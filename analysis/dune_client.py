@@ -105,6 +105,21 @@ class DuneClient:
             except (json.JSONDecodeError, OSError):
                 self.query_id_map = {}
 
+        # analysis/output/*.json попадает в .gitignore -- эфемерный кэш,
+        # переживает только через actions/cache (и то не всегда, см.
+        # docs/COST_POSTMORTEM.md: run #13 выполнился ДО того, как этот
+        # шаг появился в workflow, поэтому его query_ids.json умер вместе
+        # с контейнером без следа). data/query_ids_recovered.json --
+        # ПОСТОЯННОЕ, закоммиченное дополнение: id, однажды восстановленные
+        # бесплатным способом (см. analysis/recover_query_ids.py) и больше
+        # никогда не теряющиеся. Читается здесь, поверх эфемерного кэша.
+        self.permanent_query_id_map_file = Path("data") / "query_ids_recovered.json"
+        if self.permanent_query_id_map_file.exists():
+            try:
+                self.query_id_map.update(json.loads(self.permanent_query_id_map_file.read_text()))
+            except (json.JSONDecodeError, OSError):
+                pass
+
     def _save_query_id_map(self) -> None:
         self.query_id_map_file.write_text(json.dumps(self.query_id_map))
 
@@ -197,6 +212,17 @@ class DuneClient:
 
     def get_execution_status(self, execution_id: str) -> dict:
         return self._get(f"/execution/{execution_id}/status")
+
+    def get_query_definition(self, query_id: int) -> dict:
+        """GET /query/{id} -- метаданные сохранённого запроса, включая
+        query_sql. Метаданные, не результат исполнения -- не биллится
+        (тот же паттерн, что create_query: 0 кредитов на все READ-only
+        операции метаданных запроса, только execute() и чтение
+        результата платные, см. docs/COST_POSTMORTEM.md). Используется
+        для восстановления query_id 01/02 из уже оплаченного execution_id
+        04/05 (их SQL содержит query_<id> ссылки на 01/02) без единого
+        нового execute -- см. analysis/recover_query_ids.py."""
+        return self._get(f"/query/{query_id}")
 
     def fetch_existing(
         self, execution_id: str, name: str = "unnamed", expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS

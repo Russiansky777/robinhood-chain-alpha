@@ -32,6 +32,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
 
+      # Одноразовое бесплатное восстановление query_id для 01/02/03 (см.
+      # docs/COST_POSTMORTEM.md): run #13 (последний успешный Sprint 1)
+      # выполнился ДО появления шага "Restore Dune query cache" выше --
+      # его query_ids.json умер вместе с контейнером. Только status+query
+      # GET (0 кредитов), пишет и коммитит data/query_ids_recovered.json
+      # НАВСЕГДА -- идемпотентно, безопасно гонять на каждом прогоне.
+      - name: Recover Sprint 1 query_ids (0 credits)
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+        run: python analysis/recover_query_ids.py
+
       - name: Run Sprint 1.5
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
