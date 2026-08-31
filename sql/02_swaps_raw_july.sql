@@ -27,7 +27,7 @@ select
     token_sold_amount,
     amount_usd
 from dex.trades
-where blockchain = 'robinhood_chain'
+where blockchain = 'robinhood'  -- подтверждено information_schema-пробой 2026-08-31: 'robinhood_chain' не существует в dex.trades
     and project = 'uniswap'
     and version in ('3', '4')
     and block_time >= timestamp {{start_date}}

@@ -42,7 +42,7 @@ deployer_funded_wallets as (
     select distinct f.wallet_address
     from first_swap_per_wallet_pool f
     join pools p on p.pool_address = f.pool_address
-    join robinhood_chain.traces tr
+    join robinhood.traces tr
         on tr."to" = f.wallet_address
        and tr."from" = p.deployer_address
        and tr.block_time < f.first_swap_time
@@ -54,7 +54,7 @@ deployer_funded_wallets as (
     select distinct f.wallet_address
     from first_swap_per_wallet_pool f
     join pools p on p.pool_address = f.pool_address
-    join erc20_robinhood_chain.evt_transfer erc
+    join erc20_robinhood.evt_transfer erc
         on erc."to" = f.wallet_address
        and erc."from" = p.deployer_address
        and erc.evt_block_time < f.first_swap_time

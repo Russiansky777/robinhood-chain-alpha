@@ -27,7 +27,7 @@ jobs:
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-        run: python analysis/_probe_schema.py
+        run: python analysis/run_pipeline.py
 
       - name: Commit results
         run: |

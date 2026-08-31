@@ -30,7 +30,7 @@ swaps as (
         token_sold_amount,
         amount_usd
     from dex.trades
-    where blockchain = 'robinhood_chain'
+    where blockchain = 'robinhood'  -- см. sql/02_swaps_raw_july.sql
         and project = 'uniswap'
         and version in ('3', '4')
         and block_time >= timestamp {{start_date}}

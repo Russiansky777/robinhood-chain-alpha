@@ -1,24 +1,37 @@
 # Заметки к SQL
 
-Все запросы написаны под **DuneSQL** (Trino-диалект Dune). Не выполнялись
-вживую — нет сетевого доступа к `api.dune.com` из текущей среды (см.
-`docs/DATA_ACCESS.md`). Перед первым реальным запуском проверьте:
+Все запросы написаны под **DuneSQL** (Trino-диалект Dune).
 
-1. **Название схемы для Robinhood Chain.** Использую `blockchain =
-   'robinhood_chain'` в `dune.dex.trades` (унифицированная кросс-чейн
-   таблица трейдов, которую Dune поддерживает для всех подключённых
-   чейнов) — это самый устойчивый способ не зависеть от точного имени
-   декодированных таблиц конкретного контракта. Если `dex.trades` ещё не
-   покрывает Robinhood Chain на момент запуска (индексация нового чейна
-   иногда отстаёт от появления сырых данных на несколько дней/недель),
-   фолбэк — сырые декодированные логи:
-   - Uniswap v3: `uniswap_v3_robinhood_chain.Pair_evt_Swap`
-   - Uniswap v4: `uniswap_v4_robinhood_chain.PoolManager_evt_Swap`
-   - Фабрики (для гейта снайперов): `uniswap_v3_robinhood_chain.Factory_evt_PoolCreated`,
-     `uniswap_v4_robinhood_chain.PoolManager_evt_Initialize`
-   Точные имена нужно свериться со списком таблиц в Dune UI
-   (Data Explorer → search "robinhood") — они могут отличаться на
-   момент запуска, чейн подключён недавно (июль 2026).
+**Обновление 2026-08-31: реально прогнано на Dune, схема подтверждена.**
+Первое предположение о названиях схем (см. историю git) было неверным —
+поймали это через реальный `RuntimeError` от Dune (`Schema
+'uniswap_v3_robinhood_chain' does not exist`), продиагностировали через
+`analysis/_probe_schema.py` (запрос к `information_schema.tables`) и
+поправили. Актуальное, подтверждённое:
+
+1. **`dune.dex.trades`**: значение `blockchain` для этого чейна —
+   **`'robinhood'`**, НЕ `'robinhood_chain'` (несмотря на официальное
+   название сети и chain id 4663). Запрос `select count(*) from
+   dex.trades where blockchain = 'robinhood_chain'` возвращает 0 строк;
+   `'robinhood'` — корректное значение.
+2. **Декодированные схемы контрактов Uniswap**: `uniswap_v3_robinhood` и
+   `uniswap_v4_robinhood` (без суффикса `_chain`). Таблицы —
+   `<contract>_evt_<event>` / `<contract>_call_<method>`, всё в нижнем
+   регистре, без разделителей между словами названия контракта:
+   - `uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated`
+   - `uniswap_v3_robinhood.uniswapv3pool_evt_swap` / `..._evt_initialize`
+   - `uniswap_v4_robinhood.poolmanager_evt_initialize` / `..._evt_swap`
+   - Также есть готовые `uniswap_v3_robinhood.base_trades` и
+     `uniswap_v4_robinhood.swaps` / `base_trades` — Dune-агрегированные
+     таблицы трейдов на уровне DEX-версии; не использовали (не
+     диагностировали их колонки), но потенциально дешевле/проще, чем
+     `dex.trades` — кандидат на упрощение в следующем спринте.
+3. **Сырые таблицы чейна и ERC20-трансферы**: по аналогии с
+   `blockchain='robinhood'` использую схемы `robinhood.transactions`,
+   `robinhood.traces`, `erc20_robinhood.evt_transfer` — эта часть
+   выведена по паттерну (`<protocol>_robinhood`), а не подтверждена
+   отдельным probe-запросом. Если следующий прогон упадёт на этих
+   именах — тот же процесс: `_probe_schema.py` → правим → перезапускаем.
 
 2. **Base/quote токены** (WETH, USDC, USDT и т.п.) сейчас матчатся по
    `token_bought_symbol`/`token_sold_symbol` — это удобно, но

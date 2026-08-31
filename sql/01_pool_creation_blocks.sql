@@ -6,11 +6,11 @@
 -- Params: {{sniper_block_window}} (default 3) -- см. analysis/config.py:
 --   SNIPER_BLOCK_WINDOW
 --
--- Fallback, если dex.trades ещё не покрывает Robinhood Chain: замените
--- источник на прямое объединение
---   uniswap_v3_robinhood_chain.Factory_evt_PoolCreated
---   uniswap_v4_robinhood_chain.PoolManager_evt_Initialize
--- (см. sql/00_notes.md, п.1)
+-- Схема/имена таблиц подтверждены запросом к information_schema.tables
+-- на реальном Dune-аккаунте 2026-08-31 (см. analysis/_probe_schema.py и
+-- docs/DATA_ACCESS.md, раздел "Реально обнаруженная схема Dune") —
+-- НЕ "uniswap_v3_robinhood_chain", а "uniswap_v3_robinhood"/"uniswap_v4_robinhood",
+-- таблицы <contract>_evt_<event> в нижнем регистре без разделителей.
 
 with v3_pools as (
     select
@@ -19,7 +19,7 @@ with v3_pools as (
         evt_block_number as creation_block,
         evt_block_time as creation_time,
         evt_tx_hash as creation_tx_hash
-    from uniswap_v3_robinhood_chain.Factory_evt_PoolCreated
+    from uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated
 ),
 
 v4_pools as (
@@ -29,7 +29,7 @@ v4_pools as (
         evt_block_number as creation_block,
         evt_block_time as creation_time,
         evt_tx_hash as creation_tx_hash
-    from uniswap_v4_robinhood_chain.PoolManager_evt_Initialize
+    from uniswap_v4_robinhood.poolmanager_evt_initialize
 ),
 
 all_pools as (
@@ -50,7 +50,7 @@ pool_creators as (
         p.creation_tx_hash,
         t."from" as deployer_address
     from all_pools p
-    join robinhood_chain.transactions t
+    join robinhood.transactions t
         on t.hash = p.creation_tx_hash
 )
 
