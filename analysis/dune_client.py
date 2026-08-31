@@ -142,7 +142,14 @@ class DuneClient:
         result = self._post(f"/query/{query_id}/execute", json={"query_parameters": {}})
         return result["execution_id"]
 
-    def poll_until_done(self, execution_id: str, timeout_s: int = 600, interval_s: int = 3) -> dict:
+    def poll_until_done(self, execution_id: str, timeout_s: int = 1800, interval_s: int = 5) -> dict:
+        # timeout_s поднят с 600 до 1800 (30 мин): реальный прогон на полном
+        # месяце данных (июль, ~30x больше смоук-дня) не уложился в 10 минут
+        # на query 02_swaps_raw_july -- TimeoutError, не ошибка исполнения
+        # (запрос продолжал висеть в состоянии QUERY_STATE_EXECUTING, не
+        # свалился). Смоук на 1 день при этом целиком прошёл за ~21.7
+        # кредита, так что это именно вопрос времени выполнения на Dune, не
+        # стоимости.
         waited = 0
         while waited < timeout_s:
             status = self._get(f"/execution/{execution_id}/status")
