@@ -56,24 +56,19 @@ RESULTS_PATH = ROOT / CONFIG.results_doc
 SECTION_MARKER = "## Sprint 1.5"
 
 # Пессимистичные оценки стоимости execute() для гарда (см.
-# docs/COST_POSTMORTEM.md, ревизия 2, смета перед запуском). 03b
-# заведомо самый тяжёлый шаг (окна row_number() по ~1.2M строк 8 раз) --
-# пользователь задал жёсткий пост-хок потолок 60 на его РЕАЛЬНУЮ
-# стоимость (см. main(): проверка после run_sql_cached).
+# docs/COST_POSTMORTEM.md, ревизия 3). Обновлены по реальным фактам
+# этого спринта: 03b стоил 22.79 (было оценено 45); 03c переписан в
+# один проход после инцидента на 144 кредита (UNION ALL пересчитывал
+# всю CTE-цепочку 4 раза) -- ожидание сопоставимо с 03b. Все оценки
+# теперь ≤ SANITY_MAX_ESTIMATE (40, см. credit_guard.py) -- иначе
+# санитарная проверка не даст исполниться вовсе, независимо от лимита.
 STEP_ESTIMATES = {
-    "03b_cohort_selection": 45.0,   # ожидание ~25-35, потолок отдельно проверяется в 60
-    "03c_cap_summary": 8.0,         # ожидание ~3-6
-    "03d_sniper_histogram": 6.0,    # ожидание ~2-5
-    "06_wallet_agg_august": 4.0,    # см. Sprint 1: 1.27 на ~400 адресов
+    "03b_cohort_selection": 30.0,   # факт: 22.79
+    "03c_cap_summary": 30.0,        # переписан в один проход, ожидание ~ 03b
+    "03d_sniper_histogram": 10.0,   # ожидание ~2-5, запас
+    "06_wallet_agg_august": 8.0,    # см. Sprint 1: 1.27 на ~400 адресов, запас
 }
 COHORT_SEED = "sprint15-seed42"
-STEP03B_HARD_CAP = 60.0  # см. п.4 задания пользователя: стоп-и-доклад, если факт > 60
-
-
-class Step03bTooExpensive(Exception):
-    def __init__(self, actual: float):
-        self.actual = actual
-        super().__init__(f"03b_cohort_selection стоил {actual:.2f} > потолок {STEP03B_HARD_CAP}")
 
 
 def fmt_lift(x: float) -> str:
@@ -123,20 +118,52 @@ def print_ledger_md(ledger: list[dict]) -> str:
 
 
 def build_cap_section(df_cap: pd.DataFrame) -> str:
+    """df_cap -- ОДНА строка (ревизия 3: 03c переписан в один проход без
+    UNION ALL, см. sql/03c_cap_summary.sql). Разворачиваем в 4-строчную
+    таблицу для отчёта."""
+    row = df_cap.iloc[0]
+    total_net = row["total_network_pnl_usd"]
+    combos = [
+        ("sniper=5мин, cap=1500", row["n_gated_5"], row["n_cut_5_1500"], row["cut_pnl_5_1500"]),
+        ("sniper=5мин, cap=3000", row["n_gated_5"], row["n_cut_5_3000"], row["cut_pnl_5_3000"]),
+        ("sniper=1мин, cap=1500", row["n_gated_1"], row["n_cut_1_1500"], row["cut_pnl_1_1500"]),
+        ("sniper=1мин, cap=3000", row["n_gated_1"], row["n_cut_1_3000"], row["cut_pnl_1_3000"]),
+    ]
     lines = [
         "### Фильтр копируемости (боты/HFT/маркет-мейкеры вне популяции)\n",
-        "Посчитано серверным SQL (`sql/03c_cap_summary.sql`) по всем 4 "
-        "комбинациям sniper-окно×кап -- не только по первичной, в отличие "
-        "от ревизии 1.\n",
+        "Посчитано серверным SQL (`sql/03c_cap_summary.sql`, один проход "
+        "без UNION ALL -- см. docs/COST_POSTMORTEM.md, ревизия 3) по всем "
+        "4 комбинациям sniper-окно×кап.\n",
         "| Комбинация | Прошли гейты 1-2 и снайпер-фильтр | Срезано капом | PnL срезанных | % July PnL сети |",
         "|---|---|---|---|---|",
     ]
-    for row in df_cap.itertuples():
-        pct_net = (row.cut_pnl_usd / row.total_network_pnl_usd * 100) if row.total_network_pnl_usd else float("nan")
-        lines.append(
-            f"| {row.combo} | {row.n_gated} | {row.n_cut} | {fmt_usd(row.cut_pnl_usd)} | {pct_net:.2f}% |"
-        )
+    for label, n_gated, n_cut, cut_pnl in combos:
+        pct_net = (cut_pnl / total_net * 100) if total_net else float("nan")
+        lines.append(f"| {label} | {int(n_gated)} | {int(n_cut)} | {fmt_usd(cut_pnl)} | {pct_net:.2f}% |")
     return "\n".join(lines)
+
+
+def build_cost_ledger_section() -> str:
+    """Полная таблица «шаг -> оценка -> факт» по ВСЕМ платным операциям
+    Sprint 1.5 (весь цикл, все попытки, не только этот прогон) -- из
+    персистентного data/credits_spent.json, см. п.3 задания пользователя."""
+    from credit_guard import load_state
+
+    state = load_state()
+    lines = [
+        "| # | Операция | Шаг | Оценка | Факт | Когда |",
+        "|---|---|---|---|---|---|",
+    ]
+    for i, entry in enumerate(state["entries"], start=1):
+        base_name = entry["name"].split(" [")[0]
+        estimate = STEP_ESTIMATES.get(base_name)
+        estimate_str = f"{estimate:.1f}" if estimate is not None else "-"
+        credits_str = f"{entry['credits']:.3f}" if entry["credits_known"] else f"~{entry['credits']:.3f} (оценка)"
+        lines.append(f"| {i} | {entry['op']} | {entry['name']} | {estimate_str} | {credits_str} | {entry['at']} |")
+    total = state["sprint15"]["spent"]
+    budget = state["sprint15"]["budget_remaining_at_init"]
+    lines.append(f"\n**Итого за весь Sprint 1.5: {total:.2f} / {budget:.1f} кредитов лимита.**")
+    return "### Полный леджер кредитов Sprint 1.5 (все попытки)\n\n" + "\n".join(lines)
 
 
 def build_histogram_section(df_hist: pd.DataFrame) -> str:
@@ -212,11 +239,6 @@ def main() -> int:
             render_sql(substitute_refs(read_sql("03_wallet_agg_july")), {"base_token_symbols": base_tokens_sql}),
             require_cached=True,
         )
-        query_ids["03_wallet_agg_july"] = client.create_query(
-            "03_wallet_agg_july",
-            render_sql(substitute_refs(read_sql("03_wallet_agg_july")), {"base_token_symbols": base_tokens_sql}),
-            require_cached=True,
-        )
         print(f"  query_ids: 02={query_ids['02_swaps_raw_july']}, 01={query_ids['01_pool_creation_blocks']}, 03={query_ids['03_wallet_agg_july']}")
         print("  Pre-flight OK -- 02/01/03 уже материализованы на Dune, execute для них не требуется.")
 
@@ -227,14 +249,16 @@ def main() -> int:
         )
         df_cohorts = run_named("03b_cohort_selection", sql_03b, expected_max_rows=2000, expected_columns=12)
         actual_03b_cost = client.credit_ledger[-1]["credits"] or 0.0
-        print(f"  03b_cohort_selection: реальная стоимость execute = {actual_03b_cost:.2f} (потолок {STEP03B_HARD_CAP})")
-        if actual_03b_cost > STEP03B_HARD_CAP:
-            raise Step03bTooExpensive(actual_03b_cost)
+        # Санитарная проверка (>40 или UNION ALL + сырые свопы) и пост-хок
+        # "факт > вдвое оценки" уже отработали ВНУТРИ run_sql_cached (см.
+        # dune_client.py/credit_guard.py) -- если мы дошли досюда, оба
+        # прошли. actual_03b_cost сохранён только для текста отчёта.
+        print(f"  03b_cohort_selection: реальная стоимость execute = {actual_03b_cost:.2f}")
         print(f"  03b вернул {len(df_cohorts)} строк (кошельки хотя бы в одной когорте)")
 
-        # ============ 2. 03c: сводка по капам (для отчёта) ============
+        # ============ 2. 03c: сводка по капам (для отчёта) -- один проход, без UNION ALL ============
         sql_03c = render_sql(substitute_refs(read_sql("03c_cap_summary")), combo_params)
-        df_cap = run_named("03c_cap_summary", sql_03c, expected_max_rows=10, expected_columns=5)
+        df_cap = run_named("03c_cap_summary", sql_03c, expected_max_rows=5, expected_columns=10)
 
         # ============ 3. 03d: гистограмма снайперов (первичное окно) ============
         sql_03d = render_sql(
@@ -297,9 +321,9 @@ def main() -> int:
         robust = len(set(s for s in signs.values() if not np.isnan(s))) <= 1 and not any(np.isnan(s) for s in signs.values())
 
         # ============ 7. Сборка секций отчёта ============
-        sections.append(f"{SECTION_MARKER}\n\nСгенерировано `analysis/sprint_1_5.py` (ревизия 2) в {dt.datetime.utcnow().isoformat()}Z.\n")
+        sections.append(f"{SECTION_MARKER}\n\nСгенерировано `analysis/sprint_1_5.py` (ревизия 3) в {dt.datetime.utcnow().isoformat()}Z.\n")
         sections.append(
-            "### Дизайн (ревизия 2 -- см. docs/COST_POSTMORTEM.md)\n\n"
+            "### Дизайн (ревизия 3 -- см. docs/COST_POSTMORTEM.md)\n\n"
             f"- Гейт снайперов (первичный): {CONFIG.sniper_time_window_minutes} мин; sensitivity: {CONFIG.sniper_time_window_minutes_sensitivity} мин\n"
             f"- Кап копируемости (первичный): >{CONFIG.copyability_max_trades} сделок/июль исключены; sensitivity: >{CONFIG.copyability_max_trades_sensitivity}\n"
             f"- Первичный критерий (Часть 1): Fisher one-sided p<{CONFIG.part1_alpha} И лифт≥{CONFIG.part1_min_lift}x\n"
@@ -337,41 +361,37 @@ def main() -> int:
 
         run_total = sum((row["credits"] or 0.0) for row in client.credit_ledger)
         sections.append(
-            "### Стоимость Sprint 1.5 (ревизия 2)\n\n"
+            "### Стоимость Sprint 1.5 (ревизия 3)\n\n"
             f"Потрачено на execute() в этом прогоне: **{run_total:.2f}** кредитов "
-            f"(execute 03b={actual_03b_cost:.2f}, потолок {STEP03B_HARD_CAP}). Полный "
-            "построчный результат 03 (163.98 кредита за чтение в ревизии 1) не читался "
-            "ни разу -- все чтения этого прогона ограничены тысячами строк максимум "
-            "(см. data/credits_spent.json для точного леджера execute+чтений).\n\n"
+            f"(execute 03b={actual_03b_cost:.2f}). Полный построчный результат 03 "
+            "(163.98 кредита за чтение в ревизии 1) не читался ни разу; 03c переписан "
+            "в один проход после инцидента на 144 кредита в ревизии 2 (UNION ALL "
+            "пересчитывал всю CTE-цепочку 4 раза, см. docs/COST_POSTMORTEM.md).\n\n"
             + print_ledger_md(client.credit_ledger)
         )
+        sections.append(build_cost_ledger_section())
 
         write_results(sections)
         print(f"\n[sprint_1_5] Готово. Execute-стоимость этого прогона: {run_total:.2f} кредитов.")
         return 0
 
-    except Step03bTooExpensive as e:
-        sections.append(
-            f"\n\n> **ОСТАНОВЛЕНО: 03b_cohort_selection стоил {e.actual:.2f} кредитов, "
-            f"что выше согласованного потолка {STEP03B_HARD_CAP}.** Деньги за 03b уже "
-            "потрачены (Dune не даёт предварительной оценки стоимости execute), но "
-            "дальнейшие шаги (03c/03d/06×2) остановлены, чтобы не наращивать перерасход. "
-            "Требуется решение пользователя перед продолжением."
-        )
-        write_results(sections)
-        print(f"\n[sprint_1_5] {e}", file=sys.stderr)
-        return 4
     except BudgetGuardStop as e:
+        # Покрывает и бюджетный лимит, и санитарную проверку (>40 или
+        # UNION ALL + сырые свопы), и пост-хок "факт > вдвое оценки" --
+        # все три жёстко стопают через один и тот же класс, см.
+        # credit_guard.py. Точная причина уже в выводе выше.
         sections.append(
-            "\n\n> **ОСТАНОВЛЕНО персистентным бюджетным гардом** (analysis/credit_guard.py) "
-            "-- см. data/credits_spent.json и вывод выше для точной причины (execute или "
-            "чтение результата, какая оценка и какой лимит превышен)."
+            "\n\n> **ОСТАНОВЛЕНО гардом** (analysis/credit_guard.py) -- см. "
+            "data/credits_spent.json и вывод выше для точной причины (лимит бюджета, "
+            "санитарная проверка перед execute, или факт больше чем вдвое оценки)."
         )
+        sections.append(build_cost_ledger_section())
         write_results(sections)
         print(f"\n[sprint_1_5] Остановлено бюджетным гардом (см. вывод выше).", file=sys.stderr)
         return 3
     except (DuneCreditsExhausted, DuneRateLimited) as e:
         sections.append(f"\n\n> **ОСТАНОВЛЕНО: {e}**")
+        sections.append(build_cost_ledger_section())
         write_results(sections)
         return 1
 

@@ -1,10 +1,15 @@
--- 03c_cap_summary.sql
--- Sprint 1.5, ревизия 2: агрегатная сводка для секции "Фильтр
--- копируемости" в RESULTS.md -- сколько кошельков срезано капом и какая
--- доля July PnL сети это, для каждой из 4 комбинаций sniper-окно×кап.
--- Выход -- 4 строки (по одной на комбинацию), не построчный список.
+-- 03c_cap_summary.sql (ревизия 3 -- см. docs/COST_POSTMORTEM.md)
+-- ПЕРЕПИСАНО: версия с UNION ALL четырёх SELECT стоила 144.00 кредита
+-- вместо оценённых 8 -- судя по всему, движок Dune пересчитывал всю
+-- цепочку CTE (включая полное сканирование сырых свопов) ЗАНОВО в
+-- каждой из 4 веток UNION, вместо однократного вычисления. Теперь --
+-- ОДИН SELECT, ОДИН проход по `gated`, вся сводка по 4 комбинациям --
+-- через condition aggregation (count/sum FILTER) в отдельных колонках
+-- одной строки. Питон разворачивает эту одну широкую строку в 4-строчную
+-- таблицу для отчёта -- см. analysis/sprint_1_5.py:build_cap_section.
 --
--- Params: те же, что в 03b_cohort_selection.sql (без cohort_seed/size).
+-- Params: {{sniper_window_primary_minutes}}, {{sniper_window_sensitivity_minutes}},
+--         {{cap_primary}}, {{cap_sensitivity}}, {{min_trades}}, {{min_unique_tokens}}
 
 with wallet_agg as (
     select * from query_03_wallet_agg_july
@@ -44,36 +49,18 @@ gated as (
     left join sniper_flags s on s.wallet_address = w.wallet_address
     where w.trade_count >= {{min_trades}}
         and w.unique_tokens_traded >= {{min_unique_tokens}}
-),
-
-network as (
-    select sum(realized_pnl_usd) as total_network_pnl_usd from wallet_agg
 )
 
-select 'sniper=5min,cap=1500' as combo,
-    count(*) filter (where is_sniper_primary = 0) as n_gated,
-    count(*) filter (where is_sniper_primary = 0 and trade_count > {{cap_primary}}) as n_cut,
-    coalesce(sum(realized_pnl_usd) filter (where is_sniper_primary = 0 and trade_count > {{cap_primary}}), 0.0) as cut_pnl_usd,
-    (select total_network_pnl_usd from network) as total_network_pnl_usd
-from gated
-union all
-select 'sniper=5min,cap=3000',
-    count(*) filter (where is_sniper_primary = 0),
-    count(*) filter (where is_sniper_primary = 0 and trade_count > {{cap_sensitivity}}),
-    coalesce(sum(realized_pnl_usd) filter (where is_sniper_primary = 0 and trade_count > {{cap_sensitivity}}), 0.0),
-    (select total_network_pnl_usd from network)
-from gated
-union all
-select 'sniper=1min,cap=1500',
-    count(*) filter (where is_sniper_sensitivity = 0),
-    count(*) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_primary}}),
-    coalesce(sum(realized_pnl_usd) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_primary}}), 0.0),
-    (select total_network_pnl_usd from network)
-from gated
-union all
-select 'sniper=1min,cap=3000',
-    count(*) filter (where is_sniper_sensitivity = 0),
-    count(*) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_sensitivity}}),
-    coalesce(sum(realized_pnl_usd) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_sensitivity}}), 0.0),
-    (select total_network_pnl_usd from network)
+select
+    (select sum(realized_pnl_usd) from wallet_agg) as total_network_pnl_usd,
+    count(*) filter (where is_sniper_primary = 0) as n_gated_5,
+    count(*) filter (where is_sniper_primary = 0 and trade_count > {{cap_primary}}) as n_cut_5_1500,
+    coalesce(sum(realized_pnl_usd) filter (where is_sniper_primary = 0 and trade_count > {{cap_primary}}), 0.0) as cut_pnl_5_1500,
+    count(*) filter (where is_sniper_primary = 0 and trade_count > {{cap_sensitivity}}) as n_cut_5_3000,
+    coalesce(sum(realized_pnl_usd) filter (where is_sniper_primary = 0 and trade_count > {{cap_sensitivity}}), 0.0) as cut_pnl_5_3000,
+    count(*) filter (where is_sniper_sensitivity = 0) as n_gated_1,
+    count(*) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_primary}}) as n_cut_1_1500,
+    coalesce(sum(realized_pnl_usd) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_primary}}), 0.0) as cut_pnl_1_1500,
+    count(*) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_sensitivity}}) as n_cut_1_3000,
+    coalesce(sum(realized_pnl_usd) filter (where is_sniper_sensitivity = 0 and trade_count > {{cap_sensitivity}}), 0.0) as cut_pnl_1_3000
 from gated

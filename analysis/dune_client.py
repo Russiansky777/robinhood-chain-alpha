@@ -31,7 +31,15 @@ import pandas as pd
 import requests
 
 from config import CONFIG
-from credit_guard import check_before_execute, check_before_read, record_execution, record_read
+from credit_guard import (
+    check_before_execute,
+    check_before_read,
+    check_overrun_after_execute,
+    check_sql_sanity,
+    record_execution,
+    record_read,
+    DEFAULT_ESTIMATE,
+)
 
 API_BASE = "https://api.dune.com/api/v1"
 
@@ -241,12 +249,21 @@ class DuneClient:
         df, result_stats = self.get_results_df(execution_id, name=name, expected_max_rows=expected_max_rows)
         return df, status, result_stats
 
-    def execute(self, query_id: int, name: str = "unnamed", estimated_credits: float | None = None) -> str:
+    def execute(
+        self, query_id: int, name: str = "unnamed", estimated_credits: float | None = None, sql: str | None = None
+    ) -> str:
         # Бюджетный гард (см. analysis/credit_guard.py, docs/COST_POSTMORTEM.md):
         # проверка ПЕРЕД КАЖДЫМ execute -- жёсткий exit при нарушении лимита
-        # Sprint 1.5 (150 кредитов на остаток) или внешней границы биллинг-
-        # цикла. Сюда идут ВСЕ вызовы execute() в проекте, включая прямые
-        # (не только через run_sql_cached), поэтому гейт стоит именно здесь.
+        # Sprint 1.5 или внешней границы биллинг-цикла. Сюда идут ВСЕ вызовы
+        # execute() в проекте, включая прямые (не только через
+        # run_sql_cached), поэтому гейт стоит именно здесь.
+        #
+        # Санитарная проверка (ревизия 3, см. docs/COST_POSTMORTEM.md) --
+        # ДО проверки бюджета и НЕЗАВИСИМО от остатка лимита: оценка >40
+        # кредитов или структурный риск (UNION ALL + тяжёлый источник,
+        # паттерн, что дал 144 кредита вместо 8 в 03c) -- жёсткий стоп.
+        if sql is not None:
+            check_sql_sanity(name, sql, estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE)
         check_before_execute(name, estimated_credits)
         self.executions_this_run += 1
         # ПОПЫТКА (2026-08-31) явно запросить performance: "small" провалилась
@@ -369,7 +386,7 @@ class DuneClient:
             return None
 
         qid = query_id or self.create_query(name=name, sql=sql)
-        execution_id = self.execute(qid, name=name, estimated_credits=estimated_credits)
+        execution_id = self.execute(qid, name=name, estimated_credits=estimated_credits, sql=sql)
         # Печатаем ВСЕГДА, до поллинга -- если что-то дальше упадёт
         # (таймаут, 402 на следующем шаге и т.п.), id всё равно попадёт
         # в лог CI и его можно будет вручную переиспользовать через
@@ -398,12 +415,17 @@ class DuneClient:
             record_execution(f"{name} [FAILED]", failed_cost, execution_id)
             raise
         cost = status.get("execution_cost_credits")
+        estimate_used = estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
 
         if not fetch_results:
             self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
             print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits (материализован, результат не скачивался)")
             marker_file.write_text(execution_id)
             record_execution(name, cost, execution_id)
+            # Пост-хок "факт > вдвое оценки" (ревизия 3, см.
+            # docs/COST_POSTMORTEM.md) -- ПОСЛЕ record_execution: факт уже
+            # должен попасть в credits_spent.json, даже если дальше стоп.
+            check_overrun_after_execute(name, estimate_used, cost)
             return None
 
         df, result_stats = self.get_results_df(
@@ -415,4 +437,5 @@ class DuneClient:
         print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits")
         df.to_csv(cache_file, index=False)
         record_execution(name, cost, execution_id)
+        check_overrun_after_execute(name, estimate_used, cost)
         return df

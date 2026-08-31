@@ -1,8 +1,10 @@
 """Персистентный бюджетный гард поверх Dune API (см. docs/COST_POSTMORTEM.md).
 
 data/credits_spent.json -- единственный источник правды о том, сколько
-потрачено в этом биллинг-цикле и сколько из бюджета Sprint 1.5 (150
-кредитов на ОСТАТОК спринта, не на прогон) уже израсходовано.
+потрачено в этом биллинг-цикле и сколько из бюджета Sprint 1.5 (лимит
+живёт в самом файле, `sprint15.budget_remaining_at_init` -- поднят с
+150 до 210 после инцидента с 03c, см. docs/COST_POSTMORTEM.md,
+ревизия 3) уже израсходовано.
 Коммитится в git СРАЗУ после каждого execute с известной фактической
 стоимостью -- не в конце прогона -- чтобы переживать краш/таймаут
 посреди работы (см. пост-мортем: run #11 запустил ~100-кредитный
@@ -28,6 +30,60 @@ from pathlib import Path
 CREDITS_FILE = Path("data/credits_spent.json")
 
 DEFAULT_ESTIMATE = 110.0  # см. docstring: наихудший реально замеренный запрос + запас
+
+# ---------- Санитарная проверка запроса ДО execute (ревизия 3 гарда) ----------
+#
+# 03c_cap_summary (ревизия 2) стоил 144.00 кредита вместо оценённых 8 --
+# SQL был написан как UNION ALL четырёх независимых SELECT, каждый из
+# которых заново ссылается на цепочку CTE, включающую полное сканирование
+# сырых свопов (query_02_swaps_raw_july) -- судя по всему, движок Dune не
+# делит вычисление общих CTE между ветками UNION ALL, а пересчитывает его
+# в каждой ветке. См. docs/COST_POSTMORTEM.md, ревизия 3. Эта проверка --
+# защита от ПОВТОРЕНИЯ именно этого паттерна, а не общая линтинг SQL.
+SANITY_MAX_ESTIMATE = 40.0
+HEAVY_SOURCE_MARKERS = ("query_02_swaps_raw_july", "dex.trades")
+
+
+def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> None:
+    """Вызывается ПЕРЕД любым execute(), НЕЗАВИСИМО от остатка бюджета --
+    жёсткий стоп с докладом при срабатывании. Оценка печатается ВСЕГДА,
+    даже если проверка проходит."""
+    print(f"[credit_guard] Оценка перед execute '{name}': {estimated_credits:.1f} кредитов.")
+    if estimated_credits > SANITY_MAX_ESTIMATE:
+        print(
+            f"[credit_guard] СТОП (санитарная проверка): оценка '{name}' = "
+            f"{estimated_credits:.1f} > {SANITY_MAX_ESTIMATE} -- жёсткий стоп ДО исполнения, "
+            "независимо от остатка лимита. Пересмотрите SQL или оценку перед повторной попыткой."
+        )
+        raise BudgetGuardStop(1)
+    lower = sql.lower()
+    has_union_all = "union all" in lower
+    has_heavy_source = any(marker.lower() in lower for marker in HEAVY_SOURCE_MARKERS)
+    if has_union_all and has_heavy_source:
+        print(
+            f"[credit_guard] СТОП (санитарная проверка): '{name}' содержит UNION ALL И ссылку "
+            "на тяжёлый источник (сырые свопы) -- риск многократного пересчёта одной и той же "
+            "CTE-цепочки в каждой ветке UNION, тот же паттерн, что дал 144 кредита вместо 8 в "
+            "03c_cap_summary ревизии 2 (см. docs/COST_POSTMORTEM.md). Перепишите одним проходом "
+            "(CASE/filter в одном SELECT) перед исполнением. Ничего не заплачено."
+        )
+        raise BudgetGuardStop(1)
+
+
+def check_overrun_after_execute(name: str, estimated_credits: float, actual_credits: float | None) -> None:
+    """Пост-хок проверка: если факт > вдвое оценки -- немедленный стоп, не
+    дожидаясь исчерпания лимита (см. п.4 задания пользователя). Деньги уже
+    потрачены (Dune не даёт pre-execution оценку) -- это останавливает
+    ДАЛЬНЕЙШИЕ шаги, а не отменяет уже случившееся списание."""
+    if actual_credits is None:
+        return
+    if actual_credits > 2 * estimated_credits:
+        print(
+            f"[credit_guard] СТОП: '{name}' стоил по факту {actual_credits:.2f}, что больше чем "
+            f"вдвое превышает оценку {estimated_credits:.1f} -- немедленная остановка, не дожидаясь "
+            "исчерпания лимита. Деньги за этот шаг уже потрачены; дальнейшие шаги остановлены."
+        )
+        raise BudgetGuardStop(1)
 
 # ---------- Result Read billing (ревизия 2 гарда, см. docs/COST_POSTMORTEM.md) ----------
 #

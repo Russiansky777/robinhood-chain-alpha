@@ -6,7 +6,7 @@
     "initialized_by": "человек, факт с dune.com/settings/billing на 2026-08-31 -- НЕ выведено из логов CI, см. docs/COST_POSTMORTEM.md"
   },
   "sprint15": {
-    "budget_remaining_at_init": 150.0,
+    "budget_remaining_at_init": 210.0,
     "spent": 167.053658
   },
   "entries": [
@@ -41,6 +41,14 @@
       "credits": 144.0025,
       "credits_known": true,
       "at": "2026-08-31T22:53:10.304389+00:00"
+    }
+  ],
+  "history": [
+    {
+      "event": "budget_raised",
+      "from": 150.0,
+      "to": 210.0,
+      "reason": "user authorized after 03c_cap_summary UNION ALL bug cost 144 credits vs 8 estimated; covers fact 167.05 + ~25-35 remaining + minimal reserve"
     }
   ]
 }
