@@ -4,11 +4,18 @@
 --
 -- Критерий 1 (same-block / early-block снайпинг): первый своп кошелька в
 -- конкретном пуле произошёл в блоке создания пула или в пределах
--- {{sniper_block_window}} блоков после (см. sql/01_pool_creation_blocks.sql).
+-- sniper_block_window блоков после (см. sql/01_pool_creation_blocks.sql).
 --
 -- Критерий 2 (связь с деплойером): кошелёк получил прямой перевод
 -- (ETH или ЛЮБОЙ токен) от deployer_address ДО своего первого свопа в
 -- этом пуле.
+--
+-- Params: {{start_date}}, {{end_date}} -- статическая граница ДОПОЛНИТЕЛЬНО
+-- к динамическому `< f.first_swap_time`: partition pruning на Dune не
+-- умеет использовать per-row корреляцию, только статические литералы.
+-- Без неё join против robinhood.traces / erc20_robinhood.evt_transfer
+-- читает эти таблицы целиком -- та же причина 402, что и в
+-- 01_pool_creation_blocks.sql (см. docs/DATA_ACCESS.md).
 
 with pools as (
     select * from query_01_pool_creation_blocks
@@ -46,6 +53,8 @@ deployer_funded_wallets as (
         on tr."to" = f.wallet_address
        and tr."from" = p.deployer_address
        and tr.block_time < f.first_swap_time
+       and tr.block_time >= timestamp {{start_date}}
+       and tr.block_time <  timestamp {{end_date}}
        and tr.value > uint256 '0'
     where tr."from" != f.wallet_address  -- деплойер не сам себе шлёт
 
@@ -58,6 +67,8 @@ deployer_funded_wallets as (
         on erc."to" = f.wallet_address
        and erc."from" = p.deployer_address
        and erc.evt_block_time < f.first_swap_time
+       and erc.evt_block_time >= timestamp {{start_date}}
+       and erc.evt_block_time <  timestamp {{end_date}}
 )
 
 select wallet_address, 'early_block_sniper' as reason from early_block_snipers

@@ -5,6 +5,13 @@
 --
 -- Params: {{sniper_block_window}} (default 3) -- см. analysis/config.py:
 --   SNIPER_BLOCK_WINDOW
+-- Params: {{start_date}}, {{end_date}} -- то же окно, что и в
+--   02_swaps_raw_july.sql/06_wallet_agg_august.sql. ОБЯЗАТЕЛЬНО задавать:
+--   без этого фильтра join со сплошной робинхуд-таблицей transactions
+--   сканирует её целиком без партиционного прунинга -- именно на этом
+--   запросе (без фильтра по дате) реальный прогон 2026-08-31 упёрся в
+--   402 Payment Required на первом же шаге пайплайна (см.
+--   docs/DATA_ACCESS.md, "Инцидент: 402 на шаге 1").
 --
 -- Схема/имена таблиц подтверждены запросом к information_schema.tables
 -- на реальном Dune-аккаунте 2026-08-31 (см. analysis/_probe_schema.py и
@@ -20,6 +27,8 @@ with v3_pools as (
         evt_block_time as creation_time,
         evt_tx_hash as creation_tx_hash
     from uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated
+    where evt_block_time >= timestamp {{start_date}}
+      and evt_block_time <  timestamp {{end_date}}
 ),
 
 v4_pools as (
@@ -30,6 +39,8 @@ v4_pools as (
         evt_block_time as creation_time,
         evt_tx_hash as creation_tx_hash
     from uniswap_v4_robinhood.poolmanager_evt_initialize
+    where evt_block_time >= timestamp {{start_date}}
+      and evt_block_time <  timestamp {{end_date}}
 ),
 
 all_pools as (
@@ -40,7 +51,9 @@ all_pools as (
 
 -- "Деплойер" = tx_from транзакции создания пула. Это прокси для адреса,
 -- который потенциально мог зафандить снайпер-кошельки до/во время
--- запуска пула (Гейт 1.2).
+-- запуска пула (Гейт 1.2). Фильтр по t.block_time логически избыточен
+-- (t.hash однозначно определяет строку), но критичен для partition
+-- pruning -- без него Dune читает всю таблицу transactions.
 pool_creators as (
     select
         p.pool_address,
@@ -52,6 +65,8 @@ pool_creators as (
     from all_pools p
     join robinhood.transactions t
         on t.hash = p.creation_tx_hash
+       and t.block_time >= timestamp {{start_date}}
+       and t.block_time <  timestamp {{end_date}}
 )
 
 select

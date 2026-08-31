@@ -112,17 +112,19 @@ def main() -> int:
         query_ids[step_name] = qid
         return client.run_sql_cached(step_name, sql, query_id=qid)
 
+    train_window = {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)}
+
     # --- Гейт 0/1: сырые данные июля ---
     print("== Шаг 1: pool creation blocks ==")
-    pool_sql = render_sql(read_sql("01_pool_creation_blocks"), {"sniper_block_window": CONFIG.sniper_block_window})
+    pool_sql = render_sql(
+        read_sql("01_pool_creation_blocks"),
+        {"sniper_block_window": CONFIG.sniper_block_window, **train_window},
+    )
     df_pools = run_named("01_pool_creation_blocks", pool_sql)
     print(f"  {len(df_pools)} пулов создано в периоде покрытия запроса.")
 
     print("== Шаг 2: сырые свопы, июль ==")
-    swaps_sql = render_sql(
-        read_sql("02_swaps_raw_july"),
-        {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)},
-    )
+    swaps_sql = render_sql(read_sql("02_swaps_raw_july"), train_window)
     df_swaps_july = run_named("02_swaps_raw_july", swaps_sql)
     print(f"  {len(df_swaps_july)} свопов в июле.")
 
@@ -135,7 +137,7 @@ def main() -> int:
     print(f"  {len(df_agg_july)} уникальных кошельков-трейдеров в июле.")
 
     print("== Шаг 4: исключение снайперов/инсайдеров ==")
-    excl_sql = substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids)
+    excl_sql = render_sql(substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids), train_window)
     df_excluded = run_named("04_sniper_insider_exclusions", excl_sql)
     print(f"  {len(df_excluded)} адресов помечено как снайперы/инсайдеры.")
 
