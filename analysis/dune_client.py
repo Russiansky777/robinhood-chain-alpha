@@ -31,6 +31,7 @@ import pandas as pd
 import requests
 
 from config import CONFIG
+from credit_guard import check_before_execute, record_execution
 
 API_BASE = "https://api.dune.com/api/v1"
 
@@ -183,7 +184,13 @@ class DuneClient:
         df, result_stats = self.get_results_df(execution_id)
         return df, status, result_stats
 
-    def execute(self, query_id: int) -> str:
+    def execute(self, query_id: int, name: str = "unnamed", estimated_credits: float | None = None) -> str:
+        # Бюджетный гард (см. analysis/credit_guard.py, docs/COST_POSTMORTEM.md):
+        # проверка ПЕРЕД КАЖДЫМ execute -- жёсткий exit при нарушении лимита
+        # Sprint 1.5 (150 кредитов на остаток) или внешней границы биллинг-
+        # цикла. Сюда идут ВСЕ вызовы execute() в проекте, включая прямые
+        # (не только через run_sql_cached), поэтому гейт стоит именно здесь.
+        check_before_execute(name, estimated_credits)
         self.executions_this_run += 1
         # ПОПЫТКА (2026-08-31) явно запросить performance: "small" провалилась
         # немедленным 400: "This performance tier is not available with your
@@ -233,6 +240,7 @@ class DuneClient:
         query_id: int | None = None,
         force_refresh: bool = False,
         fetch_results: bool = True,
+        estimated_credits: float | None = None,
     ) -> pd.DataFrame | None:
         """Выполняет (или переиспользует сохранённый query_id) уже
         полностью отрендеренный запрос, с дисковым кэшем по (name, sql) —
@@ -273,19 +281,41 @@ class DuneClient:
             return None
 
         qid = query_id or self.create_query(name=name, sql=sql)
-        execution_id = self.execute(qid)
+        execution_id = self.execute(qid, name=name, estimated_credits=estimated_credits)
         # Печатаем ВСЕГДА, до поллинга -- если что-то дальше упадёт
         # (таймаут, 402 на следующем шаге и т.п.), id всё равно попадёт
         # в лог CI и его можно будет вручную переиспользовать через
         # fetch_existing(), как сделано в analysis/recover_sprint1.py.
         print(f"[dune] {name}: query_id={qid} execution_id={execution_id}")
-        status = self.poll_until_done(execution_id)
+        try:
+            status = self.poll_until_done(execution_id)
+        except TimeoutError:
+            # Реальная причина run #11 из пост-мортема: execute() уже
+            # запустил дорогой запрос на Dune, но наш поллинг сдался раньше
+            # исполнения -- запрос мог продолжить исполняться (и списывать
+            # кредиты) на стороне Dune, невидимо для нашего леджера. Пишем
+            # запись СРАЗУ как "неизвестно", коммитим -- не ждём конца
+            # прогона (его может и не быть).
+            record_execution(f"{name} [ТАЙМАУТ поллинга -- проверьте {execution_id} на dune.com]", None, execution_id)
+            raise
+        except RuntimeError:
+            # FAILED/CANCELLED -- перезапрашиваем статус (execution_cost_credits
+            # в нашем опыте был 0 в этих случаях, но не полагаемся на это
+            # без проверки) и фиксируем реальную стоимость, если она есть.
+            try:
+                failed_status = self.get_execution_status(execution_id)
+                failed_cost = failed_status.get("execution_cost_credits")
+            except Exception:
+                failed_cost = None
+            record_execution(f"{name} [FAILED]", failed_cost, execution_id)
+            raise
         cost = status.get("execution_cost_credits")
 
         if not fetch_results:
             self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
             print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits (материализован, результат не скачивался)")
             marker_file.write_text(execution_id)
+            record_execution(name, cost, execution_id)
             return None
 
         df, result_stats = self.get_results_df(execution_id)
@@ -294,4 +324,5 @@ class DuneClient:
         self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
         print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits")
         df.to_csv(cache_file, index=False)
+        record_execution(name, cost, execution_id)
         return df

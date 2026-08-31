@@ -57,6 +57,20 @@ ROOT = Path(__file__).parent.parent
 RESULTS_PATH = ROOT / CONFIG.results_doc
 SECTION_MARKER = "## Sprint 1.5"
 
+# Пессимистичные оценки стоимости КАЖДОГО шага (для персистентного
+# гарда analysis/credit_guard.py -- проверка ПЕРЕД execute), взятые из
+# реально залогированных стоимостей идентичных/аналогичных запросов
+# Sprint 1 (см. docs/COST_POSTMORTEM.md) + запас ~15-20%. 02 на полном
+# месяце доминирует весь бюджет остатка Sprint 1.5 -- см. инвентаризацию
+# в docs/COST_POSTMORTEM.md перед запуском.
+STEP_ESTIMATES = {
+    "02_swaps_raw_july": 125.0,       # run #13: 102.8; run #12: 102.6 -- запас на рост данных
+    "01_pool_creation_blocks": 1.0,   # run #13: 0.43; всегда <1
+    "03_wallet_agg_july": 30.0,       # run #13: 25.5 -- только если recover_baseline не сработал
+    "04_sniper_insider_exclusions": 3.0,  # run #13: 1.9 (5мин); та же форма запроса для 1мин
+    "06_wallet_agg_august": 4.0,      # run #13: 1.27 на ~400 адресов; здесь объединение до ~800
+}
+
 
 class BudgetStop(Exception):
     def __init__(self, spent: float, note: str):
@@ -170,11 +184,21 @@ def main() -> int:
     test_window = {"start_date": q_ts(CONFIG.test_start), "end_date": q_ts(CONFIG.test_end)}
     sections: list[str] = []  # markdown-куски -- накапливаем по ходу, чтобы частичный стоп не терял уже готовое
 
+    def _estimate_for(step_key: str) -> float:
+        for prefix, est in STEP_ESTIMATES.items():
+            if step_key.startswith(prefix):
+                return est
+        from credit_guard import DEFAULT_ESTIMATE
+        return DEFAULT_ESTIMATE
+
     def run_named(step_key: str, sql: str, fetch_results: bool = True, ref_key: str | None = None):
         qid = client.create_query(step_key, sql)
         query_ids[ref_key or step_key] = qid
         try:
-            return client.run_sql_cached(step_key, sql, query_id=qid, fetch_results=fetch_results)
+            return client.run_sql_cached(
+                step_key, sql, query_id=qid, fetch_results=fetch_results,
+                estimated_credits=_estimate_for(step_key),
+            )
         except (DuneCreditsExhausted, DuneRateLimited) as e:
             spent = total_spent(client)
             print(f"\n[sprint_1_5] ОСТАНОВЛЕНО на шаге '{step_key}' (402/429): {e}\nПотрачено: {spent:.2f}", file=sys.stderr)
