@@ -67,6 +67,22 @@ def q_list(items: list[str]) -> str:
     return ",".join("'" + str(x).replace("'", "''") + "'" for x in items)
 
 
+def q_addr_list(items: list[str]) -> str:
+    """['0xabc...','0xdef...'] -> "0xabc...,0xdef..." -- БЕЗ кавычек.
+
+    Реальный прогон 2026-08-31 упал на sql/06: `taker` в dex.trades
+    имеет тип varbinary, а q_list() даёт квотированные varchar-литералы
+    -- Trino отказывается сравнивать список из разнотипных элементов
+    ("Cannot find common type between varbinary and varchar(42)").
+    Адреса на Dune сравниваются с сырыми hex-литералами без кавычек
+    (`WHERE taker = 0xabc...`), поэтому здесь никакого экранирования и
+    кавычек не добавляем.
+    """
+    if not items:
+        return "0x0000000000000000000000000000000000000000"
+    return ",".join(str(x) for x in items)
+
+
 def next_day(date_str: str) -> str:
     d = dt.date.fromisoformat(date_str)
     return (d + dt.timedelta(days=1)).isoformat()
@@ -179,7 +195,7 @@ def main() -> int:
     def run_august(step_key: str, wallets: list[str], window: dict[str, str]) -> pd.DataFrame:
         sql = render_sql(
             read_sql("06_wallet_agg_august"),
-            {**window, "base_token_symbols": base_tokens_sql, "cohort_wallets": q_list(wallets)},
+            {**window, "base_token_symbols": base_tokens_sql, "cohort_wallets": q_addr_list(wallets)},
         )
         return run_named(step_key, sql)
 
