@@ -148,14 +148,19 @@ class DuneClient:
         текст запроса не поменялся.
         """
         cache_key = hashlib.sha256(sql.encode()).hexdigest()[:16]
-        cache_file = self.cache_dir / f"{name}_{cache_key}.parquet"
+        # CSV, не parquet: избегаем зависимости от pyarrow/fastparquet
+        # (первый реальный прогон в CI упал именно на этом — все 5 Dune-
+        # запросов честно выполнились и вернули строки, но кэш-запись
+        # рухнула ПОСЛЕ, из-за чего результат потерялся). Датафреймы
+        # здесь маленькие (агрегаты по кошелькам), CSV более чем годится.
+        cache_file = self.cache_dir / f"{name}_{cache_key}.csv"
         if cache_file.exists() and not force_refresh:
             print(f"[dune] cache hit: {cache_file.name}")
-            return pd.read_parquet(cache_file)
+            return pd.read_csv(cache_file)
 
         qid = query_id or self.create_query(name=name, sql=sql)
         execution_id = self.execute(qid)
         self.poll_until_done(execution_id)
         df = self.get_results_df(execution_id)
-        df.to_parquet(cache_file)
+        df.to_csv(cache_file, index=False)
         return df
