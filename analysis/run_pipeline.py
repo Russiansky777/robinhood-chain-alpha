@@ -5,6 +5,11 @@ docs/RESULTS.md.
 Требует DUNE_API_KEY в .env / env. Если его нет — падает сразу с понятным
 сообщением, ничего не выполняя (см. docs/DATA_ACCESS.md).
 
+Все `{{param}}` в sql/*.sql рендерятся здесь, в Python, литеральными
+значениями ДО отправки в Dune (см. dune_client.render_sql) — Dune видит
+уже готовый SQL без плейсхолдеров, поэтому ничего не требуется отдельно
+объявлять на стороне Dune API.
+
 Использование:
     python analysis/run_pipeline.py
 """
@@ -23,7 +28,7 @@ import pandas as pd
 from config import CONFIG
 from cohort_builder import build_cohorts, merge_august_pnl
 from stats_test import run_full_test
-from dune_client import DuneClient, DuneCreditsExhausted, DuneRateLimited
+from dune_client import DuneClient, DuneCreditsExhausted, DuneRateLimited, render_sql
 
 ROOT = Path(__file__).parent.parent
 SQL_DIR = ROOT / CONFIG.sql_dir
@@ -35,12 +40,25 @@ def read_sql(name: str) -> str:
 
 def substitute_query_refs(sql: str, query_ids: dict[str, int]) -> str:
     """Заменяет `query_XX_name` (человекочитаемые ссылки в наших .sql
-    файлах) на реальный синтаксис Dune для ссылки на сохранённый запрос:
-    `query_<numeric_id>`.
+    файлах на другие сохранённые запросы) на реальный синтаксис Dune для
+    ссылки на сохранённый запрос: `query_<numeric_id>`. Это НЕ то же
+    самое, что {{param}}-плейсхолдеры (см. render_sql в dune_client.py) —
+    ссылки между запросами являются законной частью Dune SQL и не требуют
+    отдельного объявления.
     """
     for name, qid in query_ids.items():
         sql = sql.replace(f"query_{name}", f"query_{qid}")
     return sql
+
+
+def q_ts(date_str: str) -> str:
+    """'2026-07-01' -> "'2026-07-01 00:00:00'" -- готовый timestamp-литерал."""
+    return f"'{date_str} 00:00:00'"
+
+
+def q_list(items: list[str]) -> str:
+    """['WETH','USDC'] -> "'WETH','USDC'" -- готовый список для IN(...) / array[...]."""
+    return ",".join("'" + str(x).replace("'", "''") + "'" for x in items)
 
 
 def fmt_usd(x: float) -> str:
@@ -84,73 +102,49 @@ def main() -> int:
 
     client = DuneClient()
     query_ids: dict[str, int] = {}
+    base_tokens_sql = q_list(list(CONFIG.base_token_symbols))
 
-    def run_step(name: str, params: dict, depends_on: list[str] | None = None) -> pd.DataFrame:
-        sql = read_sql(name)
-        if depends_on:
-            sql = substitute_query_refs(sql, {d: query_ids[d] for d in depends_on})
-        try:
-            df = client.run_sql_cached(name=name, sql=sql, params=params)
-        except (DuneCreditsExhausted, DuneRateLimited) as e:
-            print(f"\n[run_pipeline] ОСТАНОВЛЕНО на шаге '{name}': {e}", file=sys.stderr)
-            print(
-                "Кредиты не тратятся дальше молча. Решите вопрос доступа "
-                "(см. docs/DATA_ACCESS.md) и перезапустите — уже "
-                "выполненные шаги возьмутся из кэша analysis/output/cache/.",
-                file=sys.stderr,
-            )
-            raise SystemExit(1)
-        # query_id нужен для последующих ссылок; create_query выше уже
-        # присвоил его внутри run_sql_cached -> запоминаем отдельно.
-        return df
+    def run_named(step_name: str, sql: str) -> pd.DataFrame:
+        """create_query + run_sql_cached, попутно запоминает query_id для
+        последующих cross-query ссылок. Ошибки 402/429 всплывают наружу
+        и ловятся в main() отдельно, чтобы явно доложить прогресс."""
+        qid = client.create_query(step_name, sql)
+        query_ids[step_name] = qid
+        return client.run_sql_cached(step_name, sql, query_id=qid)
 
     # --- Гейт 0/1: сырые данные июля ---
     print("== Шаг 1: pool creation blocks ==")
-    pool_sql = read_sql("01_pool_creation_blocks")
-    qid_pools = client.create_query("01_pool_creation_blocks", pool_sql)
-    query_ids["01_pool_creation_blocks"] = qid_pools
-    df_pools = client.run_sql_cached(
-        "01_pool_creation_blocks", pool_sql, params={"sniper_block_window": CONFIG.sniper_block_window}, query_id=qid_pools
-    )
+    pool_sql = render_sql(read_sql("01_pool_creation_blocks"), {"sniper_block_window": CONFIG.sniper_block_window})
+    df_pools = run_named("01_pool_creation_blocks", pool_sql)
     print(f"  {len(df_pools)} пулов создано в периоде покрытия запроса.")
 
     print("== Шаг 2: сырые свопы, июль ==")
-    swaps_sql = read_sql("02_swaps_raw_july")
-    qid_swaps_july = client.create_query("02_swaps_raw_july", swaps_sql)
-    query_ids["02_swaps_raw_july"] = qid_swaps_july
-    df_swaps_july = client.run_sql_cached(
-        "02_swaps_raw_july", swaps_sql,
-        params={"start_date": CONFIG.train_start, "end_date": CONFIG.train_end},
-        query_id=qid_swaps_july,
+    swaps_sql = render_sql(
+        read_sql("02_swaps_raw_july"),
+        {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)},
     )
+    df_swaps_july = run_named("02_swaps_raw_july", swaps_sql)
     print(f"  {len(df_swaps_july)} свопов в июле.")
 
     print("== Шаг 3: агрегация по кошельку, июль ==")
-    agg_sql = substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids)
-    qid_agg_july = client.create_query("03_wallet_agg_july", agg_sql)
-    query_ids["03_wallet_agg_july"] = qid_agg_july
-    df_agg_july = client.run_sql_cached(
-        "03_wallet_agg_july", agg_sql,
-        params={"base_token_symbols": ",".join(f"'{s}'" for s in CONFIG.base_token_symbols)},
-        query_id=qid_agg_july,
+    agg_sql = render_sql(
+        substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids),
+        {"base_token_symbols": base_tokens_sql},
     )
+    df_agg_july = run_named("03_wallet_agg_july", agg_sql)
     print(f"  {len(df_agg_july)} уникальных кошельков-трейдеров в июле.")
 
     print("== Шаг 4: исключение снайперов/инсайдеров ==")
     excl_sql = substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids)
-    qid_excl = client.create_query("04_sniper_insider_exclusions", excl_sql)
-    query_ids["04_sniper_insider_exclusions"] = qid_excl
-    df_excluded = client.run_sql_cached("04_sniper_insider_exclusions", excl_sql, params={}, query_id=qid_excl)
+    df_excluded = run_named("04_sniper_insider_exclusions", excl_sql)
     print(f"  {len(df_excluded)} адресов помечено как снайперы/инсайдеры.")
 
     def run_gate5(min_trades: int) -> pd.DataFrame:
-        sql = substitute_query_refs(read_sql("05_final_cohort_pool_july"), query_ids)
-        qid = client.create_query(f"05_final_cohort_pool_july_mt{min_trades}", sql)
-        return client.run_sql_cached(
-            f"05_final_cohort_pool_july_mt{min_trades}", sql,
-            params={"min_trades": min_trades, "min_unique_tokens": CONFIG.min_unique_tokens},
-            query_id=qid,
+        sql = render_sql(
+            substitute_query_refs(read_sql("05_final_cohort_pool_july"), query_ids),
+            {"min_trades": min_trades, "min_unique_tokens": CONFIG.min_unique_tokens},
         )
+        return run_named(f"05_final_cohort_pool_july_mt{min_trades}", sql)
 
     print(f"== Шаг 5: гейт шума (MIN_TRADES={CONFIG.min_trades}) ==")
     df_gated = run_gate5(CONFIG.min_trades)
@@ -174,20 +168,21 @@ def main() -> int:
             "пулу (дешевле, но менее строго). См. docs/README.md Гейт 5."
         )
 
+    def run_august(step_name: str, wallets: list[str]) -> pd.DataFrame:
+        sql = render_sql(
+            read_sql("06_wallet_agg_august"),
+            {
+                "start_date": q_ts(CONFIG.test_start),
+                "end_date": q_ts(CONFIG.test_end),
+                "base_token_symbols": base_tokens_sql,
+                "cohort_wallets": q_list(wallets),
+            },
+        )
+        return run_named(step_name, sql)
+
     # --- Гейт 4: PnL за август ---
     print(f"== Шаг 7: агрегация по кошельку, август ({len(wallets_for_august)} адресов) ==")
-    aug_sql = substitute_query_refs(read_sql("06_wallet_agg_august"), {})
-    qid_aug = client.create_query("06_wallet_agg_august", aug_sql)
-    df_august = client.run_sql_cached(
-        "06_wallet_agg_august", aug_sql,
-        params={
-            "start_date": CONFIG.test_start,
-            "end_date": CONFIG.test_end,
-            "base_token_symbols": ",".join(f"'{s}'" for s in CONFIG.base_token_symbols),
-            "cohort_wallets": wallets_for_august,
-        },
-        query_id=qid_aug,
-    )
+    df_august = run_august("06_wallet_agg_august", wallets_for_august)
     print(f"  {len(df_august)} кошельков из выборки совершили ≥1 своп в августе.")
 
     cohort_a = merge_august_pnl(cohort_a, df_august)
@@ -215,15 +210,7 @@ def main() -> int:
         df_gated_15 = run_gate5(15)
         cohort_a_15, cohort_b_15 = build_cohorts(df_gated_15)
         wallets_15 = pd.concat([cohort_a_15, cohort_b_15])["wallet_address"].tolist()
-        df_august_15 = client.run_sql_cached(
-            "06_wallet_agg_august_mt15", substitute_query_refs(read_sql("06_wallet_agg_august"), {}),
-            params={
-                "start_date": CONFIG.test_start, "end_date": CONFIG.test_end,
-                "base_token_symbols": ",".join(f"'{s}'" for s in CONFIG.base_token_symbols),
-                "cohort_wallets": wallets_15,
-            },
-            query_id=qid_aug,
-        )
+        df_august_15 = run_august("06_wallet_agg_august_mt15", wallets_15)
         cohort_a_15 = merge_august_pnl(cohort_a_15, df_august_15)
         cohort_b_15 = merge_august_pnl(cohort_b_15, df_august_15)
         result_15 = run_full_test(cohort_a_15, cohort_b_15, alpha=CONFIG.significance_alpha)
@@ -281,4 +268,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (DuneCreditsExhausted, DuneRateLimited) as e:
+        print(f"\n[run_pipeline] ОСТАНОВЛЕНО: {e}", file=sys.stderr)
+        raise SystemExit(1)

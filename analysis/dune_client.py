@@ -6,15 +6,25 @@
 зависимость с непроверенным (на момент написания, без сетевого доступа)
 API — здесь голый `requests` поверх задокументированных REST-эндпоинтов
 Dune API v1.
+
+ВАЖНО (см. CHANGELOG в docs/RESULTS.md / commit history): изначально
+здесь была попытка использовать нативный механизм параметров Dune
+(`{{param}}` в SQL + `parameters` при создании запроса + `query_parameters`
+при выполнении). Первый реальный прогон на Dune упал с 400: Dune требует
+явно объявлять КАЖДЫЙ `{{param}}`, использованный в SQL, в теле create-
+запроса — иначе "the following keys in the query do not have matching
+parameters". Вместо того чтобы разбираться в точном формате объявления
+параметров (типы/квотинг различаются для date/number/enum и не были
+проверяемы без реального аккаунта), переключился на подстановку значений
+в текст SQL на стороне Python ДО отправки в Dune (см.
+`render_sql`/`run_pipeline.py`) — в финальном SQL, который видит Dune,
+плейсхолдеров `{{...}}` уже не остаётся, так что декларировать нечего.
 """
 from __future__ import annotations
 
 import hashlib
-import json
-import os
 import time
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import requests
@@ -32,6 +42,18 @@ class DuneRateLimited(RuntimeError):
     """Dune вернул 429."""
 
 
+def render_sql(template: str, values: dict[str, str]) -> str:
+    """Простая текстовая подстановка `{{key}}` -> значение (уже
+    правильно отформатированное/заквоченное вызывающей стороной — см.
+    run_pipeline.py: q_ts/q_list). Никакого похода в Dune для этого не
+    требуется, и на выходе в SQL не остаётся `{{...}}` — значит и Dune
+    нечего объявлять как параметры.
+    """
+    for key, value in values.items():
+        template = template.replace("{{" + key + "}}", str(value))
+    return template
+
+
 class DuneClient:
     def __init__(self, api_key: str | None = None, cache_dir: str | None = None):
         self.api_key = api_key or CONFIG.dune_api_key
@@ -45,7 +67,6 @@ class DuneClient:
         self.cache_dir = Path(cache_dir or CONFIG.cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.executions_this_run = 0
-        self.credits_spent_estimate = 0  # см. note в _post про точность оценки
 
     # ---------- низкоуровневые вызовы ----------
 
@@ -79,22 +100,18 @@ class DuneClient:
 
     # ---------- публичный API ----------
 
-    def create_query(self, name: str, sql: str, params: list[dict] | None = None) -> int:
-        """Создаёт (или пересоздаёт) сохранённый запрос на Dune. Возвращает query_id."""
-        body = {
-            "name": name,
-            "query_sql": sql,
-            "is_private": True,
-        }
-        if params:
-            body["parameters"] = params
+    def create_query(self, name: str, sql: str) -> int:
+        """Создаёт сохранённый запрос на Dune. `sql` должен быть уже
+        полностью отрендерен (без `{{...}}`) — см. render_sql выше.
+        Возвращает query_id.
+        """
+        body = {"name": name, "query_sql": sql, "is_private": True}
         result = self._post("/query", json=body)
         return result["query_id"]
 
-    def execute(self, query_id: int, query_parameters: dict[str, Any] | None = None) -> str:
+    def execute(self, query_id: int) -> str:
         self.executions_this_run += 1
-        body = {"query_parameters": query_parameters or {}}
-        result = self._post(f"/query/{query_id}/execute", json=body)
+        result = self._post(f"/query/{query_id}/execute", json={"query_parameters": {}})
         return result["execution_id"]
 
     def poll_until_done(self, execution_id: str, timeout_s: int = 600, interval_s: int = 3) -> dict:
@@ -124,28 +141,20 @@ class DuneClient:
         )
         return pd.DataFrame(rows)
 
-    def run_sql_cached(
-        self,
-        name: str,
-        sql: str,
-        params: dict[str, Any] | None = None,
-        query_id: int | None = None,
-        force_refresh: bool = False,
-    ) -> pd.DataFrame:
-        """Выполняет (или переиспользует сохранённый query_id) запрос с
-        дисковым кэшем по (name, params) — повторный прогон пайплайна не
-        пережигает кредиты повторно, пока входные параметры не изменились.
+    def run_sql_cached(self, name: str, sql: str, query_id: int | None = None, force_refresh: bool = False) -> pd.DataFrame:
+        """Выполняет (или переиспользует сохранённый query_id) уже
+        полностью отрендеренный запрос, с дисковым кэшем по (name, sql) —
+        повторный прогон пайплайна не пережигает кредиты повторно, пока
+        текст запроса не поменялся.
         """
-        cache_key = hashlib.sha256(
-            json.dumps({"name": name, "params": params or {}}, sort_keys=True).encode()
-        ).hexdigest()[:16]
+        cache_key = hashlib.sha256(sql.encode()).hexdigest()[:16]
         cache_file = self.cache_dir / f"{name}_{cache_key}.parquet"
         if cache_file.exists() and not force_refresh:
             print(f"[dune] cache hit: {cache_file.name}")
             return pd.read_parquet(cache_file)
 
         qid = query_id or self.create_query(name=name, sql=sql)
-        execution_id = self.execute(qid, query_parameters=params)
+        execution_id = self.execute(qid)
         self.poll_until_done(execution_id)
         df = self.get_results_df(execution_id)
         df.to_parquet(cache_file)

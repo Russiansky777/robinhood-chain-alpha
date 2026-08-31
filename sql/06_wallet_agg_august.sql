@@ -2,10 +2,10 @@
 -- То же самое, что 02+03 (сырые свопы -> агрегация по кошельку), но:
 --   (a) период = август 2026 ({{start_date}}='2026-08-01', {{end_date}}='2026-09-01')
 --   (b) ограничено списком адресов когорт А+Б из Гейта 3
---       ({{cohort_wallets}} -- передаётся из analysis/cohort_builder.py
---       как параметр-массив, чтобы не гонять полную августовскую
---       агрегацию по всем кошелькам чейна -- экономия Dune credits, см.
---       docs/DATA_ACCESS.md)
+--       ({{cohort_wallets}} -- подставляется в run_pipeline.py как готовый
+--       список 'адрес1','адрес2',... из когорт А+Б, чтобы не гонять полную
+--       августовскую агрегацию по всем кошелькам чейна -- экономия Dune
+--       credits, см. docs/DATA_ACCESS.md)
 --
 -- Кошелёк из когорты, не совершивший ни одного свопа в августе,
 -- НЕ появится в результате этого запроса -- analysis/cohort_builder.py
@@ -36,7 +36,7 @@ swaps as (
         and block_time >= timestamp {{start_date}}
         and block_time <  timestamp {{end_date}}
         and amount_usd is not null
-        and taker in (select cast(value as varchar) from unnest({{cohort_wallets}}) as t(value))
+        and taker in ({{cohort_wallets}})
 ),
 
 legs as (
