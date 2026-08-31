@@ -85,13 +85,19 @@ class DuneClient:
 
     def _handle_response(self, resp: requests.Response) -> dict:
         if resp.status_code == 402:
+            # Тело ответа раньше отбрасывалось -- реальный текст ошибки от
+            # Dune (например, "требуется Pro план для этого датасета" vs
+            # "недостаточно кредитов") виден только здесь. Добавлено после
+            # второго 402 подряд на dex.trades, отфильтрованном по одному
+            # дню -- сумма кредитов была явно не в лимите, значит причина
+            # не "дорогой скан", и без текста тела это не расследовать.
             raise DuneCreditsExhausted(
                 "Dune вернул 402 Payment Required — кредиты free tier "
                 "(2500/мес) исчерпаны или запрос слишком дорогой для "
                 "текущего плана. НЕ ретраю автоматически. Проверьте баланс "
                 "на dune.com/settings/billing и рассмотрите переход на "
                 "Alchemy fallback (analysis/alchemy_fallback.py), см. "
-                "docs/DATA_ACCESS.md."
+                f"docs/DATA_ACCESS.md.\nТело ответа Dune: {resp.text[:1000]}"
             )
         if resp.status_code == 429:
             raise DuneRateLimited(
