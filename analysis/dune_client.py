@@ -67,6 +67,11 @@ class DuneClient:
         self.cache_dir = Path(cache_dir or CONFIG.cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.executions_this_run = 0
+        # Леджер фактической стоимости каждого запроса этого прогона —
+        # для смоук-теста ("запрос -> кредиты", см. run_pipeline.py и
+        # docs/DATA_ACCESS.md). Один элемент на вызов run_sql_cached,
+        # включая кэш-хиты (стоимость 0, но видно, что запрос был).
+        self.credit_ledger: list[dict] = []
 
     # ---------- низкоуровневые вызовы ----------
 
@@ -127,25 +132,25 @@ class DuneClient:
             waited += interval_s
         raise TimeoutError(f"Dune execution {execution_id} не завершился за {timeout_s}s")
 
-    def get_results_df(self, execution_id: str) -> pd.DataFrame:
+    def get_results_df(self, execution_id: str) -> tuple[pd.DataFrame, dict]:
         result = self._get(f"/execution/{execution_id}/results")
         rows = result.get("result", {}).get("rows", [])
         stats = result.get("result", {}).get("metadata", {})
-        # Dune не всегда отдаёт точный credit cost в этом эндпоинте —
-        # логируем то, что есть (datapoint/row counts), точный расход
-        # кредитов сверяйте на dune.com/settings/billing.
         print(
             f"[dune] execution {execution_id}: "
             f"{stats.get('total_row_count', len(rows))} rows, "
             f"{stats.get('datapoint_count', 'n/a')} datapoints"
         )
-        return pd.DataFrame(rows)
+        return pd.DataFrame(rows), stats
 
     def run_sql_cached(self, name: str, sql: str, query_id: int | None = None, force_refresh: bool = False) -> pd.DataFrame:
         """Выполняет (или переиспользует сохранённый query_id) уже
         полностью отрендеренный запрос, с дисковым кэшем по (name, sql) —
         повторный прогон пайплайна не пережигает кредиты повторно, пока
-        текст запроса не поменялся.
+        текст запроса не поменялся. Каждый вызов (кэш-хит или реальное
+        исполнение) пишет запись в self.credit_ledger с фактической
+        стоимостью в кредитах, взятой из ответа Dune (`execution_cost_credits`
+        в статусе исполнения) — см. docs/DATA_ACCESS.md, "Смоук-тест".
         """
         cache_key = hashlib.sha256(sql.encode()).hexdigest()[:16]
         # CSV, не parquet: избегаем зависимости от pyarrow/fastparquet
@@ -156,11 +161,17 @@ class DuneClient:
         cache_file = self.cache_dir / f"{name}_{cache_key}.csv"
         if cache_file.exists() and not force_refresh:
             print(f"[dune] cache hit: {cache_file.name}")
+            self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
             return pd.read_csv(cache_file)
 
         qid = query_id or self.create_query(name=name, sql=sql)
         execution_id = self.execute(qid)
-        self.poll_until_done(execution_id)
-        df = self.get_results_df(execution_id)
+        status = self.poll_until_done(execution_id)
+        df, result_stats = self.get_results_df(execution_id)
+        cost = status.get("execution_cost_credits")
+        if cost is None:
+            cost = result_stats.get("execution_cost_credits")
+        self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
+        print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits")
         df.to_csv(cache_file, index=False)
         return df

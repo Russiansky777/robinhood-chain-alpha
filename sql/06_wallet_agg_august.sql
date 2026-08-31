@@ -69,22 +69,26 @@ priced_legs as (
     where side is not null
 ),
 
-realized as (
+realized_agg as (
+    -- Агрегируем по кошельку ОДИН раз, а не коррелированным подзапросом
+    -- на каждую строку ниже -- дешевле на движке Dune.
     select
         wallet_address,
-        case
+        sum(case
             when side = 'SELL' and bought_qty_before > 0
                 then amount_usd - traded_qty * (bought_usd_before / bought_qty_before)
             else 0.0
-        end as realized_pnl_usd
+        end) as realized_pnl_usd_august
     from priced_legs
+    group by wallet_address
 )
 
 select
     s.wallet_address,
     count(*) as trade_count_august,
     count(distinct l.traded_token_address) as unique_tokens_august,
-    coalesce((select sum(r.realized_pnl_usd) from realized r where r.wallet_address = s.wallet_address), 0.0) as realized_pnl_usd_august
+    coalesce(max(ra.realized_pnl_usd_august), 0.0) as realized_pnl_usd_august
 from swaps s
 left join legs l on l.wallet_address = s.wallet_address and l.tx_hash = s.tx_hash
+left join realized_agg ra on ra.wallet_address = s.wallet_address
 group by s.wallet_address

@@ -2,53 +2,79 @@
 
 Все запросы написаны под **DuneSQL** (Trino-диалект Dune).
 
-**Обновление 2026-08-31: реально прогнано на Dune, схема подтверждена.**
-Первое предположение о названиях схем (см. историю git) было неверным —
-поймали это через реальный `RuntimeError` от Dune (`Schema
-'uniswap_v3_robinhood_chain' does not exist`), продиагностировали через
-`analysis/_probe_schema.py` (запрос к `information_schema.tables`) и
-поправили. Актуальное, подтверждённое:
+## Архитектура на 2026-08-31: только `dex.trades`, без сырых таблиц чейна
 
-1. **`dune.dex.trades`**: значение `blockchain` для этого чейна —
-   **`'robinhood'`**, НЕ `'robinhood_chain'` (несмотря на официальное
-   название сети и chain id 4663). Запрос `select count(*) from
-   dex.trades where blockchain = 'robinhood_chain'` возвращает 0 строк;
-   `'robinhood'` — корректное значение.
-2. **Декодированные схемы контрактов Uniswap**: `uniswap_v3_robinhood` и
-   `uniswap_v4_robinhood` (без суффикса `_chain`). Таблицы —
-   `<contract>_evt_<event>` / `<contract>_call_<method>`, всё в нижнем
-   регистре, без разделителей между словами названия контракта:
-   - `uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated`
-   - `uniswap_v3_robinhood.uniswapv3pool_evt_swap` / `..._evt_initialize`
-   - `uniswap_v4_robinhood.poolmanager_evt_initialize` / `..._evt_swap`
-   - Также есть готовые `uniswap_v3_robinhood.base_trades` и
-     `uniswap_v4_robinhood.swaps` / `base_trades` — Dune-агрегированные
-     таблицы трейдов на уровне DEX-версии; не использовали (не
-     диагностировали их колонки), но потенциально дешевле/проще, чем
-     `dex.trades` — кандидат на упрощение в следующем спринте.
-3. **Сырые таблицы чейна и ERC20-трансферы**: по аналогии с
-   `blockchain='robinhood'` использую схемы `robinhood.transactions`,
-   `robinhood.traces`, `erc20_robinhood.evt_transfer` — эта часть
-   выведена по паттерну (`<protocol>_robinhood`), а не подтверждена
-   отдельным probe-запросом. Если следующий прогон упадёт на этих
-   именах — тот же процесс: `_probe_schema.py` → правим → перезапускаем.
+После реального прогона на Dune (`DUNE_API_KEY` пользователя) первая
+версия Sprint 1 упала дважды:
 
-2. **Base/quote токены** (WETH, USDC, USDT и т.п.) сейчас матчатся по
-   `token_bought_symbol`/`token_sold_symbol` — это удобно, но
-   спуфабельно (любой токен может назвать себя "USDC"). Перед боевым
-   прогоном замените на матчинг по адресу контракта
-   (`token_bought_address IN (...)`) — впишите реальные адреса
-   канонических WETH/USDC/USDT на Robinhood Chain (chain id 4663) из
-   официального bridge-реестра, см.
-   [docs.robinhood.com/chain](https://docs.robinhood.com/chain/).
+1. **400** — названия схем декодированных Uniswap-контрактов были
+   угаданы неверно (`uniswap_v3_robinhood_chain` вместо реального
+   `uniswap_v3_robinhood`). Продиагностировано и исправлено через
+   `analysis/_probe_schema.py` (запрос к `information_schema.tables`).
+2. **402 Payment Required** — на join с сырой таблицей чейна
+   `robinhood.transactions` (нужен был для определения деплойера пула,
+   гейт снайперов/инсайдеров) без фильтра по дате: Dune не мог сделать
+   partition pruning и, по всей видимости, сканировал таблицу
+   транзакций всего чейна целиком. Подробности — `docs/DATA_ACCESS.md`,
+   "Инцидент: 402 на шаге 1".
 
-3. **Realized PnL** считается методом **weighted-average cost basis**
-   (не строгий FIFO) — стандартный компромисс для чистого SQL без
-   построчного процедурного кода. Подробно — в комментариях
-   `03_wallet_agg_july.sql`. Открытые (нереализованные) позиции на конец
-   месяца в PnL не входят по определению "реализованного" PnL.
+**Решение (согласовано с пользователем 2026-08-31): полностью убрать
+сырые таблицы чейна из Sprint 1.** Единственный источник данных —
+`dune.dex.trades` (курируемая кросс-чейн таблица трейдов, `blockchain =
+'robinhood'`). Это отразилось на архитектуре:
 
-4. Даты как параметры Dune (`{{start_date}}`/`{{end_date}}`) — задавайте
-   при вызове через API (`analysis/dune_client.py` подставляет их из
-   `config.py`), чтобы один и тот же запрос переиспользовался для июля и
-   августа без дублирования SQL.
+- **`sql/01_pool_creation_blocks.sql`** больше не читает
+  `Factory_evt_PoolCreated`/`PoolManager_evt_Initialize` — "рождение"
+  пула теперь суррогат: `min(block_time)` по пулу в уже отфильтрованных
+  июльских свопах (`query_02_swaps_raw_july`). Не требует отдельного
+  скана dex.trades — агрегирует уже полученный результат query_02.
+- **`sql/04_sniper_insider_exclusions.sql`**: критерий "связь с
+  деплойером" (требовал `robinhood.traces` +
+  `erc20_robinhood.evt_transfer`) убран полностью, отложен до Sprint 2.
+  Остался только временной суррогат: первый своп кошелька в пуле в
+  первые N минут (`sniper_time_window_minutes`, default 5) после
+  суррогатного "рождения" пула. Обоснование и ограничения суррогата —
+  `docs/README.md`, раздел "Гейт 1".
+- **`sql/02`, `sql/03`, `sql/05`, `sql/06`** и раньше использовали
+  только `dex.trades`/ссылки на другие сохранённые запросы — без
+  изменений архитектуры, только мелкие правки для дешевизны (см. ниже).
+
+Подтверждённая схема `dex.trades` для этого чейна (запрос
+`information_schema.tables`, 2026-08-31): `blockchain = 'robinhood'`
+(НЕ `'robinhood_chain'`, несмотря на официальное название сети и chain
+id 4663) — колонки `taker`, `project`, `version`, `project_contract_address`,
+`token_bought_*`, `token_sold_*`, `amount_usd`, `block_time`,
+`block_number`, `tx_hash`.
+
+## Контроль стоимости (Dune credits)
+
+1. **Каждый запрос фильтрует по дате как можно раньше** и только по
+   `dex.trades` — никаких full-scan джойнов с общечейновыми таблицами.
+2. **01, 03, 04, 05 не делают отдельных сканов dex.trades** — все они
+   агрегируют/фильтруют уже материализованный (и Dune-кэшированный по
+   `query_id`) результат `query_02` через cross-query ссылки
+   (`query_02_swaps_raw_july` и т.д.). Дорогие сканы dex.trades — только
+   в `02` (июль) и `06` (август, дополнительно сужен списком адресов
+   когорт).
+3. **`06` агрегирует `realized` по кошельку один раз** (`group by`), а
+   не коррелированным подзапросом на каждую строку — дешевле для
+   движка.
+4. **Смоук-тест перед масштабированием**: `analysis/run_pipeline.py`
+   сначала гоняет весь пайплайн на одном дне (2026-07-15), логирует
+   фактическую стоимость каждого запроса
+   (`execution_cost_credits` из ответа Dune) и только при суммарной
+   стоимости ≤120 кредитов автоматически продолжает на полный период
+   (июль/август). См. `docs/DATA_ACCESS.md`, "Смоук-тест 2026-08-31".
+
+## Известные допущения (не устранены в Sprint 1)
+
+1. **Base/quote токены** (WETH, USDC, USDT и т.п.) матчатся по
+   `token_bought_symbol`/`token_sold_symbol` — спуфабельно (любой токен
+   может назвать себя "USDC"). Перед боевым использованием заменить на
+   матчинг по адресу контракта.
+2. **Realized PnL** — weighted-average cost basis, не строгий FIFO (см.
+   комментарии в `03_wallet_agg_july.sql`). Открытые позиции на конец
+   месяца не учитываются (это и есть "реализованный", а не бумажный PnL).
+3. **Гейт снайперов/инсайдеров — временной суррогат**, не полноценный
+   deployer-linked фильтр. См. `docs/README.md`, "Гейт 1 — статус на
+   Sprint 1", про то, что это ловит и что пропускает.

@@ -3,7 +3,7 @@
 Сгенерировано автоматически `analysis/run_pipeline.py` в {{GENERATED_AT}}.
 Период: июль 2026 (train) → август 2026 (test). Параметры гейтов:
 MIN_TRADES={{MIN_TRADES}}, MIN_UNIQUE_TOKENS={{MIN_UNIQUE_TOKENS}},
-SNIPER_BLOCK_WINDOW={{SNIPER_BLOCK_WINDOW}}, COHORT_SIZE={{COHORT_SIZE}}.
+гейт снайперов = {{SNIPER_BLOCK_WINDOW}}, COHORT_SIZE={{COHORT_SIZE}}.
 
 ## 1. Сводная статистика по когортам
 

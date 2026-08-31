@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Точка входа: гоняет весь пайплайн Sprint 1 (гейты 0-5) и пишет
-docs/RESULTS.md.
+"""Точка входа: смоук-тест на одном дне -> (если дёшево) полный пайплайн
+на июле/августе -> docs/RESULTS.md.
 
 Требует DUNE_API_KEY в .env / env. Если его нет — падает сразу с понятным
 сообщением, ничего не выполняя (см. docs/DATA_ACCESS.md).
 
-Все `{{param}}` в sql/*.sql рендерятся здесь, в Python, литеральными
-значениями ДО отправки в Dune (см. dune_client.render_sql) — Dune видит
-уже готовый SQL без плейсхолдеров, поэтому ничего не требуется отдельно
-объявлять на стороне Dune API.
+Дизайн на 2026-08-31 (после реального прогона на Dune, см.
+docs/DATA_ACCESS.md): единственный источник данных — dex.trades,
+никаких сырых таблиц чейна. Перед тем как гонять полный период,
+пайплайн ВСЕГДА сначала прогоняет себя целиком на одном дне
+(CONFIG.smoke_date) и меряет фактическую стоимость каждого запроса в
+кредитах (Dune API отдаёт `execution_cost_credits` в статусе
+исполнения). Полный прогон запускается автоматически только если смоук
+уложился в CONFIG.smoke_credit_budget (default 120) — иначе пайплайн
+останавливается и печатает таблицу "запрос -> кредиты" на решение
+человека.
 
 Использование:
     python analysis/run_pipeline.py
@@ -41,11 +47,7 @@ def read_sql(name: str) -> str:
 def substitute_query_refs(sql: str, query_ids: dict[str, int]) -> str:
     """Заменяет `query_XX_name` (человекочитаемые ссылки в наших .sql
     файлах на другие сохранённые запросы) на реальный синтаксис Dune для
-    ссылки на сохранённый запрос: `query_<numeric_id>`. Это НЕ то же
-    самое, что {{param}}-плейсхолдеры (см. render_sql в dune_client.py) —
-    ссылки между запросами являются законной частью Dune SQL и не требуют
-    отдельного объявления.
-    """
+    ссылки на сохранённый запрос: `query_<numeric_id>`."""
     for name, qid in query_ids.items():
         sql = sql.replace(f"query_{name}", f"query_{qid}")
     return sql
@@ -58,7 +60,16 @@ def q_ts(date_str: str) -> str:
 
 def q_list(items: list[str]) -> str:
     """['WETH','USDC'] -> "'WETH','USDC'" -- готовый список для IN(...) / array[...]."""
+    if not items:
+        # Заведомо несуществующий адрес -- пустой IN(...) невалиден в SQL,
+        # а этот список никогда ни с чем не совпадёт.
+        return "'0x0000000000000000000000000000000000000000'"
     return ",".join("'" + str(x).replace("'", "''") + "'" for x in items)
+
+
+def next_day(date_str: str) -> str:
+    d = dt.date.fromisoformat(date_str)
+    return (d + dt.timedelta(days=1)).isoformat()
 
 
 def fmt_usd(x: float) -> str:
@@ -87,6 +98,17 @@ def render_report(context: dict[str, str]) -> str:
     return template
 
 
+def print_ledger(ledger: list[dict], title: str) -> float:
+    total = sum((row["credits"] or 0.0) for row in ledger)
+    print(f"\n----- {title}: запрос -> кредиты -----")
+    for row in ledger:
+        tag = " (кэш)" if row["cached"] else ""
+        cost = row["credits"] if row["credits"] is not None else "n/a"
+        print(f"  {row['name']:<40} {cost}{tag}")
+    print(f"  {'ИТОГО':<40} {total:.3f}")
+    return total
+
+
 def main() -> int:
     if not CONFIG.dune_api_key:
         print(
@@ -104,56 +126,107 @@ def main() -> int:
     query_ids: dict[str, int] = {}
     base_tokens_sql = q_list(list(CONFIG.base_token_symbols))
 
-    def run_named(step_name: str, sql: str) -> pd.DataFrame:
-        """create_query + run_sql_cached, попутно запоминает query_id для
-        последующих cross-query ссылок. Ошибки 402/429 всплывают наружу
-        и ловятся в main() отдельно, чтобы явно доложить прогресс."""
-        qid = client.create_query(step_name, sql)
-        query_ids[step_name] = qid
-        return client.run_sql_cached(step_name, sql, query_id=qid)
+    def run_named(step_key: str, sql: str) -> pd.DataFrame:
+        qid = client.create_query(step_key, sql)
+        query_ids[step_key] = qid
+        try:
+            return client.run_sql_cached(step_key, sql, query_id=qid)
+        except (DuneCreditsExhausted, DuneRateLimited) as e:
+            total_so_far = print_ledger(client.credit_ledger, "Потрачено до остановки")
+            print(
+                f"\n[run_pipeline] ОСТАНОВЛЕНО на шаге '{step_key}': {e}\n"
+                f"Итого потрачено в этом прогоне до остановки: {total_so_far:.3f} кредитов.\n"
+                f"Не ретраю автоматически. Ждём решения.",
+                file=sys.stderr,
+            )
+            raise
 
-    train_window = {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)}
-
-    # --- Гейт 0/1: сырые данные июля ---
-    print("== Шаг 1: pool creation blocks ==")
-    pool_sql = render_sql(
-        read_sql("01_pool_creation_blocks"),
-        {"sniper_block_window": CONFIG.sniper_block_window, **train_window},
-    )
-    df_pools = run_named("01_pool_creation_blocks", pool_sql)
-    print(f"  {len(df_pools)} пулов создано в периоде покрытия запроса.")
-
-    print("== Шаг 2: сырые свопы, июль ==")
-    swaps_sql = render_sql(read_sql("02_swaps_raw_july"), train_window)
-    df_swaps_july = run_named("02_swaps_raw_july", swaps_sql)
-    print(f"  {len(df_swaps_july)} свопов в июле.")
-
-    print("== Шаг 3: агрегация по кошельку, июль ==")
-    agg_sql = render_sql(
-        substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids),
-        {"base_token_symbols": base_tokens_sql},
-    )
-    df_agg_july = run_named("03_wallet_agg_july", agg_sql)
-    print(f"  {len(df_agg_july)} уникальных кошельков-трейдеров в июле.")
-
-    print("== Шаг 4: исключение снайперов/инсайдеров ==")
-    excl_sql = render_sql(substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids), train_window)
-    df_excluded = run_named("04_sniper_insider_exclusions", excl_sql)
-    print(f"  {len(df_excluded)} адресов помечено как снайперы/инсайдеры.")
-
-    def run_gate5(min_trades: int) -> pd.DataFrame:
-        sql = render_sql(
-            substitute_query_refs(read_sql("05_final_cohort_pool_july"), query_ids),
-            {"min_trades": min_trades, "min_unique_tokens": CONFIG.min_unique_tokens},
+    def run_gates(window: dict[str, str], min_trades: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Шаги 1-5 (dex.trades-only, см. sql/00_notes.md) для окна
+        [start_date, end_date). Возвращает (df_agg, df_excluded, df_gated).
+        """
+        run_named("02_swaps_raw_july", render_sql(read_sql("02_swaps_raw_july"), window))
+        run_named("01_pool_creation_blocks", substitute_query_refs(read_sql("01_pool_creation_blocks"), query_ids))
+        df_agg = run_named(
+            "03_wallet_agg_july",
+            render_sql(substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids), {"base_token_symbols": base_tokens_sql}),
         )
-        return run_named(f"05_final_cohort_pool_july_mt{min_trades}", sql)
+        df_excluded = run_named(
+            "04_sniper_insider_exclusions",
+            render_sql(
+                substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids),
+                {"sniper_time_window_minutes": CONFIG.sniper_time_window_minutes},
+            ),
+        )
+        df_gated = run_named(
+            f"05_final_cohort_pool_july_mt{min_trades}",
+            render_sql(
+                substitute_query_refs(read_sql("05_final_cohort_pool_july"), query_ids),
+                {"min_trades": min_trades, "min_unique_tokens": CONFIG.min_unique_tokens},
+            ),
+        )
+        return df_agg, df_excluded, df_gated
 
-    print(f"== Шаг 5: гейт шума (MIN_TRADES={CONFIG.min_trades}) ==")
-    df_gated = run_gate5(CONFIG.min_trades)
-    print(f"  {len(df_gated)} кошельков прошли гейты 1-2.")
+    def run_august(step_key: str, wallets: list[str], window: dict[str, str]) -> pd.DataFrame:
+        sql = render_sql(
+            read_sql("06_wallet_agg_august"),
+            {**window, "base_token_symbols": base_tokens_sql, "cohort_wallets": q_list(wallets)},
+        )
+        return run_named(step_key, sql)
 
-    # --- Гейт 3: когорты ---
-    print("== Шаг 6: сборка когорт А/Б ==")
+    # ================= ФАЗА 1: СМОУК-ТЕСТ =================
+    print("=" * 70)
+    print(f"ФАЗА 1: СМОУК-ТЕСТ на {CONFIG.smoke_date} (один день) — измеряем")
+    print("реальную стоимость каждого запроса перед масштабированием.")
+    print("=" * 70)
+
+    smoke_window = {"start_date": q_ts(CONFIG.smoke_date), "end_date": q_ts(next_day(CONFIG.smoke_date))}
+    try:
+        df_agg_smoke, _df_excl_smoke, _df_gated_smoke = run_gates(smoke_window, CONFIG.min_trades)
+        smoke_wallets = df_agg_smoke["wallet_address"].head(5).tolist() if len(df_agg_smoke) else []
+        if smoke_wallets:
+            run_august("06_wallet_agg_august_SMOKE", smoke_wallets, smoke_window)
+        else:
+            print(f"[smoke] На {CONFIG.smoke_date} не нашлось ни одного кошелька в dex.trades — шаг 06 пропущен в смоуке.")
+    except (DuneCreditsExhausted, DuneRateLimited):
+        return 1
+
+    smoke_ledger = list(client.credit_ledger)
+    client.credit_ledger.clear()
+    smoke_total = print_ledger(smoke_ledger, "СМОУК-ТЕСТ")
+
+    if smoke_total > CONFIG.smoke_credit_budget:
+        print(
+            f"\n[run_pipeline] СТОП: смоук-тест стоил {smoke_total:.3f} кредитов "
+            f"(бюджет — {CONFIG.smoke_credit_budget}). Полный прогон НЕ запущен, "
+            f"docs/RESULTS.md не менялся. Ждём решения — можно поднять "
+            f"SMOKE_CREDIT_BUDGET, если это осознанно приемлемо, или сначала "
+            f"разобраться, какой конкретно шаг из таблицы выше дорогой."
+        )
+        return 3
+
+    print(
+        f"\n[run_pipeline] Смоук уложился в бюджет ({smoke_total:.3f} <= "
+        f"{CONFIG.smoke_credit_budget} кредитов) — продолжаю на полном периоде "
+        f"(июль -> когорты, август -> проверка персистентности)."
+    )
+
+    # ================= ФАЗА 2: ПОЛНЫЙ ПРОГОН =================
+    train_window = {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)}
+    test_window = {"start_date": q_ts(CONFIG.test_start), "end_date": q_ts(CONFIG.test_end)}
+
+    print("\n" + "=" * 70)
+    print(f"ФАЗА 2: ПОЛНЫЙ ПРОГОН — июль {CONFIG.train_start}..{CONFIG.train_end}, "
+          f"август {CONFIG.test_start}..{CONFIG.test_end}")
+    print("=" * 70)
+
+    try:
+        df_agg_july, df_excluded, df_gated = run_gates(train_window, CONFIG.min_trades)
+    except (DuneCreditsExhausted, DuneRateLimited):
+        return 1
+    print(f"  Июльских трейдеров всего: {len(df_agg_july)}; исключено как снайперы: {len(df_excluded)}; "
+          f"прошли гейты 1-2: {len(df_gated)}")
+
     cohort_a, cohort_b = build_cohorts(df_gated)
     print(f"  Когорта А: {len(cohort_a)}, Когорта Б: {len(cohort_b)}")
 
@@ -164,27 +237,12 @@ def main() -> int:
         else pd.concat([cohort_a, cohort_b])["wallet_address"].tolist()
     )
     if not full_pool_spearman:
-        print(
-            "  [ЭКОНОМИЯ КРЕДИТОВ] FULL_POOL_SPEARMAN=false — Spearman "
-            "считается только по когортам А+Б, не по всему гейтованному "
-            "пулу (дешевле, но менее строго). См. docs/README.md Гейт 5."
-        )
+        print("  [ЭКОНОМИЯ КРЕДИТОВ] FULL_POOL_SPEARMAN=false — Spearman только по когортам А+Б.")
 
-    def run_august(step_name: str, wallets: list[str]) -> pd.DataFrame:
-        sql = render_sql(
-            read_sql("06_wallet_agg_august"),
-            {
-                "start_date": q_ts(CONFIG.test_start),
-                "end_date": q_ts(CONFIG.test_end),
-                "base_token_symbols": base_tokens_sql,
-                "cohort_wallets": q_list(wallets),
-            },
-        )
-        return run_named(step_name, sql)
-
-    # --- Гейт 4: PnL за август ---
-    print(f"== Шаг 7: агрегация по кошельку, август ({len(wallets_for_august)} адресов) ==")
-    df_august = run_august("06_wallet_agg_august", wallets_for_august)
+    try:
+        df_august = run_august("06_wallet_agg_august", wallets_for_august, test_window)
+    except (DuneCreditsExhausted, DuneRateLimited):
+        return 1
     print(f"  {len(df_august)} кошельков из выборки совершили ≥1 своп в августе.")
 
     cohort_a = merge_august_pnl(cohort_a, df_august)
@@ -199,35 +257,38 @@ def main() -> int:
         all_july = both["realized_pnl_usd"].to_numpy()
         all_aug = both["realized_pnl_usd_august"].to_numpy()
 
-    # --- Гейт 5: статистика ---
-    print("== Шаг 8: статистический тест ==")
+    print("\n== Статистический тест ==")
     result = run_full_test(cohort_a, cohort_b, all_july, all_aug, alpha=CONFIG.significance_alpha)
     print(f"  Вердикт: {result.verdict}")
     print(f"  {result.verdict_reasoning}")
 
-    # --- Sensitivity: MIN_TRADES 10 vs 15 (дешёвый прогон только ради N + p) ---
-    print("== Шаг 9: sensitivity MIN_TRADES=15 ==")
+    # --- Sensitivity: MIN_TRADES 10 vs 15 (переиспользует кэш 01-04, свежий только 05+06) ---
+    print("\n== Sensitivity MIN_TRADES=15 ==")
     sens_n_10, sens_p_10 = len(df_gated), result.mannwhitney_p_one_sided
     try:
-        df_gated_15 = run_gate5(15)
+        _agg15, _excl15, df_gated_15 = run_gates(train_window, 15)
         cohort_a_15, cohort_b_15 = build_cohorts(df_gated_15)
         wallets_15 = pd.concat([cohort_a_15, cohort_b_15])["wallet_address"].tolist()
-        df_august_15 = run_august("06_wallet_agg_august_mt15", wallets_15)
+        df_august_15 = run_august("06_wallet_agg_august_mt15", wallets_15, test_window)
         cohort_a_15 = merge_august_pnl(cohort_a_15, df_august_15)
         cohort_b_15 = merge_august_pnl(cohort_b_15, df_august_15)
         result_15 = run_full_test(cohort_a_15, cohort_b_15, alpha=CONFIG.significance_alpha)
         sens_n_15, sens_p_15 = len(df_gated_15), result_15.mannwhitney_p_one_sided
     except (DuneCreditsExhausted, DuneRateLimited) as e:
-        print(f"  Sensitivity-прогон пропущен (кредиты/лимит): {e}")
+        print(f"  Sensitivity-прогон пропущен (кредиты/лимит): {e}. Основной результат (MIN_TRADES=10) не затронут.")
         sens_n_15, sens_p_15 = "n/a (см. лог)", "n/a"
 
+    full_ledger = list(client.credit_ledger)
+    full_total = print_ledger(full_ledger, "ПОЛНЫЙ ПРОГОН")
+    print(f"\n[run_pipeline] Итого за оба прогона (смоук + полный): {smoke_total + full_total:.3f} кредитов.")
+
     # --- Отчёт ---
-    print("== Шаг 10: рендер docs/RESULTS.md ==")
+    print("\n== Рендер docs/RESULTS.md ==")
     context = {
         "GENERATED_AT": dt.datetime.utcnow().isoformat() + "Z",
         "MIN_TRADES": CONFIG.min_trades,
         "MIN_UNIQUE_TOKENS": CONFIG.min_unique_tokens,
-        "SNIPER_BLOCK_WINDOW": CONFIG.sniper_block_window,
+        "SNIPER_BLOCK_WINDOW": f"{CONFIG.sniper_time_window_minutes} минут (временной суррогат, см. docs/README.md)",
         "COHORT_SIZE": CONFIG.cohort_size,
         "N_A": len(cohort_a),
         "N_B": len(cohort_b),
@@ -264,14 +325,9 @@ def main() -> int:
     report = render_report(context)
     (ROOT / CONFIG.results_doc).write_text(report)
     print(f"  Записано в {CONFIG.results_doc}")
-    print(f"\n[run_pipeline] Dune executions в этом прогоне: {client.executions_this_run}")
     print("[run_pipeline] Готово.")
     return 0
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except (DuneCreditsExhausted, DuneRateLimited) as e:
-        print(f"\n[run_pipeline] ОСТАНОВЛЕНО: {e}", file=sys.stderr)
-        raise SystemExit(1)
+    raise SystemExit(main())

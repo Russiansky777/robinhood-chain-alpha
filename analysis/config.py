@@ -21,6 +21,10 @@ def _int(name: str, default: int) -> int:
     return int(os.environ.get(name, default))
 
 
+def _float(name: str, default: float) -> float:
+    return float(os.environ.get(name, default))
+
+
 @dataclass(frozen=True)
 class Config:
     # --- Секреты (никогда не хардкодить, только из env) ---
@@ -36,8 +40,16 @@ class Config:
     test_start: str = "2026-08-01"
     test_end: str = "2026-09-01"
 
-    # --- Гейт 1: снайперы/инсайдеры ---
-    sniper_block_window: int = field(default_factory=lambda: _int("SNIPER_BLOCK_WINDOW", 3))
+    # --- Гейт 1: снайперы/инсайдеры (временной суррогат, см. docs/README.md) ---
+    sniper_time_window_minutes: int = field(
+        default_factory=lambda: _int("SNIPER_TIME_WINDOW_MINUTES", 5)
+    )
+
+    # --- Смоук-тест перед масштабированием (см. docs/DATA_ACCESS.md) ---
+    smoke_date: str = field(default_factory=lambda: os.environ.get("SMOKE_DATE", "2026-07-15"))
+    smoke_credit_budget: float = field(
+        default_factory=lambda: _float("SMOKE_CREDIT_BUDGET", 120.0)
+    )
 
     # --- Гейт 2: фильтр шума ---
     min_trades: int = field(default_factory=lambda: _int("MIN_TRADES", 10))
