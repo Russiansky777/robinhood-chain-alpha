@@ -115,8 +115,18 @@ class DuneClient:
         """Создаёт сохранённый запрос на Dune. `sql` должен быть уже
         полностью отрендерен (без `{{...}}`) — см. render_sql выше.
         Возвращает query_id.
+
+        is_private=False (не True, как было изначально): наши запросы
+        активно ссылаются друг на друга через `query_<id>`
+        (01 -> 02, 03/04 -> 01/02, 05 -> 03/04, см. sql/00_notes.md) — а
+        Dune free tier отказывает в этом для приватных запросов:
+        "querying private queries is an advanced feature included only
+        in our enterprise subscription plans". Публичность здесь значит
+        только "виден в списке запросов на dune.com" -- сама SQL-логика
+        и так уже открыта в этом репозитории; секретов/данных запрос не
+        содержит, только SQL-текст.
         """
-        body = {"name": name, "query_sql": sql, "is_private": True}
+        body = {"name": name, "query_sql": sql, "is_private": False}
         result = self._post("/query", json=body)
         return result["query_id"]
 
