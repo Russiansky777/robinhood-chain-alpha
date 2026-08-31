@@ -255,14 +255,34 @@ def main() -> int:
     cohort_a, cohort_b = build_cohorts(df_gated)
     print(f"  Когорта А: {len(cohort_a)}, Когорта Б: {len(cohort_b)}")
 
-    full_pool_spearman = os.environ.get("FULL_POOL_SPEARMAN", "true").lower() == "true"
+    # Дефолт ПЕРЕКЛЮЧЁН на false (было true): реальный прогон на полном
+    # июле дал 98 629 кошельков, прошедших гейты 1-2 -- список их адресов
+    # в SQL-литерале ({{cohort_wallets}}) занимает ~4.2 млн символов и
+    # упирается в жёсткий лимит Dune на размер запроса (500 000 символов,
+    # "Consider breaking down your query into smaller queries..."). Это
+    # не вопрос экономии кредитов, а технический потолок: full-pool
+    # Spearman в текущей архитектуре (адреса как SQL-литералы) в принципе
+    # не влезает при популяции такого размера. См. docs/README.md, "Гейт 5".
+    full_pool_spearman = os.environ.get("FULL_POOL_SPEARMAN", "false").lower() == "true"
     wallets_for_august = (
         df_gated["wallet_address"].tolist()
         if full_pool_spearman
         else pd.concat([cohort_a, cohort_b])["wallet_address"].tolist()
     )
+    # Защита независимо от флага: даже когорты А+Б при экзотических
+    # конфигурациях (огромный COHORT_SIZE) могли бы упереться в лимит --
+    # лучше упасть на явной, читаемой проверке в Python, чем на 400 от Dune.
+    rendered_addr_chars = len(q_addr_list(wallets_for_august))
+    if rendered_addr_chars > 400_000:
+        print(
+            f"  [ЗАЩИТА] Список из {len(wallets_for_august)} адресов "
+            f"({rendered_addr_chars} символов) близок к лимиту Dune "
+            f"(500 000) -- принудительно сужаю до когорт А+Б."
+        )
+        wallets_for_august = pd.concat([cohort_a, cohort_b])["wallet_address"].tolist()
+        full_pool_spearman = False
     if not full_pool_spearman:
-        print("  [ЭКОНОМИЯ КРЕДИТОВ] FULL_POOL_SPEARMAN=false — Spearman только по когортам А+Б.")
+        print("  [ОГРАНИЧЕНИЕ DUNE] Spearman считается только по когортам А+Б (не по всем 98k+ гейтованных кошельков) -- см. docs/README.md, Гейт 5.")
 
     try:
         df_august = run_august("06_wallet_agg_august", wallets_for_august, test_window)
