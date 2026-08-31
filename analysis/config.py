@@ -65,6 +65,22 @@ class Config:
     # --- Вердикт (зафиксировано заранее, см. docs/README.md) ---
     significance_alpha: float = 0.05
 
+    # --- Sprint 1.5: фильтр копируемости + двухчастный тест (см.
+    # docs/README.md, "Sprint 1.5") ---
+    copyability_max_trades: int = field(default_factory=lambda: _int("COPYABILITY_MAX_TRADES", 1500))
+    copyability_max_trades_sensitivity: int = field(
+        default_factory=lambda: _int("COPYABILITY_MAX_TRADES_SENSITIVITY", 3000)
+    )
+    sniper_time_window_minutes_sensitivity: int = field(
+        default_factory=lambda: _int("SNIPER_TIME_WINDOW_MINUTES_SENSITIVITY", 1)
+    )
+    part1_alpha: float = field(default_factory=lambda: _float("PART1_ALPHA", 0.01))
+    part1_min_lift: float = field(default_factory=lambda: _float("PART1_MIN_LIFT", 2.0))
+    part2_alpha: float = field(default_factory=lambda: _float("PART2_ALPHA", 0.05))
+    sprint15_credit_budget: float = field(
+        default_factory=lambda: _float("SPRINT15_CREDIT_BUDGET", 250.0)
+    )
+
     # --- Пути ---
     output_dir: str = "analysis/output"
     cache_dir: str = "analysis/output/cache"

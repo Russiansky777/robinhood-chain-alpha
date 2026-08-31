@@ -23,6 +23,7 @@ parameters". Вместо того чтобы разбираться в точн
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from pathlib import Path
 
@@ -72,6 +73,31 @@ class DuneClient:
         # docs/DATA_ACCESS.md). Один элемент на вызов run_sql_cached,
         # включая кэш-хиты (стоимость 0, но видно, что запрос был).
         self.credit_ledger: list[dict] = []
+
+        # Персистентная память query_id по содержимому SQL (sha256 ->
+        # query_id). БЕЗ этого create_query создавал новый query_id на
+        # КАЖДЫЙ вызов, даже когда SQL не менялся -- в Sprint 1 это
+        # привело к тому, что 03_wallet_agg_july пересчитывался ДВАЖДЫ
+        # за один прогон (~25 кредитов впустую): ссылающийся на него
+        # query_02 каждый раз получал новый id, из-за чего рендер SQL
+        # для 03 менялся байт-в-байт, и локальный кэш результатов (по
+        # хэшу ИТОГОВОГО SQL) не совпадал, хотя семантика была той же.
+        # Теперь query_id стабилен, пока не меняется сам SQL-текст (без
+        # учёта query_<id>-ссылок, см. create_query). Файл лежит в
+        # cache_dir и переживает прогоны через actions/cache (см.
+        # .github/workflows/*.yml) — но даже без него теперь всегда
+        # печатается в лог (см. create_query/run_sql_cached), так что
+        # id не теряются безвозвратно даже при потере кэша контейнера.
+        self.query_id_map_file = self.cache_dir / "query_ids.json"
+        self.query_id_map: dict[str, int] = {}
+        if self.query_id_map_file.exists():
+            try:
+                self.query_id_map = json.loads(self.query_id_map_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                self.query_id_map = {}
+
+    def _save_query_id_map(self) -> None:
+        self.query_id_map_file.write_text(json.dumps(self.query_id_map))
 
     # ---------- низкоуровневые вызовы ----------
 
@@ -126,9 +152,36 @@ class DuneClient:
         и так уже открыта в этом репозитории; секретов/данных запрос не
         содержит, только SQL-текст.
         """
+        content_hash = hashlib.sha256(sql.encode()).hexdigest()
+        cached_qid = self.query_id_map.get(content_hash)
+        if cached_qid is not None:
+            print(f"[dune] query_id переиспользован для '{name}': {cached_qid} (без нового create_query)")
+            return cached_qid
+
         body = {"name": name, "query_sql": sql, "is_private": False}
         result = self._post("/query", json=body)
-        return result["query_id"]
+        qid = result["query_id"]
+        print(f"[dune] создан query_id={qid} для '{name}'")
+        self.query_id_map[content_hash] = qid
+        self._save_query_id_map()
+        return qid
+
+    def get_execution_status(self, execution_id: str) -> dict:
+        return self._get(f"/execution/{execution_id}/status")
+
+    def fetch_existing(self, execution_id: str) -> tuple[pd.DataFrame, dict, dict]:
+        """Читает результаты УЖЕ СУЩЕСТВУЮЩЕГО execution_id (например, из
+        предыдущего прогона, найденного в логах CI) -- без create_query/
+        execute, только status + results (дёшево, ничего не запускает
+        заново). Возвращает (df, status, result_stats). Используется для
+        переиспользования дорогих запросов Sprint 1 в Sprint 1.5 -- см.
+        analysis/recover_sprint1.py и docs/DATA_ACCESS.md.
+        """
+        status = self.get_execution_status(execution_id)
+        if status.get("state") != "QUERY_STATE_COMPLETED":
+            raise RuntimeError(f"execution {execution_id} не в состоянии COMPLETED: {status}")
+        df, result_stats = self.get_results_df(execution_id)
+        return df, status, result_stats
 
     def execute(self, query_id: int) -> str:
         self.executions_this_run += 1
@@ -221,6 +274,11 @@ class DuneClient:
 
         qid = query_id or self.create_query(name=name, sql=sql)
         execution_id = self.execute(qid)
+        # Печатаем ВСЕГДА, до поллинга -- если что-то дальше упадёт
+        # (таймаут, 402 на следующем шаге и т.п.), id всё равно попадёт
+        # в лог CI и его можно будет вручную переиспользовать через
+        # fetch_existing(), как сделано в analysis/recover_sprint1.py.
+        print(f"[dune] {name}: query_id={qid} execution_id={execution_id}")
         status = self.poll_until_done(execution_id)
         cost = status.get("execution_cost_credits")
 

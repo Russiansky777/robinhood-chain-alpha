@@ -20,6 +20,20 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Постоянное решение против "кэш умирает вместе с контейнером"
+      # (см. docs/DATA_ACCESS.md, Sprint 1.5): без этого analysis/output/
+      # cache/ существует только внутри одного прогона -- следующий запуск
+      # пересчитывает всё с нуля, даже если SQL не менялся ни на байт.
+      # key всегда уникален (github.run_id) -> save всегда происходит;
+      # restore-keys откатывается на самый свежий кэш с этим префиксом.
+      - name: Restore Dune query cache
+        uses: actions/cache@v4
+        with:
+          path: analysis/output/cache
+          key: dune-cache-${{ github.run_id }}
+          restore-keys: |
+            dune-cache-
+
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
 
