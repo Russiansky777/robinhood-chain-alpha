@@ -156,7 +156,14 @@ class DuneClient:
         )
         return pd.DataFrame(rows), stats
 
-    def run_sql_cached(self, name: str, sql: str, query_id: int | None = None, force_refresh: bool = False) -> pd.DataFrame:
+    def run_sql_cached(
+        self,
+        name: str,
+        sql: str,
+        query_id: int | None = None,
+        force_refresh: bool = False,
+        fetch_results: bool = True,
+    ) -> pd.DataFrame | None:
         """Выполняет (или переиспользует сохранённый query_id) уже
         полностью отрендеренный запрос, с дисковым кэшем по (name, sql) —
         повторный прогон пайплайна не пережигает кредиты повторно, пока
@@ -164,6 +171,18 @@ class DuneClient:
         исполнение) пишет запись в self.credit_ledger с фактической
         стоимостью в кредитах, взятой из ответа Dune (`execution_cost_credits`
         в статусе исполнения) — см. docs/DATA_ACCESS.md, "Смоук-тест".
+
+        `fetch_results=False` -- запрос исполняется (нужно для
+        материализации, чтобы на него могли ссылаться другие запросы
+        через `query_<id>`, и чтобы получить реальную стоимость в
+        кредитах), но результат НЕ скачивается через `/execution/.../
+        results`. Обязательно для шагов, чей DataFrame не используется в
+        Python напрямую (только как cross-query ссылка) -- см.
+        docs/DATA_ACCESS.md, "1.8 GiB на одном дне свопов": сырые свопы
+        даже за один день оказались слишком большими для нефрагментированной
+        выгрузки (Dune вернул 400 "Result is too large... use pagination"),
+        а нам эти строки в Python и не нужны -- 01/03/04 обращаются к ним
+        через `query_02_swaps_raw_july` прямо на стороне Dune.
         """
         cache_key = hashlib.sha256(sql.encode()).hexdigest()[:16]
         # CSV, не parquet: избегаем зависимости от pyarrow/fastparquet
@@ -172,16 +191,29 @@ class DuneClient:
         # рухнула ПОСЛЕ, из-за чего результат потерялся). Датафреймы
         # здесь маленькие (агрегаты по кошелькам), CSV более чем годится.
         cache_file = self.cache_dir / f"{name}_{cache_key}.csv"
-        if cache_file.exists() and not force_refresh:
+        marker_file = self.cache_dir / f"{name}_{cache_key}.done"
+
+        if fetch_results and cache_file.exists() and not force_refresh:
             print(f"[dune] cache hit: {cache_file.name}")
             self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
             return pd.read_csv(cache_file)
+        if not fetch_results and marker_file.exists() and not force_refresh:
+            print(f"[dune] cache hit (materialize-only): {marker_file.name}")
+            self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
+            return None
 
         qid = query_id or self.create_query(name=name, sql=sql)
         execution_id = self.execute(qid)
         status = self.poll_until_done(execution_id)
-        df, result_stats = self.get_results_df(execution_id)
         cost = status.get("execution_cost_credits")
+
+        if not fetch_results:
+            self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
+            print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits (материализован, результат не скачивался)")
+            marker_file.write_text(execution_id)
+            return None
+
+        df, result_stats = self.get_results_df(execution_id)
         if cost is None:
             cost = result_stats.get("execution_cost_credits")
         self.credit_ledger.append({"name": name, "credits": cost, "cached": False})

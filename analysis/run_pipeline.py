@@ -126,11 +126,11 @@ def main() -> int:
     query_ids: dict[str, int] = {}
     base_tokens_sql = q_list(list(CONFIG.base_token_symbols))
 
-    def run_named(step_key: str, sql: str) -> pd.DataFrame:
+    def run_named(step_key: str, sql: str, fetch_results: bool = True) -> pd.DataFrame | None:
         qid = client.create_query(step_key, sql)
         query_ids[step_key] = qid
         try:
-            return client.run_sql_cached(step_key, sql, query_id=qid)
+            return client.run_sql_cached(step_key, sql, query_id=qid, fetch_results=fetch_results)
         except (DuneCreditsExhausted, DuneRateLimited) as e:
             total_so_far = print_ledger(client.credit_ledger, "Потрачено до остановки")
             print(
@@ -145,8 +145,17 @@ def main() -> int:
         """Шаги 1-5 (dex.trades-only, см. sql/00_notes.md) для окна
         [start_date, end_date). Возвращает (df_agg, df_excluded, df_gated).
         """
-        run_named("02_swaps_raw_july", render_sql(read_sql("02_swaps_raw_july"), window))
-        run_named("01_pool_creation_blocks", substitute_query_refs(read_sql("01_pool_creation_blocks"), query_ids))
+        # fetch_results=False на 02 и 01: их DataFrame нигде не используется
+        # в Python напрямую (03/04 обращаются к ним через query_XX ссылки на
+        # стороне Dune) -- а сырые свопы даже за один день оказались
+        # огромными (1.8 GiB, см. docs/DATA_ACCESS.md), нефрагментированная
+        # выгрузка такого объёма падает на самом API.
+        run_named("02_swaps_raw_july", render_sql(read_sql("02_swaps_raw_july"), window), fetch_results=False)
+        run_named(
+            "01_pool_creation_blocks",
+            substitute_query_refs(read_sql("01_pool_creation_blocks"), query_ids),
+            fetch_results=False,
+        )
         df_agg = run_named(
             "03_wallet_agg_july",
             render_sql(substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids), {"base_token_symbols": base_tokens_sql}),
