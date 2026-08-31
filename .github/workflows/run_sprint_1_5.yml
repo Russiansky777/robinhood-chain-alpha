@@ -28,6 +28,12 @@ jobs:
           key: dune-cache-${{ github.run_id }}
           restore-keys: |
             dune-cache-
+          # save-always: без этого actions/cache пропускает сохранение,
+          # если джоб завершился с ненулевым кодом -- а BudgetGuardStop
+          # всегда выходит с ненулевым (см. docs/COST_POSTMORTEM.md,
+          # ревизия 4). Основная защита теперь -- постоянный закоммиченный
+          # data/sprint15_cache/ (см. dune_client.py), это дополнительная.
+          save-always: true
 
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt

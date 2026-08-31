@@ -131,6 +131,30 @@ class DuneClient:
     def _save_query_id_map(self) -> None:
         self.query_id_map_file.write_text(json.dumps(self.query_id_map))
 
+    def _commit_permanent(self, path: Path, message: str) -> None:
+        """Коммитит и пушит немедленно -- см. ревизия 4 пост-мортема:
+        actions/cache пропускает свой post-save шаг, если джоб завершился
+        с ненулевым кодом (а BudgetGuardStop всегда так выходит по
+        дизайну), из-за чего уже оплаченные результаты (например,
+        03b_cohort_selection в run #2) терялись и пересчитывались заново
+        в следующей попытке. Постоянный файл в data/ с коммитом сразу
+        после записи не зависит от того, чем закончится джоб дальше."""
+        import subprocess
+
+        try:
+            subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=False)
+            subprocess.run(
+                ["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=False
+            )
+            subprocess.run(["git", "add", str(path)], check=False)
+            diff = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
+            if diff.returncode == 0:
+                return
+            subprocess.run(["git", "commit", "-m", message], check=False)
+            subprocess.run(["git", "push"], check=False)
+        except Exception as exc:
+            print(f"[dune] ПРЕДУПРЕЖДЕНИЕ: не удалось закоммитить {path}: {exc}")
+
     # ---------- низкоуровневые вызовы ----------
 
     def _post(self, path: str, **kwargs) -> dict:
@@ -375,7 +399,24 @@ class DuneClient:
         # здесь маленькие (агрегаты по кошелькам), CSV более чем годится.
         cache_file = self.cache_dir / f"{name}_{cache_key}.csv"
         marker_file = self.cache_dir / f"{name}_{cache_key}.done"
+        # ПОСТОЯННЫЙ, закоммиченный кэш -- см. docs/COST_POSTMORTEM.md,
+        # ревизия 4: actions/cache пропускает сохранение, если джоб
+        # завершился с ненулевым кодом (а BudgetGuardStop именно так и
+        # выходит по дизайну) -- это заставило 03b_cohort_selection
+        # оплачиваться ПОВТОРНО в run #3 (уже успешно посчитан в run #2,
+        # но эфемерный кэш умер вместе с проваленным джобом). Постоянный
+        # файл в data/ переживает это безусловно, как и query_ids_recovered.json.
+        permanent_cache_file = Path("data/sprint15_cache") / f"{name}_{cache_key}.csv"
+        permanent_marker_file = Path("data/sprint15_cache") / f"{name}_{cache_key}.done"
 
+        if fetch_results and permanent_cache_file.exists() and not force_refresh:
+            print(f"[dune] ПОСТОЯННЫЙ кэш-хит: {permanent_cache_file}")
+            self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
+            return pd.read_csv(permanent_cache_file)
+        if not fetch_results and permanent_marker_file.exists() and not force_refresh:
+            print(f"[dune] ПОСТОЯННЫЙ кэш-хит (materialize-only): {permanent_marker_file}")
+            self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
+            return None
         if fetch_results and cache_file.exists() and not force_refresh:
             print(f"[dune] cache hit: {cache_file.name}")
             self.credit_ledger.append({"name": name, "credits": 0.0, "cached": True})
@@ -421,10 +462,14 @@ class DuneClient:
             self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
             print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits (материализован, результат не скачивался)")
             marker_file.write_text(execution_id)
+            permanent_marker_file.parent.mkdir(parents=True, exist_ok=True)
+            permanent_marker_file.write_text(execution_id)
+            self._commit_permanent(permanent_marker_file, f"sprint15_cache: материализован '{name}' [automated]")
             record_execution(name, cost, execution_id)
             # Пост-хок "факт > вдвое оценки" (ревизия 3, см.
-            # docs/COST_POSTMORTEM.md) -- ПОСЛЕ record_execution: факт уже
-            # должен попасть в credits_spent.json, даже если дальше стоп.
+            # docs/COST_POSTMORTEM.md) -- ПОСЛЕ того, как результат уже
+            # закоммичен постоянно и факт попал в credits_spent.json, даже
+            # если дальше стоп -- деньги и результат не теряются вместе.
             check_overrun_after_execute(name, estimate_used, cost)
             return None
 
@@ -436,6 +481,9 @@ class DuneClient:
         self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
         print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits")
         df.to_csv(cache_file, index=False)
+        permanent_cache_file.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(permanent_cache_file, index=False)
+        self._commit_permanent(permanent_cache_file, f"sprint15_cache: результат '{name}' ({len(df)} строк) [automated]")
         record_execution(name, cost, execution_id)
         check_overrun_after_execute(name, estimate_used, cost)
         return df
