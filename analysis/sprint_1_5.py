@@ -10,17 +10,25 @@ Fisher-сравнение долей профитных не отделяло "�
 Это последняя итерация: при провале линия копитрейдинга закрывается.
 См. docs/README.md, "Sprint 1.5", за полным обоснованием дизайна.
 
-Бюджет: CONFIG.sprint15_credit_budget (default 250, см. .env.example).
-Реальный расход отслеживается по ходу дела; если очередной дорогой шаг
-рискует увести кумулятивный расход за бюджет, скрипт останавливается
-ПЕРЕД ним и пишет частичный отчёт с чёткой пометкой, что именно не
-досчитано -- не тратит дальше молча.
+РЕВИЗИЯ 2 (см. docs/COST_POSTMORTEM.md): первая попытка этого скрипта
+читала полный построчный результат 03_wallet_agg_july через API (1.21M
+строк) -- оказалось, что API Result Read биллится ОТДЕЛЬНО от execute()
+по объёму данных (163.98 кредита ЗА ОДНО такое чтение). Архитектура
+переписана вокруг принципа «сырые данные не покидают Dune»: гейт 1
+(снайперы, обе версии окна), гейт 2, капы копируемости и отбор когорт
+(топ-200 + псевдослучайные 200 через детерминированный хэш) считаются
+ОДНИМ SQL-запросом на стороне Dune (sql/03b_cohort_selection.sql),
+который ссылается на уже материализованные (из Sprint 1, БЕЗ повторного
+execute) query_01/02/03 через query_<id> и возвращает наружу только
+строки кошельков, попавших хоть в одну когорту (~тысячи строк). Сводка
+по капам (sql/03c) и гистограмма снайперов (sql/03d) -- отдельные
+маленькие агрегатные запросы (единицы строк на выходе), не выгрузка
+сырья.
 
-Экономия: 03 (агрегация по кошельку за июль, вся сеть) и 04@5мин
-(снайпер-исключения при базовом окне) переиспользуются из Sprint 1 --
-либо из закоммиченных /data/sprint1_reused/*.csv.gz, либо (первый раз)
-через дешёвое чтение уже существующего execution_id без пересчёта. См.
-analysis/recover_sprint1.py.
+Персистентный бюджетный гард (analysis/credit_guard.py) проверяет
+ПЕРЕД каждым execute() И перед каждым чтением результата (по оценке
+объёма данных), коммитит data/credits_spent.json после каждой платной
+операции. Жёсткий лимит на остаток Sprint 1.5: 150 кредитов.
 
 Использование:
     python analysis/sprint_1_5.py
@@ -37,114 +45,35 @@ import numpy as np
 import pandas as pd
 
 from config import CONFIG
-from cohort_builder import build_cohorts, merge_august_pnl
+from cohort_builder import merge_august_pnl
+from credit_guard import BudgetGuardStop
 from dune_client import DuneClient, DuneCreditsExhausted, DuneRateLimited, render_sql
-from recover_sprint1 import recover_baseline, SPRINT1_ORIGINAL_COST
-from run_pipeline import (
-    read_sql,
-    substitute_query_refs,
-    q_ts,
-    q_list,
-    q_addr_list,
-    next_day,
-    fmt_usd,
-    fmt_pct,
-    print_ledger,
-)
+from run_pipeline import read_sql, substitute_query_refs, q_ts, q_list, q_addr_list, fmt_usd, fmt_pct
 from stats_test import two_part_analysis, TwoPartResult
 
 ROOT = Path(__file__).parent.parent
 RESULTS_PATH = ROOT / CONFIG.results_doc
 SECTION_MARKER = "## Sprint 1.5"
 
-# Пессимистичные оценки стоимости КАЖДОГО шага (для персистентного
-# гарда analysis/credit_guard.py -- проверка ПЕРЕД execute), взятые из
-# реально залогированных стоимостей идентичных/аналогичных запросов
-# Sprint 1 (см. docs/COST_POSTMORTEM.md) + запас ~15-20%. 02 на полном
-# месяце доминирует весь бюджет остатка Sprint 1.5 -- см. инвентаризацию
-# в docs/COST_POSTMORTEM.md перед запуском.
+# Пессимистичные оценки стоимости execute() для гарда (см.
+# docs/COST_POSTMORTEM.md, ревизия 2, смета перед запуском). 03b
+# заведомо самый тяжёлый шаг (окна row_number() по ~1.2M строк 8 раз) --
+# пользователь задал жёсткий пост-хок потолок 60 на его РЕАЛЬНУЮ
+# стоимость (см. main(): проверка после run_sql_cached).
 STEP_ESTIMATES = {
-    "02_swaps_raw_july": 125.0,       # run #13: 102.8; run #12: 102.6 -- запас на рост данных
-    "01_pool_creation_blocks": 1.0,   # run #13: 0.43; всегда <1
-    "03_wallet_agg_july": 30.0,       # run #13: 25.5 -- только если recover_baseline не сработал
-    "04_sniper_insider_exclusions": 3.0,  # run #13: 1.9 (5мин); та же форма запроса для 1мин
-    "06_wallet_agg_august": 4.0,      # run #13: 1.27 на ~400 адресов; здесь объединение до ~800
+    "03b_cohort_selection": 45.0,   # ожидание ~25-35, потолок отдельно проверяется в 60
+    "03c_cap_summary": 8.0,         # ожидание ~3-6
+    "03d_sniper_histogram": 6.0,    # ожидание ~2-5
+    "06_wallet_agg_august": 4.0,    # см. Sprint 1: 1.27 на ~400 адресов
 }
+COHORT_SEED = "sprint15-seed42"
+STEP03B_HARD_CAP = 60.0  # см. п.4 задания пользователя: стоп-и-доклад, если факт > 60
 
 
-class BudgetStop(Exception):
-    def __init__(self, spent: float, note: str):
-        self.spent = spent
-        self.note = note
-        super().__init__(f"Бюджет Sprint 1.5 ({CONFIG.sprint15_credit_budget}) исчерпан на {spent:.2f}: {note}")
-
-
-def total_spent(client: DuneClient) -> float:
-    return sum((row["credits"] or 0.0) for row in client.credit_ledger)
-
-
-def budget_gate(client: DuneClient, note: str) -> float:
-    spent = total_spent(client)
-    if spent >= CONFIG.sprint15_credit_budget:
-        raise BudgetStop(spent, note)
-    return spent
-
-
-# ---------- гейт 2 (порог сделок/токенов) и капы -- чистый Python ----------
-
-
-def gate2_filter(df_agg: pd.DataFrame, df_excluded: pd.DataFrame, min_trades: int, min_tokens: int) -> pd.DataFrame:
-    """Реплика sql/05_final_cohort_pool_july.sql на Python: не требует
-    отдельного запроса к Dune, раз 03 (df_agg) и 04 (df_excluded) уже
-    получены как DataFrame -- см. docstring модуля."""
-    excluded_set = set(df_excluded["wallet_address"])
-    mask = (
-        (~df_agg["wallet_address"].isin(excluded_set))
-        & (df_agg["trade_count"] >= min_trades)
-        & (df_agg["unique_tokens_traded"] >= min_tokens)
-    )
-    return df_agg[mask].copy()
-
-
-def apply_trade_cap(df_gated: pd.DataFrame, max_trades: int, df_agg_full: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    over_cap = df_gated[df_gated["trade_count"] > max_trades]
-    kept = df_gated[df_gated["trade_count"] <= max_trades].copy()
-    total_network_pnl = float(df_agg_full["realized_pnl_usd"].sum())
-    total_gated_pnl = float(df_gated["realized_pnl_usd"].sum())
-    cut_pnl = float(over_cap["realized_pnl_usd"].sum())
-    return kept, {
-        "max_trades": max_trades,
-        "n_before": len(df_gated),
-        "n_cut": len(over_cap),
-        "n_kept": len(kept),
-        "cut_pnl_usd": cut_pnl,
-        "total_network_pnl_usd": total_network_pnl,
-        "total_gated_pnl_usd": total_gated_pnl,
-        "pct_of_network_pnl": (cut_pnl / total_network_pnl * 100) if total_network_pnl else float("nan"),
-        "pct_of_gated_pnl": (cut_pnl / total_gated_pnl * 100) if total_gated_pnl else float("nan"),
-    }
-
-
-def sniper_histogram(df_excluded: pd.DataFrame, df_agg_full: pd.DataFrame) -> pd.Series:
-    excl_trades = df_agg_full[df_agg_full["wallet_address"].isin(set(df_excluded["wallet_address"]))]["trade_count"]
-    bins = [1, 3, 11, 101, np.inf]
-    labels = ["1-2", "3-10", "11-100", "100+"]
-    bucketed = pd.cut(excl_trades, bins=bins, right=False, labels=labels)
-    return bucketed.value_counts().reindex(labels).fillna(0).astype(int)
-
-
-def build_top20(cohort_a_with_august: pd.DataFrame) -> str:
-    top20 = cohort_a_with_august.sort_values("realized_pnl_usd_august", ascending=False).head(20)
-    lines = [
-        "| # | Address | July PnL | August PnL | Сделок (июль) | Сделок (август) |",
-        "|---|---|---|---|---|---|",
-    ]
-    for i, row in enumerate(top20.itertuples(), start=1):
-        lines.append(
-            f"| {i} | `{row.wallet_address}` | {fmt_usd(row.realized_pnl_usd)} | "
-            f"{fmt_usd(row.realized_pnl_usd_august)} | {row.trade_count} | {row.trade_count_august} |"
-        )
-    return "\n".join(lines)
+class Step03bTooExpensive(Exception):
+    def __init__(self, actual: float):
+        self.actual = actual
+        super().__init__(f"03b_cohort_selection стоил {actual:.2f} > потолок {STEP03B_HARD_CAP}")
 
 
 def fmt_lift(x: float) -> str:
@@ -172,6 +101,62 @@ def two_part_md(label: str, r: TwoPartResult) -> str:
     )
 
 
+def build_top20(cohort_a_with_august: pd.DataFrame) -> str:
+    top20 = cohort_a_with_august.sort_values("realized_pnl_usd_august", ascending=False).head(20)
+    lines = [
+        "| # | Address | July PnL | August PnL | Сделок (июль) | Сделок (август) |",
+        "|---|---|---|---|---|---|",
+    ]
+    for i, row in enumerate(top20.itertuples(), start=1):
+        lines.append(
+            f"| {i} | `{row.wallet_address}` | {fmt_usd(row.realized_pnl_usd)} | "
+            f"{fmt_usd(row.realized_pnl_usd_august)} | {row.trade_count} | {row.trade_count_august} |"
+        )
+    return "\n".join(lines)
+
+
+def print_ledger_md(ledger: list[dict]) -> str:
+    lines = ["| Запрос | Кредиты (execute) | Кэш |", "|---|---|---|"]
+    for row in ledger:
+        lines.append(f"| {row['name']} | {row['credits'] if row['credits'] is not None else 'n/a'} | {'да' if row['cached'] else 'нет'} |")
+    return "\n".join(lines)
+
+
+def build_cap_section(df_cap: pd.DataFrame) -> str:
+    lines = [
+        "### Фильтр копируемости (боты/HFT/маркет-мейкеры вне популяции)\n",
+        "Посчитано серверным SQL (`sql/03c_cap_summary.sql`) по всем 4 "
+        "комбинациям sniper-окно×кап -- не только по первичной, в отличие "
+        "от ревизии 1.\n",
+        "| Комбинация | Прошли гейты 1-2 и снайпер-фильтр | Срезано капом | PnL срезанных | % July PnL сети |",
+        "|---|---|---|---|---|",
+    ]
+    for row in df_cap.itertuples():
+        pct_net = (row.cut_pnl_usd / row.total_network_pnl_usd * 100) if row.total_network_pnl_usd else float("nan")
+        lines.append(
+            f"| {row.combo} | {row.n_gated} | {row.n_cut} | {fmt_usd(row.cut_pnl_usd)} | {pct_net:.2f}% |"
+        )
+    return "\n".join(lines)
+
+
+def build_histogram_section(df_hist: pd.DataFrame) -> str:
+    total = int(df_hist["n_wallets"].sum())
+    lines = [
+        f"### Профиль исключённых снайперов (гейт @{CONFIG.sniper_time_window_minutes}мин, {total} кошельков)\n",
+        "Распределение общего числа сделок за июль среди кошельков, "
+        "исключённых временным суррогатом гейта 1 (первый своп в первые "
+        f"{CONFIG.sniper_time_window_minutes} минут жизни пула). Посчитано серверным "
+        "SQL (`sql/03d_sniper_histogram.sql`) -- бакеты, не выгрузка построчного списка.\n",
+        "| Бакет сделок/июль | Кошельков | Доля |",
+        "|---|---|---|",
+    ]
+    order = {"1-2": 0, "3-10": 1, "11-100": 2, "100+": 3}
+    for row in sorted(df_hist.itertuples(), key=lambda r: order.get(r.bucket, 99)):
+        pct = row.n_wallets / total * 100 if total else float("nan")
+        lines.append(f"| {row.bucket} | {row.n_wallets} | {pct:.1f}% |")
+    return "\n".join(lines)
+
+
 def main() -> int:
     if not CONFIG.dune_api_key:
         print("ОШИБКА: DUNE_API_KEY не задан.", file=sys.stderr)
@@ -179,136 +164,128 @@ def main() -> int:
 
     client = DuneClient()
     query_ids: dict[str, int] = {}
-    base_tokens_sql = q_list(list(CONFIG.base_token_symbols))
     train_window = {"start_date": q_ts(CONFIG.train_start), "end_date": q_ts(CONFIG.train_end)}
     test_window = {"start_date": q_ts(CONFIG.test_start), "end_date": q_ts(CONFIG.test_end)}
-    sections: list[str] = []  # markdown-куски -- накапливаем по ходу, чтобы частичный стоп не терял уже готовое
+    sections: list[str] = []
 
-    def _estimate_for(step_key: str) -> float:
-        for prefix, est in STEP_ESTIMATES.items():
-            if step_key.startswith(prefix):
-                return est
-        from credit_guard import DEFAULT_ESTIMATE
-        return DEFAULT_ESTIMATE
+    combo_params = {
+        "sniper_window_primary_minutes": CONFIG.sniper_time_window_minutes,
+        "sniper_window_sensitivity_minutes": CONFIG.sniper_time_window_minutes_sensitivity,
+        "cap_primary": CONFIG.copyability_max_trades,
+        "cap_sensitivity": CONFIG.copyability_max_trades_sensitivity,
+        "min_trades": CONFIG.min_trades,
+        "min_unique_tokens": CONFIG.min_unique_tokens,
+    }
 
-    def run_named(step_key: str, sql: str, fetch_results: bool = True, ref_key: str | None = None):
+    def substitute_refs(sql: str) -> str:
+        return substitute_query_refs(sql, query_ids)
+
+    def run_named(step_key: str, sql: str, expected_max_rows: int, expected_columns: int) -> pd.DataFrame:
         qid = client.create_query(step_key, sql)
-        query_ids[ref_key or step_key] = qid
-        try:
-            return client.run_sql_cached(
-                step_key, sql, query_id=qid, fetch_results=fetch_results,
-                estimated_credits=_estimate_for(step_key),
-            )
-        except (DuneCreditsExhausted, DuneRateLimited) as e:
-            spent = total_spent(client)
-            print(f"\n[sprint_1_5] ОСТАНОВЛЕНО на шаге '{step_key}' (402/429): {e}\nПотрачено: {spent:.2f}", file=sys.stderr)
-            raise
-
-    def run_august(step_key: str, wallets: list[str]) -> pd.DataFrame:
-        sql = render_sql(
-            read_sql("06_wallet_agg_august"),
-            {**test_window, "base_token_symbols": base_tokens_sql, "cohort_wallets": q_addr_list(wallets)},
+        return client.run_sql_cached(
+            step_key, sql, query_id=qid,
+            estimated_credits=STEP_ESTIMATES.get(step_key),
+            expected_max_rows=expected_max_rows, expected_columns=expected_columns,
         )
-        return run_named(step_key, sql)
 
     try:
-        # ============ 1. Обязательная база: 02+01 материализуются заново ============
-        print("== 02 (свопы июля) + 01 (рождение пулов) -- нельзя переиспользовать, execution_id не логировался ==")
-        run_named("02_swaps_raw_july", render_sql(read_sql("02_swaps_raw_july"), train_window), fetch_results=False)
-        run_named("01_pool_creation_blocks", substitute_query_refs(read_sql("01_pool_creation_blocks"), query_ids), fetch_results=False)
-        spent = budget_gate(client, "после 02+01 (обязательная база)")
-        print(f"  Потрачено на 02+01: {spent:.2f} кредитов")
+        # ============ 0. Pre-flight: query_id должны быть УЖЕ материализованы ============
+        # НИКАКОГО execute здесь -- create_query с require_cached=True либо
+        # возвращает существующий query_id (из query_id_map.json,
+        # см. dune_client.py), либо падает немедленно, ДО единого платного
+        # вызова. Это гарантирует, что 03b/03c/03d будут ссылаться на уже
+        # оплаченные в Sprint 1 результаты 02/01/03, а не тихо создадут
+        # новый (пустой) query и не заставят Dune пере-исполнить 02.
+        print("== Pre-flight: 02/01/03 должны быть в query_id_map.json (без нового execute) ==")
+        query_ids["02_swaps_raw_july"] = client.create_query(
+            "02_swaps_raw_july", render_sql(read_sql("02_swaps_raw_july"), train_window), require_cached=True
+        )
+        query_ids["01_pool_creation_blocks"] = client.create_query(
+            "01_pool_creation_blocks", substitute_refs(read_sql("01_pool_creation_blocks")), require_cached=True
+        )
+        # 03 использует {{base_token_symbols}} как unnest(array[...]) -- та же
+        # подстановка, что и в Sprint 1 (run_pipeline.py:q_list), нужна
+        # побитово идентичная SQL-строка, чтобы content-hash совпал.
+        base_tokens_sql = q_list(list(CONFIG.base_token_symbols))
+        query_ids["03_wallet_agg_july"] = client.create_query(
+            "03_wallet_agg_july",
+            render_sql(substitute_refs(read_sql("03_wallet_agg_july")), {"base_token_symbols": base_tokens_sql}),
+            require_cached=True,
+        )
+        query_ids["03_wallet_agg_july"] = client.create_query(
+            "03_wallet_agg_july",
+            render_sql(substitute_refs(read_sql("03_wallet_agg_july")), {"base_token_symbols": base_tokens_sql}),
+            require_cached=True,
+        )
+        print(f"  query_ids: 02={query_ids['02_swaps_raw_july']}, 01={query_ids['01_pool_creation_blocks']}, 03={query_ids['03_wallet_agg_july']}")
+        print("  Pre-flight OK -- 02/01/03 уже материализованы на Dune, execute для них не требуется.")
 
-        # ============ 2. Переиспользуем 03 (+04@5мин, +05@5мин как cross-check) ============
-        recovered = recover_baseline(client)
-        if recovered.recovered:
-            df_agg_july = recovered.df_agg_july
-            df_excluded_5m = recovered.df_excluded_5m
-            recovery_note = recovered.note
-            recovery_savings = recovered.savings_credits
-            if recovered.query_id_03 is not None:
-                query_ids["03_wallet_agg_july"] = recovered.query_id_03
-        else:
-            print("  [recover] Пересчитываю 03 и 04@5мин с нуля (fallback).")
-            df_agg_july = run_named(
-                "03_wallet_agg_july",
-                render_sql(substitute_query_refs(read_sql("03_wallet_agg_july"), query_ids), {"base_token_symbols": base_tokens_sql}),
+        # ============ 1. 03b: гейт 1+2, капы, когорты -- одним запросом ============
+        sql_03b = render_sql(
+            substitute_refs(read_sql("03b_cohort_selection")),
+            {**combo_params, "cohort_size": CONFIG.cohort_size, "cohort_seed": COHORT_SEED},
+        )
+        df_cohorts = run_named("03b_cohort_selection", sql_03b, expected_max_rows=2000, expected_columns=12)
+        actual_03b_cost = client.credit_ledger[-1]["credits"] or 0.0
+        print(f"  03b_cohort_selection: реальная стоимость execute = {actual_03b_cost:.2f} (потолок {STEP03B_HARD_CAP})")
+        if actual_03b_cost > STEP03B_HARD_CAP:
+            raise Step03bTooExpensive(actual_03b_cost)
+        print(f"  03b вернул {len(df_cohorts)} строк (кошельки хотя бы в одной когорте)")
+
+        # ============ 2. 03c: сводка по капам (для отчёта) ============
+        sql_03c = render_sql(substitute_refs(read_sql("03c_cap_summary")), combo_params)
+        df_cap = run_named("03c_cap_summary", sql_03c, expected_max_rows=10, expected_columns=5)
+
+        # ============ 3. 03d: гистограмма снайперов (первичное окно) ============
+        sql_03d = render_sql(
+            substitute_refs(read_sql("03d_sniper_histogram")),
+            {"sniper_window_primary_minutes": CONFIG.sniper_time_window_minutes},
+        )
+        df_hist = run_named("03d_sniper_histogram", sql_03d, expected_max_rows=10, expected_columns=2)
+
+        # ============ 4. Когорты из df_cohorts (флаговые колонки) ============
+        def cohort(flag_col: str) -> pd.DataFrame:
+            return df_cohorts[df_cohorts[flag_col] == 1].copy()
+
+        cohort_a_5_1500, cohort_b_5_1500 = cohort("cohort_a_5_1500"), cohort("cohort_b_5_1500")
+        cohort_a_5_3000, cohort_b_5_3000 = cohort("cohort_a_5_3000"), cohort("cohort_b_5_3000")
+        cohort_a_1_1500, cohort_b_1_1500 = cohort("cohort_a_1_1500"), cohort("cohort_b_1_1500")
+        cohort_a_1_3000, cohort_b_1_3000 = cohort("cohort_a_1_3000"), cohort("cohort_b_1_3000")
+        for label, df in [
+            ("A 5/1500", cohort_a_5_1500), ("B 5/1500", cohort_b_5_1500),
+            ("A 5/3000", cohort_a_5_3000), ("B 5/3000", cohort_b_5_3000),
+            ("A 1/1500", cohort_a_1_1500), ("B 1/1500", cohort_b_1_1500),
+            ("A 1/3000", cohort_a_1_3000), ("B 1/3000", cohort_b_1_3000),
+        ]:
+            print(f"  Когорта {label}: {len(df)} кошельков (ожидалось {CONFIG.cohort_size})")
+
+        # ============ 5. Августовский PnL -- 06 по union-списку когорт ============
+        def run_august(step_key: str, wallets: list[str]) -> pd.DataFrame:
+            sql = render_sql(
+                read_sql("06_wallet_agg_august"),
+                {**test_window, "base_token_symbols": base_tokens_sql, "cohort_wallets": q_addr_list(wallets)},
             )
-            df_excluded_5m = run_named(
-                "04_sniper_insider_exclusions_5m",
-                render_sql(substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids), {"sniper_time_window_minutes": CONFIG.sniper_time_window_minutes}),
-                ref_key="04_sniper_insider_exclusions",
-            )
-            recovery_note = "Переиспользование не сработало -- пересчитано с нуля."
-            recovery_savings = 0.0
-        print(f"  Всего июльских трейдеров (03): {len(df_agg_july)}; исключено снайперов @5мин (04): {len(df_excluded_5m)}")
-        spent = budget_gate(client, "после восстановления/пересчёта 03+04@5мин")
-
-        # ============ 3. Гейт 2 (Python) + фильтр копируемости для sniper=5мин ============
-        df_gated_5m = gate2_filter(df_agg_july, df_excluded_5m, CONFIG.min_trades, CONFIG.min_unique_tokens)
-        print(f"  Прошли гейты 1-2 @5мин (до фильтра копируемости): {len(df_gated_5m)}")
-
-        def cohorts_for(df_gated: pd.DataFrame, max_trades: int, label: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-            kept, cap_stats = apply_trade_cap(df_gated, max_trades, df_agg_july)
-            print(
-                f"  [{label}] Фильтр копируемости (>{max_trades} сделок/июль): срезано "
-                f"{cap_stats['n_cut']} кошельков ({cap_stats['pct_of_network_pnl']:.2f}% July PnL сети, "
-                f"{cap_stats['pct_of_gated_pnl']:.2f}% PnL гейтованной популяции), осталось {cap_stats['n_kept']}"
-            )
-            a, b = build_cohorts(kept, cohort_size=CONFIG.cohort_size)
-            return a, b, cap_stats
-
-        cohort_a_5_1500, cohort_b_5_1500, cap_stats_5_1500 = cohorts_for(df_gated_5m, CONFIG.copyability_max_trades, "sniper=5мин, cap=1500")
-        cohort_a_5_3000, cohort_b_5_3000, cap_stats_5_3000 = cohorts_for(df_gated_5m, CONFIG.copyability_max_trades_sensitivity, "sniper=5мин, cap=3000")
+            return run_named(step_key, sql, expected_max_rows=2000, expected_columns=4)
 
         wallets_5m = pd.concat([cohort_a_5_1500, cohort_b_5_1500, cohort_a_5_3000, cohort_b_5_3000])["wallet_address"].unique().tolist()
-        spent = budget_gate(client, "перед August-запросом (sniper=5мин)")
         df_august_5m = run_august("06_wallet_agg_august_sniper5m", wallets_5m)
         print(f"  {len(df_august_5m)} из {len(wallets_5m)} кошельков (sniper=5мин) торговали в августе")
 
-        def with_august(a: pd.DataFrame, b: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-            return merge_august_pnl(a, df_august_5m), merge_august_pnl(b, df_august_5m)
-
-        cohort_a_5_1500, cohort_b_5_1500 = with_august(cohort_a_5_1500, cohort_b_5_1500)
-        cohort_a_5_3000, cohort_b_5_3000 = with_august(cohort_a_5_3000, cohort_b_5_3000)
-
-        result_5_1500 = two_part_analysis(cohort_a_5_1500, cohort_b_5_1500, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
-        result_5_3000 = two_part_analysis(cohort_a_5_3000, cohort_b_5_3000, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
-        print(f"  ПЕРВИЧНЫЙ результат (sniper=5мин, cap=1500): {result_5_1500.verdict}")
-
-        sections.append(f"{SECTION_MARKER}\n\nСгенерировано `analysis/sprint_1_5.py` в {dt.datetime.utcnow().isoformat()}Z.\n")
-        sections.append(build_intro_section(recovered, recovery_note, recovery_savings))
-        sections.append(build_cap_section(cap_stats_5_1500, cap_stats_5_3000))
-        sections.append("### Основной результат (sniper=5мин, cap=1500 сделок) -- ПЕРВИЧНЫЙ\n\n" + two_part_md("sniper=5мин, cap=1500", result_5_1500))
-
-        # ============ 4. Sensitivity: sniper=1мин ============
-        # Гейт 2 для этой ветки тоже считается в Python (gate2_filter) поверх
-        # уже имеющегося df_agg_july -- 04@1мин ссылается только на 01/02
-        # (см. sql/04_sniper_insider_exclusions.sql), не на 03, так что
-        # отсутствие query_id_03 при восстановлении из локальных файлов
-        # здесь ни на что не влияет.
-        spent = budget_gate(client, "перед sniper=1мин веткой (04@1мин)")
-        df_excluded_1m = run_named(
-            "04_sniper_insider_exclusions_1m",
-            render_sql(substitute_query_refs(read_sql("04_sniper_insider_exclusions"), query_ids), {"sniper_time_window_minutes": CONFIG.sniper_time_window_minutes_sensitivity}),
-            ref_key="04_sniper_insider_exclusions",
-        )
-        print(f"  Исключено снайперов @1мин (04): {len(df_excluded_1m)}")
-        df_gated_1m = gate2_filter(df_agg_july, df_excluded_1m, CONFIG.min_trades, CONFIG.min_unique_tokens)
-        print(f"  Прошли гейты 1-2 @1мин (до фильтра копируемости): {len(df_gated_1m)}")
-
-        cohort_a_1_1500, cohort_b_1_1500, cap_stats_1_1500 = cohorts_for(df_gated_1m, CONFIG.copyability_max_trades, "sniper=1мин, cap=1500")
-        cohort_a_1_3000, cohort_b_1_3000, cap_stats_1_3000 = cohorts_for(df_gated_1m, CONFIG.copyability_max_trades_sensitivity, "sniper=1мин, cap=3000")
-
         wallets_1m = pd.concat([cohort_a_1_1500, cohort_b_1_1500, cohort_a_1_3000, cohort_b_1_3000])["wallet_address"].unique().tolist()
-        spent = budget_gate(client, "перед August-запросом (sniper=1мин)")
         df_august_1m = run_august("06_wallet_agg_august_sniper1m", wallets_1m)
+        print(f"  {len(df_august_1m)} из {len(wallets_1m)} кошельков (sniper=1мин) торговали в августе")
 
+        cohort_a_5_1500, cohort_b_5_1500 = merge_august_pnl(cohort_a_5_1500, df_august_5m), merge_august_pnl(cohort_b_5_1500, df_august_5m)
+        cohort_a_5_3000, cohort_b_5_3000 = merge_august_pnl(cohort_a_5_3000, df_august_5m), merge_august_pnl(cohort_b_5_3000, df_august_5m)
         cohort_a_1_1500, cohort_b_1_1500 = merge_august_pnl(cohort_a_1_1500, df_august_1m), merge_august_pnl(cohort_b_1_1500, df_august_1m)
         cohort_a_1_3000, cohort_b_1_3000 = merge_august_pnl(cohort_a_1_3000, df_august_1m), merge_august_pnl(cohort_b_1_3000, df_august_1m)
 
+        # ============ 6. Двухчастный тест на все 4 ячейки ============
+        result_5_1500 = two_part_analysis(cohort_a_5_1500, cohort_b_5_1500, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
+        result_5_3000 = two_part_analysis(cohort_a_5_3000, cohort_b_5_3000, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
         result_1_1500 = two_part_analysis(cohort_a_1_1500, cohort_b_1_1500, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
         result_1_3000 = two_part_analysis(cohort_a_1_3000, cohort_b_1_3000, CONFIG.part1_alpha, CONFIG.part1_min_lift, CONFIG.part2_alpha)
+        print(f"  ПЕРВИЧНЫЙ результат (sniper=5мин, cap=1500): {result_5_1500.verdict}")
 
         cells = {
             "sniper=5мин, cap=1500 (ПЕРВИЧНАЯ)": result_5_1500,
@@ -319,6 +296,22 @@ def main() -> int:
         signs = {k: np.sign(r.prop_positive_a - r.prop_positive_b) if not np.isnan(r.prop_positive_a - r.prop_positive_b) else np.nan for k, r in cells.items()}
         robust = len(set(s for s in signs.values() if not np.isnan(s))) <= 1 and not any(np.isnan(s) for s in signs.values())
 
+        # ============ 7. Сборка секций отчёта ============
+        sections.append(f"{SECTION_MARKER}\n\nСгенерировано `analysis/sprint_1_5.py` (ревизия 2) в {dt.datetime.utcnow().isoformat()}Z.\n")
+        sections.append(
+            "### Дизайн (ревизия 2 -- см. docs/COST_POSTMORTEM.md)\n\n"
+            f"- Гейт снайперов (первичный): {CONFIG.sniper_time_window_minutes} мин; sensitivity: {CONFIG.sniper_time_window_minutes_sensitivity} мин\n"
+            f"- Кап копируемости (первичный): >{CONFIG.copyability_max_trades} сделок/июль исключены; sensitivity: >{CONFIG.copyability_max_trades_sensitivity}\n"
+            f"- Первичный критерий (Часть 1): Fisher one-sided p<{CONFIG.part1_alpha} И лифт≥{CONFIG.part1_min_lift}x\n"
+            f"- Вторичный критерий (Часть 2): медиана А>Б среди августовски-активных (p<{CONFIG.part2_alpha} — информативно, не обязательно)\n"
+            "- Гейт 1/2, капы и отбор когорт (топ-200 + псевдослучайные 200 через "
+            "детерминированный хэш адреса) считаются одним серверным SQL-запросом "
+            "(`sql/03b_cohort_selection.sql`) -- полный построчный результат 03 "
+            "(1.21M строк) через API НЕ читается ни разу.\n"
+            f"- Реальная стоимость execute() 03b: {actual_03b_cost:.2f} кредитов."
+        )
+        sections.append(build_cap_section(df_cap))
+        sections.append("### Основной результат (sniper=5мин, cap=1500 сделок) -- ПЕРВИЧНЫЙ\n\n" + two_part_md("sniper=5мин, cap=1500", result_5_1500))
         sections.append(
             "### Sensitivity-сетка (2×2: снайпер-гейт × кап сделок)\n\n"
             "| Ячейка | Активных А/Б | Доля профитных А vs Б | Лифт | Fisher p | Часть 1 | Медиана А vs Б | MWU p | Вердикт ячейки |\n"
@@ -329,25 +322,11 @@ def main() -> int:
                 f"${r.median_active_a:,.0f} vs ${r.median_active_b:,.0f} | {r.mwu_p:.5f} | **{r.verdict}** |"
                 for k, r in cells.items()
             )
-            + f"\n\n**Знак результата Части 1 устойчив во всех 4 комбинациях: {'ДА' if robust else 'НЕТ'}** "
-            f"(доля профитных А {'>' if all(s > 0 for s in signs.values() if not np.isnan(s)) else '<= для части ячеек, см. таблицу' } доли профитных Б в каждой ячейке)."
+            + f"\n\n**Знак результата Части 1 устойчив во всех 4 комбинациях: {'ДА' if robust else 'НЕТ'}**."
         )
-
-        # ============ 5. Гистограмма профиля снайперов (@5мин, бесплатно) ============
-        hist = sniper_histogram(df_excluded_5m, df_agg_july)
-        sections.append(
-            "### Профиль исключённых снайперов (гейт @5мин, {} кошельков)\n\n".format(len(df_excluded_5m))
-            + "Распределение общего числа сделок за июль среди кошельков, "
-            "исключённых временным суррогатом гейта 1 (первый своп в первые "
-            "5 минут жизни пула):\n\n"
-            "| Бакет сделок/июль | Кошельков | Доля |\n|---|---|---|\n"
-            + "\n".join(f"| {b} | {int(hist[b])} | {hist[b]/len(df_excluded_5m)*100:.1f}% | " for b in hist.index)
-        )
-
-        # ============ 6. Топ-20 очищенной когорты А (primary cell) ============
+        sections.append(build_histogram_section(df_hist))
         sections.append("### Топ-20 персистентных кошельков (очищенная когорта А, sniper=5мин, cap=1500, по августовскому PnL)\n\n" + build_top20(cohort_a_5_1500))
 
-        # ============ 7. Итоговый вердикт спринта ============
         final_verdict = result_5_1500.verdict
         sections.append(
             "### Итоговый вердикт Sprint 1.5\n\n"
@@ -356,67 +335,45 @@ def main() -> int:
             f"Устойчивость по sensitivity-сетке: {'подтверждена (знак не меняется)' if robust else 'НЕ подтверждена -- знак результата Части 1 меняется между ячейками, см. таблицу выше'}."
         )
 
-        full_ledger_total = total_spent(client)
+        run_total = sum((row["credits"] or 0.0) for row in client.credit_ledger)
         sections.append(
-            "### Стоимость Sprint 1.5\n\n"
-            f"Потрачено кредитов в этом прогоне: **{full_ledger_total:.2f}** "
-            f"(бюджет {CONFIG.sprint15_credit_budget}). Сэкономлено переиспользованием "
-            f"результатов Sprint 1 (03 + 04@5мин, вместо пересчёта): **~{recovery_savings:.2f}** кредитов.\n\n"
+            "### Стоимость Sprint 1.5 (ревизия 2)\n\n"
+            f"Потрачено на execute() в этом прогоне: **{run_total:.2f}** кредитов "
+            f"(execute 03b={actual_03b_cost:.2f}, потолок {STEP03B_HARD_CAP}). Полный "
+            "построчный результат 03 (163.98 кредита за чтение в ревизии 1) не читался "
+            "ни разу -- все чтения этого прогона ограничены тысячами строк максимум "
+            "(см. data/credits_spent.json для точного леджера execute+чтений).\n\n"
             + print_ledger_md(client.credit_ledger)
         )
 
         write_results(sections)
-        print(f"\n[sprint_1_5] Готово. Итого потрачено: {full_ledger_total:.2f} кредитов.")
+        print(f"\n[sprint_1_5] Готово. Execute-стоимость этого прогона: {run_total:.2f} кредитов.")
         return 0
 
-    except BudgetStop as e:
+    except Step03bTooExpensive as e:
         sections.append(
-            f"\n\n> **ОСТАНОВЛЕНО по бюджету на {e.spent:.2f} из {CONFIG.sprint15_credit_budget} кредитов** "
-            f"перед шагом: {e.note}. Приведённые выше разделы (если есть) — то, что успело досчитаться."
+            f"\n\n> **ОСТАНОВЛЕНО: 03b_cohort_selection стоил {e.actual:.2f} кредитов, "
+            f"что выше согласованного потолка {STEP03B_HARD_CAP}.** Деньги за 03b уже "
+            "потрачены (Dune не даёт предварительной оценки стоимости execute), но "
+            "дальнейшие шаги (03c/03d/06×2) остановлены, чтобы не наращивать перерасход. "
+            "Требуется решение пользователя перед продолжением."
         )
         write_results(sections)
         print(f"\n[sprint_1_5] {e}", file=sys.stderr)
+        return 4
+    except BudgetGuardStop as e:
+        sections.append(
+            "\n\n> **ОСТАНОВЛЕНО персистентным бюджетным гардом** (analysis/credit_guard.py) "
+            "-- см. data/credits_spent.json и вывод выше для точной причины (execute или "
+            "чтение результата, какая оценка и какой лимит превышен)."
+        )
+        write_results(sections)
+        print(f"\n[sprint_1_5] Остановлено бюджетным гардом (см. вывод выше).", file=sys.stderr)
         return 3
     except (DuneCreditsExhausted, DuneRateLimited) as e:
         sections.append(f"\n\n> **ОСТАНОВЛЕНО: {e}**")
         write_results(sections)
         return 1
-
-
-def build_intro_section(recovered, recovery_note: str, savings: float) -> str:
-    lines = [
-        "### Дизайн и статус переиспользования данных Sprint 1",
-        "",
-        f"- Гейт снайперов (первичный): {CONFIG.sniper_time_window_minutes} мин; sensitivity: {CONFIG.sniper_time_window_minutes_sensitivity} мин",
-        f"- Кап копируемости (первичный): >{CONFIG.copyability_max_trades} сделок/июль исключены; sensitivity: >{CONFIG.copyability_max_trades_sensitivity}",
-        f"- Первичный критерий (Часть 1): Fisher one-sided p<{CONFIG.part1_alpha} И лифт≥{CONFIG.part1_min_lift}x",
-        f"- Вторичный критерий (Часть 2): медиана А>Б среди августовски-активных (p<{CONFIG.part2_alpha} — informativно, не обязательно)",
-        "",
-        f"**Переиспользование результатов Sprint 1:** {recovery_note}",
-    ]
-    if recovered.recovered:
-        source = "закоммиченных /data/sprint1_reused/*.csv.gz (без обращения к Dune)" if recovered.from_local_files else "execution_id Sprint 1 через Dune API (status+results, без пересчёта)"
-        lines.append(f"Источник: {source}. Сэкономлено против полного пересчёта: ~{savings:.2f} кредитов.")
-    return "\n".join(lines)
-
-
-def build_cap_section(cap_1500: dict, cap_3000: dict) -> str:
-    return (
-        "### Фильтр копируемости (боты/HFT/маркет-мейкеры вне популяции)\n\n"
-        "| Кап (сделок/июль) | Кошельков до | Срезано | Осталось | PnL срезанных | % July PnL сети | % PnL гейтованной популяции |\n"
-        "|---|---|---|---|---|---|---|\n"
-        f"| {cap_1500['max_trades']} (первичный) | {cap_1500['n_before']} | {cap_1500['n_cut']} | {cap_1500['n_kept']} | "
-        f"{fmt_usd(cap_1500['cut_pnl_usd'])} | {cap_1500['pct_of_network_pnl']:.2f}% | {cap_1500['pct_of_gated_pnl']:.2f}% |\n"
-        f"| {cap_3000['max_trades']} (sensitivity) | {cap_3000['n_before']} | {cap_3000['n_cut']} | {cap_3000['n_kept']} | "
-        f"{fmt_usd(cap_3000['cut_pnl_usd'])} | {cap_3000['pct_of_network_pnl']:.2f}% | {cap_3000['pct_of_gated_pnl']:.2f}% |"
-    )
-
-
-def print_ledger_md(ledger: list[dict]) -> str:
-    lines = ["| Запрос | Кредиты | Кэш |", "|---|---|---|"]
-    for row in ledger:
-        lines.append(f"| {row['name']} | {row['credits'] if row['credits'] is not None else 'n/a'} | {'да' if row['cached'] else 'нет'} |")
-    return "\n".join(lines)
 
 
 def write_results(sections: list[str]) -> None:

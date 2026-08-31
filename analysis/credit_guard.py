@@ -29,6 +29,32 @@ CREDITS_FILE = Path("data/credits_spent.json")
 
 DEFAULT_ESTIMATE = 110.0  # см. docstring: наихудший реально замеренный запрос + запас
 
+# ---------- Result Read billing (ревизия 2 гарда, см. docs/COST_POSTMORTEM.md) ----------
+#
+# Биллинг-страница пользователя вскрыла вторую дыру: чтение результата
+# через /execution/{id}/results биллится ОТДЕЛЬНО от execute() и
+# зависит от объёма данных ("датапоинты" = строки × колонки), а не
+# только от execute()'s execution_cost_credits. Пример: чтение полного
+# результата 03_wallet_agg_july (1,210,160 строк × 5 колонок =
+# 6,050,800 датапоинтов) стоило 163.98 кредита -- за само ЧТЕНИЕ, не
+# исполнение. Точной публичной формулы не нашлось (docs.dune.com
+# заблокирован сетевым прокси отсюда); ставка ниже калибрована по этому
+# подтверждённому пользователем факту (163.98 / 6,050,800) с запасом
+# на неточность калибровки под другие формы данных.
+READ_COST_PER_DATAPOINT = 163.98 / 6_050_800  # ~2.71e-5, подтверждено пользователем для 03
+READ_COST_PER_DATAPOINT_SAFETY_MARGIN = 1.5    # запас поверх калибровки
+
+
+def estimate_read_credits(row_count: int, column_count: int) -> float:
+    """Оценка стоимости ЧТЕНИЯ результата (не execute) по объёму данных.
+    Используется ПЕРЕД каждым вызовом /execution/{id}/results -- см.
+    check_before_read. Architectural-принцип «сырые данные не покидают
+    Dune» (docs/README.md, Sprint 1.5 ревизия 2) означает: в этом
+    проекте после редизайна такие чтения всегда малы (тысячи строк
+    максимум) -- эта функция в первую очередь защита от регрессии."""
+    datapoints = max(row_count, 0) * max(column_count, 1)
+    return datapoints * READ_COST_PER_DATAPOINT * READ_COST_PER_DATAPOINT_SAFETY_MARGIN
+
 
 class BudgetGuardStop(SystemExit):
     """Жёсткий стоп -- гард сработал ДО execute. Не перехватывать и не
@@ -91,10 +117,7 @@ def _git_commit(message: str) -> None:
         print(f"[credit_guard] ПРЕДУПРЕЖДЕНИЕ: не удалось закоммитить {CREDITS_FILE}: {exc}")
 
 
-def check_before_execute(name: str, estimated_credits: float | None = None) -> None:
-    """Вызывается ПЕРЕД КАЖДЫМ execute(). Жёсткий exit с полным докладом
-    при нарушении лимита -- см. docs/README.md, Sprint 1.5, п.2."""
-    estimate = estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
+def _check_before_operation(op_kind: str, name: str, estimate: float) -> None:
     state = load_state()
     sprint15_spent = state["sprint15"]["spent"]
     sprint15_budget = state["sprint15"]["budget_remaining_at_init"]
@@ -106,42 +129,75 @@ def check_before_execute(name: str, estimated_credits: float | None = None) -> N
 
     if projected_sprint15 > sprint15_budget:
         print(
-            f"[credit_guard] СТОП: запрос '{name}' (оценка {estimate:.1f} кредитов) "
+            f"[credit_guard] СТОП: {op_kind} '{name}' (оценка {estimate:.1f} кредитов) "
             f"превысил бы бюджет Sprint 1.5 на остаток: потрачено "
             f"{sprint15_spent:.2f} + оценка {estimate:.1f} = {projected_sprint15:.2f} "
-            f"> лимит {sprint15_budget:.1f}.\nНичего не исполнено. Файл: {CREDITS_FILE}."
+            f"> лимит {sprint15_budget:.1f}.\nНичего не исполнено/не прочитано. Файл: {CREDITS_FILE}."
         )
         raise BudgetGuardStop(1)
     if projected_cycle > cycle_limit:
         print(
-            f"[credit_guard] СТОП: запрос '{name}' (оценка {estimate:.1f} кредитов) "
+            f"[credit_guard] СТОП: {op_kind} '{name}' (оценка {estimate:.1f} кредитов) "
             f"превысил бы внешнюю границу биллинг-цикла: потрачено в цикле "
             f"{cycle_spent_so_far:.2f} + оценка {estimate:.1f} = {projected_cycle:.2f} "
-            f"> граница {cycle_limit:.1f}.\nНичего не исполнено. Файл: {CREDITS_FILE}."
+            f"> граница {cycle_limit:.1f}.\nНичего не исполнено/не прочитано. Файл: {CREDITS_FILE}."
         )
         raise BudgetGuardStop(1)
     print(
-        f"[credit_guard] OK: '{name}' оценка {estimate:.1f}; после -- Sprint1.5 "
+        f"[credit_guard] OK: {op_kind} '{name}' оценка {estimate:.1f}; после -- Sprint1.5 "
         f"{projected_sprint15:.2f}/{sprint15_budget:.1f}, цикл "
         f"{projected_cycle:.2f}/{cycle_limit:.1f}."
     )
 
 
-def record_execution(name: str, actual_credits: float | None, execution_id: str | None = None) -> None:
-    """Вызывается СРАЗУ после того, как стала известна (или точно
-    неизвестна -- см. таймаут) фактическая стоимость. Коммитит немедленно."""
-    credits = float(actual_credits) if actual_credits is not None else 0.0
+def check_before_execute(name: str, estimated_credits: float | None = None) -> None:
+    """Вызывается ПЕРЕД КАЖДЫМ execute(). Жёсткий exit с полным докладом
+    при нарушении лимита -- см. docs/README.md, Sprint 1.5, п.2."""
+    estimate = estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
+    _check_before_operation("execute", name, estimate)
+
+
+def check_before_read(name: str, row_count: int, column_count: int) -> float:
+    """Вызывается ПЕРЕД КАЖДЫМ чтением результата (/execution/.../results).
+    Ревизия 2 гарда -- execute() был не единственной платной операцией,
+    см. docs/COST_POSTMORTEM.md. Возвращает использованную оценку (для
+    записи в record_read)."""
+    estimate = estimate_read_credits(row_count, column_count)
+    _check_before_operation("чтение результата", name, estimate)
+    return estimate
+
+
+def _record(op_kind: str, name: str, credits: float, credits_known: bool, execution_id: str | None) -> None:
     state = load_state()
     state["sprint15"]["spent"] = round(state["sprint15"]["spent"] + credits, 6)
     state["entries"].append(
         {
+            "op": op_kind,
             "name": name,
             "execution_id": execution_id,
             "credits": credits,
-            "credits_known": actual_credits is not None,
+            "credits_known": credits_known,
             "at": _now(),
         }
     )
     _save(state)
-    tag = f"{credits:.3f}" if actual_credits is not None else "НЕИЗВЕСТНО (см. entries)"
-    _git_commit(f"credits_spent.json: +{tag} за '{name}' [automated guard]")
+    tag = f"{credits:.3f}" if credits_known else f"~{credits:.3f} (ОЦЕНКА, не подтверждено Dune)"
+    _git_commit(f"credits_spent.json: +{tag} за {op_kind} '{name}' [automated guard]")
+
+
+def record_execution(name: str, actual_credits: float | None, execution_id: str | None = None) -> None:
+    """Вызывается СРАЗУ после того, как стала известна (или точно
+    неизвестна -- см. таймаут) фактическая стоимость execute(). Коммитит
+    немедленно."""
+    credits = float(actual_credits) if actual_credits is not None else 0.0
+    _record("execute", name, credits, actual_credits is not None, execution_id)
+
+
+def record_read(name: str, estimated_credits: float, row_count: int, column_count: int, execution_id: str | None = None) -> None:
+    """Вызывается СРАЗУ после чтения результата. Dune не отдаёт точную
+    стоимость чтения через API (в отличие от execute()) -- пишем
+    ОЦЕНКУ (estimate_read_credits по фактическому row/column count,
+    обычно точнее предварительной, т.к. row_count здесь уже реальный,
+    не ожидаемый) и явно помечаем её как неподтверждённую."""
+    actual_estimate = estimate_read_credits(row_count, column_count)
+    _record("чтение результата", name, actual_estimate, False, execution_id)

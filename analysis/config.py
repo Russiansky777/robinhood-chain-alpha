@@ -77,8 +77,13 @@ class Config:
     part1_alpha: float = field(default_factory=lambda: _float("PART1_ALPHA", 0.01))
     part1_min_lift: float = field(default_factory=lambda: _float("PART1_MIN_LIFT", 2.0))
     part2_alpha: float = field(default_factory=lambda: _float("PART2_ALPHA", 0.05))
+    # УСТАРЕЛО (не читается analysis/sprint_1_5.py ревизии 2): реальный
+    # бюджетный лимит теперь -- персистентный analysis/credit_guard.py +
+    # data/credits_spent.json (жёсткая граница 150 на остаток спринта,
+    # см. docs/COST_POSTMORTEM.md). Оставлено, чтобы не ломать импорт,
+    # если что-то ещё на него ссылается.
     sprint15_credit_budget: float = field(
-        default_factory=lambda: _float("SPRINT15_CREDIT_BUDGET", 250.0)
+        default_factory=lambda: _float("SPRINT15_CREDIT_BUDGET", 150.0)
     )
 
     # --- Пути ---

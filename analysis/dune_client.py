@@ -31,9 +31,17 @@ import pandas as pd
 import requests
 
 from config import CONFIG
-from credit_guard import check_before_execute, record_execution
+from credit_guard import check_before_execute, check_before_read, record_execution, record_read
 
 API_BASE = "https://api.dune.com/api/v1"
+
+# Архитектурный принцип «сырые данные не покидают Dune» (Sprint 1.5,
+# ревизия 2 -- см. docs/COST_POSTMORTEM.md): страховка от регрессии --
+# если вызывающий код объявляет expected_max_rows выше этого порога без
+# явного override, это почти наверняка означает попытку читать
+# построчный результат вместо агрегата/сводки, что и стоило 163.98
+# кредита за одно чтение 03. По умолчанию отказываем.
+DEFAULT_MAX_SAFE_READ_ROWS = 20_000
 
 
 class DuneCreditsExhausted(RuntimeError):
@@ -138,7 +146,7 @@ class DuneClient:
 
     # ---------- публичный API ----------
 
-    def create_query(self, name: str, sql: str) -> int:
+    def create_query(self, name: str, sql: str, require_cached: bool = False) -> int:
         """Создаёт сохранённый запрос на Dune. `sql` должен быть уже
         полностью отрендерен (без `{{...}}`) — см. render_sql выше.
         Возвращает query_id.
@@ -152,12 +160,32 @@ class DuneClient:
         только "виден в списке запросов на dune.com" -- сама SQL-логика
         и так уже открыта в этом репозитории; секретов/данных запрос не
         содержит, только SQL-текст.
+
+        require_cached=True: жёсткий отказ, если SQL не найден в
+        query_id_map (т.е. пришлось бы создавать НОВЫЙ query, у
+        которого ещё нет исполненного результата). Используется в
+        pre-flight проверке Sprint 1.5 ревизии 2: 03b/03c/03d
+        ссылаются на query_01/02/03 через query_<id>, рассчитывая на
+        УЖЕ материализованный на Dune результат Sprint 1 -- если кэш
+        query_ids.json холодный, create_query тихо создал бы новый
+        query без результата, и ссылка на него сломалась бы только при
+        исполнении 03b (после того как заплатили за него). Лучше упасть
+        здесь, до единого платного вызова.
         """
         content_hash = hashlib.sha256(sql.encode()).hexdigest()
         cached_qid = self.query_id_map.get(content_hash)
         if cached_qid is not None:
             print(f"[dune] query_id переиспользован для '{name}': {cached_qid} (без нового create_query)")
             return cached_qid
+        if require_cached:
+            raise RuntimeError(
+                f"[dune] СТОП: query_id для '{name}' не найден в query_id_map.json (кэш "
+                "холодный или это первый раз). Требовался УЖЕ материализованный результат "
+                "Sprint 1 без нового execute -- см. docs/COST_POSTMORTEM.md, ревизия 2, "
+                "pre-flight проверка. Ничего не заплачено. Нужно либо восстановить кэш "
+                "(actions/cache с префиксом 'dune-cache-'), либо явно пересчитать 02/01/03 "
+                "заново (дорого, требует отдельного решения) -- не делаю это молча."
+            )
 
         body = {"name": name, "query_sql": sql, "is_private": False}
         result = self._post("/query", json=body)
@@ -170,18 +198,21 @@ class DuneClient:
     def get_execution_status(self, execution_id: str) -> dict:
         return self._get(f"/execution/{execution_id}/status")
 
-    def fetch_existing(self, execution_id: str) -> tuple[pd.DataFrame, dict, dict]:
+    def fetch_existing(
+        self, execution_id: str, name: str = "unnamed", expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS
+    ) -> tuple[pd.DataFrame, dict, dict]:
         """Читает результаты УЖЕ СУЩЕСТВУЮЩЕГО execution_id (например, из
         предыдущего прогона, найденного в логах CI) -- без create_query/
-        execute, только status + results (дёшево, ничего не запускает
-        заново). Возвращает (df, status, result_stats). Используется для
-        переиспользования дорогих запросов Sprint 1 в Sprint 1.5 -- см.
-        analysis/recover_sprint1.py и docs/DATA_ACCESS.md.
+        execute, только status (бесплатно) + results (ПЛАТНО по объёму,
+        см. get_results_df/credit_guard.py). НЕ используется в текущей
+        Sprint 1.5 ревизии 2 для 03/04 (их полные результаты слишком
+        большие -- см. docs/COST_POSTMORTEM.md), оставлено для мелких
+        восстановлений при необходимости.
         """
         status = self.get_execution_status(execution_id)
         if status.get("state") != "QUERY_STATE_COMPLETED":
             raise RuntimeError(f"execution {execution_id} не в состоянии COMPLETED: {status}")
-        df, result_stats = self.get_results_df(execution_id)
+        df, result_stats = self.get_results_df(execution_id, name=name, expected_max_rows=expected_max_rows)
         return df, status, result_stats
 
     def execute(self, query_id: int, name: str = "unnamed", estimated_credits: float | None = None) -> str:
@@ -222,15 +253,44 @@ class DuneClient:
             waited += interval_s
         raise TimeoutError(f"Dune execution {execution_id} не завершился за {timeout_s}s")
 
-    def get_results_df(self, execution_id: str) -> tuple[pd.DataFrame, dict]:
+    def get_results_df(
+        self,
+        execution_id: str,
+        name: str = "unnamed",
+        expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS,
+        expected_columns: int = 10,
+    ) -> tuple[pd.DataFrame, dict]:
+        """Скачивает результат execution через /execution/.../results --
+        ЭТО ПЛАТНАЯ ОПЕРАЦИЯ, биллится по объёму данных отдельно от
+        execute() (см. credit_guard.py, ревизия 2 гарда). Гейт ПЕРЕД
+        запросом использует `expected_max_rows`/`expected_columns`,
+        объявленные вызывающей стороной (у нас нет дешёвого способа
+        узнать реальный размер результата ДО оплаты за его чтение) --
+        см. docs/COST_POSTMORTEM.md. `expected_max_rows` по умолчанию
+        20k -- архитектурный принцип «сырые данные не покидают Dune»:
+        любой вызов, объявляющий больше, почти наверняка ошибка
+        (попытка читать построчный результат вместо сводки).
+        """
+        estimate = check_before_read(name, expected_max_rows, expected_columns)
         result = self._get(f"/execution/{execution_id}/results")
         rows = result.get("result", {}).get("rows", [])
         stats = result.get("result", {}).get("metadata", {})
+        actual_rows = stats.get("total_row_count", len(rows))
+        actual_cols = len(stats.get("column_names", [])) or expected_columns
         print(
             f"[dune] execution {execution_id}: "
-            f"{stats.get('total_row_count', len(rows))} rows, "
+            f"{actual_rows} rows, "
             f"{stats.get('datapoint_count', 'n/a')} datapoints"
         )
+        if actual_rows > expected_max_rows:
+            print(
+                f"[credit_guard] ПРЕДУПРЕЖДЕНИЕ: '{name}' вернул {actual_rows} строк, "
+                f"что БОЛЬШЕ заявленного expected_max_rows={expected_max_rows} -- оценка "
+                f"{estimate:.2f} была занижена, реальная стоимость этого чтения выше. "
+                "Пересмотрите SQL/вызов -- это симптом того же паттерна, что вызвал "
+                "163.98-кредитное чтение 03 в Sprint 1.5 ревизии 1."
+            )
+        record_read(name, estimate, actual_rows, actual_cols, execution_id)
         return pd.DataFrame(rows), stats
 
     def run_sql_cached(
@@ -241,6 +301,8 @@ class DuneClient:
         force_refresh: bool = False,
         fetch_results: bool = True,
         estimated_credits: float | None = None,
+        expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS,
+        expected_columns: int = 10,
     ) -> pd.DataFrame | None:
         """Выполняет (или переиспользует сохранённый query_id) уже
         полностью отрендеренный запрос, с дисковым кэшем по (name, sql) —
@@ -318,7 +380,9 @@ class DuneClient:
             record_execution(name, cost, execution_id)
             return None
 
-        df, result_stats = self.get_results_df(execution_id)
+        df, result_stats = self.get_results_df(
+            execution_id, name=name, expected_max_rows=expected_max_rows, expected_columns=expected_columns
+        )
         if cost is None:
             cost = result_stats.get("execution_cost_credits")
         self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
