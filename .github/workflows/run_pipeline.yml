@@ -1,0 +1,38 @@
+name: Run Sprint 1 pipeline
+
+on:
+  workflow_dispatch: {}   # запуск вручную из вкладки Actions
+  # По желанию: раз в неделю по понедельникам 06:00 UTC.
+  # schedule:
+  #   - cron: "0 6 * * 1"
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Run pipeline
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python analysis/run_pipeline.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/RESULTS.md
+          git diff --cached --quiet || git commit -m "Update Sprint 1 results [automated]"
+          git push
