@@ -122,7 +122,19 @@ class DuneClient:
 
     def execute(self, query_id: int) -> str:
         self.executions_this_run += 1
-        result = self._post(f"/query/{query_id}/execute", json={"query_parameters": {}})
+        # performance: "small" -- осознанный выбор для free tier, не
+        # дефолт. Dune по умолчанию исполняет на "medium"-движке, который
+        # (а) дороже по факту и (б) даёт более высокую ПРЕДВАРИТЕЛЬНУЮ
+        # оценку стоимости, используемую при проверке account-level
+        # billing limit ДО запуска запроса (см. docs/DATA_ACCESS.md,
+        # "402 = account limit, не premium-доступ и не фактическая
+        # цена" — официальная семантика 402 по документации Dune).
+        # "small" снижает и оценку, и, при реальном исполнении,
+        # фактический расход кредитов -- то, что нужно для free tier.
+        result = self._post(
+            f"/query/{query_id}/execute",
+            json={"query_parameters": {}, "performance": "small"},
+        )
         return result["execution_id"]
 
     def poll_until_done(self, execution_id: str, timeout_s: int = 600, interval_s: int = 3) -> dict:
