@@ -6,7 +6,7 @@
     "initialized_by": "человек, факт с dune.com/settings/billing на 2026-08-31 -- НЕ выведено из логов CI, см. docs/COST_POSTMORTEM.md"
   },
   "sprint15": {
-    "budget_remaining_at_init": 210.0,
+    "budget_remaining_at_init": 250.0,
     "spent": 190.205542
   },
   "entries": [
@@ -65,6 +65,12 @@
       "from": 150.0,
       "to": 210.0,
       "reason": "user authorized after 03c_cap_summary UNION ALL bug cost 144 credits vs 8 estimated; covers fact 167.05 + ~25-35 remaining + minimal reserve"
+    },
+    {
+      "event": "budget_raised_final",
+      "from": 210.0,
+      "to": 250.0,
+      "reason": "user authorized after 03b re-executed a second time (190.21 spent, ephemeral-cache-on-failure trap now fixed permanently). User explicitly states this is the FINAL raise -- hard stop with full report if 250 is also breached, no third raise."
     }
   ]
 }

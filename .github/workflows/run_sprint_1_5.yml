@@ -49,6 +49,16 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
         run: python analysis/recover_query_ids.py
 
+      # Одноразовое дешёвое (~0.26 кредита) восстановление уже
+      # оплаченного результата 03b_cohort_selection (execution_id из
+      # run #3) в постоянный кэш -- см. docs/COST_POSTMORTEM.md,
+      # ревизия 4. Идемпотентно: если постоянный файл уже есть, ничего
+      # не делает и не тратит.
+      - name: Recover 03b result into permanent cache (~0.26 credits)
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+        run: python analysis/recover_03b_result.py
+
       - name: Run Sprint 1.5
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
