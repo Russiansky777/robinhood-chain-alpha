@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,16 +53,12 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 HISTORY_LOOKBACK_YEARS = 2
 FUNDING_RESOLUTION = "1h"
 MAX_FUNDING_PAGES = 40  # 40 x 750 = 30000 часовых записей ~ 3.4 года, с запасом
-ORDER_BOOK_LIMIT = 100  # 1000 дал 400 Bad Request на реальном вызове
-                         # (run #33555814080, MRVL market_id=174) --
-                         # сервер, видимо, ограничивает `limit` меньшим
-                         # максимумом, точное число не документировано в
-                         # SDK-доке. 100 -- консервативная догадка, ещё
-                         # НЕ подтверждена реальным вызовом на момент
-                         # написания -- следующий прогон подтвердит или
-                         # опровергнет (см. try/except вокруг каждого
-                         # рынка ниже -- один плохой лимит больше не
-                         # обрушивает весь прогон).
+ORDER_BOOK_LIMIT = 100  # 1000 дал 400 Bad Request (run #33555814080,
+                         # MRVL market_id=174); 100 подтверждён рабочим
+                         # реальным прогоном (run #33556216908, все 45
+                         # рынков успешно, order_book_limit_hit=True
+                         # почти везде -- глубина по 100 уровням
+                         # занижена, см. отчёт в docs/P4_RECON.md).
 
 # Сток-регистр Sprint R1 (194 токена, уже оплачено и закэшировано --
 # 0 доп. кредитов) -- фолбэк-фильтр, если поле market_type на Lighter
@@ -69,6 +66,16 @@ ORDER_BOOK_LIMIT = 100  # 1000 дал 400 Bad Request на реальном вы
 STOCK_UNIVERSE_PATH = Path("data/sprintR1_cache/r1_rwa_full_universe.csv")
 
 _request_count = 0
+
+# Диагностика семантики поля `direction` (run #33556216908 показал
+# РЕАЛЬНЫЕ значения "long"/"short" -- НЕ "long_pays_short"/
+# "short_pays_long", как в SDK-доке -- см. docs/P4_RECON.md). Тальи
+# (direction, знак сырой rate) по ВСЕМ записям всех рынков -- если
+# direction жёстко коррелирует со знаком rate (100% одно с одним), это
+# просто дублирующая метка знака, а не отдельный payer/receiver сигнал
+# -- печатается в лог (не публикуется, не коммитится) для ручной
+# интерпретации перед тем, как менять знаковую конвенцию отчёта.
+_DIRECTION_SIGN_TALLY: Counter = Counter()
 
 
 class NeedsApiKey(RuntimeError):
@@ -191,6 +198,13 @@ def summarize_funding(records: list[dict]) -> dict:
     df = pd.DataFrame(records)
     df["timestamp"] = pd.to_numeric(df["timestamp"])
     df["rate"] = pd.to_numeric(df["rate"], errors="coerce")
+
+    # Диагностика (см. модульный докстринг _DIRECTION_SIGN_TALLY) --
+    # СЫРОЙ знак rate, ДО какой-либо инверсии, против значения direction.
+    raw_direction = df["direction"].astype(str).str.strip().str.lower()
+    for d, sign in zip(raw_direction, df["rate"].apply(lambda x: "pos" if x > 0 else ("neg" if x < 0 else "zero"))):
+        _DIRECTION_SIGN_TALLY[(d, sign)] += 1
+
     # direction: наблюдаемые значения печатаются в отчёт для ручной
     # сверки (см. docs/P4_RECON.md) -- знак приводим к конвенции
     # "положительно = в пользу шорта" (шорт получает фандинг) ТОЛЬКО
@@ -297,6 +311,9 @@ def run() -> int:
         "results": results,
     }, indent=2, default=str))
     print(f"[p4_lighter] записано {out_path}")
+    print(f"[p4_lighter] диагностика (direction, знак сырой rate) -> count, "
+          f"по всем {sum(_DIRECTION_SIGN_TALLY.values())} записям фандинга всех рынков: "
+          f"{dict(_DIRECTION_SIGN_TALLY)}")
 
     _write_recon_section(results, len(markets))
     return 0
