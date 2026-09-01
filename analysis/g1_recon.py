@@ -35,10 +35,10 @@ from run_pipeline import read_sql, q_ts
 PROBE_SCHEMAS = """
 select table_schema, table_name
 from information_schema.tables
-where table_schema ilike '%pons%' or table_name ilike '%pons%'
-   or table_schema ilike '%launchpad%' or table_name ilike '%launchpad%'
-   or table_name ilike '%graduat%' or table_name ilike '%bonding%'
-   or table_name ilike '%migrat%'
+where lower(table_schema) like '%pons%' or lower(table_name) like '%pons%'
+   or lower(table_schema) like '%launchpad%' or lower(table_name) like '%launchpad%'
+   or lower(table_name) like '%graduat%' or lower(table_name) like '%bonding%'
+   or lower(table_name) like '%migrat%'
 order by 1, 2
 limit 300
 """
