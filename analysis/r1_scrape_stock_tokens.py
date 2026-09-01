@@ -45,6 +45,17 @@ URLS = {
     "chainlink_robinhood_feeds": "https://docs.chain.link/data-feeds/tokenized-equity-feeds/robinhood",
 }
 
+# run #7: таблица фидов -- Astro-остров component-export="FeedList",
+# client="idle" -- данные приходят client-side (не в SSR HTML) через
+# API, вызываемый ИЗНУТРИ бандла /_astro/index.CujZUUH3.js. Вместо
+# исполнения JS (Playwright не установлен в GH Actions runner) --
+# читаем сам бандл как текст и ищем в нём URL API (обычно строковый
+# литерал в минифицированном JS).
+JS_BUNDLE_URLS = {
+    "feed_list_bundle": "https://docs.chain.link/_astro/index.CujZUUH3.js",
+}
+URL_IN_JS_RE = re.compile(r'https?://[a-zA-Z0-9\-\.]+(?:/[^\s"\'\\)]*)?')
+
 ADDR_RE = re.compile(r"0x[a-fA-F0-9]{40}")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 
@@ -134,12 +145,47 @@ def dump_astro_island_props(html: str) -> list[dict]:
     return out
 
 
+def scan_js_bundle_for_api_urls() -> dict:
+    """Fetch a known JS bundle and extract candidate API URLs / relative
+    fetch paths -- see JS_BUNDLE_URLS docstring above."""
+    out = {}
+    for name, url in JS_BUNDLE_URLS.items():
+        print(f"\n===== {name} ({url}) =====")
+        try:
+            status, js = fetch(url)
+        except requests.RequestException as exc:
+            print(f"[r1_scrape] ОШИБКА сети для {url}: {exc}")
+            out[name] = {"url": url, "error": str(exc)}
+            continue
+        print(f"status={status}, js_len={len(js)}")
+        abs_urls = sorted(set(URL_IN_JS_RE.findall(js)))
+        # Относительные пути вида fetch("/api/...") или похожие -- тоже
+        # кандидаты (сервер тот же, что страница).
+        rel_urls = sorted(set(re.findall(r'["\'](/[a-zA-Z0-9_\-/\.]{3,80}(?:feed|price|address|api)[a-zA-Z0-9_\-/\.]*)["\']', js, re.I)))
+        print(f"абсолютных URL в бандле: {len(abs_urls)}, релевантных относительных путей: {len(rel_urls)}")
+        for u in abs_urls[:50]:
+            print("  ABS:", u)
+        for u in rel_urls[:50]:
+            print("  REL:", u)
+        out[name] = {"url": url, "status": status, "js_len": len(js), "abs_urls": abs_urls[:200], "rel_urls": rel_urls[:200]}
+    return out
+
+
 def main() -> int:
     probe = "--probe" in sys.argv
     raw_probe = "--raw" in sys.argv
     island_dump = "--islands" in sys.argv
+    jsbundle = "--jsbundle" in sys.argv
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     fetched_at = datetime.now(timezone.utc).isoformat()
+
+    if jsbundle:
+        out = scan_js_bundle_for_api_urls()
+        out_file = CACHE_DIR / "r1_stock_tokens_jsbundle.json"
+        out_file.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+        print(f"\n[r1_scrape] Записано: {out_file}")
+        git_commit([out_file], "sprintR1_cache: URL-кандидаты из JS-бандла FeedList [automated, 0 кредитов -- не Dune]")
+        return 0
 
     results: dict[str, dict] = {}
     for name, url in URLS.items():
