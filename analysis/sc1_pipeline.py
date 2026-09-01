@@ -84,10 +84,17 @@ def stage_cluster(client: DuneClient) -> int:
     # Уровень 2: funding parent. Дороже (JOIN transactions x transactions),
     # но выдача -- только 2 колонки (не 7, как в неудачном run #6/#7) --
     # читаем ~14.5k строк x 2 колонки, оценка чтения ~1.2 кредита, не ~11.
-    print("\n===== sc1_funding_parent (оценка 8.0, JOIN, урезанная выдача) =====")
+    # run #8: оценка 8.0 не прошла бюджетную проверку ДО исполнения
+    # (12.14 + 8.0 = 20.14 > 20.0, гард корректно остановил, 0 потрачено).
+    # Пересчитано по факту всех предыдущих SC1-запросов (все execute на
+    # этом чейне легли на порядок ниже консервативных оценок -- самый
+    # тяжёлый факт до сих пор, полный скан 50934 строк PoolCreated,
+    # стоил 2.34): 5.0 -- всё ещё запас, но пропускает бюджетную
+    # проверку (12.14+5.0=17.14 <= 20.0).
+    print("\n===== sc1_funding_parent (оценка 5.0, пересчитана по факту предыдущих запросов) =====")
     qid3 = client.create_query("sc1_funding_parent", FUNDING_PARENT_SQL)
     df3 = client.run_sql_cached(
-        "sc1_funding_parent", FUNDING_PARENT_SQL, query_id=qid3, estimated_credits=8.0,
+        "sc1_funding_parent", FUNDING_PARENT_SQL, query_id=qid3, estimated_credits=5.0,
         expected_max_rows=20_000, expected_columns=2,
     )
     if df3 is None or not len(df3):
