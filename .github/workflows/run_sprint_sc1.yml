@@ -1,0 +1,80 @@
+name: Run Sprint SC1 (serial creators, юнит-экономика конвейерных запусков)
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "Какой шаг запустить"
+        required: true
+        default: "recon"
+        type: choice
+        options:
+          - recon
+          - cluster
+          - economics
+          - report
+
+jobs:
+  run-sprint-sc1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Общий эфемерный кэш query_id (см. docs/COST_POSTMORTEM.md про
+      # разделяемый префикс dune-cache- между всеми спринтами).
+      - name: Restore Dune query cache
+        uses: actions/cache@v4
+        with:
+          path: analysis/output/cache
+          key: dune-cache-${{ github.run_id }}
+          restore-keys: |
+            dune-cache-
+          save-always: true
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Run recon (Step 1 -- схема robinhood, таблица транзакций)
+        if: ${{ github.event.inputs.step == 'recon' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintSC1
+        run: python analysis/sc1_recon.py
+
+      - name: Run clustering (Step 2 -- funding parent)
+        if: ${{ github.event.inputs.step == 'cluster' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintSC1
+        run: python analysis/sc1_pipeline.py --stage cluster
+
+      - name: Run economics (Step 3-4 -- fee/gas economics per cluster)
+        if: ${{ github.event.inputs.step == 'economics' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintSC1
+        run: python analysis/sc1_pipeline.py --stage economics
+
+      - name: Report stage (Step 5 -- вердикт в docs/SC1_NOTE.md)
+        if: ${{ github.event.inputs.step == 'report' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintSC1
+        run: python analysis/sc1_pipeline.py --stage report
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/SC1_NOTE.md
+          if [ -d data ]; then git add data/; fi
+          git diff --cached --quiet || git commit -m "Update Sprint SC1 results [automated]"
+          git push

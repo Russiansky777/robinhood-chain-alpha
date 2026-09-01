@@ -30,6 +30,7 @@ from dune_client import DuneClient
 from run_pipeline import read_sql
 
 SCHEMA_DRILLDOWN_SQL = read_sql("r1/r1_schema_drilldown")
+COLUMNS_PROBE_SQL = read_sql("r1/r1_columns_probe")
 
 
 def main() -> int:
@@ -43,6 +44,21 @@ def main() -> int:
     )
     if df is not None and len(df):
         print(df.to_string(max_rows=500))
+    else:
+        print("(пусто)")
+
+    # run #9 нашёл chainlink_robinhood.dualaggregator_evt_answerupdated
+    # (декодированный Chainlink-агрегатор -- реестр фидов через
+    # contract_address) и rwa_stock_factory_robinhood.factory_deployer_evt_deployed
+    # (фабрика деплоя сток-токенов) -- колонки перед платным запросом.
+    print("\n===== r1_columns_probe (оценка 3.0) =====")
+    qid2 = client.create_query("r1_columns_probe", COLUMNS_PROBE_SQL)
+    df2 = client.run_sql_cached(
+        "r1_columns_probe", COLUMNS_PROBE_SQL, query_id=qid2, estimated_credits=3.0,
+        expected_max_rows=60, expected_columns=5,
+    )
+    if df2 is not None and len(df2):
+        print(df2.to_string(max_rows=60))
     else:
         print("(пусто)")
 
