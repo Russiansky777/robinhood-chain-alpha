@@ -1,0 +1,36 @@
+column_name,data_type,ordinal_position
+block_time,timestamp(3),1
+block_number,bigint,2
+block_hash,varbinary,3
+value,uint256,4
+index,bigint,5
+success,boolean,6
+from,varbinary,7
+to,varbinary,8
+gas_limit,bigint,9
+gas_price,uint256,10
+gas_used,bigint,11
+max_fee_per_gas,bigint,12
+max_priority_fee_per_gas,bigint,13
+priority_fee_per_gas,bigint,14
+operator_fee_constant,bigint,15
+operator_fee_scalar,bigint,16
+l1_gas_used,bigint,17
+l1_gas_price,bigint,18
+l1_fee,bigint,19
+l1_fee_scalar,double,20
+l1_block_number,bigint,21
+l1_timestamp,bigint,22
+l1_tx_origin,varbinary,23
+l1_batch_number,bigint,24
+l1_batch_tx_index,bigint,25
+chain_id,varchar,26
+nonce,bigint,27
+data,varbinary,28
+hash,varbinary,29
+type,varchar,30
+access_list,"array(row(address varbinary, storagekeys array(varbinary)))",31
+authorization_list,"array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))",32
+block_date,date,33
+gas_used_for_l1,bigint,34
+effective_gas_price,bigint,35
