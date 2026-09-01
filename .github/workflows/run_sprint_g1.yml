@@ -11,6 +11,7 @@ on:
         options:
           - recon
           - verify
+          - count
           - smoke
           - full
           - report
@@ -58,6 +59,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_verify_factory.py
+
+      - name: Full-period graduation event counts + N gate (blocking condition 4)
+        if: ${{ github.event.inputs.step == 'count' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_graduation_events.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
