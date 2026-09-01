@@ -34,15 +34,10 @@ from config import CONFIG
 CACHE_DIR = Path(CONFIG.r1_cache_dir)
 
 URLS = {
-    # run #3: /rhj/assets подтверждён как живой реестр токенов с
-    # реальными адресами (см. data/sprintR1_cache/r1_stock_tokens_probe.json).
-    # Осталось найти реестр АДРЕСОВ ФИДОВ (Oracles & Price Feeds
-    # docs.robinhood.com указывает на "Robinhood price feeds page" у
-    # Chainlink как источник правды) -- ре-проба той же страницы, что в
-    # run #1, но с бОльшим капом дампа (текст был 147951 символов,
-    # раньше сохраняли только первые 50000 -- содержательная часть
-    # могла быть дальше).
-    "chainlink_robinhood_feeds": "https://docs.chain.link/data-feeds/tokenized-equity-feeds/robinhood",
+    # SC1 (владелец, критерий): "цена газа сети ПОСЛЕ ОКОНЧАНИЯ ВЕЙВЕРА"
+    # -- не наблюдаема ончейн сейчас (вейвер ещё активен до ~29.09.2026,
+    # см. docs/PROJECT_STATE.md), нужен официально заявленный параметр.
+    "gas_and_fees": "https://docs.robinhood.com/chain/gas-and-fees",
 }
 
 # run #7: таблица фидов -- Astro-остров component-export="FeedList",
