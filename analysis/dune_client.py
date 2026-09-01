@@ -34,11 +34,13 @@ from config import CONFIG
 from credit_guard import (
     check_before_execute,
     check_before_read,
+    check_before_read_binding,
     check_overrun_after_execute,
     check_sql_sanity,
     namespace as credit_guard_namespace,
     record_execution,
     record_read,
+    BudgetGuardStop,
     DEFAULT_ESTIMATE,
 )
 
@@ -321,43 +323,84 @@ class DuneClient:
             waited += interval_s
         raise TimeoutError(f"Dune execution {execution_id} не завершился за {timeout_s}s")
 
+    def _peek_result_metadata(self, execution_id: str, status: dict | None = None) -> tuple[int | None, int | None, dict]:
+        """Бесплатная разведка объёма результата ДО оплаты /results --
+        решение владельца 2026-09-01, после перерасхода ~82 кредитов на
+        построчных чтениях в Sprint G1 (см. credit_guard.check_before_
+        read_binding). Dune кладёт метаданные результата (число строк/
+        колонок) в ответ /execution/{id}/status уже завершённого
+        исполнения -- сам /status бесплатен (в отличие от /results).
+        Точная форма это поля не проверена вживую (сетевой доступ к
+        Dune из этой песочницы заблокирован) -- проверяем НЕСКОЛЬКО
+        правдоподобных путей защитно; если ни один не найден, явно
+        сигнализируем "неизвестно" (None, None) -- вызывающий код должен
+        трактовать это как отказ читать, а не как разрешение (fail
+        closed), и распечатать реальные ключи status для диагностики."""
+        status = status or self.get_execution_status(execution_id)
+        candidates = [
+            status.get("result_metadata"),
+            status.get("result", {}).get("metadata") if isinstance(status.get("result"), dict) else None,
+            status.get("metadata"),
+        ]
+        for meta in candidates:
+            if not isinstance(meta, dict):
+                continue
+            row_count = meta.get("total_row_count", meta.get("row_count"))
+            col_names = meta.get("column_names")
+            col_count = len(col_names) if isinstance(col_names, list) else meta.get("column_count")
+            if row_count is not None:
+                return int(row_count), (int(col_count) if col_count is not None else None), status
+        return None, None, status
+
     def get_results_df(
         self,
         execution_id: str,
         name: str = "unnamed",
         expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS,
         expected_columns: int = 10,
+        status: dict | None = None,
     ) -> tuple[pd.DataFrame, dict]:
         """Скачивает результат execution через /execution/.../results --
         ЭТО ПЛАТНАЯ ОПЕРАЦИЯ, биллится по объёму данных отдельно от
-        execute() (см. credit_guard.py, ревизия 2 гарда). Гейт ПЕРЕД
-        запросом использует `expected_max_rows`/`expected_columns`,
-        объявленные вызывающей стороной (у нас нет дешёвого способа
-        узнать реальный размер результата ДО оплаты за его чтение) --
-        см. docs/COST_POSTMORTEM.md. `expected_max_rows` по умолчанию
-        20k -- архитектурный принцип «сырые данные не покидают Dune»:
-        любой вызов, объявляющий больше, почти наверняка ошибка
-        (попытка читать построчный результат вместо сводки).
+        execute() (см. credit_guard.py, ревизия 2 гарда).
+
+        Ревизия 3 (2026-09-01, обязывающий гейт): СНАЧАЛА бесплатно
+        узнаём реальный row/column count через /status
+        (_peek_result_metadata) и сравниваем с expected_max_rows/
+        expected_columns -- если факт БОЛЬШЕ заявленного, отказываем
+        читать результат ДО оплаты (см. credit_guard.
+        check_before_read_binding). Раньше (ревизия 2) это была
+        декоративная проверка ПОСЛЕ оплаты чтения -- см. run #9 Sprint
+        G1: несколько недельных партиций реально стоили 15-20x больше
+        заявленного expected_max_rows, но факт узнавался только после
+        того, как деньги уже потрачены. Если метаданные из /status не
+        удалось распознать -- fail closed (отказ читать, не тихое
+        разрешение), с дампом реальных ключей status для диагностики.
         """
-        estimate = check_before_read(name, expected_max_rows, expected_columns)
+        peeked_rows, peeked_cols, status = self._peek_result_metadata(execution_id, status)
+        if peeked_rows is None:
+            print(
+                f"[dune] СТОП: не удалось распознать метаданные результата '{name}' в ответе "
+                f"/execution/{execution_id}/status (проверены пути result_metadata/"
+                f"result.metadata/metadata) -- fail closed, отказ читать результат ДО оплаты. "
+                f"Реальные ключи status: {sorted(status.keys())}. Обновите "
+                "_peek_result_metadata по фактической форме ответа и повторите -- 0 кредитов "
+                "потрачено на эту попытку."
+            )
+            raise BudgetGuardStop(1)
+        actual_cols = peeked_cols if peeked_cols is not None else expected_columns
+        estimate = check_before_read_binding(name, peeked_rows, actual_cols, expected_max_rows, expected_columns)
+
         result = self._get(f"/execution/{execution_id}/results")
         rows = result.get("result", {}).get("rows", [])
         stats = result.get("result", {}).get("metadata", {})
         actual_rows = stats.get("total_row_count", len(rows))
-        actual_cols = len(stats.get("column_names", [])) or expected_columns
+        actual_cols = len(stats.get("column_names", [])) or actual_cols
         print(
             f"[dune] execution {execution_id}: "
             f"{actual_rows} rows, "
             f"{stats.get('datapoint_count', 'n/a')} datapoints"
         )
-        if actual_rows > expected_max_rows:
-            print(
-                f"[credit_guard] ПРЕДУПРЕЖДЕНИЕ: '{name}' вернул {actual_rows} строк, "
-                f"что БОЛЬШЕ заявленного expected_max_rows={expected_max_rows} -- оценка "
-                f"{estimate:.2f} была занижена, реальная стоимость этого чтения выше. "
-                "Пересмотрите SQL/вызов -- это симптом того же паттерна, что вызвал "
-                "163.98-кредитное чтение 03 в Sprint 1.5 ревизии 1."
-            )
         record_read(name, estimate, actual_rows, actual_cols, execution_id)
         return pd.DataFrame(rows), stats
 
@@ -488,7 +531,8 @@ class DuneClient:
             return None
 
         df, result_stats = self.get_results_df(
-            execution_id, name=name, expected_max_rows=expected_max_rows, expected_columns=expected_columns
+            execution_id, name=name, expected_max_rows=expected_max_rows, expected_columns=expected_columns,
+            status=status,
         )
         if cost is None:
             cost = result_stats.get("execution_cost_credits")

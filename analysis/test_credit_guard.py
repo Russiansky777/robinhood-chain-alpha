@@ -256,6 +256,102 @@ def test_failed_attempts_carry_estimate_and_reason() -> None:
             os.environ[cg.NAMESPACE_ENV] = orig_ns
 
 
+def test_read_binding_refuses_when_actual_exceeds_declared() -> None:
+    """Требование владельца (2026-09-01, после перерасхода ~82 кредитов
+    на построчных чтениях Sprint G1 count-стадии): check_before_read_
+    binding обязана ОТКАЗАТЬ читать результат, если реальный row_count
+    (полученный бесплатно через /status) БОЛЬШЕ заявленной обязывающей
+    границы expected_max_rows -- жёсткий стоп ДО оплаты, не
+    предупреждение постфактум."""
+    state = {
+        "billing_cycle": {"external_limit": 2450.0, "initialized_spent": 1394.0, "reset_at": "2026-09-14"},
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 0.0},
+        "entries": [],
+    }
+    orig_ns = os.environ.get(cg.NAMESPACE_ENV)
+    os.environ[cg.NAMESPACE_ENV] = "sprintG1"
+    try:
+        with with_temp_state(state):
+            exc_obj = None
+            try:
+                # Заявлено <= 5000 строк, реально пришло 102009 (реальный
+                # случай week04 Sprint G1 run #9) -- должен отказать.
+                cg.check_before_read_binding("week04_probe", 102_009, 7, 5000, 7)
+            except SystemExit as e:
+                exc_obj = e
+            check(
+                "read-binding refuses when actual rows > declared max (0 credits spent)",
+                exc_obj is not None,
+            )
+            check(
+                "read-binding refusal is the specific BudgetGuardStop type",
+                isinstance(exc_obj, cg.BudgetGuardStop),
+            )
+            # Ничего не должно было списаться -- пространство всё ещё 0.0.
+            saved = json.loads((cg.CREDITS_FILE).read_text())
+            check(
+                "no spend recorded for the refused read",
+                saved["sprintG1"]["spent"] == 0.0,
+                f"got {saved['sprintG1']['spent']!r}",
+            )
+    finally:
+        if orig_ns is None:
+            os.environ.pop(cg.NAMESPACE_ENV, None)
+        else:
+            os.environ[cg.NAMESPACE_ENV] = orig_ns
+
+
+def test_read_binding_passes_when_within_declared_bound() -> None:
+    """Тот же гейт НЕ должен ложно-срабатывать, когда реальный объём
+    укладывается в заявленную границу."""
+    state = {
+        "billing_cycle": {"external_limit": 2450.0, "initialized_spent": 1394.0, "reset_at": "2026-09-14"},
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 0.0},
+        "entries": [],
+    }
+    orig_ns = os.environ.get(cg.NAMESPACE_ENV)
+    os.environ[cg.NAMESPACE_ENV] = "sprintG1"
+    try:
+        with with_temp_state(state):
+            raised = False
+            try:
+                cg.check_before_read_binding("small_probe", 447, 7, 5000, 7)
+            except SystemExit:
+                raised = True
+            check("read-binding allows a read within the declared bound", not raised)
+    finally:
+        if orig_ns is None:
+            os.environ.pop(cg.NAMESPACE_ENV, None)
+        else:
+            os.environ[cg.NAMESPACE_ENV] = orig_ns
+
+
+def test_peek_result_metadata_defensive_paths() -> None:
+    """dune_client.DuneClient._peek_result_metadata должна найти
+    row/column count в нескольких правдоподобных формах ответа Dune
+    /status (форма не проверена вживую -- сетевой доступ заблокирован
+    из этой песочницы) и явно вернуть (None, None) -- fail closed --
+    если ни одна не совпала, а не тихо разрешить чтение."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from dune_client import DuneClient
+
+    obj = object.__new__(DuneClient)  # без __init__ -- не трогаем DUNE_API_KEY/сеть
+
+    cases = [
+        ({"result_metadata": {"total_row_count": 42, "column_names": ["a", "b", "c"]}}, (42, 3)),
+        ({"result": {"metadata": {"total_row_count": 7, "column_names": ["x"]}}}, (7, 1)),
+        ({"metadata": {"row_count": 99, "column_count": 5}}, (99, 5)),
+        ({"something_else": {}}, (None, None)),
+    ]
+    for status, expected in cases:
+        rows, cols, _ = obj._peek_result_metadata("exec_test", status=status)
+        check(
+            f"_peek_result_metadata matches shape {list(status.keys())}",
+            (rows, cols) == expected,
+            f"got {(rows, cols)!r}, expected {expected!r}",
+        )
+
+
 def main() -> int:
     # Тест не должен трогать реальный git -- _git_commit коммитит
     # CREDITS_FILE, который здесь подменён на временный путь вне
@@ -270,6 +366,9 @@ def main() -> int:
         test_within_limits_does_not_raise()
         test_real_billing_cycle_initialized_with_real_numbers()
         test_failed_attempts_carry_estimate_and_reason()
+        test_read_binding_refuses_when_actual_exceeds_declared()
+        test_read_binding_passes_when_within_declared_bound()
+        test_peek_result_metadata_defensive_paths()
     finally:
         cg._git_commit = orig_git_commit
 

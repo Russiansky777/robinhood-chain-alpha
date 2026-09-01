@@ -12,6 +12,7 @@ on:
           - recon
           - verify
           - count
+          - semantics
           - smoke
           - full
           - report
@@ -66,6 +67,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_graduation_events.py
+
+      - name: Event semantics check (TokenLaunched vs TokenDeployed, delay distribution)
+        if: ${{ github.event.inputs.step == 'semantics' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_event_semantics.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}

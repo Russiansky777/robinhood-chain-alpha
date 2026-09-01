@@ -133,6 +133,45 @@ def estimate_read_credits(row_count: int, column_count: int) -> float:
     return datapoints * READ_COST_PER_DATAPOINT * READ_COST_PER_DATAPOINT_SAFETY_MARGIN
 
 
+def check_before_read_binding(
+    name: str,
+    actual_row_count: int,
+    actual_column_count: int,
+    declared_max_rows: int,
+    declared_max_columns: int,
+) -> float:
+    """Обязывающая проверка ПЕРЕД оплаченным чтением /execution/{id}/results
+    -- вызывается ПОСЛЕ бесплатного получения РЕАЛЬНОГО row/column count
+    из /execution/{id}/status (см. dune_client.py). Решение владельца от
+    2026-09-01, после перерасхода ~82 кредитов на построчных чтениях в
+    Sprint G1 (полнопериодный счёт градуаций тянул сырые логи наружу
+    вместо агрегата -- прямое нарушение правила 1 "сырые данные не
+    покидают Dune"): expected_max_rows/expected_columns -- теперь
+    ОБЯЗЫВАЮЩАЯ декларация, не декоративная оценка. Если факт БОЛЬШЕ
+    заявленного -- жёсткий отказ ДО оплаты чтения (метаданные бесплатны
+    через /status), а не предупреждение постфактум, как было раньше в
+    get_results_df."""
+    if actual_row_count > declared_max_rows:
+        print(
+            f"[credit_guard] СТОП: '{name}' содержит {actual_row_count} строк по данным "
+            f"/status (получено БЕСПЛАТНО, до оплаты чтения) -- БОЛЬШЕ обязывающей границы "
+            f"expected_max_rows={declared_max_rows}. ОТКАЗ читать результат -- ничего не "
+            "заплачено за /execution/.../results. Пересмотрите SQL (агрегация на стороне "
+            "Dune / явный LIMIT) или expected_max_rows перед повторной попыткой."
+        )
+        raise BudgetGuardStop(1)
+    if actual_column_count > declared_max_columns:
+        print(
+            f"[credit_guard] СТОП: '{name}' содержит {actual_column_count} колонок -- БОЛЬШЕ "
+            f"обязывающей границы expected_columns={declared_max_columns}. ОТКАЗ читать "
+            "результат до оплаты."
+        )
+        raise BudgetGuardStop(1)
+    # Реальные числа (не декларация) идут в сам бюджетный/цикловой чек --
+    # точнее, чем оценка по expected_max_rows.
+    return check_before_read(name, actual_row_count, actual_column_count)
+
+
 class BudgetGuardStop(SystemExit):
     """Жёсткий стоп -- гард сработал ДО execute. Не перехватывать и не
     ретраить в вызывающем коде; сообщение уже содержит полный отчёт."""
