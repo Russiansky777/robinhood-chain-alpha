@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - recon
+          - verify
           - smoke
           - full
           - report
@@ -50,6 +51,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_recon.py
+
+      - name: Verify pons.family factory on-chain (blocking condition 3)
+        if: ${{ github.event.inputs.step == 'verify' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_verify_factory.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}

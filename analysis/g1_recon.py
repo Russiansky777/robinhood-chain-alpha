@@ -32,80 +32,13 @@ from config import CONFIG
 from dune_client import DuneClient, render_sql
 from run_pipeline import read_sql, q_ts
 
-PROBE_SCHEMAS = """
-select table_schema, count(*) as n_tables
-from information_schema.tables
-where table_schema like '%robinhood%'
-group by 1
-order by 1
-"""
-
-# Через query_02 (уже материализован, скан бесплатен) -- разбивка по
-# project/version за июль: покажет ВСЕ протоколы, активные на чейне, не
-# только uniswap -- нужно, чтобы не пропустить собственный AMM
-# pons.family, если он тегируется иначе.
-PROBE_PROJECTS_JULY_TMPL = """
-select project, version, count(*) as n_swaps,
-    count(distinct pool_address) as n_pools,
-    min(block_time) as first_seen, max(block_time) as last_seen
-from query_02_swaps_raw_july
-group by 1, 2
-order by n_swaps desc
-limit 50
-"""
-
-# Через query_02 -- "рождения" пулов (min block_time на pool_address) по
-# дням, ТОЛЬКО uniswap v3/v4 (рабочая гипотеза механики детекции: на
-# молодом чейне появление нового Uniswap-подобного пула == миграция
-# ликвидности после градуации bonding curve). Если распределение по дням
-# и число пулов неправдоподобны для темпа лаунчпада -- гипотеза неверна,
-# нужен другой сигнал (см. вывод и распредление project/version выше).
-PROBE_POOL_BIRTHS_JULY_TMPL = """
-with swaps as (
-    select pool_address, block_time
-    from query_02_swaps_raw_july
-    where project = 'uniswap' and version in ('3', '4')
-),
-births as (
-    select pool_address, min(block_time) as pool_birth_time
-    from swaps
-    group by 1
-)
-select date_trunc('day', pool_birth_time) as day, count(*) as n_new_pools
-from births
-group by 1
-order by 1
-"""
-
-# ОДИН день (не окно!) -- 2026-08-30, тот же принцип, что смоук-тест
-# Sprint 1 (один день стоил ~13-14 кредитов на полный скан dex.trades с
-# фильтром по чейну и дате -- стоимость масштабируется примерно линейно
-# по числу дней, см. docs/COST_POSTMORTEM.md, так что окно даже в 10
-# дней стоило бы ~130-140, далеко за бюджетом этого шага). Дата выбрана
-# как уже известная содержательная точка (см. docs/PROJECT_STATE.md:
-# "~51% объёма сети на pons.family на 30.08.2026") -- не наугад. Даёт
-# (а) подтверждение, что покрытие доходит почти до текущей даты
-# симуляции, (б) одну точку недавнего темпа для грубой экстраполяции
-# N_total. Точная дата конца периода фиксируется отдельно, по
-# max(block_time) в этом же результате -- не по исходам цен.
-PROBE_RECENT_DAY = """
-with swaps as (
-    select project_contract_address as pool_address, block_time
-    from dex.trades
-    where blockchain = 'robinhood'
-        and project = 'uniswap' and version in ('3', '4')
-        and block_time >= timestamp '2026-08-30 00:00:00'
-        and block_time <  timestamp '2026-08-31 00:00:00'
-),
-births as (
-    select pool_address, min(block_time) as pool_birth_time
-    from swaps
-    group by 1
-)
-select count(*) as n_new_pools_this_day,
-    (select max(block_time) from swaps) as coverage_probe_max_block_time
-from births
-"""
+# Все SQL-тексты Sprint G1 живут как файлы в sql/g1/ (не только внутри
+# Dune) -- требование владельца 2026-09-01. read_sql() уже умеет
+# подпути (SQL_DIR / f"{name}.sql").
+PROBE_SCHEMAS = read_sql("g1/g1_schemas_like_robinhood_distinct")
+PROBE_PROJECTS_JULY_TMPL = read_sql("g1/g1_dex_trades_projects_july")
+PROBE_POOL_BIRTHS_JULY_TMPL = read_sql("g1/g1_pool_births_daily_july")
+PROBE_RECENT_DAY = read_sql("g1/g1_recent_day_coverage_probe")
 
 
 def main() -> int:
