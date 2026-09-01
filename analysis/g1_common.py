@@ -65,6 +65,45 @@ def decode_token_launched(row: dict) -> dict:
     }
 
 
+TOPIC0_POOL_GRADUATED = "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259"
+
+
+def decode_pool_graduated(row: dict) -> dict:
+    """v2 PoolGraduated(token indexed, positionId, tokenAmount,
+    pairTokenAmount) -- вынесено сюда из g1_v2_recon.py/g1_v2_postfilter.py
+    (было продублировано в обоих) для использования в analysis/g1_pipeline.py,
+    не меняя уже прогнанный и закоммиченный код."""
+    d = str(row["data"]).strip()
+    if d.startswith("0x"):
+        d = d[2:]
+    words = [d[i:i + 64] for i in range(0, len(d), 64)]
+    if len(words) != 3:
+        raise ValueError(f"Ожидалось 3 слова в data (96 байт), получено {len(words)}. tx={row['tx_hash']}")
+    return {
+        "tx_hash": row["tx_hash"],
+        "block_number": int(row["block_number"]),
+        "block_time": row["block_time"],
+        "token": decode_address_word(row["topic1"]),
+        "position_id": decode_uint_word(words[0]),
+        "token_amount": decode_uint_word(words[1]),
+        "pair_token_amount": decode_uint_word(words[2]),
+    }
+
+
+def fmt_ts(ts) -> str:
+    """Timestamp (pd.Timestamp tz-aware/naive или сырая Dune-строка вида
+    '2026-08-04 20:16:08.000 UTC') -> 'YYYY-MM-DD HH:MM:SS' БЕЗ суффикса
+    offset/UTC -- Trino's `timestamp '...'` литерал не принимает offset в
+    строке (см. history: баг пойман юнит-тестом до прогона на Dune, не
+    после)."""
+    import pandas as pd
+
+    t = pd.Timestamp(ts)
+    if t.tzinfo is not None:
+        t = t.tz_localize(None)
+    return t.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def estimate_seconds_per_block(decoded_rows: list[dict]) -> float:
     """Средний блок-тайм по соседним ЛОГАМ этой же выборки (не
     захардкожено) -- сортирует по block_number, берёт медиану дельт

@@ -99,21 +99,30 @@ jobs:
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_v2_postfilter.py
 
-      - name: Run smoke test (Step 2)
+      # Владелец, 2026-09-01, решение 4: смоук -> (если факт <=2x оценки и
+      # данные осмысленны) автономно полный прогон -> статистика §2.6 ->
+      # вердикт §2.7 -> docs/RESULTS.md, ОДНИМ запуском этого шага.
+      # Возврат в штаб только на: N<200 (UNDERPOWERED), перерасход >2x,
+      # либо пустой результат -- см. analysis/sprint_g1.py.
+      - name: Run smoke test, then autonomously full pipeline + report (Step 2-5)
         if: ${{ github.event.inputs.step == 'smoke' }}
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/sprint_g1.py --stage smoke
 
-      - name: Run full pipeline (Step 3-4)
+      # Ручная точка входа для переисполнения после первого успешного смоука
+      # (--stage full тоже начинает со смоука -- но он теперь ПОСТОЯННЫЙ
+      # кэш-хит, 0 кредитов, если SQL не менялся -- дальше сразу полный
+      # прогон/статистика/отчёт как в --stage smoke).
+      - name: Run full pipeline (re-entry, smoke stage is a cache-hit)
         if: ${{ github.event.inputs.step == 'full' }}
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/sprint_g1.py --stage full
 
-      - name: Render report (Step 5)
+      - name: Report stage (no-op -- report is written inline by smoke/full)
         if: ${{ github.event.inputs.step == 'report' }}
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
