@@ -31,6 +31,8 @@ from run_pipeline import read_sql
 
 SCHEMA_DRILLDOWN_SQL = read_sql("r1/r1_schema_drilldown")
 COLUMNS_PROBE_SQL = read_sql("r1/r1_columns_probe")
+FEED_ACTIVITY_SQL = read_sql("r1/r1_feed_activity")
+STOCK_TOKEN_DEPLOYMENTS_SQL = read_sql("r1/r1_stock_token_deployments")
 
 
 def main() -> int:
@@ -61,6 +63,34 @@ def main() -> int:
         print(df2.to_string(max_rows=60))
     else:
         print("(пусто)")
+
+    # Реестр деплоя сток-токенов -- ончейн, symbol/name/stock(адрес)/uid.
+    print("\n===== r1_stock_token_deployments (оценка 6.0) =====")
+    qid3 = client.create_query("r1_stock_token_deployments", STOCK_TOKEN_DEPLOYMENTS_SQL)
+    df3 = client.run_sql_cached(
+        "r1_stock_token_deployments", STOCK_TOKEN_DEPLOYMENTS_SQL, query_id=qid3, estimated_credits=6.0,
+        expected_max_rows=2000, expected_columns=6,
+    )
+    n_tokens = 0 if df3 is None else len(df3)
+    print(f"[r1_recon] Задеплоено сток-токенов (июль-август, ончейн): {n_tokens}")
+    if df3 is not None and len(df3):
+        print(df3.head(20).to_string())
+
+    # Активность Chainlink-фидов -- обновления/закрытые часы.
+    print("\n===== r1_feed_activity (оценка 8.0) =====")
+    qid4 = client.create_query("r1_feed_activity", FEED_ACTIVITY_SQL)
+    df4 = client.run_sql_cached(
+        "r1_feed_activity", FEED_ACTIVITY_SQL, query_id=qid4, estimated_credits=8.0,
+        expected_max_rows=1000, expected_columns=5,
+    )
+    n_feeds = 0 if df4 is None else len(df4)
+    print(f"[r1_recon] Активных Chainlink-фидов (июль-август): {n_feeds}")
+    if df4 is not None and len(df4):
+        print(df4.head(20).to_string())
+        total_updates = df4["n_updates"].sum()
+        total_outside = df4["n_updates_outside_market_hours"].sum()
+        print(f"[r1_recon] Всего обновлений: {total_updates}, из них вне торговых часов: "
+              f"{total_outside} ({total_outside / total_updates:.1%})" if total_updates else "")
 
     print("\n[r1_recon] Готово. См. вывод выше -- обновите docs/R1_DESIGN.md, "
           "\"Механика\", по фактам о доступных таблицах Chainlink/RWA-фабрики.")
