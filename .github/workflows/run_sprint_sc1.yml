@@ -14,6 +14,11 @@ on:
           - cluster
           - economics
           - report
+      skip_gas_query:
+        description: "cluster: SC1_SKIP_GAS_QUERY=1 -- остановиться после проверки колонок transactions"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   run-sprint-sc1:
@@ -62,6 +67,7 @@ jobs:
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintSC1
+          SC1_SKIP_GAS_QUERY: ${{ github.event.inputs.skip_gas_query || '' }}
         run: python analysis/sc1_pipeline.py --stage cluster
 
       - name: Run economics (Step 3-4 -- fee/gas economics per cluster)

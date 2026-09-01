@@ -41,6 +41,19 @@ def stage_cluster(client: DuneClient) -> int:
     )
     if df is not None and len(df):
         print(df.to_string())
+    else:
+        print("(пусто)")
+
+    # Осторожность: не гнать следующий (более дорогой, 8.0) запрос
+    # вслепую, пока не увидели РЕАЛЬНЫЕ имена колонок transactions
+    # выше (sc1_v1_launch_tx_gas.sql писался по предположению) -- имена
+    # столбцов Dune не всегда совпадают с очевидными ("from"/"to" могут
+    # быть по-другому). Останавливаемся здесь на этом прогоне; imя
+    # колонок подтверждаются в SQL следующим коммитом перед запуском.
+    if os.environ.get("SC1_SKIP_GAS_QUERY") == "1":
+        print("\n[sc1_pipeline] SC1_SKIP_GAS_QUERY=1 -- останавливаюсь после колонок "
+              "для проверки имён перед платным запросом.")
+        return 0
 
     print("\n===== sc1_v1_launch_tx_gas (оценка 8.0) =====")
     qid2 = client.create_query("sc1_v1_launch_tx_gas", LAUNCH_TX_GAS_SQL)
