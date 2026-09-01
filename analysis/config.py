@@ -189,5 +189,25 @@ class Config:
     r1_cache_dir: str = "data/sprintR1_cache"
     r1_design_doc: str = "docs/R1_DESIGN.md"
 
+    # --- Sprint SC1: конвейерный запуск токенов (serial creators), см. docs/SC1_NOTE.md ---
+    # Параллельно R1, приоритет ресурсов у R1. Пре-регистрировано
+    # 2026-09-01, критерий заморожен -- см. docs/SC1_NOTE.md.
+    sc1_month_start: str = "2026-08-01"        # август 2026, полуоткрытый интервал
+    sc1_month_end: str = "2026-09-01"
+    sc1_pipeline_min_launches: int = 50         # "конвейер" = кластер с 50+ запусков
+    sc1_solo_max_launches: int = 4              # "штучный создатель" = 1-4 запуска (контраст)
+    sc1_go_min_fee_to_gas_ratio: float = 2.0    # критерий: комиссии >= 2x газа по пост-вейверным ценам
+    sc1_lottery_concentration_threshold: float = 0.90  # >90% комиссий у топ-5% кластеров -> лотерея
+    sc1_lottery_top_share: float = 0.05         # "топ-5% кластеров"
+    sc1_v2_hook_fee_bps: int = 100              # см. docs/G1_DESIGN.md, V2 fee-стек
+    sc1_v2_protocol_fee_share_bps: int = 3000
+    sc1_v2_creator_fee_share_of_volume: float = 0.007  # ~0.7% объёма создателю (V2), см. SC1_NOTE.md
+    sc1_early_window_h: int = 24                # объём торгов в первые 24ч после запуска
+    sc1_gas_sample_n: int = 100                 # выборка транзакций для медианного gas_used, если трейсы дороги
+
+    sc1_credit_budget: float = field(default_factory=lambda: _float("SC1_CREDIT_BUDGET", 20.0))
+    sc1_cache_dir: str = "data/sprintSC1_cache"
+    sc1_note_doc: str = "docs/SC1_NOTE.md"
+
 
 CONFIG = Config()

@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - scrape_stock_tokens_probe
+          - scrape_stock_tokens_raw
           - scrape_stock_tokens
           - recon
           - smoke
@@ -55,6 +56,10 @@ jobs:
       - name: Scrape stock token registry + Chainlink feed addresses (probe, 0 credits)
         if: ${{ github.event.inputs.step == 'scrape_stock_tokens_probe' }}
         run: python analysis/r1_scrape_stock_tokens.py --probe
+
+      - name: Scrape stock token registry + Chainlink feed addresses (raw HTML around astro-island, 0 credits)
+        if: ${{ github.event.inputs.step == 'scrape_stock_tokens_raw' }}
+        run: python analysis/r1_scrape_stock_tokens.py --raw
 
       - name: Scrape stock token registry + Chainlink feed addresses (0 credits)
         if: ${{ github.event.inputs.step == 'scrape_stock_tokens' }}

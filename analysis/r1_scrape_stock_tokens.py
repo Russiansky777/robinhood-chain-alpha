@@ -93,8 +93,23 @@ def git_commit(paths: list[Path], message: str) -> None:
         print(f"[r1_scrape] ПРЕДУПРЕЖДЕНИЕ: не удалось закоммитить: {exc}")
 
 
+def find_astro_island_props(html: str, anchor_text: str, window: int = 4000) -> list[str]:
+    """Зонд-хелпер (run #4 нашёл, что таблица фидов на docs.chain.link --
+    Astro-остров: рендерится клиентским JS, в исходном HTML только тег
+    <astro-island ... props="..."> с JSON-пропсами для гидрации (или
+    без данных вовсе, если гидрация полностью клиентская). Ищет
+    anchor_text в СЫРОМ HTML (до strip_html) и возвращает срез вокруг
+    каждого вхождения -- для разбора структуры глазами."""
+    out = []
+    for m in re.finditer(re.escape(anchor_text), html):
+        start = max(0, m.start() - 200)
+        out.append(html[start:m.start() + window])
+    return out
+
+
 def main() -> int:
     probe = "--probe" in sys.argv
+    raw_probe = "--raw" in sys.argv
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     fetched_at = datetime.now(timezone.utc).isoformat()
 
@@ -117,6 +132,14 @@ def main() -> int:
             print("---- TEXT DUMP (для разбора) ----")
             print(text[:150000])
             print("---- КОНЕЦ TEXT DUMP ----")
+        if raw_probe:
+            for anchor in ("astro-island", "Available Robinhood"):
+                slices = find_astro_island_props(html, anchor)
+                print(f"---- RAW HTML вокруг '{anchor}' ({len(slices)} вхождений) ----")
+                for s in slices[:3]:
+                    print(s)
+                    print("... [срез] ...")
+                print(f"---- КОНЕЦ RAW '{anchor}' ----")
         results[name] = {
             "url": url,
             "status": status,
