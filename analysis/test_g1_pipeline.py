@@ -87,6 +87,19 @@ def test_build_quote_distribution_query_values_row_count():
     print("[test_build_quote_distribution_query_values_row_count] OK")
 
 
+def test_build_quote_distribution_query_has_time_bound():
+    """Регрессия на run #16: первая версия не имела НИКАКОЙ границы по
+    block_time -- просканировала всю историю dex.trades для 896 активно
+    торгуемых токенов, факт 56.49 против заявленных 15.0 (>2x, 2x-гард
+    остановил пайплайн). Каждый запрос к dex.trades в этом пайплайне
+    ОБЯЗАН ограничивать block_time -- проверяем явно."""
+    events = _synthetic_events(3)
+    sql = build_quote_distribution_query(events)
+    assert "block_time >" in sql and "block_time <=" in sql, "нет границы по block_time -- та же причина, что дала 56.49 вместо 15.0 в run #16"
+    assert "interval '" in sql
+    print("[test_build_quote_distribution_query_has_time_bound] OK")
+
+
 def test_apply_filters_basic():
     df = pd.DataFrame({
         "n_buys_pre": [5, 1, 3],
@@ -161,6 +174,7 @@ def main() -> int:
         test_build_extract_query_has_all_horizon_columns,
         test_build_extract_query_has_hard_limit,
         test_build_quote_distribution_query_values_row_count,
+        test_build_quote_distribution_query_has_time_bound,
         test_apply_filters_basic,
         test_compute_returns_known_values,
         test_compute_returns_excludes_non_analytic_rows,

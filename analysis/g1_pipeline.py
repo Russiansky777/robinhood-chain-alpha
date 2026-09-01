@@ -212,30 +212,57 @@ def compute_returns(df: pd.DataFrame, cost: float, horizons: tuple[int, ...], st
     return out
 
 
+QUOTE_DISTRIBUTION_WINDOW_S = 172800  # 48ч после t0 -- квота пула не меняется со временем,
+# ранняя торговля достаточна и репрезентативна для вопроса "какой актив на другой стороне".
+
+
 def build_quote_distribution_query(events: pd.DataFrame) -> str:
     """§2.6/владелец, деливерабл смоука: распределение quote-токенов по
     ВСЕМ событиям (какой актив на другой стороне свопа) -- один
     агрегат по quote_symbol, не по токену (не нужно 896 строк для
-    вопроса о распределении)."""
-    tokens = sorted(events["token"].unique())
-    values_rows = ",\n        ".join(f"(0x{str(t).removeprefix('0x')})" for t in tokens)
+    вопроса о распределении).
+
+    БАГ, НАЙДЕННЫЙ НА РЕАЛЬНОМ ПРОГОНЕ (run #16, 2026-09-01): первая
+    версия этого запроса не имела НИКАКОЙ границы по block_time --
+    единственная во всём пайплайне (build_extract_query и все SQL до
+    неё всегда явно ограничивали block_time). Джойн по 896 активно
+    торгуемым токенам без временной границы просканировал ВСЮ историю
+    dex.trades для каждого из них (некоторые торгуются до сих пор,
+    объёмы до $10-18M -- см. g1_v2_recon.py) -- факт 56.49 против
+    заявленных 15.0 (>2x), 2x-гард сработал и остановил пайплайн
+    корректно (реальная execute-стоимость уже была записана в леджер
+    ДО отказа, ничего не потеряно из виду). Исправлено: окно (t0;
+    t0+48ч] -- квота пула фиксирована с момента создания, ранняя
+    торговля репрезентативна, новых вопросов не решает."""
+    t0_min = fmt_ts(events["t0"].min())
+    t0_max_bound = fmt_ts(pd.Timestamp(events["t0"].max()) + pd.Timedelta(seconds=QUOTE_DISTRIBUTION_WINDOW_S + 60))
+    rows = []
+    for _, r in events.iterrows():
+        rows.append(f"(0x{str(r['token']).removeprefix('0x')}, timestamp '{fmt_ts(r['t0'])}')")
+    values_rows = ",\n        ".join(rows)
     return f"""-- Сгенерировано analysis/g1_pipeline.py -- распределение quote-токенов
--- по {len(tokens)} v2-градуациям (владелец, деливерабл смоука п.3).
-with tokens(token) as (
+-- по {len(events)} v2-градуациям (владелец, деливерабл смоука п.3).
+-- Окно (t0; t0+{QUOTE_DISTRIBUTION_WINDOW_S}с] -- см. docstring build_quote_distribution_query
+-- (баг run #16: без границы по block_time просканировало всю историю).
+with events(token, t0) as (
     values
         {values_rows}
 ),
 sides as (
     select
-        case when dt.token_bought_address = t.token then dt.token_sold_symbol
+        case when dt.token_bought_address = e.token then dt.token_sold_symbol
              else dt.token_bought_symbol end as quote_symbol,
-        t.token, dt.amount_usd
-    from tokens t
+        e.token, dt.amount_usd
+    from events e
     join dex.trades dt
         on dt.blockchain = 'robinhood'
         and dt.version = '4'
-        and (dt.token_bought_address = t.token or dt.token_sold_address = t.token)
+        and (dt.token_bought_address = e.token or dt.token_sold_address = e.token)
         and dt.amount_usd is not null
+        and dt.block_time > e.t0
+        and dt.block_time <= e.t0 + interval '{QUOTE_DISTRIBUTION_WINDOW_S}' second
+        and dt.block_time >= timestamp '{t0_min}'
+        and dt.block_time <= timestamp '{t0_max_bound}'
 )
 select
     coalesce(quote_symbol, '(NULL/unknown)') as quote_symbol,

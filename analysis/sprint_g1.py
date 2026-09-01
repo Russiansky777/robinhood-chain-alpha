@@ -39,8 +39,10 @@ import pandas as pd
 from config import CONFIG
 from dune_client import DuneClient
 from credit_guard import load_state
+from g1_common import fmt_ts
 from g1_pipeline import (
     load_full_v2_events, run_extract, apply_filters, compute_returns, build_quote_distribution_query,
+    QUOTE_DISTRIBUTION_WINDOW_S,
 )
 from g1_stats import run_horizon_stats, HorizonResult
 
@@ -81,8 +83,13 @@ def quote_distribution_step(client: DuneClient, events: pd.DataFrame) -> tuple[p
     ВСЕМ 896 событиям (не только смоук-день). Возвращает (df, non_weth_flag)."""
     sql = build_quote_distribution_query(events)
     qid = client.create_query("g1_v2_quote_distribution", sql)
+    # Оценка поднята с 15.0 (run #16, 56.49 факт против 15.0 -- >2x, гард
+    # остановил пайплайн) после того как запрос получил границу по block_time
+    # (см. build_quote_distribution_query) -- теперь окно на порядок уже
+    # (48ч на событие вместо всей истории), но откалиброванных чисел под ЭТУ
+    # форму запроса ещё нет, поэтому оценка с запасом, не заниженная повторно.
     df = client.run_sql_cached(
-        "g1_v2_quote_distribution", sql, query_id=qid, estimated_credits=15.0,
+        "g1_v2_quote_distribution", sql, query_id=qid, estimated_credits=25.0,
         expected_max_rows=50, expected_columns=4,
     )
     if df is None or len(df) == 0:
@@ -111,6 +118,11 @@ def quote_manual_check_step(client: DuneClient, events: pd.DataFrame, quote_df: 
     symbols_sql = ",".join("'" + s.replace("'", "''") + "'" for s in non_weth_symbols)
     tokens = sorted(events["token"].unique())
     addr_list = ", ".join(f"0x{t.removeprefix('0x')}" for t in tokens)
+    # Границы по block_time ОБЯЗАТЕЛЬНЫ (см. run #16: build_quote_distribution_query
+    # без такой границы просканировала всю историю dex.trades, факт 56.49 вместо
+    # заявленных 15.0) -- тот же диапазон, что и quote_distribution.
+    t0_min = events["t0"].min()
+    t0_max_bound = pd.Timestamp(events["t0"].max()) + pd.Timedelta(seconds=QUOTE_DISTRIBUTION_WINDOW_S + 60)
     sql = f"""-- Ручная сверка USD-нормировки на сток-квотных событиях (owner, п.3)
 select dt.token_bought_symbol, dt.token_sold_symbol, dt.token_bought_amount,
     dt.token_sold_amount, dt.amount_usd, dt.block_time
@@ -119,6 +131,8 @@ where dt.blockchain = 'robinhood' and dt.version = '4'
     and (dt.token_bought_address in ({addr_list}) or dt.token_sold_address in ({addr_list}))
     and (dt.token_bought_symbol in ({symbols_sql}) or dt.token_sold_symbol in ({symbols_sql}))
     and dt.amount_usd is not null
+    and dt.block_time >= timestamp '{fmt_ts(t0_min)}'
+    and dt.block_time <= timestamp '{fmt_ts(t0_max_bound)}'
 limit 10
 """
     qid = client.create_query("g1_v2_quote_manual_check", sql)
@@ -136,7 +150,7 @@ def run_smoke(client: DuneClient, events: pd.DataFrame) -> tuple[bool, dict]:
     ledger_start = len(client.credit_ledger)
 
     quote_df, needs_manual_check = quote_distribution_step(client, events)
-    declared_estimate = 15.0  # quote_distribution
+    declared_estimate = 25.0  # quote_distribution (см. quote_distribution_step)
     if needs_manual_check and len(quote_df):
         quote_manual_check_step(client, events, quote_df)
         declared_estimate += 5.0
