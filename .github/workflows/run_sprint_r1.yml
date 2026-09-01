@@ -1,0 +1,98 @@
+name: Run Sprint R1 (RWA-конвергенция, сток-токены)
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "Какой шаг запустить"
+        required: true
+        default: "scrape_stock_tokens_probe"
+        type: choice
+        options:
+          - scrape_stock_tokens_probe
+          - scrape_stock_tokens
+          - recon
+          - smoke
+          - full
+          - report
+
+jobs:
+  run-sprint-r1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Тот же общий эфемерный кэш query_id, что у остальных спринтов
+      # (см. docs/COST_POSTMORTEM.md про разделяемый префикс
+      # dune-cache- между Sprint 1 / 1.5 / G1 / R1) -- дополнение,
+      # основная защита -- постоянный data/sprintR1_cache/.
+      - name: Restore Dune query cache
+        uses: actions/cache@v4
+        with:
+          path: analysis/output/cache
+          key: dune-cache-${{ github.run_id }}
+          restore-keys: |
+            dune-cache-
+          save-always: true
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      # 0 кредитов, не Dune -- обычный исходящий интернет GH Actions
+      # runner'а (интерактивная песочница агента блокирует
+      # docs.robinhood.com/docs.chain.link через свой ограничивающий
+      # прокси инструмента, см. docs/R1_DESIGN.md, "Механика"). --probe
+      # печатает полный текстовый дамп страниц в лог джобы для разбора
+      # структуры перед точным парсингом.
+      - name: Scrape stock token registry + Chainlink feed addresses (probe, 0 credits)
+        if: ${{ github.event.inputs.step == 'scrape_stock_tokens_probe' }}
+        run: python analysis/r1_scrape_stock_tokens.py --probe
+
+      - name: Scrape stock token registry + Chainlink feed addresses (0 credits)
+        if: ${{ github.event.inputs.step == 'scrape_stock_tokens' }}
+        run: python analysis/r1_scrape_stock_tokens.py
+
+      - name: Run recon (Step 1, Dune -- дешёвые агрегаты)
+        if: ${{ github.event.inputs.step == 'recon' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_recon.py
+
+      - name: Run smoke test (Step 2)
+        if: ${{ github.event.inputs.step == 'smoke' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/sprint_r1.py --stage smoke
+
+      - name: Run full pipeline (Step 3-5, re-entry -- smoke stage is a cache-hit)
+        if: ${{ github.event.inputs.step == 'full' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/sprint_r1.py --stage full
+
+      - name: Report stage (no-op -- report is written inline by smoke/full)
+        if: ${{ github.event.inputs.step == 'report' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/sprint_r1.py --stage report
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/RESULTS.md docs/R1_DESIGN.md
+          if [ -d data ]; then git add data/; fi
+          git diff --cached --quiet || git commit -m "Update Sprint R1 results [automated]"
+          git push

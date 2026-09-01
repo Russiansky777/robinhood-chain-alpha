@@ -141,5 +141,53 @@ class Config:
     g1_cache_dir: str = "data/sprintG1_cache"
     g1_design_doc: str = "docs/G1_DESIGN.md"
 
+    # --- Sprint R1: ретро-тест RWA-конвергенции (сток-токены), см. docs/R1_DESIGN.md ---
+    # Пре-регистрировано 2026-09-01, §2 заморожен -- значения ниже НЕ
+    # менять после коммита Шага 0, кроме дат покрытия/списка
+    # праздников NYSE (уточняются на Шаге 1, см. r1_coverage_end).
+    r1_period_start: str = "2026-07-01"       # §2.1
+    r1_coverage_end: str = field(
+        default_factory=lambda: os.environ.get("R1_COVERAGE_END", "")
+    )  # заполняется на Шаге 1 по факту метаданных покрытия Dune
+    r1_period_end: str = field(
+        default_factory=lambda: os.environ.get("R1_PERIOD_END", "")
+    )  # = coverage_end - 48h (§2.1), заполняется на Шаге 1
+    # Закрытые часы: вне 13:30-20:00 UTC пн-пт (§2.1), плюс праздники/
+    # укороченные сессии NYSE -- список из Шага 1 (r1_nyse_holidays.json).
+    r1_market_open_utc: str = "13:30"
+    r1_market_close_utc: str = "20:00"
+    r1_universe_lookback_days: int = 7        # §2.2
+    r1_universe_min_trades: int = 100         # §2.2
+    r1_universe_min_vol_usd: float = 10_000.0  # §2.2
+    r1_checkpoint_price_window_min: int = 30   # §2.3: VWAP в (t-30м; t]
+    r1_checkpoint_min_trades: int = 3          # §2.3
+    r1_checkpoint_min_vol_usd: float = 500.0   # §2.3
+    r1_thetas: tuple[float, ...] = (0.01, 0.025, 0.05)  # §2.3
+    r1_entry_window_min: int = 30              # §2.4: VWAP в (t; t+30м]
+    r1_horizons: tuple[str, ...] = ("4h", "12h", "open1h")  # §2.4
+    r1_horizon_open1h_start_min: int = 30      # §2.4: (открытие+30м; открытие+90м]
+    r1_horizon_open1h_end_min: int = 90
+    r1_cost_scenarios: tuple[float, ...] = (0.005, 0.015, 0.03)  # §2.4, базовый = 1.5%
+    r1_cost_scenario_base: float = 0.015
+    r1_bh_alpha: float = 0.05                  # §2.7
+    r1_bootstrap_n: int = 10_000               # §2.7
+    r1_trimmed_mean_pct: float = 0.05          # §2.7
+    r1_min_n_per_cell: int = 50                # §2.7/2.8: ячейка допущена при N>=50
+    r1_go_min_median_pct: float = 0.01         # §2.8: GO требует медиану >= +1%
+    r1_go_min_control_excess_pct: float = 0.01  # §2.8: превышение медианы контроля >= +1%
+    r1_control_max_abs_d: float = 0.005        # §2.6: контроль |D| <= 0.5%
+    r1_recon_min_tokens: int = 15              # Шаг 1 гейт разведки
+    r1_recon_min_closed_hours_trades: int = 50  # Шаг 1 гейт разведки
+
+    # Бюджет спринта -- отдельное пространство credit_guard.py
+    # (namespace "sprintR1"). Смета: разведка <=15, смоук <=15, полный
+    # <=50, резерв 20, кап 100 (владелец, п.3).
+    r1_credit_budget: float = field(default_factory=lambda: _float("R1_CREDIT_BUDGET", 100.0))
+    r1_step1_budget: float = 15.0
+    r1_step2_budget: float = 15.0
+    r1_step3_budget: float = 50.0
+    r1_cache_dir: str = "data/sprintR1_cache"
+    r1_design_doc: str = "docs/R1_DESIGN.md"
+
 
 CONFIG = Config()
