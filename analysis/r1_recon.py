@@ -26,13 +26,14 @@ from pathlib import Path
 os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "sprintR1")
 sys.path.insert(0, str(Path(__file__).parent))
 
-from dune_client import DuneClient
+from dune_client import DuneClient, render_sql
 from run_pipeline import read_sql
 
 SCHEMA_DRILLDOWN_SQL = read_sql("r1/r1_schema_drilldown")
 COLUMNS_PROBE_SQL = read_sql("r1/r1_columns_probe")
 FEED_ACTIVITY_SQL = read_sql("r1/r1_feed_activity")
 STOCK_TOKEN_DEPLOYMENTS_SQL = read_sql("r1/r1_stock_token_deployments")
+UNIVERSE_TRADES_TMPL = read_sql("r1/r1_universe_trades")
 
 
 def main() -> int:
@@ -91,6 +92,31 @@ def main() -> int:
         total_outside = df4["n_updates_outside_market_hours"].sum()
         print(f"[r1_recon] Всего обновлений: {total_updates}, из них вне торговых часов: "
               f"{total_outside} ({total_outside / total_updates:.1%})" if total_updates else "")
+
+    # Гейт разведки (§1 Шаг 1): сколько токенов проходят фильтр §2.2 и
+    # сколько сделок в закрытые часы -- нужны адреса из df3.
+    if df3 is not None and len(df3):
+        addr_list = ", ".join(f"0x{str(a).lower().replace('0x', '')}" for a in df3["token_address"])
+        universe_sql = render_sql(UNIVERSE_TRADES_TMPL, {"token_address_list": addr_list})
+        print(f"\n===== r1_universe_trades ({len(df3)} токенов, оценка 10.0) =====")
+        qid5 = client.create_query("r1_universe_trades", universe_sql)
+        df5 = client.run_sql_cached(
+            "r1_universe_trades", universe_sql, query_id=qid5, estimated_credits=10.0,
+            expected_max_rows=len(df3) + 5, expected_columns=5,
+        )
+        if df5 is not None and len(df5):
+            print(df5.to_string(max_rows=len(df5)))
+            n_pass_22 = ((df5["n_trades"] >= 100) & (df5["vol_usd"] >= 10_000)).sum()
+            n_closed_hours_trades = df5["n_trades_closed_hours"].sum()
+            print(f"\n[r1_recon] ГЕЙТ РАЗВЕДКИ: токенов с >=100 сделок И >=$10k объёма (весь период, "
+                  f"не по неделям -- см. §2.2): {n_pass_22} (нужно >=15). "
+                  f"Сделок в закрытые часы всего: {n_closed_hours_trades} (нужно >=50).")
+            if n_pass_22 >= 15 and n_closed_hours_trades >= 50:
+                print("[r1_recon] ГЕЙТ ПРОЙДЕН -- можно переходить к Шагу 2 (смоук).")
+            else:
+                print("[r1_recon] ГЕЙТ НЕ ПРОЙДЕН -- см. docs/R1_DESIGN.md, возврат к владельцу.")
+        else:
+            print("[r1_recon] ГЕЙТ РАЗВЕДКИ: 0 сделок найдено -- гейт НЕ пройден.")
 
     print("\n[r1_recon] Готово. См. вывод выше -- обновите docs/R1_DESIGN.md, "
           "\"Механика\", по фактам о доступных таблицах Chainlink/RWA-фабрики.")
