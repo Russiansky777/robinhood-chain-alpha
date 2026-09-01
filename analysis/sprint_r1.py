@@ -49,6 +49,14 @@ FEED_TMPL = read_sql("r1/r1_smoke_feed_events")
 # периоду и понедельной валидации §2.2.
 SESSION_OPEN_TMPL = read_sql("r1/r1_full_session_open_windows")
 WEEKLY_UNIVERSE_TMPL = read_sql("r1/r1_full_weekly_universe")
+# ИСПРАВЛЕНО после run #27 (партиция wk07 стоила 81.16 вместо оценки
+# 6.0 -- см. docs/R1_DESIGN.md, "Шаг 3: инцидент wk07"): смоук-шаблон
+# джойнил trades к чекпоинтам ТОЛЬКО по token_address, без временной
+# границы в самом JOIN -- при всплеске объёма у одного токена в одной
+# неделе промежуточное произведение (168 чекпоинтов x N сделок) рвёт
+# бюджет ещё до GROUP BY. Отдельный шаблон Шага 3 -- джойн ограничен
+# диапазоном (t-30м; t+12ч], смоук (run_smoke) не тронут.
+FULL_CHECKPOINT_TMPL = read_sql("r1/r1_full_checkpoint_windows")
 
 # Смоук: один срединный уикенд периода (01.07-28.08.2026) -- 25-26.07.2026
 # (суббота-воскресенье). Чекпоинты -- вся сетка часов в этом диапазоне
@@ -408,7 +416,16 @@ def run_full() -> int:
         trades_start = p_start - pd.Timedelta(minutes=30)
         trades_end = p_end + pd.Timedelta(hours=12, minutes=5)
         name = f"r1_full_checkpoint_wk{i + 1:02d}"
-        sql = render_sql(CHECKPOINT_TMPL, {
+        # wk01-wk06 УЖЕ корректно посчитаны и оплачены под старым
+        # (смоук-style) шаблоном ДО инцидента wk07 (run #27, см.
+        # docs/R1_DESIGN.md "Шаг 3: инцидент wk07") -- держим их на
+        # старом шаблоне, чтобы run_sql_cached узнал ТОТ ЖЕ рендер SQL
+        # (тот же хэш) и отдал постоянный кэш бесплатно, не пересчитывая
+        # уже оплаченные недели под новым текстом запроса. wk07+ (ещё не
+        # получены) -- на исправленном шаблоне с ограниченным по времени
+        # JOIN.
+        tmpl = CHECKPOINT_TMPL if i < 6 else FULL_CHECKPOINT_TMPL
+        sql = render_sql(tmpl, {
             "token_address_list": token_addr_list,
             "checkpoint_start": p_start.strftime("%Y-%m-%d %H:%M:%S"),
             "checkpoint_end": p_end.strftime("%Y-%m-%d %H:%M:%S"),
@@ -425,17 +442,19 @@ def run_full() -> int:
             part_df["t_checkpoint"] = pd.to_datetime(part_df["t_checkpoint"], utc=True)
             part_df["token_address"] = part_df["token_address"].str.lower()
             cp_parts.append(part_df)
-        if i == 0:
-            # Калибровка узким срезом (правило G1/SC1): факт 1-й партиции
-            # x оставшиеся партиции x2.5 запас -- если проекция не
-            # укладывается в остаток namespace, стоп ДО траты остального
-            # бюджета на партиции 2..N (1-я уже посчитана и сохранена).
+        if i == 6:
+            # Калибровка узким срезом (правило G1/SC1) НА ПЕРВОЙ партиции,
+            # реально исполняемой под ИСПРАВЛЕННЫМ шаблоном (wk01-06 --
+            # кэш-хиты старого шаблона, их факт не показателен для оценки
+            # нового джойна) -- факт x оставшиеся x2.5 запас, стоп ДО
+            # траты остального бюджета, если проекция не влезает.
             actual_first = spent_on(name)
-            projected = actual_first * len(partitions) * 2.5
+            n_remaining_new = len(partitions) - i
+            projected = actual_first * n_remaining_new * 2.5
             remaining_ns = CONFIG.r1_credit_budget - cg.load_state().get("sprintR1", {}).get("spent", 0.0)
             print(
-                f"[sprint_r1] Калибровка по 1-й партиции: факт {actual_first:.3f}, "
-                f"проекция на все {len(partitions)} партиций x2.5 запас = {projected:.2f}, "
+                f"[sprint_r1] Калибровка по {name} (первая под исправленным джойном): факт {actual_first:.3f}, "
+                f"проекция на оставшиеся {n_remaining_new} партиций x2.5 запас = {projected:.2f}, "
                 f"остаток namespace = {remaining_ns:.2f}."
             )
             if projected > remaining_ns:
