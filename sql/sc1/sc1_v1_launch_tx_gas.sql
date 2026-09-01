@@ -16,5 +16,6 @@ select
     block_time
 from robinhood.transactions
 where "to" = 0xA5aAb3F0c6EeadF30Ef1D3Eb997108E976351feB
+  and success = true  -- только успешные launch(), гейт §2.3-подобной логики: неудачные транзакции не создали токен
   and block_time >= timestamp '2026-08-01 00:00:00'
   and block_time <  timestamp '2026-08-13 00:00:00'
