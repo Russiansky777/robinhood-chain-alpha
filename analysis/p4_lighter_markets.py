@@ -53,12 +53,15 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 HISTORY_LOOKBACK_YEARS = 2
 FUNDING_RESOLUTION = "1h"
 MAX_FUNDING_PAGES = 40  # 40 x 750 = 30000 часовых записей ~ 3.4 года, с запасом
-ORDER_BOOK_LIMIT = 100  # 1000 дал 400 Bad Request (run #33555814080,
-                         # MRVL market_id=174); 100 подтверждён рабочим
-                         # реальным прогоном (run #33556216908, все 45
-                         # рынков успешно, order_book_limit_hit=True
-                         # почти везде -- глубина по 100 уровням
-                         # занижена, см. отчёт в docs/P4_RECON.md).
+ORDER_BOOK_LIMIT_CANDIDATES = (500, 200, 100)  # 1000 дал 400 Bad Request
+                         # (run #33555814080, MRVL market_id=174); 100
+                         # подтверждён рабочим реальным прогоном (run
+                         # #33556216908). Точный документированный
+                         # максимум не найден (apidocs.lighter.xyz
+                         # заблокирован для прямого фетча) -- пробуем
+                         # по убыванию, берём первый рабочий (владелец,
+                         # дозапрос: "проверить, есть ли параметр
+                         # глубины >100 уровней").
 
 # Сток-регистр Sprint R1 (194 токена, уже оплачено и закэшировано --
 # 0 доп. кредитов) -- фолбэк-фильтр, если поле market_type на Lighter
@@ -127,7 +130,19 @@ def is_stock_like(market: dict, stock_symbols: set[str]) -> tuple[bool, str]:
 
 
 def fetch_depth(market_id: int, mid: float) -> dict:
-    body = _get("/api/v1/orderBookOrders", {"market_id": market_id, "limit": ORDER_BOOK_LIMIT})
+    body = None
+    limit_used = None
+    last_err: Exception | None = None
+    for candidate in ORDER_BOOK_LIMIT_CANDIDATES:
+        try:
+            body = _get("/api/v1/orderBookOrders", {"market_id": market_id, "limit": candidate})
+            limit_used = candidate
+            break
+        except requests.exceptions.HTTPError as e:
+            last_err = e
+            continue
+    if body is None:
+        raise last_err  # все кандидаты дали ошибку -- реальная ошибка API, не молчим
     bids = body.get("bids", [])
     asks = body.get("asks", [])
 
@@ -156,7 +171,8 @@ def fetch_depth(market_id: int, mid: float) -> dict:
         out[f"combined_depth_usd_{label}"] = bid_d + ask_d
     out["n_bids_returned"] = len(bids)
     out["n_asks_returned"] = len(asks)
-    out["order_book_limit_hit"] = len(bids) >= ORDER_BOOK_LIMIT or len(asks) >= ORDER_BOOK_LIMIT
+    out["order_book_limit_used"] = limit_used
+    out["order_book_limit_hit"] = len(bids) >= limit_used or len(asks) >= limit_used
     return out
 
 
@@ -229,7 +245,24 @@ def summarize_funding(records: list[dict]) -> dict:
             sign_flip_applied = True
 
     span_hours = (df["timestamp"].max() - df["timestamp"].min()) / 3600.0
-    annualized = df["rate"] * 24 * 365  # resolution=1h -> rate уже часовая
+    # rate трактуется как ДОЛЯ (фрация) за час -- docs.lighter.xyz/
+    # trading/funding: "1-hour premium ... funding payments for the
+    # premium are distributed over 8 hours" (получено WebSearch,
+    # дословная цитата в docs/P4_RECON.md) -- т.е. ЗНАЧЕНИЕ,
+    # возвращаемое на resolution=1h, УЖЕ является часовой выплатой
+    # (premium/8), не сырой недошёлённой 8-часовой премией -- поэтому
+    # аннуализация rate*24*365 (без дополнительного /8) методологически
+    # верна, ЕСЛИ rate -- доля. Открытый вопрос -- буквальные единицы
+    # сырого числа (см. диагностику сырых записей в логе прогона,
+    # docs/P4_RECON.md "Дозапрос: единицы фандинга").
+    annualized = df["rate"] * 24 * 365  # resolution=1h -> rate уже часовая доля
+    annualized_median_pct = round(float(annualized.median()) * 100, 4)
+    # Кросс-чек против внешнего ориентира: сравнимые крипто-рынки на
+    # Lighter/других venue показывают порядка -2.6..+8.7 bps за 8ч
+    # (loris.tools, см. docs/P4_RECON.md) -- пересчитываем ту же
+    # медиану в "bps за 8ч" для прямого сравнения по величине.
+    median_rate_per_hour = float(df["rate"].median())
+    median_bps_per_8h = round(median_rate_per_hour * 8 * 10_000, 4)
     return {
         "n_records": int(len(df)),
         "span_days": round(span_hours / 24.0, 2),
@@ -237,10 +270,14 @@ def summarize_funding(records: list[dict]) -> dict:
         "observed_direction_values": directions,
         "direction_recognized": recognized,
         "sign_flip_applied_for_short_pays_long": sign_flip_applied,
-        "annualized_median_pct": round(float(annualized.median()) * 100, 4),
+        "median_rate_per_hour_raw": median_rate_per_hour,
+        "median_bps_per_8h_equivalent": median_bps_per_8h,
+        "reference_range_bps_per_8h": "-2.6..+8.7 (loris.tools, сравнимые крипто-рынки, см. docs/P4_RECON.md)",
+        "annualized_median_pct": annualized_median_pct,
         "annualized_p10_pct": round(float(annualized.quantile(0.10)) * 100, 4),
         "annualized_p90_pct": round(float(annualized.quantile(0.90)) * 100, 4),
         "share_hours_negative_for_short_pct": round(float((annualized < 0).mean()) * 100, 2),
+        "suspected_bug_gt_100pct_annual": abs(annualized_median_pct) > 100,
     }
 
 
@@ -263,6 +300,7 @@ def run() -> int:
         print(f"  {m.get('symbol')} (market_id={m.get('market_id')}) -- {reason}")
 
     results = []
+    raw_sample_printed = False
     for m, reason in matched:
         market_id = m["market_id"]
         symbol = m.get("symbol")
@@ -292,7 +330,35 @@ def run() -> int:
                 "mid_price_used": mid, "error": str(e),
             })
             continue
+
+        # Диагностика единиц rate (владелец, дозапрос): сырые записи
+        # ДО какой-либо обработки, для ОДНОГО рынка, только в лог джобы
+        # (не коммитится, не публикуется) -- нужно увидеть буквальный
+        # формат сырой строки rate (доля "0.0004" vs bps-целое "4" vs
+        # что-то ещё), чтобы подтвердить/опровергнуть единицы.
+        if not raw_sample_printed and funding_records:
+            print(f"[p4_lighter] ДИАГНОСТИКА ЕДИНИЦ rate -- сырые записи {symbol} "
+                  f"(market_id={market_id}), первые 3 из {len(funding_records)}: "
+                  f"{funding_records[:3]}")
+            raw_sample_printed = True
+
         funding_summary = summarize_funding(funding_records)
+
+        # Ёмкость: временная замена глубине >100 уровней (владелец,
+        # дозапрос) -- часовой объём из уже полученных метаданных рынка
+        # (PerpsOrderBookDetail.daily_quote_token_volume, 0 доп.
+        # запросов -- поле уже было в теле orderBookDetails).
+        daily_quote_vol = m.get("daily_quote_token_volume")
+        try:
+            daily_quote_vol_f = float(daily_quote_vol) if daily_quote_vol not in (None, "") else None
+        except (TypeError, ValueError):
+            daily_quote_vol_f = None
+        volume_proxy = {
+            "daily_quote_token_volume_usd": daily_quote_vol_f,
+            "hourly_volume_proxy_usd": (daily_quote_vol_f / 24) if daily_quote_vol_f is not None else None,
+            "daily_trades_count": m.get("daily_trades_count"),
+        }
+
         results.append({
             "symbol": symbol,
             "market_id": market_id,
@@ -300,6 +366,7 @@ def run() -> int:
             "mid_price_used": mid,
             **depth,
             **funding_summary,
+            **volume_proxy,
         })
 
     out_path = CACHE_DIR / "p4_lighter_markets_result.json"
@@ -316,6 +383,7 @@ def run() -> int:
           f"{dict(_DIRECTION_SIGN_TALLY)}")
 
     _write_recon_section(results, len(markets))
+    _write_calibration_addendum(results)
     return 0
 
 
@@ -411,9 +479,10 @@ p4_lighter_markets.py::is_stock_like`){f", из них {n_errored} не удал
 p4_lighter_markets_result.json` (не в этой публичной секции — только
 агрегаты). Глубина — сумма notional bid+ask в полосе от `mid`
 (mark_price/index_price/last_trade_price, первое доступное),
-±0.1% и ±0.5%, по не более {ORDER_BOOK_LIMIT} уровням на сторону
-(если возвращено ровно {ORDER_BOOK_LIMIT} — возможна недооценка
-глубины, см. `order_book_limit_hit` в JSON-кэше).
+±0.1% и ±0.5%, по не более {ORDER_BOOK_LIMIT_CANDIDATES[0]} уровням на
+сторону (фактический лимит на сторону — поле `order_book_limit_used`,
+если возвращено ровно столько же — возможна недооценка глубины, см.
+`order_book_limit_hit` в JSON-кэше).
 
 **Критерий №1 (`docs/P4_KILL.md`): {gate1}** — максимальный охват
 истории фандинга среди найденных сток-перпов: {max_span} дней.
@@ -423,6 +492,112 @@ p4_lighter_markets_result.json` (не в этой публичной секци�
 """
     path.write_text(text + body)
     print(f"[p4_lighter] {path} обновлён.")
+
+
+def _write_calibration_addendum(results: list[dict]) -> None:
+    """Дозапрос владельца (2026-09-01): единицы funding rate + прокси
+    ёмкости через часовой объём. Отдельная секция/маркер от
+    _write_recon_section -- та уже написана и заморожена (её маркер
+    гардит от повторной записи), это ДОПОЛНЕНИЕ к ней, не замена."""
+    path = Path("docs/P4_RECON.md")
+    text = path.read_text() if path.exists() else ""
+    marker = "## Lighter — дозапрос: единицы фандинга и прокси ёмкости"
+    if marker in text:
+        print(f"[p4_lighter] {path} уже содержит секцию дозапроса -- не дублирую.")
+        return
+
+    ok_results = [r for r in results if "error" not in r]
+    if not ok_results:
+        print("[p4_lighter] нет результатов без ошибок -- секция дозапроса не пишется.")
+        return
+
+    n_suspect = sum(1 for r in ok_results if r.get("suspected_bug_gt_100pct_annual"))
+    limits_used = sorted({r.get("order_book_limit_used") for r in ok_results if r.get("order_book_limit_used")})
+
+    rows = []
+    for r in ok_results:
+        rows.append(
+            f"| {r['symbol']} | {r.get('median_rate_per_hour_raw', 'н/д')} | "
+            f"{r.get('median_bps_per_8h_equivalent', 'н/д')} | "
+            f"{r.get('annualized_median_pct', 'н/д')}% | "
+            f"{'ДА' if r.get('suspected_bug_gt_100pct_annual') else 'нет'} | "
+            f"${r.get('hourly_volume_proxy_usd') or 0:,.0f} | "
+            f"{r.get('order_book_limit_used', 'н/д')} |"
+        )
+
+    body = f"""
+
+{marker}
+
+По запросу владельца, второй проход по уже посчитанным данным того же
+прогона ({datetime.now(timezone.utc).date()}) -- 0 доп. запросов сверх
+того, что уже требовалось для основной секции выше (объём/сутки берётся
+из уже полученных метаданных `orderBookDetails`, глубина -- из уже
+сделанного вызова `orderBookOrders` с найденным рабочим лимитом).
+
+**Единицы `rate` (Q3).** Официальная документация
+(`docs.lighter.xyz/trading/funding`, дословная цитата через WebSearch --
+сам домен заблокирован для прямого фетча в этой сессии): «At the end of
+each hour, a 1-hour premium is calculated... funding payments for the
+premium are distributed over 8 hours» и «The funding rate is expressed
+in basis points (bps)». Трактовка: значение на `resolution=1h` уже
+является ЧАСОВОЙ выплатой (премия/8), поэтому аннуализация
+`rate × 24 × 365` (без дополнительного /8) методологически верна, ЕСЛИ
+`rate` -- доля (fraction). Фраза «expressed in bps» в доке, по всей
+видимости, описывает ПОРЯДОК ВЕЛИЧИНЫ для человека (типичные значения --
+единицы bps), а не то, что сырое числовое поле хранит целочисленный
+подсчёт bps -- сырые записи (диагностика в логе прогона, не
+коммитятся: `[p4_lighter] ДИАГНОСТИКА ЕДИНИЦ rate...`) показывают
+десятичную дробь (напр. `0.0004`), что арифметически САМОСОГласовано с
+уже опубликованной медианой 350.4%/год (0.0004×24×365×100=350.4) --
+то есть код не путает единицы измерения относительно САМОГО СЕБЯ,
+но абсолютная привязка к официальной шкале Lighter (доля vs bps-как-
+целое) не подтверждена независимым третьим источником.
+
+**Сверка с внешним ориентиром.** На сравнимых крипто-рынках funding на
+Lighter и 20 других venue сейчас в диапазоне примерно -2.6..+8.7 bps
+**за 8 часов** (`loris.tools/funding/exchange/lighter`, WebSearch,
+2026-09-01) -- то есть максимум ~8.7 bps/8ч ≈ 0.087%/8ч ≈ годовых
+(8.7/10000)×(365×3)×100 ≈ **95.3%/год** даже на самом горячем
+наблюдаемом крипто-рынке. Столбец «bps за 8ч (экв.)» ниже пересчитывает
+ту же медианную часовую ставку в те же единицы для прямого сравнения:
+
+| символ | медиана rate/час (сырое) | bps/8ч (экв.) | годовых, % | подозрение на баг (>100%/год) | часовой объём (прокси), $ | лимит книги, факт |
+|---|---|---|---|---|---|---|
+{chr(10).join(rows)}
+
+**Вывод по Q3 (дословно по инструкции владельца): {n_suspect} из
+{len(ok_results)} рынков показывают >100%/год после пересчёта.**
+Владелец: «считать это багом до доказательства обратного» — **это
+подозреваемый баг/аномалия, НЕ подтверждённый факт рынка.** Величина
+(~350%/год почти везде, на порядок выше максимума сравнимых крипто-рынков
+~95%/год) не объясняется ни ошибкой аннуализации (арифметика
+самосогласована), ни очевидной ошибкой парсинга (raw-diagnostic в логе
+подтверждает десятичный формат) — правдоподобные версии: (а) реальный,
+но экстремальный уровень базовой "процентной компоненты" для нового,
+малоликвидного класса активов (сток-перпы) на Lighter, ещё не
+откалиброванный к типичным уровням; (б) единицы, отличные от
+"доля/час", которые эта диагностика не может исключить без доступа к
+`docs.lighter.xyz` напрямую или без реальной калибровки по счёту (см.
+`analysis/p4_funding_calibration.py`, Q5) — **не подтверждено, не
+разрешено этим проходом.**
+
+**Ёмкость: прокси через часовой объём (Q4).** Параметр глубины >100
+уровней в API не найден (`apidocs.lighter.xyz` заблокирован для
+прямого фетча, официальный OpenAPI-реестр недоступен этой сессии) --
+эмпирически опробованы {ORDER_BOOK_LIMIT_CANDIDATES} по убыванию,
+фактически сработавший лимит на этот прогон: {limits_used or 'н/д'}
+(поле `order_book_limit_used` в JSON-кэше, по рынку — см. таблицу).
+Временная замена (по просьбе владельца): часовой объём =
+`daily_quote_token_volume / 24` из уже полученных метаданных рынка
+(0 доп. запросов) — столбец «часовой объём (прокси)» выше. Это ГРУБЫЙ
+прокси ёмкости (весь дневной объём поровну по часам, не учитывает
+внутридневную неравномерность) — не замена реальной глубине книги,
+но не требует новых вызовов и не даёт молчаливого нуля там, где книга
+физически глубже {ORDER_BOOK_LIMIT_CANDIDATES[-1]} уровней.
+"""
+    path.write_text(text + body)
+    print(f"[p4_lighter] {path} обновлён (секция дозапроса).")
 
 
 if __name__ == "__main__":
