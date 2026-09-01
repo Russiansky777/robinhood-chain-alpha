@@ -146,12 +146,19 @@ class Config:
     # менять после коммита Шага 0, кроме дат покрытия/списка
     # праздников NYSE (уточняются на Шаге 1, см. r1_coverage_end).
     r1_period_start: str = "2026-07-01"       # §2.1
+    # Заполнено на Шаге 1 (recon, 2026-09-01): отдельного coverage-проба
+    # для R1 не гонялось -- используется значение, установленное в
+    # Sprint G1 (g1_recent_day_coverage_probe, тот же чейн, тот же Dune-
+    # индексер) как консервативная оценка: coverage_end = 2026-08-30
+    # 23:59:59 UTC. r1_feed_activity (run #11) подтвердил реальные
+    # обновления фидов минимум до 2026-08-31 23:06 UTC -- оценка не
+    # завышена. period_end = coverage_end - 48ч (§2.1).
     r1_coverage_end: str = field(
-        default_factory=lambda: os.environ.get("R1_COVERAGE_END", "")
-    )  # заполняется на Шаге 1 по факту метаданных покрытия Dune
+        default_factory=lambda: os.environ.get("R1_COVERAGE_END", "2026-08-30 23:59:59")
+    )
     r1_period_end: str = field(
-        default_factory=lambda: os.environ.get("R1_PERIOD_END", "")
-    )  # = coverage_end - 48h (§2.1), заполняется на Шаге 1
+        default_factory=lambda: os.environ.get("R1_PERIOD_END", "2026-08-28 23:59:59")
+    )
     # Закрытые часы: вне 13:30-20:00 UTC пн-пт (§2.1), плюс праздники/
     # укороченные сессии NYSE -- список из Шага 1 (r1_nyse_holidays.json).
     r1_market_open_utc: str = "13:30"
