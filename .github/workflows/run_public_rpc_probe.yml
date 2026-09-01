@@ -1,0 +1,39 @@
+name: Run public RPC probe (rpc.mainnet.chain.robinhood.com, без ключа)
+
+# Тот же разовый маркер PROBE_REQUEST, что и Blockscout REST v2 проба
+# (run_blockscout_addr_probe.yml) -- ОТДЕЛЬНЫЙ файл, P3 не тронут.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p3_guard_cache/PROBE_REQUEST"
+
+jobs:
+  run-public-rpc-probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Public RPC probe (без ключа)
+        run: python analysis/public_rpc_probe.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f data/p3_guard_cache/public_rpc_probe_result.json ]; then git add data/p3_guard_cache/public_rpc_probe_result.json; fi
+          git diff --cached --quiet || git commit -m "Public RPC probe: результат [automated]"
+          git push
