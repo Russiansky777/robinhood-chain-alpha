@@ -209,6 +209,15 @@ class Config:
     sc1_v2_hook_fee_bps: int = 100              # см. docs/G1_DESIGN.md, V2 fee-стек
     sc1_v2_protocol_fee_share_bps: int = 3000
     sc1_v2_creator_fee_share_of_volume: float = 0.007  # ~0.7% объёма создателю (V2), см. SC1_NOTE.md
+    # V1 -- НЕ bonding curve, одностороняя Uniswap V3 позиция создателя,
+    # доход = LP-комиссии на ней. Fee-тир НЕ константа V2 (0.7%) --
+    # определён эмпирически: uniswap_v3_robinhood.uniswapv3factory_evt_
+    # poolcreated пересечён с пулами всех 39680 августовских V1-запусков,
+    # 100% совпадение, fee=10000 (Uniswap V3 units) = 1.00% у ВСЕХ.
+    # Допущение: позиция создателя доминирует в пуле (см. SC1_NOTE.md
+    # оговорку) -- эффективная ставка близка к полному тиру.
+    sc1_v1_pool_fee_tier: int = 10_000           # Uniswap V3 fee units (сотые доли бипса)
+    sc1_v1_creator_fee_share_of_volume: float = 0.01  # 1.00% объёма, см. SC1_NOTE.md
     sc1_early_window_h: int = 24                # объём торгов в первые 24ч после запуска
     sc1_gas_sample_n: int = 100                 # выборка транзакций для медианного gas_used, если трейсы дороги
 
