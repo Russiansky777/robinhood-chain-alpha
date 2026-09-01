@@ -107,9 +107,37 @@ def find_astro_island_props(html: str, anchor_text: str, window: int = 4000) -> 
     return out
 
 
+ASTRO_ISLAND_RE = re.compile(r'<astro-island\b[^>]*\bprops="([^"]*)"[^>]*>', re.I)
+COMPONENT_URL_RE = re.compile(r'\bcomponent-url="([^"]*)"')
+
+
+def dump_astro_island_props(html: str) -> list[dict]:
+    """Точное извлечение props= из каждого <astro-island> тега (не окно
+    текста вокруг, а сам JSON пропсов, который Astro использует для SSR
+    -- если реестр фидов передан через пропсы при рендере, он будет
+    здесь; если пусто/нет тикеров -- значит гидрация полностью
+    клиентская без начальных данных, нужен другой источник."""
+    out = []
+    for m in re.finditer(r"<astro-island\b[^>]*>", html, re.I):
+        tag = m.group(0)
+        props_m = re.search(r'props="([^"]*)"', tag)
+        comp_m = re.search(r'component-url="([^"]*)"', tag)
+        props_raw = props_m.group(1) if props_m else ""
+        import html as html_mod
+
+        props_unescaped = html_mod.unescape(props_raw)
+        out.append({
+            "component_url": comp_m.group(1) if comp_m else None,
+            "props_len": len(props_unescaped),
+            "props_preview": props_unescaped[:2000],
+        })
+    return out
+
+
 def main() -> int:
     probe = "--probe" in sys.argv
     raw_probe = "--raw" in sys.argv
+    island_dump = "--islands" in sys.argv
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     fetched_at = datetime.now(timezone.utc).isoformat()
 
@@ -149,8 +177,18 @@ def main() -> int:
         }
         if probe:
             results[name]["text_dump"] = text[:150000]
+        if island_dump:
+            islands = dump_astro_island_props(html)
+            print(f"найдено <astro-island> тегов: {len(islands)}")
+            results[name]["astro_islands"] = islands
 
-    out_file = CACHE_DIR / ("r1_stock_tokens_probe.json" if probe else "r1_stock_tokens_raw.json")
+    if probe:
+        out_name = "r1_stock_tokens_probe.json"
+    elif island_dump:
+        out_name = "r1_stock_tokens_islands.json"
+    else:
+        out_name = "r1_stock_tokens_raw.json"
+    out_file = CACHE_DIR / out_name
     out_file.write_text(json.dumps(results, ensure_ascii=False, indent=2))
     print(f"\n[r1_scrape] Записано: {out_file}")
     git_commit(
