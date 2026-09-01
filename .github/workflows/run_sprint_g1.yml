@@ -1,0 +1,82 @@
+name: Run Sprint G1 (graduation-momentum retro-test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "Какой шаг запустить"
+        required: true
+        default: "recon"
+        type: choice
+        options:
+          - recon
+          - smoke
+          - full
+          - report
+
+jobs:
+  run-sprint-g1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Постоянный кэш для G1 (data/sprintG1_cache/) коммитится сразу
+      # после каждой оплаченной операции (см. dune_client.py) -- этот
+      # шаг только для эфемерного query_id-кэша create_query, дополнение,
+      # не основная защита.
+      - name: Restore Dune query cache
+        uses: actions/cache@v4
+        with:
+          path: analysis/output/cache
+          key: dune-cache-${{ github.run_id }}
+          restore-keys: |
+            dune-cache-
+          save-always: true
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Run recon (Step 1)
+        if: ${{ github.event.inputs.step == 'recon' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_recon.py
+
+      - name: Run smoke test (Step 2)
+        if: ${{ github.event.inputs.step == 'smoke' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/sprint_g1.py --stage smoke
+
+      - name: Run full pipeline (Step 3-4)
+        if: ${{ github.event.inputs.step == 'full' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/sprint_g1.py --stage full
+
+      - name: Render report (Step 5)
+        if: ${{ github.event.inputs.step == 'report' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/sprint_g1.py --stage report
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/RESULTS.md docs/G1_DESIGN.md
+          if [ -d data ]; then git add data/; fi
+          git diff --cached --quiet || git commit -m "Update Sprint G1 results [automated]"
+          git push
