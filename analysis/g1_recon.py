@@ -33,11 +33,11 @@ from dune_client import DuneClient, render_sql
 from run_pipeline import read_sql, q_ts
 
 PROBE_SCHEMAS = """
-select table_schema, table_name
+select table_schema, count(*) as n_tables
 from information_schema.tables
 where table_schema like '%robinhood%'
-order by 1, 2
-limit 300
+group by 1
+order by 1
 """
 
 # Через query_02 (уже материализован, скан бесплатен) -- разбивка по
@@ -46,7 +46,7 @@ limit 300
 # pons.family, если он тегируется иначе.
 PROBE_PROJECTS_JULY_TMPL = """
 select project, version, count(*) as n_swaps,
-    count(distinct project_contract_address) as n_pools,
+    count(distinct pool_address) as n_pools,
     min(block_time) as first_seen, max(block_time) as last_seen
 from query_02_swaps_raw_july
 group by 1, 2
@@ -62,7 +62,7 @@ limit 50
 # нужен другой сигнал (см. вывод и распредление project/version выше).
 PROBE_POOL_BIRTHS_JULY_TMPL = """
 with swaps as (
-    select project_contract_address as pool_address, block_time
+    select pool_address, block_time
     from query_02_swaps_raw_july
     where project = 'uniswap' and version in ('3', '4')
 ),
@@ -131,7 +131,7 @@ def main() -> int:
         print(df.to_string(max_rows=300) if df is not None else "(no rows)")
         return df
 
-    run("g1_schemas_like_robinhood", PROBE_SCHEMAS, 5.0, 300, 2)
+    run("g1_schemas_like_robinhood_distinct", PROBE_SCHEMAS, 6.0, 100, 2)
     run("g1_dex_trades_projects_july", PROBE_PROJECTS_JULY_TMPL, 2.0, 50, 6)
     run("g1_pool_births_daily_july", PROBE_POOL_BIRTHS_JULY_TMPL, 2.0, 40, 2)
     run("g1_recent_day_coverage_probe", PROBE_RECENT_DAY, 15.0, 2, 2)
