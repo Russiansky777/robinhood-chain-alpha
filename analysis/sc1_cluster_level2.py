@@ -20,6 +20,7 @@ from config import CONFIG
 
 CACHE_DIR = Path(CONFIG.sc1_cache_dir)
 OUT_PATH = CACHE_DIR / "sc1_clusters_level2.csv"
+OUT_MAP_PATH = CACHE_DIR / "sc1_deployer_to_cluster.csv"
 
 
 def main() -> int:
@@ -28,6 +29,10 @@ def main() -> int:
 
     merged = counts.merge(fp, on="deployer", how="left")
     merged["cluster_id"] = merged["funding_parent"].fillna(merged["deployer"])
+
+    # Деплоер -> кластер, отдельно (нужна для JOIN'а с объёмом/токенами
+    # по деплоеру -- сама merged таблица теряется после агрегации ниже).
+    merged[["deployer", "cluster_id"]].to_csv(OUT_MAP_PATH, index=False)
 
     cluster_sizes = (
         merged.groupby("cluster_id")["n_launches"].sum()
