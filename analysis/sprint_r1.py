@@ -928,10 +928,17 @@ def run_report() -> int:
     ]
     step3_spent = sum(e.get("credits", 0.0) or 0.0 for e in step3_entries)
 
-    md = build_results_md(stats, dev_df, ev_df, ctrl_df, step3_entries, step3_spent, ns_spent, ns_budget)
+    body = build_results_md(stats, dev_df, ev_df, ctrl_df, step3_entries, step3_spent, ns_spent, ns_budget)
     out_path = Path("docs/RESULTS.md")
-    out_path.write_text(md)
-    print(f"[sprint_r1] Записан {out_path} -- вердикт {stats['verdict']}.")
+    marker = "## Sprint R1 — Результаты и вердикт (RWA-конвергенция, сток-токены)"
+    existing = out_path.read_text() if out_path.exists() else ""
+    if marker in existing:
+        print(f"[sprint_r1] {out_path} уже содержит секцию Sprint R1 -- не перезаписываю (см. ИНЦИДЕНТ 2026-09-01: "
+              "прежний код делал write_text(md) целиком и стёр секции Sprint 1/1.5/G1 -- ИСПРАВЛЕНО, теперь read+append с маркером, как в sprint_g1.py).")
+        return 0
+    # ВАЖНО: append к существующему файлу (секции других спринтов), не overwrite -- см. комментарий выше.
+    out_path.write_text(existing + ("\n\n" if existing and not existing.endswith("\n\n") else "") + body)
+    print(f"[sprint_r1] Дописан {out_path} -- вердикт {stats['verdict']}.")
     return 0
 
 
@@ -944,7 +951,7 @@ def build_results_md(
     step3_entries: list[dict], step3_spent: float, ns_spent: float, ns_budget: float,
 ) -> str:
     lines: list[str] = []
-    lines.append("# Sprint R1 — Результаты и вердикт (RWA-конвергенция, сток-токены)")
+    lines.append("## Sprint R1 — Результаты и вердикт (RWA-конвергенция, сток-токены)")
     lines.append("")
     lines.append(f"**Дата:** 2026-09-01. **Вердикт §2.8: {stats['verdict']}.**")
     lines.append("")
@@ -957,7 +964,7 @@ def build_results_md(
     )
     lines.append("")
 
-    lines.append("## §2.8 — обоснование вердикта")
+    lines.append("### §2.8 — обоснование вердикта")
     lines.append("")
     verdict = stats["verdict"]
     if verdict == "UNDERPOWERED":
@@ -977,7 +984,7 @@ def build_results_md(
         )
     lines.append("")
 
-    lines.append("## Таблица ячеек (3θ × 3 горизонта = 9)")
+    lines.append("### Таблица ячеек (3θ × 3 горизонта = 9)")
     lines.append("")
     lines.append(
         "| θ | горизонт | N | допущена | p (знак. тест) | q (BH, m=9) | медиана r (база 1.5%) | "
@@ -1020,7 +1027,7 @@ def build_results_md(
         )
     lines.append("")
 
-    lines.append("## Сенситивность (по просьбе штаба, п.3 уточнения §2.2)")
+    lines.append("### Сенситивность (по просьбе штаба, п.3 уточнения §2.2)")
     lines.append("")
     lines.append(
         "Штаб запросил тот же расчёт таблицы ячеек на пересечении «старый реестр ∩ новый» "
@@ -1040,7 +1047,7 @@ def build_results_md(
     )
     lines.append("")
 
-    lines.append("## Топ-10 |D| по всей выборке (по просьбе штаба, п.4 уточнения — глазами проверить выбросы)")
+    lines.append("### Топ-10 |D| по всей выборке (по просьбе штаба, п.4 уточнения — глазами проверить выбросы)")
     lines.append("")
     if len(dev_df):
         top10 = dev_df.reindex(dev_df["D"].abs().sort_values(ascending=False).index).head(10)
@@ -1074,7 +1081,7 @@ def build_results_md(
         )
         lines.append("")
 
-    lines.append("## Ограничения (§2.10, обязательны в отчёте, текст заморожен дословно)")
+    lines.append("### Ограничения (§2.10, обязательны в отчёте, текст заморожен дословно)")
     lines.append("")
     lines.append(
         "Фид вне часов рынка может замирать/быть stale — дисконт может отражать реальные новости "
@@ -1085,7 +1092,7 @@ def build_results_md(
     )
     lines.append("")
 
-    lines.append("## Кредитный леджер Шага 3")
+    lines.append("### Кредитный леджер Шага 3")
     lines.append("")
     lines.append(f"Потрачено в namespace `sprintR1`: {ns_spent:.2f} из {ns_budget:.1f}. Из них Шаг 3: {step3_spent:.2f}.")
     lines.append("")
@@ -1095,7 +1102,7 @@ def build_results_md(
         lines.append(f"| {e.get('name')} | {e.get('credits', 0.0):.3f} |")
     lines.append("")
 
-    lines.append("## Артефакты")
+    lines.append("### Артефакты")
     lines.append("")
     lines.append(
         "`data/sprintR1_cache/r1_full_checkpoint_windows.csv`, `r1_full_deviations.csv`, "
