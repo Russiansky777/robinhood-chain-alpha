@@ -25,6 +25,7 @@ AUGUST_LAUNCHES_PATH = CACHE_DIR / "sc1_august_launches_decoded.csv"
 
 TX_COLUMNS_SQL = read_sql("sc1/sc1_transactions_columns")
 LAUNCH_TX_GAS_AGG_SQL = read_sql("sc1/sc1_v1_launch_tx_gas_agg")
+FUNDING_PARENT_SQL = read_sql("sc1/sc1_funding_parent")
 
 
 def sc1_spent() -> float:
@@ -78,10 +79,31 @@ def stage_cluster(client: DuneClient) -> int:
     print(f"[sc1_pipeline] Записано: {out_file}")
 
     remaining = 20.0 - sc1_spent()
-    print(f"\n[sc1_pipeline] Остаток бюджета SC1 после этого шага: {remaining:.2f} из 20.0.")
-    print("[sc1_pipeline] Funding-parent (Уровень 2) -- следующий вызов, отдельно "
-          "(бюджетная проекция джойна transactions x transactions не сделана заранее, "
-          "запрос дороже -- проверить остаток перед вызовом).")
+    print(f"\n[sc1_pipeline] Остаток бюджета SC1 после gas-агрегата: {remaining:.2f} из 20.0.")
+
+    # Уровень 2: funding parent. Дороже (JOIN transactions x transactions),
+    # но выдача -- только 2 колонки (не 7, как в неудачном run #6/#7) --
+    # читаем ~14.5k строк x 2 колонки, оценка чтения ~1.2 кредита, не ~11.
+    print("\n===== sc1_funding_parent (оценка 8.0, JOIN, урезанная выдача) =====")
+    qid3 = client.create_query("sc1_funding_parent", FUNDING_PARENT_SQL)
+    df3 = client.run_sql_cached(
+        "sc1_funding_parent", FUNDING_PARENT_SQL, query_id=qid3, estimated_credits=8.0,
+        expected_max_rows=20_000, expected_columns=2,
+    )
+    if df3 is None or not len(df3):
+        print("[sc1_pipeline] ПУСТО -- funding-parent не найден ни для одного деплоера "
+              "(либо все финансировались до 01.07, либо джойн не сработал). "
+              "Уровень 2 (склейка кластеров) невозможен без него -- STOP.")
+        return 1
+
+    print(f"[sc1_pipeline] funding_parent найден для {len(df3)} деплоеров.")
+    out_file = CACHE_DIR / "sc1_funding_parent.csv"
+    df3.to_csv(out_file, index=False)
+    client._commit_permanent(out_file, f"sprintSC1_cache: funding_parent по деплоерам [automated]")
+    print(f"[sc1_pipeline] Записано: {out_file}")
+
+    remaining2 = 20.0 - sc1_spent()
+    print(f"\n[sc1_pipeline] Остаток бюджета SC1 после Шага 2: {remaining2:.2f} из 20.0.")
     return 0
 
 
