@@ -185,3 +185,20 @@ block_number, НЕ захардкожено) = 0.100 с/блок. На
 `data/sprintG1_cache/g1_graduation_events_decoded.csv` (token, deployer, dex_factory, pair_token, pool,
 dex_id, launch_config_id, position_id, restrictions_end_block,
 initial_buy_amount, block_number, block_time, tx_hash).
+
+
+## Судьба фабрики после 12.08.2026 (владелец, 2026-09-01)
+
+**Бесплатная проверка (докс/репо):** github.com/ponsdotdev/ponsfamily
+не содержит упоминаний миграции/нового поколения фабрики.
+
+**Ончейн-скан (та же сигнатура, БЕЗ фильтра по адресу, +3 дня после
+стопа):**
+                          contract_address                  first_seen                   last_seen  n_logs
+0x2ba793fd69bf251fd1af90b576be8b9fa6be46db 2026-08-13 14:31:43.000 UTC 2026-08-15 17:36:50.000 UTC      54
+0x52453b4289a6c3a70bb8b4682bcd3d8731267e28 2026-08-12 22:30:40.000 UTC 2026-08-15 18:16:17.000 UTC       4
+0x5908923fd6350eb32fa411070feebd1d742c4b34 2026-08-13 14:12:45.000 UTC 2026-08-13 14:12:45.000 UTC       1
+0xa24d48d50fd7985c6de816eaf77c1a17d3593bbe 2026-08-15 18:53:28.000 UTC 2026-08-15 18:53:28.000 UTC       1
+0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb 2026-08-12 19:42:33.000 UTC 2026-08-12 19:42:33.000 UTC       1
+
+Разбор вручную требуется -- см. RESULTS.md за интерпретацией.
