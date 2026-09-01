@@ -38,6 +38,14 @@ URLS = {
     # -- не наблюдаема ончейн сейчас (вейвер ещё активен до ~29.09.2026,
     # см. docs/PROJECT_STATE.md), нужен официально заявленный параметр.
     "gas_and_fees": "https://docs.robinhood.com/chain/gas-and-fees",
+    # R1 Шаг 2: попытка найти реестр токен<->фид напрямую в документации
+    # (страница явно указана в сайдбаре "Oracles & Price Feeds",
+    # найденном при дампе gas_and_fees) -- дешевле, чем RPC-путь, если
+    # сработает. Плюс "Connecting to Robinhood Chain" -- публичный RPC
+    # URL (без ключа) как фолбэк на случай, если ALCHEMY_API_KEY не
+    # настроен в секретах репозитория (обнаружено run #14 -- секрет пуст).
+    "oracles_and_price_feeds": "https://docs.robinhood.com/chain/oracles-and-price-feeds",
+    "connecting_to_robinhood_chain": "https://docs.robinhood.com/chain/connecting-to-robinhood-chain",
 }
 
 # run #7: таблица фидов -- Astro-остров component-export="FeedList",
