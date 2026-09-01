@@ -173,10 +173,13 @@ def run_smoke() -> int:
     # ---- Локальный пайплайн (0 кредитов): девиации -> события (non-overlap) ----
     thetas = CONFIG.r1_thetas
     events: list[dict] = []
+    deviations: list[dict] = []  # ВСЕ валидные чекпоинты (дисконты И премии) -- нужны
+    # для §2.9 (премии фиксируются для отчёта) и для проверки выбросов
+    # (владелец: топ-10 |D| с контекстом -- глазами проверить, что
+    # верхний хвост не артефакт маппинга фида).
     n_void_price = 0
     n_void_anchor = 0
     n_checkpoints_total = 0
-    deviations_sample: list[float] = []
 
     for _, row in tf.iterrows():
         token = row["token_address"]
@@ -201,12 +204,17 @@ def run_smoke() -> int:
             if not len(anchor_candidates):
                 n_void_anchor += 1
                 continue
-            f_price = anchor_candidates.iloc[-1]["price"]
+            anchor_row = anchor_candidates.iloc[-1]
+            f_price = anchor_row["price"]
             if f_price <= 0:
                 n_void_anchor += 1
                 continue
             d = float(np.log(p / f_price))
-            deviations_sample.append(d)
+            deviations.append({
+                "token": symbol, "feed_addr": feed, "t_checkpoint": t, "D": d,
+                "P_vwap": p, "F_anchor": f_price, "anchor_age_min": (t - anchor_row["block_time"]).total_seconds() / 60,
+                "n_trades_pre": n_trades_pre, "vol_usd_pre": vol_usd_pre,
+            })
             for th in thetas:
                 if t < skip_until[th]:
                     continue
@@ -232,16 +240,25 @@ def run_smoke() -> int:
     ev_df.to_csv(out_events, index=False)
     client._commit_permanent(out_events, f"sprintR1_cache: смоук-события ({len(ev_df)} строк) [automated]")
 
+    dev_df = pd.DataFrame(deviations)
+    out_dev = CACHE_DIR / "r1_smoke_deviations.csv"
+    dev_df.to_csv(out_dev, index=False)
+    client._commit_permanent(out_dev, f"sprintR1_cache: смоук-девиации, все чекпоинты ({len(dev_df)} строк) [automated]")
+
     print("\n[sprint_r1] ===== ИТОГИ СМОУКА =====")
     print(f"Чекпоинтов всего (закрытые часы x токены с фидом): {n_checkpoints_total}")
     print(f"Пусто по цене (P невалиден -- <3 сделок или <$500): {n_void_price} "
           f"({n_void_price / max(n_checkpoints_total, 1):.1%})")
     print(f"Пусто по анкору (нет обновления фида до t): {n_void_anchor}")
-    if deviations_sample:
-        dser = pd.Series(deviations_sample)
+    if len(dev_df):
+        dser = dev_df["D"]
         print(f"Девиации D (ln P/F): медиана {dser.median():.4f}, диапазон "
               f"[{dser.min():.4f}; {dser.max():.4f}] -- САНИТАРНАЯ ПРОВЕРКА (§2.10): не должно быть "
               f"величин порядка десятков (|D|>>1), иначе decimals перепутаны.")
+        top10 = dev_df.reindex(dev_df["D"].abs().sort_values(ascending=False).index).head(10)
+        print("\n-- Топ-10 |D| (владелец: глазами проверить, что не мусор маппинга фида) --")
+        print(top10[["token", "t_checkpoint", "D", "P_vwap", "F_anchor", "anchor_age_min",
+                      "n_trades_pre", "vol_usd_pre"]].to_string(index=False))
     print(f"Событий (сумма по всем theta, с учётом non-overlap): {len(ev_df)}")
     if len(ev_df):
         print(ev_df.groupby("theta").size().to_string())
