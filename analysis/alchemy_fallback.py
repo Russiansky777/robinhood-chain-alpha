@@ -50,9 +50,18 @@ def _rpc_url() -> str:
         return CONFIG.alchemy_rpc_url
     if CONFIG.alchemy_api_key:
         return f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}"
+    # Фолбэк без секрета -- публичный JSON-RPC прокси Blockscout (см.
+    # config.py, blockscout_rpc_url). Найдено и подключено при
+    # подготовке P3-гарда (2026-09-01): ALCHEMY_API_KEY в этом
+    # репозитории оказался НЕ настроен как секрет GH Actions (первый
+    # реальный прогон .github/workflows/run_p3_guard.yml упал именно на
+    # этом -- см. docs/P3_GUARD.md), а задание прямо разрешало
+    # "RPC/Blockscout" как источник.
+    if CONFIG.blockscout_rpc_url:
+        return CONFIG.blockscout_rpc_url
     raise RuntimeError(
-        "ALCHEMY_API_KEY / ALCHEMY_ROBINHOOD_RPC_URL не заданы. "
-        "Заполните .env (см. .env.example)."
+        "Ни ALCHEMY_API_KEY/ALCHEMY_ROBINHOOD_RPC_URL, ни BLOCKSCOUT_RPC_URL "
+        "не заданы. Заполните .env (см. .env.example)."
     )
 
 
@@ -70,7 +79,7 @@ def _rpc_call(method: str, params: list) -> dict:
     resp.raise_for_status()
     body = resp.json()
     if "error" in body:
-        raise RuntimeError(f"Alchemy {method} error: {body['error']}")
+        raise RuntimeError(f"RPC {method} error ({url}): {body['error']}")
     return body["result"]
 
 
@@ -106,12 +115,11 @@ def _chunked_get_logs(
     заранее, дешевле для широких по времени, но узких по адресу сканов.
     """
     url = _rpc_url()
-    block = from_block
-    while block <= to_block:
-        end = min(block + chunk_size - 1, to_block)
+
+    def _get_range(lo: int, hi: int) -> Iterator[dict]:
         filter_obj: dict = {
-            "fromBlock": hex(block),
-            "toBlock": hex(end),
+            "fromBlock": hex(lo),
+            "toBlock": hex(hi),
             "topics": topics,
         }
         if address is not None:
@@ -126,8 +134,25 @@ def _chunked_get_logs(
         resp.raise_for_status()
         body = resp.json()
         if "error" in body:
-            raise RuntimeError(f"Alchemy eth_getLogs error: {body['error']}")
-        yield from body.get("result", [])
+            raise RuntimeError(f"eth_getLogs error ({url}): {body['error']}")
+        result = body.get("result", [])
+        # Blockscout's public eth-rpc proxy caps eth_getLogs at 1000
+        # results/request (docs.blockscout.com/devs/apis/rpc/eth-rpc) --
+        # найдено при подготовке P3-гарда (2026-09-01). Ровно 1000 --
+        # подозрение на молчаливую обрезку (провайдер не поднимает
+        # ошибку) -- бисекция диапазона блоков вместо тихой потери
+        # логов (владелец: "никогда не выдумывай данные").
+        if len(result) >= 1000 and hi > lo:
+            mid = (lo + hi) // 2
+            yield from _get_range(lo, mid)
+            yield from _get_range(mid + 1, hi)
+        else:
+            yield from result
+
+    block = from_block
+    while block <= to_block:
+        end = min(block + chunk_size - 1, to_block)
+        yield from _get_range(block, end)
         block = end + 1
 
 

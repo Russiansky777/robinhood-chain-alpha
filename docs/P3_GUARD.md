@@ -126,6 +126,10 @@ g1_common.py` и `analysis/r1_common.py`, без новой зависимост
   PoolCreated/Initialize за узкий срез (маловероятно на активном
   чейне, но не исключено), `guard` откажется работать без него.
 
+## Источник RPC на практике: Blockscout, не Alchemy (ALCHEMY_API_KEY не настроен)
+
+Первый реальный прогон (`--stage discover`, run [#33553407884](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33553407884), 2026-09-01) упал сразу на первом RPC-вызове: `ALCHEMY_API_KEY / ALCHEMY_ROBINHOOD_RPC_URL не заданы` — в этом репозитории секрет `ALCHEMY_API_KEY` НЕ настроен в GH Actions (проверено фактом падения, не документацией). Это согласуется с тем, что `analysis/r1_feed_match.py` (тот же Alchemy-путь, Sprint R1) ни разу не оставил закэшированного результата в `data/sprintR1_cache/` — Sprint R1 в итоге пошёл через `feed_match_dune` (декодированные call-traces на Dune), а не через прямой RPC. Задание прямо разрешало «RPC/Blockscout» как источник — добавлен фолбэк без секрета на публичный JSON-RPC прокси Blockscout (`https://robinhoodchain.blockscout.com/api/eth-rpc`, `docs.blockscout.com/devs/apis/rpc/eth-rpc`: «API key не обязателен, но повышает RPS»), `analysis/config.py`/`analysis/alchemy_fallback.py::_rpc_url()`. Ограничение источника: 1000 логов на один запрос `eth_getLogs` — `_chunked_get_logs` теперь рекурсивно бисектит диапазон блоков, если ответ вернул ровно 1000 строк (подозрение на молчаливую обрезку), а не молча теряет логи сверх лимита.
+
 ## Как запускалось на практике
 
 `workflow_dispatch` через GitHub API требует, чтобы файл воркфлоу уже

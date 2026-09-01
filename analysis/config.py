@@ -33,6 +33,19 @@ class Config:
     alchemy_rpc_url: str = field(
         default_factory=lambda: os.environ.get("ALCHEMY_ROBINHOOD_RPC_URL", "")
     )
+    # Фолбэк без ключа/секрета -- публичный JSON-RPC прокси Blockscout
+    # (docs.blockscout.com/devs/apis/rpc/eth-rpc, "API key не обязателен,
+    # но повышает RPS"). Найдено и подключено при подготовке P3-гарда
+    # (2026-09-01), см. docs/P3_GUARD.md -- ALCHEMY_API_KEY в этом
+    # репозитории НЕ настроен секретом GH Actions (проверено реальным
+    # прогоном, упал с "не заданы"), а именно "RPC/Blockscout" и была
+    # формулировка задания. Ограничение источника: 1000 логов/запрос,
+    # см. analysis/alchemy_fallback.py, _chunked_get_logs.
+    blockscout_rpc_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "BLOCKSCOUT_RPC_URL", "https://robinhoodchain.blockscout.com/api/eth-rpc"
+        )
+    )
 
     # --- Период анализа (Sprint 1: июль -> август 2026) ---
     train_start: str = "2026-07-01"
