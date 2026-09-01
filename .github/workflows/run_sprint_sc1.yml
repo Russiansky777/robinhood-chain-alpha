@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - recon
+          - fee_discovery
           - cluster
           - economics
           - report
@@ -48,6 +49,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintSC1
         run: python analysis/sc1_recon.py
+
+      - name: V1 fee discovery (владелец -- не переносить V2 0.7% на V1)
+        if: ${{ github.event.inputs.step == 'fee_discovery' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintSC1
+        run: python analysis/sc1_v1_fee_discovery.py
 
       - name: Run clustering (Step 2 -- funding parent)
         if: ${{ github.event.inputs.step == 'cluster' }}
