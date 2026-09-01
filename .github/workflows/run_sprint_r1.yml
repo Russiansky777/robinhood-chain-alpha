@@ -22,6 +22,7 @@ on:
           - flagship_recon
           - rwa_balances_probe
           - rwa_authoritative
+          - recon_v2
           - smoke
           - full
           - report
@@ -141,6 +142,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintR1
         run: python analysis/r1_rwa_authoritative.py
+
+      - name: Re-run recon gate on authoritative RWA universe (194 tokens)
+        if: ${{ github.event.inputs.step == 'recon_v2' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_recon_v2.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
