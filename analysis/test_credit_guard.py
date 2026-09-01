@@ -194,6 +194,50 @@ def test_within_limits_does_not_raise() -> None:
             os.environ[cg.NAMESPACE_ENV] = orig_ns
 
 
+def test_overrun_below_absolute_floor_does_not_stop() -> None:
+    """Владелец, 2026-09-01 (после run #18: 20.09 факт vs 8.2 оценка --
+    2.45x, но абсолютно 20 кредитов): >2x останавливает пайплайн ТОЛЬКО
+    если факт ТАКЖЕ >= OVERRUN_MIN_ABSOLUTE (25). Ниже порога -- печать,
+    не стоп."""
+    raised = False
+    try:
+        cg.check_overrun_after_execute("small_overrun", 8.2, 20.09)  # 2.45x, но 20.09 < 25
+    except SystemExit:
+        raised = True
+    check("overrun >2x but below the 25-credit absolute floor does not raise", not raised)
+
+
+def test_overrun_above_absolute_floor_still_stops() -> None:
+    """Тот же множитель (>2x), но факт >= 25 -- должен остановить, как раньше."""
+    raised = False
+    try:
+        cg.check_overrun_after_execute("large_overrun", 10.0, 25.01)  # 2.5x и >= 25
+    except SystemExit:
+        raised = True
+    check("overrun >2x AND >= the 25-credit absolute floor still raises", raised)
+
+
+def test_overrun_exactly_at_floor_stops():
+    """Граница: ровно 25.0 (>=) должна останавливать, не пропускать."""
+    raised = False
+    try:
+        cg.check_overrun_after_execute("boundary_overrun", 10.0, 25.0)  # ровно 2.5x, ровно 25
+    except SystemExit:
+        raised = True
+    check("overrun exactly at the 25-credit floor (>=) still raises", raised)
+
+
+def test_overrun_under_2x_never_stops_regardless_of_absolute_size() -> None:
+    """Сам множитель (>2x) остаётся необходимым условием -- большая
+    абсолютная сумма БЕЗ превышения 2x не должна останавливать."""
+    raised = False
+    try:
+        cg.check_overrun_after_execute("big_but_not_2x", 100.0, 150.0)  # 1.5x, 150 >= 25, но не >2x
+    except SystemExit:
+        raised = True
+    check("large absolute cost that does not exceed 2x does not raise", not raised)
+
+
 def test_real_billing_cycle_initialized_with_real_numbers() -> None:
     """Требование: цикловой потолок инициализирован РЕАЛЬНЫМИ числами
     (человеком, с dune.com/settings/billing), а не выведен из сумм
@@ -604,6 +648,10 @@ def main() -> int:
         test_reserve_buffer_reduces_effective_cycle_limit()
         test_external_truth_drift_check_noop_when_live_total_none()
         test_external_truth_drift_check_stops_on_large_gap()
+        test_overrun_below_absolute_floor_does_not_stop()
+        test_overrun_above_absolute_floor_still_stops()
+        test_overrun_exactly_at_floor_stops()
+        test_overrun_under_2x_never_stops_regardless_of_absolute_size()
     finally:
         cg._git_commit = orig_git_commit
 

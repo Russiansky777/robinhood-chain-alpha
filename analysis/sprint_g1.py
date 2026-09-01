@@ -2,9 +2,11 @@
 """Sprint G1 v2 -- Шаг 2 (смоук) -> Шаг 3 (полный прогон) -> Шаг 4
 (статистика/вердикт) -> Шаг 5 (отчёт), автономно одним запуском после
 смоука (владелец, 2026-09-01, решение 4: "После смоука -- автономно до
-конца Шага 4"). Возвратные условия (владелец): аналитическое N < 200;
-перерасход >2x факт/оценка; результаты Шага 4 готовы (нормальное
-завершение, не ошибка).
+конца Шага 4"). Возвратные условия (владелец, после run #18): аналитическое
+N < 200; результаты Шага 4 готовы (нормальное завершение). Бюджетная
+проекция (п.6 ниже) и абсолютный минимум >2x-гарда (25 кредитов, см.
+credit_guard.OVERRUN_MIN_ABSOLUTE) остаются структурными предохранителями
+в коде, но не ожидаются как штатные точки возврата в этом каскаде.
 
 Решения владельца, зафиксированные в этом прогоне (НЕ меняют §2 --
 мех "Механика детекции"/"Механика возвратов", см. docs/G1_DESIGN.md):
@@ -25,8 +27,9 @@
 g1_v2_quote_distribution, см. docs/COST_POSTMORTEM.md ревизия 5):
 5. Калибровка вместо угадывания: любой запрос НОВОЙ формы сначала
    исполняется на узком срезе (смоук-день сам служит таким срезом),
-   оценка полной версии = факт среза * масштаб * 1.3 (см.
-   g1_pipeline.CALIBRATION_SCALE_FACTOR); если оценка > 40 --
+   оценка полной версии = факт среза * масштаб * CALIBRATION_SCALE_
+   FACTOR (см. g1_pipeline.py -- 2.5, поднято с 1.3 после run #18,
+   гетерогенность популяции подтверждена); если оценка > 40 --
    партиционируется (g1_pipeline.run_*_calibrated).
 6. Бюджетная проекция до каскада: перед полным прогоном суммарная
    проекция (quote_distribution-полный + extract-полный + буфер на
@@ -40,6 +43,19 @@ g1_v2_quote_distribution, см. docs/COST_POSTMORTEM.md ревизия 5):
 drift(None) -- живого usage-эндпоинта у Dune API v1 нет (см.
 analysis/audit_dune_account.py), поэтому это сейчас no-op, но
 структурно на месте и включится сам, если такой источник появится.
+
+Владелец, 2026-09-01, после run #18 (g1_v2_quote_distribution_full:
+20.09 факт vs 8.2 оценка -- 2.45x, но абсолютно 20 кредитов):
+7. Абсолютный минимум для >2x-гарда: 25 кредитов (credit_guard.
+   OVERRUN_MIN_ABSOLUTE) -- отклонения ниже этой суммы пишутся в
+   леджер, но не останавливают каскад. Кап спринта и граница по
+   block_time в SQL не меняются.
+8. g1_v2_quote_distribution_full УЖЕ оплачен в run #18 (execute
+   успешен, 20.089 кредита) -- analysis/recover_g1_v2_quote_
+   distribution_full.py восстанавливает уже готовый результат в
+   постоянный кэш ОДНИМ дополнительным (дешёвым) чтением, без
+   повторного execute. Должен запускаться (или его эквивалент)
+   ДО --stage smoke, чтобы каскад не заплатил за этот запрос дважды.
 
 Использование: python analysis/sprint_g1.py --stage smoke|full|report
 """
@@ -441,6 +457,57 @@ def render_stress_table(stress_medians: dict[int, float]) -> str:
     return "\n".join([header, sep, row])
 
 
+STABLE_SYMBOLS = {"USDC", "USDT", "DAI", "USDG", "USDE", "FRAX", "TUSD", "BUSD", "USDC.E", "PYUSD", "USDP"}
+WETH_SYMBOLS = {"WETH", "ETH"}
+
+
+def categorize_quote_symbol(sym: str) -> str:
+    s = str(sym).strip().upper()
+    if s in WETH_SYMBOLS:
+        return "WETH/ETH"
+    if s in STABLE_SYMBOLS or "USD" in s:
+        return "стейблкоин"
+    if s in ("(NULL/UNKNOWN)", "NAN", ""):
+        return "(не определён)"
+    return "прочее (вкл. сток-токены)"
+
+
+def render_quote_distribution_report(quote_df: pd.DataFrame) -> str:
+    """Владелец, п.5: распределение quote-активов по всем 896 событиям --
+    входной материал для следующей линии, не только контроль качества.
+    Строит и построчную таблицу (как есть по символам), и бакетную
+    сводку (WETH/ETH, стейблы, прочее -- вкл. сток-токены) с долями по
+    n_tokens (сколько РАЗНЫХ токенов торговалось против этого quote --
+    токен может считаться в нескольких, если торговался против >1)."""
+    if quote_df is None or len(quote_df) == 0:
+        return "(распределение quote-активов не получено)"
+    df = quote_df.copy()
+    total_n_tokens = df["n_tokens"].sum()
+    df["доля_по_n_tokens"] = df["n_tokens"] / total_n_tokens if total_n_tokens else 0.0
+    lines = ["| quote-актив | n_tokens | доля (n_tokens) | n_trades | vol_usd |", "|---|---|---|---|---|"]
+    for _, r in df.iterrows():
+        lines.append(
+            f"| {r['quote_symbol']} | {int(r['n_tokens'])} | {r['доля_по_n_tokens']*100:.1f}% | "
+            f"{int(r['n_trades'])} | ${r['vol_usd']:,.0f} |"
+        )
+    per_symbol_table = "\n".join(lines)
+
+    df["категория"] = df["quote_symbol"].map(categorize_quote_symbol)
+    bucket = df.groupby("категория", as_index=False).agg(n_tokens=("n_tokens", "sum"), vol_usd=("vol_usd", "sum"))
+    bucket["доля"] = bucket["n_tokens"] / total_n_tokens if total_n_tokens else 0.0
+    bucket = bucket.sort_values("n_tokens", ascending=False)
+    bucket_lines = ["| категория | n_tokens | доля | vol_usd |", "|---|---|---|---|"]
+    for _, r in bucket.iterrows():
+        bucket_lines.append(f"| {r['категория']} | {int(r['n_tokens'])} | {r['доля']*100:.1f}% | ${r['vol_usd']:,.0f} |")
+    bucket_table = "\n".join(bucket_lines)
+
+    return (
+        f"**По символам (токен может считаться в нескольких quote-активах, если торговался "
+        f"против >1 -- доли не обязаны суммироваться в 100%):**\n\n{per_symbol_table}\n\n"
+        f"**По категориям (WETH/ETH, стейблкоин, прочее -- вкл. сток-токены):**\n\n{bucket_table}"
+    )
+
+
 def write_design_addendum(smoke_info: dict, full_info: dict) -> None:
     design_path = Path(CONFIG.g1_design_doc)
     text = design_path.read_text()
@@ -516,6 +583,7 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
         return
 
     if full_info.get("underpowered"):
+        quote_report = render_quote_distribution_report(full_info.get("quote_df_full"))
         body = f"""
 
 {marker}
@@ -525,6 +593,10 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
 выборки / закрыть). N сырых={full_info['n_raw']}, пост-фильтр §2.2=
 {full_info['n_pass_filter']}. Фактическая стоимость полного прогона:
 {full_info['full_actual']:.3f} кредитов.
+
+### Распределение quote-активов по всем {full_info['n_raw']} событиям (владелец, входной материал для следующей линии)
+
+{quote_report}
 """
         results_path.write_text(text + body)
         print(f"[sprint_g1] {results_path} обновлён (UNDERPOWERED).")
@@ -534,6 +606,7 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
     half_table = render_half_table(full_info["half_medians"])
     cost_table = render_cost_scenario_table(full_info["cost_scenario_medians"])
     stress_table = render_stress_table(full_info["stress_medians"])
+    quote_report = render_quote_distribution_report(full_info.get("quote_df_full"))
 
     body = f"""
 
@@ -557,6 +630,10 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
   2-я половина -- сырых={full_info['half2_n_raw']}, пост-фильтр={full_info['half2_n_pass_filter']},
   аналитическое={full_info['half2_n_analytic']}.
 - Гейт N>={CONFIG.g1_min_n_events} (§2.1/2.7) по аналитическому N: **ПРОЙДЕН**.
+
+### Распределение quote-активов по всем {full_info['n_raw']} событиям (владелец, входной материал для следующей линии)
+
+{quote_report}
 
 ### §2.6 Основной тест (базовая стоимость c={CONFIG.g1_cost_scenario_base:.0%}, знаковый тест + BH по {len(CONFIG.g1_horizons_s)} горизонтам, alpha={CONFIG.g1_bh_alpha})
 

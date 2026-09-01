@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - audit
+          - recover_quote_full
           - recon
           - verify
           - count
@@ -61,6 +62,18 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/audit_dune_account.py
+
+      # Владелец, 2026-09-01, решение 3: g1_v2_quote_distribution_full УЖЕ
+      # оплачен в run #18 (execute 20.089 кредита), но 2x-гард остановил
+      # пайплайн ДО чтения результата -- ОДНО дешёвое дополнительное чтение
+      # вместо повторного execute. Идемпотентно (пропускает, если кэш уже
+      # восстановлен) -- безопасно гонять повторно.
+      - name: Recover already-paid g1_v2_quote_distribution_full result
+        if: ${{ github.event.inputs.step == 'recover_quote_full' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/recover_g1_v2_quote_distribution_full.py
 
       - name: Run recon (Step 1)
         if: ${{ github.event.inputs.step == 'recon' }}

@@ -91,20 +91,41 @@ def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> None:
         raise BudgetGuardStop(1)
 
 
+OVERRUN_MIN_ABSOLUTE = 25.0  # владелец, 2026-09-01: правило создавалось против ошибок ценой
+# в сотни кредитов (run #16: 15 -> 56.49), не против шума в единицах -- см. ниже.
+
+
 def check_overrun_after_execute(name: str, estimated_credits: float, actual_credits: float | None) -> None:
     """Пост-хок проверка: если факт > вдвое оценки -- немедленный стоп, не
     дожидаясь исчерпания лимита (см. п.4 задания пользователя). Деньги уже
     потрачены (Dune не даёт pre-execution оценку) -- это останавливает
-    ДАЛЬНЕЙШИЕ шаги, а не отменяет уже случившееся списание."""
+    ДАЛЬНЕЙШИЕ шаги, а не отменяет уже случившееся списание.
+
+    Владелец, 2026-09-01 (после run #18: 20.09 факт vs 8.2 оценка на
+    g1_v2_quote_distribution_full -- 2.45x, но абсолютно 20 кредитов,
+    остановка сожгла больше внимания штаба, чем стоил сам инцидент):
+    абсолютный минимум OVERRUN_MIN_ABSOLUTE -- отклонение >2x останавливает
+    пайплайн, ТОЛЬКО если факт также >= 25 кредитов. Ниже порога --
+    отклонение печатается (леджер уже фиксирует факт отдельно, это не
+    теряется), но каскад продолжается. Кап спринта и граница по
+    block_time этим не затрагиваются -- обе проверки независимы и
+    остаются в силе."""
     if actual_credits is None:
         return
-    if actual_credits > 2 * estimated_credits:
+    if actual_credits > 2 * estimated_credits and actual_credits >= OVERRUN_MIN_ABSOLUTE:
         print(
             f"[credit_guard] СТОП: '{name}' стоил по факту {actual_credits:.2f}, что больше чем "
-            f"вдвое превышает оценку {estimated_credits:.1f} -- немедленная остановка, не дожидаясь "
-            "исчерпания лимита. Деньги за этот шаг уже потрачены; дальнейшие шаги остановлены."
+            f"вдвое превышает оценку {estimated_credits:.1f} И >= абсолютного минимума "
+            f"{OVERRUN_MIN_ABSOLUTE:.0f} -- немедленная остановка, не дожидаясь исчерпания лимита. "
+            "Деньги за этот шаг уже потрачены; дальнейшие шаги остановлены."
         )
         raise BudgetGuardStop(1)
+    if actual_credits > 2 * estimated_credits:
+        print(
+            f"[credit_guard] Отклонение >2x на '{name}' ({actual_credits:.2f} vs оценка "
+            f"{estimated_credits:.1f}), но факт < {OVERRUN_MIN_ABSOLUTE:.0f} -- ниже абсолютного "
+            "порога остановки (владелец, 2026-09-01), каскад продолжается."
+        )
 
 # ---------- Result Read billing (ревизия 2 гарда, см. docs/COST_POSTMORTEM.md) ----------
 #
