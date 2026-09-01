@@ -19,6 +19,7 @@ on:
           - feed_match
           - feed_match_dune
           - rwa_schema_probe
+          - flagship_recon
           - smoke
           - full
           - report
@@ -117,6 +118,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintR1
         run: python analysis/r1_rwa_schema_probe.py
+
+      - name: Recon flagship tickers (AAPL/TSLA/...) directly by symbol in dex.trades
+        if: ${{ github.event.inputs.step == 'flagship_recon' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_flagship_recon.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
