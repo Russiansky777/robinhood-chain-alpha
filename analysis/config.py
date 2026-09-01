@@ -33,17 +33,29 @@ class Config:
     alchemy_rpc_url: str = field(
         default_factory=lambda: os.environ.get("ALCHEMY_ROBINHOOD_RPC_URL", "")
     )
-    # Фолбэк без ключа/секрета -- публичный JSON-RPC прокси Blockscout
-    # (docs.blockscout.com/devs/apis/rpc/eth-rpc, "API key не обязателен,
-    # но повышает RPS"). Найдено и подключено при подготовке P3-гарда
-    # (2026-09-01), см. docs/P3_GUARD.md -- ALCHEMY_API_KEY в этом
-    # репозитории НЕ настроен секретом GH Actions (проверено реальным
-    # прогоном, упал с "не заданы"), а именно "RPC/Blockscout" и была
-    # формулировка задания. Ограничение источника: 1000 логов/запрос,
-    # см. analysis/alchemy_fallback.py, _chunked_get_logs.
+    # Фолбэк, если Alchemy не настроен. Найдено и подключено при
+    # подготовке P3-гарда (2026-09-01), см. docs/P3_GUARD.md --
+    # ALCHEMY_API_KEY в этом репозитории НЕ настроен секретом GH
+    # Actions (проверено реальным прогоном), а задание прямо разрешало
+    # "RPC/Blockscout". ВАЖНО: прямой безключевой eth-rpc прокси
+    # (robinhoodchain.blockscout.com/api/eth-rpc, как у большинства
+    # чейнов на Blockscout) для ЭТОГО чейна вернул 403 -- по
+    # официальной доке (github.com/blockscout/docs, robinhood-api.mdx)
+    # Robinhood Chain обслуживается через платный "PRO API" гейтвей
+    # api.blockscout.com с Bearer-токеном, "required for all PRO API
+    # tiers, including free". Бесплатный ключ существует
+    # (dev.blockscout.com), но регистрация на внешнем сервисе не
+    # выполняется этой сессией автономно -- см. docs/P3_GUARD.md,
+    # "Блокер выполнения". blockscout_rpc_url указывает на
+    # ПРАВИЛЬНЫЙ (документированный) endpoint для использования, КОГДА
+    # ключ появится; blockscout_api_key -- сам ключ (пусто = гард не
+    # запустится, явная ошибка, а не тихий сбой). Ограничение
+    # источника: 1000 логов/запрос, см. analysis/alchemy_fallback.py,
+    # _chunked_get_logs.
+    blockscout_api_key: str = field(default_factory=lambda: os.environ.get("BLOCKSCOUT_API_KEY", ""))
     blockscout_rpc_url: str = field(
         default_factory=lambda: os.environ.get(
-            "BLOCKSCOUT_RPC_URL", "https://robinhoodchain.blockscout.com/api/eth-rpc"
+            "BLOCKSCOUT_RPC_URL", "https://api.blockscout.com/4663/json-rpc"
         )
     )
 

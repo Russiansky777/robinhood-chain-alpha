@@ -50,28 +50,33 @@ def _rpc_url() -> str:
         return CONFIG.alchemy_rpc_url
     if CONFIG.alchemy_api_key:
         return f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}"
-    # Фолбэк без секрета -- публичный JSON-RPC прокси Blockscout (см.
-    # config.py, blockscout_rpc_url). Найдено и подключено при
-    # подготовке P3-гарда (2026-09-01): ALCHEMY_API_KEY в этом
-    # репозитории оказался НЕ настроен как секрет GH Actions (первый
-    # реальный прогон .github/workflows/run_p3_guard.yml упал именно на
-    # этом -- см. docs/P3_GUARD.md), а задание прямо разрешало
-    # "RPC/Blockscout" как источник.
-    if CONFIG.blockscout_rpc_url:
+    if CONFIG.blockscout_api_key:
         return CONFIG.blockscout_rpc_url
+    # ВАЖНО (найдено при подготовке P3-гарда, 2026-09-01, см.
+    # docs/P3_GUARD.md): прямой POST на robinhoodchain.blockscout.com/
+    # api/eth-rpc вернул 403 -- не WAF/UA-фильтр (заголовок User-Agent
+    # не помог), а по официальной доке Robinhood Chain
+    # (github.com/blockscout/docs, robinhood-api.mdx) у ЭТОГО чейна
+    # Blockscout API обслуживается через "PRO API" гейтвей
+    # (api.blockscout.com/4663/json-rpc, Bearer-токен) -- "Get a free
+    # API key at dev.blockscout.com -- required for all PRO API tiers,
+    # including free." Бесплатный ключ существует, но требует
+    # регистрации на внешнем сервисе -- не выполняется этой сессией
+    # автономно (см. docs/P3_GUARD.md, "Блокер выполнения").
     raise RuntimeError(
-        "Ни ALCHEMY_API_KEY/ALCHEMY_ROBINHOOD_RPC_URL, ни BLOCKSCOUT_RPC_URL "
-        "не заданы. Заполните .env (см. .env.example)."
+        "Ни ALCHEMY_API_KEY/ALCHEMY_ROBINHOOD_RPC_URL, ни BLOCKSCOUT_API_KEY "
+        "не заданы. Robinhood Chain на Blockscout требует ключ даже для "
+        "бесплатного тира PRO API (dev.blockscout.com) -- анонимный "
+        "eth-rpc прокси для этого чейна недоступен (403). Заполните .env "
+        "(см. .env.example) или добавьте секрет GH Actions."
     )
 
 
-# Blockscout eth-rpc прокси вернул 403 Forbidden без User-Agent (см.
-# docs/P3_GUARD.md -- WAF/Cloudflare перед публичными block explorer'ами
-# обычно блокирует запросы с дефолтным `python-requests/x.y` UA как
-# похожие на неразмеченный скрейпинг-бот). Не обход защиты -- обычный
-# заголовок легитимного клиента, тот же паттерн используют
-# документированные публичные интеграции с Blockscout.
-_HEADERS = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
+def _auth_headers() -> dict:
+    headers = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
+    if not CONFIG.alchemy_rpc_url and not CONFIG.alchemy_api_key and CONFIG.blockscout_api_key:
+        headers["Authorization"] = f"Bearer {CONFIG.blockscout_api_key}"
+    return headers
 
 
 def _rpc_call(method: str, params: list) -> dict:
@@ -83,7 +88,7 @@ def _rpc_call(method: str, params: list) -> dict:
     resp = requests.post(
         url,
         json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-        headers=_HEADERS,
+        headers=_auth_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -140,7 +145,7 @@ def _chunked_get_logs(
             "method": "eth_getLogs",
             "params": [filter_obj],
         }
-        resp = requests.post(url, json=payload, headers=_HEADERS, timeout=30)
+        resp = requests.post(url, json=payload, headers=_auth_headers(), timeout=30)
         resp.raise_for_status()
         body = resp.json()
         if "error" in body:

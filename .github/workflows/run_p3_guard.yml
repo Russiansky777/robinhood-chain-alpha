@@ -61,12 +61,14 @@ jobs:
         if: ${{ steps.resolve.outputs.stage == 'discover' }}
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
         run: python analysis/p3_dislocation_guard.py --stage discover
 
       - name: Guard (полный прогон, 7 дней, вердикт >80%)
         if: ${{ steps.resolve.outputs.stage == 'guard' }}
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
         run: python analysis/p3_dislocation_guard.py --stage guard
 
       - name: Commit results

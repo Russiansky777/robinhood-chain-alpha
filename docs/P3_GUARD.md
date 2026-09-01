@@ -7,7 +7,7 @@
 приходящаяся на топ-3 адреса за последние 7 дней. Если > 80% — P3
 закрывается окончательно.»
 
-## Статус
+## Статус: код готов, реальный запуск заблокирован на кредах (не на коде)
 
 Код готов и протестирован (синтетические логи, см. `analysis/
 p3_dislocation_guard.py` docstring). Реальный запуск — на GH Actions
@@ -20,13 +20,16 @@ runner'е (`.github/workflows/run_p3_guard.yml`), НЕ в интерактивн
 r1_feed_match.py`, "eth_call через Alchemy RPC ... недоступный из
 интерактивной песочницы инструмента").
 
-**Результат появится здесь после реального прогона `--stage guard`
-на GH Actions** (или в `data/p3_guard_cache/p3_guard_result.json`
-дословно). До тех пор P3 остаётся в статусе **watchlist** (решение
-владельца от 2026-09-01, зафиксировано в `docs/PROJECT_STATE.md`) —
-этот гард может либо подтвердить окончательное закрытие (>80%), либо
-не подтвердить (остаётся watchlist по прежним причинам: латентностная
-гонка, режим-брейк 29.09, бюджет).
+**Три реальных прогона на GH Actions сделаны 2026-09-01 (не 0, не
+теория) — все три уткнулись в отсутствие рабочего RPC-ключа, не в
+баг кода.** Подробности и точная причина — секция "Блокер выполнения"
+ниже. Результат (число, вердикт >80%) появится здесь и в
+`data/p3_guard_cache/p3_guard_result.json` **после того, как владелец
+предоставит один из двух ключей** (см. "Что нужно от владельца"). До
+тех пор P3 остаётся в статусе **watchlist** (решение владельца от
+2026-09-01, зафиксировано в `docs/PROJECT_STATE.md`) по прежним трём
+причинам (латентностная гонка, режим-брейк 29.09, бюджет) — гард ещё
+не подтвердил и не опроверг окончательное закрытие.
 
 ## Источник данных и без-Dune ограничение
 
@@ -126,9 +129,29 @@ g1_common.py` и `analysis/r1_common.py`, без новой зависимост
   PoolCreated/Initialize за узкий срез (маловероятно на активном
   чейне, но не исключено), `guard` откажется работать без него.
 
-## Источник RPC на практике: Blockscout, не Alchemy (ALCHEMY_API_KEY не настроен)
+## Блокер выполнения: оба бесплатных RPC-пути требуют ключ, которого нет в этой сессии
 
-Первый реальный прогон (`--stage discover`, run [#33553407884](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33553407884), 2026-09-01) упал сразу на первом RPC-вызове: `ALCHEMY_API_KEY / ALCHEMY_ROBINHOOD_RPC_URL не заданы` — в этом репозитории секрет `ALCHEMY_API_KEY` НЕ настроен в GH Actions (проверено фактом падения, не документацией). Это согласуется с тем, что `analysis/r1_feed_match.py` (тот же Alchemy-путь, Sprint R1) ни разу не оставил закэшированного результата в `data/sprintR1_cache/` — Sprint R1 в итоге пошёл через `feed_match_dune` (декодированные call-traces на Dune), а не через прямой RPC. Задание прямо разрешало «RPC/Blockscout» как источник — добавлен фолбэк без секрета на публичный JSON-RPC прокси Blockscout (`https://robinhoodchain.blockscout.com/api/eth-rpc`, `docs.blockscout.com/devs/apis/rpc/eth-rpc`: «API key не обязателен, но повышает RPS»), `analysis/config.py`/`analysis/alchemy_fallback.py::_rpc_url()`. Ограничение источника: 1000 логов на один запрос `eth_getLogs` — `_chunked_get_logs` теперь рекурсивно бисектит диапазон блоков, если ответ вернул ровно 1000 строк (подозрение на молчаливую обрезку), а не молча теряет логи сверх лимита.
+Три реальных прогона на GH Actions (не в интерактивной сессии, см. ниже), в порядке:
+
+1. **`ALCHEMY_API_KEY`** ([run #33553407884](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33553407884)) — упал сразу: `ALCHEMY_API_KEY / ALCHEMY_ROBINHOOD_RPC_URL не заданы`. В этом репозитории секрет `ALCHEMY_API_KEY` НЕ настроен в GH Actions (проверено фактом падения, не документацией). Согласуется с тем, что `analysis/r1_feed_match.py` (тот же Alchemy-путь, Sprint R1) ни разу не оставил закэшированного результата в `data/sprintR1_cache/` — Sprint R1 в итоге пошёл через `feed_match_dune` (декодированные call-traces на Dune), а не через прямой RPC.
+2. **Публичный Blockscout eth-rpc без ключа** ([run #33553766600](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33553766600)) — `POST https://robinhoodchain.blockscout.com/api/eth-rpc` вернул `403 Forbidden`. Стандартная документация Blockscout (`docs.blockscout.com/devs/apis/rpc/eth-rpc`) говорит «API key не обязателен, но повышает RPS» — это верно для большинства чейнов на Blockscout, но не для этого.
+3. **То же самое + `User-Agent`** ([run #33553900159](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33553900159)) — тот же `403`, заголовок не помог (значит это не UA-фильтр WAF).
+
+**Причина найдена** (официальная документация Robinhood Chain в репозитории `blockscout/docs`, файл `robinhood-api.mdx`, получено WebFetch дословно): Robinhood Chain на Blockscout обслуживается через отдельный **«PRO API» гейтвей** (`api.blockscout.com`, `chain_id=4663`), а не через обычный бесплатный `<explorer>/api/eth-rpc`, который есть у большинства чейнов. Цитата: «Get a free API key at dev.blockscout.com — required for all PRO API tiers, including free.» — то есть бесплатный тир СУЩЕСТВУЕТ, но требует регистрации на внешнем сервисе (`dev.blockscout.com`) и получения ключа. ETH RPC-запросы идут `POST https://api.blockscout.com/4663/json-rpc` с `Authorization: Bearer <ключ>`.
+
+**Эта сессия не регистрируется на внешних сервисах и не создаёт учётные данные самостоятельно** — получение ключа `dev.blockscout.com` требует действия владельца (или добавления уже имеющегося `ALCHEMY_API_KEY` секретом в GH Actions — любой из двух путей разблокирует гард).
+
+### Что сделано, чтобы гард завёлся сразу после появления ключа
+
+`analysis/config.py`/`analysis/alchemy_fallback.py::_rpc_url()` теперь: Alchemy (если настроен) → Blockscout PRO API с `Bearer`-токеном (если задан `BLOCKSCOUT_API_KEY`) → явная понятная ошибка (не тихий сбой), объясняющая обе причины. `.github/workflows/run_p3_guard.yml` пробрасывает оба секрета (`ALCHEMY_API_KEY`, `BLOCKSCOUT_API_KEY`) в обе стадии. `.env.example` документирует оба варианта. Ограничение источника Blockscout: 1000 логов на один запрос `eth_getLogs` — `_chunked_get_logs` рекурсивно бисектит диапазон блоков, если ответ вернул ровно 1000 строк (подозрение на молчаливую обрезку), а не молча теряет логи сверх лимита.
+
+### Что нужно от владельца, чтобы получить реальный результат
+
+Один из двух (любой достаточен):
+- Добавить секрет `ALCHEMY_API_KEY` (или `ALCHEMY_ROBINHOOD_RPC_URL`) в GH Actions этого репозитория, **или**
+- Зарегистрировать бесплатный ключ на `dev.blockscout.com` (тир PRO API "включая бесплатный") и добавить его секретом `BLOCKSCOUT_API_KEY`.
+
+После этого: поменять `data/p3_guard_cache/STAGE_REQUEST` на `discover` (push-триггер перезапустит) — либо, если репозиторий к тому моменту смержен в дефолтную ветку, использовать `workflow_dispatch` напрямую (см. ниже).
 
 ## Как запускалось на практике
 
