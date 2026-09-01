@@ -52,7 +52,16 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 HISTORY_LOOKBACK_YEARS = 2
 FUNDING_RESOLUTION = "1h"
 MAX_FUNDING_PAGES = 40  # 40 x 750 = 30000 часовых записей ~ 3.4 года, с запасом
-ORDER_BOOK_LIMIT = 1000
+ORDER_BOOK_LIMIT = 100  # 1000 дал 400 Bad Request на реальном вызове
+                         # (run #33555814080, MRVL market_id=174) --
+                         # сервер, видимо, ограничивает `limit` меньшим
+                         # максимумом, точное число не документировано в
+                         # SDK-доке. 100 -- консервативная догадка, ещё
+                         # НЕ подтверждена реальным вызовом на момент
+                         # написания -- следующий прогон подтвердит или
+                         # опровергнет (см. try/except вокруг каждого
+                         # рынка ниже -- один плохой лимит больше не
+                         # обрушивает весь прогон).
 
 # Сток-регистр Sprint R1 (194 токена, уже оплачено и закэшировано --
 # 0 доп. кредитов) -- фолбэк-фильтр, если поле market_type на Lighter
@@ -258,6 +267,17 @@ def run() -> int:
         except NeedsApiKey as e:
             _write_needs_key_report(f"orderBookOrders/fundings for {symbol}", e)
             return 1
+        except requests.exceptions.HTTPError as e:
+            # НЕ 401/403 (тот случай -- NeedsApiKey выше) -- реальная
+            # ошибка API на этом ОДНОМ рынке (напр. неверный параметр)
+            # не должна ронять весь прогон по остальным 40+ рынкам.
+            # Отмечается явно в результате, не молчаливый 0.
+            print(f"[p4_lighter] {symbol} (market_id={market_id}): HTTP error, пропускаю -- {e}")
+            results.append({
+                "symbol": symbol, "market_id": market_id, "match_reason": reason,
+                "mid_price_used": mid, "error": str(e),
+            })
+            continue
         funding_summary = summarize_funding(funding_records)
         results.append({
             "symbol": symbol,
@@ -336,14 +356,19 @@ def _write_recon_section(results: list[dict], n_total_markets: int) -> None:
         return
 
     rows = []
+    n_errored = 0
     for r in results:
+        if "error" in r:
+            n_errored += 1
+            rows.append(f"| {r['symbol']} | ОШИБКА API на этом рынке, пропущен | | | | | | | |")
+            continue
         rows.append(
             f"| {r['symbol']} | {r.get('n_records', 0)} | {r.get('span_days', 0)} | "
             f"{r.get('annualized_median_pct', 'н/д')}% | {r.get('annualized_p10_pct', 'н/д')}% | "
             f"{r.get('annualized_p90_pct', 'н/д')}% | {r.get('share_hours_negative_for_short_pct', 'н/д')}% | "
             f"${r.get('combined_depth_usd_0.1pct', 0):,.0f} | ${r.get('combined_depth_usd_0.5pct', 0):,.0f} |"
         )
-    max_span = max((r.get("span_days", 0) for r in results), default=0)
+    max_span = max((r.get("span_days", 0) for r in results if "error" not in r), default=0)
     gate1 = "ПРОЙДЕН" if max_span >= 30 else "KILL (нет ни одного перпа с ≥30д истории)"
 
     body = f"""
@@ -351,11 +376,13 @@ def _write_recon_section(results: list[dict], n_total_markets: int) -> None:
 {marker}
 
 Публичный REST Lighter ({BASE_URL}) опрошен 2026-09-01 (0 Dune,
-без ключа). {n_total_markets} перп-рынков всего, **{len(results)}
+без ключа — ни один эндпоинт из использованных не потребовал
+авторизации). {n_total_markets} перп-рынков всего, **{len(results)}
 сток-/RWA-подобных** (совпадение `market_type` и/или символа с
 реестром 194 сток-токенов Sprint R1 — см. `analysis/
-p4_lighter_markets.py::is_stock_like`). Только агрегаты — построчная
-история фандинга/ордербука наружу не выгружалась.
+p4_lighter_markets.py::is_stock_like`){f", из них {n_errored} не удалось опросить (ошибка API на конкретном рынке, не авторизация — см. таблицу)" if n_errored else ""}.
+Только агрегаты — построчная история фандинга/ордербука наружу не
+выгружалась.
 
 | символ | N записей фандинга | охват, дней | годовой фандинг медиана | p10 | p90 | доля часов против шорта | глубина ±0.1% | глубина ±0.5% |
 |---|---|---|---|---|---|---|---|---|
