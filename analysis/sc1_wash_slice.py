@@ -1,149 +1,66 @@
-"""SC1, дозапрос владельца (2026-09-01, п.3): срез через RPC (Alchemy/
-Blockscout eth_getLogs) для применения критерия «доля объёма от
-кошельков-повторников», пре-регистрированного в `docs/SC1_NOTE.md`
-(«Пре-регистрация: критерий концентрации кошельков-повторников...»,
+"""SC1, дозапрос владельца (2026-09-01): срез через публичный RPC
+(`https://rpc.mainnet.chain.robinhood.com`, без ключа, см.
+`analysis/alchemy_fallback.py::_endpoints()`) -- применяет
+пре-регистрированный критерий кошельков-повторников (`docs/SC1_NOTE.md`,
+«Пре-регистрация: критерий концентрации кошельков-повторников...»,
 2026-09-01T21:28:48Z, ДО какого-либо измерения):
 
-    >50% -> KILL; <20% -> главная линия; между 20% и 50% -> второй
-    кластер (см. SC1_NOTE.md для полной формулировки).
+    >50% -> KILL; <20% -> главная линия; между 20% и 50% -> третий
+    кластер (обновлено владельцем в этом дозапросе -- теперь ДВА
+    кластера уже задействованы, main + control, поэтому "между"
+    требует ТРЕТИЙ, не второй).
 
-СТАТУС: ЗАГОТОВКА. НЕ ЗАПУСКАЛСЯ (владелец: "не запускать полный срез
-без команды"). Обновление 2026-09-01 (дозапрос владельца, "проба
-публичного RPC"): **ключ БОЛЬШЕ НЕ ТРЕБУЕТСЯ** для старта -- реальный
-прогон GH Actions (run 33570102743) подтвердил, что `PUBLIC_RPC_URL`
-(`https://rpc.mainnet.chain.robinhood.com`) отдаёт `eth_blockNumber`/
-`eth_getLogs` без ключа и без 403 (rate-limit 429 на быстрых
-последовательных вызовах -- см. `analysis/alchemy_fallback.py`,
-`_endpoints()`/`_post_with_fallback` -- ретрай с backoff на 429,
-переход на Alchemy/Blockscout как ФОЛБЭК только при стойкой ошибке).
-Всё ещё подключён к push-триггеру `data/p3_guard_cache/STAGE_REQUEST`
-(.github/workflows/run_sc1_wash_slice.yml, ОТДЕЛЬНЫЙ файл от
-run_p3_guard.yml -- P3 не тронут) -- теперь реально СТАРТУЕТ при
-следующем пуше в этот маркер (ключ больше не блокер), но полный прогон
-всё равно не запускается автоматически этим дозапросом -- маркер не
-бампался.
-
-Область (по заданию владельца -- ЯВНО СУЖЕНО, не весь кластер):
-топ-20 токенов кластера `0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78`
-ПО ОБЪЁМУ (те же 20, что в `docs/SC1_NOTE.md`, "Оценка стоимости
-среза...") -- $1 181 698 их суммарного 24ч-объёма против
-$31 748 336 объёма ВСЕГО кластера (1641 токен) -- то есть эта
-заготовка покрывает ~3.7% объёма кластера, честно НЕ полный кластер.
-Расширение на больше токенов -- отдельное решение владельца (кратно
-больше eth_getLogs-вызовов, см. оценку в docstring ниже и в
-SC1_NOTE.md).
+СТАТУС (2026-09-01): запускается по прямой команде владельца ("запустить
+сейчас"). Ключ не требуется -- публичный RPC работает без него
+(rate-limited, ретрай/фолбэк встроены в alchemy_fallback.py).
 
 ============================================================
-ОЦЕНКА СТОИМОСТИ (доложено владельцу, без запуска, тот же паспортный
-принцип "калибровка узким срезом x2.5", что и Dune-оценка выше)
+Методология выборки (владелец, этот дозапрос)
 ============================================================
 
-Блочный диапазон -- по факту таймстампов/номеров блоков ЭТОГО
-кластера (0 доп. запросов, из уже оплаченного
-`sc1_august_launches_decoded.csv`): блоки [24 592 957; 34 788 433] --
-10 195 476 блоков, что соответствует 11.82 дня активности (эмпирический
-блоктайм Robinhood Chain из ЭТИХ ЖЕ данных: dt=1 021 194с /
-dblocks=10 195 476 = ровно ~0.1002 с/блок, ~10 блоков/с -- согласуется
-с оценкой "~100мс блоктайм", уже записанной в analysis/
-alchemy_fallback.py до этого дозапроса).
+**MAIN**: случайные 50 токенов кластера `0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78`
+(1641 токен всего) -- та же цель, что и предыдущий дозапрос (топ-10 по
+$/день лидер), но теперь СЛУЧАЙНАЯ выборка вместо топ-20 по объёму
+(убирает смещение отбора по объёму).
 
-Число вызовов eth_getLogs -- при chunk_size=2000 блоков/запрос (тот же
-дефолт, что уже в `analysis/alchemy_fallback.py::_chunked_get_logs`):
-ceil(10 195 476 / 2000) = **5 098 базовых вызовов** (нижняя граница,
-ДО учёта бисекции при плотных диапазонах).
+**CONTROL**: случайные 50 токенов кластера
+`0x376d633018680caa4ec3f3e735a2797abf7f9cb2` (481 токен всего, 2-й в
+топ-10 по $/день, тоже "плоский" профиль по внутрикластерному разбору,
+см. `docs/SC1_NOTE.md`) -- для сравнения, та же методология,
+одинаковый размер выборки.
 
-Оценка плотности событий (0 доп. запросов -- из уже оплаченного
-`n_trades_24h` этих же 20 токенов, 117 768 сделок за первые 24ч,
-`docs/SC1_NOTE.md`): 117 768 сделок / (86400с x 10 блоков/с = 864 000
-блоков/сутки) = ~0.136 сделки/блок В СРЕДНЕМ за самые горячие первые
-сутки -> ~272 события на чанк в 2000 блоков -- НИЖЕ лимита Blockscout
-в 1000 записей/вызов (WebSearch, blog.blockscout.com, 2026-09-01), то
-есть бисекция ожидается РЕДКО (только в отдельных особо плотных
-чанках сразу после запуска, если активность там локально в разы выше
-средней по суткам) -- честная оговорка: это оценка по СРЕДНЕЙ
-плотности первых суток, не гарантия, что НИ ОДИН чанк не превысит
-1000; активность после первых суток, по общему наблюдению для
-мем-подобных токенов (см. ту же оговорку в SC1_NOTE.md про Dune-срез),
-типично НИЖЕ первого дня -- то есть оценка консервативна (скорее
-занижает риск бисекции, чем завышает).
+**Seed = 42** -- ПЕРЕИСПОЛЬЗУЕТСЯ `CONFIG.random_seed` (`analysis/
+config.py`, используется по всему проекту с самого начала, Sprint 1) --
+осознанно НЕ новый/подобранный seed, чтобы не создавать даже видимость
+подгонки выборки под желаемый результат. Сэмплирование
+(`random.Random(42).sample(...)`) сделано ДО запуска, зафиксировано в
+коде (списки `MAIN_SAMPLE`/`CONTROL_SAMPLE` ниже) -- воспроизводимо,
+проверяемо, коммитится ДО реального прогона (тот же принцип
+пре-регистрации, что и весь остальной SC1).
 
-**Итоговая оценка: порядка 5 000-10 000 вызовов eth_getLogs**
-(нижняя граница 5098 + запас на редкую бисекцию в пиковых чанках).
-
-Проверка по документации (WebSearch, 2026-09-01, обе -- не
-дословный WebFetch, домены заблокированы для прямого фетча в этой
-сессии, см. `docs/P4_RECON.md` про тот же блокер):
-- **Alchemy free tier**: 30 000 000 CU/месяц, 500 CUPS
-  (`alchemy.com/support/what-are-compute-units...`). `eth_getLogs`
-  базово ~60 CU/вызов, но реальная стоимость растёт с объёмом
-  ответа/диапазоном ("could cost thousands of CU для тяжёлых
-  запросов" -- WebSearch, точная формула не найдена). Пессимистичный
-  сценарий (500 CU/вызов вместо базовых 60) x 10 000 вызовов =
-  5 000 000 CU = **~16.7% месячного лимита free tier** -- укладывается
-  с запасом даже в пессимистичном случае. Оптимистичный сценарий
-  (60 CU x 10 000) = 600 000 CU = **~2% лимита**.
-- **Blockscout free tier (PRO API, dev.blockscout.com)**: 5
-  запросов/сек, 1000 записей/`eth_getLogs`-вызов (WebSearch,
-  blog.blockscout.com, "Blockscout vs Etherscan API... 2026"). Теперь
-  ФОЛБЭК (см. СТАТУС выше), не основной путь.
-- **ПУБЛИЧНЫЙ RPC (`PUBLIC_RPC_URL`, основной путь с 2026-09-01)**:
-  без документированного месячного капа (сам эндпоинт не платный),
-  но РЕАЛЬНО измеренный rate-limit (run 33570102743, docs/P3_GUARD.md):
-  429 начинается уже на 3-м быстром подряд вызове, ~3 запроса/с сырых
-  (18/20 успешных за 6.64с в пробе). С ретраем-backoff
-  (`_post_with_fallback`, до 3 попыток на 429, экспоненциальный backoff
-  2с/4с) устойчивый эффективный темп, вероятно, НИЖЕ 3/с -- честная
-  оценка **~1.5-2.5 запроса/с эффективно**. При 5 000-10 000 вызовах:
-  **~33-111 минут** -- вписывается в один прогон GH Actions (лимит
-  job'а по умолчанию 6 часов) с запасом, но заметно дольше, чем
-  давала бы Blockscout-only оценка (5/с) -- платный ключ по-прежнему
-  ускорил бы прогон, если владелец решит его добавить, но БОЛЬШЕ НЕ
-  ОБЯЗАТЕЛЕН для самого факта запуска.
-
-**Вывод: срез технически укладывается в бесплатный тир публичного RPC
-без ключа** -- медленнее, чем было бы с платным ключом, но не требует
-его для старта. Оценка не идеальна (плотность после первых суток не
-измерена, только предположена по общему паттерну; реальный устойчивый
-rate публичного RPC под нагрузкой в тысячи вызовов подряд тоже не
-измерен -- проба была короткой, 20 вызовов) -- при реальном прогоне
-скрипт сам считает фактическое число вызовов и печатает его в лог,
-чтобы это предположение можно было проверить постфактум.
+Честная оговорка: «кошелёк с ≥5 токенами» проверяется ТОЛЬКО в
+пределах наблюдаемой выборки (50 токенов), не всего кластера (1641/481)
+-- реальное число различных токенов кластера у кошелька может быть
+ВЫШЕ (мы не видим остальные ~1591/431 токена) -- то есть это НИЖНЯЯ
+ГРАНИЦА признака "повторник", не полная картина. Это делает метрику
+консервативной в сторону "главной линии" (реже находит повторников,
+чем было бы видно по всему кластеру), не в сторону KILL.
 
 ============================================================
-Методологические оговорки (честно, не додумано):
+Дополнительные метрики (владелец, "из тех же логов, без новых запросов")
 ============================================================
-1. **"Кошелёк" = `recipient` из Swap-события** (второй indexed
-   параметр, topics[2]) -- НЕ обязательно исходный EOA-трейдер: если
-   фронтенд/роутер вызывает `pool.swap()` от своего имени, `recipient`
-   может быть контрактом роутера, а не кошельком пользователя, что
-   занижало бы число уникальных кошельков и искусственно завышало бы
-   долю "повторников" (ложный сигнал в сторону KILL). Разрешение
-   (доп. точность, доп. стоимость) -- резолвить `tx.from` через
-   `eth_getTransactionByHash` по каждому уникальному `transactionHash`
-   из логов; НЕ включено в базовую оценку выше (могло бы кратно
-   увеличить число вызовов, вплоть до дублирования всего eth_getLogs
-   бюджета) -- явно вынесено в TODO, не сделано молча.
-2. **Валюта пары** -- ВСЕ 39 680 V1-запусков используют ОДИН И ТОТ ЖЕ
-   `pair_token` (`0x0bd7d308f8e1639fab988df18a8011f41eacad73`, 100%
-   совпадение, проверено локально по кэшу) -- по косвенным признакам
-   (единый адрес на весь V1, согласуется с уже установленным
-   ETH/USD-курсом через WETH-пары в `docs/SC1_NOTE.md`) это,
-   по всей видимости, WETH, но **НЕ подтверждено прямым вызовом**
-   (`symbol()`/`decimals()`) -- скрипт при реальном запуске делает ОДИН
-   `eth_call` на этот адрес перед стартом, чтобы подтвердить/опровергнуть
-   допущение явно (см. `_verify_pair_token_is_weth`), а не молчаливо
-   предполагает.
-3. **token0/token1 порядок** в Swap-событии определяется адресной
-   сортировкой Uniswap V3 (меньший uint256-адрес = token0) --
-   вычисляется локально (0 доп. запросов) сравнением `token` и
-   `pair_token` как целых чисел, не запрашивается отдельно.
-4. Выгружаются и коммитятся **ТОЛЬКО агрегаты** (число уникальных
-   кошельков, доля объёма повторников, применённый вердикт по
-   пре-регистрированному порогу) -- построчные Swap-логи/адреса
-   кошельков остаются только в локальном JSON-кэше
-   (`data/p3_guard_cache/sc1_wash_slice_result.json`, коммитится как
-   агрегированный JSON, НЕ построчный дамп -- см. `run()`), тот же
-   принцип, что и `p4_lighter_markets.py`.
+
+- Общее число уникальных торговавших адресов (по выборке).
+- Доля объёма у топ-3 адресов (по объёму, НЕ обязательно те же, что
+  "повторники" -- отдельная сортировка).
+- Медиана числа ВНЕШНИХ покупателей на токен -- "внешний" = НЕ входит
+  в множество адресов-деплоеров этого кластера (`sc1_deployer_to_cluster.csv`,
+  тот же принцип, что исходный паспорт SC1, Шаг 3: "доля токенов
+  кластера с нулём внешних покупателей (покупатели != сам кластер)").
+
+Наружу -- ТОЛЬКО агрегаты (владелец: "наружу только агрегаты") --
+построчные логи/адреса кошельков остаются в локальном JSON-кэше,
+НЕ публикуются в docs/.
 """
 from __future__ import annotations
 
@@ -160,89 +77,186 @@ from alchemy_fallback import (  # noqa: E402  (см. sys.path.insert выше)
     _rpc_call,
     topic0,
 )
-from config import CONFIG  # noqa: E402
 
-CACHE_DIR = Path("data/p3_guard_cache")  # тот же кэш-каталог/маркер, что P3 -- см. докстринг
+CACHE_DIR = Path("data/p3_guard_cache")
 OUT_PATH = CACHE_DIR / "sc1_wash_slice_result.json"
 
-CLUSTER_ID = "0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78"
-FROM_BLOCK = 24_592_957
-TO_BLOCK = 34_788_433
-PAIR_TOKEN = "0x0bd7d308f8e1639fab988df18a8011f41eacad73"  # см. докстринг, п.2 -- предположительно WETH
+PAIR_TOKEN = "0x0bd7d308f8e1639fab988df18a8011f41eacad73"  # WETH, подтверждено symbol() в прошлом прогоне (docs/P3_GUARD.md)
 ETH_USD_PRICE = 1895.565143603286  # sc1_eth_usd_price.csv, тот же источник, что весь SC1_NOTE.md
+RANDOM_SEED = 42  # CONFIG.random_seed -- см. докстринг выше
 
-# Топ-20 токенов кластера 0x0eaced... по vol_usd_24h (docs/SC1_NOTE.md,
-# "Оценка стоимости среза..."), (token, pool) -- из уже оплаченного
-# sc1_august_launches_decoded.csv, 0 доп. Dune-кредитов на их получение.
-TOP20_TOKEN_POOL = [
-    ("0x329e6cfb85ffd0b56c3b8033d56668c4cc686950", "0xf5f8447620c1ab53108db068de8a895d7ba096ba"),
-    ("0x5d37a506cb95598f939637cae1a4ced423b7a100", "0x66efc46e2e12161e61fef1f12a1418b37a3486b9"),
-    ("0x988968faf4bcc51cc9758a53208f268da9318865", "0xcbfdac6c2a58cd5fe34769b5c82beb0279e26b69"),
-    ("0x26f3d3f872fb461730436db5fe60083072a35bcc", "0x5e5125723dfcabda539c0e508286cb7077ac3dd1"),
-    ("0x4726c8ff5f7e594464a13387a64bf217aef6e4b4", "0x32828ba1cea1b7e8795ff2d97f77a80f71a3be56"),
-    ("0x48df55e5d982a770461f8ea0d77c7e6c8a136384", "0x958f22d3b5b24ce38b67d197eda1c0bd2b929af9"),
-    ("0x3f06f58ba8fede100f25a597b3330def9ed1af9c", "0xc67ce041ded53bfa255feae72b829a58186c2319"),
-    ("0xe40290374b7eaf3c3f2d58a2d6d84a0ee1d8d64d", "0x21bb864a8018a184ba6c6912c99f221fc176fa92"),
-    ("0xe1fc3a93168934e09441fac17cc87355fcbd9697", "0x63357870edf5e732eccab5b579735cca03085f56"),
-    ("0x2972f52d5dd4d060c7fca5e3c7db5f9938fed407", "0x93673c8eb73ec3805703f678aca0331ec074b5a5"),
-    ("0x4846d7487dd934173f5294f1e744bffd568b7463", "0x37deb20cd4f841c40a326002c132d4b07f8f75ba"),
-    ("0xeccfefa3cee624462fce8980f315121d2c036b06", "0x81b5d5e45fbbb4527b9715de54ddecbe48908853"),
-    ("0xbb8bfc928e659c38e055f7e1c5868ec26d3082db", "0x6096f464ffaaba1ce51ceefa20c06d7f617ac18b"),
-    ("0xd26b746ab68c7519a0c6d10dc637e0d448202d7f", "0x8bddbfaf41de7906b69dc4fa799978acd866c47a"),
-    ("0x69e2c83c44fde5f323e4a3caf6ca6861b71fa79e", "0xa7e24863bb05dfd1671d37d6e1d7e1df51b3edc6"),
-    ("0xed0b2a253c79c36e0fdecdc2c1cffe0a290d3f7e", "0x28450dd62469da02f8989a3f62ebd36d62be1581"),
-    ("0x4d8e89bb6ec022ff256718c2eab2a07febf2b0c3", "0x206b4ca4bae9bd1e9c79bafa5a789df39fb36529"),
-    ("0x69179599b459ae2773dd241aaf8bbe0fe7c57a78", "0xa0d55ca51878e021f3ea0dc0bdd24719773cac2f"),
-    ("0x45d698d37765b6c4073fab0ba1c3b90dc200d7a1", "0xf28317fbc7dc18abbfac4a204a8aedfe2cfd385b"),
-    ("0x13a951810efd653dcd9800880d99b385ab1fcc00", "0x7e0aacf748071491a4b4f1dd1be0c45d430a457b"),
-]
-
-# Пре-регистрированный порог (docs/SC1_NOTE.md, "Пре-регистрация:
-# критерий концентрации кошельков-повторников...", 2026-09-01T21:28:48Z,
-# ДО этого запуска) -- НЕ менять здесь без обновления того раздела.
 KILL_THRESHOLD = 0.50
 MAIN_LINE_THRESHOLD = 0.20
 
+# Сэмплы зафиксированы (random.Random(42).sample(...), см. скрипт
+# генерации в истории сессии) -- (token, pool), отсортировано для
+# детерминизма. НЕ пересчитывать заново без явного решения владельца
+# -- пере-семплирование задним числом было бы нарушением
+# пре-регистрации.
+MAIN_SAMPLE = [
+    ("0x027b4451f7d433e64996814e60baeb45455a5113", "0x84d1bdd63c6bc33e7df99687dd74c8002492b77e"),
+    ("0x0789130db945a40404270f8b391fcedf0b00fbf9", "0xd2589be627bf278a413bb19b1f596a47f66deb50"),
+    ("0x07f0b213f5d4c3442b3ab88b3040aed849a1fdd6", "0xcfce51206ced498d8ddae36db0777d3339f58cbc"),
+    ("0x08d40c3bee04510c1be48422de7774d6a3c77fae", "0x23ec54f281e9f5e0204b1d88b78eab9f1b877417"),
+    ("0x09c33f475080f55bf9a7328d7e84a6a8566586d0", "0x74faf14c8b42372458ad6312f32333e005a97d29"),
+    ("0x1baf95283904c31db593785eb6c52b7ebec58362", "0x7124445ccaccb6cf39dc3196a30d33b7044bfb7b"),
+    ("0x1e7fe90df7e6ff0b178ddfa35e1adda82ce38f58", "0x851526ae0cd98a3989800ae9822d64bc65195e16"),
+    ("0x1e94ca9f390ae77b88a721c4dfa6bd53c5221b70", "0x44f9c3e89d08007c32c4266a3113452f2017420b"),
+    ("0x1f35f3a4cc1aa8933ff44011452f4c0bc9653a15", "0x73be0e5b63f89bb1e8d28698c3de22b9a25d937e"),
+    ("0x203433091548989aa487cc56ea8e193409833ff1", "0x9ea145e620ee86e39c527f56e33a53c9374753fd"),
+    ("0x230642ca6bc53c5a4cc7854d1fbd77abf3a92998", "0x0ca08f2e721706de9f78549a9f3b039bab6f847e"),
+    ("0x2afd22126e120b7a669fe5c8405c0a891d172d22", "0x6e9fd54f429a405065f1e306c573e8865e163aa2"),
+    ("0x31e114c87bcc3bde5e9bfaa39b24f6d451678dc3", "0xf42c666c3f02c42f4b796f455d7664d0819b0b09"),
+    ("0x32916412648ea71dd550253ae46252ffef903ba2", "0xa440941f85c72ba91f881b7461eb21b141b43f13"),
+    ("0x3f06f58ba8fede100f25a597b3330def9ed1af9c", "0xc67ce041ded53bfa255feae72b829a58186c2319"),
+    ("0x4413929bc56d53053290de7270c1bec67e5c7409", "0x21c9fe485ee57283bfc937d43645ed86b57c7e35"),
+    ("0x44cfcb4a99036ca24c8715521a302cd359642c94", "0x0fb63097a84e4fb96b1f4e3cfd49ce7503a74d43"),
+    ("0x455709fbdc0d41adebec7ee9e02df68124ba11dc", "0xe358387fd24526104afdd05389dbdeb439c959d6"),
+    ("0x45e549be546932cc1511caecebbbd8a2c0a55845", "0xca3613d658a7f2ac362df80b06b8a666f8958216"),
+    ("0x47b198eb27d3cedbf14275ca272a9862ee9749fe", "0x92580b1240d69d01c6bb9017c50c674306371830"),
+    ("0x4c4fa6d62f8b24d3c939997510989e402ec6e2aa", "0xa3198f0be4167390c85220ee1d9f292dfa9b9d7a"),
+    ("0x55c01d0969fd80b92acc161adb428e57dde9d58f", "0x9b5e928fa4cd851ada680d869cd9953abde1d002"),
+    ("0x56d9bccf84abdd506ac2b805e64f73a272003fb6", "0x0a9bf71454298cff67abdb05740d392806edd522"),
+    ("0x69179599b459ae2773dd241aaf8bbe0fe7c57a78", "0xa0d55ca51878e021f3ea0dc0bdd24719773cac2f"),
+    ("0x69dc6d30f6dc5c64ef33bae0b32ed8328baa3759", "0x468399f058283f47d6b20742a44bd5b4277b0989"),
+    ("0x6aafa6e6090e17068e1eeba9a6956f8c71f9f5c3", "0xc82ac63793b1619459d818208694476b9eaad5ec"),
+    ("0x70877d7efbcf9ae26d654dff28df538c98e5b2bb", "0xc469580c6a0d51a1eabbe200e3b1704efaea09be"),
+    ("0x755a06d5e9f9a304f60ce0685407788721a91df4", "0x3d6dbe0faa9bdc21c6825d5db03d47074e1ba78c"),
+    ("0x8302fe2cc45d8cf4e8f408d457444deaa01b477f", "0x78d6b5ac16c24a6f725d6f4ea047bc3ff96608bb"),
+    ("0x83a0ab228259ba0eb98aeb46c65842db31a010b8", "0x51dbb04c0a5b88a67bc952c05b7287f94e7b0b2b"),
+    ("0x83bee96e74cbf3168ecadfc37967a53cef16a802", "0x8a413c846550746173101af3f4b4c437224141fa"),
+    ("0x8cf68fa704ecf2b15b4c998f44294238e62d17ff", "0x729a551302d18ecf6a21f6b232a4d40b44e73174"),
+    ("0xa083f8a37f5c6c22f1c61d002c671d43aa0dd92a", "0xbf36b99c1cd509b654b4f17c39c804e2e8fc628a"),
+    ("0xb0892373823f2069fab090197acf0a07576cbb38", "0xd7e2a3b7dd4e04c2065e2be296d6c0bf22cb4b97"),
+    ("0xb48ac0335671068c289f107059f1660e7050cd81", "0x43246b927c82d5f74b753bd47ffb9e687da252a2"),
+    ("0xbd7408d148bc8ffc574208ee8d40c6928cb350da", "0x71da8d85e90ab588a91552c424bd069f5df58cd7"),
+    ("0xbe0cd7df8d02694c5241d43d272990f2cf51a0c1", "0x5487678fba91c8a1772e749d34fe5c7833dbe288"),
+    ("0xc2042b7c7ad91aec15454cbf1803d7cc54ea6ff9", "0x3e7802812b3c7a78bc23a50de3dacaec6034af4f"),
+    ("0xc2b2186a9698fd85e23656ac09811b15b5dd9589", "0xc7de906d2b7dfa8ac4c0b48c241ff37a6f1773a3"),
+    ("0xcc4a8c99afb34abd77ee8f1598178c67aafc35ee", "0x85f0d26cb8ff2880bd4cbc80333f9adfb447d8b5"),
+    ("0xcf0afe6efac54e2c6473c2dac9d648c9665a6729", "0x255ee4408279ffa7107af6baa69c2aec49e58d60"),
+    ("0xd69eab2437a8cb95c11e263e4ce3f0d78e9db81c", "0x6771447530182285c1f74fe4474c2f173ba5d051"),
+    ("0xdd904ac15858482d071c9007388b19650f9e68eb", "0xbfca7be2b52278a441412d0c9d42e457c2dfcb69"),
+    ("0xdedf14fb258f1bced72efd80128723b88a234d92", "0xc5aadd9f2328a41f55098a86cfdb4caa507fcdde"),
+    ("0xe2f450df1b8d2be57fb6d43ccfe416bef7ac3fc3", "0x6bb22f739589834ae1e0c48391c27ff189a75f1d"),
+    ("0xead42096dabc98ea29900fbb9a9e41a3906cc45a", "0x9856ae21d542082c84c3ae4aafb36a0aa996af7a"),
+    ("0xebc10a616aadf8aea933f73c630282d70e8f44c7", "0xe5dcb78135bd2a07b01a981f2bf220565bc330fa"),
+    ("0xec15ae140deea6a5b005544fdd20720d21e50dc8", "0x7a0d0dec3b173352f9edf71b84f345f167e6dc1c"),
+    ("0xf127232eac184695f4f2ed5ef416e05a687b53d0", "0x95dc824573fb92c1f86268d543d4700be304e492"),
+    ("0xf283ba68b3fcc6ffaa1d42d86a353b3544e57d4e", "0x98fc937f9c72f65cf09edf2d65687c40554ac9a1"),
+]
+
+CONTROL_SAMPLE = [
+    ("0x00d377b5db6eaac8752aafb1ebed191f64992863", "0x98bbe014d21693dfc8f3f38d202c0d82d5a31108"),
+    ("0x04b325f8cf3c5a0c63b6a170380d009c38113d76", "0xd584fbb26c6e7a7c1026cb613bb1493aa105b1b2"),
+    ("0x05214fdf03c6aa8e678e3f90137b0d08eb39521d", "0x53c3b2494230fe6184657172232ea60df6828033"),
+    ("0x05c93acee23706c4fbfbe20e059c7ee01b597904", "0x48174d7f5cf1d720cc4ecdd46b6c689a92e6c875"),
+    ("0x05d46c19e2550ff7d634df8101f7811151fafe95", "0x3104b7124bd3ddfcc62400ce3494da56dd5903a1"),
+    ("0x1726bcd7b8ab885afc08c81c3810365d7bc4d505", "0xe8392123fa09e5b5aeee3790a02caae6c30b393f"),
+    ("0x183aad75ace9db09fa0a81e50b1a14d819d691db", "0x528fa746490cfd386b3b4bf6a816d2f4edf8b238"),
+    ("0x191604871555ff22e6c5cdbc070a2eaf172d509c", "0x29bae0710f61da449740973b2e8d71b19a273662"),
+    ("0x19ed7aa1f4703b36aea5c271a17875e7d859e8b5", "0xfc1657a70675aae49b7006dcddde1bd587a74ed3"),
+    ("0x1cff548f3113b5bdb24ac3c44f840e2370bb8879", "0xc918da270c3c622667fab615be522584e13725a9"),
+    ("0x230ef75e0efb375651aa939af3790be04da2767e", "0x37d54d7ff64cda9ce1d9d09c53bdf1a4b79335ff"),
+    ("0x28d7811852ef467ff2da46381c04f9ecd5a474d6", "0x41d04347a7e77f0bb866230117c8cb893dde5186"),
+    ("0x2a0c8d39d0ef02938fe09bc073b3e270a773118e", "0xbba8bea14c4d290b059e3c50f13aa430a4cbe6d5"),
+    ("0x347980bc51029c1fc8bd6f593dd634c5f9b8dfd5", "0x18d15db1a0a4f6d000124de22e426aebb807db83"),
+    ("0x389408e717d814bd25d0e6079301e538e1ba06c9", "0x60d86d417ab515afc35119563186aaef19a21995"),
+    ("0x39383382c74b3249c7201576f8c4f8af24e1e251", "0x8590a4432730aa2f6d82cef7491bbf80313c1acf"),
+    ("0x395fa04462d4552a28696648bdfea643f2c21ecd", "0xc2de632f2322262f3ea3e2cb599bdcc66e926b59"),
+    ("0x3a96fafb738ecaf738f71dcadafd34862c5647e8", "0x4ad0aa6ab7ec917a3745e1148fcedf5c55a8afe0"),
+    ("0x3eb9b9ac1c93697ac63d14f899c73d9fb0352f27", "0x6614089a8b690f0b8d51f34716fed0aabde94433"),
+    ("0x433257d1cd9e84f40591db9f09d38d9cc7f43024", "0xbd87707c7384aca4070e9ba3ebbf6edb156ebef1"),
+    ("0x49cc50af254f645afb3a9b8bfc24dad890c38527", "0xb09718fcc29efd31c184d573dae1ac4d3e8ddb64"),
+    ("0x4b915b54f55c1672a4038b09e0e80e402f84add0", "0xc3e4fb43e06b49d21730b5d061afbcf64a76d805"),
+    ("0x5c669c172b1d8336febbe28b60ba274abdf00366", "0x39068c0cde64e2c1211525692a7076acd62c56e6"),
+    ("0x5d1b255e235d7e8700962b358dabab278797039e", "0x224fb74cb1927cf37b325e2bee02f4a152b75fde"),
+    ("0x63b5a7b62e4eeaf1b5e7606b0125083454842a1e", "0xce8ecd762f6e55bfa0d407aabf3536f42ac03878"),
+    ("0x69da4a5fca427b25b64ada92c9858ac1e4be2255", "0xd307b07f195788a7023f4e1e40e216f76112236c"),
+    ("0x712f6f092b918c074b6d84dd6dd9a0c5fad06602", "0x1e5d409e37bf0ddfd9a0d3b40238c3c5d18ef8fc"),
+    ("0x729a6d3d85cedccdae54caffe3b1b64ad0dc355c", "0xe0efc2727709e14b23398dd95dffeb95832841af"),
+    ("0x78eb436655c7a5c46ad05135dbb9f8f203cbaa3a", "0xbed7147bec372a5d4250a9b769113a57c8cc2894"),
+    ("0x8a64b0a22866215c28aa4da9e3797ec3e7d8b26e", "0xfe58bf33346cb0f4dd1ce20868f60a104d3a3bd0"),
+    ("0x9b783d260a3f4ab98fed37a6c7a234eb8e02519d", "0x87e8add4fc24227a8437db167cf6660a0a8e6f1d"),
+    ("0x9e37f8f27ee912f8da6355d4eb79e5069d661670", "0x058822d5087501c685ecfa090be244e59f0d568c"),
+    ("0xa51bda953d430bb4c6ae135e03d51c94ef7d1744", "0xddfa070018382d1b55ffab424c70652226151166"),
+    ("0xa5837eb75532c3431eb09d13c82d314a8cccba72", "0x34db5db28208adc35a4e737cfbb5470e0afeadca"),
+    ("0xa6d659e8713b8639819d05a818581c0a16078351", "0x270aea068f4f89c755a82da6d13ce017b35d5101"),
+    ("0xb1be6c5fa8838e8b13bfdf6e569f44d3af45b40d", "0x407c9ed3ebe9befc5d3444f88aead820037f1ec6"),
+    ("0xb277d7d64a2cfb6d8c6b7e43a89b24556866463e", "0xaf2f442494ceed36da123da73da49516851babed"),
+    ("0xb7ab37aec527485b966cd02bf71897288f5400d3", "0x5e49b3123c399a49112b595a58a8c1e0ea17f9de"),
+    ("0xbc4845a6842c2f005d682ed3996c2ac2e2ada9e3", "0xd81d11de4b856fb4b967577e241cc95399f4db8e"),
+    ("0xbcd80ed12ea8d9d19ceedc9cfa2475b763a6bc56", "0x7401b64a718ecfd45ba1cc9feb766e241c3f1a9d"),
+    ("0xc19b31e47a83668ea29789bdcfa3fe7a0a5bfc3e", "0xb0394fd4ec89bb795b507dc869b2b79682a414d1"),
+    ("0xc8a8c20da2fc8e46927c9030aa9d15786f89c97f", "0xc24e16a382ab27c8dbd97e77867f456b311caa60"),
+    ("0xc995b428548db80f9948f1cce7642fb97b0e5e64", "0x49545a37ebbf838e8e76d7b077f7d5cc07c50222"),
+    ("0xcc64d3cd2f9adb956ed1b323a2420644c78c4d10", "0x109e033f75da0a490988be46057b95cdbac51fde"),
+    ("0xcd2aab3c77a94a3d7f78f02989097c15125741d1", "0xdaaa8f3ca0b2080ee0ecc95eeef54bdcc2d05472"),
+    ("0xd7fdd2c93f7379b0d92d997a3a74169f0fd56a66", "0xf13f1ecef332e9fb1445408165aa65a13243de84"),
+    ("0xd860a8c21bc3e9915df7e9fe3b72cfd953d5a483", "0x94f0ac15bcdc1e19f6066db203e0ec526003a095"),
+    ("0xe60aa8a8d02b5ac2084aeafb980f972f5e2ec929", "0xfcc6b784e6330c021faaac4a8c03086b3d43cf77"),
+    ("0xe99a050fd8f2c5d5bb70da5e67f4a5c5b4af8fdd", "0x0486f7b588898a763d4832cc56e6a2f27b3c849d"),
+    ("0xf07e5a7ab86715e438d89019b28002b41c4f7833", "0x811827927e11c233566606bc6978c4b54774145d"),
+]
+
+CLUSTERS = {
+    "main": {
+        "cluster_id": "0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78",
+        "role": "MAIN",
+        "n_tokens_total": 1641,
+        "from_block": 24_592_957,
+        "to_block": 34_788_433,
+        "deployer_addresses": {
+            "0x072e4e8a0e3463b00bf93f69a34db4874030819c", "0x0cfaa33eb4e786fca04b55e717ea9bdb291c62c6",
+            "0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78", "0x36cf37c0bdf51299a59c376790a360b2db66fdc0",
+            "0x38f4fa33cf8292c3671f3bab1aa4d2cfff14f108", "0x39296166c0dcc770f30745dd2253c9b73dc1ec4a",
+            "0x9361c7533216ca1d5ebe22a6b89351beb94a0357", "0x9e8477412ba258e0aff78b1a8590b1926dd92931",
+            "0xc14a2637f27ca988633d58154cf4b35389f86700", "0xeaee48a727cd34a3b8c639bae643122e8900c8f2",
+            "0xff39c17ec51a3c94411012314c90d572c6077312",
+        },
+        "sample": MAIN_SAMPLE,
+    },
+    "control": {
+        "cluster_id": "0x376d633018680caa4ec3f3e735a2797abf7f9cb2",
+        "role": "CONTROL",
+        "n_tokens_total": 481,
+        "from_block": 27_311_849,
+        "to_block": 32_932_594,
+        "deployer_addresses": {
+            "0x376d633018680caa4ec3f3e735a2797abf7f9cb2", "0xa219966bd6217c06d13e5788386fed7e0ac77575",
+        },
+        "sample": CONTROL_SAMPLE,
+    },
+}
+
 
 def _verify_pair_token_is_weth() -> str | None:
-    """Один eth_call (symbol()) -- подтверждает допущение docstring п.2
-    вместо молчаливого предположения. Возвращает символ или None, если
-    вызов не удался (не блокирует остальной прогон -- допущение тогда
-    остаётся явно НЕподтверждённым в выводе)."""
+    """Один eth_call (symbol()) -- подтверждает допущение, что
+    PAIR_TOKEN == WETH, вместо молчаливого предположения. Общий для
+    обоих кластеров (тот же pair_token у всех 39680 V1-запусков)."""
     try:
-        # symbol() selector = 0x95d89b41, без аргументов
         result = _rpc_call("eth_call", [{"to": PAIR_TOKEN, "data": "0x95d89b41"}, "latest"])
         raw = bytes.fromhex(result[2:])
-        # ABI-декодирование string: offset(32) + length(32) + data
         length = int.from_bytes(raw[32:64], "big")
         return raw[64 : 64 + length].decode("utf-8", errors="replace")
-    except Exception as e:  # noqa: BLE001 -- диагностика, не критично для остального прогона
+    except Exception as e:  # noqa: BLE001 -- диагностика, не критично
         print(f"[sc1_wash_slice] symbol() на pair_token не удался (не блокирует прогон): {e}")
         return None
 
 
 def _decode_swap_data(data_hex: str) -> tuple[int, int]:
-    """int256 amount0, int256 amount1 -- первые два 32-байтовых слова
-    non-indexed данных Swap(...). Остальные поля (sqrtPriceX96,
-    liquidity, tick) не нужны для объёма -- не декодируются."""
     raw = bytes.fromhex(data_hex[2:])
+
     def to_signed(word: bytes) -> int:
         v = int.from_bytes(word, "big")
         return v - (1 << 256) if v >= (1 << 255) else v
-    amount0 = to_signed(raw[0:32])
-    amount1 = to_signed(raw[32:64])
-    return amount0, amount1
+
+    return to_signed(raw[0:32]), to_signed(raw[32:64])
 
 
 def _fetch_logs_chunked(addresses: list[str], from_block: int, to_block: int, chunk_size: int = 2000):
-    """Тонкая обёртка над `alchemy_fallback._chunked_get_logs` (общий
-    путь с P3-гардом -- ретрай на 429 + фолбэк на Alchemy/Blockscout
-    при стойкой ошибке, см. docs/P3_GUARD.md, "Проба публичного RPC...").
-    Раньше здесь была отдельная дублирующая реализация без фолбэка --
-    убрана в пользу переиспользования (владелец, 2026-09-01: "публичный
-    RPC как основной источник, ключевые пути фолбэком"). Счётчик вызовов
-    через `on_call` -- для проверки постфактум оценки в докстринге
-    модуля (5000-10000)."""
+    """Тонкая обёртка над общим `alchemy_fallback._chunked_get_logs`
+    (ретрай на 429 + фолбэк на Alchemy/Blockscout при стойкой ошибке)."""
     n_calls = 0
 
     def _count(lo: int, hi: int, n_results: int) -> None:
@@ -253,80 +267,118 @@ def _fetch_logs_chunked(addresses: list[str], from_block: int, to_block: int, ch
         from_block, to_block, [topic0(UNISWAP_V3_SWAP_SIG)],
         chunk_size=chunk_size, address=addresses, on_call=_count,
     )
-    print(f"[sc1_wash_slice] фактическое число вызовов eth_getLogs: {n_calls} "
-          f"(оценка в докстрине: 5000-10000)")
+    print(f"[sc1_wash_slice] фактическое число вызовов eth_getLogs: {n_calls}")
 
 
-def run() -> int:
-    token_by_pool = {pool.lower(): token.lower() for token, pool in TOP20_TOKEN_POOL}
+def run_cluster(key: str, spec: dict) -> dict:
+    cluster_id = spec["cluster_id"]
+    sample = spec["sample"]
+    token_by_pool = {pool.lower(): token.lower() for token, pool in sample}
     addresses = list(token_by_pool.keys())
+    deployer_set = {a.lower() for a in spec["deployer_addresses"]}
 
-    symbol = _verify_pair_token_is_weth()
-    print(f"[sc1_wash_slice] pair_token {PAIR_TOKEN} symbol() = {symbol!r} "
-          f"({'подтверждено WETH' if symbol and symbol.upper() in ('WETH','ETH') else 'НЕ подтверждено как WETH -- см. докстринг п.2, цифры ниже условны'})")
+    print(f"\n[sc1_wash_slice] === {spec['role']} {cluster_id} "
+          f"(выборка {len(sample)} из {spec['n_tokens_total']}) ===")
 
-    # wallet -> {pool: volume_usd}, чтобы посчитать и "в скольких разных
-    # токенах кластера участвовал", и объём одним проходом.
     wallet_pool_volume: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    token_buyers: dict[str, set[str]] = defaultdict(set)  # pool -> set(wallet), для медианы внешних покупателей
     total_volume_usd = 0.0
     n_logs = 0
 
-    for log in _fetch_logs_chunked(addresses, FROM_BLOCK, TO_BLOCK):
+    for log in _fetch_logs_chunked(addresses, spec["from_block"], spec["to_block"]):
         n_logs += 1
         pool = log["address"].lower()
         token = token_by_pool.get(pool)
         if token is None:
             continue
-        recipient = "0x" + log["topics"][2][-40:]  # topics[2] = recipient (indexed), см. докстринг п.1
+        recipient = "0x" + log["topics"][2][-40:]
         amount0, amount1 = _decode_swap_data(log["data"])
-
-        # token0/token1 по адресной сортировке (см. докстринг п.3) --
-        # WETH-нога всегда одна и та же сторона для КОНКРЕТНОГО пула,
-        # определяется сравнением token vs PAIR_TOKEN как целых чисел.
         weth_is_token0 = int(PAIR_TOKEN, 16) < int(token, 16)
         weth_amount_wei = amount0 if weth_is_token0 else amount1
         volume_usd = abs(weth_amount_wei) / 1e18 * ETH_USD_PRICE
 
         wallet_pool_volume[recipient][pool] += volume_usd
         total_volume_usd += volume_usd
+        token_buyers[pool].add(recipient)
 
     n_wallets = len(wallet_pool_volume)
+
+    # Метрика 1 (пре-регистрация): доля объёма кошельков-повторников
+    # (>=5 РАЗНЫХ токенов -- в пределах ЭТОЙ выборки, см. докстринг).
     repeat_wallets_volume = 0.0
     n_repeat_wallets = 0
     for wallet, pools in wallet_pool_volume.items():
         if len(pools) >= 5:
             n_repeat_wallets += 1
             repeat_wallets_volume += sum(pools.values())
-
-    share = (repeat_wallets_volume / total_volume_usd) if total_volume_usd > 0 else float("nan")
-    if share > KILL_THRESHOLD:
+    share_repeat = (repeat_wallets_volume / total_volume_usd) if total_volume_usd > 0 else float("nan")
+    if share_repeat > KILL_THRESHOLD:
         verdict = "KILL"
-    elif share < MAIN_LINE_THRESHOLD:
+    elif share_repeat < MAIN_LINE_THRESHOLD:
         verdict = "главная линия"
     else:
-        verdict = "второй кластер (неоднозначно, нужна сверка)"
+        verdict = "третий кластер (неоднозначно, нужна сверка ещё на одном)"
+
+    # Метрика 2: доля объёма у топ-3 адресов (по объёму, независимо от >=5 порога).
+    wallet_totals = {w: sum(pools.values()) for w, pools in wallet_pool_volume.items()}
+    top3_volume = sum(sorted(wallet_totals.values(), reverse=True)[:3])
+    share_top3 = (top3_volume / total_volume_usd) if total_volume_usd > 0 else float("nan")
+
+    # Метрика 3: медиана числа ВНЕШНИХ покупателей на токен (покупатель
+    # != адрес-деплоер этого кластера, тот же принцип, что паспорт SC1
+    # Шаг 3).
+    external_buyers_per_token = []
+    for pool in addresses:
+        buyers = token_buyers.get(pool, set())
+        external = buyers - deployer_set
+        external_buyers_per_token.append(len(external))
+    external_buyers_per_token.sort()
+    n = len(external_buyers_per_token)
+    median_external_buyers = (
+        external_buyers_per_token[n // 2] if n % 2 == 1
+        else (external_buyers_per_token[n // 2 - 1] + external_buyers_per_token[n // 2]) / 2
+    )
 
     result = {
-        "cluster_id": CLUSTER_ID,
-        "scope": "топ-20 токенов по объёму (~3.7% объёма всего кластера, см. докстринг)",
-        "from_block": FROM_BLOCK,
-        "to_block": TO_BLOCK,
-        "pair_token_symbol_verified": symbol,
+        "cluster_id": cluster_id,
+        "role": spec["role"],
+        "n_tokens_in_sample": len(sample),
+        "n_tokens_total_in_cluster": spec["n_tokens_total"],
+        "from_block": spec["from_block"],
+        "to_block": spec["to_block"],
         "n_logs": n_logs,
-        "n_unique_wallets": n_wallets,
-        "n_repeat_wallets_ge5_tokens": n_repeat_wallets,
         "total_volume_usd": total_volume_usd,
+        "n_unique_wallets": n_wallets,
+        "n_repeat_wallets_ge5_tokens_in_sample": n_repeat_wallets,
         "repeat_wallets_volume_usd": repeat_wallets_volume,
-        "share_volume_from_repeat_wallets": share,
+        "share_volume_from_repeat_wallets": share_repeat,
         "kill_threshold": KILL_THRESHOLD,
         "main_line_threshold": MAIN_LINE_THRESHOLD,
         "verdict": verdict,
+        "share_volume_top3_wallets": share_top3,
+        "median_external_buyers_per_token": median_external_buyers,
     }
     print(json.dumps(result, indent=2, default=str))
+    return result
 
+
+def run() -> int:
+    symbol = _verify_pair_token_is_weth()
+    print(f"[sc1_wash_slice] pair_token {PAIR_TOKEN} symbol() = {symbol!r} "
+          f"({'подтверждено WETH' if symbol and symbol.upper() in ('WETH', 'ETH') else 'НЕ подтверждено как WETH'})")
+
+    results = {}
+    for key, spec in CLUSTERS.items():
+        results[key] = run_cluster(key, spec)
+
+    out = {
+        "pair_token_symbol_verified": symbol,
+        "random_seed": RANDOM_SEED,
+        "clusters": results,
+    }
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(result, indent=2, default=str))
-    print(f"[sc1_wash_slice] записано {OUT_PATH} (только агрегаты, без построчных кошельков/логов)")
+    OUT_PATH.write_text(json.dumps(out, indent=2, default=str))
+    print(f"\n[sc1_wash_slice] записано {OUT_PATH} (только агрегаты)")
     return 0
 
 
