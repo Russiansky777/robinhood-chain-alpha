@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Iterator
 
 import requests
-from web3 import Web3
+from Crypto.Hash import keccak
 
 from config import CONFIG
 
@@ -34,7 +34,15 @@ UNISWAP_V4_INITIALIZE_SIG = "Initialize(bytes32,address,address,uint24,int24,add
 
 
 def topic0(signature: str) -> str:
-    return Web3.keccak(text=signature).hex()
+    # pycryptodome (уже в requirements.txt для Sprint G1/R1, см.
+    # analysis/g1_common.py, analysis/r1_common.py) -- не web3.py, чтобы
+    # не тащить новую тяжёлую зависимость ради одной функции; исходно
+    # здесь стоял Web3.keccak (заготовка ни разу не запускалась, web3
+    # не был установлен и не был в requirements.txt -- баг, найден и
+    # исправлен при подготовке P3-гарда, 2026-09-01).
+    h = keccak.new(digest_bits=256)
+    h.update(signature.encode())
+    return "0x" + h.hexdigest()
 
 
 def _rpc_url() -> str:
@@ -48,27 +56,71 @@ def _rpc_url() -> str:
     )
 
 
+def _rpc_call(method: str, params: list) -> dict:
+    """Единичный JSON-RPC вызов (не для eth_getLogs -- см. _chunked_get_logs
+    для постраничной версии). Используется P3-гардом (analysis/
+    p3_dislocation_guard.py) для eth_blockNumber/eth_getBlockByNumber/
+    eth_getTransactionByHash -- лёгкие точечные вызовы, не диапазон блоков."""
+    url = _rpc_url()
+    resp = requests.post(
+        url,
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    if "error" in body:
+        raise RuntimeError(f"Alchemy {method} error: {body['error']}")
+    return body["result"]
+
+
+def get_block_number() -> int:
+    return int(_rpc_call("eth_blockNumber", []), 16)
+
+
+def get_block(block_number: int) -> dict:
+    return _rpc_call("eth_getBlockByNumber", [hex(block_number), False])
+
+
+def get_transaction(tx_hash: str) -> dict:
+    return _rpc_call("eth_getTransactionByHash", [tx_hash])
+
+
 def _chunked_get_logs(
-    from_block: int, to_block: int, topics: list[str], chunk_size: int = 2000
+    from_block: int,
+    to_block: int,
+    topics: list,
+    chunk_size: int = 2000,
+    address: str | list[str] | None = None,
 ) -> Iterator[dict]:
     """eth_getLogs постранично, чтобы не упереться в лимит провайдера на
     диапазон блоков за запрос. Возвращает сырые логи по одному.
+
+    `topics` — либо плоский список topic0[,topic1,...] (как раньше,
+    обратная совместимость), либо уже готовый список позиций топиков
+    (каждая позиция — строка или список строк/None для OR/wildcard) --
+    передаётся в payload как есть, если элемент сам является списком.
+    `address` — опциональный фильтр по адресу контракта (одна строка
+    или список строк), см. Sprint P3-гард (analysis/
+    p3_dislocation_guard.py) — сужает диапазон без знания topic1/2
+    заранее, дешевле для широких по времени, но узких по адресу сканов.
     """
     url = _rpc_url()
     block = from_block
     while block <= to_block:
         end = min(block + chunk_size - 1, to_block)
+        filter_obj: dict = {
+            "fromBlock": hex(block),
+            "toBlock": hex(end),
+            "topics": topics,
+        }
+        if address is not None:
+            filter_obj["address"] = address
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "eth_getLogs",
-            "params": [
-                {
-                    "fromBlock": hex(block),
-                    "toBlock": hex(end),
-                    "topics": [topics],
-                }
-            ],
+            "params": [filter_obj],
         }
         resp = requests.post(url, json=payload, timeout=30)
         resp.raise_for_status()

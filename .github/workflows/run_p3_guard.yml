@@ -1,0 +1,54 @@
+name: Run P3 dislocation guard (v3<->v4, без Dune)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Какую стадию запустить"
+        required: true
+        default: "discover"
+        type: choice
+        options:
+          - discover
+          - guard
+
+jobs:
+  run-p3-guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      # Без Dune -- обычный исходящий интернет GH Actions runner'а к
+      # Alchemy RPC (недоступен из интерактивной песочницы агента, см.
+      # docs/P3_GUARD.md, "Ограничение среды"). Тот же паттерн, что
+      # analysis/r1_feed_match.py в Sprint R1.
+      - name: Discover (узкий срез 1 день, chain-wide, калибровка x2.5)
+        if: ${{ github.event.inputs.stage == 'discover' }}
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python analysis/p3_dislocation_guard.py --stage discover
+
+      - name: Guard (полный прогон, 7 дней, вердикт >80%)
+        if: ${{ github.event.inputs.stage == 'guard' }}
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python analysis/p3_dislocation_guard.py --stage guard
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -d data/p3_guard_cache ]; then git add data/p3_guard_cache/; fi
+          git diff --cached --quiet || git commit -m "P3 guard: результат стадии ${{ github.event.inputs.stage }} [automated]"
+          git push
