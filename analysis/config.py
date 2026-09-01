@@ -188,8 +188,11 @@ class Config:
 
     # Бюджет спринта -- отдельное пространство credit_guard.py
     # (namespace "sprintR1"). Смета: разведка <=15, смоук <=15, полный
-    # <=50, резерв 20, кап 100 (владелец, п.3).
-    r1_credit_budget: float = field(default_factory=lambda: _float("R1_CREDIT_BUDGET", 100.0))
+    # <=50, резерв 20, исходный кап 100 (владелец, п.3).
+    # Владелец, 2026-09-01: кап поднят 100 -> 180 после инцидента wk07
+    # (см. docs/R1_DESIGN.md, "Шаг 3: инцидент wk07") -- первый из двух
+    # подъёмов, разрешённых паспортом спринта.
+    r1_credit_budget: float = field(default_factory=lambda: _float("R1_CREDIT_BUDGET", 180.0))
     r1_step1_budget: float = 15.0
     r1_step2_budget: float = 15.0
     r1_step3_budget: float = 50.0
