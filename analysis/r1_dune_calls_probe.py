@@ -22,6 +22,7 @@ from dune_client import DuneClient
 from run_pipeline import read_sql
 
 PROBE_SQL = read_sql("r1/r1_decimals_description_probe")
+COLUMNS_PROBE_SQL = read_sql("r1/r1_calls_columns_probe")
 
 
 def main() -> int:
@@ -32,14 +33,32 @@ def main() -> int:
         "r1_decimals_description_probe", PROBE_SQL, query_id=qid, estimated_credits=3.0,
         expected_max_rows=500, expected_columns=2,
     )
-    if df is not None and len(df):
-        print(df.to_string(max_rows=500))
-        print(f"\n[r1_dune_calls_probe] Найдено {len(df)} таблиц-кандидатов -- "
-              f"смотрим глазами, есть ли decimals/description среди decoded calls.")
-    else:
+    if df is None or not len(df):
         print("[r1_dune_calls_probe] Пусто -- Dune НЕ декодировал вызовы decimals()/"
               "description() на chainlink_robinhood. Нужен RPC-путь (Alchemy ключ "
               "не настроен -- см. run #14) либо инференс decimals по правдоподобию цены.")
+        return 0
+
+    print(df.to_string(max_rows=500))
+    hit = df["table_name"].isin(["dualaggregator_call_decimals", "dualaggregator_call_description"])
+    print(f"\n[r1_dune_calls_probe] Найдено {len(df)} таблиц-кандидатов, из них "
+          f"decimals/description-совпадений: {hit.sum()}.")
+    if not hit.any():
+        return 0
+
+    # run #16: dualaggregator_call_decimals и dualaggregator_call_description
+    # НАЙДЕНЫ -- закрывают decimals-вопрос и token<->feed сопоставление БЕЗ
+    # RPC. Колонки перед платным запросом агрегатов по ним.
+    print("\n===== r1_calls_columns_probe (оценка 3.0) =====")
+    qid2 = client.create_query("r1_calls_columns_probe", COLUMNS_PROBE_SQL)
+    df2 = client.run_sql_cached(
+        "r1_calls_columns_probe", COLUMNS_PROBE_SQL, query_id=qid2, estimated_credits=3.0,
+        expected_max_rows=40, expected_columns=5,
+    )
+    if df2 is not None and len(df2):
+        print(df2.to_string(max_rows=40))
+    else:
+        print("(пусто)")
     return 0
 
 
