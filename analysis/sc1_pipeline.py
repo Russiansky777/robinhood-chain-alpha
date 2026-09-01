@@ -24,7 +24,7 @@ CACHE_DIR = Path("data/sprintSC1_cache")
 AUGUST_LAUNCHES_PATH = CACHE_DIR / "sc1_august_launches_decoded.csv"
 
 TX_COLUMNS_SQL = read_sql("sc1/sc1_transactions_columns")
-LAUNCH_TX_GAS_SQL = read_sql("sc1/sc1_v1_launch_tx_gas")
+LAUNCH_TX_GAS_AGG_SQL = read_sql("sc1/sc1_v1_launch_tx_gas_agg")
 
 
 def sc1_spent() -> float:
@@ -44,43 +44,37 @@ def stage_cluster(client: DuneClient) -> int:
     else:
         print("(пусто)")
 
-    # Осторожность: не гнать следующий (более дорогой, 8.0) запрос
-    # вслепую, пока не увидели РЕАЛЬНЫЕ имена колонок transactions
-    # выше (sc1_v1_launch_tx_gas.sql писался по предположению) -- имена
-    # столбцов Dune не всегда совпадают с очевидными ("from"/"to" могут
-    # быть по-другому). Останавливаемся здесь на этом прогоне; imя
-    # колонок подтверждаются в SQL следующим коммитом перед запуском.
-    if os.environ.get("SC1_SKIP_GAS_QUERY") == "1":
-        print("\n[sc1_pipeline] SC1_SKIP_GAS_QUERY=1 -- останавливаюсь после колонок "
-              "для проверки имён перед платным запросом.")
-        return 0
-
-    print("\n===== sc1_v1_launch_tx_gas (оценка 8.0) =====")
-    qid2 = client.create_query("sc1_v1_launch_tx_gas", LAUNCH_TX_GAS_SQL)
+    # run #6/#7: построчное чтение ~39680 строк x 7 колонок стоило бы
+    # ~11.2 кредита чтения -- гард отказал ДО оплаты (правильно; execute
+    # уже был оплачен -- 0.70, урок учтён). Владелец сам предусмотрел
+    # такой случай (§1 Шаг1: "выборка/агрегат, если трейсы дороги") --
+    # агрегат на стороне Dune вместо построчного чтения.
+    print("\n===== sc1_v1_launch_tx_gas_agg (оценка 3.0, агрегат вместо построчного чтения) =====")
+    qid2 = client.create_query("sc1_v1_launch_tx_gas_agg", LAUNCH_TX_GAS_AGG_SQL)
     df2 = client.run_sql_cached(
-        "sc1_v1_launch_tx_gas", LAUNCH_TX_GAS_SQL, query_id=qid2, estimated_credits=8.0,
-        expected_max_rows=45_000, expected_columns=7,
+        "sc1_v1_launch_tx_gas_agg", LAUNCH_TX_GAS_AGG_SQL, query_id=qid2, estimated_credits=3.0,
+        expected_max_rows=2, expected_columns=10,
     )
     if df2 is None or not len(df2):
         print("[sc1_pipeline] ПУСТО -- нет транзакций к фабрике в окне. Стоп.")
         return 1
 
-    print(f"[sc1_pipeline] Транзакций к PonsLaunchFactory V1 в окне: {len(df2)} "
-          f"(ожидали ~39680, если что-то ещё шло в этот контракт помимо launch()).")
-    n_nonzero_value = (df2["value"].astype(float) > 0).sum()
-    print(f"[sc1_pipeline] launchFee: {n_nonzero_value} из {len(df2)} транзакций с value > 0 "
-          f"({'launchFee, похоже, НЕНУЛЕВОЙ' if n_nonzero_value > 0 else 'launchFee = 0 у всех проверенных'}).")
-    if n_nonzero_value > 0:
-        nz = df2[df2["value"].astype(float) > 0]["value"].astype(float)
-        print(f"  value (native) при ненулевых: min={nz.min()}, median={nz.median()}, max={nz.max()}")
-    print(f"[sc1_pipeline] gas_used: median={df2['gas_used'].median()}, "
-          f"mean={df2['gas_used'].mean():.1f}, min={df2['gas_used'].min()}, max={df2['gas_used'].max()}")
+    row = df2.iloc[0]
+    print(f"[sc1_pipeline] Транзакций к PonsLaunchFactory V1 в окне: {row['n_tx']} "
+          f"успешных={row['n_success']} (ожидали ~39680 успешных).")
+    print(f"[sc1_pipeline] launchFee: {row['n_nonzero_value']} из {row['n_success']} успешных транзакций "
+          f"с value > 0 ({'НЕНУЛЕВОЙ' if row['n_nonzero_value'] else '= 0 у всех'}).")
+    if row["n_nonzero_value"]:
+        print(f"  value (native) при ненулевых: median={row['value_median_when_nonzero']}, "
+              f"max={row['value_max']}")
+    print(f"[sc1_pipeline] gas_used: median={row['gas_used_median']}, mean={row['gas_used_mean']:.1f}, "
+          f"min={row['gas_used_min']}, max={row['gas_used_max']}")
     print(f"[sc1_pipeline] gas_price ФАКТИЧЕСКИЙ (в период вейвера, НЕ пост-вейверная цена -- "
-          f"критерий требует другую): median={df2['gas_price'].median()}")
+          f"критерий требует другую, см. далее): median={row['gas_price_median']}")
 
-    out_file = CACHE_DIR / "sc1_v1_launch_tx_gas_merged.csv"
+    out_file = CACHE_DIR / "sc1_v1_launch_tx_gas_agg.csv"
     df2.to_csv(out_file, index=False)
-    client._commit_permanent(out_file, f"sprintSC1_cache: gas/value по транзакциям launch() V1 [automated]")
+    client._commit_permanent(out_file, f"sprintSC1_cache: агрегат gas/value по транзакциям launch() V1 [automated]")
     print(f"[sc1_pipeline] Записано: {out_file}")
 
     remaining = 20.0 - sc1_spent()
