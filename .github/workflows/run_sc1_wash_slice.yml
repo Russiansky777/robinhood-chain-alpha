@@ -1,0 +1,46 @@
+name: Run SC1 wash-trading slice (RPC, без Dune)
+
+# Подключён к ТОМУ ЖЕ маркеру, что P3 (data/p3_guard_cache/STAGE_REQUEST),
+# по просьбе владельца ("стартует при появлении ALCHEMY_API_KEY или
+# BLOCKSCOUT_API_KEY") -- ОТДЕЛЬНЫЙ файл от run_p3_guard.yml, P3 не
+# тронут. Оба workflow сработают на один и тот же push маркера;
+# каждый скрипт сам проверяет наличие ключа и корректно докладывает
+# его отсутствие (тот же паттерн, что уже у P3), а не падает тихо.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p3_guard_cache/STAGE_REQUEST"
+
+jobs:
+  run-sc1-wash-slice:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Wash-slice (кластер 0x0eaced..., топ-20 токенов, eth_getLogs)
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: python analysis/sc1_wash_slice.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f data/p3_guard_cache/sc1_wash_slice_result.json ]; then git add data/p3_guard_cache/sc1_wash_slice_result.json; fi
+          git diff --cached --quiet || git commit -m "SC1: результат wash-slice кластера 0x0eaced... [automated]"
+          git push
