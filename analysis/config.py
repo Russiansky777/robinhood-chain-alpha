@@ -93,5 +93,40 @@ class Config:
     results_doc: str = "docs/RESULTS.md"
     report_template: str = "analysis/report_template.md"
 
+    # --- Sprint G1: ретро-тест graduation-momentum (см. docs/G1_DESIGN.md) ---
+    # Пре-регистрировано 2026-09-01, §2 заморожен -- значения ниже НЕ
+    # менять после коммита Шага 0, кроме дат периода (уточняются на
+    # Шаге 1 по факту метаданных покрытия Dune, см. g1_period_end_note).
+    g1_launchpad: str = "pons.family"
+    g1_chain_id: int = 4663
+    g1_period_start: str = "2026-07-01"     # или дата первой градуации, если позже (§2.1)
+    g1_period_end: str = field(default_factory=lambda: os.environ.get("G1_PERIOD_END", ""))  # заполняется на Шаге 1
+    g1_min_n_events: int = 200               # §2.1/2.7: N < 200 -> UNDERPOWERED
+    g1_pre_window_buy_usd_min: float = 250.0  # §2.2
+    g1_pre_window_trades_min: int = 3         # §2.2
+    g1_entry_window_start_s: int = 30         # §2.3: (t0+30s; t0+90s]
+    g1_entry_window_end_s: int = 90
+    g1_horizons_s: tuple[int, ...] = (30, 60, 120, 300, 900, 1800, 3600, 14400, 43200, 86400)  # §2.3
+    g1_exit_delta_min_s: int = 30             # δ = max(30s, 0.1*h), §2.3
+    g1_exit_delta_frac: float = 0.1
+    g1_cost_scenarios: tuple[float, ...] = (0.01, 0.03, 0.05)  # §2.4, базовый = 0.03
+    g1_cost_scenario_base: float = 0.03
+    g1_bh_alpha: float = 0.05                 # §2.6
+    g1_bootstrap_n: int = 10_000              # §2.6
+    g1_trimmed_mean_pct: float = 0.05         # §2.6, 5%-усечённое среднее
+    g1_go_min_median_pct: float = 0.02        # §2.7: GO требует медиану >= +2%
+    g1_go_min_horizon_s: int = 60             # §2.7: h* >= 1 мин
+    g1_excluded_events_max_share: float = 0.30  # §2.3: >30% без entry-сделок -> ограничение выборки
+
+    # Бюджет спринта -- отдельное пространство в credit_guard.py
+    # (namespace "sprintG1"), НЕ смешивается со Sprint 1.5. Смета по
+    # этапам -- разведка ≤20, смоук ≤30, полный прогон ≤200, резерв 50.
+    g1_credit_budget: float = field(default_factory=lambda: _float("G1_CREDIT_BUDGET", 300.0))
+    g1_step1_budget: float = 20.0
+    g1_step2_budget: float = 30.0
+    g1_step3_budget: float = 200.0
+    g1_cache_dir: str = "data/sprintG1_cache"
+    g1_design_doc: str = "docs/G1_DESIGN.md"
+
 
 CONFIG = Config()

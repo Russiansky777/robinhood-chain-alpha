@@ -1,10 +1,21 @@
 """Персистентный бюджетный гард поверх Dune API (см. docs/COST_POSTMORTEM.md).
 
 data/credits_spent.json -- единственный источник правды о том, сколько
-потрачено в этом биллинг-цикле и сколько из бюджета Sprint 1.5 (лимит
-живёт в самом файле, `sprint15.budget_remaining_at_init` -- поднят с
-150 до 210 после инцидента с 03c, см. docs/COST_POSTMORTEM.md,
-ревизия 3) уже израсходовано.
+потрачено в этом биллинг-цикле (`billing_cycle`, общий на все спринты)
+и сколько из бюджета ТЕКУЩЕГО спринта уже израсходовано. Начиная с
+ревизии 5 (Sprint G1) файл держит НЕСКОЛЬКО независимых бюджетных
+"пространств" верхнего уровня -- одно на спринт (`sprint15`, `sprintG1`,
+...), каждое со своим `budget_remaining_at_init`/`spent`, но с ОБЩИМ
+`billing_cycle` (внешняя граница биллинг-цикла Dune едина на аккаунт).
+Какое пространство использует текущий процесс, определяет переменная
+окружения CREDIT_GUARD_NAMESPACE (по умолчанию "sprint15" -- для
+обратной совместимости со старыми скриптами Sprint 1.5). Новый спринт
+должен явно установить её ДО первого вызова гарда (см.
+analysis/sprint_g1.py) и явно инициализировать своё пространство в
+data/credits_spent.json (см. docs/G1_DESIGN.md, Шаг 0) -- гард не
+создаёт пространство сам молча, чтобы бюджет каждого спринта был
+результатом явного решения, а не дефолта.
+
 Коммитится в git СРАЗУ после каждого execute с известной фактической
 стоимостью -- не в конце прогона -- чтобы переживать краш/таймаут
 посреди работы (см. пост-мортем: run #11 запустил ~100-кредитный
@@ -23,6 +34,7 @@ execute(). Проверка "потрачено + оценка <= лимит" п
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +42,15 @@ from pathlib import Path
 CREDITS_FILE = Path("data/credits_spent.json")
 
 DEFAULT_ESTIMATE = 110.0  # см. docstring: наихудший реально замеренный запрос + запас
+
+NAMESPACE_ENV = "CREDIT_GUARD_NAMESPACE"
+
+
+def namespace() -> str:
+    """Текущее бюджетное пространство -- см. docstring модуля. Читается
+    заново при каждом вызове (не кэшируется), чтобы скрипт мог
+    установить os.environ[NAMESPACE_ENV] до первого обращения к гарду."""
+    return os.environ.get(NAMESPACE_ENV, "sprint15")
 
 # ---------- Санитарная проверка запроса ДО execute (ревизия 3 гарда) ----------
 #
@@ -140,6 +161,22 @@ def _init_state() -> dict:
     }
 
 
+def ensure_namespace(ns: str, budget: float) -> None:
+    """Явно создаёт (или переинициализирует, если ещё не тратилось)
+    бюджетное пространство `ns` с лимитом `budget` -- часть Шага 0
+    пре-регистрации нового спринта (см. docstring модуля). Не трогает
+    `spent`, если пространство уже существует и в нём что-то потрачено
+    -- только budget_remaining_at_init можно скорректировать явным
+    вызовом (аналог поднятия лимита Sprint 1.5)."""
+    state = load_state()
+    if ns in state:
+        state[ns]["budget_remaining_at_init"] = budget
+    else:
+        state[ns] = {"budget_remaining_at_init": budget, "spent": 0.0}
+    _save(state)
+    print(f"[credit_guard] Пространство '{ns}' инициализировано: лимит {budget:.1f}, потрачено {state[ns]['spent']:.2f}.")
+
+
 def load_state() -> dict:
     if CREDITS_FILE.exists():
         try:
@@ -175,20 +212,36 @@ def _git_commit(message: str) -> None:
 
 def _check_before_operation(op_kind: str, name: str, estimate: float) -> None:
     state = load_state()
-    sprint15_spent = state["sprint15"]["spent"]
-    sprint15_budget = state["sprint15"]["budget_remaining_at_init"]
-    cycle_spent_so_far = state["billing_cycle"]["initialized_spent"] + sprint15_spent
+    ns = namespace()
+    if ns not in state:
+        print(
+            f"[credit_guard] СТОП: бюджетное пространство '{ns}' не инициализировано в "
+            f"{CREDITS_FILE} -- см. docstring модуля. Нужно явно создать "
+            f"state['{ns}'] = {{'budget_remaining_at_init': <лимит>, 'spent': 0.0}} ДО первого "
+            "вызова гарда (часть Шага 0 пре-регистрации). Ничего не исполнено/не прочитано."
+        )
+        raise BudgetGuardStop(1)
+    ns_spent = state[ns]["spent"]
+    ns_budget = state[ns]["budget_remaining_at_init"]
+    # Биллинг-цикл общий на ВСЕ пространства (sprint15 + sprintG1 + ...),
+    # не только текущее -- иначе новый спринт видел бы заниженный расход
+    # цикла и мог бы пробить его внешнюю границу, не заметив.
+    all_namespaces_spent = sum(
+        v["spent"] for k, v in state.items()
+        if k not in ("billing_cycle", "entries", "history") and isinstance(v, dict) and "spent" in v
+    )
+    cycle_spent_so_far = state["billing_cycle"]["initialized_spent"] + all_namespaces_spent
     cycle_limit = state["billing_cycle"]["external_limit"]
 
-    projected_sprint15 = sprint15_spent + estimate
+    projected_ns = ns_spent + estimate
     projected_cycle = cycle_spent_so_far + estimate
 
-    if projected_sprint15 > sprint15_budget:
+    if projected_ns > ns_budget:
         print(
             f"[credit_guard] СТОП: {op_kind} '{name}' (оценка {estimate:.1f} кредитов) "
-            f"превысил бы бюджет Sprint 1.5 на остаток: потрачено "
-            f"{sprint15_spent:.2f} + оценка {estimate:.1f} = {projected_sprint15:.2f} "
-            f"> лимит {sprint15_budget:.1f}.\nНичего не исполнено/не прочитано. Файл: {CREDITS_FILE}."
+            f"превысил бы бюджет '{ns}' на остаток: потрачено "
+            f"{ns_spent:.2f} + оценка {estimate:.1f} = {projected_ns:.2f} "
+            f"> лимит {ns_budget:.1f}.\nНичего не исполнено/не прочитано. Файл: {CREDITS_FILE}."
         )
         raise BudgetGuardStop(1)
     if projected_cycle > cycle_limit:
@@ -200,8 +253,8 @@ def _check_before_operation(op_kind: str, name: str, estimate: float) -> None:
         )
         raise BudgetGuardStop(1)
     print(
-        f"[credit_guard] OK: {op_kind} '{name}' оценка {estimate:.1f}; после -- Sprint1.5 "
-        f"{projected_sprint15:.2f}/{sprint15_budget:.1f}, цикл "
+        f"[credit_guard] OK: {op_kind} '{name}' оценка {estimate:.1f}; после -- '{ns}' "
+        f"{projected_ns:.2f}/{ns_budget:.1f}, цикл "
         f"{projected_cycle:.2f}/{cycle_limit:.1f}."
     )
 
@@ -225,10 +278,12 @@ def check_before_read(name: str, row_count: int, column_count: int) -> float:
 
 def _record(op_kind: str, name: str, credits: float, credits_known: bool, execution_id: str | None) -> None:
     state = load_state()
-    state["sprint15"]["spent"] = round(state["sprint15"]["spent"] + credits, 6)
+    ns = namespace()
+    state[ns]["spent"] = round(state[ns]["spent"] + credits, 6)
     state["entries"].append(
         {
             "op": op_kind,
+            "namespace": ns,
             "name": name,
             "execution_id": execution_id,
             "credits": credits,

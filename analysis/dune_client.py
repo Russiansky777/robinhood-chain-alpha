@@ -36,6 +36,7 @@ from credit_guard import (
     check_before_read,
     check_overrun_after_execute,
     check_sql_sanity,
+    namespace as credit_guard_namespace,
     record_execution,
     record_read,
     DEFAULT_ESTIMATE,
@@ -406,8 +407,12 @@ class DuneClient:
         # оплачиваться ПОВТОРНО в run #3 (уже успешно посчитан в run #2,
         # но эфемерный кэш умер вместе с проваленным джобом). Постоянный
         # файл в data/ переживает это безусловно, как и query_ids_recovered.json.
-        permanent_cache_file = Path("data/sprint15_cache") / f"{name}_{cache_key}.csv"
-        permanent_marker_file = Path("data/sprint15_cache") / f"{name}_{cache_key}.done"
+        # Директория по бюджетному пространству (см. credit_guard.py) --
+        # "sprint15" -> data/sprint15_cache/, "sprintG1" -> data/sprintG1_cache/,
+        # так каждый спринт получает свой постоянный кэш, не смешиваясь.
+        permanent_dir = Path(f"data/{credit_guard_namespace()}_cache")
+        permanent_cache_file = permanent_dir / f"{name}_{cache_key}.csv"
+        permanent_marker_file = permanent_dir / f"{name}_{cache_key}.done"
 
         if fetch_results and permanent_cache_file.exists() and not force_refresh:
             print(f"[dune] ПОСТОЯННЫЙ кэш-хит: {permanent_cache_file}")
@@ -464,7 +469,7 @@ class DuneClient:
             marker_file.write_text(execution_id)
             permanent_marker_file.parent.mkdir(parents=True, exist_ok=True)
             permanent_marker_file.write_text(execution_id)
-            self._commit_permanent(permanent_marker_file, f"sprint15_cache: материализован '{name}' [automated]")
+            self._commit_permanent(permanent_marker_file, f"{permanent_dir.name}: материализован '{name}' [automated]")
             record_execution(name, cost, execution_id)
             # Пост-хок "факт > вдвое оценки" (ревизия 3, см.
             # docs/COST_POSTMORTEM.md) -- ПОСЛЕ того, как результат уже
@@ -483,7 +488,7 @@ class DuneClient:
         df.to_csv(cache_file, index=False)
         permanent_cache_file.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(permanent_cache_file, index=False)
-        self._commit_permanent(permanent_cache_file, f"sprint15_cache: результат '{name}' ({len(df)} строк) [automated]")
+        self._commit_permanent(permanent_cache_file, f"{permanent_dir.name}: результат '{name}' ({len(df)} строк) [automated]")
         record_execution(name, cost, execution_id)
         check_overrun_after_execute(name, estimate_used, cost)
         return df
