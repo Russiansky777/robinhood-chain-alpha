@@ -11,6 +11,7 @@ on:
         options:
           - audit
           - recover_quote_full
+          - recover_full_extract
           - recon
           - verify
           - count
@@ -74,6 +75,16 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/recover_g1_v2_quote_distribution_full.py
+
+      # Run #20: g1_v2_full_extract УЖЕ оплачен (execute 34.230 кредита),
+      # >2x-гард с абсолютным минимумом 25 остановил пайплайн ДО чтения --
+      # то же восстановление, что recover_quote_full, но для 896x26.
+      - name: Recover already-paid g1_v2_full_extract result
+        if: ${{ github.event.inputs.step == 'recover_full_extract' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/recover_g1_v2_full_extract.py
 
       - name: Run recon (Step 1)
         if: ${{ github.event.inputs.step == 'recon' }}

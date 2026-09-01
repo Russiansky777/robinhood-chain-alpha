@@ -472,38 +472,67 @@ def categorize_quote_symbol(sym: str) -> str:
     return "прочее (вкл. сток-токены)"
 
 
-def render_quote_distribution_report(quote_df: pd.DataFrame) -> str:
-    """Владелец, п.5: распределение quote-активов по всем 896 событиям --
-    входной материал для следующей линии, не только контроль качества.
-    Строит и построчную таблицу (как есть по символам), и бакетную
-    сводку (WETH/ETH, стейблы, прочее -- вкл. сток-токены) с долями по
-    n_tokens (сколько РАЗНЫХ токенов торговалось против этого quote --
-    токен может считаться в нескольких, если торговался против >1)."""
-    if quote_df is None or len(quote_df) == 0:
+def render_quote_distribution_report(quote_df: pd.DataFrame, total_tokens: int) -> str:
+    """Владелец, п.5 + уточнение методики (2026-09-01, после того как
+    суммы n_tokens по строкам (1603) не сошлись с 896 градуациями):
+    распределение quote-активов по всем событиям -- входной материал
+    для следующей линии, искажение недопустимо, методика ЯВНАЯ.
+
+    Методика (см. build_quote_distribution_query): один и тот же
+    градуированный токен МОЖЕТ попасть в НЕСКОЛЬКО строк -- запрос
+    смотрит на ВСЕ его сделки в окне (t0; t0+48ч] и для каждой сделки
+    берёт другую сторону как quote_symbol; если токен торговался и
+    против ETH, и против USDG в разных сделках -- он учтён В ОБЕИХ
+    строках (`n_tokens` в каждой строке = count(distinct token) СРЕДИ
+    сделок именно с этим quote_symbol, дедуп внутри строки, НЕ между
+    строками). Поэтому:
+    - сумма n_tokens по строкам закономерно БОЛЬШЕ total_tokens
+      ({total_tokens}) -- это не баг и не двойной
+      подсчёт одной и той же сделки, а множественное членство токена;
+    - доля каждой строки считается ОТ total_tokens ({total_tokens} --
+      реальное число градуированных событий в выборке), НЕ от суммы
+      n_tokens по строкам -- иначе доли отвечали бы на другой вопрос
+      ("доля среди пар токен-quote", не "доля среди 896 градуаций");
+    - доли по разным строкам НЕ обязаны суммироваться в 100% (токен с
+      членством в двух строках даёт вклад в обе)."""
+    if quote_df is None or len(quote_df) == 0 or not total_tokens:
         return "(распределение quote-активов не получено)"
     df = quote_df.copy()
-    total_n_tokens = df["n_tokens"].sum()
-    df["доля_по_n_tokens"] = df["n_tokens"] / total_n_tokens if total_n_tokens else 0.0
-    lines = ["| quote-актив | n_tokens | доля (n_tokens) | n_trades | vol_usd |", "|---|---|---|---|---|"]
+    sum_n_tokens = int(df["n_tokens"].sum())
+    df["доля_от_total"] = df["n_tokens"] / total_tokens
+    lines = ["| quote-актив | n_tokens (уникальных, из общих " + str(total_tokens) + ") | доля от " + str(total_tokens) + " | n_trades | vol_usd |",
+             "|---|---|---|---|---|"]
     for _, r in df.iterrows():
         lines.append(
-            f"| {r['quote_symbol']} | {int(r['n_tokens'])} | {r['доля_по_n_tokens']*100:.1f}% | "
+            f"| {r['quote_symbol']} | {int(r['n_tokens'])} | {r['доля_от_total']*100:.1f}% | "
             f"{int(r['n_trades'])} | ${r['vol_usd']:,.0f} |"
         )
     per_symbol_table = "\n".join(lines)
 
     df["категория"] = df["quote_symbol"].map(categorize_quote_symbol)
     bucket = df.groupby("категория", as_index=False).agg(n_tokens=("n_tokens", "sum"), vol_usd=("vol_usd", "sum"))
-    bucket["доля"] = bucket["n_tokens"] / total_n_tokens if total_n_tokens else 0.0
+    bucket["доля"] = bucket["n_tokens"] / total_tokens
     bucket = bucket.sort_values("n_tokens", ascending=False)
-    bucket_lines = ["| категория | n_tokens | доля | vol_usd |", "|---|---|---|---|"]
+    bucket_lines = ["| категория | n_tokens (сумма по входящим символам) | доля от " + str(total_tokens) + " | vol_usd |", "|---|---|---|---|"]
     for _, r in bucket.iterrows():
         bucket_lines.append(f"| {r['категория']} | {int(r['n_tokens'])} | {r['доля']*100:.1f}% | ${r['vol_usd']:,.0f} |")
     bucket_table = "\n".join(bucket_lines)
 
+    overlap_note = (
+        f"**Методика подсчёта (важно для интерпретации):** каждая строка -- число УНИКАЛЬНЫХ "
+        f"токенов (из {total_tokens} градуированных в выборке), у которых была хотя бы одна "
+        f"сделка против ИМЕННО этого quote-актива в окне (t0; t0+48ч]. Один и тот же токен может "
+        f"попасть в НЕСКОЛЬКО строк, если торговался против разных quote-активов в разных сделках "
+        f"(смешанная ликвидность/маршрутизация) -- это НЕ двойной подсчёт одной сделки и не баг: "
+        f"сумма n_tokens по всем строкам ({sum_n_tokens}) поэтому больше {total_tokens}, а доли "
+        f"(каждая посчитана от {total_tokens}, не от суммы по строкам) НЕ обязаны суммироваться в "
+        f"100%. Категория токена в разбивке по бакетам ниже -- аналогично: тот же токен может "
+        f"входить в несколько категорий одновременно."
+    )
+
     return (
-        f"**По символам (токен может считаться в нескольких quote-активах, если торговался "
-        f"против >1 -- доли не обязаны суммироваться в 100%):**\n\n{per_symbol_table}\n\n"
+        f"{overlap_note}\n\n"
+        f"**По символам:**\n\n{per_symbol_table}\n\n"
         f"**По категориям (WETH/ETH, стейблкоин, прочее -- вкл. сток-токены):**\n\n{bucket_table}"
     )
 
@@ -583,7 +612,7 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
         return
 
     if full_info.get("underpowered"):
-        quote_report = render_quote_distribution_report(full_info.get("quote_df_full"))
+        quote_report = render_quote_distribution_report(full_info.get("quote_df_full"), full_info["n_raw"])
         body = f"""
 
 {marker}
@@ -606,7 +635,7 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
     half_table = render_half_table(full_info["half_medians"])
     cost_table = render_cost_scenario_table(full_info["cost_scenario_medians"])
     stress_table = render_stress_table(full_info["stress_medians"])
-    quote_report = render_quote_distribution_report(full_info.get("quote_df_full"))
+    quote_report = render_quote_distribution_report(full_info.get("quote_df_full"), full_info["n_raw"])
 
     body = f"""
 

@@ -40,24 +40,36 @@ def test_categorize_quote_symbol_unknown():
     print("[test_categorize_quote_symbol_unknown] OK")
 
 
-def test_render_quote_distribution_report_shares_and_buckets():
+def test_render_quote_distribution_report_shares_use_true_total_not_row_sum():
+    """Регрессия на реальный инцидент (владелец, 2026-09-01): ETH 827 +
+    USDG 735 + WETH 41 = 1603 при 896 градуациях -- токен может входить
+    в несколько строк (торговался против >1 quote в разных сделках),
+    это не баг. Доли ОБЯЗАНЫ считаться от истинного total_tokens (896),
+    НЕ от суммы n_tokens по строкам (1603) -- иначе они отвечали бы на
+    другой вопрос."""
     df = pd.DataFrame({
-        "quote_symbol": ["WETH", "USDC", "PONS-STOCK"],
-        "n_trades": [900, 90, 10],
-        "n_tokens": [720, 180, 90],  # сумма 990, не обязана быть 896 (токен может считаться дважды)
-        "vol_usd": [9_000_000.0, 900_000.0, 90_000.0],
+        "quote_symbol": ["ETH", "USDG", "WETH"],
+        "n_trades": [2768205, 674846, 15396],
+        "n_tokens": [827, 735, 41],  # сумма 1603, БОЛЬШЕ total_tokens=896
+        "vol_usd": [3.260329e8, 7.186861e7, 8.93137e5],
     })
-    report = render_quote_distribution_report(df)
-    assert "WETH" in report and "USDC" in report and "PONS-STOCK" in report
-    assert "WETH/ETH" in report and "стейблкоин" in report and "вкл. сток-токены" in report
-    # 720/990 = 72.7%
-    assert "72.7%" in report
-    print("[test_render_quote_distribution_report_shares_and_buckets] OK")
+    report = render_quote_distribution_report(df, total_tokens=896)
+    assert "ETH" in report and "USDG" in report and "WETH" in report
+    assert "WETH/ETH" in report and "стейблкоин" in report
+    # 827/896 = 92.3% (НЕ 827/1603=51.6%, что было бы неверной методикой)
+    assert "92.3%" in report, report
+    assert "51.6%" not in report
+    # 735/896 = 82.0%
+    assert "82.0%" in report
+    # Явно называет сумму по строкам (1603) и объясняет, что она больше total_tokens
+    assert "1603" in report and "896" in report
+    print("[test_render_quote_distribution_report_shares_use_true_total_not_row_sum] OK")
 
 
 def test_render_quote_distribution_report_empty():
-    assert "не получено" in render_quote_distribution_report(None)
-    assert "не получено" in render_quote_distribution_report(pd.DataFrame())
+    assert "не получено" in render_quote_distribution_report(None, 896)
+    assert "не получено" in render_quote_distribution_report(pd.DataFrame(), 896)
+    assert "не получено" in render_quote_distribution_report(pd.DataFrame({"quote_symbol": ["ETH"], "n_tokens": [1], "n_trades": [1], "vol_usd": [1.0]}), 0)
     print("[test_render_quote_distribution_report_empty] OK")
 
 
@@ -67,7 +79,7 @@ def main() -> int:
         test_categorize_quote_symbol_stable,
         test_categorize_quote_symbol_other,
         test_categorize_quote_symbol_unknown,
-        test_render_quote_distribution_report_shares_and_buckets,
+        test_render_quote_distribution_report_shares_use_true_total_not_row_sum,
         test_render_quote_distribution_report_empty,
     ]
     failed = 0

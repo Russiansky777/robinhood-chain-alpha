@@ -260,7 +260,8 @@ class DuneClient:
         return self._get(f"/query/{query_id}")
 
     def fetch_existing(
-        self, execution_id: str, name: str = "unnamed", expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS
+        self, execution_id: str, name: str = "unnamed", expected_max_rows: int = DEFAULT_MAX_SAFE_READ_ROWS,
+        expected_columns: int = 10,
     ) -> tuple[pd.DataFrame, dict, dict]:
         """Читает результаты УЖЕ СУЩЕСТВУЮЩЕГО execution_id (например, из
         предыдущего прогона, найденного в логах CI) -- без create_query/
@@ -269,11 +270,16 @@ class DuneClient:
         Sprint 1.5 ревизии 2 для 03/04 (их полные результаты слишком
         большие -- см. docs/COST_POSTMORTEM.md), оставлено для мелких
         восстановлений при необходимости.
-        """
+
+        expected_columns добавлен 2026-09-01 (владелец, восстановление
+        g1_v2_full_extract -- 26 колонок, старый дефолт 10 отказал бы в
+        чтении обязывающим гардом check_before_read_binding)."""
         status = self.get_execution_status(execution_id)
         if status.get("state") != "QUERY_STATE_COMPLETED":
             raise RuntimeError(f"execution {execution_id} не в состоянии COMPLETED: {status}")
-        df, result_stats = self.get_results_df(execution_id, name=name, expected_max_rows=expected_max_rows)
+        df, result_stats = self.get_results_df(
+            execution_id, name=name, expected_max_rows=expected_max_rows, expected_columns=expected_columns,
+        )
         return df, status, result_stats
 
     def execute(
