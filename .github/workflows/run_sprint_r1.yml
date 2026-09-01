@@ -15,6 +15,7 @@ on:
           - scrape_stock_tokens_jsbundle
           - scrape_stock_tokens
           - recon
+          - feed_match
           - smoke
           - full
           - report
@@ -81,6 +82,17 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintR1
         run: python analysis/r1_recon.py
+
+      # 0 кредитов Dune -- eth_call через Alchemy RPC (обычный
+      # исходящий интернет GH Actions runner'а, недоступный из
+      # интерактивной песочницы инструмента). Ни один декодированный на
+      # Dune реестр не содержит прямой связи токен<->фид -- см.
+      # docs/R1_DESIGN.md, "Механика".
+      - name: Match stock tokens to Chainlink feeds (0 Dune credits, Alchemy eth_call)
+        if: ${{ github.event.inputs.step == 'feed_match' }}
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python analysis/r1_feed_match.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
