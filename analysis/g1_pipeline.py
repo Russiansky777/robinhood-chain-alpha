@@ -87,16 +87,16 @@ def build_extract_query(events: pd.DataFrame) -> str:
     for h in CONFIG.g1_horizons_s:
         delta = horizon_delta(h)
         win_pred = (
-            f"block_time > t0 + interval '{h}' second "
-            f"and block_time <= t0 + interval '{h + delta}' second"
+            f"p.block_time > e.t0 + interval '{h}' second "
+            f"and p.block_time <= e.t0 + interval '{h + delta}' second"
         )
-        locf_pred = f"block_time <= t0 + interval '{h + delta}' second"
+        locf_pred = f"p.block_time <= e.t0 + interval '{h + delta}' second"
         horizon_selects.append(
             f"    count(*) filter (where {win_pred}) as exit_n_{h},\n"
             f"    coalesce(\n"
-            f"        sum(amount_usd) filter (where {win_pred}) "
-            f"/ nullif(sum(qty) filter (where {win_pred}), 0),\n"
-            f"        max_by(price, block_time) filter (where {locf_pred})\n"
+            f"        sum(p.amount_usd) filter (where {win_pred}) "
+            f"/ nullif(sum(p.qty) filter (where {win_pred}), 0),\n"
+            f"        max_by(p.price, p.block_time) filter (where {locf_pred})\n"
             f"    ) as exit_vwap_{h}"
         )
         horizon_cols.append(f"exit_n_{h}")
@@ -107,6 +107,14 @@ def build_extract_query(events: pd.DataFrame) -> str:
 -- §2.2 (n_buys_pre/vol_usd_pre) + §2.3 (entry_vwap, exit_vwap_h x{len(CONFIG.g1_horizons_s)}
 -- горизонтов, LOCF-фолбэк через max_by при пустом exit-окне). Один
 -- проход по dex.trades на событие, наружу -- только агрегат.
+--
+-- ВАЖНО (найдено и исправлено 2026-09-01, run #18): финальный SELECT
+-- идёт FROM events LEFT JOIN priced (не FROM priced) -- событие БЕЗ
+-- вообще ни одной сделки в окне должно остаться строкой с нулевыми
+-- агрегатами (и корректно провалить §2.2 ниже, в Python), а не
+-- молча исчезнуть из результата (что раньше занижало "N сырых" --
+-- 99 вместо 108 на смоук-дне -- хотя на аналитическое N это не влияло,
+-- т.к. такие события всё равно не проходят §2.2).
 with events(token, t0) as (
     values
         {values_sql}
@@ -118,7 +126,7 @@ trades as (
              else dt.token_sold_amount end as qty,
         case when dt.token_bought_address = e.token then 1 else 0 end as is_buy
     from events e
-    join dex.trades dt
+    left join dex.trades dt
         on dt.blockchain = 'robinhood'
         and dt.version = '4'
         and (dt.token_bought_address = e.token or dt.token_sold_address = e.token)
@@ -129,23 +137,26 @@ trades as (
         and dt.block_time <= timestamp '{t0_max_bound}'
 ),
 priced as (
-    -- qty<=0 (дегенеративный своп, VWAP не определён) исключается ИЗ ВСЕХ
-    -- окон, включая пре-окно §2.2 -- редкий крайний случай, не искажает
-    -- фильтр торгуемости (такой своп не несёт информации о цене).
+    -- qty<=0 (дегенеративный своп ИЛИ отсутствие сделок вовсе -- dt.*
+    -- все NULL после left join) исключается ИЗ ВСЕХ окон, включая
+    -- пре-окно §2.2 -- редкий/пустой случай, не искажает фильтр
+    -- торгуемости (такое событие не несёт информации о цене и корректно
+    -- проваливает §2.2 при агрегации ниже).
     select token, t0, block_time, amount_usd, qty, is_buy, amount_usd / qty as price
     from trades
     where qty > 0
 )
 select
-    token, t0,
-    count(*) filter (where is_buy = 1 and block_time <= t0 + interval '{entry_start}' second) as n_buys_pre,
-    coalesce(sum(amount_usd) filter (where is_buy = 1 and block_time <= t0 + interval '{entry_start}' second), 0) as vol_usd_pre,
-    count(*) filter (where block_time > t0 + interval '{entry_start}' second and block_time <= t0 + interval '{entry_end}' second) as entry_n,
-    sum(amount_usd) filter (where block_time > t0 + interval '{entry_start}' second and block_time <= t0 + interval '{entry_end}' second)
-        / nullif(sum(qty) filter (where block_time > t0 + interval '{entry_start}' second and block_time <= t0 + interval '{entry_end}' second), 0) as entry_vwap,
+    e.token, e.t0,
+    count(*) filter (where p.is_buy = 1 and p.block_time <= e.t0 + interval '{entry_start}' second) as n_buys_pre,
+    coalesce(sum(p.amount_usd) filter (where p.is_buy = 1 and p.block_time <= e.t0 + interval '{entry_start}' second), 0) as vol_usd_pre,
+    count(*) filter (where p.block_time > e.t0 + interval '{entry_start}' second and p.block_time <= e.t0 + interval '{entry_end}' second) as entry_n,
+    sum(p.amount_usd) filter (where p.block_time > e.t0 + interval '{entry_start}' second and p.block_time <= e.t0 + interval '{entry_end}' second)
+        / nullif(sum(p.qty) filter (where p.block_time > e.t0 + interval '{entry_start}' second and p.block_time <= e.t0 + interval '{entry_end}' second), 0) as entry_vwap,
 {horizon_sql}
-from priced
-group by token, t0
+from events e
+left join priced p on p.token = e.token and p.t0 = e.t0
+group by e.token, e.t0
 limit {len(events)}
 """
 

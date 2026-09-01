@@ -81,6 +81,20 @@ def test_build_extract_query_has_hard_limit():
     print("[test_build_extract_query_has_hard_limit] OK")
 
 
+def test_build_extract_query_preserves_zero_trade_events():
+    """Регрессия на run #18: изначальный INNER JOIN тихо ронял события
+    без единой сделки во всём окне из результата (смоук-день дал 99
+    строк вместо 108 -- расходилось с истинным N, хотя на аналитическое
+    N не влияло, т.к. такие события всё равно проваливают §2.2).
+    Финальный SELECT теперь идёт FROM events LEFT JOIN priced -- каждое
+    событие обязано остаться строкой, даже с нулевыми/NULL агрегатами."""
+    events = _synthetic_events(3)
+    sql = build_extract_query(events)
+    assert "left join dex.trades" in sql, "джойн с dex.trades должен быть LEFT (не терять события без сделок)"
+    assert "from events e\nleft join priced p" in sql, "финальный SELECT должен идти FROM events LEFT JOIN priced, не FROM priced напрямую"
+    print("[test_build_extract_query_preserves_zero_trade_events] OK")
+
+
 def test_build_quote_distribution_query_values_row_count():
     events = _synthetic_events(3)
     sql = build_quote_distribution_query(events)
@@ -246,6 +260,7 @@ def main() -> int:
         test_build_extract_query_values_row_count_matches_events,
         test_build_extract_query_has_all_horizon_columns,
         test_build_extract_query_has_hard_limit,
+        test_build_extract_query_preserves_zero_trade_events,
         test_build_quote_distribution_query_values_row_count,
         test_build_quote_distribution_query_has_time_bound,
         test_apply_filters_basic,
