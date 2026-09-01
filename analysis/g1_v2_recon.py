@@ -103,7 +103,7 @@ def main() -> int:
     qid2 = client.create_query("g1_v2_graduation_sample", sql2)
     df2 = client.run_sql_cached(
         "g1_v2_graduation_sample", sql2, query_id=qid2, estimated_credits=5.0,
-        expected_max_rows=30, expected_columns=4,
+        expected_max_rows=30, expected_columns=5,
     )
     if df2 is None or len(df2) == 0:
         print("[g1_v2_recon] СТОП: выборка PoolGraduated пуста при точечном запросе -- расходится "
