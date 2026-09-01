@@ -65,6 +65,15 @@ def _rpc_url() -> str:
     )
 
 
+# Blockscout eth-rpc прокси вернул 403 Forbidden без User-Agent (см.
+# docs/P3_GUARD.md -- WAF/Cloudflare перед публичными block explorer'ами
+# обычно блокирует запросы с дефолтным `python-requests/x.y` UA как
+# похожие на неразмеченный скрейпинг-бот). Не обход защиты -- обычный
+# заголовок легитимного клиента, тот же паттерн используют
+# документированные публичные интеграции с Blockscout.
+_HEADERS = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
+
+
 def _rpc_call(method: str, params: list) -> dict:
     """Единичный JSON-RPC вызов (не для eth_getLogs -- см. _chunked_get_logs
     для постраничной версии). Используется P3-гардом (analysis/
@@ -74,6 +83,7 @@ def _rpc_call(method: str, params: list) -> dict:
     resp = requests.post(
         url,
         json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        headers=_HEADERS,
         timeout=30,
     )
     resp.raise_for_status()
@@ -130,7 +140,7 @@ def _chunked_get_logs(
             "method": "eth_getLogs",
             "params": [filter_obj],
         }
-        resp = requests.post(url, json=payload, timeout=30)
+        resp = requests.post(url, json=payload, headers=_HEADERS, timeout=30)
         resp.raise_for_status()
         body = resp.json()
         if "error" in body:
