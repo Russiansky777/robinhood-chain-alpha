@@ -515,6 +515,20 @@ class DuneClient:
         cost = status.get("execution_cost_credits")
         estimate_used = estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
 
+        # Ревизия 4 гарда (2026-09-01): execute() уже произошёл и уже
+        # оплачен на стороне Dune к этому моменту (cost из бесплатного
+        # /status) -- записываем ЭТО в леджер немедленно, ДО попытки
+        # чтения результата, а не после неё. Раньше (до этой правки)
+        # record_execution для ветки fetch_results=True вызывался ПОСЛЕ
+        # get_results_df -- если обязывающий гейт чтения отказывал
+        # (см. check_before_read_binding), исключение пробрасывалось
+        # ДО record_execution, и реальная, уже списанная Dune стоимость
+        # execute никогда не попадала в credits_spent.json (найдено на
+        # примере run #12: g1_v2_graduation_sample). Симметрично с веткой
+        # fetch_results=False, которая всегда фиксировала execute сразу.
+        record_execution(name, cost, execution_id)
+        check_overrun_after_execute(name, estimate_used, cost)
+
         if not fetch_results:
             self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
             print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits (материализован, результат не скачивался)")
@@ -522,26 +536,20 @@ class DuneClient:
             permanent_marker_file.parent.mkdir(parents=True, exist_ok=True)
             permanent_marker_file.write_text(execution_id)
             self._commit_permanent(permanent_marker_file, f"{permanent_dir.name}: материализован '{name}' [automated]")
-            record_execution(name, cost, execution_id)
-            # Пост-хок "факт > вдвое оценки" (ревизия 3, см.
-            # docs/COST_POSTMORTEM.md) -- ПОСЛЕ того, как результат уже
-            # закоммичен постоянно и факт попал в credits_spent.json, даже
-            # если дальше стоп -- деньги и результат не теряются вместе.
-            check_overrun_after_execute(name, estimate_used, cost)
             return None
 
+        # Дальше -- ЧТЕНИЕ результата, отдельная платная операция (см.
+        # check_before_read_binding в get_results_df). Если она откажет,
+        # execute уже безопасно записан выше -- теряется только попытка
+        # чтения (корректно 0 кредитов, т.к. отказ ДО оплаты /results).
         df, result_stats = self.get_results_df(
             execution_id, name=name, expected_max_rows=expected_max_rows, expected_columns=expected_columns,
             status=status,
         )
-        if cost is None:
-            cost = result_stats.get("execution_cost_credits")
         self.credit_ledger.append({"name": name, "credits": cost, "cached": False})
         print(f"[dune] {name}: {cost if cost is not None else 'n/a'} credits")
         df.to_csv(cache_file, index=False)
         permanent_cache_file.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(permanent_cache_file, index=False)
         self._commit_permanent(permanent_cache_file, f"{permanent_dir.name}: результат '{name}' ({len(df)} строк) [automated]")
-        record_execution(name, cost, execution_id)
-        check_overrun_after_execute(name, estimate_used, cost)
         return df

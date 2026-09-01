@@ -352,6 +352,79 @@ def test_peek_result_metadata_defensive_paths() -> None:
         )
 
 
+def test_execute_cost_recorded_even_when_read_is_refused() -> None:
+    """Регрессия найдена в run #12 (2026-09-01): execute() уже оплачен
+    на стороне Dune к моменту, когда мы решаем читать результат -- если
+    check_before_read_binding отказывает (реальных строк больше
+    заявленного), это должно останавливать только ЧТЕНИЕ, а execute-
+    стоимость обязана попасть в credits_spent.json уже К ЭТОМУ МОМЕНТУ,
+    а не теряться из-за брошенного исключения. dune_client.run_sql_cached
+    ревизии 4 переставил record_execution() ДО get_results_df() именно
+    ради этого -- тест мокает сетевые вызовы и проверяет итоговое
+    состояние леджера напрямую."""
+    state = {
+        "billing_cycle": {"external_limit": 2450.0, "initialized_spent": 1394.0, "reset_at": "2026-09-14"},
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 0.0},
+        "entries": [],
+    }
+    orig_ns = os.environ.get(cg.NAMESPACE_ENV)
+    os.environ[cg.NAMESPACE_ENV] = "sprintG1"
+    orig_key = os.environ.get("DUNE_API_KEY")
+    os.environ["DUNE_API_KEY"] = "test-key-not-real"
+    try:
+        with with_temp_state(state) as tmp_file:
+            import tempfile as _tempfile
+            sys.path.insert(0, str(Path(__file__).parent))
+            from dune_client import DuneClient
+
+            client = DuneClient(api_key="test-key-not-real", cache_dir=_tempfile.mkdtemp())
+            # Мокаем сеть: execute -> execution_id; status -> COMPLETED с
+            # реальной стоимостью 3.5; никогда не должны дойти до /results,
+            # т.к. заявлено expected_max_rows=1, а /status сообщает 999 строк.
+            client.execute = lambda *a, **k: "exec_test_123"
+            client.poll_until_done = lambda *a, **k: {
+                "state": "QUERY_STATE_COMPLETED",
+                "execution_cost_credits": 3.5,
+                "result_metadata": {"total_row_count": 999, "column_names": ["a"]},
+            }
+
+            def _should_not_be_called(*a, **k):
+                raise AssertionError("get_results_df internals reached /results -- read-binding refusal failed to short-circuit")
+            client._get = _should_not_be_called  # would be hit by an actual /results call
+
+            exc_obj = None
+            try:
+                client.run_sql_cached(
+                    "regression_probe", "select 1", query_id=1, estimated_credits=2.0,
+                    expected_max_rows=1, expected_columns=1,
+                )
+            except SystemExit as e:
+                exc_obj = e
+            check("refused read still raises BudgetGuardStop", isinstance(exc_obj, cg.BudgetGuardStop))
+
+            saved = json.loads(tmp_file.read_text())
+            check(
+                "execute cost (3.5) IS recorded despite the read being refused",
+                saved["sprintG1"]["spent"] == 3.5,
+                f"got {saved['sprintG1']['spent']!r}",
+            )
+            entries = [e for e in saved["entries"] if e["name"] == "regression_probe"]
+            check(
+                "exactly one entry recorded for the execute (no read entry, since it was refused)",
+                len(entries) == 1 and entries[0]["credits"] == 3.5,
+                f"got {entries!r}",
+            )
+    finally:
+        if orig_ns is None:
+            os.environ.pop(cg.NAMESPACE_ENV, None)
+        else:
+            os.environ[cg.NAMESPACE_ENV] = orig_ns
+        if orig_key is None:
+            os.environ.pop("DUNE_API_KEY", None)
+        else:
+            os.environ["DUNE_API_KEY"] = orig_key
+
+
 def main() -> int:
     # Тест не должен трогать реальный git -- _git_commit коммитит
     # CREDITS_FILE, который здесь подменён на временный путь вне
@@ -369,6 +442,7 @@ def main() -> int:
         test_read_binding_refuses_when_actual_exceeds_declared()
         test_read_binding_passes_when_within_declared_bound()
         test_peek_result_metadata_defensive_paths()
+        test_execute_cost_recorded_even_when_read_is_refused()
     finally:
         cg._git_commit = orig_git_commit
 
