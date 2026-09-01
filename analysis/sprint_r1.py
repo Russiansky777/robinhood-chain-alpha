@@ -434,10 +434,19 @@ def run_full() -> int:
         })
         print(f"\n===== {name} ({p_start.date()}..{p_end.date()}) =====")
         qid = client.create_query(name, sql)
+        # ВАЖНО (баг найден и исправлен на этом самом retry, run #28):
+        # spent_on(name) суммирует ВСЮ историю по этому имени, включая
+        # сгоревшую 81-кредитную попытку wk07 под старым джойном (run
+        # #27) -- калибровка на её основе даёт абсурдную проекцию (факт
+        # "84.13" вместо реальных 0.49 нового джойна). Берём чистую
+        # дельту namespace.spent ДО/ПОСЛЕ именно этого вызова -- не
+        # зависит от истории имени.
+        spent_before = cg.load_state().get("sprintR1", {}).get("spent", 0.0)
         part_df = client.run_sql_cached(
             name, sql, query_id=qid, estimated_credits=6.0,
             expected_max_rows=6000, expected_columns=14,
         )
+        spent_after = cg.load_state().get("sprintR1", {}).get("spent", 0.0)
         if part_df is not None and len(part_df):
             part_df["t_checkpoint"] = pd.to_datetime(part_df["t_checkpoint"], utc=True)
             part_df["token_address"] = part_df["token_address"].str.lower()
@@ -448,7 +457,7 @@ def run_full() -> int:
             # кэш-хиты старого шаблона, их факт не показателен для оценки
             # нового джойна) -- факт x оставшиеся x2.5 запас, стоп ДО
             # траты остального бюджета, если проекция не влезает.
-            actual_first = spent_on(name)
+            actual_first = spent_after - spent_before
             n_remaining_new = len(partitions) - i
             projected = actual_first * n_remaining_new * 2.5
             remaining_ns = CONFIG.r1_credit_budget - cg.load_state().get("sprintR1", {}).get("spent", 0.0)
