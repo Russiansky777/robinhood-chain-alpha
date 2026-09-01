@@ -145,6 +145,23 @@ g1_common.py` и `analysis/r1_common.py`, без новой зависимост
 
 `analysis/config.py`/`analysis/alchemy_fallback.py::_rpc_url()` теперь: Alchemy (если настроен) → Blockscout PRO API с `Bearer`-токеном (если задан `BLOCKSCOUT_API_KEY`) → явная понятная ошибка (не тихий сбой), объясняющая обе причины. `.github/workflows/run_p3_guard.yml` пробрасывает оба секрета (`ALCHEMY_API_KEY`, `BLOCKSCOUT_API_KEY`) в обе стадии. `.env.example` документирует оба варианта. Ограничение источника Blockscout: 1000 логов на один запрос `eth_getLogs` — `_chunked_get_logs` рекурсивно бисектит диапазон блоков, если ответ вернул ровно 1000 строк (подозрение на молчаливую обрезку), а не молча теряет логи сверх лимита.
 
+### Отдельная проверка (владелец, 2026-09-01): публичный REST v2 `/api/v2/addresses/...` — тоже 403, но по ДРУГОЙ причине
+
+Одна разовая попытка (не регулярная стадия, `analysis/
+blockscout_addr_probe.py`, [run
+33569280543](https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33569280543)) —
+`GET /api/v2/addresses/{addr}/token-transfers` и `.../transactions`
+БЕЗ ключа, с GH Actions runner'а. **Оба вернули `403`** — но тело
+ответа НЕ то же самое «PRO API требует Bearer-токен» сообщение, что у
+`/api/eth-rpc` выше: это HTML-страница Cloudflare **«Just a
+moment...»** (JS-челлендж антибот-защиты, `challenges.cloudflare.com`
+в CSP заголовке) — то есть блок на уровне Cloudflare перед Blockscout,
+а не (только) официальный PRO API гейтвей. Практический вывод для
+владельца тот же: ключа по-прежнему нет — путь не бесплатнее. По
+прямой инструкции («если 403 — доложить, дальше не пробовать») —
+дальнейшие попытки (другие эндпоинты v2, обход Cloudflare) в этом
+проходе не предпринимались.
+
 ### Что нужно от владельца, чтобы получить реальный результат
 
 Один из двух (любой достаточен):
