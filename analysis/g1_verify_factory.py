@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import CONFIG
 from dune_client import DuneClient, render_sql
-from run_pipeline import read_sql, q_ts, q_list, substitute_query_refs
+from run_pipeline import read_sql, q_ts, substitute_query_refs
 
 # Посчитано локально (Crypto.Hash.keccak) от точной сигнатуры типов в
 # data/pons_family/PonsLaunchFactory_v1_abi.json -- НЕ угадано, см.
@@ -119,10 +119,17 @@ def main() -> int:
           f"{seconds_per_block:.3f}")
 
     pool_addresses = sorted({d["pool"] for d in decoded_rows})
+    # НЕ q_list() -- pool_address в query_02 типизирован varbinary, а
+    # q_list() кавычит значения как varchar (см. run #7: "Cannot find
+    # common type between varbinary and varchar(42)", 0 кредитов --
+    # упало до биллинга). Голые 0x-литералы без кавычек -- тот же
+    # паттерн, что сработал в g1_factory_logs_topic0_probe.sql для
+    # contract_address.
+    addr_list = ", ".join(pool_addresses)
     swap_check_sql_template = (
         "select pool_address, count(*) as n_swaps, min(block_time) as first_swap, "
         f"max(block_time) as last_swap from query_02_swaps_raw_july "
-        f"where pool_address in ({q_list(pool_addresses)}) group by 1"
+        f"where pool_address in ({addr_list}) group by 1"
     )
     swap_check_sql = substitute_query_refs(swap_check_sql_template, query_ids)
     print(f"\n===== g1_pool_swap_crosscheck (оценка 3.0) =====")
