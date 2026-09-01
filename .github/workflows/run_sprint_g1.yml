@@ -13,6 +13,7 @@ on:
           - verify
           - count
           - semantics
+          - factory_fate
           - smoke
           - full
           - report
@@ -74,6 +75,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_event_semantics.py
+
+      - name: Factory fate after 2026-08-12 (docs check done free, on-chain scan here)
+        if: ${{ github.event.inputs.step == 'factory_fate' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_factory_fate.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
