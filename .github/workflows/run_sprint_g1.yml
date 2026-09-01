@@ -15,6 +15,7 @@ on:
           - semantics
           - factory_fate
           - v2_recon
+          - v2_postfilter
           - smoke
           - full
           - report
@@ -90,6 +91,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintG1
         run: python analysis/g1_v2_recon.py
+
+      - name: V2 post-filter N (full 896-event set, tradability filter, N gate)
+        if: ${{ github.event.inputs.step == 'v2_postfilter' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/g1_v2_postfilter.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
