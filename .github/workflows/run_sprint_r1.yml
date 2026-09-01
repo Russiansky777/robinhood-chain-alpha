@@ -18,6 +18,7 @@ on:
           - dune_calls_probe
           - feed_match
           - feed_match_dune
+          - rwa_schema_probe
           - smoke
           - full
           - report
@@ -109,6 +110,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintR1
         run: python analysis/r1_feed_match_dune.py
+
+      - name: Probe rwa_robinhood schema for direct token->feed link (critical mismatch found)
+        if: ${{ github.event.inputs.step == 'rwa_schema_probe' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_rwa_schema_probe.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}

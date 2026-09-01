@@ -36,11 +36,23 @@ def _latest(glob_pat: str) -> Path:
     return Path(matches[-1])
 
 
-def extract_ticker(desc) -> str | None:
+def ticker_candidates(desc) -> set[str]:
+    """Формат description() на этих фидах непостоянный (эмпирически, run
+    #18): "Robinhood PLTR / USD", "RHTSLA / USD" (без пробела перед
+    тикером), "Robinhood USAR-USD" (дефис без пробелов). Вместо жёсткого
+    regex -- набор кандидатов, сверяемых со списком реальных symbol."""
     if not isinstance(desc, str) or not desc:
-        return None
-    m = re.match(r"\s*([A-Za-z.]+)\s*[/\-]", desc)
-    return m.group(1).upper() if m else desc.strip().upper()
+        return set()
+    cands: set[str] = set()
+    for variant in (desc, re.sub(r"(?i)^\s*robinhood\s*", "", desc)):
+        m = re.match(r"\s*([A-Za-z0-9.]+)\s*[/\-]", variant)
+        if not m:
+            continue
+        cand = m.group(1).upper()
+        cands.add(cand)
+        if cand.startswith("RH") and len(cand) > 2:
+            cands.add(cand[2:])
+    return cands
 
 
 def main() -> int:
@@ -62,6 +74,11 @@ def main() -> int:
     df.to_csv(out_raw, index=False)
     print(df.to_string(max_rows=200))
     print(f"\n[r1_feed_match_dune] Записано: {out_raw}")
+    # Коммитим ОПЛАЧЕННЫЙ результат сразу -- run #18 упал НИЖЕ по скрипту
+    # (0 совпадений из-за бага в парсинге тикера), и generic "Commit
+    # results" шаг воркфлоу не выполнился (job остановился на non-zero
+    # exit) -- результат потерялся бы, пришлось бы платить заново.
+    client._commit_permanent(out_raw, "sprintR1_cache: decimals()/description() по 31 фиду [automated]")
 
     n_feeds = df["feed_address"].nunique()
     n_with_desc = df["description"].notna().sum()
@@ -71,20 +88,35 @@ def main() -> int:
           f"{sorted(decimals_vals)}.")
 
     tokens = pd.read_csv(_latest("r1_stock_token_deployments_*.csv"))
-    tokens["symbol_upper"] = tokens["symbol"].str.upper()
-    df["ticker"] = df["description"].apply(extract_ticker)
+    symbol_to_row = {row.symbol.upper(): row for row in tokens.itertuples()}
 
-    merged = df.merge(tokens, left_on="ticker", right_on="symbol_upper", how="inner")
+    matches = []
+    for row in df.itertuples():
+        cands = ticker_candidates(row.description)
+        hit_symbol = next((c for c in cands if c in symbol_to_row), None)
+        if hit_symbol is None:
+            continue
+        t = symbol_to_row[hit_symbol]
+        matches.append({
+            "token_address": t.token_address, "symbol": t.symbol,
+            "feed_address": row.feed_address, "decimals": row.decimals,
+            "description": row.description,
+        })
+
+    merged = pd.DataFrame(matches)
     out_map = CACHE_DIR / "r1_feed_token_map.csv"
-    merged[["token_address", "symbol", "feed_address", "decimals", "description"]].drop_duplicates(
-        subset=["token_address"]
-    ).to_csv(out_map, index=False)
+    merged.drop_duplicates(subset=["token_address"]).to_csv(out_map, index=False)
 
-    print(f"\n[r1_feed_match_dune] Сопоставлено {merged['token_address'].nunique()} токенов "
-          f"из {n_feeds} фидов с decoded description(). Записано: {out_map}")
+    print(f"\n[r1_feed_match_dune] Сопоставлено {merged['token_address'].nunique() if len(merged) else 0} "
+          f"токенов из {n_feeds} фидов с decoded description(). Записано: {out_map}")
     if len(merged):
-        print(merged[["symbol", "feed_address", "decimals", "description"]]
-              .drop_duplicates().to_string(index=False))
+        print(merged.drop_duplicates().to_string(index=False))
+    unmatched = df[~df["feed_address"].isin(merged["feed_address"])] if len(merged) else df
+    if len(unmatched):
+        print(f"\n[r1_feed_match_dune] Без совпадения ({len(unmatched)} фидов) -- "
+              f"либо криптовалютный фид (не сток-токен), либо тикер в description() "
+              f"не найден в реестре деплоя:")
+        print(unmatched[["feed_address", "description"]].to_string(index=False))
     return 0 if len(merged) else 1
 
 
