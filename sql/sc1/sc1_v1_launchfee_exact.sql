@@ -9,7 +9,7 @@
 -- многие создатели НЕ делали seed buy, launchFee будет доминирующим
 -- значением.
 select
-    approx_most_frequent(5, cast(value as double), 1000) as top5_values,
+    approx_most_frequent(5, cast(value as bigint), 1000) as top5_values,
     min(cast(value as double)) filter (where cast(value as double) > 0) as value_min_nonzero,
     count(*) filter (where cast(value as double) = 0) as n_zero_value
 from robinhood.transactions
