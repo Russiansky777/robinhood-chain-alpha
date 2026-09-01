@@ -184,7 +184,7 @@ def _now() -> str:
 def _init_state() -> dict:
     return {
         "billing_cycle": {
-            "external_limit": 2450.0,
+            "external_limit": 2500.0,
             "initialized_spent": 1394.0,
             "initialized_at": _now(),
             "initialized_by": (
@@ -196,6 +196,20 @@ def _init_state() -> dict:
                 "человек, docs/PROJECT_STATE.md правило 7 -- дата сброса "
                 "биллинг-цикла Dune, НЕ выведена из кода/API"
             ),
+            # Владелец, 2026-09-01: внутренний леджер разошёлся с реальным
+            # дашбордом Dune на ~315 кредитов (2138.84 факт vs 1823.26
+            # внутренний расчёт на тот момент) -- см. _true_cycle_spent().
+            # С этого якоря остаток ВСЕГДА считается от внешней правды +
+            # дельта внутреннего леджера ПОСЛЕ якоря, не от суммы namespace
+            # spent с нуля (см. docs/G1_DESIGN.md за полным разбором).
+            "external_truth": {
+                "cycle_spent": 2138.84,
+                "as_of": "2026-09-01",
+                "source": "владелец, дашборд dune.com/settings/billing, 2026-09-01",
+                "namespace_snapshot_at_anchor": {"sprint15": 244.155491, "sprintG1": 185.107335},
+                "reserve_buffer": 20.0,
+                "reserve_buffer_source": "владелец, 2026-09-01 -- неснижаемый страховой остаток",
+            },
         },
         "sprint15": {
             "budget_remaining_at_init": 150.0,
@@ -203,6 +217,70 @@ def _init_state() -> dict:
         },
         "entries": [],
     }
+
+
+def _true_cycle_spent(state: dict) -> float:
+    """Реальный расход в биллинг-цикле -- владелец, 2026-09-01: внутренний
+    леджер (initialized_spent + сумма namespace.spent с нуля) разошёлся с
+    дашбордом Dune на ~315 кредитов. С этого момента, если в state есть
+    billing_cycle.external_truth, расчёт идёт от ВНЕШНЕГО якоря: якорная
+    сумма + (дельта внутреннего леджера каждого namespace ПОСЛЕ якоря).
+    Без external_truth (только для чтения очень старого/чужого state) --
+    старая формула, сохранена для обратной совместимости."""
+    et = state["billing_cycle"].get("external_truth")
+    if et is None:
+        all_ns_spent = sum(
+            v["spent"] for k, v in state.items()
+            if k not in ("billing_cycle", "entries", "history") and isinstance(v, dict) and "spent" in v
+        )
+        return state["billing_cycle"]["initialized_spent"] + all_ns_spent
+    snapshot = et.get("namespace_snapshot_at_anchor", {})
+    delta_since_anchor = sum(
+        v["spent"] - snapshot.get(k, 0.0)
+        for k, v in state.items()
+        if k not in ("billing_cycle", "entries", "history") and isinstance(v, dict) and "spent" in v
+    )
+    return et["cycle_spent"] + delta_since_anchor
+
+
+def _cycle_reserve_buffer(state: dict) -> float:
+    et = state["billing_cycle"].get("external_truth")
+    return float(et.get("reserve_buffer", 0.0)) if et else 0.0
+
+
+def remaining_cycle_budget(state: dict | None = None) -> float:
+    """Публичный хелпер для отчётности (сколько реально осталось в
+    цикле, с учётом внешнего якоря и страхового буфера)."""
+    state = state or load_state()
+    limit = state["billing_cycle"]["external_limit"]
+    return limit - _true_cycle_spent(state) - _cycle_reserve_buffer(state)
+
+
+def check_external_truth_drift(live_dune_total: float | None) -> None:
+    """Владелец, п.3 (2026-09-01): перед каждым платным этапом, ЕСЛИ
+    доступно через API, сверять внутренний расчётный расход цикла с
+    актуальным числом от Dune -- расхождение >5% => жёсткий стоп.
+    live_dune_total=None (эндпойнт недоступен/не проверялся в этом
+    прогоне -- см. analysis/audit_dune_account.py, на free-tier API v1
+    похоже нет такого эндпоинта) -- тихий no-op, НЕ блокируем работу без
+    данных, но и не притворяемся, что сверка была сделана."""
+    if live_dune_total is None:
+        print("[credit_guard] Сверка с внешней правдой Dune пропущена -- живой источник недоступен в этом прогоне.")
+        return
+    state = load_state()
+    computed = _true_cycle_spent(state)
+    if computed <= 0:
+        return
+    drift = abs(live_dune_total - computed) / computed
+    print(f"[credit_guard] Сверка с Dune: расчёт={computed:.2f}, факт(Dune)={live_dune_total:.2f}, расхождение={drift:.1%}.")
+    if drift > 0.05:
+        print(
+            f"[credit_guard] СТОП: расхождение с внешней правдой Dune {drift:.1%} > 5% -- "
+            "внутренний леджер разошёлся с реальным биллингом на существенную величину. "
+            "Ничего не исполнено. Нужен новый якорь billing_cycle.external_truth (владелец) "
+            "или разбор причины разрыва перед продолжением."
+        )
+        raise BudgetGuardStop(1)
 
 
 def ensure_namespace(ns: str, budget: float) -> None:
@@ -269,13 +347,11 @@ def _check_before_operation(op_kind: str, name: str, estimate: float) -> None:
     ns_budget = state[ns]["budget_remaining_at_init"]
     # Биллинг-цикл общий на ВСЕ пространства (sprint15 + sprintG1 + ...),
     # не только текущее -- иначе новый спринт видел бы заниженный расход
-    # цикла и мог бы пробить его внешнюю границу, не заметив.
-    all_namespaces_spent = sum(
-        v["spent"] for k, v in state.items()
-        if k not in ("billing_cycle", "entries", "history") and isinstance(v, dict) and "spent" in v
-    )
-    cycle_spent_so_far = state["billing_cycle"]["initialized_spent"] + all_namespaces_spent
-    cycle_limit = state["billing_cycle"]["external_limit"]
+    # цикла и мог бы пробить его внешнюю границу, не заметив. С 2026-09-01
+    # (владелец) -- считается ОТ ВНЕШНЕГО ЯКОРЯ (_true_cycle_spent), не
+    # суммой namespace.spent с нуля (см. billing_cycle.external_truth).
+    cycle_spent_so_far = _true_cycle_spent(state)
+    cycle_limit = state["billing_cycle"]["external_limit"] - _cycle_reserve_buffer(state)
 
     projected_ns = ns_spent + estimate
     projected_cycle = cycle_spent_so_far + estimate
@@ -291,7 +367,8 @@ def _check_before_operation(op_kind: str, name: str, estimate: float) -> None:
     if projected_cycle > cycle_limit:
         print(
             f"[credit_guard] СТОП: {op_kind} '{name}' (оценка {estimate:.1f} кредитов) "
-            f"превысил бы внешнюю границу биллинг-цикла: потрачено в цикле "
+            f"превысил бы внешнюю границу биллинг-цикла (с учётом страхового буфера "
+            f"{_cycle_reserve_buffer(state):.1f}): потрачено в цикле "
             f"{cycle_spent_so_far:.2f} + оценка {estimate:.1f} = {projected_cycle:.2f} "
             f"> граница {cycle_limit:.1f}.\nНичего не исполнено/не прочитано. Файл: {CREDITS_FILE}."
         )

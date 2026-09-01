@@ -274,3 +274,122 @@ group by 1
 order by n_tokens desc
 limit 50
 """
+
+
+# ---------- Калибровка вместо угадывания (владелец, 2026-09-01, после run #16) ----------
+#
+# Оценка 15.0 для g1_v2_quote_distribution была догадкой, прошла санитарный
+# порог credit_guard.SANITY_MAX_ESTIMATE=40 не будучи откалиброванной, факт
+# оказался 56.49 (>2x). Правило на остаток спринта: любой запрос НОВОЙ формы
+# сначала исполняется на узком срезе (смоук-день сам по себе им и служит --
+# "один день" по букве правила владельца), оценка полной версии = факт среза
+# / n_среза * n_полный * 1.3 (запас); если оценка > 40 -- партиционировать до
+# соответствия. Партиционирование НЕ меняет суммарную ожидаемую стоимость
+# (та же per-unit ставка на весь объём), только дробит её на куски, каждый
+# из которых укладывается в санитарный порог credit_guard.py по отдельности.
+CALIBRATION_SCALE_FACTOR = 1.3
+CALIBRATION_MAX_ESTIMATE = 40.0  # см. credit_guard.SANITY_MAX_ESTIMATE -- держим партицию строго под ним
+
+
+def project_full_estimate(slice_actual_credits: float, slice_n: int, target_n: int) -> float:
+    """Оценка полной версии запроса по факту узкого среза: (факт/n_среза) *
+    n_целевой * CALIBRATION_SCALE_FACTOR."""
+    if slice_n <= 0:
+        raise ValueError("slice_n должен быть > 0 для калибровочной проекции")
+    return (slice_actual_credits / slice_n) * target_n * CALIBRATION_SCALE_FACTOR
+
+
+def calibrated_batch_size(slice_actual_credits: float, slice_n: int, max_estimate: float = CALIBRATION_MAX_ESTIMATE) -> int:
+    """Максимальный размер партиции (в единицах n, событий/токенов), при
+    котором её проекция (project_full_estimate) не превышает max_estimate.
+    Целочисленное деление -- намеренно округляет ВНИЗ (никогда не превысит
+    порог из-за округления)."""
+    if slice_actual_credits <= 0 or slice_n <= 0:
+        return slice_n if slice_n > 0 else 1
+    per_unit = slice_actual_credits / slice_n
+    size = int(max_estimate / (per_unit * CALIBRATION_SCALE_FACTOR))
+    return max(1, size)
+
+
+def batch_rows(df: pd.DataFrame, batch_size: int) -> list[pd.DataFrame]:
+    """Режет df на последовательные непересекающиеся куски по batch_size
+    строк (последний может быть короче) -- используется и для событий
+    (extract), и для токенов (quote distribution)."""
+    return [df.iloc[i:i + batch_size].reset_index(drop=True) for i in range(0, len(df), batch_size)]
+
+
+def run_extract_calibrated(
+    client: DuneClient, base_name: str, events: pd.DataFrame,
+    calib_actual_credits: float, calib_n: int,
+) -> tuple[pd.DataFrame, float]:
+    """Полная версия build_extract_query, откалиброванная по факту смоук-
+    среза (calib_actual_credits, calib_n событий). Партиционирует, если
+    проекция > CALIBRATION_MAX_ESTIMATE. Возвращает (df_все_партиции,
+    итоговая_проекция_до_прогона -- та же величина, что была бы без
+    партиционирования, для сверки с бюджетной проекцией п.2)."""
+    projection = project_full_estimate(calib_actual_credits, calib_n, len(events))
+    if projection <= CALIBRATION_MAX_ESTIMATE:
+        df = run_extract(client, base_name, events, projection)
+        return (df if df is not None else pd.DataFrame()), projection
+    batch_size = calibrated_batch_size(calib_actual_credits, calib_n)
+    batches = batch_rows(events, batch_size)
+    print(
+        f"[{base_name}] Проекция {projection:.1f} > {CALIBRATION_MAX_ESTIMATE:.0f} -- "
+        f"партиционирую на {len(batches)} батчей по <= {batch_size} событий."
+    )
+    parts = []
+    for i, batch in enumerate(batches):
+        est = project_full_estimate(calib_actual_credits, calib_n, len(batch))
+        df = run_extract(client, f"{base_name}_part{i}", batch, est)
+        if df is not None and len(df):
+            parts.append(df)
+    combined = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    return combined, projection
+
+
+def run_quote_distribution_calibrated(
+    client: DuneClient, base_name: str, events: pd.DataFrame,
+    calib_actual_credits: float, calib_n: int,
+) -> tuple[pd.DataFrame, float]:
+    """Полная версия build_quote_distribution_query, откалиброванная по
+    факту смоук-среза. Партиционирует по токенам, если проекция > порога;
+    партиции агрегируются суммой в Python (безопасно -- токен встречается
+    ровно в одной партиции, дублей нет)."""
+    projection = project_full_estimate(calib_actual_credits, calib_n, len(events))
+    if projection <= CALIBRATION_MAX_ESTIMATE:
+        sql = build_quote_distribution_query(events)
+        qid = client.create_query(base_name, sql)
+        df = client.run_sql_cached(
+            base_name, sql, query_id=qid, estimated_credits=projection,
+            expected_max_rows=50, expected_columns=4,
+        )
+        return (df if df is not None else pd.DataFrame()), projection
+    batch_size = calibrated_batch_size(calib_actual_credits, calib_n)
+    batches = batch_rows(events, batch_size)
+    print(
+        f"[{base_name}] Проекция {projection:.1f} > {CALIBRATION_MAX_ESTIMATE:.0f} -- "
+        f"партиционирую на {len(batches)} батчей по <= {batch_size} токенов."
+    )
+    parts = []
+    for i, batch in enumerate(batches):
+        est = project_full_estimate(calib_actual_credits, calib_n, len(batch))
+        sql = build_quote_distribution_query(batch)
+        qid = client.create_query(f"{base_name}_part{i}", sql)
+        df = client.run_sql_cached(
+            f"{base_name}_part{i}", sql, query_id=qid, estimated_credits=est,
+            expected_max_rows=50, expected_columns=4,
+        )
+        if df is not None and len(df):
+            parts.append(df)
+    if not parts:
+        return pd.DataFrame(), projection
+    combined = pd.concat(parts, ignore_index=True)
+    for col in ("n_trades", "n_tokens", "vol_usd"):
+        combined[col] = combined[col].astype(float)
+    result = (
+        combined.groupby("quote_symbol", as_index=False)
+        .agg(n_trades=("n_trades", "sum"), n_tokens=("n_tokens", "sum"), vol_usd=("vol_usd", "sum"))
+        .sort_values("n_tokens", ascending=False)
+        .reset_index(drop=True)
+    )
+    return result, projection

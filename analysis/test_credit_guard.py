@@ -223,6 +223,163 @@ def test_real_billing_cycle_initialized_with_real_numbers() -> None:
         "_init_state() default also carries reset_at (survives a fresh/missing file)",
         cg._init_state()["billing_cycle"].get("reset_at") == "2026-09-14",
     )
+    check(
+        "billing_cycle.external_limit is the corrected 2500.0 (владелец, 2026-09-01 -- было 2450.0)",
+        bc.get("external_limit") == 2500.0,
+        f"got {bc.get('external_limit')!r}",
+    )
+    et = bc.get("external_truth")
+    check("billing_cycle.external_truth block exists (владелец, 2026-09-01 якорь)", et is not None)
+    if et:
+        check("external_truth.cycle_spent is the real 2138.84", et.get("cycle_spent") == 2138.84, f"got {et.get('cycle_spent')!r}")
+        check("external_truth.as_of is 2026-09-01", et.get("as_of") == "2026-09-01")
+        check("external_truth.reserve_buffer is the real 20.0", et.get("reserve_buffer") == 20.0)
+        check(
+            "external_truth carries a per-namespace snapshot for both known namespaces",
+            {"sprint15", "sprintG1"} <= set(et.get("namespace_snapshot_at_anchor", {}).keys()),
+        )
+
+
+def test_external_truth_anchors_cycle_spend_not_double_counted() -> None:
+    """Владелец, 2026-09-01: внутренний леджер разошёлся с дашбордом Dune
+    на ~315 кредитов -- с этого момента _true_cycle_spent считает ОТ
+    ЯКОРЯ (external_truth.cycle_spent), не суммой namespace.spent с нуля.
+    При state ровно НА якоре (namespace.spent == snapshot) расчёт должен
+    вернуть РОВНО cycle_spent -- ни на кредит больше (доказывает, что
+    pre-anchor история не складывается ДВАЖДЫ)."""
+    state = {
+        "billing_cycle": {
+            "external_limit": 2500.0,
+            "initialized_spent": 1394.0,
+            "reset_at": "2026-09-14",
+            "external_truth": {
+                "cycle_spent": 2138.84,
+                "as_of": "2026-09-01",
+                "namespace_snapshot_at_anchor": {"sprint15": 244.155491, "sprintG1": 185.107335},
+                "reserve_buffer": 20.0,
+            },
+        },
+        "sprint15": {"budget_remaining_at_init": 250.0, "spent": 244.155491},
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 185.107335},
+        "entries": [],
+    }
+    computed = cg._true_cycle_spent(state)
+    check(
+        "at the anchor point (no post-anchor spend), true_cycle_spent equals the anchor exactly",
+        abs(computed - 2138.84) < 1e-9,
+        f"got {computed!r}",
+    )
+
+    # Теперь добавим НОВЫЙ расход ПОСЛЕ якоря (например, sprintG1 потратил
+    # ещё 10) -- должно добавиться К ЯКОРЮ, не пересчитываться с нуля.
+    state["sprintG1"]["spent"] = 185.107335 + 10.0
+    computed_after = cg._true_cycle_spent(state)
+    check(
+        "spend recorded AFTER the anchor adds as a delta on top of the anchor (2138.84 + 10)",
+        abs(computed_after - (2138.84 + 10.0)) < 1e-9,
+        f"got {computed_after!r}",
+    )
+
+    # Новое пространство, которого не было на момент якоря -- его снапшот
+    # трактуется как 0 (не как текущий spent, что занулило бы его дельту).
+    state["sprintNew"] = {"budget_remaining_at_init": 50.0, "spent": 3.0}
+    computed_new_ns = cg._true_cycle_spent(state)
+    check(
+        "a namespace absent from the anchor snapshot contributes its FULL spent as delta (snapshot defaults to 0)",
+        abs(computed_new_ns - (2138.84 + 10.0 + 3.0)) < 1e-9,
+        f"got {computed_new_ns!r}",
+    )
+
+
+def test_reserve_buffer_reduces_effective_cycle_limit() -> None:
+    """Владелец, п.3: страховой буфер (20 кредитов) -- неснижаемый
+    остаток. check_before_execute должен отказать операции, которая
+    укладывается в external_limit НАПРЯМУЮ, но не укладывается с учётом
+    буфера."""
+    et_snapshot = {"sprint15": 0.0, "sprintG1": 0.0}
+    state = {
+        "billing_cycle": {
+            "external_limit": 2500.0,
+            "initialized_spent": 1394.0,
+            "reset_at": "2026-09-14",
+            "external_truth": {
+                "cycle_spent": 2485.0,  # остаток без буфера = 15; с буфером (20) = -5 (уже отрицательный)
+                "as_of": "2026-09-01",
+                "namespace_snapshot_at_anchor": et_snapshot,
+                "reserve_buffer": 20.0,
+            },
+        },
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 0.0},
+        "entries": [],
+    }
+    orig_ns = os.environ.get(cg.NAMESPACE_ENV)
+    os.environ[cg.NAMESPACE_ENV] = "sprintG1"
+    try:
+        with with_temp_state(state):
+            raised = False
+            try:
+                # Оценка 10.0: 2485+10=2495 <= 2500 (прошло бы БЕЗ буфера),
+                # но лимит с буфером = 2500-20=2480 < 2495 -- должен отказать.
+                cg.check_before_execute("would_eat_into_reserve_buffer", 10.0)
+            except SystemExit:
+                raised = True
+            check(
+                "operation that would eat into the 20-credit reserve buffer is refused "
+                "even though it fits the raw external_limit",
+                raised,
+            )
+    finally:
+        if orig_ns is None:
+            os.environ.pop(cg.NAMESPACE_ENV, None)
+        else:
+            os.environ[cg.NAMESPACE_ENV] = orig_ns
+
+
+def test_external_truth_drift_check_noop_when_live_total_none() -> None:
+    """live_dune_total=None (эндпойнт недоступен, см.
+    analysis/audit_dune_account.py) -- тихий no-op, НЕ бросает."""
+    raised = False
+    try:
+        cg.check_external_truth_drift(None)
+    except SystemExit:
+        raised = True
+    check("drift check is a no-op when the live Dune total is unavailable (None)", not raised)
+
+
+def test_external_truth_drift_check_stops_on_large_gap() -> None:
+    """Владелец, п.3: расхождение с живой цифрой Dune >5% -- жёсткий
+    стоп. Расхождение <=5% -- проходит."""
+    state = {
+        "billing_cycle": {
+            "external_limit": 2500.0,
+            "initialized_spent": 1394.0,
+            "reset_at": "2026-09-14",
+            "external_truth": {
+                "cycle_spent": 2000.0,
+                "as_of": "2026-09-01",
+                "namespace_snapshot_at_anchor": {"sprint15": 0.0, "sprintG1": 0.0},
+                "reserve_buffer": 20.0,
+            },
+        },
+        "sprint15": {"budget_remaining_at_init": 250.0, "spent": 0.0},
+        "sprintG1": {"budget_remaining_at_init": 300.0, "spent": 0.0},
+        "entries": [],
+    }
+    # computed true_cycle_spent = 2000.0 (на якоре, без пост-якорной дельты).
+    with with_temp_state(state):
+        raised_small = False
+        try:
+            cg.check_external_truth_drift(2040.0)  # 2% расхождение -- в пределах
+        except SystemExit:
+            raised_small = True
+        check("drift <=5% does not raise", not raised_small)
+
+        raised_large = False
+        try:
+            cg.check_external_truth_drift(2200.0)  # 10% расхождение -- за пределами
+        except SystemExit:
+            raised_large = True
+        check("drift >5% raises BudgetGuardStop", raised_large)
 
 
 def test_failed_attempts_carry_estimate_and_reason() -> None:
@@ -443,6 +600,10 @@ def main() -> int:
         test_read_binding_passes_when_within_declared_bound()
         test_peek_result_metadata_defensive_paths()
         test_execute_cost_recorded_even_when_read_is_refused()
+        test_external_truth_anchors_cycle_spend_not_double_counted()
+        test_reserve_buffer_reduces_effective_cycle_limit()
+        test_external_truth_drift_check_noop_when_live_total_none()
+        test_external_truth_drift_check_stops_on_large_gap()
     finally:
         cg._git_commit = orig_git_commit
 

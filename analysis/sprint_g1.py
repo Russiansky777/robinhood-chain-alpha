@@ -21,6 +21,26 @@
    без нового ручного запуска, если смоук в норме (факт <= 2x оценки,
    данные осмысленны).
 
+Ужесточения владельца после run #16 (56.49 факт vs 15.0 оценка на
+g1_v2_quote_distribution, см. docs/COST_POSTMORTEM.md ревизия 5):
+5. Калибровка вместо угадывания: любой запрос НОВОЙ формы сначала
+   исполняется на узком срезе (смоук-день сам служит таким срезом),
+   оценка полной версии = факт среза * масштаб * 1.3 (см.
+   g1_pipeline.CALIBRATION_SCALE_FACTOR); если оценка > 40 --
+   партиционируется (g1_pipeline.run_*_calibrated).
+6. Бюджетная проекция до каскада: перед полным прогоном суммарная
+   проекция (quote_distribution-полный + extract-полный + буфер на
+   чтения) сравнивается с ОСТАТКОМ пространства sprintG1 -- если
+   проекция > остатка, СТОП с полной проекцией, лимит не поднимается
+   молча (только владелец).
+
+Владелец, 2026-09-01 (после разрыва 2138.84 факт Dune vs 1823.26
+внутренний леджер, см. docs/COST_POSTMORTEM.md ревизия 5): перед
+каждым платным этапом вызывается credit_guard.check_external_truth_
+drift(None) -- живого usage-эндпоинта у Dune API v1 нет (см.
+analysis/audit_dune_account.py), поэтому это сейчас no-op, но
+структурно на месте и включится сам, если такой источник появится.
+
 Использование: python analysis/sprint_g1.py --stage smoke|full|report
 """
 from __future__ import annotations
@@ -38,11 +58,12 @@ import pandas as pd
 
 from config import CONFIG
 from dune_client import DuneClient
-from credit_guard import load_state
+from credit_guard import load_state, remaining_cycle_budget, check_external_truth_drift
 from g1_common import fmt_ts
 from g1_pipeline import (
     load_full_v2_events, run_extract, apply_filters, compute_returns, build_quote_distribution_query,
-    QUOTE_DISTRIBUTION_WINDOW_S,
+    QUOTE_DISTRIBUTION_WINDOW_S, project_full_estimate, run_extract_calibrated, run_quote_distribution_calibrated,
+    CALIBRATION_MAX_ESTIMATE,
 )
 from g1_stats import run_horizon_stats, HorizonResult
 
@@ -58,6 +79,22 @@ def print_ledger(ledger: list[dict], title: str) -> float:
         print(f"  {row['name']:<40} {cost}{tag}")
     print(f"  {'ИТОГО':<40} {total:.3f}")
     return total
+
+
+def sprintg1_spent() -> float:
+    return load_state().get("sprintG1", {}).get("spent", 0.0)
+
+
+def run_with_cost(fn, *args, **kwargs):
+    """Выполняет fn(*args, **kwargs), возвращает (result, real_cost) --
+    real_cost = дельта sprintG1.spent ДО/ПОСЛЕ вызова. Точнее, чем сумма
+    client.credit_ledger (там только execute -- см. владелец,
+    docs/COST_POSTMORTEM.md ревизия 5, п.3: read-стоимость коммитится в
+    credits_spent.json отдельно, в client.credit_ledger не попадает)."""
+    before = sprintg1_spent()
+    result = fn(*args, **kwargs)
+    after = sprintg1_spent()
+    return result, after - before
 
 
 def parse_t0(df: pd.DataFrame) -> pd.DataFrame:
@@ -78,51 +115,62 @@ def analytic_n(filtered: pd.DataFrame) -> pd.DataFrame:
     return filtered[filtered["pass_filter"] & filtered["pass_entry"]]
 
 
-def quote_distribution_step(client: DuneClient, events: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
-    """Владелец, деливерабл смоука п.3: распределение quote-токенов по
-    ВСЕМ 896 событиям (не только смоук-день). Возвращает (df, non_weth_flag)."""
-    sql = build_quote_distribution_query(events)
-    qid = client.create_query("g1_v2_quote_distribution", sql)
-    # Оценка поднята с 15.0 (run #16, 56.49 факт против 15.0 -- >2x, гард
-    # остановил пайплайн) после того как запрос получил границу по block_time
-    # (см. build_quote_distribution_query) -- теперь окно на порядок уже
-    # (48ч на событие вместо всей истории), но откалиброванных чисел под ЭТУ
-    # форму запроса ещё нет, поэтому оценка с запасом, не заниженная повторно.
-    df = client.run_sql_cached(
-        "g1_v2_quote_distribution", sql, query_id=qid, estimated_credits=25.0,
-        expected_max_rows=50, expected_columns=4,
-    )
+def summarize_quote_distribution(df: pd.DataFrame, label: str) -> tuple[pd.DataFrame, bool]:
     if df is None or len(df) == 0:
-        print("[quote_distribution] ПУСТО -- неожиданно (свопы уже подтверждены ранее). Продолжаю без этой заметки.")
+        print(f"[{label}] ПУСТО -- неожиданно (свопы уже подтверждены ранее).")
         return pd.DataFrame(), False
+    df = df.copy()
+    for col in ("n_trades", "n_tokens", "vol_usd"):
+        if col in df.columns:
+            df[col] = df[col].astype(float)
     df = df.sort_values("n_tokens", ascending=False).reset_index(drop=True)
     total_tokens_seen = df["n_tokens"].sum()  # токен может встретиться в >1 строке, если торговался против >1 quote
     weth_like = df[df["quote_symbol"].astype(str).str.upper().isin(["WETH", "ETH"])]
-    weth_tokens = int(weth_like["n_tokens"].sum()) if len(weth_like) else 0
+    weth_tokens = float(weth_like["n_tokens"].sum()) if len(weth_like) else 0.0
     non_weth_share = 1 - (weth_tokens / total_tokens_seen) if total_tokens_seen else 0.0
-    print(f"[quote_distribution] non-WETH доля (по n_tokens, токен может считаться в нескольких quote): {non_weth_share:.1%}")
+    print(f"[{label}] non-WETH доля (по n_tokens, токен может считаться в нескольких quote): {non_weth_share:.1%}")
     print(df.to_string(index=False))
     return df, non_weth_share > 0.10
 
 
-def quote_manual_check_step(client: DuneClient, events: pd.DataFrame, quote_df: pd.DataFrame) -> pd.DataFrame | None:
+def quote_distribution_smoke_step(client: DuneClient, smoke_events: pd.DataFrame) -> tuple[pd.DataFrame, bool, float]:
+    """Калибровочный прогон (владелец, ужесточение 5): смоук-день -- узкий
+    срез "один день" по букве правила. Первый прогон ИСПРАВЛЕННОЙ формы
+    запроса (после run #16 -- см. docstring build_quote_distribution_query),
+    оценка для НЕГО САМОГО -- по-прежнему осторожная догадка (не с чем
+    калибровать calibration-запрос), но на порядок меньший масштаб (108
+    токенов, не 896) и уже с границей по block_time -- под защитой
+    существующего 2x-гарда. Возвращает (df, non_weth_flag, реальная_стоимость)."""
+    sql = build_quote_distribution_query(smoke_events)
+    qid = client.create_query("g1_v2_quote_distribution_smoke", sql)
+    df, cost = run_with_cost(
+        client.run_sql_cached, "g1_v2_quote_distribution_smoke", sql, query_id=qid,
+        estimated_credits=10.0, expected_max_rows=50, expected_columns=4,
+    )
+    quote_df, needs_manual_check = summarize_quote_distribution(df, "quote_distribution_smoke")
+    return quote_df, needs_manual_check, cost
+
+
+def quote_manual_check_step(client: DuneClient, smoke_events: pd.DataFrame, quote_df: pd.DataFrame) -> tuple[pd.DataFrame | None, float]:
     """Только если non_weth_share > 10% (владелец, п.3): выборка нескольких
-    сток-квотных событий для ручной сверки USD-нормировки."""
+    сток-квотных событий для ручной сверки USD-нормировки. Только по
+    смоук-дню (не по всем 896) -- это диагностический сэмпл, не
+    статистика, полных 896 не требует."""
     non_weth_symbols = [
         s for s in quote_df["quote_symbol"].astype(str).tolist()
         if s.upper() not in ("WETH", "ETH", "(NULL/UNKNOWN)")
     ][:5]
     if not non_weth_symbols:
         print("[quote_manual_check] non-WETH доля >10%, но не нашлось конкретных не-ETH символов для выборки -- пропускаю.")
-        return None
+        return None, 0.0
     symbols_sql = ",".join("'" + s.replace("'", "''") + "'" for s in non_weth_symbols)
-    tokens = sorted(events["token"].unique())
+    tokens = sorted(smoke_events["token"].unique())
     addr_list = ", ".join(f"0x{t.removeprefix('0x')}" for t in tokens)
     # Границы по block_time ОБЯЗАТЕЛЬНЫ (см. run #16: build_quote_distribution_query
     # без такой границы просканировала всю историю dex.trades, факт 56.49 вместо
     # заявленных 15.0) -- тот же диапазон, что и quote_distribution.
-    t0_min = events["t0"].min()
-    t0_max_bound = pd.Timestamp(events["t0"].max()) + pd.Timedelta(seconds=QUOTE_DISTRIBUTION_WINDOW_S + 60)
+    t0_min = smoke_events["t0"].min()
+    t0_max_bound = pd.Timestamp(smoke_events["t0"].max()) + pd.Timedelta(seconds=QUOTE_DISTRIBUTION_WINDOW_S + 60)
     sql = f"""-- Ручная сверка USD-нормировки на сток-квотных событиях (owner, п.3)
 select dt.token_bought_symbol, dt.token_sold_symbol, dt.token_bought_amount,
     dt.token_sold_amount, dt.amount_usd, dt.block_time
@@ -136,34 +184,40 @@ where dt.blockchain = 'robinhood' and dt.version = '4'
 limit 10
 """
     qid = client.create_query("g1_v2_quote_manual_check", sql)
-    df = client.run_sql_cached(
-        "g1_v2_quote_manual_check", sql, query_id=qid, estimated_credits=5.0,
-        expected_max_rows=10, expected_columns=6,
+    df, cost = run_with_cost(
+        client.run_sql_cached, "g1_v2_quote_manual_check", sql, query_id=qid,
+        estimated_credits=5.0, expected_max_rows=10, expected_columns=6,
     )
     if df is not None and len(df):
         print("[quote_manual_check] Сэмпл сток-квотных сделок (ручная сверка амаунт_usd на разумность):")
         print(df.to_string(index=False))
-    return df
+    return df, cost
 
 
 def run_smoke(client: DuneClient, events: pd.DataFrame) -> tuple[bool, dict]:
-    ledger_start = len(client.credit_ledger)
-
-    quote_df, needs_manual_check = quote_distribution_step(client, events)
-    declared_estimate = 25.0  # quote_distribution (см. quote_distribution_step)
-    if needs_manual_check and len(quote_df):
-        quote_manual_check_step(client, events, quote_df)
-        declared_estimate += 5.0
+    """Смоук = калибровочный узкий срез (владелец, ужесточение 5) для
+    ОБЕИХ форм запросов (quote_distribution, extract) -- смоук-день сам
+    служит "одним днём" по букве правила. Возвращает калибровочные
+    факты (актуальная_стоимость, n), которые main() использует для
+    бюджетной проекции ПЕРЕД каскадом к полному прогону (ужесточение 6)."""
+    check_external_truth_drift(None)  # владелец, правило на будущее -- см. docstring модуля
 
     smoke_events = events[events["t0"].dt.strftime("%Y-%m-%d") == SMOKE_DAY].reset_index(drop=True)
-    print(f"\n[smoke] День {SMOKE_DAY}: {len(smoke_events)} событий-кандидатов (из 896).")
+    print(f"\n[smoke] День {SMOKE_DAY}: {len(smoke_events)} событий-кандидатов (из 896) -- калибровочный срез.")
     if len(smoke_events) == 0:
         print("[smoke] СТОП: на выбранный день нет событий -- расходится с посуточным агрегатом (run #13). Возврат в штаб.")
         return False, {}
+    n_smoke = len(smoke_events)
+
+    quote_df_smoke, needs_manual_check, quote_cost = quote_distribution_smoke_step(client, smoke_events)
+    manual_check_cost = 0.0
+    if needs_manual_check and len(quote_df_smoke):
+        _df, manual_check_cost = quote_manual_check_step(client, smoke_events, quote_df_smoke)
+    declared_estimate = 10.0 + (5.0 if needs_manual_check else 0.0)
 
     smoke_extract_estimate = 15.0
     declared_estimate += smoke_extract_estimate
-    df_smoke_raw = run_extract(client, "g1_v2_smoke_extract", smoke_events, smoke_extract_estimate)
+    df_smoke_raw, extract_cost = run_with_cost(run_extract, client, "g1_v2_smoke_extract", smoke_events, smoke_extract_estimate)
     if df_smoke_raw is None or len(df_smoke_raw) == 0:
         print("[smoke] СТОП: экстракт пуст -- неожиданно. Возврат в штаб.")
         return False, {}
@@ -182,8 +236,14 @@ def run_smoke(client: DuneClient, events: pd.DataFrame) -> tuple[bool, dict]:
     )
     sanity_ok = n_pass_filter > 0 and analytic["entry_vwap"].notna().any()
 
-    smoke_ledger = client.credit_ledger[ledger_start:]
-    smoke_actual = print_ledger(smoke_ledger, "СМОУК-ТЕСТ (день {})".format(SMOKE_DAY))
+    smoke_actual = quote_cost + manual_check_cost + extract_cost
+    print(
+        f"\n----- СМОУК-ТЕСТ (калибровка, день {SMOKE_DAY}): запрос -> кредиты -----\n"
+        f"  g1_v2_quote_distribution_smoke            {quote_cost:.3f}\n"
+        f"  g1_v2_quote_manual_check                  {manual_check_cost:.3f}\n"
+        f"  g1_v2_smoke_extract                       {extract_cost:.3f}\n"
+        f"  {'ИТОГО':<40} {smoke_actual:.3f}"
+    )
     within_2x = smoke_actual <= 2 * declared_estimate
 
     print(
@@ -194,7 +254,8 @@ def run_smoke(client: DuneClient, events: pd.DataFrame) -> tuple[bool, dict]:
     return ok, {
         "n_pass_filter": n_pass_filter, "n_analytic": n_analytic,
         "empty_entry_share": empty_entry_share, "actual_credits": smoke_actual,
-        "declared_estimate": declared_estimate, "quote_df": quote_df,
+        "declared_estimate": declared_estimate, "quote_df": quote_df_smoke,
+        "n_smoke": n_smoke, "quote_calib_actual": quote_cost, "extract_calib_actual": extract_cost,
     }
 
 
@@ -277,10 +338,19 @@ def compute_stats_bundle(filtered: pd.DataFrame) -> dict:
     }
 
 
-def run_full(client: DuneClient, events: pd.DataFrame) -> tuple[int, dict | None]:
-    ledger_start = len(client.credit_ledger)
-    full_estimate = 35.0
-    df_full_raw = run_extract(client, "g1_v2_full_extract", events, full_estimate)
+def run_full(client: DuneClient, events: pd.DataFrame, smoke_info: dict) -> tuple[int, dict | None]:
+    check_external_truth_drift(None)  # владелец, правило на будущее -- см. docstring модуля
+    ledger_start_cost = sprintg1_spent()
+    n_smoke = smoke_info["n_smoke"]
+
+    quote_df_full, _needs_check = run_quote_distribution_calibrated(
+        client, "g1_v2_quote_distribution_full", events, smoke_info["quote_calib_actual"], n_smoke,
+    )
+    quote_df_full, _ = summarize_quote_distribution(quote_df_full, "quote_distribution_full")
+
+    df_full_raw, _extract_projection = run_extract_calibrated(
+        client, "g1_v2_full_extract", events, smoke_info["extract_calib_actual"], n_smoke,
+    )
     if df_full_raw is None or len(df_full_raw) == 0:
         print("[full] СТОП: полный экстракт пуст -- неожиданно. Возврат в штаб.")
         return 1, None
@@ -303,21 +373,22 @@ def run_full(client: DuneClient, events: pd.DataFrame) -> tuple[int, dict | None
             f"> {CONFIG.g1_excluded_events_max_share:.0%} -- фиксируется как ограничение выборки (§2.3), не блокирует."
         )
 
-    full_ledger = client.credit_ledger[ledger_start:]
-    full_actual = print_ledger(full_ledger, "ПОЛНЫЙ ПРОГОН")
+    full_actual = sprintg1_spent() - ledger_start_cost  # execute+чтение (см. run_with_cost docstring)
+    print(f"\n----- ПОЛНЫЙ ПРОГОН (quote_distribution_full + extract, вкл. чтения): {full_actual:.3f} кредитов -----")
 
     if n_analytic < CONFIG.g1_min_n_events:
         print(
             f"\n[full] АНАЛИТИЧЕСКОЕ N = {n_analytic} < {CONFIG.g1_min_n_events} -- UNDERPOWERED. "
             "Вердикт НЕ выносится (§2.7). Возврат в штаб -- решение владельца (продлить период / закрыть)."
         )
-        return 3, {"filtered": filtered, "n_raw": n_raw, "n_pass_filter": n_pass_filter, "n_analytic": n_analytic, "full_actual": full_actual, "underpowered": True}
+        return 3, {"filtered": filtered, "n_raw": n_raw, "n_pass_filter": n_pass_filter, "n_analytic": n_analytic, "full_actual": full_actual, "underpowered": True, "quote_df_full": quote_df_full}
 
     print(f"\n[full] АНАЛИТИЧЕСКОЕ N = {n_analytic} >= {CONFIG.g1_min_n_events} -- ГЕЙТ ПРОЙДЕН, считаю статистику §2.6.")
     stats_bundle = compute_stats_bundle(filtered)
     stats_bundle.update({
         "filtered": filtered, "n_raw": n_raw, "n_pass_filter": n_pass_filter, "n_analytic": n_analytic,
         "excluded_entry_share": excluded_entry_share, "full_actual": full_actual, "underpowered": False,
+        "quote_df_full": quote_df_full,
     })
     print(f"\n[full] ВЕРДИКТ: {stats_bundle['verdict']}\n{stats_bundle['reasoning']}")
     return 0, stats_bundle
@@ -396,8 +467,9 @@ block_time) filter (...)`, согласно §2.3 буквально.
 пост-фильтр §2.2 МИНУС события с пустым entry-окном (t0+30с; t0+90с]
 (§2.3, "нет сделок в окне -> событие исключается как неисполнимое").
 
-**Смоук-день:** {SMOKE_DAY} (владелец допустил 26 или 27.08 -- выбран
-27, более плотный рабочий день, 108 градуаций, без граничных эффектов
+**Смоук-день (он же калибровочный срез, владелец, ужесточение 5):** {SMOKE_DAY}
+(владелец допустил 26 или 27.08 -- выбран 27, более плотный рабочий
+день, {smoke_info.get('n_smoke')} градуаций, без граничных эффектов
 последнего дня периода 29.08). Смоук: N пост-фильтр={smoke_info.get('n_pass_filter')},
 N аналитическое={smoke_info.get('n_analytic')}, доля пустых entry-окон
 ={fmt_pct(smoke_info.get('empty_entry_share'))}, факт кредитов
@@ -405,8 +477,11 @@ N аналитическое={smoke_info.get('n_analytic')}, доля пусты
 {smoke_info.get('declared_estimate', 0):.1f} -- в норме, продолжено
 автономно к полному прогону (владелец, решение 4).
 
-**Распределение quote-токенов (все 896 событий):**
+**Распределение quote-токенов на смоук-дне ({smoke_info.get('n_smoke')} событий, калибровочный срез):**
 {smoke_info.get('quote_df').to_string(index=False) if isinstance(smoke_info.get('quote_df'), pd.DataFrame) and len(smoke_info.get('quote_df')) else '(не получено)'}
+
+**Распределение quote-токенов по всем 896 событиям (полный прогон):**
+{full_info.get('quote_df_full').to_string(index=False) if isinstance(full_info.get('quote_df_full'), pd.DataFrame) and len(full_info.get('quote_df_full')) else '(не получено)'}
 
 **Граница периода НЕ расширена** за 29.08.2026 23:59:59 (config.
 g1_period_end) несмотря на видимый плотный хвост градуаций после
@@ -524,6 +599,55 @@ def write_results_md(full_info: dict, smoke_info: dict) -> None:
     print(f"[sprint_g1] {results_path} обновлён.")
 
 
+def budget_projection_gate(events: pd.DataFrame, smoke_info: dict) -> tuple[bool, dict]:
+    """Владелец, ужесточение 6: перед каскадом к полному прогону --
+    спроектировать суммарную стоимость (quote_distribution-полный +
+    extract-полный, ОБА уже с учётом возможного партиционирования --
+    сумма проекции инвариантна к партиционированию, см. g1_pipeline.py
+    docstring + буфер на чтения) и сравнить с ОСТАТКОМ пространства
+    sprintG1. Если проекция > остатка -- НЕ поднимать лимит молча, стоп
+    и возврат в штаб с полной проекцией (владелец решает)."""
+    n_smoke = smoke_info["n_smoke"]
+    n_full = len(events)
+    proj_quote = project_full_estimate(smoke_info["quote_calib_actual"], n_smoke, n_full)
+    proj_extract = project_full_estimate(smoke_info["extract_calib_actual"], n_smoke, n_full)
+    # Буфер на чтения (владелец, п.2 "+ чтения") -- по прецеденту всего
+    # проекта чтения агрегатов такого размера стоили <1 кредита каждое
+    # (см. credits_spent.json entries); 2 полных запроса (+ возможные
+    # партиции) -- берём с запасом, не точным числом.
+    read_buffer = 5.0
+    total_projected = proj_quote + proj_extract + read_buffer
+
+    state = load_state()
+    ns = state.get("sprintG1", {})
+    ns_remaining = ns.get("budget_remaining_at_init", 0.0) - ns.get("spent", 0.0)
+
+    print(
+        f"\n[budget_projection] Проекция quote_distribution-полный: {proj_quote:.1f} "
+        f"({'>' if proj_quote > CALIBRATION_MAX_ESTIMATE else '<='} {CALIBRATION_MAX_ESTIMATE:.0f} -- "
+        f"{'партиционируется' if proj_quote > CALIBRATION_MAX_ESTIMATE else 'один запрос'})"
+    )
+    print(
+        f"[budget_projection] Проекция extract-полный: {proj_extract:.1f} "
+        f"({'>' if proj_extract > CALIBRATION_MAX_ESTIMATE else '<='} {CALIBRATION_MAX_ESTIMATE:.0f} -- "
+        f"{'партиционируется' if proj_extract > CALIBRATION_MAX_ESTIMATE else 'один запрос'})"
+    )
+    print(f"[budget_projection] Буфер на чтения: {read_buffer:.1f}")
+    print(f"[budget_projection] СУММАРНАЯ проекция: {total_projected:.2f} vs остаток sprintG1: {ns_remaining:.2f}")
+
+    ok = total_projected <= ns_remaining
+    if not ok:
+        print(
+            f"\n[budget_projection] СТОП: суммарная проекция ({total_projected:.2f}) > остатка "
+            f"sprintG1 ({ns_remaining:.2f}). Лимит НЕ поднимается молча -- решение только владельца. "
+            "Полный прогон НЕ запущен."
+        )
+    return ok, {
+        "proj_quote": proj_quote, "proj_extract": proj_extract, "read_buffer": read_buffer,
+        "total_projected": total_projected, "ns_remaining": ns_remaining,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", choices=["smoke", "full", "report"], required=True)
@@ -550,8 +674,14 @@ def main() -> int:
         print("\n[sprint_g1] СМОУК НЕ ПРОШЁЛ -- ждём решения владельца. Полный прогон НЕ запущен.")
         return 3
 
-    print("\n[sprint_g1] Смоук в норме -- продолжаю автономно к полному прогону (владелец, решение 4).")
-    rc, full_info = run_full(client, events)
+    print("\n[sprint_g1] Смоук в норме -- проверяю бюджетную проекцию перед каскадом (владелец, ужесточение 6).")
+    budget_ok, budget_info = budget_projection_gate(events, smoke_info)
+    if not budget_ok:
+        print("\n[sprint_g1] ПРОЕКЦИЯ ПРЕВЫШАЕТ ОСТАТОК -- ждём решения владельца. Полный прогон НЕ запущен.")
+        return 4
+
+    print("\n[sprint_g1] Проекция в пределах остатка -- продолжаю автономно к полному прогону (владелец, решение 4).")
+    rc, full_info = run_full(client, events, smoke_info)
     if full_info is None:
         return rc
 

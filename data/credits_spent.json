@@ -1,11 +1,19 @@
 {
   "billing_cycle": {
-    "external_limit": 2450.0,
+    "external_limit": 2500.0,
     "initialized_spent": 1394.0,
     "initialized_at": "2026-08-31T22:04:07.051087+00:00",
     "initialized_by": "человек, факт с dune.com/settings/billing на 2026-08-31 -- НЕ выведено из логов CI, см. docs/COST_POSTMORTEM.md",
     "reset_at": "2026-09-14",
-    "reset_at_source": "человек, docs/PROJECT_STATE.md правило 7 -- дата сброса биллинг-цикла Dune, НЕ выведена из кода/API"
+    "reset_at_source": "человек, docs/PROJECT_STATE.md правило 7 -- дата сброса биллинг-цикла Dune, НЕ выведена из кода/API",
+    "external_truth": {
+      "cycle_spent": 2138.84,
+      "as_of": "2026-09-01",
+      "source": "владелец, дашборд dune.com/settings/billing, 2026-09-01 -- расхождение с внутренним леджером (1823.26) ~315 кредитов, см. docs/COST_POSTMORTEM.md",
+      "namespace_snapshot_at_anchor": {"sprint15": 244.155491, "sprintG1": 185.107335},
+      "reserve_buffer": 20.0,
+      "reserve_buffer_source": "владелец, 2026-09-01 -- неснижаемый страховой остаток поверх external_limit"
+    }
   },
   "sprint15": {
     "budget_remaining_at_init": 250.0,

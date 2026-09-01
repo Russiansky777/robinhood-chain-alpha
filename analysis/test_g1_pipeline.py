@@ -20,6 +20,8 @@ from config import CONFIG
 from g1_pipeline import (
     build_extract_query, build_quote_distribution_query, horizon_delta, max_offset_s,
     apply_filters, compute_returns, STRESS_LOG_SENTINEL,
+    project_full_estimate, calibrated_batch_size, batch_rows,
+    CALIBRATION_SCALE_FACTOR, CALIBRATION_MAX_ESTIMATE,
 )
 
 
@@ -165,6 +167,77 @@ def test_compute_returns_stress_substitutes_sentinel_for_no_liquidity():
     print("[test_compute_returns_stress_substitutes_sentinel_for_no_liquidity] OK")
 
 
+def test_project_full_estimate_known_values():
+    # run #16-style scenario: факт 56.49 на 896 -- если бы 108 было
+    # калибровочным срезом с той же per-unit ставкой, проекция на 896:
+    per_unit = 56.49 / 896
+    expected = per_unit * 896 * CALIBRATION_SCALE_FACTOR
+    got = project_full_estimate(56.49, 896, 896)
+    assert abs(got - expected) < 1e-9
+    # Простая проверка масштабирования: вдвое больше n_среза -> при том
+    # же per-unit ставка проекции на тот же target тоже вдвое меньше,
+    # т.к. per_unit меньше -- проверим через прямую формулу.
+    assert abs(project_full_estimate(10.0, 100, 100) - 10.0 * CALIBRATION_SCALE_FACTOR) < 1e-9
+    assert abs(project_full_estimate(10.0, 100, 200) - 20.0 * CALIBRATION_SCALE_FACTOR) < 1e-9
+    print("[test_project_full_estimate_known_values] OK")
+
+
+def test_project_full_estimate_raises_on_zero_slice():
+    try:
+        project_full_estimate(10.0, 0, 100)
+        assert False, "ожидался ValueError на slice_n=0"
+    except ValueError:
+        pass
+    print("[test_project_full_estimate_raises_on_zero_slice] OK")
+
+
+def test_calibrated_batch_size_stays_under_cap():
+    # факт 56.49 на срезе 108 -> per_unit=0.523; батч должен быть таким,
+    # чтобы project_full_estimate(56.49, 108, batch) <= 40 -- проверяем
+    # напрямую, не пересчитывая формулу вручную (защита от рассинхрона).
+    batch = calibrated_batch_size(56.49, 108)
+    proj = project_full_estimate(56.49, 108, batch)
+    assert proj <= CALIBRATION_MAX_ESTIMATE + 1e-9, f"batch={batch} даёт проекцию {proj} > {CALIBRATION_MAX_ESTIMATE}"
+    # На единицу больше -- уже должно превышать порог (иначе batch_size
+    # занижен сильнее, чем нужно, тратим лишние запросы впустую).
+    proj_plus_one = project_full_estimate(56.49, 108, batch + 1)
+    assert proj_plus_one > CALIBRATION_MAX_ESTIMATE, "batch_size занижен -- следующий размер тоже укладывался бы"
+    print("[test_calibrated_batch_size_stays_under_cap] OK")
+
+
+def test_calibrated_batch_size_degenerate_zero_actual():
+    # Нулевая калибровочная стоимость (кэш-хит) -- не должно падать/делить на 0.
+    assert calibrated_batch_size(0.0, 100) == 100
+    assert calibrated_batch_size(10.0, 0) == 1
+    print("[test_calibrated_batch_size_degenerate_zero_actual] OK")
+
+
+def test_batch_rows_covers_all_rows_without_overlap():
+    df = pd.DataFrame({"x": range(10)})
+    batches = batch_rows(df, 3)
+    assert [len(b) for b in batches] == [3, 3, 3, 1]
+    reassembled = pd.concat(batches, ignore_index=True)
+    assert list(reassembled["x"]) == list(range(10))
+    print("[test_batch_rows_covers_all_rows_without_overlap] OK")
+
+
+def test_partitioning_does_not_change_total_projected_cost():
+    """Владелец: партиционирование НЕ меняет суммарную ожидаемую
+    стоимость, только дробит её на куски под санитарным порогом --
+    проверяем это свойство напрямую (сумма проекций по партициям ==
+    проекция на весь объём)."""
+    calib_actual, calib_n, full_n = 56.49, 108, 896
+    batch_size = calibrated_batch_size(calib_actual, calib_n)
+    n_batches = -(-full_n // batch_size)  # ceil div
+    total_partitioned = sum(
+        project_full_estimate(calib_actual, calib_n, min(batch_size, full_n - i * batch_size))
+        for i in range(n_batches)
+    )
+    total_unpartitioned = project_full_estimate(calib_actual, calib_n, full_n)
+    assert abs(total_partitioned - total_unpartitioned) < 1e-6, (total_partitioned, total_unpartitioned)
+    print("[test_partitioning_does_not_change_total_projected_cost] OK")
+
+
 def main() -> int:
     tests = [
         test_horizon_delta_matches_spec,
@@ -179,6 +252,12 @@ def main() -> int:
         test_compute_returns_known_values,
         test_compute_returns_excludes_non_analytic_rows,
         test_compute_returns_stress_substitutes_sentinel_for_no_liquidity,
+        test_project_full_estimate_known_values,
+        test_project_full_estimate_raises_on_zero_slice,
+        test_calibrated_batch_size_stays_under_cap,
+        test_calibrated_batch_size_degenerate_zero_actual,
+        test_batch_rows_covers_all_rows_without_overlap,
+        test_partitioning_does_not_change_total_projected_cost,
     ]
     failed = 0
     for t in tests:
