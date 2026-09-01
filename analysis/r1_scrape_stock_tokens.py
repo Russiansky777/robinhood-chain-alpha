@@ -181,6 +181,21 @@ def main() -> int:
             islands = dump_astro_island_props(html)
             print(f"найдено <astro-island> тегов: {len(islands)}")
             results[name]["astro_islands"] = islands
+            # run #6: ни один astro-island не похож на таблицу фидов
+            # (только чехол UI -- NavBar/Header/TOC/...). Значит таблица
+            # -- либо обычный <table> в статичном HTML, либо данные для
+            # неё приходят отдельным client-side fetch(). Вырезаем сырой
+            # срез между двумя якорями секции для разбора глазами.
+            start_anchor = "The following table shows"
+            end_anchor = "Total Return Value calculation"
+            si = html.find(start_anchor)
+            ei = html.find(end_anchor, si) if si >= 0 else -1
+            if si >= 0:
+                section = html[si:ei if ei > si else si + 20000]
+                results[name]["feed_table_section_raw"] = section
+                print(f"[r1_scrape] Секция таблицы фидов: {len(section)} символов сырого HTML.")
+            else:
+                print("[r1_scrape] Якорь 'The following table shows' не найден в сыром HTML.")
 
     if probe:
         out_name = "r1_stock_tokens_probe.json"
