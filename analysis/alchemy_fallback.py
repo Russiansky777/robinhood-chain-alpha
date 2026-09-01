@@ -4,8 +4,12 @@
 Тянет `Swap`-логи Uniswap v3 (Pool) и v4 (PoolManager) напрямую через
 Alchemy `eth_getLogs` за диапазон блоков, без прохода через Dune вообще.
 
-Статус: заготовка (не выполнялась — нет сети до *.alchemy.com из этой
-среды, см. docs/DATA_ACCESS.md). Компромиссы относительно SQL-пути:
+Статус: интерактивная сессия по-прежнему не имеет сети до этого домена
+(egress-прокси блокирует всё, кроме github.com — см. docs/DATA_ACCESS.md),
+но с GH Actions runner'а публичный `PUBLIC_RPC_URL` (без ключа)
+реально работает — подтверждено прогоном 2026-09-01 (docs/P3_GUARD.md,
+"Проба публичного RPC..."). Alchemy/Blockscout остаются
+фолбэком — см. `_endpoints()`. Компромиссы относительно SQL-пути:
 
 - Не даёт готовый amount_usd — цены нужно джойнить отдельно (напр. через
   Alchemy Prices API или CoinGecko по timestamp блока), здесь оставлен
@@ -19,7 +23,8 @@ Alchemy `eth_getLogs` за диапазон блоков, без прохода 
 """
 from __future__ import annotations
 
-from typing import Iterator
+import time
+from typing import Callable, Iterator
 
 import requests
 from Crypto.Hash import keccak
@@ -45,38 +50,106 @@ def topic0(signature: str) -> str:
     return "0x" + h.hexdigest()
 
 
-def _rpc_url() -> str:
+_BASE_HEADERS = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
+_MAX_RETRIES_PER_ENDPOINT = 3
+_BACKOFF_BASE_S = 2.0
+
+
+def _endpoints() -> list[tuple[str, dict]]:
+    """Упорядоченный список (base_url, доп.заголовки) -- первый в
+    приоритете, следующие -- ФОЛБЭК.
+
+    ПУБЛИЧНЫЙ RPC (CONFIG.public_rpc_url) -- ПЕРВЫЙ с 2026-09-01
+    (владелец, дозапрос): реальный прогон GH Actions (run 33570102743,
+    см. docs/P3_GUARD.md, "Проба публичного RPC...") подтвердил --
+    eth_blockNumber и eth_getLogs (диапазоны 1000/2000 блоков) проходят
+    БЕЗ 403 и без ключа; троттлинг (429) начинается при быстрых
+    последовательных вызовах (~3 запроса/с по факту). Раньше (до этого
+    дозапроса) единственными вариантами были платные ключи -- Alchemy
+    и Blockscout PRO API (см. историю ниже) -- теперь они ФОЛБЭК,
+    используются только если публичный RPC вернул стойкую (не 429)
+    ошибку на всех попытках."""
+    endpoints: list[tuple[str, dict]] = []
+    if CONFIG.public_rpc_url:
+        endpoints.append((CONFIG.public_rpc_url, {}))
     if CONFIG.alchemy_rpc_url:
-        return CONFIG.alchemy_rpc_url
-    if CONFIG.alchemy_api_key:
-        return f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}"
+        endpoints.append((CONFIG.alchemy_rpc_url, {}))
+    elif CONFIG.alchemy_api_key:
+        endpoints.append((f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}", {}))
     if CONFIG.blockscout_api_key:
-        return CONFIG.blockscout_rpc_url
-    # ВАЖНО (найдено при подготовке P3-гарда, 2026-09-01, см.
-    # docs/P3_GUARD.md): прямой POST на robinhoodchain.blockscout.com/
-    # api/eth-rpc вернул 403 -- не WAF/UA-фильтр (заголовок User-Agent
-    # не помог), а по официальной доке Robinhood Chain
-    # (github.com/blockscout/docs, robinhood-api.mdx) у ЭТОГО чейна
-    # Blockscout API обслуживается через "PRO API" гейтвей
-    # (api.blockscout.com/4663/json-rpc, Bearer-токен) -- "Get a free
-    # API key at dev.blockscout.com -- required for all PRO API tiers,
-    # including free." Бесплатный ключ существует, но требует
-    # регистрации на внешнем сервисе -- не выполняется этой сессией
-    # автономно (см. docs/P3_GUARD.md, "Блокер выполнения").
-    raise RuntimeError(
-        "Ни ALCHEMY_API_KEY/ALCHEMY_ROBINHOOD_RPC_URL, ни BLOCKSCOUT_API_KEY "
-        "не заданы. Robinhood Chain на Blockscout требует ключ даже для "
-        "бесплатного тира PRO API (dev.blockscout.com) -- анонимный "
-        "eth-rpc прокси для этого чейна недоступен (403). Заполните .env "
-        "(см. .env.example) или добавьте секрет GH Actions."
-    )
+        # ВАЖНО (найдено при подготовке P3-гарда, 2026-09-01, см.
+        # docs/P3_GUARD.md): прямой безключевой eth-rpc-прокси
+        # Blockscout для ЭТОГО чейна вернул 403 -- обслуживается через
+        # платный "PRO API" гейтвей (api.blockscout.com/4663/json-rpc),
+        # требующий Bearer-токен даже на бесплатном тире.
+        endpoints.append((CONFIG.blockscout_rpc_url, {"Authorization": f"Bearer {CONFIG.blockscout_api_key}"}))
+    if not endpoints:
+        # Практически недостижимо -- CONFIG.public_rpc_url всегда имеет
+        # дефолт -- но если владелец явно очистил PUBLIC_RPC_URL="" И
+        # ключи не заданы, явная ошибка лучше тихого сбоя.
+        raise RuntimeError(
+            "Ни PUBLIC_RPC_URL, ни ALCHEMY_API_KEY/ALCHEMY_ROBINHOOD_RPC_URL, "
+            "ни BLOCKSCOUT_API_KEY не заданы -- нет ни одного RPC-эндпоинта. "
+            "Заполните .env (см. .env.example) или добавьте секрет GH Actions."
+        )
+    return endpoints
+
+
+def _rpc_url() -> str:
+    """Текущий ПЕРВЫЙ (приоритетный) эндпоинт -- для кода, которому
+    нужен один URL без встроенного фолбэка/ретрая (напр. диагностика).
+    Основной путь запросов (_rpc_call/_chunked_get_logs) сам перебирает
+    весь список _endpoints(), не полагается только на эту функцию."""
+    return _endpoints()[0][0]
 
 
 def _auth_headers() -> dict:
-    headers = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
-    if not CONFIG.alchemy_rpc_url and not CONFIG.alchemy_api_key and CONFIG.blockscout_api_key:
-        headers["Authorization"] = f"Bearer {CONFIG.blockscout_api_key}"
-    return headers
+    """Заголовки ПЕРВОГО (приоритетного) эндпоинта -- см. оговорку
+    _rpc_url() выше про встроенный фолбэк основного пути."""
+    _, extra = _endpoints()[0]
+    return {**_BASE_HEADERS, **extra}
+
+
+def _post_with_fallback(payload: dict) -> dict:
+    """POST payload по списку `_endpoints()` в порядке приоритета.
+
+    На 429 (rate-limit) -- retry с экспоненциальным backoff НА ТОМ ЖЕ
+    эндпоинте (до `_MAX_RETRIES_PER_ENDPOINT` раз) прежде чем перейти к
+    следующему -- транзиентная проблема, не повод сразу тратить платный
+    ключ. На 401/403 или сетевую ошибку -- сразу переход к следующему
+    эндпоинту (без ретрая на этом же -- не транзиентно). Возвращает
+    распарсенный JSON-body первого успешного ответа (включая
+    JSON-RPC-level `"error"` в теле -- это не транспортная проблема,
+    вызывающий код сам решает, что с ней делать, как раньше).
+    Кидает RuntimeError, если ВСЕ эндпоинты исчерпаны."""
+    last_err: Exception | str | None = None
+    for url, extra_headers in _endpoints():
+        headers = {**_BASE_HEADERS, **extra_headers}
+        for attempt in range(_MAX_RETRIES_PER_ENDPOINT):
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=30)
+            except requests.exceptions.RequestException as e:
+                last_err = f"{url}: сетевая ошибка {e}"
+                break  # не ретраим сетевые ошибки на этом URL -- следующий эндпоинт
+            if resp.status_code == 429:
+                if attempt < _MAX_RETRIES_PER_ENDPOINT - 1:
+                    time.sleep(_BACKOFF_BASE_S * (2 ** attempt))
+                    continue
+                last_err = f"{url}: 429 после {_MAX_RETRIES_PER_ENDPOINT} попыток"
+                break
+            if resp.status_code in (401, 403):
+                last_err = f"{url}: {resp.status_code} {resp.text[:300]!r}"
+                break
+            try:
+                resp.raise_for_status()
+                return resp.json()
+            except requests.exceptions.HTTPError as e:
+                last_err = f"{url}: {e}"
+                break
+            except ValueError:
+                last_err = f"{url}: не-JSON ответ {resp.status_code} {resp.text[:300]!r}"
+                break
+    raise RuntimeError(f"Все RPC-эндпоинты исчерпаны. Последняя ошибка: {last_err}")
 
 
 def _rpc_call(method: str, params: list) -> dict:
@@ -84,17 +157,9 @@ def _rpc_call(method: str, params: list) -> dict:
     для постраничной версии). Используется P3-гардом (analysis/
     p3_dislocation_guard.py) для eth_blockNumber/eth_getBlockByNumber/
     eth_getTransactionByHash -- лёгкие точечные вызовы, не диапазон блоков."""
-    url = _rpc_url()
-    resp = requests.post(
-        url,
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-        headers=_auth_headers(),
-        timeout=30,
-    )
-    resp.raise_for_status()
-    body = resp.json()
+    body = _post_with_fallback({"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
     if "error" in body:
-        raise RuntimeError(f"RPC {method} error ({url}): {body['error']}")
+        raise RuntimeError(f"RPC {method} error: {body['error']}")
     return body["result"]
 
 
@@ -116,9 +181,12 @@ def _chunked_get_logs(
     topics: list,
     chunk_size: int = 2000,
     address: str | list[str] | None = None,
+    on_call: Callable[[int, int, int], None] | None = None,
 ) -> Iterator[dict]:
     """eth_getLogs постранично, чтобы не упереться в лимит провайдера на
-    диапазон блоков за запрос. Возвращает сырые логи по одному.
+    диапазон блоков за запрос. Возвращает сырые логи по одному. Каждый
+    реальный HTTP-вызов идёт через `_post_with_fallback` -- ретрай на
+    429 + переход на фолбэк-эндпоинт при стойкой ошибке (см. выше).
 
     `topics` — либо плоский список topic0[,topic1,...] (как раньше,
     обратная совместимость), либо уже готовый список позиций топиков
@@ -128,8 +196,10 @@ def _chunked_get_logs(
     или список строк), см. Sprint P3-гард (analysis/
     p3_dislocation_guard.py) — сужает диапазон без знания topic1/2
     заранее, дешевле для широких по времени, но узких по адресу сканов.
+    `on_call(lo, hi, n_results)` — опциональный колбэк, вызывается
+    после КАЖДОГО реального HTTP-вызова (для верификации оценок
+    стоимости постфактум, см. analysis/sc1_wash_slice.py).
     """
-    url = _rpc_url()
 
     def _get_range(lo: int, hi: int) -> Iterator[dict]:
         filter_obj: dict = {
@@ -145,18 +215,20 @@ def _chunked_get_logs(
             "method": "eth_getLogs",
             "params": [filter_obj],
         }
-        resp = requests.post(url, json=payload, headers=_auth_headers(), timeout=30)
-        resp.raise_for_status()
-        body = resp.json()
+        body = _post_with_fallback(payload)
         if "error" in body:
-            raise RuntimeError(f"eth_getLogs error ({url}): {body['error']}")
+            raise RuntimeError(f"eth_getLogs error [{lo};{hi}]: {body['error']}")
         result = body.get("result", [])
+        if on_call is not None:
+            on_call(lo, hi, len(result))
         # Blockscout's public eth-rpc proxy caps eth_getLogs at 1000
         # results/request (docs.blockscout.com/devs/apis/rpc/eth-rpc) --
         # найдено при подготовке P3-гарда (2026-09-01). Ровно 1000 --
         # подозрение на молчаливую обрезку (провайдер не поднимает
         # ошибку) -- бисекция диапазона блоков вместо тихой потери
-        # логов (владелец: "никогда не выдумывай данные").
+        # логов (владелец: "никогда не выдумывай данные"). Публичный
+        # RPC (теперь основной эндпоинт) такого капа не документирует,
+        # но проверка безвредна и на нём -- оставлена как есть.
         if len(result) >= 1000 and hi > lo:
             mid = (lo + hi) // 2
             yield from _get_range(lo, mid)

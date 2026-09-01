@@ -58,6 +58,22 @@ class Config:
             "BLOCKSCOUT_RPC_URL", "https://api.blockscout.com/4663/json-rpc"
         )
     )
+    # ПУБЛИЧНЫЙ RPC -- без ключа (владелец, дозапрос 2026-09-01,
+    # проверено реальным прогоном GH Actions run 33570102743):
+    # eth_blockNumber и eth_getLogs (диапазоны 1000/2000 блоков) прошли
+    # БЕЗ 403 и без ключа; на 3-м быстром подряд вызове (5000 блоков)
+    # получен 429 Too Many Requests -- значит источник живой, но
+    # rate-limited (~3 запроса/с по факту 20-вызовной пробы, 18
+    # успешных из 20 за 6.64с), не платно-огороженный, как Blockscout
+    # PRO API. См. docs/P3_GUARD.md, "Проба публичного RPC...". Теперь
+    # ПЕРВЫЙ в приоритете `alchemy_fallback._endpoints()` -- ключевые
+    # пути (Alchemy/Blockscout) остаются ФОЛБЭКОМ на случай стойкой
+    # (не 429) ошибки этого источника.
+    public_rpc_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "PUBLIC_RPC_URL", "https://rpc.mainnet.chain.robinhood.com"
+        )
+    )
 
     # --- Период анализа (Sprint 1: июль -> август 2026) ---
     train_start: str = "2026-07-01"

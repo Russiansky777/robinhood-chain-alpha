@@ -7,15 +7,21 @@ Blockscout eth_getLogs) для применения критерия «доля 
     >50% -> KILL; <20% -> главная линия; между 20% и 50% -> второй
     кластер (см. SC1_NOTE.md для полной формулировки).
 
-СТАТУС: ЗАГОТОВКА. НЕ ЗАПУСКАЛСЯ. Требует ALCHEMY_API_KEY ИЛИ
-BLOCKSCOUT_API_KEY (тот же блокер, что у P3 -- см. analysis/
-alchemy_fallback.py, docs/P3_GUARD.md) -- подключён к тому же
-push-триггеру `data/p3_guard_cache/STAGE_REQUEST`, что и P3
+СТАТУС: ЗАГОТОВКА. НЕ ЗАПУСКАЛСЯ (владелец: "не запускать полный срез
+без команды"). Обновление 2026-09-01 (дозапрос владельца, "проба
+публичного RPC"): **ключ БОЛЬШЕ НЕ ТРЕБУЕТСЯ** для старта -- реальный
+прогон GH Actions (run 33570102743) подтвердил, что `PUBLIC_RPC_URL`
+(`https://rpc.mainnet.chain.robinhood.com`) отдаёт `eth_blockNumber`/
+`eth_getLogs` без ключа и без 403 (rate-limit 429 на быстрых
+последовательных вызовах -- см. `analysis/alchemy_fallback.py`,
+`_endpoints()`/`_post_with_fallback` -- ретрай с backoff на 429,
+переход на Alchemy/Blockscout как ФОЛБЭК только при стойкой ошибке).
+Всё ещё подключён к push-триггеру `data/p3_guard_cache/STAGE_REQUEST`
 (.github/workflows/run_sc1_wash_slice.yml, ОТДЕЛЬНЫЙ файл от
-run_p3_guard.yml -- P3 не тронут), поэтому реально стартует, как
-только владелец добавит секрет и в следующий раз изменится тот же
-маркер (тот же механизм, что уже "срабатывает вхолостую" для P3 при
-каждом пуше маркера -- ключа пока нет ни у одного).
+run_p3_guard.yml -- P3 не тронут) -- теперь реально СТАРТУЕТ при
+следующем пуше в этот маркер (ключ больше не блокер), но полный прогон
+всё равно не запускается автоматически этим дозапросом -- маркер не
+бампался.
 
 Область (по заданию владельца -- ЯВНО СУЖЕНО, не весь кластер):
 топ-20 токенов кластера `0x0eaced04ec017ea0d9985b6bcd16657b5b2dac78`
@@ -78,18 +84,28 @@ ceil(10 195 476 / 2000) = **5 098 базовых вызовов** (нижняя 
   (60 CU x 10 000) = 600 000 CU = **~2% лимита**.
 - **Blockscout free tier (PRO API, dev.blockscout.com)**: 5
   запросов/сек, 1000 записей/`eth_getLogs`-вызов (WebSearch,
-  blog.blockscout.com, "Blockscout vs Etherscan API... 2026"). При
-  5-10к вызовах и лимите 5/с -- **~17-33 минуты** только на
-  rate-limit ожидание (без параллелизации), без явного месячного
-  количественного капа в найденных источниках (в отличие от Alchemy)
-  -- вписывается в один прогон GH Actions (лимит job'а по умолчанию
-  6 часов).
+  blog.blockscout.com, "Blockscout vs Etherscan API... 2026"). Теперь
+  ФОЛБЭК (см. СТАТУС выше), не основной путь.
+- **ПУБЛИЧНЫЙ RPC (`PUBLIC_RPC_URL`, основной путь с 2026-09-01)**:
+  без документированного месячного капа (сам эндпоинт не платный),
+  но РЕАЛЬНО измеренный rate-limit (run 33570102743, docs/P3_GUARD.md):
+  429 начинается уже на 3-м быстром подряд вызове, ~3 запроса/с сырых
+  (18/20 успешных за 6.64с в пробе). С ретраем-backoff
+  (`_post_with_fallback`, до 3 попыток на 429, экспоненциальный backoff
+  2с/4с) устойчивый эффективный темп, вероятно, НИЖЕ 3/с -- честная
+  оценка **~1.5-2.5 запроса/с эффективно**. При 5 000-10 000 вызовах:
+  **~33-111 минут** -- вписывается в один прогон GH Actions (лимит
+  job'а по умолчанию 6 часов) с запасом, но заметно дольше, чем
+  давала бы Blockscout-only оценка (5/с) -- платный ключ по-прежнему
+  ускорил бы прогон, если владелец решит его добавить, но БОЛЬШЕ НЕ
+  ОБЯЗАТЕЛЕН для самого факта запуска.
 
-**Вывод: срез технически укладывается в бесплатный тир ЛЮБОГО из двух
-источников** (Alchemy с большим запасом по CU; Blockscout -- по
-времени, не по счётчику) -- ни то, ни другое не требует платного
-плана. Оценка не идеальна (плотность после первых суток не измерена,
-только предположена по общему паттерну) -- при реальном прогоне
+**Вывод: срез технически укладывается в бесплатный тир публичного RPC
+без ключа** -- медленнее, чем было бы с платным ключом, но не требует
+его для старта. Оценка не идеальна (плотность после первых суток не
+измерена, только предположена по общему паттерну; реальный устойчивый
+rate публичного RPC под нагрузкой в тысячи вызовов подряд тоже не
+измерен -- проба была короткой, 20 вызовов) -- при реальном прогоне
 скрипт сам считает фактическое число вызовов и печатает его в лог,
 чтобы это предположение можно было проверить постфактум.
 
@@ -140,9 +156,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from alchemy_fallback import (  # noqa: E402  (см. sys.path.insert выше)
     UNISWAP_V3_SWAP_SIG,
-    _auth_headers,
+    _chunked_get_logs,
     _rpc_call,
-    _rpc_url,
     topic0,
 )
 from config import CONFIG  # noqa: E402
@@ -220,46 +235,24 @@ def _decode_swap_data(data_hex: str) -> tuple[int, int]:
 
 
 def _fetch_logs_chunked(addresses: list[str], from_block: int, to_block: int, chunk_size: int = 2000):
-    """Тот же паттерн бисекции при >=1000 результатах, что
-    `alchemy_fallback._chunked_get_logs`, но с явным счётчиком реальных
-    вызовов (для проверки постфактум оценки выше) -- не переиспользует
-    приватную функцию напрямую, т.к. там нет счётчика."""
-    url = _rpc_url()
-    import requests
-
+    """Тонкая обёртка над `alchemy_fallback._chunked_get_logs` (общий
+    путь с P3-гардом -- ретрай на 429 + фолбэк на Alchemy/Blockscout
+    при стойкой ошибке, см. docs/P3_GUARD.md, "Проба публичного RPC...").
+    Раньше здесь была отдельная дублирующая реализация без фолбэка --
+    убрана в пользу переиспользования (владелец, 2026-09-01: "публичный
+    RPC как основной источник, ключевые пути фолбэком"). Счётчик вызовов
+    через `on_call` -- для проверки постфактум оценки в докстринге
+    модуля (5000-10000)."""
     n_calls = 0
 
-    def _get_range(lo: int, hi: int):
+    def _count(lo: int, hi: int, n_results: int) -> None:
         nonlocal n_calls
         n_calls += 1
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "eth_getLogs",
-            "params": [{
-                "fromBlock": hex(lo), "toBlock": hex(hi),
-                "address": addresses, "topics": [topic0(UNISWAP_V3_SWAP_SIG)],
-            }],
-        }
-        resp = requests.post(url, json=payload, headers=_auth_headers(), timeout=30)
-        resp.raise_for_status()
-        body = resp.json()
-        if "error" in body:
-            raise RuntimeError(f"eth_getLogs error: {body['error']}")
-        result = body.get("result", [])
-        if len(result) >= 1000 and hi > lo:
-            mid = (lo + hi) // 2
-            yield from _get_range(lo, mid)
-            yield from _get_range(mid + 1, hi)
-        else:
-            yield from result
 
-    block = from_block
-    while block <= to_block:
-        end = min(block + chunk_size - 1, to_block)
-        yield from _get_range(block, end)
-        block = end + 1
-
+    yield from _chunked_get_logs(
+        from_block, to_block, [topic0(UNISWAP_V3_SWAP_SIG)],
+        chunk_size=chunk_size, address=addresses, on_call=_count,
+    )
     print(f"[sc1_wash_slice] фактическое число вызовов eth_getLogs: {n_calls} "
           f"(оценка в докстрине: 5000-10000)")
 
