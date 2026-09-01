@@ -245,24 +245,33 @@ def summarize_funding(records: list[dict]) -> dict:
             sign_flip_applied = True
 
     span_hours = (df["timestamp"].max() - df["timestamp"].min()) / 3600.0
-    # rate трактуется как ДОЛЯ (фрация) за час -- docs.lighter.xyz/
-    # trading/funding: "1-hour premium ... funding payments for the
-    # premium are distributed over 8 hours" (получено WebSearch,
-    # дословная цитата в docs/P4_RECON.md) -- т.е. ЗНАЧЕНИЕ,
-    # возвращаемое на resolution=1h, УЖЕ является часовой выплатой
-    # (premium/8), не сырой недошёлённой 8-часовой премией -- поэтому
-    # аннуализация rate*24*365 (без дополнительного /8) методологически
-    # верна, ЕСЛИ rate -- доля. Открытый вопрос -- буквальные единицы
-    # сырого числа (см. диагностику сырых записей в логе прогона,
-    # docs/P4_RECON.md "Дозапрос: единицы фандинга").
-    annualized = df["rate"] * 24 * 365  # resolution=1h -> rate уже часовая доля
-    annualized_median_pct = round(float(annualized.median()) * 100, 4)
+    # ИСПРАВЛЕНО (дозапрос владельца, 2026-09-01, п.3 -- "проверить
+    # единицу по документации/API, пересчитать если rate в %"): rate
+    # трактуется как уже ПРОЦЕНТ (не доля) -- три независимых реальных
+    # доказательства, полный разбор в docs/P4_RECON.md, "Дозапрос
+    # владельца: проверка единицы rate...":
+    #   1. docs.lighter.xyz/perpetual-futures/funding (WebSearch,
+    #      2026-09-01): часовая rate зажата в [-0.5%, +0.5%] -- реальная
+    #      запись SNDK rate="0.0361" как ДОЛЯ была бы 3.61%/час
+    #      (нарушает клэмп), как ПРОЦЕНТ -- 0.0361%/час (укладывается).
+    #   2. Эмпирика на 48 реальных записях funding SNDK: value =
+    #      (rate/100) x price -- implied_price = value/rate*100 гладко
+    #      восстанавливает реальную ценовую траекторию рынка.
+    #   3. `base_interest_rate` в метаданных рынка (orderBookDetails)
+    #      = 0.0032 (%); формула официальной доки fundingRate =
+    #      premium/8 + interestRateComponent; медианный rate = 0.0004 у
+    #      ВСЕХ 36 успешно опрошенных рынков (premium~=0 typical) --
+    #      0.0032/8 = 0.0004 ровно.
+    # Аннуализация теперь БЕЗ дополнительного x100 в конце (rate уже %).
+    annualized = df["rate"] * 24 * 365  # rate уже ПРОЦЕНТ/час -> сразу % годовых
+    annualized_median_pct = round(float(annualized.median()), 4)
     # Кросс-чек против внешнего ориентира: сравнимые крипто-рынки на
     # Lighter/других venue показывают порядка -2.6..+8.7 bps за 8ч
     # (loris.tools, см. docs/P4_RECON.md) -- пересчитываем ту же
-    # медиану в "bps за 8ч" для прямого сравнения по величине.
+    # медиану в "bps за 8ч" (rate уже % -> x100 переводит % в bps, не
+    # x10000, которое было бы верно только для доли).
     median_rate_per_hour = float(df["rate"].median())
-    median_bps_per_8h = round(median_rate_per_hour * 8 * 10_000, 4)
+    median_bps_per_8h = round(median_rate_per_hour * 8 * 100, 4)
     return {
         "n_records": int(len(df)),
         "span_days": round(span_hours / 24.0, 2),
@@ -274,8 +283,8 @@ def summarize_funding(records: list[dict]) -> dict:
         "median_bps_per_8h_equivalent": median_bps_per_8h,
         "reference_range_bps_per_8h": "-2.6..+8.7 (loris.tools, сравнимые крипто-рынки, см. docs/P4_RECON.md)",
         "annualized_median_pct": annualized_median_pct,
-        "annualized_p10_pct": round(float(annualized.quantile(0.10)) * 100, 4),
-        "annualized_p90_pct": round(float(annualized.quantile(0.90)) * 100, 4),
+        "annualized_p10_pct": round(float(annualized.quantile(0.10)), 4),
+        "annualized_p90_pct": round(float(annualized.quantile(0.90)), 4),
         "share_hours_negative_for_short_pct": round(float((annualized < 0).mean()) * 100, 2),
         "suspected_bug_gt_100pct_annual": abs(annualized_median_pct) > 100,
     }

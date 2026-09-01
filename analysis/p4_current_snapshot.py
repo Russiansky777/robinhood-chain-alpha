@@ -85,7 +85,10 @@ def run() -> int:
     if latest:
         try:
             rate_raw = float(latest.get("rate"))
-            annualized_pct = round(rate_raw * 24 * 365 * 100, 4)
+            # ИСПРАВЛЕНО (дозапрос владельца, 2026-09-01, п.3): rate уже
+            # ПРОЦЕНТ, не доля -- см. docs/P4_RECON.md, "Дозапрос
+            # владельца: проверка единицы rate...". Без доп. x100.
+            annualized_pct = round(rate_raw * 24 * 365, 4)
         except (TypeError, ValueError):
             rate_raw = None
             annualized_pct = None
