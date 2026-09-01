@@ -34,11 +34,15 @@ from config import CONFIG
 CACHE_DIR = Path(CONFIG.r1_cache_dir)
 
 URLS = {
-    # docs.robinhood.com/chain/stock-token-apis (run #2 разведки) описал
-    # ЖИВОЙ read-only REST API -- https://api.robinhood.com/rhj/assets --
-    # это лучше, чем парсить документацию: полный актуальный реестр
-    # сток-токенов с реальными адресами, а не пример из документации.
-    "assets_api_probe": "https://api.robinhood.com/rhj/assets",
+    # run #3: /rhj/assets подтверждён как живой реестр токенов с
+    # реальными адресами (см. data/sprintR1_cache/r1_stock_tokens_probe.json).
+    # Осталось найти реестр АДРЕСОВ ФИДОВ (Oracles & Price Feeds
+    # docs.robinhood.com указывает на "Robinhood price feeds page" у
+    # Chainlink как источник правды) -- ре-проба той же страницы, что в
+    # run #1, но с бОльшим капом дампа (текст был 147951 символов,
+    # раньше сохраняли только первые 50000 -- содержательная часть
+    # могла быть дальше).
+    "chainlink_robinhood_feeds": "https://docs.chain.link/data-feeds/tokenized-equity-feeds/robinhood",
 }
 
 ADDR_RE = re.compile(r"0x[a-fA-F0-9]{40}")
