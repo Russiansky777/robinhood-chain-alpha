@@ -16,6 +16,9 @@ from pathlib import Path
 os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "sprintR1")
 sys.path.insert(0, str(Path(__file__).parent))
 
+import pandas as pd
+
+from config import CONFIG
 from dune_client import DuneClient
 from run_pipeline import read_sql
 
@@ -28,7 +31,7 @@ def main() -> int:
     qid = client.create_query("r1_flagship_trades_by_symbol", SQL)
     df = client.run_sql_cached(
         "r1_flagship_trades_by_symbol", SQL, query_id=qid, estimated_credits=8.0,
-        expected_max_rows=200, expected_columns=5,
+        expected_max_rows=2000, expected_columns=5,
     )
     if df is None or not len(df):
         print("[r1_flagship_recon] Пусто -- флагманские тикеры (с фидами) ВООБЩЕ не "
@@ -38,13 +41,33 @@ def main() -> int:
               "фактически провален (нет пересечения объём+фид ни в одну сторону).")
         return 1
 
-    print(df.to_string(max_rows=200))
-    n_pass22 = ((df["n_trades"] >= 100) & (df["vol_usd"] >= 10_000)).sum()
+    out_path = Path(CONFIG.r1_cache_dir) / "r1_flagship_trades_by_symbol.csv"
+    df.to_csv(out_path, index=False)
+    print(f"[r1_flagship_recon] {len(df)} строк (symbol x token_address) -- "
+          f"МНОГО адресов на символ (копии/пародии) -- см. {out_path}.")
+
+    # По символу: суммарный объём/сделки (все адреса вместе) + топ-адрес
+    # по объёму (вероятный кандидат на "настоящий" контракт, требует
+    # отдельной проверки против rwa_robinhood -- не принимается на веру).
+    by_symbol = df.groupby("symbol").agg(
+        n_addresses=("token_address", "nunique"),
+        n_trades=("n_trades", "sum"),
+        vol_usd=("vol_usd", "sum"),
+        n_trades_closed_hours=("n_trades_closed_hours", "sum"),
+    ).sort_values("vol_usd", ascending=False)
+    top_addr = df.sort_values("vol_usd", ascending=False).drop_duplicates("symbol").set_index("symbol")["token_address"]
+    by_symbol["top_address_by_vol"] = top_addr
+    print("\n-- По символу (все адреса суммарно) --")
+    print(by_symbol.to_string())
+
+    n_pass22 = ((by_symbol["n_trades"] >= 100) & (by_symbol["vol_usd"] >= 10_000)).sum()
     total_closed = df["n_trades_closed_hours"].sum()
     total_vol = df["vol_usd"].sum()
-    print(f"\n[r1_flagship_recon] Флагманских тикеров с торговлей: {len(df)} / 31. "
-          f"Проходят §2.2 (>=100 сделок И >=$10k): {n_pass22}. "
-          f"Сделок в закрытые часы всего: {total_closed}. Суммарный объём: ${total_vol:,.2f}.")
+    n_symbols_traded = df["symbol"].nunique()
+    print(f"\n[r1_flagship_recon] Флагманских тикеров с ЛЮБОЙ торговлей (под этим именем, "
+          f"любым адресом): {n_symbols_traded} / 31. Проходят §2.2 по сумме всех адресов: "
+          f"{n_pass22}. Сделок в закрытые часы всего: {total_closed}. "
+          f"Суммарный объём: ${total_vol:,.2f}.")
     return 0
 
 

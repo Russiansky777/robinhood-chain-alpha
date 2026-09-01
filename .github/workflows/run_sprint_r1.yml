@@ -20,6 +20,7 @@ on:
           - feed_match_dune
           - rwa_schema_probe
           - flagship_recon
+          - rwa_balances_probe
           - smoke
           - full
           - report
@@ -125,6 +126,13 @@ jobs:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: sprintR1
         run: python analysis/r1_flagship_recon.py
+
+      - name: Probe rwa_robinhood.balances columns (authoritative RWA token list?)
+        if: ${{ github.event.inputs.step == 'rwa_balances_probe' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_rwa_balances_probe.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
