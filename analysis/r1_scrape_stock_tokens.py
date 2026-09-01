@@ -34,8 +34,11 @@ from config import CONFIG
 CACHE_DIR = Path(CONFIG.r1_cache_dir)
 
 URLS = {
-    "token_contracts": "https://docs.robinhood.com/chain/token-contracts",
-    "stock_token_apis": "https://docs.robinhood.com/chain/stock-token-apis",
+    # docs.robinhood.com/chain/stock-token-apis (run #2 разведки) описал
+    # ЖИВОЙ read-only REST API -- https://api.robinhood.com/rhj/assets --
+    # это лучше, чем парсить документацию: полный актуальный реестр
+    # сток-токенов с реальными адресами, а не пример из документации.
+    "assets_api_probe": "https://api.robinhood.com/rhj/assets",
 }
 
 ADDR_RE = re.compile(r"0x[a-fA-F0-9]{40}")
@@ -108,7 +111,7 @@ def main() -> int:
         # больше разумного -- страница документации, не мегабайты.
         if probe:
             print("---- TEXT DUMP (для разбора) ----")
-            print(text[:60000])
+            print(text[:150000])
             print("---- КОНЕЦ TEXT DUMP ----")
         results[name] = {
             "url": url,
