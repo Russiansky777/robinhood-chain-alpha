@@ -29,6 +29,7 @@ FUNDING_PARENT_SQL = read_sql("sc1/sc1_funding_parent")
 LAUNCHFEE_EXACT_SQL = read_sql("sc1/sc1_v1_launchfee_exact")
 VOLUME_24H_CALIB_SQL = read_sql("sc1/sc1_volume_24h_calib")
 VOLUME_24H_FULL_TMPL = read_sql("sc1/sc1_volume_24h_full")
+ETH_USD_PRICE_SQL = read_sql("sc1/sc1_eth_usd_price")
 
 CALIBRATION_SCALE_FACTOR = 2.5  # см. docs/G1_DESIGN.md -- гетерогенность популяции подтверждена там же
 SANITY_MAX_ESTIMATE = 40.0
@@ -215,6 +216,24 @@ def stage_economics(client: DuneClient) -> int:
     client._commit_permanent(out_vol, f"sprintSC1_cache: объём 24ч по {len(volume_df)} токенам [automated]")
     print(f"\n[sc1_pipeline] Итого токенов с объёмом за 24ч: {len(volume_df)} / 39680. "
           f"Записано: {out_vol}")
+
+    # Курс ETH/USD для перевода launchFee+газ в доллары в отчёте (владелец
+    # требует "$X"/"$Y") -- не по памяти, а медиана из тех же данных
+    # (dex.trades, WETH/ETH против стейблкоинов, август 2026).
+    print("\n===== sc1_eth_usd_price (оценка 5.0) =====")
+    qidp = client.create_query("sc1_eth_usd_price", ETH_USD_PRICE_SQL)
+    dfp = client.run_sql_cached(
+        "sc1_eth_usd_price", ETH_USD_PRICE_SQL, query_id=qidp, estimated_credits=5.0,
+        expected_max_rows=2, expected_columns=2,
+    )
+    if dfp is not None and len(dfp):
+        print(dfp.to_string())
+        out_p = CACHE_DIR / "sc1_eth_usd_price.csv"
+        dfp.to_csv(out_p, index=False)
+        client._commit_permanent(out_p, "sprintSC1_cache: медианный курс ETH/USD [automated]")
+    else:
+        print("[sc1_pipeline] ВНИМАНИЕ: курс ETH/USD не получен (пусто) -- "
+              "перевод в доллары в отчёте будет невозможен без ручного разбора.")
 
     remaining = 40.0 - sc1_spent()
     print(f"\n[sc1_pipeline] Остаток бюджета SC1 после Шага 3: {remaining:.2f} из 40.0.")
