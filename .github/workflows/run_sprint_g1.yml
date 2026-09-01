@@ -9,6 +9,7 @@ on:
         default: "recon"
         type: choice
         options:
+          - audit
           - recon
           - verify
           - count
@@ -49,6 +50,17 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
+
+      # Владелец, 2026-09-01: расхождение 2138.84 (Dune) vs 1823.26
+      # (внутренний леджер) -- аудит НИЧЕГО не исполняет (execute()), только
+      # бесплатные GET /query/{id} метаданные + defensive account/usage
+      # пробы. Безопасно гонять сколько угодно раз, 0 кредитов.
+      - name: Audit Dune account (schedules/leaks, 0 credits)
+        if: ${{ github.event.inputs.step == 'audit' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintG1
+        run: python analysis/audit_dune_account.py
 
       - name: Run recon (Step 1)
         if: ${{ github.event.inputs.step == 'recon' }}
