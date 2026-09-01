@@ -152,6 +152,11 @@ def _init_state() -> dict:
                 "человек, факт с dune.com/settings/billing на 2026-08-31 -- "
                 "НЕ выведено из логов CI, см. docs/COST_POSTMORTEM.md"
             ),
+            "reset_at": "2026-09-14",
+            "reset_at_source": (
+                "человек, docs/PROJECT_STATE.md правило 7 -- дата сброса "
+                "биллинг-цикла Dune, НЕ выведена из кода/API"
+            ),
         },
         "sprint15": {
             "budget_remaining_at_init": 150.0,
@@ -276,32 +281,54 @@ def check_before_read(name: str, row_count: int, column_count: int) -> float:
     return estimate
 
 
-def _record(op_kind: str, name: str, credits: float, credits_known: bool, execution_id: str | None) -> None:
+def _record(
+    op_kind: str,
+    name: str,
+    credits: float,
+    credits_known: bool,
+    execution_id: str | None,
+    estimated_credits: float | None = None,
+    failure_reason: str | None = None,
+) -> None:
     state = load_state()
     ns = namespace()
     state[ns]["spent"] = round(state[ns]["spent"] + credits, 6)
-    state["entries"].append(
-        {
-            "op": op_kind,
-            "namespace": ns,
-            "name": name,
-            "execution_id": execution_id,
-            "credits": credits,
-            "credits_known": credits_known,
-            "at": _now(),
-        }
-    )
+    entry = {
+        "op": op_kind,
+        "namespace": ns,
+        "name": name,
+        "execution_id": execution_id,
+        "estimated_credits": estimated_credits,
+        "credits": credits,
+        "credits_known": credits_known,
+        "at": _now(),
+    }
+    if failure_reason is not None:
+        entry["failure_reason"] = failure_reason
+    state["entries"].append(entry)
     _save(state)
     tag = f"{credits:.3f}" if credits_known else f"~{credits:.3f} (ОЦЕНКА, не подтверждено Dune)"
     _git_commit(f"credits_spent.json: +{tag} за {op_kind} '{name}' [automated guard]")
 
 
-def record_execution(name: str, actual_credits: float | None, execution_id: str | None = None) -> None:
+def record_execution(
+    name: str,
+    actual_credits: float | None,
+    execution_id: str | None = None,
+    estimated_credits: float | None = None,
+    failure_reason: str | None = None,
+) -> None:
     """Вызывается СРАЗУ после того, как стала известна (или точно
     неизвестна -- см. таймаут) фактическая стоимость execute(). Коммитит
-    немедленно."""
+    немедленно. `estimated_credits`/`failure_reason` -- контекст для
+    нулевых (упавших до биллинга) попыток: операция -> оценка -> факт=0
+    -> причина падения, чтобы леджер не терял эту информацию (см.
+    docs/G1_DESIGN.md, требование владельца перед Шагом 2)."""
     credits = float(actual_credits) if actual_credits is not None else 0.0
-    _record("execute", name, credits, actual_credits is not None, execution_id)
+    _record(
+        "execute", name, credits, actual_credits is not None, execution_id,
+        estimated_credits=estimated_credits, failure_reason=failure_reason,
+    )
 
 
 def record_read(name: str, estimated_credits: float, row_count: int, column_count: int, execution_id: str | None = None) -> None:
@@ -311,4 +338,4 @@ def record_read(name: str, estimated_credits: float, row_count: int, column_coun
     обычно точнее предварительной, т.к. row_count здесь уже реальный,
     не ожидаемый) и явно помечаем её как неподтверждённую."""
     actual_estimate = estimate_read_credits(row_count, column_count)
-    _record("чтение результата", name, actual_estimate, False, execution_id)
+    _record("чтение результата", name, actual_estimate, False, execution_id, estimated_credits=actual_estimate)

@@ -447,18 +447,27 @@ class DuneClient:
             # кредиты) на стороне Dune, невидимо для нашего леджера. Пишем
             # запись СРАЗУ как "неизвестно", коммитим -- не ждём конца
             # прогона (его может и не быть).
-            record_execution(f"{name} [ТАЙМАУТ поллинга -- проверьте {execution_id} на dune.com]", None, execution_id)
+            record_execution(
+                f"{name} [ТАЙМАУТ поллинга -- проверьте {execution_id} на dune.com]", None, execution_id,
+                estimated_credits=estimated_credits, failure_reason="таймаут поллинга, статус на Dune неизвестен",
+            )
             raise
-        except RuntimeError:
+        except RuntimeError as exc:
             # FAILED/CANCELLED -- перезапрашиваем статус (execution_cost_credits
             # в нашем опыте был 0 в этих случаях, но не полагаемся на это
             # без проверки) и фиксируем реальную стоимость, если она есть.
+            # Оценку и текст причины падения тоже пишем в леджер (не только
+            # факт=0) -- нулевые попытки должны быть прослеживаемы: операция
+            # -> оценка -> факт=0 -> причина.
             try:
                 failed_status = self.get_execution_status(execution_id)
                 failed_cost = failed_status.get("execution_cost_credits")
             except Exception:
                 failed_cost = None
-            record_execution(f"{name} [FAILED]", failed_cost, execution_id)
+            record_execution(
+                f"{name} [FAILED]", failed_cost, execution_id,
+                estimated_credits=estimated_credits, failure_reason=str(exc)[:500],
+            )
             raise
         cost = status.get("execution_cost_credits")
         estimate_used = estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
