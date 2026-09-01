@@ -100,7 +100,20 @@ class Config:
     g1_launchpad: str = "pons.family"
     g1_chain_id: int = 4663
     g1_period_start: str = "2026-07-01"     # или дата первой градуации, если позже (§2.1)
-    g1_period_end: str = field(default_factory=lambda: os.environ.get("G1_PERIOD_END", ""))  # заполняется на Шаге 1
+    # Заполнено на Шаге 1 (recon, 2026-09-01): g1_recent_day_coverage_probe
+    # дал coverage_probe_max_block_time = 2026-08-30 23:59:59 UTC (полное
+    # покрытие суток 30.08, не по исходам цен -- по max(block_time) в
+    # dex.trades). §2.1 требует конец выборки = "coverage-end минус 24ч"
+    # (событию нужны все горизонты вплоть до +24ч), поэтому:
+    #   coverage_end (факт метаданных)     = 2026-08-30 23:59:59 UTC
+    #   g1_period_end (последний допустимый t0) = coverage_end - 24h
+    #                                       = 2026-08-29 23:59:59 UTC
+    g1_coverage_end: str = field(
+        default_factory=lambda: os.environ.get("G1_COVERAGE_END", "2026-08-30 23:59:59")
+    )
+    g1_period_end: str = field(
+        default_factory=lambda: os.environ.get("G1_PERIOD_END", "2026-08-29 23:59:59")
+    )
     g1_min_n_events: int = 200               # §2.1/2.7: N < 200 -> UNDERPOWERED
     g1_pre_window_buy_usd_min: float = 250.0  # §2.2
     g1_pre_window_trades_min: int = 3         # §2.2
