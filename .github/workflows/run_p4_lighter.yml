@@ -1,0 +1,48 @@
+name: Run P4 Lighter markets recon (0 Dune, публичный REST)
+
+# Тот же паттерн, что .github/workflows/run_p3_guard.yml: workflow_dispatch
+# для будущего ручного запуска (требует, чтобы файл был на дефолтной
+# ветке репозитория -- GitHub API dispatches ограничение, не выбор
+# проекта), push-триггер по маркер-файлу -- рабочий канал из этой
+# ветки прямо сейчас (см. docs/P3_GUARD.md, "Как запускалось на
+# практике", тот же разбор применим здесь).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p4_lighter_cache/RUN_REQUEST"
+
+jobs:
+  run-p4-lighter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      # docs/P4_KILL.md закоммичен ДО этого шага (проверка в коде --
+      # см. analysis/p4_lighter_markets.py не читает P4_KILL.md сам,
+      # порядок коммитов в git-истории репозитория -- обязателен по
+      # заданию владельца).
+      - name: Lighter markets recon (публичный REST, без ключа)
+        run: python analysis/p4_lighter_markets.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/P4_RECON.md
+          if [ -d data/p4_lighter_cache ]; then git add data/p4_lighter_cache/; fi
+          git diff --cached --quiet || git commit -m "P4: результат стадии p4_lighter_markets [automated]"
+          git push
