@@ -37,7 +37,7 @@ def stage_cluster(client: DuneClient) -> int:
     qid = client.create_query("sc1_transactions_columns", TX_COLUMNS_SQL)
     df = client.run_sql_cached(
         "sc1_transactions_columns", TX_COLUMNS_SQL, query_id=qid, estimated_credits=3.0,
-        expected_max_rows=30, expected_columns=3,
+        expected_max_rows=60, expected_columns=3,
     )
     if df is not None and len(df):
         print(df.to_string())
