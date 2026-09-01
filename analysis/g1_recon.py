@@ -102,7 +102,8 @@ births as (
     from swaps
     group by 1
 )
-select count(*) as n_new_pools_this_day, max(block_time) as coverage_probe_max_block_time
+select count(*) as n_new_pools_this_day,
+    (select max(block_time) from swaps) as coverage_probe_max_block_time
 from births
 """
 
