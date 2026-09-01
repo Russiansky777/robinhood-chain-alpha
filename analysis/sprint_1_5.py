@@ -63,10 +63,10 @@ SECTION_MARKER = "## Sprint 1.5"
 # теперь ≤ SANITY_MAX_ESTIMATE (40, см. credit_guard.py) -- иначе
 # санитарная проверка не даст исполниться вовсе, независимо от лимита.
 STEP_ESTIMATES = {
-    "03b_cohort_selection": 30.0,   # факт: 22.79
-    "03c_cap_summary": 30.0,        # переписан в один проход, ожидание ~ 03b
-    "03d_sniper_histogram": 10.0,   # ожидание ~2-5, запас
-    "06_wallet_agg_august": 8.0,    # см. Sprint 1: 1.27 на ~400 адресов, запас
+    "03b_cohort_selection": 30.0,   # факт: 22.79 (run #2/#3), 0.00 постоянный кэш-хит (run #4)
+    "03c_cap_summary": 40.0,        # факт (один проход, run #4): 34.97 -- дороже 03b, но не UNION ALL
+    "03d_sniper_histogram": 20.0,   # факт (run #4): 16.29 -- дороже ожидания, но не вдвое
+    "06_wallet_agg_august": 3.0,    # см. Sprint 1: 1.27 на ~400 адресов; остаток бюджета (~8) не даёт запаса больше
 }
 COHORT_SEED = "sprint15-seed42"
 
@@ -157,6 +157,11 @@ def build_cost_ledger_section() -> str:
     for i, entry in enumerate(state["entries"], start=1):
         base_name = entry["name"].split(" [")[0]
         estimate = STEP_ESTIMATES.get(base_name)
+        if estimate is None:
+            for prefix, est in STEP_ESTIMATES.items():
+                if base_name.startswith(prefix):
+                    estimate = est
+                    break
         estimate_str = f"{estimate:.1f}" if estimate is not None else "-"
         credits_str = f"{entry['credits']:.3f}" if entry["credits_known"] else f"~{entry['credits']:.3f} (оценка)"
         lines.append(f"| {i} | {entry['op']} | {entry['name']} | {estimate_str} | {credits_str} | {entry['at']} |")
@@ -207,11 +212,26 @@ def main() -> int:
     def substitute_refs(sql: str) -> str:
         return substitute_query_refs(sql, query_ids)
 
+    def estimate_for(step_key: str) -> float | None:
+        # Точное совпадение сначала (03b/03c/03d), иначе по префиксу --
+        # нужно для "06_wallet_agg_august_sniper5m"/"_sniper1m", у которых
+        # ключ в STEP_ESTIMATES короче полного step_key. БАГ ревизии 3/4:
+        # был .get(step_key) без фолбэка на префикс -- обе ветки 06
+        # получали estimated_credits=None -> DEFAULT_ESTIMATE=110 ->
+        # санитарная проверка (>40) ложно стопала их, см.
+        # docs/COST_POSTMORTEM.md, ревизия 4.
+        if step_key in STEP_ESTIMATES:
+            return STEP_ESTIMATES[step_key]
+        for prefix, est in STEP_ESTIMATES.items():
+            if step_key.startswith(prefix):
+                return est
+        return None
+
     def run_named(step_key: str, sql: str, expected_max_rows: int, expected_columns: int) -> pd.DataFrame:
         qid = client.create_query(step_key, sql)
         return client.run_sql_cached(
             step_key, sql, query_id=qid,
-            estimated_credits=STEP_ESTIMATES.get(step_key),
+            estimated_credits=estimate_for(step_key),
             expected_max_rows=expected_max_rows, expected_columns=expected_columns,
         )
 
