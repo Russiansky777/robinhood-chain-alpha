@@ -1,5 +1,15 @@
 name: Run P3 dislocation guard (v3<->v4, без Dune)
 
+# workflow_dispatch остаётся для будущего ручного запуска (когда файл
+# попадёт на дефолтную ветку репозитория -- GitHub API dispatches
+# требует этого, см. docs/P3_GUARD.md, "Как запускалось на практике").
+# push-триггер -- рабочий канал ИЗ ЭТОЙ ветки прямо сейчас: репозиторий
+# требует не пушить в другую ветку без явного разрешения владельца
+# (см. системные инструкции сессии), а дефолтная ветка репозитория --
+# НЕ ветка этой сессии (claude/sc1-verdict-3jaxoy). push, отфильтрованный
+# по изменению одного маркер-файла, даёт управляемый запуск без
+# нарушения этого правила: стадию выбирает содержимое
+# data/p3_guard_cache/STAGE_REQUEST ("discover" или "guard"), не GH UI.
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +21,11 @@ on:
         options:
           - discover
           - guard
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p3_guard_cache/STAGE_REQUEST"
 
 jobs:
   run-p3-guard:
@@ -29,18 +44,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
 
+      - name: Resolve stage (workflow_dispatch input OR STAGE_REQUEST marker file)
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.stage }}" ]; then
+            echo "stage=${{ github.event.inputs.stage }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=$(cat data/p3_guard_cache/STAGE_REQUEST)" >> "$GITHUB_OUTPUT"
+          fi
+
       # Без Dune -- обычный исходящий интернет GH Actions runner'а к
       # Alchemy RPC (недоступен из интерактивной песочницы агента, см.
       # docs/P3_GUARD.md, "Ограничение среды"). Тот же паттерн, что
       # analysis/r1_feed_match.py в Sprint R1.
       - name: Discover (узкий срез 1 день, chain-wide, калибровка x2.5)
-        if: ${{ github.event.inputs.stage == 'discover' }}
+        if: ${{ steps.resolve.outputs.stage == 'discover' }}
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python analysis/p3_dislocation_guard.py --stage discover
 
       - name: Guard (полный прогон, 7 дней, вердикт >80%)
-        if: ${{ github.event.inputs.stage == 'guard' }}
+        if: ${{ steps.resolve.outputs.stage == 'guard' }}
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python analysis/p3_dislocation_guard.py --stage guard
@@ -50,5 +74,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -d data/p3_guard_cache ]; then git add data/p3_guard_cache/; fi
-          git diff --cached --quiet || git commit -m "P3 guard: результат стадии ${{ github.event.inputs.stage }} [automated]"
+          git diff --cached --quiet || git commit -m "P3 guard: результат стадии ${{ steps.resolve.outputs.stage }} [automated]"
           git push
