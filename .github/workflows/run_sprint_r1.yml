@@ -17,6 +17,7 @@ on:
           - recon
           - dune_calls_probe
           - feed_match
+          - feed_match_dune
           - smoke
           - full
           - report
@@ -101,6 +102,13 @@ jobs:
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python analysis/r1_feed_match.py
+
+      - name: Match tokens to feeds + decimals via Dune decoded call-traces (no RPC needed)
+        if: ${{ github.event.inputs.step == 'feed_match_dune' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: sprintR1
+        run: python analysis/r1_feed_match_dune.py
 
       - name: Run smoke test (Step 2)
         if: ${{ github.event.inputs.step == 'smoke' }}
