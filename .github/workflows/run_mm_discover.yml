@@ -32,7 +32,7 @@ jobs:
         run: pip install -r analysis/requirements.txt
 
       - name: MM discover + calibrate
-        run: python analysis/mm_discover.py
+        run: python -u analysis/mm_discover.py
 
       - name: Commit results
         if: always()

@@ -111,9 +111,20 @@ def run() -> int:
           f"{len(universe)} токенов: {sorted(universe)}")
     token_addrs = {v["token_address"] for v in universe.values()}
 
-    # --- Стадия 1: подтвердить реальные факторию/poolmanager (1-дневный chain-wide срез) ---
-    blocks_1d = int(round(86400 / spb))
-    discover_from = max(1, latest - blocks_1d)
+    # --- Стадия 1: подтвердить реальные факторию/poolmanager (МАЛЫЙ chain-wide срез) ---
+    # ИСПРАВЛЕНО 2026-09-02: было "1 полный день" (~860k блоков) БЕЗ
+    # адресного фильтра (chain-wide) -- реальный прогон завис на 2.5ч+ без
+    # единого байта вывода (не отменён потолком, т.к. это была одна из
+    # первых двух scan()-вызовов, ДО первой записи _count-эффекта в лог).
+    # PoolManager активно используется Pons V2 для градуации мем-токенов
+    # (см. docs/G1_DESIGN.md) -- Initialize-события МОГУТ идти очень
+    # плотно, chain-wide без фильтра над 860k блоков это могло уйти в
+    # глубокую адаптивную бисекцию (_chunked_get_logs бисектит при
+    # >=1000 результатов на чанк) практически без страховки по времени.
+    # Стадии 1 нужно только ПОДТВЕРДИТЬ, какие адреса реально
+    # используются -- не каталогизировать все события -- малого окна
+    # достаточно (используем тот же CALIBRATION_BLOCKS, ~30 мин).
+    discover_from = max(1, latest - CALIBRATION_BLOCKS)
     pc_logs = scan(discover_from, latest, [TOPIC0_V3_POOL_CREATED])
     init_logs = scan(discover_from, latest, [TOPIC0_V4_INITIALIZE])
     factories_seen = sorted({str(l["address"]).lower() for l in pc_logs})
@@ -142,32 +153,77 @@ def run() -> int:
     pool_created = [decode_pool_created(l) for l in v3_pools_all]
     initializes = [decode_v4_initialize(l) for l in v4_inits_all]
 
-    v3_by_token: dict[str, list[str]] = {}
+    # ВАЖНО: сохраняем КОНТРАГЕНТА (другую валюту пары) для каждого
+    # пула. Первый прогон (2026-09-02) показал у NVDA 8270 уникальных
+    # v4 pool_id -- физически невозможно для одного "спот-пула акции".
+    # Гипотеза (проверяется ниже, не принимается на веру): PoolManager
+    # массово переиспользуется Pons V2 для градуации мем-токенов (см.
+    # docs/G1_DESIGN.md), и создатель мем-монеты может выбрать сток-токен
+    # как pair-token -- тогда "пул NVDA" на самом деле пара
+    # мем-коин/NVDA, НЕ реальный спот-рынок акции. Отличаем эвристикой:
+    # настоящий спот-пул использует ОБЩИЙ котируемый актив (WETH/USDG/
+    # нативный ETH), повторяющийся у МНОГИХ сток-токенов; мем-коин-пары
+    # используют уникальный, не повторяющийся у других сток-токенов
+    # адрес (у каждого мем-коина свой адрес).
+    v3_by_token: dict[str, list[tuple[str, str]]] = {}
     for r in pool_created:
-        for side in ("token0", "token1"):
-            if r[side] in token_addrs:
-                v3_by_token.setdefault(r[side], []).append(r["pool"])
+        if r["token0"] in token_addrs:
+            v3_by_token.setdefault(r["token0"], []).append((r["pool"], r["token1"]))
+        if r["token1"] in token_addrs:
+            v3_by_token.setdefault(r["token1"], []).append((r["pool"], r["token0"]))
 
-    v4_by_token: dict[str, list[tuple[str, str]]] = {}
+    v4_by_token: dict[str, list[tuple[str, str, str]]] = {}
     for r in initializes:
-        for side in ("currency0", "currency1"):
-            if r[side] in token_addrs:
-                v4_by_token.setdefault(r[side], []).append((r["pool_manager_address"], r["pool_id"]))
+        if r["currency0"] in token_addrs:
+            v4_by_token.setdefault(r["currency0"], []).append((r["pool_manager_address"], r["pool_id"], r["currency1"]))
+        if r["currency1"] in token_addrs:
+            v4_by_token.setdefault(r["currency1"], []).append((r["pool_manager_address"], r["pool_id"], r["currency0"]))
 
+    # Глобальная частота контрагентов ПО РАЗНЫМ сток-токенам (не по числу
+    # пулов -- один и тот же контрагент может иметь много пулов с ОДНИМ
+    # токеном, это не делает его "общим"). Общий котируемый актив -- это
+    # адрес, встречающийся у НЕСКОЛЬКИХ разных сток-токенов.
     addr_to_symbol = {v["token_address"]: sym for sym, v in universe.items()}
+    counterparty_to_symbols: dict[str, set[str]] = {}
+    for addr, entries in v4_by_token.items():
+        sym = addr_to_symbol[addr]
+        for _, _, cp in entries:
+            counterparty_to_symbols.setdefault(cp, set()).add(sym)
+    for addr, entries in v3_by_token.items():
+        sym = addr_to_symbol[addr]
+        for _, cp in entries:
+            counterparty_to_symbols.setdefault(cp, set()).add(sym)
+
+    SHARED_COUNTERPARTY_MIN_SYMBOLS = 3  # встречается минимум у 3 разных сток-токенов -> похоже на общий котируемый актив
+    shared_counterparties = sorted(
+        cp for cp, syms in counterparty_to_symbols.items() if len(syms) >= SHARED_COUNTERPARTY_MIN_SYMBOLS
+    )
+    print(f"[mm_discover] контрагентов, общих для >= {SHARED_COUNTERPARTY_MIN_SYMBOLS} сток-токенов: "
+          f"{len(shared_counterparties)} из {len(counterparty_to_symbols)} всего уникальных контрагентов")
+
     pools_by_symbol = {}
     for addr in token_addrs:
         sym = addr_to_symbol[addr]
+        v3_entries = sorted(set(v3_by_token.get(addr, [])))
+        v4_entries = sorted(set(v4_by_token.get(addr, [])))
+        v3_genuine = [(pool, cp) for pool, cp in v3_entries if cp in shared_counterparties]
+        v4_genuine = [(pm, pid, cp) for pm, pid, cp in v4_entries if cp in shared_counterparties]
         pools_by_symbol[sym] = {
             "token_address": addr,
-            "v3_pools": sorted(set(v3_by_token.get(addr, []))),
-            "v4_pool_ids": sorted(set(v4_by_token.get(addr, []))),
+            "v3_pools_total": len(v3_entries),
+            "v4_pools_total": len(v4_entries),
+            "v3_pools_with_shared_counterparty": v3_genuine,
+            "v4_pools_with_shared_counterparty": v4_genuine,
+            "n_v3_genuine": len(v3_genuine),
+            "n_v4_genuine": len(v4_genuine),
         }
-    n_with_v3 = sum(1 for p in pools_by_symbol.values() if p["v3_pools"])
-    n_with_v4 = sum(1 for p in pools_by_symbol.values() if p["v4_pool_ids"])
-    n_with_any = sum(1 for p in pools_by_symbol.values() if p["v3_pools"] or p["v4_pool_ids"])
-    print(f"[mm_discover] из {len(universe)} eligible-токенов: {n_with_v3} имеют v3-пул, "
-          f"{n_with_v4} имеют v4-пул, {n_with_any} имеют хоть один")
+    n_with_v3 = sum(1 for p in pools_by_symbol.values() if p["v3_pools_total"])
+    n_with_v4 = sum(1 for p in pools_by_symbol.values() if p["v4_pools_total"])
+    n_with_any = sum(1 for p in pools_by_symbol.values() if p["v3_pools_total"] or p["v4_pools_total"])
+    n_with_genuine = sum(1 for p in pools_by_symbol.values() if p["n_v3_genuine"] or p["n_v4_genuine"])
+    print(f"[mm_discover] из {len(universe)} eligible-токенов: {n_with_v3} имеют v3-пул (любой), "
+          f"{n_with_v4} имеют v4-пул (любой), {n_with_any} имеют хоть один; "
+          f"{n_with_genuine} имеют хотя бы 1 пул с ОБЩИМ контрагентом (кандидат на 'настоящий' спот-пул)")
 
     OUT_PATH.write_text(json.dumps({
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -176,15 +232,23 @@ def run() -> int:
         "v3_factory_used": v3_factory,
         "pool_managers_seen_1d_slice": pool_managers_seen,
         "pools_by_symbol": pools_by_symbol,
+        "shared_counterparties": shared_counterparties,
         "n_eligible_with_v3_pool": n_with_v3,
         "n_eligible_with_v4_pool": n_with_v4,
         "n_eligible_with_any_pool": n_with_any,
+        "n_eligible_with_genuine_pool": n_with_genuine,
         "requests_used_so_far": _request_count,
     }, indent=2, default=str, ensure_ascii=False))
 
     # --- Стадия 3: калибровка плотности Swap на МАЛОМ срезе (CALIBRATION_BLOCKS) ВНУТРИ окна ---
     # НЕ полный день (баг первого прогона -- см. докстринг MAX_REQUESTS_PER_RUN
     # выше): дорого и без страховки при до 24 токенах x 2 версии протокола.
+    # Калибруем ТОЛЬКО пулы с общим контрагентом ("genuine") -- у NVDA,
+    # например, 8270 всего v4-пулов, подавляющее большинство -- шум
+    # (мем-коин/NVDA пары через Pons V2 pair-token, см. комментарий выше
+    # у v3_by_token/v4_by_token) -- калибровать плотность по ним значило
+    # бы измерять активность мем-коин-фабрики, а не реального
+    # спот-рынка NVDA.
     calib_to = window_end_block
     calib_from = max(window_start_block, calib_to - CALIBRATION_BLOCKS)
     # Реальная длительность среза в секундах -- по фактическим таймстемпам
@@ -198,18 +262,19 @@ def run() -> int:
     n_swap_calib = 0
     calib_calls = 0
     for sym, p in pools_by_symbol.items():
-        if p["v3_pools"]:
-            logs = scan(calib_from, calib_to, [TOPIC0_V3_SWAP], address=p["v3_pools"], chunk_size=2000)
+        v3_pool_addrs = sorted({pool for pool, _cp in p["v3_pools_with_shared_counterparty"]})
+        if v3_pool_addrs:
+            logs = scan(calib_from, calib_to, [TOPIC0_V3_SWAP], address=v3_pool_addrs, chunk_size=2000)
             n_swap_calib += len(logs)
             calib_calls += max(1, (calib_to - calib_from) // 2000 + 1)
-        for pm, pool_id in p["v4_pool_ids"]:
+        for pm, pool_id, _cp in p["v4_pools_with_shared_counterparty"]:
             logs = scan(calib_from, calib_to, [[TOPIC0_V4_SWAP], [pool_id]], address=pm, chunk_size=2000)
             n_swap_calib += len(logs)
             calib_calls += max(1, (calib_to - calib_from) // 2000 + 1)
 
     print(f"[mm_discover] калибровка [{calib_from},{calib_to}] (~{calib_duration_s/60:.1f} мин "
           f"по факту timestamp'ов блоков): {n_swap_calib} Swap-событий "
-          f"по {n_with_any} токенам с пулом ({calib_calls} вызовов eth_getLogs)")
+          f"по {n_with_genuine} токенам с 'настоящим' пулом ({calib_calls} вызовов eth_getLogs)")
 
     # Экстраполяция на всё окно: (секунд в окне / секунд в калибровочном
     # срезе) x буфер x1.5 на неравномерность активности (явно назван
@@ -244,9 +309,11 @@ def run() -> int:
         "v3_factory_used": v3_factory,
         "pool_managers_seen_1d_slice": pool_managers_seen,
         "pools_by_symbol": pools_by_symbol,
+        "shared_counterparties": shared_counterparties,
         "n_eligible_with_v3_pool": n_with_v3,
         "n_eligible_with_v4_pool": n_with_v4,
         "n_eligible_with_any_pool": n_with_any,
+        "n_eligible_with_genuine_pool": n_with_genuine,
         "calibration_window": {"from_block": calib_from, "to_block": calib_to},
         "calibration_duration_s_by_block_timestamps": calib_duration_s,
         "calibration_n_swap_events": n_swap_calib,
