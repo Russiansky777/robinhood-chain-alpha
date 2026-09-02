@@ -299,7 +299,7 @@ def run() -> int:
         "token": TOKEN, "curve": CURVE,
         "creation_tx": CREATION_TX, "creation_block": CREATION_BLOCK,
         "creation_block_timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(creation_ts)),
-        "latest_block_checked": int(_rpc_call("eth_blockNumber", [])),
+        "latest_block_checked": int(_rpc_call("eth_blockNumber", []), 16),
         "n_events": len(events),
         "delta_creation_to_first_swap_blocks": delta_first_blocks,
         "delta_creation_to_first_swap_seconds": delta_first_seconds,
