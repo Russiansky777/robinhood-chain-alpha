@@ -325,7 +325,28 @@ def _chunked_get_logs(
             "method": "eth_getLogs",
             "params": [filter_obj],
         }
-        body = _post_with_fallback(payload)
+        try:
+            body = _post_with_fallback(payload)
+        except RuntimeError as e:
+            # НАЙДЕНО 2026-09-02 (relayer recon, широкие диапазоны для
+            # разреженных событий типа EnabledDepositRoute): даже после
+            # исчерпания 15-минутного бюджета ретраев в _post_with_fallback,
+            # ошибка вида "log query timed out" может быть НЕ транзиентной
+            # перегрузкой, а тем, что САМ диапазон [lo;hi] слишком велик
+            # для ноды за один запрос (не документированный лимит) --
+            # повторять идентичный запрос бессмысленно, а вот бисекция
+            # диапазона (тот же принцип, что уже есть для >=1000
+            # результатов ниже) вполне может помочь -- каждая половина
+            # дешевле для ноды. Только если диапазон ещё делим и
+            # сообщение похоже на таймаут/переполнение, а не на что-то
+            # содержательное (напр. неверные параметры).
+            msg = str(e).lower()
+            if hi > lo and any(m in msg for m in ("timed out", "timeout", "too large", "too many", "exceed")):
+                mid = (lo + hi) // 2
+                yield from _get_range(lo, mid)
+                yield from _get_range(mid + 1, hi)
+                return
+            raise
         if "error" in body:
             raise RuntimeError(f"eth_getLogs error [{lo};{hi}]: {body['error']}")
         result = body.get("result", [])
