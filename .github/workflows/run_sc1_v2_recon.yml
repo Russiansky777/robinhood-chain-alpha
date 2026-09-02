@@ -40,7 +40,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/p3_guard_cache/sc1_v2_recon_result.json data/p3_guard_cache/sc1_launcher_dryrun_*.json docs/SC1_LAUNCHER.md 2>/dev/null || true
+          # НАЙДЕНО 2026-09-02 (run 33576972884): `git add a b c` с
+          # glob-паттерном, который не совпал ни с одним файлом (b),
+          # атомарно проваливает ВЕСЬ вызов (в т.ч. a и c, которые
+          # реально существовали) -- stderr был подавлен `2>/dev/null`,
+          # `|| true` глотал ошибку, ничего не коммитилось молча.
+          # Теперь -- по каждому файлу отдельно, только если существует.
+          for f in data/p3_guard_cache/sc1_v2_recon_result.json docs/SC1_LAUNCHER.md data/p3_guard_cache/sc1_launcher_dryrun_*.json; do
+            [ -e "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && exit 0
           git commit -m "SC1 V2: recon + launcher dry-run (NVX) [automated]"
           for i in 1 2 3 4 5; do

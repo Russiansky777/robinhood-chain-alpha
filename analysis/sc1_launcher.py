@@ -389,16 +389,26 @@ def main() -> int:
         printable = {k: v for k, v in report.items() if not k.startswith("_")}
         print(json.dumps(printable, indent=2, default=str, ensure_ascii=False))
 
+        if not args.confirm_mainnet:
+            # ВАЖНО: пишем отчёт ВСЕГДА в dry-run режиме, включая случай
+            # abort_reason (напр. превышен потолок газа) -- НАЙДЕНО
+            # 2026-09-02 (run 33576972884): раньше запись отчёта была
+            # ПОСЛЕ проверки abort_reason с `continue` внутри неё --
+            # самый информативный случай (реальная оценка газа, упёршаяся
+            # в потолок) вообще не попадал в файл и, соответственно, не
+            # коммитился воркфлоу.
+            dryrun_path = REPO_ROOT / "data" / "p3_guard_cache" / f"sc1_launcher_dryrun_{symbol}.json"
+            dryrun_path.parent.mkdir(parents=True, exist_ok=True)
+            dryrun_path.write_text(json.dumps(printable, indent=2, default=str, ensure_ascii=False))
+            print(f"[sc1_launcher] {symbol}: dry-run отчёт записан: {dryrun_path}")
+
         if report.get("abort_reason"):
             print(f"[sc1_launcher] {symbol}: ОСТАНОВЛЕНО -- {report['abort_reason']}")
             exit_code = 1
             continue
 
         if not args.confirm_mainnet:
-            dryrun_path = REPO_ROOT / "data" / "p3_guard_cache" / f"sc1_launcher_dryrun_{symbol}.json"
-            dryrun_path.parent.mkdir(parents=True, exist_ok=True)
-            dryrun_path.write_text(json.dumps(printable, indent=2, default=str, ensure_ascii=False))
-            print(f"[sc1_launcher] {symbol}: dry-run завершён, отправка НЕ выполнялась (нет --confirm-mainnet). Отчёт: {dryrun_path}")
+            print(f"[sc1_launcher] {symbol}: dry-run завершён, отправка НЕ выполнялась (нет --confirm-mainnet).")
             continue
 
         if n_sent >= args.limit:
