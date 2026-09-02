@@ -375,8 +375,27 @@ def run() -> int:
     # data/credits_spent.json/sprint*_cache по всему проекту -- ничего
     # не теряется, если job оборвётся на середине).
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # НАЙДЕНО 2026-09-02 (третий прогон подряд): при ретрае после
+    # частичного сбоя скрипт гнал MAIN заново с нуля (5228 вызовов,
+    # ~35 минут), хотя результат уже лежал в закоммиченном OUT_PATH --
+    # инкрементальная запись спасала от ПОТЕРИ результата, но не от
+    # ПОВТОРНОЙ работы. Теперь -- resume: уже готовые кластеры (по ключу
+    # в существующем файле) не пересчитываются.
     results = {}
+    if OUT_PATH.exists():
+        try:
+            existing = json.loads(OUT_PATH.read_text())
+            results = existing.get("clusters", {})
+            if results:
+                print(f"[sc1_wash_slice] resume: уже готовы кластеры {list(results.keys())} -- пересчитываться не будут")
+        except (json.JSONDecodeError, OSError) as e:  # noqa: BLE001 -- битый/отсутствующий кэш -- начинаем с нуля, не падаем
+            print(f"[sc1_wash_slice] не удалось прочитать существующий {OUT_PATH} ({e}) -- начинаю с нуля")
+            results = {}
+
     for key, spec in CLUSTERS.items():
+        if key in results:
+            continue
         results[key] = run_cluster(key, spec)
         out = {
             "pair_token_symbol_verified": symbol,
