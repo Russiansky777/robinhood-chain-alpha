@@ -8,11 +8,21 @@ name: Run SC1 wash-trading slice (RPC, без Dune)
 # заодно, что явно не запрашивалось в этой команде владельца
 # (запущен только этот срез). Поэтому -- ОТДЕЛЬНЫЙ маркер
 # WASH_SLICE_REQUEST, P3 (run_p3_guard.yml, STAGE_REQUEST) не тронут.
+#
+# 2026-09-02: добавлена ветка claude/sc1-pons-v2-launcher-efdbyt --
+# работа продолжена в ней (см. docs/PROJECT_STATE.md про
+# workflow_dispatch, недоступный для воркфлоу вне дефолтной ветки;
+# push-триггер остаётся единственным путём запуска). Прошлый прогон
+# (run 33571808939, ветка claude/sc1-verdict-3jaxoy) упал через 36
+# минут на транзиентной ошибке апстрима RPC-гейтвея (не 429, см. фикс
+# в analysis/alchemy_fallback.py) -- результата ещё нет, требуется
+# новый прогон.
 on:
   workflow_dispatch: {}
   push:
     branches:
       - claude/sc1-verdict-3jaxoy
+      - claude/sc1-pons-v2-launcher-efdbyt
     paths:
       - "data/p3_guard_cache/WASH_SLICE_REQUEST"
 

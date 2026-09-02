@@ -116,11 +116,14 @@ def _post_with_fallback(payload: dict) -> dict:
     На 429 (rate-limit) -- retry с экспоненциальным backoff НА ТОМ ЖЕ
     эндпоинте (до `_MAX_RETRIES_PER_ENDPOINT` раз) прежде чем перейти к
     следующему -- транзиентная проблема, не повод сразу тратить платный
-    ключ. На 401/403 или сетевую ошибку -- сразу переход к следующему
-    эндпоинту (без ретрая на этом же -- не транзиентно). Возвращает
-    распарсенный JSON-body первого успешного ответа (включая
-    JSON-RPC-level `"error"` в теле -- это не транспортная проблема,
-    вызывающий код сам решает, что с ней делать, как раньше).
+    ключ. На 401/403 -- сразу переход к следующему эндпоинту (без
+    ретрая на этом же -- не транзиентно). Возвращает распарсенный
+    JSON-body первого успешного ответа (включая JSON-RPC-level
+    `"error"` в теле -- это не транспортная проблема, вызывающий код
+    сам решает, что с ней делать, как раньше) -- ЗА ИСКЛЮЧЕНИЕМ
+    транзиентных upstream-ошибок (см. `_TRANSIENT_ERROR_MARKERS` ниже),
+    которые тоже ретраятся на этом же эндпоинте, а не возвращаются
+    как финальный результат.
     Кидает RuntimeError, если ВСЕ эндпоинты исчерпаны."""
     last_err: Exception | str | None = None
     for url, extra_headers in _endpoints():
@@ -142,14 +145,55 @@ def _post_with_fallback(payload: dict) -> dict:
                 break
             try:
                 resp.raise_for_status()
-                return resp.json()
+                body = resp.json()
             except requests.exceptions.HTTPError as e:
                 last_err = f"{url}: {e}"
                 break
             except ValueError:
                 last_err = f"{url}: не-JSON ответ {resp.status_code} {resp.text[:300]!r}"
                 break
+            # НАЙДЕНО 2026-09-01 (реальный прогон wash-slice, run
+            # 33571808939): сам публичный RPC-гейтвей — это прокси
+            # перед внутренним нодом; при сбое ЭТОГО внутреннего дайла
+            # он возвращает 200 OK с JSON-RPC `"error"` вида
+            # `{'code': -32000, 'message': 'Post "http://10.x.x.x:8547/rpc":
+            # dial tcp ...: i/o timeout'}` -- транспортно это выглядит
+            # как успех (raise_for_status() не сработал бы), но по сути
+            # та же транзиентная проблема, что и 429. Раньше это сразу
+            # каскадом улетало в RuntimeError вызывающему коду и роняло
+            # весь прогон (36 минут работы потеряно на одном таком сбое)
+            # -- теперь ретраится здесь же, тем же путём, что и 429.
+            err = body.get("error") if isinstance(body, dict) else None
+            if err is not None and _looks_transient(err):
+                if attempt < _MAX_RETRIES_PER_ENDPOINT - 1:
+                    time.sleep(_BACKOFF_BASE_S * (2 ** attempt))
+                    continue
+                last_err = f"{url}: транзиентная RPC-ошибка после {_MAX_RETRIES_PER_ENDPOINT} попыток: {err}"
+                break
+            return body
     raise RuntimeError(f"Все RPC-эндпоинты исчерпаны. Последняя ошибка: {last_err}")
+
+
+_TRANSIENT_ERROR_MARKERS = (
+    "i/o timeout", "dial tcp", "connection reset", "connection refused",
+    "eof", "context deadline exceeded", "no such host", "timeout awaiting",
+    "temporarily unavailable", "upstream", "bad gateway", "gateway timeout",
+    "internal error",
+)
+
+
+def _looks_transient(err: dict) -> bool:
+    """Эвристика (не документированный контракт провайдера -- честно
+    приблизительная): код -32000/-32603 ("generic"/"internal error" в
+    JSON-RPC) с сообщением, указывающим на сетевую/upstream-проблему
+    самого гейтвея, а не на содержательную ошибку запроса (некорректные
+    параметры, неизвестный метод и т.п., которые ретраить бессмысленно
+    -- они повторятся идентично)."""
+    code = err.get("code")
+    if code not in (-32000, -32603):
+        return False
+    msg = str(err.get("message", "")).lower()
+    return any(marker in msg for marker in _TRANSIENT_ERROR_MARKERS)
 
 
 def _rpc_call(method: str, params: list) -> dict:
