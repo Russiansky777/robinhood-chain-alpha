@@ -367,18 +367,27 @@ def run() -> int:
     print(f"[sc1_wash_slice] pair_token {PAIR_TOKEN} symbol() = {symbol!r} "
           f"({'подтверждено WETH' if symbol and symbol.upper() in ('WETH', 'ETH') else 'НЕ подтверждено как WETH'})")
 
+    # НАЙДЕНО 2026-09-02 (run 33575241260, второй прогон): результат
+    # писался ТОЛЬКО в конце, после ОБОИХ кластеров -- сбой (429 после
+    # исчерпания ретраев) на CONTROL после уже готового MAIN терял и
+    # MAIN тоже, несмотря на потраченное время. Теперь -- инкрементальная
+    # запись после КАЖДОГО кластера (тот же принцип, что
+    # data/credits_spent.json/sprint*_cache по всему проекту -- ничего
+    # не теряется, если job оборвётся на середине).
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     results = {}
     for key, spec in CLUSTERS.items():
         results[key] = run_cluster(key, spec)
+        out = {
+            "pair_token_symbol_verified": symbol,
+            "random_seed": RANDOM_SEED,
+            "clusters": results,
+            "complete": set(results.keys()) == set(CLUSTERS.keys()),
+        }
+        OUT_PATH.write_text(json.dumps(out, indent=2, default=str))
+        print(f"[sc1_wash_slice] промежуточно записано {OUT_PATH} после кластера {key!r}")
 
-    out = {
-        "pair_token_symbol_verified": symbol,
-        "random_seed": RANDOM_SEED,
-        "clusters": results,
-    }
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(out, indent=2, default=str))
-    print(f"\n[sc1_wash_slice] записано {OUT_PATH} (только агрегаты)")
+    print(f"\n[sc1_wash_slice] записано {OUT_PATH} (только агрегаты, оба кластера)")
     return 0
 
 

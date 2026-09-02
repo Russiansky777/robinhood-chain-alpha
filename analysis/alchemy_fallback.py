@@ -110,35 +110,65 @@ def _auth_headers() -> dict:
     return {**_BASE_HEADERS, **extra}
 
 
+_MAX_RETRIES_429 = 10  # 429 -- гарантированно транзиентно (документированный rate-limit публичного RPC, не ошибка запроса), терпим дольше, чем стойкие сбои
+_BACKOFF_CAP_S = 20.0
+_MIN_REQUEST_INTERVAL_S = 0.35  # ~2.9 req/s -- чуть ниже эмпирического потолка ~3 req/s (docs/P3_GUARD.md), самотроттлинг ДО того, как прилетит 429, а не только реакция на него
+_last_request_at = 0.0
+
+
+def _throttle() -> None:
+    """Минимальный интервал между запросами К ЛЮБОМУ эндпоинту --
+    найдено 2026-09-02 (run 33575241260): реактивного ретрая на 429
+    недостаточно при устойчивой нагрузке (тысячи eth_getLogs подряд) --
+    после нескольких retry с backoff всё равно исчерпывается лимит
+    попыток и весь прогон падает. Проактивный самотроттлинг снижает
+    частоту 429 в принципе, а не только реагирует на них постфактум."""
+    global _last_request_at
+    wait = _last_request_at + _MIN_REQUEST_INTERVAL_S - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _last_request_at = time.monotonic()
+
+
 def _post_with_fallback(payload: dict) -> dict:
     """POST payload по списку `_endpoints()` в порядке приоритета.
 
-    На 429 (rate-limit) -- retry с экспоненциальным backoff НА ТОМ ЖЕ
-    эндпоинте (до `_MAX_RETRIES_PER_ENDPOINT` раз) прежде чем перейти к
-    следующему -- транзиентная проблема, не повод сразу тратить платный
-    ключ. На 401/403 -- сразу переход к следующему эндпоинту (без
-    ретрая на этом же -- не транзиентно). Возвращает распарсенный
-    JSON-body первого успешного ответа (включая JSON-RPC-level
-    `"error"` в теле -- это не транспортная проблема, вызывающий код
-    сам решает, что с ней делать, как раньше) -- ЗА ИСКЛЮЧЕНИЕМ
-    транзиентных upstream-ошибок (см. `_TRANSIENT_ERROR_MARKERS` ниже),
-    которые тоже ретраятся на этом же эндпоинте, а не возвращаются
-    как финальный результат.
+    На 429 (rate-limit) -- retry с экспоненциальным backoff (капнутым
+    `_BACKOFF_CAP_S`) НА ТОМ ЖЕ эндпоинте, до `_MAX_RETRIES_429` раз
+    (см. `_MAX_RETRIES_429` -- НАЙДЕНО 2026-09-02, run 33575241260:
+    старых 3 попыток/~14с суммарного ожидания недостаточно при
+    устойчивой нагрузке -- публичный RPC документированно
+    рейт-лимитится на быстрых последовательных вызовах, это ОЖИДАЕМОЕ,
+    не аномальное поведение, полный прогон изначально оценивался в
+    33-111 минут именно из-за этого) прежде чем перейти к следующему
+    эндпоинту -- транзиентная проблема, не повод сразу тратить платный
+    ключ. Прочие транзиентные ошибки (см. `_TRANSIENT_ERROR_MARKERS`)
+    -- ретраятся тем же путём, но с бюджетом `_MAX_RETRIES_PER_ENDPOINT`
+    (меньше -- это не документированное штатное поведение, а сбой,
+    от которого не стоит ждать так же долго). На 401/403 -- сразу
+    переход к следующему эндпоинту (без ретрая на этом же -- не
+    транзиентно). Возвращает распарсенный JSON-body первого успешного
+    ответа (включая JSON-RPC-level `"error"` в теле -- это не
+    транспортная проблема, вызывающий код сам решает, что с ней делать).
     Кидает RuntimeError, если ВСЕ эндпоинты исчерпаны."""
     last_err: Exception | str | None = None
     for url, extra_headers in _endpoints():
         headers = {**_BASE_HEADERS, **extra_headers}
-        for attempt in range(_MAX_RETRIES_PER_ENDPOINT):
+        max_attempts = max(_MAX_RETRIES_429, _MAX_RETRIES_PER_ENDPOINT)
+        attempt = 0
+        while attempt < max_attempts:
+            _throttle()
             try:
                 resp = requests.post(url, json=payload, headers=headers, timeout=30)
             except requests.exceptions.RequestException as e:
                 last_err = f"{url}: сетевая ошибка {e}"
                 break  # не ретраим сетевые ошибки на этом URL -- следующий эндпоинт
             if resp.status_code == 429:
-                if attempt < _MAX_RETRIES_PER_ENDPOINT - 1:
-                    time.sleep(_BACKOFF_BASE_S * (2 ** attempt))
+                if attempt < _MAX_RETRIES_429 - 1:
+                    time.sleep(min(_BACKOFF_BASE_S * (2 ** attempt), _BACKOFF_CAP_S))
+                    attempt += 1
                     continue
-                last_err = f"{url}: 429 после {_MAX_RETRIES_PER_ENDPOINT} попыток"
+                last_err = f"{url}: 429 после {_MAX_RETRIES_429} попыток"
                 break
             if resp.status_code in (401, 403):
                 last_err = f"{url}: {resp.status_code} {resp.text[:300]!r}"
@@ -162,11 +192,13 @@ def _post_with_fallback(payload: dict) -> dict:
             # та же транзиентная проблема, что и 429. Раньше это сразу
             # каскадом улетало в RuntimeError вызывающему коду и роняло
             # весь прогон (36 минут работы потеряно на одном таком сбое)
-            # -- теперь ретраится здесь же, тем же путём, что и 429.
+            # -- теперь ретраится здесь же (бюджет `_MAX_RETRIES_PER_ENDPOINT`,
+            # не `_MAX_RETRIES_429` -- см. докстринг выше).
             err = body.get("error") if isinstance(body, dict) else None
             if err is not None and _looks_transient(err):
                 if attempt < _MAX_RETRIES_PER_ENDPOINT - 1:
-                    time.sleep(_BACKOFF_BASE_S * (2 ** attempt))
+                    time.sleep(min(_BACKOFF_BASE_S * (2 ** attempt), _BACKOFF_CAP_S))
+                    attempt += 1
                     continue
                 last_err = f"{url}: транзиентная RPC-ошибка после {_MAX_RETRIES_PER_ENDPOINT} попыток: {err}"
                 break

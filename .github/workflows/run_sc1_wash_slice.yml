@@ -50,6 +50,7 @@ jobs:
         run: python analysis/sc1_wash_slice.py
 
       - name: Commit results
+        if: always()   # 2026-09-02: сохранить ПРОМЕЖУТОЧНЫЙ результат (см. sc1_wash_slice.py) даже если сам job упал (429 и т.п.)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -36,6 +36,7 @@ jobs:
         run: python analysis/sc1_launcher.py --symbols NVX --limit 1
 
       - name: Commit results (recon + dry-run отчёты + обновлённый SC1_LAUNCHER.md)
+        if: always()   # 2026-09-02: recon (шаг выше) может успеть, даже если dry-run следом упал -- не терять его результат
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

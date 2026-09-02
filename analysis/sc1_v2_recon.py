@@ -57,6 +57,10 @@ def run() -> int:
     print(f"[sc1_v2_recon] maxCreatorTaxBps = {max_tax_bps}")
     print(f"[sc1_v2_recon] launchConfigCount = {n_configs}")
     print(f"[sc1_v2_recon] approvedPairTokens[{v2.CANDIDATE_WETH}] (кандидат WETH, из V1) = {weth_approved}")
+    if not weth_approved:
+        print("[sc1_v2_recon] -> кандидат WETH НЕ одобрен как pairToken. sc1_launcher.py по умолчанию "
+              "использует NATIVE_PAIR_TOKEN (address(0)) -- контракт пропускает проверку approvedPairTokens "
+              "для address(0) и берёт phantomQuote/graduationThreshold конфига напрямую (нативный ETH).")
 
     configs = []
     for i in range(n_configs):

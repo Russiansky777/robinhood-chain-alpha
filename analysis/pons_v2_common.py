@@ -28,10 +28,24 @@ V2_FACTORY = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
 
 # Кандидат pairToken -- тот же адрес, что PAIR_TOKEN во всех 39680
 # V1-запусках (data/sprintSC1_cache, sc1_wash_slice.py), symbol()
-# подтверждён как WETH прогоном wash-slice. Для V2 это ГИПОТЕЗА, не
-# факт -- approved_pair_tokens() ниже проверяет её вызовом, не
-# полагается на аналогию с V1 молча.
+# подтверждён как WETH прогоном wash-slice. Для V2 это была ГИПОТЕЗА --
+# ОПРОВЕРГНУТА живым recon (2026-09-02, run 33575904035):
+# approvedPairTokens[CANDIDATE_WETH] = False. Оставлен для справки/
+# диагностики, НЕ используется как дефолт -- см. NATIVE_PAIR_TOKEN.
 CANDIDATE_WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+
+# Дефолтный путь V2 -- нативный ETH как quote-актив. Источник
+# (дословный запрос _launchToken): `if (pairToken != address(0) &&
+# !approvedPairTokens[pairToken]) revert PairTokenNotApproved();` --
+# address(0) ЦЕЛИКОМ ОБХОДИТ проверку approvedPairTokens, и
+# `previewLaunchEconomics`/economics digest в этом случае берёт
+# `config.phantomQuote`/`config.graduationThreshold` НАПРЯМУЮ (не из
+# `pairTokenEconomics[pairToken]`). Подтверждено live-значениями
+# конфига 0 (2026-09-02): phantomQuote=1.68e18, graduationThreshold=
+# 4.2e18 -- правдоподобные ETH-величины (1.68 / 4.2 ETH), согласуется
+# с нативным ETH как quote. `buy()`/`sell()` на кривой -- `payable`,
+# тоже согласуется с нативным ETH, не ERC20.
+NATIVE_PAIR_TOKEN = "0x0000000000000000000000000000000000000000"
 
 
 def _selector(signature: str) -> bytes:

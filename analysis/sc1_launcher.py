@@ -164,9 +164,15 @@ def prepare_one(symbol: str, image_path: Path, args, sha: str) -> dict:
         )
         return report
 
-    pair_token = args.pair_token or v2.CANDIDATE_WETH
-    pair_ok = v2.approved_pair_tokens(pair_token)
+    # По умолчанию -- нативный ETH (address(0)), см. pons_v2_common.py::
+    # NATIVE_PAIR_TOKEN -- контракт ЦЕЛИКОМ пропускает approvedPairTokens
+    # для address(0) (`pairToken != address(0) && !approvedPairTokens[...]`),
+    # подтверждено live: CANDIDATE_WETH (гипотеза из V1) approvedPairTokens=False.
+    pair_token = args.pair_token or v2.NATIVE_PAIR_TOKEN
+    is_native = pair_token.lower() == v2.NATIVE_PAIR_TOKEN.lower()
+    pair_ok = True if is_native else v2.approved_pair_tokens(pair_token)
     report["pair_token"] = pair_token
+    report["pair_token_is_native_eth"] = is_native
     report["pair_token_approved"] = pair_ok
     if not pair_ok:
         report["abort_reason"] = f"approvedPairTokens[{pair_token}] = False -- revert PairTokenNotApproved()"
