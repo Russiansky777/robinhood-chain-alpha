@@ -28,18 +28,22 @@
 комиссии уже учтены внутри этих сумм, повторно вычитать их не нужно
 (дословно проверено по коду buy()/sell(), не предположено).
 
-**"Цена после сделки"** -- вызывается `getReserves()` кривой
-(`(uint256 quoteReserve, uint256 tokenReserve)`, constant-product с
-фантомными резервами, см. docs/SC1_LAUNCHER.md) ЧЕРЕЗ `eth_call` с
-блок-тегом = номер блока события -- это состояние ПОСЛЕ ВСЕХ
-транзакций этого блока, не после конкретной транзакции внутри блока.
-**Честная оговорка**: если в одном блоке несколько событий, цена
-"после сделки" для НЕ последнего события в блоке технически неточна
-(это цена после всего блока, а не после именно этой транзакции) --
-публичный RPC этого чейна не даёт дешёвого способа получить
-промежуточное состояние внутри блока (нет debug_traceCall с
-custom-tracer на стороне логики контракта). Помечается в выводе явно
-(`price_source: "post-block, not necessarily post-tx if same-block collisions"`).
+**Цена** -- два независимых числа на каждую строку: (1)
+`effective_trade_price_eth_per_token` -- эффективная цена ИМЕННО этой
+сделки (`quoteIn/tokensOut` для buy, `quoteOut/tokensIn` для sell),
+считается напрямую из полей события, доступна ВСЕГДА, не зависит от
+archival state; (2) `price_after_block_eth_per_token` -- маржинальная
+цена кривой (`getReserves()`, constant-product с фантомными резервами,
+см. docs/SC1_LAUNCHER.md) ЧЕРЕЗ `eth_call` с блок-тегом = номер блока
+события -- состояние ПОСЛЕ ВСЕХ транзакций этого блока, не после
+конкретной транзакции внутри блока (точно для последнего события в
+блоке, приблизительно для остальных при коллизии блока). **Честная
+оговорка, найдено эмпирически 2026-09-02**: публичная нода этого чейна
+НЕ архивная -- для части исторических блоков `eth_call` возвращает
+`{'code': -32000, 'message': 'metadata is not found, <block>'}`; в
+таком случае `price_after_block_eth_per_token = None`, помечено явно
+(`price_after_block_note`), эффективная цена сделки в строке всё равно
+присутствует.
 
 Наружу -- полная построчная хронология (не агрегат) -- владелец
 явно попросил таблицу по каждому событию, это не то же самое правило
@@ -83,11 +87,25 @@ def block_time(block_number: int) -> int:
     return _block_time_cache[block_number]
 
 
-def get_reserves_at(block_number: int) -> tuple[int, int]:
-    if block_number not in _reserves_cache:
+def get_reserves_at(block_number: int) -> tuple[int, int] | None:
+    """eth_call с историческим block-тегом -- НАЙДЕНО 2026-09-02 (первый
+    прогон): публичная нода не архивная, для блоков вне какого-то
+    недокументированного недавнего окна возвращает `{'code': -32000,
+    'message': 'metadata is not found, <block>'}` -- вернуть None и
+    ЯВНО пометить недоступность вместо падения всего скрипта (эффективная
+    цена сделки из самого события -- см. `_effective_trade_price` --
+    остаётся доступна всегда, не зависит от архивного state)."""
+    if block_number in _reserves_cache:
+        return _reserves_cache[block_number]
+    try:
         result = _rpc_call("eth_call", [{"to": CURVE, "data": GET_RESERVES_SELECTOR}, hex(block_number)])
-        quote_reserve, token_reserve = abi_decode(["uint256", "uint256"], bytes.fromhex(result[2:]))
-        _reserves_cache[block_number] = (quote_reserve, token_reserve)
+    except RuntimeError as e:
+        print(f"[sc1_nvx_chronology] getReserves() на блоке {block_number} недоступен ({e}) -- "
+              "нода не архивная, использую только эффективную цену сделки для этой строки.")
+        _reserves_cache[block_number] = None
+        return None
+    quote_reserve, token_reserve = abi_decode(["uint256", "uint256"], bytes.fromhex(result[2:]))
+    _reserves_cache[block_number] = (quote_reserve, token_reserve)
     return _reserves_cache[block_number]
 
 
@@ -162,8 +180,15 @@ def run() -> int:
 
     for i, e in enumerate(events):
         ts = block_time(e["block_number"])
-        quote_reserve, token_reserve = get_reserves_at(e["block_number"])
-        price_eth_per_token = (quote_reserve / token_reserve) if token_reserve else float("nan")
+        # Эффективная цена ЭТОЙ сделки -- ВСЕГДА доступна (считается из
+        # самого события, не требует archival state): для buy это
+        # quoteIn/tokensOut (сколько ETH заплачено за 1 токен в среднем
+        # по этой сделке), для sell -- quoteOut/tokensIn.
+        effective_price = (
+            (e["quote_amount_wei"] / e["token_amount_wei"]) if e["token_amount_wei"] else float("nan")
+        )
+        reserves = get_reserves_at(e["block_number"])
+        price_after_block = (reserves[0] / reserves[1]) if reserves and reserves[1] else None
 
         delta_blocks_prev = e["block_number"] - prev_block
         delta_seconds_prev = ts - prev_ts
@@ -183,8 +208,13 @@ def run() -> int:
             "eth_amount_usd": (e["quote_amount_wei"] / 1e18 * eth_usd) if eth_usd else None,
             "fee_eth": e["fee_wei"] / 1e18,
             "tax_eth": e["tax_wei"] / 1e18,
-            "price_eth_per_token_after_block": price_eth_per_token,
-            "price_source": "post-block getReserves() -- см. докстринг скрипта про точность при нескольких событиях в одном блоке",
+            "effective_trade_price_eth_per_token": effective_price,
+            "price_after_block_eth_per_token": price_after_block,
+            "price_after_block_note": (
+                "недоступно -- нода не архивная (metadata not found на этом блоке), см. docstring"
+                if price_after_block is None else
+                "post-block getReserves() -- точно для последнего события в блоке, приблизительно для остальных при коллизии блока"
+            ),
             "delta_blocks_since_prev_event": delta_blocks_prev,
             "delta_seconds_since_prev_event": delta_seconds_prev,
         }
@@ -318,15 +348,22 @@ def _write_doc(result: dict) -> None:
 
     lines.append("## Полная хронология событий")
     lines.append("")
-    lines.append("| # | блок | время (UTC) | tx_idx | тип | адрес | ETH | токены | цена после блока (ETH/токен) | Δблок | Δсек |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| # | блок | время (UTC) | tx_idx | тип | адрес | ETH | токены | комиссия ETH | цена сделки (ETH/токен) | цена после блока | Δблок | Δсек |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in result["events"]:
+        after_block = f"{r['price_after_block_eth_per_token']:.10f}" if r["price_after_block_eth_per_token"] is not None else "н/д (не архивная нода)"
         lines.append(
             f"| {r['seq']} | {r['block_number']} | {r['block_timestamp_utc']} | {r['tx_index']} | {r['type']} | "
-            f"`{r['address']}` | {r['eth_amount']:.6f} | {r['token_amount']:.4f} | "
-            f"{r['price_eth_per_token_after_block']:.10f} | {r['delta_blocks_since_prev_event']} | {r['delta_seconds_since_prev_event']} |"
+            f"`{r['address']}` | {r['eth_amount']:.6f} | {r['token_amount']:.4f} | {r['fee_eth']+r['tax_eth']:.6f} | "
+            f"{r['effective_trade_price_eth_per_token']:.10f} | {after_block} | "
+            f"{r['delta_blocks_since_prev_event']} | {r['delta_seconds_since_prev_event']} |"
         )
     lines.append("")
+    lines.append(
+        "**Цена сделки** — эффективная цена ЭТОЙ сделки (`quoteIn/tokensOut` для buy, `quoteOut/tokensIn` для sell), "
+        "доступна всегда. **Цена после блока** — `getReserves()` на конкретном историческом блоке; публичная нода "
+        "не архивная и для части блоков не хранит state (`metadata is not found`) — тогда «н/д»."
+    )
 
     lines.append("## По адресам")
     lines.append("")
