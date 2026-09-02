@@ -52,6 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Git identity (НАЙДЕНО 2026-09-02, run 33612440836-- нужна ДО Launcher, не только в финальном Push, т.к. sc1_launcher.py сам коммитит построчно)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

@@ -339,11 +339,33 @@ def _decode_receipt(receipt: dict, report: dict, gas_price_wei_estimated: int) -
 
 
 def append_registry_and_commit(entry: dict) -> None:
+    # НАЙДЕНО 2026-09-02 (первый реальный запуск, run 33612440836):
+    # эта функция печаталась ПОСЛЕ git commit -- при реальном сбое
+    # коммита (в этом случае: git identity не была настроена ДО этого
+    # шага в самой джобе, `git commit` упал с exit 128) запись о УЖЕ
+    # ОТПРАВЛЕННОЙ И ЗАМАЙНЕННОЙ транзакции терялась целиком -- в логах
+    # оставался только tx_hash из send_one(), реальный token_address/
+    # curve_address/gas ушли в никуда вместе с крашем процесса. Печать
+    # entry -- ПЕРВЫМ действием, до любых git-операций, которые могут
+    # упасть -- при повторном сбое запись минимум видна в логах джобы и
+    # восстановима вручную (см. analysis/sc1_recover_tx.py).
+    print(f"[sc1_launcher] запись реестра для {entry['symbol']} (пишу ДО git-операций, на случай их сбоя):")
+    print(json.dumps(entry, indent=2, default=str, ensure_ascii=False))
+
     existing = []
     if REGISTRY_PATH.exists():
         existing = json.loads(REGISTRY_PATH.read_text())
     existing.append(entry)
     REGISTRY_PATH.write_text(json.dumps(existing, indent=2, default=str) + "\n")
+
+    # Идентичность git -- НЕ полагаемся на то, что вызывающий workflow
+    # уже её настроил ДО запуска этого скрипта (баг run 33612440836:
+    # run_sc1_launcher.yml настраивал identity только в ПОСЛЕДНЕМ шаге
+    # Push, а не перед Launcher -- git commit падал с exit 128,
+    # "please tell me who you are"). Настраиваем defensively здесь же,
+    # идемпотентно (--local, безвредно перезаписать тем же значением).
+    subprocess.run(["git", "config", "user.name", "github-actions[bot]"], cwd=REPO_ROOT, check=True)
+    subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], cwd=REPO_ROOT, check=True)
 
     subprocess.run(["git", "add", str(REGISTRY_PATH.relative_to(REPO_ROOT))], cwd=REPO_ROOT, check=True)
     subprocess.run(

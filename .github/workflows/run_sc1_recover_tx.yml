@@ -1,0 +1,55 @@
+name: SC1 -- восстановление записи реестра по известному tx_hash (после сбоя коммита)
+
+# Читает УЖЕ ОТПРАВЛЕННУЮ транзакцию (receipt, публичный RPC) и
+# дописывает data/sc1_launches.json -- используется, когда реальная
+# отправка прошла, но append_registry_and_commit() упал ДО коммита
+# (см. run 33612440836, docs/SC1_LAUNCHER.md). НЕ отправляет ничего
+# нового -- PRIVATE_KEY_NOX не требуется и не читается.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/SC1_RECOVER_TX_REQUEST"
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Recover
+        run: |
+          SYMBOL=$(jq -r '.symbol' data/p3_guard_cache/SC1_RECOVER_TX_REQUEST)
+          TX_HASH=$(jq -r '.tx_hash' data/p3_guard_cache/SC1_RECOVER_TX_REQUEST)
+          IMAGE_FILE=$(jq -r '.image_file' data/p3_guard_cache/SC1_RECOVER_TX_REQUEST)
+          LAUNCH_FEE_ETH=$(jq -r '.launch_fee_eth' data/p3_guard_cache/SC1_RECOVER_TX_REQUEST)
+          ETH_USD_PRICE=$(jq -r '.eth_usd_price' data/p3_guard_cache/SC1_RECOVER_TX_REQUEST)
+          python analysis/sc1_recover_tx.py "$SYMBOL" "$TX_HASH" "$IMAGE_FILE" "$LAUNCH_FEE_ETH" "$ETH_USD_PRICE"
+
+      - name: Push
+        if: always()
+        run: |
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
