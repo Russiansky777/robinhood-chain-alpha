@@ -35,7 +35,11 @@ jobs:
       - name: Launcher dry-run (один токен, NVX -- НЕ отправляет ничего, ключ не передан)
         run: python analysis/sc1_launcher.py --symbols NVX --limit 1
 
-      - name: Commit results (recon + dry-run отчёты + обновлённый SC1_LAUNCHER.md)
+      - name: "Перепроверка eth_estimateGas бинарным поиском через eth_call (владелец: перепроверить на ошибку / попробовать с меньшим газом) -- бесплатная симуляция, ничего не отправляет"
+        if: always()   # запускаем даже если dry-run выше упал по потолку газа -- перепроверка нужна ИМЕННО в этом случае
+        run: python analysis/sc1_gas_probe.py --symbol NVX
+
+      - name: Commit results (recon + dry-run отчёты + gas-probe + обновлённый SC1_LAUNCHER.md)
         if: always()   # 2026-09-02: recon (шаг выше) может успеть, даже если dry-run следом упал -- не терять его результат
         run: |
           git config user.name "github-actions[bot]"
@@ -46,7 +50,7 @@ jobs:
           # реально существовали) -- stderr был подавлен `2>/dev/null`,
           # `|| true` глотал ошибку, ничего не коммитилось молча.
           # Теперь -- по каждому файлу отдельно, только если существует.
-          for f in data/p3_guard_cache/sc1_v2_recon_result.json docs/SC1_LAUNCHER.md data/p3_guard_cache/sc1_launcher_dryrun_*.json; do
+          for f in data/p3_guard_cache/sc1_v2_recon_result.json docs/SC1_LAUNCHER.md data/p3_guard_cache/sc1_launcher_dryrun_*.json data/p3_guard_cache/sc1_gas_probe_*.json; do
             [ -e "$f" ] && git add "$f"
           done
           git diff --cached --quiet && exit 0

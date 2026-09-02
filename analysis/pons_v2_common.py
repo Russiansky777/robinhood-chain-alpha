@@ -181,6 +181,30 @@ def eth_estimate_gas(from_addr: str, calldata: bytes, value_wei: int) -> int:
     return int(result, 16)
 
 
+def eth_call_would_succeed(from_addr: str, calldata: bytes, value_wei: int, gas_limit: int) -> tuple[bool, str | None]:
+    """`eth_call` с ЯВНЫМ капом газа в самом объекте вызова -- бесплатная
+    симуляция (ничего не подписывается/не отправляется), используется
+    ТОЛЬКО для перепроверки `eth_estimateGas` бинарным поиском (см.
+    sc1_gas_probe.py) -- не для реальной отправки. Возвращает
+    (True, None) при успехе, (False, причина) при revert/out-of-gas --
+    "недостаточно газа" и "содержательный revert контракта"
+    неразличимы дёшево (оба -- ошибка eth_call), поэтому вызывающий код
+    трактует ЛЮБУЮ ошибку как "с этим газом НЕ проходит", что
+    консервативно (не занижает необходимый газ)."""
+    tx = {
+        "from": from_addr,
+        "to": V2_FACTORY,
+        "data": "0x" + calldata.hex(),
+        "value": hex(value_wei),
+        "gas": hex(gas_limit),
+    }
+    try:
+        _rpc_call("eth_call", [tx, "latest"])
+        return True, None
+    except RuntimeError as e:
+        return False, str(e)
+
+
 def eth_gas_price() -> int:
     result = _rpc_call("eth_gasPrice", [])
     return int(result, 16)
