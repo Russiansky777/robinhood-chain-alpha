@@ -194,3 +194,26 @@ squash-merge PR). Для реального использования в `logo`
 - `maxCreatorTaxBps()` — потолок для `creatorTaxBps`.
 
 <!-- SC1_V2_RECON_RESULT -->
+
+## Результат живого прогона (`analysis/sc1_v2_recon.py`, GH Actions, публичный RPC)
+
+Подтверждено вызовами `eth_call` к `0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e` (chainId=4663):
+
+| параметр | значение |
+|---|---|
+| `launchFee()` | **500000000000000 wei = 0.00050000 ETH** |
+| `launchEnabled()` | **True** |
+| `whitelistedLaunchers(0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75)` | False |
+| `canLaunch(0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75)` | **True** |
+| `maxCreatorTaxBps()` | 1000 |
+| `launchConfigCount()` | 1 |
+| `approvedPairTokens(0x0bd7d308f8e1639fab988df18a8011f41eacad73)` (кандидат WETH, из V1) | **False** |
+
+### launchConfig'и
+
+| id | supply | curveFeeBps | phantomQuote | graduationThreshold | poolFee | tickSpacing | enabled |
+|---|---|---|---|---|---|---|---|
+| 0 | 1000000000000000000000000000 | 100 | 1680000000000000000 | 4200000000000000000 | 0 | 200 | True |
+
+Артефакт: `data/p3_guard_cache/sc1_v2_recon_result.json`.
+
