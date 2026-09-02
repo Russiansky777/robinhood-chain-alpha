@@ -24,29 +24,62 @@ def run() -> int:
     latest_block = int(_rpc_call("eth_blockNumber", []), 16)
     print(f"[relayer_recon] SpokePool={ac.SPOKE_POOL}, deploy_block={ac.SPOKE_POOL_DEPLOY_BLOCK}, latest={latest_block}")
 
-    # --- 1. Все EnabledDepositRoute за всю историю (редкое событие, большой chunk) ---
-    route_logs = ac.fetch_enabled_deposit_route_logs(ac.SPOKE_POOL_DEPLOY_BLOCK, latest_block)
-    routes = [ac.decode_enabled_deposit_route(l) for l in route_logs]
-    routes.sort(key=lambda r: r["block_number"])
+    # Resume: скан EnabledDepositRoute -- 2625 вызовов, ~50 мин на паблик
+    # RPC, за всю (неизменную) историю чейна -- если кэш от предыдущего
+    # прогона уже содержит его, не пересчитывать (баг в декодинге
+    # сэмпла свалил первый прогон ПОСЛЕ этого дорогого шага -- потеря
+    # результата экономически ощутима).
+    cached = None
+    if OUT_PATH.exists():
+        try:
+            cached = json.loads(OUT_PATH.read_text())
+        except Exception:  # noqa: BLE001
+            cached = None
 
-    # Текущее состояние (последнее событие по каждой паре origin_token+destination_chain_id побеждает)
-    current_state: dict[tuple[str, int], dict] = {}
-    for r in routes:
-        key = (r["origin_token"].lower(), r["destination_chain_id"])
-        current_state[key] = r
+    if cached and cached.get("deploy_block") == ac.SPOKE_POOL_DEPLOY_BLOCK and "all_enabled_deposit_route_events" in cached:
+        routes = cached["all_enabled_deposit_route_events"]
+        enabled_routes_now = cached["enabled_routes_now"]
+        token_info = cached["token_info"]
+        print(f"[relayer_recon] resume: {len(routes)} EnabledDepositRoute событий взято из кэша {OUT_PATH}, скан НЕ повторяется")
+    else:
+        # --- 1. Все EnabledDepositRoute за всю историю (редкое событие, большой chunk) ---
+        route_logs = ac.fetch_enabled_deposit_route_logs(ac.SPOKE_POOL_DEPLOY_BLOCK, latest_block)
+        routes = [ac.decode_enabled_deposit_route(l) for l in route_logs]
+        routes.sort(key=lambda r: r["block_number"])
 
-    distinct_tokens = sorted({r["origin_token"] for r in routes})
-    token_info = {}
-    for addr in distinct_tokens:
-        symbol = ac.erc20_symbol(addr)
-        decimals = ac.erc20_decimals(addr)
-        token_info[addr] = {"symbol": symbol, "decimals": decimals}
-        print(f"[relayer_recon] token {addr}: symbol={symbol!r} decimals={decimals}")
+        # Текущее состояние (последнее событие по каждой паре origin_token+destination_chain_id побеждает)
+        current_state: dict[tuple[str, int], dict] = {}
+        for r in routes:
+            key = (r["origin_token"].lower(), r["destination_chain_id"])
+            current_state[key] = r
 
-    enabled_routes_now = [
-        {**r, "token_symbol": token_info.get(r["origin_token"], {}).get("symbol")}
-        for r in current_state.values() if r["enabled"]
-    ]
+        distinct_tokens = sorted({r["origin_token"] for r in routes})
+        token_info = {}
+        for addr in distinct_tokens:
+            symbol = ac.erc20_symbol(addr)
+            decimals = ac.erc20_decimals(addr)
+            token_info[addr] = {"symbol": symbol, "decimals": decimals}
+            print(f"[relayer_recon] token {addr}: symbol={symbol!r} decimals={decimals}")
+
+        enabled_routes_now = [
+            {**r, "token_symbol": token_info.get(r["origin_token"], {}).get("symbol")}
+            for r in current_state.values() if r["enabled"]
+        ]
+
+        # Промежуточная запись ДО сэмпла свопов -- см. docstring выше.
+        partial = {
+            "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "spoke_pool": ac.SPOKE_POOL,
+            "deploy_block": ac.SPOKE_POOL_DEPLOY_BLOCK,
+            "latest_block": latest_block,
+            "all_enabled_deposit_route_events": routes,
+            "enabled_routes_now": enabled_routes_now,
+            "token_info": token_info,
+            "sample_stage": "not_started",
+        }
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(partial, indent=2, default=str))
+        print(f"[relayer_recon] промежуточная запись (маршруты+токены) -- {OUT_PATH}")
 
     # --- 2. Сэмпл недавней активности (депозиты И филлы) ---
     sample_from = max(ac.SPOKE_POOL_DEPLOY_BLOCK, latest_block - SAMPLE_WINDOW_BLOCKS)
@@ -59,8 +92,17 @@ def run() -> int:
         n_dep_calls += 1
 
     deposit_logs = list(ac.fetch_deposit_logs(sample_from, latest_block, on_call=_count_dep))
-    deposits = [ac.decode_funds_deposited(l) for l in deposit_logs]
-    print(f"[relayer_recon] FundsDeposited в сэмпле: {len(deposits)} ({n_dep_calls} вызовов)")
+    deposits, deposit_decode_errors = [], []
+    for l in deposit_logs:
+        try:
+            deposits.append(ac.decode_funds_deposited(l))
+        except Exception as e:  # noqa: BLE001 -- баг первого прогона: NonEmptyPaddingBytes
+            # на реальном логе -- вероятно, схема события на этом деплое
+            # отличается от дословной V3SpokePoolInterface.sol (не
+            # выдумываем расшифровку -- сохраняем сырой лог для разбора).
+            deposit_decode_errors.append({"error": str(e), "raw_log": l})
+    print(f"[relayer_recon] FundsDeposited в сэмпле: {len(deposits)} декодировано, "
+          f"{len(deposit_decode_errors)} НЕ декодировано ({n_dep_calls} вызовов)")
 
     n_fill_calls = 0
 
@@ -69,8 +111,14 @@ def run() -> int:
         n_fill_calls += 1
 
     fill_logs = list(ac.fetch_filled_relay_logs(sample_from, latest_block, on_call=_count_fill))
-    fills = [ac.decode_filled_relay(l) for l in fill_logs]
-    print(f"[relayer_recon] FilledRelay в сэмпле: {len(fills)} ({n_fill_calls} вызовов)")
+    fills, fill_decode_errors = [], []
+    for l in fill_logs:
+        try:
+            fills.append(ac.decode_filled_relay(l))
+        except Exception as e:  # noqa: BLE001
+            fill_decode_errors.append({"error": str(e), "raw_log": l})
+    print(f"[relayer_recon] FilledRelay в сэмпле: {len(fills)} декодировано, "
+          f"{len(fill_decode_errors)} НЕ декодировано ({n_fill_calls} вызовов)")
 
     dest_chain_ids_seen = sorted({d["destination_chain_id"] for d in deposits})
     origin_chain_ids_seen = sorted({f["origin_chain_id"] for f in fills})
@@ -94,10 +142,14 @@ def run() -> int:
         "sample_window": {"from_block": sample_from, "to_block": latest_block},
         "sample_n_deposits": len(deposits),
         "sample_n_fills": len(fills),
+        "sample_n_deposit_decode_errors": len(deposit_decode_errors),
+        "sample_n_fill_decode_errors": len(fill_decode_errors),
         "sample_destination_chain_ids_seen_in_deposits": dest_chain_ids_seen,
         "sample_origin_chain_ids_seen_in_fills": origin_chain_ids_seen,
         "sample_deposits": deposits,
         "sample_fills": fills,
+        "sample_deposit_decode_errors": deposit_decode_errors,
+        "sample_fill_decode_errors": fill_decode_errors,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, default=str))

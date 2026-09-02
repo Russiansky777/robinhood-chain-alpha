@@ -44,7 +44,11 @@ LIT_CONTRACT = "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2"  # CoinGecko coins/l
 ETH_RPC_ENDPOINTS = [
     "https://ethereum-rpc.publicnode.com",
     "https://eth.llamarpc.com",
-    "https://cloudflare-eth.com",
+    # cloudflare-eth.com убран -- первый реальный прогон (2026-09-02)
+    # получил {"code": -32603, "message": "Internal error"} на
+    # eth_getLogs с этим адресом (известное ограничение публичного
+    # шлюза Cloudflare -- не поддерживает getLogs с topics для
+    # произвольных контрактов), фактом, не предположением.
 ]
 
 DOCS_BASE = "https://docs.lighter.xyz"
@@ -137,7 +141,15 @@ def fetch_transfer_logs(from_block: int, to_block: int, chunk_size: int = 3000) 
             logs.extend(result)
         except Exception as e:  # noqa: BLE001
             print(f"[p4_lit_onchain] getLogs [{lo},{hi}] не удался: {e}")
-            if hi > lo:
+            # Бисекция ТОЛЬКО если ошибка похожа на "диапазон слишком
+            # велик" -- на систематическую ошибку (эндпоинт в принципе
+            # не отдаёт getLogs с этими параметрами) бисекция до
+            # 1-блочных чанков не поможет и просто умножит число
+            # безнадёжных запросов -- fail fast с диагностикой вместо
+            # тихого зависания.
+            msg = str(e).lower()
+            size_related = any(m in msg for m in ("too large", "too many", "exceed", "limit", "range"))
+            if size_related and hi > lo:
                 mid = (lo + hi) // 2
                 logs.extend(fetch_transfer_logs(lo, mid, max(chunk_size // 2, 200)))
                 logs.extend(fetch_transfer_logs(mid + 1, hi, max(chunk_size // 2, 200)))
@@ -231,7 +243,11 @@ def run() -> int:
         print(f"[p4_lit_onchain] Ethereum mainnet RPC доступен, latest block = {int(eth_block, 16)}")
         onchain = {}
         for label, (start_iso, end_iso) in PAYOUT_WINDOWS.items():
-            onchain[label] = analyze_window(label, start_iso, end_iso)
+            try:
+                onchain[label] = analyze_window(label, start_iso, end_iso)
+            except Exception as e:  # noqa: BLE001 -- одно окно не должно топить второе
+                print(f"[p4_lit_onchain] окно {label} НЕ удалось: {e}")
+                onchain[label] = {"reachable": False, "error": str(e)}
             OUT_PATH.write_text(json.dumps({**result, "onchain_lit_transfers": onchain}, indent=2, default=str, ensure_ascii=False))
         result["onchain_lit_transfers"] = onchain
     except Exception as e:  # noqa: BLE001

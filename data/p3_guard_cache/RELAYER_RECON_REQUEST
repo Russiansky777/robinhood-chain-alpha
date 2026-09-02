@@ -1,1 +1,6 @@
-relayer-recon1-2026-09-02T142946Z
+Повторный прогон после фикса: EnabledDepositRoute=0 за всю историю
+(2625 вызовов, подтверждено первым прогоном), но сэмпл 500k блоков
+содержит НЕ декодируемые (сырой лог сохраняется, не выдумывается)
+FundsDeposited-логи -- decode_funds_deposited падал с
+NonEmptyPaddingBytes. Фикс: try/except на каждый лог + resume (не
+пересканировать EnabledDepositRoute повторно).
