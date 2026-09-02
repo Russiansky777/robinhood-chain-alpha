@@ -1,0 +1,50 @@
+name: MM -- market-making stock-token discovery + RPC-call estimate (только чтение)
+
+# П.6 задания: "Оценить число RPC-вызовов до старта и доложить ожидаемое
+# время." Этот прогон -- discover + calibrate, НЕ полная выгрузка сделок.
+# Публичный RPC без ключа, ключ не используется, транзакций нет.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/MM_DISCOVER_REQUEST"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: MM discover + calibrate
+        run: python analysis/mm_discover.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/mm_discover_result.json ] && git add data/p3_guard_cache/mm_discover_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "MM: discover пулов сток-токенов + оценка RPC-вызовов [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
