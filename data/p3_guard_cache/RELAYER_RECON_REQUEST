@@ -1,6 +1,10 @@
-Повторный прогон после фикса: EnabledDepositRoute=0 за всю историю
-(2625 вызовов, подтверждено первым прогоном), но сэмпл 500k блоков
-содержит НЕ декодируемые (сырой лог сохраняется, не выдумывается)
-FundsDeposited-логи -- decode_funds_deposited падал с
-NonEmptyPaddingBytes. Фикс: try/except на каждый лог + resume (не
-пересканировать EnabledDepositRoute повторно).
+Найден и исправлен корень бага: моя транскрипция индексации
+FundsDeposited была неверна с самого начала (indexed = inputToken/
+outputToken/destinationChainId), несмотря на докстринг "дословно".
+Перепроверено 02.09.2026 прямым WebFetch реального
+V3SpokePoolInterface.sol: indexed = destinationChainId, depositId,
+depositor. Проверено на 50 реальных ранее падавших логах -- 50/50 OK,
+включая осмысленные значения (destination_chain_id=8453=Base,
+output_token=0x4200...0006=канонический WETH на OP-stack чейнах).
+Resume пропустит дорогой EnabledDepositRoute-скан (уже в кэше), только
+пересчитает сэмпл (500k блоков) с исправленным декодером.

@@ -50,9 +50,24 @@ SPOKE_POOL_DEPLOY_BLOCK = 156309  # broadcast/deployed-addresses.json, across-pr
 FUNDS_DEPOSITED_SIG = (
     "FundsDeposited(bytes32,bytes32,uint256,uint256,uint256,uint256,uint32,uint32,uint32,bytes32,bytes32,bytes32,bytes)"
 )
-# indexed: inputToken(bytes32), outputToken(bytes32), destinationChainId(uint256)
-# data: inputAmount, outputAmount, depositId, quoteTimestamp, fillDeadline,
-#       exclusivityDeadline, depositor, recipient, exclusiveRelayer, message
+# ИСПРАВЛЕНО 2026-09-02 (первый реальный прогон relayer_recon.py дал 2664
+# decode-ошибок из 3470 + бессмысленные destination_chain_id вида
+# 3.75e50 на "успешных" декодах -- схема ниже была ошибочно
+# транскрибирована с самого начала, несмотря на докстринг "дословно").
+# Перепроверено 02.09.2026 прямым WebFetch реального
+# `across-protocol/contracts/master/contracts/interfaces/
+# V3SpokePoolInterface.sol` (не по памяти): порядок параметров сигнатуры
+# для topic0 (inputToken,outputToken,inputAmount,outputAmount,
+# destinationChainId,depositId,quoteTimestamp,fillDeadline,
+# exclusivityDeadline,depositor,recipient,exclusiveRelayer,message) верен
+# как есть (menяет только СЕЛЕКТОР, не влияет), НО индексация другая:
+# indexed = destinationChainId(uint256), depositId(uint256),
+# depositor(bytes32) -- НЕ (inputToken, outputToken, destinationChainId),
+# как было раньше. Остальные 10 полей -- в data, в исходном порядке
+# сигнатуры за вычетом индексированных.
+# indexed (topics[1..3]): destinationChainId(uint256), depositId(uint256), depositor(bytes32)
+# data: inputToken, outputToken, inputAmount, outputAmount, quoteTimestamp,
+#       fillDeadline, exclusivityDeadline, recipient, exclusiveRelayer, message
 
 FILLED_RELAY_SIG = (
     "FilledRelay(bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint32,uint32,"
@@ -128,14 +143,18 @@ def fetch_deposit_logs(from_block: int, to_block: int, chunk_size: int = 2000, o
 
 
 def decode_funds_deposited(log: dict) -> dict:
-    input_token_b32, output_token_b32, destination_chain_id = (
-        log["topics"][1], log["topics"][2], int(log["topics"][3], 16),
-    )
+    # indexed (topics[1..3]): destinationChainId(uint256), depositId(uint256),
+    # depositor(bytes32) -- проверено 02.09.2026 напрямую по исходнику
+    # (см. комментарий у FUNDS_DEPOSITED_SIG выше), НЕ по памяти.
+    destination_chain_id = int(log["topics"][1], 16)
+    deposit_id = int(log["topics"][2], 16)
+    depositor_b32 = log["topics"][3]
     (
-        input_amount, output_amount, deposit_id, quote_timestamp, fill_deadline,
-        exclusivity_deadline, depositor_b32, recipient_b32, exclusive_relayer_b32, message,
+        input_token_b32, output_token_b32, input_amount, output_amount,
+        quote_timestamp, fill_deadline, exclusivity_deadline,
+        recipient_b32, exclusive_relayer_b32, message,
     ) = abi_decode(
-        ["uint256", "uint256", "uint256", "uint32", "uint32", "uint32", "bytes32", "bytes32", "bytes32", "bytes"],
+        ["bytes32", "bytes32", "uint256", "uint256", "uint32", "uint32", "uint32", "bytes32", "bytes32", "bytes"],
         bytes.fromhex(log["data"][2:]),
     )
     return {
