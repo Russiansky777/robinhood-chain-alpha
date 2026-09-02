@@ -1,0 +1,42 @@
+{
+  "note": "РЕКОНСТРУИРОВАНО ИЗ ЛОГА GH ACTIONS -- скрипт реально выполнился и записал этот файл на runner'е (см. лог: '[public_rpc_probe] записано data/p3_guard_cache/public_rpc_probe_result.json'), но шаг git push проиграл гонку с run_blockscout_addr_probe.yml (тот же push-триггер PROBE_REQUEST) -- 'rejected (fetch first)', файл не попал в git. Все числа ниже -- дословно из реального лога job'а (run_id=33570102743, job_id=100061982793), не додуманы; поля, для которых лог не печатал значение (напр. latency_s отдельных вызовов range_probe/rate_limit_probe кроме первых двух), оставлены null с явной пометкой, не заполнены произвольно.",
+  "source_run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/33570102743/job/100061982793",
+  "generated_at_approx": "2026-09-01T23:14:59Z",
+  "base_url": "https://rpc.mainnet.chain.robinhood.com",
+  "eth_blockNumber": {
+    "status": 200,
+    "body": {"jsonrpc": "2.0", "id": 1, "result": "0x31b0783"},
+    "latency_s": 0.141,
+    "error": null
+  },
+  "current_block": 52103043,
+  "eth_getLogs_1000_blocks": {
+    "status": 200,
+    "latency_s": 0.717,
+    "n_logs": 365,
+    "body_error": null,
+    "error": null,
+    "pool": "0xf5f8447620c1ab53108db068de8a895d7ba096ba",
+    "from_block": 33436269,
+    "to_block": 33437268
+  },
+  "range_probe": [
+    {"range_size": 1000, "status": 200, "ok": true, "n_logs": 365, "body_error": null, "error": null, "latency_s": null},
+    {"range_size": 2000, "status": 200, "ok": true, "n_logs": 786, "body_error": null, "error": null, "latency_s": null},
+    {"range_size": 5000, "status": 429, "ok": false, "n_logs": null, "body_error": {"code": 429, "message": "Too Many Requests"}, "error": null, "latency_s": null}
+  ],
+  "max_ok_range_tried": 2000,
+  "range_probe_note": "Диапазон 5000 упал на 429 (rate-limit), НЕ на ошибку 'диапазон слишком большой' -- максимальный ДОПУСТИМЫЙ диапазон этим прогоном не установлен, только то, что 2000 блоков прошло, а 5000 запрошенных подряд сразу после -- нет (могло быть троттлингом самих по себе быстрых последовательных вызовов, не обязательно лимитом диапазона).",
+  "rate_limit_probe": {
+    "n_calls": 20,
+    "n_ok": 18,
+    "n_throttled": 2,
+    "total_time_s": 6.64,
+    "effective_rate_calls_per_s": 3.0,
+    "calls_with_individual_status_in_log": [
+      {"i": 0, "status": 429},
+      {"i": 1, "status": 429}
+    ],
+    "calls_note": "В логе построчно напечатаны только неуспешные вызовы (i=0,1, оба 429); остальные 18 известны только агрегатом ('18/20 успешно'), не по отдельности -- не додуманы поштучно."
+  }
+}

@@ -1,0 +1,56 @@
+name: Run SC1 wash-trading slice (RPC, без Dune)
+
+# Раньше был подключён к общему с P3 маркеру (data/p3_guard_cache/
+# STAGE_REQUEST) -- это было безопасно, ПОКА оба скрипта одинаково
+# блокировались отсутствием ключа. С 2026-09-01 публичный RPC (без
+# ключа) разблокировал ОБА -- значит, общий маркер больше НЕ safe
+# no-op: бамп STAGE_REQUEST теперь реально запускал бы live P3-гард
+# заодно, что явно не запрашивалось в этой команде владельца
+# (запущен только этот срез). Поэтому -- ОТДЕЛЬНЫЙ маркер
+# WASH_SLICE_REQUEST, P3 (run_p3_guard.yml, STAGE_REQUEST) не тронут.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p3_guard_cache/WASH_SLICE_REQUEST"
+
+jobs:
+  run-sc1-wash-slice:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Wash-slice (0x0eaced.../0x376d63..., случайные 50, публичный RPC)
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: python analysis/sc1_wash_slice.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f data/p3_guard_cache/sc1_wash_slice_result.json ]; then git add data/p3_guard_cache/sc1_wash_slice_result.json; fi
+          git diff --cached --quiet && exit 0
+          git commit -m "SC1: результат wash-slice (main+control) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

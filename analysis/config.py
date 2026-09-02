@@ -33,6 +33,47 @@ class Config:
     alchemy_rpc_url: str = field(
         default_factory=lambda: os.environ.get("ALCHEMY_ROBINHOOD_RPC_URL", "")
     )
+    # Фолбэк, если Alchemy не настроен. Найдено и подключено при
+    # подготовке P3-гарда (2026-09-01), см. docs/P3_GUARD.md --
+    # ALCHEMY_API_KEY в этом репозитории НЕ настроен секретом GH
+    # Actions (проверено реальным прогоном), а задание прямо разрешало
+    # "RPC/Blockscout". ВАЖНО: прямой безключевой eth-rpc прокси
+    # (robinhoodchain.blockscout.com/api/eth-rpc, как у большинства
+    # чейнов на Blockscout) для ЭТОГО чейна вернул 403 -- по
+    # официальной доке (github.com/blockscout/docs, robinhood-api.mdx)
+    # Robinhood Chain обслуживается через платный "PRO API" гейтвей
+    # api.blockscout.com с Bearer-токеном, "required for all PRO API
+    # tiers, including free". Бесплатный ключ существует
+    # (dev.blockscout.com), но регистрация на внешнем сервисе не
+    # выполняется этой сессией автономно -- см. docs/P3_GUARD.md,
+    # "Блокер выполнения". blockscout_rpc_url указывает на
+    # ПРАВИЛЬНЫЙ (документированный) endpoint для использования, КОГДА
+    # ключ появится; blockscout_api_key -- сам ключ (пусто = гард не
+    # запустится, явная ошибка, а не тихий сбой). Ограничение
+    # источника: 1000 логов/запрос, см. analysis/alchemy_fallback.py,
+    # _chunked_get_logs.
+    blockscout_api_key: str = field(default_factory=lambda: os.environ.get("BLOCKSCOUT_API_KEY", ""))
+    blockscout_rpc_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "BLOCKSCOUT_RPC_URL", "https://api.blockscout.com/4663/json-rpc"
+        )
+    )
+    # ПУБЛИЧНЫЙ RPC -- без ключа (владелец, дозапрос 2026-09-01,
+    # проверено реальным прогоном GH Actions run 33570102743):
+    # eth_blockNumber и eth_getLogs (диапазоны 1000/2000 блоков) прошли
+    # БЕЗ 403 и без ключа; на 3-м быстром подряд вызове (5000 блоков)
+    # получен 429 Too Many Requests -- значит источник живой, но
+    # rate-limited (~3 запроса/с по факту 20-вызовной пробы, 18
+    # успешных из 20 за 6.64с), не платно-огороженный, как Blockscout
+    # PRO API. См. docs/P3_GUARD.md, "Проба публичного RPC...". Теперь
+    # ПЕРВЫЙ в приоритете `alchemy_fallback._endpoints()` -- ключевые
+    # пути (Alchemy/Blockscout) остаются ФОЛБЭКОМ на случай стойкой
+    # (не 429) ошибки этого источника.
+    public_rpc_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "PUBLIC_RPC_URL", "https://rpc.mainnet.chain.robinhood.com"
+        )
+    )
 
     # --- Период анализа (Sprint 1: июль -> август 2026) ---
     train_start: str = "2026-07-01"

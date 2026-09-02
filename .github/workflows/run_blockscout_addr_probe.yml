@@ -1,0 +1,52 @@
+name: Run Blockscout address REST probe (одна попытка, без ключа)
+
+# Одноразовая проверка (владелец, 2026-09-01) -- отдельный маркер, НЕ
+# STAGE_REQUEST (чтобы не задевать P3/sc1_wash_slice, у которых
+# другой смысл того маркера). Не для повторного использования как
+# регулярная стадия.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p3_guard_cache/PROBE_REQUEST"
+
+jobs:
+  run-blockscout-probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Blockscout address REST probe (без ключа)
+        run: python analysis/blockscout_addr_probe.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f data/p3_guard_cache/blockscout_addr_probe_result.json ]; then git add data/p3_guard_cache/blockscout_addr_probe_result.json; fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Blockscout probe: результат [automated]"
+          # Тот же маркер PROBE_REQUEST триггерит и run_public_rpc_probe.yml
+          # параллельно -- реальная гонка push'ей уже случилась один раз
+          # (run 33570102743, "! [rejected] fetch first"). Ретрай с rebase.
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

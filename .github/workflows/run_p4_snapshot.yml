@@ -1,0 +1,42 @@
+name: Run P4 current snapshot (single market, 0 Dune, публичный REST)
+
+# Точечный, дешёвый прогон для одного рынка (см. analysis/
+# p4_current_snapshot.py) -- НЕ повторяет полный 45-рыночный прогон
+# run_p4_lighter.yml. Тот же push-по-маркеру паттерн (см.
+# .github/workflows/run_p4_lighter.yml) -- эта ветка не дефолтная,
+# workflow_dispatch через REST API недоступен из неё.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-verdict-3jaxoy
+    paths:
+      - "data/p4_lighter_cache/SNAPSHOT_REQUEST"
+
+jobs:
+  run-p4-snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Current snapshot (один рынок, публичный REST, без ключа)
+        run: python analysis/p4_current_snapshot.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -d data/p4_lighter_cache ]; then git add data/p4_lighter_cache/; fi
+          git diff --cached --quiet || git commit -m "P4: результат стадии p4_current_snapshot [automated]"
+          git push
