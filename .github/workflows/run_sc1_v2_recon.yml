@@ -1,0 +1,52 @@
+name: SC1 -- Pons V2 recon + launcher dry-run (только чтение, публичный RPC)
+
+# Только чтение ончейн-состояния (sc1_v2_recon.py) + dry-run launcher'а
+# (sc1_launcher.py БЕЗ --confirm-mainnet -- НИЧЕГО не подписывает и не
+# отправляет, PRIVATE_KEY_NOX этому job'у не передаётся вовсе). См.
+# docs/SC1_LAUNCHER.md.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/SC1_V2_RECON_REQUEST"
+
+jobs:
+  recon-and-dryrun:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Recon (только чтение -- launchFee/launchEnabled/canLaunch/launchConfig/approvedPairTokens)
+        run: python analysis/sc1_v2_recon.py
+
+      - name: Launcher dry-run (один токен, NVX -- НЕ отправляет ничего, ключ не передан)
+        run: python analysis/sc1_launcher.py --symbols NVX --limit 1
+
+      - name: Commit results (recon + dry-run отчёты + обновлённый SC1_LAUNCHER.md)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/p3_guard_cache/sc1_v2_recon_result.json data/p3_guard_cache/sc1_launcher_dryrun_*.json docs/SC1_LAUNCHER.md 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "SC1 V2: recon + launcher dry-run (NVX) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

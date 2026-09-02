@@ -1,0 +1,56 @@
+name: SC1 -- launch tracker (объём/уник. покупатели по реестру, каждые N часов)
+
+# Только чтение (публичный RPC), реестр data/sc1_launches.json не
+# меняется, обновляется только docs/SC1_LIVE.md + кэш JSON.
+#
+# ВАЖНО (см. docs/PROJECT_STATE.md): `schedule:` у GitHub Actions
+# фактически исполняется только с ДЕФОЛТНОЙ ветки репозитория -- на
+# этой ветке (не дефолтной) cron ниже не сработает сам по себе, пока
+# ветка не смержена. До мержа -- ручной workflow_dispatch или push в
+# маркер ниже, теми же средствами, что остальные гарды проекта.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 */6 * * *"   # каждые 6 часов -- сработает только после мержа в дефолтную ветку
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/SC1_LAUNCH_TRACKER_REQUEST"
+      - "data/sc1_launches.json"
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Tracker
+        run: python analysis/sc1_launch_tracker.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/SC1_LIVE.md data/p3_guard_cache/sc1_launch_tracker_result.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "SC1_LIVE: обновление трекера запусков [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

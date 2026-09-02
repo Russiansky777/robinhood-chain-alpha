@@ -1,0 +1,77 @@
+name: SC1 -- Pons V2 launcher (dry-run по умолчанию, реальная отправка -- ТОЛЬКО ручной workflow_dispatch)
+
+# НАМЕРЕННО без push-триггера -- реальная отправка транзакций
+# (расход ~$15 кошелька PRIVATE_KEY_NOX) не должна случайно сработать
+# от рутинного коммита/пуша в маркер, как остальные read-only гарды
+# этого проекта. Запуск -- ТОЛЬКО вручную через "Run workflow" (Actions
+# tab) с явными inputs, включая send_real (по умолчанию false = всегда
+# dry-run, даже если input забыт/передан неверно -- fail-safe в сторону
+# dry-run, не в сторону отправки).
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Через запятую, напр. NVX или NVX,QRT. Пусто = все 20."
+        required: false
+        default: ""
+      limit:
+        description: "Максимум РЕАЛЬНЫХ отправок за прогон (игнорируется в dry-run)."
+        required: false
+        default: "1"
+      send_real:
+        description: 'Реальная mainnet-отправка -- ТОЛЬКО буквально "yes" включает её. Любое другое значение = dry-run.'
+        required: false
+        default: "no"
+      gas_ceiling_usd:
+        description: "Потолок стоимости газа в USD на один запуск."
+        required: false
+        default: "5.0"
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Launcher
+        env:
+          # ключ передаётся В ОКРУЖЕНИЕ ТОЛЬКО этого шага -- скрипт сам
+          # читает его из env ТОЛЬКО если send_real == "yes" (см.
+          # sc1_launcher.py::send_one -- prepare_one/dry-run его вообще
+          # не трогает). Секрет должен существовать в репозитории под
+          # именем PRIVATE_KEY_NOX (см. задание владельца).
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+        run: |
+          ARGS="--gas-ceiling-usd ${{ github.event.inputs.gas_ceiling_usd }} --limit ${{ github.event.inputs.limit }}"
+          if [ -n "${{ github.event.inputs.symbols }}" ]; then
+            ARGS="$ARGS --symbols ${{ github.event.inputs.symbols }}"
+          fi
+          if [ "${{ github.event.inputs.send_real }}" = "yes" ]; then
+            echo "::warning::send_real=yes -- РЕАЛЬНАЯ mainnet-отправка включена этим прогоном."
+            ARGS="$ARGS --confirm-mainnet"
+          else
+            echo "dry-run (send_real != 'yes')"
+          fi
+          python analysis/sc1_launcher.py $ARGS
+
+      - name: Push (реестр коммитится скриптом построчно -- здесь только push накопленного)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток -- ЛОКАЛЬНЫЕ коммиты реестра могут быть впереди origin, проверить вручную" >&2
+          exit 1
