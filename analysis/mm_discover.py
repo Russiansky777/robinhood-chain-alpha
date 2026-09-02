@@ -46,12 +46,26 @@ from p3_common import (  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/mm_discover_result.json")
 
+# Первый прогон (2026-09-02) не имел потолка и калибровался на ПОЛНЫЙ
+# день (~860k блоков при spb~0.1с) на пул, вместо дешёвого малого среза
+# -- при до 24 токенах x 2 версии протокола это могло уйти в десятки
+# тысяч вызовов без страховки. Отменено вручную. Фикс: явный потолок (тот
+# же принцип, что MAX_REQUESTS_PER_RUN в p3_dislocation_guard.py) +
+# калибровка на МАЛОМ фиксированном срезе (не "1 день").
+MAX_REQUESTS_PER_RUN = 20_000
+CALIBRATION_BLOCKS = 20_000  # ~30-35 мин при spb~0.1с -- достаточно для оценки плотности, дёшево
+
 _request_count = 0
 
 
 def _count(n: int = 1) -> None:
     global _request_count
     _request_count += n
+    if _request_count > MAX_REQUESTS_PER_RUN:
+        raise RuntimeError(
+            f"[mm_discover] СТОП: потолок запросов за прогон превышен "
+            f"({_request_count} > {MAX_REQUESTS_PER_RUN}). См. MAX_REQUESTS_PER_RUN."
+        )
 
 
 def estimate_seconds_per_block(latest: int, lookback_blocks: int = 500_000) -> float:
@@ -109,6 +123,16 @@ def run() -> int:
           f"{len(pc_logs)} PoolCreated (factories={factories_seen}), "
           f"{len(init_logs)} v4 Initialize (poolManagers={pool_managers_seen})")
 
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps({
+        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "stage": "1_done_factories_confirmed",
+        "factories_seen_1d_slice": factories_seen,
+        "v3_factory_used": v3_factory,
+        "pool_managers_seen_1d_slice": pool_managers_seen,
+        "requests_used_so_far": _request_count,
+    }, indent=2, default=str, ensure_ascii=False))
+
     # --- Стадия 2: полная история пулов для eligible_universe (редкое событие -- дёшево) ---
     v3_pools_all = scan(window_start_block, window_end_block, [TOPIC0_V3_POOL_CREATED], address=v3_factory, chunk_size=20_000) if v3_factory else []
     v4_inits_all: list[dict] = []
@@ -145,9 +169,32 @@ def run() -> int:
     print(f"[mm_discover] из {len(universe)} eligible-токенов: {n_with_v3} имеют v3-пул, "
           f"{n_with_v4} имеют v4-пул, {n_with_any} имеют хоть один")
 
-    # --- Стадия 3: калибровка плотности Swap на 1-дневном срезе ВНУТРИ окна ---
+    OUT_PATH.write_text(json.dumps({
+        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "stage": "2_done_pools_found",
+        "factories_seen_1d_slice": factories_seen,
+        "v3_factory_used": v3_factory,
+        "pool_managers_seen_1d_slice": pool_managers_seen,
+        "pools_by_symbol": pools_by_symbol,
+        "n_eligible_with_v3_pool": n_with_v3,
+        "n_eligible_with_v4_pool": n_with_v4,
+        "n_eligible_with_any_pool": n_with_any,
+        "requests_used_so_far": _request_count,
+    }, indent=2, default=str, ensure_ascii=False))
+
+    # --- Стадия 3: калибровка плотности Swap на МАЛОМ срезе (CALIBRATION_BLOCKS) ВНУТРИ окна ---
+    # НЕ полный день (баг первого прогона -- см. докстринг MAX_REQUESTS_PER_RUN
+    # выше): дорого и без страховки при до 24 токенах x 2 версии протокола.
     calib_to = window_end_block
-    calib_from = max(window_start_block, calib_to - blocks_1d)
+    calib_from = max(window_start_block, calib_to - CALIBRATION_BLOCKS)
+    # Реальная длительность среза в секундах -- по фактическим таймстемпам
+    # блоков, не по оценке spb (не накапливаем ошибку оценки поверх оценки).
+    calib_to_ts = int(get_block(calib_to)["timestamp"], 16)
+    _count()
+    calib_from_ts = int(get_block(calib_from)["timestamp"], 16)
+    _count()
+    calib_duration_s = max(1, calib_to_ts - calib_from_ts)
+
     n_swap_calib = 0
     calib_calls = 0
     for sym, p in pools_by_symbol.items():
@@ -160,14 +207,18 @@ def run() -> int:
             n_swap_calib += len(logs)
             calib_calls += max(1, (calib_to - calib_from) // 2000 + 1)
 
-    print(f"[mm_discover] калибровка 1д [{calib_from},{calib_to}]: {n_swap_calib} Swap-событий "
+    print(f"[mm_discover] калибровка [{calib_from},{calib_to}] (~{calib_duration_s/60:.1f} мин "
+          f"по факту timestamp'ов блоков): {n_swap_calib} Swap-событий "
           f"по {n_with_any} токенам с пулом ({calib_calls} вызовов eth_getLogs)")
 
-    # Экстраполяция на всё окно: календарных дней в окне / 1, буфер x1.5
-    # на неравномерность активности (явно назван буфером, не фактом).
+    # Экстраполяция на всё окно: (секунд в окне / секунд в калибровочном
+    # срезе) x буфер x1.5 на неравномерность активности (явно назван
+    # буфером, не фактом).
+    window_seconds = (WINDOW_END_UTC - WINDOW_START_UTC).total_seconds()
+    scale = window_seconds / calib_duration_s
     BUFFER = 1.5
-    projected_swap_events = int(n_swap_calib * window_days * BUFFER)
-    projected_getlogs_calls = int(calib_calls * window_days * BUFFER)
+    projected_swap_events = int(n_swap_calib * scale * BUFFER)
+    projected_getlogs_calls = int(calib_calls * scale * BUFFER)
     # Плюс по одному eth_call на сделку для "цены до/после" не нужен --
     # цена уже в самом Swap-логе (sqrtPriceX96/amount0/amount1) --
     # никаких доп. RPC на сделку сверх getLogs не требуется для п.1.
@@ -179,6 +230,7 @@ def run() -> int:
 
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "stage": "3_done_complete",
         "latest_block": latest,
         "seconds_per_block_estimate": spb,
         "window_start_utc": WINDOW_START_UTC.isoformat(),
@@ -196,8 +248,10 @@ def run() -> int:
         "n_eligible_with_v4_pool": n_with_v4,
         "n_eligible_with_any_pool": n_with_any,
         "calibration_window": {"from_block": calib_from, "to_block": calib_to},
+        "calibration_duration_s_by_block_timestamps": calib_duration_s,
         "calibration_n_swap_events": n_swap_calib,
         "calibration_n_getlogs_calls": calib_calls,
+        "extrapolation_scale_window_over_calibration": scale,
         "extrapolation_buffer": BUFFER,
         "projected_swap_events_full_window": projected_swap_events,
         "projected_getlogs_calls_full_window": projected_getlogs_calls,
