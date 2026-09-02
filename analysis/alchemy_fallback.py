@@ -51,7 +51,6 @@ def topic0(signature: str) -> str:
 
 
 _BASE_HEADERS = {"User-Agent": "robinhood-chain-alpha-p3-guard/1.0"}
-_MAX_RETRIES_PER_ENDPOINT = 3
 _BACKOFF_BASE_S = 2.0
 
 
@@ -143,20 +142,20 @@ def _throttle() -> None:
 def _post_with_fallback(payload: dict) -> dict:
     """POST payload по списку `_endpoints()` в порядке приоритета.
 
-    На 429 (rate-limit) -- retry с экспоненциальным backoff (капнутым
-    `_BACKOFF_CAP_S`) НА ТОМ ЖЕ эндпоинте, по БЮДЖЕТУ ВРЕМЕНИ
-    `_RATE_LIMIT_WAIT_BUDGET_S` (не по числу попыток -- см. её докстринг:
-    фиксированное число попыток эмпирически не хватало) прежде чем
-    перейти к следующему эндпоинту -- транзиентная проблема, не повод
-    сразу тратить платный ключ. Прочие транзиентные ошибки (см.
-    `_TRANSIENT_ERROR_MARKERS`) -- ретраятся тем же путём, но с
-    бюджетом попыток `_MAX_RETRIES_PER_ENDPOINT` (меньше -- это не
-    документированное штатное поведение, а сбой, от которого не стоит
-    ждать так же долго). На 401/403 -- сразу переход к следующему
-    эндпоинту (без ретрая на этом же -- не транзиентно). Возвращает
-    распарсенный JSON-body первого успешного ответа (включая
-    JSON-RPC-level `"error"` в теле -- это не транспортная проблема,
-    вызывающий код сам решает, что с ней делать).
+    На 429 (rate-limit) И на прочие транзиентные JSON-RPC ошибки (см.
+    `_TRANSIENT_ERROR_MARKERS` -- эвристика по коду -32000/-32603 +
+    маркерам сообщения) -- ОДИНАКОВЫЙ путь: retry с экспоненциальным
+    backoff (капнутым `_BACKOFF_CAP_S`) НА ТОМ ЖЕ эндпоинте, по БЮДЖЕТУ
+    ВРЕМЕНИ `_RATE_LIMIT_WAIT_BUDGET_S` (не по числу попыток -- см. её
+    докстринг: фиксированное число попыток эмпирически не хватало ни
+    разу за три разных инцидента одного и того же спринта) прежде чем
+    перейти к следующему эндпоинту -- обе категории одинаково
+    транзиентны, не повод сразу тратить платный ключ. На 401/403 --
+    сразу переход к следующему эндпоинту (без ретрая на этом же -- не
+    транзиентно). Возвращает распарсенный JSON-body первого успешного
+    ответа (включая JSON-RPC-level `"error"` в теле, если он НЕ
+    транзиентный -- это не транспортная проблема, вызывающий код сам
+    решает, что с ней делать).
     Кидает RuntimeError, если ВСЕ эндпоинты исчерпаны."""
     last_err: Exception | str | None = None
     for url, extra_headers in _endpoints():
@@ -202,25 +201,50 @@ def _post_with_fallback(payload: dict) -> dict:
             # та же транзиентная проблема, что и 429. Раньше это сразу
             # каскадом улетало в RuntimeError вызывающему коду и роняло
             # весь прогон (36 минут работы потеряно на одном таком сбое)
-            # -- теперь ретраится здесь же (бюджет `_MAX_RETRIES_PER_ENDPOINT`,
-            # не `_MAX_RETRIES_429` -- см. докстринг выше).
+            # -- теперь ретраится здесь же, тем же бюджетом времени, что
+            # 429 (см. докстринг выше).
             err = body.get("error") if isinstance(body, dict) else None
             if err is not None and _looks_transient(err):
-                if attempt < _MAX_RETRIES_PER_ENDPOINT - 1:
+                # НАЙДЕНО 2026-09-02 (run 33608868849): фиксированные 3
+                # попытки здесь оказались тем же недостаточным бюджетом,
+                # что раньше был у 429 -- 'log query timed out' на CONTROL
+                # рухнул без единого шанса на восстановление после
+                # рестарта соединения с апстримом. Тот же бюджет по
+                # времени, что 429 (см. `_RATE_LIMIT_WAIT_BUDGET_S`) --
+                # обе категории транзиентны одинаково, отдельного
+                # меньшего бюджета для этой ветки больше нет.
+                now = time.monotonic()
+                if rate_limit_deadline is None:
+                    rate_limit_deadline = now + _RATE_LIMIT_WAIT_BUDGET_S
+                if now < rate_limit_deadline:
                     time.sleep(min(_BACKOFF_BASE_S * (2 ** attempt), _BACKOFF_CAP_S))
                     attempt += 1
                     continue
-                last_err = f"{url}: транзиентная RPC-ошибка после {_MAX_RETRIES_PER_ENDPOINT} попыток: {err}"
+                last_err = f"{url}: транзиентная RPC-ошибка устойчиво в течение {_RATE_LIMIT_WAIT_BUDGET_S:.0f}с: {err}"
                 break
             return body
     raise RuntimeError(f"Все RPC-эндпоинты исчерпаны. Последняя ошибка: {last_err}")
 
 
 _TRANSIENT_ERROR_MARKERS = (
+    # НАЙДЕНО 2026-09-02 (run 33608868849, третий по счёту РАЗНЫЙ текст
+    # транзиентной ошибки за один спринт): узкий список конкретных фраз
+    # -- вечная игра в "поймай следующую формулировку". CONTROL упал на
+    # {'code': -32000, 'message': 'log query timed out'} -- "timed out"
+    # (с пробелом) не совпадало ни с одним из прежних маркеров ("i/o
+    # timeout" и т.п.), ошибка ушла в RuntimeError без единой попытки
+    # ретрая. Список расширен generic-словами -- для eth_getLogs ЛЮБАЯ
+    # JSON-RPC error (-32000/-32603) по сути ВСЕГДА транзиентна (нет
+    # "легитимного revert" у чтения логов, в отличие от eth_call) --
+    # но код используется и для eth_call (launcher), где revert может
+    # быть содержательным, поэтому остаёмся в рамках эвристики по
+    # словам, а не "любая -32000/-32603 = ретраить" целиком.
     "i/o timeout", "dial tcp", "connection reset", "connection refused",
     "eof", "context deadline exceeded", "no such host", "timeout awaiting",
     "temporarily unavailable", "upstream", "bad gateway", "gateway timeout",
-    "internal error",
+    "internal error", "timed out", "timeout", "rate limit", "too many requests",
+    "resource exhausted", "unavailable", "try again", "overloaded", "busy",
+    "query timed", "request timed",
 )
 
 
