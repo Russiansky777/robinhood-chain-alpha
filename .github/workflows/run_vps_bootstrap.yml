@@ -80,7 +80,12 @@ jobs:
             # уже подключены по ключу (эта же сессия это доказывает).
             sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication no/" /etc/ssh/sshd_config
             grep -q "^PasswordAuthentication no" /etc/ssh/sshd_config
-            systemctl reload sshd
+            # НАЙДЕНО 2026-09-03 (первый прогон): на Ubuntu 24.04 юнит
+            # называется ssh.service, НЕ sshd.service (systemctl reload
+            # sshd -- "Unit sshd.service not found", падал ПОСЛЕ того как
+            # ufw/fail2ban/sed уже реально применились -- лишний повод
+            # проверить новым соединением, не просто починить название).
+            systemctl reload ssh 2>/dev/null || systemctl reload sshd
           '
 
       - name: 3б. Проверка -- НОВОЕ соединение после смены sshd_config (не залочились)
