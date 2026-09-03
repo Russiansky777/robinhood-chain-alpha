@@ -1,0 +1,325 @@
+{
+  "generated_at_utc": "2026-09-03T18:38:28Z",
+  "docs": {
+    "https://apidocs.rh.lighter.xyz/reference/accountorders": {
+      "status_code": 200,
+      "full_text": "accountOrders For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference accountOrders Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints order accountOrders Copy Page get https://api.rh.lighter.xyz /api/v1/accountOrders Get account orders by client order indexes. Account index defaults to the authorization token&#x27;s account. Supports the last 10K active orders (with no time limits), or the last 1K inactive orders (in the last 24 hours). Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params account_index int64 Defaults to 281474976710655 client_order_indexes string required comma-separated int64s, e.g. &quot;123,456&quot;, with a limit of 20. Headers authorization string required Responses 200 A successful response. 400 Bad request Updated about 2 months ago publicPoolsMetadata accountActiveOrders Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated about 2 months ago publicPoolsMetadata accountActiveOrders Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/accountinactiveorders": {
+      "status_code": 200,
+      "full_text": "accountInactiveOrders For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference accountInactiveOrders Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints order accountInactiveOrders Copy Page get https://api.rh.lighter.xyz /api/v1/accountInactiveOrders Get account inactive orders. auth can be generated using the SDK. Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params account_index int64 required market_id int16 Defaults to 255 ask_filter int8 Defaults to -1 between_timestamps string cursor string limit int64 required 1 to 100 market_type string enum Defaults to all all spot perp Allowed: all spot perp Headers authorization string required Responses 200 A successful response. 400 Bad request Updated 2 months ago accountActiveOrders export Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago accountActiveOrders export Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/accountactiveorders": {
+      "status_code": 200,
+      "full_text": "accountActiveOrders For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference accountActiveOrders Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints order accountActiveOrders Copy Page get https://api.rh.lighter.xyz /api/v1/accountActiveOrders Get account active orders. auth can be generated using the SDK. Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params account_index int64 required market_id int16 Defaults to 255 If not specified, returns active orders for all markets. market_type string enum Defaults to all all spot perp Allowed: all spot perp Headers authorization string required Responses 200 A successful response. 400 Bad request Updated 2 months ago accountOrders accountInactiveOrders Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago accountOrders accountInactiveOrders Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/trades": {
+      "status_code": 200,
+      "full_text": "trades For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference trades Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints order trades Copy Page get https://api.rh.lighter.xyz /api/v1/trades Get trades for lighter accounts, including sub-accounts and public pools. auth is required for master accounts and sub accounts. Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params market_id int16 Defaults to 255 market_type string enum Defaults to all all spot perp Allowed: all spot perp account_index int64 Defaults to -1 order_index int64 sort_by string enum required block_height timestamp trade_id Allowed: block_height timestamp trade_id sort_dir string enum Defaults to desc desc Allowed: desc cursor string from int64 Defaults to -1 ask_filter int8 Defaults to -1 role string enum Defaults to all all maker taker Allowed: all maker taker type string enum Defaults to all all trade liquidation deleverage market-settlement Allowed: all trade liquidation deleverage market-settlement limit int64 required 1 to 100 aggregate boolean Defaults to false true false skip_ask_order_id string skip_bid_order_id string Headers authorization string Responses 200 A successful response. 400 Bad request Updated 2 months ago recentTrades transaction Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago recentTrades transaction Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/accountlimits": {
+      "status_code": 200,
+      "full_text": "accountLimits For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference accountLimits Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints account accountLimits Copy Page get https://api.rh.lighter.xyz /api/v1/accountLimits Get account limits. For more details on account types, see this page: https://apidocs.lighter.xyz/docs/account-types Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params account_index int64 required Headers authorization string required Responses 200 A successful response. 400 Bad request Updated 2 months ago account accountMetadata Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago account accountMetadata Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/accountmetadata": {
+      "status_code": 200,
+      "full_text": "accountMetadata For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference accountMetadata Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints account accountMetadata Copy Page get https://api.rh.lighter.xyz /api/v1/accountMetadata Get account metadatas Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params by string enum required index l1_address Allowed: index l1_address value string required cursor string Headers authorization string Responses 200 A successful response. 400 Bad request Updated 2 months ago accountLimits accountsByL1Address Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago accountLimits accountsByL1Address Did this page help you? Yes No"
+    },
+    "https://apidocs.rh.lighter.xyz/reference/tx": {
+      "status_code": 200,
+      "full_text": "tx For AI agents: visit https://apidocs.rh.lighter.xyz/llms.txt for an index of all pages formatted in Markdown and endpoints in OpenAPI. Append .md to any documentation page URL to get its markdown version. Jump to Content Guides API Reference API Reference Log In Jump to Content Guides API Reference tx Log In JUMP TO Endpoints root systemConfig get status get layer1BasicInfo get account account get accountLimits get accountMetadata get accountsByL1Address get changeAccountTier post l1Metadata get liquidations get pnl get positionFunding get publicPoolsMetadata get order accountOrders get accountActiveOrders get accountInactiveOrders get export get assetDetails get orderBookDetails get orderBookOrders get orderBooks get recentTrades get trades get transaction sendTx post sendTxBatch post tx get txFromL1TxHash get deposit_history get transfer_history get withdraw_history get announcement announcement get api keys apikeys get nextNonce get tokens_create post tokens_revoke post tokens get setMakerOnlyApiKeys post getMakerOnlyApiKeys get candlestick candles get markPriceCandles get marketPriceCharts get bridge createIntentAddress post fastbridge_info get deposit_latest get deposit_networks get fastwithdraw post fastwithdraw_info get funding fundings get funding-rates get notification notification_ack post referral referral_create post referral_points get referral_get get referral_kickback_update post referral_update post referral_use post userReferrals get referral_stats get info get exchangeStats get exchangeMetrics get partnerStats get executeStats get transferFeeInfo get withdrawalDelay get tokenlist get syntheticSpotInfo get points leaderboard get livePoints_total get rfq rfq_create post rfq_respond post rfq_update post rfq_get get rfq_list get fee credits leaseOptions get leases get litLease post Lighter Explorer API Account Get Account Assets get Get Account by Address get Get Account by Address get Batches Get Recent Batches get Get Batch by Id get Blocks Get Recent Blocks get Get Block by Id get Logs Get Log by Hash get Markets List all markets get Get Market Latest Logs. To query perpetual markets, use the symbol alone. For spot markets, use `symbol-quote` e.g. `eth-usdc` get Search Search for blocks, batches, transactions, or accounts get Stats Get Tx Stats get Total List Total Values get Powered by Endpoints transaction tx Copy Page get https://api.rh.lighter.xyz /api/v1/tx Get transaction by hash or sequence index Recent Requests Log in to see full request history Time Status User Agent Retrieving recent requests… Loading Loading… Query Params by string enum required hash sequence_index Allowed: hash sequence_index value string required Responses 200 A successful response. 400 Bad request Updated 2 months ago sendTxBatch txFromL1TxHash Did this page help you? Yes No Language Shell Node Ruby PHP Python Loading Loading… Response Click Try It! to start a request and see the response here! Or choose an example: application/json 200 400 Updated 2 months ago sendTxBatch txFromL1TxHash Did this page help you? Yes No"
+    }
+  },
+  "api": {
+    "/api/v1/accountOrders?account_index=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/accountOrders?by=index&value=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?by=index&value=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/accountInactiveOrders?account_index=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountInactiveOrders?account_index=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param : auth query param and Authorization header are empty"
+      }
+    },
+    "/api/v1/accountInactiveOrders?by=index&value=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountInactiveOrders?by=index&value=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/accountActiveOrders?account_index=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountActiveOrders?account_index=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param : auth query param and Authorization header are empty"
+      }
+    },
+    "/api/v1/accountActiveOrders?by=index&value=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountActiveOrders?by=index&value=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/trades?account_index=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/trades?account_index=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/trades?by=index&value=22012&market_id=0&limit=50": {
+      "url": "https://api.rh.lighter.xyz/api/v1/trades?by=index&value=22012&market_id=0&limit=50",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt2_0pct::accountOrders::{'account_index': 22012, 'client_order_index': 1788454912}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&client_order_index=1788454912",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt2_0pct::accountOrders::{'account_index': 22012, 'market_id': 0, 'order_index': 1788454912}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&market_id=0&order_index=1788454912",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt2_0pct::tx_by_hash": {
+      "url": "https://api.rh.lighter.xyz/api/v1/tx?by=hash&value=6a2d21bb633bab778d33c4e40bda4c02bee9d435f74919b44df8694f05f469074b7a8526ba2f40aa",
+      "status_code": 400,
+      "body": {
+        "code": 21500,
+        "message": "transaction not found"
+      }
+    },
+    "attempt3_27pct::accountOrders::{'account_index': 22012, 'client_order_index': 1788456703}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&client_order_index=1788456703",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt3_27pct::accountOrders::{'account_index': 22012, 'market_id': 0, 'order_index': 1788456703}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&market_id=0&order_index=1788456703",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt3_27pct::tx_by_hash": {
+      "url": "https://api.rh.lighter.xyz/api/v1/tx?by=hash&value=875df81836f4c53e69a715475adda90a8bea6f9d7810dcb359fd4b67ec7b2e1669572a9ed563a4b1",
+      "status_code": 200,
+      "body": {
+        "code": 200,
+        "hash": "875df81836f4c53e69a715475adda90a8bea6f9d7810dcb359fd4b67ec7b2e1669572a9ed563a4b1",
+        "type": 14,
+        "info": "{\"AccountIndex\":22012,\"ApiKeyIndex\":4,\"MarketIndex\":0,\"ClientOrderIndex\":1788456703,\"BaseAmount\":365,\"Price\":247319,\"IsAsk\":1,\"Type\":1,\"TimeInForce\":0,\"ReduceOnly\":0,\"TriggerPrice\":0,\"OrderExpiry\":0,\"ExpiredAt\":1788457302954,\"Nonce\":2,\"Sig\":\"ipaLEPuDIZ4mojGxsIkItXUdCuCb/2O9Jhlw7jOLerozWUD+2rDccwli4hS//5zDfrGkQeiqFjuA9I2u0YbhQPNY0T7BeqoWYjUngF/LIGA=\",\"L2TxAttributes\":null}",
+        "event_info": "{\"m\":0,\"t\":{\"p\":249815,\"s\":100,\"tf\":0,\"mf\":0,\"itf\":0,\"itfci\":0,\"imf\":0,\"imfci\":0},\"mo\":{\"i\":562949894608550,\"u\":1788456691830,\"a\":3952,\"is\":100,\"p\":249815,\"rs\":0,\"ia\":0,\"ot\":0,\"f\":1,\"ro\":0,\"tp\":0,\"e\":1790875891830,\"st\":3,\"ts\":0,\"t0\":0,\"t1\":0,\"c0\":0,\"ifci\":0,\"itf\":0,\"imf\":0,\"of\":0,\"mn\":0},\"to\":{\"i\":281475032681764,\"u\":1788456703,\"a\":22012,\"is\":365,\"p\":247319,\"rs\":265,\"ia\":1,\"ot\":1,\"f\":0,\"ro\":0,\"tp\":0,\"e\":0,\"st\":0,\"ts\":0,\"t0\":0,\"t1\":0,\"c0\":0,\"ifci\":0,\"itf\":0,\"imf\":0,\"of\":0,\"mn\":0},\"ae\":\"\"}",
+        "status": 3,
+        "transaction_index": 195,
+        "l1_address": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+        "account_index": 22012,
+        "nonce": 2,
+        "expire_at": 1788457302954,
+        "block_height": 17083963,
+        "queued_at": 1788456704604,
+        "sequence_index": 2431125774,
+        "parent_hash": "",
+        "api_key_index": 4,
+        "transaction_time": 1788456704604545,
+        "committed_at": 0,
+        "verified_at": 0,
+        "executed_at": 1788456704433
+      }
+    },
+    "attempt4_0pct_5slip::accountOrders::{'account_index': 22012, 'client_order_index': 1788458953}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&client_order_index=1788458953",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt4_0pct_5slip::accountOrders::{'account_index': 22012, 'market_id': 0, 'order_index': 1788458953}": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountOrders?account_index=22012&market_id=0&order_index=1788458953",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "attempt4_0pct_5slip::tx_by_hash": {
+      "url": "https://api.rh.lighter.xyz/api/v1/tx?by=hash&value=487b6c341d5d06ed97cab8c8de9693b81106d1fb107128b503d9eedd89788d37151542c8a77aa12a",
+      "status_code": 400,
+      "body": {
+        "code": 21500,
+        "message": "transaction not found"
+      }
+    },
+    "/api/v1/accountLimits?account_index=22012": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountLimits?account_index=22012",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param : auth query param and Authorization header are empty"
+      }
+    },
+    "/api/v1/accountLimits?by=index&value=22012": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountLimits?by=index&value=22012",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/accountMetadata?account_index=22012": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountMetadata?account_index=22012",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param "
+      }
+    },
+    "/api/v1/accountMetadata?by=index&value=22012": {
+      "url": "https://api.rh.lighter.xyz/api/v1/accountMetadata?by=index&value=22012",
+      "status_code": 400,
+      "body": {
+        "code": 20001,
+        "message": "invalid param : auth query param and Authorization header are both empty"
+      }
+    },
+    "/api/v1/account (full, fresh)": {
+      "url": "https://api.rh.lighter.xyz/api/v1/account?by=index&value=22012",
+      "status_code": 200,
+      "body": {
+        "code": 200,
+        "total": 1,
+        "accounts": [
+          {
+            "code": 0,
+            "account_type": 0,
+            "index": 22012,
+            "l1_address": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+            "cancel_all_time": 0,
+            "total_order_count": 0,
+            "total_isolated_order_count": 0,
+            "pending_order_count": 0,
+            "available_balance": "39.867780",
+            "status": 1,
+            "collateral": "39.867780",
+            "transaction_time": 1788458954284871,
+            "account_trading_mode": 1,
+            "account_index": 22012,
+            "name": "",
+            "description": "",
+            "can_invite": true,
+            "referral_points_percentage": "",
+            "can_rfq": true,
+            "can_rfq_market_ids": [],
+            "agent_enabled": false,
+            "created_at": 0,
+            "metadata": {
+              "color": ""
+            },
+            "positions": [
+              {
+                "market_id": 0,
+                "symbol": "ETH",
+                "initial_margin_fraction": "50.00",
+                "open_order_count": 0,
+                "pending_order_count": 0,
+                "position_tied_order_count": 0,
+                "sign": 1,
+                "position": "0.0000",
+                "avg_entry_price": "0.00",
+                "position_value": "-0.000000",
+                "unrealized_pnl": "0.000000",
+                "realized_pnl": "0.000000",
+                "liquidation_price": "0",
+                "margin_mode": 0,
+                "margin_set_flag": 1,
+                "allocated_margin": "0.000000"
+              },
+              {
+                "market_id": 5,
+                "symbol": "LIT",
+                "initial_margin_fraction": "50.00",
+                "open_order_count": 0,
+                "pending_order_count": 0,
+                "position_tied_order_count": 0,
+                "sign": 1,
+                "position": "0.00",
+                "avg_entry_price": "0.0000",
+                "position_value": "-0.000000",
+                "unrealized_pnl": "0.000000",
+                "realized_pnl": "0.000000",
+                "liquidation_price": "0",
+                "margin_mode": 0,
+                "margin_set_flag": 1,
+                "allocated_margin": "0.000000"
+              }
+            ],
+            "assets": [
+              {
+                "symbol": "USDG",
+                "asset_id": 3,
+                "balance": "0.000000",
+                "locked_balance": "0.000000",
+                "margin_mode": "enabled",
+                "margin_balance": "39.867780",
+                "multiplier": "1.000000000000000000"
+              }
+            ],
+            "total_asset_value": "39.86778",
+            "cross_asset_value": "39.86778",
+            "cross_initial_margin_requirement": "0.000000",
+            "cross_maintenance_margin_requirement": "0.000000",
+            "shares": [],
+            "pending_unlocks": [],
+            "approved_integrators": [
+              {
+                "account_index": 18971,
+                "name": "unknown",
+                "max_perps_taker_fee": 10000,
+                "max_perps_maker_fee": 10000,
+                "max_spot_taker_fee": 20000,
+                "max_spot_maker_fee": 20000,
+                "approval_expiry": 1819977304127
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "runtime_s": 6.585978984832764
+}
