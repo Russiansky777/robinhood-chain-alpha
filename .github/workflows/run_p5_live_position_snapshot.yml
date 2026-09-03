@@ -1,0 +1,54 @@
+name: P5 LIVE -- снимок позиции 1000756 (ончейн-комиссии, Lighter, дельта, экономика; только чтение)
+
+# Владелец, 2026-09-03: "снять первую реальную точку доходности по
+# 1000756" + "снимать [комиссии] раз в час, минимум 24 точки до
+# запуска демона". ТОЛЬКО ЧТЕНИЕ: eth_call (staticcall-эквивалент, не
+# транзакция) + публичный Lighter REST. Ни один приватный ключ не
+# нужен и не используется -- ни decreaseLiquidity/collect, ни
+# Lighter-ордера этот workflow не отправляет.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_SNAPSHOT_REQUEST"
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Снимок позиции 1000756 (комиссии, диапазон, Lighter-хедж, дельта, экономика)
+        run: python -u analysis/p5_live_position_snapshot.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_live_snapshot_1000756_result.json ] && git add data/p3_guard_cache/p5_live_snapshot_1000756_result.json
+          [ -e data/p5_fee_accrual.jsonl ] && git add data/p5_fee_accrual.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: снимок 1000756 -- комиссии/диапазон/Lighter/дельта/экономика [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

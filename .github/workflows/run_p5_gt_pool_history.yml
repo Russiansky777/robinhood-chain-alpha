@@ -1,0 +1,53 @@
+name: P5 -- история пула GeckoTerminal (реальная сигма, снимок TVL/объёма; только чтение)
+
+# Владелец, 2026-09-03: скачать OHLCV-историю пула ETH/USDG с
+# GeckoTerminal (слаг сети "robinhood"), посчитать реальную
+# аннуализированную sigma (15м и часовую) + эмпирическое распределение
+# max|ln(Pt/P0)| по горизонтам, и перечитать /pools/{addr} для сверки
+# TVL/объёма с цифрами, записанными в docs/P5_HEDGED_LP.md. Только
+# HTTP GET на публичный API, без ключа.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_GT_POOL_HISTORY_REQUEST"
+
+jobs:
+  gt_history:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: История пула GeckoTerminal -- OHLCV, сигма, сверка TVL/объёма
+        run: python -u analysis/p5_gt_pool_history.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_gt_pool_history_result.json ] && git add data/p3_guard_cache/p5_gt_pool_history_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5: реальная история пула GeckoTerminal -- сигма, TVL/объём сейчас vs записанное [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
