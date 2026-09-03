@@ -115,6 +115,25 @@ LEVERAGE_VERIFY_TOLERANCE = 0.05  # 5% допуск при сверке -- imf_r
 # округляет (для 3x: int(10000/3)=3333 => фактическое плечо 10000/3333=3.0003x, не ровно 3.0) --
 # не ошибка проверки, а механическое усечение при отправке; допуск покрывает его, не более.
 
+# ЧИСТЫЙ ЛИСТ (владелец, 2026-09-03, после ручного закрытия LP+хеджа и
+# довнесения маржи +20%): "Если по расчёту свободной маржи остаётся
+# меньше 25% от collateral -- уменьшить размер позиции до того, при
+# котором остаётся, и сказать какой он." Иначе ребалансы (будущий
+# демон) будут упираться в тот же `canceled-margin-not-allowed`,
+# который стоил 4 попыток ранее -- нужен запас, не 100% использование
+# маржи под один вход.
+MARGIN_FREE_BUFFER_PCT = 0.25
+# Реальный, ранее УЖЕ установленный владельцем kill-порог (не новое
+# число -- см. analysis/p5_backtest_10d.py::KILL_THRESHOLD_ANNUAL,
+# "поднят с 25% до 30%"), сюда просто зеркалится для стартовой записи
+# состояния позиции -- будущий демон (p5_live_bot.py) читает её отсюда.
+KILL_THRESHOLD_ANNUAL = 0.30
+# Старая LP-позиция (создана предыдущей попыткой этого же скрипта,
+# закрыта владельцем ВРУЧНУЮ) -- проверяем реальным чтением, что она
+# действительно пуста, не полагаемся на слова "закрыл всё".
+PRIOR_LP_TOKEN_ID_TO_VERIFY = 999556
+POSITION_STATE_PATH = Path("data/p5_live_position_state.json")
+
 MINT_SIG = "mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))"
 INCREASE_LIQUIDITY_TOPIC0 = topic0("IncreaseLiquidity(uint256,uint128,uint256,uint256)")
 TRANSFER_TOPIC0 = topic0("Transfer(address,address,uint256)")
@@ -369,11 +388,24 @@ def main() -> int:
     current_leverage_info = pc.real_eth_leverage(account_full)
     positions_open = pc.lighter_positions()
     print(f"[p5_live_step1] pool_price=${pool_price:.4f} lighter_mark=${lighter_price} "
-          f"wallet: ETH={wb['eth_human']} USDG={wb['usdg_human']} margin={lm}")
+          f"wallet: ETH={wb['eth_human']} WETH={wb['weth_human']} USDG={wb['usdg_human']} margin={lm}")
     print(f"[p5_live_step1] п.5 -- РЕАЛЬНОЕ текущее плечо ETH (прочитано с аккаунта, "
           f"допущение MAX_LEVERAGE=3 из precheck.py убрано): {current_leverage_info}")
     print(f"[p5_live_step1] п.4 -- открытые позиции на Lighter сейчас (постоянная предпосылка -- должно стать "
           f"пусто до хеджа): {positions_open}")
+
+    # ЧИСТЫЙ ЛИСТ -- п.1, последний пункт: реально подтвердить, что старая
+    # LP (та же, что открывал этот скрипт ранее) закрыта, не со слов.
+    prior_lp_state = pc.nfpm_position(PRIOR_LP_TOKEN_ID_TO_VERIFY, NFPM)
+    progress["prior_lp_check"] = prior_lp_state
+    print(f"[p5_live_step1] п.1 -- старая LP tokenId={PRIOR_LP_TOKEN_ID_TO_VERIFY}: {prior_lp_state}")
+    if prior_lp_state.get("found") and not prior_lp_state.get("fully_closed"):
+        progress["abort_reason"] = (f"Старая LP tokenId={PRIOR_LP_TOKEN_ID_TO_VERIFY} НЕ закрыта полностью "
+                                     f"({prior_lp_state}) -- СТОП, не открываю новую позицию поверх незакрытой старой.")
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_step1] {progress['abort_reason']}")
+        return 1
 
     if not current_leverage_info.get("found") or not current_leverage_info.get("leverage"):
         progress["abort_reason"] = "Не удалось прочитать реальное плечо с аккаунта -- СТОП, не считаю по допущению."
@@ -385,24 +417,63 @@ def main() -> int:
 
     p0 = pool_price
     gas_reserve_eth = pc.GAS_RESERVE_USD / p0
-    usable_eth = max(0.0, wb["eth_human"] - gas_reserve_eth)
-    usable_usdg = wb["usdg_human"]
+    usable_native_eth = max(0.0, wb["eth_human"] - gas_reserve_eth)
+    # П.2 -- "WETH считать доступным ETH, mint его всё равно оборачивает":
+    # уже имеющийся WETH-остаток (от предыдущего close) -- тот же капитал.
+    usable_eth_total_full = usable_native_eth + wb["weth_human"]
+    usable_usdg_full = wb["usdg_human"]
     pa, pb = p0 * (1 - pc.RANGE_PCT), p0 * (1 + pc.RANGE_PCT)
     sqrt_p, sqrt_pa, sqrt_pb = p0 ** 0.5, pa ** 0.5, pb ** 0.5
-    L = pc.get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, usable_eth, usable_usdg)
-    expected0, expected1 = pc.v3_amounts(L, sqrt_p, sqrt_pa, sqrt_pb)
-    delta_eth_expected = expected0
-    hedge_notional = delta_eth_expected * (lighter_price or p0)
+
+    def _plan_at(usable_eth: float, usable_usdg: float) -> dict:
+        L = pc.get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, usable_eth, usable_usdg)
+        e0, e1 = pc.v3_amounts(L, sqrt_p, sqrt_pa, sqrt_pb)
+        notional = e0 * (lighter_price or p0)
+        return {"usable_eth": usable_eth, "usable_usdg": usable_usdg, "L": L,
+                "expected0": e0, "expected1": e1, "delta_eth": e0, "hedge_notional": notional}
+
     margin_available = lm.get("collateral_usd", 0) if lm.get("found") else 0
-    # П.5: маржа считается ИСКЛЮЧИТЕЛЬНО по РЕАЛЬНОМУ прочитанному плечу -- не по допущению.
+    full = _plan_at(usable_eth_total_full, usable_usdg_full)
+    required_margin_full = full["hedge_notional"] / current_leverage
+
+    # П.2 -- буфер 25% свободной маржи: если required_margin_full не оставляет
+    # хотя бы MARGIN_FREE_BUFFER_PCT от collateral свободными, УМЕНЬШИТЬ размер
+    # (не просто отказать) -- формулы LiquidityAmounts/v3_amounts линейны по
+    # входным (amount0,amount1) (проверено: L, expected0, expected1 все line-
+    # арны по usable_eth/usable_usdg при фиксированном диапазоне/цене), так что
+    # масштаб k считается аналитически, без подбора.
+    max_required_margin = margin_available * (1 - MARGIN_FREE_BUFFER_PCT)
+    scale_k = 1.0 if required_margin_full <= 0 else min(1.0, max_required_margin / required_margin_full)
+    scaled = _plan_at(usable_eth_total_full * scale_k, usable_usdg_full * scale_k) if scale_k < 1.0 else full
+    usable_eth, usable_usdg = scaled["usable_eth"], scaled["usable_usdg"]
+    L, expected0, expected1 = scaled["L"], scaled["expected0"], scaled["expected1"]
+    delta_eth_expected, hedge_notional = scaled["delta_eth"], scaled["hedge_notional"]
     required_margin_at_current_leverage = hedge_notional / current_leverage
+    free_margin_after_at_current_leverage = margin_available - required_margin_at_current_leverage
+    free_margin_pct_at_current_leverage = (free_margin_after_at_current_leverage / margin_available
+                                            if margin_available > 0 else 0.0)
     sufficient_at_current_leverage = margin_available >= required_margin_at_current_leverage
+    print(f"[p5_live_step1] п.2 -- размер БЕЗ ограничения: delta_eth={full['delta_eth']:.6f} "
+          f"notional=${full['hedge_notional']:.2f} margin@{current_leverage:.4f}x="
+          f"${full['hedge_notional']/current_leverage:.4f}")
+    if scale_k < 1.0:
+        print(f"[p5_live_step1] п.2 -- УМЕНЬШЕНО (scale_k={scale_k:.6f}) чтобы оставить >={MARGIN_FREE_BUFFER_PCT:.0%} "
+              f"свободной маржи: delta_eth={delta_eth_expected:.6f} notional=${hedge_notional:.2f} "
+              f"required_margin=${required_margin_at_current_leverage:.4f} свободно после="
+              f"${free_margin_after_at_current_leverage:.4f} ({free_margin_pct_at_current_leverage:.2%})")
+    else:
+        print(f"[p5_live_step1] п.2 -- полный размер уже укладывается в буфер {MARGIN_FREE_BUFFER_PCT:.0%}: "
+              f"свободно после=${free_margin_after_at_current_leverage:.4f} ({free_margin_pct_at_current_leverage:.2%})")
     # Предпросмотр -- ТОЛЬКО информационно (для dry-run отчёта): плечо, утверждённое владельцем
     # как целевое для ЭТОЙ попытки, но ЕЩЁ НЕ применённое -- реальный gate ниже, в REAL-ветке,
     # использует плечо, ПОДТВЕРЖДЁННОЕ чтением ПОСЛЕ настоящего update_leverage(), не эту цифру.
     required_margin_at_target_leverage = hedge_notional / TARGET_LEVERAGE
     sufficient_at_target_leverage = margin_available >= required_margin_at_target_leverage
     has_funds = usable_eth > 0 and usable_usdg > 0
+
+    # П.2 -- расстояние до ликвидации (предпросмотр, по текущему прочитанному плечу и цене).
+    mmf_preview = float(eth_market["maintenance_margin_fraction"]) / 10_000
+    liq_move_pct_preview = liquidation_distance_pct(margin_available, delta_eth_expected, lighter_price or p0, mmf_preview)
 
     tick_lower = tick_from_price(pa)
     tick_upper = tick_from_price(pb)
@@ -416,22 +487,32 @@ def main() -> int:
     amount0_min = int(expected0 * (1 - SLIPPAGE_AMOUNTS) * 10 ** WETH_DECIMALS)
     amount1_min = int(expected1 * (1 - SLIPPAGE_AMOUNTS) * 10 ** USDG_DECIMALS)
     deadline = int(time.time()) + 600
+    # Сколько реально нужно ОБЕРНУТЬ (native ETH -> WETH) -- уже имеющийся WETH идёт в дело
+    # первым, wrap покрывает только недостачу (см. докстринг у 1_wrap ниже).
+    existing_weth_wei = wb["weth_raw"]
+    wrap_amount_wei = max(0, amount0_desired_wei - existing_weth_wei)
 
     plan = {
         "pool_price_usd": p0, "lighter_mark_price_usd": lighter_price,
         "wallet_balances": wb, "lighter_margin": lm,
         "current_leverage": current_leverage_info, "positions_open_now": positions_open,
         "target_leverage_for_this_attempt": TARGET_LEVERAGE,
+        "usable_eth_total_full_no_scale": usable_eth_total_full, "usable_usdg_full_no_scale": usable_usdg_full,
+        "margin_buffer_scale_k": scale_k, "margin_free_buffer_pct_target": MARGIN_FREE_BUFFER_PCT,
         "usable_eth": usable_eth, "usable_usdg": usable_usdg,
+        "existing_weth_wei": existing_weth_wei, "wrap_amount_wei": wrap_amount_wei,
         "range_lower_usd": pa, "range_upper_usd": pb, "tick_lower": tick_lower, "tick_upper": tick_upper,
         "tick_spacing": pool["tick_spacing"], "current_tick": pool["tick"],
         "computed_liquidity": L, "expected_amount0_eth": expected0, "expected_amount1_usdg": expected1,
         "delta_eth_expected": delta_eth_expected, "hedge_notional_usd_expected": hedge_notional,
         "margin_available_usd": margin_available,
         "required_margin_usd_at_current_leverage": required_margin_at_current_leverage,
+        "free_margin_after_usd_at_current_leverage": free_margin_after_at_current_leverage,
+        "free_margin_pct_at_current_leverage": free_margin_pct_at_current_leverage,
         "sufficient_at_current_leverage": sufficient_at_current_leverage,
         "required_margin_usd_at_target_leverage_PREVIEW": required_margin_at_target_leverage,
         "sufficient_at_target_leverage_PREVIEW": sufficient_at_target_leverage,
+        "estimated_liquidation_move_pct_PREVIEW": liq_move_pct_preview,
         "amount0_desired_wei": amount0_desired_wei, "amount1_desired_raw": amount1_desired_raw,
         "amount0_min_wei": amount0_min, "amount1_min_raw": amount1_min, "deadline": deadline,
         "nfpm_address": NFPM, "fee_tier": FEE_TIER,
@@ -536,9 +617,11 @@ def main() -> int:
     gas_price = eth_gas_price()
     eth_usd = lighter_price or p0
 
-    # Оценка суммарного газа ДО отправки -- потолок, не понижение суммы при превышении
+    # Оценка суммарного газа ДО отправки -- потолок, не понижение суммы при превышении.
+    # wrap_amount_wei (не amount0_desired_wei) -- уже имеющийся WETH используется без
+    # повторного wrap (см. plan.wrap_amount_wei выше); если == 0, тратим 0 газа на этот шаг вообще.
     est_gas_total = (
-        eth_estimate_gas(WETH, build_calldata_deposit(), amount0_desired_wei) +
+        (eth_estimate_gas(WETH, build_calldata_deposit(), wrap_amount_wei) if wrap_amount_wei > 0 else 0) +
         eth_estimate_gas(WETH, build_calldata_approve(NFPM, amount0_desired_wei), 0) +
         eth_estimate_gas(USDG, build_calldata_approve(NFPM, amount1_desired_raw), 0) +
         250_000  # консервативная надбавка на mint() (сложный вызов, оценка eth_estimateGas на NFPM ненадёжна для точного mint() до апрувов)
@@ -553,8 +636,15 @@ def main() -> int:
 
     nonce = eth_nonce()
     try:
-        send_and_wait(account, "1_wrap_ETH_to_WETH", WETH, build_calldata_deposit(), amount0_desired_wei, nonce, progress)
-        nonce += 1
+        # П.2 -- "WETH считать доступным ETH": уже имеющийся WETH-остаток идёт в mint как есть,
+        # wrap отправляется ТОЛЬКО на недостачу (wrap_amount_wei), а не всегда на полную сумму
+        # amount0_desired_wei -- пропускается целиком, если существующего WETH уже достаточно.
+        if wrap_amount_wei > 0:
+            send_and_wait(account, "1_wrap_ETH_to_WETH", WETH, build_calldata_deposit(), wrap_amount_wei, nonce, progress)
+            nonce += 1
+        else:
+            print(f"[p5_live_step1] 1_wrap_ETH_to_WETH: ПРОПУЩЕН -- существующего WETH ({wb['weth_human']:.6f}) "
+                  f"уже достаточно для amount0_desired ({amount0_desired_wei / 10**WETH_DECIMALS:.6f} ETH).")
         send_and_wait(account, "2_approve_WETH", WETH, build_calldata_approve(NFPM, amount0_desired_wei), 0, nonce, progress)
         nonce += 1
         send_and_wait(account, "3_approve_USDG", USDG, build_calldata_approve(NFPM, amount1_desired_raw), 0, nonce, progress)
@@ -753,6 +843,14 @@ def main() -> int:
     lm_final = pc.lighter_margin()
     progress["final_balances"] = {"wallet": wb_final, "lighter_margin": lm_final}
     progress["runtime_s"] = time.time() - t0
+
+    # П.6 -- потраченный газ: сумма по РЕАЛЬНЫМ квитанциям (gas_used * effective_gas_price),
+    # не по предторговой оценке.
+    total_gas_wei = sum(tx["gas_used"] * tx["effective_gas_price_wei"] for tx in progress.get("txs", []))
+    total_gas_eth = total_gas_wei / 1e18
+    total_gas_usd = total_gas_eth * (lighter_price or p0)
+    progress["total_gas_spent"] = {"wei": total_gas_wei, "eth": total_gas_eth, "usd_est": total_gas_usd}
+
     OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -765,10 +863,32 @@ def main() -> int:
             "tick_lower": tick_lower, "tick_upper": tick_upper,
             "real_leverage_confirmed": real_leverage_confirmed,
             "estimated_liquidation_move_pct": liq_move_pct_final,
+            "total_gas_spent_usd_est": total_gas_usd,
         }, default=str, ensure_ascii=False) + "\n")
 
-    # П.7 -- итоговый доклад: фактическое плечо, tokenId LP, размер и цена входа шорта,
-    # итоговая дельта, остатки на кошельке и марже, расстояние до ликвидации в %.
+    # П.5 -- зафиксировать время открытия и стартовые значения для расчёта доходности
+    # ("первый полноценный прогон, с которого считается kill-порог 30% годовых") --
+    # отдельный state-файл для будущего демона (p5_live_bot.py), не полагаемся на
+    # разбор хвоста p5_live_log.jsonl.
+    position_state = {
+        "opened_at_utc": progress["generated_at_utc"],
+        "token_id": liq_event["token_id"],
+        "lp_amount0_eth_entry": real_amount0_eth, "lp_amount1_usdg_entry": real_amount1_usdg,
+        "tick_lower": tick_lower, "tick_upper": tick_upper,
+        "pool_price_usd_entry": p0,
+        "hedge_size_eth_entry": real_hedge_size_eth, "hedge_entry_price_usd": worst_price,
+        "leverage_entry": real_leverage_confirmed,
+        "margin_available_usd_entry": margin_post_hedge,
+        "total_gas_spent_usd_est": total_gas_usd,
+        "kill_threshold_annual": KILL_THRESHOLD_ANNUAL,
+        "capital_at_risk_usd_entry": real_amount0_eth * p0 + real_amount1_usdg + margin_post_hedge,
+    }
+    POSITION_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    POSITION_STATE_PATH.write_text(json.dumps(position_state, indent=2, default=str, ensure_ascii=False))
+    print(f"[p5_live_step1] п.5: состояние позиции для расчёта доходности записано в {POSITION_STATE_PATH}")
+
+    # П.6 -- итоговый доклад: фактическое плечо, tokenId LP, обе ноги, размер и цена
+    # входа шорта, итоговая дельта, свободная маржа, расстояние до ликвидации, газ.
     delta_final = real_amount0_eth - real_hedge_size_eth
     print(f"\n[p5_live_step1] ГОТОВО. Итог:")
     print(f"  фактическое плечо (подтверждено чтением): {real_leverage_confirmed}x")
@@ -776,8 +896,9 @@ def main() -> int:
     print(f"  хедж: {real_hedge_size_eth:.6f} ETH шорт @ ${worst_price:.2f}")
     print(f"  итоговая дельта (LP ETH - хедж ETH, должна быть близка к нулю): {delta_final:.6f} ETH")
     print(f"  остатки на кошельке: {wb_final}")
-    print(f"  остатки на марже Lighter: {lm_final}")
+    print(f"  остатки/свободная маржа на Lighter: {lm_final}")
     print(f"  расстояние до ликвидации (оценка, рост цены ETH): {liq_move_pct_final:.2f}%")
+    print(f"  потраченный газ: {total_gas_eth:.8f} ETH (~${total_gas_usd:.4f})")
     return 0
 
 

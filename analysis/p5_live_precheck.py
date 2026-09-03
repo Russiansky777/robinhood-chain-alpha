@@ -169,13 +169,49 @@ def find_nfpm_address() -> dict:
             "owners_ranked": ranked[:5], "most_common_owner": ranked[0][0] if ranked else None}
 
 
+def erc20_balance_of(token: str, holder: str) -> int:
+    _count()
+    calldata = "0x" + _selector("balanceOf(address)")[2:] + holder[2:].rjust(64, "0").lower()
+    return int(_eth_call(token, calldata), 16)
+
+
 def wallet_balances() -> dict:
     _count()
     eth_raw = int(_rpc_call("eth_getBalance", [WALLET, "latest"]), 16)
-    calldata = "0x" + _selector("balanceOf(address)")[2:] + WALLET[2:].rjust(64, "0").lower()
-    usdg_raw = int(_eth_call(USDG, calldata), 16)
+    usdg_raw = erc20_balance_of(USDG, WALLET)
+    # НАЙДЕНО (владелец, 2026-09-03, "чистый лист" после ручного закрытия):
+    # WETH на кошельке нужно считать доступным ETH для LP -- mint всё
+    # равно оборачивает native ETH в WETH перед approve, так что уже
+    # имеющийся WETH-остаток (напр. после предыдущего close/decreaseLiquidity)
+    # -- это тот же капитал, просто не требует повторного wrap на всю сумму.
+    weth_raw = erc20_balance_of(WETH, WALLET)
     return {"eth_raw_wei": eth_raw, "eth_human": eth_raw / 1e18,
+            "weth_raw": weth_raw, "weth_human": weth_raw / 1e18,
             "usdg_raw": usdg_raw, "usdg_human": usdg_raw / 1e6}
+
+
+def nfpm_position(token_id: int, nfpm_address: str) -> dict:
+    """Реальное состояние NFT-позиции Uniswap v3 (NonfungiblePositionManager.
+    positions(tokenId)) -- используется, чтобы ПОДТВЕРДИТЬ (не предположить),
+    что старая LP реально закрыта (liquidity==0), а не просто "владелец
+    сказал". Сигнатура и порядок полей -- дословно из реального интерфейса
+    INonfungiblePositionManager (Uniswap v3-periphery)."""
+    selector = _selector("positions(uint256)")
+    calldata = "0x" + selector[2:] + hex(token_id)[2:].rjust(64, "0")
+    raw = _eth_call(nfpm_address, calldata)
+    if raw is None:
+        return {"found": False}
+    types = ["uint96", "address", "address", "address", "uint24", "int24", "int24",
+             "uint128", "uint256", "uint256", "uint128", "uint128"]
+    (nonce, operator, token0, token1, fee, tick_lower, tick_upper, liquidity,
+     fee_growth0, fee_growth1, tokens_owed0, tokens_owed1) = abi_decode(types, bytes.fromhex(raw[2:]))
+    return {
+        "found": True, "token_id": token_id, "liquidity": liquidity,
+        "tick_lower": tick_lower, "tick_upper": tick_upper,
+        "tokens_owed0": tokens_owed0, "tokens_owed1": tokens_owed1,
+        "token0": token0, "token1": token1,
+        "fully_closed": liquidity == 0 and tokens_owed0 == 0 and tokens_owed1 == 0,
+    }
 
 
 def lighter_eth_perp() -> dict | None:
