@@ -50,7 +50,12 @@ OUT_PATH = Path("data/p3_guard_cache/p5_gt_pool_history_result.json")
 GT_BASE = "https://api.geckoterminal.com/api/v2"
 NETWORK_SLUG_CANDIDATES = ["robinhood", "robinhood-chain"]  # проверяем ОБА -- владелец сказал "robinhood", предыдущий прогон сессии искал "robinhood-chain"
 POOL_ADDRESS = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
-MIN_REQUEST_INTERVAL_S = 2.2  # 30 запросов/мин лимит -> >=2.0с между вызовами, с запасом
+MIN_REQUEST_INTERVAL_S = 2.6  # заявлено 30/мин; НАЙДЕНО ЭМПИРИЧЕСКИ (первый реальный прогон,
+# 2026-09-03T22:38Z): 429 "You've exceeded the Rate Limit" словил уже на 6-м вызове при
+# интервале 2.2с -- заявленный лимит либо burst-чувствительный, либо ниже 30/мин по факту.
+# Интервал увеличен + добавлен ретрай на 429 (см. _get) вместо тихой сдачи после первой же ошибки.
+RATE_LIMIT_BACKOFF_S = 65.0  # окно лимита -- минута; ждём с запасом, не долбим тот же вызов чаще
+RATE_LIMIT_MAX_RETRIES = 2
 HEADERS = {"Accept": "application/json;version=20230302", "User-Agent": "robinhood-chain-alpha-p5/1.0"}
 
 _last_call = 0.0
@@ -65,12 +70,20 @@ def _throttle() -> None:
 
 
 def _get(url: str, params: dict | None = None) -> tuple[int, dict | str]:
-    _throttle()
-    r = requests.get(url, params=params, headers=HEADERS, timeout=30)
-    try:
-        return r.status_code, r.json()
-    except ValueError:
-        return r.status_code, r.text[:500]
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        _throttle()
+        r = requests.get(url, params=params, headers=HEADERS, timeout=30)
+        try:
+            status, body = r.status_code, r.json()
+        except ValueError:
+            status, body = r.status_code, r.text[:500]
+        if status == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            print(f"[gt_history] 429 на {url} (попытка {attempt + 1}/{RATE_LIMIT_MAX_RETRIES + 1}) -- "
+                  f"жду {RATE_LIMIT_BACKOFF_S:.0f}с (окно лимита) и повторяю тот же запрос")
+            time.sleep(RATE_LIMIT_BACKOFF_S)
+            continue
+        return status, body
+    return status, body  # noqa: F821 -- недостижимо при RATE_LIMIT_MAX_RETRIES>=0, но для типизации
 
 
 def find_working_network_slug() -> tuple[str | None, dict]:
