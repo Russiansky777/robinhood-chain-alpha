@@ -95,6 +95,37 @@ def run() -> int:
               f"(~{e['amount_human_if_18dec']:.8f} если 18 decimals)")
     print(f"[across_handler_probe] handler-адрес по паттерну владельца (0xa8aD...0ab6BD) из логов: {candidate_handler}")
 
+    # НАЙДЕНО (реальный первый прогон этого скрипта, 2026-09-03): последний
+    # Transfer в цепочке -- handler -> address(0) -- это НЕ утечка/сжигание
+    # средств, а канонический паттерн WETH9.withdraw() (WETH сжигается
+    # Transfer-логом на address(0), встроенным в сам ERC20-контракт WETH,
+    # РЕЗУЛЬТАТ -- native ETH зачисляется вызывающему, т.е. handler'у).
+    # Значит "завис ли на handler'е" нужно проверять по NATIVE ETH
+    # балансу handler'а СЕЙЧАС, не по WETH (который тривиально уже 0 --
+    # он только что сожжён в этой же транзакции). Также ищем отдельный
+    # Withdrawal(address,uint256) лог того же WETH-контракта -- он
+    # выставляется WETH9 ТОЛЬКО из withdraw(), не бывает у произвольного
+    # Transfer-to-zero -- если он есть, это подтверждает withdraw(),
+    # не что-то более странное.
+    withdrawal_topic0 = topic0("Withdrawal(address,uint256)")
+    withdrawal_logs = []
+    for log in receipt.get("logs", []):
+        if log["address"].lower() == WETH.lower() and log["topics"][0].lower() == withdrawal_topic0.lower():
+            src = _addr_from_topic(log["topics"][1])
+            amount_raw = abi_decode(["uint256"], bytes.fromhex(log["data"][2:]))[0]
+            withdrawal_logs.append({"src": src, "amount_raw": amount_raw, "amount_human": amount_raw / 1e18})
+    result["weth_withdrawal_logs"] = withdrawal_logs
+    print(f"[across_handler_probe] WETH.Withdrawal-логов (подтверждает withdraw(), не просто Transfer-to-zero): "
+          f"{withdrawal_logs}")
+
+    if candidate_handler:
+        print(f"\n=== native ETH баланс handler'а СЕЙЧАС ({candidate_handler}) ===")
+        handler_native_eth = int(_rpc_call("eth_getBalance", [candidate_handler, "latest"]), 16)
+        result["handler_native_eth_balance_raw"] = handler_native_eth
+        result["handler_native_eth_balance_human"] = handler_native_eth / 1e18
+        print(f"[across_handler_probe] native ETH на handler'е: {handler_native_eth} raw "
+              f"(~{handler_native_eth/1e18:.8f} ETH) -- это и есть проверка \"зависли ли\" после withdraw()")
+
     if candidate_handler:
         print(f"\n=== balanceOf(WETH, {candidate_handler}) ===")
         handler_weth_balance = erc20_balance_of(WETH, candidate_handler)
