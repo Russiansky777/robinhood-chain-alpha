@@ -1,0 +1,78 @@
+name: P5 LIVE -- ЭКСТРЕННО выровнять остаточную позицию на Lighter
+
+# Реальный run 33784994487 (2026-09-03): хедж-ордер частично исполнился
+# (0.01 ETH из запрошенных 0.0365) -- LP закрыта автозакрытием, но сама
+# позиция на Lighter осталась открытой (автозакрытие трогает только
+# ончейн-LP). Реальная короткая экспозиция без покрытия -- закрываем
+# немедленно. Без отдельного confirm-гейта: скрипт сам проверяет
+# позицию и ничего не шлёт, если она уже 0 (идемпотентно, безопасно
+# запускать повторно). Выполняется на VPS Нидерланды -- та же причина,
+# что Step1 (торговый путь Lighter).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_FLATTEN_REQUEST"
+
+jobs:
+  flatten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Обновить репозиторий на VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: Выровнять позицию на Lighter (reduce_only)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot bash -c 'set -a; source /etc/bot/env; set +a; ./venv/bin/python analysis/p5_live_flatten_lighter.py'
+          "
+
+      - name: Забрать результат с VPS
+        if: always()
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p5_live_flatten_lighter_result.json' > /tmp/flatten_result.json || true
+          mkdir -p data/p3_guard_cache
+          [ -s /tmp/flatten_result.json ] && cp /tmp/flatten_result.json data/p3_guard_cache/p5_live_flatten_lighter_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch data/p3_guard_cache/P5_LIVE_FLATTEN_REQUEST
+          git add data/p3_guard_cache/p5_live_flatten_lighter_result.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: выравнивание остаточной позиции на Lighter [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
