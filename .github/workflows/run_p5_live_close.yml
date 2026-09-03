@@ -1,0 +1,66 @@
+name: P5 LIVE -- ЭКСТРЕННОЕ закрытие LP (decreaseLiquidity + collect)
+
+# Владелец, 2026-09-03: "СРОЧНО: убрать голую экспозицию." Закрывает
+# LP-позицию tokenId=992779 полностью (decreaseLiquidity + collect).
+# Lighter не участвует -- гео-блок к этой операции не относится.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_CLOSE_DRYRUN_REQUEST"
+      - "data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST"
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Определить режим (dry-run по умолчанию, real только если есть CONFIRM-маркер в этом коммите)
+        id: mode
+        run: |
+          if [ -e data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST ] && git log -1 --name-only --pretty=format: | grep -q "P5_LIVE_CLOSE_CONFIRM_REQUEST"; then
+            echo "flag=--confirm-mainnet" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: РЕАЛЬНОЕ ЗАКРЫТИЕ (CONFIRM-маркер в последнем коммите)"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: DRY-RUN"
+          fi
+
+      - name: Закрыть LP-позицию (decreaseLiquidity + collect)
+        env:
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/p5_live_close.py ${{ steps.mode.outputs.flag }}
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_live_close_result.json ] && git add data/p3_guard_cache/p5_live_close_result.json
+          [ -e data/p5_live_log.jsonl ] && git add data/p5_live_log.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: результат экстренного закрытия LP (mode=${{ steps.mode.outputs.flag }}) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
