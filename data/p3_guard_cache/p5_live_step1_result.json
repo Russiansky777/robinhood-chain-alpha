@@ -1,6 +1,6 @@
 {
-  "generated_at_utc": "2026-09-03T22:03:07Z",
-  "mode": "DRY-RUN",
+  "generated_at_utc": "2026-09-03T22:06:36Z",
+  "mode": "REAL",
   "prior_lp_check": {
     "found": true,
     "token_id": 999556,
@@ -14,8 +14,8 @@
     "fully_closed": true
   },
   "plan": {
-    "pool_price_usd": 2506.8784255082387,
-    "lighter_mark_price_usd": 2505.71,
+    "pool_price_usd": 2509.904741515298,
+    "lighter_mark_price_usd": 2508.68,
     "wallet_balances": {
       "eth_raw_wei": 11256323887305013,
       "eth_human": 0.011256323887305013,
@@ -37,40 +37,195 @@
     },
     "positions_open_now": [],
     "target_leverage_for_this_attempt": 3.0,
-    "usable_eth_total_full_no_scale": 0.051676634909797695,
+    "usable_eth_total_full_no_scale": 0.05168144467375076,
     "usable_usdg_full_no_scale": 102.378373,
     "margin_buffer_scale_k": 1.0,
     "margin_free_buffer_pct_target": 0.25,
-    "usable_eth": 0.051676634909797695,
+    "usable_eth": 0.05168144467375076,
     "usable_usdg": 102.378373,
     "existing_weth_wei": 44409335738748165,
-    "wrap_amount_wei": 7267299171049531,
-    "range_lower_usd": 2256.190582957415,
-    "range_upper_usd": 2757.5662680590626,
-    "tick_lower": -199106,
-    "tick_upper": -197100,
+    "wrap_amount_wei": 7272108935002595,
+    "range_lower_usd": 2258.9142673637684,
+    "range_upper_usd": 2760.8952156668283,
+    "tick_lower": -199094,
+    "tick_upper": -197087,
     "tick_spacing": 1,
-    "current_tick": -198053,
-    "computed_liquidity": 39.84582745067361,
-    "expected_amount0_eth": 0.037035518564211535,
+    "current_tick": -198041,
+    "computed_liquidity": 39.82179816491903,
+    "expected_amount0_eth": 0.03699086301182882,
     "expected_amount1_usdg": 102.378373,
-    "delta_eth_expected": 0.037035518564211535,
-    "hedge_notional_usd_expected": 92.80026922153048,
+    "delta_eth_expected": 0.03699086301182882,
+    "hedge_notional_usd_expected": 92.79823822051472,
     "margin_available_usd": 59.799088,
-    "required_margin_usd_at_current_leverage": 30.930329731536112,
-    "free_margin_after_usd_at_current_leverage": 28.868758268463885,
-    "free_margin_pct_at_current_leverage": 0.4827625175230747,
+    "required_margin_usd_at_current_leverage": 30.929652798897557,
+    "free_margin_after_usd_at_current_leverage": 28.86943520110244,
+    "free_margin_pct_at_current_leverage": 0.4827738376395045,
     "sufficient_at_current_leverage": true,
-    "required_margin_usd_at_target_leverage_PREVIEW": 30.933423073843496,
+    "required_margin_usd_at_target_leverage_PREVIEW": 30.932746073504905,
     "sufficient_at_target_leverage_PREVIEW": true,
-    "estimated_liquidation_move_pct_PREVIEW": 62.48862200759335,
-    "amount0_desired_wei": 51676634909797696,
+    "estimated_liquidation_move_pct_PREVIEW": 62.49001559823528,
+    "amount0_desired_wei": 51681444673750760,
     "amount1_desired_raw": 102378373,
-    "amount0_min_wei": 36294808192927304,
+    "amount0_min_wei": 36251045751592240,
     "amount1_min_raw": 100330805,
-    "deadline": 1788473592,
+    "deadline": 1788473800,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "note": "DRY-RUN -- ничего не отправлялось (плечо НЕ менялось). Запустите с --confirm-mainnet для реальной отправки: сначала flat-precondition (п.4), затем update_leverage(3.0x) + верификация чтением (п.1-2), затем пересчёт маржи по подтверждённому плечу (п.3) и только потом деньги (п.6)."
+  "pre_hedge_flat_check": {
+    "was_flat": true,
+    "flatten_result": null,
+    "flat": true,
+    "positions_before": []
+  },
+  "leverage_update": {
+    "verified": true,
+    "before": {
+      "found": true,
+      "initial_margin_fraction_pct": 33.33,
+      "leverage": 3.0003000300030003,
+      "margin_mode_raw": 0
+    },
+    "after": {
+      "found": true,
+      "initial_margin_fraction_pct": 33.33,
+      "leverage": 3.0003000300030003,
+      "margin_mode_raw": 0
+    },
+    "call": {
+      "tx_hash": "959fb14b3640f3672145f31717f6453e73d8cc9807414a1cf79f7ae14ef7f4dcb4c0bbe105d93572",
+      "resp_code": 200,
+      "resp_message": "{\"ratelimit\": \"didn't use volume quota\"}",
+      "err": null
+    },
+    "actual_leverage": 3.0003000300030003,
+    "attempts_used": 1
+  },
+  "post_leverage_recheck": {
+    "real_leverage_confirmed": 3.0003000300030003,
+    "margin_available_usd": 59.799088,
+    "hedge_notional_usd": 92.79823822051472,
+    "required_margin_usd": 30.929652798897557,
+    "free_margin_after_hedge_usd": 28.86943520110244,
+    "sufficient": true,
+    "maintenance_margin_fraction": 0.012,
+    "estimated_liquidation_move_pct": 62.49001559823528
+  },
+  "gas_estimate": {
+    "gas_units_total_est": 368866,
+    "gas_price_wei": 318082000,
+    "est_cost_usd": 0.29434250876190415
+  },
+  "txs": [
+    {
+      "label": "1_wrap_ETH_to_WETH",
+      "tx_hash": "0xe68c78d76c64589c41a3440df4e947b12771bead8814881e530df5b0c163697a",
+      "status": "success",
+      "gas_used": 40547,
+      "block_number": 53753999,
+      "gas_price_offered_wei": 317472000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 317472000
+    },
+    {
+      "label": "2_approve_WETH",
+      "tx_hash": "0x5c63f3c8395695273ad8b2c5d405c62e9ea4a6d91c000869c31ce74d7a63542d",
+      "status": "success",
+      "gas_used": 36325,
+      "block_number": 53754070,
+      "gas_price_offered_wei": 319362000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 320912000
+    },
+    {
+      "label": "3_approve_USDG",
+      "tx_hash": "0xb6be86634012dcc37f7d79b87b918a382ad7065b230c3f29179fe9f77a7653f5",
+      "status": "success",
+      "gas_used": 40888,
+      "block_number": 53754140,
+      "gas_price_offered_wei": 323816000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 320634000
+    },
+    {
+      "label": "4_mint",
+      "tx_hash": "0xcc5a5a92df8eb866f616f4a6951f2445ab692aad32db53b726de8090e934d172",
+      "status": "success",
+      "gas_used": 447863,
+      "block_number": 53754211,
+      "gas_price_offered_wei": 324822000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 321752000
+    }
+  ],
+  "lp_position": {
+    "token_id": 1000756,
+    "liquidity": 40193983848339,
+    "amount0_eth_actual": 0.03772533823006162,
+    "amount1_usdg_actual": 102.378373,
+    "tick_lower": -199094,
+    "tick_upper": -197087
+  },
+  "hedge_target_delta_eth": 0.03772533823006162,
+  "hedge_order": {
+    "tx_hash": "4e76bbd96fe54ccf45dcce11be55fd05cdf6ba1218da1c0d8b4f6c989d5f3d1bd03cb46de0b861c3",
+    "resp_code": 200,
+    "resp_message": "{\"ratelimit\": \"didn't use volume quota\"}",
+    "err": null,
+    "base_amount": 377,
+    "size_eth_requested": 0.03772533823006162,
+    "max_slippage": 0.05,
+    "client_order_index": 1788473233
+  },
+  "hedge_fill_check": {
+    "filled": true,
+    "position": {
+      "market_id": 0,
+      "symbol": "ETH",
+      "initial_margin_fraction": "33.33",
+      "open_order_count": 0,
+      "pending_order_count": 0,
+      "position_tied_order_count": 0,
+      "sign": -1,
+      "position": "0.0377",
+      "avg_entry_price": "2506.43",
+      "position_value": "94.513523",
+      "unrealized_pnl": "-0.021112",
+      "realized_pnl": "0.000000",
+      "liquidation_price": "4044.0837011564145",
+      "total_funding_paid_out": "0.000000",
+      "margin_mode": 0,
+      "margin_set_flag": 1,
+      "allocated_margin": "0.000000"
+    },
+    "attempts_used": 2
+  },
+  "post_hedge_liquidation_estimate": {
+    "margin_usd": 59.799088,
+    "size_eth": 0.0377,
+    "entry_price_usd": 2506.43,
+    "maintenance_margin_fraction": 0.012,
+    "estimated_liquidation_move_pct": 61.348360064171544
+  },
+  "final_balances": {
+    "wallet": {
+      "eth_raw_wei": 3802474387750418,
+      "eth_human": 0.003802474387750418,
+      "weth_raw": 13956106443689137,
+      "weth_human": 0.013956106443689135,
+      "usdg_raw": 0,
+      "usdg_human": 0.0
+    },
+    "lighter_margin": {
+      "found": true,
+      "collateral_usd": 59.799088,
+      "available_balance_usd": 28.274608
+    }
+  },
+  "runtime_s": 42.86941337585449,
+  "total_gas_spent": {
+    "wei": 181740564552000,
+    "eth": 0.000181740564552,
+    "usd_est": 0.4559289194803113
+  }
 }
