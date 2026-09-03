@@ -48,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from eth_abi import decode as abi_decode  # noqa: E402
 
 from alchemy_fallback import (  # noqa: E402
-    _chunked_get_logs, _rpc_call, get_block, get_block_number, get_transaction, topic0,
+    _chunked_get_logs, _rpc_call, get_block, get_block_number, get_transaction_fast, topic0,
 )
 from mm_p5_setup import sqrt_price_to_usd  # noqa: E402
 
@@ -66,6 +66,7 @@ TOP_N_ADDRESSES = 3
 CLOSE_SHARE_KILL_THRESHOLD = 0.80
 WINDOW_DAYS = 7
 MAX_REQUESTS_PER_RUN = 12000
+TIME_BUDGET_S = 80 * 60  # мягкий предел -- запас под 90-минутную дисциплину владельца
 
 # NVDA/COST -- дословно от владельца. Третий выбирается ниже, по кэшу.
 FORCED_TOKENS = ["NVDA", "COST"]
@@ -314,7 +315,7 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
         v4_p = sorted(v4_by_tx[tx], key=lambda r: r["log_index"])[-1]["price_usdg"]
         if v3_p and v4_p:
             gaps_pct.append(abs(v3_p - v4_p) / v4_p * 100)
-        tx_info = get_transaction(tx)
+        tx_info = get_transaction_fast(tx)
         _count()
         addr_counts[str(tx_info.get("from", "")).lower()] += 1
 
@@ -373,8 +374,19 @@ def run() -> int:
     print(f"[p3_concentration] latest={latest} spb~={spb:.4f} окно=[{from_block},{latest}] "
           f"(~{WINDOW_DAYS}д)")
 
+    # НАЙДЕНО 2026-09-03 (первый прогон, публичный RPC): реальная плотность
+    # свопов на этих пулах оказалась намного выше предположенной (NVDA --
+    # 694 467 v3-свопов/7д, ~4133/час) -- один NVDA занял ~59 минут, весь
+    # прогон 3 токенов ушёл далеко за 90-минутную дисциплину, пришлось
+    # отменить на QQQ. Мягкий самоконтроль по токену (не только общий
+    # потолок запросов) -- частичный результат honest, не тихая отмена.
     per_token = {}
     for sym in tokens:
+        elapsed = time.time() - t0
+        if elapsed > TIME_BUDGET_S:
+            print(f"[p3_concentration] мягкий бюджет времени ({TIME_BUDGET_S}с) исчерпан ДО {sym} -- "
+                  f"стоп, частичный результат по {list(per_token.keys())}")
+            break
         per_token[sym] = analyze_token(sym, pools[sym], from_block, latest)
 
     overall_kill = any(v["close_tx_top3_share"] is not None and v["close_tx_top3_share"] > CLOSE_SHARE_KILL_THRESHOLD
@@ -383,7 +395,8 @@ def run() -> int:
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "window_days": WINDOW_DAYS, "from_block": from_block, "to_block": latest,
-        "tokens_analyzed": tokens, "third_token_selection_ratios": ratios,
+        "tokens_requested": tokens, "tokens_analyzed": list(per_token.keys()),
+        "third_token_selection_ratios": ratios,
         "close_share_kill_threshold": CLOSE_SHARE_KILL_THRESHOLD,
         "per_token": per_token,
         "any_token_over_threshold": overall_kill,

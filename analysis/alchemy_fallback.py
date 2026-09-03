@@ -58,34 +58,37 @@ def _endpoints() -> list[tuple[str, dict]]:
     """Упорядоченный список (base_url, доп.заголовки) -- первый в
     приоритете, следующие -- ФОЛБЭК.
 
-    ПЕРЕКЛЮЧЕНО 2026-09-03 (владелец, дал реальный ALCHEMY_API_KEY):
-    "переключи alchemy_fallback.py на кейед-путь как основной,
-    публичный RPC оставь фолбэком" -- если ключ (или явный
-    ALCHEMY_ROBINHOOD_RPC_URL) задан, Alchemy теперь ПЕРВЫЙ, публичный
-    RPC -- фолбэк (обратный прежнему порядку с 2026-09-01, когда
-    ALCHEMY_API_KEY не был настроен секретом GH Actions и публичный RPC
-    был единственным реальным вариантом). Если ключ НЕ задан --
-    поведение НЕ меняется (публичный RPC первый, как раньше).
-
-    URL Alchemy для Robinhood Chain НЕ подтверждён из независимого
-    источника (интерактивная песочница и WebFetch блокируют egress к
-    alchemy.com -- проверено эмпирически 2026-09-03) -- используется
-    правдоподобный паттерн Alchemy (`<network>.g.alchemy.com/v2/<key>`)
-    как ПЕРВАЯ гипотеза, пробуется реальным вызовом; если он не
-    работает -- код НЕ подставляет альтернативы молча, ошибка
-    поднимается наружу (см. analysis/alchemy_key_probe.py, который
-    проверяет это ДО переключения основных скриптов на ключ)."""
+    ПЕРЕКЛЮЧЕНО 2026-09-03, ЗАТЕМ ОТКАЧЕНО В ТОТ ЖЕ ДЕНЬ (владелец дал
+    реальный ALCHEMY_API_KEY, "переключи на кейед-путь как основной" --
+    сделано, проверено `analysis/alchemy_key_probe.py`, реальный
+    прогон): auth реально работает (robinhood-mainnet.g.alchemy.com,
+    подтверждено живым eth_blockNumber), rate limit чистый до ~13
+    запросов/с (лучше публичного RPC ~2-3/с) -- НО free tier ограничивает
+    `eth_getLogs` до **10 БЛОКОВ ЗА ЗАПРОС** (реальная ошибка провайдера:
+    "Under the Free tier plan, you can make eth_getLogs requests with up
+    to a 10 block range... Upgrade to PAYG for expanded block range").
+    Все тяжёлые скрипты сессии сканируют Swap/Initialize ДИАПАЗОНАМИ в
+    десятки-сотни тысяч блоков -- на 10-блочном пределе это буквально в
+    тысячи раз дороже публичного RPC (без такого ограничения диапазона),
+    несмотря на более высокий req/s. Ставить Alchemy первым для ВСЕХ
+    методов (как было в первой версии этой правки) активно вредит --
+    `_chunked_get_logs` получал бы эту ошибку на КАЖДОМ вызове,
+    пытался бы бисектить до <=10 блоков (тысячи вызовов) и НИКОГДА не
+    падал бы обратно на публичный RPC (JSON-RPC error в теле 200-ответа
+    не триггерит переход на следующий эндпоинт -- это НЕ транспортная
+    ошибка, см. докстринг _post_with_fallback). Порядок вернули к
+    публичный-RPC-первый (как было исходно) -- это НЕ отказ от ключа:
+    ключ реален и рабочий, полезен для точечных вызовов БЕЗ диапазона
+    (eth_getTransactionByHash/eth_call), см. `get_transaction_fast()`
+    ниже, которая использует его целенаправленно именно там, где
+    10-блочный лимит не действует."""
     endpoints: list[tuple[str, dict]] = []
-    alchemy_ep: tuple[str, dict] | None = None
-    if CONFIG.alchemy_rpc_url:
-        alchemy_ep = (CONFIG.alchemy_rpc_url, {})
-    elif CONFIG.alchemy_api_key:
-        alchemy_ep = (f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}", {})
-
-    if alchemy_ep:
-        endpoints.append(alchemy_ep)
     if CONFIG.public_rpc_url:
         endpoints.append((CONFIG.public_rpc_url, {}))
+    if CONFIG.alchemy_rpc_url:
+        endpoints.append((CONFIG.alchemy_rpc_url, {}))
+    elif CONFIG.alchemy_api_key:
+        endpoints.append((f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}", {}))
     if CONFIG.blockscout_api_key:
         # ВАЖНО (найдено при подготовке P3-гарда, 2026-09-01, см.
         # docs/P3_GUARD.md): прямой безключевой eth-rpc-прокси
@@ -294,6 +297,57 @@ def get_block(block_number: int) -> dict:
 
 def get_transaction(tx_hash: str) -> dict:
     return _rpc_call("eth_getTransactionByHash", [tx_hash])
+
+
+_alchemy_direct_url: str | None = None
+_alchemy_direct_checked = False
+_ALCHEMY_MIN_REQUEST_INTERVAL_S = 0.1  # ~10 req/s, с запасом ниже измеренных ~13 req/s чистых (analysis/alchemy_key_probe.py, 2026-09-03)
+_alchemy_last_request_at = 0.0
+
+
+def _alchemy_direct_endpoint() -> str | None:
+    """URL Alchemy, ЕСЛИ ключ задан -- независимо от порядка в
+    _endpoints() (см. её докстринг: публичный RPC там первый). Кэш на
+    процесс, не на модуль -- достаточно для одного прогона скрипта."""
+    global _alchemy_direct_url, _alchemy_direct_checked
+    if _alchemy_direct_checked:
+        return _alchemy_direct_url
+    _alchemy_direct_checked = True
+    if CONFIG.alchemy_rpc_url:
+        _alchemy_direct_url = CONFIG.alchemy_rpc_url
+    elif CONFIG.alchemy_api_key:
+        _alchemy_direct_url = f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}"
+    return _alchemy_direct_url
+
+
+def get_transaction_fast(tx_hash: str) -> dict:
+    """Как get_transaction(), но ЦЕЛЕНАПРАВЛЕННО через Alchemy напрямую
+    (в обход публичный-RPC-первый порядка _endpoints()), если ключ
+    задан -- eth_getTransactionByHash НЕ диапазонный вызов, 10-блочный
+    лимит free tier Alchemy (см. докстринг _endpoints()) сюда не
+    применяется, а более высокий req/s (~13/с чисто, против ~2-3/с у
+    публичного RPC) даёт реальное ускорение на пакетах точечных
+    вызовов (напр. get_transaction на списке closing-tx в
+    analysis/p3_concentration_and_fragmentation.py). Фолбэк на
+    get_transaction() (публичный RPC) при любой ошибке -- НЕ тихо
+    проглатывает сбой, просто использует уже проверенный путь."""
+    global _alchemy_last_request_at
+    url = _alchemy_direct_endpoint()
+    if url:
+        wait = _alchemy_last_request_at + _ALCHEMY_MIN_REQUEST_INTERVAL_S - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _alchemy_last_request_at = time.monotonic()
+        try:
+            resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": "eth_getTransactionByHash",
+                                             "params": [tx_hash]}, headers=_BASE_HEADERS, timeout=20)
+            if resp.status_code == 200:
+                body = resp.json()
+                if "result" in body:
+                    return body["result"]
+        except Exception:  # noqa: BLE001
+            pass
+    return get_transaction(tx_hash)
 
 
 def _chunked_get_logs(
