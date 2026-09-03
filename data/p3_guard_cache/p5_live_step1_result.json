@@ -1,209 +1,43 @@
 {
-  "generated_at_utc": "2026-09-03T17:31:08Z",
-  "mode": "REAL",
+  "generated_at_utc": "2026-09-03T18:05:09Z",
+  "mode": "DRY-RUN",
   "plan": {
-    "pool_price_usd": 2498.635720541606,
-    "lighter_mark_price_usd": 2498.17,
+    "pool_price_usd": 2503.833812553107,
+    "lighter_mark_price_usd": 2503.26,
     "wallet_balances": {
-      "eth_raw_wei": 44322480746783630,
-      "eth_human": 0.04432248074678363,
-      "usdg_raw": 101285447,
-      "usdg_human": 101.285447
+      "eth_raw_wei": 43791654698624582,
+      "eth_human": 0.04379165469862458,
+      "usdg_raw": 101161123,
+      "usdg_human": 101.161123
     },
     "lighter_margin": {
       "found": true,
-      "collateral_usd": 40.0,
-      "available_balance_usd": 40.0
+      "collateral_usd": 39.86778,
+      "available_balance_usd": 39.86778
     },
-    "usable_eth": 0.04032029670779439,
-    "usable_usdg": 101.285447,
-    "range_lower_usd": 2248.7721484874455,
-    "range_upper_usd": 2748.4992925957667,
-    "tick_lower": -199139,
-    "tick_upper": -197132,
+    "usable_eth": 0.039797779406317055,
+    "usable_usdg": 101.161123,
+    "range_lower_usd": 2253.450431297796,
+    "range_upper_usd": 2754.2171938084175,
+    "tick_lower": -199118,
+    "tick_upper": -197112,
     "tick_spacing": 1,
-    "current_tick": -198086,
-    "computed_liquidity": 39.48542708256394,
-    "expected_amount0_eth": 0.03676102260950191,
-    "expected_amount1_usdg": 101.285447,
-    "delta_eth_expected": 0.03676102260950191,
-    "hedge_notional_usd_expected": 91.83528385237939,
-    "required_margin_usd": 30.611761284126462,
-    "margin_available_usd": 40.0,
+    "current_tick": -198065,
+    "computed_liquidity": 39.39600235482376,
+    "expected_amount0_eth": 0.03663967570606355,
+    "expected_amount1_usdg": 101.16112300000002,
+    "delta_eth_expected": 0.03663967570606355,
+    "hedge_notional_usd_expected": 91.71863460796065,
+    "required_margin_usd": 30.572878202653552,
+    "margin_available_usd": 39.86778,
     "sufficient": true,
-    "amount0_desired_wei": 40320296707794392,
-    "amount1_desired_raw": 101285447,
-    "amount0_min_wei": 36025802157311876,
-    "amount1_min_raw": 99259738,
-    "deadline": 1788457272,
+    "amount0_desired_wei": 39797779406317056,
+    "amount1_desired_raw": 101161123,
+    "amount0_min_wei": 35906882191942284,
+    "amount1_min_raw": 99137900,
+    "deadline": 1788459312,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "gas_estimate": {
-    "gas_units_total_est": 403960,
-    "gas_price_wei": 626168000,
-    "est_cost_usd": 0.6319041705097376
-  },
-  "txs": [
-    {
-      "label": "1_wrap_ETH_to_WETH",
-      "tx_hash": "0x5aab65875d74a071db4abaada4d626ad7ece91a19fbbac2869982a644225d459",
-      "status": "success",
-      "gas_used": 57647,
-      "block_number": 53591843,
-      "gas_price_offered_wei": 612708000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 607918000
-    },
-    {
-      "label": "2_approve_WETH",
-      "tx_hash": "0x856db2bf31d396e6ee693668e08dc4263074f6caa70949370ef2ee90e3d9b6ae",
-      "status": "success",
-      "gas_used": 36337,
-      "block_number": 53591911,
-      "gas_price_offered_wei": 596922000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 593676000
-    },
-    {
-      "label": "3_approve_USDG",
-      "tx_hash": "0x2c074f17eee89de61d1ded14d55a95aabb2a2fef4091e52d32e3858003bad088",
-      "status": "success",
-      "gas_used": 57988,
-      "block_number": 53591979,
-      "gas_price_offered_wei": 599608000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 590936000
-    },
-    {
-      "label": "4_mint",
-      "tx_hash": "0x71354897ac767ea347ac36852414b17c632d327b43254b6b4a4fd5b8f3560700",
-      "status": "success",
-      "gas_used": 443735,
-      "block_number": 53592045,
-      "gas_price_offered_wei": 594858000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 600498000
-    }
-  ],
-  "lp_position": {
-    "token_id": 994653,
-    "liquidity": 39350023546051,
-    "amount0_eth_actual": 0.03650316484173225,
-    "amount1_usdg_actual": 101.285447,
-    "tick_lower": -199139,
-    "tick_upper": -197132
-  },
-  "hedge_target_delta_eth": 0.03650316484173225,
-  "hedge_order": {
-    "tx_hash": "code=200 message='{\"ratelimit\": \"didn\\'t use volume quota\"}' tx_hash='875df81836f4c53e69a715475adda90a8bea6f9d7810dcb359fd4b67ec7b2e1669572a9ed563a4b1' predicted_execution_time_ms=1788456704602 volume_quota_remaining=None additional_properties={}",
-    "err": null,
-    "base_amount": 365,
-    "size_eth_requested": 0.03650316484173225,
-    "avg_execution_price_worst": 247319,
-    "worst_price_usd": 2473.1883000000003,
-    "client_order_index": 1788456703
-  },
-  "hedge_fill_check": {
-    "filled": false,
-    "position": null,
-    "attempts_used": 4,
-    "last_positions_seen": [
-      {
-        "market_id": 0,
-        "symbol": "ETH",
-        "initial_margin_fraction": "50.00",
-        "open_order_count": 0,
-        "pending_order_count": 0,
-        "position_tied_order_count": 0,
-        "sign": -1,
-        "position": "0.0100",
-        "avg_entry_price": "2498.15",
-        "position_value": "24.988900",
-        "unrealized_pnl": "-0.007400",
-        "realized_pnl": "0.000000",
-        "liquidation_price": "6421.096837944664",
-        "total_funding_paid_out": "0.000000",
-        "margin_mode": 0,
-        "margin_set_flag": 1,
-        "allocated_margin": "0.000000"
-      }
-    ]
-  },
-  "hedge_error": "RuntimeError: create_market_order вернул err=None (принят API), но реальная позиция на Lighter НЕ появилась после 4 проверок -- ордер не исполнился (см. hedge_order.tx_hash для сырого ответа API).",
-  "CRITICAL": "LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция ~0.036503 ETH) -- хедж-ордер не прошёл, см. hedge_error. АВТОЗАКРЫТИЕ УСПЕШНО -- голой позиции больше нет.",
-  "close_position_onchain": {
-    "nonce": 0,
-    "operator": "0x0000000000000000000000000000000000000000",
-    "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
-    "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-    "fee": 100,
-    "tickLower": -199139,
-    "tickUpper": -197132,
-    "liquidity": 39350023546051,
-    "feeGrowthInside0LastX128": 0,
-    "feeGrowthInside1LastX128": 0,
-    "tokensOwed0": 0,
-    "tokensOwed1": 0
-  },
-  "close_plan": {
-    "pool_price_usd": 2498.986778265931,
-    "liquidity_to_remove": 39350023546051,
-    "expected_amount0_eth": 0.036578307216104694,
-    "expected_amount1_usdg": 101.0976492727543,
-    "amount0_min_wei": 34749391855299460,
-    "amount1_min_raw": 96042766,
-    "deadline": 1788457317,
-    "sanity_check_vs_known_deposit": {
-      "known_deposit0_eth": 0.03650316484173225,
-      "known_deposit1_usdg": 101.285447,
-      "sane0": true,
-      "sane1": true
-    }
-  },
-  "close_txs": [
-    {
-      "label": "1_decreaseLiquidity",
-      "tx_hash": "0x1664e3f9e4041f133b8803a12f88bc80330de85cf66f9f8aed6f7a9bfc1ff0d7",
-      "status": "success",
-      "gas_used": 236204,
-      "block_number": 53592265,
-      "gas_price_offered_wei": 588548000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 585542000
-    },
-    {
-      "label": "2_collect",
-      "tx_hash": "0xeca7235ee782c4fae89de4699c757c7fb08c6fa742ddb77e38a0577f762d5ceb",
-      "status": "success",
-      "gas_used": 122439,
-      "block_number": 53592332,
-      "gas_price_offered_wei": 587078000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 582806000
-    }
-  ],
-  "close_result": {
-    "decrease_amount0_eth": 0.036552929582477335,
-    "decrease_amount1_usdg": 101.161069,
-    "collect_amount0_eth_total": 0.0365529550867152,
-    "collect_amount1_usdg_total": 101.161123,
-    "fees_earned_amount0_eth": 2.550423786745748e-08,
-    "fees_earned_amount1_usdg": 5.400000000577165e-05
-  },
-  "close_pnl": {
-    "fees_earned_usd": 0.00011773475322629718,
-    "impermanent_loss_vs_deposit_usd": -1.6570854210223862e-05,
-    "total_gas_usd": 1.35009166700748,
-    "gas_price_used_wei": 566098000,
-    "net_pnl_usd": -1.349990503108464
-  },
-  "close_final_wallet_balances": {
-    "eth_raw_wei": 3435172262031238,
-    "eth_human": 0.003435172262031238,
-    "usdg_raw": 101161123,
-    "usdg_human": 101.161123,
-    "weth_human": 0.04037008695277734
-  },
-  "auto_close_succeeded": true
+  "note": "DRY-RUN -- ничего не отправлялось. Запустите с --confirm-mainnet для реальной отправки."
 }
