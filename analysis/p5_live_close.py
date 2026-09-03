@@ -55,7 +55,7 @@ from alchemy_fallback import _rpc_call, topic0  # noqa: E402
 import p5_live_precheck as pc  # noqa: E402
 from p5_live_step1 import (  # noqa: E402 -- переиспользуем уже проверенную реальными tx инфраструктуру отправки
     NFPM, WALLET, WETH, USDG, WETH_DECIMALS, USDG_DECIMALS, CHAIN_ID,
-    eth_estimate_gas, eth_gas_price, eth_nonce, send_tx, wait_for_receipt,
+    eth_estimate_gas, eth_gas_price, eth_nonce, wait_for_receipt, send_with_gas_retry,
 )
 
 OUT_PATH = Path("data/p3_guard_cache/p5_live_close_result.json")
@@ -112,18 +112,19 @@ def build_calldata_collect(token_id: int, recipient: str, amount0_max: int, amou
 
 
 def send_and_wait(account, label: str, to: str, data: bytes, nonce: int, progress: dict, out_path: Path) -> dict:
-    # gas_price читается СВЕЖИМ прямо здесь, не заранее -- см.
-    # p5_live_step1.py::send_tx, реальный прогон 33780888659: baseFee
-    # успевает подрасти за время ожидания квитанции предыдущей tx.
+    # Эскалирующийся retry на gas-race -- см. p5_live_step1.py::
+    # send_with_gas_retry (общая реализация, реальный инцидент 33780888659).
     print(f"[p5_live_close] --- {label}: отправка (nonce={nonce}) ---")
-    gas_price = eth_gas_price()
     gas_est = eth_estimate_gas(to, data, 0)
-    tx_hash = send_tx(account, to, data, 0, nonce, gas_est, gas_price)
-    print(f"[p5_live_close] {label}: ОТПРАВЛЕНО {tx_hash}, жду квитанцию...")
+    tx_hash, gas_price_used, buffer_used = send_with_gas_retry(account, to, data, 0, nonce, gas_est, label)
+    print(f"[p5_live_close] {label}: ОТПРАВЛЕНО {tx_hash} (gas_price={gas_price_used}, buffer={buffer_used}), жду квитанцию...")
     receipt = wait_for_receipt(tx_hash)
     status = int(receipt["status"], 16)
+    effective_gas_price = int(receipt["effectiveGasPrice"], 16) if receipt.get("effectiveGasPrice") else gas_price_used
     entry = {"label": label, "tx_hash": tx_hash, "status": "success" if status == 1 else "REVERTED",
-              "gas_used": int(receipt["gasUsed"], 16), "block_number": int(receipt["blockNumber"], 16)}
+              "gas_used": int(receipt["gasUsed"], 16), "block_number": int(receipt["blockNumber"], 16),
+              "gas_price_offered_wei": gas_price_used, "buffer_used": buffer_used,
+              "effective_gas_price_wei": effective_gas_price}
     progress.setdefault("close_txs", []).append(entry)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))

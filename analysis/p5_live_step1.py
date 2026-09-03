@@ -121,22 +121,29 @@ def eth_nonce() -> int:
     return int(_rpc_call("eth_getTransactionCount", [WALLET, "pending"]), 16)
 
 
-def send_tx(account, to: str, data: bytes, value: int, nonce: int, gas_limit: int, gas_price: int) -> str:
+def send_tx(account, to: str, data: bytes, value: int, nonce: int, gas_limit: int, gas_price: int,
+            buffer_mult: float = 1.5) -> str:
     # НАЙДЕНО (реальный прогон 33775506412, 2026-09-03): eth_account
     # требует EIP-55 checksummed 'to' (не просто валидный по длине hex) --
     # наши WETH/USDG/NFPM-константы записаны строчными буквами, чистый
     # eth_account.Account.sign_transaction() падал `TypeError: Transaction
     # had invalid fields: {'to': '0x0bd7...'}` ДО отправки (локальная
     # валидация, ничего не ушло в сеть, нонс не тронут).
-    # НАЙДЕНО (реальный прогон 33780888659, 2026-09-03): 10%-запас на
-    # gasPrice был недостаточен -- 4-я транзакция в последовательности
-    # (mint) была отклонена ДО отправки в сеть: `maxFeePerGas
-    # 1568113800 < baseFee 1637694000` -- base fee успел вырасти за время
-    # ожидания квитанций 3 предыдущих транзакций. Увеличено до 50% (в
-    # абсолютных числах это копейки -- base fee на этой сети ~1-2 Gwei).
+    # НАЙДЕНО (реальный прогон 33780888659, 2026-09-03): фиксированного
+    # запаса на gasPrice недостаточно -- base fee успевает вырасти за
+    # время ожидания квитанций предыдущих tx в последовательности.
+    # `buffer_mult` теперь параметризован -- см. send_with_gas_retry()
+    # (эскалация запаса при повторной попытке), не жёстко зашит здесь.
+    #
+    # Сеть здесь принимает legacy-транзакции (поле gasPrice, БЕЗ
+    # отдельных maxFeePerGas/maxPriorityFeePerGas в самой tx) -- узел
+    # трактует gasPrice как неявный maxFeePerGas при сверке с текущим
+    # baseFee (реальное сообщение об ошибке использует EIP-1559
+    # терминологию даже для legacy-tx: `maxFeePerGas ... < baseFee ...`).
+    # Отдельного maxPriorityFeePerGas в этой tx нет и не нужен.
     tx = {
         "chainId": CHAIN_ID, "nonce": nonce, "to": to_checksum_address(to), "value": value,
-        "gas": int(gas_limit * 1.2), "gasPrice": int(gas_price * 1.5), "data": "0x" + data.hex(),
+        "gas": int(gas_limit * 1.2), "gasPrice": int(gas_price * buffer_mult), "data": "0x" + data.hex(),
     }
     signed = Account.sign_transaction(tx, account.key)
     return _rpc_call("eth_sendRawTransaction", ["0x" + signed.raw_transaction.hex()])
@@ -152,19 +159,56 @@ def wait_for_receipt(tx_hash: str, timeout_s: int = 300, poll_s: int = 5) -> dic
     raise RuntimeError(f"{tx_hash} не замайнилась за {timeout_s}с -- проверить вручную, НЕ повторять отправку автоматически.")
 
 
+# Эскалация запаса поверх СВЕЖЕГО eth_gasPrice на каждой попытке (владелец,
+# 2026-09-03, после реального инцидента 33780888659: "добавить retry с
+# эскалацией... разумный предел попыток (2-3), прежде чем останавливаться").
+GAS_RETRY_BUFFERS = [1.15, 1.4, 1.75]
+_GAS_TOO_LOW_MARKERS = ("max fee per gas less than block base fee", "max fee per gas too low")
+
+
+def _is_gas_too_low_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return any(m in msg for m in _GAS_TOO_LOW_MARKERS)
+
+
+def send_with_gas_retry(account, to: str, data: bytes, value: int, nonce: int, gas_limit: int, label: str) -> tuple[str, int, float]:
+    """Отправляет tx с эскалирующимся запасом к gasPrice при ошибке
+    "max fee per gas less than block base fee" -- каждая попытка
+    заново читает eth_gasPrice (может и baseFee за это время
+    подрасти, не только наш буфер недостаточен) и использует
+    следующий, больший множитель из GAS_RETRY_BUFFERS. Другие ошибки
+    (не gas-race) -- пробрасываются немедленно, без повторов (ретраить
+    их бессмысленно, они повторятся идентично). Возвращает
+    (tx_hash, gas_price_fetched, buffer_used) успешной попытки."""
+    last_err: Exception | None = None
+    for attempt, buf in enumerate(GAS_RETRY_BUFFERS, start=1):
+        gas_price = eth_gas_price()
+        try:
+            tx_hash = send_tx(account, to, data, value, nonce, gas_limit, gas_price, buffer_mult=buf)
+            if attempt > 1:
+                print(f"[gas_retry] {label}: попытка {attempt}/{len(GAS_RETRY_BUFFERS)} прошла (buffer={buf})")
+            return tx_hash, gas_price, buf
+        except RuntimeError as e:
+            if not _is_gas_too_low_error(e):
+                raise
+            last_err = e
+            print(f"[gas_retry] {label}: попытка {attempt}/{len(GAS_RETRY_BUFFERS)} отклонена "
+                  f"(gas price устарел, gas_price={gas_price}, buffer={buf}): {e}")
+    raise RuntimeError(f"{label}: {len(GAS_RETRY_BUFFERS)} попыток отправки не прошли по gas-race -- последняя ошибка: {last_err}")
+
+
 def send_and_wait(account, label: str, to: str, data: bytes, value: int, nonce: int, progress: dict) -> dict:
-    # gas_price читается СВЕЖИМ прямо здесь (не передаётся заранее
-    # посчитанным сверху) -- см. комментарий в send_tx про baseFee drift
-    # между последовательными транзакциями, ждущими квитанций.
     print(f"[p5_live_step1] --- {label}: отправка (nonce={nonce}) ---")
-    gas_price = eth_gas_price()
     gas_est = eth_estimate_gas(to, data, value)
-    tx_hash = send_tx(account, to, data, value, nonce, gas_est, gas_price)
-    print(f"[p5_live_step1] {label}: ОТПРАВЛЕНО {tx_hash}, жду квитанцию...")
+    tx_hash, gas_price_used, buffer_used = send_with_gas_retry(account, to, data, value, nonce, gas_est, label)
+    print(f"[p5_live_step1] {label}: ОТПРАВЛЕНО {tx_hash} (gas_price={gas_price_used}, buffer={buffer_used}), жду квитанцию...")
     receipt = wait_for_receipt(tx_hash)
     status = int(receipt["status"], 16)
+    effective_gas_price = int(receipt["effectiveGasPrice"], 16) if receipt.get("effectiveGasPrice") else gas_price_used
     entry = {"label": label, "tx_hash": tx_hash, "status": "success" if status == 1 else "REVERTED",
-              "gas_used": int(receipt["gasUsed"], 16), "block_number": int(receipt["blockNumber"], 16)}
+              "gas_used": int(receipt["gasUsed"], 16), "block_number": int(receipt["blockNumber"], 16),
+              "gas_price_offered_wei": gas_price_used, "buffer_used": buffer_used,
+              "effective_gas_price_wei": effective_gas_price}
     progress.setdefault("txs", []).append(entry)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))  # пишем ПОСЛЕ каждого шага -- восстановимо при сбое
