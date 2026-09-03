@@ -83,9 +83,17 @@ jobs:
         run: |
           ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p5_live_step1_result.json' > /tmp/step1_result.json || true
           ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p5_live_log.jsonl' > /tmp/p5_live_log.jsonl || true
+          # НАЙДЕНО (реальный прогон "чистый лист", 2026-09-03): этот шаг
+          # раньше забирал только результат/лог, но не сам
+          # data/p5_live_position_state.json (п.5 -- время открытия и
+          # стартовые значения для kill-порога, читает будущий демон
+          # p5_live_bot.py) -- файл писался на VPS, но никогда не попадал
+          # в репозиторий. Добавлено явно.
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p5_live_position_state.json' > /tmp/p5_live_position_state.json || true
           mkdir -p data/p3_guard_cache
           [ -s /tmp/step1_result.json ] && cp /tmp/step1_result.json data/p3_guard_cache/p5_live_step1_result.json
           [ -s /tmp/p5_live_log.jsonl ] && cp /tmp/p5_live_log.jsonl data/p5_live_log.jsonl
+          [ -s /tmp/p5_live_position_state.json ] && cp /tmp/p5_live_position_state.json data/p5_live_position_state.json
 
       - name: Commit results
         if: always()
@@ -96,7 +104,7 @@ jobs:
           # в шаге "Определить режим" (иначе CONFIRM-маркер остаётся в
           # дереве и триггерит РЕАЛЬНЫЙ режим на любом будущем push).
           git rm -f --ignore-unmatch data/p3_guard_cache/P5_LIVE_STEP1_VPS_CONFIRM_REQUEST data/p3_guard_cache/P5_LIVE_STEP1_VPS_DRYRUN_REQUEST
-          git add data/p3_guard_cache/p5_live_step1_result.json data/p5_live_log.jsonl 2>/dev/null || true
+          git add data/p3_guard_cache/p5_live_step1_result.json data/p5_live_log.jsonl data/p5_live_position_state.json 2>/dev/null || true
           git diff --cached --quiet && exit 0
           git commit -m "P5 LIVE Step1 (VPS-NL): результат (mode=${{ steps.mode.outputs.flag }}) [automated]"
           for i in 1 2 3 4 5; do
