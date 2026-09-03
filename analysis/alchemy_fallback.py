@@ -58,23 +58,34 @@ def _endpoints() -> list[tuple[str, dict]]:
     """Упорядоченный список (base_url, доп.заголовки) -- первый в
     приоритете, следующие -- ФОЛБЭК.
 
-    ПУБЛИЧНЫЙ RPC (CONFIG.public_rpc_url) -- ПЕРВЫЙ с 2026-09-01
-    (владелец, дозапрос): реальный прогон GH Actions (run 33570102743,
-    см. docs/P3_GUARD.md, "Проба публичного RPC...") подтвердил --
-    eth_blockNumber и eth_getLogs (диапазоны 1000/2000 блоков) проходят
-    БЕЗ 403 и без ключа; троттлинг (429) начинается при быстрых
-    последовательных вызовах (~3 запроса/с по факту). Раньше (до этого
-    дозапроса) единственными вариантами были платные ключи -- Alchemy
-    и Blockscout PRO API (см. историю ниже) -- теперь они ФОЛБЭК,
-    используются только если публичный RPC вернул стойкую (не 429)
-    ошибку на всех попытках."""
+    ПЕРЕКЛЮЧЕНО 2026-09-03 (владелец, дал реальный ALCHEMY_API_KEY):
+    "переключи alchemy_fallback.py на кейед-путь как основной,
+    публичный RPC оставь фолбэком" -- если ключ (или явный
+    ALCHEMY_ROBINHOOD_RPC_URL) задан, Alchemy теперь ПЕРВЫЙ, публичный
+    RPC -- фолбэк (обратный прежнему порядку с 2026-09-01, когда
+    ALCHEMY_API_KEY не был настроен секретом GH Actions и публичный RPC
+    был единственным реальным вариантом). Если ключ НЕ задан --
+    поведение НЕ меняется (публичный RPC первый, как раньше).
+
+    URL Alchemy для Robinhood Chain НЕ подтверждён из независимого
+    источника (интерактивная песочница и WebFetch блокируют egress к
+    alchemy.com -- проверено эмпирически 2026-09-03) -- используется
+    правдоподобный паттерн Alchemy (`<network>.g.alchemy.com/v2/<key>`)
+    как ПЕРВАЯ гипотеза, пробуется реальным вызовом; если он не
+    работает -- код НЕ подставляет альтернативы молча, ошибка
+    поднимается наружу (см. analysis/alchemy_key_probe.py, который
+    проверяет это ДО переключения основных скриптов на ключ)."""
     endpoints: list[tuple[str, dict]] = []
+    alchemy_ep: tuple[str, dict] | None = None
+    if CONFIG.alchemy_rpc_url:
+        alchemy_ep = (CONFIG.alchemy_rpc_url, {})
+    elif CONFIG.alchemy_api_key:
+        alchemy_ep = (f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}", {})
+
+    if alchemy_ep:
+        endpoints.append(alchemy_ep)
     if CONFIG.public_rpc_url:
         endpoints.append((CONFIG.public_rpc_url, {}))
-    if CONFIG.alchemy_rpc_url:
-        endpoints.append((CONFIG.alchemy_rpc_url, {}))
-    elif CONFIG.alchemy_api_key:
-        endpoints.append((f"https://robinhood-mainnet.g.alchemy.com/v2/{CONFIG.alchemy_api_key}", {}))
     if CONFIG.blockscout_api_key:
         # ВАЖНО (найдено при подготовке P3-гарда, 2026-09-01, см.
         # docs/P3_GUARD.md): прямой безключевой eth-rpc-прокси
