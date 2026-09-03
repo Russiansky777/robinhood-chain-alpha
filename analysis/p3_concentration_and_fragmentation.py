@@ -198,7 +198,7 @@ def _price_and_usd_volume(sqrt_price_x96: int, amount0: int, amount1: int,
     return price, usdg_volume
 
 
-def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
+def analyze_token(sym: str, info: dict, from_block: int, to_block: int, run_t0: float) -> dict:
     print(f"\n[p3_concentration] === {sym} ===")
     is_v4_primary = "v3_pool_addresses" in info  # SPY/MSTR: единственная v4-нога, несколько v3-пулов
 
@@ -310,7 +310,19 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
 
     gaps_pct = []
     addr_counts: Counter[str] = Counter()
-    for tx in sorted(close_tx):
+    close_tx_sorted = sorted(close_tx)
+    sampled = False
+    for i, tx in enumerate(close_tx_sorted):
+        # НАЙДЕНО 2026-09-03 (run 33758226688): один NVDA потратил все
+        # ~40 минут ИМЕННО на этот цикл (3166 get_transaction) -- проверка
+        # бюджета времени между токенами (в run()) не успевала сработать,
+        # т.к. один токен сам съедал весь бюджет. Проверяем здесь же,
+        # каждые 200 транзакций -- честная выборка вместо тихого зависания.
+        if i % 200 == 0 and time.time() - run_t0 > TIME_BUDGET_S:
+            print(f"[p3_concentration] {sym}: бюджет времени исчерпан на {i}/{len(close_tx_sorted)} "
+                  f"closing tx -- дальше по выборке, не по всем")
+            sampled = True
+            break
         v3_p = sorted(v3_by_tx[tx], key=lambda r: r["log_index"])[-1]["price_usdg"]
         v4_p = sorted(v4_by_tx[tx], key=lambda r: r["log_index"])[-1]["price_usdg"]
         if v3_p and v4_p:
@@ -329,7 +341,8 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
     result = {
         "n_v3_swaps": len(v3_swaps), "n_v4_swaps": len(v4_swaps),
         "n_v4_pool_ids_with_liquidity": len(v4_pool_ids),
-        "n_close_tx": len(close_tx),
+        "n_close_tx": len(close_tx), "close_tx_sampled_due_to_time_budget": sampled,
+        "n_close_tx_actually_processed": total_closes,
         "close_tx_top3_addresses": top3, "close_tx_top3_share": top3_share,
         "typical_gap_pct_median": median_gap_pct, "typical_gap_pct_avg": avg_gap_pct,
         "gap_pct_samples_n": len(gaps_pct),
@@ -387,7 +400,7 @@ def run() -> int:
             print(f"[p3_concentration] мягкий бюджет времени ({TIME_BUDGET_S}с) исчерпан ДО {sym} -- "
                   f"стоп, частичный результат по {list(per_token.keys())}")
             break
-        per_token[sym] = analyze_token(sym, pools[sym], from_block, latest)
+        per_token[sym] = analyze_token(sym, pools[sym], from_block, latest, t0)
 
     overall_kill = any(v["close_tx_top3_share"] is not None and v["close_tx_top3_share"] > CLOSE_SHARE_KILL_THRESHOLD
                         for v in per_token.values())

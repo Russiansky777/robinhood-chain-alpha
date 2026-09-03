@@ -183,7 +183,16 @@ def _post_with_fallback(payload: dict) -> dict:
             except requests.exceptions.RequestException as e:
                 last_err = f"{url}: сетевая ошибка {e}"
                 break  # не ретраим сетевые ошибки на этом URL -- следующий эндпоинт
-            if resp.status_code == 429:
+            if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                # НАЙДЕНО 2026-09-03 (p3_concentration, run 33758226688,
+                # ~40 минут работы потеряно): единичный 502 Bad Gateway
+                # от прокси публичного RPC раньше сразу ронял ЭТОТ
+                # эндпоинт без единой попытки повтора (raise_for_status()
+                # -> HTTPError -> break) -- а такой 502 почти всегда
+                # транзиентный сбой инфраструктуры гейтвея, не
+                # содержательная ошибка запроса. Тот же бюджет времени
+                # и backoff, что у 429 -- 5xx категорически так же
+                # заслуживает повтора, не немедленной сдачи.
                 now = time.monotonic()
                 if rate_limit_deadline is None:
                     rate_limit_deadline = now + _RATE_LIMIT_WAIT_BUDGET_S
@@ -191,7 +200,7 @@ def _post_with_fallback(payload: dict) -> dict:
                     time.sleep(min(_BACKOFF_BASE_S * (2 ** attempt), _BACKOFF_CAP_S))
                     attempt += 1
                     continue
-                last_err = f"{url}: 429 устойчиво в течение {_RATE_LIMIT_WAIT_BUDGET_S:.0f}с -- сдаюсь на этом эндпоинте"
+                last_err = f"{url}: {resp.status_code} устойчиво в течение {_RATE_LIMIT_WAIT_BUDGET_S:.0f}с -- сдаюсь на этом эндпоинте"
                 break
             if resp.status_code in (401, 403):
                 last_err = f"{url}: {resp.status_code} {resp.text[:300]!r}"

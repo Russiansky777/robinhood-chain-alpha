@@ -39,6 +39,8 @@ jobs:
         run: pip install -r analysis/requirements.txt
 
       - name: Концентрация топ-3 + разрыв цены + фрагментация
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python -u analysis/p3_concentration_and_fragmentation.py
 
       - name: Commit results
