@@ -37,7 +37,9 @@ jobs:
       - name: Определить режим
         id: mode
         run: |
-          if [ -e data/p3_guard_cache/P5_LIVE_UNWRAP_CONFIRM_REQUEST ] && git log -1 --name-only --pretty=format: | grep -q "P5_LIVE_UNWRAP_CONFIRM_REQUEST"; then
+          # Только existence -- НЕ git log (shallow-clone на checkout@v4
+          # даёт ложные срабатывания, см. run_p5_live_step1_vps.yml).
+          if [ -e data/p3_guard_cache/P5_LIVE_UNWRAP_CONFIRM_REQUEST ]; then
             echo "flag=--confirm-mainnet" >> "$GITHUB_OUTPUT"
           else
             echo "flag=" >> "$GITHUB_OUTPUT"
@@ -52,6 +54,7 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/P5_LIVE_UNWRAP_CONFIRM_REQUEST data/p3_guard_cache/P5_LIVE_UNWRAP_DRYRUN_REQUEST
           [ -e data/p3_guard_cache/p5_live_unwrap_weth_result.json ] && git add data/p3_guard_cache/p5_live_unwrap_weth_result.json
           git diff --cached --quiet && exit 0
           git commit -m "P5 LIVE: развернуть WETH в ETH перед retry Step1 [automated]"
