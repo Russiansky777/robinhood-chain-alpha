@@ -1,0 +1,59 @@
+name: P5 LIVE -- Шаг 0 (проверка перед деньгами, только чтение)
+
+# Владелец, 2026-09-03: "живой бот P5 -- хеджированное LP на ETH/USDG,
+# реальные деньги, малый размер". Шаг 0 -- ТОЛЬКО чтение: баланс
+# кошелька (ETH/USDG), проверка что PRIVATE_KEY_NOX даёт ожидаемый
+# адрес (без печати ключа), публичные спред/глубина ETH-перпа на
+# Lighter. Транзакций НЕТ. Проверка маржи Lighter (аутентифицированный
+# API) требует секретов LIGHTER_API_KEY_PUBLIC/LIGHTER_API_KEY_PRIVATE
+# -- эта сессия не может добавить секреты сама (нет gh CLI/API для
+# этого), см. докладную часть в чате.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_STEP0_REQUEST"
+
+jobs:
+  step0:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Шаг 0 -- балансы, ключ, ETH-перп спред/глубина
+        env:
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+          LIGHTER_API_KEY_PUBLIC: ${{ secrets.LIGHTER_API_KEY_PUBLIC }}
+          LIGHTER_API_KEY_PRIVATE: ${{ secrets.LIGHTER_API_KEY_PRIVATE }}
+        run: python -u analysis/p5_live_step0.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_live_step0_result.json ] && git add data/p3_guard_cache/p5_live_step0_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: Шаг 0 -- проверка перед деньгами [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
