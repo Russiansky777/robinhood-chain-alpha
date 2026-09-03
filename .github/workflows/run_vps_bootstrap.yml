@@ -1,0 +1,178 @@
+name: P5 LIVE -- bootstrap VPS (216.146.25.26)
+
+# Владелец, 2026-09-03: настройка VPS для живого бота P5. Интерактивная
+# песочница этой сессии не имеет исходящего доступа к произвольным
+# TCP-портам (проверено эмпирически -- SSH/22 таймаутит, тот же периметр,
+# что блокирует HTTPS к неразрешённым доменам) -- вся работа с хостом
+# идёт через этот GH Actions runner (обычный исходящий интернет).
+#
+# Секреты, используемые ЗДЕСЬ: VPS_SSH_KEY (новый, нужно добавить),
+# PRIVATE_KEY_NOX, LIGHTER_API_KEY_PUBLIC, LIGHTER_API_KEY_PRIVATE (уже
+# есть) -- последние три пишутся НАПРЯМУЮ в /etc/bot/env на VPS через
+# SSH-стдин, никогда не проходят через shell -c / echo / логи этого
+# job'а (GitHub маскирует значения зарегистрированных секретов в логах,
+# но лучше вообще не печатать).
+#
+# Только настройка хоста + ОДИН запуск Step 0 (чтение). Шаги 1-4
+# живого задания (реальные деньги, шорт) НЕ запускаются.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_BOOTSTRAP_REQUEST"
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 216.146.25.26 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: 1-2. Подключение, идентификация хоста
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            echo "=== hostname ==="; hostname
+            echo "=== uptime ==="; uptime
+            echo "=== os-release ==="; cat /etc/os-release | head -3
+            echo "=== disk (до апдейта) ==="; df -h /
+          '
+
+      - name: 2. Обновление системы
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get -y upgrade
+            apt-get -y autoremove
+          '
+
+      - name: 3. ufw (22/tcp только) + fail2ban + отключение PasswordAuthentication
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get install -y ufw fail2ban
+
+            # ВАЖНО: allow 22 ДО enable -- иначе default-deny включится раньше
+            # разрешающего правила и текущая же SSH-сессия оборвётся.
+            ufw allow 22/tcp
+            ufw default deny incoming
+            ufw default allow outgoing
+            ufw --force enable
+            ufw status verbose
+
+            systemctl enable --now fail2ban
+            systemctl status fail2ban --no-pager | head -5
+
+            # PasswordAuthentication no -- безопасно ТОЛЬКО потому, что мы
+            # уже подключены по ключу (эта же сессия это доказывает).
+            sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication no/" /etc/ssh/sshd_config
+            grep -q "^PasswordAuthentication no" /etc/ssh/sshd_config
+            systemctl reload sshd
+          '
+
+      - name: 3б. Проверка -- НОВОЕ соединение после смены sshd_config (не залочились)
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 'echo "новое соединение по ключу работает"'
+
+      - name: 4-5. Пользователь bot (без sudo), зависимости, клон репозитория
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get install -y python3-venv python3-pip git
+
+            id -u bot &>/dev/null || useradd -m -s /bin/bash bot
+            id bot
+
+            sudo -u bot git config --global --get user.name || sudo -u bot git config --global user.name "p5-live-bot"
+            sudo -u bot git config --global --get user.email || sudo -u bot git config --global user.email "p5-live-bot@localhost"
+
+            if [ -d /home/bot/robinhood-chain-alpha/.git ]; then
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/sc1-pons-v2-launcher-efdbyt
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            else
+              sudo -u bot git clone --branch claude/sc1-pons-v2-launcher-efdbyt https://github.com/russiansky777/robinhood-chain-alpha.git /home/bot/robinhood-chain-alpha
+            fi
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+
+            sudo -u bot python3 -m venv /home/bot/robinhood-chain-alpha/venv
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q --upgrade pip
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: 6. Секреты -> /etc/bot/env (напрямую по SSH stdin, не через -c/echo)
+        env:
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+          LIGHTER_API_KEY_PUBLIC: ${{ secrets.LIGHTER_API_KEY_PUBLIC }}
+          LIGHTER_API_KEY_PRIVATE: ${{ secrets.LIGHTER_API_KEY_PRIVATE }}
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 'mkdir -p /etc/bot && cat > /etc/bot/env && chmod 640 /etc/bot/env && chown root:bot /etc/bot/env && wc -l /etc/bot/env' <<EOF
+          PRIVATE_KEY_NOX=$PRIVATE_KEY_NOX
+          LIGHTER_API_KEY_PUBLIC=$LIGHTER_API_KEY_PUBLIC
+          LIGHTER_API_KEY_PRIVATE=$LIGHTER_API_KEY_PRIVATE
+          EOF
+
+      - name: 7. systemd-юнит (установлен, НЕ включён -- p5_live_bot.py ещё не написан)
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 'cat > /etc/systemd/system/p5-live-bot.service' <<'EOF'
+          [Unit]
+          Description=P5 live hedged-LP bot (ETH/USDG)
+          After=network-online.target
+          Wants=network-online.target
+          StartLimitIntervalSec=600
+          StartLimitBurst=5
+
+          [Service]
+          Type=simple
+          User=bot
+          Group=bot
+          WorkingDirectory=/home/bot/robinhood-chain-alpha
+          EnvironmentFile=/etc/bot/env
+          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/robinhood-chain-alpha/analysis/p5_live_bot.py
+          Restart=always
+          RestartSec=10
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          ssh $SSH_OPTS root@216.146.25.26 'systemctl daemon-reload && systemctl status p5-live-bot --no-pager || true'
+
+      - name: 8. logrotate по размеру (диск 75GB)
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 'mkdir -p /home/bot/robinhood-chain-alpha/logs && chown bot:bot /home/bot/robinhood-chain-alpha/logs && cat > /etc/logrotate.d/p5-live-bot' <<'EOF'
+          /home/bot/robinhood-chain-alpha/logs/*.log {
+              size 200M
+              rotate 5
+              compress
+              delaycompress
+              missingok
+              notifempty
+              copytruncate
+              su bot bot
+          }
+          EOF
+          ssh $SSH_OPTS root@216.146.25.26 'logrotate -d /etc/logrotate.d/p5-live-bot 2>&1 | tail -20'
+
+      - name: 9-10. Step 0 (только чтение) + свободное место на диске
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot bash -c "set -a; source /etc/bot/env; set +a; ./venv/bin/python analysis/p5_live_step0.py"
+            echo "=== disk (после всей настройки) ==="
+            df -h /
+          '
