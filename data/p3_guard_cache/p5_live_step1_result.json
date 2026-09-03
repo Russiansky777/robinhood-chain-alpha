@@ -1,109 +1,43 @@
 {
-  "generated_at_utc": "2026-09-03T17:01:16Z",
-  "mode": "REAL",
+  "generated_at_utc": "2026-09-03T17:21:04Z",
+  "mode": "DRY-RUN",
   "plan": {
-    "pool_price_usd": 2493.388143243357,
-    "lighter_mark_price_usd": 2493.05,
+    "pool_price_usd": 2498.1956068704612,
+    "lighter_mark_price_usd": 2498.0,
     "wallet_balances": {
-      "eth_raw_wei": 46109536768111916,
-      "eth_human": 0.04610953676811192,
-      "usdg_raw": 100020860,
-      "usdg_human": 100.02086
+      "eth_raw_wei": 2745400930793044,
+      "eth_human": 0.002745400930793044,
+      "usdg_raw": 101285447,
+      "usdg_human": 101.285447
     },
     "lighter_margin": {
       "found": true,
       "collateral_usd": 40.0,
       "available_balance_usd": 40.0
     },
-    "usable_eth": 0.042098929744452875,
-    "usable_usdg": 100.02086,
-    "range_lower_usd": 2244.0493289190213,
-    "range_upper_usd": 2742.726957567693,
-    "tick_lower": -199160,
-    "tick_upper": -197153,
+    "usable_eth": 0.0,
+    "usable_usdg": 101.285447,
+    "range_lower_usd": 2248.3760461834154,
+    "range_upper_usd": 2748.0151675575075,
+    "tick_lower": -199141,
+    "tick_upper": -197134,
     "tick_spacing": 1,
-    "current_tick": -198107,
-    "computed_liquidity": 39.03344675289473,
-    "expected_amount0_eth": 0.03637844856118646,
-    "expected_amount1_usdg": 100.02086,
-    "delta_eth_expected": 0.03637844856118646,
-    "hedge_notional_usd_expected": 90.69329118546591,
-    "required_margin_usd": 30.23109706182197,
+    "current_tick": -198087,
+    "computed_liquidity": 0.0,
+    "expected_amount0_eth": 0.0,
+    "expected_amount1_usdg": 0.0,
+    "delta_eth_expected": 0.0,
+    "hedge_notional_usd_expected": 0.0,
+    "required_margin_usd": 0.0,
     "margin_available_usd": 40.0,
-    "sufficient": true,
-    "amount0_desired_wei": 42098929744452872,
-    "amount1_desired_raw": 100020860,
-    "amount0_min_wei": 35650879589962728,
-    "amount1_min_raw": 98020442,
-    "deadline": 1788455480,
+    "sufficient": false,
+    "amount0_desired_wei": 0,
+    "amount1_desired_raw": 101285447,
+    "amount0_min_wei": 0,
+    "amount1_min_raw": 0,
+    "deadline": 1788456670,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "gas_estimate": {
-    "gas_units_total_est": 383624,
-    "gas_price_wei": 1610416000,
-    "est_cost_usd": 1.5401918990782912
-  },
-  "txs": [
-    {
-      "label": "1_wrap_ETH_to_WETH",
-      "tx_hash": "0x6edc252681f046d965fcec80da443428e38136e37a023eb75fd4e762e3206bcf",
-      "status": "success",
-      "gas_used": 57648,
-      "block_number": 53574777
-    },
-    {
-      "label": "2_approve_WETH",
-      "tx_hash": "0x1c79f8eae994e3b98e47af747b3c44df3abdee4eb0da26c7fcc2fb725ceb070c",
-      "status": "success",
-      "gas_used": 36542,
-      "block_number": 53574882
-    },
-    {
-      "label": "3_approve_USDG",
-      "tx_hash": "0x691b6fff0ded8fe2798ef91d48e96db4f53a0acb911f1f4262f38e62f450891a",
-      "status": "success",
-      "gas_used": 38282,
-      "block_number": 53574943
-    },
-    {
-      "label": "4_mint",
-      "tx_hash": "0xff11725f9ba97320387e479b1f3cc5f43841a2e8184f4948cee240f993a582f9",
-      "status": "success",
-      "gas_used": 483585,
-      "block_number": 53575011
-    }
-  ],
-  "lp_position": {
-    "token_id": 993839,
-    "liquidity": 39085397075864,
-    "amount0_eth_actual": 0.03648741172335956,
-    "amount1_usdg_actual": 100.02086,
-    "tick_lower": -199160,
-    "tick_upper": -197153
-  },
-  "hedge_target_delta_eth": 0.03648741172335956,
-  "hedge_order": {
-    "tx_hash": "code=200 message='{\"ratelimit\": \"didn\\'t use volume quota\"}' tx_hash='6a2d21bb633bab778d33c4e40bda4c02bee9d435f74919b44df8694f05f469074b7a8526ba2f40aa' predicted_execution_time_ms=1788454912870 volume_quota_remaining=None additional_properties={}",
-    "err": null,
-    "base_amount": 365,
-    "size_eth_requested": 0.03648741172335956,
-    "avg_execution_price_worst": 246812,
-    "worst_price_usd": 2468.1195000000002,
-    "client_order_index": 1788454912
-  },
-  "final_balances": {
-    "wallet": {
-      "eth_raw_wei": 2921321289893044,
-      "eth_human": 0.002921321289893044,
-      "usdg_raw": 0,
-      "usdg_human": 0.0
-    },
-    "lighter_margin": {
-      "found": true,
-      "collateral_usd": 40.0,
-      "available_balance_usd": 40.0
-    }
-  },
-  "runtime_s": 36.71279740333557
+  "abort_reason": "sufficient=False при свежем пересчёте -- СТОП, не открываю позицию частично."
 }
