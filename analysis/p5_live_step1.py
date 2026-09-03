@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from eth_abi import decode as abi_decode, encode as abi_encode  # noqa: E402
 from eth_account import Account  # noqa: E402
+from eth_utils import to_checksum_address  # noqa: E402
 
 from alchemy_fallback import _rpc_call, topic0  # noqa: E402
 import p5_live_precheck as pc  # noqa: E402
@@ -106,8 +107,14 @@ def eth_nonce() -> int:
 
 
 def send_tx(account, to: str, data: bytes, value: int, nonce: int, gas_limit: int, gas_price: int) -> str:
+    # НАЙДЕНО (реальный прогон 33775506412, 2026-09-03): eth_account
+    # требует EIP-55 checksummed 'to' (не просто валидный по длине hex) --
+    # наши WETH/USDG/NFPM-константы записаны строчными буквами, чистый
+    # eth_account.Account.sign_transaction() падал `TypeError: Transaction
+    # had invalid fields: {'to': '0x0bd7...'}` ДО отправки (локальная
+    # валидация, ничего не ушло в сеть, нонс не тронут).
     tx = {
-        "chainId": CHAIN_ID, "nonce": nonce, "to": to, "value": value,
+        "chainId": CHAIN_ID, "nonce": nonce, "to": to_checksum_address(to), "value": value,
         "gas": int(gas_limit * 1.2), "gasPrice": int(gas_price * 1.1), "data": "0x" + data.hex(),
     }
     signed = Account.sign_transaction(tx, account.key)
