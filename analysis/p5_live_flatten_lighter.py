@@ -52,19 +52,18 @@ async def _close_round(size_eth: float, is_ask: bool, mark_price: float, size_de
                                    api_private_keys={LIGHTER_API_KEY_INDEX: lighter_priv})
     try:
         base_amount = round(size_eth * 10 ** size_decimals)
-        # reduce_only BUY (is_ask=False) закрывает шорт -- худшая приемлемая
-        # цена = потолок (готовы заплатить чуть больше mark, лишь бы закрыть);
-        # reduce_only SELL (is_ask=True) закрывает лонг -- худшая = пол.
-        worst_price = mark_price * (1 + SLIPPAGE) if not is_ask else mark_price * (1 - SLIPPAGE)
-        avg_execution_price = round(worst_price * 10 ** price_decimals)
+        # НАЙДЕНО (владелец, 2026-09-03): собственный расчёт от mark_price
+        # -- та же проблема, что в p5_live_step1.py -- реальный референс
+        # у SDK берётся из ЖИВОГО best_bid/best_ask (get_best_price()),
+        # не mark. Переходим на сам SDK-хелпер (ideal_price=None).
         client_order_index = int(time.time() * 1000) % (2 ** 31)
-        tx, tx_hash, err = await client.create_market_order(
+        tx, tx_hash, err = await client.create_market_order_limited_slippage(
             market_index=0, client_order_index=client_order_index, base_amount=base_amount,
-            avg_execution_price=avg_execution_price, is_ask=is_ask, reduce_only=True,
+            max_slippage=SLIPPAGE, is_ask=is_ask, reduce_only=True,
             api_key_index=LIGHTER_API_KEY_INDEX,
         )
         return {"tx_hash": str(tx_hash), "err": str(err) if err is not None else None,
-                "base_amount": base_amount, "is_ask": is_ask, "worst_price_usd": worst_price}
+                "base_amount": base_amount, "is_ask": is_ask, "max_slippage": SLIPPAGE}
     finally:
         await client.close()
 

@@ -403,23 +403,33 @@ def main() -> int:
                 raise RuntimeError(f"check_client() вернул ошибку: {check_err}")
 
             base_amount = round(real_delta_eth * 10 ** eth_market["size_decimals"])
-            worst_price = (lighter_price or p0) * (1 - SLIPPAGE_HEDGE)  # is_ask=True (продажа/шорт) -- минимально приемлемая цена
-            avg_execution_price = round(worst_price * 10 ** eth_market["price_decimals"])
             client_order_index = int(time.time()) % (2 ** 31)
 
-            print(f"[p5_live_step1] ОТПРАВКА хедж-ордера: market_index=0(ETH) is_ask=True "
-                  f"base_amount={base_amount} (~{real_delta_eth:.6f} ETH) worst_price=${worst_price:.2f} "
-                  f"(avg_execution_price={avg_execution_price})")
-            tx, tx_hash, err = await client.create_market_order(
+            # НАЙДЕНО (владелец, 2026-09-03, после 4 реальных попыток с
+            # sell-паттерном 0%/27%/0% филла против 100% на buy): наша
+            # ручная формула avg_execution_price = mark_price*(1-slippage)
+            # использовала MARK PRICE как референс -- знак совпадал с
+            # формулой самого SDK, но реальный "ideal_price" в
+            # create_market_order_limited_slippage() (см. реальный
+            # исходник, lighter/signer_client.py) берётся из ЖИВОГО
+            # get_best_price() -- лучший бид/аск ИЗ САМОЙ КНИГИ на момент
+            # отправки, не mark. Если mark хоть немного расходится с
+            # реальным best_bid в моменте, наш floor мог оказаться выше
+            # реального best_bid -- ордеру не с чем матчиться. Переходим
+            # на сам SDK-хелпер (ideal_price=None -> получает live
+            # best_bid сам), а не на собственный расчёт с mark_price.
+            print(f"[p5_live_step1] ОТПРАВКА хедж-ордера (create_market_order_limited_slippage, "
+                  f"живой best_bid из книги заявок, не mark_price): market_index=0(ETH) is_ask=True "
+                  f"base_amount={base_amount} (~{real_delta_eth:.6f} ETH) max_slippage={SLIPPAGE_HEDGE}")
+            tx, tx_hash, err = await client.create_market_order_limited_slippage(
                 market_index=0, client_order_index=client_order_index, base_amount=base_amount,
-                avg_execution_price=avg_execution_price, is_ask=True, reduce_only=False,
+                max_slippage=SLIPPAGE_HEDGE, is_ask=True, reduce_only=False,
                 api_key_index=LIGHTER_API_KEY_INDEX,
             )
             order_info = {
                 "tx_hash": str(tx_hash), "err": str(err) if err is not None else None,
                 "base_amount": base_amount, "size_eth_requested": real_delta_eth,
-                "avg_execution_price_worst": avg_execution_price, "worst_price_usd": worst_price,
-                "client_order_index": client_order_index,
+                "max_slippage": SLIPPAGE_HEDGE, "client_order_index": client_order_index,
             }
             if err is not None:
                 print(f"[p5_live_step1] create_market_order вернул ошибку: {err}")
@@ -476,7 +486,10 @@ def main() -> int:
                 f"после {fill_check['attempts_used']} проверок -- ордер не исполнился (см. hedge_order.tx_hash "
                 f"для сырого ответа API)."
             )
-        worst_price = order_info["worst_price_usd"]
+        # Реальная цена входа -- из подтверждённой позиции (avg_entry_price),
+        # не из нашей предторговой оценки (которой теперь и нет -- цену
+        # определяет сам SDK через live best_bid, см. _place_hedge()).
+        worst_price = float(fill_check["position"].get("avg_entry_price", 0))
         print(f"[p5_live_step1] ХЕДЖ ПОДТВЕРЖДЁН реальной позицией: {fill_check['position']}")
     except Exception as e:  # noqa: BLE001
         progress["hedge_error"] = f"{type(e).__name__}: {e}"
