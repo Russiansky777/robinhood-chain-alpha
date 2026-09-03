@@ -335,8 +335,17 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int, run_t0: 
     top3 = addr_counts.most_common(TOP_N_ADDRESSES)
     top3_sum = sum(c for _, c in top3)
     top3_share = top3_sum / total_closes if total_closes else None
+    # НАЙДЕНО 2026-09-03 (QQQ, run 33762766617): typical_gap_pct_avg вышел
+    # 1.8e+28% -- один тонкий/давно не торговавшийся v4 pool_id дал
+    # аномальную цену на конкретной closing tx, испортив среднее (медиана
+    # осталась нормальной -- она устойчива к выбросам, среднее нет).
+    # Явный порог правдоподобия (>1000% -- заведомо не реальное "закрытие
+    # дислокации", артефакт тонкого пула) -- исключаем из среднего,
+    # честно считаем сколько исключили, не скрываем сам факт выброса.
+    plausible_gaps = [g for g in gaps_pct if g <= 1000]
+    n_outliers_excluded = len(gaps_pct) - len(plausible_gaps)
     median_gap_pct = sorted(gaps_pct)[len(gaps_pct) // 2] if gaps_pct else None
-    avg_gap_pct = sum(gaps_pct) / len(gaps_pct) if gaps_pct else None
+    avg_gap_pct = sum(plausible_gaps) / len(plausible_gaps) if plausible_gaps else None
 
     result = {
         "n_v3_swaps": len(v3_swaps), "n_v4_swaps": len(v4_swaps),
@@ -345,7 +354,7 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int, run_t0: 
         "n_close_tx_actually_processed": total_closes,
         "close_tx_top3_addresses": top3, "close_tx_top3_share": top3_share,
         "typical_gap_pct_median": median_gap_pct, "typical_gap_pct_avg": avg_gap_pct,
-        "gap_pct_samples_n": len(gaps_pct),
+        "gap_pct_samples_n": len(gaps_pct), "gap_pct_outliers_excluded_from_avg": n_outliers_excluded,
         "fragmentation": fragmentation,
         "requests_used_cumulative": _request_count,
     }

@@ -11,18 +11,22 @@
 analysis/sc1_launcher.py (send_one(), строка ~267) -- НИКОГДА не
 печатается сам ключ, транзакций НЕТ.
 
-Часть "баланс маржи на Lighter" НЕ реализована в этом прогоне --
-требует аутентифицированного API Lighter (не публичный REST), а
-реальная схема подписи запросов НЕ проверена в этом репозитории (см.
-docstring analysis/p4_lighter_markets.py: "никакого SDK-пакета
-lighter-python в этом репозитории на самом деле [не установлено]" --
-она использовала только ПУБЛИЧНЫЕ эндпоинты). Секреты
-LIGHTER_API_KEY_PUBLIC/LIGHTER_API_KEY_PRIVATE тоже пока не заданы
-(отдельный блокер, требует действия владельца — эта сессия не имеет
-инструмента для установки GitHub Secrets, см. докладную часть в чате).
-Часть "ETH-перп доступен, спред и глубина" -- ПУБЛИЧНЫЙ Lighter REST
-(та же связка, что analysis/p4_lighter_markets.py/mm_p5_setup.py),
-ключа не требует, выполнена здесь полностью.
+ИСПРАВЛЕНО 2026-09-03 (после первого реального прогона на VPS):
+- `LIGHTER_API_BASE` был `https://robinhoodchain.lighter.xyz` (URL,
+  данный владельцем как "инстанс Lighter") -- реальная проверка
+  (analysis/lighter_robinhood_probe.py) показала, что это ВЕБ-ФРОНТЕНД
+  (React SPA, любой путь отдаёт одну и ту же HTML-страницу), не API.
+  Реальный REST API -- `mainnet.zklighter.elliot.ai` (подтверждено
+  живым JSON-ответом с реальными рынками/таker_fee/maker_fee).
+- "Баланс маржи на Lighter" -- РЕАЛИЗОВАНО: `AccountApi.account()`
+  (`GET /api/v1/account?by=index&value=<idx>`) в реальном SDK
+  (elliottech/lighter-python/lighter/api/account_api.py) объявлен с
+  `_auth_settings: []` -- ПУБЛИЧНЫЙ эндпоинт, подпись НЕ нужна для
+  чтения (см. analysis/p5_live_lighter_account.py, уже проверено
+  живым прогоном 2026-09-03 -- account_index 22012 реально
+  существует). `LIGHTER_API_KEY_PUBLIC`/`LIGHTER_API_KEY_PRIVATE`
+  здесь НЕ используются (нужны только для записи -- ордера, вне
+  этого шага).
 """
 from __future__ import annotations
 
@@ -44,7 +48,8 @@ WALLET = "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75"
 USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
 USDG_DECIMALS = 6
 P5_POOL = "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca".lower()
-LIGHTER_API_BASE = "https://robinhoodchain.lighter.xyz"
+LIGHTER_API_BASE = "https://mainnet.zklighter.elliot.ai"  # реальный API -- см. докстринг выше
+LIGHTER_ACCOUNT_INDEX = 22012
 GAS_RESERVE_USD = 10.0
 
 _request_count = 0
@@ -153,17 +158,29 @@ def fetch_eth_perp_depth(market_id: int, mid: float) -> dict:
 
 
 def check_lighter_margin() -> dict:
-    pub = os.environ.get("LIGHTER_API_KEY_PUBLIC", "")
-    priv = os.environ.get("LIGHTER_API_KEY_PRIVATE", "")
-    if not pub or not priv:
-        return {"configured": False,
-                "verdict": "LIGHTER_API_KEY_PUBLIC/LIGHTER_API_KEY_PRIVATE не заданы -- проверка маржи "
-                           "НЕ выполнена, требуется секрет + верификация реальной схемы подписи Lighter "
-                           "(не публичный REST) -- см. докладную часть, не додумано."}
-    return {"configured": True,
-            "verdict": "Секреты заданы, но аутентифицированный вызов ЕЩЁ НЕ РЕАЛИЗОВАН в этом прогоне -- "
-                       "схема подписи Lighter требует проверки по реальному источнику (elliottech/lighter-python), "
-                       "не догадки, до реализации."}
+    """GET /api/v1/account -- публичный эндпоинт (_auth_settings=[] в
+    реальном SDK, см. докстринг модуля), подпись не нужна."""
+    try:
+        r = requests.get(f"{LIGHTER_API_BASE}/api/v1/account",
+                          params={"by": "index", "value": str(LIGHTER_ACCOUNT_INDEX)}, timeout=20)
+        r.raise_for_status()
+        accounts = r.json().get("accounts", [])
+    except Exception as e:  # noqa: BLE001
+        return {"configured": True, "found": False, "verdict": f"GET /api/v1/account не удался: {e} -- СТОП"}
+    if not accounts:
+        return {"configured": True, "found": False,
+                "verdict": f"аккаунт {LIGHTER_ACCOUNT_INDEX} НЕ найден в ответе -- СТОП"}
+    acct = accounts[0]
+    collateral = float(acct.get("collateral", 0))
+    available = float(acct.get("available_balance", 0))
+    positions = [p for p in acct.get("positions", []) if float(p.get("position", 0)) != 0]
+    return {
+        "configured": True, "found": True, "account_index": LIGHTER_ACCOUNT_INDEX,
+        "collateral_usd": collateral, "available_balance_usd": available,
+        "open_positions": positions, "n_open_positions": len(positions),
+        "verdict": ("МАРЖА ПУСТА (0 или почти 0) -- недостаточно для хеджа -- СТОП" if collateral < 1
+                    else f"collateral=${collateral:.2f}, available=${available:.2f}"),
+    }
 
 
 def run() -> int:
@@ -196,8 +213,10 @@ def run() -> int:
         blockers.append("не удалось прочитать баланс кошелька")
     if eth_market is None:
         blockers.append("ETH-перп на Lighter не найден")
-    if not margin_check.get("configured"):
-        blockers.append("маржа Lighter не проверена (нет секретов/реализации)")
+    if not margin_check.get("found"):
+        blockers.append("аккаунт Lighter не найден/недоступен")
+    elif margin_check.get("collateral_usd", 0) < 1:
+        blockers.append(f"маржа Lighter практически пуста (${margin_check.get('collateral_usd', 0):.4f})")
 
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
