@@ -31,9 +31,35 @@ collect на САМОЙ позиции -- если с момента откры�
     экономика).
   - data/p5_fee_accrual.jsonl -- ОДНА строка добавляется КАЖДЫЙ прогон
     (append-only, схема владельца): timestamp, block, fees0, fees1,
-    pool_price, in_range. Предназначен для почасового запуска (см.
-    .github/workflows/run_p5_live_position_snapshot.yml) -- минимум 24
-    строки нужны до включения демона ребаланса.
+    pool_price, in_range, free_margin_usd, margin_call_price,
+    fee_capture_ratio, gas_spent_cumulative_usd. Предназначен для
+    почасового запуска (см. .github/workflows/run_p5_live_position_
+    snapshot.yml) -- минимум 24 строки нужны до включения демона
+    ребаланса.
+
+ОБНОВЛЕНО (владелец, 2026-09-03/04, задача расширения отчёта):
+  - `min_base_amount`/`size_decimals`/`min_quote_amount` рынка ETH-перпа
+    на Lighter -- реальное чтение `GET /api/v1/orderBookDetails`
+    (то же, что `pc.lighter_eth_perp()` уже делал для mark_price), не
+    из документации. Нужно для порога хеджа -- минимальный лот/шаг/
+    нотионал ограничивают, насколько мелко можно ребалансировать.
+  - `free_margin_usd` (абсолют) и `margin_call_price` -- цена ETH, при
+    которой свободная маржа (initial margin) обнуляется. ЭТО НЕ
+    `liquidation_price` (та считается по maintenance margin, более
+    низкому порогу) -- выведена той же техникой, что формула §5
+    PROJECT_STATE.md (текущий collateral/size/mark, без реконструкции
+    цифр на момент входа): `P_margin_call = (collateral + size×P_now) /
+    (size×(1 + 1/leverage))`.
+  - `fee_capture_ratio` = (наши комиссии за интервал / наш reserve_usd)
+    ÷ (комиссии пула за интервал / TVL пула) -- сравнивает наш
+    фактический fee yield с пуловым средним за тот же интервал. Пул --
+    тем же вызовом GeckoTerminal `/pools/{addr}`, что и
+    `p5_gt_pool_history.py` (мягкий отказ, если GT недоступен/лимит --
+    не должно блокировать основной ончейн-снимок).
+  - `gas_spent_cumulative_usd` -- ОТДЕЛЬНОЕ поле, намеренно вынесено из
+    блока `economics`, чтобы газ не "размазывался" внутри доходности
+    (владелец, дословно). Пока = газ входа (`total_gas_spent_usd_est`
+    из state) -- ребалансов ещё не было, демон не написан.
 """
 from __future__ import annotations
 
@@ -45,6 +71,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import requests  # noqa: E402
 from eth_abi import decode as abi_decode, encode as abi_encode  # noqa: E402
 from eth_utils import to_checksum_address  # noqa: E402
 
@@ -61,6 +88,10 @@ WALLET = pc.WALLET
 WETH_DECIMALS, USDG_DECIMALS = pc.WETH_DECIMALS, pc.USDG_DECIMALS
 MAX_UINT128 = 2 ** 128 - 1
 RANGE_PCT = pc.RANGE_PCT  # 0.10 -- тот же параметр, что использовался при открытии
+POOL_FEE_FRACTION = 0.0001  # 0.01%, подтверждено ончейн (fee=100/1e6, docs/P5_HEDGED_LP.md §1)
+
+GT_NETWORK = "robinhood"  # подтверждено реальным вызовом, p5_gt_pool_history.py, run 33814194154
+GT_POOL_ADDRESS = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 
 COLLECT_SIG = "collect((uint256,address,uint128,uint128))"
 
@@ -92,6 +123,41 @@ def price_from_tick(tick: int) -> float:
     """Та же decimals-поправка, что pc.price_from_sqrt() -- 1.0001**tick
     ЭКВИВАЛЕНТНО (sqrtPriceX96/2**96)**2 по определению Uniswap v3."""
     return (1.0001 ** tick) * (10 ** (WETH_DECIMALS - USDG_DECIMALS))
+
+
+def fetch_gt_pool_snapshot_soft() -> dict | None:
+    """Снимок /pools/{addr} с GeckoTerminal -- ТОЛЬКО для fee_capture_ratio
+    (сравнение с пуловым средним), МЯГКИЙ отказ при любой проблеме (429,
+    таймаут, сеть) -- это вспомогательная метрика, не должна ронять
+    основной ончейн/Lighter-снимок позиции. Один вызов, без ретрая
+    (см. p5_gt_pool_history.py для полноценного ретрая на 429 -- здесь
+    сознательно проще, почасовой cadence сам по себе далеко от лимита
+    30/мин на ОДИН вызов)."""
+    try:
+        r = requests.get(f"https://api.geckoterminal.com/api/v2/networks/{GT_NETWORK}/pools/{GT_POOL_ADDRESS}",
+                          headers={"Accept": "application/json;version=20230302"}, timeout=20)
+        if r.status_code != 200:
+            print(f"[snapshot] GT /pools/{{addr}} вернул HTTP {r.status_code} -- fee_capture_ratio пропущен в этом прогоне")
+            return None
+        return r.json().get("data", {}).get("attributes", {})
+    except Exception as e:  # noqa: BLE001
+        print(f"[snapshot] GT /pools/{{addr}} недоступен ({e}) -- fee_capture_ratio пропущен в этом прогоне")
+        return None
+
+
+def read_last_accrual_entry() -> dict | None:
+    """Последняя строка data/p5_fee_accrual.jsonl ДО добавления текущей --
+    нужна для расчёта комиссий/интервала (fee_capture_ratio). None на
+    первом прогоне (нет предыдущей точки для интервала)."""
+    if not ACCRUAL_LOG_PATH.exists():
+        return None
+    last_line = None
+    with ACCRUAL_LOG_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                last_line = line
+    return json.loads(last_line) if last_line else None
 
 
 def raw_sqrt_from_tick(tick: int) -> float:
@@ -168,6 +234,26 @@ def run() -> int:
     lighter_mark_price_now = float(eth_market["mark_price"]) if eth_market else None
     real_leverage = pc.real_eth_leverage(account_full)
 
+    # Метаданные рынка (лот/шаг/минимальный нотионал) -- реальное чтение
+    # GET /api/v1/orderBookDetails (то же eth_market), НЕ из документации
+    # (владелец, задача расширения отчёта, 2026-09-04). Единственная
+    # цифра, которой не хватало для порога хеджа -- насколько мелко
+    # можно ребалансировать.
+    lighter_market_meta = None
+    if eth_market:
+        min_base_amount = float(eth_market["min_base_amount"]) if eth_market.get("min_base_amount") is not None else None
+        size_decimals = eth_market.get("size_decimals")
+        lot_step = (10 ** -size_decimals) if size_decimals is not None else None
+        min_quote_amount = float(eth_market["min_quote_amount"]) if eth_market.get("min_quote_amount") is not None else None
+        lighter_market_meta = {
+            "min_base_amount_eth": min_base_amount, "size_decimals": size_decimals,
+            "lot_step_eth": lot_step, "min_quote_amount_usd": min_quote_amount,
+            "price_decimals": eth_market.get("price_decimals"),
+        }
+        print(f"[snapshot] Lighter ETH market meta (реально, orderBookDetails): "
+              f"min_base_amount={min_base_amount} ETH, шаг лота=10^-{size_decimals}={lot_step} ETH, "
+              f"min_quote_amount=${min_quote_amount}")
+
     lighter_hedge_now: dict = {"found": eth_pos is not None}
     if eth_pos:
         real_hedge_size_eth = abs(float(eth_pos.get("position", 0)))
@@ -178,6 +264,26 @@ def run() -> int:
         collateral_usd = float(account_full.get("collateral", 0))
         available_usd = float(account_full.get("available_balance", 0))
         free_margin_pct_now = (available_usd / collateral_usd * 100) if collateral_usd else None
+        free_margin_usd = available_usd  # то же самое поле биржи, явное имя по просьбе владельца -- абсолют, не только %
+
+        # margin_call_price -- цена ETH, при которой initial-margin буфер
+        # обнуляется (НЕ liquidation_price -- та считается по maintenance
+        # margin, более низкому порогу, см. §5 PROJECT_STATE.md). Та же
+        # техника вывода, что и там: только ТЕКУЩИЕ наблюдаемые величины
+        # (collateral/size/mark/leverage), без реконструкции состояния на
+        # момент входа. Вывод (шорт, cross-margin):
+        #   collateral(P) = collateral_now - size×(P - P_now)
+        #   required_initial_margin(P) = size×P / leverage
+        #   collateral(P) = required_initial_margin(P)  =>
+        #   P_margin_call = (collateral_now + size×P_now) / (size×(1 + 1/leverage))
+        leverage_val = real_leverage.get("leverage") if real_leverage.get("found") else None
+        margin_call_price = None
+        if leverage_val and real_hedge_size_eth and lighter_mark_price_now:
+            margin_call_price = ((collateral_usd + real_hedge_size_eth * lighter_mark_price_now) /
+                                  (real_hedge_size_eth * (1 + 1 / leverage_val)))
+        margin_call_move_pct_from_current = (
+            (margin_call_price / lighter_mark_price_now - 1) * 100
+        ) if (margin_call_price and lighter_mark_price_now) else None
 
         # Кросс-проверка формулой §5 паспорта (P0/size ФИКСИРОВАНЫ при
         # входе позиции, collateral -- ТЕКУЩИЙ, cross-margin пулит по
@@ -198,14 +304,19 @@ def run() -> int:
             "lighter_mark_price_now_usd": lighter_mark_price_now,
             "distance_to_liquidation_pct_from_current_price": dist_to_liq_pct_now,
             "collateral_usd": collateral_usd, "available_balance_usd": available_usd,
-            "free_margin_pct_now": free_margin_pct_now,
+            "free_margin_pct_now": free_margin_pct_now, "free_margin_usd": free_margin_usd,
+            "margin_call_price_usd": margin_call_price,
+            "margin_call_move_pct_from_current": margin_call_move_pct_from_current,
             "current_leverage": real_leverage,
             "liquidation_formula_cross_check": mmf_formula_check,
         })
         print(f"[snapshot] Lighter ETH-позиция: size={real_hedge_size_eth} avg_entry=${avg_entry_price} "
               f"unrealized_pnl=${unrealized_pnl} liquidation_price=${liq_price} mark_now=${lighter_mark_price_now}")
         print(f"[snapshot] расстояние до ликвидации СЕЙЧАС (от текущей mark price): {dist_to_liq_pct_now}%")
-        print(f"[snapshot] margin: collateral=${collateral_usd} available=${available_usd} свободно={free_margin_pct_now}%")
+        print(f"[snapshot] margin: collateral=${collateral_usd} available(=free_margin_usd)=${free_margin_usd} "
+              f"свободно={free_margin_pct_now}%")
+        print(f"[snapshot] margin_call_price=${margin_call_price} ({margin_call_move_pct_from_current:+.4f}% от текущей цены) "
+              f"-- НЕ liquidation_price, порог обнуления initial-margin буфера" if margin_call_price else "")
     else:
         print("[snapshot] ETH-позиция на Lighter НЕ найдена -- голая LP-экспозиция, если это неожиданно, см. флаг ниже.")
 
@@ -219,6 +330,12 @@ def run() -> int:
     sqrt_p_clamped = min(max(sqrt_p_raw, sqrt_pa_raw), sqrt_pb_raw)
     amount0_required_raw = max(pos["liquidity"] * (1 / sqrt_p_clamped - 1 / sqrt_pb_raw), 0.0)
     amount0_eth_required_now = amount0_required_raw / 10 ** WETH_DECIMALS
+    # amount1 (USDG-нога) -- та же raw sqrt-математика, что amount0 выше
+    # (p5_live_close.py::close_position()) -- нужна для рыночной стоимости
+    # НАШЕЙ LP-позиции СЕЙЧАС (our_reserve_usd, см. fee_capture_ratio ниже).
+    amount1_required_raw = max(pos["liquidity"] * (sqrt_p_clamped - sqrt_pa_raw), 0.0)
+    amount1_usdg_now = amount1_required_raw / 10 ** USDG_DECIMALS
+    our_reserve_usd_now = amount0_eth_required_now * pool_price_now + amount1_usdg_now
 
     delta_check: dict = {"amount_eth_required_now_formula": amount0_eth_required_now}
     if eth_pos:
@@ -280,6 +397,47 @@ def run() -> int:
     else:
         print("[snapshot] нет data/p5_live_position_state.json с opened_at_utc/capital_at_risk_usd_entry -- экономика не посчитана.")
 
+    # === gas_spent_cumulative_usd -- ОТДЕЛЬНО от economics (владелец: "чтобы
+    # газ не размазывался внутри доходности"). Пока = газ входа -- ребалансов
+    # ещё не было (демон не написан, см. docs/PROJECT_STATE.md §8). ===
+    gas_spent_cumulative_usd = state.get("total_gas_spent_usd_est", 0.0)
+
+    # === fee_capture_ratio: наш fee yield за интервал против пулового
+    # среднего за тот же интервал (владелец, задача расширения отчёта) ===
+    prev_entry = read_last_accrual_entry()
+    gt_pool = fetch_gt_pool_snapshot_soft()
+    fee_capture_ratio = None
+    fee_capture_detail: dict = {}
+    if prev_entry and prev_entry.get("token_id") == TOKEN_ID:
+        prev_fees_usd = prev_entry["fees0_eth"] * prev_entry["pool_price_usd"] + prev_entry["fees1_usdg"]
+        prev_ts = datetime.strptime(prev_entry["timestamp_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        interval_hours = (now_utc - prev_ts).total_seconds() / 3600
+        interval_fees_usd = fees_usd_unclaimed - prev_fees_usd
+        fee_capture_detail["interval_hours"] = interval_hours
+        fee_capture_detail["interval_fees_usd"] = interval_fees_usd
+        if interval_fees_usd < 0:
+            fee_capture_detail["note"] = "отрицательный интервал комиссий -- вероятно collect() был вызван между снимками, база сброшена."
+        elif gt_pool and gt_pool.get("volume_usd", {}).get("h1") and gt_pool.get("reserve_in_usd") and our_reserve_usd_now:
+            pool_volume_h1_usd = float(gt_pool["volume_usd"]["h1"])
+            pool_reserve_usd = float(gt_pool["reserve_in_usd"])
+            pool_fees_interval_usd = pool_volume_h1_usd * POOL_FEE_FRACTION
+            our_yield = interval_fees_usd / our_reserve_usd_now
+            pool_yield = pool_fees_interval_usd / pool_reserve_usd if pool_reserve_usd else None
+            fee_capture_ratio = (our_yield / pool_yield) if pool_yield else None
+            fee_capture_detail.update({
+                "our_reserve_usd_now": our_reserve_usd_now, "our_yield_interval": our_yield,
+                "pool_volume_h1_usd_proxy_for_interval": pool_volume_h1_usd,
+                "pool_fees_interval_usd_est": pool_fees_interval_usd, "pool_reserve_usd": pool_reserve_usd,
+                "pool_yield_interval": pool_yield,
+                "NOTE": "pool_volume_h1 -- проxy пулового объёма 'за тот же интервал' (rolling last-hour из GT), "
+                        "не точное совпадение с фактическим интервалом между снимками -- приближение, не точный факт.",
+            })
+        else:
+            fee_capture_detail["note"] = "GT-снимок пула недоступен в этом прогоне ИЛИ our_reserve_usd_now=0 -- ratio не посчитан."
+    else:
+        fee_capture_detail["note"] = "нет предыдущей точки ряда (первый прогон или сменился token_id) -- интервал не определён."
+    print(f"\n[snapshot] fee_capture_ratio={fee_capture_ratio} детали={fee_capture_detail}")
+
     # === Запись почасового ряда (append-only) ===
     block_now = get_block_number()
     accrual_entry = {
@@ -287,6 +445,10 @@ def run() -> int:
         "block": block_now, "token_id": TOKEN_ID,
         "fees0_eth": fees0_eth, "fees1_usdg": fees1_usdg,
         "pool_price_usd": pool_price_now, "in_range": in_range,
+        "free_margin_usd": lighter_hedge_now.get("free_margin_usd"),
+        "margin_call_price": lighter_hedge_now.get("margin_call_price_usd"),
+        "fee_capture_ratio": fee_capture_ratio,
+        "gas_spent_cumulative_usd": gas_spent_cumulative_usd,
     }
     ACCRUAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ACCRUAL_LOG_PATH.open("a") as f:
@@ -305,8 +467,11 @@ def run() -> int:
             "pct_of_10pct_path_to_nearest_edge": pct_of_10pct_path_to_nearest_edge,
         },
         "lighter_hedge_now": lighter_hedge_now,
-        "delta_check": delta_check,
+        "lighter_market_meta": lighter_market_meta,
+        "delta_check": {**delta_check, "our_reserve_usd_now": our_reserve_usd_now, "amount1_usdg_now": amount1_usdg_now},
         "economics": economics,
+        "gas_spent_cumulative_usd": gas_spent_cumulative_usd,
+        "fee_capture_ratio": fee_capture_ratio, "fee_capture_detail": fee_capture_detail,
         "runtime_s": time.time() - t0,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
