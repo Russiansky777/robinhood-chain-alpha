@@ -52,8 +52,62 @@ LIGHTER_API_BASE = "https://api.rh.lighter.xyz"
 LIGHTER_ACCOUNT_INDEX = 22012
 GAS_RESERVE_USD = 10.0
 RANGE_PCT = 0.10
-MAX_LEVERAGE = 3.0
 MINT_TOPIC0 = topic0("Mint(address,address,int24,int24,uint128,uint256,uint256)")
+
+# НАЙДЕНО (владелец, 2026-09-03, после реального `canceled-margin-not-allowed`
+# на всех 3 неудачных хедж-попытках, см. data/p3_guard_cache/
+# lighter_order_status_authed_probe_result.json): формула требуемой маржи
+# использовала ЗАШИТЫЙ MAX_LEVERAGE=3.0, а РЕАЛЬНОЕ плечо на аккаунте было
+# 2x (initial_margin_fraction="50.00", подтверждено аутентифицированным
+# /api/v1/account) -- допущение маскировало нехватку маржи все 4 попытки.
+# MAX_LEVERAGE как константа УБРАН -- required_margin теперь считается
+# ИСКЛЮЧИТЕЛЬНО по факту, прочитанному с аккаунта через real_eth_leverage().
+#
+# Реальная формула перевода (не догадка -- дословно из
+# elliottech/lighter-python/lighter/signer_client.py::update_leverage,
+# проверено прямым fetch исходника 2026-09-03):
+#   imf_raw = int(10_000 / leverage)  =>  leverage = 10_000 / imf_raw
+# Единицы raw-полей рынка (min_initial_margin_fraction, default_initial_
+# margin_fraction, maintenance_margin_fraction в orderBookDetails) --
+# ТА ЖЕ шкала (bps от 10_000): default_initial_margin_fraction=5000 =>
+# 10000/5000=2x, что ТОЧНО совпало с реальным плечом аккаунта (50.00% в
+# positions[].initial_margin_fraction) -- независимая перекрёстная
+# проверка, не совпадение.
+# Строковое поле positions[].initial_margin_fraction -- уже ПРОЦЕНТ
+# (raw/100), например "50.00" => leverage = 100 / 50.00 = 2.
+
+
+def lighter_account_full() -> dict | None:
+    """Полный сырой accounts[0] с публичного (без подписи) GET /api/v1/account
+    -- единый источник для margin/positions/leverage, чтобы не расходиться
+    между разными чтениями в одном прогоне."""
+    r = requests.get(f"{LIGHTER_API_BASE}/api/v1/account",
+                      params={"by": "index", "value": str(LIGHTER_ACCOUNT_INDEX)}, timeout=20)
+    r.raise_for_status()
+    accounts = r.json().get("accounts", [])
+    return accounts[0] if accounts else None
+
+
+def real_eth_leverage(account_full: dict | None = None, market_symbol: str = "ETH") -> dict:
+    """Реальное ТЕКУЩЕЕ плечо по рынку -- читается с аккаунта, не
+    предполагается. `initial_margin_fraction` в positions[] -- строка-
+    процент (raw/100); leverage = 100 / imf_pct. Позиция присутствует в
+    ответе даже при нулевом размере (проверено эмпирически 2026-09-03),
+    так что это читается независимо от того, flat аккаунт или нет."""
+    if account_full is None:
+        account_full = lighter_account_full()
+    if account_full is None:
+        return {"found": False}
+    pos = next((p for p in account_full.get("positions", [])
+                if str(p.get("symbol", "")).upper() == market_symbol.upper()), None)
+    if pos is None:
+        return {"found": False}
+    imf_pct = float(pos["initial_margin_fraction"])
+    return {
+        "found": True, "initial_margin_fraction_pct": imf_pct,
+        "leverage": 100.0 / imf_pct if imf_pct else None,
+        "margin_mode_raw": pos.get("margin_mode"),
+    }
 
 _request_count = 0
 
@@ -208,8 +262,20 @@ def run() -> int:
     print("\n=== Балансы (fresh) ===")
     wb = wallet_balances()
     lm = lighter_margin()
+    account_full = lighter_account_full()
+    real_leverage = real_eth_leverage(account_full)
     print(f"[p5_live_precheck] кошелёк: ETH={wb['eth_human']} USDG={wb['usdg_human']}")
     print(f"[p5_live_precheck] Lighter margin: {lm}")
+    print(f"[p5_live_precheck] РЕАЛЬНОЕ текущее плечо ETH (прочитано с аккаунта, не предположено): {real_leverage}")
+    if not real_leverage.get("found") or not real_leverage.get("leverage"):
+        print("[p5_live_precheck] ОШИБКА: не удалось прочитать реальное плечо -- СТОП, не считаю по допущению.")
+        result = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                   "abort_reason": "real_eth_leverage() не нашёл позицию/плечо -- нельзя считать маржу без факта.",
+                   "lighter_margin": lm, "real_leverage": real_leverage}
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+        return 1
+    current_leverage = real_leverage["leverage"]
 
     # --- Расчёт: используем ОНЧЕЙН-цену пула как основную (это сам актив
     # хеджа/позиции), Lighter mark -- для сверки и для хеджа. ---
@@ -227,11 +293,11 @@ def run() -> int:
 
     hedge_price = lighter_price or p0
     hedge_notional_usd = delta_eth * hedge_price
-    required_margin_at_3x = hedge_notional_usd / MAX_LEVERAGE
+    required_margin_real = hedge_notional_usd / current_leverage
     margin_available = lm.get("collateral_usd", 0) if lm.get("found") else 0
 
-    sufficient = margin_available >= required_margin_at_3x and usable_eth > 0 and usable_usdg > 0
-    shortfall_margin = max(0.0, required_margin_at_3x - margin_available)
+    sufficient = margin_available >= required_margin_real and usable_eth > 0 and usable_usdg > 0
+    shortfall_margin = max(0.0, required_margin_real - margin_available)
 
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -244,7 +310,7 @@ def run() -> int:
         "range_pct": RANGE_PCT, "range_lower_usd": pa, "range_upper_usd": pb,
         "computed_liquidity": L, "computed_amount0_eth": amount0_used, "computed_amount1_usdg": amount1_used,
         "computed_delta_eth": delta_eth, "hedge_notional_usd": hedge_notional_usd,
-        "max_leverage": MAX_LEVERAGE, "required_margin_usd_at_max_leverage": required_margin_at_3x,
+        "real_leverage": real_leverage, "required_margin_usd_at_real_leverage": required_margin_real,
         "margin_available_usd": margin_available, "shortfall_margin_usd": shortfall_margin,
         "sufficient": sufficient,
         "requests_used": _request_count, "runtime_s": time.time() - t0,
@@ -255,7 +321,7 @@ def run() -> int:
     print(f"[p5_live_precheck] диапазон [{pa:.2f}, {pb:.2f}], L={L:.2f}, "
           f"amount0(ETH)={amount0_used:.6f} amount1(USDG)={amount1_used:.4f}")
     print(f"[p5_live_precheck] delta_eth={delta_eth:.6f} hedge_notional=${hedge_notional_usd:.2f} "
-          f"требуемая маржа (<={MAX_LEVERAGE}x)=${required_margin_at_3x:.2f} доступно=${margin_available:.4f}")
+          f"требуемая маржа (реальное плечо {current_leverage}x)=${required_margin_real:.2f} доступно=${margin_available:.4f}")
     print(f"[p5_live_precheck] ДОСТАТОЧНО: {sufficient}" + (f", НЕХВАТКА МАРЖИ: ${shortfall_margin:.4f}" if not sufficient else ""))
     print(f"[p5_live_precheck] записано {OUT_PATH}")
     return 0

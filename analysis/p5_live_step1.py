@@ -100,6 +100,21 @@ SLIPPAGE_HEDGE = 0.05  # 5% на worst acceptable price хедж-ордера --
 # по факту исполнения), чтобы полностью исключить цену как переменную и изолировать проблему.
 LIGHTER_API_KEY_INDEX = 4
 
+# ПЯТАЯ ПОПЫТКА (владелец, 2026-09-03, после реального `canceled-margin-
+# not-allowed` на всех 3 прошлых попытках -- см. data/p3_guard_cache/
+# lighter_order_status_authed_probe_result.json): "Владелец выбрал плечо
+# 3×. Пятая попытка Step 1 разрешена, при условии что все проверки ниже
+# выполнены и показаны" -- update_leverage(3x) реально + верификация
+# ЧТЕНИЕМ, расчёт по прочитанному (не ожидаемому) плечу, flat-аккаунт как
+# ПОСТОЯННАЯ предпосылка хеджа, MAX_LEVERAGE-допущение убрано из
+# precheck.py (см. real_eth_leverage() там).
+TARGET_LEVERAGE = 3.0
+LEVERAGE_MARGIN_MODE = 0  # CROSS_MARGIN_MODE=0 (elliottech/lighter-python/lighter/signer_client.py) --
+# совпадает с реальным margin_mode=0 на позиции ETH аккаунта 22012 (см. p5_live_lighter_account_result.json)
+LEVERAGE_VERIFY_TOLERANCE = 0.05  # 5% допуск при сверке -- imf_raw=int(10_000/leverage) целочисленно
+# округляет (для 3x: int(10000/3)=3333 => фактическое плечо 10000/3333=3.0003x, не ровно 3.0) --
+# не ошибка проверки, а механическое усечение при отправке; допуск покрывает его, не более.
+
 MINT_SIG = "mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))"
 INCREASE_LIQUIDITY_TOPIC0 = topic0("IncreaseLiquidity(uint256,uint128,uint256,uint256)")
 TRANSFER_TOPIC0 = topic0("Transfer(address,address,uint256)")
@@ -247,6 +262,97 @@ def decode_increase_liquidity(receipt: dict) -> dict:
     raise RuntimeError("IncreaseLiquidity событие не найдено в квитанции mint() -- разобрать логи вручную.")
 
 
+def _ensure_account_flat() -> dict:
+    """п.4 (владелец, 2026-09-03): "убедиться, что аккаунт flat... Сделать
+    это постоянной предпосылкой хеджа, не разовой проверкой." Реальное
+    чтение позиций; если что-то открыто -- реально закрывает
+    (p5_live_flatten_lighter.flatten(), reduce_only рыночными ордерами на
+    ФАКТИЧЕСКИЙ текущий размер) ПЕРЕД тем, как продолжать. Вызывается на
+    каждом реальном прогоне Step 1, не только при обнаруженной проблеме."""
+    from p5_live_flatten_lighter import flatten  # отложенный импорт -- см. p5_live_close выше по той же причине
+    positions_before = pc.lighter_positions()
+    if not positions_before:
+        return {"was_flat": True, "flatten_result": None, "flat": True, "positions_before": []}
+    print(f"[p5_live_step1] === П.4: аккаунт НЕ flat перед хеджем ({positions_before}) -- закрываю реально перед продолжением ===")
+    flatten_result = flatten()
+    return {"was_flat": False, "flatten_result": flatten_result, "flat": flatten_result["flattened"],
+             "positions_before": positions_before}
+
+
+async def _update_leverage_and_verify(target_leverage: float, market_index: int = 0,
+                                       margin_mode: int = LEVERAGE_MARGIN_MODE,
+                                       verify_attempts: int = 4, verify_delay_s: float = 3.0) -> dict:
+    """п.1-2 (владелец, 2026-09-03): реальный update_leverage(3x) +
+    ПРОВЕРКА ЧТЕНИЕМ фактического initial_margin_fraction ПОСЛЕ вызова --
+    "Не полагаться на отсутствие ошибки в ответе update_leverage (урок
+    err=None)." err=None здесь тоже НЕ считается доказательством --
+    только свежее чтение pc.real_eth_leverage() после вызова."""
+    import lighter
+    lighter_priv = os.environ["LIGHTER_API_KEY_PRIVATE"]
+    client = lighter.SignerClient(url=pc.LIGHTER_API_BASE, account_index=pc.LIGHTER_ACCOUNT_INDEX,
+                                   api_private_keys={LIGHTER_API_KEY_INDEX: lighter_priv})
+    try:
+        before = pc.real_eth_leverage()
+        print(f"[p5_live_step1] update_leverage: плечо ДО вызова (прочитано): {before}")
+        # Реальная формула SDK: imf = int(10_000/leverage) -- см. комментарий у TARGET_LEVERAGE.
+        tx_info, resp, err = await client.update_leverage(
+            market_index=market_index, margin_mode=margin_mode, leverage=target_leverage,
+            api_key_index=LIGHTER_API_KEY_INDEX,
+        )
+        call_info = {
+            "tx_hash": resp.tx_hash if resp is not None else None,
+            "resp_code": resp.code if resp is not None else None,
+            "resp_message": resp.message if resp is not None else None,
+            "err": str(err) if err is not None else None,
+        }
+        print(f"[p5_live_step1] update_leverage: ответ API: {call_info}")
+        if err is not None:
+            return {"verified": False, "reason": f"update_leverage вернул ошибку: {err}",
+                     "before": before, "call": call_info}
+
+        for i in range(verify_attempts):
+            if i > 0:
+                time.sleep(verify_delay_s)
+            after = pc.real_eth_leverage()
+            actual = after.get("leverage")
+            print(f"[p5_live_step1] update_leverage: проверка чтением {i + 1}/{verify_attempts}: {after}")
+            if actual is not None and abs(actual - target_leverage) <= target_leverage * LEVERAGE_VERIFY_TOLERANCE:
+                return {"verified": True, "before": before, "after": after, "call": call_info,
+                         "actual_leverage": actual, "attempts_used": i + 1}
+        return {"verified": False, "reason": f"после {verify_attempts} проверок чтением плечо НЕ подтвердилось "
+                                              f"на уровне {target_leverage}x (допуск {LEVERAGE_VERIFY_TOLERANCE:.0%}) -- "
+                                              f"err=None в ответе API НЕ считается доказательством.",
+                 "before": before, "after": pc.real_eth_leverage(), "call": call_info}
+    finally:
+        await client.close()
+
+
+def liquidation_distance_pct(collateral_usd: float, size_eth: float, entry_price_usd: float,
+                              maintenance_margin_fraction: float) -> float:
+    """Оценка % роста цены ETH до ликвидации КОРОТКОЙ позиции в CROSS-
+    маржинальном режиме, при условии, что это ЕДИНСТВЕННАЯ открытая
+    позиция в пуле обеспечения (гарантируется п.4 -- flat перед хеджем)
+    и весь `collateral_usd` пула обеспечения стоит за этой позицией
+    (не только формально требуемая initial margin -- у cross-margin
+    избыточное обеспечение тоже служит буфером).
+
+    Вывод (линейный перп, не инверсный): equity(P) = collateral - size*(P-P0)
+    (для шорта цена растёт -> убыток). Ликвидация при equity(P) = P*size*mmf
+    (maintenance margin по ТЕКУЩЕЙ цене). Решая относительно P:
+        P = (collateral + size*P0) / (size*(1+mmf))
+    % роста до ликвидации = P/P0 - 1.
+
+    ПРИМЕЧАНИЕ: это расчётная оценка по официально задокументированным
+    сырым риск-параметрам рынка (maintenance_margin_fraction), а не
+    официальная формула ликвидации самой Lighter (публичный API её не
+    публикует по этому эндпоинту) -- используется только как оценка
+    запаса, не как гарантия точной цены ликвидации."""
+    if size_eth <= 0 or entry_price_usd <= 0:
+        return float("nan")
+    p_liq = (collateral_usd + size_eth * entry_price_usd) / (size_eth * (1 + maintenance_margin_fraction))
+    return (p_liq / entry_price_usd - 1) * 100
+
+
 def main() -> int:
     confirm = "--confirm-mainnet" in sys.argv
     t0 = time.time()
@@ -259,8 +365,23 @@ def main() -> int:
     lighter_price = float(eth_market["mark_price"]) if eth_market else None
     wb = pc.wallet_balances()
     lm = pc.lighter_margin()
+    account_full = pc.lighter_account_full()
+    current_leverage_info = pc.real_eth_leverage(account_full)
+    positions_open = pc.lighter_positions()
     print(f"[p5_live_step1] pool_price=${pool_price:.4f} lighter_mark=${lighter_price} "
           f"wallet: ETH={wb['eth_human']} USDG={wb['usdg_human']} margin={lm}")
+    print(f"[p5_live_step1] п.5 -- РЕАЛЬНОЕ текущее плечо ETH (прочитано с аккаунта, "
+          f"допущение MAX_LEVERAGE=3 из precheck.py убрано): {current_leverage_info}")
+    print(f"[p5_live_step1] п.4 -- открытые позиции на Lighter сейчас (постоянная предпосылка -- должно стать "
+          f"пусто до хеджа): {positions_open}")
+
+    if not current_leverage_info.get("found") or not current_leverage_info.get("leverage"):
+        progress["abort_reason"] = "Не удалось прочитать реальное плечо с аккаунта -- СТОП, не считаю по допущению."
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_step1] {progress['abort_reason']}")
+        return 1
+    current_leverage = current_leverage_info["leverage"]
 
     p0 = pool_price
     gas_reserve_eth = pc.GAS_RESERVE_USD / p0
@@ -272,9 +393,16 @@ def main() -> int:
     expected0, expected1 = pc.v3_amounts(L, sqrt_p, sqrt_pa, sqrt_pb)
     delta_eth_expected = expected0
     hedge_notional = delta_eth_expected * (lighter_price or p0)
-    required_margin = hedge_notional / pc.MAX_LEVERAGE
     margin_available = lm.get("collateral_usd", 0) if lm.get("found") else 0
-    sufficient = margin_available >= required_margin and usable_eth > 0 and usable_usdg > 0
+    # П.5: маржа считается ИСКЛЮЧИТЕЛЬНО по РЕАЛЬНОМУ прочитанному плечу -- не по допущению.
+    required_margin_at_current_leverage = hedge_notional / current_leverage
+    sufficient_at_current_leverage = margin_available >= required_margin_at_current_leverage
+    # Предпросмотр -- ТОЛЬКО информационно (для dry-run отчёта): плечо, утверждённое владельцем
+    # как целевое для ЭТОЙ попытки, но ЕЩЁ НЕ применённое -- реальный gate ниже, в REAL-ветке,
+    # использует плечо, ПОДТВЕРЖДЁННОЕ чтением ПОСЛЕ настоящего update_leverage(), не эту цифру.
+    required_margin_at_target_leverage = hedge_notional / TARGET_LEVERAGE
+    sufficient_at_target_leverage = margin_available >= required_margin_at_target_leverage
+    has_funds = usable_eth > 0 and usable_usdg > 0
 
     tick_lower = tick_from_price(pa)
     tick_upper = tick_from_price(pb)
@@ -292,13 +420,18 @@ def main() -> int:
     plan = {
         "pool_price_usd": p0, "lighter_mark_price_usd": lighter_price,
         "wallet_balances": wb, "lighter_margin": lm,
+        "current_leverage": current_leverage_info, "positions_open_now": positions_open,
+        "target_leverage_for_this_attempt": TARGET_LEVERAGE,
         "usable_eth": usable_eth, "usable_usdg": usable_usdg,
         "range_lower_usd": pa, "range_upper_usd": pb, "tick_lower": tick_lower, "tick_upper": tick_upper,
         "tick_spacing": pool["tick_spacing"], "current_tick": pool["tick"],
         "computed_liquidity": L, "expected_amount0_eth": expected0, "expected_amount1_usdg": expected1,
         "delta_eth_expected": delta_eth_expected, "hedge_notional_usd_expected": hedge_notional,
-        "required_margin_usd": required_margin, "margin_available_usd": margin_available,
-        "sufficient": sufficient,
+        "margin_available_usd": margin_available,
+        "required_margin_usd_at_current_leverage": required_margin_at_current_leverage,
+        "sufficient_at_current_leverage": sufficient_at_current_leverage,
+        "required_margin_usd_at_target_leverage_PREVIEW": required_margin_at_target_leverage,
+        "sufficient_at_target_leverage_PREVIEW": sufficient_at_target_leverage,
         "amount0_desired_wei": amount0_desired_wei, "amount1_desired_raw": amount1_desired_raw,
         "amount0_min_wei": amount0_min, "amount1_min_raw": amount1_min, "deadline": deadline,
         "nfpm_address": NFPM, "fee_tier": FEE_TIER,
@@ -306,15 +439,22 @@ def main() -> int:
     progress["plan"] = plan
     print(json.dumps(plan, indent=2, default=str, ensure_ascii=False))
 
-    if not sufficient:
-        progress["abort_reason"] = "sufficient=False при свежем пересчёте -- СТОП, не открываю позицию частично."
+    if not has_funds:
+        progress["abort_reason"] = "usable_eth<=0 или usable_usdg<=0 при свежем пересчёте -- СТОП, не открываю позицию частично."
         OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
         print(f"[p5_live_step1] {progress['abort_reason']}")
         return 1
 
     if not confirm:
-        progress["note"] = "DRY-RUN -- ничего не отправлялось. Запустите с --confirm-mainnet для реальной отправки."
+        # П.5: НЕ считаем dry-run проваленным только из-за sufficient_at_current_leverage=False --
+        # это ОЖИДАЕМО, пока update_leverage(3x) реально не вызван (текущее реальное плечо
+        # {current_leverage}x, см. plan.current_leverage) -- сам gate по марже происходит В
+        # REAL-ветке ниже, ПОСЛЕ подтверждённого чтением update_leverage, не здесь.
+        progress["note"] = ("DRY-RUN -- ничего не отправлялось (плечо НЕ менялось). Запустите с "
+                             "--confirm-mainnet для реальной отправки: сначала flat-precondition (п.4), "
+                             f"затем update_leverage({TARGET_LEVERAGE}x) + верификация чтением (п.1-2), "
+                             "затем пересчёт маржи по подтверждённому плечу (п.3) и только потом деньги (п.6).")
         OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
         print(f"\n[p5_live_step1] DRY-RUN завершён. {progress['note']}")
@@ -335,6 +475,63 @@ def main() -> int:
     account = Account.from_key(bytes.fromhex(priv_hex))
     if account.address.lower() != WALLET.lower():
         raise RuntimeError(f"PRIVATE_KEY_NOX даёт {account.address}, ожидался {WALLET} -- СТОП.")
+
+    # === П.4: аккаунт на Lighter ДОЛЖЕН быть flat перед хеджем -- ПОСТОЯННАЯ предпосылка,
+    # проверяется и, если нужно, реально исправляется на КАЖДОМ реальном прогоне, не разово. ===
+    print("[p5_live_step1] === П.4: flat-precondition перед хеджем ===")
+    flat_check = _ensure_account_flat()
+    progress["pre_hedge_flat_check"] = flat_check
+    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+    if not flat_check["flat"]:
+        progress["abort_reason"] = f"П.4: не удалось привести аккаунт на Lighter к flat перед хеджем -- СТОП. {flat_check}"
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_step1] {progress['abort_reason']}")
+        return 1
+    print(f"[p5_live_step1] П.4 подтверждено: аккаунт flat. {flat_check}")
+
+    # === П.1-2: update_leverage(TARGET_LEVERAGE) реально + верификация ЧТЕНИЕМ. ===
+    print(f"[p5_live_step1] === П.1-2: update_leverage({TARGET_LEVERAGE}x) + верификация чтением ===")
+    leverage_update = asyncio.run(_update_leverage_and_verify(TARGET_LEVERAGE, market_index=0))
+    progress["leverage_update"] = leverage_update
+    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+    if not leverage_update["verified"]:
+        progress["abort_reason"] = f"П.1-2: update_leverage не подтверждено чтением -- СТОП, не полагаюсь на err=None. {leverage_update}"
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_step1] {progress['abort_reason']}")
+        return 1
+    real_leverage_confirmed = leverage_update["actual_leverage"]
+    print(f"[p5_live_step1] П.1-2 подтверждено ЧТЕНИЕМ: реальное плечо теперь {real_leverage_confirmed}x "
+          f"(цель {TARGET_LEVERAGE}x, допуск {LEVERAGE_VERIFY_TOLERANCE:.0%}).")
+
+    # === П.3: пересчёт требуемой маржи по ФАКТИЧЕСКОМУ (прочитанному) плечу, не по ожиданию. ===
+    lm_post_leverage = pc.lighter_margin()  # маржа могла чуть измениться (комиссия tx update_leverage)
+    margin_available_confirmed = lm_post_leverage.get("collateral_usd", 0) if lm_post_leverage.get("found") else 0
+    required_margin_confirmed = hedge_notional / real_leverage_confirmed
+    free_margin_after_hedge = margin_available_confirmed - required_margin_confirmed
+    sufficient_confirmed = margin_available_confirmed >= required_margin_confirmed and has_funds
+    mmf_fraction = float(eth_market["maintenance_margin_fraction"]) / 10_000  # см. комментарий в precheck.py
+    liq_move_pct_estimate = liquidation_distance_pct(
+        margin_available_confirmed, delta_eth_expected, lighter_price or p0, mmf_fraction)
+    post_leverage_recheck = {
+        "real_leverage_confirmed": real_leverage_confirmed,
+        "margin_available_usd": margin_available_confirmed,
+        "hedge_notional_usd": hedge_notional,
+        "required_margin_usd": required_margin_confirmed,
+        "free_margin_after_hedge_usd": free_margin_after_hedge,
+        "sufficient": sufficient_confirmed,
+        "maintenance_margin_fraction": mmf_fraction,
+        "estimated_liquidation_move_pct": liq_move_pct_estimate,
+    }
+    progress["post_leverage_recheck"] = post_leverage_recheck
+    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+    print(f"[p5_live_step1] П.3: {json.dumps(post_leverage_recheck, indent=2, default=str, ensure_ascii=False)}")
+    if not sufficient_confirmed:
+        progress["abort_reason"] = (f"П.3: даже после подтверждённого {real_leverage_confirmed}x маржи "
+                                     f"недостаточно (требуется ${required_margin_confirmed:.4f}, доступно "
+                                     f"${margin_available_confirmed:.4f}) -- СТОП, не открываю частично.")
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_step1] {progress['abort_reason']}")
+        return 1
 
     gas_price = eth_gas_price()
     eth_usd = lighter_price or p0
@@ -421,20 +618,32 @@ def main() -> int:
             print(f"[p5_live_step1] ОТПРАВКА хедж-ордера (create_market_order_limited_slippage, "
                   f"живой best_bid из книги заявок, не mark_price): market_index=0(ETH) is_ask=True "
                   f"base_amount={base_amount} (~{real_delta_eth:.6f} ETH) max_slippage={SLIPPAGE_HEDGE}")
-            tx, tx_hash, err = await client.create_market_order_limited_slippage(
+            tx, resp, err = await client.create_market_order_limited_slippage(
                 market_index=0, client_order_index=client_order_index, base_amount=base_amount,
                 max_slippage=SLIPPAGE_HEDGE, is_ask=True, reduce_only=False,
                 api_key_index=LIGHTER_API_KEY_INDEX,
             )
+            # НАЙДЕНО (проверка реального исходника signer_client.py,
+            # 2026-09-03): create_order/create_market_order_limited_slippage
+            # возвращают (tx_object, RespSendTx, error) -- второй элемент
+            # НЕ строка-хэш, это pydantic-модель (code/message/tx_hash/...).
+            # Прежний `"tx_hash": str(resp)` писал ВЕСЬ repr модели в это
+            # поле (реально найдено в старом p5_live_step1_result.json:
+            # "tx_hash": "code=200 message=... tx_hash='487b6c...' ...") --
+            # достаём реальный хэш и код явно, не полагаемся на str().
+            real_tx_hash = resp.tx_hash if resp is not None else None
             order_info = {
-                "tx_hash": str(tx_hash), "err": str(err) if err is not None else None,
+                "tx_hash": real_tx_hash,
+                "resp_code": resp.code if resp is not None else None,
+                "resp_message": resp.message if resp is not None else None,
+                "err": str(err) if err is not None else None,
                 "base_amount": base_amount, "size_eth_requested": real_delta_eth,
                 "max_slippage": SLIPPAGE_HEDGE, "client_order_index": client_order_index,
             }
             if err is not None:
                 print(f"[p5_live_step1] create_market_order вернул ошибку: {err}")
             else:
-                print(f"[p5_live_step1] ХЕДЖ ОТПРАВЛЕН: tx_hash={tx_hash}")
+                print(f"[p5_live_step1] ХЕДЖ ОТПРАВЛЕН: tx_hash={real_tx_hash} resp_code={order_info['resp_code']} resp_message={order_info['resp_message']}")
             return order_info
         finally:
             await client.close()
@@ -490,7 +699,22 @@ def main() -> int:
         # не из нашей предторговой оценки (которой теперь и нет -- цену
         # определяет сам SDK через live best_bid, см. _place_hedge()).
         worst_price = float(fill_check["position"].get("avg_entry_price", 0))
+        real_hedge_size_eth = abs(float(fill_check["position"].get("position", 0)))
         print(f"[p5_live_step1] ХЕДЖ ПОДТВЕРЖДЁН реальной позицией: {fill_check['position']}")
+
+        # П.7: расстояние до ликвидации в % -- по РЕАЛЬНЫМ пост-филл цифрам
+        # (свежая маржа, реальный размер и реальная цена входа), не по предторговой оценке.
+        lm_post_hedge = pc.lighter_margin()
+        margin_post_hedge = lm_post_hedge.get("collateral_usd", 0) if lm_post_hedge.get("found") else 0
+        mmf_fraction_final = float(eth_market["maintenance_margin_fraction"]) / 10_000
+        liq_move_pct_final = liquidation_distance_pct(margin_post_hedge, real_hedge_size_eth, worst_price, mmf_fraction_final)
+        progress["post_hedge_liquidation_estimate"] = {
+            "margin_usd": margin_post_hedge, "size_eth": real_hedge_size_eth, "entry_price_usd": worst_price,
+            "maintenance_margin_fraction": mmf_fraction_final, "estimated_liquidation_move_pct": liq_move_pct_final,
+        }
+        print(f"[p5_live_step1] п.7: оценка расстояния до ликвидации (рост цены ETH): "
+              f"{liq_move_pct_final:.2f}% (маржа=${margin_post_hedge:.4f}, размер={real_hedge_size_eth:.6f} ETH, "
+              f"вход=${worst_price:.2f}, mmf={mmf_fraction_final:.4%})")
     except Exception as e:  # noqa: BLE001
         progress["hedge_error"] = f"{type(e).__name__}: {e}"
         progress["CRITICAL"] = (f"LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция "
@@ -539,10 +763,21 @@ def main() -> int:
             "lp_amount0_eth": real_amount0_eth, "lp_amount1_usdg": real_amount1_usdg,
             "hedge_size_eth": real_delta_eth, "hedge_entry_price_usd": worst_price,
             "tick_lower": tick_lower, "tick_upper": tick_upper,
+            "real_leverage_confirmed": real_leverage_confirmed,
+            "estimated_liquidation_move_pct": liq_move_pct_final,
         }, default=str, ensure_ascii=False) + "\n")
 
-    print(f"\n[p5_live_step1] ГОТОВО. Итог: LP amount0(ETH)={real_amount0_eth:.6f} amount1(USDG)={real_amount1_usdg:.4f}, "
-          f"хедж={real_delta_eth:.6f} ETH шорт @ ~${worst_price:.2f}, остатки: {wb_final}, margin={lm_final}")
+    # П.7 -- итоговый доклад: фактическое плечо, tokenId LP, размер и цена входа шорта,
+    # итоговая дельта, остатки на кошельке и марже, расстояние до ликвидации в %.
+    delta_final = real_amount0_eth - real_hedge_size_eth
+    print(f"\n[p5_live_step1] ГОТОВО. Итог:")
+    print(f"  фактическое плечо (подтверждено чтением): {real_leverage_confirmed}x")
+    print(f"  LP tokenId={liq_event['token_id']} amount0(ETH)={real_amount0_eth:.6f} amount1(USDG)={real_amount1_usdg:.4f}")
+    print(f"  хедж: {real_hedge_size_eth:.6f} ETH шорт @ ${worst_price:.2f}")
+    print(f"  итоговая дельта (LP ETH - хедж ETH, должна быть близка к нулю): {delta_final:.6f} ETH")
+    print(f"  остатки на кошельке: {wb_final}")
+    print(f"  остатки на марже Lighter: {lm_final}")
+    print(f"  расстояние до ликвидации (оценка, рост цены ETH): {liq_move_pct_final:.2f}%")
     return 0
 
 

@@ -57,18 +57,38 @@ async def _close_round(size_eth: float, is_ask: bool, mark_price: float, size_de
         # у SDK берётся из ЖИВОГО best_bid/best_ask (get_best_price()),
         # не mark. Переходим на сам SDK-хелпер (ideal_price=None).
         client_order_index = int(time.time() * 1000) % (2 ** 31)
-        tx, tx_hash, err = await client.create_market_order_limited_slippage(
+        tx, resp, err = await client.create_market_order_limited_slippage(
             market_index=0, client_order_index=client_order_index, base_amount=base_amount,
             max_slippage=SLIPPAGE, is_ask=is_ask, reduce_only=True,
             api_key_index=LIGHTER_API_KEY_INDEX,
         )
-        return {"tx_hash": str(tx_hash), "err": str(err) if err is not None else None,
-                "base_amount": base_amount, "is_ask": is_ask, "max_slippage": SLIPPAGE}
+        # НАЙДЕНО (проверка исходника signer_client.py, 2026-09-03):
+        # create_order/create_market_order_limited_slippage возвращают
+        # (tx_object, RespSendTx, error) -- второе значение НЕ строка-хэш,
+        # это pydantic-модель с полями code/message/tx_hash/... Прежний
+        # `"tx_hash": str(resp)` писал ВЕСЬ repr модели в это поле (реально
+        # найдено в data/p3_guard_cache/p5_live_step1_result.json --
+        # "tx_hash": "code=200 message=... tx_hash='...' ..."). Достаём
+        # реальный хэш и код явно.
+        return {
+            "tx_hash": resp.tx_hash if resp is not None else None,
+            "resp_code": resp.code if resp is not None else None,
+            "resp_message": resp.message if resp is not None else None,
+            "err": str(err) if err is not None else None,
+            "base_amount": base_amount, "is_ask": is_ask, "max_slippage": SLIPPAGE,
+        }
     finally:
         await client.close()
 
 
-def run() -> int:
+def flatten(max_rounds: int = FLATTEN_MAX_ROUNDS) -> dict:
+    """Приводит ETH-позицию на Lighter к нулю (reduce_only рыночными
+    ордерами на РЕАЛЬНЫЙ текущий размер, до max_rounds попыток). Ордеров
+    без нужды не шлёт -- если позиция уже 0, ничего не делает. Возвращает
+    result-словарь с ключом "flattened": bool. Импортируется как
+    ПОСТОЯННАЯ предпосылка перед любым новым хеджем (владелец,
+    2026-09-03, п.4: "Сделать это постоянной предпосылкой хеджа, не
+    разовой проверкой") -- не только из CLI run() ниже."""
     t0 = time.time()
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "rounds": []}
 
@@ -76,17 +96,17 @@ def run() -> int:
     result["initial_position"] = pos
     if pos is None or abs(float(pos.get("position", 0))) < 1e-6:
         result["note"] = "Позиция уже плоская (0) -- ничего не отправляю."
-        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+        result["flattened"] = True
+        result["runtime_s"] = time.time() - t0
         print(f"[flatten] {result['note']}")
-        return 0
+        return result
 
     eth_market = pc.lighter_eth_perp()
     mark_price = float(eth_market["mark_price"])
     size_decimals = eth_market["size_decimals"]
     price_decimals = eth_market["price_decimals"]
 
-    for rnd in range(1, FLATTEN_MAX_ROUNDS + 1):
+    for rnd in range(1, max_rounds + 1):
         pos = eth_position()
         if pos is None or abs(float(pos.get("position", 0))) < 1e-6:
             result["final_position"] = None
@@ -99,8 +119,6 @@ def run() -> int:
               f"-> отправляю reduce_only {'SELL' if is_ask else 'BUY'} {size_eth} ETH")
         order = asyncio.run(_close_round(size_eth, is_ask, mark_price, size_decimals, price_decimals))
         result["rounds"].append({"round": rnd, "position_before": pos, "order": order})
-        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
         if order.get("err") is not None:
             result["abort_reason"] = f"раунд {rnd}: ордер вернул ошибку: {order['err']}"
             print(f"[flatten] {result['abort_reason']}")
@@ -113,8 +131,14 @@ def run() -> int:
     result["final_position_check"] = final_pos
     result["flattened"] = final_pos is None or abs(float(final_pos.get("position", 0))) < 1e-6
     result["runtime_s"] = time.time() - t0
-    OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
     print(f"\n[flatten] ИТОГ: flattened={result['flattened']} final_position={final_pos}")
+    return result
+
+
+def run() -> int:
+    result = flatten()
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
     print(f"[flatten] записано {OUT_PATH}")
     return 0 if result["flattened"] else 1
 
