@@ -1,83 +1,78 @@
 {
-  "generated_at_utc": "2026-09-03T16:20:03Z",
+  "generated_at_utc": "2026-09-03T17:12:13Z",
   "mode": "REAL",
-  "token_id": 992779,
-  "position_onchain": {
+  "token_id": 993839,
+  "close_position_onchain": {
     "nonce": 0,
     "operator": "0x0000000000000000000000000000000000000000",
     "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
     "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
     "fee": 100,
-    "tickLower": -199139,
-    "tickUpper": -197132,
-    "liquidity": 39101212426893,
+    "tickLower": -199160,
+    "tickUpper": -197153,
+    "liquidity": 39085397075864,
     "feeGrowthInside0LastX128": 0,
     "feeGrowthInside1LastX128": 0,
     "tokensOwed0": 0,
     "tokensOwed1": 0
   },
-  "plan": {
-    "pool_price_usd": 2493.61836183179,
-    "range_lower_usd": 2248.720674897543,
-    "range_upper_usd": 2748.4893438780005,
-    "liquidity_to_remove": 39101212426893,
-    "expected_amount0_eth": 0.03718853486754049,
-    "expected_amount1_usdg": 98.35773626380775,
-    "amount0_min_wei": 35329108124163468,
-    "amount1_min_raw": 93439849,
-    "deadline": 1788453006,
-    "tokens_owed0_wei_before": 0,
-    "tokens_owed1_raw_before": 0,
+  "close_plan": {
+    "pool_price_usd": 2496.2509426812094,
+    "liquidity_to_remove": 39085397075864,
+    "expected_amount0_eth": 0.03597747441696493,
+    "expected_amount1_usdg": 101.29296226438838,
+    "amount0_min_wei": 34178600696116680,
+    "amount1_min_raw": 96228314,
+    "deadline": 1788456136,
     "sanity_check_vs_known_deposit": {
-      "known_deposit0_eth": 0.03649432253555083,
-      "known_deposit1_usdg": 100.090373,
+      "known_deposit0_eth": 0.03648741172335956,
+      "known_deposit1_usdg": 100.02086,
       "sane0": true,
       "sane1": true
     }
   },
-  "gas_estimate": {
-    "gas_units_total_est": 522645,
-    "gas_price_wei": 507048000,
-    "est_cost_usd": 0.6608240818449235
-  },
-  "txs": [
+  "close_txs": [
     {
       "label": "1_decreaseLiquidity",
-      "tx_hash": "0xca3538d062485cbdd14c84bed5bbf208f8daaf52bb87a6f35a23b7a71ac48832",
+      "tx_hash": "0xc8fbd3740fdd9e3e4eaf33f5b49c54d0fc37fd384e324f17f1d25e906ff94d0b",
       "status": "success",
       "gas_used": 237437,
-      "block_number": 53551249
+      "block_number": 53581033,
+      "gas_price_offered_wei": 522324000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 516774000
     },
     {
       "label": "2_collect",
-      "tx_hash": "0x928c5591ec77997c0f742189c9ddb50bf02b4cb943052e6e3c6efa30386718a9",
+      "tx_hash": "0xec4dbf1b53125a42eb9bce6ad7f003bddd74e566a0a9ed4732267818e2f69116",
       "status": "success",
       "gas_used": 122439,
-      "block_number": 53551312
+      "block_number": 53581103,
+      "gas_price_offered_wei": 442958000,
+      "buffer_used": 1.15,
+      "effective_gas_price_wei": 434658000
     }
   ],
   "close_result": {
-    "decrease_amount0_eth": 0.03723960727031814,
-    "decrease_amount1_usdg": 98.230389,
-    "collect_amount0_eth_total": 0.03724090459763044,
-    "collect_amount1_usdg_total": 98.233492,
-    "fees_earned_amount0_eth": 1.2973273123065288e-06,
-    "fees_earned_amount1_usdg": 0.003102999999995859
+    "decrease_amount0_eth": 0.03598117495549101,
+    "decrease_amount1_usdg": 101.283724,
+    "collect_amount0_eth_total": 0.03598182806799527,
+    "collect_amount1_usdg_total": 101.285447,
+    "fees_earned_amount0_eth": 6.531125042591457e-07,
+    "fees_earned_amount1_usdg": 0.0017229999999983647
   },
-  "pnl": {
-    "fees_earned_usd": 0.006338039207269304,
-    "impermanent_loss_vs_deposit_usd": -0.0015283005913016012,
-    "total_gas_usd_all_6_txs": 1.3013560616138122,
-    "gas_price_used_wei": 507048000,
-    "net_pnl_usd": -1.2965463229978444,
-    "note": "IL считается относительно суммы, реально задепонированной в mint() (см. data/p3_guard_cache/p5_live_step1_result.json), не относительно holding-альтернативы. Газ на все 6 tx (4 mint + decrease + collect) пересчитан по ТЕКУЩЕЙ gas_price (эффективная цена по факту каждой tx могла немного отличаться -- расхождение пренебрежимо мало)."
+  "close_pnl": {
+    "fees_earned_usd": 0.0033533327044321425,
+    "impermanent_loss_vs_deposit_usd": -0.0008300090117407954,
+    "total_gas_usd": 1.3189200638746272,
+    "gas_price_used_wei": 541390000,
+    "net_pnl_usd": -1.3163967401819359
   },
-  "final_wallet_balances": {
-    "eth_raw_wei": 3493500292234982,
-    "eth_human": 0.003493500292234982,
-    "usdg_raw": 98233492,
-    "usdg_human": 98.233492,
-    "weth_human": 0.04376770375532493
-  },
-  "runtime_s": 19.443873643875122
+  "close_final_wallet_balances": {
+    "eth_raw_wei": 2745400930793044,
+    "eth_human": 0.002745400930793044,
+    "usdg_raw": 101285447,
+    "usdg_human": 101.285447,
+    "weth_human": 0.04159334608908859
+  }
 }
