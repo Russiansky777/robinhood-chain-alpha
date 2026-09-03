@@ -1,0 +1,57 @@
+name: P3 -- концентрация топ-3 + типичный разрыв цены + фрагментация (NVDA/COST/QQQ, 7д)
+
+# Владелец, 2026-09-03: "P3 — гард, а не разработка... по 3 токенам с
+# наибольшим расхождением глубины (NVDA, COST и любой третий) за
+# последние 7 дней — доля закрывающих сделок у топ-3 адресов, типичный
+# разрыв цены. Порог >80% у топ-3 -> P3 закрывается окончательно."
+# Плюс фрагментация: доля объёма через второй по глубине пул. Только
+# чтение, ключ не используется, транзакций нет. Оценка неточная (сама
+# плотность Swap-логов на этих 3 пулах -- то, что скрипт измеряет) --
+# защитный потолок MAX_REQUESTS_PER_RUN=12000 в скрипте, ожидание --
+# от нескольких сотен до нескольких тысяч запросов, минуты-десятки минут.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P3_CONCENTRATION_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Концентрация топ-3 + разрыв цены + фрагментация
+        run: python -u analysis/p3_concentration_and_fragmentation.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p3_concentration_result.json ] && git add data/p3_guard_cache/p3_concentration_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P3: концентрация топ-3 + разрыв цены + фрагментация (NVDA/COST/QQQ, 7д) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
