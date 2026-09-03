@@ -1,0 +1,51 @@
+name: MM/P5 -- базис (MM) + верификация пула и разведка внешних API (P5)
+
+# Приоритет №1 -- P5 (хедж LP ETH/USDG), приоритет №2 -- MM базис
+# (дёшево). Только чтение (eth_call + публичные HTTP API), ключ не
+# используется, транзакций нет. Ожидаемо дёшево (~20 RPC + 4 HTTP),
+# без отдельного лимита времени (заведомо укладывается в минуты).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/MM_P5_SETUP_REQUEST"
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: MM basis + P5 pool verify + external API probe
+        run: python -u analysis/mm_p5_setup.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/mm_p5_setup_result.json ] && git add data/p3_guard_cache/mm_p5_setup_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "MM/P5: базис + верификация пула + разведка внешних API [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
