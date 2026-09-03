@@ -1,0 +1,43 @@
+name: MM -- базис-снимки NVDA/SPY/QQQ/GME/MSTR (20+ повторов, открытый/закрытый режим)
+
+# Владелец, 2026-09-03: "Базис — одновременный снимок... Повторить 20
+# раз с интервалом 5 минут в разные режимы рынка (открытый/закрытый)."
+# ОДИН job, внутренний цикл (analysis/mm_basis_snapshot_loop.py) -- см.
+# докстринг скрипта за объяснением, почему это многочасовой (не 90-мин)
+# прогон и почему schedule-триггер здесь не используется (сработал бы
+# только с дефолтной ветки репозитория, не с этой feature-ветки).
+# Только чтение (eth_call + Lighter REST), ключ не используется,
+# транзакций нет. timeout-minutes ниже -- запас под платформенный
+# 6-часовой потолок GitHub Actions (сам скрипт останавливается раньше,
+# на 5ч45м, см. MAX_WALLCLOCK_S).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/MM_BASIS_SNAPSHOT_LOOP_REQUEST"
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Базис-снимки (внутренний цикл, ~5-6 часов)
+        run: python -u analysis/mm_basis_snapshot_loop.py

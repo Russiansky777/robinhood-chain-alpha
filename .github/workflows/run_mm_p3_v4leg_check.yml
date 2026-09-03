@@ -1,0 +1,53 @@
+name: MM/P3 -- вторая нога v3<->v4 для проверенных токенов + пул DELL/USO vs оракул
+
+# Владелец, 2026-09-03: уточнить P3 -- закрыт не из-за отсутствия v3,
+# а из-за отсутствия ОБЕИХ ног одновременно с ликвидностью; проверить
+# напрямую (не декларировать). DELL/USO -- сравнить реальную цену пула
+# (если найдётся) с уже известным оракулом. Только чтение, ключ не
+# используется, транзакций нет. Оценка ~60-90 вызовов, секунды-минуты
+# (см. докстринг analysis/mm_p3_v4leg_check.py).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/MM_P3_V4LEG_CHECK_REQUEST"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: P3 вторая нога + DELL/USO пул vs оракул
+        run: python -u analysis/mm_p3_v4leg_check.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/mm_p3_v4leg_check_result.json ] && git add data/p3_guard_cache/mm_p3_v4leg_check_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "MM/P3: вторая нога v3<->v4 + DELL/USO пул vs оракул [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
