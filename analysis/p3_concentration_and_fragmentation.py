@@ -218,7 +218,7 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
     # --- V3 Swap-логи (все известные v3-пулы токена) ---
     v3_swaps = []
     for addr, _liq in v3_pools:
-        logs = list(_chunked_get_logs(from_block, to_block, [TOPIC0_V3_SWAP], chunk_size=500_000,
+        logs = list(_chunked_get_logs(from_block, to_block, [TOPIC0_V3_SWAP], chunk_size=50_000,
                                        address=addr, on_call=lambda lo, hi, n: _count(1)))
         for l in logs:
             row = decode_v3_swap_full(l)
@@ -231,7 +231,7 @@ def analyze_token(sym: str, info: dict, from_block: int, to_block: int) -> dict:
     v4_swaps = []
     if v4_pool_ids:
         logs = list(_chunked_get_logs(
-            from_block, to_block, [TOPIC0_V4_SWAP, v4_pool_ids], chunk_size=500_000,
+            from_block, to_block, [TOPIC0_V4_SWAP, v4_pool_ids], chunk_size=50_000,
             address=POOL_MANAGER, on_call=lambda lo, hi, n: _count(1),
         ))
         v4_swaps = [decode_v4_swap_full(l) for l in logs]

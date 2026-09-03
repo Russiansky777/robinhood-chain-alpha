@@ -348,6 +348,23 @@ def _chunked_get_logs(
                 return
             raise
         if "error" in body:
+            # НАЙДЕНО 2026-09-03 (p3_concentration_and_fragmentation.py,
+            # chunk_size=500_000 на плотном Swap-событии): в отличие от
+            # HTTP/транспортных сбоев выше, публичный RPC на этой сети
+            # иногда возвращает HTTP 200 с JSON-RPC уровня ошибкой ВНУТРИ
+            # тела ("logs matched by query exceeds limit of 10000") --
+            # _post_with_fallback не бросает исключение (запрос "успешен"
+            # с точки зрения транспорта), поэтому бисекция выше НИКОГДА
+            # не срабатывает на этот случай -- пустой диапазон блоков
+            # либо честная ошибка вместо результата. Тот же принцип
+            # бисекции, применённый к error-телу, а не только к
+            # брошенному исключению.
+            err_msg = str(body["error"]).lower()
+            if hi > lo and any(m in err_msg for m in ("exceed", "too many", "too large", "limit")):
+                mid = (lo + hi) // 2
+                yield from _get_range(lo, mid)
+                yield from _get_range(mid + 1, hi)
+                return
             raise RuntimeError(f"eth_getLogs error [{lo};{hi}]: {body['error']}")
         result = body.get("result", [])
         if on_call is not None:

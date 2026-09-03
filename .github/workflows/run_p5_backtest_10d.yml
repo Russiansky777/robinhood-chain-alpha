@@ -1,0 +1,59 @@
+name: P5 -- бэктест 10 дней (вариант 1), реализованная волатильность ETH
+
+# Владелец, 2026-09-03: "P5 — вариант 1, окно 10 дней, один прогон.
+# Kill-порог 30% годовых после издержек. Реализованная волатильность
+# ETH за окно и за 30 дней, репрезентативность." Только чтение
+# (eth_getLogs/eth_call + публичные HTTP API: Lighter, CoinGecko), ключ
+# не используется, транзакций нет. ЧЕСТНАЯ оговорка: полные 10 дней
+# полного разрешения свопов на пуле P5 (~34к свопов/час) оцениваются в
+# ~112 минут при эмпирической скорости РПЦ -- БОЛЬШЕ 90-минутного
+# жёсткого лимита. Скрипт сам себя ограничивает мягким лимитом 85 минут
+# (analysis/p5_backtest_10d.py, TIME_BUDGET_S) и сканирует ОТ САМЫХ
+# СВЕЖИХ суток назад -- при исчерпании бюджета останавливается на
+# границе суток и честно репортит days_covered < 10, если не успел.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_BACKTEST_10D_REQUEST"
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: P5 бэктест 10 дней + волатильность ETH
+        run: python -u analysis/p5_backtest_10d.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_backtest_10d_result.json ] && git add data/p3_guard_cache/p5_backtest_10d_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5: бэктест 10 дней + реализованная волатильность ETH [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
