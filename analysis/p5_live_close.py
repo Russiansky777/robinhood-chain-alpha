@@ -150,12 +150,37 @@ def main() -> int:
 
     pool = pc.read_pool_state()
     pool_price = pc.price_from_sqrt(pool["sqrt_price_x96"])
-    sqrt_p = pool["sqrt_price_x96"] / (2 ** 96)
     tick_lower, tick_upper = pos["tickLower"], pos["tickUpper"]
-    pa = 1.0001 ** tick_lower * (10 ** (WETH_DECIMALS - USDG_DECIMALS))
+
+    # НАЙДЕНО (реальный dry-run 33777423316, 2026-09-03): первая версия
+    # смешивала РЕАЛЬНЫЙ ончейн liquidity (real Q96 uint128 из positions())
+    # с псевдо-единицами pc.v3_amounts/get_liquidity_for_amounts из
+    # p5_live_precheck.py -- та пара функций самосогласована ТОЛЬКО когда
+    # свой же L считается через human-adjusted sqrt(price_usd) (см. её
+    # docstring); настоящий ончейн L определён через RAW sqrt-цену
+    # (sqrtPriceX96/2^96, БЕЗ домножения на 10^(decimals0-decimals1)).
+    # Итог бага: amount0=78 МЛРД ETH, amount1=0 -- поймано ДО отправки
+    # реальных tx dry-run'ом, ничего не сломано.
+    #
+    # Правильная формула (реальный Uniswap V3, проверено алгебраически):
+    # при sqrtA=sqrtRatioAX96/2^96, sqrtB=sqrtRatioBX96/2^96 (сырые, БЕЗ
+    # decimals-поправки), amount0 = L*(1/sqrtP - 1/sqrtB), amount1 =
+    # L*(sqrtP - sqrtA) -- результат СРАЗУ в raw wei/raw-USDG-unit, без
+    # дополнительного масштабирования (L*2^96 в числителе и знаменателе
+    # сокращается, см. коммит-сообщение для полного вывода).
+    sqrt_p_raw = pool["sqrt_price_x96"] / (2 ** 96)
+    sqrt_pa_raw = (1.0001 ** tick_lower) ** 0.5
+    sqrt_pb_raw = (1.0001 ** tick_upper) ** 0.5
+    if sqrt_pa_raw > sqrt_pb_raw:
+        sqrt_pa_raw, sqrt_pb_raw = sqrt_pb_raw, sqrt_pa_raw
+    sqrt_p_clamped = min(max(sqrt_p_raw, sqrt_pa_raw), sqrt_pb_raw)
+    amount0_raw = max(pos["liquidity"] * (1 / sqrt_p_clamped - 1 / sqrt_pb_raw), 0.0)
+    amount1_raw = max(pos["liquidity"] * (sqrt_p_clamped - sqrt_pa_raw), 0.0)
+    expected0 = amount0_raw / 10 ** WETH_DECIMALS
+    expected1 = amount1_raw / 10 ** USDG_DECIMALS
+
+    pa = 1.0001 ** tick_lower * (10 ** (WETH_DECIMALS - USDG_DECIMALS))  # только для отчёта (человеко-читаемая цена границ)
     pb = 1.0001 ** tick_upper * (10 ** (WETH_DECIMALS - USDG_DECIMALS))
-    sqrt_pa, sqrt_pb = pa ** 0.5, pb ** 0.5
-    expected0, expected1 = pc.v3_amounts(pos["liquidity"], sqrt_p, sqrt_pa, sqrt_pb)
     amount0_min = int(expected0 * (1 - SLIPPAGE_CLOSE) * 10 ** WETH_DECIMALS)
     amount1_min = int(expected1 * (1 - SLIPPAGE_CLOSE) * 10 ** USDG_DECIMALS)
     deadline = int(time.time()) + 600
@@ -169,6 +194,24 @@ def main() -> int:
     }
     progress["plan"] = plan
     print(json.dumps(plan, indent=2, default=str, ensure_ascii=False))
+
+    # Доп. защита от повторной ошибки единиц измерения (см. комментарий
+    # выше про баг 33777423316): ожидаемые суммы должны быть в разумных
+    # пределах от того, что реально было задепонировано при mint()
+    # (data/p3_guard_cache/p5_live_step1_result.json) -- при расхождении
+    # >30% что-то не так с расчётом, СТОП вместо отправки вслепую.
+    known_deposit0, known_deposit1 = 0.03649432253555083, 100.090373
+    sane0 = 0.7 * known_deposit0 <= expected0 <= 1.3 * known_deposit0
+    sane1 = 0.7 * known_deposit1 <= expected1 <= 1.3 * known_deposit1
+    plan["sanity_check_vs_known_deposit"] = {"known_deposit0_eth": known_deposit0, "known_deposit1_usdg": known_deposit1,
+                                              "sane0": sane0, "sane1": sane1}
+    if not (sane0 and sane1):
+        progress["abort_reason"] = (f"expected_amount0/1 ({expected0}, {expected1}) отклоняются от известного депозита "
+                                     f"({known_deposit0}, {known_deposit1}) более чем на 30% -- СТОП, не отправляю вслепую.")
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p5_live_close] {progress['abort_reason']}")
+        return 1
 
     if not confirm:
         progress["note"] = "DRY-RUN -- ничего не отправлялось. Запустите с --confirm-mainnet для реального закрытия."
