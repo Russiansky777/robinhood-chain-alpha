@@ -11,13 +11,22 @@
 analysis/sc1_launcher.py (send_one(), строка ~267) -- НИКОГДА не
 печатается сам ключ, транзакций НЕТ.
 
-ИСПРАВЛЕНО 2026-09-03 (после первого реального прогона на VPS):
-- `LIGHTER_API_BASE` был `https://robinhoodchain.lighter.xyz` (URL,
-  данный владельцем как "инстанс Lighter") -- реальная проверка
+ИСПРАВЛЕНО 2026-09-03, дважды:
+- Сначала `LIGHTER_API_BASE` был `https://robinhoodchain.lighter.xyz`
+  (URL, данный владельцем как "инстанс Lighter") -- реальная проверка
   (analysis/lighter_robinhood_probe.py) показала, что это ВЕБ-ФРОНТЕНД
   (React SPA, любой путь отдаёт одну и ту же HTML-страницу), не API.
-  Реальный REST API -- `mainnet.zklighter.elliot.ai` (подтверждено
-  живым JSON-ответом с реальными рынками/таker_fee/maker_fee).
+  Переключились на `mainnet.zklighter.elliot.ai` -- ОШИБКА: это
+  реальный, но ОБЩИЙ/другой Lighter-деплой, не Robinhood-специфичный
+  (аккаунт 22012 там существовал, но с нулевой маржой -- ЧУЖОЙ аккаунт
+  с тем же индексом, не тот, что владелец пополнил). Владелец поправил
+  ("это не сеть Lighter, а robinhoodchain.lighter.xyz и сеть
+  robinhood") -- реальный API-хост найден по факту (не угадан) внутри
+  JS-бандла самого фронтенда (analysis/
+  lighter_robinhood_jsbundle_probe.py): **`https://api.rh.lighter.xyz`**
+  -- отдельный, документированный (apidocs.rh.lighter.xyz) API именно
+  для Robinhood Chain. ВСЕГДА этот хост для аккаунта 22012, не
+  mainnet.zklighter.elliot.ai.
 - "Баланс маржи на Lighter" -- РЕАЛИЗОВАНО: `AccountApi.account()`
   (`GET /api/v1/account?by=index&value=<idx>`) в реальном SDK
   (elliottech/lighter-python/lighter/api/account_api.py) объявлен с
@@ -48,7 +57,7 @@ WALLET = "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75"
 USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
 USDG_DECIMALS = 6
 P5_POOL = "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca".lower()
-LIGHTER_API_BASE = "https://mainnet.zklighter.elliot.ai"  # реальный API -- см. докстринг выше
+LIGHTER_API_BASE = "https://api.rh.lighter.xyz"  # реальный API Robinhood-инстанса -- см. докстринг выше
 LIGHTER_ACCOUNT_INDEX = 22012
 GAS_RESERVE_USD = 10.0
 

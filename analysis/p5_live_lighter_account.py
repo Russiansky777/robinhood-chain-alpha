@@ -39,7 +39,7 @@ from pathlib import Path
 import requests
 
 OUT_PATH = Path("data/p3_guard_cache/p5_live_lighter_account_result.json")
-LIGHTER_API_BASE = "https://mainnet.zklighter.elliot.ai"
+LIGHTER_API_BASE = "https://api.rh.lighter.xyz"
 ACCOUNT_INDEX = 22012
 
 
