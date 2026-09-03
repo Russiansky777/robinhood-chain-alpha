@@ -1,0 +1,61 @@
+name: VPS -- забрать data/p5_live_position_state.json (без повторного открытия)
+
+# Владелец, 2026-09-03: реальный прогон "чистый лист" записал
+# data/p5_live_position_state.json на VPS, но старая версия
+# run_p5_live_step1_vps.yml не забирала этот файл обратно в git.
+# Этот workflow ТОЛЬКО читает файл с VPS и коммитит его -- не трогает
+# Step 1 и не открывает никаких позиций.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FETCH_VPS_POSITION_STATE_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Забрать data/p5_live_position_state.json с VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p5_live_position_state.json' > /tmp/p5_live_position_state.json
+          [ -s /tmp/p5_live_position_state.json ]
+          cp /tmp/p5_live_position_state.json data/p5_live_position_state.json
+          cat data/p5_live_position_state.json
+
+      - name: Commit
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FETCH_VPS_POSITION_STATE_REQUEST
+          git add data/p5_live_position_state.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: забрать data/p5_live_position_state.json с VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
