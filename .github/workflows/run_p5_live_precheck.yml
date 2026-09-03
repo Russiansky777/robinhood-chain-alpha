@@ -1,0 +1,53 @@
+name: P5 LIVE -- Step 1 предпроверка (ончейн-цена, достаточность капитала, только чтение)
+
+# Владелец, 2026-09-03: "пересчитать требуемые суммы под LP+хедж,
+# используя цену ETH ИСКЛЮЧИТЕЛЬНО с ончейн-источников... Если не
+# хватает — остановиться и доложить точную недостающую сумму, не
+# открывать позицию частично." Только чтение (eth_call + публичный
+# Lighter REST), ключ используется ТОЛЬКО чтобы вывести адрес и
+# сверить с кошельком (тот же приём, что Step 0) -- транзакций НЕТ.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_PRECHECK_REQUEST"
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Ончейн-предпроверка достаточности капитала (Step 1)
+        run: python -u analysis/p5_live_precheck.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_live_precheck_result.json ] && git add data/p3_guard_cache/p5_live_precheck_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: предпроверка Step 1 -- ончейн-цена, достаточность капитала [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
