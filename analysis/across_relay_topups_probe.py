@@ -58,7 +58,9 @@ def try_alchemy_asset_transfers() -> dict:
         "jsonrpc": "2.0", "id": 1, "method": "alchemy_getAssetTransfers",
         "params": [{
             "toAddress": WALLET,
-            "category": ["external", "erc20", "internal"],
+            # НАЙДЕНО (реальный первый прогон, 2026-09-03): "internal" отклонён этой сетью --
+            # "The 'internal' category is not supported for this network" -- убран.
+            "category": ["external", "erc20"],
             "order": "desc",
             "maxCount": "0x19",
             "withMetadata": True,
@@ -109,6 +111,36 @@ def run() -> int:
     print(f"[topups_probe] прямых WETH-переводов НА кошелёк за окно: {len(direct_transfers)}")
     for e in direct_transfers:
         print(f"  block={e['block_number']} tx={e['tx_hash']} from={e['from']} amount={e['amount_human']:.8f} WETH")
+
+    # НАЙДЕНО (реальный первый прогон, 2026-09-03): ни один прямой WETH-
+    # перевод НА кошелёк за окно не оказался внешним пополнением -- все
+    # 10 результатов это либо наш собственный wrap (from=0x0, deposit()),
+    # либо возврат из пула P5 (from=0x52e65b17...) -- согласуется с уже
+    # разобранным первым Across-переводом: handler СЖИГАЕТ WETH
+    # (Transfer -> address(0)), не credit'ит кошелёк напрямую. Ищем
+    # ВТОРОЙ Across-перевод (~0.00544 WETH) тем же паттерном -- burn'ы
+    # WETH за то же окно, без привязки к конкретному handler-адресу
+    # (мог быть другой handler).
+    print(f"\n=== Реальный eth_getLogs: WETH Transfer(to=0x0, burn) за последние ~{WINDOW_HOURS}ч ===")
+    burn_topics = [TRANSFER_TOPIC0, None, _topic_addr("0x0000000000000000000000000000000000000000")]
+    burn_logs = list(_chunked_get_logs(from_block, latest, burn_topics, chunk_size=5_000, address=WETH,
+                                         on_call=lambda lo, hi, n: print(f"[topups_probe]   диапазон [{lo},{hi}]: {n} логов")))
+    burns = []
+    for log in burn_logs:
+        frm = _addr_from_topic(log["topics"][1])  # адрес, который сжёг WETH -- это и есть handler той сделки
+        amount_raw = int(log["data"], 16)
+        burns.append({
+            "block_number": int(log["blockNumber"], 16), "tx_hash": log["transactionHash"],
+            "burned_by": frm, "amount_raw": amount_raw, "amount_human": amount_raw / 1e18,
+        })
+    burns.sort(key=lambda e: e["block_number"])
+    result["weth_burns"] = burns
+    print(f"[topups_probe] WETH burn-событий (Transfer -> address(0)) за окно: {len(burns)}")
+    for e in burns:
+        flag = " <-- близко к ~0.00544" if abs(e["amount_human"] - 0.00544) < 0.0003 else \
+               (" <-- уже разобран (across_handler_probe, ~0.0039)" if abs(e["amount_human"] - 0.0039) < 0.0002 else "")
+        print(f"  block={e['block_number']} tx={e['tx_hash']} burned_by={e['burned_by']} "
+              f"amount={e['amount_human']:.8f} WETH{flag}")
 
     result["runtime_s"] = time.time() - t0
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
