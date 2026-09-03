@@ -1,189 +1,53 @@
 {
-  "generated_at_utc": "2026-09-03T18:08:38Z",
-  "mode": "REAL",
+  "generated_at_utc": "2026-09-03T20:58:29Z",
+  "mode": "DRY-RUN",
   "plan": {
-    "pool_price_usd": 2505.0147761190283,
-    "lighter_mark_price_usd": 2504.56,
+    "pool_price_usd": 2504.785531861966,
+    "lighter_mark_price_usd": 2503.88,
     "wallet_balances": {
-      "eth_raw_wei": 43791654698624582,
-      "eth_human": 0.04379165469862458,
-      "usdg_raw": 101161123,
-      "usdg_human": 101.161123
+      "eth_raw_wei": 3718965803510542,
+      "eth_human": 0.003718965803510542,
+      "usdg_raw": 101909238,
+      "usdg_human": 101.909238
     },
     "lighter_margin": {
       "found": true,
       "collateral_usd": 39.86778,
       "available_balance_usd": 39.86778
     },
-    "usable_eth": 0.03979966227792804,
-    "usable_usdg": 101.161123,
-    "range_lower_usd": 2254.5132985071255,
-    "range_upper_usd": 2755.516253730931,
-    "tick_lower": -199114,
-    "tick_upper": -197107,
+    "current_leverage": {
+      "found": true,
+      "initial_margin_fraction_pct": 50.0,
+      "leverage": 2.0,
+      "margin_mode_raw": 0
+    },
+    "positions_open_now": [],
+    "target_leverage_for_this_attempt": 3.0,
+    "usable_eth": 0.0,
+    "usable_usdg": 101.909238,
+    "range_lower_usd": 2254.306978675769,
+    "range_upper_usd": 2755.2640850481625,
+    "tick_lower": -199115,
+    "tick_upper": -197108,
     "tick_spacing": 1,
-    "current_tick": -198060,
-    "computed_liquidity": 39.38671483911263,
-    "expected_amount0_eth": 0.03662240230612649,
-    "expected_amount1_usdg": 101.16112300000002,
-    "delta_eth_expected": 0.03662240230612649,
-    "hedge_notional_usd_expected": 91.72300391983217,
-    "required_margin_usd": 30.574334639944055,
+    "current_tick": -198061,
+    "computed_liquidity": 0.0,
+    "expected_amount0_eth": 0.0,
+    "expected_amount1_usdg": 0.0,
+    "delta_eth_expected": 0.0,
+    "hedge_notional_usd_expected": 0.0,
     "margin_available_usd": 39.86778,
-    "sufficient": true,
-    "amount0_desired_wei": 39799662277928040,
-    "amount1_desired_raw": 101161123,
-    "amount0_min_wei": 35889954260003956,
-    "amount1_min_raw": 99137900,
-    "deadline": 1788459521,
+    "required_margin_usd_at_current_leverage": 0.0,
+    "sufficient_at_current_leverage": true,
+    "required_margin_usd_at_target_leverage_PREVIEW": 0.0,
+    "sufficient_at_target_leverage_PREVIEW": true,
+    "amount0_desired_wei": 0,
+    "amount1_desired_raw": 101909238,
+    "amount0_min_wei": 0,
+    "amount1_min_raw": 0,
+    "deadline": 1788469713,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "gas_estimate": {
-    "gas_units_total_est": 403960,
-    "gas_price_wei": 317982000,
-    "est_cost_usd": 0.3217157629597632
-  },
-  "txs": [
-    {
-      "label": "1_wrap_ETH_to_WETH",
-      "tx_hash": "0xa162d2e64de80539ddfcf864b65938a278710f71dafa79e80faf8f80cd99537f",
-      "status": "success",
-      "gas_used": 57647,
-      "block_number": 53613388,
-      "gas_price_offered_wei": 320144000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 318696000
-    },
-    {
-      "label": "2_approve_WETH",
-      "tx_hash": "0x1315227ec14b5f2eac4f52b1c9a91d4d3edb67d4b7ac03a804514ae010ddcea7",
-      "status": "success",
-      "gas_used": 36337,
-      "block_number": 53613456,
-      "gas_price_offered_wei": 311366000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 328140000
-    },
-    {
-      "label": "3_approve_USDG",
-      "tx_hash": "0x694fe805bd892165d10943102df006a7c4ebc49f0e6d462963ab1f911d121d67",
-      "status": "success",
-      "gas_used": 57988,
-      "block_number": 53613523,
-      "gas_price_offered_wei": 319002000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 317734000
-    },
-    {
-      "label": "4_mint",
-      "tx_hash": "0x412d1e93f0cfe141d695075b95d27e374b36a8b13884c491d35f37c357c71e2c",
-      "status": "success",
-      "gas_used": 433047,
-      "block_number": 53613592,
-      "gas_price_offered_wei": 310562000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 309112000
-    }
-  ],
-  "lp_position": {
-    "token_id": 995601,
-    "liquidity": 39262254594565,
-    "amount0_eth_actual": 0.03638614959223104,
-    "amount1_usdg_actual": 101.161123,
-    "tick_lower": -199114,
-    "tick_upper": -197107
-  },
-  "hedge_target_delta_eth": 0.03638614959223104,
-  "hedge_order": {
-    "tx_hash": "code=200 message='{\"ratelimit\": \"didn\\'t use volume quota\"}' tx_hash='487b6c341d5d06ed97cab8c8de9693b81106d1fb107128b503d9eedd89788d37151542c8a77aa12a' predicted_execution_time_ms=1788458954280 volume_quota_remaining=None additional_properties={}",
-    "err": null,
-    "base_amount": 364,
-    "size_eth_requested": 0.03638614959223104,
-    "avg_execution_price_worst": 237933,
-    "worst_price_usd": 2379.332,
-    "client_order_index": 1788458953
-  },
-  "hedge_fill_check": {
-    "filled": false,
-    "position": null,
-    "attempts_used": 4,
-    "last_positions_seen": []
-  },
-  "hedge_error": "RuntimeError: create_market_order вернул err=None (принят API), но реальная позиция на Lighter НЕ появилась после 4 проверок -- ордер не исполнился (см. hedge_order.tx_hash для сырого ответа API).",
-  "CRITICAL": "LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция ~0.036386 ETH) -- хедж-ордер не прошёл, см. hedge_error. АВТОЗАКРЫТИЕ УСПЕШНО -- голой позиции больше нет.",
-  "close_position_onchain": {
-    "nonce": 0,
-    "operator": "0x0000000000000000000000000000000000000000",
-    "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
-    "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-    "fee": 100,
-    "tickLower": -199114,
-    "tickUpper": -197107,
-    "liquidity": 39262254594565,
-    "feeGrowthInside0LastX128": 10110283141862536476544662166711556652380,
-    "feeGrowthInside1LastX128": 24823478754437484844166674971309,
-    "tokensOwed0": 0,
-    "tokensOwed1": 0
-  },
-  "close_plan": {
-    "pool_price_usd": 2507.5949159192414,
-    "liquidity_to_remove": 39262254594565,
-    "expected_amount0_eth": 0.03608298622414018,
-    "expected_amount1_usdg": 101.92104009033388,
-    "amount0_min_wei": 34278836912933172,
-    "amount1_min_raw": 96824988,
-    "deadline": 1788459566,
-    "sanity_check_vs_known_deposit": {
-      "known_deposit0_eth": 0.03638614959223104,
-      "known_deposit1_usdg": 101.161123,
-      "sane0": true,
-      "sane1": true
-    }
-  },
-  "close_txs": [
-    {
-      "label": "1_decreaseLiquidity",
-      "tx_hash": "0xd7c169a8487e06da9ab8d1bf55f3a7cba456f8e92d7f3f361d162ce03a55ee04",
-      "status": "success",
-      "gas_used": 170613,
-      "block_number": 53613811,
-      "gas_price_offered_wei": 304328000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 306566000
-    },
-    {
-      "label": "2_collect",
-      "tx_hash": "0x5048a183cf4631444167e28011814167d0d14e9504fc41c8f2663b6ff5f5346a",
-      "status": "success",
-      "gas_used": 122439,
-      "block_number": 53613879,
-      "gas_price_offered_wei": 305718000,
-      "buffer_used": 1.15,
-      "effective_gas_price_wei": 311520000
-    }
-  ],
-  "close_result": {
-    "decrease_amount0_eth": 0.036087738031876516,
-    "decrease_amount1_usdg": 101.909124,
-    "collect_amount0_eth_total": 0.036087761353367026,
-    "collect_amount1_usdg_total": 101.909238,
-    "fees_earned_amount0_eth": 2.3321490509597975e-08,
-    "fees_earned_amount1_usdg": 0.00011399999999639476
-  },
-  "close_pnl": {
-    "fees_earned_usd": 0.00017248085102992148,
-    "impermanent_loss_vs_deposit_usd": -0.0002943115965328147,
-    "total_gas_usd": 0.675103713473587,
-    "gas_price_used_wei": 306608000,
-    "net_pnl_usd": -0.6752255442190899
-  },
-  "close_final_wallet_balances": {
-    "eth_raw_wei": 3718965803510542,
-    "eth_human": 0.003718965803510542,
-    "usdg_raw": 101909238,
-    "usdg_human": 101.909238,
-    "weth_human": 0.03950127403906402
-  },
-  "auto_close_succeeded": true
+  "abort_reason": "usable_eth<=0 или usable_usdg<=0 при свежем пересчёте -- СТОП, не открываю позицию частично."
 }
