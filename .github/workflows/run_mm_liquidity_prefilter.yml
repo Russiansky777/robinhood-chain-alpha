@@ -1,0 +1,54 @@
+name: MM -- liquidity prefilter (extsload/slot0, только чтение, лимит 55 мин)
+
+# Владелец, 2026-09-03: "Вариант 1, с ограничениями" -- предфильтр по
+# реальной ликвидности v4-пулов (extsload) вместо дорогой Swap-калибровки.
+# Лимит 60 минут задан владельцем; скрипт сам следит за временем
+# (мягкий предел 55 мин) и корректно останавливается с частичным
+# результатом, если не укладывается. Job-таймаут ниже -- второй,
+# грубый рубеж на случай зависания самого скрипта.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/MM_LIQUIDITY_PREFILTER_REQUEST"
+
+jobs:
+  prefilter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Liquidity prefilter (extsload, 55-min self-limit)
+        run: python -u analysis/mm_liquidity_prefilter.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/mm_liquidity_prefilter_result.json ] && git add data/p3_guard_cache/mm_liquidity_prefilter_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "MM: liquidity prefilter (extsload/slot0) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
