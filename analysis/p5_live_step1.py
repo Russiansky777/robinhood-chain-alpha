@@ -427,22 +427,35 @@ def main() -> int:
         # `"ratelimit": "didn't use volume quota"` -- не ошибка, но и не
         # подтверждение филла). err=None САМ ПО СЕБЕ НЕ ДОКАЗЫВАЕТ хедж --
         # только свежее чтение реальных positions() доказывает.
+        #
+        # Порог 85% (не 50%) -- владелец, 2026-09-03, ревью логики:
+        # частичный филл 50-85% всё ещё оставляет существенную голую
+        # экспозицию и НЕ должен молча считаться успехом без автозакрытия
+        # -- только близкий к полному филл (>=85% запрошенного размера)
+        # трактуется как success, иначе -- та же ветка автозакрытия, что
+        # и полное отсутствие позиции. sign/direction поля позиции
+        # НЕ проверяются здесь напрямую (семантика API не подтверждена
+        # официальной документацией) -- сырой объект позиции целиком
+        # попадает в hedge_fill_check для ручной проверки при докладе.
         last_positions: list[dict] = []
         for i in range(attempts):
             if i > 0:
                 time.sleep(delay_s)
             last_positions = pc.lighter_positions()
             eth_pos = next((p for p in last_positions if str(p.get("symbol", "")).upper() == "ETH"), None)
-            if eth_pos is not None and abs(float(eth_pos.get("position", 0))) >= expected_size_eth * 0.5:
+            if eth_pos is not None and abs(float(eth_pos.get("position", 0))) >= expected_size_eth * 0.85:
                 return {"filled": True, "position": eth_pos, "attempts_used": i + 1}
             print(f"[p5_live_step1] проверка филла хеджа: попытка {i + 1}/{attempts} -- ETH-позиция не найдена "
-                  f"(positions={last_positions})")
+                  f"или недостаточного размера (positions={last_positions})")
         return {"filled": False, "position": None, "attempts_used": attempts, "last_positions_seen": last_positions}
 
     try:
         order_info = asyncio.run(_place_hedge())
         progress["hedge_order"] = order_info
-        if order_info.get("err"):
+        # `is not None`, не truthy-проверка -- пустая строка "" тоже
+        # означала бы реальную ошибку API и не должна молча проскочить
+        # как "нет ошибки" (ревью логики, владелец, 2026-09-03).
+        if order_info.get("err") is not None:
             raise RuntimeError(f"create_market_order вернул ошибку: {order_info['err']}")
 
         fill_check = _verify_hedge_filled(real_delta_eth)
