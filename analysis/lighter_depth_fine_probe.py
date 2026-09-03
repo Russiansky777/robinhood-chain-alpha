@@ -41,7 +41,10 @@ def run() -> int:
         return 1
     mid = float(eth["mark_price"])
 
-    rr = requests.get(f"{LIGHTER_API_BASE}/api/v1/orderBookOrders", params={"market_id": eth["market_id"], "limit": 500}, timeout=20)
+    # НАЙДЕНО (реальный прогон 33786801139): limit=500 -> 400 Bad Request --
+    # p5_live_step0.py::fetch_eth_perp_depth уже использовал limit=200
+    # (работало весь день), похоже это максимум для этого эндпоинта.
+    rr = requests.get(f"{LIGHTER_API_BASE}/api/v1/orderBookOrders", params={"market_id": eth["market_id"], "limit": 200}, timeout=20)
     rr.raise_for_status()
     body = rr.json()
     bids = sorted(body.get("bids", []), key=lambda o: float(o["price"]), reverse=True)
