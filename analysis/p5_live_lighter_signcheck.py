@@ -3,19 +3,31 @@
 `SignerClient`) ДО того, как она используется для реального хедж-ордера
 в p5_live_step1.py. Ордеров не отправляет.
 
-Зачем отдельный скрипт: SignerClient подписывает через скомпилированные
-нативные библиотеки (ctypes, .so/.dylib/.dll внутри пакета) -- риск
-поломки на конкретной ОС раннера GH Actions. Проверяем ДО того, как
-эта же подпись понадобится сразу после реальной mint-транзакции (где
-уже открыта незахеджированная позиция и retry дороже).
+Зачем отдельный скрипт: SignerClient подписывает через нативный
+async-стек (aiohttp), завязанный на конкретный event loop -- риск
+поломки на конкретной ОС/версии раннера GH Actions. Проверяем ДО того,
+как эта же подпись понадобится сразу после реальной mint-транзакции
+(где уже открыта незахеджированная позиция и retry дороже).
 
 Проверка -- `SignerClient.check_client()`, реальный публичный метод SDK
 (подтверждено WebFetch реального lighter/signer_client.py,
 elliottech/lighter-python, 2026-09-03): по сигнатуре относится к
 "Auth/Validation only" -- не создаёт и не отправляет ордер, только
-проверяет валидность клиента/ключей (использует ту же нативную подпись,
+проверяет валидность клиента/ключей (использует ту же подпись,
 что и create_market_order, так что успешный вызов -- реальное
 доказательство, что подпись рабочая).
+
+НАЙДЕНО (реальный прогон 33774374657, 2026-09-03): первая версия этого
+скрипта падала `RuntimeError: no running event loop` -- `SignerClient.
+__init__` не помечен `async def`, но внутри создаёт aiohttp-объект,
+которому нужен УЖЕ работающий event loop. Проверено по реальному
+исходнику (examples/orders/create_market_order_eth_sell.py,
+elliottech/lighter-python): весь пример обёрнут в `async def main()` +
+`asyncio.run(main())`; `create_market_order`/`close` -- `async def`
+(нужен `await`), `check_client`/`create_auth_token_with_expiry` --
+обычные `def`, но клиент должен быть СОЗДАН внутри работающего loop.
+Этот скрипт исправлен соответственно (вся работа -- в `async def
+_check()`, запущенной через `asyncio.run`).
 
 Секреты: LIGHTER_API_KEY_PUBLIC / LIGHTER_API_KEY_PRIVATE (владелец
 добавил в GitHub Secrets) -- ТОЛЬКО из окружения, никогда не печатаются
@@ -23,9 +35,9 @@ elliottech/lighter-python, 2026-09-03): по сигнатуре относитс
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -35,48 +47,23 @@ ACCOUNT_INDEX = 22012
 API_KEY_INDEX = 4
 
 
-def run() -> int:
-    t0 = time.time()
-    result: dict = {
-        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "account_index": ACCOUNT_INDEX, "api_key_index": API_KEY_INDEX,
-        "orders_sent": False,
-    }
+async def _check(result: dict) -> None:
+    import lighter  # elliottech/lighter-python -- установлен через pip install git+... в workflow
 
-    try:
-        import lighter  # elliottech/lighter-python -- установлен через pip install git+... в workflow
-        result["sdk_import_ok"] = True
-        result["sdk_module_file"] = getattr(lighter, "__file__", None)
-    except Exception as e:  # noqa: BLE001
-        result["sdk_import_ok"] = False
-        result["sdk_import_error"] = f"{type(e).__name__}: {e}"
-        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
-        print(f"[p5_live_lighter_signcheck] ИМПОРТ SDK НЕ УДАЛСЯ: {result['sdk_import_error']}")
-        return 1
+    result["sdk_import_ok"] = True
+    result["sdk_module_file"] = getattr(lighter, "__file__", None)
 
     priv = os.environ.get("LIGHTER_API_KEY_PRIVATE", "")
     pub = os.environ.get("LIGHTER_API_KEY_PUBLIC", "")
     if not priv or not pub:
         result["error"] = "LIGHTER_API_KEY_PRIVATE/PUBLIC не заданы в окружении"
-        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
-        print(f"[p5_live_lighter_signcheck] {result['error']}")
-        return 1
+        return
 
-    try:
-        client = lighter.SignerClient(
-            url=LIGHTER_API_BASE, account_index=ACCOUNT_INDEX,
-            api_private_keys={API_KEY_INDEX: priv},
-        )
-        result["client_constructed_ok"] = True
-    except Exception as e:  # noqa: BLE001
-        result["client_constructed_ok"] = False
-        result["construct_error"] = f"{type(e).__name__}: {e}"
-        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
-        print(f"[p5_live_lighter_signcheck] КОНСТРУКТОР SignerClient УПАЛ: {result['construct_error']}")
-        return 1
+    client = lighter.SignerClient(
+        url=LIGHTER_API_BASE, account_index=ACCOUNT_INDEX,
+        api_private_keys={API_KEY_INDEX: priv},
+    )
+    result["client_constructed_ok"] = True
 
     try:
         err = client.check_client()
@@ -89,9 +76,8 @@ def run() -> int:
         print(f"[p5_live_lighter_signcheck] check_client() УПАЛ: {result['check_client_error']}")
 
     # Дополнительно -- create_auth_token_with_expiry: тоже [Auth/Validation
-    # only] по сигнатуре реального SDK, реально прогоняет ту же нативную
-    # подпись end-to-end (создаёт подписанный auth-токен), не отправляет
-    # ордер и не требует сети (чисто локальная подпись).
+    # only] по сигнатуре реального SDK, реально прогоняет ту же подпись
+    # end-to-end (создаёт подписанный auth-токен), не отправляет ордер.
     try:
         token = client.create_auth_token_with_expiry(api_key_index=API_KEY_INDEX)
         result["auth_token_created_ok"] = bool(token)
@@ -104,9 +90,25 @@ def run() -> int:
         print(f"[p5_live_lighter_signcheck] create_auth_token_with_expiry() УПАЛ: {result['auth_token_error']}")
 
     try:
-        client.close()
+        await client.close()
     except Exception:  # noqa: BLE001
         pass
+
+
+def run() -> int:
+    t0 = time.time()
+    result: dict = {
+        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "account_index": ACCOUNT_INDEX, "api_key_index": API_KEY_INDEX,
+        "orders_sent": False,
+    }
+
+    try:
+        asyncio.run(_check(result))
+    except Exception as e:  # noqa: BLE001
+        result.setdefault("client_constructed_ok", False)
+        result["fatal_error"] = f"{type(e).__name__}: {e}"
+        print(f"[p5_live_lighter_signcheck] СБОЙ: {result['fatal_error']}")
 
     result["signing_scheme_verified"] = bool(
         result.get("check_client_ok") or result.get("auth_token_created_ok")
