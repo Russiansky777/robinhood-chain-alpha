@@ -1,97 +1,43 @@
 {
-  "generated_at_utc": "2026-09-03T16:06:20Z",
-  "mode": "REAL",
+  "generated_at_utc": "2026-09-03T16:44:32Z",
+  "mode": "DRY-RUN",
   "plan": {
-    "pool_price_usd": 2498.776546130788,
-    "lighter_mark_price_usd": 2498.73,
+    "pool_price_usd": 2489.428147799176,
+    "lighter_mark_price_usd": 2488.58,
     "wallet_balances": {
-      "eth_raw_wei": 47023080177882302,
-      "eth_human": 0.0470230801778823,
-      "usdg_raw": 100090373,
-      "usdg_human": 100.090373
+      "eth_raw_wei": 46366328108919916,
+      "eth_human": 0.04636632810891992,
+      "usdg_raw": 100020860,
+      "usdg_human": 100.02086
     },
     "lighter_margin": {
       "found": true,
       "collateral_usd": 40.0,
       "available_balance_usd": 40.0
     },
-    "usable_eth": 0.04302112169324532,
-    "usable_usdg": 100.090373,
-    "range_lower_usd": 2248.898891517709,
-    "range_upper_usd": 2748.654200743867,
-    "tick_lower": -199139,
-    "tick_upper": -197132,
+    "usable_eth": 0.04234934131263874,
+    "usable_usdg": 100.02086,
+    "range_lower_usd": 2240.485333019258,
+    "range_upper_usd": 2738.3709625790934,
+    "tick_lower": -199176,
+    "tick_upper": -197169,
     "tick_spacing": 1,
-    "current_tick": -198085,
-    "computed_liquidity": 39.018436251882314,
-    "expected_amount0_eth": 0.03632522943319721,
-    "expected_amount1_usdg": 100.090373,
-    "delta_eth_expected": 0.03632522943319721,
-    "hedge_notional_usd_expected": 90.76694054161285,
-    "required_margin_usd": 30.255646847204286,
+    "current_tick": -198123,
+    "computed_liquidity": 39.064480155043675,
+    "expected_amount0_eth": 0.03643631666663711,
+    "expected_amount1_usdg": 100.02086,
+    "delta_eth_expected": 0.03643631666663711,
+    "hedge_notional_usd_expected": 90.67468893025978,
+    "required_margin_usd": 30.224896310086592,
     "margin_available_usd": 40.0,
     "sufficient": true,
-    "amount0_desired_wei": 43021121693245320,
-    "amount1_desired_raw": 100090373,
-    "amount0_min_wei": 35598724844533260,
-    "amount1_min_raw": 98088565,
-    "deadline": 1788452184,
+    "amount0_desired_wei": 42349341312638736,
+    "amount1_desired_raw": 100020860,
+    "amount0_min_wei": 35707590333304368,
+    "amount1_min_raw": 98020442,
+    "deadline": 1788454475,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "gas_estimate": {
-    "gas_units_total_est": 421492,
-    "gas_price_wei": 497836000,
-    "est_cost_usd": 0.5243182392380338
-  },
-  "txs": [
-    {
-      "label": "1_wrap_ETH_to_WETH",
-      "tx_hash": "0xb370c2957fcb68d39d8117fc07ae542f23314ed717fad4e2448137a8e5a0b7bf",
-      "status": "success",
-      "gas_used": 57647,
-      "block_number": 53543376
-    },
-    {
-      "label": "2_approve_WETH",
-      "tx_hash": "0xc843e1d0221d090f31e94675949dc1e25c355ef0023371ea88d1f8ca66064078",
-      "status": "success",
-      "gas_used": 53437,
-      "block_number": 53543442
-    },
-    {
-      "label": "3_approve_USDG",
-      "tx_hash": "0x52481337f26011c001b80009378f905f88981a5044ae41651092033830f91680",
-      "status": "success",
-      "gas_used": 57988,
-      "block_number": 53543508
-    },
-    {
-      "label": "4_mint",
-      "tx_hash": "0x36f9138c1831baa620015ab19d63f83d6718b8bad626c94af8287969e30d3690",
-      "status": "success",
-      "gas_used": 500293,
-      "block_number": 53543572
-    }
-  ],
-  "lp_position": {
-    "token_id": 992779,
-    "liquidity": 39101212426893,
-    "amount0_eth_actual": 0.03649432253555083,
-    "amount1_usdg_actual": 100.090373,
-    "tick_lower": -199139,
-    "tick_upper": -197132
-  },
-  "hedge_target_delta_eth": 0.03649432253555083,
-  "hedge_order": {
-    "tx_hash": "None",
-    "err": "HTTP response body: code=20558 message='You are accessing Lighter from a restricted jurisdiction. For more information, see the https://lighter.xyz/terms' additional_properties={}",
-    "base_amount": 365,
-    "size_eth_requested": 0.03649432253555083,
-    "avg_execution_price_worst": 247374,
-    "worst_price_usd": 2473.7427,
-    "client_order_index": 1788451615
-  },
-  "hedge_error": "RuntimeError: create_market_order вернул ошибку: HTTP response body: code=20558 message='You are accessing Lighter from a restricted jurisdiction. For more information, see the https://lighter.xyz/terms' additional_properties={}",
-  "CRITICAL": "LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция ~0.036494 ETH) -- хедж-ордер не прошёл, см. hedge_error. НЕ повторяю автоматически -- требуется ручное решение владельца."
+  "note": "DRY-RUN -- ничего не отправлялось. Запустите с --confirm-mainnet для реальной отправки."
 }
