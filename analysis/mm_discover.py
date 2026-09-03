@@ -96,6 +96,53 @@ def scan(from_block: int, to_block: int, topics: list, address=None, chunk_size:
 
 def run() -> int:
     t0 = time.time()
+
+    universe = eligible_universe()
+    print(f"[mm_discover] eligible_universe (feed R1 ∩ Lighter perp market): "
+          f"{len(universe)} токенов: {sorted(universe)}")
+    token_addrs = {v["token_address"] for v in universe.values()}
+
+    # Resume: стадия 2 (полная история пулов) стоит ~5985 запросов и
+    # реально занимает часы на паблик RPC -- три прогона подряд заново
+    # пересчитывали её при каждой правке стадии 3/калибровки. Если кэш
+    # уже содержит результат стадии 2 (или полный результат) для ТОЙ ЖЕ
+    # eligible_universe -- не пересканировать, сразу к стадии 3.
+    cached = None
+    if OUT_PATH.exists():
+        try:
+            cached = json.loads(OUT_PATH.read_text())
+        except Exception:  # noqa: BLE001
+            cached = None
+    resume_ok = (
+        cached is not None
+        and cached.get("stage") in ("2_done_pools_found", "3_done_complete")
+        and sorted(cached.get("eligible_universe_symbols", cached.get("pools_by_symbol", {}).keys())) == sorted(universe)
+        and "window_start_block" in cached and "window_end_block" in cached
+    )
+
+    if resume_ok:
+        latest = cached["latest_block"]
+        spb = cached["seconds_per_block_estimate"]
+        window_start_block = cached["window_start_block"]
+        window_end_block = cached["window_end_block"]
+        window_days = (WINDOW_END_UTC - WINDOW_START_UTC).total_seconds() / 86400
+        factories_seen = cached["factories_seen_1d_slice"]
+        v3_factory = cached["v3_factory_used"]
+        pool_managers_seen = cached["pool_managers_seen_1d_slice"]
+        pools_by_symbol = cached["pools_by_symbol"]
+        shared_counterparties = cached.get("shared_counterparties", [])
+        n_with_v3 = sum(1 for p in pools_by_symbol.values() if p["v3_pools_total"])
+        n_with_v4 = sum(1 for p in pools_by_symbol.values() if p["v4_pools_total"])
+        n_with_any = sum(1 for p in pools_by_symbol.values() if p["v3_pools_total"] or p["v4_pools_total"])
+        n_with_genuine = sum(1 for p in pools_by_symbol.values() if p["n_v3_genuine"] or p["n_v4_genuine"])
+        print(f"[mm_discover] RESUME: стадии 1-2 взяты из кэша {OUT_PATH} (stage={cached.get('stage')}, "
+              f"latest={latest}, окно=[{window_start_block},{window_end_block}]) -- скан НЕ повторяется")
+        return _stage3_and_write(
+            t0, latest, spb, window_start_block, window_end_block, window_days,
+            universe, factories_seen, v3_factory, pool_managers_seen,
+            pools_by_symbol, shared_counterparties, n_with_v3, n_with_v4, n_with_any, n_with_genuine,
+        )
+
     latest = get_block_number()
     _count()
     spb = estimate_seconds_per_block(latest)
@@ -105,11 +152,6 @@ def run() -> int:
 
     print(f"[mm_discover] latest={latest} seconds_per_block~={spb:.4f} "
           f"окно=[{window_start_block},{window_end_block}] ({window_days:.1f} дней)")
-
-    universe = eligible_universe()
-    print(f"[mm_discover] eligible_universe (feed R1 ∩ Lighter perp market): "
-          f"{len(universe)} токенов: {sorted(universe)}")
-    token_addrs = {v["token_address"] for v in universe.values()}
 
     # --- Стадия 1: подтвердить реальные факторию/poolmanager (МАЛЫЙ chain-wide срез) ---
     # ИСПРАВЛЕНО 2026-09-02: было "1 полный день" (~860k блоков) БЕЗ
@@ -228,6 +270,11 @@ def run() -> int:
     OUT_PATH.write_text(json.dumps({
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "stage": "2_done_pools_found",
+        "latest_block": latest,
+        "seconds_per_block_estimate": spb,
+        "window_start_block": window_start_block,
+        "window_end_block": window_end_block,
+        "eligible_universe_symbols": sorted(universe),
         "factories_seen_1d_slice": factories_seen,
         "v3_factory_used": v3_factory,
         "pool_managers_seen_1d_slice": pool_managers_seen,
@@ -240,6 +287,18 @@ def run() -> int:
         "requests_used_so_far": _request_count,
     }, indent=2, default=str, ensure_ascii=False))
 
+    return _stage3_and_write(
+        t0, latest, spb, window_start_block, window_end_block, window_days,
+        universe, factories_seen, v3_factory, pool_managers_seen,
+        pools_by_symbol, shared_counterparties, n_with_v3, n_with_v4, n_with_any, n_with_genuine,
+    )
+
+
+def _stage3_and_write(
+    t0, latest, spb, window_start_block, window_end_block, window_days,
+    universe, factories_seen, v3_factory, pool_managers_seen,
+    pools_by_symbol, shared_counterparties, n_with_v3, n_with_v4, n_with_any, n_with_genuine,
+) -> int:
     # --- Стадия 3: калибровка плотности Swap на МАЛОМ срезе (CALIBRATION_BLOCKS) ВНУТРИ окна ---
     # НЕ полный день (баг первого прогона -- см. докстринг MAX_REQUESTS_PER_RUN
     # выше): дорого и без страховки при до 24 токенах x 2 версии протокола.
