@@ -67,6 +67,24 @@ def probe_defillama_detail() -> dict:
             out["protocols_n"] = len(body.get("protocols") or [])
             out["protocol_names"] = [p.get("name") for p in (body.get("protocols") or [])][:10]
             out["total24h"] = body.get("total24h")
+            # per-protocol дневная разбивка -- если "Uniswap V3" на этом чейне
+            # почти целиком состоит из пула P5, это даёт бесплатную дневную
+            # историю ИМЕННО этого пула, не всей сети (owner, продолжение
+            # разведки после первого запуска этого скрипта).
+            breakdown = body.get("totalDataChartBreakdown") or []
+            out["breakdown_points"] = len(breakdown)
+            uni_v3_series = []
+            if breakdown:
+                for point in breakdown:
+                    ts, by_protocol = point[0], point[1]
+                    v = by_protocol.get("Uniswap V3")
+                    if v is not None:
+                        # значение может быть числом или {chain: значение} -- проверяем обе формы
+                        val = v if isinstance(v, (int, float)) else sum(v.values()) if isinstance(v, dict) else None
+                        uni_v3_series.append([ts, val])
+                out["uniswap_v3_daily_series_points"] = len(uni_v3_series)
+                out["uniswap_v3_daily_series_last5"] = uni_v3_series[-5:]
+                out["breakdown_last_point_raw"] = breakdown[-1]
         else:
             out["body_snippet"] = r.text[:500]
         print(f"[mm_p5_variant3_probe] DefiLlama detail {url}: status={r.status_code}, "
