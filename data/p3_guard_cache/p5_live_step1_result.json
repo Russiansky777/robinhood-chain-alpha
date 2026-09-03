@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-09-03T16:44:32Z",
-  "mode": "DRY-RUN",
+  "generated_at_utc": "2026-09-03T16:49:18Z",
+  "mode": "REAL",
   "plan": {
-    "pool_price_usd": 2489.428147799176,
-    "lighter_mark_price_usd": 2488.58,
+    "pool_price_usd": 2495.1867849392297,
+    "lighter_mark_price_usd": 2494.41,
     "wallet_balances": {
       "eth_raw_wei": 46366328108919916,
       "eth_human": 0.04636632810891992,
@@ -15,29 +15,58 @@
       "collateral_usd": 40.0,
       "available_balance_usd": 40.0
     },
-    "usable_eth": 0.04234934131263874,
+    "usable_eth": 0.04235861210931649,
     "usable_usdg": 100.02086,
-    "range_lower_usd": 2240.485333019258,
-    "range_upper_usd": 2738.3709625790934,
-    "tick_lower": -199176,
-    "tick_upper": -197169,
+    "range_lower_usd": 2245.668106445307,
+    "range_upper_usd": 2744.705463433153,
+    "tick_lower": -199153,
+    "tick_upper": -197146,
     "tick_spacing": 1,
-    "current_tick": -198123,
-    "computed_liquidity": 39.064480155043675,
-    "expected_amount0_eth": 0.03643631666663711,
-    "expected_amount1_usdg": 100.02086,
-    "delta_eth_expected": 0.03643631666663711,
-    "hedge_notional_usd_expected": 90.67468893025978,
-    "required_margin_usd": 30.224896310086592,
+    "current_tick": -198099,
+    "computed_liquidity": 39.019375693773,
+    "expected_amount0_eth": 0.03635222535625119,
+    "expected_amount1_usdg": 100.02086000000001,
+    "delta_eth_expected": 0.03635222535625119,
+    "hedge_notional_usd_expected": 90.67735445088653,
+    "required_margin_usd": 30.225784816962175,
     "margin_available_usd": 40.0,
     "sufficient": true,
-    "amount0_desired_wei": 42349341312638736,
+    "amount0_desired_wei": 42358612109316488,
     "amount1_desired_raw": 100020860,
-    "amount0_min_wei": 35707590333304368,
+    "amount0_min_wei": 35625180849126164,
     "amount1_min_raw": 98020442,
-    "deadline": 1788454475,
+    "deadline": 1788454761,
     "nfpm_address": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
     "fee_tier": 100
   },
-  "note": "DRY-RUN -- ничего не отправлялось. Запустите с --confirm-mainnet для реальной отправки."
+  "gas_estimate": {
+    "gas_units_total_est": 403960,
+    "gas_price_wei": 1425558000,
+    "est_cost_usd": 1.4364519197898886
+  },
+  "txs": [
+    {
+      "label": "1_wrap_ETH_to_WETH",
+      "tx_hash": "0x9813e9d1b392c27c1a7d3f46398b6971214c5fbbc6e267e9da33a50f9a34d17c",
+      "status": "success",
+      "gas_used": 57647,
+      "block_number": 53567971
+    },
+    {
+      "label": "2_approve_WETH",
+      "tx_hash": "0x6bcdc9bbe748036349ad3055274f4290785b202b59e44c14a45b9b518ea2d961",
+      "status": "success",
+      "gas_used": 36337,
+      "block_number": 53568036
+    },
+    {
+      "label": "3_approve_USDG",
+      "tx_hash": "0x6e22b466233d9656a1b41da2420a6a64059cc1c3a93755d4a88a5a45701d95bc",
+      "status": "success",
+      "gas_used": 57988,
+      "block_number": 53568093
+    }
+  ],
+  "abort_reason": "RPC eth_sendRawTransaction error: {'code': -32000, 'message': 'max fee per gas less than block base fee: address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75, maxFeePerGas: 1568113800 baseFee: 1637694000'}",
+  "CRITICAL": "Сбой в пакете mint -- проверить состояние вручную ПЕРЕД повтором. Если approve прошли, но mint нет -- approve остаются в силе, ETH может быть уже wrapped."
 }
