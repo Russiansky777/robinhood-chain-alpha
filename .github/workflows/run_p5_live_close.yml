@@ -1,10 +1,18 @@
-name: P5 LIVE -- ЭКСТРЕННОЕ закрытие LP (decreaseLiquidity + collect)
+name: P5 LIVE -- ручное закрытие LP (decreaseLiquidity + collect)
 
-# Владелец, 2026-09-03: "СРОЧНО: убрать голую экспозицию." Закрывает
-# LP-позицию tokenId=992779 полностью (decreaseLiquidity + collect).
-# Lighter не участвует -- гео-блок к этой операции не относится.
+# Ручной/резервный путь. С 2026-09-03 автоматическое закрытие на
+# неудачном хедже встроено прямо в p5_live_step1.py (close_position(),
+# в том же процессе, без раунда через отдельный workflow) -- этот
+# workflow остаётся для РУЧНОГО закрытия произвольного tokenId (правка
+# TOKEN_ID_TO_CLOSE ниже перед триггером), напр. если позицию нужно
+# закрыть отдельно от Step1.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      token_id:
+        description: "tokenId LP-позиции для закрытия"
+        required: true
+        type: string
   push:
     branches:
       - claude/sc1-pons-v2-launcher-efdbyt
@@ -43,11 +51,21 @@ jobs:
             echo "РЕЖИМ: DRY-RUN"
           fi
 
+      - name: Определить token_id (из marker-файла при push-триггере, из input при workflow_dispatch)
+        id: token
+        run: |
+          if [ -n "${{ inputs.token_id }}" ]; then
+            echo "id=${{ inputs.token_id }}" >> "$GITHUB_OUTPUT"
+          else
+            cat data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST data/p3_guard_cache/P5_LIVE_CLOSE_DRYRUN_REQUEST 2>/dev/null | grep -oE 'token_id=[0-9]+' | head -1 | cut -d= -f2 > /tmp/tid
+            echo "id=$(cat /tmp/tid)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Закрыть LP-позицию (decreaseLiquidity + collect)
         env:
           PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-        run: python -u analysis/p5_live_close.py ${{ steps.mode.outputs.flag }}
+        run: python -u analysis/p5_live_close.py ${{ steps.token.outputs.id }} ${{ steps.mode.outputs.flag }}
 
       - name: Commit results
         if: always()

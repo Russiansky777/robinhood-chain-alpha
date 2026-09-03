@@ -1,0 +1,92 @@
+name: P5 LIVE Step 1 (с VPS Нидерланды) -- mint LP + хедж на Lighter
+
+# Владелец, 2026-09-03: "пропустить промежуточный тестовый ордер, идти
+# сразу на полный Step 1 (LP mint + хедж) с VPS Нидерланды
+# (45.59.170.76)." Выполняется ПО SSH НА САМОМ VPS (не на GH Actions
+# runner'е, US IP которого гарантированно попадает под geo-блок Lighter,
+# см. docs/PROJECT_STATE.md) -- venv и секреты (/etc/bot/env) там уже
+# настроены (run_vps_bootstrap_nl.yml). При ЛЮБОЙ ошибке хедж-ордера
+# p5_live_step1.py САМ немедленно закрывает LP обратно (close_position(),
+# тот же процесс) -- п.2 задачи владельца, не опционально.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_STEP1_VPS_DRYRUN_REQUEST"
+      - "data/p3_guard_cache/P5_LIVE_STEP1_VPS_CONFIRM_REQUEST"
+
+jobs:
+  step1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Обновить репозиторий на VPS до последнего коммита (включая фикс close-скрипта + auto-close)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: Определить режим (dry-run по умолчанию, real только если есть CONFIRM-маркер в этом коммите)
+        id: mode
+        run: |
+          if [ -e data/p3_guard_cache/P5_LIVE_STEP1_VPS_CONFIRM_REQUEST ] && git log -1 --name-only --pretty=format: | grep -q "P5_LIVE_STEP1_VPS_CONFIRM_REQUEST"; then
+            echo "flag=--confirm-mainnet" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: РЕАЛЬНАЯ ОТПРАВКА"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: DRY-RUN"
+          fi
+
+      - name: "Step 1 на VPS: mint LP + хедж (с автозакрытием при сбое хеджа)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot bash -c 'set -a; source /etc/bot/env; set +a; ./venv/bin/python analysis/p5_live_step1.py ${{ steps.mode.outputs.flag }}'
+          "
+
+      - name: Забрать результат с VPS
+        if: always()
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p5_live_step1_result.json' > /tmp/step1_result.json || true
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p5_live_log.jsonl' > /tmp/p5_live_log.jsonl || true
+          mkdir -p data/p3_guard_cache
+          [ -s /tmp/step1_result.json ] && cp /tmp/step1_result.json data/p3_guard_cache/p5_live_step1_result.json
+          [ -s /tmp/p5_live_log.jsonl ] && cp /tmp/p5_live_log.jsonl data/p5_live_log.jsonl
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/p3_guard_cache/p5_live_step1_result.json data/p5_live_log.jsonl 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE Step1 (VPS-NL): результат (mode=${{ steps.mode.outputs.flag }}) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

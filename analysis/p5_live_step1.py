@@ -27,6 +27,21 @@ p5_live_precheck.py. NFPM-адрес и формулы -- см. docstring
 p5_live_precheck.py (то же обоснование, дословно те же функции,
 переиспользованы отсюда через импорт).
 
+ОБНОВЛЕНО 2026-09-03 (после реального инцидента на первом хосте, США:
+create_market_order упал `code=20558 restricted jurisdiction` -- LP
+осталась незахеджированной ~14 минут до ручного закрытия). Владелец:
+"Если хедж-ордер вернёт ЛЮБУЮ ошибку -- НЕМЕДЛЕННО, автоматически, без
+ожидания команды: закрыть только что открытую LP-позицию обратно...
+Это не опционально." -- при ЛЮБОЙ ошибке create_market_order этот
+скрипт теперь САМ вызывает p5_live_close.close_position() В ТОМ ЖЕ
+процессе (никакого отдельного workflow-раунда) с реальным
+только-что-полученным tokenId, сразу после детекта ошибки хеджа.
+
+Скрипт предназначен для запуска С IP, где Lighter НЕ применяет
+юрисдикционный geo-блок к торговому пути (см. docs/PROJECT_STATE.md,
+"второй VPS (Нидерланды)") -- запускается по SSH на VPS, не на GH
+Actions runner'е (US IP гарантированно попадает под geo-блок).
+
 Шаги 2-4 (цикл ребаланса, почасовое логирование, safety-стопы) -- ВНЕ
 этого скрипта, не запускаются без отдельной команды владельца.
 """
@@ -348,11 +363,35 @@ def main() -> int:
         worst_price = order_info["worst_price_usd"]
     except Exception as e:  # noqa: BLE001
         progress["hedge_error"] = f"{type(e).__name__}: {e}"
-        progress["CRITICAL"] = ("LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция "
-                                 f"~{real_delta_eth:.6f} ETH) -- хедж-ордер не прошёл, см. hedge_error. "
-                                 "НЕ повторяю автоматически -- требуется ручное решение владельца.")
+        progress["CRITICAL"] = (f"LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция "
+                                 f"~{real_delta_eth:.6f} ETH) -- хедж-ордер не прошёл, см. hedge_error.")
         OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
         print(f"[p5_live_step1] {progress['CRITICAL']}")
+
+        # Владелец, 2026-09-03 (задача Step1-с-VPS-Нидерланды, п.2):
+        # "Если хедж-ордер вернёт ЛЮБУЮ ошибку -- НЕМЕДЛЕННО, автоматически,
+        # без ожидания команды: закрыть только что открытую LP-позицию
+        # обратно... Голая экспозиция не должна оставаться открытой ни на
+        # минуту дольше, чем требуется на детект ошибки. Это не опционально."
+        print("[p5_live_step1] === АВТОМАТИЧЕСКОЕ ЗАКРЫТИЕ LP (хедж не прошёл) ===")
+        from p5_live_close import close_position  # отложенный импорт -- p5_live_close сам импортирует из этого модуля на уровне файла (циклический импорт на верхнем уровне)
+        try:
+            close_position(
+                liq_event["token_id"], account, progress,
+                known_deposit0=real_amount0_eth, known_deposit1=real_amount1_usdg,
+                prior_gas_txs=progress.get("txs", []), out_path=OUT_PATH,
+            )
+            progress["auto_close_succeeded"] = True
+            progress["CRITICAL"] += " АВТОЗАКРЫТИЕ УСПЕШНО -- голой позиции больше нет."
+            print("[p5_live_step1] АВТОЗАКРЫТИЕ УСПЕШНО -- голой позиции больше нет.")
+        except Exception as close_exc:  # noqa: BLE001
+            progress["auto_close_succeeded"] = False
+            progress["auto_close_error"] = f"{type(close_exc).__name__}: {close_exc}"
+            progress["CRITICAL"] += (f" АВТОЗАКРЫТИЕ ТОЖЕ НЕ УДАЛОСЬ: {progress['auto_close_error']} -- "
+                                      "ПОЗИЦИЯ ВСЁ ЕЩЁ ГОЛАЯ, ТРЕБУЕТСЯ НЕМЕДЛЕННОЕ РУЧНОЕ ВМЕШАТЕЛЬСТВО ВЛАДЕЛЬЦА.")
+            print(f"[p5_live_step1] {progress['CRITICAL']}")
+
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
         return 1
 
     # Финальные остатки (свежий пересчёт)
