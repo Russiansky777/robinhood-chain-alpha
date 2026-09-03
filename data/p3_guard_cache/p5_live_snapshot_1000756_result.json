@@ -1,0 +1,85 @@
+{
+  "generated_at_utc": "2026-09-03T22:38:12.196802+00:00",
+  "token_id": 1000756,
+  "block": 53772685,
+  "nfpm_positions_raw": {
+    "found": true,
+    "token_id": 1000756,
+    "liquidity": 40193983848339,
+    "tick_lower": -199094,
+    "tick_upper": -197087,
+    "tokens_owed0": 0,
+    "tokens_owed1": 0,
+    "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "fully_closed": false
+  },
+  "uncollected_fees_callStatic": {
+    "fees0_eth": 1.644159875169e-06,
+    "fees1_usdg": 0.003756,
+    "fees_usd": 0.007859202472470822
+  },
+  "price_vs_range": {
+    "pool_price_now_usd": 2495.6225574164814,
+    "range_lower_usd": 2258.8622122121415,
+    "range_upper_usd": 2760.884795012003,
+    "current_tick": -198098,
+    "in_range": true,
+    "position_pct_in_range": 47.161293797559665,
+    "pct_drop_to_lower_edge": 9.487025371714825,
+    "pct_rise_to_upper_edge": 10.62910081523411,
+    "nearest_edge": "lower",
+    "move_from_entry_pct": -0.5690329143804158,
+    "pct_of_10pct_path_to_nearest_edge": 5.689149220437349
+  },
+  "lighter_hedge_now": {
+    "found": true,
+    "symbol": "ETH",
+    "sign": -1,
+    "position_size_eth": 0.0377,
+    "avg_entry_price_usd": 2506.43,
+    "unrealized_pnl_usd": 0.456547,
+    "liquidation_price_usd": 4044.0837011564154,
+    "lighter_mark_price_now_usd": 2494.32,
+    "distance_to_liquidation_pct_from_current_price": 62.13171129431729,
+    "collateral_usd": 59.799088,
+    "available_balance_usd": 28.913482,
+    "free_margin_pct_now": 48.35104174163994,
+    "current_leverage": {
+      "found": true,
+      "initial_margin_fraction_pct": 33.33,
+      "leverage": 3.0003000300030003,
+      "margin_mode_raw": 0
+    },
+    "liquidation_formula_cross_check": {
+      "mmf": 0.012,
+      "p_liq_formula": 4044.083701156415,
+      "p_liq_real": 4044.0837011564154,
+      "diff_abs": -4.547473508864641e-13
+    }
+  },
+  "delta_check": {
+    "amount_eth_required_now_formula": 0.03962758720345073,
+    "real_hedge_size_eth": 0.0377,
+    "net_delta_eth_now": 0.00192758720345073,
+    "net_delta_usd_now": 4.8105301063189945,
+    "drift_pct_of_hedge_size": 5.112963404378594,
+    "hours_since_open": 0.5267213338888889,
+    "drift_pct_of_hedge_size_per_hour": 9.707150774829195
+  },
+  "economics": {
+    "fees_earned_usd_unclaimed_now": 0.007859202472470822,
+    "hours_elapsed": 0.5267213338888889,
+    "capital_at_risk_usd_entry": 256.86446629889997,
+    "gas_spent_so_far_usd": 0.4559289194803113,
+    "net_usd_so_far": -0.4480697170078405,
+    "fees_per_hour_usd": 0.014920987563660578,
+    "annualized_pct_fees_only_gross": 50.885921646152745,
+    "annualized_pct_net_of_gas_spent_so_far": -2901.113769691019,
+    "kill_threshold_annual_pct": 30.0,
+    "passes_kill_threshold_gross": true,
+    "passes_kill_threshold_net_of_gas": false,
+    "CAUTION": "Экстраполяция в годовые с выборки в считанные часы -- статистически ненадёжна (один выброс/затишье комиссий даёт кратные искажения APR). Не решение по kill-порогу, только первая точка ряда -- см. data/p5_fee_accrual.jsonl, нужно минимум 24 часовых точки."
+  },
+  "runtime_s": 3.7734267711639404
+}
