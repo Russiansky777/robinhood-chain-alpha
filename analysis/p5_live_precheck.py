@@ -144,6 +144,23 @@ def lighter_margin() -> dict:
             "available_balance_usd": float(acct.get("available_balance", 0))}
 
 
+def lighter_positions() -> list[dict]:
+    """Реальный список открытых позиций аккаунта (не только маржа) --
+    НАЙДЕНО (реальный инцидент 2026-09-03, run 33782052511): Lighter
+    может вернуть `err=None` от create_market_order (200 OK, есть
+    tx_hash) БЕЗ фактического исполнения ордера (ответ содержал
+    `"ratelimit": "didn't use volume quota"` -- не ошибка, но и не факт
+    филла). Единственный надёжный способ подтвердить реальный хедж --
+    свежее чтение позиций отсюда, не доверие полю err."""
+    r = requests.get(f"{LIGHTER_API_BASE}/api/v1/account",
+                      params={"by": "index", "value": str(LIGHTER_ACCOUNT_INDEX)}, timeout=20)
+    r.raise_for_status()
+    accounts = r.json().get("accounts", [])
+    if not accounts:
+        return []
+    return [p for p in accounts[0].get("positions", []) if float(p.get("position", 0)) != 0]
+
+
 def get_liquidity_for_amounts(sqrt_p: float, sqrt_pa: float, sqrt_pb: float, amount0: float, amount1: float) -> float:
     """Дословно Uniswap/v3-periphery LiquidityAmounts.sol::getLiquidityForAmounts
     (работает во float, не в Q96-фиксированной точке -- для оценочного

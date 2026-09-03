@@ -40,12 +40,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
 
-      - name: Определить режим (dry-run по умолчанию, real только если есть CONFIRM-маркер в этом коммите)
+      - name: Определить режим (dry-run по умолчанию, real только если есть CONFIRM-маркер)
         id: mode
         run: |
-          if [ -e data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST ] && git log -1 --name-only --pretty=format: | grep -q "P5_LIVE_CLOSE_CONFIRM_REQUEST"; then
+          # НЕ полагаемся на "маркер в ПОСЛЕДНЕМ коммите" через git log --
+          # ненадёжно на shallow-clone (checkout@v4 default fetch-depth=1,
+          # см. run_p5_live_step1_vps.yml для полного разбора реального
+          # инцидента). Только существование файла + удаление сразу после
+          # использования (шаг Commit results).
+          if [ -e data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST ]; then
             echo "flag=--confirm-mainnet" >> "$GITHUB_OUTPUT"
-            echo "РЕЖИМ: РЕАЛЬНОЕ ЗАКРЫТИЕ (CONFIRM-маркер в последнем коммите)"
+            echo "РЕЖИМ: РЕАЛЬНОЕ ЗАКРЫТИЕ"
           else
             echo "flag=" >> "$GITHUB_OUTPUT"
             echo "РЕЖИМ: DRY-RUN"
@@ -70,6 +75,7 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/P5_LIVE_CLOSE_CONFIRM_REQUEST data/p3_guard_cache/P5_LIVE_CLOSE_DRYRUN_REQUEST
           [ -e data/p3_guard_cache/p5_live_close_result.json ] && git add data/p3_guard_cache/p5_live_close_result.json
           [ -e data/p5_live_log.jsonl ] && git add data/p5_live_log.jsonl
           git diff --cached --quiet && exit 0

@@ -42,6 +42,17 @@ create_market_order упал `code=20558 restricted jurisdiction` -- LP
 "второй VPS (Нидерланды)") -- запускается по SSH на VPS, не на GH
 Actions runner'е (US IP гарантированно попадает под geo-блок).
 
+НАЙДЕНО (реальный инцидент 2026-09-03, run 33782052511, VPS-NL):
+`create_market_order` вернул `err=None` (200 OK, реальный tx_hash) БЕЗ
+фактического исполнения ордера -- ответ содержал `"ratelimit": "didn't
+use volume quota"`, не ошибку, но и не подтверждение филла. Реальных
+позиций на Lighter не появилось (LP осталась голой). `err is None` САМ
+ПО СЕБЕ теперь НЕ считается доказательством хеджа -- добавлена
+`_verify_hedge_filled()`: свежее чтение реальных positions() (до 4
+попыток, 3с пауза) ПОСЛЕ отправки ордера; если реальная позиция не
+появилась -- это трактуется как сбой хеджа наравне с ошибкой API, тот
+же автозакрытие срабатывает.
+
 Шаги 2-4 (цикл ребаланса, почасовое логирование, safety-стопы) -- ВНЕ
 этого скрипта, не запускаются без отдельной команды владельца.
 """
@@ -409,12 +420,42 @@ def main() -> int:
         finally:
             await client.close()
 
+    def _verify_hedge_filled(expected_size_eth: float, attempts: int = 4, delay_s: float = 3.0) -> dict:
+        # НАЙДЕНО (реальный инцидент 2026-09-03, run 33782052511):
+        # create_market_order вернул err=None (200 OK, реальный tx_hash),
+        # но реальной позиции на Lighter НЕ появилось (ответ содержал
+        # `"ratelimit": "didn't use volume quota"` -- не ошибка, но и не
+        # подтверждение филла). err=None САМ ПО СЕБЕ НЕ ДОКАЗЫВАЕТ хедж --
+        # только свежее чтение реальных positions() доказывает.
+        last_positions: list[dict] = []
+        for i in range(attempts):
+            if i > 0:
+                time.sleep(delay_s)
+            last_positions = pc.lighter_positions()
+            eth_pos = next((p for p in last_positions if str(p.get("symbol", "")).upper() == "ETH"), None)
+            if eth_pos is not None and abs(float(eth_pos.get("position", 0))) >= expected_size_eth * 0.5:
+                return {"filled": True, "position": eth_pos, "attempts_used": i + 1}
+            print(f"[p5_live_step1] проверка филла хеджа: попытка {i + 1}/{attempts} -- ETH-позиция не найдена "
+                  f"(positions={last_positions})")
+        return {"filled": False, "position": None, "attempts_used": attempts, "last_positions_seen": last_positions}
+
     try:
         order_info = asyncio.run(_place_hedge())
         progress["hedge_order"] = order_info
         if order_info.get("err"):
             raise RuntimeError(f"create_market_order вернул ошибку: {order_info['err']}")
+
+        fill_check = _verify_hedge_filled(real_delta_eth)
+        progress["hedge_fill_check"] = fill_check
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        if not fill_check["filled"]:
+            raise RuntimeError(
+                f"create_market_order вернул err=None (принят API), но реальная позиция на Lighter НЕ появилась "
+                f"после {fill_check['attempts_used']} проверок -- ордер не исполнился (см. hedge_order.tx_hash "
+                f"для сырого ответа API)."
+            )
         worst_price = order_info["worst_price_usd"]
+        print(f"[p5_live_step1] ХЕДЖ ПОДТВЕРЖДЁН реальной позицией: {fill_check['position']}")
     except Exception as e:  # noqa: BLE001
         progress["hedge_error"] = f"{type(e).__name__}: {e}"
         progress["CRITICAL"] = (f"LP-позиция ОТКРЫТА и НЕ ЗАХЕДЖИРОВАНА (полная направленная экспозиция "
