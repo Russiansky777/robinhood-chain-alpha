@@ -111,8 +111,12 @@ def build_calldata_collect(token_id: int, recipient: str, amount0_max: int, amou
     return selector + abi_encode(types, [(token_id, recipient, amount0_max, amount1_max)])
 
 
-def send_and_wait(account, label: str, to: str, data: bytes, nonce: int, gas_price: int, progress: dict, out_path: Path) -> dict:
+def send_and_wait(account, label: str, to: str, data: bytes, nonce: int, progress: dict, out_path: Path) -> dict:
+    # gas_price читается СВЕЖИМ прямо здесь, не заранее -- см.
+    # p5_live_step1.py::send_tx, реальный прогон 33780888659: baseFee
+    # успевает подрасти за время ожидания квитанции предыдущей tx.
     print(f"[p5_live_close] --- {label}: отправка (nonce={nonce}) ---")
+    gas_price = eth_gas_price()
     gas_est = eth_estimate_gas(to, data, 0)
     tx_hash = send_tx(account, to, data, 0, nonce, gas_est, gas_price)
     print(f"[p5_live_close] {label}: ОТПРАВЛЕНО {tx_hash}, жду квитанцию...")
@@ -228,13 +232,13 @@ def close_position(
         decrease_receipt = send_and_wait(
             account, "1_decreaseLiquidity", NFPM,
             build_calldata_decrease(token_id, pos["liquidity"], amount0_min, amount1_min, deadline),
-            nonce, gas_price, progress, out_path,
+            nonce, progress, out_path,
         )
         nonce += 1
         collect_receipt = send_and_wait(
             account, "2_collect", NFPM,
             build_calldata_collect(token_id, WALLET, MAX_UINT128, MAX_UINT128),
-            nonce, gas_price, progress, out_path,
+            nonce, progress, out_path,
         )
     except RuntimeError as e:
         progress["close_abort_reason"] = str(e)

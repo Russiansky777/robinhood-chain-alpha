@@ -1,0 +1,64 @@
+name: P5 LIVE -- развернуть WETH обратно в ETH (перед retry Step1)
+
+# После run 33780888659: шаг "1_wrap_ETH_to_WETH" прошёл, "4_mint" был
+# отклонён (gas-race) -- в кошельке осталось ~0.0424 WETH, невидимое
+# для wallet_balances()/Step1. Чистая ончейн-операция (withdraw() на
+# WETH9), Lighter не участвует -- может идти с обычного GH Actions
+# runner'а, не нужен VPS.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_LIVE_UNWRAP_DRYRUN_REQUEST"
+      - "data/p3_guard_cache/P5_LIVE_UNWRAP_CONFIRM_REQUEST"
+
+jobs:
+  unwrap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Определить режим
+        id: mode
+        run: |
+          if [ -e data/p3_guard_cache/P5_LIVE_UNWRAP_CONFIRM_REQUEST ] && git log -1 --name-only --pretty=format: | grep -q "P5_LIVE_UNWRAP_CONFIRM_REQUEST"; then
+            echo "flag=--confirm-mainnet" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Развернуть WETH -> ETH
+        env:
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/p5_live_unwrap_weth.py ${{ steps.mode.outputs.flag }}
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_live_unwrap_weth_result.json ] && git add data/p3_guard_cache/p5_live_unwrap_weth_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5 LIVE: развернуть WETH в ETH перед retry Step1 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          exit 1

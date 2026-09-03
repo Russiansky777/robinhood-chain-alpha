@@ -128,9 +128,15 @@ def send_tx(account, to: str, data: bytes, value: int, nonce: int, gas_limit: in
     # eth_account.Account.sign_transaction() падал `TypeError: Transaction
     # had invalid fields: {'to': '0x0bd7...'}` ДО отправки (локальная
     # валидация, ничего не ушло в сеть, нонс не тронут).
+    # НАЙДЕНО (реальный прогон 33780888659, 2026-09-03): 10%-запас на
+    # gasPrice был недостаточен -- 4-я транзакция в последовательности
+    # (mint) была отклонена ДО отправки в сеть: `maxFeePerGas
+    # 1568113800 < baseFee 1637694000` -- base fee успел вырасти за время
+    # ожидания квитанций 3 предыдущих транзакций. Увеличено до 50% (в
+    # абсолютных числах это копейки -- base fee на этой сети ~1-2 Gwei).
     tx = {
         "chainId": CHAIN_ID, "nonce": nonce, "to": to_checksum_address(to), "value": value,
-        "gas": int(gas_limit * 1.2), "gasPrice": int(gas_price * 1.1), "data": "0x" + data.hex(),
+        "gas": int(gas_limit * 1.2), "gasPrice": int(gas_price * 1.5), "data": "0x" + data.hex(),
     }
     signed = Account.sign_transaction(tx, account.key)
     return _rpc_call("eth_sendRawTransaction", ["0x" + signed.raw_transaction.hex()])
@@ -146,8 +152,12 @@ def wait_for_receipt(tx_hash: str, timeout_s: int = 300, poll_s: int = 5) -> dic
     raise RuntimeError(f"{tx_hash} не замайнилась за {timeout_s}с -- проверить вручную, НЕ повторять отправку автоматически.")
 
 
-def send_and_wait(account, label: str, to: str, data: bytes, value: int, nonce: int, gas_price: int, progress: dict) -> dict:
+def send_and_wait(account, label: str, to: str, data: bytes, value: int, nonce: int, progress: dict) -> dict:
+    # gas_price читается СВЕЖИМ прямо здесь (не передаётся заранее
+    # посчитанным сверху) -- см. комментарий в send_tx про baseFee drift
+    # между последовательными транзакциями, ждущими квитанций.
     print(f"[p5_live_step1] --- {label}: отправка (nonce={nonce}) ---")
+    gas_price = eth_gas_price()
     gas_est = eth_estimate_gas(to, data, value)
     tx_hash = send_tx(account, to, data, value, nonce, gas_est, gas_price)
     print(f"[p5_live_step1] {label}: ОТПРАВЛЕНО {tx_hash}, жду квитанцию...")
@@ -282,15 +292,15 @@ def main() -> int:
 
     nonce = eth_nonce()
     try:
-        send_and_wait(account, "1_wrap_ETH_to_WETH", WETH, build_calldata_deposit(), amount0_desired_wei, nonce, gas_price, progress)
+        send_and_wait(account, "1_wrap_ETH_to_WETH", WETH, build_calldata_deposit(), amount0_desired_wei, nonce, progress)
         nonce += 1
-        send_and_wait(account, "2_approve_WETH", WETH, build_calldata_approve(NFPM, amount0_desired_wei), 0, nonce, gas_price, progress)
+        send_and_wait(account, "2_approve_WETH", WETH, build_calldata_approve(NFPM, amount0_desired_wei), 0, nonce, progress)
         nonce += 1
-        send_and_wait(account, "3_approve_USDG", USDG, build_calldata_approve(NFPM, amount1_desired_raw), 0, nonce, gas_price, progress)
+        send_and_wait(account, "3_approve_USDG", USDG, build_calldata_approve(NFPM, amount1_desired_raw), 0, nonce, progress)
         nonce += 1
         mint_params = (WETH, USDG, FEE_TIER, tick_lower, tick_upper, amount0_desired_wei, amount1_desired_raw,
                         amount0_min, amount1_min, WALLET, deadline)
-        mint_receipt = send_and_wait(account, "4_mint", NFPM, build_calldata_mint(mint_params), 0, nonce, gas_price, progress)
+        mint_receipt = send_and_wait(account, "4_mint", NFPM, build_calldata_mint(mint_params), 0, nonce, progress)
     except RuntimeError as e:
         progress["abort_reason"] = str(e)
         progress["CRITICAL"] = "Сбой в пакете mint -- проверить состояние вручную ПЕРЕД повтором. Если approve прошли, но mint нет -- approve остаются в силе, ETH может быть уже wrapped."
