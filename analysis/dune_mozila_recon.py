@@ -137,6 +137,20 @@ WHERE (LOWER(table_schema) LIKE '%robinhood%' OR LOWER(table_name) LIKE '%robinh
        OR LOWER(table_name) LIKE '%usdg%' OR LOWER(table_schema) LIKE '%uniswap%')
 LIMIT 100
 """
+# Реальный результат: этот широкий фильтр зашумлён мостом Across
+# (across_v3_robinhood -- 'v3' в названии схемы, но это SpokePool моста,
+# не DEX) -- алфавитно раньше настоящих кандидатов, LIMIT 100 съеден им
+# целиком. distinct_schemas (см. выше) реально нашёл кандидатов в DEX:
+# robinswap_v3_robinhood, sushiswap_v3_robinhood, pancakeswap_v3_robinhood,
+# ramsesxyz_cl_robinhood, gigadex_v3_robinhood, poolsfun_robinhood -- этот
+# третий запрос узко ищет ТОЛЬКО evt_swap (Swap-событие), не 'pool'/'v3'
+# вообще, чтобы не собирать мостовые/vault-таблицы снова.
+EVT_SWAP_SEARCH_SQL = """
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE LOWER(table_schema) LIKE '%robinhood%' AND LOWER(table_name) LIKE '%evt_swap%'
+LIMIT 100
+"""
 
 
 def run() -> int:
@@ -183,6 +197,9 @@ def run() -> int:
 
     print("\n=== 4. Точечный поиск таблиц swap/uniswap/pool/v3/usdg среди robinhood-схем ===")
     run_query_step("mozila_swap_table_search", SWAP_TABLE_SEARCH_SQL, 2.0)
+
+    print("\n=== 5. Узкий поиск ТОЛЬКО evt_swap среди всех robinhood-схем (без шума моста/vault) ===")
+    run_query_step("mozila_evt_swap_search", EVT_SWAP_SEARCH_SQL, 2.0)
 
     print(f"\n=== Остаток бюджета разведки (funding_mozila): "
           f"{RECON_BUDGET - load_state()['funding_mozila']['spent']:.2f} из {RECON_BUDGET} ===")
