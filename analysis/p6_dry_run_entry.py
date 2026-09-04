@@ -14,18 +14,22 @@
   - real_eth_leverage()-паттерн (читает initial_margin_fraction С АККАУНТА,
     не константой) -- для BTC вместо ETH.
 
-ВАЖНО: аккаунт 22012 -- ТОТ ЖЕ, что уже держит ETH-шорт P5, и торгует в
-режиме CROSS margin (см. p5_live_position_snapshot.py: cross_initial_
-margin_requirement -- НА ВЕСЬ аккаунт, не на одну позицию). Это значит,
-что реальный риск ликвидации при добавлении BTC-шорта -- СОВМЕСТНЫЙ с
-существующим ETH-шортом, не изолированный. Здесь считается ИЗОЛИРОВАННАЯ
-проекция для нового BTC-шорта (тот же метод, что уже провалидирован для
-ETH) -- совместный (joint) риск ЯВНО помечен как отдельный, не решённый
-здесь вопрос, а не молча проигнорирован."""
+ОБНОВЛЕНО, 2026-09-04 (владелец, ПОСЛЕ реального закрытия P5): P5
+закрыт по-настоящему (ETH-шорт flatten + decreaseLiquidity/collect на
+1000756, см. RESULTS.md) -- аккаунт 22012 сейчас реально БЕЗ открытых
+позиций, весь collateral свободен. Новое правило размера: свободная
+маржа на Lighter ПОСЛЕ открытия BTC-шорта >= 40% от collateral. Если
+целевой LP-капитал ($250 по умолчанию) требует маржи больше допустимой
+-- УМЕНЬШАЕТСЯ LP (TARGET_TOTAL_CAPITAL_USD), а не маржа/плечо
+(владелец, дословно: "если на LP-ногу остаётся меньше $250, уменьшить
+LP, не маржу"). Целевой капитал читается из env P6_TARGET_CAPITAL_USD
+(default 250.0) -- позволяет пересчитать под правило без редактирования
+константы вручную на каждой итерации."""
 from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -42,10 +46,11 @@ USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 CBBTC = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
 
 LIGHTER_API_BASE = "https://api.rh.lighter.xyz"  # тот же хост, что P5
-LIGHTER_ACCOUNT_INDEX = 22012  # тот же аккаунт, что P5 (cross margin -- см. докстринг)
+LIGHTER_ACCOUNT_INDEX = 22012  # тот же аккаунт, что P5 (P5 реально закрыт -- см. докстринг)
 
 RANGE_PCT = 0.10  # владелец: диапазон +-10%, тот же, что P5
-TARGET_TOTAL_CAPITAL_USD = 250.0  # владелец: ~$250 суммарно (LP + коллатерал)
+TARGET_TOTAL_CAPITAL_USD = float(os.environ.get("P6_TARGET_CAPITAL_USD") or "250.0")
+MIN_FREE_MARGIN_PCT = 40.0  # владелец, 2026-09-04: свободная маржа после открытия шорта >= 40% от collateral
 
 SELECTORS = {
     "slot0": "0x3850c7bd", "liquidity": "0x1a686502", "tickSpacing": "0xd0c93a7c",
@@ -356,76 +361,47 @@ def run() -> int:
     print(f"[p6_dry_run] РЕАЛЬНОЕ текущее состояние аккаунта: collateral=${collateral_now:.2f}, "
           f"available_balance=${available_now:.2f}, cross_initial_margin_requirement(текущая, от ETH P5)=${cross_initial_margin_requirement_now:.2f}")
 
-    # Проекция цены ликвидации -- ИЗОЛИРОВАННАЯ (см. докстринг: реальный
-    # риск -- совместный с ETH-шортом P5 на этом же cross-margin аккаунте,
-    # явно помечено ниже как открытый вопрос, не решается здесь).
+    # П5 РЕАЛЬНО закрыт (RESULTS.md, 2026-09-04) -- аккаунт сейчас реально
+    # без открытых позиций (проверяется явно ниже, не предполагается),
+    # поэтому формула ликвидации для BTC-шорта здесь -- уже НЕ изолированная
+    # условность "как если бы", а точная формула для факта "одна позиция
+    # на аккаунте" (P_liq = (equity + size*entry)/(size*(1+mmf)), та же,
+    # что уже сверена с реальным Lighter `liquidation_price` для ETH,
+    # p5_live_position_snapshot.py, mmf_formula_check). entry = p0 (текущая
+    # цена, т.к. позиции ещё нет, реального avg_entry_price не существует).
+    other_open_positions = [p for p in account_full.get("positions", [])
+                             if str(p.get("symbol", "")).upper() != "BTC" and abs(float(p.get("position", 0))) > 1e-9]
     mmf_raw = btc_market.get("maintenance_margin_fraction") if btc_market else None
-    liq_price_projection = None
-    if mmf_raw is not None:
+    size_btc = amount1_used
+    liq_price_single_position = None
+    if mmf_raw is not None and size_btc and not other_open_positions:
         mmf = float(mmf_raw) / 10000
-        liq_price_projection = (required_margin_usd + short_notional_usd) / ((short_notional_usd / p0) * (1 + mmf)) if p0 else None
-        # short: p_liq = (collateral + size*p0)/(size*(1+mmf)), collateral=required_margin_usd (изолированная проекция)
+        liq_price_single_position = (collateral_now + size_btc * p0) / (size_btc * (1 + mmf))
+
+    free_margin_usd = collateral_now - required_margin_usd
+    free_margin_pct = (free_margin_usd / collateral_now * 100) if collateral_now else None
+    margin_rule_satisfied = (free_margin_pct is not None and free_margin_pct >= MIN_FREE_MARGIN_PCT)
+
     result["hedge"] = {
         "btc_leverage_used": btc_leverage,
         "btc_leverage_confirmed_account_setting": btc_leverage_is_confirmed_account_setting,
         "short_notional_usd": short_notional_usd,
-        "required_margin_usd_isolated_projection": required_margin_usd,
+        "required_margin_usd": required_margin_usd,
         "account_collateral_now_usd": collateral_now, "account_available_balance_now_usd": available_now,
         "account_cross_initial_margin_requirement_now_usd": cross_initial_margin_requirement_now,
-        "liquidation_price_projection_isolated_usd": liq_price_projection,
-        "CROSS_MARGIN_WARNING": ("Аккаунт УЖЕ держит ETH-шорт P5 в режиме cross margin -- "
-                                  "реальный совместный риск ликвидации НЕ равен этой изолированной "
-                                  "проекции. Открытый вопрос владельцу, не решён здесь."),
+        "other_open_positions_besides_btc": other_open_positions,
+        "free_margin_usd": free_margin_usd, "free_margin_pct": free_margin_pct,
+        "min_free_margin_pct_rule": MIN_FREE_MARGIN_PCT, "margin_rule_satisfied": margin_rule_satisfied,
+        "liquidation_price_single_position_usd": liq_price_single_position,
+        "note": ("P5 реально закрыт -- на аккаунте нет других позиций (проверено по факту), поэтому "
+                 "это точная формула для 'одна позиция на аккаунте', не проекция 'как если бы'."
+                 if not other_open_positions else
+                 "На аккаунте ЕСТЬ другие открытые позиции кроме BTC -- формула единственной позиции не применяется, ликвидация не считается."),
     }
-
-    print("\n=== 4b. Сценарий: после закрытия P5 (реальный свободный баланс из dry-run закрытия) ===")
-    p5_close_path = Path("data/p3_guard_cache/p5_close_dry_run_result.json")
-    if p5_close_path.exists():
-        p5_close = json.loads(p5_close_path.read_text())
-        pnl = p5_close.get("step3_final_pnl_all_legs")
-        hedge_close = p5_close.get("step1_hedge_close", {})
-        if pnl and "abort_reason" not in hedge_close:
-            freed_usd = pnl.get("freed_on_lighter_usd")
-            collateral_after_p5_close = hedge_close.get("account_projection_after_close", {}).get("collateral_usd")
-            available_after_p5_close = hedge_close.get("account_projection_after_close", {}).get("available_balance_usd")
-            other_positions_besides_eth = hedge_close.get("other_open_positions_besides_eth", [])
-            if available_after_p5_close is not None and not other_positions_besides_eth:
-                margin_ok_after_close = available_after_p5_close >= required_margin_usd
-                # Единственная позиция на аккаунте (P5 ETH-шорт закрыт, других
-                # нет) -- ликвидация по ТОЙ ЖЕ проверенной cross-margin формуле,
-                # что уже сверена с реальным полем Lighter `liquidation_price`
-                # для ETH (p5_live_position_snapshot.py, mmf_formula_check):
-                # P_liq = (equity + size*entry)/(size*(1+mmf)), где entry -- цена
-                # входа В МОМЕНТ ГИПОТЕТИЧЕСКОГО открытия = текущая p0 (позиции
-                # ещё нет, реального avg_entry_price не существует).
-                size_btc = amount1_used
-                liq_price_single_position = None
-                if mmf_raw is not None and size_btc:
-                    mmf_val = float(mmf_raw) / 10000
-                    liq_price_single_position = (collateral_after_p5_close + size_btc * p0) / (size_btc * (1 + mmf_val))
-                result["post_p5_close_scenario"] = {
-                    "source": "data/p3_guard_cache/p5_close_dry_run_result.json (dry-run, ничего не отправлено там же)",
-                    "freed_on_lighter_usd": freed_usd,
-                    "account_collateral_after_p5_close_usd": collateral_after_p5_close,
-                    "account_available_balance_after_p5_close_usd": available_after_p5_close,
-                    "required_margin_usd_for_btc_short": required_margin_usd,
-                    "margin_sufficient_after_p5_close": margin_ok_after_close,
-                    "liquidation_price_single_position_usd": liq_price_single_position,
-                    "note": ("После закрытия P5 BTC-шорт станет ЕДИНСТВЕННОЙ позицией на аккаунте -- "
-                             "эта проекция ликвидации УЖЕ не изолированная условность, а реальная формула "
-                             "для факта 'одна позиция на аккаунте' (не проекция 'как если бы', а точная "
-                             "формула при этом условии)."),
-                }
-                print(f"[p6_dry_run] после закрытия P5: available_balance=${available_after_p5_close:.2f} "
-                      f"(+${freed_usd:.2f} освобождено), требуется=${required_margin_usd:.2f}, "
-                      f"хватает={margin_ok_after_close}, ликвидация(единств. позиция)=${liq_price_single_position}")
-            else:
-                result["post_p5_close_scenario"] = {"note": "на аккаунте останутся другие позиции кроме BTC после закрытия P5 -- сценарий 'единственная позиция' не применим, не считаю.",
-                                                      "other_open_positions_besides_eth": other_positions_besides_eth}
-        else:
-            result["post_p5_close_scenario"] = {"note": "p5_close_dry_run_result.json найден, но без валидного step3_final_pnl_all_legs -- пропущено."}
-    else:
-        result["post_p5_close_scenario"] = {"note": "data/p3_guard_cache/p5_close_dry_run_result.json не найден -- сценарий 'после закрытия P5' пропущен."}
+    print(f"[p6_dry_run] требуемая маржа=${required_margin_usd:.2f}, collateral=${collateral_now:.2f}, "
+          f"свободная маржа=${free_margin_usd:.2f} ({free_margin_pct:.1f}%), "
+          f"правило >={MIN_FREE_MARGIN_PCT:.0f}% -- {'ВЫПОЛНЕНО' if margin_rule_satisfied else 'НЕ выполнено'}, "
+          f"ликвидация(единств. позиция)=${liq_price_single_position}")
 
     print("\n=== 5. Реальный газ (последняя Mint-транзакция на этом пуле) ===")
     mint_tx = find_recent_mint_tx()

@@ -25,7 +25,15 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
+      - name: Определить целевой капитал LP (из маркера "capital_usd=NNN", по умолчанию 250 -- см. скрипт)
+        id: capital
+        run: |
+          val=$(grep -oE 'capital_usd=[0-9.]+' data/p3_guard_cache/P6_DRY_RUN_ENTRY_REQUEST 2>/dev/null | cut -d= -f2 || true)
+          echo "value=$val" >> "$GITHUB_OUTPUT"
+          echo "целевой капитал LP: ${val:-<default из скрипта>}"
       - name: Dry-run входа P6 -- реальные суммы, тик-диапазон, маржа, ликвидация, газ, Across
+        env:
+          P6_TARGET_CAPITAL_USD: ${{ steps.capital.outputs.value }}
         run: python -u analysis/p6_dry_run_entry.py
       - name: Commit results
         if: always()
