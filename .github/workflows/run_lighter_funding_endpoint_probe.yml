@@ -1,0 +1,53 @@
+name: "Логгер фандинга -- разведка: работает ли /api/v1/fundings на api.rh.lighter.xyz"
+
+# api.rh.lighter.xyz (Robinhood-инстанс, ТОТ ЖЕ хост, что хедж P5) --
+# ОТДЕЛЬНЫЙ деплой от mainnet.zklighter.elliot.ai, где /api/v1/fundings
+# подтверждён (P4). Разные деплои одного ПО не гарантированно идентичны
+# по набору эндпоинтов -- проверяем реально перед тем, как писать
+# продовый часовой сборщик на этом предположении. Хост заблокирован из
+# интерактивной песочницы (прокси), поэтому проверка -- только здесь.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/LIGHTER_FUNDING_ENDPOINT_PROBE_REQUEST"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Проверить /api/v1/fundings + orderBookOrders на api.rh.lighter.xyz
+        run: python -u analysis/lighter_funding_endpoint_probe.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/lighter_funding_endpoint_probe_result.json ] && git add data/p3_guard_cache/lighter_funding_endpoint_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Логгер фандинга: разведка эндпоинтов api.rh.lighter.xyz [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
