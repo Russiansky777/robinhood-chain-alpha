@@ -1,0 +1,53 @@
+name: P5 -- signature plot волатильности + скользящие окна + регрессия объём/волатильность (только чтение)
+
+# Владелец, 2026-09-04: отдельная задача на 52-дневной истории GT --
+# сети из интерактивной сессии нет, гонится через GH Actions. Signature
+# plot (15m/1h/4h/12h/1d + variance ratio), распределение sigma на
+# скользящих окнах 24ч/72ч, регрессия почасовой объём~|log-return| и
+# численное решение порога по sigma. Только HTTP GET на публичный
+# GeckoTerminal API, без ключа.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_GT_SIGNATURE_PLOT_REQUEST"
+
+jobs:
+  signature_plot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Signature plot -- sigma по таймфреймам, скользящие окна, регрессия объём/волатильность
+        run: python -u analysis/p5_gt_signature_plot.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_gt_signature_plot_result.json ] && git add data/p3_guard_cache/p5_gt_signature_plot_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5: signature plot волатильности -- sigma по таймфреймам, скользящие окна, регрессия [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
