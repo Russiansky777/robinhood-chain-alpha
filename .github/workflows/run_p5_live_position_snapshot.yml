@@ -1,11 +1,18 @@
-name: P5 LIVE -- снимок позиции 1000756 (ончейн-комиссии, Lighter, дельта, экономика; только чтение)
+name: P5 LIVE -- забрать накопленный cron'ом ряд с NL VPS (1000756, только чтение по SSH + коммит)
 
-# Владелец, 2026-09-03: "снять первую реальную точку доходности по
-# 1000756" + "снимать [комиссии] раз в час, минимум 24 точки до
-# запуска демона". ТОЛЬКО ЧТЕНИЕ: eth_call (staticcall-эквивалент, не
-# транзакция) + публичный Lighter REST. Ни один приватный ключ не
-# нужен и не используется -- ни decreaseLiquidity/collect, ни
-# Lighter-ордера этот workflow не отправляет.
+# Владелец, 2026-09-04: ДО этой правки workflow ГЕНЕРИРОВАЛ новую точку,
+# запуская p5_live_position_snapshot.py прямо на GH Actions runner'е при
+# каждом push'е маркера. Теперь сбор идёт автономным cron'ом раз в час
+# НА САМОМ VPS (см. run_vps_setup_hourly_cron_nl.yml, живой файл ВНЕ
+# git-репозитория -- /home/bot/p5_live_data/p5_fee_accrual.jsonl) --
+# этот workflow больше НИЧЕГО не генерирует, только читает по SSH то,
+# что cron уже накопил с прошлого визита, и коммитит (дедуп по
+# timestamp_utc, analysis/p5_merge_accrual_from_vps.py). Маркер
+# (`data/p3_guard_cache/P5_LIVE_SNAPSHOT_REQUEST`) тот же, что и
+# раньше -- владелец сознательно переиспользует существующий канал.
+# Git на VPS не используется -- у раннера уже есть доступ на запись,
+# отдельного кредда для пуша с хоста нет и не заводим (см.
+# docs/HANDOFF.md).
 on:
   workflow_dispatch: {}
   push:
@@ -15,7 +22,7 @@ on:
       - "data/p3_guard_cache/P5_LIVE_SNAPSHOT_REQUEST"
 
 jobs:
-  snapshot:
+  fetch:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,19 +38,38 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -r analysis/requirements.txt
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: Снимок позиции 1000756 (комиссии, диапазон, Lighter-хедж, дельта, экономика)
-        run: python -u analysis/p5_live_position_snapshot.py
+      - name: Забрать накопленный ряд (вне git на VPS) + последний полный снимок
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/p5_live_data/p5_fee_accrual.jsonl' > /tmp/vps_p5_fee_accrual.jsonl
+          [ -s /tmp/vps_p5_fee_accrual.jsonl ]
+          echo "строк на VPS: $(wc -l < /tmp/vps_p5_fee_accrual.jsonl), было в git: $(wc -l < data/p5_fee_accrual.jsonl)"
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p5_live_snapshot_1000756_result.json' > /tmp/vps_p5_live_snapshot_1000756_result.json || true
+
+      - name: Слить новые строки (дедуп по timestamp_utc, ничего не генерируем заново)
+        run: python -u analysis/p5_merge_accrual_from_vps.py /tmp/vps_p5_fee_accrual.jsonl
+
+      - name: Обновить последний полный снимок (не накопительный файл -- просто последнее состояние с VPS)
+        run: |
+          [ -s /tmp/vps_p5_live_snapshot_1000756_result.json ] && cp /tmp/vps_p5_live_snapshot_1000756_result.json data/p3_guard_cache/p5_live_snapshot_1000756_result.json || true
 
       - name: Commit results
         if: always()
         run: |
-          [ -e data/p3_guard_cache/p5_live_snapshot_1000756_result.json ] && git add data/p3_guard_cache/p5_live_snapshot_1000756_result.json
           [ -e data/p5_fee_accrual.jsonl ] && git add data/p5_fee_accrual.jsonl
+          [ -e data/p3_guard_cache/p5_live_snapshot_1000756_result.json ] && git add data/p3_guard_cache/p5_live_snapshot_1000756_result.json
           git diff --cached --quiet && exit 0
-          git commit -m "P5 LIVE: снимок 1000756 -- комиссии/диапазон/Lighter/дельта/экономика [automated]"
+          git commit -m "P5 LIVE: забрать ряд, накопленный cron'ом на NL VPS [automated]"
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"

@@ -1,0 +1,126 @@
+name: P5 LIVE -- VPS Нидерланды: автономный часовой cron снимка 1000756 (только приложение, SSH/ufw/firewall/ключи не трогает)
+
+# Владелец, 2026-09-04: сбор `data/p5_fee_accrual.jsonl` переносится с
+# GH Actions runner'а (одна точка за push маркера) на автономный cron
+# от пользователя `bot` НА САМОМ VPS -- раз в час, без git на хосте.
+# Настоящий накопленный ряд хранится ВНЕ git-репозитория
+# (/home/bot/p5_live_data/p5_fee_accrual.jsonl), чтобы будущий
+# `git reset --hard`/переразворачивание репозитория на хосте не могли
+# его стереть. Забор накопленного -- отдельный workflow
+# (run_p5_live_position_snapshot.yml, переиспользует тот же маркер).
+#
+# Этот workflow НЕ трогает SSH-порт/sshd_config/ufw/ключи -- только
+# приложение (venv, скрипт, crontab) через уже существующий аудируемый
+# канал (VPS_SSH_KEY). См. docs/PROJECT_STATE.md §4 п.8 про то, почему
+# изменения канала доступа -- отдельная тема с отдельным подтверждением.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_SETUP_HOURLY_CRON_NL_REQUEST"
+
+jobs:
+  setup_cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "1. Обновить код репозитория у bot (reset --hard -- безопасно, накопленный ряд живёт вне репо)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "2. Засеять внешний живой файл (вне git) текущим содержимым git -- только если ещё не создан"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/p5_live_data
+            if [ ! -s /home/bot/p5_live_data/p5_fee_accrual.jsonl ]; then
+              sudo -u bot cp /home/bot/robinhood-chain-alpha/data/p5_fee_accrual.jsonl /home/bot/p5_live_data/p5_fee_accrual.jsonl
+              echo "засеяно: $(wc -l < /home/bot/p5_live_data/p5_fee_accrual.jsonl) строк из git"
+            else
+              echo "внешний файл уже существует ($(wc -l < /home/bot/p5_live_data/p5_fee_accrual.jsonl) строк) -- не трогаю, cron продолжает его"
+            fi
+          '
+
+      - name: "3. Обёрточный скрипт cron'а (идемпотентно перезаписывается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /home/bot/bin && cat > /home/bot/bin/p5_hourly_snapshot.sh && chown bot:bot /home/bot/bin/p5_hourly_snapshot.sh && chmod +x /home/bot/bin/p5_hourly_snapshot.sh' <<'EOF'
+          #!/bin/bash
+          # Автономный часовой снимок P5 (1000756) НА САМОМ VPS -- только
+          # чтение, без git. Настоящий накопленный ряд -- ВНЕ git-репозитория
+          # (/home/bot/p5_live_data/p5_fee_accrual.jsonl), чтобы будущий
+          # git reset репозитория его не стёр. Перед запуском рабочая копия
+          # в репо восстанавливается из внешнего файла, после -- копируется
+          # обратно со свежей добавленной строкой.
+          set -euo pipefail
+
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/p5_live_data
+          LIVE_ACCRUAL="$LIVE_DIR/p5_fee_accrual.jsonl"
+
+          mkdir -p "$LIVE_DIR"
+          touch "$LIVE_ACCRUAL"
+
+          cd "$REPO"
+          cp "$LIVE_ACCRUAL" data/p5_fee_accrual.jsonl
+
+          set -a
+          [ -f /etc/bot/env ] && source /etc/bot/env
+          set +a
+
+          echo "=== $(date -u +%FT%TZ) -- запуск p5_live_position_snapshot.py ==="
+          "$REPO/venv/bin/python" -u analysis/p5_live_position_snapshot.py
+
+          cp data/p5_fee_accrual.jsonl "$LIVE_ACCRUAL"
+          echo "=== $(date -u +%FT%TZ) -- ОК, строк в живом ряду: $(wc -l < "$LIVE_ACCRUAL") ==="
+          EOF
+
+      - name: "4. Crontab bot -- раз в час, минута :06, идемпотентно (не дублирует строку при повторном запуске)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/robinhood-chain-alpha/logs
+            CRONLINE="6 * * * * /home/bot/bin/p5_hourly_snapshot.sh >> /home/bot/robinhood-chain-alpha/logs/p5_hourly_snapshot.log 2>&1"
+            ( sudo -u bot crontab -l 2>/dev/null | grep -vF "p5_hourly_snapshot.sh" ; echo "$CRONLINE" ) | sudo -u bot crontab -
+            echo "=== crontab bot ==="; sudo -u bot crontab -l
+          '
+
+      - name: "5. Разовый тестовый прогон вручную (подтвердить механизм сразу, не ждать первого тика)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot /home/bot/bin/p5_hourly_snapshot.sh
+            echo "=== хвост внешнего живого файла ==="
+            tail -1 /home/bot/p5_live_data/p5_fee_accrual.jsonl
+            echo "=== число строк ==="
+            wc -l /home/bot/p5_live_data/p5_fee_accrual.jsonl
+          '
+
+      - name: Итог
+        run: |
+          echo "cron установлен (раз в час, минута :06), первый тестовый прогон прошёл."
+          echo "Дальше растёт автономно; забор -- отдельным маркером P5_LIVE_SNAPSHOT_REQUEST."
+          echo "Git на VPS не используется нигде в этом механизме."
