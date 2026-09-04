@@ -129,20 +129,38 @@ def v3_amounts(liquidity, sqrt_p, sqrt_pa, sqrt_pb) -> tuple[float, float]:
 
 def find_recent_mint_tx() -> dict:
     """Реальная недавняя Mint-транзакция на ЭТОМ пуле -- для реальной
-    оценки gasUsed (не общеизвестная оценка "обычно 300-400k газа")."""
+    оценки gasUsed (не общеизвестная оценка "обычно 300-400k газа").
+
+    ИСПРАВЛЕНО (реальная ошибка первого прогона): mainnet.base.org
+    реально вернул 413 "Payload Too Large" на eth_getLogs с окном
+    200_000 блоков -- публичный RPC ограничивает диапазон одного
+    вызова (не задокументировано явно, найдено по факту). Чанкинг
+    назад от latest небольшими окнами, с ранним выходом при первой
+    находке -- не гадаем лимит заранее, ловим ошибку и сокращаем."""
     latest = int(rpc("eth_blockNumber", []), 16)
-    window = 200_000  # Base ~2с/блок => ~4.6 дня, реальный охват для найти хотя бы 1 Mint
-    from_block = max(1, latest - window)
-    logs = rpc("eth_getLogs", [{
-        "address": POOL_ADDRESS, "topics": [MINT_TOPIC0],
-        "fromBlock": hex(from_block), "toBlock": hex(latest),
-    }])
-    if not logs:
-        return {"found": False, "window_blocks": window}
-    tx_hash = logs[-1]["transactionHash"]
-    receipt = rpc("eth_getTransactionReceipt", [tx_hash])
-    return {"found": True, "tx_hash": tx_hash, "gas_used": int(receipt["gasUsed"], 16),
-            "n_mints_in_window": len(logs)}
+    chunk_size = 10_000
+    max_chunks = 20  # 20x10_000 = 200_000 блоков ~ 4.6 дня, тот же общий охват
+    to_block = latest
+    for _ in range(max_chunks):
+        from_block = max(1, to_block - chunk_size)
+        try:
+            logs = rpc("eth_getLogs", [{
+                "address": POOL_ADDRESS, "topics": [MINT_TOPIC0],
+                "fromBlock": hex(from_block), "toBlock": hex(to_block),
+            }])
+        except Exception as exc:  # noqa: BLE001
+            print(f"    eth_getLogs [{from_block}, {to_block}] упал: {exc}")
+            to_block = from_block - 1
+            continue
+        if logs:
+            tx_hash = logs[-1]["transactionHash"]
+            receipt = rpc("eth_getTransactionReceipt", [tx_hash])
+            return {"found": True, "tx_hash": tx_hash, "gas_used": int(receipt["gasUsed"], 16),
+                    "n_mints_in_chunk": len(logs), "chunk_range": [from_block, to_block]}
+        to_block = from_block - 1
+        if from_block <= 1:
+            break
+    return {"found": False, "window_blocks": chunk_size * max_chunks}
 
 
 def lighter_account_full() -> dict | None:
