@@ -211,14 +211,23 @@ def get_acceptance_datetime(cik: int, accession: str) -> str | None:
     accn_nodash = accession.replace("-", "")
     url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accn_nodash}.txt"
     try:
-        resp = _rate_limited_get(url, headers={**HEADERS, "Range": "bytes=0-8192"}, timeout=15)
+        # Accept-Encoding: identity -- ВАЖНО вместе с Range. gzip + partial
+        # byte-range не декомпрессируется (частичный сжатый поток), и
+        # requests либо отдаёт мусор, либо пустой text без исключения --
+        # реальная причина 0/379 в первом прогоне после фикса таймаута
+        # (никаких ошибок в логе не было, просто ни разу не совпал regex).
+        resp = _rate_limited_get(
+            url, headers={**HEADERS, "Range": "bytes=0-8192", "Accept-Encoding": "identity"}, timeout=15,
+        )
     except requests.exceptions.RequestException as exc:
         print(f"    [edgar] acceptance-datetime сеть-ошибка {accession}: {exc}")
         return None
     if resp.status_code not in (200, 206):
+        print(f"    [edgar] acceptance-datetime {accession}: HTTP {resp.status_code}")
         return None
     m = re.search(r"<ACCEPTANCE-DATETIME>(\d{14})", resp.text)
     if not m:
+        print(f"    [edgar] acceptance-datetime {accession}: паттерн не найден в первых {len(resp.content)} байтах")
         return None
     raw = m.group(1)
     # ВАЖНО: ACCEPTANCE-DATETIME в SGML-заголовке EDGAR -- локальное
