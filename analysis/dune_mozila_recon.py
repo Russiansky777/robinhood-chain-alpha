@@ -152,6 +152,31 @@ WHERE LOWER(table_schema) LIKE '%robinhood%' AND LOWER(table_name) LIKE '%evt_sw
 LIMIT 100
 """
 
+# Реальный результат: НЕСКОЛЬКО форков используют идентичную ABI/имя
+# таблицы 'uniswapv3pool_evt_swap' / 'clpool_evt_swap' (сам контракт
+# UniswapV3Pool переиспользован разными проектами) -- нельзя угадать,
+# какая схема держит НАШ конкретный адрес пула
+# (0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca, ETH/USDG, см.
+# PROJECT_STATE.md §1), не проверив по факту. Один UNION ALL с COUNT(*)
+# по contract_address -- ветки независимы (не пересчитывают общий CTE
+# друг друга, не тот паттерн, что дал 144 кредита в 03c, см.
+# credit_guard.check_sql_sanity) -- определит, в какой схеме реально
+# есть строки для этого адреса.
+POOL_ADDRESS = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
+IDENTIFY_POOL_SCHEMA_SQL = f"""
+SELECT 'uniswap_v3_robinhood' AS project, count(*) AS n FROM uniswap_v3_robinhood.uniswapv3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'robinswap_robinhood', count(*) FROM robinswap_robinhood.uniswapv3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'sushiswap_v3_robinhood', count(*) FROM sushiswap_v3_robinhood.uniswapv3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'ramsesxyz_robinhood_v3pool', count(*) FROM ramsesxyz_robinhood.ramsesv3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'sheriff_robinhood_pool', count(*) FROM sheriff_robinhood.sheriffpool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'sheriff_robinhood_algebra', count(*) FROM sheriff_robinhood.algebrapool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'gigadex_robinhood_cl', count(*) FROM gigadex_robinhood.clpool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'uponrh_robinhood', count(*) FROM uponrh_robinhood.clpool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'pancakeswap_v3_robinhood', count(*) FROM pancakeswap_v3_robinhood.pancakev3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+UNION ALL SELECT 'swaphood_robinhood', count(*) FROM swaphood_robinhood.pancakev3pool_evt_swap WHERE contract_address = {POOL_ADDRESS}
+LIMIT 100
+"""
+
 
 def run() -> int:
     ensure_ledger_seeded()
@@ -200,6 +225,9 @@ def run() -> int:
 
     print("\n=== 5. Узкий поиск ТОЛЬКО evt_swap среди всех robinhood-схем (без шума моста/vault) ===")
     run_query_step("mozila_evt_swap_search", EVT_SWAP_SEARCH_SQL, 2.0)
+
+    print(f"\n=== 6. Идентификация схемы для НАШЕГО адреса пула {POOL_ADDRESS} (UNION ALL COUNT по кандидатам) ===")
+    run_query_step("mozila_identify_pool_schema", IDENTIFY_POOL_SCHEMA_SQL, 5.0)
 
     print(f"\n=== Остаток бюджета разведки (funding_mozila): "
           f"{RECON_BUDGET - load_state()['funding_mozila']['spent']:.2f} из {RECON_BUDGET} ===")
