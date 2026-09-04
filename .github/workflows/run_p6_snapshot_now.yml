@@ -40,11 +40,12 @@ jobs:
       - name: Забрать результат с VPS
         if: always()
         run: |
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/p6_live_data/p6_fee_accrual.jsonl' > /tmp/p6_fee_accrual.jsonl || true
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p6_live_snapshot_result.json' > /tmp/p6_live_snapshot_result.json || true
           mkdir -p data/p3_guard_cache
-          [ -s /tmp/p6_fee_accrual.jsonl ] && cp /tmp/p6_fee_accrual.jsonl data/p6_fee_accrual.jsonl
-          [ -s /tmp/p6_live_snapshot_result.json ] && cp /tmp/p6_live_snapshot_result.json data/p3_guard_cache/p6_live_snapshot_result.json
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/p6_live_data/p6_fee_accrual.jsonl' > /tmp/p6_fee_accrual.jsonl || true
+          [ -s /tmp/p6_fee_accrual.jsonl ] && cp /tmp/p6_fee_accrual.jsonl data/p6_fee_accrual.jsonl || true
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p6_live_snapshot_result.json' > /tmp/p6_live_snapshot_result.json || true
+          [ -s /tmp/p6_live_snapshot_result.json ] && cp /tmp/p6_live_snapshot_result.json data/p3_guard_cache/p6_live_snapshot_result.json || true
+          exit 0
 
       - name: Commit results
         if: always()

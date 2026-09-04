@@ -68,11 +68,18 @@ jobs:
       - name: Забрать результат с VPS
         if: always()
         run: |
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p6_live_step1_result.json' > /tmp/p6_step1_result.json || true
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p6_live_position_state.json' > /tmp/p6_live_position_state.json || true
+          # НАЙДЕНО (реальный прогон, dry-run): [ -s file ] && cp ... как
+          # ПОСЛЕДНЯЯ команда скрипта -- классическая ловушка `set -e`:
+          # если тест ложный (файла нет -- ожидаемо в dry-run, position_state.json
+          # пишется только в REAL-режиме), exit-код ВСЕГО шага = exit-код теста
+          # (1), хотя реально всё прошло штатно. mkdir/копирования вынесены
+          # ПЕРЕД потенциально отсутствующим файлом, каждая строка -- с || true.
           mkdir -p data/p3_guard_cache
-          [ -s /tmp/p6_step1_result.json ] && cp /tmp/p6_step1_result.json data/p3_guard_cache/p6_live_step1_result.json
-          [ -s /tmp/p6_live_position_state.json ] && cp /tmp/p6_live_position_state.json data/p6_live_position_state.json
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p6_live_step1_result.json' > /tmp/p6_step1_result.json || true
+          [ -s /tmp/p6_step1_result.json ] && cp /tmp/p6_step1_result.json data/p3_guard_cache/p6_live_step1_result.json || true
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p6_live_position_state.json' > /tmp/p6_live_position_state.json || true
+          [ -s /tmp/p6_live_position_state.json ] && cp /tmp/p6_live_position_state.json data/p6_live_position_state.json || true
+          exit 0
 
       - name: Commit results
         if: always()
