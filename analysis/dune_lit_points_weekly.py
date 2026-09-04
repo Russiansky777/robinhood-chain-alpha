@@ -64,6 +64,13 @@ WHERE blockchain = 'ethereum' AND contract_address = {LIT_CONTRACT}
 LIMIT 5
 """
 
+# erc20_ethereum.evt_transfer -- альтернативная таблица, тоже реально
+# существует и содержит данные (проверено 2026-09-04, 12 колонок:
+# from/to/value/evt_block_time и т.д., value в raw-единицах), НЕ
+# используется в run() ниже -- tokens.transfers выбрана как основная
+# (amount уже в человекочитаемых единицах, не нужно применять decimals
+# вручную). Оставлено как задокументированный, реально проверенный
+# запасной путь, если tokens.transfers перестанет отдавать строки.
 PEEK_ERC20_EVT_TRANSFER_SQL = f"""
 SELECT *
 FROM erc20_ethereum.evt_transfer
@@ -72,15 +79,21 @@ LIMIT 5
 """
 
 
-def top_senders_window_sql(date_str: str, table: str, amount_col: str, from_col: str, time_col: str) -> str:
+def top_senders_window_sql(date_str: str) -> str:
+    # Реальные имена колонок подтверждены 2026-09-04 через fetch_existing()
+    # на уже оплаченном execute (см. analysis/dune_lit_points_recover_peek.py,
+    # data/p3_guard_cache/dune_lit_points_recover_peek_result.json) -- НЕ
+    # угаданы. tokens.transfers.amount уже в человекочитаемых единицах
+    # (не raw, decimals уже применены Dune) -- amount_raw есть отдельно,
+    # но не нужен здесь.
     return f"""
-SELECT {from_col} AS sender, count(*) AS n_transfers, sum(CAST({amount_col} AS double)) AS total_amount_raw_units
-FROM {table}
-WHERE contract_address = {LIT_CONTRACT}
-  AND {time_col} >= TIMESTAMP '{date_str} 00:00:00' - INTERVAL '1' DAY
-  AND {time_col} < TIMESTAMP '{date_str} 00:00:00' + INTERVAL '2' DAY
-GROUP BY {from_col}
-ORDER BY total_amount_raw_units DESC
+SELECT "from" AS sender, count(*) AS n_transfers, sum(amount) AS total_amount_lit
+FROM tokens.transfers
+WHERE blockchain = 'ethereum' AND contract_address = {LIT_CONTRACT}
+  AND block_time >= TIMESTAMP '{date_str} 00:00:00' - INTERVAL '1' DAY
+  AND block_time < TIMESTAMP '{date_str} 00:00:00' + INTERVAL '2' DAY
+GROUP BY "from"
+ORDER BY total_amount_lit DESC
 LIMIT 20
 """
 
@@ -110,27 +123,19 @@ def run() -> int:
             result["steps"][step_name] = {"failed": True, "reason": str(exc)[:2000]}
             print(f"[lit_points] {step_name} УПАЛ (не гвард, реальная ошибка Dune): {exc}")
 
+    # Схема уже подтверждена 2026-09-04 (analysis/dune_lit_points_recover_peek.py,
+    # см. data/p3_guard_cache/dune_lit_points_recover_peek_result.json):
+    # tokens.transfers -- 22 реальные колонки, amount уже в человекочитаемых
+    # единицах. Пики этой ревизии здесь по-прежнему выполняются (для
+    # самодостаточности повторного запуска с нуля), но с исправленной
+    # декларацией колонок -- не занижаем её вслепую второй раз.
     print("=== 1. Разведка схемы: tokens.transfers (единая таблица трансферов Dune) ===")
-    run_query_step("lit_peek_tokens_transfers", PEEK_TOKENS_TRANSFERS_SQL, 2.0, expected_max_rows=5, expected_columns=15)
+    run_query_step("lit_peek_tokens_transfers", PEEK_TOKENS_TRANSFERS_SQL, 2.0, expected_max_rows=5, expected_columns=25)
 
-    print("\n=== 2. Разведка схемы: erc20_ethereum.evt_transfer (декодированное событие) ===")
-    run_query_step("lit_peek_erc20_evt_transfer", PEEK_ERC20_EVT_TRANSFER_SQL, 2.0, expected_max_rows=5, expected_columns=10)
-
-    tokens_ok = result["steps"]["lit_peek_tokens_transfers"].get("n_rows", 0) > 0
-    erc20_ok = result["steps"]["lit_peek_erc20_evt_transfer"].get("n_rows", 0) > 0
-
-    if not tokens_ok and not erc20_ok:
-        print("\n[lit_points] Ни tokens.transfers, ни erc20_ethereum.evt_transfer не дали строк -- "
-              "останавливаюсь здесь, не гадаю дальше вслепую по другим именам таблиц без причины.")
-    else:
-        table, amount_col, from_col, time_col = (
-            ("tokens.transfers", "amount_raw", "\"from\"", "block_time") if tokens_ok
-            else ("erc20_ethereum.evt_transfer", "value", "\"from\"", "evt_block_time")
-        )
-        print(f"\n=== 3. Топ отправителей LIT по окнам вокруг известных пятниц выплат, таблица {table} ===")
-        for d in PAYOUT_FRIDAYS:
-            step = f"lit_top_senders_{d}"
-            run_query_step(step, top_senders_window_sql(d, table, amount_col, from_col, time_col), 5.0, expected_max_rows=20, expected_columns=5)
+    print("\n=== 2. Топ отправителей LIT по окнам вокруг известных пятниц выплат (tokens.transfers) ===")
+    for d in PAYOUT_FRIDAYS:
+        step = f"lit_top_senders_{d}"
+        run_query_step(step, top_senders_window_sql(d), 5.0, expected_max_rows=20, expected_columns=5)
 
     state = load_state()
     ns_spent = state["lit_points_mozila"]["spent"]
