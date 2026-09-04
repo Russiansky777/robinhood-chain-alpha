@@ -73,6 +73,26 @@ def run() -> int:
     result["steps"]["table_discovery"] = q(client, "wash_table_discovery", discovery_sql, 3.0, expected_max_rows=100, expected_columns=2)
 
     discovered = (result["steps"]["table_discovery"] or {}).get("rows") or []
+
+    # Реальный результат первого прогона (2026-09-04): только
+    # uniswap_v3_base.uniswapv3pool_evt_swap нашёлся -- у aerodrome_slipstream_base
+    # НЕТ таблицы с 'evt_swap' в имени вообще (не значит, что там нет
+    # свопов -- значит, имя события/таблицы называется иначе). USDC-CBBTC
+    # (реально aerodrome-slipstream, НЕ задвоенный с uniswap-v3) дал 0
+    # строк в uniswap_v3_base -- нужен более широкий список ВСЕХ таблиц
+    # этой схемы, чтобы найти реальное имя.
+    if "aerodrome_slipstream_base" not in {d["table_schema"] for d in discovered}:
+        print("\n=== aerodrome_slipstream_base: нет evt_swap-таблицы -- полный список таблиц схемы ===")
+        all_tables_sql = """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'aerodrome_slipstream_base'
+        LIMIT 100
+        """
+        result["steps"]["aerodrome_slipstream_base_all_tables"] = q(
+            client, "wash_aerodrome_slipstream_base_all_tables", all_tables_sql, 3.0,
+            expected_max_rows=100, expected_columns=1,
+        )
     by_schema: dict[str, str] = {}
     for row in discovered:
         by_schema.setdefault(row["table_schema"], row["table_name"])
@@ -102,7 +122,7 @@ def run() -> int:
         rows = step.get("rows") or []
         real_schema = None
         for row in rows:
-            if row.get("n", 0) and row["n"] > 0:
+            if float(row.get("n") or 0) > 0:
                 real_schema = row["schema_name"]
                 break
         if real_schema is None:
@@ -144,8 +164,12 @@ def run() -> int:
         totals_rows = (result["steps"][f"totals_7d_{pool_name}"] or {}).get("rows") or []
         wash_check = {"note": "недостаточно данных"}
         if sender_rows and recipient_rows and totals_rows:
-            total_vol = totals_rows[0]["total_volume_raw_units"]
-            top3_sender_vol = sum(r["volume_raw_units"] for r in sender_rows[:3])
+            # float() defensively -- Dune/CSV-круговорот отдаёт очень большие
+            # целые то как int, то как str в разных строках одного столбца
+            # (реальный баг первого прогона: TypeError int+str на sum()) --
+            # не полагаемся на консистентный тип, приводим явно.
+            total_vol = float(totals_rows[0]["total_volume_raw_units"])
+            top3_sender_vol = sum(float(r["volume_raw_units"]) for r in sender_rows[:3])
             top_sender_addr = sender_rows[0]["sender"]
             top_recipient_addr = recipient_rows[0]["recipient"]
             wash_check = {
