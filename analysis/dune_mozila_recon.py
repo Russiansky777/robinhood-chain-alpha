@@ -105,9 +105,15 @@ def probe_account_endpoints(client: DuneClient) -> dict:
 SCHEMA_SEARCH_SQL = """
 SELECT table_catalog, table_schema, table_name
 FROM information_schema.tables
-WHERE table_name ILIKE '%robinhood%' OR table_schema ILIKE '%robinhood%'
+WHERE LOWER(table_name) LIKE '%robinhood%' OR LOWER(table_schema) LIKE '%robinhood%'
 LIMIT 100
 """
+# ПЕРВАЯ попытка использовала ILIKE -- реальная ошибка Dune (2026-09-04,
+# execution 01M1PBWQ7EFDZDHKBQW2Z6HCTZ): "mismatched input 'ILIKE'.
+# Expecting: ... <predicate>" -- парсер Dune для information_schema-запросов
+# не принимает ILIKE (в отличие от полного DuneSQL/Trino для основных
+# запросов, не проверено отдельно, не обобщаем). LOWER(...) LIKE --
+# портируемая замена, не требует ILIKE вообще.
 
 
 def run() -> int:
@@ -141,6 +147,15 @@ def run() -> int:
     except SystemExit as exc:
         result["steps"]["schema_search"] = {"stopped": True, "reason": str(exc)}
         print(f"[recon] schema_search остановлен гвардом: {exc}")
+    except Exception as exc:  # noqa: BLE001 -- падение Dune (FAILED/TIMEOUT) не должно
+        # оставлять этот скрипт без результата: реальная стоимость уже
+        # записана гвардом (record_execution/_record внутри run_sql_cached)
+        # ДО того, как исключение долетело сюда -- credits_spent_mozila.json
+        # достоверен независимо от этого, но OUT_PATH тоже должен фиксировать
+        # факт и причину падения, а не пропадать молча (см. реальный кейс
+        # 2026-09-04: 'ILIKE' -- Dune не принял синтаксис в information_schema).
+        result["steps"]["schema_search"] = {"failed": True, "reason": str(exc)[:2000]}
+        print(f"[recon] schema_search УПАЛ (не гвард, реальная ошибка Dune): {exc}")
 
     print(f"\n=== Остаток бюджета разведки (funding_mozila): "
           f"{RECON_BUDGET - load_state()['funding_mozila']['spent']:.2f} из {RECON_BUDGET} ===")

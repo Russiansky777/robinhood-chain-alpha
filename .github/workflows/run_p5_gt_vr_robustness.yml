@@ -1,0 +1,47 @@
+name: "P5 -- устойчивость VR (блочный бутстрап + leave-one-day-out) + порог sigma<37% (только чтение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P5_GT_VR_ROBUSTNESS_REQUEST"
+
+jobs:
+  vr_robustness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: VR блочный бутстрап + leave-one-day-out + порог sigma<37%
+        run: python -u analysis/p5_gt_vr_robustness.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p5_gt_vr_robustness_result.json ] && git add data/p3_guard_cache/p5_gt_vr_robustness_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P5: устойчивость VR (бутстрап/leave-one-day-out) + порог sigma<37% [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
