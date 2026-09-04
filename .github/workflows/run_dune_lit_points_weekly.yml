@@ -1,0 +1,59 @@
+name: "Dune (Mozila) -- Поинты Lighter: недельные трансферы LIT вокруг известных выплат"
+
+# Владелец: давно открытый вопрос "сколько LIT распределено по программе
+# поинтов за недели 21.08 и 28.08" -- закрыт ЧАСТИЧНО 2026-09-02 через
+# бесплатные Ethereum RPC (docs/P4_RECON.md, раздел 4): eth_getLogs упал
+# на ДВУХ разных бесплатных шлюзах по инфраструктурным причинам (не по
+# отсутствию данных). Dune индексирует Ethereum mainnet как основную
+# сеть -- тот же путь (Transfer-логи LIT, окна вокруг тех же пятниц),
+# но через Dune SQL вместо публичного RPC. Отдельный маленький бюджет
+# (namespace lit_points_mozila, 30 кредитов) в том же леджере
+# data/credits_spent_mozila.json, что и funding_mozila* -- не смешивать.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/DUNE_LIT_POINTS_WEEKLY_REQUEST"
+
+jobs:
+  lit_points:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: LIT weekly transfers -- Dune (новый аккаунт, отдельный небольшой бюджет)
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/dune_lit_points_weekly.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/dune_lit_points_weekly_result.json ] && git add data/p3_guard_cache/dune_lit_points_weekly_result.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Dune (Mozila): недельные трансферы LIT вокруг выплат 21.08/28.08 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
