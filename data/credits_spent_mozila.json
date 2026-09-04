@@ -1,0 +1,37 @@
+{
+  "billing_cycle": {
+    "external_limit": 2000.0,
+    "initialized_spent": 0.0,
+    "initialized_at": "2026-09-04",
+    "initialized_by": "владелец, устно ('2000+ кредитов') -- НЕ подтверждено API на момент инициализации, см. account_endpoint_probe в результате этого скрипта. ОТДЕЛЬНЫЙ аккаунт от data/credits_spent.json (secrets.DUNE_API_KEY, 2500/цикл) -- бюджеты НЕ смешивать.",
+    "reset_at": null,
+    "reset_at_source": "неизвестно -- новый аккаунт, дата сброса цикла не сообщена владельцем",
+    "external_truth": {
+      "cycle_spent": 0.0,
+      "as_of": "2026-09-04",
+      "source": "инициализация с нуля (новый аккаунт), намеренно НЕТ калибровки по факту",
+      "namespace_snapshot_at_anchor": {
+        "funding_mozila": 0.0
+      },
+      "reserve_buffer": 20.0,
+      "reserve_buffer_source": "тот же неснижаемый страховой остаток, что и в старом аккаунте (владелец, 2026-09-01)"
+    }
+  },
+  "funding_mozila": {
+    "budget_remaining_at_init": 50.0,
+    "spent": 0.0
+  },
+  "entries": [
+    {
+      "op": "execute",
+      "namespace": "funding_mozila",
+      "name": "mozila_schema_search_robinhood [FAILED]",
+      "execution_id": "01M1PBWQ7EFDZDHKBQW2Z6HCTZ",
+      "estimated_credits": 2.0,
+      "credits": 0.0,
+      "credits_known": true,
+      "at": "2026-09-04T14:06:50.309547+00:00",
+      "failure_reason": "Dune execution 01M1PBWQ7EFDZDHKBQW2Z6HCTZ завершился со статусом QUERY_STATE_FAILED: {'execution_id': '01M1PBWQ7EFDZDHKBQW2Z6HCTZ', 'query_id': 8607161, 'is_execution_finished': True, 'state': 'QUERY_STATE_FAILED', 'submitted_at': '2026-09-04T14:06:50.096074Z', 'expires_at': '2026-12-03T14:06:50.170982Z', 'execution_started_at': '2026-09-04T14:06:50.09852529Z', 'execution_ended_at': '2026-09-04T14:06:50.170977504Z', 'execution_cost_credits': 0, 'error': {'type': 'FAILED_TYPE_EXECUTION_FAILED', '"
+    }
+  ]
+}
