@@ -72,7 +72,9 @@ def _rate_limited_get(url: str, **kwargs) -> requests.Response:
     wait = _last_request_at + REQUEST_INTERVAL_S - time.monotonic()
     if wait > 0:
         time.sleep(wait)
-    resp = requests.get(url, headers=HEADERS, timeout=30, **kwargs)
+    kwargs.setdefault("headers", HEADERS)
+    kwargs.setdefault("timeout", 30)
+    resp = requests.get(url, **kwargs)
     _last_request_at = time.monotonic()
     return resp
 
@@ -176,7 +178,10 @@ def get_cik_map(tickers: list[str]) -> dict[str, dict]:
 
 def get_8k_filings(cik: int, from_date: date) -> list[dict]:
     cik10 = str(cik).zfill(10)
-    resp = _rate_limited_get(f"https://data.sec.gov/submissions/CIK{cik10}.json")
+    try:
+        resp = _rate_limited_get(f"https://data.sec.gov/submissions/CIK{cik10}.json")
+    except requests.exceptions.RequestException as exc:
+        return [{"error": f"сеть: {exc}"}]
     if resp.status_code != 200:
         return [{"error": f"status={resp.status_code}"}]
     data = resp.json()
@@ -197,13 +202,22 @@ def get_8k_filings(cik: int, from_date: date) -> list[dict]:
 
 def get_acceptance_datetime(cik: int, accession: str) -> str | None:
     """ACCEPTANCE-DATETIME из SGML-заголовка полного текстового файла --
-    единственный точный источник времени (не только даты)."""
+    единственный точный источник времени (не только даты). Полный .txt
+    может весить мегабайты (приложенные exhibit'ы) -- заголовок всегда
+    в первых нескольких КБ, Range-запрос вместо скачивания всего файла
+    (реальная причина первого падения: ReadTimeout на большом файле,
+    30с не хватило). Любая сетевая ошибка здесь -- None, не крашит
+    остальной прогон (см. вызывающий код)."""
     accn_nodash = accession.replace("-", "")
     url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accn_nodash}.txt"
-    resp = _rate_limited_get(url)
-    if resp.status_code != 200:
+    try:
+        resp = _rate_limited_get(url, headers={**HEADERS, "Range": "bytes=0-8192"}, timeout=15)
+    except requests.exceptions.RequestException as exc:
+        print(f"    [edgar] acceptance-datetime сеть-ошибка {accession}: {exc}")
         return None
-    m = re.search(r"<ACCEPTANCE-DATETIME>(\d{14})", resp.text[:4000])
+    if resp.status_code not in (200, 206):
+        return None
+    m = re.search(r"<ACCEPTANCE-DATETIME>(\d{14})", resp.text)
     if not m:
         return None
     raw = m.group(1)
@@ -231,24 +245,36 @@ def run() -> int:
 
     print("\n=== 2. 8-K filings + ACCEPTANCE-DATETIME по каждому тикеру ===")
     filings_by_ticker: dict[str, list[dict]] = {}
+
+    def _save_partial() -> None:
+        """Пишем результат ПОСЛЕ КАЖДОГО тикера -- реальный сбой
+        2026-09-04 (ReadTimeout на одном большом .txt) уронил весь
+        прогон без единой сохранённой строки, хотя десятки тикеров уже
+        были обработаны. Теперь падение теряет максимум один тикер."""
+        result["filings_by_ticker"] = filings_by_ticker
+        result["runtime_s"] = time.time() - t0
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+
     for ticker, info in cik_map.items():
         cik = info.get("cik")
         if not cik:
             filings_by_ticker[ticker] = []
+            _save_partial()
             continue
-        filings = get_8k_filings(cik, FILING_DATE_FROM)
-        for f in filings:
-            if "error" in f:
-                continue
-            f["acceptance_datetime_utc_naive"] = get_acceptance_datetime(cik, f["accession"])
+        try:
+            filings = get_8k_filings(cik, FILING_DATE_FROM)
+            for f in filings:
+                if "error" in f:
+                    continue
+                f["acceptance_datetime_utc_naive"] = get_acceptance_datetime(cik, f["accession"])
+        except Exception as exc:  # noqa: BLE001 -- один тикер не должен ронять весь прогон
+            filings = [{"error": f"необработанное исключение: {exc}"}]
+            print(f"  {ticker}: ОШИБКА {exc}")
         filings_by_ticker[ticker] = filings
         print(f"  {ticker}: {len(filings)} форм 8-K с {FILING_DATE_FROM}")
+        _save_partial()
 
-    result["filings_by_ticker"] = filings_by_ticker
-    result["runtime_s"] = time.time() - t0
-
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     print(f"\n[edgar] записано {OUT_PATH}")
     return 0
 
