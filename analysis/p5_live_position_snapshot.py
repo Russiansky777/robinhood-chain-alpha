@@ -50,12 +50,26 @@ collect на САМОЙ позиции -- если с момента откры�
     PROJECT_STATE.md (текущий collateral/size/mark, без реконструкции
     цифр на момент входа): `P_margin_call = (collateral + size×P_now) /
     (size×(1 + 1/leverage))`.
-  - `fee_capture_ratio` = (наши комиссии за интервал / наш reserve_usd)
-    ÷ (комиссии пула за интервал / TVL пула) -- сравнивает наш
-    фактический fee yield с пуловым средним за тот же интервал. Пул --
-    тем же вызовом GeckoTerminal `/pools/{addr}`, что и
-    `p5_gt_pool_history.py` (мягкий отказ, если GT недоступен/лимит --
-    не должно блокировать основной ончейн-снимок).
+  - `fee_capture_ratio_interval` (переименовано из `fee_capture_ratio`) =
+    (наши комиссии за интервал / наш reserve_usd) ÷ (комиссии пула за
+    интервал / TVL пула). НАЙДЕНО (владелец, 2026-09-04, реальные две
+    точки дали 0.57 и 0.109 -- пятикратный разброс за час): накопление
+    комиссий в коротком интервале (~0.27ч) пуассоновское, попал крупный
+    своп в окно или нет решает всё -- поинтервальное отношение не
+    сходится ни к чему, сколько его ни собирай. **Оставлено в отчёте
+    как шумная диагностика (видно, чтобы не удивляться разбросу), для
+    решений НЕ используется** -- см. `fee_capture_ratio_cumulative` ниже.
+  - `fee_capture_ratio_cumulative` -- тот же принцип, но НАКОПИТЕЛЬНО с
+    момента открытия позиции: числитель -- наши комиссии с открытия
+    (сам `callStatic collect()` уже накопительный, суммировать не
+    нужно) делить на текущую стоимость LP-ноги; знаменатель -- сумма
+    РЕАЛЬНОГО почасового объёма пула (`ohlcv/hour?currency=usd`,
+    свечи с `timestamp >= position_open_ts`, НЕ `volume_usd.h24` --
+    это скользящее окно, соседние снятия перекрываются на 23ч и
+    складывать их нельзя) × 0.0001, делить на СРЕДНИЙ TVL пула по всем
+    точкам `data/p5_fee_accrual.jsonl` (не последний снимок -- TVL
+    гуляет, числитель накоплен за весь период, знаменатель должен быть
+    за тот же). Все входы -- отдельными полями для аудита.
   - `gas_spent_cumulative_usd` -- ОТДЕЛЬНОЕ поле, намеренно вынесено из
     блока `economics`, чтобы газ не "размазывался" внутри доходности
     (владелец, дословно). Пока = газ входа (`total_gas_spent_usd_est`
@@ -92,6 +106,9 @@ POOL_FEE_FRACTION = 0.0001  # 0.01%, подтверждено ончейн (fee=
 
 GT_NETWORK = "robinhood"  # подтверждено реальным вызовом, p5_gt_pool_history.py, run 33814194154
 GT_POOL_ADDRESS = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
+GT_RATE_LIMIT_BACKOFF_S = 65.0  # тот же ретрай, что p5_gt_pool_history.py -- реальный 429 словлен уже на ~6-м вызове/мин
+GT_RATE_LIMIT_MAX_RETRIES = 2
+GT_HOURLY_MAX_PAGES = 6  # 6000 часовых свечей ~= 250 дней -- с большим запасом на срок жизни позиции
 
 COLLECT_SIG = "collect((uint256,address,uint128,uint128))"
 
@@ -143,6 +160,88 @@ def fetch_gt_pool_snapshot_soft() -> dict | None:
     except Exception as e:  # noqa: BLE001
         print(f"[snapshot] GT /pools/{{addr}} недоступен ({e}) -- fee_capture_ratio пропущен в этом прогоне")
         return None
+
+
+def _gt_get_with_retry(url: str, params: dict) -> tuple[int | None, dict | str | None]:
+    """GET с ретраем на 429 (тот же бэкофф, что p5_gt_pool_history.py --
+    реальный лимит оказался жёстче заявленных 30/мин). Используется ТОЛЬКО
+    для кумулятивного fee_capture_ratio -- часового объёма пула."""
+    status, body = None, None
+    for attempt in range(GT_RATE_LIMIT_MAX_RETRIES + 1):
+        try:
+            r = requests.get(url, params=params, headers={"Accept": "application/json;version=20230302"}, timeout=20)
+            status, body = r.status_code, (r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text[:300])
+        except Exception as e:  # noqa: BLE001
+            print(f"[snapshot] GT hourly OHLCV: сетевая ошибка {e}")
+            return None, None
+        if status == 429 and attempt < GT_RATE_LIMIT_MAX_RETRIES:
+            print(f"[snapshot] GT hourly OHLCV 429 (попытка {attempt + 1}/{GT_RATE_LIMIT_MAX_RETRIES + 1}) -- жду {GT_RATE_LIMIT_BACKOFF_S:.0f}с")
+            time.sleep(GT_RATE_LIMIT_BACKOFF_S)
+            continue
+        break
+    return status, body
+
+
+def fetch_hourly_volume_usd_since(since_ts_unix: int) -> tuple[float | None, int, int | None, int | None]:
+    """Реальный почасовой объём пула в USD (`currency=usd`, НЕ `token` --
+    нужен именно объём в долларах, не в ETH) с `timestamp >= since_ts_unix`
+    (владелец: "снимки h24 -- скользящее окно, соседние точки
+    перекрываются на 23 часа, суммировать нельзя -- берём фактический
+    почасовой объём из OHLCV"). Возвращает (сумма_volume_usd,
+    n_свечей_учтено, самый_ранний_учтённый_ts, самый_поздний_ts).
+    (None, 0, None, None), если свечей с нужным timestamp ещё нет
+    (позиция открыта меньше часа назад) -- НЕ придумываем частичную
+    свечу, честный null (владелец, п.4 задачи)."""
+    all_rows: dict[int, list] = {}
+    before_ts: int | None = None
+    hit_older_than_since = False
+    for _ in range(GT_HOURLY_MAX_PAGES):
+        params = {"aggregate": 1, "limit": 1000, "currency": "usd", "include_empty_intervals": "true"}
+        if before_ts is not None:
+            params["before_timestamp"] = before_ts
+        status, body = _gt_get_with_retry(
+            f"https://api.geckoterminal.com/api/v2/networks/{GT_NETWORK}/pools/{GT_POOL_ADDRESS}/ohlcv/hour", params)
+        if status != 200 or not isinstance(body, dict):
+            print(f"[snapshot] GT hourly OHLCV: HTTP {status} -- {str(body)[:200]} -- останов пагинации")
+            break
+        rows = body.get("data", {}).get("attributes", {}).get("ohlcv_list", [])
+        if not rows:
+            break
+        for row in rows:
+            ts = int(row[0])
+            if ts >= since_ts_unix:
+                all_rows[ts] = row
+            else:
+                hit_older_than_since = True
+        oldest_ts = min(int(row[0]) for row in rows)
+        if len(rows) < 1000 or hit_older_than_since:
+            break
+        before_ts = oldest_ts
+    if not all_rows:
+        return None, 0, None, None
+    volume_sum = sum(float(row[5]) for row in all_rows.values())
+    ts_sorted = sorted(all_rows.keys())
+    return volume_sum, len(all_rows), ts_sorted[0], ts_sorted[-1]
+
+
+def read_all_accrual_pool_tvls() -> list[float]:
+    """Все реально сохранённые `pool_reserve_in_usd` из data/p5_fee_accrual.jsonl
+    (пропуская строки без этого поля -- старые точки/сбои GT) -- для
+    СРЕДНЕГО TVL пула за период накопления (владелец: "не последний
+    снимок, среднее"). Не включает текущую точку -- та добавляется
+    отдельно к списку перед усреднением (см. run())."""
+    if not ACCRUAL_LOG_PATH.exists():
+        return []
+    tvls = []
+    with ACCRUAL_LOG_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("pool_reserve_in_usd") is not None:
+                tvls.append(float(row["pool_reserve_in_usd"]))
+    return tvls
 
 
 def read_last_accrual_entry() -> dict | None:
@@ -402,12 +501,17 @@ def run() -> int:
     # ещё не было (демон не написан, см. docs/PROJECT_STATE.md §8). ===
     gas_spent_cumulative_usd = state.get("total_gas_spent_usd_est", 0.0)
 
-    # === fee_capture_ratio: наш fee yield за интервал против пулового
-    # среднего за тот же интервал (владелец, задача расширения отчёта) ===
+    # === fee_capture_ratio_interval (переименовано из fee_capture_ratio):
+    # наш fee yield за интервал против пулового среднего за тот же интервал.
+    # НАЙДЕНО (владелец, 2026-09-04): две реальные точки дали 0.57 и 0.109 --
+    # пуассоновский шум короткого интервала, не сходится ни к чему. Оставлено
+    # как диагностика, для решений НЕ используется (см. cumulative ниже). ===
     prev_entry = read_last_accrual_entry()
     gt_pool = fetch_gt_pool_snapshot_soft()
-    fee_capture_ratio = None
-    fee_capture_detail: dict = {}
+    fee_capture_ratio_interval = None
+    fee_capture_detail: dict = {
+        "CAUTION": "поинтервальное значение шумное (пуассоновское накопление на коротком окне) -- для решений не используется, оставлено как диагностика разброса.",
+    }
     if prev_entry and prev_entry.get("token_id") == TOKEN_ID:
         prev_fees_usd = prev_entry["fees0_eth"] * prev_entry["pool_price_usd"] + prev_entry["fees1_usdg"]
         prev_ts = datetime.strptime(prev_entry["timestamp_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
@@ -423,7 +527,7 @@ def run() -> int:
             pool_fees_interval_usd = pool_volume_h1_usd * POOL_FEE_FRACTION
             our_yield = interval_fees_usd / our_reserve_usd_now
             pool_yield = pool_fees_interval_usd / pool_reserve_usd if pool_reserve_usd else None
-            fee_capture_ratio = (our_yield / pool_yield) if pool_yield else None
+            fee_capture_ratio_interval = (our_yield / pool_yield) if pool_yield else None
             fee_capture_detail.update({
                 "our_reserve_usd_now": our_reserve_usd_now, "our_yield_interval": our_yield,
                 "pool_volume_h1_usd_proxy_for_interval": pool_volume_h1_usd,
@@ -436,7 +540,60 @@ def run() -> int:
             fee_capture_detail["note"] = "GT-снимок пула недоступен в этом прогоне ИЛИ our_reserve_usd_now=0 -- ratio не посчитан."
     else:
         fee_capture_detail["note"] = "нет предыдущей точки ряда (первый прогон или сменился token_id) -- интервал не определён."
-    print(f"\n[snapshot] fee_capture_ratio={fee_capture_ratio} детали={fee_capture_detail}")
+    print(f"\n[snapshot] fee_capture_ratio_interval={fee_capture_ratio_interval} (шумно, диагностика) детали={fee_capture_detail}")
+
+    # === fee_capture_ratio_cumulative (владелец, 2026-09-04, замена
+    # интервального): числитель -- НАШИ комиссии С ОТКРЫТИЯ (callStatic
+    # collect() уже накопительный) / текущая стоимость LP-ноги. Знаменатель
+    # -- сумма РЕАЛЬНОГО почасового объёма пула (ohlcv/hour?currency=usd,
+    # свечи с timestamp>=position_open_ts, НЕ volume_usd.h24 -- то
+    # скользящее окно, соседние снятия перекрываются на 23ч) × 0.0001,
+    # делённая на СРЕДНИЙ TVL пула по всем точкам jsonl (не последний
+    # снимок). ===
+    our_fees_usd_cum = fees_usd_unclaimed  # уже накопительно с открытия -- сам callStatic collect() так устроен
+    our_reserve_usd = our_reserve_usd_now
+    our_yield_cum = (our_fees_usd_cum / our_reserve_usd) if our_reserve_usd else None
+
+    position_open_ts_unix = None
+    hours_covered = None
+    if state.get("opened_at_utc"):
+        opened_at = datetime.fromisoformat(state["opened_at_utc"].replace("Z", "+00:00"))
+        position_open_ts_unix = int(opened_at.timestamp())
+        hours_covered = (now_utc - opened_at).total_seconds() / 3600
+
+    pool_volume_usd_sum, n_hourly_candles, earliest_ts, latest_ts = (None, 0, None, None)
+    if position_open_ts_unix is not None:
+        pool_volume_usd_sum, n_hourly_candles, earliest_ts, latest_ts = fetch_hourly_volume_usd_since(position_open_ts_unix)
+
+    pool_fees_usd_cum = (pool_volume_usd_sum * POOL_FEE_FRACTION) if pool_volume_usd_sum is not None else None
+
+    # Средний TVL: реально сохранённые pool_reserve_in_usd из ПРОШЛЫХ точек
+    # jsonl + текущий снимок (если GT доступен сейчас) -- НЕ придумываем
+    # значение для точек, где GT не был снят в своё время (см. read_all_
+    # accrual_pool_tvls()).
+    pool_reserve_now = float(gt_pool["reserve_in_usd"]) if (gt_pool and gt_pool.get("reserve_in_usd")) else None
+    tvl_samples = read_all_accrual_pool_tvls()
+    if pool_reserve_now is not None:
+        tvl_samples = tvl_samples + [pool_reserve_now]
+    avg_pool_tvl_usd = (sum(tvl_samples) / len(tvl_samples)) if tvl_samples else None
+    n_accrual_points = len(tvl_samples)
+
+    pool_yield_cum = (pool_fees_usd_cum / avg_pool_tvl_usd) if (pool_fees_usd_cum is not None and avg_pool_tvl_usd) else None
+    fee_capture_ratio_cumulative = (our_yield_cum / pool_yield_cum) if (our_yield_cum is not None and pool_yield_cum) else None
+
+    fee_capture_cumulative_detail = {
+        "our_fees_usd_cum": our_fees_usd_cum, "our_reserve_usd": our_reserve_usd, "our_yield_cum": our_yield_cum,
+        "position_open_ts_unix": position_open_ts_unix, "hours_covered": hours_covered,
+        "pool_volume_usd_sum_since_open": pool_volume_usd_sum, "n_hourly_candles": n_hourly_candles,
+        "earliest_hourly_candle_ts": earliest_ts, "latest_hourly_candle_ts": latest_ts,
+        "pool_fees_usd_cum": pool_fees_usd_cum,
+        "avg_pool_tvl_usd": avg_pool_tvl_usd, "n_accrual_points": n_accrual_points,
+        "pool_yield_cum": pool_yield_cum,
+        "note": (None if n_hourly_candles else
+                 "0 часовых свечей с timestamp>=position_open_ts (позиция открыта <1ч назад на момент первых точек) -- "
+                 "pool_fees_usd_cum/avg_pool_tvl_usd/ratio честно null, не выдумываем частичную свечу."),
+    }
+    print(f"[snapshot] fee_capture_ratio_cumulative={fee_capture_ratio_cumulative} детали={fee_capture_cumulative_detail}")
 
     # === Запись почасового ряда (append-only) ===
     block_now = get_block_number()
@@ -447,8 +604,14 @@ def run() -> int:
         "pool_price_usd": pool_price_now, "in_range": in_range,
         "free_margin_usd": lighter_hedge_now.get("free_margin_usd"),
         "margin_call_price": lighter_hedge_now.get("margin_call_price_usd"),
-        "fee_capture_ratio": fee_capture_ratio,
+        "fee_capture_ratio_interval": fee_capture_ratio_interval,
         "gas_spent_cumulative_usd": gas_spent_cumulative_usd,
+        "pool_reserve_in_usd": pool_reserve_now,
+        "our_fees_usd_cum": our_fees_usd_cum, "our_reserve_usd": our_reserve_usd,
+        "pool_fees_usd_cum": pool_fees_usd_cum, "avg_pool_tvl_usd": avg_pool_tvl_usd,
+        "hours_covered": hours_covered, "n_hourly_candles": n_hourly_candles,
+        "n_accrual_points": n_accrual_points,
+        "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
     }
     ACCRUAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ACCRUAL_LOG_PATH.open("a") as f:
@@ -471,7 +634,9 @@ def run() -> int:
         "delta_check": {**delta_check, "our_reserve_usd_now": our_reserve_usd_now, "amount1_usdg_now": amount1_usdg_now},
         "economics": economics,
         "gas_spent_cumulative_usd": gas_spent_cumulative_usd,
-        "fee_capture_ratio": fee_capture_ratio, "fee_capture_detail": fee_capture_detail,
+        "fee_capture_ratio_interval": fee_capture_ratio_interval, "fee_capture_interval_detail": fee_capture_detail,
+        "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
+        "fee_capture_cumulative_detail": fee_capture_cumulative_detail,
         "runtime_s": time.time() - t0,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
