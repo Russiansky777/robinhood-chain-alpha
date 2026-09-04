@@ -208,8 +208,12 @@ def get_acceptance_datetime(cik: int, accession: str) -> str | None:
     (реальная причина первого падения: ReadTimeout на большом файле,
     30с не хватило). Любая сетевая ошибка здесь -- None, не крашит
     остальной прогон (см. вызывающий код)."""
-    accn_nodash = accession.replace("-", "")
-    url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accn_nodash}.txt"
+    # ВАЖНО (найдено 2026-09-04 через analysis/edgar_acceptance_debug.py,
+    # 5-way URL probe): плоский .txt-путь требует accession С ДЕФИСАМИ.
+    # accn_nodash (без дефисов) верен для имени ПОДКАТАЛОГА заявки, но
+    # не для этого плоского файла -- со strip'ом дефисов EDGAR отдаёт 404
+    # молча (для этого URL), из-за чего был 0/379 в первом полном прогоне.
+    url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession}.txt"
     try:
         # Accept-Encoding: identity -- ВАЖНО вместе с Range. gzip + partial
         # byte-range не декомпрессируется (частичный сжатый поток), и
