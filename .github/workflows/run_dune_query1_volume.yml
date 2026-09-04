@@ -1,0 +1,56 @@
+name: "Dune (Mozila) -- запрос 1: органический ли объём ETH/USDG (7 дней, содержательный)"
+
+# Владелец, 2026-09-04: разрешены траты на содержательные запросы,
+# лимит 300 кредитов на блок (funding_mozila_content, отдельно от
+# 50-кредитного разведочного funding_mozila -- см.
+# data/credits_spent_mozila.json). Строгий порядок 1 -> 2 -> 3, если
+# запрос 1 покажет инсентивный объём (топ-3 sender > 50%) -- доклад ДО
+# запуска 2 и 3.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/DUNE_QUERY1_VOLUME_REQUEST"
+
+jobs:
+  query1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Запрос 1 -- объём по адресам (peek + 7-дневное окно + недельный ряд по полной истории)
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/dune_pool_volume_query1.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/dune_query1_volume_result.json ] && git add data/p3_guard_cache/dune_query1_volume_result.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Dune (Mozila) запрос 1: объём по адресам ETH/USDG [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
