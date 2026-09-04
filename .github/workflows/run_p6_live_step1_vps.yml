@@ -90,7 +90,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git rm -f --ignore-unmatch data/p3_guard_cache/P6_LIVE_STEP1_VPS_CONFIRM_REQUEST data/p3_guard_cache/P6_LIVE_STEP1_VPS_DRYRUN_REQUEST
-          git add data/p3_guard_cache/p6_live_step1_result.json data/p6_live_position_state.json 2>/dev/null || true
+          # НАЙДЕНО (реальный прогон, воспроизведено локально): `git add
+          # fileA fileB` АТОМАРНО падает целиком, если fileB не существует
+          # (dry-run не пишет p6_live_position_state.json) -- fileA НЕ
+          # СТЕЙДЖИТСЯ ВООБЩЕ, даже если реально существует. `2>/dev/null
+          # || true` глушил ошибку, но результат.json молча пропадал из
+          # коммита на двух прошлых прогонах.Фикс: РАЗДЕЛЬНЫЕ git add.
+          [ -e data/p3_guard_cache/p6_live_step1_result.json ] && git add data/p3_guard_cache/p6_live_step1_result.json || true
+          [ -e data/p6_live_position_state.json ] && git add data/p6_live_position_state.json || true
           git diff --cached --quiet && exit 0
           git commit -m "P6 LIVE Step1 (VPS-NL): результат (mode=${{ steps.mode.outputs.flag }}) [automated]"
           for i in 1 2 3 4 5; do
