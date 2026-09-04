@@ -168,6 +168,25 @@ def run() -> int:
         "eth_human": eth_balance_wei / 1e18, "usdc_human": usdc_balance / 1e6, "cbbtc_human": cbbtc_balance / 1e8,
     }
 
+    print("\n=== 5. Маршрут Across для ETH (Robinhood Chain -> Base) -- нужен газ на Base, кошелёк пуст ===")
+    try:
+        r_chain = requests.post("https://rpc.mainnet.chain.robinhood.com",
+                                 json={"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}, timeout=20)
+        robinhood_chain_id = int(r_chain.json()["result"], 16)
+    except Exception as exc:  # noqa: BLE001
+        result["robinhood_chain_id_error"] = str(exc)[:300]
+        robinhood_chain_id = 4663  # известное реальное значение из предыдущих прогонов (docs/PROJECT_STATE.md)
+    try:
+        routes_r = requests.get("https://app.across.to/api/available-routes",
+                                 params={"originChainId": robinhood_chain_id, "destinationChainId": 8453}, timeout=20)
+        routes = routes_r.json() if routes_r.status_code == 200 else None
+        eth_routes = [r for r in (routes or []) if str(r.get("originTokenSymbol", "")).upper() in ("ETH", "WETH")]
+        result["across_eth_routes_robinhood_to_base"] = eth_routes
+        print(f"[recon] ETH/WETH маршруты Robinhood->Base: {eth_routes}")
+    except Exception as exc:  # noqa: BLE001
+        result["across_eth_routes_error"] = str(exc)[:300]
+        print(f"[recon] ошибка получения маршрутов ETH: {exc}")
+
     Path("data/p3_guard_cache/p6_entry_recon_result.json").write_text(
         json.dumps(result, indent=2, ensure_ascii=False, default=str)
     )
