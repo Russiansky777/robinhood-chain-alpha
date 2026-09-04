@@ -203,6 +203,53 @@ def run() -> int:
         client, "q1_weekly_volume_full_history", weekly_sql, 15.0, expected_max_rows=20, expected_columns=4,
     )
 
+    # --- Дополнение владельца, 2026-09-04 (дёшево): Mint-события DOMINANT_ADDRESS
+    # в нашем пуле + сколько ликвидности держит; топ-5 по объёму по неделям ---
+    DOMINANT_ADDRESS = "0x65050a9b7e5075a2ba5ced7b1b64ee66262c40dc"
+
+    print(f"\n=== 8. Peek Mint-таблицы (SELECT *, LIMIT 3 -- структура/регистр колонок) ===")
+    mint_peek_sql = f"""
+    SELECT * FROM {POOL_TABLE.rsplit('_evt_swap', 1)[0]}_evt_mint
+    WHERE contract_address = {POOL_ADDRESS}
+    LIMIT 3
+    """
+    result["steps"]["mint_peek"] = q(client, "q1_mint_peek", mint_peek_sql, 3.0, expected_max_rows=3, expected_columns=20)
+
+    print(f"\n=== 9. Mint-события {DOMINANT_ADDRESS} в нашем пуле (owner ИЛИ sender) ===")
+    mint_addr_sql = f"""
+    SELECT COUNT(*) AS n_mints, SUM(amount) AS total_liquidity_minted_raw,
+           SUM(amount0)/1e18 AS total_weth_deposited, SUM(amount1)/1e6 AS total_usdg_deposited
+    FROM {POOL_TABLE.rsplit('_evt_swap', 1)[0]}_evt_mint
+    WHERE contract_address = {POOL_ADDRESS}
+      AND (owner = {DOMINANT_ADDRESS} OR sender = {DOMINANT_ADDRESS})
+    """
+    result["steps"]["mint_dominant_address"] = q(
+        client, "q1_mint_dominant_address", mint_addr_sql, 5.0, expected_max_rows=1, expected_columns=4,
+    )
+
+    print("\n=== 10. Топ-5 адресов по объёму (sender) по неделям, полная история ===")
+    top5_weekly_sql = f"""
+    WITH weekly AS (
+      SELECT DATE_TRUNC('week', evt_block_time) AS week_start, sender,
+             SUM(ABS(amount1))/1e6 AS volume_usd
+      FROM {POOL_TABLE}
+      WHERE contract_address = {POOL_ADDRESS}
+      GROUP BY DATE_TRUNC('week', evt_block_time), sender
+    ),
+    ranked AS (
+      SELECT week_start, sender, volume_usd,
+             ROW_NUMBER() OVER (PARTITION BY week_start ORDER BY volume_usd DESC) AS rnk
+      FROM weekly
+    )
+    SELECT week_start, sender, volume_usd, rnk
+    FROM ranked
+    WHERE rnk <= 5
+    ORDER BY week_start, rnk
+    """
+    result["steps"]["top5_by_week"] = q(
+        client, "q1_top5_by_week", top5_weekly_sql, 15.0, expected_max_rows=100, expected_columns=4,
+    )
+
     total_spent = spent_so_far()
     print(f"\n=== Итого потрачено в блоке содержательных запросов (funding_mozila_content): "
           f"{total_spent:.3f} из {CONTENT_BUDGET} ===")
