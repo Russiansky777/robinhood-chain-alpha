@@ -1,0 +1,43 @@
+name: "P6 -- шаг 1: базис cbBTC/BTC за 90 дней (только чтение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P6_CBBTC_BTC_BASIS_REQUEST"
+
+jobs:
+  basis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Базис cbBTC/BTC за 90 дней (GT + CoinGecko)
+        run: python -u analysis/p6_cbbtc_btc_basis.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p6_cbbtc_btc_basis_result.json ] && git add data/p3_guard_cache/p6_cbbtc_btc_basis_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P6: базис cbBTC/BTC за 90 дней [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
