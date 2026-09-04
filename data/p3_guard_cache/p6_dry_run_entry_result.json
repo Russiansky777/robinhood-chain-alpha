@@ -1,29 +1,113 @@
 {
-  "generated_at_utc": "2026-09-04T21:55:54Z",
+  "generated_at_utc": "2026-09-04T22:05:00Z",
   "note": "DRY-RUN, ничего не отправлено",
   "pool_state": {
-    "sqrtPriceX96": 2807752776741308637199207246,
-    "tick": -66803,
-    "liquidity_raw": 1213254933672,
+    "sqrtPriceX96": 2806545059482431188935259499,
+    "tick": -66811,
+    "liquidity_raw": 1178629981677,
     "tick_spacing": 2000,
-    "price_cbbtc_usd_estimate": 79623.53167372066
+    "price_cbbtc_usd_estimate": 79692.07388617621
   },
   "lp_leg": {
     "target_capital_usd": 250.0,
     "price_range_usd": [
-      71661.1785063486,
-      87585.88484109273
+      71722.86649755859,
+      87661.28127479383
     ],
     "tick_lower": -68000,
     "tick_upper": -64000,
-    "current_tick": -66803,
+    "current_tick": -66811,
     "tick_spacing": 2000,
-    "usdc_amount": 125.00000000000018,
-    "cbbtc_amount": 0.0014236789232617232,
-    "cbbtc_notional_usd": 113.35834383953834
+    "usdc_amount": 125.00000000000027,
+    "cbbtc_amount": 0.0014224544338179409,
+    "cbbtc_notional_usd": 113.35834383953829
   },
-  "abort_reason": "real_leverage(BTC) не нашёл позицию/плечо -- НЕ считаю маржу по допущению (урок canceled-margin-not-allowed)",
-  "btc_leverage_probe": {
-    "found": false
+  "hedge": {
+    "btc_leverage_used": {
+      "found": true,
+      "initial_margin_fraction_pct": 50.0,
+      "leverage": 2.0,
+      "source": "БИРЖЕВОЙ ДЕФОЛТ рынка BTC (default_initial_margin_fraction), НЕ подтверждено настройкой аккаунта 22012 -- у аккаунта нет истории по BTC, аутентифицированные эндпоинты настройки плеча вне рамок дешёвого шага"
+    },
+    "btc_leverage_confirmed_account_setting": false,
+    "short_notional_usd": 113.35834383953829,
+    "required_margin_usd_isolated_projection": 56.679171919769146,
+    "account_collateral_now_usd": 59.82608,
+    "account_available_balance_now_usd": 31.042573,
+    "account_cross_initial_margin_requirement_now_usd": 30.816668,
+    "liquidation_price_projection_isolated_usd": 118120.6628747671,
+    "CROSS_MARGIN_WARNING": "Аккаунт УЖЕ держит ETH-шорт P5 в режиме cross margin -- реальный совместный риск ликвидации НЕ равен этой изолированной проекции. Открытый вопрос владельцу, не решён здесь."
+  },
+  "gas_estimate": {
+    "found": true,
+    "tx_hash": "0xb88f7f2385abdd76a477406e22c87336302d3b6f2f9401ddee9d086ad0131243",
+    "gas_used": 1470504,
+    "n_mints_in_chunk": 29,
+    "chunk_range": [
+      50875080,
+      50885080
+    ],
+    "gas_price_gwei": 0.006,
+    "eth_usd": 2454.2,
+    "estimated_cost_usd": 0.0216534655008
+  },
+  "across_quote_real_amount": {
+    "estimatedFillTimeSec": 2,
+    "capitalFeePct": "100000000000000",
+    "capitalFeeTotal": "25000",
+    "relayGasFeePct": "13416000000000",
+    "relayGasFeeTotal": "3354",
+    "relayFeePct": "613416000000000",
+    "relayFeeTotal": "153339",
+    "lpFeePct": "0",
+    "timestamp": "1788559415",
+    "isAmountTooLow": false,
+    "quoteBlock": "25906820",
+    "exclusiveRelayer": "0x394311A6Aaa0D8E3411D8b62DE4578D41322d1bD",
+    "exclusivityDeadline": 3,
+    "spokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+    "destinationSpokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+    "totalRelayFee": {
+      "pct": "613416000000000",
+      "total": "153339"
+    },
+    "relayerCapitalFee": {
+      "pct": "100000000000000",
+      "total": "25000"
+    },
+    "relayerGasFee": {
+      "pct": "13416000000000",
+      "total": "3354"
+    },
+    "lpFee": {
+      "pct": "0",
+      "total": "0"
+    },
+    "internalizedSwapFee": {
+      "pct": "500000000000000",
+      "total": "124985"
+    },
+    "limits": {
+      "minDeposit": "500000",
+      "maxDeposit": "428704196345",
+      "maxDepositInstant": "95912467496",
+      "maxDepositShortDelay": "428704196345",
+      "recommendedDepositInstant": "95912467496"
+    },
+    "fillDeadline": "1788566615",
+    "outputAmount": "249846661",
+    "inputToken": {
+      "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "symbol": "USDG",
+      "decimals": 6,
+      "chainId": 4663
+    },
+    "outputToken": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "symbol": "USDC",
+      "decimals": 6,
+      "chainId": 8453
+    },
+    "id": "xbcr2-1788559513405-2b02822ae65c"
   }
 }
