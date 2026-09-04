@@ -72,15 +72,40 @@ def _throttle_gt() -> None:
     _last_gt_call = time.monotonic()
 
 
+RPC_MIN_INTERVAL_S = 1.5  # первый прогон (2026-09-04): mainnet.base.org реально
+# вернул 429 "Too Many Requests" на публичных eth_call без троттлинга --
+# 15/23 кандидатов упали не по содержательной причине. Arbitrum/BSC RPC
+# в том же прогоне не разу не дали 429 -- проблема специфична для
+# Base, но троттлинг применяется ко всем сетям одинаково (не угадываем,
+# у какой сети какой реальный лимит).
+RPC_RETRY_BACKOFF_S = 15.0
+RPC_MAX_RETRIES = 3
+_last_rpc_call: dict[str, float] = {}
+
+
+def _throttle_rpc(network: str) -> None:
+    last = _last_rpc_call.get(network, 0.0)
+    wait = last + RPC_MIN_INTERVAL_S - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _last_rpc_call[network] = time.monotonic()
+
+
 def rpc_call(network: str, to: str, data: str) -> str:
-    url = RPC_ENDPOINTS[network]
-    resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
-                                      "params": [{"to": to, "data": data}, "latest"]}, timeout=20)
-    resp.raise_for_status()
-    body = resp.json()
-    if "error" in body:
-        raise RuntimeError(f"eth_call {to} {data}: {body['error']}")
-    return body["result"]
+    for attempt in range(RPC_MAX_RETRIES + 1):
+        _throttle_rpc(network)
+        resp = requests.post(RPC_ENDPOINTS[network], json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
+                                          "params": [{"to": to, "data": data}, "latest"]}, timeout=20)
+        if resp.status_code == 429 and attempt < RPC_MAX_RETRIES:
+            print(f"    RPC {network} 429, жду {RPC_RETRY_BACKOFF_S:.0f}с и повторяю")
+            time.sleep(RPC_RETRY_BACKOFF_S)
+            continue
+        resp.raise_for_status()
+        body = resp.json()
+        if "error" in body:
+            raise RuntimeError(f"eth_call {to} {data}: {body['error']}")
+        return body["result"]
+    raise RuntimeError(f"RPC {network} 429 после {RPC_MAX_RETRIES + 1} попыток")
 
 
 def verify_rpc(network: str) -> None:
@@ -120,12 +145,35 @@ def get_slot0_and_liquidity(network: str, pool_address: str) -> dict:
     return {"sqrtPriceX96": sqrt_price_x96, "tick": tick, "liquidity_raw": liquidity}
 
 
+GT_RETRY_BACKOFF_S = 65.0
+GT_MAX_RETRIES = 2
+
+
 def get_gt_pool_prices(network: str, pool_address: str) -> dict:
-    _throttle_gt()
-    resp = requests.get(f"{GT_BASE}/networks/{network}/pools/{pool_address}", headers=HEADERS_GT, timeout=30)
+    resp = None
+    for attempt in range(GT_MAX_RETRIES + 1):
+        _throttle_gt()
+        resp = requests.get(f"{GT_BASE}/networks/{network}/pools/{pool_address}", headers=HEADERS_GT, timeout=30)
+        if resp.status_code == 429 and attempt < GT_MAX_RETRIES:
+            print(f"    GT 429, жду {GT_RETRY_BACKOFF_S:.0f}с и повторяю")
+            time.sleep(GT_RETRY_BACKOFF_S)
+            continue
+        break
     resp.raise_for_status()
-    attrs = resp.json().get("data", {}).get("attributes", {})
+    data = resp.json().get("data", {})
+    attrs = data.get("attributes", {})
+    relationships = data.get("relationships", {})
+    # ВАЖНО (найдено 2026-09-04, price_check_suspect на 2/8 пулов): GT
+    # "base_token"/"quote_token" НЕ гарантированно совпадает по порядку с
+    # DefiLlama underlying_tokens[0]/[1] -- нужно сопоставлять по РЕАЛЬНОМУ
+    # адресу, не по позиции. Формула L_full сама по себе order-independent
+    # (sqrt(a*b) симметрична) -- баг НЕ портил уже посчитанные k, только
+    # диагностику price_check ниже, но сопоставление всё равно чинится
+    # для честной сверки, а не полагаемся на "не важно в этот раз".
+    base_addr = (relationships.get("base_token", {}).get("data", {}).get("id", "") or "").split("_")[-1].lower()
+    quote_addr = (relationships.get("quote_token", {}).get("data", {}).get("id", "") or "").split("_")[-1].lower()
     return {
+        "base_token_address": base_addr, "quote_token_address": quote_addr,
         "base_token_price_usd": float(attrs["base_token_price_usd"]) if attrs.get("base_token_price_usd") else None,
         "quote_token_price_usd": float(attrs["quote_token_price_usd"]) if attrs.get("quote_token_price_usd") else None,
         "reserve_in_usd": float(attrs["reserve_in_usd"]) if attrs.get("reserve_in_usd") else None,
@@ -165,8 +213,23 @@ def compute_k(candidate: dict) -> dict:
     L_raw = onchain["liquidity_raw"]
     L_active_human = L_raw / (10 ** ((dec0 + dec1) / 2))
 
-    price0_usd = gt_prices["base_token_price_usd"]
-    price1_usd = gt_prices["quote_token_price_usd"]
+    # Сопоставление по РЕАЛЬНОМУ адресу, не по позиции (найдено 2026-09-04:
+    # GT base_token/quote_token порядок не гарантированно совпадает с
+    # DefiLlama underlying_tokens[0]/[1] -- см. докстринг get_gt_pool_prices).
+    addr_to_price = {}
+    if gt_prices.get("base_token_address"):
+        addr_to_price[gt_prices["base_token_address"]] = gt_prices["base_token_price_usd"]
+    if gt_prices.get("quote_token_address"):
+        addr_to_price[gt_prices["quote_token_address"]] = gt_prices["quote_token_price_usd"]
+    price0_usd = addr_to_price.get(token0.lower())
+    price1_usd = addr_to_price.get(token1.lower())
+    price_match_ok = price0_usd is not None and price1_usd is not None
+    if not price_match_ok:
+        # Резервный путь -- позиционное сопоставление (старое поведение),
+        # ЯВНО помечено как менее надёжное, если адресное не удалось.
+        price0_usd = price0_usd or gt_prices["base_token_price_usd"]
+        price1_usd = price1_usd or gt_prices["quote_token_price_usd"]
+
     tvl_usd = gt_prices["reserve_in_usd"] or candidate["tvl_usd"]
     if not price0_usd or not price1_usd or not tvl_usd:
         r["error"] = f"нет цен/TVL от GT для L_full (price0={price0_usd}, price1={price1_usd}, tvl={tvl_usd})"
@@ -194,6 +257,7 @@ def compute_k(candidate: dict) -> dict:
         "decimals0": dec0, "decimals1": dec1, "liquidity_raw": L_raw,
         "sqrtPriceX96": onchain["sqrtPriceX96"], "tick": onchain["tick"],
         "price0_usd_gt": price0_usd, "price1_usd_gt": price1_usd, "tvl_usd_used": tvl_usd,
+        "price_match_by_address_ok": price_match_ok,
         "price_from_sqrtPriceX96_token0_in_token1": price_human_token0_in_token1,
         "price_check_deviation_pct": price_check_deviation_pct,
         "price_check_suspect": (price_check_deviation_pct is not None and price_check_deviation_pct > 5.0),
