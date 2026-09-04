@@ -1,0 +1,42 @@
+name: "Скринер пулов -- топ-3: fee tier, газ Base, котировка моста Across"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/POOL_SCREENER_TOP3_ENTRY_COST_REQUEST"
+
+jobs:
+  entry_cost:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: fee tier (RPC) + газ Base (RPC) + Across котировка Robinhood Chain -> Base
+        run: python -u analysis/pool_screener_top3_entry_cost.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/pool_screener_top3_entry_cost_result.json ] && git add data/p3_guard_cache/pool_screener_top3_entry_cost_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Скринер пулов: fee tier/газ/Across для топ-3 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
