@@ -73,6 +73,23 @@ def run() -> int:
         client, "stock_factory_evt_tables", factory_evt_sql, 3.0, expected_max_rows=100, expected_columns=1,
     )
 
+    print("\n=== 3. Таблицы ИМЕННО rwa_robinhood (отдельно от midas -- предыдущий LIMIT 100 съеден midas_rwa_robinhood) ===")
+    rwa_only_sql = """
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'rwa_robinhood'
+    LIMIT 100
+    """
+    result["steps"]["rwa_robinhood_tables"] = q(client, "stock_rwa_robinhood_tables", rwa_only_sql, 3.0, expected_max_rows=100, expected_columns=1)
+
+    print("\n=== 4. Peek factory_deployer_evt_deployed -- реестр деплоя токенов (SELECT *, LIMIT 20) ===")
+    deployed_sql = """
+    SELECT * FROM rwa_stock_factory_robinhood.factory_deployer_evt_deployed
+    LIMIT 20
+    """
+    result["steps"]["factory_deployed_peek"] = q(
+        client, "stock_factory_deployed_peek", deployed_sql, 3.0, expected_max_rows=20, expected_columns=15,
+    )
+
     total_spent = load_state()["funding_mozila_block2"]["spent"]
     print(f"\n=== Потрачено funding_mozila_block2: {total_spent:.3f} из {BLOCK2_BUDGET} ===")
     result["spent_this_run"] = total_spent
