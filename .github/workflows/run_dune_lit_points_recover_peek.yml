@@ -1,0 +1,55 @@
+name: "Dune (Mozila) -- Поинты Lighter: восстановить peek без повторной оплаты execute"
+
+# Оба peek-запроса из run_dune_lit_points_weekly.yml реально исполнились
+# и были оплачены (см. лог run 33899068539), но чтение отклонил гвард --
+# expected_columns был занижен. Здесь -- fetch_existing() на те же
+# execution_id, БЕЗ повторного execute (не платим дважды за исполнение,
+# только за чтение маленького LIMIT-5 результата).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/DUNE_LIT_POINTS_RECOVER_PEEK_REQUEST"
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Восстановить peek через fetch_existing (без повторного execute)
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/dune_lit_points_recover_peek.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/dune_lit_points_recover_peek_result.json ] && git add data/p3_guard_cache/dune_lit_points_recover_peek_result.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Dune (Mozila): восстановлен peek LIT-трансферов (fetch_existing) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
