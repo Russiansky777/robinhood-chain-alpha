@@ -1,0 +1,94 @@
+{
+  "generated_at_utc": "2026-09-04T22:23:27Z",
+  "note": "DRY-RUN, ничего не отправлено (ни на Base, ни на Lighter) -- только чтение и симуляция eth_call.",
+  "order_owner_specified": "1) закрыть ETH-шорт на Lighter -> 2) collect комиссий и burn LP 1000756 -> 3) финальный PnL по всем ногам с газом",
+  "step1_hedge_close": {
+    "eth_position_now": {
+      "symbol": "ETH",
+      "sign": -1,
+      "position_size_eth": 0.0377,
+      "avg_entry_price_usd": 2506.43,
+      "mark_price_now_usd": 2452.4,
+      "unrealized_pnl_usd": 2.036931,
+      "realized_pnl_usd_already": 0.0,
+      "total_funding_paid_out_usd_already": 0.027005,
+      "liquidation_price_usd": "4044.791179585033"
+    },
+    "other_open_positions_besides_eth": [],
+    "closing_order_projection": {
+      "taker_fee_real": 0.0,
+      "closing_notional_usd": 92.45548,
+      "closing_fee_usd": 0.0,
+      "reduce_only": true,
+      "note": "reduce_only рыночный ордер на текущий реальный размер (тот же паттерн, что p5_live_flatten_lighter.py) -- НЕ отправлен, только оценка."
+    },
+    "realized_pnl_if_closed_now_usd": 2.036931,
+    "account_now": {
+      "collateral_usd": 59.82608,
+      "available_balance_usd": 31.0476,
+      "cross_initial_margin_requirement_usd": 30.815411
+    },
+    "account_projection_after_close": {
+      "collateral_usd": 61.863011,
+      "available_balance_usd": 61.863011,
+      "note": "На аккаунте нет других открытых позиций (проверено по факту) -- available_balance после закрытия = collateral_after_close."
+    },
+    "freed_on_lighter_usd": 30.815411
+  },
+  "step2_lp_close": {
+    "token_id": 1000756,
+    "onchain_position": {
+      "nonce": 0,
+      "operator": "0x0000000000000000000000000000000000000000",
+      "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 100,
+      "tickLower": -199094,
+      "tickUpper": -197087,
+      "liquidity": 40193983848339,
+      "feeGrowthInside0LastX128": 0,
+      "feeGrowthInside1LastX128": 0,
+      "tokensOwed0": 0,
+      "tokensOwed1": 0
+    },
+    "pool_price_usd_now": 2453.2611608156863,
+    "pool_tick_now": -198269,
+    "principal_if_decreased_now": {
+      "amount0_eth": 0.04654438907491026,
+      "amount1_usdg": 80.50523004448682,
+      "principal_usd": 194.6907720158581
+    },
+    "known_deposit_at_open": {
+      "amount0_eth": 0.03772533823006162,
+      "amount1_usdg": 102.378373
+    },
+    "impermanent_loss_vs_deposit_usd": -0.2377080425872471,
+    "fees_collectible_now_real": {
+      "fees0_eth": 7.5794361477526e-05,
+      "fees1_usdg": 0.186977,
+      "fees_usd": 0.37292036322163913,
+      "method": "eth_call-симуляция collect() -- реальная, актуальная к текущему блоку сумма"
+    },
+    "gas_projection": {
+      "gas_units_decrease_estimated": 262932,
+      "gas_units_collect_buffer": 250000,
+      "gas_price_wei": 404090000,
+      "gas_cost_usd_new_close_txs": 0.5084891381645993
+    },
+    "already_spent_gas_usd_cumulative_sunk": 0.4559289194803113,
+    "last_accrual_point_context": {
+      "timestamp_utc": "2026-09-04T20:06:02Z",
+      "fee_capture_ratio_cumulative": 0.49478802954252077,
+      "our_fees_usd_cum_last_hourly": 0.3531500443115223
+    }
+  },
+  "step3_final_pnl_all_legs": {
+    "fees_earned_usd": 0.37292036322163913,
+    "impermanent_loss_usd": -0.2377080425872471,
+    "hedge_pnl_usd": 2.036931,
+    "new_closing_gas_and_fees_usd": 0.5084891381645993,
+    "already_sunk_gas_usd_cumulative": 0.4559289194803113,
+    "net_pnl_if_closed_now_usd": 1.6636541824697928,
+    "freed_on_lighter_usd": 30.815411
+  }
+}
