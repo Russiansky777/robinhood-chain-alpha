@@ -90,6 +90,17 @@ def run() -> int:
         client, "stock_factory_deployed_peek", deployed_sql, 3.0, expected_max_rows=20, expected_columns=15,
     )
 
+    print("\n=== 5. ПОЛНЫЙ реестр деплоя (symbol, stock-адрес, время) -- сколько их всего реально ===")
+    deployed_full_sql = """
+    SELECT symbol, name, stock AS stock_token_address, evt_block_time
+    FROM rwa_stock_factory_robinhood.factory_deployer_evt_deployed
+    ORDER BY evt_block_time
+    LIMIT 500
+    """
+    result["steps"]["factory_deployed_full"] = q(
+        client, "stock_factory_deployed_full", deployed_full_sql, 5.0, expected_max_rows=500, expected_columns=4,
+    )
+
     total_spent = load_state()["funding_mozila_block2"]["spent"]
     print(f"\n=== Потрачено funding_mozila_block2: {total_spent:.3f} из {BLOCK2_BUDGET} ===")
     result["spent_this_run"] = total_spent
