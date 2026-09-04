@@ -20,10 +20,14 @@ SEC блокирует по IP, это боевой хост. Лимит 10 за
 даты/N-й день недели месяца, кроме Страстной пятницы (вычисляется
 через алгоритм Пасхи).
 
-Список тикеров -- ПРЕДВАРИТЕЛЬНЫЙ (9 известных из прошлой P4-разведки:
-NVDA/QQQ/RDDT/COST/GME/RBLX/LLY/SPY/MSTR), будет уточнён/расширен
-реальным реестром деплоя `rwa_stock_factory_robinhood` (Dune,
-разведка в процессе) -- "все доступные тикеры, не только NVDA".
+Список тикеров -- РЕАЛЬНЫЙ полный реестр (203 токена, Dune
+`rwa_stock_factory_robinhood.factory_deployer_evt_deployed`, см.
+`data/rwa_stock_token_registry.json`) -- заменяет предварительный
+список из 9 тикеров прошлой P4-разведки. Часть тикеров -- ETF/облигации
+(QQQ, SPY, GLD, SLV, BND, SHY, SGOV, VTI, SMH, SOXX, XLK и др.) -- они
+не подают 8-K по определению (регулируются иначе, N-CEN/N-PORT), для
+них просто не будет находок, это не ошибка и не повод исключать их из
+списка заранее.
 """
 from __future__ import annotations
 
@@ -42,8 +46,19 @@ HEADERS = {"User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"}
 REQUEST_INTERVAL_S = 1.0 / 8  # владелец: лимит 10/с, берём 8/с с запасом
 ET = ZoneInfo("America/New_York")
 
-# Предварительный список -- см. докстринг, будет расширен после Dune-реестра.
-PROVISIONAL_TICKERS = ["NVDA", "QQQ", "RDDT", "COST", "GME", "RBLX", "LLY", "SPY", "MSTR"]
+REGISTRY_PATH = Path("data/rwa_stock_token_registry.json")
+
+
+def load_tickers() -> list[str]:
+    if REGISTRY_PATH.exists():
+        reg = json.loads(REGISTRY_PATH.read_text())
+        return sorted(reg["tokens"].keys())
+    # Резервный список, только если реестр почему-то ещё не собран --
+    # см. HISTORY: 9 тикеров прошлой P4-разведки, честно меньше реальности.
+    return ["NVDA", "QQQ", "RDDT", "COST", "GME", "RBLX", "LLY", "SPY", "MSTR"]
+
+
+PROVISIONAL_TICKERS = load_tickers()
 
 # Наблюдаемое окно данных на цепи (первый своп нашего типа ~2026-07-06,
 # см. data/p3_guard_cache/dune_query1_volume_result.json weekly_volume_full_history).
