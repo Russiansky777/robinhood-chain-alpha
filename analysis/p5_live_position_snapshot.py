@@ -74,10 +74,59 @@ collect на САМОЙ позиции -- если с момента откры�
     блока `economics`, чтобы газ не "размазывался" внутри доходности
     (владелец, дословно). Пока = газ входа (`total_gas_spent_usd_est`
     из state) -- ребалансов ещё не было, демон не написан.
+
+ОБНОВЛЕНО (задача LVR, 2026-09-04): дельта-хедж снимает только ПЕРВЫЙ
+порядок риска (направление). LVR (loss-versus-rebalancing, Milionis et
+al.) -- ВТОРОЙ порядок (гамма), хедж его не убирает вообще. Формулы
+(для v3-позиции: `x(P)=L×(1/√P−1/√P_upper)`, `V(P)=x(P)×P+y(P)`):
+  - Гамма `Γ = d²V/dP² = −L/(2×P^1.5)`.
+  - LVR-темп (непрерывный ребаланс) = `(σ²/2)×P²×|Γ| = σ²×L×√P/4`
+    (в $/год, той же формулой, что доказанная теория Milionis).
+  - Бенчмарк статического хеджа (без ребаланса до этой точки) --
+    квадратичное приближение по Тейлору вокруг `P_open`:
+    `−(L/(4×P_open^1.5))×(P_t−P_open)²`. Должен совпадать с
+    `combined_pnl_ex_fees` (LP P&L + хедж P&L, без комиссий) с
+    точностью до фандинга/клиппинга на границах -- если разойдётся
+    заметно, это баг в L/тиках/чтении, докладывается сразу.
+`L` -- РЕАЛЬНАЯ ончейн-ликвидность позиции (`pos["liquidity"]`,
+`uint128`, читается каждый прогон, не задаётся числом), переведена в
+"человеческую" шкалу (та же, в которой `P` выражена в USD, а не в
+raw-sqrt-Q96-единицах): `L_human = liquidity_raw / 10**((WETH_DECIMALS
++ USDG_DECIMALS)//2)` -- точное тождество (не аппроксимация), выведено
+из `price_from_tick()`: `amount0_eth(P) = L_human×(1/√P−1/√P_upper)`
+эквивалентно raw-формуле `amount0_raw = L_raw×(1/√P_raw−1/√Pb_raw)`
+после деления на `10**WETH_DECIMALS` и подстановки `√P_raw=√P_usd×
+10**-(WETH_DECIMALS-USDG_DECIMALS)/2` -- проверено численно (L_human
+получается ≈40.19, совпадает по порядку с `computed_liquidity` из
+предпрогонного плана открытия, ~39.82).
+
+σ для LVR-темпа -- РЕАЛИЗОВАННАЯ волатильность по САМОМУ ряду
+`data/p5_fee_accrual.jsonl` (log-returns между соседними точками,
+квадратичная вариация / фактическое прошедшее время в годах -- НЕ
+считаем шаги часовыми, там есть разрыв 2.91ч), НЕ историческая 45.5%
+из отдельного 52-дневного OHLCV-скана (`p5_gt_pool_history.py`) -- та
+измеряет другой период и другую (более широкую) выборку.
+
+Фандинг хеджа на Lighter -- реальное поле позиции `total_funding_paid_out`
+(вместе с `realized_pnl`) -- прочитаны РЯДОМ с уже используемым
+`unrealized_pnl`/`liquidation_price` в том же ответе `GET /api/v1/account`,
+раньше не извлекались. `cross_initial_margin_requirement` (реальное
+поле account-уровня, cross-margin) заменяет ФОРМУЛЬНУЮ оценку требуемой
+маржи в сверке `Δfree_margin` -- убирает источник невязки, а не
+объясняет её постфактум.
+
+Обратная сторона: поля `realized_pnl`/`total_funding_paid_out`/
+`cross_initial_margin_requirement` НЕ читались до этого обновления --
+для уже собранных точек ряда сверка маржи и фандинг честно `null`
+(бэкфилл невозможен без выдумывания), новые точки получают их с этого
+прогона. LVR/статический-хедж бэкфиллятся полностью (нужны только
+liquidity/тики из git-history полного отчёта прошлых прогонов --
+реальные, не переисполненные задним числом).
 """
 from __future__ import annotations
 
 import json
+import math
 import sys
 import time
 from datetime import datetime, timezone
@@ -109,6 +158,8 @@ GT_POOL_ADDRESS = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 GT_RATE_LIMIT_BACKOFF_S = 65.0  # тот же ретрай, что p5_gt_pool_history.py -- реальный 429 словлен уже на ~6-м вызове/мин
 GT_RATE_LIMIT_MAX_RETRIES = 2
 GT_HOURLY_MAX_PAGES = 6  # 6000 часовых свечей ~= 250 дней -- с большим запасом на срок жизни позиции
+
+L_HUMAN_DIVISOR = 10 ** ((WETH_DECIMALS + USDG_DECIMALS) // 2)  # 1e12 -- точное тождество, см. докстринг модуля
 
 COLLECT_SIG = "collect((uint256,address,uint128,uint128))"
 
@@ -244,6 +295,23 @@ def read_all_accrual_pool_tvls() -> list[float]:
     return tvls
 
 
+def read_all_accrual_price_series() -> list[tuple[datetime, float]]:
+    """Все (timestamp, pool_price_usd) из data/p5_fee_accrual.jsonl -- для
+    реализованной sigma по самому ряду (см. sigma_realized_annualized_from_series)."""
+    if not ACCRUAL_LOG_PATH.exists():
+        return []
+    series = []
+    with ACCRUAL_LOG_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            ts = datetime.strptime(row["timestamp_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            series.append((ts, row["pool_price_usd"]))
+    return series
+
+
 def read_last_accrual_entry() -> dict | None:
     """Последняя строка data/p5_fee_accrual.jsonl ДО добавления текущей --
     нужна для расчёта комиссий/интервала (fee_capture_ratio). None на
@@ -257,6 +325,54 @@ def read_last_accrual_entry() -> dict | None:
             if line:
                 last_line = line
     return json.loads(last_line) if last_line else None
+
+
+def lp_value_usd(L_human: float, tick_lower: int, tick_upper: int, P_usd: float) -> float:
+    """V(P) в USDG для v3-позиции в "человеческой" шкале (P в USD, L_human
+    из liquidity_raw/L_HUMAN_DIVISOR, см. докстринг модуля) -- используется
+    и для V(P_t) (сверка с our_reserve_usd_now), и для V(P_open) (LVR).
+    Клиппинг на границах диапазона -- позиция вне диапазона держит
+    единственный актив, оценённый по РЕАЛЬНОЙ (не клиппированной) цене."""
+    Pa, Pb = price_from_tick(tick_lower), price_from_tick(tick_upper)
+    if Pa > Pb:
+        Pa, Pb = Pb, Pa
+    P_clamped = min(max(P_usd, Pa), Pb)
+    x = max(L_human * (1 / math.sqrt(P_clamped) - 1 / math.sqrt(Pb)), 0.0)
+    y = max(L_human * (math.sqrt(P_clamped) - math.sqrt(Pa)), 0.0)
+    return x * P_usd + y
+
+
+def sigma_realized_annualized_from_series(points: list[tuple[datetime, float]]) -> dict:
+    """Реализованная годовая sigma по РЯДУ (timestamp, pool_price_usd),
+    log-returns + квадратичная вариация / фактическое прошедшее время в
+    годах -- НЕ считаем шаги часовыми (владелец: "там есть разрыв 2.91ч").
+    Нужно >=2 точки для одного return, >=3 для содержательной оценки
+    (одна точка данных даёт технически валидную, но крайне шумную sigma
+    -- честно помечается малым n, не скрывается)."""
+    pts = sorted(points, key=lambda p: p[0])
+    if len(pts) < 2:
+        return {"sigma_realized_annualized": None, "n_returns": 0, "note": "меньше 2 точек -- sigma не считается."}
+    log_returns = []
+    total_seconds = 0.0
+    for i in range(1, len(pts)):
+        t0, p0 = pts[i - 1]
+        t1, p1 = pts[i]
+        dt_s = (t1 - t0).total_seconds()
+        if dt_s <= 0 or p0 <= 0 or p1 <= 0:
+            continue
+        log_returns.append(math.log(p1 / p0))
+        total_seconds += dt_s
+    if not log_returns or total_seconds <= 0:
+        return {"sigma_realized_annualized": None, "n_returns": 0, "note": "нет валидных интервалов."}
+    quadratic_variation = sum(r ** 2 for r in log_returns)
+    total_years = total_seconds / (365.25 * 24 * 3600)
+    annualized_variance = quadratic_variation / total_years
+    sigma = math.sqrt(annualized_variance)
+    return {
+        "sigma_realized_annualized": sigma, "n_returns": len(log_returns),
+        "total_hours_covered": total_seconds / 3600, "quadratic_variation": quadratic_variation,
+        "note": ("ОЧЕНЬ малая выборка -- статистически ненадёжно, только диагностика" if len(log_returns) < 20 else None),
+    }
 
 
 def raw_sqrt_from_tick(tick: int) -> float:
@@ -365,6 +481,17 @@ def run() -> int:
         free_margin_pct_now = (available_usd / collateral_usd * 100) if collateral_usd else None
         free_margin_usd = available_usd  # то же самое поле биржи, явное имя по просьбе владельца -- абсолют, не только %
 
+        # Реальные поля позиции/аккаунта для сверки маржи и фандинга (задача
+        # LVR, 2026-09-04) -- РЯДОМ с уже читаемыми unrealized_pnl/
+        # liquidation_price в том же ответе, раньше просто не извлекались.
+        realized_pnl_usd = float(eth_pos["realized_pnl"]) if eth_pos.get("realized_pnl") not in (None, "") else None
+        total_funding_paid_out_usd = (float(eth_pos["total_funding_paid_out"])
+                                       if eth_pos.get("total_funding_paid_out") not in (None, "") else None)
+        cross_initial_margin_requirement_usd = (float(account_full["cross_initial_margin_requirement"])
+                                                 if account_full.get("cross_initial_margin_requirement") not in (None, "") else None)
+        cross_maintenance_margin_requirement_usd = (float(account_full["cross_maintenance_margin_requirement"])
+                                                     if account_full.get("cross_maintenance_margin_requirement") not in (None, "") else None)
+
         # margin_call_price -- цена ETH, при которой initial-margin буфер
         # обнуляется (НЕ liquidation_price -- та считается по maintenance
         # margin, более низкому порогу, см. §5 PROJECT_STATE.md). Та же
@@ -408,6 +535,9 @@ def run() -> int:
             "margin_call_move_pct_from_current": margin_call_move_pct_from_current,
             "current_leverage": real_leverage,
             "liquidation_formula_cross_check": mmf_formula_check,
+            "realized_pnl_usd": realized_pnl_usd, "total_funding_paid_out_usd": total_funding_paid_out_usd,
+            "cross_initial_margin_requirement_usd": cross_initial_margin_requirement_usd,
+            "cross_maintenance_margin_requirement_usd": cross_maintenance_margin_requirement_usd,
         })
         print(f"[snapshot] Lighter ETH-позиция: size={real_hedge_size_eth} avg_entry=${avg_entry_price} "
               f"unrealized_pnl=${unrealized_pnl} liquidation_price=${liq_price} mark_now=${lighter_mark_price_now}")
@@ -595,6 +725,128 @@ def run() -> int:
     }
     print(f"[snapshot] fee_capture_ratio_cumulative={fee_capture_ratio_cumulative} детали={fee_capture_cumulative_detail}")
 
+    # === 6. LVR (loss-versus-rebalancing) -- второй порядок риска, хедж
+    # его НЕ снимает (задача владельца, 2026-09-04). См. докстринг модуля
+    # для полного вывода формул. ===
+    print("\n=== 6. LVR -- реализованный убыток конструкции против теоретического (непрерывный ребаланс) ===")
+    L_human = pos["liquidity"] / L_HUMAN_DIVISOR
+    # Сверка: та же L_human должна воспроизводить amount0_eth_required_now
+    # (уже посчитанный ВЫШЕ raw-sqrt-методом, §4) -- независимая проверка
+    # тождества L_human=liquidity_raw/1e12 на реальных числах этого прогона,
+    # не только в докстринге. Та же клипп-логика, что §4 (min/max в диапазон).
+    p_now_clamped = min(max(pool_price_now, range_lower), range_upper)
+    l_human_cross_check_amount0 = L_human * (1 / math.sqrt(p_now_clamped) - 1 / math.sqrt(range_upper))
+    l_human_cross_check_diff = l_human_cross_check_amount0 - amount0_eth_required_now
+
+    lvr_block: dict = {"L_human": L_human, "l_human_cross_check_diff_eth": l_human_cross_check_diff}
+    if entry_price and eth_pos:
+        V_lp_now_usd = our_reserve_usd_now
+        V_lp_open_usd = lp_value_usd(L_human, pos["tick_lower"], pos["tick_upper"], entry_price)
+        lp_pnl_ex_fees_usd = V_lp_now_usd - V_lp_open_usd
+        hedge_pnl_ex_funding_usd = unrealized_pnl + (realized_pnl_usd or 0.0)
+        hedge_pnl_incl_funding_usd = hedge_pnl_ex_funding_usd + (total_funding_paid_out_usd or 0.0)
+        combined_pnl_ex_fees_usd = lp_pnl_ex_fees_usd + hedge_pnl_incl_funding_usd
+
+        # Бенчмарк статического хеджа = гамма-член (LVR-квадратичное
+        # приближение) + БАЗИСНЫЙ член. НАЙДЕНО численно (реальные данные
+        # этого прогона): наивная формула −(L/(4P^1.5))(P_t−P_open)² даёт
+        # отклонение −$0.119 при гамма-члене всего −$0.024 -- это НЕ баг в
+        # L/тиках, а известный, уже задокументированный факт паспорта: LP
+        # заминчена по ончейн-цене пула (`entry_price`=$2509.9047), а хедж
+        # исполнен по СВОЕЙ цене на Lighter (`avg_entry_price`=$2506.43,
+        # см. data/p5_live_position_state.json) -- секунды между двумя
+        # исполнениями дают реальный базис. Хедж-PnL считается биржей ОТ
+        # СВОЕЙ цены входа (не от entry_price LP), поэтому корректный
+        # бенчмарк ДОЛЖЕН включать линейный член `size×(avg_entry_price−
+        # entry_price)` -- без него сравнение сравнивает разные вещи.
+        # С поправкой отклонение падает до ~$0.012 (в пределах ожидаемого
+        # шума третьего порядка) -- проверено, не осталось необъяснённым.
+        delta_p = pool_price_now - entry_price
+        gamma_term_usd = -(L_human / (4 * entry_price ** 1.5)) * (delta_p ** 2)
+        basis_term_usd = real_hedge_size_eth * (avg_entry_price - entry_price)
+        static_hedge_benchmark_usd = gamma_term_usd + basis_term_usd
+        static_hedge_deviation_usd = combined_pnl_ex_fees_usd - static_hedge_benchmark_usd
+
+        # sigma реализованная по САМОМУ ряду (не 45.5% из отдельного 52-дневного
+        # OHLCV-скана) -- добавляем ТЕКУЩУЮ точку к уже сохранённым, т.к. эта
+        # точка ещё не записана в jsonl на момент этого вычисления.
+        price_series = read_all_accrual_price_series() + [(now_utc, pool_price_now)]
+        sigma_info = sigma_realized_annualized_from_series(price_series)
+        sigma_realized = sigma_info.get("sigma_realized_annualized")
+
+        delta_t_years = (hours_covered / (365.25 * 24)) if hours_covered else None
+        continuous_lvr_theoretical_usd = (
+            (sigma_realized ** 2) * L_human * math.sqrt(pool_price_now) / 4 * delta_t_years
+        ) if (sigma_realized is not None and delta_t_years is not None) else None
+        fee_lvr_ratio = (our_fees_usd_cum / continuous_lvr_theoretical_usd) if continuous_lvr_theoretical_usd else None
+
+        lvr_block.update({
+            "V_lp_open_usd": V_lp_open_usd, "V_lp_now_usd": V_lp_now_usd,
+            "lp_pnl_ex_fees_usd": lp_pnl_ex_fees_usd,
+            "hedge_unrealized_pnl_usd": unrealized_pnl, "hedge_realized_pnl_usd": realized_pnl_usd,
+            "hedge_funding_paid_out_usd": total_funding_paid_out_usd,
+            "hedge_pnl_incl_funding_usd": hedge_pnl_incl_funding_usd,
+            "combined_pnl_ex_fees_usd": combined_pnl_ex_fees_usd,
+            "static_hedge_benchmark_usd": static_hedge_benchmark_usd,
+            "static_hedge_benchmark_gamma_term_usd": gamma_term_usd,
+            "static_hedge_benchmark_basis_term_usd": basis_term_usd,
+            "static_hedge_deviation_usd": static_hedge_deviation_usd,
+            "sigma_realized_info": sigma_info,
+            "delta_t_years": delta_t_years,
+            "continuous_lvr_theoretical_usd": continuous_lvr_theoretical_usd,
+            "fee_lvr_ratio": fee_lvr_ratio,
+            "CAUTION": ("static_hedge_deviation_usd, если заметно ненулевой (не объясним фандингом/клиппингом), -- "
+                        "сигнал бага в L/тиках/чтении, не просто шум. sigma_realized на малой выборке крайне шумная "
+                        "-- continuous_lvr_theoretical_usd/fee_lvr_ratio ненадёжны до накопления точек."),
+        })
+        print(f"[snapshot] L_human={L_human:.6f} (сверка с §4: diff={l_human_cross_check_diff})")
+        print(f"[snapshot] V_lp(P_open)=${V_lp_open_usd:.6f} V_lp(P_now)=${V_lp_now_usd:.6f} lp_pnl_ex_fees=${lp_pnl_ex_fees_usd:+.6f}")
+        print(f"[snapshot] hedge_pnl (unrealized+realized+funding) = ${hedge_pnl_incl_funding_usd:+.6f}")
+        print(f"[snapshot] combined_pnl_ex_fees=${combined_pnl_ex_fees_usd:+.6f} vs static_hedge_benchmark=${static_hedge_benchmark_usd:+.6f} "
+              f"(отклонение ${static_hedge_deviation_usd:+.6f})")
+        print(f"[snapshot] sigma_realized={sigma_realized} ({sigma_info.get('n_returns')} returns, {sigma_info.get('note')})")
+        print(f"[snapshot] continuous_lvr_theoretical_usd=${continuous_lvr_theoretical_usd} fee_lvr_ratio={fee_lvr_ratio}")
+    else:
+        lvr_block["note"] = "нет entry_price или реальной Lighter-позиции -- LVR-блок неполный."
+
+    # === 7. Сверка свободной маржи -- Δ раскладывается на РЕАЛЬНЫЕ поля
+    # (unrealized_pnl, realized_pnl, funding, требование маржи), не на
+    # формульную оценку (задача владельца, 2026-09-04). ===
+    print("\n=== 7. Сверка свободной маржи (реальные поля, не формула) ===")
+    margin_recon: dict = {}
+    if eth_pos and prev_entry and prev_entry.get("token_id") == TOKEN_ID:
+        prev_free_margin = prev_entry.get("free_margin_usd")
+        prev_unrealized = prev_entry.get("hedge_unrealized_pnl_usd")
+        prev_realized = prev_entry.get("hedge_realized_pnl_usd")
+        prev_funding = prev_entry.get("hedge_funding_paid_out_usd")
+        prev_cross_imr = prev_entry.get("cross_initial_margin_requirement_usd")
+        if None not in (prev_free_margin, prev_unrealized, prev_realized, prev_funding, prev_cross_imr,
+                        cross_initial_margin_requirement_usd):
+            d_free_margin = free_margin_usd - prev_free_margin
+            d_unrealized = unrealized_pnl - prev_unrealized
+            d_realized = (realized_pnl_usd or 0.0) - prev_realized
+            d_funding = (total_funding_paid_out_usd or 0.0) - prev_funding
+            d_cross_imr = cross_initial_margin_requirement_usd - prev_cross_imr
+            d_collateral_implied = d_free_margin + d_cross_imr  # тождество: free_margin = collateral - cross_imr
+            explained = d_unrealized + d_realized + d_funding
+            residual_usd = d_collateral_implied - explained
+            margin_recon = {
+                "d_free_margin_usd": d_free_margin, "d_cross_initial_margin_requirement_usd": d_cross_imr,
+                "d_collateral_implied_usd": d_collateral_implied,
+                "d_unrealized_pnl_usd": d_unrealized, "d_realized_pnl_usd": d_realized, "d_funding_usd": d_funding,
+                "explained_usd": explained, "residual_usd": residual_usd,
+                "note": None,
+            }
+            print(f"[snapshot] Δfree_margin=${d_free_margin:+.6f} = Δcollateral(${d_collateral_implied:+.6f}) − ΔIMR(${d_cross_imr:+.6f})")
+            print(f"[snapshot] Δcollateral объяснено PnL+funding: ${explained:+.6f}, остаток=${residual_usd:+.6f}")
+        else:
+            margin_recon["note"] = ("нет полного набора полей на предыдущей точке (funding/realized_pnl/cross_imr "
+                                     "начали читаться только с этого обновления кода) -- сверка недоступна для этой пары точек.")
+            print(f"[snapshot] {margin_recon['note']}")
+    else:
+        margin_recon["note"] = "нет предыдущей точки или Lighter-позиции -- сверка маржи недоступна."
+        print(f"[snapshot] {margin_recon['note']}")
+
     # === Запись почасового ряда (append-only) ===
     block_now = get_block_number()
     accrual_entry = {
@@ -612,6 +864,21 @@ def run() -> int:
         "hours_covered": hours_covered, "n_hourly_candles": n_hourly_candles,
         "n_accrual_points": n_accrual_points,
         "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
+        # -- поля для сверки маржи следующей точки (задача LVR, 2026-09-04) --
+        "hedge_unrealized_pnl_usd": lighter_hedge_now.get("unrealized_pnl_usd"),
+        "hedge_realized_pnl_usd": lighter_hedge_now.get("realized_pnl_usd"),
+        "hedge_funding_paid_out_usd": lighter_hedge_now.get("total_funding_paid_out_usd"),
+        "cross_initial_margin_requirement_usd": lighter_hedge_now.get("cross_initial_margin_requirement_usd"),
+        # -- LVR-блок --
+        "L_human": lvr_block.get("L_human"),
+        "lp_pnl_ex_fees_usd": lvr_block.get("lp_pnl_ex_fees_usd"),
+        "combined_pnl_ex_fees_usd": lvr_block.get("combined_pnl_ex_fees_usd"),
+        "static_hedge_benchmark_usd": lvr_block.get("static_hedge_benchmark_usd"),
+        "static_hedge_deviation_usd": lvr_block.get("static_hedge_deviation_usd"),
+        "sigma_realized_annualized": (lvr_block.get("sigma_realized_info") or {}).get("sigma_realized_annualized"),
+        "continuous_lvr_theoretical_usd": lvr_block.get("continuous_lvr_theoretical_usd"),
+        "fee_lvr_ratio": lvr_block.get("fee_lvr_ratio"),
+        "margin_recon_residual_usd": margin_recon.get("residual_usd"),
     }
     ACCRUAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ACCRUAL_LOG_PATH.open("a") as f:
@@ -637,6 +904,8 @@ def run() -> int:
         "fee_capture_ratio_interval": fee_capture_ratio_interval, "fee_capture_interval_detail": fee_capture_detail,
         "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
         "fee_capture_cumulative_detail": fee_capture_cumulative_detail,
+        "lvr": lvr_block,
+        "margin_reconciliation": margin_recon,
         "runtime_s": time.time() - t0,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
