@@ -34,8 +34,17 @@ def probe(path: str, params: dict) -> dict:
 
 def run() -> int:
     result = {}
-    print("=== 1. /api/v1/fundings (per-market hourly funding history) ===")
-    result["fundings"] = probe("/api/v1/fundings", {"market_id": BTC_MARKET_ID, "resolution": "1h", "count_back": 3})
+    print("=== 1a. /api/v1/fundings, неполный набор параметров (как в первой попытке) ===")
+    result["fundings_partial_params"] = probe("/api/v1/fundings", {"market_id": BTC_MARKET_ID, "resolution": "1h", "count_back": 3})
+    print(json.dumps(result["fundings_partial_params"], indent=2, ensure_ascii=False))
+
+    print("\n=== 1b. /api/v1/fundings, ПОЛНЫЙ набор параметров (как в analysis/p4_lighter_markets.py::fetch_funding_history) ===")
+    import time as _time
+    _now = int(_time.time())
+    result["fundings"] = probe("/api/v1/fundings", {
+        "market_id": BTC_MARKET_ID, "resolution": "1h",
+        "start_timestamp": _now - 3 * 3600, "end_timestamp": _now, "count_back": 3,
+    })
     print(json.dumps(result["fundings"], indent=2, ensure_ascii=False))
 
     print("\n=== 2. /api/v1/orderBookOrders (depth for +-0.5% calc) ===")
