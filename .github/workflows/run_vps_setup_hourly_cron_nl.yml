@@ -98,14 +98,17 @@ jobs:
           echo "=== $(date -u +%FT%TZ) -- ОК, строк в живом ряду: $(wc -l < "$LIVE_ACCRUAL") ==="
           EOF
 
-      - name: "4. Crontab bot -- раз в час, минута :06, идемпотентно (не дублирует строку при повторном запуске)"
+      - name: "4. Crontab bot -- раз в час, минута :06 (через файл, не stdin-pipe -- см. диагностику 2026-09-04: REPLACE логировался, но crontab -l оставался пустым, sudo -u bot crontab - не получал stdin из pipe)"
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
             set -e
             sudo -u bot mkdir -p /home/bot/robinhood-chain-alpha/logs
-            CRONLINE="6 * * * * /home/bot/bin/p5_hourly_snapshot.sh >> /home/bot/robinhood-chain-alpha/logs/p5_hourly_snapshot.log 2>&1"
-            ( sudo -u bot crontab -l 2>/dev/null | grep -vF "p5_hourly_snapshot.sh" ; echo "$CRONLINE" ) | sudo -u bot crontab -
-            echo "=== crontab bot ==="; sudo -u bot crontab -l
+            printf "%s\n" "6 * * * * /home/bot/bin/p5_hourly_snapshot.sh >> /home/bot/robinhood-chain-alpha/logs/p5_hourly_snapshot.log 2>&1" > /tmp/bot_cron.txt
+            chown bot:bot /tmp/bot_cron.txt
+            sudo -u bot crontab /tmp/bot_cron.txt
+            rm -f /tmp/bot_cron.txt
+            echo "=== raw crontab файл ==="; cat /var/spool/cron/crontabs/bot
+            echo "=== crontab -l bot ==="; sudo -u bot crontab -l
           '
 
       - name: "5. Разовый тестовый прогон вручную (подтвердить механизм сразу, не ждать первого тика)"
