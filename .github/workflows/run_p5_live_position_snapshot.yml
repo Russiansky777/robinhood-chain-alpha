@@ -13,6 +13,12 @@ name: P5 LIVE -- забрать накопленный cron'ом ряд с NL VP
 # Git на VPS не используется -- у раннера уже есть доступ на запись,
 # отдельного кредда для пуша с хоста нет и не заводим (см.
 # docs/HANDOFF.md).
+#
+# Владелец, 2026-09-04 (п.1): РАСШИРЕНО -- тем же маркером и тем же
+# прогоном забирается ТАКЖЕ накопленный cron'ом (минута :21) ряд логгера
+# фандинга (/home/bot/funding_live_data/funding_spread.jsonl), дедуп по
+# (timestamp_utc, symbol) -- analysis/funding_merge_from_vps.py. Один
+# канал на оба ряда, не два отдельных маркера.
 on:
   workflow_dispatch: {}
   push:
@@ -56,8 +62,17 @@ jobs:
           echo "строк на VPS: $(wc -l < /tmp/vps_p5_fee_accrual.jsonl), было в git: $(wc -l < data/p5_fee_accrual.jsonl)"
           ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p5_live_snapshot_1000756_result.json' > /tmp/vps_p5_live_snapshot_1000756_result.json || true
 
-      - name: Слить новые строки (дедуп по timestamp_utc, ничего не генерируем заново)
+      - name: Слить новые строки P5 (дедуп по timestamp_utc, ничего не генерируем заново)
         run: python -u analysis/p5_merge_accrual_from_vps.py /tmp/vps_p5_fee_accrual.jsonl
+
+      - name: Забрать накопленный ряд логгера фандинга (вне git на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/funding_live_data/funding_spread.jsonl' > /tmp/vps_funding_spread.jsonl
+          [ -s /tmp/vps_funding_spread.jsonl ]
+          echo "строк на VPS: $(wc -l < /tmp/vps_funding_spread.jsonl), было в git: $(wc -l < data/funding_spread.jsonl 2>/dev/null || echo 0)"
+
+      - name: Слить новые строки логгера фандинга (дедуп по timestamp_utc+symbol)
+        run: python -u analysis/funding_merge_from_vps.py /tmp/vps_funding_spread.jsonl
 
       - name: Обновить последний полный снимок (не накопительный файл -- просто последнее состояние с VPS)
         run: |
@@ -68,8 +83,9 @@ jobs:
         run: |
           [ -e data/p5_fee_accrual.jsonl ] && git add data/p5_fee_accrual.jsonl
           [ -e data/p3_guard_cache/p5_live_snapshot_1000756_result.json ] && git add data/p3_guard_cache/p5_live_snapshot_1000756_result.json
+          [ -e data/funding_spread.jsonl ] && git add data/funding_spread.jsonl
           git diff --cached --quiet && exit 0
-          git commit -m "P5 LIVE: забрать ряд, накопленный cron'ом на NL VPS [automated]"
+          git commit -m "P5 LIVE + логгер фандинга: забрать ряды, накопленные cron'ом на NL VPS [automated]"
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
