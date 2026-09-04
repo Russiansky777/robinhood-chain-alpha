@@ -1,0 +1,79 @@
+name: "P5 -- остановить cron :06 на VPS Нидерланды (funding :21 не трогать, SSH/ufw/ключи не трогает)"
+
+# Владелец, 2026-09-04 (после закрытия P5): "Cron P5 после этого
+# остановить (строку :06 убрать, :21 не трогать), последние точки в
+# ряду оставить." По образцу run_vps_setup_funding_cron_nl.yml --
+# читает ТЕКУЩИЙ crontab, убирает ТОЛЬКО строку p5_hourly_snapshot.sh,
+# пишет обратно через файл (не stdin-pipe), проверяет ДО и ПОСЛЕ, что
+# funding-строка (:21) на месте. Не трогает SSH-порт/sshd_config/ufw/
+# ключи, не трогает /home/bot/p5_live_data/p5_fee_accrual.jsonl
+# (внешний живой файл остаётся как есть -- просто больше не растёт).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_STOP_P5_CRON_NL_REQUEST"
+
+jobs:
+  stop_cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Убрать строку P5 (:06) из crontab bot, funding (:21) оставить -- с проверкой до/после
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            echo "=== crontab bot ДО ==="
+            sudo -u bot crontab -l || echo "(пусто)"
+            EXISTING=$(sudo -u bot crontab -l 2>/dev/null || true)
+            if ! echo "$EXISTING" | grep -q "funding_hourly_snapshot.sh"; then
+              echo "СТОП: строка funding (:21) НЕ найдена в текущем crontab ДО изменений -- не продолжаю вслепую." >&2
+              exit 1
+            fi
+            FILTERED=$(echo "$EXISTING" | grep -vF "p5_hourly_snapshot.sh" || true)
+            printf "%s\n" "$FILTERED" > /tmp/bot_cron.txt
+            chown bot:bot /tmp/bot_cron.txt
+            sudo -u bot crontab /tmp/bot_cron.txt
+            rm -f /tmp/bot_cron.txt
+            echo "=== crontab bot ПОСЛЕ ==="
+            sudo -u bot crontab -l || echo "(пусто)"
+            sudo -u bot crontab -l | grep -q "p5_hourly_snapshot.sh" && { echo "ОШИБКА: строка P5 (:06) всё ещё на месте!" >&2; exit 1; } || echo "OK: строка P5 (:06) убрана"
+            sudo -u bot crontab -l | grep -q "funding_hourly_snapshot.sh" && echo "OK: строка funding (:21) сохранена" || { echo "ОШИБКА: строка funding (:21) пропала!" >&2; exit 1; }
+            echo "=== последние точки живого ряда P5 (не трогаются) ==="
+            tail -1 /home/bot/p5_live_data/p5_fee_accrual.jsonl 2>/dev/null || echo "(файл не найден -- не трогаю дальше)"
+            wc -l /home/bot/p5_live_data/p5_fee_accrual.jsonl 2>/dev/null || true
+          '
+
+      - name: Commit (снять маркер)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch data/p3_guard_cache/VPS_STOP_P5_CRON_NL_REQUEST
+          git diff --cached --quiet && exit 0
+          git commit -m "P5: cron :06 остановлен на VPS, funding :21 не тронут [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
