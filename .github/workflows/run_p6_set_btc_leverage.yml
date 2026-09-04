@@ -1,0 +1,77 @@
+name: "P6 -- выставить реальное плечо BTC на Lighter (update_leverage, не ордер) и перечитать"
+
+# Владелец, 2026-09-04: "Плечо BTC не брать по дефолту, а выставить
+# аутентифицированным вызовом (не ордер) и перечитать." Единственная
+# реальная подписанная транзакция во всей цепочке P6-dry-run --
+# update_leverage не открывает позицию/ордер, только настраивает
+# плечо/margin_mode рынка на аккаунте. Выполняется на VPS Нидерланды --
+# та же причина, что p5_live_flatten_lighter.py/p5_live_step1.py
+# (подпись Lighter-транзакций из юрисдикции GH Actions отклоняется).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P6_SET_BTC_LEVERAGE_REQUEST"
+
+jobs:
+  set_leverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Обновить репозиторий на VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: Выставить плечо BTC (update_leverage) и перечитать
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot bash -c 'set -a; source /etc/bot/env; set +a; ./venv/bin/python analysis/p6_set_btc_leverage.py'
+          "
+
+      - name: Забрать результат с VPS
+        if: always()
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/p3_guard_cache/p6_set_btc_leverage_result.json' > /tmp/leverage_result.json || true
+          mkdir -p data/p3_guard_cache
+          [ -s /tmp/leverage_result.json ] && cp /tmp/leverage_result.json data/p3_guard_cache/p6_set_btc_leverage_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch data/p3_guard_cache/P6_SET_BTC_LEVERAGE_REQUEST
+          git add data/p3_guard_cache/p6_set_btc_leverage_result.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P6: реальное плечо BTC выставлено через update_leverage и перечитано [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
