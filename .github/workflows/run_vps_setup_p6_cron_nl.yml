@@ -1,0 +1,132 @@
+name: "P6 -- VPS Нидерланды: часовой cron снимка (третья строка :36, P5 :06 уже снят, funding :21 не трогать)"
+
+# Владелец, Гейт 2, 2026-09-04, ДО транзакций входа: "p6_hourly_snapshot
+# -- тот же скрипт, что P5, параметры из конфига. Cron третьей строкой
+# (:36, не трогая :21). Проверить сухим прогоном, что скрипт стартует и
+# честно пишет «позиции нет» вместо падения." По образцу
+# run_vps_setup_funding_cron_nl.yml -- читает ТЕКУЩИЙ crontab, ДОПИСЫВАЕТ
+# строку :36 (P6), не заменяет; funding (:21) должна остаться на месте
+# (проверено до/после). Позиции ещё нет (Гейт 2 транзакции -- отдельным
+# шагом ПОСЛЕ этого workflow) -- тестовый прогон должен честно напечатать
+# "позиции нет" и завершиться успешно (exit 0), не упасть.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_SETUP_P6_CRON_NL_REQUEST"
+
+jobs:
+  setup_cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "1. Обновить репозиторий у bot"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "2. Засеять внешний живой файл (вне git) -- пусто, позиции ещё нет"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/p6_live_data
+            sudo -u bot touch /home/bot/p6_live_data/p6_fee_accrual.jsonl
+            echo "внешний файл: $(wc -l < /home/bot/p6_live_data/p6_fee_accrual.jsonl) строк"
+          '
+
+      - name: "3. Обёрточный скрипт cron'а (идемпотентно перезаписывается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /home/bot/bin && cat > /home/bot/bin/p6_hourly_snapshot.sh && chown bot:bot /home/bot/bin/p6_hourly_snapshot.sh && chmod +x /home/bot/bin/p6_hourly_snapshot.sh' <<'EOF'
+          #!/bin/bash
+          # Часовой снимок P6 НА САМОМ VPS -- только чтение, без git.
+          # Накопленный ряд -- ВНЕ git-репозитория (/home/bot/p6_live_data/
+          # p6_fee_accrual.jsonl), тот же паттерн, что P5/funding.
+          set -euo pipefail
+
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/p6_live_data
+          LIVE_ACCRUAL="$LIVE_DIR/p6_fee_accrual.jsonl"
+          LIVE_STATE="$LIVE_DIR/p6_live_position_state.json"
+
+          mkdir -p "$LIVE_DIR"
+          touch "$LIVE_ACCRUAL"
+
+          cd "$REPO"
+          cp "$LIVE_ACCRUAL" data/p6_fee_accrual.jsonl
+          [ -f "$LIVE_STATE" ] && cp "$LIVE_STATE" data/p6_live_position_state.json || true
+
+          set -a
+          [ -f /etc/bot/env ] && source /etc/bot/env
+          set +a
+
+          echo "=== $(date -u +%FT%TZ) -- запуск p6_hourly_snapshot.py ==="
+          "$REPO/venv/bin/python" -u analysis/p6_hourly_snapshot.py
+
+          cp data/p6_fee_accrual.jsonl "$LIVE_ACCRUAL"
+          echo "=== $(date -u +%FT%TZ) -- ОК, строк в живом ряду: $(wc -l < "$LIVE_ACCRUAL") ==="
+          EOF
+
+      - name: "4. Crontab bot -- ДОПИСАТЬ строку P6 (:36) к существующей funding (:21), не заменить"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/robinhood-chain-alpha/logs
+            EXISTING=$(sudo -u bot crontab -l 2>/dev/null || true)
+            echo "=== существующий crontab (до) ==="
+            echo "$EXISTING"
+            if ! echo "$EXISTING" | grep -q "funding_hourly_snapshot.sh"; then
+              echo "СТОП: строка funding (:21) НЕ найдена в текущем crontab -- не продолжаю, чтобы не работать вслепую поверх неожиданного состояния." >&2
+              exit 1
+            fi
+            FILTERED=$(echo "$EXISTING" | grep -vF "p6_hourly_snapshot.sh" || true)
+            {
+              echo "$FILTERED"
+              echo "36 * * * * /home/bot/bin/p6_hourly_snapshot.sh >> /home/bot/robinhood-chain-alpha/logs/p6_hourly_snapshot.log 2>&1"
+            } > /tmp/bot_cron.txt
+            chown bot:bot /tmp/bot_cron.txt
+            sudo -u bot crontab /tmp/bot_cron.txt
+            rm -f /tmp/bot_cron.txt
+            echo "=== raw crontab файл (после) ==="; cat /var/spool/cron/crontabs/bot
+            echo "=== crontab -l bot (после) ==="; sudo -u bot crontab -l
+            echo "=== проверка: funding (:21) на месте? ==="
+            sudo -u bot crontab -l | grep -q "21 \* \* \* \* /home/bot/bin/funding_hourly_snapshot.sh" && echo "OK: funding-строка сохранена" || { echo "ОШИБКА: funding-строка пропала!" >&2; exit 1; }
+            echo "=== проверка: P5 (:06) отсутствует (реально закрыт и остановлен ранее)? ==="
+            sudo -u bot crontab -l | grep -q "p5_hourly_snapshot.sh" && echo "ПРЕДУПРЕЖДЕНИЕ: строка P5 всё ещё есть (не ожидалось)" || echo "OK: строки P5 нет (как и ожидалось)"
+          '
+
+      - name: "5. Сухой тестовый прогон -- ДОЛЖЕН честно напечатать 'позиции нет' и завершиться успешно (позиция ещё не открыта)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot /home/bot/bin/p6_hourly_snapshot.sh
+            echo "=== содержимое живого ряда после тестового прогона ==="
+            cat /home/bot/p6_live_data/p6_fee_accrual.jsonl 2>/dev/null || echo "(пусто -- ожидаемо, позиции ещё нет)"
+          '
+
+      - name: Итог
+        run: |
+          echo "cron P6 установлен (раз в час, минута :36), funding (:21) не тронут, P5 (:06) отсутствует (закрыт ранее)."
+          echo "Тестовый прогон прошёл -- скрипт стартует и честно обрабатывает отсутствие позиции, не падает."
