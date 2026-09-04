@@ -1,0 +1,47 @@
+name: "Логгер фандинга -- проверить единицу rate у Lighter реальным Δfunding позиции 1000756"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VERIFY_LIGHTER_RATE_UNITS_REQUEST"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Проверить единицу rate реальным Δfunding позиции
+        run: python -u analysis/verify_lighter_rate_units.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/verify_lighter_rate_units_result.json ] && git add data/p3_guard_cache/verify_lighter_rate_units_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Логгер фандинга: проверка единицы rate Lighter [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
