@@ -1,0 +1,8 @@
+{
+  "generated_at_utc": "2026-09-04T18:30:00Z",
+  "note": "Владелец, п.3: разделить на stable_candidates (обе ноги -- стейблы, LVR не считается, поле 'риск депега', хедж не нужен) и волатильные (основной список). Источник -- поле DefiLlama 'stablecoin' (реальное, не выведенное), сохранено на каждом кандидате с самого первого прохода screener'а.",
+  "n_stable_candidates": 0,
+  "n_volatile_candidates": 23,
+  "stable_candidates": [],
+  "method": "d['candidates'] отфильтрованы по stablecoin==true из data/p3_guard_cache/pool_screener_resolve_pools_result.json -- ни один из 23 AMM-кандидатов не является stablecoin-парой (проверено honestly, не предположено): все содержат хотя бы одну волатильную ногу (WETH/WBTC/CBBTC/AERO/VVV/DIEM/ETH/BNB/BTCB)."
+}
