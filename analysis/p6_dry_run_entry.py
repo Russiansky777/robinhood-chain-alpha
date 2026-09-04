@@ -293,12 +293,36 @@ def run() -> int:
     btc_leverage = real_leverage(account_full, "BTC")
     print(f"[p6_dry_run] BTC market mark_price={btc_market.get('mark_price') if btc_market else None}")
     print(f"[p6_dry_run] РЕАЛЬНОЕ текущее плечо BTC на аккаунте {LIGHTER_ACCOUNT_INDEX}: {btc_leverage}")
-    if not btc_leverage.get("found") or not btc_leverage.get("leverage"):
-        result["abort_reason"] = "real_leverage(BTC) не нашёл позицию/плечо -- НЕ считаю маржу по допущению (урок canceled-margin-not-allowed)"
-        result["btc_leverage_probe"] = btc_leverage
-        Path("data/p3_guard_cache/p6_dry_run_entry_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
-        print(f"[p6_dry_run] СТОП: {result['abort_reason']}")
-        return 1
+
+    # НАЙДЕНО (2026-09-04, реальный прогон): аккаунт 22012 НИКОГДА не
+    # торговал BTC -- в отличие от ETH (см. p5_live_precheck.py), positions[]
+    # не содержит даже нулевой BTC-записи, значит real_leverage() честно не
+    # находит плечо. Аутентифицированные /api/v1/accountLimits и
+    # /api/v1/accountMetadata (единственные кандидаты на "настройку плеча
+    # без истории позиции") реально проверялись 2026-09-0X
+    # (data/p3_guard_cache/lighter_order_history_probe_result.json) --
+    # ОБА требуют подписи ключом (400 "auth query param... empty"), что
+    # выходит за рамки "дешёвого шага только на чтение" (владелец,
+    # docs/P6_HEDGED_LP.md). Фолбэк -- биржевой default_initial_margin_fraction
+    # рынка BTC, ЯВНО помечен как НЕподтверждённый под этот аккаунт (не
+    # молчаливое допущение, как было в canceled-margin-not-allowed -- там
+    # ошибка была в том, что допущение НЕ было помечено и не сверялось).
+    btc_leverage_is_confirmed_account_setting = btc_leverage.get("found") and btc_leverage.get("leverage")
+    if not btc_leverage_is_confirmed_account_setting:
+        default_imf = btc_market.get("default_initial_margin_fraction") if btc_market else None
+        if default_imf is None:
+            result["abort_reason"] = "ни реальное плечо аккаунта, ни биржевой default_initial_margin_fraction для BTC не найдены -- СТОП"
+            result["btc_leverage_probe"] = btc_leverage
+            Path("data/p3_guard_cache/p6_dry_run_entry_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+            print(f"[p6_dry_run] СТОП: {result['abort_reason']}")
+            return 1
+        imf_pct = float(default_imf) / 100  # та же шкала bps/10000->%, что в p4/p5 (default_initial_margin_fraction=5000 => 50.00% => imf_pct=50)
+        btc_leverage = {
+            "found": True, "initial_margin_fraction_pct": imf_pct, "leverage": 100.0 / imf_pct if imf_pct else None,
+            "source": "БИРЖЕВОЙ ДЕФОЛТ рынка BTC (default_initial_margin_fraction), НЕ подтверждено настройкой аккаунта 22012 -- "
+                       "у аккаунта нет истории по BTC, аутентифицированные эндпоинты настройки плеча вне рамок дешёвого шага",
+        }
+        print(f"[p6_dry_run] ФОЛБЭК (явно помечен, не молчаливое допущение): {btc_leverage}")
 
     leverage_val = btc_leverage["leverage"]
     short_notional_usd = amount1_used * p0  # хедж = cbBTC-экспозиция LP
@@ -322,7 +346,9 @@ def run() -> int:
         liq_price_projection = (required_margin_usd + short_notional_usd) / ((short_notional_usd / p0) * (1 + mmf)) if p0 else None
         # short: p_liq = (collateral + size*p0)/(size*(1+mmf)), collateral=required_margin_usd (изолированная проекция)
     result["hedge"] = {
-        "btc_leverage_real": btc_leverage, "short_notional_usd": short_notional_usd,
+        "btc_leverage_used": btc_leverage,
+        "btc_leverage_confirmed_account_setting": btc_leverage_is_confirmed_account_setting,
+        "short_notional_usd": short_notional_usd,
         "required_margin_usd_isolated_projection": required_margin_usd,
         "account_collateral_now_usd": collateral_now, "account_available_balance_now_usd": available_now,
         "account_cross_initial_margin_requirement_now_usd": cross_initial_margin_requirement_now,
