@@ -1,0 +1,58 @@
+name: "P5 LIVE -- VPS Нидерланды: диагностика, почему часовой cron не тикнул (только чтение, ничего не меняет)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_DIAG_CRON_NL_REQUEST"
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Диагностика cron -- служба, crontab, время системы, лог, права
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            echo "=== date -u (системное время VPS в UTC) ==="; date -u
+            echo "=== timedatectl (таймзона) ==="; timedatectl 2>&1 || true
+            echo ""
+            echo "=== cron.service / crond.service статус ==="
+            systemctl status cron --no-pager 2>&1 || systemctl status crond --no-pager 2>&1 || echo "ни cron, ни crond службы не найдено"
+            echo ""
+            echo "=== установлен ли пакет cron вообще ==="
+            dpkg -l | grep -i cron || echo "пакет cron НЕ установлен"
+            echo ""
+            echo "=== crontab bot ==="
+            sudo -u bot crontab -l 2>&1 || echo "crontab -l не вернул ничего/ошибка"
+            echo ""
+            echo "=== /var/log/syslog | grep CRON (последние строки, если есть) ==="
+            grep -i "CRON" /var/log/syslog 2>/dev/null | tail -20 || echo "syslog недоступен или нет записей CRON"
+            echo ""
+            echo "=== лог обёрточного скрипта (последние 40 строк) ==="
+            tail -40 /home/bot/robinhood-chain-alpha/logs/p5_hourly_snapshot.log 2>&1 || echo "лог-файла ещё нет"
+            echo ""
+            echo "=== права/владелец обёрточного скрипта ==="
+            ls -la /home/bot/bin/p5_hourly_snapshot.sh 2>&1 || echo "скрипта нет"
+            echo ""
+            echo "=== содержимое внешнего живого файла -- последние 2 строки ==="
+            tail -2 /home/bot/p5_live_data/p5_fee_accrual.jsonl 2>&1
+            wc -l /home/bot/p5_live_data/p5_fee_accrual.jsonl 2>&1
+          '
