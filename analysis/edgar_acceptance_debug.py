@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from edgar_8k_fetch import HEADERS, get_cik_map, get_8k_filings, FILING_DATE_FROM
+from edgar_8k_fetch import HEADERS, get_cik_map, get_8k_filings, get_acceptance_datetime, FILING_DATE_FROM
 import requests
 
 result = {}
@@ -42,6 +42,10 @@ if filings:
         except Exception as exc:  # noqa: BLE001
             probe_results[label] = {"url": url, "error": str(exc)}
     result["url_probe"] = probe_results
+
+    # Сквозная проверка: реальный вызов исправленной get_acceptance_datetime()
+    # (а не вывод по аналогии с url_probe) -- фиксирует факт, а не догадку.
+    result["get_acceptance_datetime_real_call"] = get_acceptance_datetime(cik, accession)
 
 Path("data/p3_guard_cache/edgar_acceptance_debug_result.json").write_text(
     json.dumps(result, indent=2, ensure_ascii=False, default=str)
