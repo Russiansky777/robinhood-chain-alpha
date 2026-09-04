@@ -325,22 +325,24 @@ def run() -> int:
     # рынка BTC, ЯВНО помечен как НЕподтверждённый под этот аккаунт (не
     # молчаливое допущение, как было в canceled-margin-not-allowed -- там
     # ошибка была в том, что допущение НЕ было помечено и не сверялось).
-    btc_leverage_is_confirmed_account_setting = btc_leverage.get("found") and btc_leverage.get("leverage")
+    btc_leverage_is_confirmed_account_setting = bool(btc_leverage.get("found") and btc_leverage.get("leverage"))
+    # Владелец, 2026-09-04: "Плечо BTC не брать по дефолту, а выставить
+    # аутентифицированным вызовом (не ордер) и перечитать." -- реальный
+    # update_leverage уже отправлен отдельным шагом (analysis/p6_set_btc_leverage.py,
+    # ЕДИНСТВЕННАЯ мутирующая транзакция во всей цепочке P6-dry-run, не
+    # ордер, не позиция). Если аккаунт до сих пор не подтверждает плечо
+    # BTC -- честный стоп, БЕЗ фолбэка на биржевой дефолт (тот путь был
+    # оставлен только как история в data/p3_guard_cache/p6_dry_run_entry_result.json
+    # прошлых прогонов, здесь сознательно убран).
     if not btc_leverage_is_confirmed_account_setting:
-        default_imf = btc_market.get("default_initial_margin_fraction") if btc_market else None
-        if default_imf is None:
-            result["abort_reason"] = "ни реальное плечо аккаунта, ни биржевой default_initial_margin_fraction для BTC не найдены -- СТОП"
-            result["btc_leverage_probe"] = btc_leverage
-            Path("data/p3_guard_cache/p6_dry_run_entry_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
-            print(f"[p6_dry_run] СТОП: {result['abort_reason']}")
-            return 1
-        imf_pct = float(default_imf) / 100  # та же шкала bps/10000->%, что в p4/p5 (default_initial_margin_fraction=5000 => 50.00% => imf_pct=50)
-        btc_leverage = {
-            "found": True, "initial_margin_fraction_pct": imf_pct, "leverage": 100.0 / imf_pct if imf_pct else None,
-            "source": "БИРЖЕВОЙ ДЕФОЛТ рынка BTC (default_initial_margin_fraction), НЕ подтверждено настройкой аккаунта 22012 -- "
-                       "у аккаунта нет истории по BTC, аутентифицированные эндпоинты настройки плеча вне рамок дешёвого шага",
-        }
-        print(f"[p6_dry_run] ФОЛБЭК (явно помечен, не молчаливое допущение): {btc_leverage}")
+        result["abort_reason"] = ("реальное плечо BTC НЕ подтверждено настройкой аккаунта 22012 -- "
+                                   "запустите analysis/p6_set_btc_leverage.py (update_leverage) первым, "
+                                   "фолбэк на биржевой дефолт отключён по прямому указанию владельца.")
+        result["btc_leverage_probe"] = btc_leverage
+        Path("data/p3_guard_cache/p6_dry_run_entry_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        print(f"[p6_dry_run] СТОП: {result['abort_reason']}")
+        return 1
+    print(f"[p6_dry_run] РЕАЛЬНОЕ подтверждённое плечо BTC (аккаунт, не дефолт): {btc_leverage}")
 
     leverage_val = btc_leverage["leverage"]
     short_notional_usd = amount1_used * p0  # хедж = cbBTC-экспозиция LP
@@ -375,6 +377,55 @@ def run() -> int:
                                   "реальный совместный риск ликвидации НЕ равен этой изолированной "
                                   "проекции. Открытый вопрос владельцу, не решён здесь."),
     }
+
+    print("\n=== 4b. Сценарий: после закрытия P5 (реальный свободный баланс из dry-run закрытия) ===")
+    p5_close_path = Path("data/p3_guard_cache/p5_close_dry_run_result.json")
+    if p5_close_path.exists():
+        p5_close = json.loads(p5_close_path.read_text())
+        pnl = p5_close.get("step3_final_pnl_all_legs")
+        hedge_close = p5_close.get("step1_hedge_close", {})
+        if pnl and "abort_reason" not in hedge_close:
+            freed_usd = pnl.get("freed_on_lighter_usd")
+            collateral_after_p5_close = hedge_close.get("account_projection_after_close", {}).get("collateral_usd")
+            available_after_p5_close = hedge_close.get("account_projection_after_close", {}).get("available_balance_usd")
+            other_positions_besides_eth = hedge_close.get("other_open_positions_besides_eth", [])
+            if available_after_p5_close is not None and not other_positions_besides_eth:
+                margin_ok_after_close = available_after_p5_close >= required_margin_usd
+                # Единственная позиция на аккаунте (P5 ETH-шорт закрыт, других
+                # нет) -- ликвидация по ТОЙ ЖЕ проверенной cross-margin формуле,
+                # что уже сверена с реальным полем Lighter `liquidation_price`
+                # для ETH (p5_live_position_snapshot.py, mmf_formula_check):
+                # P_liq = (equity + size*entry)/(size*(1+mmf)), где entry -- цена
+                # входа В МОМЕНТ ГИПОТЕТИЧЕСКОГО открытия = текущая p0 (позиции
+                # ещё нет, реального avg_entry_price не существует).
+                size_btc = amount1_used
+                liq_price_single_position = None
+                if mmf_raw is not None and size_btc:
+                    mmf_val = float(mmf_raw) / 10000
+                    liq_price_single_position = (collateral_after_p5_close + size_btc * p0) / (size_btc * (1 + mmf_val))
+                result["post_p5_close_scenario"] = {
+                    "source": "data/p3_guard_cache/p5_close_dry_run_result.json (dry-run, ничего не отправлено там же)",
+                    "freed_on_lighter_usd": freed_usd,
+                    "account_collateral_after_p5_close_usd": collateral_after_p5_close,
+                    "account_available_balance_after_p5_close_usd": available_after_p5_close,
+                    "required_margin_usd_for_btc_short": required_margin_usd,
+                    "margin_sufficient_after_p5_close": margin_ok_after_close,
+                    "liquidation_price_single_position_usd": liq_price_single_position,
+                    "note": ("После закрытия P5 BTC-шорт станет ЕДИНСТВЕННОЙ позицией на аккаунте -- "
+                             "эта проекция ликвидации УЖЕ не изолированная условность, а реальная формула "
+                             "для факта 'одна позиция на аккаунте' (не проекция 'как если бы', а точная "
+                             "формула при этом условии)."),
+                }
+                print(f"[p6_dry_run] после закрытия P5: available_balance=${available_after_p5_close:.2f} "
+                      f"(+${freed_usd:.2f} освобождено), требуется=${required_margin_usd:.2f}, "
+                      f"хватает={margin_ok_after_close}, ликвидация(единств. позиция)=${liq_price_single_position}")
+            else:
+                result["post_p5_close_scenario"] = {"note": "на аккаунте останутся другие позиции кроме BTC после закрытия P5 -- сценарий 'единственная позиция' не применим, не считаю.",
+                                                      "other_open_positions_besides_eth": other_positions_besides_eth}
+        else:
+            result["post_p5_close_scenario"] = {"note": "p5_close_dry_run_result.json найден, но без валидного step3_final_pnl_all_legs -- пропущено."}
+    else:
+        result["post_p5_close_scenario"] = {"note": "data/p3_guard_cache/p5_close_dry_run_result.json не найден -- сценарий 'после закрытия P5' пропущен."}
 
     print("\n=== 5. Реальный газ (последняя Mint-транзакция на этом пуле) ===")
     mint_tx = find_recent_mint_tx()
