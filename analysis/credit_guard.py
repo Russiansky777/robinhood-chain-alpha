@@ -39,7 +39,16 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-CREDITS_FILE = Path("data/credits_spent.json")
+CREDITS_FILE_ENV = "CREDIT_GUARD_FILE"
+
+CREDITS_FILE = Path(os.environ.get(CREDITS_FILE_ENV, "data/credits_spent.json"))
+# Владелец, 2026-09-04: новый Dune-аккаунт (secrets.DUNE_API_KEY_MOZILA,
+# 2000+ кредитов) -- ОТДЕЛЬНЫЙ от старого (2500/цикл, secrets.DUNE_API_KEY,
+# уже привязан к billing_cycle.external_truth выше). Переменная окружения
+# позволяет скриптам нового аккаунта указывать свой леджер-файл (см.
+# analysis/dune_mozila_recon.py), не трогая и не смешиваясь со старым
+# data/credits_spent.json -- у каждого аккаунта свой независимый
+# billing_cycle с собственным external_limit/reserve_buffer.
 
 DEFAULT_ESTIMATE = 110.0  # см. docstring: наихудший реально замеренный запрос + запас
 
