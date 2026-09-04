@@ -494,22 +494,43 @@ def run() -> int:
 
         # margin_call_price -- цена ETH, при которой initial-margin буфер
         # обнуляется (НЕ liquidation_price -- та считается по maintenance
-        # margin, более низкому порогу, см. §5 PROJECT_STATE.md). Та же
-        # техника вывода, что и там: только ТЕКУЩИЕ наблюдаемые величины
-        # (collateral/size/mark/leverage), без реконструкции состояния на
-        # момент входа. Вывод (шорт, cross-margin):
-        #   collateral(P) = collateral_now - size×(P - P_now)
+        # margin, более низкому порогу, см. §5 PROJECT_STATE.md).
+        #
+        # ИСПРАВЛЕНО (задача LVR, 2026-09-04, найдено численно): поле
+        # `collateral` на Lighter -- ЭТО НЕ mark-to-market equity, а
+        # статичный депозит + РЕАЛИЗОВАННЫЕ события (funding/realized_pnl)
+        # -- проверено на реальных данных: между двумя снимками collateral
+        # изменился ровно на Δtotal_funding_paid_out, unrealized_pnl в него
+        # НЕ включён. Прямое доказательство по факту: (collateral +
+        # unrealized_pnl) − cross_initial_margin_requirement совпало с
+        # реальным available_balance с точностью до 6 знака; формула ниже
+        # (через P_now вместо avg_entry_price) давала расхождение ~$14 --
+        # НЕ шум, реальная ошибка модели, исправлена. Вывод (шорт,
+        # cross-margin, unrealized_pnl(P)=size×(avg_entry_price−P) --
+        # ФИКСИРОВАННАЯ цена входа хеджа, не текущая):
+        #   equity(P) = collateral_now + size×(avg_entry_price − P)
         #   required_initial_margin(P) = size×P / leverage
-        #   collateral(P) = required_initial_margin(P)  =>
-        #   P_margin_call = (collateral_now + size×P_now) / (size×(1 + 1/leverage))
+        #   equity(P) = required_initial_margin(P)  =>
+        #   P_margin_call = (collateral_now + size×avg_entry_price) / (size×(1 + 1/leverage))
         leverage_val = real_leverage.get("leverage") if real_leverage.get("found") else None
         margin_call_price = None
-        if leverage_val and real_hedge_size_eth and lighter_mark_price_now:
-            margin_call_price = ((collateral_usd + real_hedge_size_eth * lighter_mark_price_now) /
+        if leverage_val and real_hedge_size_eth and avg_entry_price:
+            margin_call_price = ((collateral_usd + real_hedge_size_eth * avg_entry_price) /
                                   (real_hedge_size_eth * (1 + 1 / leverage_val)))
         margin_call_move_pct_from_current = (
             (margin_call_price / lighter_mark_price_now - 1) * 100
         ) if (margin_call_price and lighter_mark_price_now) else None
+
+        # Самопроверка модели equity/margin на РЕАЛЬНОМ available_balance
+        # (не только в комментарии -- считается и хранится каждый прогон,
+        # чтобы расхождение было видно сразу, если формула снова разойдётся
+        # с фактом при каких-то новых условиях, напр. margin_mode!=0).
+        free_margin_model_check = None
+        if leverage_val and real_hedge_size_eth and avg_entry_price and cross_initial_margin_requirement_usd is not None:
+            equity_now_model = collateral_usd + real_hedge_size_eth * (avg_entry_price - lighter_mark_price_now)
+            free_margin_model = equity_now_model - cross_initial_margin_requirement_usd
+            free_margin_model_check = {"equity_now_model": equity_now_model, "free_margin_model": free_margin_model,
+                                        "free_margin_real": available_usd, "diff": free_margin_model - available_usd}
 
         # Кросс-проверка формулой §5 паспорта (P0/size ФИКСИРОВАНЫ при
         # входе позиции, collateral -- ТЕКУЩИЙ, cross-margin пулит по
@@ -538,6 +559,7 @@ def run() -> int:
             "realized_pnl_usd": realized_pnl_usd, "total_funding_paid_out_usd": total_funding_paid_out_usd,
             "cross_initial_margin_requirement_usd": cross_initial_margin_requirement_usd,
             "cross_maintenance_margin_requirement_usd": cross_maintenance_margin_requirement_usd,
+            "free_margin_model_check": free_margin_model_check,
         })
         print(f"[snapshot] Lighter ETH-позиция: size={real_hedge_size_eth} avg_entry=${avg_entry_price} "
               f"unrealized_pnl=${unrealized_pnl} liquidation_price=${liq_price} mark_now=${lighter_mark_price_now}")
@@ -546,6 +568,10 @@ def run() -> int:
               f"свободно={free_margin_pct_now}%")
         print(f"[snapshot] margin_call_price=${margin_call_price} ({margin_call_move_pct_from_current:+.4f}% от текущей цены) "
               f"-- НЕ liquidation_price, порог обнуления initial-margin буфера" if margin_call_price else "")
+        if free_margin_model_check:
+            print(f"[snapshot] самопроверка модели equity/margin: модель=${free_margin_model_check['free_margin_model']:.6f} "
+                  f"реальный available_balance=${free_margin_model_check['free_margin_real']:.6f} "
+                  f"diff=${free_margin_model_check['diff']:.6f}")
     else:
         print("[snapshot] ETH-позиция на Lighter НЕ найдена -- голая LP-экспозиция, если это неожиданно, см. флаг ниже.")
 
