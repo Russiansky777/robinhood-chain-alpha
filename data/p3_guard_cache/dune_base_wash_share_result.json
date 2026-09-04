@@ -1,13 +1,270 @@
 {
-  "generated_at_utc": "2026-09-04T21:01:02Z",
+  "generated_at_utc": "2026-09-04T21:11:26Z",
   "steps": {
+    "table_discovery": {
+      "rows": [
+        {
+          "table_name": "uniswapv3pool_evt_swap",
+          "table_schema": "uniswap_v3_base"
+        }
+      ],
+      "n_rows": 1
+    },
+    "aerodrome_slipstream_base_all_tables": {
+      "rows": [
+        {
+          "table_name": "base_liquidity_events"
+        },
+        {
+          "table_name": "pools"
+        }
+      ],
+      "n_rows": 2
+    },
     "identify_schema_USDC-CBBTC": {
-      "failed": true,
-      "reason": "Dune execution 01M1Q3K5SSZWYKCQMMT5EBZBMN завершился со статусом QUERY_STATE_FAILED: {'execution_id': '01M1Q3K5SSZWYKCQMMT5EBZBMN', 'query_id': 8610685, 'is_execution_finished': True, 'state': 'QUERY_STATE_FAILED', 'submitted_at': '2026-09-04T21:01:03.16194Z', 'expires_at': '2026-12-03T21:01:04.186362Z', 'execution_cost_credits': 0, 'error': {'type': 'FAILED_TYPE_EXECUTION_FAILED', 'message': \"line 2:69: Table 'delta_prod.aerodrome_slipstream_base.clpool_evt_swap' does not exist at line 2, position 69 [Execution ID: 01M1Q3K5SSZWYKCQMMT5EBZBMN]\", 'metadata': {'line': 2, 'column': 69}}}"
+      "rows": [
+        {
+          "n": 0,
+          "schema_name": "uniswap_v3_base"
+        }
+      ],
+      "n_rows": 1
     },
     "identify_schema_WETH-CBBTC": {
-      "failed": true,
-      "reason": "Dune execution 01M1Q3KCB4FKBRVYZ7D9VDWDAD завершился со статусом QUERY_STATE_FAILED: {'execution_id': '01M1Q3KCB4FKBRVYZ7D9VDWDAD', 'query_id': 8610687, 'is_execution_finished': True, 'state': 'QUERY_STATE_FAILED', 'submitted_at': '2026-09-04T21:01:09.861472Z', 'expires_at': '2026-12-03T21:01:10.868035Z', 'execution_cost_credits': 0, 'error': {'type': 'FAILED_TYPE_EXECUTION_FAILED', 'message': \"line 2:69: Table 'delta_prod.aerodrome_slipstream_base.clpool_evt_swap' does not exist at line 2, position 69 [Execution ID: 01M1Q3KCB4FKBRVYZ7D9VDWDAD]\", 'metadata': {'line': 2, 'column': 69}}}"
+      "rows": [
+        {
+          "n": 2762955,
+          "schema_name": "uniswap_v3_base"
+        }
+      ],
+      "n_rows": 1
+    },
+    "by_sender_7d_WETH-CBBTC": {
+      "rows": [
+        {
+          "n_swaps": 12857,
+          "sender": "0x83d55acdc72027ed339d267eebaf9a41e47490d5",
+          "volume_raw_units": 95518624072
+        },
+        {
+          "n_swaps": 2129,
+          "sender": "0xc174cfd48383e7041d0224b004192cbcca3eeb7b",
+          "volume_raw_units": 24517244248
+        },
+        {
+          "n_swaps": 893,
+          "sender": "0x08fb33543ad633db94282df364ad80feb8d9fc35",
+          "volume_raw_units": 16481058199
+        },
+        {
+          "n_swaps": 977,
+          "sender": "0xd08b938153ffaa75fbe19339a56cc35ca11c0fbc",
+          "volume_raw_units": 14879469874
+        },
+        {
+          "n_swaps": 2141,
+          "sender": "0x6c6f13d731a53e58ef182ea46fe726ca06360cf8",
+          "volume_raw_units": 12229396661
+        },
+        {
+          "n_swaps": 184,
+          "sender": "0xa5610319da909ec606b879251adf846353459f8e",
+          "volume_raw_units": 5684509154
+        },
+        {
+          "n_swaps": 2306,
+          "sender": "0x278d858f05b94576c1e6f73285886876ff6ef8d2",
+          "volume_raw_units": 4503011821
+        },
+        {
+          "n_swaps": 1113,
+          "sender": "0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7",
+          "volume_raw_units": 3194334540
+        },
+        {
+          "n_swaps": 290,
+          "sender": "0x8ad399967db9cae7dbd09e59485879a968772e17",
+          "volume_raw_units": 1844941895
+        },
+        {
+          "n_swaps": 7834,
+          "sender": "0x2626664c2603336e57b271c5c0b26f421741e481",
+          "volume_raw_units": 1468558607
+        },
+        {
+          "n_swaps": 402,
+          "sender": "0x8f10b468b06c6fd214b65f87778827f7d113f996",
+          "volume_raw_units": 1002834872
+        },
+        {
+          "n_swaps": 403,
+          "sender": "0xc37e0e1fc73cf30378080c2df3904e26ba6229a1",
+          "volume_raw_units": 769378833
+        },
+        {
+          "n_swaps": 215,
+          "sender": "0x7747f8d2a76bd6345cc29622a946a929647f2359",
+          "volume_raw_units": 660531577
+        },
+        {
+          "n_swaps": 1495,
+          "sender": "0x6ff5693b99212da76ad316178a184ab56d299b43",
+          "volume_raw_units": 617686212
+        },
+        {
+          "n_swaps": 64,
+          "sender": "0xee5af97db978720107bc6c0b9913cfa81724ca67",
+          "volume_raw_units": 373462736
+        },
+        {
+          "n_swaps": 22,
+          "sender": "0x1bf28070bc69cc6ec18bc4df226a9459e7d2e79c",
+          "volume_raw_units": 359043385
+        },
+        {
+          "n_swaps": 105,
+          "sender": "0xf3588f2a51b54df05bf664f44f4a1da68d815d3f",
+          "volume_raw_units": 356038883
+        },
+        {
+          "n_swaps": 66,
+          "sender": "0x1c9637f9103d51e257b38712e514dfcdd4a55812",
+          "volume_raw_units": 353094437
+        },
+        {
+          "n_swaps": 91,
+          "sender": "0x182b51037a9085a1532b63e5aac63bed0789e49c",
+          "volume_raw_units": 336013327
+        },
+        {
+          "n_swaps": 78,
+          "sender": "0x29a95a3f3a32adb8bf4523c3af3754b4a0f83dfc",
+          "volume_raw_units": 305698733
+        }
+      ],
+      "n_rows": 20
+    },
+    "by_recipient_7d_WETH-CBBTC": {
+      "rows": [
+        {
+          "n_swaps": 12850,
+          "recipient": "0x51c72848c68a965f66fa7a88855f9f7784502a7f",
+          "volume_raw_units": 95468296358
+        },
+        {
+          "n_swaps": 3106,
+          "recipient": "0x01989c93890aed05a63d179b03424997075b6acf",
+          "volume_raw_units": 39396714122
+        },
+        {
+          "n_swaps": 893,
+          "recipient": "0x08fb33543ad633db94282df364ad80feb8d9fc35",
+          "volume_raw_units": 16481058199
+        },
+        {
+          "n_swaps": 2141,
+          "recipient": "0xbeeb9eee061925cc6d2122f05a4e6536f0feb000",
+          "volume_raw_units": 12229396661
+        },
+        {
+          "n_swaps": 184,
+          "recipient": "0x8b12ca0e3f55da41b11be7381d673efb96e61a8e",
+          "volume_raw_units": 5684509154
+        },
+        {
+          "n_swaps": 2306,
+          "recipient": "0x278d858f05b94576c1e6f73285886876ff6ef8d2",
+          "volume_raw_units": 4503011821
+        },
+        {
+          "n_swaps": 727,
+          "recipient": "0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7",
+          "volume_raw_units": 2001533115
+        },
+        {
+          "n_swaps": 290,
+          "recipient": "0x61040e143a77f165ba44543af4a079f2c809d14b",
+          "volume_raw_units": 1844941895
+        },
+        {
+          "n_swaps": 401,
+          "recipient": "0x8f10b468b06c6fd214b65f87778827f7d113f996",
+          "volume_raw_units": 1002388680
+        },
+        {
+          "n_swaps": 401,
+          "recipient": "0xc37e0e1fc73cf30378080c2df3904e26ba6229a1",
+          "volume_raw_units": 765313321
+        },
+        {
+          "n_swaps": 41,
+          "recipient": "0x8836dfc15ca9fdc43b371d7bbc46cf9f266fb1de",
+          "volume_raw_units": 696569827
+        },
+        {
+          "n_swaps": 212,
+          "recipient": "0x7747f8d2a76bd6345cc29622a946a929647f2359",
+          "volume_raw_units": 660531532
+        },
+        {
+          "n_swaps": 6,
+          "recipient": "0xb4bb788ea4133a5b23cc32848d59780ead78e797",
+          "volume_raw_units": 435905125
+        },
+        {
+          "n_swaps": 1022,
+          "recipient": "0x6ff5693b99212da76ad316178a184ab56d299b43",
+          "volume_raw_units": 409229713
+        },
+        {
+          "n_swaps": 105,
+          "recipient": "0xf3588f2a51b54df05bf664f44f4a1da68d815d3f",
+          "volume_raw_units": 356038883
+        },
+        {
+          "n_swaps": 12,
+          "recipient": "0xc211e1f853a898bd1302385ccde55f33a8c4b3f3",
+          "volume_raw_units": 302202171
+        },
+        {
+          "n_swaps": 63,
+          "recipient": "0xee5af97db978720107bc6c0b9913cfa81724ca67",
+          "volume_raw_units": 291966026
+        },
+        {
+          "n_swaps": 77,
+          "recipient": "0x29a95a3f3a32adb8bf4523c3af3754b4a0f83dfc",
+          "volume_raw_units": 289588896
+        },
+        {
+          "n_swaps": 41,
+          "recipient": "0x4446adc0b8136ffc55ddb7a488ba5509ace2a5ef",
+          "volume_raw_units": 283608949
+        },
+        {
+          "n_swaps": 71,
+          "recipient": "0xcdbdc59a5eeb54027f8b45b118e3cd1f675d79c5",
+          "volume_raw_units": 275101341
+        }
+      ],
+      "n_rows": 20
+    },
+    "totals_7d_WETH-CBBTC": {
+      "rows": [
+        {
+          "n_distinct_recipient": 1816,
+          "n_distinct_sender": 135,
+          "n_swaps": 38539,
+          "total_volume_raw_units": 190588786346
+        }
+      ],
+      "n_rows": 1
     }
+  },
+  "wash_check_WETH-CBBTC": {
+    "top3_sender_share_of_volume": 0.7162904446600731,
+    "top_sender_is_also_top_recipient": false,
+    "top_sender_address": "0x83d55acdc72027ed339d267eebaf9a41e47490d5",
+    "top_recipient_address": "0x51c72848c68a965f66fa7a88855f9f7784502a7f"
   }
 }
