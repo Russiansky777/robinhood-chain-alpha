@@ -806,6 +806,21 @@ def run() -> int:
         ) if (sigma_realized is not None and delta_t_years is not None) else None
         fee_lvr_ratio = (our_fees_usd_cum / continuous_lvr_theoretical_usd) if continuous_lvr_theoretical_usd else None
 
+        # fee_lvr_ratio_at_hist_sigma (владелец, 2026-09-04, задача signature
+        # plot, п.5): ТО ЖЕ отношение, но с sigma=45.5% (52-дневный исторический
+        # скан, p5_gt_pool_history.py) вместо реализованной по нашему короткому
+        # ряду -- сравнение двух чисел рядом показывает, сколько в результате
+        # от стратегии, а сколько от того, что рынок СЕЙЧАС тише истории.
+        # fee_lvr_ratio ПОМЕЧЕН неустойчивым (малая выборка sigma_realized) --
+        # решения на нём одном не принимаются.
+        HIST_SIGMA_45_5PCT = 0.455
+        continuous_lvr_theoretical_at_hist_sigma_usd = (
+            (HIST_SIGMA_45_5PCT ** 2) * L_human * math.sqrt(pool_price_now) / 4 * delta_t_years
+        ) if delta_t_years is not None else None
+        fee_lvr_ratio_at_hist_sigma = (
+            our_fees_usd_cum / continuous_lvr_theoretical_at_hist_sigma_usd
+        ) if continuous_lvr_theoretical_at_hist_sigma_usd else None
+
         lvr_block.update({
             "V_lp_open_usd": V_lp_open_usd, "V_lp_now_usd": V_lp_now_usd,
             "lp_pnl_ex_fees_usd": lp_pnl_ex_fees_usd,
@@ -821,9 +836,13 @@ def run() -> int:
             "delta_t_years": delta_t_years,
             "continuous_lvr_theoretical_usd": continuous_lvr_theoretical_usd,
             "fee_lvr_ratio": fee_lvr_ratio,
+            "continuous_lvr_theoretical_at_hist_sigma_usd": continuous_lvr_theoretical_at_hist_sigma_usd,
+            "fee_lvr_ratio_at_hist_sigma": fee_lvr_ratio_at_hist_sigma,
             "CAUTION": ("static_hedge_deviation_usd, если заметно ненулевой (не объясним фандингом/клиппингом), -- "
-                        "сигнал бага в L/тиках/чтении, не просто шум. sigma_realized на малой выборке крайне шумная "
-                        "-- continuous_lvr_theoretical_usd/fee_lvr_ratio ненадёжны до накопления точек."),
+                        "сигнал бага в L/тиках/чтении, не просто шум. fee_lvr_ratio НЕУСТОЙЧИВ (sigma_realized на малой "
+                        "выборке крайне шумная) -- для решений не используется. fee_lvr_ratio_at_hist_sigma (sigma=45.5% "
+                        "из 52-дневного скана) -- разница между ним и fee_lvr_ratio показывает, сколько в результате от "
+                        "тишины текущего рынка, а не от самой стратегии."),
         })
         print(f"[snapshot] L_human={L_human:.6f} (сверка с §4: diff={l_human_cross_check_diff})")
         print(f"[snapshot] V_lp(P_open)=${V_lp_open_usd:.6f} V_lp(P_now)=${V_lp_now_usd:.6f} lp_pnl_ex_fees=${lp_pnl_ex_fees_usd:+.6f}")
@@ -831,7 +850,8 @@ def run() -> int:
         print(f"[snapshot] combined_pnl_ex_fees=${combined_pnl_ex_fees_usd:+.6f} vs static_hedge_benchmark=${static_hedge_benchmark_usd:+.6f} "
               f"(отклонение ${static_hedge_deviation_usd:+.6f})")
         print(f"[snapshot] sigma_realized={sigma_realized} ({sigma_info.get('n_returns')} returns, {sigma_info.get('note')})")
-        print(f"[snapshot] continuous_lvr_theoretical_usd=${continuous_lvr_theoretical_usd} fee_lvr_ratio={fee_lvr_ratio}")
+        print(f"[snapshot] continuous_lvr_theoretical_usd=${continuous_lvr_theoretical_usd} fee_lvr_ratio(НЕУСТОЙЧИВ)={fee_lvr_ratio}")
+        print(f"[snapshot] fee_lvr_ratio_at_hist_sigma(sigma=45.5%)={fee_lvr_ratio_at_hist_sigma}")
     else:
         lvr_block["note"] = "нет entry_price или реальной Lighter-позиции -- LVR-блок неполный."
 
@@ -904,6 +924,7 @@ def run() -> int:
         "sigma_realized_annualized": (lvr_block.get("sigma_realized_info") or {}).get("sigma_realized_annualized"),
         "continuous_lvr_theoretical_usd": lvr_block.get("continuous_lvr_theoretical_usd"),
         "fee_lvr_ratio": lvr_block.get("fee_lvr_ratio"),
+        "fee_lvr_ratio_at_hist_sigma": lvr_block.get("fee_lvr_ratio_at_hist_sigma"),
         "margin_recon_residual_usd": margin_recon.get("residual_usd"),
     }
     ACCRUAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
