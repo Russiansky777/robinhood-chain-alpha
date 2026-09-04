@@ -1,26 +1,26 @@
 {
-  "generated_at_utc": "2026-09-04T22:33:55Z",
+  "generated_at_utc": "2026-09-04T22:55:10Z",
   "note": "DRY-RUN, ничего не отправлено",
   "pool_state": {
-    "sqrtPriceX96": 2806008890109795959380331003,
-    "tick": -66815,
+    "sqrtPriceX96": 2806741801037172911476283101,
+    "tick": -66810,
     "liquidity_raw": 1213267440627,
     "tick_spacing": 2000,
-    "price_cbbtc_usd_estimate": 79722.53175939599
+    "price_cbbtc_usd_estimate": 79680.90207621346
   },
   "lp_leg": {
-    "target_capital_usd": 250.0,
+    "target_capital_usd": 164.0,
     "price_range_usd": [
-      71750.2785834564,
-      87694.7849353356
+      71712.81186859212,
+      87648.99228383481
     ],
     "tick_lower": -68000,
     "tick_upper": -64000,
-    "current_tick": -66815,
+    "current_tick": -66810,
     "tick_spacing": 2000,
-    "usdc_amount": 125.00000000000009,
-    "cbbtc_amount": 0.0014219109872432999,
-    "cbbtc_notional_usd": 113.35834383953808
+    "usdc_amount": 82.00000000000013,
+    "cbbtc_amount": 0.0009332609398373794,
+    "cbbtc_notional_usd": 74.36307355873717
   },
   "hedge": {
     "btc_leverage_used": {
@@ -29,64 +29,59 @@
       "leverage": 2.0
     },
     "btc_leverage_confirmed_account_setting": true,
-    "short_notional_usd": 113.35834383953808,
-    "required_margin_usd_isolated_projection": 56.67917191976904,
-    "account_collateral_now_usd": 59.82608,
-    "account_available_balance_now_usd": 31.025985,
-    "account_cross_initial_margin_requirement_now_usd": 30.820815,
-    "liquidation_price_projection_isolated_usd": 118165.80794376876,
-    "CROSS_MARGIN_WARNING": "Аккаунт УЖЕ держит ETH-шорт P5 в режиме cross margin -- реальный совместный риск ликвидации НЕ равен этой изолированной проекции. Открытый вопрос владельцу, не решён здесь."
-  },
-  "post_p5_close_scenario": {
-    "source": "data/p3_guard_cache/p5_close_dry_run_result.json (dry-run, ничего не отправлено там же)",
-    "freed_on_lighter_usd": 30.815411,
-    "account_collateral_after_p5_close_usd": 61.863011,
-    "account_available_balance_after_p5_close_usd": 61.863011,
-    "required_margin_usd_for_btc_short": 56.67917191976904,
-    "margin_sufficient_after_p5_close": true,
-    "liquidation_price_single_position_usd": 121768.26314567291,
-    "note": "После закрытия P5 BTC-шорт станет ЕДИНСТВЕННОЙ позицией на аккаунте -- эта проекция ликвидации УЖЕ не изолированная условность, а реальная формула для факта 'одна позиция на аккаунте' (не проекция 'как если бы', а точная формула при этом условии)."
+    "short_notional_usd": 74.36307355873717,
+    "required_margin_usd": 37.181536779368585,
+    "account_collateral_now_usd": 61.883369,
+    "account_available_balance_now_usd": 61.883369,
+    "account_cross_initial_margin_requirement_now_usd": 0.0,
+    "other_open_positions_besides_btc": [],
+    "free_margin_usd": 24.701832220631417,
+    "free_margin_pct": 39.91675408077963,
+    "min_free_margin_pct_rule": 40.0,
+    "margin_rule_satisfied": false,
+    "liquidation_price_single_position_usd": 144258.5522941453,
+    "note": "P5 реально закрыт -- на аккаунте нет других позиций (проверено по факту), поэтому это точная формула для 'одна позиция на аккаунте', не проекция 'как если бы'."
   },
   "gas_estimate": {
     "found": true,
     "tx_hash": "0x2915a4fed723591630f64da255075fdff1ba9761c39cefc99ed263fb20ee3e63",
     "gas_used": 4846063,
-    "n_mints_in_chunk": 27,
+    "n_mints_in_chunk": 26,
     "chunk_range": [
-      50875947,
-      50885947
+      50876585,
+      50886585
     ],
     "gas_price_gwei": 0.006,
-    "eth_usd": 2453.04,
-    "estimated_cost_usd": 0.07132551828912
+    "eth_usd": 2452.21,
+    "estimated_cost_usd": 0.07130138489538
   },
   "across_quote_real_amount": {
     "estimatedFillTimeSec": 2,
     "capitalFeePct": "100000000000000",
-    "capitalFeeTotal": "25000",
-    "relayGasFeePct": "13412000000000",
-    "relayGasFeeTotal": "3353",
-    "relayFeePct": "613412000000000",
-    "relayFeeTotal": "153338",
+    "capitalFeeTotal": "16400",
+    "relayGasFeePct": "20432926829268",
+    "relayGasFeeTotal": "3350",
+    "relayFeePct": "620432926829268",
+    "relayFeeTotal": "101740",
     "lpFeePct": "0",
-    "timestamp": "1788561095",
+    "timestamp": "1788562295",
     "isAmountTooLow": false,
-    "quoteBlock": "25906960",
-    "exclusiveRelayer": "0xFD03AbCAdaF3F930fA4E37Eb2f6ea3A44a41b7F0",
+    "quoteBlock": "25907060",
+    "exclusiveRelayer": "0xeF1eC136931Ab5728B0783FD87D109c9D15D31F1",
     "exclusivityDeadline": 3,
     "spokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
     "destinationSpokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
     "totalRelayFee": {
-      "pct": "613412000000000",
-      "total": "153338"
+      "pct": "620432926829268",
+      "total": "101740"
     },
     "relayerCapitalFee": {
       "pct": "100000000000000",
-      "total": "25000"
+      "total": "16400"
     },
     "relayerGasFee": {
-      "pct": "13412000000000",
-      "total": "3353"
+      "pct": "20432926829268",
+      "total": "3350"
     },
     "lpFee": {
       "pct": "0",
@@ -94,17 +89,17 @@
     },
     "internalizedSwapFee": {
       "pct": "500000000000000",
-      "total": "124985"
+      "total": "81990"
     },
     "limits": {
       "minDeposit": "500000",
-      "maxDeposit": "432760287338",
-      "maxDepositInstant": "104899679602",
-      "maxDepositShortDelay": "432760287338",
-      "recommendedDepositInstant": "104899679602"
+      "maxDeposit": "676938557194",
+      "maxDepositInstant": "104501603863",
+      "maxDepositShortDelay": "676938557194",
+      "recommendedDepositInstant": "104501603863"
     },
-    "fillDeadline": "1788568295",
-    "outputAmount": "249846662",
+    "fillDeadline": "1788569495",
+    "outputAmount": "163898260",
     "inputToken": {
       "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
       "symbol": "USDG",
@@ -117,6 +112,6 @@
       "decimals": 6,
       "chainId": 8453
     },
-    "id": "gb2wc-1788561247848-5291f73e4f31"
+    "id": "gskfz-1788562523677-973931d2c19f"
   }
 }
