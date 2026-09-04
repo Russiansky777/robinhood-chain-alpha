@@ -77,6 +77,7 @@ def run() -> int:
                 if ctxs:
                     found[kw] = ctxs
             entry["keyword_hits"] = found
+            entry["text_preview_first_1500"] = text[:1500]
             print(f"[hyperliquid_jurisdiction_probe] {url}: status={r.status_code} len={len(text)} "
                   f"ключевых совпадений: {list(found.keys())}")
         except Exception as e:  # noqa: BLE001
