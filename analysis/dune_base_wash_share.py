@@ -58,14 +58,103 @@ def run() -> int:
     client = DuneClient()
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "steps": {}}
 
+    # Первая попытка (угаданное имя clpool_evt_swap по аналогии с
+    # Robinhood Chain) реально упала -- "Table ... does not exist"
+    # (0 кредитов, не оплачено). Реальные имена таблиц НЕ угадываем
+    # второй раз -- широкая разведка по обеим схемам сначала.
+    print("=== Разведка реальных имён evt_swap-таблиц в uniswap_v3_base и aerodrome_slipstream_base ===")
+    discovery_sql = """
+    SELECT table_schema, table_name
+    FROM information_schema.tables
+    WHERE table_schema IN ('uniswap_v3_base', 'aerodrome_slipstream_base')
+      AND LOWER(table_name) LIKE '%evt_swap%'
+    LIMIT 100
+    """
+    result["steps"]["table_discovery"] = q(client, "wash_table_discovery", discovery_sql, 3.0, expected_max_rows=100, expected_columns=2)
+
+    discovered = (result["steps"]["table_discovery"] or {}).get("rows") or []
+    by_schema: dict[str, str] = {}
+    for row in discovered:
+        by_schema.setdefault(row["table_schema"], row["table_name"])
+    print(f"[wash_share] найдены реальные таблицы: {by_schema}")
+
+    if not by_schema:
+        print("[wash_share] ни одна из двух схем не дала evt_swap таблицу -- останавливаюсь, не гадаю дальше.")
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        return 1
+
     for pool_name, addr in POOLS.items():
-        print(f"\n=== Идентификация схемы для {pool_name} ({addr}) -- UNION ALL COUNT по кандидатам ===")
-        sql = f"""
-        SELECT 'uniswap_v3_base' AS schema, count(*) AS n FROM uniswap_v3_base.uniswapv3pool_evt_swap WHERE contract_address = {addr}
-        UNION ALL SELECT 'aerodrome_slipstream_base', count(*) FROM aerodrome_slipstream_base.clpool_evt_swap WHERE contract_address = {addr}
-        LIMIT 100
-        """
+        branches = [
+            f"SELECT '{schema}' AS schema_name, count(*) AS n FROM {schema}.{table} WHERE contract_address = {addr}"
+            for schema, table in by_schema.items()
+        ]
+        sql = "\nUNION ALL ".join(branches) + "\nLIMIT 100"
+        print(f"\n=== Идентификация схемы для {pool_name} ({addr}) -- UNION ALL COUNT по реальным таблицам ===")
         result["steps"][f"identify_schema_{pool_name}"] = q(client, f"wash_identify_{pool_name}", sql, 5.0, expected_max_rows=100, expected_columns=2)
+
+    # Для каждого пула -- берём схему, которая реально дала n>0 в
+    # UNION ALL COUNT выше (та же дизамбигуация, что для Robinhood Chain
+    # -- контракт может числиться в нескольких схемах-форках одновременно,
+    # но реальные строки для НАШЕГО адреса есть только в одной).
+    for pool_name, addr in POOLS.items():
+        step = result["steps"].get(f"identify_schema_{pool_name}") or {}
+        rows = step.get("rows") or []
+        real_schema = None
+        for row in rows:
+            if row.get("n", 0) and row["n"] > 0:
+                real_schema = row["schema_name"]
+                break
+        if real_schema is None:
+            print(f"[wash_share] {pool_name}: ни одна схема не дала строк для {addr} -- пропускаю содержательный запрос")
+            continue
+        table = by_schema[real_schema]
+        print(f"\n=== Содержательный wash_share для {pool_name} (схема {real_schema}.{table}) ===")
+
+        window_filter = f"contract_address = {addr} AND evt_block_time >= NOW() - INTERVAL '7' DAY"
+        by_sender_sql = f"""
+        SELECT sender, COUNT(*) AS n_swaps, SUM(ABS(amount1)) AS volume_raw_units
+        FROM {real_schema}.{table}
+        WHERE {window_filter}
+        GROUP BY sender ORDER BY volume_raw_units DESC LIMIT 20
+        """
+        result["steps"][f"by_sender_7d_{pool_name}"] = q(client, f"wash_by_sender_{pool_name}", by_sender_sql, 5.0, expected_max_rows=20, expected_columns=3)
+
+        by_recipient_sql = f"""
+        SELECT recipient, COUNT(*) AS n_swaps, SUM(ABS(amount1)) AS volume_raw_units
+        FROM {real_schema}.{table}
+        WHERE {window_filter}
+        GROUP BY recipient ORDER BY volume_raw_units DESC LIMIT 20
+        """
+        result["steps"][f"by_recipient_7d_{pool_name}"] = q(client, f"wash_by_recipient_{pool_name}", by_recipient_sql, 5.0, expected_max_rows=20, expected_columns=3)
+
+        totals_sql = f"""
+        SELECT COUNT(*) AS n_swaps, SUM(ABS(amount1)) AS total_volume_raw_units,
+               COUNT(DISTINCT sender) AS n_distinct_sender, COUNT(DISTINCT recipient) AS n_distinct_recipient
+        FROM {real_schema}.{table}
+        WHERE {window_filter}
+        """
+        result["steps"][f"totals_7d_{pool_name}"] = q(client, f"wash_totals_{pool_name}", totals_sql, 3.0, expected_max_rows=1, expected_columns=4)
+
+        # Признак самоторговли -- та же эвристика, что нашла 0x65050a:
+        # адрес одновременно топ-1 по sender И по recipient, доля топ-3
+        # по объёму. Считается в Python ниже из уже полученных данных.
+        sender_rows = (result["steps"][f"by_sender_7d_{pool_name}"] or {}).get("rows") or []
+        recipient_rows = (result["steps"][f"by_recipient_7d_{pool_name}"] or {}).get("rows") or []
+        totals_rows = (result["steps"][f"totals_7d_{pool_name}"] or {}).get("rows") or []
+        wash_check = {"note": "недостаточно данных"}
+        if sender_rows and recipient_rows and totals_rows:
+            total_vol = totals_rows[0]["total_volume_raw_units"]
+            top3_sender_vol = sum(r["volume_raw_units"] for r in sender_rows[:3])
+            top_sender_addr = sender_rows[0]["sender"]
+            top_recipient_addr = recipient_rows[0]["recipient"]
+            wash_check = {
+                "top3_sender_share_of_volume": (top3_sender_vol / total_vol) if total_vol else None,
+                "top_sender_is_also_top_recipient": (top_sender_addr == top_recipient_addr),
+                "top_sender_address": top_sender_addr, "top_recipient_address": top_recipient_addr,
+            }
+        result[f"wash_check_{pool_name}"] = wash_check
+        print(f"[wash_share] {pool_name} wash_check: {wash_check}")
 
     state = load_state()
     print(f"\n=== Остаток funding_mozila_block2: {250.0 - state['funding_mozila_block2']['spent']:.2f} из 250 ===")
