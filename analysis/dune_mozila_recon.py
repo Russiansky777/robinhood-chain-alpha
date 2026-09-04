@@ -114,6 +114,29 @@ LIMIT 100
 # не принимает ILIKE (в отличие от полного DuneSQL/Trino для основных
 # запросов, не проверено отдельно, не обобщаем). LOWER(...) LIKE --
 # портируемая замена, не требует ILIKE вообще.
+#
+# Реальный результат первого прогона: ВСЕ 100 строк (лимит съеден целиком)
+# попали в ОДНУ схему 'accountable_v1_1_robinhood' (алфавитно первая) --
+# не значит, что других схем по 'robinhood' нет, просто LIMIT 100 без
+# ORDER BY отрезал раньше, чем дошёл до остальных. Следующие два запроса --
+# сначала список РАЗЛИЧНЫХ схем (дёшево, чтобы не упереться в тот же
+# лимит), потом точечный поиск по названиям, похожим на Uniswap v3/пул.
+DISTINCT_SCHEMAS_SQL = """
+SELECT DISTINCT table_schema
+FROM information_schema.tables
+WHERE LOWER(table_schema) LIKE '%robinhood%'
+LIMIT 100
+"""
+
+SWAP_TABLE_SEARCH_SQL = """
+SELECT table_catalog, table_schema, table_name
+FROM information_schema.tables
+WHERE (LOWER(table_schema) LIKE '%robinhood%' OR LOWER(table_name) LIKE '%robinhood%')
+  AND (LOWER(table_name) LIKE '%swap%' OR LOWER(table_name) LIKE '%uniswap%'
+       OR LOWER(table_name) LIKE '%pool%' OR LOWER(table_name) LIKE '%v3%'
+       OR LOWER(table_name) LIKE '%usdg%' OR LOWER(table_schema) LIKE '%uniswap%')
+LIMIT 100
+"""
 
 
 def run() -> int:
@@ -128,34 +151,38 @@ def run() -> int:
     print("=== 1. Account/usage эндпоинты (бесплатно, метаданные) ===")
     result["steps"]["account_endpoint_probe"] = probe_account_endpoints(client)
 
+    def run_query_step(step_name: str, sql: str, estimated_credits: float) -> None:
+        """Общая обёртка: LIMIT 100 запрос -> результат/причина падения в
+        result['steps'][step_name]. Реальное падение Dune (не гвард) не
+        должно ронять весь скрипт без следа -- стоимость уже фиксируется
+        гвардом (record_execution) независимо от того, что случится тут."""
+        try:
+            df = client.run_sql_cached(
+                name=step_name, sql=sql, estimated_credits=estimated_credits,
+                expected_max_rows=100, expected_columns=5,
+            )
+            result["steps"][step_name] = {
+                "rows": df.to_dict(orient="records") if df is not None else None,
+                "n_rows": len(df) if df is not None else 0,
+            }
+            print(f"[recon] {step_name}: найдено строк {len(df) if df is not None else 0}")
+            if df is not None and len(df):
+                print(df.to_string())
+        except SystemExit as exc:
+            result["steps"][step_name] = {"stopped": True, "reason": str(exc)}
+            print(f"[recon] {step_name} остановлен гвардом: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            result["steps"][step_name] = {"failed": True, "reason": str(exc)[:2000]}
+            print(f"[recon] {step_name} УПАЛ (не гвард, реальная ошибка Dune): {exc}")
+
     print("\n=== 2. Поиск схем/таблиц по 'robinhood' (LIMIT 100, information_schema) ===")
-    try:
-        df = client.run_sql_cached(
-            name="mozila_schema_search_robinhood",
-            sql=SCHEMA_SEARCH_SQL,
-            estimated_credits=2.0,
-            expected_max_rows=100,
-            expected_columns=3,
-        )
-        result["steps"]["schema_search"] = {
-            "rows": df.to_dict(orient="records") if df is not None else None,
-            "n_rows": len(df) if df is not None else 0,
-        }
-        print(f"[recon] найдено строк: {len(df) if df is not None else 0}")
-        if df is not None and len(df):
-            print(df.to_string())
-    except SystemExit as exc:
-        result["steps"]["schema_search"] = {"stopped": True, "reason": str(exc)}
-        print(f"[recon] schema_search остановлен гвардом: {exc}")
-    except Exception as exc:  # noqa: BLE001 -- падение Dune (FAILED/TIMEOUT) не должно
-        # оставлять этот скрипт без результата: реальная стоимость уже
-        # записана гвардом (record_execution/_record внутри run_sql_cached)
-        # ДО того, как исключение долетело сюда -- credits_spent_mozila.json
-        # достоверен независимо от этого, но OUT_PATH тоже должен фиксировать
-        # факт и причину падения, а не пропадать молча (см. реальный кейс
-        # 2026-09-04: 'ILIKE' -- Dune не принял синтаксис в information_schema).
-        result["steps"]["schema_search"] = {"failed": True, "reason": str(exc)[:2000]}
-        print(f"[recon] schema_search УПАЛ (не гвард, реальная ошибка Dune): {exc}")
+    run_query_step("mozila_schema_search_robinhood", SCHEMA_SEARCH_SQL, 2.0)
+
+    print("\n=== 3. Список РАЗЛИЧНЫХ схем по 'robinhood' (предыдущий LIMIT 100 съело одной схемой) ===")
+    run_query_step("mozila_distinct_schemas_robinhood", DISTINCT_SCHEMAS_SQL, 2.0)
+
+    print("\n=== 4. Точечный поиск таблиц swap/uniswap/pool/v3/usdg среди robinhood-схем ===")
+    run_query_step("mozila_swap_table_search", SWAP_TABLE_SEARCH_SQL, 2.0)
 
     print(f"\n=== Остаток бюджета разведки (funding_mozila): "
           f"{RECON_BUDGET - load_state()['funding_mozila']['spent']:.2f} из {RECON_BUDGET} ===")
