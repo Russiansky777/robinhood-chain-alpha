@@ -1,0 +1,113 @@
+{
+  "generated_at_utc": "2026-09-04T11:46:25Z",
+  "network": "robinhood",
+  "signature_plot": {
+    "15m": {
+      "n_candles": 5547,
+      "n_returns": 5546,
+      "periods_per_year": 35064.0,
+      "sigma_annualized": 0.4492808650384291,
+      "first_ts": 1783530000,
+      "last_ts": 1788521400
+    },
+    "1h": {
+      "n_candles": 1387,
+      "n_returns": 1386,
+      "periods_per_year": 8766.0,
+      "sigma_annualized": 0.4666219025858843,
+      "first_ts": 1783530000,
+      "last_ts": 1788519600
+    },
+    "4h": {
+      "n_candles": 347,
+      "n_returns": 346,
+      "periods_per_year": 2191.5,
+      "sigma_annualized": 0.48172208494234653,
+      "first_ts": 1783526400,
+      "last_ts": 1788508800
+    },
+    "12h": {
+      "n_candles": 116,
+      "n_returns": 115,
+      "periods_per_year": 730.5,
+      "sigma_annualized": 0.5532742578121134,
+      "first_ts": 1783512000,
+      "last_ts": 1788480000
+    },
+    "1d": {
+      "n_candles": 59,
+      "n_returns": 58,
+      "periods_per_year": 365.25,
+      "sigma_annualized": 0.5760240692404824,
+      "first_ts": 1783468800,
+      "last_ts": 1788480000
+    }
+  },
+  "variance_ratios": {
+    "1h": 1.0786843941731263,
+    "4h": 1.149627834058032,
+    "12h": 1.5165093208492832,
+    "1d": 1.6437865292745348
+  },
+  "vr_trend_hint": "растёт (VR на самом длинном таймфрейме=1.644 > 1) -- признак тренда, хуже базового GBM-сценария",
+  "rolling_sigma_24h": {
+    "n_windows": 1363,
+    "median": 0.35528418579192056,
+    "p25": 0.2564715292478274,
+    "p75": 0.49048244541474767,
+    "p90": 0.6276491061036638,
+    "min": 0.05964500100641128,
+    "max": 1.6152112162609895,
+    "frac_below_kill_threshold": 0.6478356566397653,
+    "frac_below_breakeven_threshold": 0.7989728539985327
+  },
+  "rolling_sigma_72h": {
+    "n_windows": 1315,
+    "median": 0.37385016501855034,
+    "p25": 0.2894500183693361,
+    "p75": 0.477253192767862,
+    "p90": 0.6073623037521273,
+    "min": 0.15595499686802006,
+    "max": 1.1971313932077692,
+    "frac_below_kill_threshold": 0.5673003802281369,
+    "frac_below_breakeven_threshold": 0.8106463878326996
+  },
+  "sigma_thresholds_used": {
+    "kill": 0.411,
+    "breakeven": 0.536
+  },
+  "volume_return_regression": {
+    "n_obs": 1386,
+    "correlation": 0.22263315052721955,
+    "alpha_intercept_usd": 5207996.302335512,
+    "beta_slope_usd_per_absreturn": 485956805.5589892,
+    "r_squared": 0.04956551971367551
+  },
+  "fee_yield_vs_lvr_threshold_solve": {
+    "assumptions": {
+      "lvr_coefficient_c_real": 2.555034225485624,
+      "lvr_coefficient_c_owner_estimate": 2.53,
+      "fee_capture_ratio_representative_median": 0.5036248929208316,
+      "avg_pool_tvl_usd": 25990452.07016923,
+      "regression": {
+        "n_obs": 1386,
+        "correlation": 0.22263315052721955,
+        "alpha_intercept_usd": 5207996.302335512,
+        "beta_slope_usd_per_absreturn": 485956805.5589892,
+        "r_squared": 0.04956551971367551
+      },
+      "note": "fee_yield(sigma) -- НАША годовая доходность по комиссиям, выведенная из регрессии объём~|log-return| часовых свечей пула + медианный fee_capture_ratio нашего ряда. Экстраполяция регрессии за пределы наблюдённого диапазона |r| -- умозрительна, не факт."
+    },
+    "kill_30pct": {
+      "sigma_threshold": null,
+      "f_at_sigma_0.01": -0.21114906757690055,
+      "f_at_sigma_3.0": -22.995942723566923,
+      "note": "порога НЕТ в диапазоне sigma∈[1%,300%] -- неравенство НИКОГДА не выполняется в этом диапазоне"
+    },
+    "breakeven_0pct": {
+      "sigma_threshold": 0.20027930358498736,
+      "fee_yield_at_threshold": 0.10248700820289995
+    }
+  },
+  "runtime_s": 159.58156538009644
+}
