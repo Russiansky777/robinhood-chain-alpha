@@ -26,9 +26,12 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r analysis/requirements.txt
+        run: |
+          pip install -r analysis/requirements.txt
+          pip install playwright
+          playwright install --with-deps chromium
 
-      - name: Проверить ToS/docs Hyperliquid на упоминание юрисдикционных ограничений
+      - name: Проверить ToS Hyperliquid на упоминание юрисдикционных ограничений (рендеринг JS-SPA)
         run: python -u analysis/hyperliquid_jurisdiction_probe.py
 
       - name: Commit results
