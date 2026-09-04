@@ -1,0 +1,47 @@
+name: "Логгер фандинга -- п.1: отбор пар Lighter x Hyperliquid (один раз, только чтение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FUNDING_PAIRS_SELECT_REQUEST"
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+
+      - name: Отбор топ-15 пар (пересечение Lighter x Hyperliquid, сортировка по объёму Lighter)
+        run: python -u analysis/funding_pairs_select.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/funding_pairs.json ] && git add data/funding_pairs.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Логгер фандинга: отбор пар Lighter x Hyperliquid [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
