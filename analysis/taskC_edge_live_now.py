@@ -123,6 +123,8 @@ def run() -> int:
         team_names = [o["title"].replace(" wins", "") for o in game["outcomes"] if o["title"] != "Tie is the result"]
 
         # --- EPL: Tie (Kalshi) <-> Draw (Polymarket) ---
+        # outcomes здесь реально ["Yes","No"] (не имена команд) -- позиция
+        # 0=Yes/1=No безопасна, но проверяем полем outcomes, не гадаем.
         if tie_ticker and len(team_names) == 2:
             teams_norm = [normalize(t) for t in team_names]
             pm_draw = next((pm for pm in pm_markets
@@ -132,12 +134,16 @@ def run() -> int:
                 yes_k_ask, no_k_ask = kalshi_best_yes_no_ask(tie_ticker)
                 try:
                     token_ids = json.loads(pm_draw["clobTokenIds"]) if isinstance(pm_draw["clobTokenIds"], str) else pm_draw["clobTokenIds"]
+                    outcomes = json.loads(pm_draw["outcomes"]) if isinstance(pm_draw["outcomes"], str) else pm_draw["outcomes"]
                 except (ValueError, TypeError, KeyError):
-                    token_ids = None
-                yes_p_ask = clob_best_ask(token_ids[0]) if token_ids else None
-                no_p_ask = clob_best_ask(token_ids[1]) if token_ids and len(token_ids) > 1 else None
+                    token_ids, outcomes = None, None
+                yes_idx = outcomes.index("Yes") if outcomes and "Yes" in outcomes else 0
+                no_idx = outcomes.index("No") if outcomes and "No" in outcomes else 1
+                yes_p_ask = clob_best_ask(token_ids[yes_idx]) if token_ids else None
+                no_p_ask = clob_best_ask(token_ids[no_idx]) if token_ids and len(token_ids) > no_idx else None
                 entry = {"kalshi_event": game["event_ticker"], "type": "tie_vs_draw",
                           "kalshi_tie_ticker": tie_ticker, "polymarket_question": pm_draw.get("question"),
+                          "polymarket_outcomes_order": outcomes,
                           "yes_k_ask": yes_k_ask, "no_k_ask": no_k_ask, "yes_p_ask": yes_p_ask, "no_p_ask": no_p_ask}
                 if None not in (yes_k_ask, no_k_ask, yes_p_ask, no_p_ask):
                     entry["spread"] = compute_spread(yes_k_ask, no_k_ask, yes_p_ask, no_p_ask)
@@ -147,30 +153,49 @@ def run() -> int:
                 results.append(entry)
                 print(f"[live] {game['event_ticker']} Tie<->Draw: {entry}")
 
-        # --- UFC: fighter A wins <-> fight-winner market (Polymarket, 2 outcomes = 2 бойца) ---
+        # --- UFC: КАЖДЫЙ боец (Kalshi) <-> тот же боец в outcomes Polymarket ---
+        # РЕАЛЬНАЯ НАХОДКА (taskC_edge_outcome_order_verify_result.json):
+        # Polymarket outcomes -- ИМЕНА бойцов, порядок НЕ гарантированно
+        # совпадает с порядком Kalshi-исходов (team_names[0] позиционно
+        # != outcomes[0] -- проверено эмпирически, первая версия сравнивала
+        # РАЗНЫХ бойцов между площадками, давая фиктивный "спред" 0.32-0.74).
+        # Матчим по НОРМАЛИЗОВАННОМУ ИМЕНИ, не по позиции; считаем для ОБОИХ
+        # бойцов, не только team_names[0].
         if game["series"] == "KXUFCFIGHT" and len(team_names) == 2:
             teams_norm = [normalize(t) for t in team_names]
             pm_fight = next((pm for pm in pm_markets
                               if all(t in normalize(pm.get("question", "") + (pm.get("slug", "") or "")) for t in teams_norm)), None)
             if pm_fight:
-                fighter_a_ticker = next(o["ticker"] for o in game["outcomes"] if o["title"] == f"{team_names[0]} wins")
-                yes_k_ask, no_k_ask = kalshi_best_yes_no_ask(fighter_a_ticker)
                 try:
                     token_ids = json.loads(pm_fight["clobTokenIds"]) if isinstance(pm_fight["clobTokenIds"], str) else pm_fight["clobTokenIds"]
+                    outcomes = json.loads(pm_fight["outcomes"]) if isinstance(pm_fight["outcomes"], str) else pm_fight["outcomes"]
                 except (ValueError, TypeError, KeyError):
-                    token_ids = None
-                yes_p_ask = clob_best_ask(token_ids[0]) if token_ids else None
-                no_p_ask = clob_best_ask(token_ids[1]) if token_ids and len(token_ids) > 1 else None
-                entry = {"kalshi_event": game["event_ticker"], "type": "fight_winner",
-                          "kalshi_ticker": fighter_a_ticker, "polymarket_question": pm_fight.get("question"),
-                          "yes_k_ask": yes_k_ask, "no_k_ask": no_k_ask, "yes_p_ask": yes_p_ask, "no_p_ask": no_p_ask}
-                if None not in (yes_k_ask, no_k_ask, yes_p_ask, no_p_ask):
-                    entry["spread"] = compute_spread(yes_k_ask, no_k_ask, yes_p_ask, no_p_ask)
-                else:
-                    entry["spread"] = None
-                    entry["reason_no_spread"] = "пустой стакан на одной из сторон -- честно не считаем"
-                results.append(entry)
-                print(f"[live] {game['event_ticker']} fight_winner: {entry}")
+                    token_ids, outcomes = None, None
+                outcomes_norm = [normalize(o) for o in outcomes] if outcomes else []
+                for fighter_name in team_names:
+                    fighter_ticker = next(o["ticker"] for o in game["outcomes"] if o["title"] == f"{fighter_name} wins")
+                    fn = normalize(fighter_name)
+                    match_idx = next((i for i, o in enumerate(outcomes_norm) if fn == o or fn in o or o in fn), None)
+                    if match_idx is None or not token_ids or len(token_ids) < 2:
+                        results.append({"kalshi_event": game["event_ticker"], "type": "fight_winner",
+                                         "kalshi_ticker": fighter_ticker, "polymarket_question": pm_fight.get("question"),
+                                         "spread": None, "reason_no_spread": "боец не найден в outcomes Polymarket по имени -- не гадаем"})
+                        continue
+                    other_idx = 1 - match_idx
+                    yes_k_ask, no_k_ask = kalshi_best_yes_no_ask(fighter_ticker)
+                    yes_p_ask = clob_best_ask(token_ids[match_idx])
+                    no_p_ask = clob_best_ask(token_ids[other_idx])
+                    entry = {"kalshi_event": game["event_ticker"], "type": "fight_winner",
+                              "kalshi_ticker": fighter_ticker, "polymarket_question": pm_fight.get("question"),
+                              "matched_polymarket_outcome": outcomes[match_idx],
+                              "yes_k_ask": yes_k_ask, "no_k_ask": no_k_ask, "yes_p_ask": yes_p_ask, "no_p_ask": no_p_ask}
+                    if None not in (yes_k_ask, no_k_ask, yes_p_ask, no_p_ask):
+                        entry["spread"] = compute_spread(yes_k_ask, no_k_ask, yes_p_ask, no_p_ask)
+                    else:
+                        entry["spread"] = None
+                        entry["reason_no_spread"] = "пустой стакан на одной из сторон -- честно не считаем"
+                    results.append(entry)
+                    print(f"[live] {game['event_ticker']} fight_winner ({fighter_name}): {entry}")
 
     out["results"] = results
     out["n_with_real_spread"] = sum(1 for r in results if r.get("spread"))
