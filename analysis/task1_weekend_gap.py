@@ -82,17 +82,30 @@ def real_fridays_since(start_date: str, now_utc: datetime) -> list[str]:
     return fridays
 
 
+_STOOQ_DIAG_PRINTED = 0
+
+
 def stooq_daily(symbol: str) -> pd.DataFrame | None:
     """Реальные дневные OHLC с Stooq (бесплатно, без ключа) --
     `stooq.com/q/d/l/?s=<symbol>.us&i=d`. Возвращает None, если тикер не
     найден (Stooq отвечает пустым/HTML телом вместо CSV на несуществующий
     символ -- НЕ выдумываем данные, честно пропускаем)."""
     try:
-        r = requests.get("https://stooq.com/q/d/l/", params={"s": f"{symbol.lower()}.us", "i": "d"}, timeout=20)
+        r = requests.get("https://stooq.com/q/d/l/", params={"s": f"{symbol.lower()}.us", "i": "d"},
+                          headers={"User-Agent": "Mozilla/5.0 (robinhood-chain-alpha-task1/1.0)"}, timeout=20)
     except Exception as e:  # noqa: BLE001
         print(f"    Stooq {symbol}: сетевая ошибка {e}")
         return None
     if r.status_code != 200 or "Date,Open" not in r.text[:200]:
+        # Диагностика (владелец: не гадать) -- реальный статус и сырое
+        # начало тела ответа для 2-3 первых неудач, чтобы увидеть точную
+        # причину (BOM/HTML-заглушка/иной заголовок CSV/блок по UA) --
+        # не на каждый тикер, иначе лог раздувается на все 38.
+        global _STOOQ_DIAG_PRINTED
+        if _STOOQ_DIAG_PRINTED < 3:
+            print(f"    [STOOQ DIAG] {symbol}: status={r.status_code} content-type={r.headers.get('content-type')} "
+                  f"body_repr={r.text[:200]!r}")
+            _STOOQ_DIAG_PRINTED += 1
         return None
     from io import StringIO
     try:
