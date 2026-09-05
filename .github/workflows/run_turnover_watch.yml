@@ -1,0 +1,49 @@
+name: "Сторожок на переоткрытие 'хеджированное LP' -- аномальный оборот (только чтение, без капитала)"
+
+# Владелец, 2026-09-05, дополнение к закрытию линии: "cron раз в сутки,
+# без капитала: по DefiLlama и GT -- пулы с TVL >= $2M и суточным объёмом
+# > 20x TVL. Список в data/turnover_watch.jsonl, новые -- строкой в
+# отчёт. Ничего не считать, только ловить." Публичный DefiLlama+GT API,
+# без RPC/Lighter/VPS.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TURNOVER_WATCH_REQUEST"
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Сторожок на аномальный оборот (только чтение)
+        run: python -u analysis/turnover_watch.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/turnover_watch.jsonl ] && git add data/turnover_watch.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "turnover_watch: суточный снимок [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
