@@ -250,6 +250,11 @@ def across_quote(origin_chain_id: int, dest_chain_id: int, origin_token: str, am
         "originChainId": origin_chain_id, "destinationChainId": dest_chain_id,
         "token": origin_token, "amount": amount,
     }, timeout=20)
+    if r.status_code != 200:
+        # НАЙДЕНО (реальный прогон, 2026-09-05): 400 без тела ошибки в
+        # логе не даёт понять причину -- печатаем/пробрасываем реальное
+        # тело ответа ПЕРЕД raise_for_status(), не гадаем.
+        print(f"[p6_step1] across_quote НЕ 200 ({r.status_code}): {r.text[:1000]}")
     r.raise_for_status()
     return r.json()
 
