@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-09-05T17:55:01Z",
+  "generated_at_utc": "2026-09-05T18:03:23Z",
   "results": [
     {
       "kalshi_event": "KXEPLGAME-26SEP05FULCRY",
-      "status": "Polymarket рынок больше не найден в bulk (вероятно, ротировался из окна)"
+      "status": "Polymarket рынок не найден ни в bulk, ни по прямому slug"
     },
     {
       "kalshi_event": "KXEPLGAME-26SEP05BRESUN",
@@ -16,25 +16,30 @@
         "2026-08-23T18:30:18+00:00",
         "2026-09-05T17:05:06+00:00"
       ],
-      "n_pm_yes_points": 3717,
-      "n_pm_no_points": 3717,
+      "n_pm_yes_points": 18580,
+      "n_pm_no_points": 18580,
       "polymarket_yes_final_price": 0.9995,
       "polymarket_outcomes": [
         "Yes",
         "No"
       ],
       "n_points_compared": 3725,
-      "fraction_time_below_dollar": 0.6765,
-      "n_windows_below_dollar": 109,
-      "median_window_seconds": 1.0701429843902588,
-      "net_spread_pct_median": 6.5,
-      "net_spread_pct_max": 33.0,
+      "fraction_time_below_dollar": 0.5208,
+      "n_windows_below_dollar": 132,
+      "median_window_seconds": 1.494668960571289,
+      "max_polymarket_price_staleness_seconds": 76.4,
+      "caveat": "Сравнение использует forward-fill цены Polymarket (fidelity=1мин) против тиковых сделок Kalshi -- при max staleness выше ~60-120с видимый спред может быть НЕ реально одновременным, а артефактом устаревшей котировки одной из сторон, особенно у быстро сходящегося рынка перед разрешением. См. max_polymarket_price_staleness_seconds перед тем, как доверять net_spread_pct_*.",
+      "n_below_dollar_fresh_data": 1889,
+      "net_spread_pct_median_fresh": 2.0,
+      "net_spread_pct_max_fresh": 36.5,
+      "net_spread_pct_median": 2.0,
+      "net_spread_pct_max": 36.5,
       "net_spread_pct_min": 0.5,
       "status": "ok"
     },
     {
       "kalshi_event": "KXUFCFIGHT-26SEP05DUCDIA",
-      "status": "Polymarket рынок больше не найден в bulk (вероятно, ротировался из окна)"
+      "status": "Polymarket рынок не найден ни в bulk, ни по прямому slug"
     }
   ]
 }
