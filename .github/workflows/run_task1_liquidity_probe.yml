@@ -7,6 +7,7 @@ on:
       - claude/sc1-pons-v2-launcher-efdbyt
     paths:
       - "data/p3_guard_cache/TASK1_LIQUIDITY_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASK1_LIQUIDITY_PROBE2_REQUEST"
 
 jobs:
   probe:
@@ -26,15 +27,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
       - name: Разведка резервов/TVL (метаданные, дёшево)
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_LIQUIDITY_PROBE_REQUEST') != '' }}
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: task1_weekend_gap
         run: python -u analysis/task1_liquidity_probe.py
+      - name: Разведка адресов пулов (project_contract_address) + схем robinhood
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_LIQUIDITY_PROBE2_REQUEST') != '' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_liquidity_probe2.py
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_LIQUIDITY_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_LIQUIDITY_PROBE2_REQUEST
           [ -e data/p3_guard_cache/task1_liquidity_probe_result.json ] && git add data/p3_guard_cache/task1_liquidity_probe_result.json
+          [ -e data/p3_guard_cache/task1_liquidity_probe2_result.json ] && git add data/p3_guard_cache/task1_liquidity_probe2_result.json
           [ -e data/credits_spent.json ] && git add data/credits_spent.json
           git diff --cached --quiet && exit 0
           git commit -m "Задача 1: разведка резервов/TVL для проверки 1, результат [automated]"
