@@ -1,48 +1,11 @@
 {
-  "generated_at_utc": "2026-09-05T09:51:53Z",
+  "generated_at_utc": "2026-09-05T09:55:50Z",
   "mode": "REAL",
   "hedge_before": {
-    "position": {
-      "market_id": 1,
-      "symbol": "BTC",
-      "initial_margin_fraction": "50.00",
-      "open_order_count": 0,
-      "pending_order_count": 0,
-      "position_tied_order_count": 0,
-      "sign": -1,
-      "position": "0.00024",
-      "avg_entry_price": "79536.8",
-      "position_value": "19.109304",
-      "unrealized_pnl": "-0.020472",
-      "realized_pnl": "0.000000",
-      "liquidation_price": "333389.62450592883",
-      "total_funding_paid_out": "0.001475",
-      "margin_mode": 0,
-      "margin_set_flag": 1,
-      "allocated_margin": "0.000000"
-    },
-    "collateral_usd": 61.88484
+    "position": null,
+    "collateral_usd": 61.863576
   },
-  "hedge_close_order": {
-    "tx_hash": "89067608f0ee63cf615482392d7fc44b20827ee30003707f561c8297393012a5447b79a892b159d6",
-    "resp_code": 200,
-    "resp_message": "{\"ratelimit\": \"didn't use volume quota\"}",
-    "err": null,
-    "base_amount": 24,
-    "is_ask": false,
-    "size_btc_requested": 0.00024
-  },
-  "hedge_close_result": {
-    "size_btc": 0.00024,
-    "avg_entry_price_usd": 79536.8,
-    "unrealized_pnl_at_close_usd": -0.020472,
-    "realized_pnl_cum_usd": 0.0,
-    "funding_received_cum_usd": 0.001475,
-    "collateral_before_usd": 61.88484,
-    "collateral_after_usd": 61.863576,
-    "method1_pnl_usd": -0.021263999999995065,
-    "method2_pnl_usd": -0.018997
-  },
+  "hedge_close_note": "позиция уже 0 -- ничего не отправлено",
   "lp_position_before_close": {
     "nonce": 0,
     "operator": "0x0000000000000000000000000000000000000000",
@@ -59,7 +22,44 @@
   },
   "lp_close_plan": {
     "pool_price_usd": 79680.1678601746,
-    "expected_amount0_usdc": 438.384280148302,
-    "expected_amount1_cbbtc": 2.4262749487364534e-05
-  }
+    "expected_amount0_usdc": 43.83842801483021,
+    "expected_amount1_cbbtc": 0.00024262749487364538
+  },
+  "txs": [
+    {
+      "label": "1_decreaseLiquidity",
+      "tx_hash": "0x32cd5679bc4281fc29ebf59bcec4cd9f08d62632c6e9c15e1bcf8d8b7858f92f",
+      "status": "success",
+      "gas_used": 171420,
+      "block_number": 50906404,
+      "effective_gas_price_wei": 6899999
+    },
+    {
+      "label": "2_collect",
+      "tx_hash": "0x00015359fc30814582c750b56894f1c5d720e74fb96a218ff013cf8c219f9a49",
+      "status": "success",
+      "gas_used": 129863,
+      "block_number": 50906406,
+      "effective_gas_price_wei": 6899999
+    }
+  ],
+  "lp_close_result": {
+    "decrease_amount0_usdc": 43.838428,
+    "decrease_amount1_cbbtc": 0.00024262,
+    "collect_amount0_usdc_total": 43.839019,
+    "collect_amount1_cbbtc_total": 0.00024262,
+    "fees_earned_amount0_usdc": 0.0005910000000000082,
+    "fees_earned_amount1_cbbtc": 0.0
+  },
+  "final_base_balances": {
+    "usdc": 9e-06,
+    "cbbtc": 0.0004529,
+    "eth_native": 0.000238742642831444
+  },
+  "final_lighter": {
+    "collateral_usd": 61.863576,
+    "available_balance_usd": 61.863576,
+    "positions_open": 3
+  },
+  "runtime_s": 23.453844785690308
 }
