@@ -47,6 +47,32 @@ NEW_TICK_LOWER = -68000
 NEW_TICK_UPPER = -66000
 MINT_SLIPPAGE = 0.10  # тот же допуск, что реальный вход (docs/PROJECT_STATE.md #13)
 
+LIGHTER_API_BASE = "https://api.rh.lighter.xyz"
+LIGHTER_ACCOUNT_INDEX = 22012
+
+
+def lighter_account_full() -> dict | None:
+    try:
+        r = requests.get(f"{LIGHTER_API_BASE}/api/v1/account", params={"by": "index", "value": str(LIGHTER_ACCOUNT_INDEX)}, timeout=20)
+        r.raise_for_status()
+        accounts = r.json().get("accounts", [])
+        return accounts[0] if accounts else None
+    except Exception as e:  # noqa: BLE001
+        print(f"[reposition] Lighter account недоступен: {e}")
+        return None
+
+
+def lighter_btc_market() -> dict | None:
+    try:
+        r = requests.get(f"{LIGHTER_API_BASE}/api/v1/orderBookDetails", params={"filter": "all"}, timeout=20)
+        r.raise_for_status()
+        markets = r.json().get("order_book_details", [])
+        exact = [m for m in markets if str(m.get("symbol", "")).upper() == "BTC"]
+        return exact[0] if exact else None
+    except Exception as e:  # noqa: BLE001
+        print(f"[reposition] Lighter market недоступен: {e}")
+        return None
+
 
 def _topic0(sig: str) -> str:
     k = keccak.new(digest_bits=256)
@@ -254,14 +280,71 @@ def main():
 
     sqrt_p = usd_to_domain(p0) ** 0.5
     sqrt_pa, sqrt_pb = usd_to_domain(pb_actual_usd) ** 0.5, usd_to_domain(pa_actual_usd) ** 0.5
-    L_new = get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, total_usdc_human, total_cbbtc_human)
+
+    # Владелец, 2026-09-05: "decreaseLiquidity(ALL)+collect -> СВОП USDC->cbBTC
+    # на Base до оптимального соотношения для [NEW_TICK_LOWER,NEW_TICK_UPPER] ->
+    # approve -> eth_call mint" -- цель >=95% размещённого капитала. Держать
+    # ПОЛУЧЕННОЕ соотношение (как раньше) недостаточно -- нужно СНАЧАЛА
+    # посчитать ЦЕЛЕВОЕ соотношение (независимо от того, что реально держим),
+    # затем определить размер свопа, который к нему приводит.
+    L_unit = get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, 1.0, 1.0 / p0)  # L при равной $-стоимости обеих ног (пробный якорь)
+    amount0_at_unit, amount1_at_unit = v3_amounts(L_unit, sqrt_p, sqrt_pa, sqrt_pb)
+    value0_frac = amount0_at_unit / (amount0_at_unit + amount1_at_unit * p0)
+    value1_frac = 1.0 - value0_frac
+    total_usd_value = total_usdc_human + total_cbbtc_human * p0
+    target_usdc_human = total_usd_value * value0_frac
+    target_cbbtc_human = (total_usd_value * value1_frac) / p0
+    print(f"[reposition] целевое соотношение (по $-доле для этого диапазона): USDC-доля={value0_frac*100:.2f}% cbBTC-доля={value1_frac*100:.2f}% "
+          f"-> target USDC={target_usdc_human:.6f} target cbBTC={target_cbbtc_human:.8f}")
+
+    swap_needed_usdc_to_cbbtc_human = 0.0
+    swap_needed_cbbtc_to_usdc_human = 0.0
+    if target_cbbtc_human > total_cbbtc_human:
+        # не хватает cbBTC -- сворачиваем часть USDC в cbBTC (та же аппроксимация
+        # "amountIn/price", что реальный вход, широкий допуск на проскальзывание)
+        cbbtc_shortfall = target_cbbtc_human - total_cbbtc_human
+        swap_needed_usdc_to_cbbtc_human = cbbtc_shortfall * p0
+    elif target_usdc_human > total_usdc_human:
+        usdc_shortfall = target_usdc_human - total_usdc_human
+        swap_needed_cbbtc_to_usdc_human = usdc_shortfall / p0
+    POOL_FEE_FRACTION = 0.00033  # docs/PROJECT_STATE.md, "Скринер пулов" -- 0.033%, тот же, что p6_hourly_snapshot.py
+    if swap_needed_usdc_to_cbbtc_human > 0:
+        expected_cbbtc_out = (swap_needed_usdc_to_cbbtc_human * (1 - POOL_FEE_FRACTION)) / p0
+        post_swap_usdc_human = total_usdc_human - swap_needed_usdc_to_cbbtc_human
+        post_swap_cbbtc_human = total_cbbtc_human + expected_cbbtc_out
+        print(f"[reposition] СВОП (симуляция, не транзакция): USDC->cbBTC, amountIn={swap_needed_usdc_to_cbbtc_human:.6f} USDC "
+              f"-> ожидаемо {expected_cbbtc_out:.8f} cbBTC (комиссия пула {POOL_FEE_FRACTION*100:.3f}%)")
+    elif swap_needed_cbbtc_to_usdc_human > 0:
+        expected_usdc_out = (swap_needed_cbbtc_to_usdc_human * (1 - POOL_FEE_FRACTION)) * p0
+        post_swap_cbbtc_human = total_cbbtc_human - swap_needed_cbbtc_to_usdc_human
+        post_swap_usdc_human = total_usdc_human + expected_usdc_out
+        print(f"[reposition] СВОП (симуляция, не транзакция): cbBTC->USDC, amountIn={swap_needed_cbbtc_to_usdc_human:.8f} cbBTC "
+              f"-> ожидаемо {expected_usdc_out:.6f} USDC (комиссия пула {POOL_FEE_FRACTION*100:.3f}%)")
+    else:
+        post_swap_usdc_human, post_swap_cbbtc_human = total_usdc_human, total_cbbtc_human
+        print("[reposition] своп не требуется -- держим уже в целевом соотношении (маловероятно, но проверено).")
+
+    result["swap_plan"] = {
+        "target_usdc_human": target_usdc_human, "target_cbbtc_human": target_cbbtc_human,
+        "swap_usdc_to_cbbtc_human": swap_needed_usdc_to_cbbtc_human, "swap_cbbtc_to_usdc_human": swap_needed_cbbtc_to_usdc_human,
+        "post_swap_usdc_human": post_swap_usdc_human, "post_swap_cbbtc_human": post_swap_cbbtc_human,
+        "note": "СИМУЛЯЦИЯ (математика с реальной ценой пула, широкий допуск -- своп сам НЕ eth_call-симулирован: тот же "
+                "allowance=0 сейчас блокирует eth_call свопа так же, как mint (см. mint_simulation.note ниже), "
+                "но amountIn/price-аппроксимация -- тот же метод, что реально использовался и подтвердился при входе.",
+    }
+
+    L_new = get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, post_swap_usdc_human, post_swap_cbbtc_human)
     amount0_at_L, amount1_at_L = v3_amounts(L_new, sqrt_p, sqrt_pa, sqrt_pb)
-    amount0_desired = min(int(total_usdc_human * 10 ** USDC_DECIMALS), int(amount0_at_L * 10 ** USDC_DECIMALS))
-    amount1_desired = min(int(total_cbbtc_human * 10 ** CBBTC_DECIMALS), int(amount1_at_L * 10 ** CBBTC_DECIMALS))
+    amount0_desired = min(int(post_swap_usdc_human * 10 ** USDC_DECIMALS), int(amount0_at_L * 10 ** USDC_DECIMALS))
+    amount1_desired = min(int(post_swap_cbbtc_human * 10 ** CBBTC_DECIMALS), int(amount1_at_L * 10 ** CBBTC_DECIMALS))
     amount0_min = int(amount0_desired * (1 - MINT_SLIPPAGE))
     amount1_min = int(amount1_desired * (1 - MINT_SLIPPAGE))
-    dust_usdc_after = total_usdc_human - amount0_desired / 10 ** USDC_DECIMALS
-    dust_cbbtc_after = total_cbbtc_human - amount1_desired / 10 ** CBBTC_DECIMALS
+    dust_usdc_after = post_swap_usdc_human - amount0_desired / 10 ** USDC_DECIMALS
+    dust_cbbtc_after = post_swap_cbbtc_human - amount1_desired / 10 ** CBBTC_DECIMALS
+    deployed_usd = amount0_desired / 10 ** USDC_DECIMALS + (amount1_desired / 10 ** CBBTC_DECIMALS) * p0
+    deployed_pct = (deployed_usd / total_usd_value * 100) if total_usd_value else None
+    print(f"[reposition] ДОЛЯ РАЗМЕЩЁННОГО КАПИТАЛА: ${deployed_usd:.4f} / ${total_usd_value:.4f} = {deployed_pct:.2f}% "
+          f"(цель >=95%){' -- ДОСТИГНУТА' if deployed_pct and deployed_pct >= 95 else ' -- НЕ ДОСТИГНУТА'}")
     print(f"[reposition] оптимум: amount0(USDC)={amount0_desired/10**USDC_DECIMALS} amount1(cbBTC)={amount1_desired/10**CBBTC_DECIMALS} "
           f"(L={L_new:.4f}) -- дребезг ПОСЛЕ mint: USDC={dust_usdc_after:.6f} cbBTC={dust_cbbtc_after:.8f} (~${dust_usdc_after + dust_cbbtc_after*p0:.2f})")
 
@@ -319,6 +402,52 @@ def main():
                 "Allowance был реально достаточен -- этот revert РЕАЛЬНО про сам mint (возможно PSC), не про allowance.")
         print(f"[reposition] {note}")
         result["mint_simulation"] = {"success": False, "error": err, "decoded": decoded, "note": note}
+
+    print("\n=== Реальный хедж ПОСЛЕ перестановки (размер, маржа, ликвидация) -- по свежим данным Lighter ===")
+    account_full = lighter_account_full()
+    market = lighter_btc_market()
+    current_hedge_size_btc = 0.0
+    leverage = None
+    collateral_usd = None
+    if account_full:
+        collateral_usd = float(account_full.get("collateral", 0))
+        btc_pos = next((p for p in account_full.get("positions", []) if str(p.get("symbol", "")).upper() == "BTC"
+                         and abs(float(p.get("position", 0))) > 1e-9), None)
+        if btc_pos:
+            current_hedge_size_btc = abs(float(btc_pos.get("position", 0)))
+            imf = float(btc_pos.get("initial_margin_fraction", 0))
+            leverage = 100.0 / imf if imf else None
+    mark_price_now = float(market["mark_price"]) if market else None
+    mmf = float(market["maintenance_margin_fraction"]) / 10000 if market and market.get("maintenance_margin_fraction") is not None else None
+    new_target_cbbtc = amount1_desired / 10 ** CBBTC_DECIMALS
+    delta_short_btc = new_target_cbbtc - current_hedge_size_btc
+    new_total_short_btc = new_target_cbbtc  # хедж = вся волатильная нога новой LP-позиции (тот же принцип, что вход)
+    print(f"[reposition] реальный текущий шорт={current_hedge_size_btc} BTC, плечо={leverage}, mark_price=${mark_price_now}, "
+          f"новая cbBTC-нога={new_target_cbbtc:.8f} -> ДЕЛЬТА шорта={delta_short_btc:+.8f} BTC -> новый ИТОГО шорт={new_total_short_btc:.8f} BTC")
+
+    hedge_after_reposition = None
+    if leverage and mark_price_now and mmf is not None and collateral_usd is not None:
+        new_notional = new_total_short_btc * mark_price_now
+        new_required_margin = new_notional / leverage
+        new_available = collateral_usd - new_required_margin
+        new_free_margin_pct = (new_available / collateral_usd * 100) if collateral_usd else None
+        # Ликвидация -- ТА ЖЕ формула, что реальный вход (p6_live_step1.py::p_liq_formula),
+        # avg_entry ЗДЕСЬ приближён текущим mark_price (реальный avg_entry появится только
+        # после реального инкрементального ордера -- честно помечено как оценка).
+        p_liq_formula_est = (collateral_usd + new_total_short_btc * mark_price_now) / (new_total_short_btc * (1 + mmf))
+        print(f"[reposition] ОЦЕНКА после перестановки: notional=${new_notional:.4f} required_margin=${new_required_margin:.4f} "
+              f"available=${new_available:.4f} free_margin={new_free_margin_pct:.2f}% ликвидация(оценка, avg_entry~=mark)=${p_liq_formula_est:.2f}")
+        hedge_after_reposition = {
+            "current_hedge_size_btc": current_hedge_size_btc, "delta_short_btc": delta_short_btc, "new_total_short_btc": new_total_short_btc,
+            "leverage": leverage, "mark_price_usd": mark_price_now, "mmf": mmf, "collateral_usd": collateral_usd,
+            "new_notional_usd": new_notional, "new_required_margin_usd": new_required_margin,
+            "new_available_usd": new_available, "new_free_margin_pct": new_free_margin_pct,
+            "liquidation_price_formula_usd_estimate": p_liq_formula_est,
+            "note": "avg_entry_price приближён текущим mark_price для ОЦЕНКИ (реальный avg_entry после инкрементального ордера может отличаться).",
+        }
+    else:
+        print("[reposition] не хватило реальных данных (leverage/mark_price/mmf/collateral) для оценки хеджа -- см. значения выше.")
+    result["hedge_after_reposition_estimate"] = hedge_after_reposition
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, default=str, ensure_ascii=False))
