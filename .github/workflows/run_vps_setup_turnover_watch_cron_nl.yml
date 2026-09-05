@@ -1,0 +1,143 @@
+name: "Сторожок оборота -- VPS Нидерланды: автономный суточный cron (только приложение, SSH/ufw/firewall/ключи не трогает)"
+
+# Владелец, 2026-09-05: "Сторожок оборота -- перенести с Routine на cron
+# на NL-хосте (четвёртая строка, :51 или любая свободная минута, раз в
+# сутки 09:00 UTC). Routine после подтверждения cron удалить. Причина:
+# сбор не зависит от сессии -- правило проекта." По образцу
+# run_vps_setup_funding_cron_nl.yml (P5/funding) -- собранный ряд живёт
+# ВНЕ git-репозитория (/home/bot/turnover_watch_live_data/
+# turnover_watch.jsonl), чтобы будущий git reset --hard на хосте его не
+# стёр. ЧИТАЕТ текущий crontab и ДОПИСЫВАЕТ четвёртую строку (минута
+# :51), не заменяет его целиком. Git на VPS НЕ используется для push --
+# тот же принцип, что funding/P5 (см. итог run_vps_setup_funding_cron_nl.yml).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_SETUP_TURNOVER_WATCH_CRON_NL_REQUEST"
+
+jobs:
+  setup_cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "0. ПРОВЕРКА ПЕРЕД ИЗМЕНЕНИЕМ: текущий crontab bot -- убедиться, что строка funding (:21) на месте"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            echo "=== текущий crontab bot ДО изменений ==="
+            sudo -u bot crontab -l || echo "(crontab пуст или не существует)"
+          '
+
+      - name: "1. Обновить код репозитория у bot (reset --hard -- безопасно, накопленные ряды живут вне репо)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "2. Засеять внешний живой файл (вне git) текущим содержимым git -- только если ещё не создан"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/turnover_watch_live_data
+            if [ ! -s /home/bot/turnover_watch_live_data/turnover_watch.jsonl ] && [ -s /home/bot/robinhood-chain-alpha/data/turnover_watch.jsonl ]; then
+              sudo -u bot cp /home/bot/robinhood-chain-alpha/data/turnover_watch.jsonl /home/bot/turnover_watch_live_data/turnover_watch.jsonl
+              echo "засеяно: $(wc -l < /home/bot/turnover_watch_live_data/turnover_watch.jsonl) строк из git"
+            else
+              sudo -u bot touch /home/bot/turnover_watch_live_data/turnover_watch.jsonl
+              echo "внешний файл уже существует или в git пусто -- $(wc -l < /home/bot/turnover_watch_live_data/turnover_watch.jsonl) строк, не трогаю"
+            fi
+          '
+
+      - name: "3. Обёрточный скрипт cron'а (идемпотентно перезаписывается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /home/bot/bin && cat > /home/bot/bin/turnover_watch_daily.sh && chown bot:bot /home/bot/bin/turnover_watch_daily.sh && chmod +x /home/bot/bin/turnover_watch_daily.sh' <<'EOF'
+          #!/bin/bash
+          # Автономный суточный сторожок на переоткрытие линии "хеджированное
+          # LP" НА САМОМ VPS -- только чтение внешних API (DefiLlama+GT), без
+          # git push. Накопленный ряд -- ВНЕ git-репозитория
+          # (/home/bot/turnover_watch_live_data/turnover_watch.jsonl), чтобы
+          # будущий git reset репозитория его не стёр. Перед запуском рабочая
+          # копия в репо восстанавливается из внешнего файла, после --
+          # копируется обратно со свежей добавленной строкой.
+          set -euo pipefail
+
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/turnover_watch_live_data
+          LIVE_FILE="$LIVE_DIR/turnover_watch.jsonl"
+
+          mkdir -p "$LIVE_DIR"
+          touch "$LIVE_FILE"
+
+          cd "$REPO"
+          cp "$LIVE_FILE" data/turnover_watch.jsonl
+
+          echo "=== $(date -u +%FT%TZ) -- запуск turnover_watch.py ==="
+          "$REPO/venv/bin/python" -u analysis/turnover_watch.py
+
+          cp data/turnover_watch.jsonl "$LIVE_FILE"
+          echo "=== $(date -u +%FT%TZ) -- ОК, строк в живом ряду: $(wc -l < "$LIVE_FILE") ==="
+          EOF
+
+      - name: "4. Crontab bot -- ДОПИСАТЬ строку turnover_watch (:51) к существующим, не заменить (через файл, не stdin-pipe)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/robinhood-chain-alpha/logs
+            EXISTING=$(sudo -u bot crontab -l 2>/dev/null || true)
+            echo "=== существующий crontab (до) ==="
+            echo "$EXISTING"
+            if ! echo "$EXISTING" | grep -q "funding_hourly_snapshot.sh"; then
+              echo "СТОП: строка funding (:21) НЕ найдена в текущем crontab -- не продолжаю, чтобы не работать вслепую поверх неожиданного состояния." >&2
+              exit 1
+            fi
+            FILTERED=$(echo "$EXISTING" | grep -vF "turnover_watch_daily.sh" || true)
+            {
+              echo "$FILTERED"
+              echo "51 9 * * * /home/bot/bin/turnover_watch_daily.sh >> /home/bot/robinhood-chain-alpha/logs/turnover_watch.log 2>&1"
+            } > /tmp/bot_cron.txt
+            chown bot:bot /tmp/bot_cron.txt
+            sudo -u bot crontab /tmp/bot_cron.txt
+            rm -f /tmp/bot_cron.txt
+            echo "=== raw crontab файл (после) ==="; cat /var/spool/cron/crontabs/bot
+            echo "=== crontab -l bot (после) ==="; sudo -u bot crontab -l
+            echo "=== проверка: строка funding (:21) на месте? ==="
+            sudo -u bot crontab -l | grep -q "21 \* \* \* \* /home/bot/bin/funding_hourly_snapshot.sh" && echo "OK: funding-строка сохранена" || { echo "ОШИБКА: funding-строка пропала!" >&2; exit 1; }
+          '
+
+      - name: "5. Разовый тестовый прогон вручную (подтвердить механизм сразу, не ждать первого тика 09:51 UTC)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot /home/bot/bin/turnover_watch_daily.sh
+            echo "=== хвост внешнего живого файла ==="
+            tail -3 /home/bot/turnover_watch_live_data/turnover_watch.jsonl
+            echo "=== число строк ==="
+            wc -l /home/bot/turnover_watch_live_data/turnover_watch.jsonl
+          '
+
+      - name: Итог
+        run: |
+          echo "cron сторожка оборота установлен (раз в сутки, минута :51 -> 09:51 UTC), funding (:21) не тронут, первый тестовый прогон прошёл."
+          echo "Git на VPS не используется нигде в этом механизме (тот же принцип, что funding/P5)."
