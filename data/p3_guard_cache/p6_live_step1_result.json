@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-05T00:32:09Z",
+  "generated_at_utc": "2026-09-05T00:40:33Z",
   "mode": "REAL",
   "recon_used": {
     "nfpm": "0x827922686190790b37229fd06084350E74485b72",
@@ -11,50 +11,122 @@
     "leverage": 2.0,
     "margin_mode": 0
   },
-  "bridge_fill_check": {
-    "filled": true,
-    "skipped_already_bridged": true,
-    "usdc_before": 79948649,
-    "eth_before": 247714999665286
+  "across_quote_usdg": {
+    "estimatedFillTimeSec": 2,
+    "capitalFeePct": "100000000000000",
+    "capitalFeeTotal": "8000",
+    "relayGasFeePct": "41925000000000",
+    "relayGasFeeTotal": "3354",
+    "relayFeePct": "641925000000000",
+    "relayFeeTotal": "51348",
+    "lpFeePct": "0",
+    "timestamp": "1788568571",
+    "isAmountTooLow": false,
+    "quoteBlock": "25907580",
+    "exclusiveRelayer": "0xFD03AbCAdaF3F930fA4E37Eb2f6ea3A44a41b7F0",
+    "exclusivityDeadline": 3,
+    "spokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+    "destinationSpokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+    "totalRelayFee": {
+      "pct": "641925000000000",
+      "total": "51348"
+    },
+    "relayerCapitalFee": {
+      "pct": "100000000000000",
+      "total": "8000"
+    },
+    "relayerGasFee": {
+      "pct": "41925000000000",
+      "total": "3354"
+    },
+    "lpFee": {
+      "pct": "0",
+      "total": "0"
+    },
+    "internalizedSwapFee": {
+      "pct": "500000000000000",
+      "total": "39994"
+    },
+    "limits": {
+      "minDeposit": "500000",
+      "maxDeposit": "531983261216",
+      "maxDepositInstant": "99904052132",
+      "maxDepositShortDelay": "531983261216",
+      "recommendedDepositInstant": "99904052132"
+    },
+    "fillDeadline": "1788575771",
+    "outputAmount": "79948652",
+    "inputToken": {
+      "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "symbol": "USDG",
+      "decimals": 6,
+      "chainId": 4663
+    },
+    "outputToken": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "symbol": "USDC",
+      "decimals": 6,
+      "chainId": 8453
+    },
+    "id": "2lg22-1788568834964-0f09666540f0"
   },
-  "swap_plan": {
-    "pool_price_usd": 79701.67945937511,
-    "usdc_total_human": 79.948649,
-    "usdc_to_swap_human": 36.25138577139427,
-    "expected_cbbtc_out": 0.00045483841767565296
-  },
-  "txs": [
-    {
-      "label": "4_approve_USDC_to_Router",
-      "tx_hash": "0xf551cba9af208c302bd45bea90c7afa37692e2b8005121eab944ea546d72a944",
-      "status": "success",
-      "gas_used": 35549,
-      "block_number": 50889493,
-      "effective_gas_price_wei": 6899999
+  "across_quote_eth": {
+    "estimatedFillTimeSec": 1,
+    "capitalFeePct": "140003250000000",
+    "capitalFeeTotal": "35000812500",
+    "relayGasFeePct": "7473710946340000",
+    "relayGasFeeTotal": "1868427736585",
+    "relayFeePct": "7613714196340000",
+    "relayFeeTotal": "1903428549085",
+    "lpFeePct": "0",
+    "timestamp": "1788568571",
+    "isAmountTooLow": false,
+    "quoteBlock": "25907580",
+    "exclusiveRelayer": "0xFD03AbCAdaF3F930fA4E37Eb2f6ea3A44a41b7F0",
+    "exclusivityDeadline": 3,
+    "spokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+    "destinationSpokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+    "totalRelayFee": {
+      "pct": "7613714196340000",
+      "total": "1903428549085"
     },
-    {
-      "label": "5_exactInputSingle_swap",
-      "tx_hash": "0x30732ca70bdebd5034357e2bc4e3239c12f628c42376b030e295106d5742f968",
-      "status": "success",
-      "gas_used": 251441,
-      "block_number": 50889493,
-      "effective_gas_price_wei": 6899999
+    "relayerCapitalFee": {
+      "pct": "140003250000000",
+      "total": "35000812500"
     },
-    {
-      "label": "6_approve_USDC_to_NFPM",
-      "tx_hash": "0x99cce8322199be3422d1955f102793e06690eb3f476ad5fc41c5aa9aa7f670ea",
-      "status": "success",
-      "gas_used": 55449,
-      "block_number": 50889509,
-      "effective_gas_price_wei": 6899999
+    "relayerGasFee": {
+      "pct": "7473710946340000",
+      "total": "1868427736585"
     },
-    {
-      "label": "7_approve_CBBTC_to_NFPM",
-      "tx_hash": "0x3f80f7c63013d806a7f841b2855db1d2611be746d81e733e0478ee98ed85424e",
-      "status": "success",
-      "gas_used": 59940,
-      "block_number": 50889512,
-      "effective_gas_price_wei": 6899999
-    }
-  ]
+    "lpFee": {
+      "pct": "0",
+      "total": "0"
+    },
+    "internalizedSwapFee": {
+      "pct": "0",
+      "total": "0"
+    },
+    "limits": {
+      "minDeposit": "203845338464799",
+      "maxDeposit": "20180688508015198707",
+      "maxDepositInstant": "20180688508015198707",
+      "maxDepositShortDelay": "20180688508015198707",
+      "recommendedDepositInstant": "20180688508015198707"
+    },
+    "fillDeadline": "1788575771",
+    "outputAmount": "248096571450915",
+    "inputToken": {
+      "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+      "symbol": "WETH",
+      "decimals": 18,
+      "chainId": 4663
+    },
+    "outputToken": {
+      "address": "0x4200000000000000000000000000000000000006",
+      "symbol": "WETH",
+      "decimals": 18,
+      "chainId": 8453
+    },
+    "id": "mrgjq-1788568835204-ce96221cba12"
+  }
 }
