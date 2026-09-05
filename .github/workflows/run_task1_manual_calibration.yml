@@ -1,0 +1,49 @@
+name: "Задача 1 -- ручная калибровка на одних выходных (X/Z из сырых свопов, Y из yfinance, сверка с пайплайном)"
+
+# Владелец, 2026-09-05: "калибровка на одних выходных вручную перед
+# выводом: X и Z из сырых свопов, Y со Stooq [-> yfinance после бага
+# #24], сверить с тем, что выдал пайплайн" -- условие остаётся в силе
+# перед полным прогоном Задачи 1. Ничего не пересчитывает в Dune --
+# только читает уже реальный сырой кэш смоука и его результат.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK1_MANUAL_CALIBRATION_REQUEST"
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Ручная калибровка (X/Z из сырого кэша, Y из yfinance)
+        run: python -u analysis/task1_manual_calibration.py
+      - name: Commit (только убрать маркер)
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_MANUAL_CALIBRATION_REQUEST
+          git diff --cached --quiet && exit 0
+          git commit -m "trigger: убрать маркер ручной калибровки Задачи 1 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
