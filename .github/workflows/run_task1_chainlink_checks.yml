@@ -1,0 +1,62 @@
+name: "Задача 1 -- две проверки перед переключением Y на Chainlink"
+
+# Владелец, 2026-09-05: "Chainlink как Y -- да, после двух проверок:
+# 1) обновляется ли фид по выходным (AnswerUpdated, 5 фидов, 3 выходных);
+# 2) сверка Y на трёх выходных с yfinance, расхождение >0.2% -- разбирать."
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK1_CHAINLINK_WEEKEND_CHECK_REQUEST"
+      - "data/p3_guard_cache/TASK1_Y_SOURCE_CROSSCHECK_REQUEST"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Проверка 1 -- обновляется ли фид по выходным"
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_CHAINLINK_WEEKEND_CHECK_REQUEST') != '' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_chainlink_weekend_check.py
+      - name: "Проверка 2 -- сверка Y с yfinance на трёх выходных"
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_Y_SOURCE_CROSSCHECK_REQUEST') != '' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_y_source_crosscheck.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_CHAINLINK_WEEKEND_CHECK_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_Y_SOURCE_CROSSCHECK_REQUEST
+          [ -e data/p3_guard_cache/task1_chainlink_weekend_check_result.json ] && git add data/p3_guard_cache/task1_chainlink_weekend_check_result.json
+          [ -e data/p3_guard_cache/task1_y_source_crosscheck_result.json ] && git add data/p3_guard_cache/task1_y_source_crosscheck_result.json
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 1: проверки к переключению Y на Chainlink [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

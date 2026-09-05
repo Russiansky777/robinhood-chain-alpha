@@ -149,7 +149,11 @@ def process_pair(pair: dict, since_unix: int, since_ms: int) -> pd.DataFrame:
     l_df = pd.DataFrame(l_records)
     if len(l_df):
         l_df["hour"] = pd.to_datetime(l_df["timestamp"], unit="s", utc=True).dt.floor("h")
-        l_df = l_df.rename(columns={"rate": "lighter_rate_pct"})[["hour", "lighter_rate_pct"]]
+        # Реальный баг (run 33966468935): rate у Lighter приходит СТРОКОЙ
+        # (напр. "0.0012"), не числом -- явный float(), иначе TypeError
+        # на вычитании (str - float) ниже.
+        l_df["lighter_rate_pct"] = l_df["rate"].astype(float)
+        l_df = l_df[["hour", "lighter_rate_pct"]]
         l_df = l_df.groupby("hour", as_index=False).last()  # на случай дублей внутри часа
 
     h_df = pd.DataFrame(h_records)
