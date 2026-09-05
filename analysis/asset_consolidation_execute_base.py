@@ -89,7 +89,11 @@ def rpc(method: str, params: list):
     r.raise_for_status()
     body = r.json()
     if "error" in body:
-        raise RuntimeError(f"{method} {params}: {body['error']}")
+        # РЕАЛЬНАЯ НАХОДКА: если ошибку класть ПОСЛЕ params (particularly
+        # длинного calldata у eth_call), любая truncation на фиксированную
+        # длину строки (str(exc)[:N]) отрезает саму ошибку, а не params --
+        # мы реально теряли текст revert-причины. Кладём ошибку ПЕРВОЙ.
+        raise RuntimeError(f"{body['error']} (метод={method})")
     return body["result"]
 
 
