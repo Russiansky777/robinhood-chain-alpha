@@ -314,8 +314,16 @@ def run() -> int:
     else:
         print("[execute_base] USDC->WETH уже сделан -- пропуск")
 
+    # РЕАЛЬНАЯ НАХОДКА (run 33976972830): balanceOf сразу после последней
+    # tx может попасть на отстающую RPC-реплику (public mainnet.base.org
+    # -- пул нод) и вернуть баланс БЕЗ учёта самой последней транзакции.
+    # Независимая верификация (asset_consolidation_base_verify.py,
+    # декодирующая Transfer-логи из квитанций) подтвердила: этот прогон
+    # реально недосчитал usdc_to_weth_swap. Фикс: короткая пауза перед
+    # финальным чтением, не полагаемся на baланс сразу после tx.
+    time.sleep(5.0)
     weth_final = erc20_balance(WETH) / 10 ** WETH_DECIMALS
-    print(f"\n[execute_base] РЕАЛЬНЫЙ финальный баланс WETH на Base: {weth_final}")
+    print(f"\n[execute_base] РЕАЛЬНЫЙ финальный баланс WETH на Base (после паузы на реплика-лаг): {weth_final}")
     progress["weth_final_base"] = weth_final
     OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
     print(f"[execute_base] ГОТОВО. Результат в {OUT_PATH}")
