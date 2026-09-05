@@ -21,9 +21,14 @@ P5_POOL = "52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 
 def run() -> int:
     client = DuneClient()
+    # РЕАЛЬНЫЙ баг первой попытки (run 33974784079, 0 строк): Trino
+    # to_hex() возвращает ВЕРХНИЙ регистр (подтверждено в
+    # task1_pool_addresses_by_token -- "D4EB21209C4D..."), а сравнение
+    # шло с lowercase-литералом -- 0 совпадений молча. lower() с обеих
+    # сторон, не полагаемся на регистр.
     sql = f"""select to_hex(tx_to) as tx_to, project, version, count(*) as n_trades, max(block_time) as last_trade
 from dex.trades
-where blockchain = 'robinhood' and to_hex(project_contract_address) = '{P5_POOL}'
+where blockchain = 'robinhood' and lower(to_hex(project_contract_address)) = '{P5_POOL}'
 group by to_hex(tx_to), project, version
 order by n_trades desc
 limit 20"""
