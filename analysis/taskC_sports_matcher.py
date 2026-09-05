@@ -87,34 +87,39 @@ def fetch_kalshi_games(series_ticker: str) -> list[dict]:
     return list(games.values())
 
 
-def fetch_polymarket_bulk(max_pages: int = 6, page_size: int = 100) -> list[dict]:
-    """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь (tag_slug/search
-    не фильтруют, см. taskC_polymarket_btc_probe_result.json /
-    taskC_sports_match_probe_result.json).
+def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100) -> list[dict]:
+    """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь для активных
+    рынков (tag_slug/search НЕ фильтруют, см. taskC_polymarket_btc_
+    probe_result.json / taskC_sports_match_probe_result.json).
 
-    РЕАЛЬНАЯ НАХОДКА (2026-09-05, диагностика после 0 уверенных
-    совпадений): докстринг утверждал "active+closed", но КОД реально
-    запрашивал только closed=false в ОБОИХ срезах -- закрытые
-    (settled/resolved) рынки никогда не попадали в выборку. Kalshi-игры
-    старше нескольких часов почти все уже в статусе settled, и их
-    Polymarket-аналоги к этому моменту почти наверняка ТОЖЕ уже closed
-    -- то есть весь 30-дневный back-window был структурно исключён из
-    поиска, независимо от порога даты. Диагностика полей даты Kalshi
-    (taskC_kalshi_date_field_diag_result.json) заодно ОПРОВЕРГЛА
-    прежнюю гипотезу про смещённый close_time -- разница ~1 день с
-    датой из тикера оказалась обычным артефактом часового пояса
-    (вечерние игры в США пересекают полночь UTC), close_time реально
-    точен.
+    РЕАЛЬНАЯ НАХОДКА #1 (2026-09-05): докстринг утверждал "active+closed",
+    но КОД реально запрашивал только closed=false в ОБОИХ срезах --
+    закрытые (settled/resolved) рынки никогда не попадали в выборку.
+    Kalshi-игры старше нескольких часов почти все уже settled, и их
+    Polymarket-аналоги к этому моменту тоже почти наверняка closed --
+    весь 30-дневный back-window был структурно исключён. Первый фикс
+    (голая пагинация closed=true по endDate DESC, 6 страниц) дал только
+    4 матча -- все на СЕГОДНЯШНИЕ игры, потому что 600 строк доминированы
+    недавними закрытиями ИЗ ДРУГИХ категорий (крипто/политика), старые
+    NFL/MLB похоронены глубже.
 
-    Три среза: volume24hr среди активных (будущие/идущие игры),
-    endDate среди активных (ближайшие по времени), и closed=true
-    сортировка по endDate DESC (самые недавно завершившиеся -- нужны
-    именно они для 30-дневного back-window)."""
+    РЕАЛЬНАЯ НАХОДКА #2 (2026-09-05, `taskC_polymarket_daterange_probe_
+    result.json`): в отличие от tag_slug/search, параметры
+    `end_date_min`/`end_date_max` (именно snake_case -- camelCase
+    `endDateMin` эмпирически НЕ работает, дал тот же результат, что без
+    фильтра вообще) РЕАЛЬНО фильтруют /markets -- проверено эмпирически,
+    не на слово документации. Используем их напрямую для closed-среза,
+    скоуп -- ровно наше окно [-WINDOW_DAYS_BACK; +WINDOW_DAYS_FWD], без
+    пагинации через нерелевантные категории."""
     out = {}
+    now = datetime.now(timezone.utc)
+    window_min = (now - timedelta(days=WINDOW_DAYS_BACK)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    window_max = (now + timedelta(days=WINDOW_DAYS_FWD)).strftime("%Y-%m-%dT%H:%M:%SZ")
     passes = [
         {"active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
         {"active": "true", "closed": "false", "order": "endDate", "ascending": "true"},
-        {"closed": "true", "order": "endDate", "ascending": "false"},
+        {"closed": "true", "order": "endDate", "ascending": "false",
+         "end_date_min": window_min, "end_date_max": window_max},
     ]
     for params_base in passes:
         for offset in range(0, max_pages * page_size, page_size):
@@ -129,6 +134,8 @@ def fetch_polymarket_bulk(max_pages: int = 6, page_size: int = 100) -> list[dict
             for m in body:
                 if m.get("slug"):
                     out[m["slug"]] = m
+            if len(body) < page_size:
+                break  # реально дошли до конца отфильтрованной выборки, дальше пусто
             time.sleep(0.3)
     return list(out.values())
 
