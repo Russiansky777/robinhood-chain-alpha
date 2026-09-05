@@ -37,7 +37,6 @@ HEADERS = {"User-Agent": "robinhood-chain-alpha-taskC-edge-history/1.0"}
 KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2"
 CLOB_BASE = "https://clob.polymarket.com"
 OUT_PATH = Path("data/p3_guard_cache/taskC_edge_history_analysis_result.json")
-MATCHER_RESULT_PATH = Path("data/p3_guard_cache/taskC_sports_matcher_result.json")
 
 
 def kalshi_fee(price_dollars: float) -> float:
@@ -150,12 +149,21 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
                 break
         return result
 
+    # РЕАЛЬНАЯ НАХОДКА: Kalshi /markets/trades отдаёт сделки НОВЫЕ->СТАРЫЕ
+    # (подтверждено эмпирически, taskC_edge_probe_result.json -- убывающий
+    # created_time). Без явной сортировки по возрастанию непрерывные
+    # "окна ниже доллара" считались задом наперёд -- отрицательная
+    # длительность окна была прямым признаком этого бага.
+    trades_sorted = sorted(trades, key=lambda t: t["created_time"])
+
     below_dollar = 0
     windows = []
+    min_costs_below = []
     in_window = False
     window_start = None
     total = 0
-    for t in trades:
+    last_ts = None
+    for t in trades_sorted:
         ts = datetime.fromisoformat(t["created_time"].replace("Z", "+00:00")).timestamp()
         yes_k = float(t.get("yes_price_dollars", 0))
         no_k = float(t.get("no_price_dollars", 0))
@@ -164,48 +172,71 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
         if yes_p is None or no_p is None:
             continue
         total += 1
+        last_ts = ts
         combo_a = yes_k + kalshi_fee(yes_k) + no_p
         combo_b = yes_p + no_k + kalshi_fee(no_k)
         min_cost = min(combo_a, combo_b)
         is_below = min_cost < 1.0
         if is_below:
             below_dollar += 1
+            min_costs_below.append(min_cost)
         if is_below and not in_window:
             in_window, window_start = True, ts
         elif not is_below and in_window:
             windows.append(ts - window_start)
             in_window = False
-    if in_window:
-        windows.append(times[-1].timestamp() - window_start)
+    if in_window and last_ts is not None:
+        windows.append(last_ts - window_start)
 
     entry["n_points_compared"] = total
     entry["fraction_time_below_dollar"] = round(below_dollar / total, 4) if total else None
     entry["n_windows_below_dollar"] = len(windows)
     entry["median_window_seconds"] = sorted(windows)[len(windows) // 2] if windows else None
+    # РЕАЛЬНАЯ величина спреда (не только флаг "<$1") -- нужна для
+    # предрегистрированного порога владельца "чистый спред >=1.5%"
+    if min_costs_below:
+        net_spreads = sorted(round((1 - c) * 100, 4) for c in min_costs_below)  # в % от $1
+        entry["net_spread_pct_median"] = net_spreads[len(net_spreads) // 2]
+        entry["net_spread_pct_max"] = net_spreads[-1]
+        entry["net_spread_pct_min"] = net_spreads[0]
     entry["status"] = "ok"
     return entry
 
 
+# РЕАЛЬНАЯ ФИКСАЦИЯ (не читаем taskC_sports_matcher_result.json "matched"
+# -- этот файл живой, п.1/п.2 уже дважды перезаписали его для своих целей,
+# список "matched" сейчас другой набор игр, не оригинальные 4). Ниже --
+# ИМЕННО те 4 игры, что были реально совпадены и опубликованы владельцу
+# изначально (2026-09-05, run 33978555122): 3 EPL + 1 UFC. MCICOV
+# сознательно ПРОПУЩЕН -- реально подтверждено (taskC_edge_probe_result.json),
+# что для неё на Polymarket вообще нет ни draw, ни moneyline рынка
+# (только corners O/U, несопоставимо по семантике) -- не гадаем замену.
+ORIGINAL_MATCHED_GAMES = [
+    {"kalshi_event": "KXEPLGAME-26SEP05FULCRY", "has_tie": True,
+     "pm_question": "Will Fulham FC vs. Crystal Palace FC end in a draw?"},
+    {"kalshi_event": "KXEPLGAME-26SEP05BRESUN", "has_tie": True,
+     "pm_question": "Will Brentford FC vs. Sunderland AFC end in a draw?"},
+    {"kalshi_event": "KXUFCFIGHT-26SEP05DUCDIA", "has_tie": False,
+     "pm_question": "UFC Fight Night: Luis Felipe Dias vs. Matthieu Letho Duclos (Middleweight, Prelims)"},
+]
+
+
 def run() -> int:
-    matcher_result = json.loads(MATCHER_RESULT_PATH.read_text())
-    games = matcher_result["matched"]
     pm_markets = fetch_polymarket_bulk()
     print(f"[history] реальных Polymarket-рынков для поиска: {len(pm_markets)}")
 
     results = []
-    for g in games:
-        # Берём тот же moneyline/tie/fight-market подход, что и live-скрипт:
-        # ищем ТОЧНО тот вопрос, что уже был сопоставлен ранее.
-        best = g["polymarket_candidates"][0]
-        pm_market = next((m for m in pm_markets if normalize(m.get("question", "")) == normalize(best["question"])), None)
+    for g in ORIGINAL_MATCHED_GAMES:
+        pm_market = next((m for m in pm_markets if normalize(m.get("question", "")) == normalize(g["pm_question"])), None)
         if not pm_market:
             results.append({"kalshi_event": g["kalshi_event"], "status": "Polymarket рынок больше не найден в bulk (вероятно, ротировался из окна)"})
             continue
         # Реальный тикер конкретного Kalshi-рынка -- НЕ строковая склейка
         # (событие != рынок): для EPL берём Tie-исход (сопоставлен с Draw),
-        # для UFC -- первый исход "X wins" (симметрично матчу-победителю).
+        # для UFC -- первый исход "X wins" (симметрично матчу-победителю,
+        # any_side_verify.py уже подтвердил корректность name-based match).
         event_markets = kalshi_event_markets(g["kalshi_event"])
-        if "Tie is the result" in g["teams"]:
+        if g["has_tie"]:
             chosen = next((m for m in event_markets if m.get("title") == "Tie is the result"), None)
         else:
             chosen = next((m for m in event_markets if (m.get("title") or "").endswith(" wins")), None)
