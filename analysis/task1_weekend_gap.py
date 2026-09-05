@@ -11,8 +11,15 @@ Sprint R1):
        is_dark_window, но здесь НЕ привязано к 8-K -- просто КАЖДЫЕ
        выходные).
   Y -- гэп акции пт закрытие (16:00 ET) -> пн открытие (9:30 ET),
-       бесплатный дневной источник -- Stooq (`stooq.com/q/d/l/`, без
-       ключа, дневные OHLC).
+       дневной источник -- `yfinance` (закрытие/открытие РЕГУЛЯРНОЙ
+       сессии). Смена источника, владелец, 2026-09-05: Stooq реально
+       заблокирован anti-bot стеной с IP GH Actions (баг #24, все 38
+       тикеров смоука вернули HTML вместо CSV), Chainlink-оракул
+       предлагался как замена и реально провалил калибровку (баг #24:
+       не обновляется по выходным + отстаёт от открытия на ~0.4%,
+       13/13 наблюдений сверх порога 0.2%) -- решение владельца: не
+       использовать Chainlink, взять yfinance (реально работает с
+       GH Actions раннера).
   Z -- движение токена вс 20:00 -> пн 9:30 ET (примыкающее к открытию
        окно, для проверки, продолжает ли позднее движение направление X
        или разворачивает).
@@ -82,47 +89,35 @@ def real_fridays_since(start_date: str, now_utc: datetime) -> list[str]:
     return fridays
 
 
-_STOOQ_DIAG_PRINTED = 0
-
-
-def stooq_daily(symbol: str) -> pd.DataFrame | None:
-    """Реальные дневные OHLC с Stooq (бесплатно, без ключа) --
-    `stooq.com/q/d/l/?s=<symbol>.us&i=d`. Возвращает None, если тикер не
-    найден (Stooq отвечает пустым/HTML телом вместо CSV на несуществующий
-    символ -- НЕ выдумываем данные, честно пропускаем)."""
+def yfinance_daily(symbol: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """Реальные дневные OHLC (закрытие/открытие РЕГУЛЯРНОЙ сессии, не
+    pre/post-market) с yfinance -- владелец, 2026-09-05, ПОСЛЕ того как
+    Stooq реально оказался заблокирован anti-bot стеной с IP GH Actions
+    (баг #24, docs/PROJECT_STATE.md: status=200, HTML-страница проверки
+    браузера вместо CSV) и Chainlink-оракул реально провалил калибровку
+    (баг #24: не обновляется по выходным, отстаёт от открытия на ~0.4%,
+    task1_y_source_crosscheck_result.json). yfinance реально работает с
+    GH Actions раннера (подтверждено тем же прогоном калибровки, 13/15
+    close-наблюдений и все 15 open-наблюдений реально получены)."""
     try:
-        r = requests.get("https://stooq.com/q/d/l/", params={"s": f"{symbol.lower()}.us", "i": "d"},
-                          headers={"User-Agent": "Mozilla/5.0 (robinhood-chain-alpha-task1/1.0)"}, timeout=20)
+        import yfinance as yf
+        hist = yf.Ticker(symbol).history(start=start_date, end=end_date, interval="1d")
     except Exception as e:  # noqa: BLE001
-        print(f"    Stooq {symbol}: сетевая ошибка {e}")
+        print(f"    yfinance {symbol}: сетевая/библиотечная ошибка {e}")
         return None
-    if r.status_code != 200 or "Date,Open" not in r.text[:200]:
-        # Диагностика (владелец: не гадать) -- реальный статус и сырое
-        # начало тела ответа для 2-3 первых неудач, чтобы увидеть точную
-        # причину (BOM/HTML-заглушка/иной заголовок CSV/блок по UA) --
-        # не на каждый тикер, иначе лог раздувается на все 38.
-        global _STOOQ_DIAG_PRINTED
-        if _STOOQ_DIAG_PRINTED < 3:
-            print(f"    [STOOQ DIAG] {symbol}: status={r.status_code} content-type={r.headers.get('content-type')} "
-                  f"body_repr={r.text[:200]!r}")
-            _STOOQ_DIAG_PRINTED += 1
+    if hist is None or not len(hist):
         return None
-    from io import StringIO
-    try:
-        df = pd.read_csv(StringIO(r.text))
-    except Exception:  # noqa: BLE001
-        return None
-    if "Date" not in df.columns or not len(df):
-        return None
-    df["Date"] = pd.to_datetime(df["Date"])
-    return df
+    hist = hist.reset_index()
+    hist = hist.rename(columns={"Date": "Date", "Open": "Open", "Close": "Close"})
+    hist["Date"] = pd.to_datetime(hist["Date"]).dt.tz_localize(None)
+    return hist[["Date", "Open", "Close"]]
 
 
 def friday_monday_gap(daily: pd.DataFrame, friday_date: str) -> dict:
     """Y = (Monday_Open / Friday_Close - 1) для КОНКРЕТНЫХ выходных --
     реальные даты по календарю (пятница = friday_date, понедельник =
     friday_date+3, с учётом реальных праздников NYSE -- если понедельник
-    отсутствует в данных Stooq, значит был выходной/праздник, честно
+    отсутствует в данных yfinance, значит был выходной/праздник, честно
     пропускаем эту пару выходных для этого тикера, не сдвигаем дату
     вручную/по памяти)."""
     fri = pd.Timestamp(friday_date)
@@ -130,7 +125,7 @@ def friday_monday_gap(daily: pd.DataFrame, friday_date: str) -> dict:
     row_fri = daily[daily["Date"] == fri]
     row_mon = daily[daily["Date"] == mon]
     if not len(row_fri) or not len(row_mon):
-        return {"gap": None, "reason": "нет реальных дневных данных на пятницу или понедельник (праздник/выходной/тикер молодой)"}
+        return {"gap": None, "reason": "нет реальных дневных данных на пятницу или понедельник (праздник/выходной/тикер молодой/не на yfinance)"}
     close_fri = float(row_fri.iloc[0]["Close"])
     open_mon = float(row_mon.iloc[0]["Open"])
     if close_fri <= 0:
@@ -215,7 +210,9 @@ def run() -> int:
     print(f"[task1] фильтр тонких пулов (мин {MIN_BRACKET_TRADES} сделок в каждом из 4 брекетов): "
           f"исключено {n_excluded_thin} из {n_before_thin_filter}, осталось {len(df)}")
 
-    print(f"[task1] реальные дневные цены со Stooq для {df['symbol'].nunique()} тикеров...")
+    print(f"[task1] реальные дневные цены с yfinance для {df['symbol'].nunique()} тикеров...")
+    y_start_date = fridays[0]
+    y_end_date = (datetime.strptime(fridays[-1], "%Y-%m-%d") + timedelta(days=4)).strftime("%Y-%m-%d")
     daily_cache: dict[str, pd.DataFrame | None] = {}
     gaps = []
     for row in df.itertuples():
@@ -224,20 +221,20 @@ def run() -> int:
             gaps.append({"gap": None, "reason": "символ не сопоставлен из реестра"})
             continue
         if sym not in daily_cache:
-            daily_cache[sym] = stooq_daily(sym)
-            time.sleep(0.3)  # вежливый троттлинг, Stooq без документированного лимита, но публичный сервис
+            daily_cache[sym] = yfinance_daily(sym, y_start_date, y_end_date)
+            time.sleep(0.3)  # вежливый троттлинг
         daily = daily_cache[sym]
         if daily is None:
-            gaps.append({"gap": None, "reason": "Stooq не вернул реальные дневные данные для этого тикера"})
+            gaps.append({"gap": None, "reason": "yfinance не вернул реальные дневные данные для этого тикера"})
             continue
         gaps.append(friday_monday_gap(daily, row.friday_utc[:10] if isinstance(row.friday_utc, str) else str(row.friday_utc)[:10]))
 
     df["Y"] = [g["gap"] for g in gaps]
     df["Y_reason_missing"] = [g.get("reason") for g in gaps]
-    n_no_stooq = df["Y"].isna().sum()
-    print(f"[task1] реальный Y (гэп Stooq) получен для {len(df)-n_no_stooq}/{len(df)}, "
-          f"не найден для {n_no_stooq} (тикер молодой/не на Stooq/праздник)")
-    if n_no_stooq:
+    n_no_yfinance = df["Y"].isna().sum()
+    print(f"[task1] реальный Y (гэп yfinance) получен для {len(df)-n_no_yfinance}/{len(df)}, "
+          f"не найден для {n_no_yfinance} (тикер молодой/не на yfinance/праздник)")
+    if n_no_yfinance:
         for sym, reason, cnt in df[df["Y"].isna()].groupby(["symbol", "Y_reason_missing"], dropna=False).size().reset_index(name="n").itertuples(index=False):
             print(f"    Y отсутствует: {sym} -- {reason} (n={cnt})")
 
@@ -247,7 +244,7 @@ def run() -> int:
 
     # Диагностика (владелец: не гадать, честно доложить причину) --
     # какие символы прошли фильтр тонких пулов, но не получили Y, и
-    # почему конкретно (символ не сопоставлен / Stooq не ответил /
+    # почему конкретно (символ не сопоставлен / yfinance не ответил /
     # реальных дневных данных на пятницу-понедельник не нашлось).
     missing_y_diag = (
         df[df["Y"].isna()][["symbol", "Y_reason_missing"]].drop_duplicates().to_dict("records")
@@ -259,7 +256,7 @@ def run() -> int:
         "smoke_only": SMOKE_ONLY, "n_weekends_used": len(fridays), "n_weekends_total_available": len(all_fridays),
         "n_before_thin_filter": n_before_thin_filter, "n_excluded_thin_pools": n_excluded_thin,
         "min_bracket_trades_threshold": MIN_BRACKET_TRADES,
-        "n_no_stooq_data": int(n_no_stooq), "n_final": n,
+        "n_no_yfinance_data": int(n_no_yfinance), "n_final": n,
         "missing_y_diagnostic": missing_y_diag,
     }
 
