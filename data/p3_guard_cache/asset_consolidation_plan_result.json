@@ -1,0 +1,58 @@
+{
+  "generated_at_utc": "2026-09-05T14:42:06Z",
+  "steps": [
+    {
+      "action": "swap cbBTC -> USDC",
+      "chain": "base",
+      "pool": "0x3e66e55e97ce60096f74b7c475e8249f2d31a9fb",
+      "fee_bps": 332,
+      "fee_pct": 0.0332,
+      "cbbtc_amount": 0.0004529,
+      "cbbtc_usd_value": 36.02287102623739,
+      "expected_usdc_out": 36.01091143305668,
+      "note": "оценка по спот-цене пула (GT) за вычетом fee tier, без полной v3-симуляции проскальзывания -- сумма мала относительно TVL пула"
+    },
+    {
+      "action": "bridge USDC Base -> Robinhood (Across)",
+      "amount_usdc": 79.84993943305668,
+      "quote_raw": {
+        "error": "HTTP 400",
+        "raw": "{\"type\":\"AcrossApiError\",\"code\":\"INVALID_PARAM\",\"status\":400,\"message\":\"Unsupported token address on given destination chain\",\"param\":\"outputTokenAddress\",\"id\":\"766rr-1788619327148-49534a4e8f27\"}"
+      },
+      "decision": "ОШИБКА КОТИРОВКИ: HTTP 400"
+    },
+    {
+      "action": "swap WETH -> USDG",
+      "chain": "robinhood",
+      "pool": "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca",
+      "fee_bps": 100,
+      "fee_pct": 0.01,
+      "weth_amount": 0.060744816588510844,
+      "weth_usd_value": 149.17712057806494,
+      "expected_usdg_out": 149.16220286600714,
+      "note": "оценка по спот-цене пула (GT) за вычетом fee tier"
+    },
+    {
+      "action": "wrap remainder ETH -> WETH -> swap -> USDG",
+      "native_eth_now": 0.002772531095044418,
+      "reserve_eth_target": 0.00020359964166463066,
+      "remainder_eth": 0.0025689314533797873,
+      "remainder_usd": 6.308781863210082,
+      "gas_price_gwei": 0.385518,
+      "assumed_gas_per_tx": 150000,
+      "cost_two_tx_usd_estimate": 0.28402653132000005,
+      "decision": "ОБЕРНУТЬ И СВОПНУТЬ",
+      "expected_usdg_out": 6.308150985023761
+    },
+    {
+      "action": "Lighter",
+      "decision": "НЕ ТРОГАТЬ (владелец)"
+    }
+  ],
+  "summary": {
+    "usdg_now": 0.282426,
+    "usdg_estimated_after": 155.75277985103088,
+    "total_estimated_cost_usd": 0.3109038365585174,
+    "total_usd_before": 236.7165316497779
+  }
+}
