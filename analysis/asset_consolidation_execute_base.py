@@ -11,9 +11,19 @@ ABI struct exactInputSingle -- SwapRouter02 (в отличие от classic
 SwapRouter v1 / Aerodrome Slipstream, использованных в P5/P6) НЕ
 содержит `deadline` в структуре параметров. ПЕРЕД реальной отправкой
 -- эмпирическая проверка через eth_call-СИМУЛЯЦИЮ (0 газа, не меняет
-состояние): пробуем 7-поле (без deadline) структуру; если реально
-revert -- СТОП, не гадаем, не пробуем другой вариант вслепую на
-реальные деньги.
+состояние): пробуем 7-поле (без deadline) структуру, затем 8-поле
+(с deadline, classic SwapRouter v1) как fallback.
+
+РЕАЛЬНАЯ НАХОДКА (run 33975504003, 2026-09-05): первая попытка сообщила
+"ОБЕ структуры ABI провалились" -- но реальная причина была НЕ ABI, а
+порядок действий: симуляция exactInputSingle шла ДО approve, а router
+не может выполнить внутренний transferFrom без allowance (падает
+одинаково для любой структуры). Деньги не потрачены (симуляция
+сработала как задумано), но диагноз был вводящим в заблуждение. Фикс:
+approve СНАЧАЛА (дёшево, стандартно, не трогает основную сумму),
+симуляция ПОСЛЕ, когда allowance уже реально в состоянии сети -- только
+тогда результат симуляции говорит именно про структуру ABI, не про
+allowance.
 
 Резилентность -- тот же паттерн, что p6_live_step1.py: pre-flight
 баланс перед каждым свопом, gas-estimate с ретраями (лаг RPC-реплики),
@@ -213,11 +223,19 @@ def send_and_wait(account, label: str, to: str, data: bytes, nonce: int, eth_usd
 
 
 def do_swap(account, label: str, token_in: str, token_out: str, fee: int, decimals_in: int,
-            eth_usd: float, progress: dict) -> None:
+            eth_usd: float, progress: dict, already_done: set[str]) -> None:
     """Свопает ВЕСЬ реальный (только что прочитанный, RAW-целое, БЕЗ
     прохода через float human-round-trip -- на реальные деньги не
     полагаемся на округление float64 при пересчёте назад в raw) баланс
-    token_in."""
+    token_in.
+
+    РЕАЛЬНАЯ НАХОДКА (run 33975504003): симуляция exactInputSingle
+    ДО approve всегда падает -- router не может сделать внутренний
+    transferFrom без allowance, независимо от того, какая ABI-структура
+    верна. Это выглядело как "ОБЕ структуры ABI провалились", хотя
+    реальная причина -- порядок действий, не ABI. Фикс: approve СНАЧАЛА
+    (дёшево, стандартно, не трогает основную сумму), симуляция ПОСЛЕ,
+    когда allowance уже реально в состоянии сети."""
     print(f"\n=== {label}: {token_in} -> {token_out}, fee={fee/10000:.2f}% ===")
 
     print("--- PRE-FLIGHT: реальный баланс перед свопом ---")
@@ -227,20 +245,22 @@ def do_swap(account, label: str, token_in: str, token_out: str, fee: int, decima
         print(f"[execute_base] {label}: баланс 0 -- нечего свопать, пропуск")
         return
 
-    print("--- Эмпирическая проверка структуры calldata (eth_call-симуляция, 0 газа) ---")
-    abi_variant, simulated_out = simulate_swap(token_in, token_out, fee, amount_raw)
-    print(f"[execute_base] структура ABI, реально подтверждённая симуляцией: {abi_variant}, ожидаемый output raw = {simulated_out}")
-
-    min_out_raw = int(simulated_out * (1 - SWAP_SLIPPAGE))
-
-    allowance = erc20_allowance(token_in, ROUTER)
     nonce = eth_nonce()
-    if allowance < amount_raw:
+    allowance = erc20_allowance(token_in, ROUTER)
+    if f"{label}_approve" in already_done:
+        print(f"[execute_base] {label}: approve уже сделан ранее (progress-файл) -- пропуск")
+    elif allowance < amount_raw:
         approve_data = APPROVE_SELECTOR + abi_encode(["address", "uint256"], [to_checksum_address(ROUTER), amount_raw])
         send_and_wait(account, f"{label}_approve", token_in, approve_data, nonce, eth_usd, progress)
         nonce += 1
     else:
         print(f"[execute_base] {label}: allowance уже достаточен ({allowance/10**decimals_in}), approve не нужен")
+
+    print("--- Эмпирическая проверка структуры calldata (eth_call-симуляция, 0 газа, ПОСЛЕ approve) ---")
+    abi_variant, simulated_out = simulate_swap(token_in, token_out, fee, amount_raw)
+    print(f"[execute_base] структура ABI, реально подтверждённая симуляцией: {abi_variant}, ожидаемый output raw = {simulated_out}")
+
+    min_out_raw = int(simulated_out * (1 - SWAP_SLIPPAGE))
 
     if abi_variant == "no_deadline":
         swap_data = build_swap_calldata_no_deadline(token_in, token_out, fee, WALLET, amount_raw, min_out_raw)
@@ -275,12 +295,12 @@ def run() -> int:
 
     already_done = {t["label"] for t in progress.get("txs", []) if t["status"] == "success"}
     if "cbbtc_to_weth_swap" not in already_done:
-        do_swap(account, "cbbtc_to_weth", CBBTC, WETH, CBBTC_WETH_POOL_FEE, CBBTC_DECIMALS, eth_usd, progress)
+        do_swap(account, "cbbtc_to_weth", CBBTC, WETH, CBBTC_WETH_POOL_FEE, CBBTC_DECIMALS, eth_usd, progress, already_done)
     else:
         print("[execute_base] cbBTC->WETH уже сделан -- пропуск")
 
     if "usdc_to_weth_swap" not in already_done:
-        do_swap(account, "usdc_to_weth", USDC, WETH, USDC_WETH_POOL_FEE, USDC_DECIMALS, eth_usd, progress)
+        do_swap(account, "usdc_to_weth", USDC, WETH, USDC_WETH_POOL_FEE, USDC_DECIMALS, eth_usd, progress, already_done)
     else:
         print("[execute_base] USDC->WETH уже сделан -- пропуск")
 
