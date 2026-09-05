@@ -98,7 +98,9 @@ BRIDGE_ETH_AMOUNT_ETH = 0.00025  # владелец, 2026-09-05: 0.0006 реал
 # Base исторически дёшев (~$0.02-0.07 за mint, см. p6_dry_run_entry_result.json), должно хватить.
 RANGE_PCT = 0.10
 SWAP_SLIPPAGE = 0.03  # широкий допуск -- приоритет гарантированного исполнения (тот же принцип, что P5)
-MINT_SLIPPAGE = 0.05
+MINT_SLIPPAGE = 0.10  # увеличено с 0.05 после 2 реальных revert PSC (run 11/13) -- запас на реальный
+# сдвиг цены за время двух approve-транзакций между расчётом оптимума и самим mint (реальное время
+# на подтверждение блоков), сверх основного фикса (реальные тиковые границы вместо номинала ±10%)
 LIGHTER_API_BASE = "https://api.rh.lighter.xyz"
 LIGHTER_ACCOUNT_INDEX = 22012
 LIGHTER_API_KEY_INDEX = 4
@@ -327,6 +329,17 @@ def price_cbbtc_usd(sqrt_price_x96: int) -> float:
 def usd_price_to_tick(p_usd: float) -> int:
     raw = (1 / p_usd) * (10 ** (CBBTC_DECIMALS - USDC_DECIMALS))
     return math.floor(math.log(raw) / math.log(1.0001))
+
+
+def tick_to_usd_price(tick: int) -> float:
+    """Точная обратная функция к usd_price_to_tick -- реальная USD-цена на
+    ГРАНИЦЕ конкретного (уже округлённого до tickSpacing) тика. НУЖНА для
+    расчёта mint-соотношения: при tickSpacing=2000 один шаг тика --
+    ~22% цены (1.0001**2000), так что округлённые tick_lower/tick_upper
+    могут заметно отличаться от номинальных pa/pb=p0*(1+-RANGE_PCT) --
+    оптимум для mint должен считаться по РЕАЛЬНЫМ границам тика, не по
+    неокруглённому номиналу (реальная причина повторного revert PSC)."""
+    return (10 ** (CBBTC_DECIMALS - USDC_DECIMALS)) / (1.0001 ** tick)
 
 
 def get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, amount0, amount1) -> float:
@@ -672,11 +685,27 @@ def main() -> int:
     # что в P5 (p5_live_step1.py, expected0/expected1 из
     # get_liquidity_for_amounts) -- считаем ОПТИМАЛЬНЫЕ суммы под СВЕЖИЙ
     # диапазон/цену, а не берём весь баланс как желаемое.
+    #
+    # НАЙДЕНО ВТОРОЙ РАЗ (реальный прогон run 13, commit 39f3338): ЭТОТ
+    # фикс тоже реально упал на PSC -- причина ГЛУБЖЕ, чем показалось:
+    # оптимум считался по НЕОКРУГЛЁННЫМ pa_fresh/pb_fresh (±10% номинал),
+    # а РЕАЛЬНЫЙ ончейн-диапазон -- это ОКРУГЛЁННЫЕ до tickSpacing
+    # tick_lower/tick_upper. При tickSpacing=2000 один шаг тика --
+    # 1.0001**2000 ~= 1.221, то есть ~22% цены за ОДИН шаг -- округление
+    # заметно уводит реальные границы от номинальных ±10%. Пул же считает
+    # amount0/amount1 СТРОГО по РЕАЛЬНЫМ (округлённым) границам тика, не
+    # по номиналу. Настоящий фикс -- взять реальные USD-цены НА ГРАНИЦАХ
+    # округлённых tick_lower/tick_upper (tick_to_usd_price, точная
+    # обратная функция к usd_price_to_tick), а не номинальные pa/pb.
     def usd_to_domain_mint(p_usd: float) -> float:
         return 1.0 / p_usd
 
+    pb_actual_usd = tick_to_usd_price(tick_lower)  # tick_lower <-> ВЕРХНЯЯ граница цены (см. usd_price_to_tick: цена и тик обратно связаны)
+    pa_actual_usd = tick_to_usd_price(tick_upper)  # tick_upper <-> НИЖНЯЯ граница цены
     sqrt_p_fresh = usd_to_domain_mint(p0_fresh) ** 0.5
-    sqrt_pa_fresh, sqrt_pb_fresh = usd_to_domain_mint(pb_fresh) ** 0.5, usd_to_domain_mint(pa_fresh) ** 0.5
+    sqrt_pa_fresh, sqrt_pb_fresh = usd_to_domain_mint(pb_actual_usd) ** 0.5, usd_to_domain_mint(pa_actual_usd) ** 0.5
+    print(f"[p6_step1] mint: реальные границы диапазона по округлённым тикам -- ${pa_actual_usd:.2f}..${pb_actual_usd:.2f} "
+          f"(номинал ±{RANGE_PCT*100:.0f}% был ${pa_fresh:.2f}..${pb_fresh:.2f} -- округление до tickSpacing={ts} сдвинуло границы).")
     usdc_after_swap_human = usdc_after_swap / 10 ** USDC_DECIMALS
     cbbtc_after_swap_human = cbbtc_after_swap / 10 ** CBBTC_DECIMALS
     L_mint = get_liquidity_for_amounts(sqrt_p_fresh, sqrt_pa_fresh, sqrt_pb_fresh, usdc_after_swap_human, cbbtc_after_swap_human)
