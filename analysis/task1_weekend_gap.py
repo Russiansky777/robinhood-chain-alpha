@@ -224,10 +224,22 @@ def run() -> int:
     n_no_stooq = df["Y"].isna().sum()
     print(f"[task1] реальный Y (гэп Stooq) получен для {len(df)-n_no_stooq}/{len(df)}, "
           f"не найден для {n_no_stooq} (тикер молодой/не на Stooq/праздник)")
+    if n_no_stooq:
+        for sym, reason, cnt in df[df["Y"].isna()].groupby(["symbol", "Y_reason_missing"], dropna=False).size().reset_index(name="n").itertuples(index=False):
+            print(f"    Y отсутствует: {sym} -- {reason} (n={cnt})")
 
     final = df.dropna(subset=["X", "Y", "Z"]).copy()
     n = len(final)
     print(f"[task1] финальная выборка (X, Y, Z все реальны): N={n}")
+
+    # Диагностика (владелец: не гадать, честно доложить причину) --
+    # какие символы прошли фильтр тонких пулов, но не получили Y, и
+    # почему конкретно (символ не сопоставлен / Stooq не ответил /
+    # реальных дневных данных на пятницу-понедельник не нашлось).
+    missing_y_diag = (
+        df[df["Y"].isna()][["symbol", "Y_reason_missing"]].drop_duplicates().to_dict("records")
+        if "Y_reason_missing" in df.columns else []
+    )
 
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -235,6 +247,7 @@ def run() -> int:
         "n_before_thin_filter": n_before_thin_filter, "n_excluded_thin_pools": n_excluded_thin,
         "min_bracket_trades_threshold": MIN_BRACKET_TRADES,
         "n_no_stooq_data": int(n_no_stooq), "n_final": n,
+        "missing_y_diagnostic": missing_y_diag,
     }
 
     if n >= 3:
