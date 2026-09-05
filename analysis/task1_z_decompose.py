@@ -117,6 +117,33 @@ def run() -> int:
         print(f"[z_decompose] corr(X,Z1)={corr_x_z1:.4f} (доля обратных={opp_z1:.1%})  "
               f"corr(X,Z2)={corr_x_z2:.4f} (доля обратных={opp_z2:.1%})")
         print(f"[z_decompose] {result['interpretation']}")
+
+        # Робастность (урок основного прогона task1_weekend_gap.py --
+        # ВСЕГДА проверять чувствительность к выбросам тонкой ликвидности
+        # с |X|>0.5 ДО того, как доверять headline-корреляции: здесь
+        # Pearson corr(X,Z1) на полной выборке оказался развёрнут по
+        # знаку ОДНОЙ строкой AMC X=6.40, найдено сразу, не по запросу).
+        robust_mask = merged["X"].abs() <= 0.5
+        robust = merged[robust_mask]
+        n_excluded = int((~robust_mask).sum())
+        if len(robust) >= 3:
+            corr_x_z1_r = robust["X"].corr(robust["Z1"])
+            corr_x_z2_r = robust["X"].corr(robust["Z2"])
+            opp_z1_r = float((np.sign(robust["X"]) != np.sign(robust["Z1"])).mean())
+            opp_z2_r = float((np.sign(robust["X"]) != np.sign(robust["Z2"])).mean())
+            where_r = ("Z1 (вс 20:00-21:00 ET, разворот РАННИЙ)" if abs(corr_x_z1_r) > abs(corr_x_z2_r)
+                       else "Z2 (21:00 ET-пн 9:30, разворот ПОЗДНИЙ/растянутый)")
+            result["robustness_check"] = {
+                "n_outliers_excluded_absX_gt_0_5": n_excluded, "n_robust": int(len(robust)),
+                "corr_X_Z1_robust": corr_x_z1_r, "corr_X_Z2_robust": corr_x_z2_r,
+                "sign_opposite_fraction_X_Z1_robust": opp_z1_r, "sign_opposite_fraction_X_Z2_robust": opp_z2_r,
+            }
+            result["interpretation_robust"] = f"РОБАСТНАЯ (после исключения {n_excluded} выбросов |X|>0.5): сильнее: {where_r}"
+            print(f"[z_decompose] РОБАСТНОСТЬ: corr(X,Z1)={corr_x_z1_r:.4f} corr(X,Z2)={corr_x_z2_r:.4f} "
+                  f"(исключено {n_excluded} строк) -- {result['interpretation_robust']}")
+            if (corr_x_z1_r > 0) != (corr_x_z1 > 0) or (corr_x_z2_r > 0) != (corr_x_z2 > 0):
+                print("[z_decompose] ВНИМАНИЕ: знак corr развернулся после исключения выбросов -- "
+                      "headline-число на полной выборке НЕ робастно, доверять interpretation_robust, не interpretation.")
     else:
         result["interpretation"] = f"N={len(merged)} слишком мало для корреляции -- честно доложить"
         print(f"[z_decompose] {result['interpretation']}")
