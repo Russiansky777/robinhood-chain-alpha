@@ -91,7 +91,11 @@ TARGET_TOTAL_CAPITAL_USD = 80.0  # владелец, 2026-09-05, вариант 
 # (баланс USDG на кошельке = $80.282426, не $161; своп WETH->USDG на Robinhood Chain --
 # путь B -- не существует нигде в проекте, владелец прямо сказал в этом случае идти по A).
 # RESULTS.md §6.
-BRIDGE_ETH_AMOUNT_ETH = 0.0006  # ~$1.5 газа на Base -- Base исторически дёшев (см. p6_dry_run_entry_result.json, ~$0.02-0.07 за mint)
+BRIDGE_ETH_AMOUNT_ETH = 0.00025  # владелец, 2026-09-05: 0.0006 реально упёрлось в LOW_BRIDGE_LIQUIDITY
+# Across ("Amount is higher than available liquidity") -- реальная нехватка ликвидности релеера
+# на этом маршруте (Robinhood Chain -> Base, нативный ETH), не баг кода. minDeposit реально
+# был 0.0002036 ETH (p6_debug/предыдущие котировки) -- 0.00025 ETH (~$0.61) чуть выше пола,
+# Base исторически дёшев (~$0.02-0.07 за mint, см. p6_dry_run_entry_result.json), должно хватить.
 RANGE_PCT = 0.10
 SWAP_SLIPPAGE = 0.03  # широкий допуск -- приоритет гарантированного исполнения (тот же принцип, что P5)
 MINT_SLIPPAGE = 0.05
