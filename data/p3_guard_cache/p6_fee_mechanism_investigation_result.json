@@ -1,0 +1,33 @@
+{
+  "generated_at_utc": "2026-09-05T02:11:59Z",
+  "fee_apr": {
+    "tvl_usd_now": 7025317.8694,
+    "volume_24h_usd": 8303802.010493436,
+    "n_candles_24h": 24,
+    "volume_7d_usd": 45139039.968286686,
+    "n_candles_7d": 168,
+    "fee_apr_24h": 0.142369778956259,
+    "fee_apr_7d": 0.11055925491310553,
+    "verdict": "~14.2% -- НИЗКИЙ, ближе к гипотезе 'DefiLlama врал' -- P6 кандидат на закрытие по предрегистрации."
+  },
+  "mechanism": {
+    "source_confirmed": "CLPool.sol calculateFees()/applyUnstakedFees(), aerodrome-finance/slipstream, WebFetch 2026-09-05 -- комиссия делится между staked(gauge)/unstaked(LP), СВЕРХУ unstaked несёт unstakedFee() (per-million) в пользу gaugeFee; feeGrowthGlobalX128 += (unstakedAmount-cut)*Q128/(liquidity-stakedLiquidity); далее position.update() с feeGrowthInside -- ТА ЖЕ механика, что Uniswap v3 core, но от УМЕНЬШЕННОЙ суммы и с ДРУГИМ (меньшим) знаменателем.",
+    "total_liquidity_raw": 1250696499757,
+    "staked_liquidity_raw": 1037062751843,
+    "unstaked_liquidity_raw": 213633747914,
+    "unstaked_fee_per_million": 100000,
+    "our_liquidity_raw": 11851202,
+    "our_share_of_unstaked_liquidity": 5.547439070708434e-05,
+    "effective_fee_rate_after_unstaked_cut": 0.000297
+  },
+  "our_fees_actual_vs_expected": {
+    "opened_at_ts": 1788570043,
+    "pool_volume_usd_since_open": 21684.16991215056,
+    "n_hourly_candles_since_open": 1,
+    "real_fee0_usdc": 0.000152,
+    "real_fee1_cbbtc": 0.0,
+    "real_fees_usd": 0.000152,
+    "expected_fees_usd": 0.0003572660858180365,
+    "ratio_actual_vs_expected": 0.4254532015037581
+  }
+}
