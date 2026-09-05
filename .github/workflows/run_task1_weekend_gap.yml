@@ -67,6 +67,14 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          # Маркеры-триггеры УДАЛЯЮТСЯ после использования -- баг #3 в
+          # docs/PROJECT_STATE.md уже документировал этот класс ошибки
+          # (маркер, оставшийся в репо, повторно триггерит СВОЮ ветку if
+          # на КАЖДОМ следующем push в этот workflow, даже нецелевом --
+          # реально наступили на него здесь же, run 33965268403).
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_DEX_TRADES_COLUMNS_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_WEEKEND_GAP_SMOKE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_WEEKEND_GAP_FULL_REQUEST
           [ -e data/p3_guard_cache/task1_weekend_gap_result.json ] && git add data/p3_guard_cache/task1_weekend_gap_result.json
           [ -e data/p3_guard_cache/task1_dex_trades_columns_probe_result.json ] && git add data/p3_guard_cache/task1_dex_trades_columns_probe_result.json
           [ -d data/task1_weekend_gap_cache ] && git add data/task1_weekend_gap_cache/
