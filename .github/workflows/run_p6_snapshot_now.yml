@@ -53,7 +53,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git rm -f --ignore-unmatch data/p3_guard_cache/P6_SNAPSHOT_NOW_REQUEST
-          git add data/p6_fee_accrual.jsonl data/p3_guard_cache/p6_live_snapshot_result.json 2>/dev/null || true
+          # НАЙДЕНО (run_p6_live_step1_vps.yml, реальный прогон): `git add
+          # fileA fileB` АТОМАРНО падает целиком, если fileB не существует
+          # -- fileA НЕ СТЕЙДЖИТСЯ ВООБЩЕ, даже если реально существует.
+          # Тот же фикс здесь превентивно: РАЗДЕЛЬНЫЕ git add.
+          [ -e data/p6_fee_accrual.jsonl ] && git add data/p6_fee_accrual.jsonl || true
+          [ -e data/p3_guard_cache/p6_live_snapshot_result.json ] && git add data/p3_guard_cache/p6_live_snapshot_result.json || true
           git diff --cached --quiet && exit 0
           git commit -m "P6: снимок вручную сразу после входа [automated]"
           for i in 1 2 3 4 5; do
