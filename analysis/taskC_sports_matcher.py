@@ -90,44 +90,46 @@ def fetch_kalshi_games(series_ticker: str) -> list[dict]:
 def fetch_polymarket_bulk(max_pages: int = 6, page_size: int = 100) -> list[dict]:
     """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь (tag_slug/search
     не фильтруют, см. taskC_polymarket_btc_probe_result.json /
-    taskC_sports_match_probe_result.json). ДВА среза, не один -- реальная
-    находка первого прогона (2026-09-05): сортировка ТОЛЬКО по объёму
-    почти не даёт NFL/NBA/UFC (игры ещё не начались, объём низкий) и
-    систематически промахивается по конкретной дате в MLB-сериях (3
-    игры одних команд подряд -- под объёмом всплывает только одна,
-    остальные не видны matcher'у) -- поэтому дополнительно сортируем
-    по endDate (ближайшие по времени рынки), с фильтром на реальное
-    окно дат, чтобы конкретные игры (не только самые объёмные) попали
-    в выборку."""
+    taskC_sports_match_probe_result.json).
+
+    РЕАЛЬНАЯ НАХОДКА (2026-09-05, диагностика после 0 уверенных
+    совпадений): докстринг утверждал "active+closed", но КОД реально
+    запрашивал только closed=false в ОБОИХ срезах -- закрытые
+    (settled/resolved) рынки никогда не попадали в выборку. Kalshi-игры
+    старше нескольких часов почти все уже в статусе settled, и их
+    Polymarket-аналоги к этому моменту почти наверняка ТОЖЕ уже closed
+    -- то есть весь 30-дневный back-window был структурно исключён из
+    поиска, независимо от порога даты. Диагностика полей даты Kalshi
+    (taskC_kalshi_date_field_diag_result.json) заодно ОПРОВЕРГЛА
+    прежнюю гипотезу про смещённый close_time -- разница ~1 день с
+    датой из тикера оказалась обычным артефактом часового пояса
+    (вечерние игры в США пересекают полночь UTC), close_time реально
+    точен.
+
+    Три среза: volume24hr среди активных (будущие/идущие игры),
+    endDate среди активных (ближайшие по времени), и closed=true
+    сортировка по endDate DESC (самые недавно завершившиеся -- нужны
+    именно они для 30-дневного back-window)."""
     out = {}
-    for offset in range(0, max_pages * page_size, page_size):
-        r = requests.get(f"{POLYMARKET_BASE}/markets", params={
-            "limit": page_size, "offset": offset, "active": "true", "closed": "false",
-            "order": "volume24hr", "ascending": "false",
-        }, headers=HEADERS, timeout=30)
-        if r.status_code != 200:
-            break
-        body = r.json()
-        if not isinstance(body, list) or not body:
-            break
-        for m in body:
-            if m.get("slug"):
-                out[m["slug"]] = m
-        time.sleep(0.3)
-    for offset in range(0, max_pages * page_size, page_size):
-        r = requests.get(f"{POLYMARKET_BASE}/markets", params={
-            "limit": page_size, "offset": offset, "active": "true", "closed": "false",
-            "order": "endDate", "ascending": "true",
-        }, headers=HEADERS, timeout=30)
-        if r.status_code != 200:
-            break
-        body = r.json()
-        if not isinstance(body, list) or not body:
-            break
-        for m in body:
-            if m.get("slug"):
-                out[m["slug"]] = m
-        time.sleep(0.3)
+    passes = [
+        {"active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
+        {"active": "true", "closed": "false", "order": "endDate", "ascending": "true"},
+        {"closed": "true", "order": "endDate", "ascending": "false"},
+    ]
+    for params_base in passes:
+        for offset in range(0, max_pages * page_size, page_size):
+            r = requests.get(f"{POLYMARKET_BASE}/markets", params={
+                "limit": page_size, "offset": offset, **params_base,
+            }, headers=HEADERS, timeout=30)
+            if r.status_code != 200:
+                break
+            body = r.json()
+            if not isinstance(body, list) or not body:
+                break
+            for m in body:
+                if m.get("slug"):
+                    out[m["slug"]] = m
+            time.sleep(0.3)
     return list(out.values())
 
 
