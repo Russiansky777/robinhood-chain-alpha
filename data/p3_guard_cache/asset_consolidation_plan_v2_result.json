@@ -1,0 +1,138 @@
+{
+  "generated_at_utc": "2026-09-05T15:12:27Z",
+  "steps": [
+    {
+      "action": "swap cbBTC -> WETH",
+      "pool": "0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1",
+      "pool_reserve_usd": 18757341.7415,
+      "fee_bps": 2500,
+      "fee_pct": 0.25,
+      "cbbtc_amount": 0.0004529,
+      "cbbtc_usd_value": 36.02287102623739,
+      "expected_weth_out": 0.014631816047182913
+    },
+    {
+      "action": "swap USDC -> WETH",
+      "pool": "0x6c561b446416e1a00e8e93e221854d6ea4171372",
+      "pool_reserve_usd": 116236659.0525,
+      "fee_bps": 3000,
+      "fee_pct": 0.3,
+      "usdc_amount": 43.839028,
+      "expected_weth_out": 0.017797667121101063
+    },
+    {
+      "action": "bridge WETH Base -> Robinhood (Across)",
+      "amount_weth": 0.03242948316828398,
+      "quote_raw": {
+        "estimatedFillTimeSec": 1,
+        "capitalFeePct": "98648771534655",
+        "capitalFeeTotal": "3199128676054",
+        "relayGasFeePct": "2668824777124647",
+        "relayGasFeeTotal": "86548608188862",
+        "relayFeePct": "2792457624825637",
+        "relayFeeTotal": "90557957542427",
+        "lpFeePct": "0",
+        "timestamp": "1788621059",
+        "isAmountTooLow": false,
+        "quoteBlock": "25911940",
+        "exclusiveRelayer": "0xFD03AbCAdaF3F930fA4E37Eb2f6ea3A44a41b7F0",
+        "exclusivityDeadline": 3,
+        "spokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+        "destinationSpokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+        "totalRelayFee": {
+          "pct": "2792457624825637",
+          "total": "90557957542427"
+        },
+        "relayerCapitalFee": {
+          "pct": "98648771534655",
+          "total": "3199128676054"
+        },
+        "relayerGasFee": {
+          "pct": "2668824777124647",
+          "total": "86548608188862"
+        },
+        "lpFee": {
+          "pct": "24984076166335",
+          "total": "810220677511"
+        },
+        "internalizedSwapFee": {
+          "pct": "0",
+          "total": "0"
+        },
+        "limits": {
+          "minDeposit": "346331093303042",
+          "maxDeposit": "195338628600131030400",
+          "maxDepositInstant": "195338628600131030400",
+          "maxDepositShortDelay": "195338628600131030400",
+          "recommendedDepositInstant": "195338628600131030400"
+        },
+        "fillDeadline": "1788628259",
+        "outputAmount": "32338925210741553",
+        "inputToken": {
+          "address": "0x4200000000000000000000000000000000000006",
+          "symbol": "WETH",
+          "decimals": 18,
+          "chainId": 8453
+        },
+        "outputToken": {
+          "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "symbol": "WETH",
+          "decimals": 18,
+          "chainId": 4663
+        },
+        "id": "sqp6t-1788621150545-77742d6cf843",
+        "_matched_route": {
+          "originChainId": 8453,
+          "originToken": "0x4200000000000000000000000000000000000006",
+          "destinationChainId": 4663,
+          "destinationToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "originTokenSymbol": "WETH",
+          "destinationTokenSymbol": "WETH",
+          "isNative": false
+        }
+      },
+      "total_relay_fee_pct": 0.27924576248256366,
+      "expected_weth_out_robinhood": 0.032338925210741554,
+      "decision": "ИСПОЛНИТЬ"
+    },
+    {
+      "action": "wrap remainder ETH -> WETH",
+      "native_eth_now": 0.002772531095044418,
+      "reserve_eth_target": 0.00020359964166463066,
+      "remainder_eth": 0.0025689314533797873,
+      "remainder_usd": 6.308781863210082,
+      "gas_price_gwei": 0.386252,
+      "cost_two_tx_usd_estimate": 0.28456729848,
+      "decision": "ОБЕРНУТЬ"
+    },
+    {
+      "action": "swap (WETH-существующий + WETH-с-моста + обёрнутый-остаток) -> USDG, ОДНОЙ транзакцией",
+      "pool": "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca",
+      "fee_bps": 100,
+      "fee_pct": 0.01,
+      "weth_existing": 0.060744816588510844,
+      "weth_from_bridge": 0.032338925210741554,
+      "weth_wrapped_remainder": 0.0025689314533797873,
+      "total_weth_in": 0.09565267325263219,
+      "total_weth_usd_value": 234.90383497381413,
+      "expected_usdg_out": 234.88034459031675
+    },
+    {
+      "action": "Lighter",
+      "decision": "НЕ ТРОГАТЬ (владелец)"
+    }
+  ],
+  "summary": {
+    "usdg_now": 0.282426,
+    "usdg_estimated_after": 235.16277059031674,
+    "total_estimated_cost_usd": 0.6097405264356727,
+    "total_usd_before": 236.7165316497779,
+    "cost_breakdown": {
+      "base_cbbtc_weth_fee_usd": 0.09005717756559348,
+      "base_usdc_weth_fee_usd": 0.131517084,
+      "across_bridge_fee_usd": 0.22239223213269774,
+      "robinhood_swap_fee_usd": 0.023490383497381414,
+      "wrap_tx_gas_usd_estimate": 0.14228364924
+    }
+  }
+}
