@@ -4,7 +4,7 @@
     "project": "uniswap-v3",
     "chain": "Robinhood Chain",
     "symbol": "WETH-USDG",
-    "tvl_usd": 28914313.512,
+    "tvl_usd": 28908740.8912,
     "apyBase": null,
     "underlying_tokens": [
       "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
@@ -15,22 +15,22 @@
       "resolved_pool_address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
     },
     "concentration": {
-      "k": 47.38307372433305,
+      "k": 49.64490493174383,
       "error": null,
       "method": "uniswap-v3-style RPC (slot0+liquidity)",
-      "L_active_human": 13817949.104967445,
-      "L_full_human": 291622.0502147667,
+      "L_active_human": 14475882.415570797,
+      "L_full_human": 291588.48094227415,
       "decimals0": 18,
       "decimals1": 6,
-      "liquidity_raw": 13817949104967443603,
-      "sqrtPriceX96": 3925871811235420975100998,
-      "tick": -198260,
-      "price0_usd_gt": 2456.64,
-      "price1_usd_gt": 1.00042271341273,
-      "tvl_usd_used": 28914313.512,
+      "liquidity_raw": 14475882415570796594,
+      "sqrtPriceX96": 3924986367081403350645082,
+      "tick": -198265,
+      "price0_usd_gt": 2455.85,
+      "price1_usd_gt": 1.00058916977065,
+      "tvl_usd_used": 28908740.8912,
       "price_match_by_address_ok": true,
-      "price_from_sqrtPriceX96_token0_in_token1": 2455.3480456380476,
-      "price_check_deviation_pct": 0.010341190005080936,
+      "price_from_sqrtPriceX96_token0_in_token1": 2454.240608357109,
+      "price_check_deviation_pct": 0.006654611093726004,
       "price_check_suspect": false
     }
   },
@@ -39,11 +39,11 @@
     "project": "uniswap-v3",
     "chain": "Robinhood Chain",
     "symbol": "WETH-USDG",
-    "tvl_usd": 28914313.512,
+    "tvl_usd": 28908740.8912,
     "apyBase_defillama_pct": null,
     "apyBase7d_defillama_pct": null,
     "apyMean30d_defillama_pct": null,
-    "k_from_concentration_screener": 47.38307372433305,
+    "k_from_concentration_screener": 49.64490493174383,
     "fee_tier": {
       "fee_fraction": 0.0001,
       "error": null,
@@ -51,32 +51,31 @@
     },
     "gt_window": {
       "n_hourly_points": 720,
-      "volume_7d_usd": 4411006163.254829,
-      "volume_30d_usd": 7337588317.015104,
-      "sigma_realized_annualized_30d_real": 0.13489049264928163,
-      "oldest_point_utc": "2026-08-06T11:00:00Z",
-      "newest_point_utc": "2026-09-05T10:00:00Z"
+      "volume_7d_usd": 4406271403.92662,
+      "volume_30d_usd": 7337305402.591761,
+      "volatile_gt_token_side_used_for_sigma": "quote",
+      "volatile_side_error": null,
+      "n_close_points_for_sigma": 720,
+      "sigma_realized_annualized_30d_real": 0.5258427928785572,
+      "oldest_point_utc": "2026-08-06T12:00:00Z",
+      "newest_point_utc": "2026-09-05T11:00:00Z"
     },
-    "fee_apr_gt_7d_raw": 0.7954623032340142,
-    "fee_apr_gt_30d_raw": 0.30875362527040456,
+    "fee_apr_gt_7d_raw": 0.7947616300976338,
+    "fee_apr_gt_30d_raw": 0.3088012355876798,
     "gauge_correction": {
       "applicable": false,
       "reason": "поправка реализована только для CL (Aerodrome Slipstream) -- staked/unstaked liquidity-based split подтверждён WebFetch CLPool.sol; для aerodrome-v1 (classic) механика другая (per-LP supplyIndex), не смоделирована -- число ниже показывается БЕЗ поправки, как верхняя граница"
     },
-    "fee_apr_gt_7d_corrected": 0.7954623032340142,
-    "fee_apr_gt_30d_corrected": 0.30875362527040456,
+    "fee_apr_gt_7d_corrected": 0.7947616300976338,
+    "fee_apr_gt_30d_corrected": 0.3088012355876798,
     "gauge_correction_applied": false,
-    "lvr_at_real_30d_sigma_frac": 0.1077695140276987,
-    "ratio_to_lvr_real_30d_sigma": 2.8649440248106655,
-    "passes_threshold_2x_gt_real": true,
+    "lvr_at_real_30d_sigma_frac": 1.7159180719411888,
+    "ratio_to_lvr_real_30d_sigma": 0.17996269206392718,
+    "passes_threshold_2x_gt_real": false,
     "discrepancy_multiplier_defillama_over_gt_real": 0.0
   },
   "close_price_domain_diagnostic": {
     "closes_usd_currency": [
-      [
-        1788570000,
-        0.999678954965773
-      ],
       [
         1788573600,
         1.00011262107525
@@ -111,14 +110,14 @@
       ],
       [
         1788602400,
-        1.00061437429984
+        1.0006608226701
+      ],
+      [
+        1788606000,
+        1.00015720116239
       ]
     ],
     "closes_token_quote_currency": [
-      [
-        1788570000,
-        2453.04753873103
-      ],
       [
         1788573600,
         2452.85375697246
@@ -153,7 +152,11 @@
       ],
       [
         1788602400,
-        2455.59246603813
+        2454.08828282828
+      ],
+      [
+        1788606000,
+        2454.60971185923
       ]
     ],
     "verdict": {
@@ -171,7 +174,7 @@
     1.47
   ],
   "true_ratio_source": "data/p3_guard_cache/pool_screener_calibrate_p5_result.json::real_fee_lvr_ratio_at_hist_sigma=1.4666349853049427",
-  "script_ratio": 2.8649440248106655,
+  "script_ratio": 0.17996269206392718,
   "within_true_range": false,
-  "multiplier_script_over_true_midpoint": 2.071543040354783
+  "multiplier_script_over_true_midpoint": 0.13012486772518234
 }
