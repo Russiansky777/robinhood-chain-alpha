@@ -90,11 +90,16 @@ def fetch_kalshi_games(series_ticker: str) -> list[dict]:
 def fetch_polymarket_bulk(max_pages: int = 6, page_size: int = 100) -> list[dict]:
     """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь (tag_slug/search
     не фильтруют, см. taskC_polymarket_btc_probe_result.json /
-    taskC_sports_match_probe_result.json). Берём active, отсортированные
-    по объёму (самые ликвидные -- туда же, где реально может быть
-    спред), плюс страницы по offset для покрытия большего числа
-    рынков."""
-    out = []
+    taskC_sports_match_probe_result.json). ДВА среза, не один -- реальная
+    находка первого прогона (2026-09-05): сортировка ТОЛЬКО по объёму
+    почти не даёт NFL/NBA/UFC (игры ещё не начались, объём низкий) и
+    систематически промахивается по конкретной дате в MLB-сериях (3
+    игры одних команд подряд -- под объёмом всплывает только одна,
+    остальные не видны matcher'у) -- поэтому дополнительно сортируем
+    по endDate (ближайшие по времени рынки), с фильтром на реальное
+    окно дат, чтобы конкретные игры (не только самые объёмные) попали
+    в выборку."""
+    out = {}
     for offset in range(0, max_pages * page_size, page_size):
         r = requests.get(f"{POLYMARKET_BASE}/markets", params={
             "limit": page_size, "offset": offset, "active": "true", "closed": "false",
@@ -105,13 +110,36 @@ def fetch_polymarket_bulk(max_pages: int = 6, page_size: int = 100) -> list[dict
         body = r.json()
         if not isinstance(body, list) or not body:
             break
-        out.extend(body)
+        for m in body:
+            if m.get("slug"):
+                out[m["slug"]] = m
         time.sleep(0.3)
-    return out
+    for offset in range(0, max_pages * page_size, page_size):
+        r = requests.get(f"{POLYMARKET_BASE}/markets", params={
+            "limit": page_size, "offset": offset, "active": "true", "closed": "false",
+            "order": "endDate", "ascending": "true",
+        }, headers=HEADERS, timeout=30)
+        if r.status_code != 200:
+            break
+        body = r.json()
+        if not isinstance(body, list) or not body:
+            break
+        for m in body:
+            if m.get("slug"):
+                out[m["slug"]] = m
+        time.sleep(0.3)
+    return list(out.values())
 
 
 def normalize(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+DATE_DIFF_CONFIDENT_DAYS = 0.5  # владелец не задавал число -- MLB-серии реально дают
+# несколько игр одних команд подряд (найдено 2026-09-05: 48/52 "совпадений"
+# первого прогона были на самом деле ДРУГОЙ игрой той же серии, diff>=1 день) --
+# без строгого порога matcher производит вводящие в заблуждение пары, честно
+# отбрасываем кандидатов без блика в пределах суток, не подсовываем "похоже, но не то"
 
 
 def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
@@ -122,7 +150,7 @@ def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
         game_date = datetime.fromisoformat(game["close_time"].replace("Z", "+00:00"))
     except ValueError:
         return []
-    candidates = []
+    candidates, near_misses = [], 0
     for pm in pm_markets:
         q = normalize(pm.get("question", "") + " " + (pm.get("slug", "") or ""))
         if all(t and t in q for t in teams):
@@ -134,11 +162,14 @@ def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
                     date_diff_days = abs((end_date - game_date).total_seconds()) / 86400
                 except ValueError:
                     pass
+            if date_diff_days is None or date_diff_days > DATE_DIFF_CONFIDENT_DAYS:
+                near_misses += 1  # команды совпали, дата нет -- честно считаем отдельно, не подсовываем как матч
+                continue
             candidates.append({"question": pm.get("question"), "slug": pm.get("slug"),
                                 "endDate": end_date_str, "date_diff_days": date_diff_days,
                                 "outcomePrices": pm.get("outcomePrices"), "volume": pm.get("volumeNum")})
-    candidates.sort(key=lambda c: (c["date_diff_days"] is None, c["date_diff_days"] or 999))
-    return candidates
+    candidates.sort(key=lambda c: c["date_diff_days"])
+    return candidates, near_misses
 
 
 def run() -> int:
@@ -154,10 +185,12 @@ def run() -> int:
     pm_markets = fetch_polymarket_bulk()
     print(f"[matcher] реальных активных рынков Polymarket загружено: {len(pm_markets)}")
 
-    print("\n[matcher] сопоставление по названиям команд...")
-    matched = []
+    print("\n[matcher] сопоставление по названиям команд + дате (строгий порог "
+          f"{DATE_DIFF_CONFIDENT_DAYS} дня)...")
+    matched, total_near_misses = [], 0
     for game in all_games:
-        cands = match_game_to_polymarket(game, pm_markets)
+        cands, near_misses = match_game_to_polymarket(game, pm_markets)
+        total_near_misses += near_misses
         if cands:
             matched.append({"kalshi_event": game["event_ticker"], "series": game["series"],
                              "close_time": game["close_time"],
@@ -167,14 +200,18 @@ def run() -> int:
     result = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "window_days_back": WINDOW_DAYS_BACK, "window_days_fwd": WINDOW_DAYS_FWD,
+        "date_diff_confident_threshold_days": DATE_DIFF_CONFIDENT_DAYS,
         "n_kalshi_games": len(all_games), "n_polymarket_markets_scanned": len(pm_markets),
-        "n_matched": len(matched), "matched": matched,
+        "n_matched_confident": len(matched),
+        "n_team_matched_but_date_rejected": total_near_misses,
+        "matched": matched,
         "unmatched_sample": [g["event_ticker"] for g in all_games if g["event_ticker"] not in {m["kalshi_event"] for m in matched}][:30],
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
 
-    print(f"\n[matcher] РЕАЛЬНО СОПОСТАВЛЕНО: {len(matched)} из {len(all_games)} игр Kalshi")
+    print(f"\n[matcher] РЕАЛЬНО СОПОСТАВЛЕНО (уверенно, diff<={DATE_DIFF_CONFIDENT_DAYS}д): {len(matched)} из {len(all_games)} игр Kalshi")
+    print(f"[matcher] команды совпали, но дата НЕ прошла порог (вероятно другая игра той же серии): {total_near_misses}")
     print("\n=== первые 20 пар для ручной проверки владельцем ===")
     for m in matched[:20]:
         best = m["polymarket_candidates"][0]
