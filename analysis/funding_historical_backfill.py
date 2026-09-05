@@ -251,10 +251,18 @@ def check_predicted_fundings(all_symbols: list[str]) -> dict:
             v = entry.get(venue)
             if v is None:
                 continue
-            rate = float(v["fundingRate"])
-            interval_h = float(v["fundingIntervalHours"])
-            venues[venue] = {"rate_raw": rate, "interval_hours": interval_h,
-                              "annualized_pct": rate * (ANNUALIZATION_HOURS / interval_h) * 100}
+            # Реальный баг (run 33966675458): не у каждой монеты на каждой
+            # площадке структура полная -- напр. отсутствует
+            # fundingIntervalHours (площадка не котирует этот перп с тем
+            # же интервалом/вообще не даёт прогноз) -- честно пропускаем
+            # ЭТУ площадку для ЭТОГО символа, не роняем весь скрипт.
+            try:
+                rate = float(v["fundingRate"])
+                interval_h = float(v["fundingIntervalHours"])
+                venues[venue] = {"rate_raw": rate, "interval_hours": interval_h,
+                                  "annualized_pct": rate * (ANNUALIZATION_HOURS / interval_h) * 100}
+            except (KeyError, TypeError, ValueError) as exc:
+                venues[venue] = {"error": f"неполные данные от predictedFundings: {exc}, сырое значение={v}"}
         out[sym] = {"venues": venues}
     return out
 
@@ -302,11 +310,25 @@ def run() -> int:
     print(f"\n[funding_backfill] primary: {result['primary']['verdict']}")
     print(f"[funding_backfill] exploratory: {result['exploratory']['verdict']}")
 
+    # Реальный урок (run 33966675458): предыдущая попытка потеряла ВЕСЬ
+    # успешно посчитанный результат бэкфилла из-за необработанного
+    # исключения в НЕЗАВИСИМОМ шаге (сверка с predictedFundings) --
+    # запись файла ПЕРЕНЕСЕНА раньше этого шага, сама сверка обёрнута в
+    # try/except, чтобы её сбой никогда больше не топил уже готовый
+    # реальный результат.
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    print(f"\n[funding_backfill] основной результат записан в {OUT_PATH} (до сверки с predictedFundings)")
+
     all_symbols = [p["symbol"] for p in pairs]
     print("\n=== Сверка с predictedFundings (снимок СЕЙЧАС, Binance/Bybit -- не HL) ===")
-    result["predicted_fundings_crosscheck"] = check_predicted_fundings(all_symbols)
-    for sym, v in result["predicted_fundings_crosscheck"].items():
-        print(f"  {sym}: {v}")
+    try:
+        result["predicted_fundings_crosscheck"] = check_predicted_fundings(all_symbols)
+        for sym, v in result["predicted_fundings_crosscheck"].items():
+            print(f"  {sym}: {v}")
+    except Exception as exc:  # noqa: BLE001
+        result["predicted_fundings_crosscheck"] = {"error": f"сверка упала целиком: {exc}"}
+        print(f"  СВЕРКА УПАЛА ЦЕЛИКОМ: {exc}")
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
