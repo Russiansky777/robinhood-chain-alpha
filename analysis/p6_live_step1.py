@@ -450,177 +450,202 @@ def main() -> int:
     if account.address.lower() != WALLET.lower():
         raise RuntimeError(f"PRIVATE_KEY_NOX даёт {account.address}, ожидался {WALLET} -- СТОП.")
 
-    # ============================= ШАГ 1: Across USDG -> USDC на Base =============================
-    print(f"\n=== ШАГ 1: Across -- бридж USDG->USDC (${TARGET_TOTAL_CAPITAL_USD}) и ETH->ETH (газ на Base) ===")
-    chain_id_check = int(rpc(ROBINHOOD_RPC, "eth_chainId", []), 16)
-    if chain_id_check != ROBINHOOD_CHAIN_ID:
-        raise RuntimeError(f"chainId Robinhood {chain_id_check} != {ROBINHOOD_CHAIN_ID} -- СТОП")
-
-    usdc_before_bridge = erc20_balance(BASE_RPC, USDC, WALLET)
-    eth_before_bridge = int(rpc(BASE_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
-    print(f"[p6_step1] Base ДО моста: USDC={usdc_before_bridge / 10**USDC_DECIMALS} ETH={eth_before_bridge / 1e18}")
-
-    # НАЙДЕНО (реальный прогон run 10, commit 4197e3c): мост УЖЕ реально
-    # заполнился (USDC=79.948649, ETH=0.000248098 на Base), скрипт упал
-    # ПОСЛЕ моста (real STF revert на шаге свопа, транзиентный лаг RPC-
-    # реплики mainnet.base.org). Без этой проверки повторный запуск слепо
-    # повторил бы depositV3 -- ЕЩЁ РАЗ списал бы $80 USDG (которых на
-    # кошельке больше и не осталось после первого раза) и ещё раз потратил
-    # бы газовый ETH-мост. Idempotency guard: если на Base УЖЕ реально
-    # лежит >= 95% целевой суммы в USDC (запас на реальную комиссию моста,
-    # наблюдалась ~0.064%) И достаточно ETH на газ -- мост пропускается
-    # целиком, используется уже реально пришедший баланс.
-    MIN_BRIDGED_USDC_RAW = int(TARGET_TOTAL_CAPITAL_USD * 0.95 * 10 ** USDC_DECIMALS)
-    MIN_BRIDGED_ETH_WEI = int(0.0001 * 1e18)
-    if usdc_before_bridge >= MIN_BRIDGED_USDC_RAW and eth_before_bridge >= MIN_BRIDGED_ETH_WEI:
-        print(f"[p6_step1] МОСТ ПРОПУЩЕН -- на Base уже реально лежит USDC={usdc_before_bridge / 10**USDC_DECIMALS} "
-              f"(>= {MIN_BRIDGED_USDC_RAW / 10**USDC_DECIMALS}) и ETH={eth_before_bridge / 1e18} (>= {MIN_BRIDGED_ETH_WEI / 1e18}) "
-              f"-- реальный остаток предыдущей попытки (run 10), НЕ мощу повторно.")
-        progress["bridge_fill_check"] = {"filled": True, "skipped_already_bridged": True,
-                                          "usdc_before": usdc_before_bridge, "eth_before": eth_before_bridge}
+    # НАЙДЕНО (реальный прогон run 12, commit 7fa05ff): мост-guard (по
+    # USDC) один не спасает при возобновлении ПОСЛЕ уже сделанного свопа
+    # (run 11) -- реальный баланс USDC на Base УЖЕ ниже порога (своп его
+    # уменьшил), guard не срабатывал, скрипт пытался мостить ЗАНОВО и
+    # падал (правильно, безопасно) на pre-flight, т.к. реального USDG на
+    # кошельке больше не было ($0.28). Расширяем проверку ДО САМОГО ШАГ 1:
+    # если на Base УЖЕ реально есть cbBTC (свыше пыли) -- значит своп УЖЕ
+    # сделан в прошлой попытке, мост и своп пропускаются ЦЕЛИКОМ, идём
+    # сразу к mint с текущими реальными балансами (mint пересчитывает
+    # оптимальные суммы под диапазон САМ, см. фикс ниже -- лишнее
+    # оставшееся в одном из токенов останется на кошельке как дребезг).
+    DUST_CBBTC_RAW = int(0.00001 * 10 ** CBBTC_DECIMALS)  # ~$0.8 -- ниже считаем "свопа ещё не было"
+    cbbtc_before_all = erc20_balance(BASE_RPC, CBBTC, WALLET)
+    if cbbtc_before_all > DUST_CBBTC_RAW:
+        usdc_after_swap = erc20_balance(BASE_RPC, USDC, WALLET)
+        cbbtc_after_swap = cbbtc_before_all
+        print(f"[p6_step1] МОСТ И СВОП ПРОПУЩЕНЫ -- на Base уже реально есть cbBTC={cbbtc_after_swap / 10**CBBTC_DECIMALS} "
+              f"(остаток предыдущей попытки, run 11) -- использую реальные текущие балансы как есть: "
+              f"USDC={usdc_after_swap / 10**USDC_DECIMALS} cbBTC={cbbtc_after_swap / 10**CBBTC_DECIMALS}.")
+        progress["bridge_fill_check"] = {"filled": True, "skipped_already_bridged": True}
+        progress["swap_plan"] = {"skipped_already_swapped": True, "usdc_after_swap_human": usdc_after_swap / 10 ** USDC_DECIMALS,
+                                  "cbbtc_after_swap_human": cbbtc_after_swap / 10 ** CBBTC_DECIMALS}
         OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
-        usdc_balance_now = usdc_before_bridge
-        print(f"[p6_step1] МОСТ (пропущен, уже был): USDC={usdc_balance_now / 10**USDC_DECIMALS}")
+        nonce_base = eth_nonce(BASE_RPC)  # ШАГ 3 (approve x2 + mint) использует nonce_base независимо от ветки выше
     else:
-        usdg_amount_wei = int(TARGET_TOTAL_CAPITAL_USD * 10 ** 6)
-        quote_usdg = across_quote(ROBINHOOD_CHAIN_ID, BASE_CHAIN_ID, USDG, str(usdg_amount_wei))
-        progress["across_quote_usdg"] = quote_usdg
-        output_token_usdg = quote_usdg["outputToken"]["address"]  # из ответа, не предположено -- должен быть USDC на Base
-        if output_token_usdg.lower() != USDC.lower():
-            raise RuntimeError(f"котировка USDG вернула неожиданный outputToken={output_token_usdg}, ожидался USDC={USDC} -- СТОП.")
-        print(f"[p6_step1] котировка USDG->USDC: outputAmount={quote_usdg.get('outputAmount')} outputToken={output_token_usdg}")
+        # ============================= ШАГ 1: Across USDG -> USDC на Base =============================
+        print(f"\n=== ШАГ 1: Across -- бридж USDG->USDC (${TARGET_TOTAL_CAPITAL_USD}) и ETH->ETH (газ на Base) ===")
+        chain_id_check = int(rpc(ROBINHOOD_RPC, "eth_chainId", []), 16)
+        if chain_id_check != ROBINHOOD_CHAIN_ID:
+            raise RuntimeError(f"chainId Robinhood {chain_id_check} != {ROBINHOOD_CHAIN_ID} -- СТОП")
 
-        eth_bridge_wei = int(BRIDGE_ETH_AMOUNT_ETH * 1e18)
-        # ETH -- нативный маршрут (isNative:true, подтверждено p6_entry_recon.py) --
-        # origin_token в запросе -- WETH-адрес-плейсхолдер на Robinhood chain
-        # (тот же, что реально вернулся в available-routes для isNative:true записи),
-        # outputToken -- из ответа (должен быть нативный ETH-сентинел на Base).
-        quote_eth = across_quote(ROBINHOOD_CHAIN_ID, BASE_CHAIN_ID,
-                                  "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", str(eth_bridge_wei))
-        progress["across_quote_eth"] = quote_eth
-        output_token_eth = quote_eth["outputToken"]["address"]
-        print(f"[p6_step1] котировка ETH->ETH: outputAmount={quote_eth.get('outputAmount')} outputToken={output_token_eth}")
-        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        usdc_before_bridge = erc20_balance(BASE_RPC, USDC, WALLET)
+        eth_before_bridge = int(rpc(BASE_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
+        print(f"[p6_step1] Base ДО моста: USDC={usdc_before_bridge / 10**USDC_DECIMALS} ETH={eth_before_bridge / 1e18}")
 
-        print("\n--- PRE-FLIGHT (обязательно перед мостом): реальный баланс USDG/ETH на Robinhood Chain ---")
-        usdg_balance_now = erc20_balance(ROBINHOOD_RPC, USDG, WALLET)
-        eth_balance_robinhood_now = int(rpc(ROBINHOOD_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
-        preflight_balance("USDG перед мостом", usdg_balance_now, usdg_amount_wei, 6, "USDG")
-        preflight_balance("ETH(Robinhood) перед мостом", eth_balance_robinhood_now, eth_bridge_wei, 18, "ETH")
-        progress["preflight_bridge"] = {"usdg_balance_now": usdg_balance_now / 1e6, "eth_balance_robinhood_now": eth_balance_robinhood_now / 1e18,
-                                         "usdg_required": usdg_amount_wei / 1e6, "eth_required": eth_bridge_wei / 1e18}
-        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
-
-        nonce = eth_nonce(ROBINHOOD_RPC)
-        # Владелец, 2026-09-05: "Approve не трогать, allowance останется" --
-        # реально уже есть allowance $161 (прошлая попытка, tx=0xe3ab9448...),
-        # этого достаточно для нового меньшего $80 -- реально ПЕРЕЧИТАНО, не
-        # предположено; approve отправляется, только если реально не хватает.
-        existing_allowance = erc20_allowance(ROBINHOOD_RPC, USDG, WALLET, SPOKE_POOL)
-        print(f"[p6_step1] реальный текущий allowance USDG->SpokePool: {existing_allowance / 1e6} (нужно {usdg_amount_wei / 1e6})")
-        if existing_allowance < usdg_amount_wei:
-            send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "1_approve_USDG_to_SpokePool", USDG,
-                          erc20_approve_calldata(SPOKE_POOL, usdg_amount_wei), 0, nonce, progress, eth_usd_price)
-            nonce += 1
-        else:
-            print("[p6_step1] 1_approve_USDG_to_SpokePool: ПРОПУЩЕН -- существующего allowance уже достаточно.")
-
-        deposit_usdg_calldata = build_deposit_v3_calldata(
-            WALLET, WALLET, USDG, USDC, usdg_amount_wei, int(quote_usdg["outputAmount"]), BASE_CHAIN_ID,
-            quote_usdg["exclusiveRelayer"], int(quote_usdg["timestamp"]), int(quote_usdg["fillDeadline"]),
-            int(quote_usdg["exclusivityDeadline"]),
-        )
-        send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "2_depositV3_USDG", SPOKE_POOL,
-                      deposit_usdg_calldata, 0, nonce, progress, eth_usd_price)
-        nonce += 1
-
-        deposit_eth_calldata = build_deposit_v3_calldata(
-            WALLET, WALLET, "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", output_token_eth,
-            eth_bridge_wei, int(quote_eth["outputAmount"]), BASE_CHAIN_ID,
-            quote_eth["exclusiveRelayer"], int(quote_eth["timestamp"]), int(quote_eth["fillDeadline"]),
-            int(quote_eth["exclusivityDeadline"]),
-        )
-        send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "3_depositV3_ETH_native", SPOKE_POOL,
-                      deposit_eth_calldata, eth_bridge_wei, nonce, progress, eth_usd_price)
-
-        print("\n=== Ожидание заполнения моста на Base (poll реального баланса, до 10 минут) ===")
-        expected_usdc_min = usdc_before_bridge + int(int(quote_usdg["outputAmount"]) * 0.9)  # запас на возможное отклонение котировки
-        expected_eth_min = eth_before_bridge + int(int(quote_eth["outputAmount"]) * 0.5)
-        deadline = time.time() + BRIDGE_FILL_TIMEOUT_S
-        filled = False
-        while time.time() < deadline:
-            usdc_now = erc20_balance(BASE_RPC, USDC, WALLET)
-            eth_now = int(rpc(BASE_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
-            print(f"[p6_step1] Base сейчас: USDC={usdc_now / 10**USDC_DECIMALS} ETH={eth_now / 1e18}")
-            if usdc_now >= expected_usdc_min and eth_now >= expected_eth_min:
-                filled = True
-                break
-            time.sleep(BRIDGE_FILL_POLL_S)
-        progress["bridge_fill_check"] = {"filled": filled, "usdc_before": usdc_before_bridge, "eth_before": eth_before_bridge}
-        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
-        if not filled:
-            progress["CRITICAL"] = ("Мост НЕ подтвердил заполнение за отведённое время -- средства В ПУТИ на "
-                                     "SpokePool (Robinhood), НЕ отправляю повторно, НЕ считаю потерянными. "
-                                     "Проверить вручную: FundsDeposited на Robinhood, FilledV3Relay на Base "
-                                     "(analysis/across_common.py) для реальных depositId выше.")
+        # НАЙДЕНО (реальный прогон run 10, commit 4197e3c): мост УЖЕ реально
+        # заполнился (USDC=79.948649, ETH=0.000248098 на Base), скрипт упал
+        # ПОСЛЕ моста (real STF revert на шаге свопа, транзиентный лаг RPC-
+        # реплики mainnet.base.org). Без этой проверки повторный запуск слепо
+        # повторил бы depositV3 -- ЕЩЁ РАЗ списал бы $80 USDG (которых на
+        # кошельке больше и не осталось после первого раза) и ещё раз потратил
+        # бы газовый ETH-мост. Idempotency guard: если на Base УЖЕ реально
+        # лежит >= 95% целевой суммы в USDC (запас на реальную комиссию моста,
+        # наблюдалась ~0.064%) И достаточно ETH на газ -- мост пропускается
+        # целиком, используется уже реально пришедший баланс.
+        MIN_BRIDGED_USDC_RAW = int(TARGET_TOTAL_CAPITAL_USD * 0.95 * 10 ** USDC_DECIMALS)
+        MIN_BRIDGED_ETH_WEI = int(0.0001 * 1e18)
+        if usdc_before_bridge >= MIN_BRIDGED_USDC_RAW and eth_before_bridge >= MIN_BRIDGED_ETH_WEI:
+            print(f"[p6_step1] МОСТ ПРОПУЩЕН -- на Base уже реально лежит USDC={usdc_before_bridge / 10**USDC_DECIMALS} "
+                  f"(>= {MIN_BRIDGED_USDC_RAW / 10**USDC_DECIMALS}) и ETH={eth_before_bridge / 1e18} (>= {MIN_BRIDGED_ETH_WEI / 1e18}) "
+                  f"-- реальный остаток предыдущей попытки, НЕ мощу повторно.")
+            progress["bridge_fill_check"] = {"filled": True, "skipped_already_bridged": True,
+                                              "usdc_before": usdc_before_bridge, "eth_before": eth_before_bridge}
             OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
-            print(f"[p6_step1] СТОП: {progress['CRITICAL']}")
-            return 1
-        usdc_balance_now = erc20_balance(BASE_RPC, USDC, WALLET)
-    print(f"[p6_step1] МОСТ ЗАПОЛНЕН: USDC={usdc_balance_now / 10**USDC_DECIMALS}")
+            usdc_balance_now = usdc_before_bridge
+            print(f"[p6_step1] МОСТ (пропущен, уже был): USDC={usdc_balance_now / 10**USDC_DECIMALS}")
+        else:
+            usdg_amount_wei = int(TARGET_TOTAL_CAPITAL_USD * 10 ** 6)
+            quote_usdg = across_quote(ROBINHOOD_CHAIN_ID, BASE_CHAIN_ID, USDG, str(usdg_amount_wei))
+            progress["across_quote_usdg"] = quote_usdg
+            output_token_usdg = quote_usdg["outputToken"]["address"]  # из ответа, не предположено -- должен быть USDC на Base
+            if output_token_usdg.lower() != USDC.lower():
+                raise RuntimeError(f"котировка USDG вернула неожиданный outputToken={output_token_usdg}, ожидался USDC={USDC} -- СТОП.")
+            print(f"[p6_step1] котировка USDG->USDC: outputAmount={quote_usdg.get('outputAmount')} outputToken={output_token_usdg}")
 
-    # ============================= ШАГ 2: своп половины в cbBTC =============================
-    print("\n=== ШАГ 2: exactInputSingle -- своп части USDC в cbBTC (Aerodrome Slipstream Router) ===")
-    chain_id_base_check = int(rpc(BASE_RPC, "eth_chainId", []), 16)
-    if chain_id_base_check != BASE_CHAIN_ID:
-        raise RuntimeError(f"chainId Base {chain_id_base_check} != {BASE_CHAIN_ID} -- СТОП")
+            eth_bridge_wei = int(BRIDGE_ETH_AMOUNT_ETH * 1e18)
+            # ETH -- нативный маршрут (isNative:true, подтверждено p6_entry_recon.py) --
+            # origin_token в запросе -- WETH-адрес-плейсхолдер на Robinhood chain
+            # (тот же, что реально вернулся в available-routes для isNative:true записи),
+            # outputToken -- из ответа (должен быть нативный ETH-сентинел на Base).
+            quote_eth = across_quote(ROBINHOOD_CHAIN_ID, BASE_CHAIN_ID,
+                                      "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", str(eth_bridge_wei))
+            progress["across_quote_eth"] = quote_eth
+            output_token_eth = quote_eth["outputToken"]["address"]
+            print(f"[p6_step1] котировка ETH->ETH: outputAmount={quote_eth.get('outputAmount')} outputToken={output_token_eth}")
+            OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
-    pool = read_pool_state_base()
-    p0 = price_cbbtc_usd(pool["sqrtPriceX96"])
-    pa_usd, pb_usd = p0 * (1 - RANGE_PCT), p0 * (1 + RANGE_PCT)
-    usdc_total_human = usdc_balance_now / 10 ** USDC_DECIMALS
+            print("\n--- PRE-FLIGHT (обязательно перед мостом): реальный баланс USDG/ETH на Robinhood Chain ---")
+            usdg_balance_now = erc20_balance(ROBINHOOD_RPC, USDG, WALLET)
+            eth_balance_robinhood_now = int(rpc(ROBINHOOD_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
+            preflight_balance("USDG перед мостом", usdg_balance_now, usdg_amount_wei, 6, "USDG")
+            preflight_balance("ETH(Robinhood) перед мостом", eth_balance_robinhood_now, eth_bridge_wei, 18, "ETH")
+            progress["preflight_bridge"] = {"usdg_balance_now": usdg_balance_now / 1e6, "eth_balance_robinhood_now": eth_balance_robinhood_now / 1e18,
+                                             "usdg_required": usdg_amount_wei / 1e6, "eth_required": eth_bridge_wei / 1e18}
+            OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
-    def usd_to_domain(p_usd: float) -> float:
-        return 1.0 / p_usd
+            nonce = eth_nonce(ROBINHOOD_RPC)
+            # Владелец, 2026-09-05: "Approve не трогать, allowance останется" --
+            # реально уже есть allowance $161 (прошлая попытка, tx=0xe3ab9448...),
+            # этого достаточно для нового меньшего $80 -- реально ПЕРЕЧИТАНО, не
+            # предположено; approve отправляется, только если реально не хватает.
+            existing_allowance = erc20_allowance(ROBINHOOD_RPC, USDG, WALLET, SPOKE_POOL)
+            print(f"[p6_step1] реальный текущий allowance USDG->SpokePool: {existing_allowance / 1e6} (нужно {usdg_amount_wei / 1e6})")
+            if existing_allowance < usdg_amount_wei:
+                send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "1_approve_USDG_to_SpokePool", USDG,
+                              erc20_approve_calldata(SPOKE_POOL, usdg_amount_wei), 0, nonce, progress, eth_usd_price)
+                nonce += 1
+            else:
+                print("[p6_step1] 1_approve_USDG_to_SpokePool: ПРОПУЩЕН -- существующего allowance уже достаточно.")
 
-    sqrt_p = usd_to_domain(p0) ** 0.5
-    sqrt_pa, sqrt_pb = usd_to_domain(pb_usd) ** 0.5, usd_to_domain(pa_usd) ** 0.5
-    amount0_target = usdc_total_human / 2
-    amount1_target = (usdc_total_human / 2) / p0
-    L_target = get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, amount0_target, amount1_target)
-    amount0_at_L, amount1_at_L = v3_amounts(L_target, sqrt_p, sqrt_pa, sqrt_pb)
-    usdc_to_swap_human = amount1_at_L * p0  # $-стоимость нужной cbBTC-ноги -- именно столько USDC меняем
-    usdc_to_swap_raw = int(usdc_to_swap_human * 10 ** USDC_DECIMALS)
-    expected_cbbtc_out = usdc_to_swap_human / p0
-    min_cbbtc_out_raw = int(expected_cbbtc_out * (1 - SWAP_SLIPPAGE) * 10 ** CBBTC_DECIMALS)
-    print(f"[p6_step1] price=${p0:.2f}, USDC всего={usdc_total_human:.4f}, своп в cbBTC={usdc_to_swap_human:.4f} USDC "
-          f"-> ожидаемо {expected_cbbtc_out:.8f} cbBTC (min={min_cbbtc_out_raw})")
-    progress["swap_plan"] = {"pool_price_usd": p0, "usdc_total_human": usdc_total_human,
-                              "usdc_to_swap_human": usdc_to_swap_human, "expected_cbbtc_out": expected_cbbtc_out}
-    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+            deposit_usdg_calldata = build_deposit_v3_calldata(
+                WALLET, WALLET, USDG, USDC, usdg_amount_wei, int(quote_usdg["outputAmount"]), BASE_CHAIN_ID,
+                quote_usdg["exclusiveRelayer"], int(quote_usdg["timestamp"]), int(quote_usdg["fillDeadline"]),
+                int(quote_usdg["exclusivityDeadline"]),
+            )
+            send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "2_depositV3_USDG", SPOKE_POOL,
+                          deposit_usdg_calldata, 0, nonce, progress, eth_usd_price)
+            nonce += 1
 
-    print("\n--- PRE-FLIGHT (обязательно перед свопом): реальный баланс USDC на Base ---")
-    usdc_balance_preswap = erc20_balance(BASE_RPC, USDC, WALLET)
-    preflight_balance("USDC перед свопом", usdc_balance_preswap, usdc_to_swap_raw, USDC_DECIMALS, "USDC")
+            deposit_eth_calldata = build_deposit_v3_calldata(
+                WALLET, WALLET, "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", output_token_eth,
+                eth_bridge_wei, int(quote_eth["outputAmount"]), BASE_CHAIN_ID,
+                quote_eth["exclusiveRelayer"], int(quote_eth["timestamp"]), int(quote_eth["fillDeadline"]),
+                int(quote_eth["exclusivityDeadline"]),
+            )
+            send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "3_depositV3_ETH_native", SPOKE_POOL,
+                          deposit_eth_calldata, eth_bridge_wei, nonce, progress, eth_usd_price)
 
-    nonce_base = eth_nonce(BASE_RPC)
-    send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "4_approve_USDC_to_Router", USDC,
-                  erc20_approve_calldata(ROUTER, usdc_to_swap_raw), 0, nonce_base, progress, eth_usd_price)
-    nonce_base += 1
+            print("\n=== Ожидание заполнения моста на Base (poll реального баланса, до 10 минут) ===")
+            expected_usdc_min = usdc_before_bridge + int(int(quote_usdg["outputAmount"]) * 0.9)  # запас на возможное отклонение котировки
+            expected_eth_min = eth_before_bridge + int(int(quote_eth["outputAmount"]) * 0.5)
+            deadline = time.time() + BRIDGE_FILL_TIMEOUT_S
+            filled = False
+            while time.time() < deadline:
+                usdc_now = erc20_balance(BASE_RPC, USDC, WALLET)
+                eth_now = int(rpc(BASE_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
+                print(f"[p6_step1] Base сейчас: USDC={usdc_now / 10**USDC_DECIMALS} ETH={eth_now / 1e18}")
+                if usdc_now >= expected_usdc_min and eth_now >= expected_eth_min:
+                    filled = True
+                    break
+                time.sleep(BRIDGE_FILL_POLL_S)
+            progress["bridge_fill_check"] = {"filled": filled, "usdc_before": usdc_before_bridge, "eth_before": eth_before_bridge}
+            OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+            if not filled:
+                progress["CRITICAL"] = ("Мост НЕ подтвердил заполнение за отведённое время -- средства В ПУТИ на "
+                                         "SpokePool (Robinhood), НЕ отправляю повторно, НЕ считаю потерянными. "
+                                         "Проверить вручную: FundsDeposited на Robinhood, FilledV3Relay на Base "
+                                         "(analysis/across_common.py) для реальных depositId выше.")
+                OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+                print(f"[p6_step1] СТОП: {progress['CRITICAL']}")
+                return 1
+            usdc_balance_now = erc20_balance(BASE_RPC, USDC, WALLET)
+        print(f"[p6_step1] МОСТ ЗАПОЛНЕН: USDC={usdc_balance_now / 10**USDC_DECIMALS}")
 
-    swap_selector = bytes.fromhex(_selector(
-        "exactInputSingle((address,address,int24,address,uint256,uint256,uint256,uint160))")[2:])
-    swap_deadline = int(time.time()) + 600
-    swap_params = (to_checksum_address(USDC), to_checksum_address(CBBTC), pool["tick_spacing"],
-                   to_checksum_address(WALLET), swap_deadline, usdc_to_swap_raw, min_cbbtc_out_raw, 0)
-    swap_calldata = swap_selector + abi_encode(
-        ["(address,address,int24,address,uint256,uint256,uint256,uint160)"], [swap_params])
-    send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "5_exactInputSingle_swap", ROUTER, swap_calldata, 0, nonce_base, progress, eth_usd_price)
-    nonce_base += 1
+        # ============================= ШАГ 2: своп половины в cbBTC =============================
+        print("\n=== ШАГ 2: exactInputSingle -- своп части USDC в cbBTC (Aerodrome Slipstream Router) ===")
+        chain_id_base_check = int(rpc(BASE_RPC, "eth_chainId", []), 16)
+        if chain_id_base_check != BASE_CHAIN_ID:
+            raise RuntimeError(f"chainId Base {chain_id_base_check} != {BASE_CHAIN_ID} -- СТОП")
 
-    usdc_after_swap = erc20_balance(BASE_RPC, USDC, WALLET)
-    cbbtc_after_swap = erc20_balance(BASE_RPC, CBBTC, WALLET)
-    print(f"[p6_step1] после свопа: USDC={usdc_after_swap / 10**USDC_DECIMALS} cbBTC={cbbtc_after_swap / 10**CBBTC_DECIMALS}")
+        pool = read_pool_state_base()
+        p0 = price_cbbtc_usd(pool["sqrtPriceX96"])
+        pa_usd, pb_usd = p0 * (1 - RANGE_PCT), p0 * (1 + RANGE_PCT)
+        usdc_total_human = usdc_balance_now / 10 ** USDC_DECIMALS
+
+        def usd_to_domain(p_usd: float) -> float:
+            return 1.0 / p_usd
+
+        sqrt_p = usd_to_domain(p0) ** 0.5
+        sqrt_pa, sqrt_pb = usd_to_domain(pb_usd) ** 0.5, usd_to_domain(pa_usd) ** 0.5
+        amount0_target = usdc_total_human / 2
+        amount1_target = (usdc_total_human / 2) / p0
+        L_target = get_liquidity_for_amounts(sqrt_p, sqrt_pa, sqrt_pb, amount0_target, amount1_target)
+        amount0_at_L, amount1_at_L = v3_amounts(L_target, sqrt_p, sqrt_pa, sqrt_pb)
+        usdc_to_swap_human = amount1_at_L * p0  # $-стоимость нужной cbBTC-ноги -- именно столько USDC меняем
+        usdc_to_swap_raw = int(usdc_to_swap_human * 10 ** USDC_DECIMALS)
+        expected_cbbtc_out = usdc_to_swap_human / p0
+        min_cbbtc_out_raw = int(expected_cbbtc_out * (1 - SWAP_SLIPPAGE) * 10 ** CBBTC_DECIMALS)
+        print(f"[p6_step1] price=${p0:.2f}, USDC всего={usdc_total_human:.4f}, своп в cbBTC={usdc_to_swap_human:.4f} USDC "
+              f"-> ожидаемо {expected_cbbtc_out:.8f} cbBTC (min={min_cbbtc_out_raw})")
+        progress["swap_plan"] = {"pool_price_usd": p0, "usdc_total_human": usdc_total_human,
+                                  "usdc_to_swap_human": usdc_to_swap_human, "expected_cbbtc_out": expected_cbbtc_out}
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+
+        print("\n--- PRE-FLIGHT (обязательно перед свопом): реальный баланс USDC на Base ---")
+        usdc_balance_preswap = erc20_balance(BASE_RPC, USDC, WALLET)
+        preflight_balance("USDC перед свопом", usdc_balance_preswap, usdc_to_swap_raw, USDC_DECIMALS, "USDC")
+
+        nonce_base = eth_nonce(BASE_RPC)
+        send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "4_approve_USDC_to_Router", USDC,
+                      erc20_approve_calldata(ROUTER, usdc_to_swap_raw), 0, nonce_base, progress, eth_usd_price)
+        nonce_base += 1
+
+        swap_selector = bytes.fromhex(_selector(
+            "exactInputSingle((address,address,int24,address,uint256,uint256,uint256,uint160))")[2:])
+        swap_deadline = int(time.time()) + 600
+        swap_params = (to_checksum_address(USDC), to_checksum_address(CBBTC), pool["tick_spacing"],
+                       to_checksum_address(WALLET), swap_deadline, usdc_to_swap_raw, min_cbbtc_out_raw, 0)
+        swap_calldata = swap_selector + abi_encode(
+            ["(address,address,int24,address,uint256,uint256,uint256,uint160)"], [swap_params])
+        send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "5_exactInputSingle_swap", ROUTER, swap_calldata, 0, nonce_base, progress, eth_usd_price)
+        nonce_base += 1
+
+        usdc_after_swap = erc20_balance(BASE_RPC, USDC, WALLET)
+        cbbtc_after_swap = erc20_balance(BASE_RPC, CBBTC, WALLET)
+        print(f"[p6_step1] после свопа: USDC={usdc_after_swap / 10**USDC_DECIMALS} cbBTC={cbbtc_after_swap / 10**CBBTC_DECIMALS}")
 
     # ============================= ШАГ 3: mint LP +-10% =============================
     print("\n=== ШАГ 3: mint LP на Aerodrome Slipstream (тик-диапазон пересчитан СВЕЖЕ) ===")
