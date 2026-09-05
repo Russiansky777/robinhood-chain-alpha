@@ -72,17 +72,42 @@ def read_fee_bps(rpc_url: str, pool_address: str) -> int:
     return int(raw, 16)
 
 
-def across_quote(origin_chain_id: int, dest_chain_id: int, origin_token: str, amount: str) -> dict:
-    """ТОТ ЖЕ метод, что p6_live_step1.py::across_quote -- реально
-    подтверждён рабочими прогонами P6."""
+def across_quote(origin_chain_id: int, dest_chain_id: int, origin_token: str, amount: str,
+                  origin_token_symbol: str | None = None) -> dict:
+    """Первая попытка (только `token`, без проверки маршрута) реально
+    провалилась на направлении Base->Robinhood USDC (run 2026-09-05,
+    "Unsupported token address on given destination chain") -- в отличие
+    от p6_live_step1.py, где ТОТ ЖЕ паттерн реально работал (но для
+    ДРУГОГО направления/токена, Robinhood->Base). Симметрия маршрутов
+    Across НЕ гарантирована -- честно проверяем `available-routes`
+    ПЕРЕД suggested-fees (тот же паттерн, что p6_dry_run_entry.py::
+    across_quote), не предполагаем, что раз в одну сторону сработало,
+    сработает и в другую."""
+    routes_r = requests.get("https://app.across.to/api/available-routes",
+                             params={"originChainId": origin_chain_id, "destinationChainId": dest_chain_id}, timeout=20)
+    if routes_r.status_code != 200:
+        return {"error": f"available-routes HTTP {routes_r.status_code}", "raw": routes_r.text[:500]}
+    routes = routes_r.json()
+    match = None
+    for x in routes:
+        if x.get("originToken", "").lower() == origin_token.lower():
+            match = x
+            break
+    if match is None and origin_token_symbol:
+        match = next((x for x in routes if x.get("originTokenSymbol") == origin_token_symbol), None)
+    if match is None:
+        return {"error": f"маршрут {origin_chain_id}->{dest_chain_id} для токена {origin_token} НЕ найден в available-routes",
+                "available_routes_sample": routes[:10]}
     r = requests.get("https://app.across.to/api/suggested-fees", params={
         "originChainId": origin_chain_id, "destinationChainId": dest_chain_id,
-        "token": origin_token, "amount": amount,
+        "token": match["originToken"], "amount": amount,
     }, timeout=20)
     if r.status_code != 200:
         print(f"[plan] across_quote НЕ 200 ({r.status_code}): {r.text[:500]}")
-        return {"error": f"HTTP {r.status_code}", "raw": r.text[:500]}
-    return r.json()
+        return {"error": f"HTTP {r.status_code}", "raw": r.text[:500], "matched_route": match}
+    out = r.json()
+    out["_matched_route"] = match
+    return out
 
 
 def run() -> int:
@@ -123,7 +148,7 @@ def run() -> int:
     # --- Шаг 2: Across USDC (Base) -> USDG (Robinhood) ---
     print("\n=== Шаг 2: Across мост USDC (Base) -> Robinhood ===")
     amount_raw = str(int(total_usdc_before_bridge * (10 ** USDC_DECIMALS)))
-    quote = across_quote(BASE_CHAIN_ID, ROBINHOOD_CHAIN_ID, USDC_ADDR, amount_raw)
+    quote = across_quote(BASE_CHAIN_ID, ROBINHOOD_CHAIN_ID, USDC_ADDR, amount_raw, origin_token_symbol="USDC")
     step2 = {"action": "bridge USDC Base -> Robinhood (Across)", "amount_usdc": total_usdc_before_bridge, "quote_raw": quote}
     if "error" not in quote:
         total_relay_fee_pct = None
