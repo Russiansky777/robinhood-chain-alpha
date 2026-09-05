@@ -28,6 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import requests  # noqa: E402
+
 import pool_screener_concentration as psc  # noqa: E402
 import pool_screener_gt_recompute as psg  # noqa: E402
 
@@ -48,9 +50,50 @@ psg.RPC_ENDPOINTS["robinhood"] = ROBINHOOD_RPC
 OUT_PATH = Path("data/p3_guard_cache/pool_screener_gt_recompute_calibrate_p5_result.json")
 
 
+def diagnose_close_price_domains() -> dict:
+    """Прямое сравнение close-цен из currency=usd против
+    currency=token&token=quote на ОДНОМ И ТОМ ЖЕ окне (последние 10 часовых
+    свечей пула ETH/USDG) -- не гадаем по расхождению итогового ratio,
+    смотрим на сырые данные напрямую (владелец, проверка 1: "не гадать
+    дальше -- разобраться точно")."""
+    params_common = {"aggregate": 1, "limit": 10, "include_empty_intervals": "true"}
+    r_usd = requests.get(
+        f"https://api.geckoterminal.com/api/v2/networks/robinhood/pools/{POOL_ADDRESS}/ohlcv/hour",
+        params={**params_common, "currency": "usd"}, headers={"Accept": "application/json;version=20230302"}, timeout=20)
+    import time as _t
+    _t.sleep(2.6)
+    r_quote = requests.get(
+        f"https://api.geckoterminal.com/api/v2/networks/robinhood/pools/{POOL_ADDRESS}/ohlcv/hour",
+        params={**params_common, "currency": "token", "token": "quote"}, headers={"Accept": "application/json;version=20230302"}, timeout=20)
+    rows_usd = r_usd.json().get("data", {}).get("attributes", {}).get("ohlcv_list", []) if r_usd.status_code == 200 else []
+    rows_quote = r_quote.json().get("data", {}).get("attributes", {}).get("ohlcv_list", []) if r_quote.status_code == 200 else []
+    closes_usd = [(int(row[0]), float(row[4])) for row in sorted(rows_usd, key=lambda x: x[0])]
+    closes_quote = [(int(row[0]), float(row[4])) for row in sorted(rows_quote, key=lambda x: x[0])]
+    print(f"    currency=usd close (последние {len(closes_usd)}): {closes_usd}")
+    print(f"    currency=token&token=quote close (последние {len(closes_quote)}): {closes_quote}")
+    verdict = None
+    if closes_usd and closes_quote:
+        usd_vals = [c for _, c in closes_usd]
+        quote_vals = [c for _, c in closes_quote]
+        usd_range_pct = (max(usd_vals) - min(usd_vals)) / min(usd_vals) * 100 if min(usd_vals) else None
+        quote_range_pct = (max(quote_vals) - min(quote_vals)) / min(quote_vals) * 100 if min(quote_vals) else None
+        verdict = {
+            "usd_close_min": min(usd_vals), "usd_close_max": max(usd_vals), "usd_close_range_pct": usd_range_pct,
+            "quote_close_min": min(quote_vals), "quote_close_max": max(quote_vals), "quote_close_range_pct": quote_range_pct,
+            "usd_close_looks_like_stable_flatline": (0.85 <= min(usd_vals) <= 1.15 and usd_range_pct is not None and usd_range_pct < 5.0),
+        }
+        print(f"    ВЕРДИКТ: usd close диапазон {min(usd_vals):.6g}..{max(usd_vals):.6g} ({usd_range_pct:.4f}% размах); "
+              f"quote close диапазон {min(quote_vals):.6g}..{max(quote_vals):.6g} ({quote_range_pct:.4f}% размах)")
+        print(f"    usd close похож на плоскую линию стейбла (~$1, размах <5%)? {verdict['usd_close_looks_like_stable_flatline']}")
+    return {"closes_usd_currency": closes_usd, "closes_token_quote_currency": closes_quote, "verdict": verdict}
+
+
 def run() -> int:
     print("=== 0. Подтверждение RPC Robinhood Chain (chainId) ===")
     psc.verify_rpc("robinhood")
+
+    print("\n=== 0.5. Прямое сравнение close-цен: currency=usd vs currency=token&token=quote ===")
+    domain_diag = diagnose_close_price_domains()
 
     candidate = {
         "pool_id": "calibration_p5_eth_usdg", "project": "uniswap-v3", "chain": "Robinhood Chain",
@@ -77,7 +120,7 @@ def run() -> int:
     true_ratio_source = "data/p3_guard_cache/pool_screener_calibrate_p5_result.json::real_fee_lvr_ratio_at_hist_sigma=1.4666349853049427"
     ratio = entry.get("ratio_to_lvr_real_30d_sigma")
     out = {
-        "candidate_used": candidate, "process_one_result": entry,
+        "candidate_used": candidate, "process_one_result": entry, "close_price_domain_diagnostic": domain_diag,
         "true_ratio_range_from_live_position": true_ratio_range, "true_ratio_source": true_ratio_source,
         "script_ratio": ratio,
         "within_true_range": (true_ratio_range[0] <= ratio <= true_ratio_range[1]) if ratio is not None else None,
