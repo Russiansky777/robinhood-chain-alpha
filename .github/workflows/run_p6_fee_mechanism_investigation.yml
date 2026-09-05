@@ -1,0 +1,43 @@
+name: "P6 -- 3 проверки реального механизма комиссий (только чтение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/P6_FEE_MECHANISM_INVESTIGATION_REQUEST"
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: 3 проверки механизма комиссий (только чтение, реальные данные)
+        run: python -u analysis/p6_fee_mechanism_investigation.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/p6_fee_mechanism_investigation_result.json ] && git add data/p3_guard_cache/p6_fee_mechanism_investigation_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "P6: проверка механизма комиссий [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
