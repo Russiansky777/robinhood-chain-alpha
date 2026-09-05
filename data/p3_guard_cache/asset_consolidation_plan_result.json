@@ -1,23 +1,32 @@
 {
-  "generated_at_utc": "2026-09-05T14:42:06Z",
+  "generated_at_utc": "2026-09-05T14:44:15Z",
   "steps": [
     {
       "action": "swap cbBTC -> USDC",
       "chain": "base",
       "pool": "0x3e66e55e97ce60096f74b7c475e8249f2d31a9fb",
-      "fee_bps": 332,
-      "fee_pct": 0.0332,
+      "fee_bps": 330,
+      "fee_pct": 0.033,
       "cbbtc_amount": 0.0004529,
       "cbbtc_usd_value": 36.02287102623739,
-      "expected_usdc_out": 36.01091143305668,
+      "expected_usdc_out": 36.01098347879873,
       "note": "оценка по спот-цене пула (GT) за вычетом fee tier, без полной v3-симуляции проскальзывания -- сумма мала относительно TVL пула"
     },
     {
       "action": "bridge USDC Base -> Robinhood (Across)",
-      "amount_usdc": 79.84993943305668,
+      "amount_usdc": 79.85001147879873,
       "quote_raw": {
         "error": "HTTP 400",
-        "raw": "{\"type\":\"AcrossApiError\",\"code\":\"INVALID_PARAM\",\"status\":400,\"message\":\"Unsupported token address on given destination chain\",\"param\":\"outputTokenAddress\",\"id\":\"766rr-1788619327148-49534a4e8f27\"}"
+        "raw": "{\"type\":\"AcrossApiError\",\"code\":\"INVALID_PARAM\",\"status\":400,\"message\":\"Unsupported token address on given destination chain\",\"param\":\"outputTokenAddress\",\"id\":\"mp8f6-1788619456454-4fa786f5dfea\"}",
+        "matched_route": {
+          "originChainId": 8453,
+          "originToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "destinationChainId": 4663,
+          "destinationToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+          "originTokenSymbol": "USDC",
+          "destinationTokenSymbol": "USDG",
+          "isNative": false
+        }
       },
       "decision": "ОШИБКА КОТИРОВКИ: HTTP 400"
     },
@@ -38,9 +47,9 @@
       "reserve_eth_target": 0.00020359964166463066,
       "remainder_eth": 0.0025689314533797873,
       "remainder_usd": 6.308781863210082,
-      "gas_price_gwei": 0.385518,
+      "gas_price_gwei": 0.38377,
       "assumed_gas_per_tx": 150000,
-      "cost_two_tx_usd_estimate": 0.28402653132000005,
+      "cost_two_tx_usd_estimate": 0.28273870980000004,
       "decision": "ОБЕРНУТЬ И СВОПНУТЬ",
       "expected_usdg_out": 6.308150985023761
     },
@@ -52,7 +61,7 @@
   "summary": {
     "usdg_now": 0.282426,
     "usdg_estimated_after": 155.75277985103088,
-    "total_estimated_cost_usd": 0.3109038365585174,
+    "total_estimated_cost_usd": 0.3095439692964649,
     "total_usd_before": 236.7165316497779
   }
 }
