@@ -1,0 +1,78 @@
+{
+  "generated_at_utc": "2026-09-05T01:36:12Z",
+  "mode": "DRY-RUN, только чтение/симуляция",
+  "current_position": {
+    "nonce": 0,
+    "operator": "0x0000000000000000000000000000000000000000",
+    "token0": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "token1": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+    "tick_spacing": 2000,
+    "tick_lower": -68000,
+    "tick_upper": -64000,
+    "liquidity": 11851202,
+    "fee_growth0": 157602924499672703387330434765795603948,
+    "fee_growth1": 191263436548677876489976858606843114,
+    "tokens_owed0": 0,
+    "tokens_owed1": 0
+  },
+  "decrease_liquidity_simulated": {
+    "raw_response": {
+      "jsonrpc": "2.0",
+      "result": "0x00000000000000000000000000000000000000000000000000000000029cb8940000000000000000000000000000000000000000000000000000000000005ed7",
+      "id": 1
+    },
+    "amount0_usdc": 43.8253,
+    "amount1_cbbtc": 0.00024279
+  },
+  "collect_fees_simulated": {
+    "raw_response": {
+      "jsonrpc": "2.0",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000000680000000000000000000000000000000000000000000000000000000000000000",
+      "id": 1
+    },
+    "fee0_usdc": 0.000104,
+    "fee1_cbbtc": 0.0
+  },
+  "wallet_dust_now": {
+    "usdc": 9e-06,
+    "cbbtc": 0.00021028
+  },
+  "total_available_for_reposition": {
+    "usdc_human": 43.825413,
+    "cbbtc_human": 0.00045307,
+    "total_usd_approx": 79.93441464272232
+  },
+  "new_range_plan": {
+    "tick_lower": -68000,
+    "tick_upper": -66000,
+    "pa_actual_usd": 73485.26640160655,
+    "pb_actual_usd": 89754.20958030385,
+    "pct_from_current_price": {
+      "lower": -7.795928621897508,
+      "upper": 12.617180992441511
+    },
+    "amount0_desired_usdc": 24.896549,
+    "amount1_desired_cbbtc": 0.00045307,
+    "amount0_min_usdc": 22.406894,
+    "amount1_min_cbbtc": 0.00040776,
+    "dust_after_usdc": 18.928863999999997,
+    "dust_after_cbbtc": 0.0,
+    "k_new_range_geometry": 10.508831520012562,
+    "k_current_range_geometry": 5.516904730347132,
+    "k_nominal_10pct_unreachable": 10.474937185533102
+  },
+  "allowance_now": {
+    "usdc_to_nfpm": 9e-06,
+    "cbbtc_to_nfpm": 0.0
+  },
+  "mint_simulation": {
+    "success": false,
+    "error": {
+      "code": 3,
+      "message": "execution reverted: STF",
+      "data": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000035354460000000000000000000000000000000000000000000000000000000000"
+    },
+    "decoded": "Error(string): \"STF\"",
+    "note": "Реальный allowance СЕЙЧАС недостаточен (approve на прошлом входе был выдан ровно на использованную сумму и NFPM списал его целиком) -- эта симуляция, скорее всего, упала на STF (транзакция ПЕРЕД проверкой PSC), а не проверила PSC. Полноценная проверка PSC требует реального (дешёвого, ~$0.001) approve НЕПОСРЕДСТВЕННО перед этим же eth_call -- это и есть предлагаемый протокольный шаг, физически исполняется только на реальном входе (не здесь, только чтение)."
+  }
+}
