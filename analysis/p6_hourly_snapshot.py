@@ -504,6 +504,26 @@ def run() -> int:
     opened_at = datetime.fromisoformat(state["opened_at_utc"].replace("Z", "+00:00")) if state.get("opened_at_utc") else None
     hours_covered = (now_utc - opened_at).total_seconds() / 3600 if opened_at else None
     fee_apr_annualized = (our_yield_cum * 24 * 365 / hours_covered) if (our_yield_cum is not None and hours_covered) else None
+
+    # fee_lvr_ratio_at_hist_sigma (владелец, 2026-09-05, тот же паттерн, что
+    # P5 -- HIST_SIGMA_45_5PCT в p5_live_position_snapshot.py): ТО ЖЕ
+    # отношение, но с 30-дневной РЕАЛЬНОЙ реализованной sigma (не 3-точечной
+    # по своему короткому ряду) -- справочно, рядом с основным (шумным)
+    # kill_flag_1, kill_flag_1 САМ не переопределяется.
+    # РЕАЛЬНО ПЕРЕПРОВЕРЕНО (analysis/p6_hist_sigma_30d.py, реальный
+    # часовой OHLCV-скан GT за 30 дней, 720 точек, полное покрытие,
+    # 2026-09-05): sigma_realized_annualized_30d = 0.41658 (41.66%), НЕ
+    # заявленные владельцем 37.47% -- реальный пересчёт расходится с
+    # озвученной цифрой на ~4.2 п.п. (~11% относительно), использована
+    # РЕАЛЬНО ПОДТВЕРЖДЁННАЯ (не озвученная) величина, расхождение
+    # зафиксировано в docs/PROJECT_STATE.md.
+    HIST_SIGMA_30D = 0.41658
+    lvr_annualized_frac_at_hist_sigma = (k_val * HIST_SIGMA_30D ** 2 / 8) if k_val is not None else None
+    fee_lvr_ratio_at_hist_sigma = (
+        fee_apr_annualized / lvr_annualized_frac_at_hist_sigma
+    ) if (fee_apr_annualized is not None and lvr_annualized_frac_at_hist_sigma) else None
+    print(f"[p6_snapshot] fee_lvr_ratio_at_hist_sigma(sigma_30d=41.66%, справочно)={fee_lvr_ratio_at_hist_sigma} "
+          f"(основной, шумный по своему ряду) fee_lvr_ratio будет посчитан ниже отдельно)")
     fee_lvr_ratio = (fee_apr_annualized / lvr_annualized_frac) if (fee_apr_annualized is not None and lvr_annualized_frac) else None
 
     # fee_capture_ratio_cumulative (владелец, П6_HEDGED_LP.md kill-критерий №2,
@@ -573,7 +593,9 @@ def run() -> int:
         "btc_price_usd": btc_usd, "basis_pct": basis_pct,
         "sigma_realized_annualized": sigma, "k_concentration": k_val,
         "lvr_annualized_frac": lvr_annualized_frac, "fee_apr_annualized": fee_apr_annualized,
-        "fee_lvr_ratio": fee_lvr_ratio, "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
+        "fee_lvr_ratio": fee_lvr_ratio,
+        "lvr_annualized_frac_at_hist_sigma": lvr_annualized_frac_at_hist_sigma, "fee_lvr_ratio_at_hist_sigma": fee_lvr_ratio_at_hist_sigma,
+        "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
         "fee_capture_note": fee_capture_note, "fee_capture_detail": fee_capture_detail,
         "basis_kill_detail": basis_kill,
         "price_pct_from_entry": price_pct_from_entry, "flag_price_up_11pct_reduce_short": flag_price_up_11pct_reduce_short,
