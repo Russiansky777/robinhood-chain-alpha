@@ -61,8 +61,14 @@ USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 WETH = "0x4200000000000000000000000000000000000006"
 CBBTC_DECIMALS, USDC_DECIMALS, WETH_DECIMALS = 8, 6, 18
 
-CBBTC_WETH_POOL_FEE = 2500  # реальный fee tier, подтверждён plan_v2 (0.25%)
-USDC_WETH_POOL_FEE = 3000  # реальный fee tier, подтверждён plan_v2 (0.30%)
+CBBTC_WETH_POOL_FEE = 3000  # РЕАЛЬНО перепроверено on-chain (diag run 33976559782): fee=2500
+# из plan_v2 -- пул с ТАКИМ fee НЕ СУЩЕСТВУЕТ на каноническом Uniswap V3 Factory
+# (factory.getPool() вернул нулевой адрес) -- offchain-атрибуция (Dune/GT) была
+# неверной. Реально существующие тиры: 100/500/3000/10000; fee=3000 самый
+# ликвидный (2524 WETH резерва) И eth_call-симуляция exactInputSingle на нём
+# реально прошла (output=0.0146488 WETH).
+USDC_WETH_POOL_FEE = 3000  # РЕАЛЬНО перепроверено on-chain (diag run 33976559782):
+# тот же адрес пула, что и в plan_v2, реально самый ликвидный (19484 WETH резерва) -- подтверждено, не менялось.
 SWAP_SLIPPAGE = 0.03  # тот же широкий допуск, что P5/P6 -- приоритет гарантированного исполнения
 PER_TX_GAS_CEILING_USD = 3.0
 
