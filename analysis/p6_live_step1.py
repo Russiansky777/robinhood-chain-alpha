@@ -635,11 +635,35 @@ def main() -> int:
     if tick_lower >= tick_upper:
         tick_upper = tick_lower + ts
 
-    amount0_desired = usdc_after_swap
-    amount1_desired = cbbtc_after_swap
+    # НАЙДЕНО (реальный прогон run 11, commit b8a94e9): amount0_desired/
+    # amount1_desired РАНЬШЕ были ВСЕЙ имеющейся суммой обоих токенов, а
+    # amount_min -- 95% от неё. Реальный revert "PSC" на mint (подтверждён
+    # чтением исходника LiquidityManagement.sol, aerodrome-finance/slipstream:
+    # require(amount0>=amount0Min && amount1>=amount1Min, "PSC")) --
+    # своп считался по цене ДО свопа, а тик-диапазон здесь пересчитывается
+    # СВЕЖЕ (после свопа) -- реальное соотношение USDC:cbBTC на кошельке не
+    # совпадает с тем, что пул реально возьмёт для этого диапазона, так что
+    # одна из ног реально уходит заметно ниже 95% "desired". Тот же паттерн,
+    # что в P5 (p5_live_step1.py, expected0/expected1 из
+    # get_liquidity_for_amounts) -- считаем ОПТИМАЛЬНЫЕ суммы под СВЕЖИЙ
+    # диапазон/цену, а не берём весь баланс как желаемое.
+    def usd_to_domain_mint(p_usd: float) -> float:
+        return 1.0 / p_usd
+
+    sqrt_p_fresh = usd_to_domain_mint(p0_fresh) ** 0.5
+    sqrt_pa_fresh, sqrt_pb_fresh = usd_to_domain_mint(pb_fresh) ** 0.5, usd_to_domain_mint(pa_fresh) ** 0.5
+    usdc_after_swap_human = usdc_after_swap / 10 ** USDC_DECIMALS
+    cbbtc_after_swap_human = cbbtc_after_swap / 10 ** CBBTC_DECIMALS
+    L_mint = get_liquidity_for_amounts(sqrt_p_fresh, sqrt_pa_fresh, sqrt_pb_fresh, usdc_after_swap_human, cbbtc_after_swap_human)
+    amount0_at_L_human, amount1_at_L_human = v3_amounts(L_mint, sqrt_p_fresh, sqrt_pa_fresh, sqrt_pb_fresh)
+    amount0_desired = min(usdc_after_swap, int(amount0_at_L_human * 10 ** USDC_DECIMALS))
+    amount1_desired = min(cbbtc_after_swap, int(amount1_at_L_human * 10 ** CBBTC_DECIMALS))
     amount0_min = int(amount0_desired * (1 - MINT_SLIPPAGE))
     amount1_min = int(amount1_desired * (1 - MINT_SLIPPAGE))
     mint_deadline = int(time.time()) + 600
+    print(f"[p6_step1] mint оптимальные суммы под свежий диапазон (L={L_mint:.2f}): "
+          f"amount0(USDC)={amount0_at_L_human:.6f} amount1(cbBTC)={amount1_at_L_human:.8f} "
+          f"(держим USDC={usdc_after_swap_human:.6f} cbBTC={cbbtc_after_swap_human:.8f} -- излишек одной ноги останется на кошельке).")
 
     print(f"[p6_step1] mint: tick_lower={tick_lower} tick_upper={tick_upper} tickSpacing={ts} "
           f"amount0(USDC)={amount0_desired / 10**USDC_DECIMALS} amount1(cbBTC)={amount1_desired / 10**CBBTC_DECIMALS}")
