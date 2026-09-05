@@ -1,0 +1,48 @@
+name: "Скринер-пересчёт -- калибровка на пуле P5 (ETH/USDG, только чтение)"
+
+# Владелец, 2026-09-05, проверка 1: "Прогнать ETH/USDG 0x52e65B17... через
+# pool_screener_gt_recompute.py как обычный кандидат. Истинное значение из
+# живой позиции: 1.3-1.47." Только публичный RPC (Robinhood Chain) + GT
+# API -- без VPS/SSH/Lighter, не денежная операция.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/POOL_SCREENER_GT_RECOMPUTE_CALIBRATE_P5_REQUEST"
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Калибровка на ETH/USDG (только чтение)
+        run: python -u analysis/pool_screener_gt_recompute_calibrate_p5.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/pool_screener_gt_recompute_calibrate_p5_result.json ] && git add data/p3_guard_cache/pool_screener_gt_recompute_calibrate_p5_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Скринер-пересчёт: калибровка на P5 (ETH/USDG) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
