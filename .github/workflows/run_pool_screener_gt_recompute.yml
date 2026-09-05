@@ -1,0 +1,51 @@
+name: "Скринер -- честный пересчёт fee APR по реальному объёму GT для всех 23 кандидатов (только чтение)"
+
+# Владелец, 2026-09-05, после реального закрытия P6 (правило #18):
+# "Пересчёт скринера по всем 23: fee_apr_gt_7d, fee_apr_gt_30d из объёма
+# GT x fee tier / TVL; для gauge-форков -- поправка ... Отношение к LVR
+# при 30-дневной sigma, порог >=2. Рядом -- старое число DefiLlama и
+# множитель расхождения." Только публичные RPC + GT API, без VPS/SSH/
+# Lighter -- в отличие от P6-входа/закрытия, здесь не нужна подпись
+# транзакций из юрисдикции, поэтому обычный GH Actions runner.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/POOL_SCREENER_GT_RECOMPUTE_REQUEST"
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Честный пересчёт fee APR по всем 23 кандидатам (только чтение)
+        run: python -u analysis/pool_screener_gt_recompute.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/pool_screener_gt_recompute_result.json ] && git add data/p3_guard_cache/pool_screener_gt_recompute_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Скринер: честный пересчёт fee APR по реальному GT-объёму, все 23 кандидата [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
