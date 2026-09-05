@@ -203,13 +203,25 @@ def main() -> int:
     else:
         pool = read_pool_state_base()
         p0 = price_cbbtc_usd(pool["sqrtPriceX96"])
-        pb_actual_usd = tick_to_usd_price(pos["tick_lower"])
-        pa_actual_usd = tick_to_usd_price(pos["tick_upper"])
-        sqrt_p = (1.0 / p0) ** 0.5
-        sqrt_pa, sqrt_pb = (1.0 / pb_actual_usd) ** 0.5, (1.0 / pa_actual_usd) ** 0.5
-        sqrt_p_clamped = min(max(sqrt_p, sqrt_pa), sqrt_pb)
-        expected0 = max(pos["liquidity"] * (1 / sqrt_p_clamped - 1 / sqrt_pb), 0.0)
-        expected1 = max(pos["liquidity"] * (sqrt_p_clamped - sqrt_pa), 0.0)
+        # НАЙДЕНО (реальный прогон, run 1, revert "PS" = NFPM.decreaseLiquidity
+        # "Price Slippage", исходник подтверждён WebFetch): РЕАЛЬНАЯ ончейн
+        # `liquidity` (raw, из positions()) НЕЛЬЗЯ комбинировать со sqrt в
+        # "человеческом" (1/p_usd) домене (тем, что использует get_liquidity_
+        # for_amounts/v3_amounts выше по файлу для расчёта ЖЕЛАЕМЫХ сумм при
+        # mint) -- это ДВА РАЗНЫХ домена. РЕАЛЬНАЯ формула (тот же урок, что
+        # уже задокументирован в analysis/p5_live_close.py после реального
+        # инцидента 33777423316, amount0 получался 78 МЛРД ETH): raw
+        # liquidity нужно комбинировать ТОЛЬКО с СЫРЫМ sqrtPriceX96/2^96 (без
+        # какой-либо decimals/price-адаptации) -- результат сразу в raw wei
+        # (token0/token1 minimal units), делим на 10**decimals В КОНЦЕ.
+        sqrt_p_raw = pool["sqrtPriceX96"] / (2 ** 96)
+        sqrt_pa_raw = (1.0001 ** pos["tick_lower"]) ** 0.5
+        sqrt_pb_raw = (1.0001 ** pos["tick_upper"]) ** 0.5
+        if sqrt_pa_raw > sqrt_pb_raw:
+            sqrt_pa_raw, sqrt_pb_raw = sqrt_pb_raw, sqrt_pa_raw
+        sqrt_p_clamped = min(max(sqrt_p_raw, sqrt_pa_raw), sqrt_pb_raw)
+        expected0 = max(pos["liquidity"] * (1 / sqrt_p_clamped - 1 / sqrt_pb_raw), 0.0)
+        expected1 = max(pos["liquidity"] * (sqrt_p_clamped - sqrt_pa_raw), 0.0)
         amount0_min = int(expected0 * (1 - MINT_SLIPPAGE_CLOSE))
         amount1_min = int(expected1 * (1 - MINT_SLIPPAGE_CLOSE))
         deadline = int(time.time()) + 600
