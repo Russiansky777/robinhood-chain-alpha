@@ -1,0 +1,70 @@
+name: "Задача 1, проверка 4 -- out-of-sample прогноз/проверка знака Z на выходные 2026-09-04"
+
+# Владелец, 2026-09-05: "В воскресенье в 19:55 ET -- прогноз... В
+# понедельник после 9:30 -- проверка." Два независимых запуска
+# (predict/verify), каждый триггерится своим маркером в РЕАЛЬНОЕ время
+# через запланированный триггер (create_trigger, вне сессии).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "predict или verify"
+        required: true
+        type: choice
+        options: ["predict", "verify"]
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK1_OOS_CHECK4_PREDICT_REQUEST"
+      - "data/p3_guard_cache/TASK1_OOS_CHECK4_VERIFY_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Determine mode
+        id: mode
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "verify" ] || [ -e data/p3_guard_cache/TASK1_OOS_CHECK4_VERIFY_REQUEST ]; then
+            echo "mode=verify" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=predict" >> "$GITHUB_OUTPUT"
+          fi
+      - name: "Задача 1, проверка 4 -- predict/verify"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_oos_check4.py "${{ steps.mode.outputs.mode }}"
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_OOS_CHECK4_PREDICT_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_OOS_CHECK4_VERIFY_REQUEST
+          [ -e data/p3_guard_cache/task1_oos_check4_predict_result.json ] && git add data/p3_guard_cache/task1_oos_check4_predict_result.json
+          [ -e data/p3_guard_cache/task1_oos_check4_verify_result.json ] && git add data/p3_guard_cache/task1_oos_check4_verify_result.json
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 1, проверка 4 (${{ steps.mode.outputs.mode }}): результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
