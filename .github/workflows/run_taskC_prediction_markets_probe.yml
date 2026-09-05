@@ -12,6 +12,7 @@ on:
     paths:
       - "data/p3_guard_cache/TASKC_PREDICTION_MARKETS_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKC_KALSHI_BTC_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKC_POLYMARKET_BTC_PROBE_REQUEST"
 
 jobs:
   probe:
@@ -36,13 +37,18 @@ jobs:
       - name: Разведка Kalshi BTC-часовых серий (только чтение)
         if: ${{ hashFiles('data/p3_guard_cache/TASKC_KALSHI_BTC_PROBE_REQUEST') != '' }}
         run: python -u analysis/taskC_kalshi_btc_probe.py
+      - name: Разведка структуры BTC-рынков Polymarket (только чтение)
+        if: ${{ hashFiles('data/p3_guard_cache/TASKC_POLYMARKET_BTC_PROBE_REQUEST') != '' }}
+        run: python -u analysis/taskC_polymarket_btc_probe.py
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_PREDICTION_MARKETS_PROBE_REQUEST
           git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_KALSHI_BTC_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_POLYMARKET_BTC_PROBE_REQUEST
           [ -e data/p3_guard_cache/taskC_prediction_markets_probe_result.json ] && git add data/p3_guard_cache/taskC_prediction_markets_probe_result.json
           [ -e data/p3_guard_cache/taskC_kalshi_btc_probe_result.json ] && git add data/p3_guard_cache/taskC_kalshi_btc_probe_result.json
+          [ -e data/p3_guard_cache/taskC_polymarket_btc_probe_result.json ] && git add data/p3_guard_cache/taskC_polymarket_btc_probe_result.json
           git diff --cached --quiet && exit 0
           git commit -m "Задача C: разведка API предикт-маркетов, результат [automated]"
           for i in 1 2 3 4 5; do
