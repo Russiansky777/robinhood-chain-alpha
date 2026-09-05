@@ -58,10 +58,30 @@ def _selector(sig: str) -> str:
     return _topic0(sig)[:10]
 
 
+RPC_MIN_INTERVAL_S = 1.0
+RPC_RETRY_BACKOFF_S = 15.0
+RPC_MAX_RETRIES = 3
+_last_rpc_call = 0.0
+
+
 def rpc(method: str, params: list):
-    r = requests.post(BASE_RPC, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=20)
-    r.raise_for_status()
-    return r.json()
+    """НАЙДЕНО (реальный прогон): mainnet.base.org реально отдал 429 без
+    троттлинга между несколькими eth_call подряд -- тот же троттлинг/ретрай,
+    что уже используется в p6_hourly_snapshot.py."""
+    global _last_rpc_call
+    wait = _last_rpc_call + RPC_MIN_INTERVAL_S - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    for attempt in range(RPC_MAX_RETRIES + 1):
+        _last_rpc_call = time.monotonic()
+        r = requests.post(BASE_RPC, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=20)
+        if r.status_code == 429 and attempt < RPC_MAX_RETRIES:
+            print(f"[reposition] RPC 429 (попытка {attempt + 1}/{RPC_MAX_RETRIES + 1}) -- жду {RPC_RETRY_BACKOFF_S:.0f}с")
+            time.sleep(RPC_RETRY_BACKOFF_S)
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError("RPC 429 после ретраев")
 
 
 def eth_call(to: str, data: str, frm: str | None = None):
