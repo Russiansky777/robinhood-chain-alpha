@@ -1,0 +1,9 @@
+ГЕЙТ 2, ПОВТОР -- реальный revert STF на шаге свопа (run 10) диагностирован как
+транзиентный лаг RPC-реплики mainnet.base.org (analysis/p6_debug_swap_stf.py,
+run 33932960347: allowance/баланс реально в порядке, повторный estimateGas сразу
+прошёл). Idempotency-guard на мост добавлен (analysis/p6_live_step1.py, commit 26933f2)
+-- мост будет реально пропущен (на Base уже реально лежит USDC=79.948649,
+ETH=0.000248098 после run 10). Ретрай eth_estimateGas с паузой добавлен на случай
+повтора лага на следующих шагах (approve->mint).
+Продолжение с шага 2 (своп половины USDC->cbBTC) -> mint +-10% -> шорт BTC $73 на
+Lighter (плечо 2.0x).
