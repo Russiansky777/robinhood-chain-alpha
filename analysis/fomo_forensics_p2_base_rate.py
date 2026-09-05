@@ -12,6 +12,27 @@
   Полный прогон -- только если интервал шире +-30% относительной.
 - Бюджет: не более 60 кредитов на п.2 без отдельного разрешения.
 
+**Аккаунт (владелец, 2026-09-05, после реального СТОПа по общему циклу
+старого аккаунта): переключено на secrets.DUNE_API_KEY_MOZILA.**
+Проверено структурно (не предположено), что предыдущий стоп относился
+к СТАРОМУ аккаунту: все workflow'ы форензики fomo до этой правки
+использовали `secrets.DUNE_API_KEY` (grep по .github/workflows/), это
+тот же ключ, что пишет в `data/credits_spent.json` (внешний лимит
+2500/цикл, откуда и пришёл реальный стоп: 2479.96/2480). Аккаунт Mozila
+(`data/credits_spent_mozila.json`) до сих пор использовался только для
+`funding_mozila`/`lit_points_mozila` -- НЕ форензикой fomo, смешивания
+не было. Новый namespace `fomo_forensics_mozila` -- ОТДЕЛЬНЫЙ от них
+внутри того же файла (один файл на КЛЮЧ/аккаунт, не один на задачу).
+**Реальную external_truth-цифру для Mozila должен прислать владелец
+(dune.com/settings/billing) -- ничего не запускается до неё**, текущее
+значение в файле помечено как НЕподтверждённое устное "2000+".
+Правило владельца для этого аккаунта (docs/PROJECT_STATE.md, п.9а):
+каждый НОВЫЙ запрос -- сначала LIMIT 100 для проверки синтаксиса/
+структуры, полный прогон -- вторым шагом. Этап 1 ниже поэтому идёт в
+двух под-шагах: 1a (LIMIT 100, fetch_results=True, дёшево) и 1b
+(реальный LIMIT {N_PRESAMPLE}, materialize-only) -- 1b запускается,
+только если 1a прошёл без ошибок.
+
 Архитектура (осторожно с credit_guard.check_sql_sanity -- UNION ALL +
 `dex.trades` в одном запросе даёт жёсткий стоп ДО исполнения, см.
 COST_POSTMORTEM.md, ревизия 03c: 144 вместо 8 кредитов из-за
@@ -48,13 +69,16 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "fomo_forensics")
+os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "fomo_forensics_mozila")
+os.environ.setdefault("CREDIT_GUARD_FILE", "data/credits_spent_mozila.json")
 
 from credit_guard import ensure_namespace, remaining_cycle_budget, load_state  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/fomo_forensics_p2_base_rate_result.json")
-NAMESPACE_BUDGET = 250.0
+NAMESPACE_BUDGET = 250.0  # перенесено с исходного распределения на старом аккаунте (там ~76 уже потрачено
+                          # и застряло вместе с исчерпанным общим циклом) -- ТРЕБУЕТ подтверждения владельца,
+                          # что 250 актуально и для нового (Mozila) аккаунта, не удвоение бюджета молча.
 P2_MANUAL_CAP = 60.0  # владелец, 2026-09-05: явная граница на п.2, отдельно от namespace-бюджета
 
 LAUNCH_CONTRACTS = [
@@ -92,7 +116,8 @@ def run() -> int:
     }}
 
     # --- Этап 1: материализация свопов случайной предвыборки токенов (ЕДИНСТВЕННЫЙ скан dex.trades) ---
-    sql_stage1 = f"""with launches as (
+    def build_sql_stage1(sample_limit: int) -> str:
+        return f"""with launches as (
     select substr(lower(to_hex(topic1)), 25, 40) as token_address, block_time as deploy_time
     from robinhood.logs
     where lower(to_hex(contract_address)) in ({addrs_sql})
@@ -101,7 +126,7 @@ def run() -> int:
         and block_time >= now() - interval '30' day
 ),
 sampled as (
-    select * from launches order by random() limit {N_PRESAMPLE}
+    select * from launches order by random() limit {sample_limit}
 )
 select s.token_address, s.deploy_time, t.block_time,
     t.amount_usd,
@@ -114,8 +139,28 @@ join dex.trades t
     and t.blockchain = 'robinhood'
     and t.block_time between s.deploy_time and s.deploy_time + interval '7' day"""
 
+    # Этап 1a -- правило владельца для аккаунта Mozila (docs/PROJECT_STATE.md, п.9а):
+    # каждый НОВЫЙ запрос сначала на LIMIT 100 (структура/синтаксис), полный прогон вторым шагом.
+    # Это первый содержательный запрос форензики fomo на этом аккаунте.
+    sql_stage1_dryrun = build_sql_stage1(100)
+    qid1_dry = client.create_query("fomo_forensics_p2_sample_trades_dryrun100", sql_stage1_dryrun)
+    print(f"[p2] этап 1a (правило Mozila: LIMIT 100 первым): query_id={qid1_dry}")
+    df_dry = client.run_sql_cached("fomo_forensics_p2_sample_trades_dryrun100", sql_stage1_dryrun, query_id=qid1_dry,
+                                    estimated_credits=5.0, expected_max_rows=100_000, expected_columns=5)
+    spent1a = p2_spent_so_far(client)
+    print(f"[p2] этап 1a вернул {0 if df_dry is None else len(df_dry)} строк; потрачено: {spent1a:.2f} / {P2_MANUAL_CAP}")
+    out["stage1a_dryrun_credits"] = spent1a
+    out["stage1a_dryrun_rows"] = 0 if df_dry is None else len(df_dry)
+    if df_dry is None or df_dry.empty:
+        print("[p2] СТОП: этап 1a (LIMIT 100) не вернул строк -- структура запроса под вопросом, не идём на полный прогон вслепую.")
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
+        return 1
+
+    # Этап 1b -- реальный прогон (materialize-only) на полную предвыборку.
+    sql_stage1 = build_sql_stage1(N_PRESAMPLE)
     qid1 = client.create_query("fomo_forensics_p2_sample_trades", sql_stage1)
-    print(f"[p2] этап 1: материализация свопов предвыборки ({N_PRESAMPLE} токенов), query_id={qid1}")
+    print(f"[p2] этап 1b: материализация свопов предвыборки ({N_PRESAMPLE} токенов), query_id={qid1}")
     client.run_sql_cached("fomo_forensics_p2_sample_trades", sql_stage1, query_id=qid1,
                            fetch_results=False, estimated_credits=25.0)
     spent1 = p2_spent_so_far(client)

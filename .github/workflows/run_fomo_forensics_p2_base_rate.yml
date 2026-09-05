@@ -25,9 +25,9 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
-      - name: "п.2 базовая ставка (материализация + агрегат + выборка 2000, ручной кап 60 кредитов)"
+      - name: "п.2 базовая ставка (аккаунт Mozila, материализация + агрегат + выборка 2000, ручной кап 60 кредитов)"
         env:
-          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
         run: python -u analysis/fomo_forensics_p2_base_rate.py
       - name: Commit results
         if: always()
@@ -35,7 +35,7 @@ jobs:
           git rm -f --ignore-unmatch data/p3_guard_cache/FOMO_FORENSICS_P2_BASE_RATE_REQUEST
           [ -e data/p3_guard_cache/fomo_forensics_p2_base_rate_result.json ] && git add data/p3_guard_cache/fomo_forensics_p2_base_rate_result.json
           [ -e data/p3_guard_cache/fomo_forensics_p2_sample_addresses.json ] && git add data/p3_guard_cache/fomo_forensics_p2_sample_addresses.json
-          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
           git diff --cached --quiet && exit 0
           git commit -m "Форензика fomo: п.2 базовая ставка, результат [automated]"
           for i in 1 2 3 4 5; do
