@@ -21,6 +21,7 @@ on:
     paths:
       - "data/p3_guard_cache/TASK1_WEEKEND_GAP_SMOKE_REQUEST"
       - "data/p3_guard_cache/TASK1_WEEKEND_GAP_FULL_REQUEST"
+      - "data/p3_guard_cache/TASK1_DEX_TRADES_COLUMNS_PROBE_REQUEST"
 
 jobs:
   run:
@@ -39,8 +40,15 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
+      - name: Определение колонок dex.trades (только если запрошен маркер, диагностика реальной ошибки типов)
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_DEX_TRADES_COLUMNS_PROBE_REQUEST') != '' }}
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_dex_trades_columns_probe.py
       - name: Determine smoke vs full
         id: mode
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_DEX_TRADES_COLUMNS_PROBE_REQUEST') == '' }}
         run: |
           if [ "${{ github.event.inputs.full }}" = "true" ] || [ -e data/p3_guard_cache/TASK1_WEEKEND_GAP_FULL_REQUEST ]; then
             echo "smoke_only=0" >> "$GITHUB_OUTPUT"
@@ -50,6 +58,7 @@ jobs:
             echo "РЕЖИМ: смоук (1 последнее завершённое выходные)"
           fi
       - name: Задача 1 -- X (тёмное окно) vs Y (гэп) vs Z
+        if: ${{ hashFiles('data/p3_guard_cache/TASK1_DEX_TRADES_COLUMNS_PROBE_REQUEST') == '' }}
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: task1_weekend_gap
@@ -59,6 +68,7 @@ jobs:
         if: always()
         run: |
           [ -e data/p3_guard_cache/task1_weekend_gap_result.json ] && git add data/p3_guard_cache/task1_weekend_gap_result.json
+          [ -e data/p3_guard_cache/task1_dex_trades_columns_probe_result.json ] && git add data/p3_guard_cache/task1_dex_trades_columns_probe_result.json
           [ -d data/task1_weekend_gap_cache ] && git add data/task1_weekend_gap_cache/
           [ -e data/credits_spent.json ] && git add data/credits_spent.json
           git diff --cached --quiet && exit 0
