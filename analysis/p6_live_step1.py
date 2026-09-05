@@ -6,6 +6,21 @@ Across USDG -> USDC на Base -> своп половины в cbBTC -> mint +-10
 стоит. Хедж проверить чтением позиции (урок err=None), дельту и
 свободную маржу записать как стартовые значения."
 
+ОБНОВЛЕНО 2026-09-05 (владелец, после реального `InsufficientFunds()`
+на попытке $161 -- реальный баланс USDG на кошельке был $80.282426, не
+$161): "Вариант B (своп WETH->USDG на пуле P5 перед мостом) -- ТОЛЬКО
+если существующий путь свопа из P5 есть; если его нет -- остановиться
+и сказать, тогда идём по A на $80." Реально проверено: НИГДЕ в проекте
+нет исполняемого свопа (ни на пуле P5, ни где-либо ещё на Robinhood
+Chain) -- только чтение/наблюдение (across_common.py) и mint/collect/
+decreaseLiquidity через NFPM. Путь B не существует -- владелец
+подтвердил идти по варианту A: TARGET_TOTAL_CAPITAL_USD=$80 (реально
+ликвидный баланс USDG, без довнесения). Также добавлен ОБЯЗАТЕЛЬНЫЙ
+pre-flight (реальное чтение баланса + сверка с суммой) ПЕРЕД каждой
+ногой: USDG перед мостом, USDC на Base перед свопом, USDC и cbBTC перед
+mint, коллатерал перед шортом -- владелец, тот же урок
+InsufficientFunds(), см. `preflight_balance()` ниже."
+
 Реальные адреса -- ПОДТВЕРЖДЕНЫ отдельной разведкой (не предположены):
   - NFPM/Router на Base -- analysis/p6_entry_recon.py, совпадение
     pool.factory() с factory() кандидата (реально СОВПАЛ "initial"
@@ -72,7 +87,10 @@ CBBTC = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
 USDC_DECIMALS, CBBTC_DECIMALS = 6, 8
 POOL_ADDRESS = "0x3e66e55e97ce60096f74b7c475e8249f2d31a9fb"
 
-TARGET_TOTAL_CAPITAL_USD = 161.0  # владелец, подтверждено Гейтом 2 (RESULTS.md, свободная маржа 41.02%)
+TARGET_TOTAL_CAPITAL_USD = 80.0  # владелец, 2026-09-05, вариант A -- $161 упёрся в реальный InsufficientFunds()
+# (баланс USDG на кошельке = $80.282426, не $161; своп WETH->USDG на Robinhood Chain --
+# путь B -- не существует нигде в проекте, владелец прямо сказал в этом случае идти по A).
+# RESULTS.md §6.
 BRIDGE_ETH_AMOUNT_ETH = 0.0006  # ~$1.5 газа на Base -- Base исторически дёшев (см. p6_dry_run_entry_result.json, ~$0.02-0.07 за mint)
 RANGE_PCT = 0.10
 SWAP_SLIPPAGE = 0.03  # широкий допуск -- приоритет гарантированного исполнения (тот же принцип, что P5)
@@ -120,6 +138,12 @@ def erc20_balance(rpc_url: str, token: str, holder: str) -> int:
     return int(eth_call(rpc_url, token, data), 16)
 
 
+def erc20_allowance(rpc_url: str, token: str, owner: str, spender: str) -> int:
+    selector = _selector("allowance(address,address)")[2:]
+    data = "0x" + selector + owner[2:].rjust(64, "0").lower() + spender[2:].rjust(64, "0").lower()
+    return int(eth_call(rpc_url, token, data), 16)
+
+
 def erc20_approve_calldata(spender: str, amount: int) -> bytes:
     selector = bytes.fromhex(_selector("approve(address,uint256)")[2:])
     return selector + abi_encode(["address", "uint256"], [spender, amount])
@@ -135,6 +159,18 @@ def eth_estimate_gas(rpc_url: str, to: str, data: bytes, value: int = 0) -> int:
 
 def eth_nonce(rpc_url: str) -> int:
     return int(rpc(rpc_url, "eth_getTransactionCount", [WALLET, "pending"]), 16)
+
+
+def preflight_balance(label: str, actual_raw: int, required_raw: int, decimals: int, symbol: str) -> None:
+    """Владелец, 2026-09-04 (после реального InsufficientFunds() на
+    depositV3): ПЕРЕД КАЖДОЙ ногой -- реальное чтение баланса нужного
+    токена и сверка с суммой, обязательный pre-flight, не полагаемся на
+    ранее посчитанный план. СТОП с точной цифрой, если не хватает --
+    не отправляем транзакцию вслепую."""
+    actual_h, required_h = actual_raw / 10 ** decimals, required_raw / 10 ** decimals
+    print(f"[p6_step1] PRE-FLIGHT {label}: реальный баланс {symbol}={actual_h}, нужно={required_h}")
+    if actual_raw < required_raw:
+        raise RuntimeError(f"PRE-FLIGHT {label}: недостаточно {symbol} -- реально {actual_h}, нужно {required_h} -- СТОП, не отправляю.")
 
 
 def send_tx(rpc_url: str, chain_id: int, account, to: str, data: bytes, value: int, nonce: int,
@@ -377,7 +413,7 @@ def main() -> int:
         raise RuntimeError(f"PRIVATE_KEY_NOX даёт {account.address}, ожидался {WALLET} -- СТОП.")
 
     # ============================= ШАГ 1: Across USDG -> USDC на Base =============================
-    print("\n=== ШАГ 1: Across -- бридж USDG->USDC ($161) и ETH->ETH (газ на Base) ===")
+    print(f"\n=== ШАГ 1: Across -- бридж USDG->USDC (${TARGET_TOTAL_CAPITAL_USD}) и ETH->ETH (газ на Base) ===")
     chain_id_check = int(rpc(ROBINHOOD_RPC, "eth_chainId", []), 16)
     if chain_id_check != ROBINHOOD_CHAIN_ID:
         raise RuntimeError(f"chainId Robinhood {chain_id_check} != {ROBINHOOD_CHAIN_ID} -- СТОП")
@@ -406,10 +442,28 @@ def main() -> int:
     print(f"[p6_step1] котировка ETH->ETH: outputAmount={quote_eth.get('outputAmount')} outputToken={output_token_eth}")
     OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
+    print("\n--- PRE-FLIGHT (обязательно перед мостом): реальный баланс USDG/ETH на Robinhood Chain ---")
+    usdg_balance_now = erc20_balance(ROBINHOOD_RPC, USDG, WALLET)
+    eth_balance_robinhood_now = int(rpc(ROBINHOOD_RPC, "eth_getBalance", [WALLET, "latest"]), 16)
+    preflight_balance("USDG перед мостом", usdg_balance_now, usdg_amount_wei, 6, "USDG")
+    preflight_balance("ETH(Robinhood) перед мостом", eth_balance_robinhood_now, eth_bridge_wei, 18, "ETH")
+    progress["preflight_bridge"] = {"usdg_balance_now": usdg_balance_now / 1e6, "eth_balance_robinhood_now": eth_balance_robinhood_now / 1e18,
+                                     "usdg_required": usdg_amount_wei / 1e6, "eth_required": eth_bridge_wei / 1e18}
+    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+
     nonce = eth_nonce(ROBINHOOD_RPC)
-    send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "1_approve_USDG_to_SpokePool", USDG,
-                  erc20_approve_calldata(SPOKE_POOL, usdg_amount_wei), 0, nonce, progress, eth_usd_price)
-    nonce += 1
+    # Владелец, 2026-09-05: "Approve не трогать, allowance останется" --
+    # реально уже есть allowance $161 (прошлая попытка, tx=0xe3ab9448...),
+    # этого достаточно для нового меньшего $80 -- реально ПЕРЕЧИТАНО, не
+    # предположено; approve отправляется, только если реально не хватает.
+    existing_allowance = erc20_allowance(ROBINHOOD_RPC, USDG, WALLET, SPOKE_POOL)
+    print(f"[p6_step1] реальный текущий allowance USDG->SpokePool: {existing_allowance / 1e6} (нужно {usdg_amount_wei / 1e6})")
+    if existing_allowance < usdg_amount_wei:
+        send_and_wait(ROBINHOOD_RPC, ROBINHOOD_CHAIN_ID, account, "1_approve_USDG_to_SpokePool", USDG,
+                      erc20_approve_calldata(SPOKE_POOL, usdg_amount_wei), 0, nonce, progress, eth_usd_price)
+        nonce += 1
+    else:
+        print("[p6_step1] 1_approve_USDG_to_SpokePool: ПРОПУЩЕН -- существующего allowance уже достаточно.")
 
     deposit_usdg_calldata = build_deposit_v3_calldata(
         WALLET, WALLET, USDG, USDC, usdg_amount_wei, int(quote_usdg["outputAmount"]), BASE_CHAIN_ID,
@@ -485,6 +539,10 @@ def main() -> int:
                               "usdc_to_swap_human": usdc_to_swap_human, "expected_cbbtc_out": expected_cbbtc_out}
     OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
+    print("\n--- PRE-FLIGHT (обязательно перед свопом): реальный баланс USDC на Base ---")
+    usdc_balance_preswap = erc20_balance(BASE_RPC, USDC, WALLET)
+    preflight_balance("USDC перед свопом", usdc_balance_preswap, usdc_to_swap_raw, USDC_DECIMALS, "USDC")
+
     nonce_base = eth_nonce(BASE_RPC)
     send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "4_approve_USDC_to_Router", USDC,
                   erc20_approve_calldata(ROUTER, usdc_to_swap_raw), 0, nonce_base, progress, eth_usd_price)
@@ -525,6 +583,12 @@ def main() -> int:
 
     print(f"[p6_step1] mint: tick_lower={tick_lower} tick_upper={tick_upper} tickSpacing={ts} "
           f"amount0(USDC)={amount0_desired / 10**USDC_DECIMALS} amount1(cbBTC)={amount1_desired / 10**CBBTC_DECIMALS}")
+
+    print("\n--- PRE-FLIGHT (обязательно перед mint): реальные балансы USDC и cbBTC на Base ---")
+    usdc_balance_premint = erc20_balance(BASE_RPC, USDC, WALLET)
+    cbbtc_balance_premint = erc20_balance(BASE_RPC, CBBTC, WALLET)
+    preflight_balance("USDC перед mint", usdc_balance_premint, amount0_desired, USDC_DECIMALS, "USDC")
+    preflight_balance("cbBTC перед mint", cbbtc_balance_premint, amount1_desired, CBBTC_DECIMALS, "cbBTC")
 
     send_and_wait(BASE_RPC, BASE_CHAIN_ID, account, "6_approve_USDC_to_NFPM", USDC,
                   erc20_approve_calldata(NFPM, amount0_desired), 0, nonce_base, progress, eth_usd_price)
@@ -569,6 +633,26 @@ def main() -> int:
     print("\n=== ШАГ 4: шорт BTC на Lighter (плечо уже 2.0x, размер = реальная cbBTC-нога) ===")
     real_delta_btc = real_amount1_cbbtc
     progress["hedge_target_delta_btc"] = real_delta_btc
+
+    print("\n--- PRE-FLIGHT (обязательно перед шортом): реальный коллатерал на Lighter, свежий (не из П.0) ---")
+    btc_market = lighter_btc_market()  # перечитано СВЕЖЕ -- с П.0 прошло время (мост+своп+mint)
+    account_full_prehedge = lighter_account_full()
+    collateral_prehedge = float(account_full_prehedge.get("collateral", 0)) if account_full_prehedge else 0.0
+    mark_price_prehedge = float(btc_market["mark_price"]) if btc_market else None
+    short_notional_prehedge = real_delta_btc * mark_price_prehedge if mark_price_prehedge else None
+    required_margin_prehedge = short_notional_prehedge / btc_leverage["leverage"] if short_notional_prehedge else None
+    print(f"[p6_step1] PRE-FLIGHT шорт: collateral реально=${collateral_prehedge:.4f}, notional=${short_notional_prehedge:.4f}, "
+          f"требуемая маржа=${required_margin_prehedge:.4f}")
+    if required_margin_prehedge is None or collateral_prehedge < required_margin_prehedge:
+        progress["CRITICAL"] = (f"LP-позиция (tokenId={liq_event['token_id']}) ОТКРЫТА, но PRE-FLIGHT перед шортом провален -- "
+                                 f"collateral=${collateral_prehedge} < требуемая маржа=${required_margin_prehedge}. "
+                                 "ТРЕБУЕТСЯ НЕМЕДЛЕННОЕ РУЧНОЕ ВМЕШАТЕЛЬСТВО ВЛАДЕЛЬЦА (LP без хеджа).")
+        OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
+        print(f"[p6_step1] {progress['CRITICAL']}")
+        return 1
+    progress["preflight_hedge"] = {"collateral_usd": collateral_prehedge, "short_notional_usd": short_notional_prehedge,
+                                    "required_margin_usd": required_margin_prehedge, "mark_price_usd": mark_price_prehedge}
+    OUT_PATH.write_text(json.dumps(progress, indent=2, default=str, ensure_ascii=False))
 
     async def _place_hedge() -> dict:
         import lighter
