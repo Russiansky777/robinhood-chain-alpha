@@ -41,9 +41,18 @@ order by ordinal_position"""
     out["dex_trades_all_columns"] = df1.to_dict("records") if df1 is not None else None
     print("[probe] dex.trades колонки:", [r["column_name"] for r in out["dex_trades_all_columns"]] if df1 is not None else None)
 
+    # Пишем результат ПОСЛЕ первого запроса, ДО второго -- урок бага
+    # (funding_historical_backfill.py: сбой в необязательном ВТОРОМ шаге
+    # не должен топить уже полученный результат ПЕРВОГО).
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
+
+    # Trino/Dune SQL -- НЕТ `ilike` (реальная ошибка первой попытки,
+    # run 33969380403: "mismatched input 'ilike'"), только `like` --
+    # регистронезависимость через lower().
     sql2 = """select table_schema, table_name
 from information_schema.tables
-where table_name ilike '%pool%' or table_name ilike '%reserve%' or table_name ilike '%liquidit%'
+where lower(table_name) like '%pool%' or lower(table_name) like '%reserve%' or lower(table_name) like '%liquidit%'
 order by table_schema, table_name
 limit 200"""
     qid2 = client.create_query("task1_pool_reserve_tables_search", sql2)
@@ -52,7 +61,6 @@ limit 200"""
     out["pool_reserve_tables"] = df2.to_dict("records") if df2 is not None else None
     print(f"[probe] найдено таблиц с pool/reserve/liquidit в имени: {len(out['pool_reserve_tables']) if df2 is not None else 0}")
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
     print(f"[probe] результат записан в {OUT_PATH}")
     return 0
