@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-05T00:48:51Z",
+  "generated_at_utc": "2026-09-05T01:00:43Z",
   "mode": "REAL",
   "recon_used": {
     "nfpm": "0x827922686190790b37229fd06084350E74485b72",
@@ -23,19 +23,84 @@
   "txs": [
     {
       "label": "6_approve_USDC_to_NFPM",
-      "tx_hash": "0xf77bbdce6ce0f2e7acf873d285308cc0b4ece2538912031d1902d93e44f7c319",
+      "tx_hash": "0x05a118384ff10b28dca709158bfa18b364ed3487ddad977345e99d26fd448445",
       "status": "success",
       "gas_used": 38349,
-      "block_number": 50890002,
+      "block_number": 50890358,
       "effective_gas_price_wei": 6899999
     },
     {
       "label": "7_approve_CBBTC_to_NFPM",
-      "tx_hash": "0x259d4bd88c9bfb08e0894ad33b8e8b9df9ee0ee31c8808f636476cede1aa88b7",
+      "tx_hash": "0x772c99f4016ffe9291122a6931b33a370e85f8b5b43b32546e467b053ad11581",
       "status": "success",
-      "gas_used": 40040,
-      "block_number": 50890004,
+      "gas_used": 42840,
+      "block_number": 50890361,
+      "effective_gas_price_wei": 6899999
+    },
+    {
+      "label": "8_mint",
+      "tx_hash": "0x0e27b0944a32d1cc8ba52942a73e9b384332070f8a7a6e409901e82e1927c380",
+      "status": "success",
+      "gas_used": 436250,
+      "block_number": 50890364,
       "effective_gas_price_wei": 6899999
     }
-  ]
+  ],
+  "lp_position": {
+    "token_id": 76445294,
+    "liquidity": 11851202,
+    "amount0_usdc_actual": 43.697255,
+    "amount1_cbbtc_actual": 0.0002444,
+    "tick_lower": -68000,
+    "tick_upper": -64000
+  },
+  "hedge_target_delta_btc": 0.0002444,
+  "preflight_hedge": {
+    "collateral_usd": 61.883369,
+    "short_notional_usd": 19.44074912,
+    "required_margin_usd": 9.72037456,
+    "mark_price_usd": 79544.8
+  },
+  "hedge_order": {
+    "tx_hash": "1a387eb96d0c63da452d26efc85bbf5e4846987afe84514df98b146543fac97f4d8500382d152a24",
+    "resp_code": 200,
+    "resp_message": "{\"ratelimit\": \"didn't use volume quota\"}",
+    "err": null,
+    "base_amount": 24,
+    "size_btc_requested": 0.0002444
+  },
+  "hedge_fill_check": {
+    "filled": true,
+    "position": {
+      "market_id": 1,
+      "symbol": "BTC",
+      "initial_margin_fraction": "50.00",
+      "open_order_count": 0,
+      "pending_order_count": 0,
+      "position_tied_order_count": 0,
+      "sign": -1,
+      "position": "0.00024",
+      "avg_entry_price": "79536.8",
+      "position_value": "19.090728",
+      "unrealized_pnl": "-0.001896",
+      "realized_pnl": "0.000000",
+      "liquidation_price": "333383.5680171278",
+      "total_funding_paid_out": "0.000000",
+      "margin_mode": 0,
+      "margin_set_flag": 1,
+      "allocated_margin": "0.000000"
+    },
+    "attempts_used": 2
+  },
+  "hedge_confirmed": {
+    "size_btc": 0.00024,
+    "avg_entry_price_usd": 79536.8,
+    "liquidation_price_exchange_usd": 333383.5680171278,
+    "liquidation_price_formula_usd": 333383.5680171278,
+    "collateral_usd": 61.883369,
+    "available_balance_usd": 52.336109,
+    "free_margin_pct": 84.5721715635747,
+    "net_delta_btc": 4.3999999999999714e-06
+  },
+  "runtime_s": 39.40193772315979
 }
