@@ -163,22 +163,35 @@ def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
     for pm in pm_markets:
         q = normalize(pm.get("question", "") + " " + (pm.get("slug", "") or ""))
         if all(t and t in q for t in teams):
-            end_date_str = pm.get("endDate")
+            # РЕАЛЬНАЯ НАХОДКА (2026-09-05, taskC_edge_probe_result.json):
+            # у Polymarket есть поле `gameStartTime` -- реальное время НАЧАЛА
+            # игры, точнее для MLB-серий, чем `endDate` (endDate у "базового"
+            # moneyline-рынка может стоять на дату ПОСЛЕДНЕЙ игры серии, а не
+            # конкретной -- пример: "Toronto Blue Jays vs. Kansas City Royals"
+            # endDate=2026-09-12, но gameStartTime=2026-09-05 -- РЕАЛЬНАЯ игра).
+            # Используем gameStartTime, когда есть; endDate -- fallback, когда
+            # поля нет (не у всех типов рынков оно проставлено).
+            compare_date_str = pm.get("gameStartTime") or pm.get("endDate")
+            date_source = "gameStartTime" if pm.get("gameStartTime") else "endDate"
             date_diff_days = None
-            if end_date_str:
+            if compare_date_str:
                 try:
-                    end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-                    date_diff_days = abs((end_date - game_date).total_seconds()) / 86400
+                    compare_date = datetime.fromisoformat(compare_date_str.replace("Z", "+00:00"))
+                    if compare_date.tzinfo is None:
+                        compare_date = compare_date.replace(tzinfo=timezone.utc)
+                    date_diff_days = abs((compare_date - game_date).total_seconds()) / 86400
                 except ValueError:
                     pass
             if date_diff_days is None or date_diff_days > DATE_DIFF_CONFIDENT_DAYS:
                 near_misses += 1  # команды совпали, дата нет -- честно считаем отдельно, не подсовываем как матч
                 if len(near_miss_samples) < 3:  # диагностика -- реальный размер разрыва, не гадаем
                     near_miss_samples.append({"question": pm.get("question"), "kalshi_close_time": game["close_time"],
-                                               "pm_endDate": end_date_str, "date_diff_days": date_diff_days})
+                                               "pm_compare_date": compare_date_str, "date_source": date_source,
+                                               "date_diff_days": date_diff_days})
                 continue
             candidates.append({"question": pm.get("question"), "slug": pm.get("slug"),
-                                "endDate": end_date_str, "date_diff_days": date_diff_days,
+                                "endDate": pm.get("endDate"), "gameStartTime": pm.get("gameStartTime"),
+                                "date_source": date_source, "date_diff_days": date_diff_days,
                                 "outcomePrices": pm.get("outcomePrices"), "volume": pm.get("volumeNum")})
     candidates.sort(key=lambda c: c["date_diff_days"])
     return candidates, near_misses, near_miss_samples
