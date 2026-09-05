@@ -61,11 +61,17 @@ DRYRUN_PATH = Path("data/p3_guard_cache/asset_consolidation_dryrun_result.json")
 
 APPROVE_SELECTOR = _selector("approve(address,uint256)")
 BALANCE_OF_SELECTOR = "0x70a08231"
-# exactInputSingle((address,address,uint24,address,uint256,uint256,uint160)) --
-# SwapRouter02 (БЕЗ deadline в структуре, в отличие от classic SwapRouter v1 /
-# Aerodrome Slipstream, использованных в P5/P6) -- вычисляется, не хардкодится.
-EXACT_INPUT_SINGLE_SELECTOR_NO_DEADLINE = _selector(
-    "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))")
+# Два реальных кандидата на ABI exactInputSingle -- проверяются по
+# очереди через eth_call-симуляцию (0 газа), НЕ угадывается вслепую на
+# реальные деньги. Первая попытка (SwapRouter02, БЕЗ deadline) реально
+# провалилась (run 33975314247, "execution reverted", деньги НЕ
+# потрачены -- симуляция сработала как задумано) -- пробуем classic
+# SwapRouter v1 (С deadline), тот же struct-стиль, что уже реально
+# работал в P5/P6 (там с int24 tickSpacing вместо uint24 fee).
+EXACT_INPUT_SINGLE_SIG_NO_DEADLINE = "exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))"
+EXACT_INPUT_SINGLE_SIG_WITH_DEADLINE = "exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))"
+EXACT_INPUT_SINGLE_SELECTOR_NO_DEADLINE = _selector(EXACT_INPUT_SINGLE_SIG_NO_DEADLINE)
+EXACT_INPUT_SINGLE_SELECTOR_WITH_DEADLINE = _selector(EXACT_INPUT_SINGLE_SIG_WITH_DEADLINE)
 
 
 def rpc(method: str, params: list):
@@ -90,21 +96,53 @@ def erc20_allowance(token: str, spender: str) -> int:
     return int(rpc("eth_call", [{"to": token, "data": data}, "latest"]), 16)
 
 
-def build_swap_calldata(token_in: str, token_out: str, fee: int, recipient: str, amount_in: int, amount_out_min: int) -> bytes:
+def build_swap_calldata_no_deadline(token_in: str, token_out: str, fee: int, recipient: str, amount_in: int, amount_out_min: int) -> bytes:
     params = (to_checksum_address(token_in), to_checksum_address(token_out), fee, to_checksum_address(recipient),
               amount_in, amount_out_min, 0)
     encoded = abi_encode(["(address,address,uint24,address,uint256,uint256,uint160)"], [params])
     return EXACT_INPUT_SINGLE_SELECTOR_NO_DEADLINE + encoded
 
 
-def simulate_swap(token_in: str, token_out: str, fee: int, amount_in: int) -> int:
-    """eth_call СИМУЛЯЦИЯ (0 газа, не меняет состояние) -- эмпирически
-    подтверждает, что структура параметров реально принимается
-    контрактом, ДО того как тратить реальный газ. amount_out_min=0 для
-    симуляции (не для реальной отправки)."""
-    calldata = build_swap_calldata(token_in, token_out, fee, WALLET, amount_in, 0)
-    result = rpc("eth_call", [{"from": WALLET, "to": ROUTER, "data": "0x" + calldata.hex()}, "latest"])
-    return int(result, 16)
+def build_swap_calldata_with_deadline(token_in: str, token_out: str, fee: int, recipient: str, deadline: int, amount_in: int, amount_out_min: int) -> bytes:
+    params = (to_checksum_address(token_in), to_checksum_address(token_out), fee, to_checksum_address(recipient),
+              deadline, amount_in, amount_out_min, 0)
+    encoded = abi_encode(["(address,address,uint24,address,uint256,uint256,uint256,uint160)"], [params])
+    return EXACT_INPUT_SINGLE_SELECTOR_WITH_DEADLINE + encoded
+
+
+def simulate_call(data: bytes) -> tuple[bool, int | None, str | None]:
+    """eth_call СИМУЛЯЦИЯ (0 газа, не меняет состояние). Возвращает
+    (успех, output_raw|None, ошибка|None) -- НЕ бросает исключение при
+    revert, чтобы вызывающий код мог перебрать несколько кандидатов
+    ABI, не падая на первом же."""
+    try:
+        result = rpc("eth_call", [{"from": WALLET, "to": ROUTER, "data": "0x" + data.hex()}, "latest"])
+        return True, int(result, 16), None
+    except RuntimeError as e:
+        return False, None, str(e)[:300]
+
+
+def simulate_swap(token_in: str, token_out: str, fee: int, amount_in: int) -> tuple[str, int]:
+    """Перебирает РЕАЛЬНЫЕ кандидаты ABI через eth_call-симуляцию (0
+    газа, деньги не тратятся), возвращает (какая структура сработала,
+    ожидаемый output). Обе попытки провалились -- explicit RuntimeError,
+    не гадаем дальше на реальные деньги."""
+    data_no_dl = build_swap_calldata_no_deadline(token_in, token_out, fee, WALLET, amount_in, 0)
+    ok, out, err = simulate_call(data_no_dl)
+    if ok and out and out > 0:
+        print(f"[execute_base] структура БЕЗ deadline (SwapRouter02) сработала, output={out}")
+        return "no_deadline", out
+    print(f"[execute_base] структура БЕЗ deadline провалилась ({err}) -- пробую С deadline (classic SwapRouter v1)")
+
+    deadline = int(time.time()) + 600
+    data_with_dl = build_swap_calldata_with_deadline(token_in, token_out, fee, WALLET, deadline, amount_in, 0)
+    ok2, out2, err2 = simulate_call(data_with_dl)
+    if ok2 and out2 and out2 > 0:
+        print(f"[execute_base] структура С deadline (classic SwapRouter v1) сработала, output={out2}")
+        return "with_deadline", out2
+
+    raise RuntimeError(f"ОБЕ структуры ABI провалились на реальном router {ROUTER} -- "
+                        f"без deadline: {err}; с deadline: {err2} -- СТОП, не гадаем дальше на реальные деньги.")
 
 
 def eth_gas_price() -> int:
@@ -190,10 +228,8 @@ def do_swap(account, label: str, token_in: str, token_out: str, fee: int, decima
         return
 
     print("--- Эмпирическая проверка структуры calldata (eth_call-симуляция, 0 газа) ---")
-    simulated_out = simulate_swap(token_in, token_out, fee, amount_raw)
-    print(f"[execute_base] симуляция прошла, ожидаемый output raw = {simulated_out}")
-    if simulated_out <= 0:
-        raise RuntimeError(f"{label}: симуляция вернула 0 или отрицательное -- СТОП, не гадаем структуру calldata дальше.")
+    abi_variant, simulated_out = simulate_swap(token_in, token_out, fee, amount_raw)
+    print(f"[execute_base] структура ABI, реально подтверждённая симуляцией: {abi_variant}, ожидаемый output raw = {simulated_out}")
 
     min_out_raw = int(simulated_out * (1 - SWAP_SLIPPAGE))
 
@@ -206,7 +242,10 @@ def do_swap(account, label: str, token_in: str, token_out: str, fee: int, decima
     else:
         print(f"[execute_base] {label}: allowance уже достаточен ({allowance/10**decimals_in}), approve не нужен")
 
-    swap_data = build_swap_calldata(token_in, token_out, fee, WALLET, amount_raw, min_out_raw)
+    if abi_variant == "no_deadline":
+        swap_data = build_swap_calldata_no_deadline(token_in, token_out, fee, WALLET, amount_raw, min_out_raw)
+    else:
+        swap_data = build_swap_calldata_with_deadline(token_in, token_out, fee, WALLET, int(time.time()) + 600, amount_raw, min_out_raw)
     send_and_wait(account, f"{label}_swap", ROUTER, swap_data, nonce, eth_usd, progress)
 
 
