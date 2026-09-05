@@ -175,15 +175,19 @@ def send_and_wait(account, label: str, to: str, data: bytes, nonce: int, eth_usd
 
 
 def do_swap(account, label: str, token_in: str, token_out: str, fee: int, decimals_in: int,
-            amount_human: float, eth_usd: float, progress: dict) -> None:
-    amount_raw = int(amount_human * 10 ** decimals_in)
-    print(f"\n=== {label}: {amount_human} ({token_in}) -> {token_out}, fee={fee/10000:.2f}% ===")
+            eth_usd: float, progress: dict) -> None:
+    """Свопает ВЕСЬ реальный (только что прочитанный, RAW-целое, БЕЗ
+    прохода через float human-round-trip -- на реальные деньги не
+    полагаемся на округление float64 при пересчёте назад в raw) баланс
+    token_in."""
+    print(f"\n=== {label}: {token_in} -> {token_out}, fee={fee/10000:.2f}% ===")
 
     print("--- PRE-FLIGHT: реальный баланс перед свопом ---")
-    bal = erc20_balance(token_in)
-    print(f"[execute_base] реальный баланс token_in: {bal / 10**decimals_in}")
-    if bal < amount_raw:
-        raise RuntimeError(f"{label}: PRE-FLIGHT -- реально {bal/10**decimals_in}, нужно {amount_human} -- СТОП.")
+    amount_raw = erc20_balance(token_in)
+    print(f"[execute_base] реальный баланс token_in (RAW): {amount_raw} ({amount_raw / 10**decimals_in})")
+    if amount_raw <= 0:
+        print(f"[execute_base] {label}: баланс 0 -- нечего свопать, пропуск")
+        return
 
     print("--- Эмпирическая проверка структуры calldata (eth_call-симуляция, 0 газа) ---")
     simulated_out = simulate_swap(token_in, token_out, fee, amount_raw)
@@ -227,21 +231,19 @@ def run() -> int:
         progress = json.loads(OUT_PATH.read_text())
         print(f"[execute_base] найден progress-файл с {len(progress.get('txs', []))} уже отправленными tx -- продолжаю идемпотентно")
 
-    cbbtc_amount = erc20_balance(CBBTC) / 10 ** CBBTC_DECIMALS
-    usdc_amount = erc20_balance(USDC) / 10 ** USDC_DECIMALS
-    print(f"[execute_base] РЕАЛЬНЫЕ балансы сейчас: cbBTC={cbbtc_amount}, USDC={usdc_amount}")
+    print(f"[execute_base] РЕАЛЬНЫЕ балансы сейчас: cbBTC={erc20_balance(CBBTC)/10**CBBTC_DECIMALS}, "
+          f"USDC={erc20_balance(USDC)/10**USDC_DECIMALS}")
 
     already_done = {t["label"] for t in progress.get("txs", []) if t["status"] == "success"}
-    if "cbbtc_to_weth_swap" not in already_done and cbbtc_amount > 0:
-        do_swap(account, "cbbtc_to_weth", CBBTC, WETH, CBBTC_WETH_POOL_FEE, CBBTC_DECIMALS, cbbtc_amount, eth_usd, progress)
+    if "cbbtc_to_weth_swap" not in already_done:
+        do_swap(account, "cbbtc_to_weth", CBBTC, WETH, CBBTC_WETH_POOL_FEE, CBBTC_DECIMALS, eth_usd, progress)
     else:
-        print("[execute_base] cbBTC->WETH уже сделан или баланс 0 -- пропуск")
+        print("[execute_base] cbBTC->WETH уже сделан -- пропуск")
 
-    usdc_amount_now = erc20_balance(USDC) / 10 ** USDC_DECIMALS
-    if "usdc_to_weth_swap" not in already_done and usdc_amount_now > 0:
-        do_swap(account, "usdc_to_weth", USDC, WETH, USDC_WETH_POOL_FEE, USDC_DECIMALS, usdc_amount_now, eth_usd, progress)
+    if "usdc_to_weth_swap" not in already_done:
+        do_swap(account, "usdc_to_weth", USDC, WETH, USDC_WETH_POOL_FEE, USDC_DECIMALS, eth_usd, progress)
     else:
-        print("[execute_base] USDC->WETH уже сделан или баланс 0 -- пропуск")
+        print("[execute_base] USDC->WETH уже сделан -- пропуск")
 
     weth_final = erc20_balance(WETH) / 10 ** WETH_DECIMALS
     print(f"\n[execute_base] РЕАЛЬНЫЙ финальный баланс WETH на Base: {weth_final}")
