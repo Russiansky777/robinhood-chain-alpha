@@ -1,0 +1,73 @@
+name: "Задача 1 -- сток-токены по выходным: X (тёмное окно) vs Y (гэп акции) vs Z"
+
+# Владелец, 2026-09-05: замена закрытому Query 3 (0 заявок 8-K в тёмном
+# окне). Смоук по умолчанию (1 последнее завершённое выходные) --
+# TASK1_SMOKE_ONLY=1; полный прогон по всем выходным с 01.07.2026 --
+# отдельный workflow_dispatch input full=true. Бюджет -- пространство
+# task1_weekend_gap, 250 кредитов (docs/PROJECT_STATE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Полный прогон по всем выходным (не только смоук)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK1_WEEKEND_GAP_SMOKE_REQUEST"
+      - "data/p3_guard_cache/TASK1_WEEKEND_GAP_FULL_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: Determine smoke vs full
+        id: mode
+        run: |
+          if [ "${{ github.event.inputs.full }}" = "true" ] || [ -e data/p3_guard_cache/TASK1_WEEKEND_GAP_FULL_REQUEST ]; then
+            echo "smoke_only=0" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: ПОЛНЫЙ прогон по всем выходным"
+          else
+            echo "smoke_only=1" >> "$GITHUB_OUTPUT"
+            echo "РЕЖИМ: смоук (1 последнее завершённое выходные)"
+          fi
+      - name: Задача 1 -- X (тёмное окно) vs Y (гэп) vs Z
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+          TASK1_SMOKE_ONLY: ${{ steps.mode.outputs.smoke_only }}
+        run: python -u analysis/task1_weekend_gap.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/task1_weekend_gap_result.json ] && git add data/p3_guard_cache/task1_weekend_gap_result.json
+          [ -d data/task1_weekend_gap_cache ] && git add data/task1_weekend_gap_cache/
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 1 (сток-токены по выходным): результат прогона [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
