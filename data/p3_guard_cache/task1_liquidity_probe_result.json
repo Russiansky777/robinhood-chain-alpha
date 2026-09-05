@@ -1,0 +1,931 @@
+{
+  "dex_trades_all_columns": [
+    {
+      "column_name": "blockchain",
+      "data_type": "varchar",
+      "ordinal_position": 1
+    },
+    {
+      "column_name": "project",
+      "data_type": "varchar",
+      "ordinal_position": 2
+    },
+    {
+      "column_name": "version",
+      "data_type": "varchar",
+      "ordinal_position": 3
+    },
+    {
+      "column_name": "block_month",
+      "data_type": "date",
+      "ordinal_position": 4
+    },
+    {
+      "column_name": "block_date",
+      "data_type": "date",
+      "ordinal_position": 5
+    },
+    {
+      "column_name": "block_time",
+      "data_type": "timestamp(3) with time zone",
+      "ordinal_position": 6
+    },
+    {
+      "column_name": "block_number",
+      "data_type": "bigint",
+      "ordinal_position": 7
+    },
+    {
+      "column_name": "token_bought_symbol",
+      "data_type": "varchar",
+      "ordinal_position": 8
+    },
+    {
+      "column_name": "token_sold_symbol",
+      "data_type": "varchar",
+      "ordinal_position": 9
+    },
+    {
+      "column_name": "token_pair",
+      "data_type": "varchar",
+      "ordinal_position": 10
+    },
+    {
+      "column_name": "token_bought_amount",
+      "data_type": "double",
+      "ordinal_position": 11
+    },
+    {
+      "column_name": "token_sold_amount",
+      "data_type": "double",
+      "ordinal_position": 12
+    },
+    {
+      "column_name": "token_bought_amount_raw",
+      "data_type": "uint256",
+      "ordinal_position": 13
+    },
+    {
+      "column_name": "token_sold_amount_raw",
+      "data_type": "uint256",
+      "ordinal_position": 14
+    },
+    {
+      "column_name": "amount_usd",
+      "data_type": "double",
+      "ordinal_position": 15
+    },
+    {
+      "column_name": "token_bought_address",
+      "data_type": "varbinary",
+      "ordinal_position": 16
+    },
+    {
+      "column_name": "token_sold_address",
+      "data_type": "varbinary",
+      "ordinal_position": 17
+    },
+    {
+      "column_name": "taker",
+      "data_type": "varbinary",
+      "ordinal_position": 18
+    },
+    {
+      "column_name": "maker",
+      "data_type": "varbinary",
+      "ordinal_position": 19
+    },
+    {
+      "column_name": "project_contract_address",
+      "data_type": "varbinary",
+      "ordinal_position": 20
+    },
+    {
+      "column_name": "tx_hash",
+      "data_type": "varbinary",
+      "ordinal_position": 21
+    },
+    {
+      "column_name": "tx_from",
+      "data_type": "varbinary",
+      "ordinal_position": 22
+    },
+    {
+      "column_name": "tx_to",
+      "data_type": "varbinary",
+      "ordinal_position": 23
+    },
+    {
+      "column_name": "evt_index",
+      "data_type": "bigint",
+      "ordinal_position": 24
+    },
+    {
+      "column_name": "_updated_at",
+      "data_type": "timestamp(3) with time zone",
+      "ordinal_position": 25
+    }
+  ],
+  "pool_reserve_tables": [
+    {
+      "table_name": "kishimotoinu_call__liquidityfee",
+      "table_schema": "03_fantom"
+    },
+    {
+      "table_name": "kishimotoinu_call_setliquidityfeepercent",
+      "table_schema": "03_fantom"
+    },
+    {
+      "table_name": "onethousandpdf_call_liquidityfee",
+      "table_schema": "0nameservice_bnb"
+    },
+    {
+      "table_name": "salmonation_call_setnewreserveraddress",
+      "table_schema": "0x4841181_bnb"
+    },
+    {
+      "table_name": "salmonation_evt_reserveraddressupdated",
+      "table_schema": "0x4841181_bnb"
+    },
+    {
+      "table_name": "poolmanager_call_addrewardtopool",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_bondyieldpercentage",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_ismanager",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_owner",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_pool",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_precision",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_renounceownership",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_setmanager",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_transferownership",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_treasury",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_updatebondyield",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_updatebondyieldpercentage",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_call_wsteth",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "poolmanager_evt_ownershiptransferred",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_balanceof",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_basepool",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_duration",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_earned",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_getreward",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_getrewardbasepool",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_historicalrewards",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_lasttimerewardapplicable",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_lastupdatetime",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_manager",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_notifyrewardamount",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_owner",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_periodfinish",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_recovertoken",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_renounceownership",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_rewardpertoken",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_rewardpertokenstored",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_rewardrate",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_rewards",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_rewardtoken",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_setmanager",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_totalsupply",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_transferownership",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_updatestaked",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_call_userrewardpertokenpaid",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_evt_ownershiptransferred",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_evt_rewardadded",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_evt_rewardpaid",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "yieldpool_evt_updatestaked",
+      "table_schema": "0xacid_arbitrum"
+    },
+    {
+      "table_name": "terkehh_call_addliquidity",
+      "table_schema": "0xbitcoin_bnb"
+    },
+    {
+      "table_name": "terkehh_call_liquidity",
+      "table_schema": "0xbitcoin_bnb"
+    },
+    {
+      "table_name": "oxdv1rewards_call_partnersrewardspooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_gaugebysolidpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_isoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_migrateableoxpools",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolbysolidpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpooldata",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolfactory",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolfactoryaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolsaddresses",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolsdata",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxpoolsmigrationmapping",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxsolidrewardpoolposition",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxsolidrewardspool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_oxsolidrewardspooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_partnersrewardspooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_poolsfactoryaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_poolspositions",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_solidpoolbyoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_stakingpoolposition",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_stakingpoolspositions",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_stakingrewardsbyoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxlens_call_stakingrewardsbysolidpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_initializeproxystorage",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_isoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_isoxpoolorlegacyoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_multirewardstemplateaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxdaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxpoolbysolidpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxpoolimplementationsourceaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxpoolproxytemplateaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxpools",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxpoolslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxsolidaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_oxsolidrewardspooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_poolslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_proxystorageinitialized",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_rewardsdistributoraddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_solidlylensaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_solidpoolbyoxpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_syncedpoolslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_syncpools",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_tokensallowlist",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_unsyncedpoolslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_vloxdaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolfactory_call_voterproxyaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_allowance",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_allowedtokenslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_approve",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_balanceof",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribeaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribenotifysyncindex",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribeorfeesindex",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribesyncindex",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribetokensaddresses",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_bribetokenslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_decimals",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_decreaseallowance",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_depositlp",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_gaugeaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_increaseallowance",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_indexbyrewardtoken",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_initialize",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_name",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_nextclaimbribetimestamp",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_nextclaimfeetimestamp",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_nextclaimsolidtimestamp",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_notifybribeorfees",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_notifybribetokens",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_notifyfeetokens",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_oxpooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_oxpoolfactoryaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_rewardtokenbyindex",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_solidpooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_solidpoolinfo",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_stakingaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_symbol",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_syncbribetokens",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_tokensallowlistaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_totalsupply",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_transfer",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_transferfrom",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_updatetokenallowedstate",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_updatetokensallowedstates",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_call_withdrawlp",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_evt_approval",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolimplementationsource_evt_transfer",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolproxytemplate_call_implementationsourceaddress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "oxpoolproxytemplate_call_initialize",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_acceptownership",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_addreward",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_balanceof",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_earned",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_execute",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_exit",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_getreward",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_getrewardforduration",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_initializeproxystorage",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_ispartner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_lastpausetime",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_lasttimerewardapplicable",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_legacyrewardtokens",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_nominatedowner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_nominatenewowner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_notifyrewardamount",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_operator",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_owner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_paused",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_proxystorageinitialized",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_recovererc20",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_rewarddata",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_rewardpertoken",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_rewards",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_rewardtokens",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_rewardtokenslength",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_setoperator",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_setpartner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_setpaused",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_setrewardsdistributor",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_setrewardsduration",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_stake",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_stakefor",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_stakingtoken",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_totalsupply",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_userrewardpertokenpaid",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_call_withdraw",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_operatorstatus",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_ownerchanged",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_ownernominated",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_partnerstatus",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_pausechanged",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_recovered",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_rewardadded",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_rewardpaid",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_rewardsdurationupdated",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_staked",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "partnersrewardspool_evt_withdrawn",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_incentivizedpools",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_incentivizedpoolweights",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_oxdlockpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_oxsolidrewardspooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_setoxdlockpool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_setoxsolidrewardspool",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "rewardsdistributor_call_setrewardpoolowner",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_bribeaddresbypooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_bribetokensaddressesbypooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_gaugeaddressbypooladdress",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_poolinfo",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_poolreservesinfo",
+      "table_schema": "0xdao_fantom"
+    },
+    {
+      "table_name": "solidlylens_call_poolsaddresses",
+      "table_schema": "0xdao_fantom"
+    }
+  ]
+}
