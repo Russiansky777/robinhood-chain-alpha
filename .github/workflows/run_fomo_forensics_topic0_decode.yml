@@ -1,0 +1,47 @@
+name: "Форензика fomo -- структурное определение реального topic0 TokenLaunched (только чтение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FOMO_FORENSICS_TOPIC0_DECODE_REQUEST"
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Структурное определение topic0 (только чтение, LIMIT 20 на кандидата)"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+        run: python -u analysis/fomo_forensics_topic0_decode.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FOMO_FORENSICS_TOPIC0_DECODE_REQUEST
+          [ -e data/p3_guard_cache/fomo_forensics_topic0_decode_result.json ] && git add data/p3_guard_cache/fomo_forensics_topic0_decode_result.json
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Форензика fomo: структурное определение topic0 TokenLaunched, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
