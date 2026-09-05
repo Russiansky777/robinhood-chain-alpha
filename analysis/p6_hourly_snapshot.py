@@ -66,6 +66,25 @@ KILL_2_FEE_CAPTURE_THRESHOLD = 0.4
 KILL_3_BASIS_THRESHOLD_PCT = 2.0
 KILL_3_MIN_CONSECUTIVE_DAYS = 2
 
+# Владелец, 2026-09-05: "цена выше +11% от входа -> сократить шорт" --
+# реальная верхняя граница диапазона [-68000,-64000] по округлённым тикам
+# ≈+12.7% от цены входа (docs/PROJECT_STATE.md #13) -- при пробитии верхней
+# границы LP-нога полностью уходит в USDC, cbBTC-экспозиция обнуляется, а
+# хедж (шорт BTC) остаётся БЕЗ покрытия (голый шорт). Порог +11% -- запас
+# ДО фактической границы, чтобы успеть среагировать заранее, не постфактум.
+PRICE_ALERT_THRESHOLD_PCT_FROM_ENTRY = 11.0
+
+# Владелец, 2026-09-05: реальный часовой объём пула (тот же код, что
+# analysis/p5_live_position_snapshot.py::fetch_hourly_volume_usd_since) --
+# для fee_capture_ratio_cumulative (kill_flag_2). ЧЕСТНО: kill_flag_1
+# (fee_lvr_ratio) НЕ зависит от объёма пула -- ему нужен sigma_realized
+# (реализованная волатильность СВОЕГО ЖЕ ценового ряда, минимум 3 точки),
+# он останется null просто до накопления времени (не до этого фикса).
+GT_RATE_LIMIT_BACKOFF_S = 65.0
+GT_RATE_LIMIT_MAX_RETRIES = 2
+GT_HOURLY_MAX_PAGES = 6  # 6000 часовых свечей ~= 250 дней -- с запасом на срок жизни позиции
+POOL_FEE_FRACTION = CONFIG["pool_fee_fraction"]
+
 RPC_MIN_INTERVAL_S = 1.5
 RPC_RETRY_BACKOFF_S = 15.0
 RPC_MAX_RETRIES = 3
@@ -276,6 +295,81 @@ def fetch_gt_pool_tvl_soft() -> float | None:
         return None
 
 
+def _gt_get_with_retry(url: str, params: dict) -> tuple[int | None, dict | str | None]:
+    """GET с ретраем на 429 -- ТОТ ЖЕ метод, что p5_live_position_snapshot.py
+    (владелец, 2026-09-05: "тот же код, что fee_capture P5")."""
+    status, body = None, None
+    for attempt in range(GT_RATE_LIMIT_MAX_RETRIES + 1):
+        try:
+            r = requests.get(url, params=params, headers={"Accept": "application/json;version=20230302"}, timeout=20)
+            status, body = r.status_code, (r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text[:300])
+        except Exception as e:  # noqa: BLE001
+            print(f"[p6_snapshot] GT hourly OHLCV: сетевая ошибка {e}")
+            return None, None
+        if status == 429 and attempt < GT_RATE_LIMIT_MAX_RETRIES:
+            print(f"[p6_snapshot] GT hourly OHLCV 429 (попытка {attempt + 1}/{GT_RATE_LIMIT_MAX_RETRIES + 1}) -- жду {GT_RATE_LIMIT_BACKOFF_S:.0f}с")
+            time.sleep(GT_RATE_LIMIT_BACKOFF_S)
+            continue
+        break
+    return status, body
+
+
+def fetch_hourly_volume_usd_since(since_ts_unix: int) -> tuple[float | None, int, int | None, int | None]:
+    """Реальный почасовой объём пула в USD с timestamp >= since_ts_unix --
+    ДОСЛОВНО тот же метод, что p5_live_position_snapshot.py (владелец:
+    "снимки h24 -- скользящее окно, соседние точки перекрываются на 23
+    часа, суммировать нельзя -- берём фактический почасовой объём из
+    OHLCV"). (None, 0, None, None), если свечей ещё нет (позиция открыта
+    <1ч назад) -- честный null, не придумываем частичную свечу."""
+    all_rows: dict[int, list] = {}
+    before_ts: int | None = None
+    hit_older_than_since = False
+    for _ in range(GT_HOURLY_MAX_PAGES):
+        params = {"aggregate": 1, "limit": 1000, "currency": "usd", "include_empty_intervals": "true"}
+        if before_ts is not None:
+            params["before_timestamp"] = before_ts
+        status, body = _gt_get_with_retry(
+            f"https://api.geckoterminal.com/api/v2/networks/{CONFIG['gt_network']}/pools/{CONFIG['pool_address']}/ohlcv/hour", params)
+        if status != 200 or not isinstance(body, dict):
+            print(f"[p6_snapshot] GT hourly OHLCV: HTTP {status} -- {str(body)[:200]} -- останов пагинации")
+            break
+        rows = body.get("data", {}).get("attributes", {}).get("ohlcv_list", [])
+        if not rows:
+            break
+        for row in rows:
+            ts = int(row[0])
+            if ts >= since_ts_unix:
+                all_rows[ts] = row
+            else:
+                hit_older_than_since = True
+        oldest_ts = min(int(row[0]) for row in rows)
+        if len(rows) < 1000 or hit_older_than_since:
+            break
+        before_ts = oldest_ts
+    if not all_rows:
+        return None, 0, None, None
+    volume_sum = sum(float(row[5]) for row in all_rows.values())
+    ts_sorted = sorted(all_rows.keys())
+    return volume_sum, len(all_rows), ts_sorted[0], ts_sorted[-1]
+
+
+def read_all_accrual_pool_tvls() -> list[float]:
+    """Все реально сохранённые pool_reserve_in_usd из data/p6_fee_accrual.jsonl
+    (тот же метод, что P5) -- для СРЕДНЕГО TVL пула, не последнего снимка."""
+    if not ACCRUAL_LOG_PATH.exists():
+        return []
+    tvls = []
+    with ACCRUAL_LOG_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("pool_reserve_in_usd") is not None:
+                tvls.append(float(row["pool_reserve_in_usd"]))
+    return tvls
+
+
 def compute_basis_kill_flag(rows: list[dict], current_basis_pct: float | None) -> dict:
     """Тот же метод, что analysis/p6_basis_recompute.py -- суточный
     (календарные сутки UTC) базис, но здесь считается ИНКРЕМЕНТАЛЬНО из
@@ -412,14 +506,55 @@ def run() -> int:
     fee_apr_annualized = (our_yield_cum * 24 * 365 / hours_covered) if (our_yield_cum is not None and hours_covered) else None
     fee_lvr_ratio = (fee_apr_annualized / lvr_annualized_frac) if (fee_apr_annualized is not None and lvr_annualized_frac) else None
 
-    # fee_capture_ratio_cumulative (владелец, П6_HEDGED_LP.md kill-критерий №2)
-    # требует РЕАЛЬНОГО часового объёма пула (тот же метод, что
-    # p5_live_position_snapshot.py::fetch_hourly_volume_usd_since) -- НЕ
-    # реализовано в этой версии, честный null вместо приближения/выдумки.
-    fee_capture_ratio_cumulative = None
-    fee_capture_note = "TODO: требует реального часового объёма пула (fetch_hourly_volume_usd_since), не реализовано в этой версии -- честный null, не приближение."
+    # fee_capture_ratio_cumulative (владелец, П6_HEDGED_LP.md kill-критерий №2,
+    # реализовано 2026-09-05 -- ТОТ ЖЕ метод, что p5_live_position_snapshot.py):
+    # числитель -- НАШИ комиссии с открытия (callStatic collect(), уже
+    # накопительно) / текущая стоимость LP-ноги; знаменатель -- реальный
+    # почасовой объём пула (ohlcv/hour?currency=usd, timestamp>=открытие
+    # позиции) × pool_fee_fraction, делённый на СРЕДНИЙ TVL пула по всем
+    # реально сохранённым точкам (не последний снимок).
+    position_open_ts_unix = int(opened_at.timestamp()) if opened_at else None
+    pool_volume_usd_sum, n_hourly_candles, earliest_ts, latest_ts = (None, 0, None, None)
+    if position_open_ts_unix is not None:
+        pool_volume_usd_sum, n_hourly_candles, earliest_ts, latest_ts = fetch_hourly_volume_usd_since(position_open_ts_unix)
+    pool_fees_usd_cum = (pool_volume_usd_sum * POOL_FEE_FRACTION) if pool_volume_usd_sum is not None else None
+    tvl_samples = read_all_accrual_pool_tvls()
+    if tvl_now is not None:
+        tvl_samples = tvl_samples + [tvl_now]
+    avg_pool_tvl_usd = (sum(tvl_samples) / len(tvl_samples)) if tvl_samples else None
+    pool_yield_cum = (pool_fees_usd_cum / avg_pool_tvl_usd) if (pool_fees_usd_cum is not None and avg_pool_tvl_usd) else None
+    fee_capture_ratio_cumulative = (our_yield_cum / pool_yield_cum) if (our_yield_cum is not None and pool_yield_cum) else None
+    fee_capture_note = (
+        "0 часовых свечей с timestamp>=открытие позиции (позиция открыта <1ч назад) -- честный null, не выдумываем частичную свечу."
+        if not n_hourly_candles else None
+    )
+    fee_capture_detail = {
+        "pool_volume_usd_sum_since_open": pool_volume_usd_sum, "n_hourly_candles": n_hourly_candles,
+        "earliest_hourly_candle_ts": earliest_ts, "latest_hourly_candle_ts": latest_ts,
+        "pool_fees_usd_cum": pool_fees_usd_cum, "avg_pool_tvl_usd": avg_pool_tvl_usd,
+        "n_tvl_samples": len(tvl_samples), "pool_yield_cum": pool_yield_cum,
+    }
+    print(f"[p6_snapshot] fee_capture_ratio_cumulative={fee_capture_ratio_cumulative} детали={fee_capture_detail}")
 
     basis_kill = compute_basis_kill_flag(rows, basis_pct)
+
+    # Владелец, 2026-09-05: флаг "цена выше +11% от входа -> сократить шорт"
+    entry_price_usd = state.get("pool_price_usd_entry")
+    price_pct_from_entry = ((pool_price_cbbtc_usd / entry_price_usd - 1) * 100) if entry_price_usd else None
+    real_upper_bound_usd = price_from_tick_usd(pos["tick_lower"])  # реальная (округлённая) верхняя граница диапазона
+    real_upper_bound_pct_from_entry = ((real_upper_bound_usd / entry_price_usd - 1) * 100) if entry_price_usd else None
+    flag_price_up_11pct_reduce_short = (price_pct_from_entry is not None and price_pct_from_entry > PRICE_ALERT_THRESHOLD_PCT_FROM_ENTRY)
+    action_flags = {
+        "flag_price_up_11pct_reduce_short": flag_price_up_11pct_reduce_short,
+        "price_pct_from_entry": price_pct_from_entry,
+        "entry_price_usd": entry_price_usd,
+        "real_upper_bound_usd": real_upper_bound_usd,
+        "real_upper_bound_pct_from_entry": real_upper_bound_pct_from_entry,
+        "note": "Реальная верхняя граница диапазона (округлённый тик) существенно выше номинала -- см. docs/PROJECT_STATE.md #13; "
+                "при пробитии этой границы LP-нога полностью уходит в USDC, хедж остаётся без покрытия. Порог +11% -- запас ДО неё.",
+    }
+    if flag_price_up_11pct_reduce_short:
+        print(f"[p6_snapshot] !!! ФЛАГ: цена реально выросла на {price_pct_from_entry:.2f}% от входа (>{PRICE_ALERT_THRESHOLD_PCT_FROM_ENTRY}%) -- рассмотреть сокращение шорта !!!")
 
     kill_flags = {
         "kill_flag_1_fee_lvr_ratio_lt_3": (fee_lvr_ratio < KILL_1_RATIO_THRESHOLD) if fee_lvr_ratio is not None else None,
@@ -431,7 +566,7 @@ def run() -> int:
         "timestamp_utc": result["generated_at_utc"], "block": None, "token_id": token_id,
         "pool_price_cbbtc_usd": pool_price_cbbtc_usd, "in_range": in_range,
         "fees0_usdc": fees0_usdc, "fees1_cbbtc": fees1_cbbtc, "fees_usd_unclaimed": fees_usd_unclaimed,
-        "our_reserve_usd": our_reserve_usd_now,
+        "our_reserve_usd": our_reserve_usd_now, "pool_reserve_in_usd": tvl_now,
         "hedge_size_btc": hedge.get("size_btc"), "hedge_unrealized_pnl_usd": hedge.get("unrealized_pnl_usd"),
         "hedge_liquidation_price_usd": hedge.get("liquidation_price_exchange_usd"),
         "hedge_free_margin_pct": hedge.get("free_margin_pct"), "net_delta_btc": net_delta_btc,
@@ -439,13 +574,16 @@ def run() -> int:
         "sigma_realized_annualized": sigma, "k_concentration": k_val,
         "lvr_annualized_frac": lvr_annualized_frac, "fee_apr_annualized": fee_apr_annualized,
         "fee_lvr_ratio": fee_lvr_ratio, "fee_capture_ratio_cumulative": fee_capture_ratio_cumulative,
-        "fee_capture_note": fee_capture_note,
+        "fee_capture_note": fee_capture_note, "fee_capture_detail": fee_capture_detail,
         "basis_kill_detail": basis_kill,
+        "price_pct_from_entry": price_pct_from_entry, "flag_price_up_11pct_reduce_short": flag_price_up_11pct_reduce_short,
         **kill_flags,
     }
     result["row"] = row
     result["kill_flags"] = kill_flags
+    result["action_flags"] = action_flags
     print(f"[p6_snapshot] kill_flags={kill_flags}")
+    print(f"[p6_snapshot] action_flags={action_flags}")
 
     ACCRUAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ACCRUAL_LOG_PATH.open("a") as f:
