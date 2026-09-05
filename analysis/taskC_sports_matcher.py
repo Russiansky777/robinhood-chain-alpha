@@ -159,7 +159,7 @@ def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
         game_date = datetime.fromisoformat(game["close_time"].replace("Z", "+00:00"))
     except ValueError:
         return []
-    candidates, near_misses = [], 0
+    candidates, near_misses, near_miss_samples = [], 0, []
     for pm in pm_markets:
         q = normalize(pm.get("question", "") + " " + (pm.get("slug", "") or ""))
         if all(t and t in q for t in teams):
@@ -173,12 +173,15 @@ def match_game_to_polymarket(game: dict, pm_markets: list[dict]) -> list[dict]:
                     pass
             if date_diff_days is None or date_diff_days > DATE_DIFF_CONFIDENT_DAYS:
                 near_misses += 1  # команды совпали, дата нет -- честно считаем отдельно, не подсовываем как матч
+                if len(near_miss_samples) < 3:  # диагностика -- реальный размер разрыва, не гадаем
+                    near_miss_samples.append({"question": pm.get("question"), "kalshi_close_time": game["close_time"],
+                                               "pm_endDate": end_date_str, "date_diff_days": date_diff_days})
                 continue
             candidates.append({"question": pm.get("question"), "slug": pm.get("slug"),
                                 "endDate": end_date_str, "date_diff_days": date_diff_days,
                                 "outcomePrices": pm.get("outcomePrices"), "volume": pm.get("volumeNum")})
     candidates.sort(key=lambda c: c["date_diff_days"])
-    return candidates, near_misses
+    return candidates, near_misses, near_miss_samples
 
 
 def run() -> int:
@@ -196,10 +199,12 @@ def run() -> int:
 
     print("\n[matcher] сопоставление по названиям команд + дате (строгий порог "
           f"{DATE_DIFF_CONFIDENT_DAYS} дня)...")
-    matched, total_near_misses = [], 0
+    matched, total_near_misses, near_miss_samples = [], 0, []
     for game in all_games:
-        cands, near_misses = match_game_to_polymarket(game, pm_markets)
+        cands, near_misses, samples = match_game_to_polymarket(game, pm_markets)
         total_near_misses += near_misses
+        if len(near_miss_samples) < 15:
+            near_miss_samples.extend(samples)
         if cands:
             matched.append({"kalshi_event": game["event_ticker"], "series": game["series"],
                              "close_time": game["close_time"],
@@ -214,6 +219,7 @@ def run() -> int:
         "n_matched_confident": len(matched),
         "n_team_matched_but_date_rejected": total_near_misses,
         "matched": matched,
+        "near_miss_samples": near_miss_samples[:15],
         "unmatched_sample": [g["event_ticker"] for g in all_games if g["event_ticker"] not in {m["kalshi_event"] for m in matched}][:30],
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
