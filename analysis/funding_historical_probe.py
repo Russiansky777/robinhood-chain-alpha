@@ -89,6 +89,25 @@ def run() -> int:
     }
     print(json.dumps(result["lighter_earliest_probe"], indent=2, ensure_ascii=False))
 
+    print("\n=== 4. Hyperliquid predictedFundings -- реальная форма (кросс-биржевой снимок HL/Binance/Bybit и др.) ===")
+    r3 = requests.post(f"{HYPERLIQUID_API_BASE}/info", headers=HEADERS, json={"type": "predictedFundings"}, timeout=20)
+    body3 = None
+    try:
+        body3 = r3.json()
+    except Exception:
+        body3 = r3.text[:1000]
+    btc_entry = None
+    if isinstance(body3, list):
+        for entry in body3:
+            if isinstance(entry, list) and len(entry) == 2 and entry[0] == "BTC":
+                btc_entry = entry
+                break
+    result["hl_predicted_fundings"] = {
+        "status": r3.status_code, "n_entries": len(body3) if isinstance(body3, list) else None,
+        "btc_entry_full": btc_entry, "body_preview_first_500_chars": json.dumps(body3, default=str)[:500],
+    }
+    print(json.dumps(result["hl_predicted_fundings"], indent=2, ensure_ascii=False, default=str))
+
     Path("data/p3_guard_cache/funding_historical_probe_result.json").write_text(
         json.dumps(result, indent=2, ensure_ascii=False, default=str)
     )
