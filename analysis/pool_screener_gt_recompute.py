@@ -211,17 +211,34 @@ def get_real_fee_fraction(project: str, network: str, pool_address: str) -> dict
     return r
 
 
-def get_gauge_correction(project: str, network: str, pool_address: str, total_liquidity_raw: int | None) -> dict:
+def get_gauge_correction(project: str, network: str, pool_address: str) -> dict:
     """Поправка на staked/unstaked -- ТОЛЬКО для aerodrome-slipstream (CL),
     механика подтверждена реальным WebFetch в этой сессии. Для остальных --
-    честно "не применяется" / "не смоделирована", без подгонки."""
+    честно "не применяется" / "не смоделирована", без подгонки.
+
+    ВАЖНО (найдено в первом реальном прогоне этого скрипта, 2026-09-05,
+    run 33960204306): total_liquidity ЗДЕСЬ ОБЯЗАТЕЛЬНО читается ЖИВЬЁМ
+    (`liquidity()`), а не берётся из кэша pool_screener_concentration_
+    result.json -- тот кэш посчитан РАНЬШЕ (другой прогон), и на активных
+    пулах total liquidity реально меняется между запусками (LP добавляют/
+    убирают ликвидность) -- первый прогон сравнил СТАРЫЙ total с НОВЫМ
+    staked и получил staked > total на 3 пулах (unstaked_share
+    отрицательный, бессмысленный) -- это гонка чтений в моём же коде, не
+    реальная находка о механике пула. Оба числа -- staked и total --
+    ОБЯЗАНЫ быть из одного eth_call-снимка (тот же принцип, что урок
+    "raw domain vs human domain" из P5/P6 -- нельзя смешивать данные из
+    разных моментов времени в одной формуле)."""
     if project != "aerodrome-slipstream":
         return {"applicable": False, "reason": "поправка реализована только для CL (Aerodrome Slipstream) -- staked/unstaked liquidity-based split подтверждён WebFetch CLPool.sol; для aerodrome-v1 (classic) механика другая (per-LP supplyIndex), не смоделирована -- число ниже показывается БЕЗ поправки, как верхняя граница"}
     try:
+        total_liquidity_raw = int(rpc_call(network, pool_address, _selector("liquidity()")), 16)
         staked_raw = int(rpc_call(network, pool_address, _selector("stakedLiquidity()")), 16)
         unstaked_fee_raw = int(rpc_call(network, pool_address, _selector("unstakedFee()")), 16)
-        if total_liquidity_raw is None or total_liquidity_raw == 0:
-            return {"applicable": True, "error": "total_liquidity_raw неизвестен (нет в кэше concentration)"}
+        if total_liquidity_raw == 0:
+            return {"applicable": True, "error": "liquidity()=0 сейчас (реально, живым чтением)"}
+        if staked_raw > total_liquidity_raw:
+            return {"applicable": True, "error": f"staked_liquidity_raw={staked_raw} > total_liquidity_raw={total_liquidity_raw} ДАЖЕ при чтении в одном снимке -- реальная аномалия контракта, не гонка чтений, требует отдельного разбора, не подгоняем",
+                    "staked_liquidity_raw": staked_raw, "total_liquidity_raw": total_liquidity_raw}
         unstaked_share = (total_liquidity_raw - staked_raw) / total_liquidity_raw
         unstaked_fee_frac = unstaked_fee_raw / 1_000_000
         return {
@@ -275,8 +292,7 @@ def process_one(c: dict) -> dict:
         entry["fee_apr_gt_7d_raw"] = fee_apr_7d
         entry["fee_apr_gt_30d_raw"] = fee_apr_30d
 
-        total_liq_raw = c.get("concentration", {}).get("liquidity_raw")
-        gauge = get_gauge_correction(project, network, address, total_liq_raw)
+        gauge = get_gauge_correction(project, network, address)
         entry["gauge_correction"] = gauge
         mult = gauge.get("correction_multiplier") if gauge.get("applicable") and gauge.get("error") is None else 1.0
         entry["fee_apr_gt_7d_corrected"] = fee_apr_7d * mult
