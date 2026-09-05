@@ -46,7 +46,7 @@ order by total_vol_usd desc
 limit 300"""
     qid1 = client.create_query("task1_pool_addresses_by_token", sql1)
     df1 = client.run_sql_cached("task1_pool_addresses_by_token", sql1, query_id=qid1,
-                                 estimated_credits=12.0, expected_max_rows=350, expected_columns=7)
+                                 estimated_credits=12.0, expected_max_rows=350, expected_columns=8)
     out["pool_addresses_by_token"] = df1.to_dict("records") if df1 is not None else None
     print(f"[probe2] реальных строк (project x pool x pair): {len(out['pool_addresses_by_token']) if df1 is not None else 0}")
 
