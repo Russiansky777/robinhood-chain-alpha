@@ -54,7 +54,7 @@ from scipy import stats as sstats  # noqa: E402
 
 import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
-from run_pipeline import read_sql, q_list  # noqa: E402
+from run_pipeline import read_sql  # noqa: E402
 
 BUDGET = 250.0
 REGISTRY_PATH = Path("data/rwa_stock_token_registry.json")
@@ -141,6 +141,18 @@ def run() -> int:
     token_addrs = [t["stock_token_address"] for t in tokens.values()]
     addr_to_symbol = {t["stock_token_address"].lower(): sym for sym, t in tokens.items()}
 
+    # Реальная проверка (2026-09-05, task1_dex_trades_columns_probe_result.json,
+    # information_schema.columns): token_bought_address/token_sold_address в
+    # dex.trades -- VARBINARY, не VARCHAR (первый прогон run 33964786227 упал
+    # именно на этом: "Cannot find common type between varbinary and
+    # varchar(42)" -- голые q_list()-литералы, как в sql/r1/*.sql, здесь не
+    # годятся). from_hex() строит varbinary-литерал из hex-строки БЕЗ '0x'
+    # префикса. НЕ трогаем sql/r1/*.sql задним числом -- их результат уже
+    # реально получен и закоммичен ДО этой проверки; возможно, схема dex.trades
+    # реально изменилась между прогоном R1 (01-04.09) и сейчас (05.09) -- это
+    # находка о дрейфе схемы Dune, не повод переисполнять закрытый спринт.
+    token_addrs_hex_list = ",".join(f"from_hex('{a[2:].lower()}')" for a in token_addrs)
+
     sql_template = read_sql("task1/task1_weekend_windows")
     friday_list_sql = ",".join(f"timestamp '{f} 00:00:00'" for f in fridays)
     trades_start = fridays[0] + " 00:00:00"
@@ -148,7 +160,7 @@ def run() -> int:
     trades_end = trades_end_dt.strftime("%Y-%m-%d %H:%M:%S")
     sql = (sql_template
            .replace("{{weekend_friday_list}}", friday_list_sql)
-           .replace("{{token_address_list}}", q_list(token_addrs))
+           .replace("{{token_address_list}}", token_addrs_hex_list)
            .replace("{{trades_start}}", trades_start)
            .replace("{{trades_end}}", trades_end))
 

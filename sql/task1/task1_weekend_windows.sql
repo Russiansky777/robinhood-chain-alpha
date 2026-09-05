@@ -11,8 +11,18 @@
 --
 -- {{weekend_friday_list}} -- список ISO-дат пятниц (UTC полночь) через
 -- запятую, каждая обёрнута в timestamp ''; {{token_address_list}} --
--- список адресов токенов через запятую в одинарных кавычках (та же
--- подстановка, что во всех r1_*.sql).
+-- список `from_hex('...')`-литералов (VARBINARY), НЕ голых varchar-строк
+-- в кавычках, как в sql/r1/*.sql -- РЕАЛЬНАЯ проверка 2026-09-05
+-- (task1_dex_trades_columns_probe.sql, information_schema.columns)
+-- показала, что token_bought_address/token_sold_address в dex.trades
+-- сейчас VARBINARY -- первый прогон (run 33964786227) упал с "Cannot
+-- find common type between varbinary and varchar(42)" на голых
+-- varchar-литералах. Возможно, схема dex.trades реально изменилась
+-- между прогоном Sprint R1 (01-04.09.2026, тот же паттерн там работал)
+-- и сейчас (05.09.2026) -- sql/r1/*.sql НЕ переписаны задним числом
+-- (их результат уже реально получен и закрыт), это отдельная находка о
+-- дрейфе схемы Dune, зафиксированная здесь для будущих запросов к
+-- dex.trades.
 with weekends as (
     select tok.token_address, wk.friday_utc
     from unnest(array[{{weekend_friday_list}}]) as wk(friday_utc)
