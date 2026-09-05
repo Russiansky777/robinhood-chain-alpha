@@ -1,0 +1,48 @@
+name: "Задача 1, проверка 2 -- тайминг возврата (Z1 вс 20:00-21:00 ET vs Z2 21:00-пн 9:30 ET)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK1_Z_DECOMPOSE_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Проверка 2 -- Z1/Z2 декомпозиция"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+        run: python -u analysis/task1_z_decompose.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_Z_DECOMPOSE_REQUEST
+          [ -e data/p3_guard_cache/task1_z_decompose_result.json ] && git add data/p3_guard_cache/task1_z_decompose_result.json
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 1, проверка 2 (тайминг Z1/Z2): результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
