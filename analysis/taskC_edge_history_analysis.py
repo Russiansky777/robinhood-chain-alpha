@@ -36,7 +36,23 @@ from taskC_sports_matcher import fetch_polymarket_bulk, normalize  # noqa: E402
 HEADERS = {"User-Agent": "robinhood-chain-alpha-taskC-edge-history/1.0"}
 KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2"
 CLOB_BASE = "https://clob.polymarket.com"
+POLYMARKET_BASE = "https://gamma-api.polymarket.com"
 OUT_PATH = Path("data/p3_guard_cache/taskC_edge_history_analysis_result.json")
+
+
+def pm_market_by_slug(slug: str) -> dict | None:
+    """Прямой поиск по РЕАЛЬНОМУ, уже известному slug (записан при
+    исходном сопоставлении) -- надёжнее, чем полагаться на присутствие
+    рынка в постраничном bulk-fetch (settled-рынки ротируются из
+    активной/недавно-закрытой выборки со временем, реально найдено:
+    FULCRY/DUCDIA дважды подряд не нашлись в bulk)."""
+    r = requests.get(f"{POLYMARKET_BASE}/markets", params={"slug": slug}, headers=HEADERS, timeout=20)
+    if r.status_code != 200:
+        return None
+    body = r.json()
+    if isinstance(body, list) and body:
+        return body[0]
+    return None
 
 
 def kalshi_fee(price_dollars: float) -> float:
@@ -71,7 +87,16 @@ def kalshi_all_trades(ticker: str, max_pages: int = 20) -> list[dict]:
     return trades
 
 
-def clob_prices_history(token_id: str, start_ts: int, end_ts: int, fidelity: int = 5) -> list[dict]:
+def clob_prices_history(token_id: str, start_ts: int, end_ts: int, fidelity: int = 1) -> list[dict]:
+    # fidelity в МИНУТАХ (Polymarket CLOB). РЕАЛЬНАЯ НАХОДКА: fidelity=5
+    # (первый прогон) даёт до 5 минут staleness при forward-fill против
+    # тиковых сделок Kalshi -- у быстро сходящегося рынка перед
+    # разрешением это может ЗАВЫШАТЬ видимый спред (сравниваем текущую
+    # цену Kalshi со стухшей до 5 минут ценой Polymarket, это НЕ
+    # одновременная котировка). fidelity=1 (минимум, который поддерживает
+    # API) уменьшает, но не устраняет асинхронность -- честно помечаем
+    # это ограничение в результате, не выдаём сырые числа за факт
+    # мгновенного арбитража.
     r = requests.get(f"{CLOB_BASE}/prices-history",
                       params={"market": token_id, "startTs": start_ts, "endTs": end_ts, "fidelity": fidelity},
                       headers=HEADERS, timeout=20)
@@ -140,14 +165,19 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
     pm_yes_sorted = sorted(pm_yes_history, key=lambda x: x["t"])
     pm_no_sorted = sorted(pm_no_history, key=lambda x: x["t"])
 
-    def price_at(history: list[dict], ts: float) -> float | None:
-        result = None
+    def price_at(history: list[dict], ts: float) -> tuple[float, float] | tuple[None, None]:
+        """Возвращает (цена, реальный возраст этой точки в секундах на
+        момент ts) -- forward-fill, но с явным учётом staleness, чтобы
+        не выдавать устаревшую цену за одновременную котировку."""
+        result, result_t = None, None
         for pt in history:
             if pt["t"] <= ts:
-                result = pt["p"]
+                result, result_t = pt["p"], pt["t"]
             else:
                 break
-        return result
+        if result is None:
+            return None, None
+        return result, ts - result_t
 
     # РЕАЛЬНАЯ НАХОДКА: Kalshi /markets/trades отдаёт сделки НОВЫЕ->СТАРЫЕ
     # (подтверждено эмпирически, taskC_edge_probe_result.json -- убывающий
@@ -158,28 +188,31 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
 
     below_dollar = 0
     windows = []
-    min_costs_below = []
+    min_costs_below = []  # (min_cost, staleness_seconds) -- храним обе, чтобы честно связать величину со свежестью данных
     in_window = False
     window_start = None
     total = 0
     last_ts = None
+    max_staleness = 0.0
     for t in trades_sorted:
         ts = datetime.fromisoformat(t["created_time"].replace("Z", "+00:00")).timestamp()
         yes_k = float(t.get("yes_price_dollars", 0))
         no_k = float(t.get("no_price_dollars", 0))
-        yes_p = price_at(pm_yes_sorted, ts)
-        no_p = price_at(pm_no_sorted, ts)
+        yes_p, yes_p_stale = price_at(pm_yes_sorted, ts)
+        no_p, no_p_stale = price_at(pm_no_sorted, ts)
         if yes_p is None or no_p is None:
             continue
         total += 1
         last_ts = ts
+        point_staleness = max(yes_p_stale, no_p_stale)
+        max_staleness = max(max_staleness, point_staleness)
         combo_a = yes_k + kalshi_fee(yes_k) + no_p
         combo_b = yes_p + no_k + kalshi_fee(no_k)
         min_cost = min(combo_a, combo_b)
         is_below = min_cost < 1.0
         if is_below:
             below_dollar += 1
-            min_costs_below.append(min_cost)
+            min_costs_below.append((min_cost, point_staleness))
         if is_below and not in_window:
             in_window, window_start = True, ts
         elif not is_below and in_window:
@@ -192,8 +225,23 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
     entry["fraction_time_below_dollar"] = round(below_dollar / total, 4) if total else None
     entry["n_windows_below_dollar"] = len(windows)
     entry["median_window_seconds"] = sorted(windows)[len(windows) // 2] if windows else None
+    entry["max_polymarket_price_staleness_seconds"] = round(max_staleness, 1)
+    entry["caveat"] = ("Сравнение использует forward-fill цены Polymarket (fidelity=1мин) против тиковых сделок "
+                        "Kalshi -- при max staleness выше ~60-120с видимый спред может быть НЕ реально одновременным, "
+                        "а артефактом устаревшей котировки одной из сторон, особенно у быстро сходящегося рынка "
+                        "перед разрешением. См. max_polymarket_price_staleness_seconds перед тем, как доверять "
+                        "net_spread_pct_*.")
     # РЕАЛЬНАЯ величина спреда (не только флаг "<$1") -- нужна для
-    # предрегистрированного порога владельца "чистый спред >=1.5%"
+    # предрегистрированного порога владельца "чистый спред >=1.5%".
+    # Отдельно считаем ТОЛЬКО по точкам с низкой staleness (<=60с) --
+    # честная, не инфлированная асинхронностью подвыборка.
+    fresh_min_costs = [c for c, s in min_costs_below if s <= 60]
+    entry["n_below_dollar_fresh_data"] = len(fresh_min_costs)
+    if fresh_min_costs:
+        fresh_spreads = sorted(round((1 - c) * 100, 4) for c in fresh_min_costs)
+        entry["net_spread_pct_median_fresh"] = fresh_spreads[len(fresh_spreads) // 2]
+        entry["net_spread_pct_max_fresh"] = fresh_spreads[-1]
+    min_costs_below = [c for c, _ in min_costs_below]
     if min_costs_below:
         net_spreads = sorted(round((1 - c) * 100, 4) for c in min_costs_below)  # в % от $1
         entry["net_spread_pct_median"] = net_spreads[len(net_spreads) // 2]
@@ -211,13 +259,20 @@ def analyze_game(kalshi_event: str, kalshi_ticker: str, kalshi_title: str, pm_ma
 # сознательно ПРОПУЩЕН -- реально подтверждено (taskC_edge_probe_result.json),
 # что для неё на Polymarket вообще нет ни draw, ни moneyline рынка
 # (только corners O/U, несопоставимо по семантике) -- не гадаем замену.
+# slug -- РЕАЛЬНЫЙ, записанный при исходном сопоставлении
+# (taskC_sports_matcher_result.json, первый успешный прогон) --
+# используем прямой /markets?slug=X, надёжнее постраничного bulk (уже
+# дважды не нашёл FULCRY/DUCDIA там).
 ORIGINAL_MATCHED_GAMES = [
     {"kalshi_event": "KXEPLGAME-26SEP05FULCRY", "has_tie": True,
-     "pm_question": "Will Fulham FC vs. Crystal Palace FC end in a draw?"},
+     "pm_question": "Will Fulham FC vs. Crystal Palace FC end in a draw?",
+     "pm_slug": "epl-ful-cry-2026-09-05-draw"},
     {"kalshi_event": "KXEPLGAME-26SEP05BRESUN", "has_tie": True,
-     "pm_question": "Will Brentford FC vs. Sunderland AFC end in a draw?"},
+     "pm_question": "Will Brentford FC vs. Sunderland AFC end in a draw?",
+     "pm_slug": "epl-bre-sun-2026-09-05-draw"},
     {"kalshi_event": "KXUFCFIGHT-26SEP05DUCDIA", "has_tie": False,
-     "pm_question": "UFC Fight Night: Luis Felipe Dias vs. Matthieu Letho Duclos (Middleweight, Prelims)"},
+     "pm_question": "UFC Fight Night: Luis Felipe Dias vs. Matthieu Letho Duclos (Middleweight, Prelims)",
+     "pm_slug": "ufc-lui13-mat34-2026-09-05"},
 ]
 
 
@@ -229,7 +284,9 @@ def run() -> int:
     for g in ORIGINAL_MATCHED_GAMES:
         pm_market = next((m for m in pm_markets if normalize(m.get("question", "")) == normalize(g["pm_question"])), None)
         if not pm_market:
-            results.append({"kalshi_event": g["kalshi_event"], "status": "Polymarket рынок больше не найден в bulk (вероятно, ротировался из окна)"})
+            pm_market = pm_market_by_slug(g["pm_slug"])  # прямой fallback -- не зависит от bulk-пагинации
+        if not pm_market:
+            results.append({"kalshi_event": g["kalshi_event"], "status": "Polymarket рынок не найден ни в bulk, ни по прямому slug"})
             continue
         # Реальный тикер конкретного Kalshi-рынка -- НЕ строковая склейка
         # (событие != рынок): для EPL берём Tie-исход (сопоставлен с Draw),
