@@ -63,7 +63,7 @@ where lower(to_hex(contract_address)) in ({addrs_sql})
 limit 1"""
     qid = client.create_query("fomo_forensics_p2_scope_probe", sql)
     df = client.run_sql_cached("fomo_forensics_p2_scope_probe", sql, query_id=qid,
-                                estimated_credits=10.0, expected_max_rows=1, expected_columns=5)
+                                estimated_credits=10.0, expected_max_rows=1, expected_columns=6)
     rows = df.to_dict("records") if df is not None else []
     result = rows[0] if rows else {}
     print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
