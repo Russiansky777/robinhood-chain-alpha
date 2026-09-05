@@ -53,15 +53,42 @@ data/p3_guard_cache/p6_fee_mechanism_investigation_result.json) -- 12-50x
      назвал "9.9 из скринера" -- ПОДТВЕРЖДЕНО, не пересчитывается заново).
   6. ratio = fee_apr_corrected / LVR, порог >=2. Рядом -- старый apyBase
      DefiLlama (frac) и discrepancy_multiplier = apyBase_frac /
-     fee_apr_corrected (>1 = агрегатор завышает, <1 = занижает)."""
+     fee_apr_corrected (>1 = агрегатор завышает, <1 = занижает).
+
+ФИКС (владелец, 2026-09-05, калибровка на реальном пуле P5 ETH/USDG,
+`analysis/pool_screener_gt_recompute_calibrate_p5.py`): close-цены для
+sigma НЕЛЬЗЯ брать из `currency=usd` OHLCV-запроса -- прямое сравнение
+показало, что для этого пула `currency=usd` close реально был почти
+плоской линией ~$0.9995-1.0010 (размах 0.15% за 10 часов) -- это была
+цена СТЕЙБЛ-стороны (USDG), которую GT назначил `base_token`, НЕ цена
+ETH. `currency=token&token=quote` для того же окна дал реальные
+$2449-2458 (движение ETH). Занижение sigma в 3.67x (13.49% против
+реальных 49.53%) СИСТЕМАТИЧЕСКИ ЗАВЫШАЕТ `ratio_to_lvr` для ЛЮБОЙ пары
+со стейбл-стороной -- прямо объясняет, почему несколько WETH/USDC-пулов
+прошли порог >=2 в первом прогоне (см. `docs/PROJECT_STATE.md` #21) при
+подозрительно низкой sigma_30d~14-15%, притом что реальная годовая
+волатильность ETH обычно 50-90%. Фикс: `determine_volatile_gt_token_side()`
+эмпирически (по реальной GT-цене, не по хардкод-списку стейблов)
+определяет, какая из двух сторон НЕ стейбл (дальше от $1.00), и
+`fetch_hourly_closes_30d()` запрашивает close ИМЕННО для неё через
+`currency=token&token=<сторона>` -- ОТДЕЛЬНЫМ запросом от объёма (объём
+проверен отдельно на этом же пуле -- реальный дневной оборот ~21.8x TVL
+внутренне согласован с независимо ранее замеренным реальным числом
+транзакций пула (тысячи buy/sell за 5 минут, `data/p3_guard_cache/
+p5_gt_pool_history_result.json`) -- НЕ баг единиц измерения, оставлен
+через `currency=usd` как был)."""
 from __future__ import annotations
 
 import json
 import math
+import sys
 import time
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).parent))
+import pool_screener_concentration as _psc  # noqa: E402 -- reuse get_gt_pool_prices() для базовой/квотовой стороны
 
 IN_PATH = Path("data/p3_guard_cache/pool_screener_concentration_result.json")
 OUT_PATH = Path("data/p3_guard_cache/pool_screener_gt_recompute_result.json")
@@ -140,6 +167,72 @@ def _gt_get_with_retry(url: str, params: dict) -> tuple[int | None, dict | str |
             continue
         break
     return status, body
+
+
+def determine_volatile_gt_token_side(network: str, pool_address: str) -> tuple[str | None, str | None]:
+    """Реальный баг (владелец, 2026-09-05, калибровка на P5): `currency=usd`
+    в OHLCV-запросе для пула ETH/USDG вернул close ~$1.000 (реально
+    проверено прямым сравнением close-цен, размах 0.15% за 10 часов --
+    это цена СТЕЙБЛ-стороны USDG, GT считает её `base_token` для этого
+    пула), а не цену ETH -- искусственно заниженная (в 3.67 раза на этом
+    пуле: 13.49% вместо реальных 49.53%, `currency=token&token=quote`)
+    sigma, которая ЗАВЫШАЕТ `ratio_to_lvr` для ЛЮБОЙ пары со стейбл-
+    стороной (не только ETH/USDG -- тот же паттерн подозревался и на
+    WETH/USDC-пулах Base/Arbitrum, аномально низкая sigma_30d~14-15%
+    против известной волатильности ETH ~50-90%).
+
+    Определяем эмпирически (не по хардкод-списку адресов стейблов,
+    честно по РЕАЛЬНОЙ цене от GT), какая из двух сторон (`base`/`quote`
+    в терминах GT) -- НЕ стейбл: реальная цена дальше от $1.00.
+    Переиспользуем `pool_screener_concentration.get_gt_pool_prices()` --
+    ту же функцию, что уже вызывает `compute_k()` для k_pool, отдельного
+    нового пути к GT не пишем."""
+    try:
+        gt_prices = _psc.get_gt_pool_prices(network, pool_address)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"get_gt_pool_prices упал: {str(exc)[:200]}"
+    base_p, quote_p = gt_prices.get("base_token_price_usd"), gt_prices.get("quote_token_price_usd")
+    if base_p is None or quote_p is None:
+        return None, f"нет обеих цен от GT (base={base_p}, quote={quote_p})"
+    base_dev, quote_dev = abs(base_p - 1.0), abs(quote_p - 1.0)
+    if base_dev == quote_dev:
+        return None, f"обе стороны одинаково близки/далеки от $1 (base={base_p}, quote={quote_p}) -- неоднозначно, честно не выбираем"
+    side = "base" if base_dev > quote_dev else "quote"
+    return side, None
+
+
+def fetch_hourly_closes_30d(network: str, pool_address: str, token_side: str) -> list[tuple[int, float]]:
+    """(ts, close) за последние DAYS_WINDOW дней через `currency=token&
+    token=<token_side>` -- НЕ `currency=usd` (см. determine_volatile_gt_
+    token_side выше), т.к. `usd`-режим может вернуть цену стейбл-стороны,
+    близкую к плоской линии, ломая sigma. token_side -- ВЫБРАННАЯ (не
+    стейбл) сторона, определена заранее реальной проверкой цены."""
+    since_ts = int(time.time()) - DAYS_WINDOW * 86400
+    all_rows: dict[int, float] = {}
+    before_ts = None
+    for _ in range(5):
+        params = {"aggregate": 1, "limit": 1000, "currency": "token", "token": token_side, "include_empty_intervals": "true"}
+        if before_ts is not None:
+            params["before_timestamp"] = before_ts
+        status, body = _gt_get_with_retry(f"https://api.geckoterminal.com/api/v2/networks/{network}/pools/{pool_address}/ohlcv/hour", params)
+        if status != 200 or not isinstance(body, dict):
+            print(f"    GT hourly OHLCV (close, token={token_side}): HTTP {status} -- {str(body)[:200]}")
+            break
+        rows = body.get("data", {}).get("attributes", {}).get("ohlcv_list", [])
+        if not rows:
+            break
+        hit_older = False
+        for row in rows:
+            ts = int(row[0])
+            if ts >= since_ts:
+                all_rows[ts] = float(row[4])
+            else:
+                hit_older = True
+        oldest_ts = min(int(row[0]) for row in rows)
+        if len(rows) < 1000 or hit_older:
+            break
+        before_ts = oldest_ts
+    return sorted(all_rows.items())
 
 
 def fetch_hourly_ohlcv_30d(network: str, pool_address: str) -> list[tuple[int, float, float]]:
@@ -269,7 +362,7 @@ def process_one(c: dict) -> dict:
     fee_info = get_real_fee_fraction(project, network, address)
     entry["fee_tier"] = fee_info
 
-    print(f"    объём/close за {DAYS_WINDOW}д с GT...")
+    print(f"    объём за {DAYS_WINDOW}д с GT (currency=usd, проверено -- ок для объёма)...")
     rows = fetch_hourly_ohlcv_30d(network, address)
     if not rows:
         entry["error"] = (entry.get("error") or "") + " | GT hourly OHLCV пуст (нет свечей за 30д)"
@@ -277,12 +370,24 @@ def process_one(c: dict) -> dict:
     now_ts = int(time.time())
     vol_7d = sum(v for ts, _, v in rows if ts >= now_ts - 7 * 86400)
     vol_30d = sum(v for ts, _, v in rows if ts >= now_ts - 30 * 86400)
-    closes = [(ts, c_) for ts, c_, _ in rows]
-    sigma_30d = sigma_realized_annualized(closes)
+
+    # Баг (владелец, 2026-09-05, калибровка на P5): close-цены из ТОГО ЖЕ
+    # currency=usd запроса НЕЛЬЗЯ использовать для sigma -- см.
+    # determine_volatile_gt_token_side() выше. Определяем реально не-
+    # стейбл сторону и запрашиваем close ОТДЕЛЬНО через currency=token.
+    volatile_side, side_error = determine_volatile_gt_token_side(network, address)
+    sigma_30d, closes = None, []
+    if volatile_side is not None:
+        closes = fetch_hourly_closes_30d(network, address, volatile_side)
+        sigma_30d = sigma_realized_annualized(closes)
     entry["gt_window"] = {"n_hourly_points": len(rows), "volume_7d_usd": vol_7d, "volume_30d_usd": vol_30d,
+                            "volatile_gt_token_side_used_for_sigma": volatile_side, "volatile_side_error": side_error,
+                            "n_close_points_for_sigma": len(closes),
                             "sigma_realized_annualized_30d_real": sigma_30d,
                             "oldest_point_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(rows[0][0])),
                             "newest_point_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(rows[-1][0]))}
+    if sigma_30d is None:
+        entry["error"] = (entry.get("error") or "") + f" | не удалось получить честную sigma_30d (volatile_side_error={side_error})"
 
     fee_frac = fee_info.get("fee_fraction")
     tvl = c["tvl_usd"]
