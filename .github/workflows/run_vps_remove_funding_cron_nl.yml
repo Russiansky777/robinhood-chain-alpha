@@ -1,0 +1,66 @@
+name: "Фандинг -- VPS Нидерланды: убрать часовой cron логгера спреда (:21) после закрытия линии, turnover_watch :51 не трогать"
+
+# Владелец, 2026-09-05, после закрытия линии "фандинг между площадками":
+# "Cron :21 снять с проверкой до/после, :51 не трогать." Симметрично
+# run_vps_remove_p6_cron_nl.yml -- читает ТЕКУЩИЙ crontab, УБИРАЕТ
+# строку funding_hourly_snapshot.sh, явно проверяет ДО и ПОСЛЕ, что
+# turnover_watch_daily.sh (:51) осталась на месте.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_REMOVE_FUNDING_CRON_NL_REQUEST"
+
+jobs:
+  remove_cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Crontab bot -- УБРАТЬ строку funding (:21), turnover_watch (:51) не трогать"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            EXISTING=$(sudo -u bot crontab -l 2>/dev/null || true)
+            echo "=== существующий crontab (ДО) ==="
+            echo "$EXISTING"
+            if ! echo "$EXISTING" | grep -q "turnover_watch_daily.sh"; then
+              echo "СТОП: строка turnover_watch (:51) НЕ найдена в текущем crontab ДО изменения -- не продолжаю вслепую." >&2
+              exit 1
+            fi
+            if ! echo "$EXISTING" | grep -q "funding_hourly_snapshot.sh"; then
+              echo "строки funding (:21) и так уже нет -- нечего убирать, ничего не меняю."
+              exit 0
+            fi
+            FILTERED=$(echo "$EXISTING" | grep -vF "funding_hourly_snapshot.sh" || true)
+            echo "$FILTERED" > /tmp/bot_cron.txt
+            chown bot:bot /tmp/bot_cron.txt
+            sudo -u bot crontab /tmp/bot_cron.txt
+            rm -f /tmp/bot_cron.txt
+            echo "=== raw crontab файл (ПОСЛЕ) ==="; cat /var/spool/cron/crontabs/bot
+            echo "=== crontab -l bot (ПОСЛЕ) ==="; sudo -u bot crontab -l
+            echo "=== проверка: funding (:21) реально убрана? ==="
+            sudo -u bot crontab -l | grep -q "funding_hourly_snapshot.sh" && { echo "ОШИБКА: строка funding всё ещё есть!" >&2; exit 1; } || echo "OK: строки funding нет"
+            echo "=== проверка: turnover_watch (:51) реально осталась? ==="
+            sudo -u bot crontab -l | grep -q "51 9 \* \* \* /home/bot/bin/turnover_watch_daily.sh" && echo "OK: turnover_watch-строка на месте" || { echo "ОШИБКА: turnover_watch-строка пропала!" >&2; exit 1; }
+          '
+
+      - name: Итог
+        run: |
+          echo "cron funding (:21) реально убран, turnover_watch (:51) реально не тронут -- подтверждено чтением crontab до и после."
