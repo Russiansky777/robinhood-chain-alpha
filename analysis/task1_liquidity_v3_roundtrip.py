@@ -95,6 +95,31 @@ def run() -> int:
     print(f"[v3_roundtrip] доля наблюдений |Z|>round-trip (все оценённые): {frac_rows_z_gt_cost}")
     print(f"[v3_roundtrip] доля наблюдений |Z|>round-trip (только TVL>$200k): {result['fraction_rows_abs_Z_gt_round_trip_cost_TVL_ok_only']}")
 
+    # Робастность (тот же урок, что уже дважды подтверждён в проекте --
+    # исключить |X|>0.5, артефакты тонкой ликвидности искажают headline).
+    rows_robust = rows_df[rows_df["X"].abs() <= 0.5]
+    row_level_robust = []
+    for ev in evaluated:
+        sym_rows = rows_robust[rows_robust["symbol"] == ev["symbol"]]
+        for _, r in sym_rows.iterrows():
+            row_level_robust.append({"symbol": ev["symbol"], "z_gt_round_trip": bool(abs(r["Z"]) * 100 > ev["round_trip_cost_pct"]),
+                                      "tvl_ok": bool(ev.get("tvl_ok_gt_200k"))})
+    rl_df = pd.DataFrame(row_level_robust)
+    low_n = [e["symbol"] for e in evaluated if e.get("n_rows_this_symbol", 0) <= 1]
+    result["robustness_check"] = {
+        "note": "Исключены строки |X|>0.5 (та же граница, что в проверках 2/3) -- проверка чувствительности headline к выбросам тонкой ликвидности.",
+        "n_rows_robust": int(len(rl_df)),
+        "fraction_rows_abs_Z_gt_round_trip_cost_robust": float(rl_df["z_gt_round_trip"].mean()) if len(rl_df) else None,
+        "fraction_rows_abs_Z_gt_round_trip_cost_robust_TVL_ok_only": (
+            float(rl_df[rl_df["tvl_ok"]]["z_gt_round_trip"].mean()) if len(rl_df) and rl_df["tvl_ok"].any() else None
+        ),
+        "low_n_symbols_warning": low_n if low_n else None,
+    }
+    print(f"[v3_roundtrip] РОБАСТНОСТЬ (|X|<=0.5): доля={result['robustness_check']['fraction_rows_abs_Z_gt_round_trip_cost_robust']} "
+          f"(TVL-ok: {result['robustness_check']['fraction_rows_abs_Z_gt_round_trip_cost_robust_TVL_ok_only']})")
+    if low_n:
+        print(f"[v3_roundtrip] ВНИМАНИЕ: низкое N (<=1 наблюдение) у {low_n} -- медиана по ним не устойчива")
+
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     print(f"[v3_roundtrip] результат записан в {OUT_PATH}")
