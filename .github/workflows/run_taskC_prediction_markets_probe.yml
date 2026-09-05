@@ -14,6 +14,7 @@ on:
       - "data/p3_guard_cache/TASKC_KALSHI_BTC_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKC_POLYMARKET_BTC_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKC_SPORTS_MATCH_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKC_KALSHI_SERIES_PROBE_REQUEST"
 
 jobs:
   probe:
@@ -44,6 +45,9 @@ jobs:
       - name: Разведка форматов спортивных рынков (Kalshi vs Polymarket, только чтение)
         if: ${{ hashFiles('data/p3_guard_cache/TASKC_SPORTS_MATCH_PROBE_REQUEST') != '' }}
         run: python -u analysis/taskC_sports_match_probe.py
+      - name: Подтверждение реальных тикеров серий Kalshi по видам спорта
+        if: ${{ hashFiles('data/p3_guard_cache/TASKC_KALSHI_SERIES_PROBE_REQUEST') != '' }}
+        run: python -u analysis/taskC_kalshi_series_probe.py
       - name: Commit results
         if: always()
         run: |
@@ -51,10 +55,12 @@ jobs:
           git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_KALSHI_BTC_PROBE_REQUEST
           git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_POLYMARKET_BTC_PROBE_REQUEST
           git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_SPORTS_MATCH_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKC_KALSHI_SERIES_PROBE_REQUEST
           [ -e data/p3_guard_cache/taskC_prediction_markets_probe_result.json ] && git add data/p3_guard_cache/taskC_prediction_markets_probe_result.json
           [ -e data/p3_guard_cache/taskC_kalshi_btc_probe_result.json ] && git add data/p3_guard_cache/taskC_kalshi_btc_probe_result.json
           [ -e data/p3_guard_cache/taskC_polymarket_btc_probe_result.json ] && git add data/p3_guard_cache/taskC_polymarket_btc_probe_result.json
           [ -e data/p3_guard_cache/taskC_sports_match_probe_result.json ] && git add data/p3_guard_cache/taskC_sports_match_probe_result.json
+          [ -e data/p3_guard_cache/taskC_kalshi_series_probe_result.json ] && git add data/p3_guard_cache/taskC_kalshi_series_probe_result.json
           git diff --cached --quiet && exit 0
           git commit -m "Задача C: разведка API предикт-маркетов, результат [automated]"
           for i in 1 2 3 4 5; do
