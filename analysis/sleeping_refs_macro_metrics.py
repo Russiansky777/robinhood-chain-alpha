@@ -135,6 +135,30 @@ def intraday_price_asof(df: pd.DataFrame, target_utc: pd.Timestamp, max_lag_hour
     return float(row["Close"])
 
 
+def intraday_price_first_after(df: pd.DataFrame, target_utc: pd.Timestamp, max_lead_hours: float = 6.0) -> float | None:
+    """РЕАЛЬНЫЙ фикс второго бага, найденного по факту (Y=0.00000
+    буквально для КАЖДОЙ строки GOLD/SP500/... после первого фикса):
+    `intraday_price_asof` на границе x_end (вс 17:55 ET) backward-asof
+    резолвится в ТОТ ЖЕ пятничный принт, что и x_start (вс 17:55 ET
+    находится ВНУТРИ реального разрыва биржи -- рынок физически ещё не
+    открылся) -- разность тождественно 0, это НЕ измерение, а
+    тавтология. Реальный экономический смысл Y здесь -- гэп РЕАЛЬНОГО
+    рынка через ЕГО собственное закрытие: цена ПЕРЕД закрытием (Fri, тот
+    же `intraday_price_asof` на x_start -- корректно, лаг ~1ч, реально
+    проверено) -> цена ПРИ реальном возобновлении торгов (первый
+    реальный принт >= границы, forward-поиск, НЕ backward-asof).
+    Используется как цель вс 18:00 ET (`z1_start` -- то же самое время,
+    что и реальное открытие CME Globex по спецификации владельца)."""
+    eligible = df[df["dt_utc"] >= target_utc]
+    if not len(eligible):
+        return None
+    row = eligible.iloc[0]
+    lead_hours = (row["dt_utc"] - target_utc).total_seconds() / 3600.0
+    if lead_hours > max_lead_hours:
+        return None
+    return float(row["Open"])
+
+
 def resolve_y_source(ticker: str, start_date: str, end_date: str) -> dict:
     """Реальный выбор рабочего Y-тикера/метода -- пробуем кандидатов,
     честно фиксируем, какой реально сработал."""
@@ -194,7 +218,7 @@ def compute_rows(universe: dict, fridays: list[str]) -> tuple[list[dict], dict]:
                 y_val = y["gap"]
             else:
                 y_before = intraday_price_asof(y_src["intraday"], w["x_start"])
-                y_after = intraday_price_asof(y_src["intraday"], w["x_end"])
+                y_after = intraday_price_first_after(y_src["intraday"], w["z1_start"])
                 if y_before is None or y_after is None or y_before <= 0:
                     bump(f"{ticker}: реального Y (intraday) нет в пределах допуска для {friday}")
                     continue
