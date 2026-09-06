@@ -1,0 +1,62 @@
+name: "Сторожок субсидий -- забрать накопленный ряд с NL VPS (только чтение по SSH + коммит)"
+
+# По образцу run_p5_live_position_snapshot.yml / run_fetch_live_
+# divergence_from_vps.yml -- subsidy_watch.py теперь запускается
+# автономно раз в сутки НА САМОМ VPS (см. run_vps_extend_turnover_
+# watch_subsidy.yml, живой файл ВНЕ git-репозитория -- /home/bot/
+# turnover_watch_live_data/subsidy_watch.jsonl). Этот workflow ТОЛЬКО
+# читает по SSH то, что cron уже накопил, и коммитит в
+# data/subsidy_watch.jsonl.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FETCH_SUBSIDY_WATCH_FROM_VPS_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Забрать накопленный ряд (вне git на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/turnover_watch_live_data/subsidy_watch.jsonl' > /tmp/vps_subsidy_watch.jsonl
+          echo "реальных строк на VPS: $(wc -l < /tmp/vps_subsidy_watch.jsonl)"
+
+      - name: Commit results
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FETCH_SUBSIDY_WATCH_FROM_VPS_REQUEST
+          cp /tmp/vps_subsidy_watch.jsonl data/subsidy_watch.jsonl
+          git add data/subsidy_watch.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "Сторожок субсидий: забор накопленного subsidy_watch.jsonl с VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
