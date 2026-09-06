@@ -169,6 +169,43 @@ def summarize(swaps: list[dict], label: str) -> dict:
         "p5_bot_hits": p5_bot_hits,
         "top3_share_of_role_slots": top_share,
         "top10_addresses": [{"address": a, "n_role_slots": c} for a, c in top10],
+        # Полный счётчик (не только топ-10) -- нужен, чтобы честно
+        # пересчитать ПУЛ по всем выходным из уже прочекпоинченных
+        # результатов при возобновлении (см. run()), не храня сырые
+        # свопы (были бы велики -- десятки тысяч строк на выходные).
+        "role_slot_counts": dict(both),
+    }
+
+
+def _pool_from_checkpoints(per_weekend: dict, key: str) -> dict:
+    """Честно пересчитывает 'пул по всем выходным' из уже сохранённых
+    per-weekend summarize()-результатов (role_slot_counts/n_swaps/
+    self_trade_fraction/p5_bot_hits) -- без повторного чтения сырых
+    свопов. Используется и при обычном завершении, и при возобновлении
+    (когда часть выходных были посчитаны в ПРЕДЫДУЩЕМ, оборванном по
+    таймауту прогоне)."""
+    from collections import Counter
+    total = Counter()
+    n_swaps = 0
+    self_trade_n = 0
+    p5_bot_hits = 0
+    for info in per_weekend.values():
+        s = info.get(key)
+        if not s:
+            continue
+        n_swaps += s["n_swaps"]
+        if s["self_trade_fraction"] is not None:
+            self_trade_n += round(s["self_trade_fraction"] * s["n_swaps"])
+        p5_bot_hits += s["p5_bot_hits"]
+        total.update(s["role_slot_counts"])
+    top10 = total.most_common(10)
+    top_share = sum(c for _, c in total.most_common(3)) / (2 * n_swaps) if n_swaps else None
+    return {
+        "label": f"{key} pooled (из чекпоинтов)", "n_swaps": n_swaps,
+        "n_distinct_addresses": len(total),
+        "self_trade_fraction": self_trade_n / n_swaps if n_swaps else None,
+        "p5_bot_hits": p5_bot_hits, "top3_share_of_role_slots": top_share,
+        "top10_addresses": [{"address": a, "n_role_slots": c} for a, c in top10],
     }
 
 
@@ -195,16 +232,32 @@ def _checkpoint(result: dict) -> None:
 def run() -> int:
     print(f"[darkwindow] реальных v3-пулов в выборке: {len(POOLS_BY_SYMBOL)} (пропущено без известного адреса: {MISSING_SYMBOLS})")
     print(f"[darkwindow] INCLUDE_X={INCLUDE_X} (см. докстринг константы -- по умолчанию только Z, дешёвый буквальный запрос)")
-    result: dict = {
-        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "include_x": INCLUDE_X, "complete": False,
-        "pools_by_symbol": POOLS_BY_SYMBOL, "missing_symbols": MISSING_SYMBOLS,
-        "known_p5_bot": KNOWN_P5_BOT, "weekends": WEEKENDS, "per_weekend": {},
-    }
-    all_z_swaps: list[dict] = []
-    all_x_swaps: list[dict] = []
+
+    # Возобновление: предыдущий прогон (run 34046838238) реально был
+    # отменён по 25-мин таймауту, но чекпоинт после каждого выходного
+    # уже сохранил 6 из 8 -- дочитывать их заново стоило бы ещё ~20 мин
+    # RPC впустую. Если результат уже на диске и не complete -- честно
+    # переиспользуем уже посчитанные выходные, считаем только недостающие.
+    if OUT_PATH.exists():
+        prev = json.loads(OUT_PATH.read_text())
+        result = prev
+        result["generated_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        done = set(result.get("per_weekend", {}).keys())
+        print(f"[darkwindow] возобновление: {len(done)} выходных уже в чекпоинте -- {sorted(done)}")
+    else:
+        result = {
+            "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "include_x": INCLUDE_X, "complete": False,
+            "pools_by_symbol": POOLS_BY_SYMBOL, "missing_symbols": MISSING_SYMBOLS,
+            "known_p5_bot": KNOWN_P5_BOT, "weekends": WEEKENDS, "per_weekend": {},
+        }
+        done = set()
 
     for friday in WEEKENDS:
+        if friday in done and "z_summary" in result["per_weekend"][friday] and (not INCLUDE_X or "x_summary" in result["per_weekend"][friday]):
+            print(f"\n=== {friday}: уже в чекпоинте, пропускаю ===")
+            continue
+
         y, m, d = (int(x) for x in friday.split("-"))
         fri = datetime(y, m, d)
         sun = fri + timedelta(days=2)
@@ -213,40 +266,45 @@ def run() -> int:
         z_end = et_to_utc(mon.year, mon.month, mon.day, 9, 30)
 
         print(f"\n=== {friday} ===")
-        z_lo, z_hi = window_blocks(z_start, z_end)
-        print(f"  Z (тёмное, вс20:00->пн9:30 ET): блоки [{z_lo};{z_hi}] ({z_hi - z_lo} блоков)")
-        z_swaps = fetch_window_swaps(z_lo, z_hi)
-        print(f"  Z: реальных свопов {len(z_swaps)}")
-        all_z_swaps.extend(z_swaps)
-        result["per_weekend"][friday] = {"z_blocks": [z_lo, z_hi], "z_summary": summarize(z_swaps, f"{friday} Z")}
-        _checkpoint(result)
+        weekend_entry = result["per_weekend"].get(friday, {})
+        if "z_summary" not in weekend_entry:
+            z_lo, z_hi = window_blocks(z_start, z_end)
+            print(f"  Z (тёмное, вс20:00->пн9:30 ET): блоки [{z_lo};{z_hi}] ({z_hi - z_lo} блоков)")
+            z_swaps = fetch_window_swaps(z_lo, z_hi)
+            print(f"  Z: реальных свопов {len(z_swaps)}")
+            weekend_entry["z_blocks"] = [z_lo, z_hi]
+            weekend_entry["z_summary"] = summarize(z_swaps, f"{friday} Z")
+            result["per_weekend"][friday] = weekend_entry
+            _checkpoint(result)
 
-        if INCLUDE_X:
+        if INCLUDE_X and "x_summary" not in weekend_entry:
             x_start = et_to_utc(fri.year, fri.month, fri.day, 20, 0)
             x_end = et_to_utc(sun.year, sun.month, sun.day, 19, 55)
             x_lo, x_hi = window_blocks(x_start, x_end)
             print(f"  X (светлое, пт20:00->вс19:55 ET): блоки [{x_lo};{x_hi}] ({x_hi - x_lo} блоков)")
             x_swaps = fetch_window_swaps(x_lo, x_hi)
             print(f"  X: реальных свопов {len(x_swaps)}")
-            all_x_swaps.extend(x_swaps)
-            result["per_weekend"][friday]["x_blocks"] = [x_lo, x_hi]
-            result["per_weekend"][friday]["x_summary"] = summarize(x_swaps, f"{friday} X")
+            weekend_entry["x_blocks"] = [x_lo, x_hi]
+            weekend_entry["x_summary"] = summarize(x_swaps, f"{friday} X")
+            result["per_weekend"][friday] = weekend_entry
             _checkpoint(result)
 
-    print("\n=== ПУЛ ПО ВСЕМ 8 ВЫХОДНЫМ ===")
-    z_pooled = summarize(all_z_swaps, "Z pooled (все 8 выходных)")
+    print("\n=== ПУЛ ПО ВСЕМ 8 ВЫХОДНЫМ (из чекпоинтов) ===")
+    z_pooled = _pool_from_checkpoints(result["per_weekend"], "z_summary")
     result["pooled"] = {"Z": z_pooled}
     for k in ("n_swaps", "n_distinct_addresses", "self_trade_fraction", "p5_bot_hits", "top3_share_of_role_slots"):
         print(f"  Z: {k} = {z_pooled[k]}")
     if INCLUDE_X:
-        x_pooled = summarize(all_x_swaps, "X pooled (все 8 выходных)")
+        x_pooled = _pool_from_checkpoints(result["per_weekend"], "x_summary")
         result["pooled"]["X"] = x_pooled
         for k in ("n_swaps", "n_distinct_addresses", "self_trade_fraction", "p5_bot_hits", "top3_share_of_role_slots"):
             print(f"  X: {k} = {x_pooled[k]}")
 
-    result["complete"] = True
+    result["complete"] = all(
+        "z_summary" in v and (not INCLUDE_X or "x_summary" in v) for v in result["per_weekend"].values()
+    ) and len(result["per_weekend"]) == len(WEEKENDS)
     _checkpoint(result)
-    print(f"\n[darkwindow] результат записан в {OUT_PATH}")
+    print(f"\n[darkwindow] результат записан в {OUT_PATH} (complete={result['complete']})")
     return 0
 
 
