@@ -1,0 +1,877 @@
+{
+  "generated_at_utc": "2026-09-06T01:34:22Z",
+  "schemas": {
+    "poolsfun_robinhood": {
+      "n_tables": 45,
+      "tables": [
+        "partyfactory_call_acceptownership",
+        "partyfactory_call_allowedpairedasset",
+        "partyfactory_call_computetokenaddress",
+        "partyfactory_call_fee",
+        "partyfactory_call_getpairedassetcurve",
+        "partyfactory_call_initialfdvusd",
+        "partyfactory_call_launch",
+        "partyfactory_call_locker",
+        "partyfactory_call_max_fdv_usd",
+        "partyfactory_call_max_price_age",
+        "partyfactory_call_maxusabletick",
+        "partyfactory_call_min_fdv_usd",
+        "partyfactory_call_min_price_age",
+        "partyfactory_call_npm",
+        "partyfactory_call_owner",
+        "partyfactory_call_paused",
+        "partyfactory_call_pendingowner",
+        "partyfactory_call_removepairedassetcurve",
+        "partyfactory_call_renounceownership",
+        "partyfactory_call_sequencer_grace_period",
+        "partyfactory_call_sequenceruptimefeed",
+        "partyfactory_call_setinitialfdvusd",
+        "partyfactory_call_setlocker",
+        "partyfactory_call_setpairedassetcurve",
+        "partyfactory_call_setpaused",
+        "partyfactory_call_setsequenceruptimefeed",
+        "partyfactory_call_starttickfor",
+        "partyfactory_call_sushifactory",
+        "partyfactory_call_tick_spacing",
+        "partyfactory_call_total_supply",
+        "partyfactory_call_transferownership",
+        "partyfactory_call_uniswapv3swapcallback",
+        "partyfactory_call_usdg",
+        "partyfactory_call_validatepairedassetcurve",
+        "partyfactory_call_weth",
+        "partyfactory_evt_fallbacktickused",
+        "partyfactory_evt_initialfdvset",
+        "partyfactory_evt_lockerset",
+        "partyfactory_evt_ownershiptransferred",
+        "partyfactory_evt_ownershiptransferstarted",
+        "partyfactory_evt_pairedassetcurveremoved",
+        "partyfactory_evt_pairedassetcurveset",
+        "partyfactory_evt_pausedset",
+        "partyfactory_evt_sequenceruptimefeedset",
+        "partyfactory_evt_tokenlaunched"
+      ],
+      "candidate_tables": {
+        "partyfactory_call_getpairedassetcurve": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "asset",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "output_0",
+              "data_type": "varchar"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "partyfactory_call_launch": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "creator",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "deadline",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "devbuyamountin",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "devbuyminout",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "expectedstarttick",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "feerecipient",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "metadatauri",
+              "data_type": "varchar"
+            },
+            {
+              "column_name": "name",
+              "data_type": "varchar"
+            },
+            {
+              "column_name": "output_devbuyout",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "output_pool",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "output_token",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "pairedasset",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "salt",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "symbol",
+              "data_type": "varchar"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "partyfactory_call_removepairedassetcurve": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "asset",
+              "data_type": "varbinary"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "partyfactory_call_setpairedassetcurve": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "asset",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "fallbacktick",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "feed",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "maxpriceage",
+              "data_type": "bigint"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "partyfactory_call_uniswapv3swapcallback": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "_0",
+              "data_type": "int256"
+            },
+            {
+              "column_name": "_1",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "amount1delta",
+              "data_type": "int256"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        }
+      },
+      "candidate_table_names": [
+        "partyfactory_call_getpairedassetcurve",
+        "partyfactory_call_launch",
+        "partyfactory_call_removepairedassetcurve",
+        "partyfactory_call_setpairedassetcurve",
+        "partyfactory_call_uniswapv3swapcallback",
+        "partyfactory_call_validatepairedassetcurve",
+        "partyfactory_evt_pairedassetcurveremoved",
+        "partyfactory_evt_pairedassetcurveset",
+        "partyfactory_evt_tokenlaunched"
+      ]
+    },
+    "stoxesfun_robinhood": {
+      "n_tables": 100,
+      "tables": [
+        "stoxesfunearnings_call_creatorwalletof",
+        "stoxesfunearnings_call_depositcut",
+        "stoxesfunearnings_call_factory",
+        "stoxesfunearnings_call_lifetimecreatorearnings",
+        "stoxesfunearnings_call_lifetimetreasuryearnings",
+        "stoxesfunearnings_call_owner",
+        "stoxesfunearnings_call_pendingof",
+        "stoxesfunearnings_call_registertoken",
+        "stoxesfunearnings_call_setfactory",
+        "stoxesfunearnings_call_transferownership",
+        "stoxesfunearnings_call_treasury",
+        "stoxesfunearnings_call_withdraw",
+        "stoxesfunearnings_evt_cutdeposited",
+        "stoxesfunearnings_evt_factoryset",
+        "stoxesfunearnings_evt_ownershiptransferred",
+        "stoxesfunearnings_evt_paid",
+        "stoxesfunearnings_evt_pendingaccrued",
+        "stoxesfunearnings_evt_tokenregistered",
+        "stoxesfunfactory_call_alltokens",
+        "stoxesfunfactory_call_alltokenslength",
+        "stoxesfunfactory_call_computetokenaddress",
+        "stoxesfunfactory_call_creatorof",
+        "stoxesfunfactory_call_earnings",
+        "stoxesfunfactory_call_keeper",
+        "stoxesfunfactory_call_launch",
+        "stoxesfunfactory_call_max_stocks",
+        "stoxesfunfactory_call_max_tax_bps",
+        "stoxesfunfactory_call_min_tax_bps",
+        "stoxesfunfactory_call_owner",
+        "stoxesfunfactory_call_portal",
+        "stoxesfunfactory_call_setkeeper",
+        "stoxesfunfactory_call_setstockregistered",
+        "stoxesfunfactory_call_stockregistry",
+        "stoxesfunfactory_call_tokenimplementation",
+        "stoxesfunfactory_call_tokeninitcodehash",
+        "stoxesfunfactory_call_trackerimplementation",
+        "stoxesfunfactory_call_trackerof",
+        "stoxesfunfactory_call_transferownership",
+        "stoxesfunfactory_call_uniswapv2factory",
+        "stoxesfunfactory_call_vanity_suffix",
+        "stoxesfunfactory_call_weth",
+        "stoxesfunfactory_evt_keeperchanged",
+        "stoxesfunfactory_evt_ownershiptransferred",
+        "stoxesfunfactory_evt_stockregistryset",
+        "stoxesfunfactory_evt_tokenlaunched",
+        "stoxesfunportal_call_addtokenpool",
+        "stoxesfunportal_call_buy",
+        "stoxesfunportal_call_curve_fee_bps",
+        "stoxesfunportal_call_curveh",
+        "stoxesfunportal_call_curvek",
+        "stoxesfunportal_call_curver",
+        "stoxesfunportal_call_factory",
+        "stoxesfunportal_call_graduationreserve",
+        "stoxesfunportal_call_owner",
+        "stoxesfunportal_call_priceof",
+        "stoxesfunportal_call_quotebuy",
+        "stoxesfunportal_call_quotesell",
+        "stoxesfunportal_call_registertoken",
+        "stoxesfunportal_call_sell",
+        "stoxesfunportal_call_setfactory",
+        "stoxesfunportal_call_settokentaxprocessor",
+        "stoxesfunportal_call_tokenstate",
+        "stoxesfunportal_call_transferownership",
+        "stoxesfunportal_call_treasury",
+        "stoxesfunportal_call_weth",
+        "stoxesfunportal_evt_bought",
+        "stoxesfunportal_evt_factoryset",
+        "stoxesfunportal_evt_graduated",
+        "stoxesfunportal_evt_ownershiptransferred",
+        "stoxesfunportal_evt_sold",
+        "stoxesfunportal_evt_tokenregistered",
+        "stoxesfunrouter_call_buytoken",
+        "stoxesfunrouter_call_getamountout",
+        "stoxesfunrouter_call_selltoken",
+        "stoxesfunrouter_call_swapfeebps",
+        "stoxesfunrouter_call_weth",
+        "stoxesfunsimpletoken_call_allowance",
+        "stoxesfunsimpletoken_call_anti_snipe_duration",
+        "stoxesfunsimpletoken_call_antisnipeendsat",
+        "stoxesfunsimpletoken_call_approve",
+        "stoxesfunsimpletoken_call_balanceof",
+        "stoxesfunsimpletoken_call_decimals",
+        "stoxesfunsimpletoken_call_declaremigrated",
+        "stoxesfunsimpletoken_call_factory",
+        "stoxesfunsimpletoken_call_graduation_weth",
+        "stoxesfunsimpletoken_call_max_supply",
+        "stoxesfunsimpletoken_call_max_wallet_bps",
+        "stoxesfunsimpletoken_call_maxwalletexempt",
+        "stoxesfunsimpletoken_call_metauri",
+        "stoxesfunsimpletoken_call_migrated",
+        "stoxesfunsimpletoken_call_name",
+        "stoxesfunsimpletoken_call_owner",
+        "stoxesfunsimpletoken_call_pool",
+        "stoxesfunsimpletoken_call_setmaxwalletexempt",
+        "stoxesfunsimpletoken_call_setpool",
+        "stoxesfunsimpletoken_call_symbol",
+        "stoxesfunsimpletoken_call_totalsupply",
+        "stoxesfunsimpletoken_call_transfer",
+        "stoxesfunsimpletoken_call_transferfrom",
+        "stoxesfunsimpletoken_call_weth"
+      ],
+      "candidate_tables": {
+        "stoxesfunfactory_call_launch": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "output_pair",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "output_token",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "output_tracker",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "params",
+              "data_type": "varchar"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "stoxesfunfactory_call_uniswapv2factory": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "output_0",
+              "data_type": "varbinary"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "stoxesfunfactory_evt_tokenlaunched": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "evt_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "evt_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "evt_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "evt_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "evt_index",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "evt_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "evt_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "evt_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "buytaxbps",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "creator",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "pair",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "selltaxbps",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "stocks",
+              "data_type": "array(varbinary)"
+            },
+            {
+              "column_name": "token",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "tracker",
+              "data_type": "varbinary"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "evt_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "stoxesfunportal_call_addtokenpool": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "pool",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "token",
+              "data_type": "varbinary"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        },
+        "stoxesfunportal_call_buy": {
+          "columns": [
+            {
+              "column_name": "contract_address",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_success",
+              "data_type": "boolean"
+            },
+            {
+              "column_name": "call_tx_hash",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_from",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_to",
+              "data_type": "varbinary"
+            },
+            {
+              "column_name": "call_tx_index",
+              "data_type": "integer"
+            },
+            {
+              "column_name": "call_trace_address",
+              "data_type": "array(bigint)"
+            },
+            {
+              "column_name": "call_block_time",
+              "data_type": "timestamp(3)"
+            },
+            {
+              "column_name": "call_block_number",
+              "data_type": "bigint"
+            },
+            {
+              "column_name": "call_block_date",
+              "data_type": "date"
+            },
+            {
+              "column_name": "mintokensout",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "output_tokensout",
+              "data_type": "uint256"
+            },
+            {
+              "column_name": "token",
+              "data_type": "varbinary"
+            }
+          ],
+          "addr_col_guess": "contract_address",
+          "time_col_guess": "call_block_time",
+          "addr_col_dtype": "varbinary",
+          "addr_expr_mode": "varbinary",
+          "known_address_match": {
+            "n_known_addresses_matched": 0,
+            "rows": []
+          }
+        }
+      },
+      "candidate_table_names": [
+        "stoxesfunfactory_call_launch",
+        "stoxesfunfactory_call_uniswapv2factory",
+        "stoxesfunfactory_evt_tokenlaunched",
+        "stoxesfunportal_call_addtokenpool",
+        "stoxesfunportal_call_buy",
+        "stoxesfunportal_call_curve_fee_bps",
+        "stoxesfunportal_call_curveh",
+        "stoxesfunportal_call_curvek",
+        "stoxesfunportal_call_curver",
+        "stoxesfunportal_call_graduationreserve",
+        "stoxesfunportal_call_quotebuy",
+        "stoxesfunportal_call_quotesell",
+        "stoxesfunportal_call_sell",
+        "stoxesfunportal_evt_graduated",
+        "stoxesfunrouter_call_buytoken",
+        "stoxesfunrouter_call_selltoken",
+        "stoxesfunrouter_call_swapfeebps",
+        "stoxesfunsimpletoken_call_graduation_weth",
+        "stoxesfunsimpletoken_call_pool",
+        "stoxesfunsimpletoken_call_setpool"
+      ]
+    }
+  }
+}
