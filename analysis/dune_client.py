@@ -296,7 +296,15 @@ class DuneClient:
         # кредитов или структурный риск (UNION ALL + тяжёлый источник,
         # паттерн, что дал 144 кредита вместо 8 в 03c) -- жёсткий стоп.
         if sql is not None:
-            check_sql_sanity(name, sql, estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE)
+            # check_sql_sanity может ФОРСИРОВАТЬ оценку вверх (правило владельца,
+            # 2026-09-06: dex.trades(blockchain='robinhood') -- минимум 250) --
+            # возвращённое значение ОБЯЗАТЕЛЬНО прокидывается в check_before_execute
+            # ниже, иначе форсировка была бы только напечатана, а реальная проверка
+            # остатка бюджета продолжала бы использовать оптимistic-оценку вызывающего
+            # кода (реальный риск, найден при этой самой правке -- не повторяем).
+            estimated_credits = check_sql_sanity(
+                name, sql, estimated_credits if estimated_credits is not None else DEFAULT_ESTIMATE
+            )
         check_before_execute(name, estimated_credits)
         self.executions_this_run += 1
         # ПОПЫТКА (2026-08-31) явно запросить performance: "small" провалилась

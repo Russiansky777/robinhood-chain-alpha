@@ -73,13 +73,60 @@ def namespace() -> str:
 SANITY_MAX_ESTIMATE = 40.0
 HEAVY_SOURCE_MARKERS = ("query_02_swaps_raw_july", "dex.trades")
 
+# Владелец, 2026-09-06 -- после реального инцидента (форензика fomo, п.2):
+# LIMIT 100 на стороне подвыборки НЕ ограничивал сам JOIN со стороной
+# `dex.trades` -- OR-условие (`token_bought_address = X OR
+# token_sold_address = X`) против 100 адресов не оптимизировалось Trino
+# в хэш-джойн, реальный результат 191 105 985 строк / 13.76 ГБ / 238.71
+# кредита вместо ожидаемых на порядки меньше (см. docs/PROJECT_STATE.md,
+# раздел форензики fomo). Правило: ЛЮБОЙ запрос, ссылающийся на
+# `dex.trades` с фильтром `blockchain='robinhood'`, оценивается по
+# ПОТЕНЦИАЛУ СКАНИРОВАНИЯ, не по заявленному количеству строк/оценке
+# вызывающего кода -- оценка форсируется на минимум
+# DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE и требует явного одноразового
+# подтверждения владельца именно для этого прогона (переменная окружения
+# OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD=yes) -- без него жёсткий стоп ДО
+# оценки SANITY_MAX_ESTIMATE ниже (при подтверждении обычный потолок
+# 40 к этому конкретному правилу не применяется, проверка UNION ALL +
+# тяжёлый источник ниже -- применяется всегда, независимо от подтверждения).
+DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE = 250.0
+OWNER_OK_DEX_TRADES_ROBINHOOD_ENV = "OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD"
 
-def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> None:
+
+def _references_dex_trades_robinhood(sql: str) -> bool:
+    lower = sql.lower()
+    return "dex.trades" in lower and "blockchain" in lower and "'robinhood'" in lower
+
+
+def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> float:
     """Вызывается ПЕРЕД любым execute(), НЕЗАВИСИМО от остатка бюджета --
     жёсткий стоп с докладом при срабатывании. Оценка печатается ВСЕГДА,
-    даже если проверка проходит."""
+    даже если проверка проходит. Возвращает (возможно форсированную,
+    см. dex.trades(blockchain='robinhood') ниже) оценку -- ВЫЗЫВАЮЩИЙ КОД
+    ДОЛЖЕН использовать возвращённое значение для check_before_execute(),
+    иначе форсировка оценки была бы чисто косметической (напечатана, но
+    не участвовала бы в реальной проверке остатка бюджета) -- см.
+    execute() в dune_client.py."""
     print(f"[credit_guard] Оценка перед execute '{name}': {estimated_credits:.1f} кредитов.")
-    if estimated_credits > SANITY_MAX_ESTIMATE:
+    if _references_dex_trades_robinhood(sql):
+        estimated_credits = max(estimated_credits, DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE)
+        print(
+            f"[credit_guard] '{name}' ссылается на dex.trades(blockchain='robinhood') -- оценка форсирована на "
+            f"{estimated_credits:.1f} (правило владельца, 2026-09-06, после инцидента 238.71 -- оценивается "
+            "потенциал сканирования, не заявленные строки)."
+        )
+        if os.environ.get(OWNER_OK_DEX_TRADES_ROBINHOOD_ENV, "").strip().lower() != "yes":
+            print(
+                f"[credit_guard] СТОП: '{name}' требует явного одноразового подтверждения владельца -- "
+                f"переменная окружения {OWNER_OK_DEX_TRADES_ROBINHOOD_ENV}=yes должна быть установлена ИМЕННО "
+                "для этого прогона. Ничего не исполнено."
+            )
+            raise BudgetGuardStop(1)
+        print(
+            f"[credit_guard] {OWNER_OK_DEX_TRADES_ROBINHOOD_ENV}=yes присутствует -- явное подтверждение "
+            "владельца есть, обычный потолок SANITY_MAX_ESTIMATE к этому правилу не применяется."
+        )
+    elif estimated_credits > SANITY_MAX_ESTIMATE:
         print(
             f"[credit_guard] СТОП (санитарная проверка): оценка '{name}' = "
             f"{estimated_credits:.1f} > {SANITY_MAX_ESTIMATE} -- жёсткий стоп ДО исполнения, "
@@ -98,6 +145,7 @@ def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> None:
             "(CASE/filter в одном SELECT) перед исполнением. Ничего не заплачено."
         )
         raise BudgetGuardStop(1)
+    return estimated_credits
 
 
 OVERRUN_MIN_ABSOLUTE = 25.0  # владелец, 2026-09-01: правило создавалось против ошибок ценой
