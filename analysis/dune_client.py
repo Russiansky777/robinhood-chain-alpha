@@ -416,6 +416,20 @@ class DuneClient:
             f"{stats.get('datapoint_count', 'n/a')} datapoints"
         )
         record_read(name, estimate, actual_rows, actual_cols, execution_id)
+        # Реальный баг (найден 2026-09-06, форензика fomo -- разведка схем
+        # лаунчпада): `rows=[]` (легитимный 0-строчный результат, например
+        # "ни один известный адрес не найден в этой таблице") даёт
+        # `pd.DataFrame([])` -- датафрейм БЕЗ КОЛОНОК ВООБЩЕ (не только без
+        # строк), т.к. pandas неоткуда взять имена колонок из пустого
+        # списка. `to_csv()` на таком датафрейме пишет 0-байтный файл, а
+        # следующий кэш-хит падает на `pd.read_csv()` с `EmptyDataError:
+        # No columns to parse from file`. Явно передаём реальные имена
+        # колонок из `column_names` (уже в ответе Dune, бесплатно) --
+        # 0-строчный результат тогда сохраняет схему (пустой DataFrame с
+        # правильными колонками, CSV с одной строкой-заголовком).
+        column_names = stats.get("column_names")
+        if not rows and column_names:
+            return pd.DataFrame(columns=column_names), stats
         return pd.DataFrame(rows), stats
 
     def run_sql_cached(
