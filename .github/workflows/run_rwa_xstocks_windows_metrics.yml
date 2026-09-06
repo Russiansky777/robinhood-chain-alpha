@@ -1,0 +1,45 @@
+name: "RWA сток-токены -- окна/метрики по 4 реальным тикерам xStocks (Solana), 0 кредитов"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/RWA_XSTOCKS_WINDOWS_METRICS_REQUEST"
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Реальные окна/метрики по 4 тикерам xStocks (GeckoTerminal OHLCV + Jupiter round-trip + yfinance, 0 кредитов)"
+        run: python -u analysis/rwa_xstocks_windows_metrics.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/RWA_XSTOCKS_WINDOWS_METRICS_REQUEST
+          [ -e data/p3_guard_cache/rwa_xstocks_windows_metrics_result.json ] && git add data/p3_guard_cache/rwa_xstocks_windows_metrics_result.json
+          git add -f data/sleeping_refs_cache/rwa_xstocks_1h_*.csv 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "RWA сток-токены: окна/метрики xStocks, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
