@@ -1,0 +1,138 @@
+name: "Сторожок оборота -- расширение на P5-бот-индикатор (только обёрточный скрипт, cron/SSH/ufw не трогает)"
+
+# Владелец, 2026-09-06 (переклассификация линии сток-токенов): "В
+# существующий суточный cron (:51, рядом со сторожком субсидий)
+# добавить: присутствие и доля 0x65050a...c40dc в свопах пулов
+# сток-токенов за последние сутки -- по одному часовому срезу, не
+# полному скану. Ушёл или доля резко упала -- строка в отчёт. Дёшево,
+# без Dune." НЕ добавляет новую строку crontab -- существующая строка
+# ":51" (turnover_watch_daily.sh) остаётся БУКВАЛЬНО той же, меняется
+# только СОДЕРЖИМОЕ обёрточного скрипта (третий вызов -- analysis/
+# p5_bot_stock_pools_watch.py -- с тем же copy-in/copy-out для
+# внешнего файла, что уже используется для turnover_watch.jsonl/
+# subsidy_watch.jsonl). Crontab в этом workflow вообще не трогается --
+# только читается ДО и ПОСЛЕ для честной проверки, что он не изменился
+# (echo-заголовок -- ВНЕ ssh-пайпа, тот же фикс, что уже применён к
+# run_vps_extend_turnover_watch_subsidy.yml после бага run 34042187463).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/VPS_EXTEND_TURNOVER_WATCH_P5BOT_REQUEST"
+
+jobs:
+  extend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "0. ПРОВЕРКА ПЕРЕД ИЗМЕНЕНИЕМ: crontab bot ДО -- зафиксировать реальное текущее состояние"
+        run: |
+          echo "=== crontab bot ДО (должно остаться БЕЗ ИЗМЕНЕНИЙ после этого workflow) ==="
+          ssh $SSH_OPTS root@45.59.170.76 'sudo -u bot crontab -l' | tee /tmp/cron_before.txt
+
+      - name: "1. Обновить код репозитория у bot (reset --hard -- содержит новый analysis/p5_bot_stock_pools_watch.py)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/sc1-pons-v2-launcher-efdbyt
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            test -f /home/bot/robinhood-chain-alpha/analysis/p5_bot_stock_pools_watch.py && echo "OK: p5_bot_stock_pools_watch.py реально на месте"
+          '
+
+      - name: "2. Внешний живой файл для p5_bot_watch (вне git, тот же каталог, что turnover_watch.jsonl/subsidy_watch.jsonl)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/turnover_watch_live_data
+            sudo -u bot touch /home/bot/turnover_watch_live_data/p5_bot_stock_pools_watch.jsonl
+            echo "текущих строк в p5_bot_stock_pools_watch.jsonl: $(wc -l < /home/bot/turnover_watch_live_data/p5_bot_stock_pools_watch.jsonl)"
+          '
+
+      - name: "3. Обёрточный скрипт -- РАСШИРЕН (добавлен p5_bot_stock_pools_watch.py), идемпотентно перезаписывается"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/bin/turnover_watch_daily.sh && chown bot:bot /home/bot/bin/turnover_watch_daily.sh && chmod +x /home/bot/bin/turnover_watch_daily.sh' <<'EOF'
+          #!/bin/bash
+          # Автономный суточный сторожок -- ТРИ независимые проверки без
+          # капитала, только чтение публичных API/RPC, без git push:
+          #   1. turnover_watch.py -- переоткрытие "хеджированное LP" (пулы
+          #      с оборотом > 20x TVL).
+          #   2. subsidy_watch.py -- чужие субсидии (apyReward>50%/
+          #      apyBase>10%, новые деривативы/DEX-протоколы, цепи с резким
+          #      ростом TVL).
+          #   3. p5_bot_stock_pools_watch.py -- НОВОЕ (2026-09-06,
+          #      переклассификация): присутствие и доля известного P5-бота
+          #      в пулах сток-токенов, часовой срез (не полный скан) --
+          #      индикатор жизни линии "эксплуатация чужого бота".
+          # Все три живых ряда -- ВНЕ git-репозитория (/home/bot/
+          # turnover_watch_live_data/), путь ЖЁСТКО в репозитории у всех
+          # трёх скриптов -- копируем внутрь ПЕРЕД запуском и обратно
+          # НАРУЖУ после, тот же принцип, что уже был для turnover_watch/
+          # subsidy_watch.
+          set -euo pipefail
+
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/turnover_watch_live_data
+
+          mkdir -p "$LIVE_DIR"
+          touch "$LIVE_DIR/turnover_watch.jsonl" "$LIVE_DIR/subsidy_watch.jsonl" "$LIVE_DIR/p5_bot_stock_pools_watch.jsonl"
+
+          cd "$REPO"
+          cp "$LIVE_DIR/turnover_watch.jsonl" data/turnover_watch.jsonl
+          cp "$LIVE_DIR/subsidy_watch.jsonl" data/subsidy_watch.jsonl
+          cp "$LIVE_DIR/p5_bot_stock_pools_watch.jsonl" data/p5_bot_stock_pools_watch.jsonl
+
+          echo "=== $(date -u +%FT%TZ) -- запуск turnover_watch.py ==="
+          "$REPO/venv/bin/python" -u analysis/turnover_watch.py
+
+          echo "=== $(date -u +%FT%TZ) -- запуск subsidy_watch.py ==="
+          "$REPO/venv/bin/python" -u analysis/subsidy_watch.py
+
+          echo "=== $(date -u +%FT%TZ) -- запуск p5_bot_stock_pools_watch.py ==="
+          "$REPO/venv/bin/python" -u analysis/p5_bot_stock_pools_watch.py
+
+          cp data/turnover_watch.jsonl "$LIVE_DIR/turnover_watch.jsonl"
+          cp data/subsidy_watch.jsonl "$LIVE_DIR/subsidy_watch.jsonl"
+          cp data/p5_bot_stock_pools_watch.jsonl "$LIVE_DIR/p5_bot_stock_pools_watch.jsonl"
+          echo "=== $(date -u +%FT%TZ) -- ОК, строк: turnover_watch=$(wc -l < "$LIVE_DIR/turnover_watch.jsonl"), subsidy_watch=$(wc -l < "$LIVE_DIR/subsidy_watch.jsonl"), p5_bot_watch=$(wc -l < "$LIVE_DIR/p5_bot_stock_pools_watch.jsonl") ==="
+          EOF
+
+      - name: "4. Разовый тестовый прогон вручную (подтвердить все три скрипта сразу, не ждать завтрашнего :51)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot /home/bot/bin/turnover_watch_daily.sh
+            echo "=== хвост p5_bot_stock_pools_watch.jsonl ==="
+            tail -1 /home/bot/turnover_watch_live_data/p5_bot_stock_pools_watch.jsonl | head -c 2000
+            echo
+            echo "=== строк во всех трёх файлах ==="
+            wc -l /home/bot/turnover_watch_live_data/turnover_watch.jsonl /home/bot/turnover_watch_live_data/subsidy_watch.jsonl /home/bot/turnover_watch_live_data/p5_bot_stock_pools_watch.jsonl
+          '
+
+      - name: "5. ПРОВЕРКА ПОСЛЕ: crontab bot -- должен быть БУКВАЛЬНО тем же, что ДО"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'sudo -u bot crontab -l' | tee /tmp/cron_after.txt
+          diff /tmp/cron_before.txt /tmp/cron_after.txt && echo "OK: crontab не изменился" || { echo "ОШИБКА: crontab изменился, хотя не должен был!" >&2; exit 1; }
+
+      - name: Итог
+        run: |
+          echo "Обёрточный скрипт расширен на p5_bot_stock_pools_watch.py, crontab реально НЕ менялся (см. шаг 5), SSH/ufw не тронуты."
