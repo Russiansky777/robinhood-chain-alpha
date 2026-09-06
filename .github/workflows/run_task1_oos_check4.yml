@@ -49,6 +49,14 @@ jobs:
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+          # Владелец, 2026-09-06: выходные 2026-09-04 -- Labor Day (NYSE
+          # закрыт пн 2026-09-07, реальное открытие вт 2026-09-08) --
+          # окна X/Z сдвигаются на день, "условный понедельник" = 4 дня
+          # от пятницы, не 3. Этот workflow целиком одноразовый (под
+          # ЭТИ конкретные выходные, FRIDAY захардкожен в самом
+          # task1_oos_check4.py) -- жёстко "4" здесь безопасно, будущего
+          # обычного запуска этого файла не предполагается.
+          TASK1_OOS_MONDAY_OFFSET_DAYS: "4"
         run: python -u analysis/task1_oos_check4.py "${{ steps.mode.outputs.mode }}"
       - name: Commit results
         if: always()

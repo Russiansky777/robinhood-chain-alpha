@@ -54,6 +54,13 @@ from task1_liquidity_v3_roundtrip import find_pool_addr_cache  # noqa: E402
 BUDGET = 250.0
 REGISTRY_PATH = Path("data/rwa_stock_token_registry.json")
 FRIDAY = "2026-09-04"  # выходные, на которые ставится предрегистрированный прогноз
+# Владелец, 2026-09-06: выходные 2026-09-04 попадают на Labor Day (NYSE
+# закрыт понедельник 2026-09-07, реальное открытие -- вторник 2026-09-08)
+# -- окна X/Z сдвигаются на весь лишний день. 3 = обычные выходные
+# (пт+3д=пн), 4 = праздничный понедельник (условный "понедельник" по
+# смыслу окна -- реально вторник). Управляется env-переменной, не
+# хардкодом -- дефолт "3" не меняет поведение вне этого конкретного случая.
+MONDAY_OFFSET_DAYS = int(os.environ.get("TASK1_OOS_MONDAY_OFFSET_DAYS", "3"))
 MIN_BRACKET_TRADES = 3  # тот же порог, что в task1_weekend_gap.py
 ABS_X_OUTLIER_THRESHOLD = 0.5  # предрегистрировано владельцем 2026-09-05, тот же порог, что в проверке 2/3
 PREDICT_PATH = Path("data/p3_guard_cache/task1_oos_check4_predict_result.json")
@@ -82,7 +89,10 @@ def fetch_weekend_df(trades_end_hours_after_friday: int) -> pd.DataFrame:
            .replace("{{weekend_friday_list}}", friday_list_sql)
            .replace("{{token_address_list}}", token_addrs_hex_list)
            .replace("{{trades_start}}", trades_start)
-           .replace("{{trades_end}}", trades_end))
+           .replace("{{trades_end}}", trades_end)
+           .replace("{{monday_offset_days}}", str(MONDAY_OFFSET_DAYS)))
+    print(f"[oos_check4] monday_offset_days={MONDAY_OFFSET_DAYS} "
+          f"({'Labor Day -- вторник вместо понедельника' if MONDAY_OFFSET_DAYS != 3 else 'обычные выходные'})")
 
     client = DuneClient()
     qid = client.create_query("task1_weekend_windows", sql)
@@ -110,7 +120,7 @@ def predict() -> int:
     # Sunday 19:55 ET = friday+3d 00:00 UTC - 5min ровно, т.е. окно X
     # уже полностью реализовалось; окно сканирования расширяем до
     # понедельника с запасом -- будущие сделки просто ещё не существуют.
-    df = fetch_weekend_df(trades_end_hours_after_friday=3 * 24 + 14)
+    df = fetch_weekend_df(trades_end_hours_after_friday=MONDAY_OFFSET_DAYS * 24 + 14)
 
     x_ok = df[(df["x_start_n"].fillna(0) >= MIN_BRACKET_TRADES) & (df["x_end_n"].fillna(0) >= MIN_BRACKET_TRADES)].copy()
     x_ok = x_ok.dropna(subset=["X", "symbol"])
@@ -165,7 +175,7 @@ def verify() -> int:
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     print(f"[oos_check4:verify] реальное время проверки (UTC): {now}, прогноз был записан {pred['generated_at_utc']}")
 
-    df = fetch_weekend_df(trades_end_hours_after_friday=3 * 24 + 14)
+    df = fetch_weekend_df(trades_end_hours_after_friday=MONDAY_OFFSET_DAYS * 24 + 14)
     z_ok = df[(df["z_start_n"].fillna(0) >= MIN_BRACKET_TRADES) & (df["z_end_n"].fillna(0) >= MIN_BRACKET_TRADES)].copy()
     z_ok = z_ok.dropna(subset=["Z", "symbol"])
     realized_sign = {row["symbol"]: (1.0 if row["Z"] > 0 else (-1.0 if row["Z"] < 0 else 0.0)) for _, row in z_ok.iterrows()}

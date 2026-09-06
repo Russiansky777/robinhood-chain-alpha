@@ -23,6 +23,16 @@
 -- (их результат уже реально получен и закрыт), это отдельная находка о
 -- дрейфе схемы Dune, зафиксированная здесь для будущих запросов к
 -- dex.trades.
+--
+-- {{monday_offset_days}} -- ЦЕЛОЕ, дней от friday_utc до "условного
+-- понедельника" (реального открытия NYSE) -- владелец, 2026-09-06,
+-- Labor Day: обычные выходные -- 3 (пт+3д=пн), но если сам понедельник
+-- -- биржевой праздник (реальный holiday-календарь NYSE, не
+-- предполагаем по памяти), окно X и Z сдвигаются на весь лишний
+-- день -- значение здесь становится 4 (реальное открытие -- вторник).
+-- ВСЕ вызывающие СЕЙЧАС передают буквально "3" (обычные выходные,
+-- поведение не изменилось) -- параметризация добавлена, чтобы будущий
+-- праздничный уик-энд не требовал правки самого SQL-шаблона.
 with weekends as (
     select tok.token_address, wk.friday_utc
     from unnest(array[{{weekend_friday_list}}]) as wk(friday_utc)
@@ -58,44 +68,44 @@ select
     count(case when t.block_time >= w.friday_utc + interval '1' day
                 and t.block_time <  w.friday_utc + interval '1' day + interval '2' hour
                then 1 end) as x_start_n,
-    sum(case when t.block_time >= w.friday_utc + interval '3' day - interval '2' hour - interval '5' minute
-              and t.block_time <  w.friday_utc + interval '3' day - interval '5' minute
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day - interval '2' hour - interval '5' minute
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day - interval '5' minute
              then t.amount_usd end) as x_end_vol,
-    sum(case when t.block_time >= w.friday_utc + interval '3' day - interval '2' hour - interval '5' minute
-              and t.block_time <  w.friday_utc + interval '3' day - interval '5' minute
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day - interval '2' hour - interval '5' minute
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day - interval '5' minute
              then t.token_qty end) as x_end_qty,
-    count(case when t.block_time >= w.friday_utc + interval '3' day - interval '2' hour - interval '5' minute
-                and t.block_time <  w.friday_utc + interval '3' day - interval '5' minute
+    count(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day - interval '2' hour - interval '5' minute
+                and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day - interval '5' minute
                then 1 end) as x_end_n,
     sum(case when t.block_time >= w.friday_utc + interval '1' day
-              and t.block_time <  w.friday_utc + interval '3' day - interval '5' minute
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day - interval '5' minute
              then t.amount_usd end) as x_full_vol,
     count(case when t.block_time >= w.friday_utc + interval '1' day
-                and t.block_time <  w.friday_utc + interval '3' day - interval '5' minute
+                and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day - interval '5' minute
                then 1 end) as x_full_n,
     -- Z-окно: [friday+3d 00:00, friday+3d 13:30) = пн 00:00 .. пн 13:30 UTC
-    sum(case when t.block_time >= w.friday_utc + interval '3' day
-              and t.block_time <  w.friday_utc + interval '3' day + interval '2' hour
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '2' hour
              then t.amount_usd end) as z_start_vol,
-    sum(case when t.block_time >= w.friday_utc + interval '3' day
-              and t.block_time <  w.friday_utc + interval '3' day + interval '2' hour
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '2' hour
              then t.token_qty end) as z_start_qty,
-    count(case when t.block_time >= w.friday_utc + interval '3' day
-                and t.block_time <  w.friday_utc + interval '3' day + interval '2' hour
+    count(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day
+                and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '2' hour
                then 1 end) as z_start_n,
-    sum(case when t.block_time >= w.friday_utc + interval '3' day + interval '11' hour + interval '30' minute
-              and t.block_time <  w.friday_utc + interval '3' day + interval '13' hour + interval '30' minute
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day + interval '11' hour + interval '30' minute
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '13' hour + interval '30' minute
              then t.amount_usd end) as z_end_vol,
-    sum(case when t.block_time >= w.friday_utc + interval '3' day + interval '11' hour + interval '30' minute
-              and t.block_time <  w.friday_utc + interval '3' day + interval '13' hour + interval '30' minute
+    sum(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day + interval '11' hour + interval '30' minute
+              and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '13' hour + interval '30' minute
              then t.token_qty end) as z_end_qty,
-    count(case when t.block_time >= w.friday_utc + interval '3' day + interval '11' hour + interval '30' minute
-                and t.block_time <  w.friday_utc + interval '3' day + interval '13' hour + interval '30' minute
+    count(case when t.block_time >= w.friday_utc + interval '{{monday_offset_days}}' day + interval '11' hour + interval '30' minute
+                and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '13' hour + interval '30' minute
                then 1 end) as z_end_n
 from weekends w
 left join trades t
   on t.token_address = w.token_address
  and t.block_time >= w.friday_utc + interval '1' day
- and t.block_time <  w.friday_utc + interval '3' day + interval '13' hour + interval '30' minute
+ and t.block_time <  w.friday_utc + interval '{{monday_offset_days}}' day + interval '13' hour + interval '30' minute
 group by w.token_address, w.friday_utc
 order by w.token_address, w.friday_utc

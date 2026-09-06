@@ -170,7 +170,8 @@ def run() -> int:
            .replace("{{weekend_friday_list}}", friday_list_sql)
            .replace("{{token_address_list}}", token_addrs_hex_list)
            .replace("{{trades_start}}", trades_start)
-           .replace("{{trades_end}}", trades_end))
+           .replace("{{trades_end}}", trades_end)
+           .replace("{{monday_offset_days}}", "3"))  # обычные выходные -- поведение не меняется
 
     print(f"[task1] окно сделок для Dune-запроса: {trades_start} .. {trades_end}, "
           f"{len(fridays)} выходных x {len(token_addrs)} токенов = {len(fridays)*len(token_addrs)} строк ожидается")
