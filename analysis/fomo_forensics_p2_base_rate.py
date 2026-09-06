@@ -101,7 +101,7 @@ def p2_spent_so_far(client: DuneClient) -> float:
 
 
 def run() -> int:
-    ensure_namespace("fomo_forensics", NAMESPACE_BUDGET)
+    ensure_namespace("fomo_forensics_mozila", NAMESPACE_BUDGET)
     remaining = remaining_cycle_budget(load_state())
     print(f"[p2] остаток общего цикла Dune: {remaining:.1f} кредитов; ручной кап п.2 (владелец): {P2_MANUAL_CAP}")
 
