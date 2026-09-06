@@ -85,9 +85,27 @@ def _throttle() -> None:
 
 
 def _get(url: str, params: dict | None = None) -> tuple[int, dict | str]:
+    # РЕАЛЬНЫЙ баг (run 34042490918): необработанный
+    # requests.exceptions.ReadTimeout от api.geckoterminal.com уронил
+    # весь прогон посреди части 2 (поиск по тикеру) -- ни одна строка
+    # уже собранных реальных данных не была записана на диск (запись
+    # только в конце run()). Фикс: (а) сетевые исключения (timeout,
+    # обрыв соединения) тоже ретраятся с бэкоффом, не только HTTP 429;
+    # (б) run() теперь дополнительно чекпоинтит результат на диск после
+    # каждой фазы -- см. ниже.
+    last_exc: Exception | None = None
     for attempt in range(3):
         _throttle()
-        r = requests.get(url, params=params, headers=HEADERS, timeout=30)
+        try:
+            r = requests.get(url, params=params, headers=HEADERS, timeout=30)
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+            if attempt < 2:
+                wait = 10 * (attempt + 1)
+                print(f"    сетевая ошибка ({exc.__class__.__name__}), жду {wait}с и повторяю")
+                time.sleep(wait)
+                continue
+            return 0, f"сетевая ошибка после 3 попыток: {exc}"
         try:
             body = r.json()
         except ValueError:
@@ -97,7 +115,7 @@ def _get(url: str, params: dict | None = None) -> tuple[int, dict | str]:
             time.sleep(65)
             continue
         return r.status_code, body
-    return r.status_code, body
+    return 0, f"сетевая ошибка после 3 попыток: {last_exc}"
 
 
 def pools_for_token(network: str, address: str) -> list[dict]:
@@ -134,9 +152,20 @@ def search_pools(query: str) -> list[dict]:
     return out
 
 
+def _checkpoint(result: dict) -> None:
+    # Чекпоинт на диск после каждого реального запроса -- реальный
+    # сбой (ReadTimeoutError) в прошлом прогоне (34042490918) убил всё
+    # уже собранное, т.к. запись была только в самом конце run().
+    # Теперь при любом крахе на диске остаются уже реально полученные
+    # данные, а не пусто.
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+
+
 def run() -> int:
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                     "tvl_band_usd": [TVL_MIN_USD, TVL_MAX_USD], "known_tokens": {}, "search_only": {}}
+                     "tvl_band_usd": [TVL_MIN_USD, TVL_MAX_USD], "known_tokens": {}, "search_only": {},
+                     "complete": False}
 
     print("=== Часть 1: известные адреса -> реальные пулы GT ===")
     for t in KNOWN_TOKENS:
@@ -147,6 +176,7 @@ def run() -> int:
         for p in pools:
             print(f"    {p['dex']} {p['pool_address']}: TVL=${p['reserve_usd']}, vol24h=${p['volume_24h_usd']}")
         result["known_tokens"][key] = {**t, "pools": pools}
+        _checkpoint(result)
 
     print("\n=== Часть 2: поиск по тикеру (адрес не собран вручную) ===")
     for issuer, ticker in SEARCH_ONLY_TICKERS:
@@ -160,6 +190,7 @@ def run() -> int:
             else:
                 print(f"    {p.get('network')} {p['dex']} {p['pool_address']}: TVL=${p['reserve_usd']}, vol24h=${p['volume_24h_usd']}")
         result["search_only"][key] = pools
+        _checkpoint(result)
 
     # Честный сводный список "тонких" пулов (TVL в полосе, живой объём > 0) по ВСЕМ найденным пулам
     thin_pools = []
@@ -174,12 +205,12 @@ def run() -> int:
             if p.get("reserve_usd") and TVL_MIN_USD <= p["reserve_usd"] <= TVL_MAX_USD and (p.get("volume_24h_usd") or 0) > 0:
                 thin_pools.append({"source_key": key, **p})
     result["thin_pools_in_band"] = thin_pools
+    result["complete"] = True
     print(f"\n=== ИТОГО реальных тонких пулов в полосе ${TVL_MIN_USD:,.0f}-${TVL_MAX_USD:,.0f} с живым объёмом: {len(thin_pools)} ===")
     for p in thin_pools:
         print(f"  {p['source_key']}: {p.get('network','?')} {p['dex']} {p['pool_address']} TVL=${p['reserve_usd']:,.0f} vol24h=${p['volume_24h_usd']:,.0f}")
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    _checkpoint(result)
     print(f"\n[discovery] результат записан в {OUT_PATH}")
     return 0
 

@@ -39,10 +39,8 @@ jobs:
 
       - name: "0. ПРОВЕРКА ПЕРЕД ИЗМЕНЕНИЕМ: crontab bot ДО -- зафиксировать реальное текущее состояние"
         run: |
-          ssh $SSH_OPTS root@45.59.170.76 '
-            echo "=== crontab bot ДО (должно остаться БЕЗ ИЗМЕНЕНИЙ после этого workflow) ==="
-            sudo -u bot crontab -l
-          ' | tee /tmp/cron_before.txt
+          echo "=== crontab bot ДО (должно остаться БЕЗ ИЗМЕНЕНИЙ после этого workflow) ==="
+          ssh $SSH_OPTS root@45.59.170.76 'sudo -u bot crontab -l' | tee /tmp/cron_before.txt
 
       - name: "1. Обновить код репозитория у bot (reset --hard -- содержит новый analysis/subsidy_watch.py)"
         run: |
