@@ -1,0 +1,47 @@
+name: "Спящие референсы -- метрики (акции Lighter+xyz, индексы/товары/форекс xyz), yfinance"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/SLEEPING_REFS_METRICS_REQUEST"
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "П.1: метрики отдельных акций (Lighter 25 полных + xyz 23), yfinance daily"
+        run: python -u analysis/sleeping_refs_stocks_metrics.py
+      - name: "П.2: метрики индексы/товары/форекс (xyz), yfinance intraday+daily"
+        run: python -u analysis/sleeping_refs_macro_metrics.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SLEEPING_REFS_METRICS_REQUEST
+          [ -e data/p3_guard_cache/sleeping_refs_stocks_metrics_result.json ] && git add data/p3_guard_cache/sleeping_refs_stocks_metrics_result.json
+          [ -e data/p3_guard_cache/sleeping_refs_macro_metrics_result.json ] && git add data/p3_guard_cache/sleeping_refs_macro_metrics_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Спящие референсы: метрики акций + индексы/товары/форекс, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
