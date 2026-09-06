@@ -112,7 +112,19 @@ def yfinance_intraday(symbol: str, start_date: str, end_date: str) -> tuple[pd.D
     return hist[["dt_utc", "Open", "Close"]], tz_repr
 
 
-def intraday_price_asof(df: pd.DataFrame, target_utc: pd.Timestamp, max_lag_hours: float = 3.0) -> float | None:
+def intraday_price_asof(df: pd.DataFrame, target_utc: pd.Timestamp, max_lag_hours: float = 72.0) -> float | None:
+    """Реальный, эмпирически найденный факт (`sleeping_refs_yfinance_
+    intraday_diag.py`, GH Actions run 34035843308): у ES=F (и, судя по
+    структуре рынка, у всех CME/COMEX/форекс-тикеров) РЕАЛЬНЫЙ разрыв в
+    часовых данных Yahoo между пт 16:00 ET (последний реальный бар) и
+    вс 18:00 ET (первый реальный бар после выходных) -- т.е. РОВНО
+    столько, сколько и должно быть по структуре рынка (CME закрыт).
+    Дефолт 3.0ч, унаследованный от `price_asof` (наши СОБСТВЕННЫЕ 24/7
+    свечи xyz, где разрывов в принципе нет), был ОШИБОЧНО мал здесь --
+    граница X_end (вс 17:55 ET) специально стоит ВНУТРИ этого реального
+    разрыва (последний доступный принт -- пятничный), лаг там реально
+    ~50ч, не 3ч. 72ч -- реальный запас с несколькими часами сверху
+    факта, не подогнано впритык."""
     eligible = df[df["dt_utc"] <= target_utc]
     if not len(eligible):
         return None
