@@ -149,6 +149,72 @@ def fetch_window_swaps(from_block: int, to_block: int) -> list[dict]:
     return out
 
 
+N_SUBRANGES = 8  # РЕАЛЬНЫЙ фикс после трёх подряд таймаутов на одном
+# выходном (2026-08-28 -- run 34049672943 на 25 мин, run 34051087886 на
+# 45 мин: рост объёма пула продолжается, одного выходного целиком уже
+# не хватает даже 45 минут). Чекпоинт теперь ВНУТРИ одного выходного --
+# диапазон блоков делится на N_SUBRANGES частей, каждая фетчится и
+# чекпоинтится отдельно, возобновление подхватывает недостающие части,
+# не весь диапазон заново.
+
+
+def fetch_window_swaps_incremental(result: dict, friday: str, key: str, lo: int, hi: int, checkpoint_fn) -> dict:
+    """Как fetch_window_swaps, но с чекпоинтом на диск после КАЖДОГО
+    под-диапазона -- см. N_SUBRANGES. Возвращает готовый summarize()-
+    совместимый словарь (агрегированный из накопленных частей, сырые
+    свопы не хранятся -- только role_slot-счётчики, как в
+    _pool_from_checkpoints)."""
+    from collections import Counter
+
+    weekend_entry = result["per_weekend"].setdefault(friday, {})
+    progress_key = f"{key}_progress"
+    progress = weekend_entry.get(progress_key) or {
+        "done_ranges": [], "role_slot_counts": {}, "n_swaps": 0, "self_trade_n": 0, "p5_bot_hits": 0,
+    }
+
+    step = max(1, (hi - lo + 1) // N_SUBRANGES)
+    subranges = []
+    b = lo
+    while b <= hi:
+        subranges.append((b, min(b + step - 1, hi)))
+        b += step
+
+    done_set = {tuple(r) for r in progress["done_ranges"]}
+    for sub_lo, sub_hi in subranges:
+        if (sub_lo, sub_hi) in done_set:
+            continue
+        print(f"    под-диапазон [{sub_lo};{sub_hi}] ({sub_hi - sub_lo} блоков)...")
+        swaps = fetch_window_swaps(sub_lo, sub_hi)
+        print(f"      реальных свопов в под-диапазоне: {len(swaps)}")
+        counts = Counter(progress["role_slot_counts"])
+        for s in swaps:
+            counts[s["sender"]] += 1
+            counts[s["recipient"]] += 1
+            if s["sender"] == s["recipient"]:
+                progress["self_trade_n"] += 1
+            if KNOWN_P5_BOT in (s["sender"], s["recipient"]):
+                progress["p5_bot_hits"] += 1
+        progress["role_slot_counts"] = dict(counts)
+        progress["n_swaps"] += len(swaps)
+        progress["done_ranges"].append([sub_lo, sub_hi])
+        weekend_entry[progress_key] = progress
+        checkpoint_fn(result)
+
+    total = Counter(progress["role_slot_counts"])
+    n = progress["n_swaps"]
+    top10 = total.most_common(10)
+    top_share = sum(c for _, c in total.most_common(3)) / (2 * n) if n else None
+    summary = {
+        "label": f"{friday} {key}", "n_swaps": n, "n_distinct_addresses": len(total),
+        "self_trade_fraction": progress["self_trade_n"] / n if n else None,
+        "p5_bot_hits": progress["p5_bot_hits"], "top3_share_of_role_slots": top_share,
+        "top10_addresses": [{"address": a, "n_role_slots": c} for a, c in top10],
+        "role_slot_counts": dict(total),
+    }
+    del weekend_entry[progress_key]  # готово -- временный прогресс больше не нужен
+    return summary
+
+
 def summarize(swaps: list[dict], label: str) -> dict:
     from collections import Counter
     n = len(swaps)
@@ -269,24 +335,24 @@ def run() -> int:
         weekend_entry = result["per_weekend"].get(friday, {})
         if "z_summary" not in weekend_entry:
             z_lo, z_hi = window_blocks(z_start, z_end)
-            print(f"  Z (тёмное, вс20:00->пн9:30 ET): блоки [{z_lo};{z_hi}] ({z_hi - z_lo} блоков)")
-            z_swaps = fetch_window_swaps(z_lo, z_hi)
-            print(f"  Z: реальных свопов {len(z_swaps)}")
+            print(f"  Z (тёмное, вс20:00->пн9:30 ET): блоки [{z_lo};{z_hi}] ({z_hi - z_lo} блоков), по частям (N_SUBRANGES={N_SUBRANGES})")
             weekend_entry["z_blocks"] = [z_lo, z_hi]
-            weekend_entry["z_summary"] = summarize(z_swaps, f"{friday} Z")
             result["per_weekend"][friday] = weekend_entry
+            z_summary = fetch_window_swaps_incremental(result, friday, "z", z_lo, z_hi, _checkpoint)
+            weekend_entry["z_summary"] = z_summary
+            print(f"  Z: реальных свопов {z_summary['n_swaps']}")
             _checkpoint(result)
 
         if INCLUDE_X and "x_summary" not in weekend_entry:
             x_start = et_to_utc(fri.year, fri.month, fri.day, 20, 0)
             x_end = et_to_utc(sun.year, sun.month, sun.day, 19, 55)
             x_lo, x_hi = window_blocks(x_start, x_end)
-            print(f"  X (светлое, пт20:00->вс19:55 ET): блоки [{x_lo};{x_hi}] ({x_hi - x_lo} блоков)")
-            x_swaps = fetch_window_swaps(x_lo, x_hi)
-            print(f"  X: реальных свопов {len(x_swaps)}")
+            print(f"  X (светлое, пт20:00->вс19:55 ET): блоки [{x_lo};{x_hi}] ({x_hi - x_lo} блоков), по частям")
             weekend_entry["x_blocks"] = [x_lo, x_hi]
-            weekend_entry["x_summary"] = summarize(x_swaps, f"{friday} X")
             result["per_weekend"][friday] = weekend_entry
+            x_summary = fetch_window_swaps_incremental(result, friday, "x", x_lo, x_hi, _checkpoint)
+            weekend_entry["x_summary"] = x_summary
+            print(f"  X: реальных свопов {x_summary['n_swaps']}")
             _checkpoint(result)
 
     print("\n=== ПУЛ ПО ВСЕМ 8 ВЫХОДНЫМ (из чекпоинтов) ===")
