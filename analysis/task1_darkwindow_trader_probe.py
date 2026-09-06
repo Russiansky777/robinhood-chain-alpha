@@ -50,6 +50,7 @@ P5, или ретейл». Дословно: «дешёвый запрос по 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, timedelta
@@ -171,10 +172,32 @@ def summarize(swaps: list[dict], label: str) -> dict:
     }
 
 
+INCLUDE_X = os.environ.get("DARKWINDOW_INCLUDE_X", "0") == "1"  # РЕАЛЬНЫЙ фикс после
+# первого прогона (run 34045313412): X-окно (48ч, пт20:00->вс19:55 ET) на самых
+# ликвидных пулах (NVDA/SPCX -- сотни тысяч свопов за всю историю) реально
+# упёрлось в 25-минутный таймаут job'а (отменено GH Actions, 16:24:02Z->16:49:25Z,
+# ни одной строки не сохранено -- та же ошибка "нет чекпоинта", что уже была в
+# rwa_tokenized_stocks_thin_pool_discovery.py, здесь забыто исправить сразу).
+# Фикс: (а) чекпоинт на диск после КАЖДОГО выходного, не только в конце;
+# (б) X-окно (сравнение "тёмное vs светлое") по умолчанию ВЫКЛЮЧЕНО -- это
+# было полезное дополнение, но не то, что владелец буквально просил
+# ("дешёвый запрос... в тёмном окне"); Z-окно (дешевле, ~13.5ч на выходные,
+# буквальный запрос) выполняется всегда первым и полностью самодостаточно
+# отвечает на вопрос "кто торгует". X включается отдельным прогоном
+# (DARKWINDOW_INCLUDE_X=1) уже после того, как Z готово и прокоммичено.
+
+
+def _checkpoint(result: dict) -> None:
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+
+
 def run() -> int:
     print(f"[darkwindow] реальных v3-пулов в выборке: {len(POOLS_BY_SYMBOL)} (пропущено без известного адреса: {MISSING_SYMBOLS})")
+    print(f"[darkwindow] INCLUDE_X={INCLUDE_X} (см. докстринг константы -- по умолчанию только Z, дешёвый буквальный запрос)")
     result: dict = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "include_x": INCLUDE_X, "complete": False,
         "pools_by_symbol": POOLS_BY_SYMBOL, "missing_symbols": MISSING_SYMBOLS,
         "known_p5_bot": KNOWN_P5_BOT, "weekends": WEEKENDS, "per_weekend": {},
     }
@@ -186,8 +209,6 @@ def run() -> int:
         fri = datetime(y, m, d)
         sun = fri + timedelta(days=2)
         mon = fri + timedelta(days=3)
-        x_start = et_to_utc(fri.year, fri.month, fri.day, 20, 0)
-        x_end = et_to_utc(sun.year, sun.month, sun.day, 19, 55)
         z_start = et_to_utc(sun.year, sun.month, sun.day, 20, 0)
         z_end = et_to_utc(mon.year, mon.month, mon.day, 9, 30)
 
@@ -196,28 +217,35 @@ def run() -> int:
         print(f"  Z (тёмное, вс20:00->пн9:30 ET): блоки [{z_lo};{z_hi}] ({z_hi - z_lo} блоков)")
         z_swaps = fetch_window_swaps(z_lo, z_hi)
         print(f"  Z: реальных свопов {len(z_swaps)}")
-
-        x_lo, x_hi = window_blocks(x_start, x_end)
-        print(f"  X (светлое, пт20:00->вс19:55 ET): блоки [{x_lo};{x_hi}] ({x_hi - x_lo} блоков)")
-        x_swaps = fetch_window_swaps(x_lo, x_hi)
-        print(f"  X: реальных свопов {len(x_swaps)}")
-
         all_z_swaps.extend(z_swaps)
-        all_x_swaps.extend(x_swaps)
-        result["per_weekend"][friday] = {
-            "z_blocks": [z_lo, z_hi], "x_blocks": [x_lo, x_hi],
-            "z_summary": summarize(z_swaps, f"{friday} Z"), "x_summary": summarize(x_swaps, f"{friday} X"),
-        }
+        result["per_weekend"][friday] = {"z_blocks": [z_lo, z_hi], "z_summary": summarize(z_swaps, f"{friday} Z")}
+        _checkpoint(result)
+
+        if INCLUDE_X:
+            x_start = et_to_utc(fri.year, fri.month, fri.day, 20, 0)
+            x_end = et_to_utc(sun.year, sun.month, sun.day, 19, 55)
+            x_lo, x_hi = window_blocks(x_start, x_end)
+            print(f"  X (светлое, пт20:00->вс19:55 ET): блоки [{x_lo};{x_hi}] ({x_hi - x_lo} блоков)")
+            x_swaps = fetch_window_swaps(x_lo, x_hi)
+            print(f"  X: реальных свопов {len(x_swaps)}")
+            all_x_swaps.extend(x_swaps)
+            result["per_weekend"][friday]["x_blocks"] = [x_lo, x_hi]
+            result["per_weekend"][friday]["x_summary"] = summarize(x_swaps, f"{friday} X")
+            _checkpoint(result)
 
     print("\n=== ПУЛ ПО ВСЕМ 8 ВЫХОДНЫМ ===")
     z_pooled = summarize(all_z_swaps, "Z pooled (все 8 выходных)")
-    x_pooled = summarize(all_x_swaps, "X pooled (все 8 выходных)")
+    result["pooled"] = {"Z": z_pooled}
     for k in ("n_swaps", "n_distinct_addresses", "self_trade_fraction", "p5_bot_hits", "top3_share_of_role_slots"):
-        print(f"  Z: {k} = {z_pooled[k]}   |   X: {k} = {x_pooled[k]}")
-    result["pooled"] = {"Z": z_pooled, "X": x_pooled}
+        print(f"  Z: {k} = {z_pooled[k]}")
+    if INCLUDE_X:
+        x_pooled = summarize(all_x_swaps, "X pooled (все 8 выходных)")
+        result["pooled"]["X"] = x_pooled
+        for k in ("n_swaps", "n_distinct_addresses", "self_trade_fraction", "p5_bot_hits", "top3_share_of_role_slots"):
+            print(f"  X: {k} = {x_pooled[k]}")
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    result["complete"] = True
+    _checkpoint(result)
     print(f"\n[darkwindow] результат записан в {OUT_PATH}")
     return 0
 
