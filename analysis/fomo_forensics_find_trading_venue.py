@@ -70,7 +70,14 @@ def run() -> int:
         print(f"\n[venue] === {name} ({addr}) ===")
         counter: Counter[str] = Counter()
         n_logs = 0
-        for log in _chunked_get_logs(from_block, latest_block, [TRANSFER_TOPIC], address=addr, chunk_size=2000):
+        # chunk_size поднят 2000->10000 -- реально проверенное значение
+        # (5000) уже успешно использовалось на этом же публичном RPC
+        # Robinhood Chain (analysis/across_relay_topups_probe.py). BUDDY
+        # (первый прогон, chunk_size=2000) занял ~11.5 минут на 857к
+        # блоков ради всего 33 реальных логов -- почти все чанки пустые,
+        # накладные расходы на количество запросов доминируют, не на
+        # объём данных.
+        for log in _chunked_get_logs(from_block, latest_block, [TRANSFER_TOPIC], address=addr, chunk_size=10_000):
             n_logs += 1
             topics = log.get("topics", [])
             if len(topics) < 3:
@@ -84,6 +91,14 @@ def run() -> int:
         top3 = counter.most_common(3)
         print(f"[venue] {name}: {n_logs} реальных Transfer-логов за ~24ч, топ-3 контрагента: {top3}")
         out["tokens"][name] = {"address": addr, "n_transfer_logs_24h": n_logs, "top3_counterparties": top3}
+
+        # Пишем результат ПОСЛЕ КАЖДОГО токена, не только в конце -- реальный
+        # инцидент (первый прогон): джоб убит по таймауту во время ВТОРОГО
+        # токена, реальный результат первого (BUDDY) существовал только в
+        # логах CI, не в закоммиченном файле, и был потерян.
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
+        print(f"[venue] промежуточный результат ({name}) сохранён в {OUT_PATH}")
 
     # Пересечение топ-1 по всем трём токенам -- если совпадает, это
     # сильный сигнал общего пула/роутера, не совпадения на одном токене.
