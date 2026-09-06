@@ -66,12 +66,19 @@ def run() -> int:
             l_df["hour"] = pd.to_datetime(l_df["timestamp"], unit="s", utc=True).dt.floor("h")
             l_df["lighter_rate_pct"] = l_df["rate"].astype(float)  # уже % за час, реальный факт (см. funding_historical_backfill.py)
             l_df = l_df[["hour", "lighter_rate_pct"]].groupby("hour", as_index=False).last()
+        else:
+            # Реальный баг (обнаружен по факту, SNDK: HL 0 записей): pd.DataFrame([])
+            # не имеет колонки "hour" вообще -- .merge(on="hour") падает KeyError.
+            # Пустой DataFrame С колонкой "hour" -- honest empty, не падаем.
+            l_df = pd.DataFrame(columns=["hour", "lighter_rate_pct"])
 
         h_df = pd.DataFrame(h_records)
         if len(h_df):
             h_df["hour"] = pd.to_datetime(h_df["time"], unit="ms", utc=True).dt.floor("h")
             h_df["xyz_rate_pct"] = h_df["fundingRate"].astype(float) * 100  # доля -> %
             h_df = h_df.groupby("hour", as_index=False)["xyz_rate_pct"].last()
+        else:
+            h_df = pd.DataFrame(columns=["hour", "xyz_rate_pct"])
 
         n_l, n_h = len(l_df), len(h_df)
         merged = l_df.merge(h_df, on="hour", how="outer").sort_values("hour") if (n_l or n_h) else pd.DataFrame()
