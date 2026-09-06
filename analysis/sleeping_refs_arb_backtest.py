@@ -154,7 +154,15 @@ def run() -> int:
     funding_df = pd.DataFrame()
     if FUNDING_PATH.exists():
         funding_df = pd.read_csv(FUNDING_PATH)
-        funding_df["hour_ms"] = pd.to_datetime(funding_df["hour"], utc=True).astype("int64") // 1_000_000
+        # Реальный баг, найденный по факту (mean_funding_pnl_pct_per_trade
+        # оказался ТОЧНО 0.0 во ВСЕХ 4 сценариях -- подозрительно): pandas
+        # в этой версии парсит строку датывремени в datetime64[us], НЕ
+        # [ns] -- .astype("int64") даёт МИКРОсекунды, не наносекунды.
+        # Деление на 1_000_000 давало СЕКУНДЫ вместо миллисекунд -> ключи
+        # hour_ms никогда не совпадали с t (мс) из свечей -> fmap_l/fmap_x
+        # были всегда пустыми по факту поиска, funding PnL молча = 0.
+        # Проверено эмпирически (см. коммит), не по памяти о pandas API.
+        funding_df["hour_ms"] = pd.to_datetime(funding_df["hour"], utc=True).astype("int64") // 1_000
     else:
         print("[backtest] !!! нет истории фандинга -- считаем funding_pnl_pct=0 везде, честно помечено")
 
@@ -210,6 +218,26 @@ def run() -> int:
                     v["annualized_return_pct_on_capital"] for v in per_ticker_results.values() if v["n_trades"] > 0
                 ])) if n_tickers_with_trades else None,
             })
+
+            # Робастность (устоявшееся правило проекта -- ВСЕГДА проверять
+            # чувствительность headline-числа к выбросам ДО того, как
+            # доверять ему): mean по тикерам может быть раздут горсткой
+            # тонких/дорогих по round-trip тикеров (тот же класс артефакта,
+            # что уже ловился в task1_z_decompose.py).
+            per_ticker_returns = sorted(v["annualized_return_pct_on_capital"] for v in per_ticker_results.values() if v["n_trades"] > 0)
+            if per_ticker_returns:
+                median_ret = float(np.median(per_ticker_returns))
+                excl_top3 = per_ticker_returns[:-3] if len(per_ticker_returns) > 3 else per_ticker_returns
+                mean_excl_top3 = float(np.mean(excl_top3)) if excl_top3 else None
+                scenario["robustness_check"] = {
+                    "per_ticker_annualized_return_sorted_pct": per_ticker_returns,
+                    "median_annualized_return_pct": median_ret,
+                    "mean_excluding_top3_tickers_pct": mean_excl_top3,
+                }
+                print(f"  РОБАСТНОСТЬ: медиана по тикерам={median_ret:.2f}%/год "
+                      f"(vs mean={scenario['portfolio_annualized_return_pct']:.2f}%/год), "
+                      f"mean без топ-3 тикеров={mean_excl_top3}")
+
             alive = (scenario["trades_per_month"] >= 20 and scenario["mean_net_pnl_pct_per_trade"] > 0
                      and scenario.get("portfolio_annualized_return_pct") is not None
                      and scenario["portfolio_annualized_return_pct"] >= 30.0)
