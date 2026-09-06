@@ -82,13 +82,14 @@ limit 100"""
 
 
 def peek_addr_format(client: DuneClient, schema: str, table: str, addr_col: str) -> str | None:
-    """Реальный формат колонки-кандидата на адрес (varbinary vs уже
-    varchar-строка) -- НЕ предполагаем по имени/data_type из
-    information_schema (там может быть просто 'varchar', даже если
-    хранится вариант с обрезкой/регистром) -- смотрим на реальное сырое
-    значение через дешёвый LIMIT 5 перед тем, как строить платный запрос
-    сравнения. Возвращает одно из: 'hex_no_prefix', 'hex_0x_prefix', None
-    (нераспознано -- не гадаем, пропускаем сверку)."""
+    """Реальный формат ЗНАЧЕНИЯ varchar-колонки-кандидата на адрес (есть
+    ли префикс '0x') -- ТОЛЬКО для нестрогих строковых колонок. Не
+    вызывается для varbinary (там формат решает сам data_type из
+    information_schema, см. run(): varbinary требует to_hex(), lower()
+    напрямую на varbinary -- реальная ошибка Dune, поймана на этом самом
+    скрипте: 'Unexpected parameters (varbinary) for function lower' --
+    varbinary и так регистронезависим, lower() на нём просто запрещён).
+    Возвращает 'hex_no_prefix', 'hex_0x_prefix' или None (не гадаем)."""
     sql = f"select {addr_col} as v from {schema}.{table} where {addr_col} is not null limit 5"
     qid = client.create_query(f"fomo_launchpad_peek_{schema}_{table}"[:100], sql)
     df = client.run_sql_cached(f"fomo_launchpad_peek_{schema}_{table}"[:100], sql, query_id=qid,
@@ -96,7 +97,7 @@ def peek_addr_format(client: DuneClient, schema: str, table: str, addr_col: str)
     if df is None or df.empty:
         return None
     sample_val = str(df["v"].iloc[0])
-    print(f"[launchpad_recon]   реальный сырой вид {addr_col}: {sample_val!r}")
+    print(f"[launchpad_recon]   реальный сырой вид {addr_col} (varchar): {sample_val!r}")
     if sample_val.lower().startswith("0x"):
         return "hex_0x_prefix"
     if len(sample_val.replace("0x", "")) == 40 and all(c in "0123456789abcdefABCDEF" for c in sample_val):
@@ -104,13 +105,20 @@ def peek_addr_format(client: DuneClient, schema: str, table: str, addr_col: str)
     return None
 
 
-def check_known_addresses_present(client: DuneClient, schema: str, table: str, addr_col: str, addr_format: str) -> dict:
-    if addr_format == "hex_0x_prefix":
-        addrs_sql = ", ".join(f"'0x{a}'" for a in KNOWN_FOMO_TOKEN_ADDRESSES_NO_0X)
-        expr = f"lower({addr_col})"
-    else:  # hex_no_prefix
+def check_known_addresses_present(client: DuneClient, schema: str, table: str, addr_col: str, addr_expr_mode: str) -> dict:
+    """`addr_expr_mode` -- одно из 'varbinary' (использует to_hex(), НЕ
+    оборачивает lower() напрямую вокруг varbinary -- реальная ошибка
+    Dune, если сделать иначе), 'hex_0x_prefix' или 'hex_no_prefix'
+    (varchar-колонка, формат определён через peek_addr_format)."""
+    if addr_expr_mode == "varbinary":
+        expr = f"lower(to_hex({addr_col}))"
         addrs_sql = ", ".join(f"'{a}'" for a in KNOWN_FOMO_TOKEN_ADDRESSES_NO_0X)
+    elif addr_expr_mode == "hex_0x_prefix":
         expr = f"lower({addr_col})"
+        addrs_sql = ", ".join(f"'0x{a}'" for a in KNOWN_FOMO_TOKEN_ADDRESSES_NO_0X)
+    else:  # hex_no_prefix
+        expr = f"lower({addr_col})"
+        addrs_sql = ", ".join(f"'{a}'" for a in KNOWN_FOMO_TOKEN_ADDRESSES_NO_0X)
     sql = f"""select {expr} as addr, count(*) as n
 from {schema}.{table}
 where {expr} in ({addrs_sql})
@@ -163,18 +171,28 @@ def run() -> int:
             if not addr_col:
                 addr_col = next((c for c in col_names if c.lower() in ("contract_address", "token", "address")), None)
             time_col = next((c for c in col_names if "block_time" in c.lower() or c.lower() == "evt_block_time"), None)
+            addr_col_dtype = next((c["data_type"] for c in cols if c["column_name"] == addr_col), None) if addr_col else None
 
-            table_out: dict = {"columns": cols, "addr_col_guess": addr_col, "time_col_guess": time_col}
+            table_out: dict = {"columns": cols, "addr_col_guess": addr_col, "time_col_guess": time_col,
+                                "addr_col_dtype": addr_col_dtype}
 
             if addr_col:
-                addr_format = peek_addr_format(client, schema, table, addr_col)
-                table_out["addr_format_detected"] = addr_format
-                if addr_format:
-                    match = check_known_addresses_present(client, schema, table, addr_col, addr_format)
+                if addr_col_dtype == "varbinary":
+                    # varbinary -- реальный тип из information_schema, НЕ из угадывания по виду
+                    # значения (varbinary в JSON-ответе Dune визуально тоже выглядит как '0x...' --
+                    # реальная ошибка Dune поймана на этом самом скрипте: lower() напрямую на
+                    # varbinary запрещён, нужен to_hex() сначала).
+                    addr_expr_mode = "varbinary"
+                    print(f"[launchpad_recon]   {addr_col}: реальный data_type=varbinary -- используем to_hex(), не peek")
+                else:
+                    addr_expr_mode = peek_addr_format(client, schema, table, addr_col)
+                table_out["addr_expr_mode"] = addr_expr_mode
+                if addr_expr_mode:
+                    match = check_known_addresses_present(client, schema, table, addr_col, addr_expr_mode)
                     table_out["known_address_match"] = match
                     print(f"[launchpad_recon] совпадение с известными адресами fomo.family: {match}")
                 else:
-                    print(f"[launchpad_recon] реальный формат {addr_col} не распознан (не hex-строка) -- "
+                    print(f"[launchpad_recon] реальный формат {addr_col} не распознан (data_type={addr_col_dtype}, не hex-строка) -- "
                           "не гадаем сравнение, пропускаем сверку адресов")
             else:
                 print(f"[launchpad_recon] не нашли колонку-кандидата на адрес токена среди {col_names} -- пропускаем сверку адресов")
