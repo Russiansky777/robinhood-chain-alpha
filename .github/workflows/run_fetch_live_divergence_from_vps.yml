@@ -1,0 +1,63 @@
+name: "Расхождение площадок -- забрать накопленный cron'ом ряд с NL VPS (только чтение по SSH + коммит)"
+
+# По образцу run_p5_live_position_snapshot.yml -- сбор идёт автономным
+# cron'ом раз в минуту НА САМОМ VPS (см. run_vps_setup_live_divergence_
+# cron_nl.yml, живой файл ВНЕ git-репозитория -- /home/bot/
+# sleeping_refs_live_data/live_divergence.jsonl). Этот workflow ТОЛЬКО
+# читает по SSH то, что cron уже накопил, и коммитит в
+# data/sleeping_refs_cache/live_divergence.jsonl (перезапись целиком --
+# append-only источник на VPS, дублей при простом cat не будет).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FETCH_LIVE_DIVERGENCE_FROM_VPS_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Забрать накопленный ряд (вне git на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/sleeping_refs_live_data/live_divergence.jsonl' > /tmp/vps_live_divergence.jsonl
+          echo "реальных строк на VPS: $(wc -l < /tmp/vps_live_divergence.jsonl)"
+
+      - name: Commit results
+        run: |
+          mkdir -p data/sleeping_refs_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/FETCH_LIVE_DIVERGENCE_FROM_VPS_REQUEST
+          cp /tmp/vps_live_divergence.jsonl data/sleeping_refs_cache/live_divergence.jsonl
+          git add data/sleeping_refs_cache/live_divergence.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "Спящие референсы: забор накопленного live_divergence.jsonl с VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
