@@ -1,0 +1,23 @@
+name: "Спящие референсы -- диагностика yfinance intraday (ES=F), 0 кредитов"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/SLEEPING_REFS_YFINANCE_INTRADAY_DIAG_REQUEST"
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Диагностика yfinance intraday ES=F"
+        run: python -u analysis/sleeping_refs_yfinance_intraday_diag.py
