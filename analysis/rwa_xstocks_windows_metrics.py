@@ -59,7 +59,11 @@ from sleeping_refs_stocks_metrics import compute_metrics  # noqa: E402
 OUT_PATH = Path("data/p3_guard_cache/rwa_xstocks_windows_metrics_result.json")
 CACHE_DIR = Path("data/sleeping_refs_cache")
 GT_BASE = "https://api.geckoterminal.com/api/v2"
-JUP_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
+JUP_QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote"  # РЕАЛЬНЫЙ фикс после первого прогона:
+# quote-api.jup.ag/v6 -- NameResolutionError (DNS не резолвит вообще, не просто 4xx/5xx).
+# WebSearch этой сессии подтвердил: v6/quote-api.jup.ag -- deprecated legacy-эндпоинт,
+# текущий бесплатный (без API-ключа) путь -- lite-api.jup.ag/swap/v1/quote
+# (https://dev.jup.ag/api-reference/swap/quote, тот же набор параметров).
 NETWORK = "solana"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # канонический USDC-mint на Solana -- см. докстринг
 USDC_DECIMALS = 6  # стандарт USDC везде, не предположение конкретно для этого проекта
