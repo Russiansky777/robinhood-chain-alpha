@@ -167,9 +167,22 @@ def run() -> int:
             col_names = [c["column_name"] for c in cols]
             print(f"[launchpad_recon] реальные колонки: {col_names}")
 
-            addr_col = next((c for c in col_names if "token" in c.lower() and "address" in c.lower()), None)
+            # Реальный баг первого прогона: 'contract_address' -- это ВСЕГДА адрес
+            # ПРОТОКОЛЬНОГО контракта (factory/portal), эмитировавшего строку, а не
+            # адрес ЗАПУЩЕННОГО токена -- но он стоит первым в порядке колонок для
+            # всех call_/evt_ таблиц, и прежний код брал первое совпадение по
+            # приоритетному списку без учёта семантики, из-за чего 'contract_address'
+            # всегда перебивал настоящую колонку токена ('token'/'output_token'),
+            # стоящую дальше. Явный приоритет: сначала колонки, реально означающие
+            # ЗАПУЩЕННЫЙ токен, 'contract_address' -- ТОЛЬКО крайний фолбэк.
+            token_col_priority = ("token", "output_token", "newtoken", "tokenaddress")
+            addr_col = next((c for c in col_names if c.lower() in token_col_priority), None)
             if not addr_col:
-                addr_col = next((c for c in col_names if c.lower() in ("contract_address", "token", "address")), None)
+                addr_col = next((c for c in col_names if "token" in c.lower() and "address" in c.lower()), None)
+            if not addr_col:
+                addr_col = next((c for c in col_names if c.lower() in ("pair", "output_pair")), None)
+            if not addr_col:
+                addr_col = next((c for c in col_names if c.lower() in ("contract_address", "address")), None)
             time_col = next((c for c in col_names if "block_time" in c.lower() or c.lower() == "evt_block_time"), None)
             addr_col_dtype = next((c["data_type"] for c in cols if c["column_name"] == addr_col), None) if addr_col else None
 
