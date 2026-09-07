@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-07T12:25:33Z",
+  "generated_at_utc": "2026-09-07T12:30:53Z",
   "purpose": "ДИАГНОСТИКА трудоёмкости/объёма, НЕ финальный бэктест -- владелец: 'доложить до полного прогона'",
   "city": "New York (Central Park, диагностика -- сверить с реальным правилом Kalshi KXHIGHNY отдельно)",
   "lat": 40.7829,
@@ -82,7 +82,28 @@
       "byte_offset": 12323081
     }
   ],
-  "cfgrib_import_ok": false,
-  "cfgrib_import_error": "No module named 'xarray'",
-  "blocker": "cfgrib/eccodes не установились в этом окружении -- реальная системная проблема, нужно решать ДО полного прогона (см. cfgrib_import_error)"
+  "cfgrib_import_ok": true,
+  "single_message_download": {
+    "status": 206,
+    "n_bytes": 109477,
+    "download_s": 0.1477193832397461,
+    "range_header": "bytes=191501-300977",
+    "variable": "TMP"
+  },
+  "single_point_extraction": {
+    "ok": true,
+    "value_raw": 231.29202270507812,
+    "data_vars": [
+      "t"
+    ]
+  },
+  "volume_estimate": {
+    "n_days": 30,
+    "n_members": 31,
+    "n_requests_one_city_30d_idx_plus_range": 1860,
+    "measured_single_download_s": 0.1477193832397461,
+    "naive_estimated_total_s_one_city_30d": 274.75805282592773,
+    "note": "наивная оценка = время одного замера x число запросов, БЕЗ учёта троттлинга/параллелизации/накладных расходов cfgrib на файл -- реальная верхняя граница по одному образцу, не среднее"
+  },
+  "runtime_s_total": 1.2421040534973145
 }
