@@ -112,24 +112,45 @@ def _get(url: str, params: dict | None = None, max_retries: int = 3) -> tuple[in
 def fetch_negrisk_events(window_start_iso: str, now_iso: str) -> list[dict]:
     """Реальные мультиисходные события, активные или закрытые в окне.
     Два прохода (открытые сейчас + закрытые в окне) -- негативный риск
-    не фильтруется на сервере, добираем клиентски."""
+    не фильтруется на сервере, добираем клиентски.
+
+    РЕАЛЬНЫЙ фикс после первого прогона (run 34121721855): сервер
+    вернул HTTP 422 "end_date_min has a wrong value" на формат без 'Z' --
+    исправлено на честный ISO8601+'Z'. Дополнительная защита (на случай
+    ЕЩЁ одного формата, который сервер не примет) -- если и это упадёт
+    в 422, честно откатываемся на запрос БЕЗ date-фильтра (отсортированный
+    по startDate убыв., ограниченный MAX_PAGES_NO_DATE_FILTER страниц)
+    и фильтруем окно клиентски по `endDate`/`closedTime` -- не гадаем
+    формат бесконечно, ограничиваем реальными попытками."""
     out = []
+    max_pages_no_filter = 20  # честный потолок при отвале date-фильтра -- не листаем весь архив Polymarket вслепую
     for closed_filter in (False, True):
         offset = 0
+        use_date_filter = True
         while True:
             params = {"closed": str(closed_filter).lower(), "limit": 100, "offset": offset,
-                      "end_date_min": window_start_iso}
+                      "order": "startDate", "ascending": "false"}
+            if use_date_filter:
+                params["end_date_min"] = window_start_iso
             status, body = _get(f"{GAMMA_BASE}/events", params)
+            if status == 422 and use_date_filter:
+                print(f"    /events closed={closed_filter}: date-фильтр отвергнут ({body}) -- честный откат без него, фильтр клиентский, потолок {max_pages_no_filter} страниц")
+                use_date_filter = False
+                offset = 0
+                continue
             if status != 200 or not isinstance(body, list):
                 print(f"    /events closed={closed_filter} offset={offset}: HTTP {status} -- {str(body)[:300]}")
                 break
             if not body:
                 break
             out.extend(body)
-            print(f"    /events closed={closed_filter} offset={offset}: {len(body)} событий")
+            print(f"    /events closed={closed_filter} offset={offset} (date_filter={use_date_filter}): {len(body)} событий")
             if len(body) < 100:
                 break
             offset += 100
+            if not use_date_filter and offset >= max_pages_no_filter * 100:
+                print(f"    честный потолок {max_pages_no_filter} страниц без date-фильтра достигнут -- останавливаемся")
+                break
     seen_ids = set()
     multi = []
     for ev in out:
@@ -141,6 +162,19 @@ def fetch_negrisk_events(window_start_iso: str, now_iso: str) -> list[dict]:
         markets = ev.get("markets") or []
         if len(markets) < MIN_MARKETS_FOR_MULTI_OUTCOME:
             continue
+        # Клиентский фильтр окна -- нужен ВСЕГДА (даже если серверный
+        # date-фильтр сработал, он бьёт по end_date_min ТОЛЬКО, окно
+        # само по себе не проверено); критично, если сервер вообще
+        # отверг фильтр и отдал безусловный список.
+        end_date = ev.get("endDate") or ev.get("closedTime")
+        if end_date:
+            try:
+                ev_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+                win_start = datetime.fromisoformat(window_start_iso.replace("Z", "+00:00"))
+                if ev_end < win_start:
+                    continue
+            except ValueError:
+                pass  # честно не парсится -- не отбрасываем событие только из-за этого, оставляем на усмотрение анализа сделок
         multi.append(ev)
     return multi
 
@@ -269,7 +303,7 @@ def run() -> int:
     start_ts, end_ts = int(window_start.timestamp()), int(now.timestamp())
     print(f"=== Окно: {window_start.isoformat()} -> {now.isoformat()} ===")
 
-    events = fetch_negrisk_events(window_start.strftime("%Y-%m-%dT%H:%M:%S"), now.strftime("%Y-%m-%dT%H:%M:%S"))
+    events = fetch_negrisk_events(window_start.strftime("%Y-%m-%dT%H:%M:%SZ"), now.strftime("%Y-%m-%dT%H:%M:%SZ"))
     print(f"\n=== Реальных мультиисходных (negRisk, >={MIN_MARKETS_FOR_MULTI_OUTCOME} рынков) событий: {len(events)} ===")
 
     results = []

@@ -9,3 +9,4 @@ eth-account>=0.13    # Подпись EIP-1559 транзакций из PRIVATE
 yfinance>=0.2.40      # независимая сверка Y (Задача 1, проверка 2 к переключению на Chainlink) -- task1_y_source_crosscheck.py
 cfgrib>=0.9.10        # декодирование GRIB2 (NOAA GEFS, noaa_gefs_poc_one_city.py) -- Задача 3 владельца, 2026-09-07
 eccodes>=1.7.0         # C-библиотека для cfgrib -- pip-пакет с бандлом бинарников (ecmwflibs), см. докстринг noaa_gefs_poc_one_city.py, не факт что ставится без apt на GH Actions -- диагностика это проверяет
+xarray>=2023.1         # РЕАЛЬНЫЙ фикс после первого прогона диагностики: cfgrib импортировался успешно (значит eccodes реально встал), упало именно "No module named 'xarray'" -- xarray не тянется транзитивно cfgrib, нужен отдельной строкой
