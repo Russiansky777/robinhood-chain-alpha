@@ -7,3 +7,5 @@ pycryptodome>=3.20  # Keccak-256 для topic0 event-сигнатур (Sprint G1
 eth-abi>=5.0         # ABI-кодирование TokenParams (динамические string/tuple) для Pons V2 launchToken(), sc1_v2_recon.py/sc1_launcher.py
 eth-account>=0.13    # Подпись EIP-1559 транзакций из PRIVATE_KEY_NOX -- реальная отправка ТОЛЬКО с --confirm-mainnet, sc1_launcher.py
 yfinance>=0.2.40      # независимая сверка Y (Задача 1, проверка 2 к переключению на Chainlink) -- task1_y_source_crosscheck.py
+cfgrib>=0.9.10        # декодирование GRIB2 (NOAA GEFS, noaa_gefs_poc_one_city.py) -- Задача 3 владельца, 2026-09-07
+eccodes>=1.7.0         # C-библиотека для cfgrib -- pip-пакет с бандлом бинарников (ecmwflibs), см. докстринг noaa_gefs_poc_one_city.py, не факт что ставится без apt на GH Actions -- диагностика это проверяет
