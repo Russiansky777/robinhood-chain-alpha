@@ -1,0 +1,88 @@
+{
+  "generated_at_utc": "2026-09-07T12:25:33Z",
+  "purpose": "ДИАГНОСТИКА трудоёмкости/объёма, НЕ финальный бэктест -- владелец: 'доложить до полного прогона'",
+  "city": "New York (Central Park, диагностика -- сверить с реальным правилом Kalshi KXHIGHNY отдельно)",
+  "lat": 40.7829,
+  "lon": -73.9654,
+  "n_days": 30,
+  "s3_bucket": "noaa-gefs-pds",
+  "run_hour": "12",
+  "probe_idx_status": 200,
+  "probe_idx_temp_vars_found": [
+    {
+      "raw_line": "2:191501:d=2026090512:TMP:10 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "10 mb",
+      "byte_offset": 191501
+    },
+    {
+      "raw_line": "7:994877:d=2026090512:TMP:50 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "50 mb",
+      "byte_offset": 994877
+    },
+    {
+      "raw_line": "12:1836566:d=2026090512:TMP:100 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "100 mb",
+      "byte_offset": 1836566
+    },
+    {
+      "raw_line": "17:2756050:d=2026090512:TMP:200 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "200 mb",
+      "byte_offset": 2756050
+    },
+    {
+      "raw_line": "22:3789853:d=2026090512:TMP:250 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "250 mb",
+      "byte_offset": 3789853
+    },
+    {
+      "raw_line": "32:5519139:d=2026090512:TMP:500 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "500 mb",
+      "byte_offset": 5519139
+    },
+    {
+      "raw_line": "37:6636449:d=2026090512:TMP:700 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "700 mb",
+      "byte_offset": 6636449
+    },
+    {
+      "raw_line": "42:7783508:d=2026090512:TMP:850 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "850 mb",
+      "byte_offset": 7783508
+    },
+    {
+      "raw_line": "48:9285398:d=2026090512:TMP:925 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "925 mb",
+      "byte_offset": 9285398
+    },
+    {
+      "raw_line": "52:10202836:d=2026090512:TMP:1000 mb:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "1000 mb",
+      "byte_offset": 10202836
+    },
+    {
+      "raw_line": "63:11961742:d=2026090512:TMP:2 m above ground:24 hour fcst:ENS=low-res ctl",
+      "var": "TMP",
+      "level": "2 m above ground",
+      "byte_offset": 11961742
+    },
+    {
+      "raw_line": "65:12323081:d=2026090512:TMAX:2 m above ground:18-24 hour max fcst:ENS=low-res ctl",
+      "var": "TMAX",
+      "level": "2 m above ground",
+      "byte_offset": 12323081
+    }
+  ],
+  "cfgrib_import_ok": false,
+  "cfgrib_import_error": "No module named 'xarray'",
+  "blocker": "cfgrib/eccodes не установились в этом окружении -- реальная системная проблема, нужно решать ДО полного прогона (см. cfgrib_import_error)"
+}
