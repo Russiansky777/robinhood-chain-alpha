@@ -266,35 +266,58 @@ def analyze_event(ev: dict, start_ts: int, end_ts: int) -> dict:
                               "fee_applied": any(r is not None for r in fee_rates.values())})
 
     n_minutes_with_all_outcomes = sum(1 for by in per_minute.values() if len(by) >= n_outcomes)
-    return {
-        "event_id": event_id, "title": ev.get("title"), "n_outcomes": n_outcomes,
-        "n_trades_total": len(trades), "n_minutes_with_trades_on_all_outcomes": n_minutes_with_all_outcomes,
-        "n_episodes_spread_ge_1pct": len(episodes), "episodes": episodes[:200],  # честный кап на объём JSON, не на реальный подсчёт (n_episodes_spread_ge_1pct -- полный)
-    }
 
-
-def find_almost_resolved(ev: dict, end_ts: int) -> list[dict]:
-    out = []
-    for m in ev.get("markets") or []:
+    # "Почти разрешённые" (владелец: цена 97-99c при фактически известном
+    # исходе) -- переиспользуем УЖЕ полученные реальные сделки события
+    # (не дублируем /trades-запрос), ищем по КАЖДОМУ выигравшему исходу
+    # реальные сделки в полосе 0.97-0.99 ДО момента закрытия рынка.
+    almost_resolved = []
+    for i, m in enumerate(markets):
         resolution_status = m.get("umaResolutionStatus")
         closed_time = m.get("closedTime")
         try:
             outcome_prices = json.loads(m.get("outcomePrices") or "[]")
         except (ValueError, TypeError):
             outcome_prices = []
-        if not closed_time or not outcome_prices:
+        if resolution_status != "resolved" or not closed_time or "1" not in outcome_prices:
             continue
-        # Реально расчитанный рынок -- ищем последнюю цену ПЕРЕД расчётом в диапазоне 97-99c через /trades одного токена (Yes-сторона)
+        if outcome_prices.index("1") != 0:
+            continue  # честно: token_by_outcome[i] -- это ИМЕННО первый (Yes) токен из clobTokenIds; если выиграл НЕ он, а No-сторона, пропускаем (не смешиваем стороны без доп. проверки)
         try:
-            token_ids = json.loads(m.get("clobTokenIds") or "[]")
-        except (ValueError, TypeError):
-            token_ids = []
-        if not token_ids:
+            closed_dt = datetime.fromisoformat(closed_time.replace(" ", "T").replace("+00", "+00:00"))
+        except ValueError:
             continue
-        out.append({"market_question": m.get("question"), "closed_time": closed_time,
-                     "outcome_prices_final": outcome_prices, "yes_token_id": token_ids[0],
-                     "resolution_status": resolution_status})
-    return out
+        closed_ts_local = closed_dt.timestamp()
+        band_trades = [(t["timestamp"], float(t["price"])) for t in trades
+                        if t.get("outcome_index") == i and 0.97 <= float(t.get("price", 0)) <= 0.99
+                        and int(t["timestamp"]) < closed_ts_local]
+        if not band_trades:
+            continue
+        band_trades.sort()
+        first_ts, first_price = band_trades[0]
+        last_ts, last_price = band_trades[-1]
+
+        def _annualized(ts: float, price: float) -> dict:
+            days = (closed_ts_local - ts) / 86400
+            if days <= 0:
+                return {"days_to_settlement": days, "annualized_return_pct": None}
+            profit_frac = (1 - price) / price
+            return {"days_to_settlement": days, "annualized_return_pct": profit_frac * (365 / days) * 100}
+
+        almost_resolved.append({
+            "event_id": event_id, "market_question": m.get("question"),
+            "closed_time": closed_time, "outcome_prices_final": outcome_prices,
+            "n_real_trades_in_band_97_99": len(band_trades),
+            "earliest_entry": {"timestamp": first_ts, "price": first_price, **_annualized(first_ts, first_price)},
+            "latest_entry": {"timestamp": last_ts, "price": last_price, **_annualized(last_ts, last_price)},
+        })
+
+    return {
+        "event_id": event_id, "title": ev.get("title"), "n_outcomes": n_outcomes,
+        "n_trades_total": len(trades), "n_minutes_with_trades_on_all_outcomes": n_minutes_with_all_outcomes,
+        "n_episodes_spread_ge_1pct": len(episodes), "episodes": episodes[:200],  # честный кап на объём JSON, не на реальный подсчёт (n_episodes_spread_ge_1pct -- полный)
+        "almost_resolved_markets": almost_resolved,
+    }
 
 
 def run() -> int:
@@ -313,7 +336,7 @@ def run() -> int:
         try:
             res = analyze_event(ev, start_ts, end_ts)
             results.append(res)
-            almost_resolved_all.extend(find_almost_resolved(ev, end_ts))
+            almost_resolved_all.extend(res.get("almost_resolved_markets", []))
         except Exception as exc:  # noqa: BLE001
             print(f"    ошибка: {exc}")
             results.append({"event_id": ev.get("id"), "title": ev.get("title"), "error": str(exc)[:400]})
