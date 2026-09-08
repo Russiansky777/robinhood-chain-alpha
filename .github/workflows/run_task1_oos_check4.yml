@@ -1,9 +1,38 @@
-name: "Задача 1, проверка 4 -- out-of-sample прогноз/проверка знака Z на выходные 2026-09-04"
+name: "Задача 1, проверка 4+ -- out-of-sample прогноз/проверка знака Z по выходным (повторяемый механизм)"
 
 # Владелец, 2026-09-05: "В воскресенье в 19:55 ET -- прогноз... В
-# понедельник после 9:30 -- проверка." Два независимых запуска
-# (predict/verify), каждый триггерится своим маркером в РЕАЛЬНОЕ время
-# через запланированный триггер (create_trigger, вне сессии).
+# понедельник после 9:30 -- проверка." Изначально одноразовый под
+# конкретные выходные (Labor Day, 2026-09-04); владелец, 2026-09-08,
+# сделал механизм ПОВТОРЯЕМЫМ (friday/monday_offset_days -- входы
+# workflow_dispatch, не хардкод).
+#
+# РЕАЛЬНАЯ НАХОДКА этого раунда: оба первых Routine-триггера (predict
+# 2026-09-07T23:55Z, verify 2026-09-08T14:00Z) сработали по расписанию,
+# но НИ РАЗУ не запустили этот workflow -- ни одного зарегистрированного
+# запуска до ручной реконструкции 2026-09-08. Первая же ручная попытка
+# (push-триггер) реально запустилась и упала на credit_guard: SQL
+# ссылается на dex.trades(blockchain='robinhood'), что требует
+# явного одноразового подтверждения (OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD
+# =yes, правило владельца от 2026-09-06 после инцидента 238.71
+# кредитов) -- эта переменная НЕ была установлена ни в одном из
+# оригинальных промптов триггеров. Причина, по которой оригинальные
+# триггеры не оставили НИ push, НИ workflow-запуска (т.е. упали ДО
+# этого шага) осталась не выяснена (нет доступа к транскрипту тех
+# сессий) -- честно зафиксировано как нерешённое в паспорте.
+#
+# ФИКС: (1) явное подтверждение dex.trades теперь -- ВХОД
+# workflow_dispatch (owner_confirmed_dex_trades), а не переменная
+# окружения, зашитая в YAML -- сохраняет дух "явное одноразовое
+# подтверждение владельца", просто выражено через параметр запуска,
+# который передаёт КОНКРЕТНАЯ авторизованная сессия/пользователь на
+# КАЖДЫЙ конкретный прогон, а не постоянный обход проверки для всех
+# будущих запусков. (2) Триггер теперь ПРЕИМУЩЕСТВЕННО через
+# workflow_dispatch (прямой вызов API), не через git commit
+# пустого файла-маркера -- убирает git push из критического пути
+# запуска (сам push результатов внутри job всё ещё работает через
+# GITHUB_TOKEN раннера, не через сессию). Push-триггер (маркер-файл)
+# оставлен для обратной совместимости, но БЕЗ dex.trades-подтверждения
+# он всегда упадёт на credit_guard -- это ожидаемо и безопасно.
 
 on:
   workflow_dispatch:
@@ -13,6 +42,22 @@ on:
         required: true
         type: choice
         options: ["predict", "verify"]
+      friday:
+        description: "Пятница выходных (YYYY-MM-DD), на которые ставится прогноз"
+        required: false
+        default: "2026-09-04"
+        type: string
+      monday_offset_days:
+        description: "Смещение условного понедельника от пятницы (3 = обычные выходные, 4 = праздничный понедельник)"
+        required: false
+        default: "3"
+        type: string
+      owner_confirmed_dex_trades:
+        description: "Явное одноразовое подтверждение владельца на dex.trades(blockchain='robinhood') именно для ЭТОГО прогона"
+        required: true
+        default: "no"
+        type: choice
+        options: ["yes", "no"]
   push:
     branches:
       - claude/sc1-pons-v2-launcher-efdbyt
@@ -45,29 +90,24 @@ jobs:
           else
             echo "mode=predict" >> "$GITHUB_OUTPUT"
           fi
-      - name: "Задача 1, проверка 4 -- predict/verify"
+      - name: "Задача 1, проверка 4+ -- predict/verify"
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
           CREDIT_GUARD_NAMESPACE: task1_weekend_gap
-          # Владелец, 2026-09-06: выходные 2026-09-04 -- Labor Day (NYSE
-          # закрыт пн 2026-09-07, реальное открытие вт 2026-09-08) --
-          # окна X/Z сдвигаются на день, "условный понедельник" = 4 дня
-          # от пятницы, не 3. Этот workflow целиком одноразовый (под
-          # ЭТИ конкретные выходные, FRIDAY захардкожен в самом
-          # task1_oos_check4.py) -- жёстко "4" здесь безопасно, будущего
-          # обычного запуска этого файла не предполагается.
-          TASK1_OOS_MONDAY_OFFSET_DAYS: "4"
+          TASK1_OOS_FRIDAY: ${{ github.event.inputs.friday || '2026-09-04' }}
+          TASK1_OOS_MONDAY_OFFSET_DAYS: ${{ github.event.inputs.monday_offset_days || '4' }}
+          OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD: ${{ github.event.inputs.owner_confirmed_dex_trades || 'no' }}
         run: python -u analysis/task1_oos_check4.py "${{ steps.mode.outputs.mode }}"
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_OOS_CHECK4_PREDICT_REQUEST
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_OOS_CHECK4_VERIFY_REQUEST
-          [ -e data/p3_guard_cache/task1_oos_check4_predict_result.json ] && git add data/p3_guard_cache/task1_oos_check4_predict_result.json
-          [ -e data/p3_guard_cache/task1_oos_check4_verify_result.json ] && git add data/p3_guard_cache/task1_oos_check4_verify_result.json
+          git add data/p3_guard_cache/task1_oos_check4_predict_result*.json 2>/dev/null || true
+          git add data/p3_guard_cache/task1_oos_check4_verify_result*.json 2>/dev/null || true
           [ -e data/credits_spent.json ] && git add data/credits_spent.json
           git diff --cached --quiet && exit 0
-          git commit -m "Задача 1, проверка 4 (${{ steps.mode.outputs.mode }}): результат [automated]"
+          git commit -m "Задача 1, проверка OOS (${{ steps.mode.outputs.mode }}, friday=${{ github.event.inputs.friday || '2026-09-04' }}): результат [automated]"
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"

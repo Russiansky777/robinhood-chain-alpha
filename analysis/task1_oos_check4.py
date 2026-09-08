@@ -53,7 +53,12 @@ from task1_liquidity_v3_roundtrip import find_pool_addr_cache  # noqa: E402
 
 BUDGET = 250.0
 REGISTRY_PATH = Path("data/rwa_stock_token_registry.json")
-FRIDAY = "2026-09-04"  # выходные, на которые ставится предрегистрированный прогноз
+# Владелец, 2026-09-08: механизм становится ПОВТОРЯЕМЫМ (не одноразовым
+# под конкретные выходные, как задумывалось изначально) -- FRIDAY теперь
+# управляется env-переменной, дефолт остаётся исходным выходным
+# (Labor Day, 2026-09-04), чтобы не менять поведение уже закоммиченной
+# реконструкции этого раунда.
+FRIDAY = os.environ.get("TASK1_OOS_FRIDAY", "2026-09-04")  # выходные, на которые ставится предрегистрированный прогноз
 # Владелец, 2026-09-06: выходные 2026-09-04 попадают на Labor Day (NYSE
 # закрыт понедельник 2026-09-07, реальное открытие -- вторник 2026-09-08)
 # -- окна X/Z сдвигаются на весь лишний день. 3 = обычные выходные
@@ -63,8 +68,14 @@ FRIDAY = "2026-09-04"  # выходные, на которые ставится 
 MONDAY_OFFSET_DAYS = int(os.environ.get("TASK1_OOS_MONDAY_OFFSET_DAYS", "3"))
 MIN_BRACKET_TRADES = 3  # тот же порог, что в task1_weekend_gap.py
 ABS_X_OUTLIER_THRESHOLD = 0.5  # предрегистрировано владельцем 2026-09-05, тот же порог, что в проверке 2/3
-PREDICT_PATH = Path("data/p3_guard_cache/task1_oos_check4_predict_result.json")
-VERIFY_PATH = Path("data/p3_guard_cache/task1_oos_check4_verify_result.json")
+# Пути результатов -- по умолчанию (FRIDAY=2026-09-04) остаются ИСХОДНЫМИ
+# именами (уже закоммиченный результат реконструкции этого раунда не
+# переезжает); для ЛЮБОЙ другой пятницы -- отдельный файл с датой в
+# имени, чтобы новый слепой прогноз не перезаписал предыдущий.
+_FRIDAY_SLUG = FRIDAY.replace("-", "")
+_SUFFIX = "" if FRIDAY == "2026-09-04" else f"_{_FRIDAY_SLUG}"
+PREDICT_PATH = Path(f"data/p3_guard_cache/task1_oos_check4_predict_result{_SUFFIX}.json")
+VERIFY_PATH = Path(f"data/p3_guard_cache/task1_oos_check4_verify_result{_SUFFIX}.json")
 HIT_RATE_THRESHOLD = 0.60  # предрегистрировано владельцем ДО прогноза -- проверяется на ТОРГУЕМЫХ (2026-09-05)
 
 
