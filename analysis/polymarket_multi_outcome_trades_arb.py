@@ -272,6 +272,9 @@ def analyze_event(ev: dict, start_ts: int, end_ts: int) -> dict:
     # (не дублируем /trades-запрос), ищем по КАЖДОМУ выигравшему исходу
     # реальные сделки в полосе 0.97-0.99 ДО момента закрытия рынка.
     almost_resolved = []
+    ar_diag = {"n_markets_total": len(markets), "n_resolved_status": 0, "n_resolved_with_closed_time": 0,
+               "n_resolved_with_known_outcome": 0, "n_resolved_winner_is_index0": 0,
+               "n_resolved_winner_is_other_index": 0, "n_with_band_trades": 0}
     for i, m in enumerate(markets):
         resolution_status = m.get("umaResolutionStatus")
         closed_time = m.get("closedTime")
@@ -279,10 +282,17 @@ def analyze_event(ev: dict, start_ts: int, end_ts: int) -> dict:
             outcome_prices = json.loads(m.get("outcomePrices") or "[]")
         except (ValueError, TypeError):
             outcome_prices = []
+        if resolution_status == "resolved":
+            ar_diag["n_resolved_status"] += 1
+            if closed_time:
+                ar_diag["n_resolved_with_closed_time"] += 1
         if resolution_status != "resolved" or not closed_time or "1" not in outcome_prices:
             continue
+        ar_diag["n_resolved_with_known_outcome"] += 1
         if outcome_prices.index("1") != 0:
+            ar_diag["n_resolved_winner_is_other_index"] += 1
             continue  # честно: token_by_outcome[i] -- это ИМЕННО первый (Yes) токен из clobTokenIds; если выиграл НЕ он, а No-сторона, пропускаем (не смешиваем стороны без доп. проверки)
+        ar_diag["n_resolved_winner_is_index0"] += 1
         try:
             closed_dt = datetime.fromisoformat(closed_time.replace(" ", "T").replace("+00", "+00:00"))
         except ValueError:
@@ -293,6 +303,7 @@ def analyze_event(ev: dict, start_ts: int, end_ts: int) -> dict:
                         and int(t["timestamp"]) < closed_ts_local]
         if not band_trades:
             continue
+        ar_diag["n_with_band_trades"] += 1
         band_trades.sort()
         first_ts, first_price = band_trades[0]
         last_ts, last_price = band_trades[-1]
@@ -317,6 +328,7 @@ def analyze_event(ev: dict, start_ts: int, end_ts: int) -> dict:
         "n_trades_total": len(trades), "n_minutes_with_trades_on_all_outcomes": n_minutes_with_all_outcomes,
         "n_episodes_spread_ge_1pct": len(episodes), "episodes": episodes[:200],  # честный кап на объём JSON, не на реальный подсчёт (n_episodes_spread_ge_1pct -- полный)
         "almost_resolved_markets": almost_resolved,
+        "almost_resolved_diag": ar_diag,  # диагностика: на каком шаге фильтра реально отсеиваются рынки -- честная проверка, не гадание, почему almost_resolved_markets может быть пуст
     }
 
 
@@ -346,6 +358,11 @@ def run() -> int:
     times_per_day = total_episodes / days if days else 0
     prereg_pass = times_per_day >= MIN_TIMES_PER_DAY
 
+    ar_diag_total: dict = defaultdict(int)
+    for r in results:
+        for k, v in (r.get("almost_resolved_diag") or {}).items():
+            ar_diag_total[k] += v
+
     out = {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "method": "НИЖНЯЯ ГРАНИЦА по реальным сделкам (Data API /trades), не по стакану -- стакан мог быть шире",
@@ -355,6 +372,7 @@ def run() -> int:
         "prereg_pass_build_live_orderbook": prereg_pass,
         "events": results,
         "almost_resolved_markets": almost_resolved_all,
+        "almost_resolved_diag_total": dict(ar_diag_total),  # честная сводка воронки фильтра по ВСЕМ событиям -- откуда реально 0 (или не 0)
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
