@@ -167,18 +167,24 @@ def extract_price_yes(candle: dict, diag_list: list) -> float | None:
     пробуем несколько реальных кандидатов полей, честно возвращаем None
     и логируем в diag, если ни один не подошёл -- не гадаем дальше."""
     diag_list.append({"raw_candle_sample": candle})
-    for key in ("price", "yes_bid", "yes_ask", "close", "yes_close"):
+    # РЕАЛЬНАЯ схема (обнаружено вторым прогоном 2026-09-08): sub-словари
+    # price/yes_bid/yes_ask содержат СТРОКОВЫЕ поля с суффиксом
+    # `_dollars` (например 'close_dollars': '0.2200'), уже в единицах
+    # 0-1 (не центы) -- НЕ 'close'/'mean' голыми числами, как
+    # предполагалось изначально. На тонких/бесторговых свечах
+    # 'close_dollars' может отсутствовать -- честный fallback по
+    # порядку важности внутри каждого блока.
+    for key in ("price", "yes_ask", "yes_bid"):
         val = candle.get(key)
-        if val is None:
+        if not isinstance(val, dict):
             continue
-        if isinstance(val, dict):
-            for sub in ("close", "mean", "open"):
-                if val.get(sub) is not None:
-                    v = float(val[sub])
-                    return v / 100.0 if v > 1 else v
-        elif isinstance(val, (int, float)):
-            v = float(val)
-            return v / 100.0 if v > 1 else v
+        for sub in ("close_dollars", "mean_dollars", "open_dollars", "previous_dollars", "high_dollars", "low_dollars"):
+            raw = val.get(sub)
+            if raw is not None:
+                try:
+                    return float(raw)
+                except (TypeError, ValueError):
+                    continue
     return None
 
 
