@@ -90,25 +90,29 @@ def discover_station(diag: dict) -> str | None:
     diag["series_raw_response"] = data
     print(f"[task3] реальный /series/{SERIES_TICKER} ответ (полностью): {json.dumps(data, ensure_ascii=False)[:3000]}")
     series = data.get("series", data)
-    candidates = []
-    for key in ("settlement_sources", "rules_primary", "rules_secondary", "title", "category"):
-        val = series.get(key)
-        if val:
-            candidates.append((key, val))
-    diag["station_field_candidates"] = candidates
-    # Честный поиск 4-буквенного ICAO-кода (K + 3 буквы) в текстовых полях
+    diag["series_fee_multiplier"] = series.get("fee_multiplier")
+    diag["series_settlement_sources"] = series.get("settlement_sources")
+    # РЕАЛЬНАЯ находка первого прогона (2026-09-08): /series НЕ содержит
+    # rules_primary/станцию вообще -- это поле есть только на объекте
+    # РЫНКА (market), не серии. Возвращаем None здесь честно -- реальный
+    # код станции извлекается позже из первого реального market.rules_primary
+    # в run() через extract_station_from_rules().
+    print("[task3] ВНИМАНИЕ: /series не содержит station/rules_primary -- будет извлечено из объекта рынка ниже")
+    return None
+
+
+def extract_station_from_rules(rules_primary: str) -> str | None:
+    """РЕАЛЬНЫЙ формат (обнаружено этой сессией на живом ответе,
+    2026-09-08): 'If the maximum temperature recorded at New York City
+    (CLINYC) for Sep 7, 2026, is greater than 84° fahrenheit...' --
+    станция это код The Weather Company (CLINYC), НЕ NWS ICAO (KNYC) --
+    честно скорректированное предположение владельца/задачи. Ищем ЛЮБОЙ
+    код в скобках после названия города, не только K+3 буквы."""
     import re
-    icao_found = None
-    for key, val in candidates:
-        text = json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val
-        m = re.search(r"\bK[A-Z]{3}\b", text)
-        if m:
-            icao_found = m.group(0)
-            diag["station_found_in_field"] = key
-            break
-    diag["station_icao"] = icao_found
-    print(f"[task3] реальная станция, найдена в поле '{diag.get('station_found_in_field')}': {icao_found}")
-    return icao_found
+    if not rules_primary:
+        return None
+    m = re.search(r"\(([A-Z]{3,8})\)", rules_primary)
+    return m.group(1) if m else None
 
 
 def list_settled_markets(min_close_ts: int, max_close_ts: int, diag: dict) -> list[dict]:
@@ -151,6 +155,30 @@ def get_entry_price(ticker: str, close_ts: int, diag_list: list) -> dict | None:
             continue
         candles.sort(key=lambda c: abs(c.get("end_period_ts", c.get("ts", 0)) - target_ts))
         return {"candle": candles[0], "path_used": path, "target_ts": target_ts}
+    return None
+
+
+def extract_price_yes(candle: dict, diag_list: list) -> float | None:
+    """ЧЕСТНОЕ извлечение цены YES из реальной свечи -- схема Kalshi
+    candlesticks НЕ была видна живьём до первого реального прогона
+    2026-09-08 (упал с TypeError: поле оказалось dict, не числом,
+    значит реальная свеча вкладывает OHLC под ключом, а не хранит
+    единственное число верхнего уровня). Логируем сырую свечу ВСЕГДА,
+    пробуем несколько реальных кандидатов полей, честно возвращаем None
+    и логируем в diag, если ни один не подошёл -- не гадаем дальше."""
+    diag_list.append({"raw_candle_sample": candle})
+    for key in ("price", "yes_bid", "yes_ask", "close", "yes_close"):
+        val = candle.get(key)
+        if val is None:
+            continue
+        if isinstance(val, dict):
+            for sub in ("close", "mean", "open"):
+                if val.get(sub) is not None:
+                    v = float(val[sub])
+                    return v / 100.0 if v > 1 else v
+        elif isinstance(val, (int, float)):
+            v = float(val)
+            return v / 100.0 if v > 1 else v
     return None
 
 
@@ -338,6 +366,18 @@ def run() -> int:
         print(f"[task3] ОСТАНОВЛЕНО: {result['blocker']}")
         return 1
 
+    # РЕАЛЬНАЯ станция -- извлекается из rules_primary ПЕРВОГО реального
+    # рынка (не из /series -- там этого поля нет вообще, см. discover_station).
+    station = None
+    for m0 in markets:
+        station = extract_station_from_rules(m0.get("rules_primary", ""))
+        if station:
+            break
+    result["station_code_from_market_rules"] = station
+    if station and station != "KNYC":
+        print(f"[task3] РЕАЛЬНАЯ станция из rules_primary: {station} (НЕ KNYC, честно используем найденную)")
+    diag["station_sample_rules_primary"] = (markets[0].get("rules_primary") if markets else None)
+
     # Группировка по реальной дате закрытия (календарный день) -- один день
     # Kalshi обычно даёт НЕСКОЛЬКО рынков (разные пороги/бины), реально
     # используем ВСЕ, чтобы честно оценить сколько рынков в выборке.
@@ -390,12 +430,7 @@ def run() -> int:
                 "horizons": {},
             }
             if price_info:
-                candle = price_info["candle"]
-                price_yes = None
-                for key in ("yes_close", "close", "price"):
-                    if candle.get(key) is not None:
-                        price_yes = candle[key] / 100.0 if candle[key] > 1 else candle[key]
-                        break
+                price_yes = extract_price_yes(price_info["candle"], diag["http_errors"])
                 market_entry["entry_price_yes"] = price_yes
                 threshold_f = floor_strike if floor_strike is not None else cap_strike
                 if price_yes is not None and threshold_f is not None:
