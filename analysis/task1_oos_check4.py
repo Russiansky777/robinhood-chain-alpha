@@ -146,7 +146,14 @@ def fetch_weekend_df(trades_end_hours_after_friday: int) -> pd.DataFrame:
 
 
 def predict() -> int:
-    credit_guard.ensure_namespace("task1_weekend_gap", BUDGET)
+    # РЕАЛЬНЫЙ баг, найденный этим прогоном: hardcoded-строка "task1_weekend_gap"
+    # здесь инициализировала СТАРОЕ пространство, тогда как реальная
+    # execute-проверка (credit_guard.namespace(), внутри check_before_execute)
+    # читает CREDIT_GUARD_NAMESPACE из окружения (task1_weekend_gap_mozila
+    # после миграции 2026-09-09) -- расхождение имён = "пространство не
+    # инициализировано". Используем credit_guard.namespace() здесь тоже,
+    # чтобы обе стороны всегда совпадали.
+    credit_guard.ensure_namespace(credit_guard.namespace(), BUDGET)
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     print(f"[oos_check4:predict] реальное время генерации (UTC): {now}")
     # Sunday 19:55 ET = friday+3d 00:00 UTC - 5min ровно, т.е. окно X
