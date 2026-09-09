@@ -373,7 +373,7 @@ def run() -> int:
         "series_ticker": SERIES_TICKER, "n_days_target": N_DAYS,
         "edge_threshold_pct": EDGE_THRESHOLD_PCT, "horizons_days": HORIZONS_DAYS,
         "gefs_ref_hour_utc": GEFS_REF_HOUR,
-        "fxx_window_selection": f"одно 3ч окно, ближайшее к местным {TYPICAL_HIGH_LOCAL_HOUR}:00 (аппроксимация суточного максимума, см. докстринг fxx_windows_for_local_day)",
+        "fxx_window_selection": f"ПОЛНЫЙ перебор 3ч окон местного дня [{LOCAL_DAY_START_H}:00-{LOCAL_DAY_END_H}:00), максимум по всем окнам (владелец, 2026-09-09) -- не одно окно, как в первом прогоне",
         "diag": diag, "days": list(resumed_days),
     }
 
