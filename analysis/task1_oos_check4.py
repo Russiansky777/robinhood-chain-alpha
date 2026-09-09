@@ -39,7 +39,14 @@ import sys
 import time
 from pathlib import Path
 
-os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "task1_weekend_gap")
+# Владелец, 2026-09-09: снимок биллинг-цикла 2479.96/2480 (external_truth
+# от 2026-09-01) относится к СТАРОМУ DUNE_API_KEY, не к аккаунту Mozila
+# -- та же ситуация, что уже была решена для fomo/фандинга (перевод на
+# secrets.DUNE_API_KEY_MOZILA + отдельный леджер). Задача 1 переводится
+# на тот же паттерн: НОВЫЙ независимый namespace/леджер, не смешивается
+# со старым data/credits_spent.json (там своя billing_cycle-граница).
+os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "task1_weekend_gap_mozila")
+os.environ.setdefault("CREDIT_GUARD_FILE", "data/credits_spent_mozila.json")
 sys.path.insert(0, str(Path(__file__).parent))
 
 import numpy as np  # noqa: E402

@@ -92,8 +92,13 @@ jobs:
           fi
       - name: "Задача 1, проверка 4+ -- predict/verify"
         env:
-          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
-          CREDIT_GUARD_NAMESPACE: task1_weekend_gap
+          # Владелец, 2026-09-09: билинг-цикл 2479.96/2480 -- снимок
+          # СТАРОГО ключа, не Mozila. Переведено на secrets.DUNE_API_KEY_MOZILA
+          # + отдельный леджер (тот же паттерн, что fomo/фандинг) --
+          # см. run_dune_mozila_recon.yml.
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task1_weekend_gap_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
           TASK1_OOS_FRIDAY: ${{ github.event.inputs.friday || '2026-09-04' }}
           TASK1_OOS_MONDAY_OFFSET_DAYS: ${{ github.event.inputs.monday_offset_days || '4' }}
           OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD: ${{ github.event.inputs.owner_confirmed_dex_trades || 'no' }}
@@ -105,7 +110,7 @@ jobs:
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK1_OOS_CHECK4_VERIFY_REQUEST
           git add data/p3_guard_cache/task1_oos_check4_predict_result*.json 2>/dev/null || true
           git add data/p3_guard_cache/task1_oos_check4_verify_result*.json 2>/dev/null || true
-          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
           git diff --cached --quiet && exit 0
           git commit -m "Задача 1, проверка OOS (${{ steps.mode.outputs.mode }}, friday=${{ github.event.inputs.friday || '2026-09-04' }}): результат [automated]"
           for i in 1 2 3 4 5; do

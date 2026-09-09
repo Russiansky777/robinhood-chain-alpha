@@ -98,6 +98,22 @@ def _references_dex_trades_robinhood(sql: str) -> bool:
     return "dex.trades" in lower and "blockchain" in lower and "'robinhood'" in lower
 
 
+def _historical_max_actual_cost(name: str) -> float | None:
+    """Владелец, 2026-09-09 (после того как форс-250 заблокировал ровно
+    те дешёвые, уже неоднократно исполнявшиеся запросы, ради которых
+    гард и писался): если у запроса `name` в ТЕКУЩЕМ леджере (CREDITS_FILE)
+    уже есть реальная (не оценочная) история исполнений, форс-оценка
+    должна опираться на неё, не на слепые 250. Возвращает максимальную
+    реально подтверждённую (`credits_known=True`) стоимость исполнения
+    этого имени запроса, или None, если истории ещё нет вообще."""
+    state = load_state()
+    costs = [
+        e["credits"] for e in state.get("entries", [])
+        if e.get("op") == "execute" and e.get("name") == name and e.get("credits_known")
+    ]
+    return max(costs) if costs else None
+
+
 def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> float:
     """Вызывается ПЕРЕД любым execute(), НЕЗАВИСИМО от остатка бюджета --
     жёсткий стоп с докладом при срабатывании. Оценка печатается ВСЕГДА,
@@ -109,12 +125,22 @@ def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> float:
     execute() в dune_client.py."""
     print(f"[credit_guard] Оценка перед execute '{name}': {estimated_credits:.1f} кредитов.")
     if _references_dex_trades_robinhood(sql):
-        estimated_credits = max(estimated_credits, DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE)
-        print(
-            f"[credit_guard] '{name}' ссылается на dex.trades(blockchain='robinhood') -- оценка форсирована на "
-            f"{estimated_credits:.1f} (правило владельца, 2026-09-06, после инцидента 238.71 -- оценивается "
-            "потенциал сканирования, не заявленные строки)."
-        )
+        hist_max = _historical_max_actual_cost(name)
+        if hist_max is not None:
+            estimated_credits = max(estimated_credits, hist_max * 2)
+            print(
+                f"[credit_guard] '{name}' ссылается на dex.trades(blockchain='robinhood'), но в леджере ЕСТЬ "
+                f"реальная история исполнений (макс. фактическая стоимость {hist_max:.2f}) -- владелец, "
+                f"2026-09-09: форс-оценка = история×2 = {estimated_credits:.1f}, не слепые "
+                f"{DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE:.0f} (форс-250 -- только когда истории ещё нет)."
+            )
+        else:
+            estimated_credits = max(estimated_credits, DEX_TRADES_ROBINHOOD_FORCED_ESTIMATE)
+            print(
+                f"[credit_guard] '{name}' ссылается на dex.trades(blockchain='robinhood'), реальной истории "
+                f"исполнений ЕЩЁ НЕТ -- оценка форсирована на {estimated_credits:.1f} (правило владельца, "
+                "2026-09-06, после инцидента 238.71 -- оценивается потенциал сканирования, не заявленные строки)."
+            )
         if os.environ.get(OWNER_OK_DEX_TRADES_ROBINHOOD_ENV, "").strip().lower() != "yes":
             print(
                 f"[credit_guard] СТОП: '{name}' требует явного одноразового подтверждения владельца -- "
