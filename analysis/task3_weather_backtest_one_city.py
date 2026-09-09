@@ -254,36 +254,47 @@ def fetch_point_value(run_date: str, run_hour: str, member: str, fxx: int,
         tmp_path.unlink(missing_ok=True)
 
 
-TYPICAL_HIGH_LOCAL_HOUR = 15  # реальная климатологическая эвристика NWS: суточный максимум обычно ~14:00-16:00 местного
+LOCAL_DAY_START_H, LOCAL_DAY_END_H = 6, 23  # реальный дневной интервал станции с запасом на оба конца
 
 
 def fxx_windows_for_local_day(run_dt: datetime, target_local_date: datetime) -> list[int]:
-    """ЧЕСТНОЕ УПРОЩЕНИЕ (объём запросов): вместо полного перебора всех
-    3-часовых окон местного дня (что дало бы точный суточный максимум, но
-    ~5x больше запросов -- не укладывается в разумный таймаут GH Actions
-    при 31 члене x 3 горизонта x 30 дней), берём ОДНО 3-часовое окно GEFS,
-    ближайшее по концу к типичному времени суточного максимума
-    (TYPICAL_HIGH_LOCAL_HOUR местного). Это НЕ полный суточный максимум,
-    а его аппроксимация -- честно помечено в результате
-    (`fxx_window_selection`), может НЕДООЦЕНИТЬ реальный максимум в дни,
-    когда пик пришёлся на другое время. Полный перебор -- кандидат на
-    доработку, если экспектация на этом упрощённом методе будет
-    пограничной, а не явно отрицательной/положительной."""
-    target_hour_utc = target_local_date.replace(hour=0, minute=0, second=0, microsecond=0) \
-        + timedelta(hours=TYPICAL_HIGH_LOCAL_HOUR - NY_UTC_OFFSET_HOURS)
-    best_fxx, best_diff = None, None
+    """Владелец, 2026-09-09: полный перебор окон дня вместо одного
+    3-часового -- возвращает ВСЕ 3-часовые forecast-hour окончания
+    GEFS, чьё окно пересекает местный дневной интервал
+    [LOCAL_DAY_START_H, LOCAL_DAY_END_H) станции в target_local_date.
+    Суточный максимум = MAX по всем этим окнам (не одно ближайшее к
+    15:00, как в первом, честно помеченном как упрощение, прогоне)."""
+    day_start_utc = target_local_date.replace(hour=0, minute=0, second=0, microsecond=0) \
+        + timedelta(hours=LOCAL_DAY_START_H - NY_UTC_OFFSET_HOURS)
+    day_end_utc = target_local_date.replace(hour=0, minute=0, second=0, microsecond=0) \
+        + timedelta(hours=LOCAL_DAY_END_H - NY_UTC_OFFSET_HOURS)
+    fxx_list = []
     fxx = 3
     while fxx <= 192:
+        window_start_utc = run_dt + timedelta(hours=fxx - 3)
         window_end_utc = run_dt + timedelta(hours=fxx)
-        diff = abs((window_end_utc - target_hour_utc).total_seconds())
-        if best_diff is None or diff < best_diff:
-            best_fxx, best_diff = fxx, diff
+        if window_end_utc > day_start_utc and window_start_utc < day_end_utc:
+            fxx_list.append(fxx)
         fxx += 3
-    return [best_fxx] if best_fxx else []
+    return fxx_list
 
 
-def ensemble_prob_above(run_date: str, run_hour: str, target_local_date: datetime,
-                        threshold_f: float, diag_list: list) -> dict:
+_ensemble_cache: dict[tuple, dict] = {}
+
+
+def ensemble_member_max_f(run_date: str, run_hour: str, target_local_date: datetime,
+                           diag_list: list) -> dict:
+    """Реальный суточный максимум (по Фаренгейту) КАЖДОГО из 31 члена
+    ансамбля, БЕЗ порога/сравнения с рынком -- порог применяется
+    отдельно (см. prob_yes_for_market), т.к. один и тот же ансамбль
+    переиспользуется для ВСЕХ рынков одного дня (несколько порогов на
+    день), не пересчитывается на каждый рынок заново. Кэшируется по
+    (run_date, run_hour, target_local_date) -- реальная экономия
+    запросов при полном переборе окон (несколько рынков на день, тот
+    же прогон/тот же горизонт)."""
+    key = (run_date, run_hour, target_local_date.date().isoformat())
+    if key in _ensemble_cache:
+        return _ensemble_cache[key]
     run_dt = datetime.strptime(f"{run_date}{run_hour}", "%Y%m%d%H").replace(tzinfo=timezone.utc)
     fxx_list = fxx_windows_for_local_day(run_dt, target_local_date)
     member_max_k: dict[str, float] = {}
@@ -295,12 +306,34 @@ def ensemble_prob_above(run_date: str, run_hour: str, target_local_date: datetim
                 vals.append(v)
         if vals:
             member_max_k[member] = max(vals)
-    if not member_max_k:
-        return {"n_members_ok": 0, "prob_above": None, "fxx_used": fxx_list}
     member_max_f = {m: (k - 273.15) * 9 / 5 + 32 for m, k in member_max_k.items()}
-    n_above = sum(1 for f in member_max_f.values() if f > threshold_f)
-    return {"n_members_ok": len(member_max_f), "prob_above": n_above / len(member_max_f),
-            "fxx_used": fxx_list, "member_max_f": member_max_f}
+    result = {"n_members_ok": len(member_max_f), "fxx_used": fxx_list, "member_max_f": member_max_f}
+    _ensemble_cache[key] = result
+    return result
+
+
+def prob_yes_for_market(member_max_f: dict, floor_strike: float | None, cap_strike: float | None) -> float | None:
+    """Владелец, 2026-09-09: реальная проверка живых rules_primary
+    показала ТРИ разных реальных типа рынка Kalshi KXHIGHNY, перепутанных
+    в первом прогоне (честно найденная причина hit_rate=21.5%):
+      - floor-only ('...greater than {floor}...') -> YES = temp > floor.
+      - cap-only ('...less than {cap}...') -> YES = temp < cap --
+        ПЕРВЫЙ прогон здесь считал prob_above(cap) вместо prob_below(cap)
+        -- прямая инверсия знака на 30 из 180 реальных рынков выборки.
+      - оба присутствуют -> средний бин, YES = floor < temp < cap
+        (граница НЕ подтверждена живым текстом для этого случая, только
+        для двух односторонних -- честная, но правдоподобная экстраполяция
+        по аналогии со strict-inequality с обеих сторон)."""
+    if not member_max_f:
+        return None
+    n = len(member_max_f)
+    if floor_strike is not None and cap_strike is None:
+        return sum(1 for f in member_max_f.values() if f > floor_strike) / n
+    if cap_strike is not None and floor_strike is None:
+        return sum(1 for f in member_max_f.values() if f < cap_strike) / n
+    if floor_strike is not None and cap_strike is not None:
+        return sum(1 for f in member_max_f.values() if floor_strike < f < cap_strike) / n
+    return None
 
 
 def kalshi_fee_usd(m_mult: float, price_yes: float) -> float:
@@ -438,14 +471,15 @@ def run() -> int:
             if price_info:
                 price_yes = extract_price_yes(price_info["candle"], diag["http_errors"])
                 market_entry["entry_price_yes"] = price_yes
-                threshold_f = floor_strike if floor_strike is not None else cap_strike
-                if price_yes is not None and threshold_f is not None:
+                if price_yes is not None and (floor_strike is not None or cap_strike is not None):
                     for h in HORIZONS_DAYS:
                         run_dt_target = target_local_date - timedelta(days=h)
                         run_date_str = run_dt_target.strftime("%Y%m%d")
                         try:
-                            ens = ensemble_prob_above(run_date_str, GEFS_REF_HOUR, target_local_date,
-                                                       float(threshold_f), diag["http_errors"])
+                            ens = ensemble_member_max_f(run_date_str, GEFS_REF_HOUR, target_local_date,
+                                                         diag["http_errors"])
+                            prob_yes = prob_yes_for_market(ens.get("member_max_f"), floor_strike, cap_strike)
+                            ens = {**ens, "prob_above": prob_yes}  # ключ сохранён для обратной совместимости отчёта
                         except Exception as exc:  # noqa: BLE001
                             ens = {"error": str(exc)[:300]}
                         edge = None

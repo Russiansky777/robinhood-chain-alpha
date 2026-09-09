@@ -83,15 +83,34 @@ def read_fee_bps(pool_address: str) -> int:
     return int(raw, 16)
 
 
+GT_MAX_RETRIES = 4  # владелец, 2026-09-09: реальный прогон OOS-предикта поймал 429 на 35 из 79
+# реальных вызовов GT ДАЖЕ при GT_MIN_INTERVAL_S=2.6 -- честная находка: это
+# рейт-лимит GT, не отсутствие ликвидности, и одна попытка без ретрая ложно
+# помечала эти тикеры как "не оценено" (искажая воронку торгуемости). Ретрай
+# с экспоненциальной паузой (уважает Retry-After, если он есть) -- отличает
+# РЕАЛЬНОЕ отсутствие данных (404 -- не ретраится) от временного throttling.
+
+
 def get_gt_reserve_usd(pool_address: str) -> float | None:
-    _throttle_gt()
-    r = requests.get(f"{GT_BASE}/networks/{GT_NETWORK}/pools/{pool_address}", headers=HEADERS_GT, timeout=30)
-    if r.status_code == 404:
-        return None
-    r.raise_for_status()
-    attrs = r.json().get("data", {}).get("attributes", {})
-    v = attrs.get("reserve_in_usd")
-    return float(v) if v else None
+    last_exc: Exception | None = None
+    for attempt in range(GT_MAX_RETRIES):
+        _throttle_gt()
+        r = requests.get(f"{GT_BASE}/networks/{GT_NETWORK}/pools/{pool_address}", headers=HEADERS_GT, timeout=30)
+        if r.status_code == 404:
+            return None
+        if r.status_code == 429:
+            retry_after = r.headers.get("Retry-After")
+            wait = float(retry_after) if retry_after else GT_MIN_INTERVAL_S * (2 ** attempt)
+            print(f"[task1_pool_liquidity] GT 429 на {pool_address}, попытка {attempt+1}/{GT_MAX_RETRIES}, "
+                  f"жду {wait:.1f}с (реальный rate-limit, не отсутствие данных)")
+            last_exc = requests.HTTPError(f"429 после {attempt+1} попыток")
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        attrs = r.json().get("data", {}).get("attributes", {})
+        v = attrs.get("reserve_in_usd")
+        return float(v) if v else None
+    raise last_exc if last_exc else RuntimeError(f"GT: не удалось получить {pool_address} после {GT_MAX_RETRIES} попыток")
 
 
 def round_trip_cost_pct(fee_bps: int, reserve_usd: float, trade_usd: float = TRADE_SIZE_USD) -> dict:
