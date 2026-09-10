@@ -21,6 +21,7 @@ on:
       - "data/p3_guard_cache/TASKD_ANALYSIS_REQUEST"
       - "data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST"
       - "data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKD_REOPEN_CALENDAR_PROBE_REQUEST"
 
 jobs:
   run_task:
@@ -75,6 +76,12 @@ jobs:
           THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
         run: python -u analysis/taskD_reopen_depth_probe.py
 
+      - name: "Задача D -- проверка гипотезы про календарь сезона в /events (дёшево, ~4 кредита)"
+        if: hashFiles('data/p3_guard_cache/TASKD_REOPEN_CALENDAR_PROBE_REQUEST') != ''
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+        run: python -u analysis/taskD_reopen_calendar_probe.py
+
       - name: Commit results
         if: always()
         run: |
@@ -84,6 +91,7 @@ jobs:
           [ -e data/p3_guard_cache/taskD_pinnacle_polymarket_result.json ] && git add data/p3_guard_cache/taskD_pinnacle_polymarket_result.json
           [ -e data/p3_guard_cache/taskD_matching_diagnostic.json ] && git add data/p3_guard_cache/taskD_matching_diagnostic.json
           [ -e data/p3_guard_cache/taskD_reopen_depth_probe_result.json ] && git add data/p3_guard_cache/taskD_reopen_depth_probe_result.json
+          [ -e data/p3_guard_cache/taskD_reopen_calendar_probe_result.json ] && git add data/p3_guard_cache/taskD_reopen_calendar_probe_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача D: результат фетча/анализа Pinnacle [automated]"
           fi
