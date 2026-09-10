@@ -5,31 +5,14 @@
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
     "n_markets": 45,
-    "n_weeks_covered": 14,
+    "n_weeks_covered": 11,
     "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null. Поле 'llm_edge_plausible' УЖЕ вычислено детерминированным кодом (classify_edge_plausible), НЕ меняется вручную."
   },
   "markets": [
     {
-      "slug": "will-ivn-cepeda-castro-place-1st-in-bogot",
-      "question": "Will Iván Cepeda Castro place 1st in Bogotá?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the listed candidate who receives the most votes from the Bogotá Capital District in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the second-highest finishing position after applying this ranking.\n\nIf the results of the first round of the Colombian presidential election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the election results, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 7172.7165239999995,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-tisza-win-at-least-120-seats",
-      "question": "Will Tisza win at least 120 seats?",
-      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve to “Yes” if TISZA wins at least the listed number of seats in the Hungarian National Assembly (Országgyűlés) as a result of this election. Otherwise, this market will resolve to \"No\".\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “No”.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition of which it may be a part.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "slug": "will-renovacin-popular-rp-win-the-most-seats-in-the-2026-peruvian-senate-election",
+      "question": "Will Renovación Popular (RP) win the most seats in the 2026 Peruvian Senate election?",
+      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Peruvian Senate election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIf the 2026 Peruvian general election is conducted under a unicameral legislative system, this market will resolve based on the results of that unicameral congressional election.\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party in the Peruvian Senate.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
       "end_date": "2026-04-12T00:00:00Z",
       "outcome_names": [
         "Yes",
@@ -37,16 +20,16 @@
       ],
       "week_key": "2026-04-06",
       "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.515,
-      "volume": 255452.33773099998,
+      "market_price_first_outcome_n_days_before": 0.235,
+      "volume": 17097.828996,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-april-27-may-3",
-      "question": "Will there be exactly 1 earthquake of magnitude 6.5 or higher worldwide from April 27 - May 3?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between April 27, 2026, 12:00 AM ET, and May 3, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "slug": "will-there-be-exactly-5-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-27-may-3",
+      "question": "Will there be exactly 5 earthquakes of magnitude 5.5 or higher worldwide from April 27 - May 3?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 27, 2026, 12:00 AM ET, and May 3, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
       "end_date": "2026-05-03T00:00:00Z",
       "outcome_names": [
         "Yes",
@@ -54,331 +37,8 @@
       ],
       "week_key": "2026-04-27",
       "price_snapshot_date": "2026-04-26T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.345,
-      "volume": 3524.8393150000006,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-a-different-combination-of-candidates-advance-to-the-runoff-289",
-      "question": "Will a different combination of candidates advance to the runoff?",
-      "description": "First-round presidential elections are scheduled to be held in Peru on April 12, 2026, with a potential second round on June 7, 2026, if no candidate receives more than 50% of the valid votes outright.\n\nThis market will resolve according to the listed pair of candidates who advance to the runoff of the 2026 Peruvian presidential election.\n\nIf a different combination of candidates than those listed below advances to the runoff, if no runoff is being held, for example, because a candidate wins the first round outright, or if the candidates of the specified election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “Other”.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.702,
-      "volume": 312490.79099499935,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "mex-atl-mon1-2026-08-01-exact-score-0-0",
-      "question": "Exact Score: Atlas FC 0 - 0 CF Monterrey?",
-      "description": "In the upcoming Liga MX game between Atlas FC and CF Monterrey, scheduled for August 1, 2026 at 9:00 PM ET: This market will resolve based on the final score of the Atlas FC vs. CF Monterrey match originally scheduled for August 1, 2026 at 9:00 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-08-02T01:05:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-07-27",
-      "price_snapshot_date": "2026-07-26T01:05:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.475,
-      "volume": 4165.033168999999,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-donald-trump-announce-that-the-united-states-blockade-of-the-strait-of-hormuz-has-been-lifted-by-june-21-2026",
-      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 21, 2026?",
-      "description": "On April 12, 2026, President Donald Trump announced that the United States will blockade the Strait of Hormuz. You can read more about that here: https://www.nbcnews.com/world/iran/live-blog/live-updates-us-iran-fail-reach-deal-peace-talks-day-negotiations-rcna315918.\n\nThis market will resolve to \"Yes\" if President Trump, the US government, or the US military publicly and officially announces the end of the United States blockade of the Strait of Hormuz by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nQualifying statements must clearly and explicitly indicate that the United States has lifted, ended, or will lift or end its blockade of the Strait of Hormuz on a specified date or use equivalently definitive language unambiguously signaling that such blockade has ceased or is set to cease on a specified date (e.g., statements unambiguously indicating that US naval activity in the relevant area has ceased will qualify). \n\nStatements that merely describe actions inconsistent with the blockade (e.g., \"Iran resumed shipping through the Strait of Hormuz\") without explicitly indicating the blockade as lifted will not alone suffice.\n\nInformal announcements, statements from unnamed sources, or leaks do not qualify.\n\nWritten public statements from Donald Trump (e.g., posts from his personal Truth Social account) will qualify. Videos posted on his social media accounts will also qualify for a \"Yes\" resolution.\n\nThe primary resolution source for this market will be official statements from the US government and/or its official representatives; however, a consensus of credible reporting may also be used.\n\nNote: this market will resolve solely based on whether a qualifying announcement is made within the specified timeframe. Whether the blockade is effectively enforced or whether maritime traffic resumes absent a qualifying announcement will not be considered.",
-      "end_date": "2026-06-21T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-06-15",
-      "price_snapshot_date": "2026-06-14T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.59,
-      "volume": 113425.45657199998,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-tisza-respect-and-freedom-party-tisza-win-the-most-seats-in-the-next-hungarian-parliamentary-election",
-      "question": "Will TISZA – Respect and Freedom Party (TISZA) win the most seats in the next Hungarian parliamentary election?",
-      "description": "Parliamentary elections are to be scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Hungarian National Assembly (Országgyűlés) election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party or coalition in the Hungarian Parliament. If a named coalition dissolves, this market will resolve based on the seat total of the constituent party within that coalition that held the largest number of seats before the election.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.695,
-      "volume": 4782714.49172103,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-turnout-in-the-2026-slovenian-parliamentary-elections-be-between-65-and-70",
-      "question": "Will turnout in the 2026 Slovenian parliamentary elections be between 65% and 70%?",
-      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve based on the official voter turnout rate for the 2026 Slovenian Parliamentary Election, defined as the total number of ballots cast divided by the total number of eligible voters.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based solely on the official results as reported by the Slovenian Government, specifically the State Election Commission (https://www.dvk-rs.si/volitve-in-referendumi/drzavni-zbor-rs/).",
-      "end_date": "2026-03-22T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-03-16",
-      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.315,
-      "volume": 92225.488424,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-there-be-3-or-fewer-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-11-17",
-      "question": "Will there be 3 or fewer earthquakes of magnitude 5.5 or higher worldwide from May 11 - 17?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between May 11, 2026, 12:00 AM ET, and May 17, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
-      "end_date": "2026-05-17T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.25,
-      "volume": 68287.93550300002,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-jean-luc-moudenc-be-the-next-mayor-of-toulouse-following-the-2026-toulouse-municipal-election",
-      "question": "Will Jean-Luc Moudenc be the next mayor of Toulouse following the 2026 Toulouse municipal election?",
-      "description": "The 2026 Toulouse municipal election is scheduled for March 15, 2026, with a potential runoff on March 22. The Mayor of Toulouse will then be elected by the Toulouse Municipal Council elected in this election.\n\nThis market will resolve according to the next individual elected to be the Mayor of Toulouse following this election.\n\nInterim, temporary, or caretaker mayors will not count.\n\nIf no such mayor has been elected by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThe primary resolution source for this market will be official information from the government of Toulouse; however, a consensus of credible reporting may also be used.",
-      "end_date": "2026-03-22T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-03-16",
-      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.395,
-      "volume": 253620.2774179995,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-robert-golob-be-the-next-prime-minister-of-slovenia",
-      "question": "Will Robert Golob be the next Prime Minister of Slovenia?",
-      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve to the next individual who is officially elected by the National Assembly (Državni zbor) and sworn in as Prime Minister of Slovenia following the next parliamentary election.\n\nTo count for resolution, the individual must be formally sworn in. Any interim or caretaker Prime Minister will not count toward the resolution of this market.\n\nIf no such Prime Minister is sworn in by December 31, 2026, 11:59 PM ET, this market will resolve to “Other”.\n\nThe primary resolution source for this market will be official information from the Government of Slovenia; however, a consensus of credible reporting may also be used.",
-      "end_date": "2026-03-22T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-03-16",
-      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.255,
-      "volume": 668285.5074459988,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "nwsl-rac-das-2026-07-18-exact-score-3-2",
-      "question": "Exact Score: Racing Louisville FC 3 - 2 Houston Dash?",
-      "description": "In the upcoming NWSL game between Racing Louisville FC and Houston Dash, scheduled for July 18, 2026 at 8:00 PM ET: This market will resolve based on the final score of the Racing Louisville FC vs. Houston Dash match originally scheduled for July 18, 2026 at 8:00 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-07-19T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-07-13",
-      "price_snapshot_date": "2026-07-12T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.43,
-      "volume": 1380,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-keiko-fujimori-win-the-2026-peruvian-presidential-election",
-      "question": "Will Keiko Fujimori win the 2026 Peruvian presidential election?",
-      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the listed candidate who wins the next Peruvian Presidential election. \n\nThis market includes any potential second round. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/) ",
-      "end_date": "2026-06-07T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-06-01",
-      "price_snapshot_date": "2026-05-31T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.785,
-      "volume": 21817048.613106236,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-partido-socialista-obrero-espaol-de-andaluca-psoe-a-win-30-32-seats-in-the-2026-andalusia-regional-election",
-      "question": "Will Partido Socialista Obrero Español de Andalucía (PSOE-A) win 30-32 seats in the 2026 Andalusia Regional Election?",
-      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
-      "end_date": "2026-05-17T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.21,
-      "volume": 2364.402548,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-there-be-exactly-4-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-11-17",
-      "question": "Will there be exactly 4 earthquakes of magnitude 5.5 or higher worldwide from May 11 - 17?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between May 11, 2026, 12:00 AM ET, and May 17, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
-      "end_date": "2026-05-17T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.235,
-      "volume": 20073.637766000014,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-ivn-cepeda-castro-win-the-first-round-of-the-2026-colombian-presidential-election-by-10-15",
-      "question": "Will Iván Cepeda Castro win the first round of the 2026 Colombian presidential election by 10-15%?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, with a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the margin of victory between the top two candidates in the first round of the 2026 Colombia presidential election.\n\nThe “margin of victory” is defined as the absolute difference between the percentages of valid votes received by the first-place and second-place candidates. Percentages of the valid votes received by each candidate will be determined by dividing the total number of valid votes each of the top two candidates receives by the sum of all valid votes cast in the election.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nIf two candidates receive the exact same highest number of valid votes and both are listed, this market will resolve to the lowest bracket for the tied candidate whose last name comes first alphabetically. If only one of the tied candidates is listed, this market will resolve to the lowest bracket for that listed candidate. If neither tied candidate is listed, this market will resolve to “Other.”\n\nThis market will resolve based on the official vote count once the count has been made official.\n\nIf the results of the specified election are not known definitively by December 31, 2026, 11:59 PM ET, this market will resolve to “Other”.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely the official results as reported by the Colombian government, including Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).\n\nIf a recount is initiated before the vote total has been made official, the market will remain open until the recount is completed and the vote is made official.",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.275,
-      "volume": 18673.70470500001,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-tisza-win-46-50-of-the-national-list-votes-in-the-2026-hungarian-parliamentary-election",
-      "question": "Will TISZA win 46-50% of the national list votes in the 2026 Hungarian Parliamentary election?",
-      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026. Hungary uses a mixed electoral system in which most voters cast two votes: one for a candidate in a single-member constituency and one for a national party list.\n\nThis market will resolve according to the percentage of all valid national party list votes won by TISZA in this election.\n\nThis market will resolve solely based on national party list votes cast in this election. Votes cast for single-member constituencies will not be considered.\n\nIf the percentage of all valid national party list votes won by TISZA falls exactly on the boundary between two brackets, this market will resolve to the higher range bracket.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based on the official election results reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu). However, an overwhelming consensus of credible reporting may also suffice.",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.3,
-      "volume": 28774.245235999995,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-11-17",
-      "question": "Will there be exactly 7 earthquakes of magnitude 5.5 or higher worldwide from May 11 - 17?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between May 11, 2026, 12:00 AM ET, and May 17, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
-      "end_date": "2026-05-17T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.275,
-      "volume": 7790.060861000002,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "another-trump-political-opponent-federally-charged-by-may-31",
-      "question": "Another Trump political opponent federally charged by May 31?",
-      "description": "This market will resolve to “Yes” if the United States federal government formally charges or announces a criminal indictment of any individuals in one or more of the following categories between market creation and May 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to “No”.\n\nThe covered categories are:\n\n- Any individual who previously served as an investigator, special counsel, prosecutor, district attorney, attorney general, or equivalent official investigative or prosecutorial role in any criminal investigation or prosecution of Donald Trump.\n\n- Any current or former United States Senator or United States Representative who was elected as a member of the Democratic Party or who caucused with the Democratic Party while serving in Congress.\n\n- Any individual who served in a presidentially-appointed role in the federal government during the administration of President Joe Biden.\n\n- Any of the following individuals: Joe Biden, Hillary Clinton, Liz Cheney, Marjorie-Taylor Greene, John Bolton, Kamala Harris, Anthony Fauci, Michael Cohen.\n\nThe primary resolution source for this market will be official information from US governmental sources, however a wide consensus of credible reporting will also be used.\n",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.235,
-      "volume": 195302.09646199987,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-voter-turnout-be-57-60-in-the-first-round-of-the-2026-colombian-presidential-election",
-      "question": "Will voter turnout be 57-60% in the first round of the 2026 Colombian presidential election?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the official voter turnout rate for the first round of the 2026 Colombia presidential election, defined as the total number of votes cast divided by the total number of eligible voters.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based on the official results as reported by the Colombian government, including Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.243,
-      "volume": 9569.660620999999,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-donald-trump-announce-that-the-united-states-blockade-of-the-strait-of-hormuz-has-been-lifted-by-june-7-2026",
-      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 7, 2026?",
-      "description": "On April 12, 2026, President Donald Trump announced that the United States will blockade the Strait of Hormuz. You can read more about that here: https://www.nbcnews.com/world/iran/live-blog/live-updates-us-iran-fail-reach-deal-peace-talks-day-negotiations-rcna315918.\n\nThis market will resolve to \"Yes\" if President Trump, the US government, or the US military publicly and officially announces the end of the United States blockade of the Strait of Hormuz by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nQualifying statements must clearly and explicitly indicate that the United States has lifted, ended, or will lift or end its blockade of the Strait of Hormuz on a specified date or use equivalently definitive language unambiguously signaling that such blockade has ceased or is set to cease on a specified date (e.g., statements unambiguously indicating that US naval activity in the relevant area has ceased will qualify). \n\nStatements that merely describe actions inconsistent with the blockade (e.g., \"Iran resumed shipping through the Strait of Hormuz\") without explicitly indicating the blockade as lifted will not alone suffice.\n\nInformal announcements, statements from unnamed sources, or leaks do not qualify.\n\nWritten public statements from Donald Trump (e.g., posts from his personal Truth Social account) will qualify. Videos posted on his social media accounts will also qualify for a \"Yes\" resolution.\n\nThe primary resolution source for this market will be official statements from the US government and/or its official representatives; however, a consensus of credible reporting may also be used.\n\nNote: this market will resolve solely based on whether a qualifying announcement is made within the specified timeframe. Whether the blockade is effectively enforced or whether maritime traffic resumes absent a qualifying announcement will not be considered.",
-      "end_date": "2026-06-07T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-06-01",
-      "price_snapshot_date": "2026-05-31T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.295,
-      "volume": 1008008.6319970016,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-the-slovenian-democratic-party-sds-win-30-34-seats-in-the-slovenian-national-assembly-in-this-election",
-      "question": "Will the Slovenian Democratic Party (SDS) win 30-34 seats in the Slovenian National Assembly in this election?",
-      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve according to the number of seats won by the Slovenian Democratic Party (SDS) in the Slovenian National Assembly (Državni zbor) as a result of this election.\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition it may be part of.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Slovenian government, specifically the Slovenian Election Authority (Valmyndigheten) (dvk-rs.si/).",
-      "end_date": "2026-03-22T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-03-16",
-      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.285,
-      "volume": 36727.23163700001,
+      "market_price_first_outcome_n_days_before": 0.28,
+      "volume": 6949.118798000001,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
@@ -401,60 +61,9 @@
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-20-april-26",
-      "question": "Will there be exactly 7 earthquakes of magnitude 5.5 or higher worldwide from April 20 - April 26?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 20, 2026, 12:00 AM ET, and April 26, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
-      "end_date": "2026-04-26T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-20",
-      "price_snapshot_date": "2026-04-19T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.225,
-      "volume": 4730.849846,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-renovacin-popular-rp-win-the-most-seats-in-the-2026-peruvian-senate-election",
-      "question": "Will Renovación Popular (RP) win the most seats in the 2026 Peruvian Senate election?",
-      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Peruvian Senate election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIf the 2026 Peruvian general election is conducted under a unicameral legislative system, this market will resolve based on the results of that unicameral congressional election.\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party in the Peruvian Senate.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.235,
-      "volume": 17097.828996,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-rumen-radev-be-the-next-prime-minister-of-bulgaria-after-the-2026-parliamentary-election",
-      "question": "Will Rumen Radev be the next prime minister of Bulgaria after the 2026 parliamentary election?",
-      "description": "Parliamentary elections are scheduled to be held in Bulgaria on April 19, 2026.\n\nThis market will resolve to the next individual who is officially sworn in as Prime Minister of Bulgaria following the next parliamentary election.\n\nTo count for resolution, the individual must be formally sworn in. Any interim or caretaker Prime Minister will not count toward the resolution of this market.\n\nIf no such Prime Minister is appointed by March 31, 2027, 11:59 PM ET, this market will resolve to “Other”.\n\nThe primary resolution source for this market will be official information from the Government of Bulgaria; however, a consensus of credible reporting may also be used.",
-      "end_date": "2026-04-19T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-13",
-      "price_snapshot_date": "2026-04-12T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.78,
-      "volume": 291380.0961170001,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-abelardo-de-la-espriella-place-1st-in-the-antioquia-department",
-      "question": "Will Abelardo de la Espriella place 1st in the Antioquia Department?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the listed candidate who receives the most votes from the Department of Antioquia in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the second-highest finishing position after applying this ranking.\n\nIf the results of the first round of the Colombian presidential election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the election results, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
+      "slug": "will-trump-agree-to-iranian-oil-sanction-relief-by-may-31",
+      "question": "Will Trump agree to Iranian oil sanction relief by May 31?",
+      "description": "This market will resolve to “Yes” if the United States agrees to remove, suspend, waive, or otherwise reduce any sanctions restricting Iranian oil exports by May 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to “No”.\n\nSanctions restricting Iranian oil exports refers to U.S. restrictions that prohibit or limit the production, sale, transport, purchase, or export of crude oil, petroleum, or petrochemical products from Iran, including associated shipping, insurance, and financial transactions necessary for such exports. This includes both primary sanctions, which apply to U.S. persons, and secondary sanctions, which apply to non-U.S. persons or entities engaging in such activities.\n\nThe United States will be considered to have agreed to remove, suspend, waive, or reduce such sanctions if:\n- Donald Trump or another authorized representative of the Government of the United States publicly announces that the United States has definitively agreed to remove, suspend, waive, or otherwise reduce any sanctions restricting Iranian oil\n- The removal, suspension, waiver, or reduction of any such sanctions is included as part of a treaty or deal formally established between the United States and Iran, including through signing or other formal means.\n\nAgreement refers to an explicit acceptance, authorization, or consent to the specified action. Only announcements of definitive agreement will qualify. Suggestions, negotiations, expressions of openness, or other non-definitive statements will not qualify.\n\nAny definitive agreement or commitment made before the resolution date will qualify, regardless of when or whether the specified action is implemented.\n\nThe primary resolution source for this market will be official statements from Donald Trump, the U.S. government, and their official representatives; however, a consensus of credible reporting may also be used to verify the details of an announcement or formal agreement.",
       "end_date": "2026-05-31T00:00:00Z",
       "outcome_names": [
         "Yes",
@@ -462,42 +71,8 @@
       ],
       "week_key": "2026-05-25",
       "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 5215.787007999998,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-voter-turnout-be-48-51-in-the-first-round-of-the-2026-colombian-presidential-election",
-      "question": "Will voter turnout be 48-51% in the first round of the 2026 Colombian presidential election?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the official voter turnout rate for the first round of the 2026 Colombia presidential election, defined as the total number of votes cast divided by the total number of eligible voters.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based on the official results as reported by the Colombian government, including Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.295,
-      "volume": 2170.4565339999995,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-tisza-win-130-seats-in-the-hungarian-national-assembly-in-this-election",
-      "question": "Will Tisza win 130+ seats in the Hungarian National Assembly in this election?",
-      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve according to the number of seats won by TISZA in the Hungarian National Assembly (Országgyűlés) as a result of this election.\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition of which it may be a part.\n\nFor parties that contest some seats jointly with another party, including as part of a joint national party list, the number of seats won by the specified party will be determined based on a consensus of credible reporting. If necessary, official information identifying the party affiliation of specific elected candidates, including candidate registration records, parliamentary party member lists, and similar official sources, will also be used.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.265,
-      "volume": 321609.1151120001,
+      "market_price_first_outcome_n_days_before": 0.425,
+      "volume": 818932.5132730104,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
@@ -520,161 +95,42 @@
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-partido-popular-pp-win-53-55-seats-in-the-2026-andalusia-regional-election",
-      "question": "Will Partido Popular (PP) win 53-55 seats in the 2026 Andalusia Regional Election?",
-      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by Partido Popular (PP) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by Partido Popular in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
-      "end_date": "2026-05-17T00:00:00Z",
+      "slug": "will-290-to-319-tornadoes-occur-in-the-united-states-in-april-2026-746",
+      "question": "Will 290 to 319 tornadoes occur in the United States in April 2026?",
+      "description": "This market will resolve according to the number of tornadoes recorded in the United States during the specified month, based on the monthly count published on the National Centers for Environmental Information U.S. Tornadoes Time Series page (see: https://www.ncei.noaa.gov/access/monitoring/tornadoes/time-series).\n\nOnly tornadoes appearing in the final NCEI dataset for that month will count.\n\nAs of market creation, the relevant report is scheduled to be released on May 8, 2026, at 5:00 PM GMT+1 or 11:00 AM ET (Release schedule: https://www.ncei.noaa.gov/access/monitoring/dyk/monthly-releases). The market will resolve based on the first relevant tornado count published on the NCEI tornado time-series page after this scheduled release time.\n\nIf the value published after this scheduled release time is labeled preliminary, it will still determine resolution, and the market will resolve independently of any subsequent revisions, corrections, or retroactive adjustments. \n\nThe market will not resolve based on any preliminary values published before the scheduled release time.\n\nIf no data is published by the scheduled release time, or if the NCEI website is temporarily unavailable, this market will remain open until that data is made available. If the relevant data is not made available by the date of the next scheduled publication ET, this market will resolve based on available data for the most recent prior month. If the NCEI website becomes permanently unavailable, this market will resolve using another credible source.",
+      "end_date": "2026-05-10T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.57,
-      "volume": 5443.6151389999995,
+      "week_key": "2026-05-04",
+      "price_snapshot_date": "2026-05-03T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.4325,
+      "volume": 2796.7317300000004,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-fidesz-kdnp-win-at-least-100-seats",
-      "question": "Will Fidesz-KDNP win at least 100 seats?",
-      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve to “Yes” if Fidesz-KDNP wins at least the listed number of seats in the Hungarian National Assembly (Országgyűlés) as a result of this election. Otherwise, this market will resolve to \"No\".\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “No”.\n\nThis market's resolution will be based solely on the number of seats won by the specified coalition. If the specified coalition dissolves prior to the election, this market will resolve based on the total number of seats won by the two component parties.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
-      "end_date": "2026-04-12T00:00:00Z",
+      "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-20-april-26",
+      "question": "Will there be exactly 7 earthquakes of magnitude 5.5 or higher worldwide from April 20 - April 26?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 20, 2026, 12:00 AM ET, and April 26, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-04-26T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.3,
-      "volume": 50889.00301500001,
+      "week_key": "2026-04-20",
+      "price_snapshot_date": "2026-04-19T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.225,
+      "volume": 4730.849846,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-keiko-fujimori-finish-in-first-place-in-the-first-round-of-the-2026-peruvian-presidential-election",
-      "question": "Will Keiko Fujimori finish in first place in the first round of the 2026 Peruvian presidential election?",
-      "description": "First-round presidential elections are scheduled to be held in Peru on April 12, 2026, with a potential second round on June 7, 2026, if no candidate receives more than 50% of the valid votes outright.\n\nThis market will resolve according to the listed candidate who receives the most valid votes in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the highest finishing position after applying this ranking.\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/)",
-      "end_date": "2026-04-12T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-06",
-      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.57,
-      "volume": 945469.5048370016,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "uslc-css-bir-2026-08-15-exact-score-1-1",
-      "question": "Exact Score: Colorado Springs Switchbacks FC 1 - 1 Birmingham Legion FC?",
-      "description": "In the upcoming USL Championship game between Colorado Springs Switchbacks FC and Birmingham Legion FC, scheduled for August 15, 2026 at 9:00 PM ET: This market will resolve based on the final score of the Colorado Springs Switchbacks FC vs. Birmingham Legion FC match originally scheduled for August 15, 2026 at 9:00 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-08-16T01:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-08-10",
-      "price_snapshot_date": "2026-08-09T01:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.505,
-      "volume": 1583.25,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-partido-popular-pp-win-56-58-seats-in-the-2026-andalusia-regional-election",
-      "question": "Will Partido Popular (PP) win 56-58 seats in the 2026 Andalusia Regional Election?",
-      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by Partido Popular (PP) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by Partido Popular in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
-      "end_date": "2026-05-17T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-11",
-      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.36,
-      "volume": 2362.2142949999998,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-luis-gilberto-murillo-place-1st-in-the-antioquia-department",
-      "question": "Will Luis Gilberto Murillo place 1st in the Antioquia Department?",
-      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the listed candidate who receives the most votes from the Department of Antioquia in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the second-highest finishing position after applying this ranking.\n\nIf the results of the first round of the Colombian presidential election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the election results, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
-      "end_date": "2026-05-31T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-05-25",
-      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 1056.8248650000003,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "arg-cah-rie-2026-08-22-exact-score-0-1",
-      "question": "Exact Score: CA Huracán 0 - 1 CD Riestra?",
-      "description": "In the upcoming Primera División Argentina game between CA Huracán and CD Riestra, scheduled for August 22, 2026 at 8:00 PM ET: This market will resolve based on the final score of the CA Huracán vs. CD Riestra match originally scheduled for August 22, 2026 at 8:00 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-08-23T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-08-17",
-      "price_snapshot_date": "2026-08-16T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.475,
-      "volume": 2427.527425,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "nwsl-roy-pri-2026-07-18-exact-score-1-2",
-      "question": "Exact Score: Utah Royals FC 1 - 2 Orlando Pride?",
-      "description": "In the upcoming NWSL game between Utah Royals FC and Orlando Pride, scheduled for July 18, 2026 at 8:45 PM ET: This market will resolve based on the final score of the Utah Royals FC vs. Orlando Pride match originally scheduled for July 18, 2026 at 8:45 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-07-19T00:45:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-07-13",
-      "price_snapshot_date": "2026-07-12T00:45:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.425,
-      "volume": 1010,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-there-be-exactly-4-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-13-april-19",
-      "question": "Will there be exactly 4 earthquakes of magnitude 5.5 or higher worldwide from April 13 - April 19?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 13, 2026, 12:00 AM ET, and April 19, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
-      "end_date": "2026-04-19T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "week_key": "2026-04-13",
-      "price_snapshot_date": "2026-04-12T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.24,
-      "volume": 14689.900368000008,
-      "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-president-trump-sign-8-or-more-pieces-of-legislation-into-law-in-may",
-      "question": "Will President Trump sign 8 or more pieces of legislation into law in May?",
+      "slug": "will-president-trump-sign-6-pieces-of-legislation-into-law-in-may",
+      "question": "Will President Trump sign 6 pieces of legislation into law in May?",
       "description": "This market will resolve according to the number of pieces of legislation that are signed into law between May 1, 2026, 12:00 AM and May 31, 2026, 11:59 PM ET. \n\nQualifying legislation may include joint resolutions and must pass both the House and the Senate, and must be signed by the President. \n\nLegislation that becomes law without a signature while Congress remains in session, or becomes law through veto override, as well as Presidential pocket vetoes that expire, will not qualify.\n\nThe primary resolution sources for this market will be official information from the White House (https://www.whitehouse.gov/), Congress.gov’s legislation tracker (https://www.congress.gov/bill/119th-congress/house-bill/22), the Library of Congress (congress.gov), and other official information from the government of the United States; however, a consensus of credible reporting may also be used.",
       "end_date": "2026-05-31T00:00:00Z",
       "outcome_names": [
@@ -683,8 +139,42 @@
       ],
       "week_key": "2026-05-25",
       "price_snapshot_date": "2026-05-24T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.465,
-      "volume": 7005.23988,
+      "market_price_first_outcome_n_days_before": 0.4,
+      "volume": 2083.569233,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-may-4-10",
+      "question": "Will there be exactly 1 earthquake of magnitude 6.5 or higher worldwide from May 4 - 10?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between May 4, 2026, 12:00 AM ET, and May 10, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until June 30, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-10T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-04",
+      "price_snapshot_date": "2026-05-03T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.255,
+      "volume": 3620.1507180000003,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-trump-post-fed-or-federal-reserve-on-truth-social-this-week",
+      "question": "Will Trump post \"Fed\" or \"Federal Reserve\" on Truth Social this week?",
+      "description": "This market will resolve to \"Yes\" if @realDonaldTrump posts/truths the listed term between May 25, 2026, 12:00 AM ET and May 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purposes of this market, all text posted by the listed account in quote and reply posts/truths count toward a \"Yes\" resolution, but quoted posts/truths and reposts/reTruths will not count.\n\nText posted in images, memes, or other non-animated, non-video media that are not strictly text will qualify towards a \"Yes\" resolution only if the listed term is spelled out clearly and in full. (e.g., words spelled out in a letter posted as a .jpg will qualify, however a word posted as part of an animated .gif will not.)\n\nAny plural or possessive forms of a listed term, as well as variance in capitalizations, will count toward the resolution of this market, regardless of context. Other forms of the listed term will NOT count.\n\nExtraneous symbols being inserted into a word (ex: r@d1cal, for \"radical\") will disqualify it from counting toward a \"Yes\" resolution. Sigils at the beginnings of words, such as hashtags, \"@\" symbols, or denotations of currency, will not disqualify a term from counting towards a \"Yes\" resolution.\n\nMisspellings or iterations of the listed term, including all grammatical or slang forms, or misspellings with extra, missing, or incorrect letters (ex: helloooooooo or heoll, for ‘hello’), will not count toward a “Yes” resolution, regardless of context or intent.\n\nInstances where the term is used in a compound word will count regardless of context (e.g. joyful is not a compound word for \"joy,\" however \"killjoy\" is a compounding of the words \"kill\" and \"joy\").\n\nThe resolution source for this market will be Donald Trumps's verified Truth Social account: @realDonaldTrump\n\nPlease note, only the @realDonaldTrump verified Truth Social account counts for this market, regardless of the URL for this profile. If Donald Trump posts/truths from another account, it has no bearing on the resolution of this market.",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 1655.646529,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
@@ -707,26 +197,26 @@
       "llm_reasoning_brief": null
     },
     {
-      "slug": "per1-cal-ctd-2026-08-15-exact-score-1-1",
-      "question": "Exact Score: Club Alianza Lima 1 - 1 CU Técnica de Cajamarca?",
-      "description": "In the upcoming Peru Liga 1 game between Club Alianza Lima and CU Técnica de Cajamarca, scheduled for August 15, 2026 at 8:30 PM ET: This market will resolve based on the final score of the Club Alianza Lima vs. CU Técnica de Cajamarca match originally scheduled for August 15, 2026 at 8:30 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-08-16T00:30:00Z",
+      "slug": "will-turnout-in-the-second-round-of-the-2026-peruvian-presidential-election-be-between-70-and-75",
+      "question": "Will turnout in the second round of the 2026 Peruvian presidential election be between 70% and 75%?",
+      "description": "The second round of the Peru presidential election is scheduled to be held on June 7, 2026.\n\nThis market will resolve according to the turnout percentage (% Total Asistentes) in the second round Peru presidential election, calculated by dividing attendees (Asistentes) by eligible voters (Electores hábiles). \n\nThis market will resolve solely based on turnout for the second-round Presidential (Presidencial) election.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher range bracket.\n\nIf the results are not known definitively by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
+      "end_date": "2026-06-07T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "week_key": "2026-08-10",
-      "price_snapshot_date": "2026-08-09T00:30:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.43,
-      "volume": 1699.928036,
+      "week_key": "2026-06-01",
+      "price_snapshot_date": "2026-05-31T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.465,
+      "volume": 16577.891895999997,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-april-6-12",
-      "question": "Will there be exactly 1 earthquake of magnitude 6.5 or higher worldwide from April 6 - 12?",
-      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between April 6, 2026, 12:00 AM ET, and April 12, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "slug": "will-keiko-fujimori-win-the-first-round-of-the-2026-peruvian-presidential-elections-by-less-than-5",
+      "question": "Will Keiko Fujimori win the first round of the 2026 Peruvian presidential elections by less than 5%?",
+      "description": "First-round presidential elections are scheduled to be held in Peru on April 12, 2026, with a potential second round on June 7, 2026, if no candidate receives more than 50% of the valid votes outright.\n\nThis market will resolve according to the margin of victory between the top two candidates in the first round of the 2026 Peruvian presidential elections.\n\nFor the purpose of this market, the “margin of victory” is defined as the absolute difference between the percentages of valid votes received by the first-place and second-place candidates. Percentages of the valid votes received by each candidate will be determined by dividing the total number of valid votes each of the top two candidates receives by the sum of all valid votes cast in the election.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nIf two candidates receive the exact same highest number of valid votes and both are listed, this market will resolve to the lowest bracket for the tied candidate whose last name comes first alphabetically. If only one of the tied candidates is listed, this market will resolve to the lowest bracket for that listed candidate. If neither tied candidate is listed, this market will resolve to “Other.”\n\nThis market will resolve based on the official vote count once the count has been made official.\n\nIf the results of the specified election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “Other”.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/)\n\nIf a recount is initiated before the vote total has been made official, the market will remain open until the recount is completed and the vote is made official.",
       "end_date": "2026-04-12T00:00:00Z",
       "outcome_names": [
         "Yes",
@@ -734,33 +224,152 @@
       ],
       "week_key": "2026-04-06",
       "price_snapshot_date": "2026-04-05T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.305,
-      "volume": 28658.92461500001,
+      "market_price_first_outcome_n_days_before": 0.21,
+      "volume": 209115.1354730001,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "bra-bot-flu-2026-08-08-exact-score-3-0",
-      "question": "Exact Score: Botafogo FR 3 - 0 Fluminense FC?",
-      "description": "In the upcoming Brazil Série A game between Botafogo FR and Fluminense FC, scheduled for August 8, 2026 at 8:00 PM ET: This market will resolve based on the final score of the Botafogo FR vs. Fluminense FC match originally scheduled for August 8, 2026 at 8:00 PM ET, considering only the result at the end of 90 minutes of regulation plus stoppage time; extra time and penalty shoot-outs are excluded. If the actual score is not one of the explicitly listed outcomes, the market resolves to \"Any Other Score.\" If the match is postponed, the market will remain open until it is completed; if it is canceled with no make-up game, the market resolves to \"0-0.\" The primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
-      "end_date": "2026-08-09T00:00:00Z",
+      "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-27-may-3",
+      "question": "Will there be exactly 7 earthquakes of magnitude 5.5 or higher worldwide from April 27 - May 3?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 27, 2026, 12:00 AM ET, and May 3, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-03T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "week_key": "2026-08-03",
-      "price_snapshot_date": "2026-08-02T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.2545,
-      "volume": 1301.544577,
+      "week_key": "2026-04-27",
+      "price_snapshot_date": "2026-04-26T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.31,
+      "volume": 9248.332281999996,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "will-united-left-bsp-win-at-least-one-seat-in-the-2026-bulgarian-parliamentary-election",
-      "question": "Will United Left (BSP) win at least one seat in the 2026 Bulgarian parliamentary election?",
-      "description": "Parliamentary elections are scheduled to be held in Bulgaria on April 19, 2026.\n\nThis market will resolve to \"Yes\" if the listed political party wins at least one seat in the next Bulgarian National Assembly (Народно събрание, Narodno săbraniе) as a result of the election. Otherwise, the market will resolve to \"No\".\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Bulgarian government, specifically the Central Election Commission of Bulgaria (Tsentralna Izbiratelna Komisia) (https://www.cik.bg/).",
+      "slug": "will-edouard-philippe-be-the-next-mayor-of-le-havre",
+      "question": "Will Edouard Philippe be the next mayor of Le Havre?",
+      "description": "Municipal elections to elect the municipal council of Le Havre are scheduled to take place on March 15, 2026 (with a runoff on March 22 if necessary); the elected councillors will then choose the mayor.\n\nThis market will resolve according to the candidate who becomes the next elected Mayor of Le Havre.\n\nTemporary, interim, or placeholder mayors appointed before the election will not be considered.\n\nThis market includes any potential second round. If the result of this election isn't known by December 31, 2026, 11:59 PM ET, the market will resolve to \"Other\".\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the French Government, specifically the Ministry of the Interior (https://www.interieur.gouv.fr/).",
+      "end_date": "2026-03-22T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-03-16",
+      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.725,
+      "volume": 66906.39812099999,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-more-than-9-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-18-24",
+      "question": "Will there be more than 9 earthquakes of magnitude 5.5 or higher worldwide from May 18 - 24?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between May 18, 2026, 12:00 AM ET, and May 24, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until June 30, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-24T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-18",
+      "price_snapshot_date": "2026-05-17T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.33,
+      "volume": 38069.424468000005,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-voter-turnout-be-7174-in-the-2026-hungarian-parliamentary-election",
+      "question": "Will voter turnout be 71–74% in the 2026 Hungarian parliamentary election?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve based on the official voter turnout rate for the 2026 Hungary Parliamentary election, defined as the total number of votes cast divided by the total number of eligible voters. All eligible voters includes eligible voters voting by mail or without a Hungarian address.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based on the official results as reported by the Hungarian government, including the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.345,
+      "volume": 131973.10526399998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-slovenian-democratic-party-sds-win-30-34-seats-in-the-slovenian-national-assembly-in-this-election",
+      "question": "Will the Slovenian Democratic Party (SDS) win 30-34 seats in the Slovenian National Assembly in this election?",
+      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve according to the number of seats won by the Slovenian Democratic Party (SDS) in the Slovenian National Assembly (Državni zbor) as a result of this election.\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition it may be part of.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Slovenian government, specifically the Slovenian Election Authority (Valmyndigheten) (dvk-rs.si/).",
+      "end_date": "2026-03-22T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-03-16",
+      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.285,
+      "volume": 36727.23163700001,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-paloma-valencia-place-3rd-in-the-1st-round-of-the-2026-colombian-presidential-election",
+      "question": "Will Paloma Valencia place 3rd in the 1st round of the 2026 Colombian presidential election?",
+      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the listed candidate who receives the third-most valid votes in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the third-highest finishing position after applying this ranking.\n\nIf the results of the first round of the Colombian presidential election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the election results, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.495,
+      "volume": 4605.681678999999,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-partido-socialista-obrero-espaol-de-andaluca-psoe-a-win-30-32-seats-in-the-2026-andalusia-regional-election",
+      "question": "Will Partido Socialista Obrero Español de Andalucía (PSOE-A) win 30-32 seats in the 2026 Andalusia Regional Election?",
+      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
+      "end_date": "2026-05-17T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-11",
+      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.21,
+      "volume": 2364.402548,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-tisza-respect-and-freedom-party-tisza-win-the-most-seats-in-the-next-hungarian-parliamentary-election",
+      "question": "Will TISZA – Respect and Freedom Party (TISZA) win the most seats in the next Hungarian parliamentary election?",
+      "description": "Parliamentary elections are to be scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Hungarian National Assembly (Országgyűlés) election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party or coalition in the Hungarian Parliament. If a named coalition dissolves, this market will resolve based on the seat total of the constituent party within that coalition that held the largest number of seats before the election.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.695,
+      "volume": 4782714.49172103,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-progressive-bulgaria-pb-win-between-85-89-seats-in-the-2026-bulgarian-parliamentary-election",
+      "question": "Will Progressive Bulgaria (PB) win between 85-89 seats in the 2026 Bulgarian parliamentary election?",
+      "description": "Parliamentary elections are scheduled to be held in Bulgaria on April 19, 2026.\n\nThis market will resolve according to the number of seats won by Progressive Bulgaria (PB) in the next Bulgarian National Assembly (Народно събрание, Narodno săbraniе) election.\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market's resolution will be based solely on the number of seats won by the named party or coalition in the Bulgarian Parliament. If a named coalition dissolves, this market will resolve based on the seat total of the constituent party within that coalition that held the largest number of seats before the election.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Bulgarian government, specifically the Central Election Commission of Bulgaria (Tsentralna Izbiratelna Komisia) (https://www.cik.bg/).",
       "end_date": "2026-04-19T00:00:00Z",
       "outcome_names": [
         "Yes",
@@ -768,8 +377,399 @@
       ],
       "week_key": "2026-04-13",
       "price_snapshot_date": "2026-04-12T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.55,
-      "volume": 85032.93771299983,
+      "market_price_first_outcome_n_days_before": 0.235,
+      "volume": 18534.578797,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-vox-vox-win-16-18-seats-in-the-2026-andalusia-regional-election",
+      "question": "Will VOX (VOX) win 16-18 seats in the 2026 Andalusia Regional Election?",
+      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by VOX (VOX) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by VOX (VOX) in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
+      "end_date": "2026-05-17T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-11",
+      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.405,
+      "volume": 5704.772411000001,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-slovenian-democratic-party-sds-win-the-second-most-seats-in-the-2026-slovenian-parliamentary-election",
+      "question": "Will the Slovenian Democratic Party (SDS) win the second most seats in the 2026 Slovenian parliamentary election?",
+      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve according to the political party that wins the second-greatest number of seats in the next Slovenian National Assembly (Državni zbor) election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThe named parties or coalitions will be primarily ranked by the number of seats won in the specified election. If two or more parties are tied on seats, ties will be broken by the total number of valid votes received, with higher vote totals ranking higher. If parties remain tied, ties will be broken by alphabetical order of the listed party abbreviations. This market will resolve to the party that occupies the second-highest finishing position after applying this ranking.\n\nThis market's resolution will be based solely on the number of seats won by the named party in the Slovenian Parliament.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Slovenian government, specifically the Slovenian Election Authority (Valmyndigheten) (dvk-rs.si/).\n\nNote: If a listed party contests the election as part of a jointly listed coalition with one or more parties not listed in this market, the market corresponding to the listed party will represent the coalition and will count all seats won by the coalition collectively. If two or more listed parties contest the election as a jointly listed coalition, with or without additional parties not listed in this market, the market corresponding to the party within that coalition that won the most seats in the previous election will represent the coalition and will count all seats won by the coalition collectively. If such a coalition dissolves, each market will again represent its respective party individually.",
+      "end_date": "2026-03-22T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-03-16",
+      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.295,
+      "volume": 21529.105110000004,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-3-or-fewer-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-11-17",
+      "question": "Will there be 3 or fewer earthquakes of magnitude 5.5 or higher worldwide from May 11 - 17?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between May 11, 2026, 12:00 AM ET, and May 17, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-17T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-11",
+      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.25,
+      "volume": 68287.93550300002,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-fidesz-kdnp-win-at-least-80-seats",
+      "question": "Will Fidesz-KDNP win at least 80 seats?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve to “Yes” if Fidesz-KDNP wins at least the listed number of seats in the Hungarian National Assembly (Országgyűlés) as a result of this election. Otherwise, this market will resolve to \"No\".\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “No”.\n\nThis market's resolution will be based solely on the number of seats won by the specified coalition. If the specified coalition dissolves prior to the election, this market will resolve based on the total number of seats won by the two component parties.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.445,
+      "volume": 211595.80792399985,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-fuerza-popular-fp-win-the-most-seats-in-the-2026-peruvian-senate-election",
+      "question": "Will Fuerza Popular (FP) win the most seats in the 2026 Peruvian Senate election?",
+      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Peruvian Senate election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIf the 2026 Peruvian general election is conducted under a unicameral legislative system, this market will resolve based on the results of that unicameral congressional election.\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party in the Peruvian Senate.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.245,
+      "volume": 41470.216893000004,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-next-prime-minister-of-hungary-be-pter-magyar",
+      "question": "Will the next Prime Minister of Hungary be Péter Magyar?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12 2026.\n\nThis market will resolve to the individual who is next officially appointed and confirmed as Prime Minister of Hungary following the 2026 parliamentary election.\n\nTo count for resolution, the individual must be formally elected and appointed to the role of Prime Minister. Any interim or caretaker Prime Minister will not count toward the resolution of this market.\n\nIf no such Prime Minister is confirmed by December 31, 2026, 11:59 PM ET, this market will resolve to “Other.”\n\nThe primary resolution source for this market will be official information from the Government of Hungary; however, a consensus of credible reporting may also be used.",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.655,
+      "volume": 24555476.477281053,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-trump-agree-to-unfreeze-iranian-assets-by-may-31",
+      "question": "Will Trump agree to unfreeze Iranian assets by May 31?",
+      "description": "This market will resolve to “Yes” if the United States agrees to unfreeze any Iranian assets by May 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to “No.”\n\nUnfreezing Iranian assets refers to the release, transfer, or restoration of Iranian access to any assets that are frozen, blocked, or otherwise inaccessible due to U.S. sanctions or restrictions. This includes both assets held in the United States and assets held in foreign jurisdictions where access is restricted due to U.S. sanctions. The removal of sanctions which freeze these assets will also be considered to be unfreezing Iranian assets.\n\nThe United States will be considered to have agreed to unfreeze Iranian assets if:\n- Donald Trump or another authorized representative of the Government of the United States publicly announces that the United States has agreed to unfreeze any Iranian assets.\n- The unfreezing of any Iranian assets is included as part of a treaty or deal that is formally established between the United States and Iran, either through signing or other formal means.\n\nAgreement refers to an explicit acceptance, authorization or consent to the specified action. Only announcements of definitive agreement will qualify. Suggestions, negotiations, expressions of openness, or other non-definitive statements will not qualify.\n\nAny definitive agreement or commitment made before the resolution date will be considered, regardless of when or whether the specified action is begun.\n\nThe primary resolution source for this market will be official statements from Donald Trump, the U.S. government, and their official representatives; however, a consensus of credible reporting may also be used to verify the details of an announcement or formal agreement.",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.73,
+      "volume": 904480.9446749925,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-partido-socialista-obrero-espaol-de-andaluca-psoe-a-win-27-29-seats-in-the-2026-andalusia-regional-election",
+      "question": "Will Partido Socialista Obrero Español de Andalucía (PSOE-A) win 27-29 seats in the 2026 Andalusia Regional Election?",
+      "description": "Elections for the autonomous community of Andalusia’s unicameral parliament are scheduled for May 17, 2026.\n\nThis market will resolve according to the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in the Parliament of Andalusia as a result of this election.\n\nIf the results of this election are not definitively known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by Partido Socialista Obrero Español de Andalucía (PSOE-A) in this election.\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as published by the Spanish Junta Electoral Central (JEC) (https://www.juntaelectoralcentral.es/cs/jec/inicio).",
+      "end_date": "2026-05-17T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-11",
+      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.57,
+      "volume": 3416.374767,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-april-27-may-3",
+      "question": "Will there be exactly 1 earthquake of magnitude 6.5 or higher worldwide from April 27 - May 3?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between April 27, 2026, 12:00 AM ET, and May 3, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-03T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-27",
+      "price_snapshot_date": "2026-04-26T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.345,
+      "volume": 3524.8393150000006,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-abelardo-de-la-espriella-place-1st-in-the-antioquia-department",
+      "question": "Will Abelardo de la Espriella place 1st in the Antioquia Department?",
+      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the listed candidate who receives the most votes from the Department of Antioquia in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the second-highest finishing position after applying this ranking.\n\nIf the results of the first round of the Colombian presidential election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the election results, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 5215.787007999998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-exactly-0-earthquakes-of-magnitude-6pt5-or-higher-worldwide-from-may-25-31",
+      "question": "Will there be exactly 0 earthquakes of magnitude 6.5 or higher worldwide from May 25 - 31?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between May 25, 2026, 12:00 AM ET, and May 31, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until June 30, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.465,
+      "volume": 16412.897500000003,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-juntos-por-el-per-jp-win-the-most-seats-in-the-2026-peruvian-senate-election",
+      "question": "Will Juntos por el Perú (JP) win the most seats in the 2026 Peruvian Senate election?",
+      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the political party that wins the greatest number of seats in the next Peruvian Senate election. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nIf the 2026 Peruvian general election is conducted under a unicameral legislative system, this market will resolve based on the results of that unicameral congressional election.\n\nIn the event of a tie between multiple parties for the most seats won, this market will resolve in favor of the party or coalition that received a greater number of valid votes. In the event that results in a tie, this market will resolve in favor of the party or coalition whose listed abbreviation appears first in alphabetical order.\n\nThis market's resolution will be based solely on the number of seats won by the named party in the Peruvian Senate.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.2815,
+      "volume": 26202.868114999987,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-donald-trump-announce-that-the-united-states-blockade-of-the-strait-of-hormuz-has-been-lifted-by-june-21-2026",
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 21, 2026?",
+      "description": "On April 12, 2026, President Donald Trump announced that the United States will blockade the Strait of Hormuz. You can read more about that here: https://www.nbcnews.com/world/iran/live-blog/live-updates-us-iran-fail-reach-deal-peace-talks-day-negotiations-rcna315918.\n\nThis market will resolve to \"Yes\" if President Trump, the US government, or the US military publicly and officially announces the end of the United States blockade of the Strait of Hormuz by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nQualifying statements must clearly and explicitly indicate that the United States has lifted, ended, or will lift or end its blockade of the Strait of Hormuz on a specified date or use equivalently definitive language unambiguously signaling that such blockade has ceased or is set to cease on a specified date (e.g., statements unambiguously indicating that US naval activity in the relevant area has ceased will qualify). \n\nStatements that merely describe actions inconsistent with the blockade (e.g., \"Iran resumed shipping through the Strait of Hormuz\") without explicitly indicating the blockade as lifted will not alone suffice.\n\nInformal announcements, statements from unnamed sources, or leaks do not qualify.\n\nWritten public statements from Donald Trump (e.g., posts from his personal Truth Social account) will qualify. Videos posted on his social media accounts will also qualify for a \"Yes\" resolution.\n\nThe primary resolution source for this market will be official statements from the US government and/or its official representatives; however, a consensus of credible reporting may also be used.\n\nNote: this market will resolve solely based on whether a qualifying announcement is made within the specified timeframe. Whether the blockade is effectively enforced or whether maritime traffic resumes absent a qualifying announcement will not be considered.",
+      "end_date": "2026-06-21T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-06-15",
+      "price_snapshot_date": "2026-06-14T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.59,
+      "volume": 113425.45657199998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-turnout-in-the-2026-slovenian-parliamentary-elections-be-between-65-and-70",
+      "question": "Will turnout in the 2026 Slovenian parliamentary elections be between 65% and 70%?",
+      "description": "Parliamentary elections are scheduled to be held in Slovenia on March 22, 2026.\n\nThis market will resolve based on the official voter turnout rate for the 2026 Slovenian Parliamentary Election, defined as the total number of ballots cast divided by the total number of eligible voters.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based solely on the official results as reported by the Slovenian Government, specifically the State Election Commission (https://www.dvk-rs.si/volitve-in-referendumi/drzavni-zbor-rs/).",
+      "end_date": "2026-03-22T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-03-16",
+      "price_snapshot_date": "2026-03-15T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.315,
+      "volume": 92225.488424,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-fidesz-kdnp-win-70-seats-in-the-hungarian-national-assembly-in-this-election",
+      "question": "Will Fidesz-KDNP win <70 seats in the Hungarian National Assembly in this election?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve according to the number of seats won by Fidesz-KDNP in the Hungarian National Assembly (Országgyűlés) as a result of this election.\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to the lowest range bracket.\n\nThis market's resolution will be based solely on the number of seats won by the specified coalition. If the specified coalition dissolves prior to the election, this market will resolve based on the total number of seats won by the two component parties.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.325,
+      "volume": 110236.49942799986,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-carlos-lvarez-win-the-2026-peruvian-presidential-election",
+      "question": "Will Carlos Álvarez win the 2026 Peruvian presidential election?",
+      "description": "General elections are scheduled to be held in Peru on April 12, 2026.\n\nThis market will resolve according to the listed candidate who wins the next Peruvian Presidential election. \n\nThis market includes any potential second round. \n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/) ",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.3155,
+      "volume": 13208030.096722003,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-fujimori-win-the-2nd-round-of-the-2026-peru-presidential-election-by-48",
+      "question": "Will Fujimori win the 2nd round of the 2026 Peru presidential election by 4–8%?",
+      "description": "The second round of the Peru presidential election is scheduled to be held on June 7, 2026.\n\nThis market will resolve according to the margin of victory between the top two candidates in the second round of the 2026 Peruvian presidential elections.\n\nFor the purpose of this market, the “margin of victory” is defined as the absolute difference between the percentages of valid votes received by the first-place and second-place candidates. Percentages of the valid votes received by each candidate will be determined by dividing the total number of valid votes each of the top two candidates receives by the sum of all valid votes cast in the election.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nIf two candidates receive the exact same highest number of valid votes and both are listed, this market will resolve to the lowest bracket for the tied candidate whose last name comes first alphabetically.\n\nThis market will resolve based on the official vote count once the count has been made official.\n\nIf the results of the specified election are not known definitively by December 31, 2026, 11:59 PM ET, this market will resolve to “Other”.\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/)\n\nIf a recount is initiated before the vote total has been made official, the market will remain open until the recount is completed and the vote is made official.",
+      "end_date": "2026-06-07T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-06-01",
+      "price_snapshot_date": "2026-05-31T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.335,
+      "volume": 158555.36007499998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-tisza-win-at-least-120-seats",
+      "question": "Will Tisza win at least 120 seats?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve to “Yes” if TISZA wins at least the listed number of seats in the Hungarian National Assembly (Országgyűlés) as a result of this election. Otherwise, this market will resolve to \"No\".\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “No”.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition of which it may be a part.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.515,
+      "volume": 255452.33773099998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "hungary-election-tisza-wins-a-constitutional-majority",
+      "question": "Hungary Election: TISZA wins a constitutional majority?",
+      "description": "Parliamentary elections are scheduled to be held in Hungary on April 12, 2026.\n\nThis market will resolve to “Yes” if TISZA wins at least 133 seats in the Hungarian National Assembly (Országgyűlés) as a result of this election. Otherwise, this market will resolve to “No”.\n\nIf the results of this election are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to “No”.\n\nThis market's resolution will be based solely on the number of seats won by the specified party, not any coalition of which it may be a part.\n\nThis market will resolve based on the results of this election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based on the official results as reported by the Hungarian government, specifically the Hungarian Election Authority (Nemzeti Választási Iroda) (valasztas.hu).",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.26,
+      "volume": 491721.66888800083,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-exactly-9-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-20-april-26",
+      "question": "Will there be exactly 9 earthquakes of magnitude 5.5 or higher worldwide from April 20 - April 26?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 5.5 or higher that occur anywhere on Earth between April 20, 2026, 12:00 AM ET, and April 26, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program, with the minimum magnitude set to 5.5 and the date parameters set to the relevant dates for this market's timeframe (https://earthquake.usgs.gov/earthquakes/search/).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until May 31, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-04-26T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-20",
+      "price_snapshot_date": "2026-04-19T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.28,
+      "volume": 6277.409563000001,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-there-be-exactly-0-earthquakes-of-magnitude-6pt5-or-higher-worldwide-from-may-11-17",
+      "question": "Will there be exactly 0 earthquakes of magnitude 6.5 or higher worldwide from May 11 - 17?",
+      "description": "This market will resolve according to the total number of earthquakes with a magnitude of 6.5 or higher that occur anywhere on Earth between May 11, 2026, 12:00 AM ET, and May 17, 2026, 11:59 PM ET.\n\nThe resolution source for this market is the United States Geological Survey (USGS) Earthquake Hazards Program (https://earthquake.usgs.gov/earthquakes/browse/significant.php#sigdef).\n\nIf an earthquake of substantial size has occurred within this market's timeframe but not yet appeared on the resolution source, this market may remain open until June 30, 2026, 11:59 PM ET, or until the earthquake in question otherwise appears on the resolution source. If such an earthquake has not appeared on the resolution source by that date, another credible resolution source will be used.\n\nThis market may not resolve until the timeframe of this market has concluded. If a qualifying earthquake has been recorded on the final day, this market may remain open for 24 hours to allow for revisions to the recorded magnitude. After 24 hours, this market will resolve according to the latest provided data.",
+      "end_date": "2026-05-17T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-11",
+      "price_snapshot_date": "2026-05-10T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.535,
+      "volume": 33721.13026499998,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-keiko-fujimori-finish-in-first-place-in-the-first-round-of-the-2026-peruvian-presidential-election",
+      "question": "Will Keiko Fujimori finish in first place in the first round of the 2026 Peruvian presidential election?",
+      "description": "First-round presidential elections are scheduled to be held in Peru on April 12, 2026, with a potential second round on June 7, 2026, if no candidate receives more than 50% of the valid votes outright.\n\nThis market will resolve according to the listed candidate who receives the most valid votes in the first round of this election.\n\nThe named candidates will be primarily ranked by the number of valid votes received in the specified election. If two or more candidates are tied on valid votes, ties will be broken by alphabetical order of the candidates' last names. This market will resolve to the candidate that occupies the highest finishing position after applying this ranking.\n\nIf the results are not known definitively by October 31, 2026, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the results of this election, as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve solely on the official results as reported by the Peruvian government, specifically the National Office of Electoral Processes (Oficina Nacional de Procesos Electorales, ONPE) (https://www.onpe.gob.pe/elecciones/) and the National Jury of Elections (Jurado Nacional de Elecciones, JNE) (https://portal.jne.gob.pe/portal/)",
+      "end_date": "2026-04-12T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-04-06",
+      "price_snapshot_date": "2026-04-05T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.57,
+      "volume": 945469.5048370016,
+      "llm_edge_plausible": true,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-voter-turnout-be-57-60-in-the-first-round-of-the-2026-colombian-presidential-election",
+      "question": "Will voter turnout be 57-60% in the first round of the 2026 Colombian presidential election?",
+      "description": "Colombia's presidential elections are scheduled for May 31, 2026, and a second round (if required) on June 21, 2026, in case no candidate secures more than 50% of the valid votes in the first round.\n\nThis market will resolve according to the official voter turnout rate for the first round of the 2026 Colombia presidential election, defined as the total number of votes cast divided by the total number of eligible voters.\n\nIf the reported value falls exactly between two brackets, this market will resolve to the higher bracket.\n\nIf the results of this election are not known by December 31, 2026, 11:59 PM ET, this market will resolve to the lowest bracket.\n\nThis market will resolve based on the official results as reported by the Colombian government, including Colombia's National Civil Registry (Registraduría Nacional del Estado Civil) (https://registraduria.gov.co).",
+      "end_date": "2026-05-31T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "week_key": "2026-05-25",
+      "price_snapshot_date": "2026-05-24T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.243,
+      "volume": 9569.660620999999,
       "llm_edge_plausible": true,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
