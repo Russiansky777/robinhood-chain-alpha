@@ -25,6 +25,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).parent))
 from taskC_sports_matcher import fetch_polymarket_bulk, normalize  # НЕ переписываем -- реально уже написан и работал
+from polymarket_multi_outcome_trades_arb import get_fee_rate  # Задача 2: реальная формула baseRate x min(P,1-P) x shares,
+# GET /fee-rate?token_id=... -- живой эндпоинт, Polymarket прямо предупреждает не хардкодить процент
 
 HEADERS = {"User-Agent": "robinhood-chain-alpha-taskD-pinnacle-analysis/1.0"}
 CLOB_BASE = "https://clob.polymarket.com"
@@ -37,13 +39,19 @@ PERSISTENCE_MIN_SIZE = 0.01  # владелец: сохранилось "раз�
 DATE_DIFF_CONFIDENT_DAYS = 1.0  # события matcher'а -- команды + дата, допуск на разницу площадок в датах/таймзонах
 SNAPSHOT_MATCH_TOLERANCE_MIN = 90  # ближайшая реальная точка CLOB к моменту снимка Pinnacle
 
-# 2026-09-10, реальная проверка: Polymarket CLOB не публикует явное поле
-# комиссии в ответах gamma-api/markets, которые уже использовались в
-# Задачах C/E этой сессии -- по общедоступной информации Polymarket не
-# взимает явную taker-комиссию на большинстве рынков (0%). Не нашёл
-# способа проверить это эмпирически без реальной сделки, поэтому
-# ЧЕСТНО указываю это как непроверенное допущение, а не измеренный факт.
-POLYMARKET_ASSUMED_TAKER_FEE_PCT = 0.0
+# 2026-09-10, владелец: в Задаче 2 УЖЕ выяснено (прямое чтение исходника
+# CalculatorHelper.sol, Polymarket/ctf-exchange) -- комиссия берётся
+# ТОЛЬКО с TAKER-стороны В МОМЕНТ СДЕЛКИ: usdcFee = baseRate x
+# min(price, 1-price) x shares. Погашение выигравших токенов бесплатно
+# (комиссии на исходе нет) -- поэтому для стратегии "войти сейчас,
+# держать до расчёта" учитываем РОВНО ОДНУ комиссию входа, не round-trip.
+# baseRate -- РЕАЛЬНЫЙ, живой (`GET /fee-rate?token_id=...`), НЕ
+# захардкожен -- Polymarket явно предупреждает это не делать. Проверяем
+# per-event на реальных спортивных токенах (не только 15-мин крипто,
+# как в Задаче 2) -- формула в исходнике не привязана к типу рынка,
+# но фактическое ЗНАЧЕНИЕ baseRate может отличаться, поэтому меряем
+# заново для каждого сопоставленного события, не переносим число оттуда.
+_fee_rate_by_event: dict[str, float | None] = {}
 
 
 def fetch_price_history(clob_token_id: str, start_dt: datetime, end_dt: datetime) -> list[dict]:
@@ -174,6 +182,15 @@ def run() -> int:
             continue
         home_token = tokens[home_idx]
 
+        # Реальный, живой baseRate для ЭТОГО конкретного спортивного токена --
+        # не хардкодим, не переносим число из Задачи 2 (там были 15-мин крипто
+        # рынки, здесь спорт -- проверяем заново, применимость формулы та же
+        # (исходник не различает тип рынка), но фактическое значение могло
+        # отличаться).
+        fee_rate = get_fee_rate(home_token)
+        _fee_rate_by_event[ev["id"]] = fee_rate
+        time.sleep(0.1)
+
         try:
             commence_dt = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
         except ValueError:
@@ -200,9 +217,17 @@ def run() -> int:
             if poly_price is None:
                 continue
             raw_discrepancy = pinnacle_home_prob - poly_price  # знак: + значит Pinnacle оценивает home выше
-            net_discrepancy = raw_discrepancy - (POLYMARKET_ASSUMED_TAKER_FEE_PCT if raw_discrepancy > 0 else -POLYMARKET_ASSUMED_TAKER_FEE_PCT)
+            # Реальная формула (Задача 2, CalculatorHelper.sol): комиссия входа
+            # = baseRate x min(P, 1-P), P -- цена ноги, которую покупаем (сторона
+            # Polymarket, которую мы считаем неверно оценённой). Погашение
+            # бесплатно (установлено в Задаче 2) -- ОДНА комиссия на вход, не
+            # round-trip, для стратегии "войти и держать до расчёта".
+            fee_rate = _fee_rate_by_event.get(ev["id"])
+            real_fee = (fee_rate * min(poly_price, 1 - poly_price)) if fee_rate is not None else 0.0
+            net_discrepancy = raw_discrepancy - real_fee if raw_discrepancy > 0 else raw_discrepancy + real_fee
             ts_int = int(ts_dt.timestamp())
-            all_pairs.append({"event_id": ev["id"], "timestamp": ts_int, "discrepancy": net_discrepancy})
+            all_pairs.append({"event_id": ev["id"], "timestamp": ts_int, "discrepancy": net_discrepancy,
+                               "raw_discrepancy": raw_discrepancy, "fee_rate_used": fee_rate})
             pairs_by_event.setdefault(ev["id"], []).append((ts_int, net_discrepancy))
 
     result["n_events_with_price_history"] = n_price_history_ok
@@ -244,9 +269,26 @@ def run() -> int:
     result["n_persisted"] = n_persisted
     result["frac_persisted"] = frac_persisted
 
-    result["polymarket_assumed_taker_fee_pct"] = POLYMARKET_ASSUMED_TAKER_FEE_PCT
-    result["polymarket_fee_note"] = ("НЕ измерено эмпирически в этом прогоне -- допущение на основе общедоступной "
-                                       "информации о политике Polymarket (0% taker на большинстве рынков), не факт.")
+    real_fee_rates = [v for v in _fee_rate_by_event.values() if v is not None]
+    n_events_fee_rate_unavailable = sum(1 for v in _fee_rate_by_event.values() if v is None)
+    result["polymarket_fee_formula"] = "usdcFee = baseRate x min(price, 1-price) x shares (CalculatorHelper.sol, Polymarket/ctf-exchange) -- Задача 2"
+    result["polymarket_fee_note"] = ("baseRate измерен ЖИВЬЁМ (GET /fee-rate?token_id=...) для каждого реального "
+                                       "сопоставленного спортивного события в этом прогоне -- НЕ хардкожен и НЕ "
+                                       "перенесён из Задачи 2 (там были 15-мин крипто-рынки). Формула из исходника "
+                                       "не различает тип рынка -- применена как есть; фактическое значение baseRate "
+                                       "проверено заново на спортивных токенах. Одна комиссия на вход (не round-trip) "
+                                       "-- погашение выигравших токенов бесплатно (установлено в Задаче 2).")
+    result["n_events_with_real_fee_rate"] = len(real_fee_rates)
+    result["n_events_fee_rate_unavailable"] = n_events_fee_rate_unavailable
+    if real_fee_rates:
+        result["real_fee_rate_min"] = min(real_fee_rates)
+        result["real_fee_rate_max"] = max(real_fee_rates)
+        result["real_fee_rate_mean"] = sum(real_fee_rates) / len(real_fee_rates)
+        result["real_fee_rate_distinct_values"] = sorted(set(real_fee_rates))
+    else:
+        result["fee_rate_blocker"] = ("Эндпоинт /fee-rate не вернул значение ни для одного сопоставленного "
+                                        "события -- расхождение считается БЕЗ вычета комиссии (fee=0), явно "
+                                        "занижает реальные издержки, честно помечено.")
 
     result["preregistration_met"] = (
         frac_ge_2pct >= 0.15 and frac_persisted is not None and frac_persisted > 0.5
@@ -257,6 +299,13 @@ def run() -> int:
     print(f"[taskD_analysis] Живучесть (тот же знак, >=1% на следующем снимке): "
           f"{frac_persisted:.1%} из {n_persistence_checked} случаев (порог >50%)" if frac_persisted is not None
           else "[taskD_analysis] живучесть не посчитана -- 0 случаев для проверки")
+    if real_fee_rates:
+        print(f"[taskD_analysis] Реальный baseRate на спортивных рынках: min={result['real_fee_rate_min']}, "
+              f"max={result['real_fee_rate_max']}, mean={result['real_fee_rate_mean']:.6f} "
+              f"({len(real_fee_rates)}/{len(_fee_rate_by_event)} событий, значения: {result['real_fee_rate_distinct_values']})")
+    else:
+        print(f"[taskD_analysis] baseRate НЕ получен ни для одного события ({n_events_fee_rate_unavailable} "
+              "попыток) -- расхождение считается без вычета комиссии, честно занижает издержки")
     print(f"[taskD_analysis] Предрегистрация выполнена: {result['preregistration_met']}")
     return 0
 
