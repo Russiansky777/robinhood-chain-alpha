@@ -20,6 +20,7 @@ on:
       - "data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST"
       - "data/p3_guard_cache/TASKD_ANALYSIS_REQUEST"
       - "data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST"
+      - "data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST"
 
 jobs:
   run_task:
@@ -68,14 +69,21 @@ jobs:
         if: hashFiles('data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST') != ''
         run: python -u analysis/taskD_matching_diagnostic.py
 
+      - name: "Задача D -- переоткрытие: глубина истории + покрытие EPL/UFC (дёшево, ~15-25 кредитов)"
+        if: hashFiles('data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST') != ''
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+        run: python -u analysis/taskD_reopen_depth_probe.py
+
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST
           [ -e data/p3_guard_cache/taskD_pinnacle_snapshots.json ] && git add data/p3_guard_cache/taskD_pinnacle_snapshots.json
           [ -e data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json
           [ -e data/p3_guard_cache/taskD_pinnacle_polymarket_result.json ] && git add data/p3_guard_cache/taskD_pinnacle_polymarket_result.json
           [ -e data/p3_guard_cache/taskD_matching_diagnostic.json ] && git add data/p3_guard_cache/taskD_matching_diagnostic.json
+          [ -e data/p3_guard_cache/taskD_reopen_depth_probe_result.json ] && git add data/p3_guard_cache/taskD_reopen_depth_probe_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача D: результат фетча/анализа Pinnacle [automated]"
           fi
