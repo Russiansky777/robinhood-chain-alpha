@@ -91,13 +91,22 @@ GT_MAX_RETRIES = 4  # владелец, 2026-09-09: реальный прого�
 # РЕАЛЬНОЕ отсутствие данных (404 -- не ретраится) от временного throttling.
 
 
-def get_gt_reserve_usd(pool_address: str) -> float | None:
+def gt_get(url: str, params: dict | None = None) -> requests.Response | None:
+    """Общий GET на GeckoTerminal с реальным троттлингом + ретраем на 429
+    (см. GT_MAX_RETRIES выше). 2026-09-10: вынесено из get_gt_reserve_usd,
+    чтобы переиспользовать одну и ту же (уже дважды исправленную) логику
+    ретраев для ЛЮБОГО эндпоинта GT (не только /pools/{address}), напр.
+    /networks, /tokens/{address}/pools, /pools/{address}/ohlcv/day --
+    нужны turnover_gt_ohlcv.py. Возвращает Response для 200 ИЛИ 404
+    (вызывающий сам решает, как трактовать 404 -- реальное отсутствие,
+    не ретраится); бросает исключение, если после всех попыток так и не
+    получили ни того, ни другого (только 429)."""
     last_exc: Exception | None = None
     for attempt in range(GT_MAX_RETRIES):
         _throttle_gt()
-        r = requests.get(f"{GT_BASE}/networks/{GT_NETWORK}/pools/{pool_address}", headers=HEADERS_GT, timeout=30)
+        r = requests.get(url, headers=HEADERS_GT, params=params, timeout=30)
         if r.status_code == 404:
-            return None
+            return r
         if r.status_code == 429:
             retry_after = r.headers.get("Retry-After")
             exp_wait = GT_MIN_INTERVAL_S * (2 ** attempt)
@@ -108,16 +117,23 @@ def get_gt_reserve_usd(pool_address: str) -> float | None:
             # Retry-After -- ТОЛЬКО нижняя граница поверх экспоненциального
             # бэкоффа, не замена ему.
             wait = max(float(retry_after), exp_wait) if retry_after else exp_wait
-            print(f"[task1_pool_liquidity] GT 429 на {pool_address}, попытка {attempt+1}/{GT_MAX_RETRIES}, "
+            print(f"[gt] 429 на {url}, попытка {attempt+1}/{GT_MAX_RETRIES}, "
                   f"жду {wait:.1f}с (реальный rate-limit, не отсутствие данных)")
             last_exc = requests.HTTPError(f"429 после {attempt+1} попыток")
             time.sleep(wait)
             continue
         r.raise_for_status()
-        attrs = r.json().get("data", {}).get("attributes", {})
-        v = attrs.get("reserve_in_usd")
-        return float(v) if v else None
-    raise last_exc if last_exc else RuntimeError(f"GT: не удалось получить {pool_address} после {GT_MAX_RETRIES} попыток")
+        return r
+    raise last_exc if last_exc else RuntimeError(f"GT: не удалось получить {url} после {GT_MAX_RETRIES} попыток")
+
+
+def get_gt_reserve_usd(pool_address: str) -> float | None:
+    r = gt_get(f"{GT_BASE}/networks/{GT_NETWORK}/pools/{pool_address}")
+    if r is None or r.status_code == 404:
+        return None
+    attrs = r.json().get("data", {}).get("attributes", {})
+    v = attrs.get("reserve_in_usd")
+    return float(v) if v else None
 
 
 def round_trip_cost_pct(fee_bps: int, reserve_usd: float, trade_usd: float = TRADE_SIZE_USD) -> dict:

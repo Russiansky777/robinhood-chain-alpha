@@ -1,0 +1,55 @@
+name: "Ретро-сторожок, обход DefiLlama -- реальный суточный объём с GeckoTerminal OHLCV (0 кредитов)"
+
+# Владелец, 2026-09-10: универсум -- все пулы TVL>=$2M по DefiLlama (все
+# сети, где есть GT-слаг), суточный объём 90 дней с GT OHLCV, объём /
+# ТЕКУЩИЙ TVL, эпизод = >=3 дня подряд с оборотом >20x TVL. Скрипт
+# СНАЧАЛА честно проверяет живьём, реально ли сопоставить DefiLlama-пул
+# с GT (network, pool_address) -- диагностический гейт на малой выборке
+# -- и только если он проходит, запускает полный скан. Резюмируемый
+# чекпоинт (сам скрипт коммитит и пушит прогресс каждые 20 пулов) --
+# job может не уложиться в один запуск, повторный запуск продолжает с
+# места остановки. Только публичные бесплатные API (DefiLlama,
+# GeckoTerminal) -- ноль кредитов Dune.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TURNOVER_GT_OHLCV_REQUEST"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Ретро-сторожок GT OHLCV -- диагностический гейт + резюмируемый скан, 0 кредитов"
+        run: python -u analysis/turnover_gt_ohlcv.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TURNOVER_GT_OHLCV_REQUEST
+          [ -e data/p3_guard_cache/turnover_gt_ohlcv_result.json ] && git add data/p3_guard_cache/turnover_gt_ohlcv_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Ретро-сторожок GT OHLCV: финальный результат/чекпоинт [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
