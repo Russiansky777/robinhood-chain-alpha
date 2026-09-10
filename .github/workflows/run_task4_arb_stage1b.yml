@@ -1,0 +1,57 @@
+name: "Задача 4 -- медленный арбитраж, Шаг 1b: реальный TVL-фильтр + оценка Шага 2 (доминирующая статья расходов)"
+
+# Продолжение Шага 1 (run_task4_arb_stage1.yml): TVL-фильтр через GT
+# (бесплатно) на реальных >=50-своп кандидатах + один реальный
+# Dune-запрос сырых свопов (хвост+референс-пул, один день) -- честная
+# оценка доминирующей статьи расходов (Шаг 2) ДО полного пайплайна.
+# Потолок задачи -- 300 кредитов Mozila (владелец, 2026-09-10).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK4_ARB_STAGE1B_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Задача 4, Шаг 1b -- TVL-фильтр + оценка Шага 2"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task4_arb_slow_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+          OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD: "yes"
+        run: python -u analysis/task4_arb_stage1b.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK4_ARB_STAGE1B_REQUEST
+          [ -e data/p3_guard_cache/task4_arb_stage1b_result.json ] && git add data/p3_guard_cache/task4_arb_stage1b_result.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          [ -d data/task4_arb_slow_mozila_cache ] && git add data/task4_arb_slow_mozila_cache/
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 4, Шаг 1b: TVL-фильтр + оценка Шага 2, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
