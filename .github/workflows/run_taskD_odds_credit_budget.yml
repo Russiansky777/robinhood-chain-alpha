@@ -1,0 +1,54 @@
+name: "Задача D -- бюджет кредитов The Odds API (реальный ключ, перед выгрузкой)"
+
+# Владелец, 2026-09-10: Задача D переоткрыта, куплен план 20K ($30/мес).
+# Ключ в secrets.THE_ODDS_API -- эта сессия не может сама создать секрет,
+# он уже добавлен владельцем. Передаётся ТОЛЬКО через env -- GitHub
+# автоматически маскирует значение зарегистрированного секрета в логах.
+# Минимальные пробные вызовы (1 спорт, 1 регион, 1 дата) -- реальная
+# стоимость измеряется по заголовкам ответа, НЕ массовая выгрузка.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKD_CREDIT_BUDGET_REQUEST"
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача D -- реальный бюджет кредитов (минимальные пробные вызовы)"
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+        run: python -u analysis/taskD_odds_credit_budget.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_CREDIT_BUDGET_REQUEST
+          [ -e data/p3_guard_cache/taskD_odds_credit_budget_result.json ] && git add data/p3_guard_cache/taskD_odds_credit_budget_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача D: реальный бюджет кредитов The Odds API, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
