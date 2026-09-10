@@ -144,7 +144,7 @@ def run() -> int:
         w_max = (max(commence_dts) + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
         print(f"[taskD_analysis] {sport_key}: реальное окно {min(commence_dts)} .. {max(commence_dts)} "
               f"-> Polymarket closed-окно {w_min} .. {w_max} ({len(evs)} событий)")
-        sport_markets = fetch_polymarket_bulk(window_min_override=w_min, window_max_override=w_max)
+        sport_markets = fetch_polymarket_bulk(window_min_override=w_min, window_max_override=w_max, skip_active_passes=True)
         for m in sport_markets:
             if m.get("slug"):
                 pm_by_slug[m["slug"]] = m

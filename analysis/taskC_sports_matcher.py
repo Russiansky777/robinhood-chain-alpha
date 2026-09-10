@@ -88,7 +88,8 @@ def fetch_kalshi_games(series_ticker: str) -> list[dict]:
 
 
 def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100,
-                           window_min_override: str | None = None, window_max_override: str | None = None) -> list[dict]:
+                           window_min_override: str | None = None, window_max_override: str | None = None,
+                           skip_active_passes: bool = False) -> list[dict]:
     """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь для активных
     рынков (tag_slug/search НЕ фильтруют, см. taskC_polymarket_btc_
     probe_result.json / taskC_sports_match_probe_result.json).
@@ -120,17 +121,34 @@ def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100,
     прошлое). `window_min_override`/`window_max_override` (ISO8601)
     позволяют вызвать closed-срез с ЯВНЫМ окном под реальный диапазон
     дат события, не трогая поведение по умолчанию для существующих
-    вызовов (Задача 2, сама Задача C)."""
+    вызовов (Задача 2, сама Задача C).
+
+    2026-09-10, реальный найденный третий баг на том же прогоне: два
+    первых прохода (`active=true, closed=false`) ВООБЩЕ БЕЗ фильтра по
+    дате -- это просто ТЕКУЩИЕ открытые рынки Polymarket (крипто/
+    политика/будущие игры), одни и те же при ЛЮБОМ окне. Подтверждено
+    логами: при 4 совершенно разных window_min/max (NFL авг-ноя2025,
+    NBA фев-май2026, EPL авг-окт2025, UFC авг2025-янв2026)
+    n_polymarket_markets_scanned вырос лишь 3977->3978->3978->3978 --
+    та же текущая "активная" выборка забивала потолок 2000/проход,
+    вытесняя реальный closed-срез, единственный, что фильтруется по
+    нашему окну. Для сопоставления ПРОШЛЫХ (уже расчитанных) событий
+    active-проходы -- чистый шум, не относящийся к задаче.
+    `skip_active_passes=True` пропускает их (только closed-срез с
+    реальным окном), по умолчанию False -- поведение Задачи 2/Задачи C
+    не тронуто."""
     out = {}
     now = datetime.now(timezone.utc)
     window_min = window_min_override or (now - timedelta(days=WINDOW_DAYS_BACK)).strftime("%Y-%m-%dT%H:%M:%SZ")
     window_max = window_max_override or (now + timedelta(days=WINDOW_DAYS_FWD)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    passes = [
-        {"active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
-        {"active": "true", "closed": "false", "order": "endDate", "ascending": "true"},
-        {"closed": "true", "order": "endDate", "ascending": "false",
-         "end_date_min": window_min, "end_date_max": window_max},
-    ]
+    passes = []
+    if not skip_active_passes:
+        passes.extend([
+            {"active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
+            {"active": "true", "closed": "false", "order": "endDate", "ascending": "true"},
+        ])
+    passes.append({"closed": "true", "order": "endDate", "ascending": "false",
+                    "end_date_min": window_min, "end_date_max": window_max})
     for params_base in passes:
         for offset in range(0, max_pages * page_size, page_size):
             r = requests.get(f"{POLYMARKET_BASE}/markets", params={
