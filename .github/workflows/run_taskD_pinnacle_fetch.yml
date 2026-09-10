@@ -22,6 +22,7 @@ on:
       - "data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST"
       - "data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKD_REOPEN_CALENDAR_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKD_REOPEN_GAME_CALENDAR_REQUEST"
 
 jobs:
   run_task:
@@ -82,6 +83,13 @@ jobs:
           THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
         run: python -u analysis/taskD_reopen_calendar_probe.py
 
+      - name: "Задача D -- построение реального календаря игровых дней (дёшево, ~100 кредитов)"
+        if: hashFiles('data/p3_guard_cache/TASKD_REOPEN_GAME_CALENDAR_REQUEST') != ''
+        timeout-minutes: 25
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+        run: python -u analysis/taskD_reopen_game_calendar.py
+
       - name: Commit results
         if: always()
         run: |
@@ -92,6 +100,7 @@ jobs:
           [ -e data/p3_guard_cache/taskD_matching_diagnostic.json ] && git add data/p3_guard_cache/taskD_matching_diagnostic.json
           [ -e data/p3_guard_cache/taskD_reopen_depth_probe_result.json ] && git add data/p3_guard_cache/taskD_reopen_depth_probe_result.json
           [ -e data/p3_guard_cache/taskD_reopen_calendar_probe_result.json ] && git add data/p3_guard_cache/taskD_reopen_calendar_probe_result.json
+          [ -e data/p3_guard_cache/taskD_reopen_game_calendar_result.json ] && git add data/p3_guard_cache/taskD_reopen_game_calendar_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача D: результат фетча/анализа Pinnacle [automated]"
           fi
