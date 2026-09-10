@@ -1,0 +1,101 @@
+{
+  "generated_at_utc": "2026-09-10T22:05:03Z",
+  "results": [
+    {
+      "name": "kraken_btc_1h",
+      "url": "https://api.kraken.com/0/public/OHLC",
+      "params": {
+        "pair": "XBTUSD",
+        "interval": 60,
+        "since": 1781301900
+      },
+      "status": 200,
+      "body_snippet": "{\"error\":[],\"result\":{\"XXBTZUSD\":[[1786485600,\"63622.1\",\"63708.6\",\"63580.3\",\"63620.5\",\"63651.9\",\"18.12890487\",1476],[1786489200,\"63620.5\",\"63620.5\",\"63483.5\",\"63541.1\",\"63539.4\",\"35.27972219\",1288],[1786492800,\"63541.1\",\"63684.1\",\"63479.1\",\"63684.1\",\"63635.3\",\"27.13141775\",1588],[1786496400,\"63684.1\",\"63796.3\",\"63639.0\",\"63762.0\",\"63717.0\",\"26.71857913\",1401],[1786500000,\"63764.1\",\"63826.7\",\"63676",
+      "json_top_level_type": "dict",
+      "json_keys": [
+        "error",
+        "result"
+      ]
+    },
+    {
+      "name": "kraken_eth_1h",
+      "url": "https://api.kraken.com/0/public/OHLC",
+      "params": {
+        "pair": "ETHUSD",
+        "interval": 60,
+        "since": 1781301900
+      },
+      "status": 200,
+      "body_snippet": "{\"error\":[],\"result\":{\"XETHZUSD\":[[1786485600,\"1883.03\",\"1884.88\",\"1877.94\",\"1880.94\",\"1881.16\",\"200.69088822\",659],[1786489200,\"1880.93\",\"1882.71\",\"1877.36\",\"1881.01\",\"1880.20\",\"111.67665581\",357],[1786492800,\"1881.00\",\"1881.82\",\"1879.01\",\"1880.65\",\"1880.03\",\"251.59751604\",614],[1786496400,\"1880.71\",\"1884.56\",\"1879.44\",\"1883.04\",\"1882.32\",\"160.37844630\",439],[1786500000,\"1883.11\",\"1885.50\",\"1881.",
+      "json_top_level_type": "dict",
+      "json_keys": [
+        "error",
+        "result"
+      ]
+    },
+    {
+      "name": "coinbase_btc_1h",
+      "url": "https://api.exchange.coinbase.com/products/BTC-USD/candles",
+      "params": {
+        "start": "2026-09-08T22:05:01.561290+00:00",
+        "end": "2026-09-10T22:05:01.561290+00:00",
+        "granularity": 3600
+      },
+      "status": 200,
+      "body_snippet": "[[1789077600,77056.17,77139.47,77125.98,77118.86,19.17158618],[1789074000,77077.78,77278.77,77239.02,77125.97,197.17324569],[1789070400,77071.81,77325.53,77128.07,77239.01,190.63562968],[1789066800,77039.61,77270.2,77218.91,77123.6,227.64197845],[1789063200,76947.1,77305.18,77286.05,77218.6,194.97187233],[1789059600,77078.38,77518,77160.21,77286.04,477.56066046],[1789056000,76757.11,77275,77218.74",
+      "json_top_level_type": "list",
+      "json_len": 48,
+      "json_first_item": [
+        1789077600,
+        77056.17,
+        77139.47,
+        77125.98,
+        77118.86,
+        19.17158618
+      ]
+    },
+    {
+      "name": "coinbase_eth_1h",
+      "url": "https://api.exchange.coinbase.com/products/ETH-USD/candles",
+      "params": {
+        "start": "2026-09-08T22:05:01.561290+00:00",
+        "end": "2026-09-10T22:05:01.561290+00:00",
+        "granularity": 3600
+      },
+      "status": 200,
+      "body_snippet": "[[1789077600,2455.99,2459.66,2459.6,2459.08,493.37191663],[1789074000,2456.8,2462.32,2460.78,2459.69,1344.56746023],[1789070400,2460,2468.22,2461.89,2460.78,1760.31163818],[1789066800,2459.48,2471.36,2467.5,2461.8,4598.19545068],[1789063200,2453.6,2468.36,2465.1,2467.51,5329.13980777],[1789059600,2446.06,2473.89,2447.54,2465.59,8657.07908168],[1789056000,2431.79,2449.98,2440.6,2447.53,6762.8596228",
+      "json_top_level_type": "list",
+      "json_len": 48,
+      "json_first_item": [
+        1789077600,
+        2455.99,
+        2459.66,
+        2459.6,
+        2459.08,
+        493.37191663
+      ]
+    },
+    {
+      "name": "binance_btc_1h",
+      "url": "https://api.binance.com/api/v3/klines",
+      "params": {
+        "symbol": "BTCUSDT",
+        "interval": "1h",
+        "limit": 10
+      },
+      "status": 451,
+      "body_snippet": "{\n  \"code\": 0,\n  \"msg\": \"Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms. Please contact customer service if you believe you received this message in error.\"\n}"
+    },
+    {
+      "name": "binance_eth_1h",
+      "url": "https://api.binance.com/api/v3/klines",
+      "params": {
+        "symbol": "ETHUSDT",
+        "interval": "1h",
+        "limit": 10
+      },
+      "status": 451,
+      "body_snippet": "{\n  \"code\": 0,\n  \"msg\": \"Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms. Please contact customer service if you believe you received this message in error.\"\n}"
+    }
+  ]
+}
