@@ -57,6 +57,13 @@ MIN_LIFESPAN_DAYS = 5  # владелец, 2026-09-10: понижено с 8 п�
 TARGET_N_MARKETS = 40
 RANDOM_SEED = 20260910
 SHORT_CRYPTO_HORIZON_MAX_MINUTES = 360  # 6 часов, владелец
+# 2026-09-10, реальная находка владельца по итогам первого Brier-прогона:
+# первая выборка была почти вся из рынков с ценой 0.25-5% или 99%+ на
+# снимке -- исход был предрешён, сравнение измеряло "кто увереннее
+# ставит на очевидное", а не "кто точнее рассуждает". Оставляем только
+# рынки, где толпа на момент снимка реально не уверена.
+PRICE_RANGE_MIN = 0.20
+PRICE_RANGE_MAX = 0.80
 
 SPORTS_ESPORTS_KEYWORDS = (
     "nfl", "nba", "mlb", "nhl", "ncaa", "soccer", "football", "basketball",
@@ -301,15 +308,19 @@ def run() -> int:
     random.seed(RANDOM_SEED)
     random.shuffle(positive)
     random.shuffle(other)
-    selected = (positive + other)[:TARGET_N_MARKETS]
-    diag["n_selected"] = len(selected)
-    diag["n_selected_from_positive_topics"] = min(len(positive), TARGET_N_MARKETS)
-    print(f"[taskE_step1] реально выбрано: {len(selected)} (из них по целевым темам: "
-          f"{diag['n_selected_from_positive_topics']})")
+    positive_slugs = {m["slug"] for m in positive}
+    candidates_ordered = positive + other  # весь пул по порядку приоритета -- НЕ срезаем
+    # заранее до TARGET_N_MARKETS, потому что теперь отбор зависит от цены снимка, а её
+    # узнаём только после реального запроса. Останавливаемся, набрав TARGET_N_MARKETS
+    # штук в целевом ценовом диапазоне, или исчерпав весь пул.
 
     context_items = []
-    n_price_ok = 0
-    for m in selected:
+    n_examined = 0
+    n_price_snapshot_ok = 0
+    n_price_in_range = 0
+    for m in candidates_ordered:
+        if len(context_items) >= TARGET_N_MARKETS:
+            break
         slug = m["slug"]
         end_date_str = m.get("endDate")
         try:
@@ -321,10 +332,15 @@ def run() -> int:
         outcomes_names_raw = m.get("outcomes")
         outcomes_names = json.loads(outcomes_names_raw) if isinstance(outcomes_names_raw, str) else outcomes_names_raw
 
+        n_examined += 1
         price_snapshot = fetch_price_snapshot(tokens[0], end_date) if tokens else None
-        if price_snapshot is not None:
-            n_price_ok += 1
         time.sleep(0.15)
+        if price_snapshot is None:
+            continue
+        n_price_snapshot_ok += 1
+        if not (PRICE_RANGE_MIN <= price_snapshot <= PRICE_RANGE_MAX):
+            continue
+        n_price_in_range += 1
 
         # ТОЛЬКО контекст -- ни одного поля исхода здесь и не может
         # быть, потому что этот код его никогда не запрашивал.
@@ -336,9 +352,19 @@ def run() -> int:
             "volume": m.get("volumeNum"),
         })
 
-    diag["n_price_snapshot_ok"] = n_price_ok
+    diag["n_candidates_examined_for_price"] = n_examined
+    diag["n_price_snapshot_ok"] = n_price_snapshot_ok
+    diag["n_price_in_target_range"] = n_price_in_range
+    diag["price_range_filter"] = [PRICE_RANGE_MIN, PRICE_RANGE_MAX]
+    diag["n_selected"] = len(context_items)
+    diag["n_selected_from_positive_topics"] = sum(1 for c in context_items if c["slug"] in positive_slugs)
+    diag["stop_reason_selection"] = ("reached_target_n" if len(context_items) >= TARGET_N_MARKETS
+                                      else "exhausted_candidate_pool")
     diag["price_snapshot_failure_samples"] = _price_snapshot_failure_samples
-    print(f"[taskE_step1] реальных снимков цены получено: {n_price_ok}/{len(selected)}")
+    print(f"[taskE_step1] рассмотрено кандидатов (запрошена цена): {n_examined}, "
+          f"снимков цены получено: {n_price_snapshot_ok}, в диапазоне [{PRICE_RANGE_MIN};{PRICE_RANGE_MAX}]: "
+          f"{n_price_in_range}, итого отобрано: {len(context_items)} "
+          f"(остановка: {diag['stop_reason_selection']})")
 
     OUT_PATH.write_text(json.dumps({
         "meta": {"cutoff_date": CUTOFF_DATE.isoformat(), "n_days_before_resolution": N_DAYS_BEFORE_RESOLUTION,
