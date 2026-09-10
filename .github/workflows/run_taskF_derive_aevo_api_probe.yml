@@ -12,6 +12,7 @@ on:
       - claude/sc1-pons-v2-launcher-efdbyt
     paths:
       - "data/p3_guard_cache/TASKF_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST"
 
 jobs:
   probe:
@@ -31,12 +32,17 @@ jobs:
       - name: Install dependencies
         run: pip install requests
       - name: "Задача F, Шаг 0 -- разведка API Derive/Aevo"
+        if: hashFiles('data/p3_guard_cache/TASKF_PROBE_REQUEST') != ''
         run: python -u analysis/taskF_derive_aevo_api_probe.py
+      - name: "Задача F, Шаг 0b -- углублённая разведка Derive"
+        if: hashFiles('data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST') != ''
+        run: python -u analysis/taskF_derive_depth_probe.py
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASKF_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKF_PROBE_REQUEST data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST
           [ -e data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json
+          [ -e data/p3_guard_cache/taskF_derive_depth_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_depth_probe_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача F, Шаг 0: разведка API Derive/Aevo, результат [automated]"
           fi
