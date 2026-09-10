@@ -3,25 +3,16 @@
     "cutoff_date": "2026-01-01T00:00:00+00:00",
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
-    "n_markets": 40,
-    "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null"
+    "n_markets": 28,
+    "llm_estimates": "ЗАПОЛНЕНО вручную владельцем сессии на этом шаге -- см. llm_probability_estimate/llm_reasoning_brief в каждой записи.",
+    "n_excluded_sports_filter_gap": 2,
+    "excluded_sports_filter_gap_slugs": [
+      "aus-wsw-mac-2026-01-01-btts",
+      "cbb-stjohn-george-2025-12-31"
+    ],
+    "n_excluded_no_price_snapshot": 10
   },
   "markets": [
-    {
-      "slug": "cbb-stjohn-george-2025-12-31",
-      "question": "St. John's Red Storm vs. Georgetown Hoyas",
-      "description": "In the upcoming CBB game, scheduled for December 31 at 8:00 PM ET:\n\nIf the St. John's Red Storm win, the market will resolve to \"St. John's Red Storm\".\n\nIf the Georgetown Hoyas win, the market will resolve to \"Georgetown Hoyas\".\n\nIf the game is postponed, this market will remain open until the game has been completed.\n\nIf the game is canceled entirely, with no make-up game, this market will resolve 50-50.\n\nThe result will be determined based on the final score including any overtime periods.",
-      "end_date": "2026-01-01T01:00:00Z",
-      "outcome_names": [
-        "St. John's Red Storm",
-        "Georgetown Hoyas"
-      ],
-      "price_snapshot_date": "2025-12-25T01:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.51,
-      "volume": 42939.193121,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
     {
       "slug": "french-election-called-by-december-31-355-325-146-483-711",
       "question": "French election called by December 31?",
@@ -34,8 +25,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0055,
       "volume": 420953.664332,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Франция не демонстрировала явных признаков нового досрочного роспуска парламента на конец 2025 — конституционные ограничения на повторный роспуск после цикла 2024 делают объявление даты выборов маловероятным именно в этом узком окне. Оценка ниже базовой ставки, близко к рыночной, так как известного триггера кризиса на конец декабря нет."
     },
     {
       "slug": "ukraine-election-held-in-2025",
@@ -49,8 +40,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.003,
       "volume": 1589428.067032,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.01,
+      "llm_reasoning_brief": "Украина находится под военным положением из-за продолжающейся войны, а конституция прямо запрещает проведение выборов в этот период — устойчивый и хорошо известный факт, а не предположение об исходе. Вероятность проведения реальных выборов до конца 2025 крайне мала."
     },
     {
       "slug": "will-gavin-newsom-announce-a-presidential-run-by-december-31-2025",
@@ -64,8 +55,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.005,
       "volume": 31734.824838,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Официальные объявления о президентской гонке 2028 обычно делаются намного ближе к выборам, а не за три года; действующие губернаторы редко анонсируют национальные амбиции до завершения текущего срока и промежуточных выборов 2026. Базовая ставка для настолько раннего объявления очень низкая."
     },
     {
       "slug": "mike-johnson-out-as-speaker-in-2025",
@@ -79,8 +70,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.004,
       "volume": 58738.705808,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Смена спикера Палаты представителей — редкое событие вне явного внутрипартийного кризиса; у меня нет оснований полагать, что к декабрю 2025 сложилась ситуация, сопоставимая по остроте с той, что привела к смещению предыдущего спикера в 2023. Оцениваю близко к базовой ставке для непредвиденной отставки."
     },
     {
       "slug": "polish-snap-election-called-in-2025",
@@ -94,8 +85,8 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0025,
       "volume": 286784.250608,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.01,
+      "llm_reasoning_brief": "Правящая коалиция Туска не демонстрировала явных сигналов к досрочному роспуску сейма во второй половине 2025; президентские выборы 2025 были отдельным, уже запланированным событием и не создают структурного давления на досрочные парламентские выборы."
     },
     {
       "slug": "ukraine-election-called-in-2025",
@@ -109,8 +100,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0095,
       "volume": 982716.694339,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Тема послевоенных выборов на Украине периодически поднималась в контексте мирных переговоров и внешнего дипломатического давления в течение 2025, что даёт немного больше веса, чем нулю, но формальное назначение даты выборов при сохраняющемся военном положении маловероятно до конца года."
     },
     {
       "slug": "ai-industry-downturn-by-december-31-2025",
@@ -124,8 +115,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0035,
       "volume": 202990.851035,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Составное условие требует срабатывания минимум трёх из пяти жёстких индикаторов (обвал акций на 40-50% от максимума, банкротство/поглощение крупного игрока и т.д.); по доступным мне данным AI-сектор оставался в фазе роста без признаков одновременного срабатывания нескольких из этих условий к концу 2025."
     },
     {
       "slug": "spain-snap-election-called-in-2025",
@@ -139,8 +130,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0075,
       "volume": 93498.302024,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.04,
+      "llm_reasoning_brief": "Правительство Санчеса сталкивалось с коррупционными скандалами и напряжённостью в коалиции на протяжении 2024-2025, что создаёт реальный фон нестабильности, но конкретного объявления досрочных выборов к этому сроку я подтвердить не могу. Оценка чуть выше рыночной с учётом реального политического шума."
     },
     {
       "slug": "will-the-next-uk-election-is-called-by-december-31",
@@ -154,8 +145,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0045,
       "volume": 91962.29858,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Всеобщие выборы в Великобритании прошли в июле 2024, следующие по закону ожидаются не ранее ~2029 без досрочного роспуска; на конец 2025 у меня нет сведений о кризисе такого масштаба, который обычно предшествует объявлению досрочных выборов."
     },
     {
       "slug": "will-kamala-harris-announce-california-governor-run-in-2025",
@@ -169,8 +160,8 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0025,
       "volume": 36220.725824,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "По доступной мне информации к середине-концу 2025 появлялись сообщения, что Харрис склоняется не участвовать в губернаторской гонке Калифорнии, сохраняя опцию на федеральную политику; это снижает вероятность относительно чистой базовой ставки, но недостаточно уверенно, чтобы оценивать ближе к нулю, чем рынок."
     },
     {
       "slug": "will-consensys-ipo-by-december-31-2025",
@@ -184,8 +175,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0055,
       "volume": 38541.872363,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Слухи об IPO ConsenSys циркулируют с начала 2020-х без завершённого публичного размещения; в узком окне до конца 2025 нет известных мне конкретных сигналов готовности к листингу именно в этот период."
     },
     {
       "slug": "macron-out-in-2025-834",
@@ -199,8 +190,8 @@
       "price_snapshot_date": "2025-12-25T04:59:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0025,
       "volume": 1386219.767204,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Макрон пережил череду отставок премьер-министров и вотумов недоверия правительству в 2024-2025, но сам президент институционально защищён от отставки вне импичмента или добровольного ухода, признаков которого не было."
     },
     {
       "slug": "congress-authorizes-military-force-against-iran-in-2025",
@@ -214,8 +205,8 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0045,
       "volume": 54734.484901,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Летом 2025 обострение вокруг Ирана (включая удары по ядерным объектам) реально повышало политическую salience темы, но формальное принятие AUMF Конгрессом — редкий и юридически тяжёлый шаг, обычно избегаемый администрацией в пользу исполнительных полномочий; конкретных признаков голосования по такому закону к декабрю у меня нет."
     },
     {
       "slug": "rainbow-fdv-above-3b-one-day-after-launch-443-682-926",
@@ -229,8 +220,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0055,
       "volume": 29014.437957,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.05,
+      "llm_reasoning_brief": "У меня нет достоверной информации о конкретных параметрах запуска токена Rainbow к декабрю 2025; порог $3B FDV — высокая планка даже для востребованных кошельков, поэтому оценка остаётся низкой, но не нулевой из-за общей неопределённости по срокам и хайпу запуска."
     },
     {
       "slug": "will-ethena-dip-to-0pt08-by-december-31-2026",
@@ -244,23 +235,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.55,
       "volume": 60324.54775799999,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-the-monad-public-sale-commitments-be-between-1pt2b-and-1pt4b",
-      "question": "Will the Monad public sale commitments be between $1.2B and $1.4B?",
-      "description": "This market will resolve according to the total commitments for the Monad raise on Coinbase.\n\nThe resolution source is the \"Total requested\" value displayed on the Coinbase raise page available at https://www.coinbase.com/token-sales/monad.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nIf the final commitment amount cannot be verified by December 31, 2025, 11:59 PM ET, or if relevant information becomes permanently unavailable within the market timeframe, this market will resolve to “No.”",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 161474.880972,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.4,
+      "llm_reasoning_brief": "ENA торговался волатильно в 2024-2025 с заметными просадками во время слабости альткоинов, но падение до $0.08 требует ещё одной существенной волны снижения от типичных уровней; рынок оценивает это примерно паритетно, у меня нет информационного преимущества, чтобы уверенно отклониться от этого, поэтому даю оценку чуть ниже паритета."
     },
     {
       "slug": "usde-depeg-by-december-31",
@@ -274,8 +250,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.003,
       "volume": 32857.83849,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "USDe в целом удерживал привязку к доллару на протяжении 2025 несмотря на отдельные периоды стресса в крипторынке; устойчивый суточный депег на 24 часа ниже $0.98 — редкое и заметное событие, о котором у меня нет сведений применительно к этому окну."
     },
     {
       "slug": "will-xrp-reach-3pt20-before-2026-161",
@@ -289,38 +265,8 @@
       "price_snapshot_date": "2025-12-25T04:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0065,
       "volume": 393777.439753,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-eyearea-win-the-synthetix-trading-competition",
-      "question": "Will Eyearea win the Synthetix trading competition?",
-      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Synthetix trading competition starting on October 20, 2025.\n\nThe resolution source will be the Synthetix Leaderboard on https://www.synthetix.io/.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Synthetix leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or results are unavailable, the market will remain open until reliable data is published by Synthetix. If no such data is available by December 31, 2025, the market will resolve to “Other.”\n\nNote: The official competition includes 100 participants, but this market will resolve solely based on a selected group of KOL participants. Traders who are not eligible KOLs will not be considered. E.g. an eligible KOL will be considered to have won if they are the top trader out of eligible KOLs regardless of if one of the non KOL participants finishes ahead of them.  \n\nAdditional KOLs may be added as options later to reflect the full set of eligible KOLs.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 20524.90612,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-nflx-dip-to-105-in-december",
-      "question": "Will Netflix dip to $105 in December?",
-      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Netflix, Inc. (NFLX) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Netflix, Inc. (NFLX) \"Low\" prices available at https://finance.yahoo.com/quote/NFLX/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
-      "end_date": "2026-01-01T04:59:59.999Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 2234.7734,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "XRP действительно переживал сильное ралли в 2025, но конкретное окно (конец августа - конец декабря 2025) и очень низкая рыночная цена намекают, что либо пик был пройден до начала окна, либо цена к декабрю была заметно ниже порога; без точных котировок на дату среза ориентируюсь на рыночную оценку."
     },
     {
       "slug": "will-msft-dip-to-450-in-december",
@@ -334,38 +280,8 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.037,
       "volume": 4115.926121,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-nft-2731-win-the-based-trading-competition",
-      "question": "Will NFT #2731 win the Based trading competition?",
-      "description": "This market will resolve to the NFT with the highest ROI at the end of the Based AI trading competition beginning on December 2, 2025.\n\nThe resolution source is the official Based leaderboard available at: https://app.based.one/arena\n\nIf two or more NFTs are tied for the highest ROI at resolution time, the market will resolve to the NFT with the lowest ID number according to the official Based leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or final results are unavailable, the market will remain open until Based publishes reliable data. If no such data becomes available by that date, the market will resolve to “Other.”",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 1075.6865,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-agora-win-the-usdh-ticker",
-      "question": "Will Agora win the USDH ticker?",
-      "description": "This market will resolve to the winner of Hyperliquid’s USDH on-chain validator vote taking place on September 14.\n\nThe resolution source for this market will be official information from Hyperliquid.\n\nIf the vote is not completed or no winner is declared by December 31 11:59PM ET, the market will resolve to \"Other\"",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 303405.627316,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.05,
+      "llm_reasoning_brief": "MSFT торговалась в 2025 в диапазоне заметно выше $450 на фоне устойчивого роста облачного и AI-бизнеса; просадка до этого уровня потребовала бы существенной коррекции рынка, для которой у меня нет специфических признаков именно в декабре 2025."
     },
     {
       "slug": "will-meta-dip-to-560-in-december",
@@ -379,53 +295,8 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.024,
       "volume": 6683.626807,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-nft-2779-win-the-based-trading-competition",
-      "question": "Will NFT #2779 win the Based trading competition?",
-      "description": "This market will resolve to the NFT with the highest ROI at the end of the Based AI trading competition beginning on December 2, 2025.\n\nThe resolution source is the official Based leaderboard available at: https://app.based.one/arena\n\nIf two or more NFTs are tied for the highest ROI at resolution time, the market will resolve to the NFT with the lowest ID number according to the official Based leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or final results are unavailable, the market will remain open until Based publishes reliable data. If no such data becomes available by that date, the market will resolve to “Other.”",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 1347.9225,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-gold-mansacks-win-the-orderly-trading-competition",
-      "question": "Will Gold Mansacks win the Orderly trading competition?",
-      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Orderly trading competition starting on November 14, 2025.\n\nThe resolution source will be the Orderly Heavyweight Leaderboard on https://app.orderly.network/campaigns.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Orderly Heavyweight Leaderboard.\n\nIf the competition is not completed or the official leaderboard is unavailable, the market will remain open until reliable data is published by Orderly. If no such data becomes available by December 31, 2025 ET, the market will resolve to “Other\".",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 20359.745466,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-wsw-mac-2026-01-01-btts",
-      "question": "Western Sydney Wanderers FC vs. Macarthur FC: Both Teams to Score",
-      "description": "In the upcoming A-League game between Western Sydney Wanderers FC and Macarthur FC, scheduled for January 1 at 3:00 AM ET:\n\nThis market will resolve to \"Yes\" if both Western Sydney Wanderers FC and Macarthur FC each score at least one goal during the game.\n\nThis market will resolve to \"No\" if either team fails to score (i.e., if one or both teams finish with zero goals).\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50–50.\n\nIf the game is started but not completed, this market will resolve according to the official final score published on a-league.com.au. This market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T08:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 6009.09371,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "META также торговалась в 2025 значительно выше уровня $560 на фоне сильных результатов рекламного бизнеса; необходим заметный обвал акции для достижения этого уровня, конкретных признаков которого у меня нет."
     },
     {
       "slug": "will-msft-dip-to-323-in-december",
@@ -439,8 +310,8 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.0065,
       "volume": 4070.438,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.01,
+      "llm_reasoning_brief": "Порог $323 существенно ниже типичного диапазона торгов MSFT в 2025 — потребовался бы обвал, сопоставимый по масштабу с крупным рыночным кризисом; у меня нет оснований считать это вероятным в декабре 2025."
     },
     {
       "slug": "will-win-the-aster-trading-competition-389",
@@ -454,8 +325,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0005,
       "volume": 11245.022,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "Соревнование с широким пулом участников без известной мне информации о текущем лидерборде для конкретного трейдера '风无向'; при отсутствии информационного преимущества оценка близка к равномерной для одного участника среди многих, что отражает и низкая рыночная цена."
     },
     {
       "slug": "lighter-market-cap-fdv-10b-one-day-after-launch-978-517",
@@ -469,8 +340,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0085,
       "volume": 903399.79443,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.12,
+      "llm_reasoning_brief": "Проект Lighter был одним из заметно хайпуемых DeFi/перп-протоколов в крипто-сообществе в 2025, со сравнениями по масштабу с Hyperliquid, что делает высокую оценку при листинге не исключённой; но точных данных по фактическому запуску и оценке у меня нет, поэтому держу оценку выше рыночной, но умеренно."
     },
     {
       "slug": "will-ethena-reach-0pt41-in-december",
@@ -484,8 +355,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0315,
       "volume": 13947.986855,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.05,
+      "llm_reasoning_brief": "Уровень $0.41 заметно выше типичных котировок ENA во второй половине 2025, которые я связываю с ослаблением после ранних максимумов; для достижения этого потребовалось бы заметное ралли, признаков которого у меня нет."
     },
     {
       "slug": "will-hyperliquid-dip-to-24-in-december",
@@ -499,8 +370,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.9995,
       "volume": 22528.311716,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.85,
+      "llm_reasoning_brief": "HYPE прошёл мощное ралли в течение 2025 на фоне взрывного роста объёмов платформы, но к декабрю рыночная цена этого контракта близка к единице, что указывает на высокую вероятность того, что либо цена уже вблизи этого уровня, либо коррекция уже произошла; ориентируюсь на этот сильный сигнал, немного смягчая уверенность."
     },
     {
       "slug": "axiom-daily-fees-above-5m-in-2025",
@@ -514,8 +385,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.034,
       "volume": 7783.162645,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.05,
+      "llm_reasoning_brief": "Axiom как интерфейс для мем-коин трейдинга на Solana демонстрировал сильный рост комиссий в отдельные пиковые периоды 2025, но низкая рыночная цена ближе к концу окна говорит, что порог $5M за день пока не достигнут и, вероятно, уже не будет достигнут за оставшиеся дни года."
     },
     {
       "slug": "elon-musk-of-tweets-december-2025-1360-1399",
@@ -529,53 +400,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.1415,
       "volume": 165613.340628,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-icobeast-win-the-synthetix-trading-competition-491",
-      "question": "Will IcoBeast win the Synthetix trading competition?",
-      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Synthetix trading competition starting on October 20, 2025.\n\nThe resolution source will be the Synthetix Leaderboard on https://www.synthetix.io/.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Synthetix leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or results are unavailable, the market will remain open until reliable data is published by Synthetix. If no such data is available by December 31, 2025, the market will resolve to “Other.”\n\nNote: The official competition includes 100 participants, but this market will resolve solely based on a selected group of KOL participants. Traders who are not eligible KOLs will not be considered. E.g. an eligible KOL will be considered to have won if they are the top trader out of eligible KOLs regardless of if one of the non KOL participants finishes ahead of them.  \n\nAdditional KOLs may be added as options later to reflect the full set of eligible KOLs.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 7545.447166,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "will-xrp-dip-to-2pt70-before-2026-164",
-      "question": "Will XRP dip to $2.70 before 2026?",
-      "description": "This market will immediately resolve to \"Yes\" if any Binance 1 minute candle for XRP/USDT between August 31, 2025, 18:00 and December 31, 2025, 23:59 in the ET timezone has a final \"Low\" price equal to or lower than the price specified in the title. Otherwise, this market will resolve to \"No.\"\n\nThe resolution source for this market is Binance, specifically the XRP/USDT \"Low\" prices available at https://www.binance.com/en/trade/XRP_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance XRP/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 16332.151514,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "over-10m-committed-to-the-vooi-public-sale",
-      "question": "Over $10M committed to the VOOI public sale?",
-      "description": "This market will resolve to “Yes” if total commitments for the VOOI raise on Legion exceeds the number specified in the title before the raise closes. Otherwise, it will resolve to “No.”\n\nThe resolution source is the \"Allocation Requested\" value displayed on the raise page available at https://cookie.legion.cc/app/invest.\n\nIf the final commitment amount cannot be verified by December 31, 2025, 11:59 PM ET, or if relevant information becomes permanently unavailable within the market timeframe, this market will resolve to “No.”",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": null,
-      "volume": 423553.015644,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.13,
+      "llm_reasoning_brief": "Это один из множества конкурирующих числовых интервалов для количества постов Маска за месяц; без специфических данных о его активности именно в декабре 2025 я не могу дать существенно иную оценку, чем подразумевает распределение по соседним интервалам, поэтому держусь близко к рыночной."
     },
     {
       "slug": "will-nvda-reach-228-in-december",
@@ -589,8 +415,8 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.0025,
       "volume": 12018.45457,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.02,
+      "llm_reasoning_brief": "NVDA была в устойчивом растущем тренде на фоне спроса на AI-чипы в 2025, но конкретный уровень $228 (с учётом возможного сплита акций) я не могу точно сопоставить с фактическим диапазоном торгов на конец года; очень низкая рыночная цена предполагает, что уровень либо уже пройден задолго до декабря, либо далёк от текущих котировок."
     },
     {
       "slug": "will-john-fetterman-leave-the-democratic-party-in-2025",
@@ -604,8 +430,8 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.0075,
       "volume": 17916.780497,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Феттерман публично расходился с частью демократической платформы по ряду вопросов (в частности, по поддержке Израиля) в течение 2025, что даёт немного повышенный фон по сравнению с типичным сенатором, но формальный выход из партии — гораздо более редкий и решительный шаг, признаков подготовки которого у меня нет."
     }
   ]
 }
