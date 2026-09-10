@@ -19,6 +19,7 @@ on:
       - "data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST"
       - "data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST"
       - "data/p3_guard_cache/TASKD_ANALYSIS_REQUEST"
+      - "data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST"
 
 jobs:
   run_task:
@@ -63,13 +64,18 @@ jobs:
         if: hashFiles('data/p3_guard_cache/TASKD_ANALYSIS_REQUEST') != ''
         run: python -u analysis/taskD_pinnacle_polymarket_analysis.py
 
+      - name: "Задача D -- диагностика причины низкого % сопоставления (20 случайных событий)"
+        if: hashFiles('data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST') != ''
+        run: python -u analysis/taskD_matching_diagnostic.py
+
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST
           [ -e data/p3_guard_cache/taskD_pinnacle_snapshots.json ] && git add data/p3_guard_cache/taskD_pinnacle_snapshots.json
           [ -e data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json
           [ -e data/p3_guard_cache/taskD_pinnacle_polymarket_result.json ] && git add data/p3_guard_cache/taskD_pinnacle_polymarket_result.json
+          [ -e data/p3_guard_cache/taskD_matching_diagnostic.json ] && git add data/p3_guard_cache/taskD_matching_diagnostic.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача D: результат фетча/анализа Pinnacle [automated]"
           fi
