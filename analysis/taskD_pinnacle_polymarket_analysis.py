@@ -158,9 +158,19 @@ def run() -> int:
 
     # 4. Для каждого сопоставленного события -- определяем, какой clobTokenId
     # соответствует home_team, тянем ОДИН раз всю историю цены на нужное окно.
+    #
+    # 2026-09-10, реальная находка первого прогона: фиксированное окно
+    # [now-31d; commence] дало n_events_with_price_history=0 из 10 -- тот
+    # же паттерн, что уже был найден в Задаче E (`prices-history` реально
+    # возвращает 200 OK с ПУСТОЙ history, если окно предшествует созданию
+    # рынка). Спортивные moneyline-рынки Polymarket создаются незадолго до
+    # игры, не за 31 день. Первая точечная правка по факту диагноза (не
+    # вторая вслепую): окно теперь per-event, от САМОЙ РАННЕЙ реальной
+    # точки снимка Pinnacle для этого события (с запасом 2 дня), а не от
+    # фиксированной глобальной даты.
     now = datetime.now(timezone.utc)
-    window_start = now - timedelta(days=31)
     n_price_history_ok = 0
+    n_price_history_empty_diag = []
     all_pairs = []  # (event_id, timestamp, discrepancy, sign)
     pairs_by_event: dict[str, list[tuple[int, float, float]]] = {}
 
@@ -195,9 +205,27 @@ def run() -> int:
             commence_dt = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
         except ValueError:
             continue
-        history = fetch_price_history(home_token, window_start, min(now, commence_dt))
+
+        snap_timestamps = []
+        for sp in ev["snapshot_points"]:
+            if sp.get("actual_timestamp"):
+                try:
+                    snap_timestamps.append(datetime.fromisoformat(sp["actual_timestamp"].replace("Z", "+00:00")))
+                except ValueError:
+                    pass
+        earliest_snap = min(snap_timestamps) if snap_timestamps else (commence_dt - timedelta(days=7))
+        window_start_event = earliest_snap - timedelta(days=2)  # запас на неточность создания рынка
+        window_end_event = min(now, commence_dt)
+
+        history = fetch_price_history(home_token, window_start_event, window_end_event)
         time.sleep(0.15)
         if not history:
+            if len(n_price_history_empty_diag) < 5:
+                n_price_history_empty_diag.append({
+                    "event_id": ev["id"], "home_token": home_token,
+                    "window_start": window_start_event.isoformat(), "window_end": window_end_event.isoformat(),
+                    "commence_time": ev["commence_time"],
+                })
             continue
         n_price_history_ok += 1
 
@@ -232,6 +260,7 @@ def run() -> int:
 
     result["n_events_with_price_history"] = n_price_history_ok
     result["n_event_snapshot_pairs"] = len(all_pairs)
+    result["price_history_empty_diagnostics"] = n_price_history_empty_diag
     print(f"[taskD_analysis] событий с реальной ценовой историей Polymarket: {n_price_history_ok}")
     print(f"[taskD_analysis] реальных пар событие-снимок с обеими ценами: {len(all_pairs)}")
 
