@@ -1,0 +1,90 @@
+name: "Задача D -- выгрузка Pinnacle + сопоставление с Polymarket (реальные деньги)"
+
+# Владелец, 2026-09-10: бюджет подтверждён (10800/20000 кредитов, 12
+# снимков/день x 30 дней x 3 спорта). Сначала ДЕШЁВЫЙ smoke-тест
+# (1 спорт, 1 день -- ~20 кредитов) для проверки механики через реальный
+# API перед полным дорогим прогоном -- реальные деньги, ошибку в коде
+# дешевле поймать на маленьком масштабе. Полный прогон -- отдельным
+# маркером/dispatch с реальными параметрами плана.
+#
+# Ключ THE_ODDS_API передаётся ТОЛЬКО через secrets -- GitHub
+# автоматически маскирует значение в логах, нигде не печатается.
+
+on:
+  workflow_dispatch:
+    inputs:
+      window_days:
+        description: "Окно в днях (по умолчанию -- полный план 30)"
+        default: "30"
+      snapshots_per_day:
+        description: "Снимков в день (по умолчанию -- полный план 12)"
+        default: "12"
+      sports:
+        description: "Список спортов через запятую"
+        default: "americanfootball_nfl,basketball_nba,baseball_mlb"
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST"
+      - "data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST"
+      - "data/p3_guard_cache/TASKD_ANALYSIS_REQUEST"
+
+jobs:
+  run_task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: "Задача D -- SMOKE-тест фетча (1 спорт, 1 день, ~20 кредитов)"
+        if: hashFiles('data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST') != ''
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+          TASKD_WINDOW_DAYS: "1"
+          TASKD_SNAPSHOTS_PER_DAY: "2"
+          TASKD_SPORTS: "americanfootball_nfl"
+        run: python -u analysis/taskD_pinnacle_historical_fetch.py
+
+      - name: "Задача D -- ПОЛНЫЙ фетч Pinnacle (реальные деньги, ~10800 кредитов)"
+        if: hashFiles('data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST') != ''
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+          TASKD_WINDOW_DAYS: ${{ github.event.inputs.window_days || '30' }}
+          TASKD_SNAPSHOTS_PER_DAY: ${{ github.event.inputs.snapshots_per_day || '12' }}
+          TASKD_SPORTS: ${{ github.event.inputs.sports || 'americanfootball_nfl,basketball_nba,baseball_mlb' }}
+        run: python -u analysis/taskD_pinnacle_historical_fetch.py
+
+      - name: "Задача D -- бесплатный анализ (сопоставление + расхождение)"
+        if: hashFiles('data/p3_guard_cache/TASKD_ANALYSIS_REQUEST') != ''
+        run: python -u analysis/taskD_pinnacle_polymarket_analysis.py
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST
+          [ -e data/p3_guard_cache/taskD_pinnacle_snapshots.json ] && git add data/p3_guard_cache/taskD_pinnacle_snapshots.json
+          [ -e data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json
+          [ -e data/p3_guard_cache/taskD_pinnacle_polymarket_result.json ] && git add data/p3_guard_cache/taskD_pinnacle_polymarket_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача D: результат фетча/анализа Pinnacle [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
