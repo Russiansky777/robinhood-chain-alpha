@@ -10,7 +10,15 @@ llm_probability_estimate) виден в истории git. Реальные и�
 ИТОГОВЫЙ ФАЙЛ только агрегаты (Brier LLM, Brier рынка, N, лучше ли
 LLM рынка) -- НИ ОДНОГО поля per-market с фактическим исходом или
 даже булевым "угадал/не угадал" (это тоже раскрывало бы исход) не
-попадает в результат, который будет прочитан в основной сессии."""
+попадает в результат, который будет прочитан в основной сессии.
+
+2026-09-10, владелец: первый прогон на выборке с ценой 0.25-5%/99%+
+показал, что сравнение измеряло "кто увереннее ставит на очевидное",
+а не "кто точнее рассуждает". После фильтра цены снимка [0.20;0.80]
+считаем Brier score ДВАЖДЫ: по всей выборке и отдельно по подмножеству
+markets[].llm_edge_plausible=true (рынки, где у LLM в принципе может
+быть информационное преимущество -- разбор известных фактов/паттернов,
+а не гадание о будущем движении цены или чужих действиях)."""
 from __future__ import annotations
 
 import json
@@ -59,6 +67,33 @@ def fetch_outcome_prices(slug: str) -> list[float] | None:
         return None
 
 
+def score_group(scored_items: list[tuple[float, float | None, float]]) -> dict:
+    """Владелец, 2026-09-10: считаем Brier score ДВУМЯ способами -- по
+    всей выборке и отдельно по подмножеству, где информационное
+    преимущество теоретически возможно (llm_edge_plausible=true).
+    Принимает уже посчитанные (llm_p, market_p, actual_first_outcome)
+    тройки -- функция сама не знает про slug/outcome, только числа,
+    переданные вызывающим кодом; ничего не печатает и не пишет исход."""
+    n_scored = len(scored_items)
+    sum_sq_err_llm = sum((llm_p - actual) ** 2 for llm_p, _market_p, actual in scored_items)
+    market_comparable = [(llm_p, market_p, actual) for llm_p, market_p, actual in scored_items if market_p is not None]
+    n_market_comparable = len(market_comparable)
+    sum_sq_err_market = sum((market_p - actual) ** 2 for _llm_p, market_p, actual in market_comparable)
+    n_llm_better = sum(1 for llm_p, market_p, actual in market_comparable
+                        if (llm_p - actual) ** 2 < (market_p - actual) ** 2)
+
+    llm_brier = (sum_sq_err_llm / n_scored) if n_scored else None
+    market_brier = (sum_sq_err_market / n_market_comparable) if n_market_comparable else None
+    return {
+        "n_scored": n_scored,
+        "n_market_price_available_for_comparison": n_market_comparable,
+        "llm_brier_score": llm_brier,
+        "market_brier_score": market_brier,
+        "frac_markets_llm_beat_market": (n_llm_better / n_market_comparable) if n_market_comparable else None,
+        "llm_beats_market_overall": (llm_brier is not None and market_brier is not None and llm_brier < market_brier),
+    }
+
+
 def run() -> int:
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -79,12 +114,10 @@ def run() -> int:
         print(f"[taskE_step2] {result['blocker']}")
         return 1
 
-    n_scored = 0
-    sum_sq_err_llm = 0.0
-    sum_sq_err_market = 0.0
-    n_llm_missing_price = 0
     n_fetch_failed = 0
-    n_llm_better = 0
+    all_scored: list[tuple[float, float | None, float]] = []
+    edge_scored: list[tuple[float, float | None, float]] = []
+    n_edge_plausible = sum(1 for m in markets if m.get("llm_edge_plausible") is True)
 
     for m in markets:
         outcome_prices = fetch_outcome_prices(m["slug"])
@@ -96,37 +129,30 @@ def run() -> int:
         llm_p = m["llm_probability_estimate"]
         market_p = m.get("market_price_first_outcome_n_days_before")
 
-        sq_err_llm = (llm_p - actual_first_outcome) ** 2
-        sum_sq_err_llm += sq_err_llm
-        n_scored += 1
+        triple = (llm_p, market_p, actual_first_outcome)
+        all_scored.append(triple)
+        if m.get("llm_edge_plausible") is True:
+            edge_scored.append(triple)
 
-        if market_p is not None:
-            sq_err_market = (market_p - actual_first_outcome) ** 2
-            sum_sq_err_market += sq_err_market
-            if sq_err_llm < sq_err_market:
-                n_llm_better += 1
-        else:
-            n_llm_missing_price += 1
-
-    n_market_comparable = n_scored - n_llm_missing_price
     result["n_markets_total"] = len(markets)
     result["n_fetch_failed"] = n_fetch_failed
-    result["n_scored"] = n_scored
-    result["n_market_price_available_for_comparison"] = n_market_comparable
-    result["llm_brier_score"] = (sum_sq_err_llm / n_scored) if n_scored else None
-    result["market_brier_score"] = (sum_sq_err_market / n_market_comparable) if n_market_comparable else None
-    result["frac_markets_llm_beat_market"] = (n_llm_better / n_market_comparable) if n_market_comparable else None
-    result["llm_beats_market_overall"] = (
-        result["llm_brier_score"] is not None and result["market_brier_score"] is not None
-        and result["llm_brier_score"] < result["market_brier_score"]
-    )
+    result["n_edge_plausible_total"] = n_edge_plausible
+    result["overall"] = score_group(all_scored)
+    result["edge_plausible_subset"] = score_group(edge_scored)
     # Намеренно: НИ ОДНОГО per-market поля с фактическим исходом или
-    # даже булевым "угадал" не пишется в result -- только агрегаты.
+    # даже булевым "угадал" не пишется в result -- только агрегаты,
+    # посчитанные дважды (вся выборка и подмножество с теоретическим
+    # информационным преимуществом).
 
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
-    print(f"[taskE_step2] n_scored={n_scored}, LLM Brier={result['llm_brier_score']}, "
-          f"market Brier={result['market_brier_score']}, LLM лучше рынка в целом: {result['llm_beats_market_overall']}")
-    print(f"[taskE_step2] записано {OUT_PATH} -- только агрегаты, без сырых исходов.")
+    print(f"[taskE_step2] ВСЕ: n_scored={result['overall']['n_scored']}, "
+          f"LLM Brier={result['overall']['llm_brier_score']}, market Brier={result['overall']['market_brier_score']}, "
+          f"LLM лучше рынка: {result['overall']['llm_beats_market_overall']}")
+    print(f"[taskE_step2] ПОДМНОЖЕСТВО (edge_plausible): n_scored={result['edge_plausible_subset']['n_scored']}, "
+          f"LLM Brier={result['edge_plausible_subset']['llm_brier_score']}, "
+          f"market Brier={result['edge_plausible_subset']['market_brier_score']}, "
+          f"LLM лучше рынка: {result['edge_plausible_subset']['llm_beats_market_overall']}")
+    print(f"[taskE_step2] записано {OUT_PATH} -- только агрегаты (дважды), без сырых исходов.")
     return 0
 
 
