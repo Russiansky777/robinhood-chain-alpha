@@ -141,22 +141,33 @@ def run() -> int:
 
     client = DuneClient()
 
-    print(f"\n=== Реальные сырые свопы хвостового пула, один день ===")
-    sql_tail = (read_sql("task4/task4_arb_raw_swaps")
+    # 2026-09-10, реальная находка (уже 3-й раз подряд на этой цепи в
+    # разных пулах): сырые построчные свопы систематически взрывают
+    # любой разумный expected_max_rows (17906, затем 37125 строк за
+    # ОДИН день даже на "хвостовом" по TVL пуле, здесь WETH/USDG) --
+    # это структурная черта Robinhood chain, не случайность выбора
+    # пула. Вместо повторного поднятия лимита -- обе стороны минутным
+    # VWAP (тот же паттерн, что для референса). Для Шага 1 ("было ли
+    # расхождение хоть раз") минутного разрешения достаточно; секундная
+    # точность нужна только Шагу 2, если до него дойдёт -- решается
+    # отдельно, не сейчас.
+    print(f"\n=== Реальный минутный VWAP хвостового пула, один день ===")
+    sql_tail = (read_sql("task4/task4_arb_reference_minute_vwap")
                 .replace("{{chain}}", TAIL_CHAIN)
                 .replace("{{pool_address_list}}", f"from_hex('{TAIL_POOL_ADDRESS[2:].lower()}')")
+                .replace("{{token_address_list}}", f"from_hex('{TAIL_BASE_TOKEN[2:].lower()}')")
                 .replace("{{day_start}}", day_start.strftime("%Y-%m-%d %H:%M:%S"))
                 .replace("{{day_end}}", day_end.strftime("%Y-%m-%d %H:%M:%S")))
-    qid_tail = client.create_query("task4_step1_tail_raw_swaps", sql_tail)
-    df_tail = client.run_sql_cached("task4_step1_tail_raw_swaps", sql_tail, query_id=qid_tail,
-                                     estimated_credits=5.0, expected_max_rows=20000, expected_columns=8)
+    qid_tail = client.create_query("task4_step1_tail_minute_vwap", sql_tail)
+    df_tail = client.run_sql_cached("task4_step1_tail_minute_vwap", sql_tail, query_id=qid_tail,
+                                     estimated_credits=5.0, expected_max_rows=1500, expected_columns=4)
     if df_tail is None or not len(df_tail):
-        result["blocker"] = "Сырые свопы хвостового пула за этот день пусты -- нечего сравнивать."
+        result["blocker"] = "Минутный VWAP хвостового пула за этот день пуст -- нечего сравнивать."
         OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         print(f"\n[step1] {result['blocker']}")
         return 1
-    result["n_tail_swaps_this_day"] = len(df_tail)
-    print(f"[step1] реальных свопов хвостового пула за день: {len(df_tail)}")
+    result["n_tail_minutes_this_day"] = len(df_tail)
+    print(f"[step1] реальных минутных баров хвоста за день: {len(df_tail)}")
 
     print(f"\n=== Реальный минутный VWAP референс-пула, тот же день ===")
     sql_ref = (read_sql("task4/task4_arb_reference_minute_vwap")
@@ -176,20 +187,14 @@ def run() -> int:
     result["n_ref_minutes_this_day"] = len(df_ref)
     print(f"[step1] реальных минутных баров референса за день: {len(df_ref)}")
 
-    # Цена хвостового пула по каждому свопу: amount_usd / qty(base_token).
     import pandas as pd
-    df_tail["block_time"] = pd.to_datetime(df_tail["block_time"], utc=True)
-    base_t = TAIL_BASE_TOKEN.lower().replace("0x", "")
-    df_tail["qty_base"] = df_tail.apply(
-        lambda r: r["token_bought_amount"] if str(r["token_bought_address"]).lower().replace("0x", "") == base_t
-        else r["token_sold_amount"], axis=1)
-    df_tail = df_tail[df_tail["qty_base"] > 0]
-    df_tail["price_tail"] = df_tail["amount_usd"] / df_tail["qty_base"]
+    df_tail["minute_utc"] = pd.to_datetime(df_tail["minute_utc"], utc=True)
+    df_tail = df_tail[df_tail["token_qty"] > 0]
+    df_tail["price_tail"] = df_tail["vol_usd"] / df_tail["token_qty"]
 
     df_ref["minute_utc"] = pd.to_datetime(df_ref["minute_utc"], utc=True)
     df_ref = df_ref[df_ref["token_qty"] > 0]
     df_ref["price_ref_raw"] = df_ref["vol_usd"] / df_ref["token_qty"]
-    df_ref = df_ref.sort_values("minute_utc")
 
     # Честная (не идеальная) поправка на инверсию: GT может назвать
     # "base_token" по-разному на разных сетях -- сверяем порядок
@@ -204,25 +209,24 @@ def run() -> int:
     result["median_tail_price"] = float(med_tail)
     result["median_reference_price_used"] = float(df_ref["price_ref"].median())
 
-    # merge_asof: для каждого свопа хвоста -- последний известный минутный референс-бар.
-    df_tail = df_tail.sort_values("block_time")
-    merged = pd.merge_asof(df_tail, df_ref[["minute_utc", "price_ref"]],
-                            left_on="block_time", right_on="minute_utc", direction="backward")
-    merged = merged.dropna(subset=["price_ref"])
+    merged = pd.merge(df_tail[["minute_utc", "price_tail"]], df_ref[["minute_utc", "price_ref"]], on="minute_utc", how="inner")
     merged["divergence_pct"] = (merged["price_tail"] / merged["price_ref"] - 1).abs() * 100
 
     n_matched = len(merged)
     n_divergent = int((merged["divergence_pct"] > DIVERGENCE_THRESHOLD_PCT).sum())
     max_div = float(merged["divergence_pct"].max()) if n_matched else None
-    result["n_swaps_matched_to_reference"] = n_matched
-    result["n_swaps_divergence_gt_1pct"] = n_divergent
+    result["n_minutes_matched"] = n_matched
+    result["n_minutes_divergence_gt_1pct"] = n_divergent
     result["max_divergence_pct"] = max_div
     result["any_divergence_found"] = bool(n_divergent > 0)
     result["runtime_s_total"] = time.time() - t0
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
 
-    print(f"\n[step1] реальных совпавших свопов: {n_matched}, с расхождением >{DIVERGENCE_THRESHOLD_PCT}%: {n_divergent}, "
-          f"максимальное расхождение: {max_div:.2f}%" if max_div is not None else "")
+    if n_matched:
+        print(f"\n[step1] реальных совпавших минут: {n_matched}, с расхождением >{DIVERGENCE_THRESHOLD_PCT}%: {n_divergent}, "
+              f"максимальное расхождение: {max_div:.2f}%")
+    else:
+        print(f"\n[step1] 0 совпавших минут между хвостом и референсом -- нечего сравнивать (разные часы активности?).")
     if n_divergent > 0:
         print(f"\n[step1] ДА -- расхождение >1% реально было. Идём в Шаг 2.")
     else:
