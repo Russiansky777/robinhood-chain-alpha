@@ -3,67 +3,607 @@
     "cutoff_date": "2026-01-01T00:00:00+00:00",
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
-    "n_markets": 4,
+    "n_markets": 40,
     "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null"
   },
   "markets": [
     {
-      "slug": "solana-above-110-on-september-10-2026",
-      "question": "Will the price of Solana be above $110 on September 10?",
-      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
-      "end_date": "2026-09-10T16:00:00Z",
+      "slug": "cbb-stjohn-george-2025-12-31",
+      "question": "St. John's Red Storm vs. Georgetown Hoyas",
+      "description": "In the upcoming CBB game, scheduled for December 31 at 8:00 PM ET:\n\nIf the St. John's Red Storm win, the market will resolve to \"St. John's Red Storm\".\n\nIf the Georgetown Hoyas win, the market will resolve to \"Georgetown Hoyas\".\n\nIf the game is postponed, this market will remain open until the game has been completed.\n\nIf the game is canceled entirely, with no make-up game, this market will resolve 50-50.\n\nThe result will be determined based on the final score including any overtime periods.",
+      "end_date": "2026-01-01T01:00:00Z",
       "outcome_names": [
-        "Yes",
-        "No"
+        "St. John's Red Storm",
+        "Georgetown Hoyas"
       ],
-      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.505,
-      "volume": 3668.043448,
+      "price_snapshot_date": "2025-12-25T01:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.51,
+      "volume": 42939.193121,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "bitcoin-above-86k-on-september-10-2026",
-      "question": "Will the price of Bitcoin be above $86,000 on September 10?",
-      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for BTC/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the BTC/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/BTC_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance BTC/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
-      "end_date": "2026-09-10T16:00:00Z",
+      "slug": "french-election-called-by-december-31-355-325-146-483-711",
+      "question": "French election called by December 31?",
+      "description": "This market will resolve to \"Yes\" if the date of the next French legislative election is declared by December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor this market to resolve to \"Yes\" it is only necessary that the election date be declared, not that the election actually occur within the market timeframe.\n\nThe primary resolution source for this market will be official information from the government of the France, however a consensus of credible reporting will also be used.\n",
+      "end_date": "2026-01-01T04:59:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0055,
+      "volume": 420953.664332,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "ukraine-election-held-in-2025",
+      "question": "Ukraine election held by December 31, 2025?",
+      "description": "This market will resolve to \"Yes\" if national elections for the parliament and/or presidency of Ukraine are held between February 12 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is based on whether national elections are actually held in Ukraine within the specified dates. Merely scheduling an election will not be sufficient to resolve this market to \"Yes\".\n\nIf elections are officially scheduled for a date outside of 2025, this market will immediately resolve to \"No\".\n\nThe primary resolution source for this market will be official information from the government of Ukraine, however a consensus of credible reporting will also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.003,
+      "volume": 1589428.067032,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-gavin-newsom-announce-a-presidential-run-by-december-31-2025",
+      "question": "Will Gavin Newsom announce a Presidential run by December 31, 2025?",
+      "description": "This market will resolve to \"Yes\" if Gavin Newsom officially announces that he is running for U.S. President in the 2028 presidential election, by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nFor the purpose of resolving this market, an announcement by Gavin Newsom will be sufficient to trigger a \"Yes\" resolution, regardless of whether he actually filed a nomination to run, or whether he actually files a nomination to run in the future.\n\nThe primary resolution source for this market will be official statements by Gavin Newsom (e.g., via speech, social media, etc.) or his official or legal representatives; however, a consensus of credible reporting may also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.005,
+      "volume": 31734.824838,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "mike-johnson-out-as-speaker-in-2025",
+      "question": "Mike Johnson out as Speaker by December 31?",
+      "description": "This market will resolve to \"Yes\" if Mike Johnson announces that he will resign from his position as Speaker of the US House of Representatives, or otherwise ceases to be Speaker for any length of time, between April 9, and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nNote that an announcement of his resignation before the resolution date will suffice to resolve this market to \"Yes\" regardless of if/when he actually steps down.\n\nThe primary resolution source for this market will be official information from the Government of the United States of America or official statements by Mike Johnson or his representative, however a consensus of credible reporting will suffice.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.004,
+      "volume": 58738.705808,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "polish-snap-election-called-in-2025",
+      "question": "Polish snap election called in 2025?",
+      "description": "This market will resolve to \"Yes\" if the date for the next Polish parliamentary election is set between June 2 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Polish election is announced within the stated timeframe. The date the election is scheduled to take place on will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Poland however a consensus of credible reporting may also be used.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0025,
+      "volume": 286784.250608,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "ukraine-election-called-in-2025",
+      "question": "Ukraine election called in 2025?",
+      "description": "This market will resolve to \"Yes\" if the next Ukrainian presidential election is scheduled in 2025. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Ukrainian election is announced between February 14 and December 31, 2025, 11:59 PM ET. Whether the election is supposed to take place in 2025 or later will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Ukraine however a consensus of credible reporting may also be used.\n",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0095,
+      "volume": 982716.694339,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "ai-industry-downturn-by-december-31-2025",
+      "question": "AI Industry Downturn by December 31, 2025?",
+      "description": "This market will resolve to \"Yes\" if the AI industry experiences an industry downturn by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purposes of this market, the AI industry will be considered to have experienced an industry downturn once at least three of the following events have occurred within 90 days of this market's specified timeframe:\n- NVIDIA Corporation (NVDA) closing stock price is down 50% from its all-time high.\n- iShares PHLX Semiconductor ETF (SOXX) closing stock price is down 40% from its all-time high.\n- OpenAI, Inc. or Anthropic PBC declares bankruptcy.\n- OpenAI, Inc. is acquired.\n- H100 rental price falls to $1.00 or lower for five consecutive days, as shown on the SiliconData Silicon Index at:\nhttps://www.silicondata.com/products/silicon-index.\n- Major AI Hardware Supplier Collapse: Taiwan Semiconductor Manufacturing Company Limited (TSM), ASML Holding N.V. (ASML), Broadcom Inc. (AVGO), Arista Networks, Inc. (ANET), or Super Micro Computer, Inc. (SMCI), closing stock price is down 50% from its all-time high.\n\nThis market may resolve immediately once three conditions have been met within 90 days of the specified timeframe.\n\nThis market will not resolve to \"Yes\" until three conditions have been met, regardless of reporting of an industry downturn or similar claims.\n\nThe primary resolution source will be official information from the respective companies and listing exchanges; however, a consensus of credible reporting will also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0035,
+      "volume": 202990.851035,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "spain-snap-election-called-in-2025",
+      "question": "Spain snap election called in 2025?",
+      "description": "This market will resolve to \"Yes\" if the next Spanish general election is scheduled between May 28 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Spanish election is announced within the stated timeframe. The date the election is scheduled to take place on will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Spain however a consensus of credible reporting may also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0075,
+      "volume": 93498.302024,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-next-uk-election-is-called-by-december-31",
+      "question": "Will the next UK election be called by December 31?",
+      "description": "This market will resolve to \"Yes\" if the date of the next UK general election is declared by  December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor this market to resolve to \"Yes\" it is only necessary that the election date be declared, not that the election actually occur within the market timeframe.\n\nThe primary resolution source for this market will be official information from the government of the United Kingdom, however a consensus of credible reporting will also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0045,
+      "volume": 91962.29858,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-kamala-harris-announce-california-governor-run-in-2025",
+      "question": "Will Kamala Harris announce California Governor run in 2025?",
+      "description": "This market will resolve to \"Yes\" if Former United States Vice President Kamala Harris announces that she is running for Governor of California in the 2026 midterm election, between June 23 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purpose of resolving this market, an announcement by Kamala Harris will be sufficient to trigger a \"Yes\" resolution, regardless of whether she actually filed a nomination to run, or whether she actually files a nomination to run in the future.\n\nThe primary resolution source for this market will be official statements by Kamala Harris (ex: via speech, social media, etc.) or her official or legal representatives, however a consensus of credible reporting may also be used. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0025,
+      "volume": 36220.725824,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-consensys-ipo-by-december-31-2025",
+      "question": "Will Consensys IPO by December 31 2025?",
+      "description": "This market will resolve to \"Yes\" if ConsenSys (the parent company of MetaMask) completes an Initial Public Offering (IPO) by the listed date ET, as confirmed by official company announcements and credible news sources. Otherwise, this market will resolve to \"No.\"\n\nThe IPO refers to the first sale of stock by the listed company to the public on any recognized stock exchange.\n\nIf ConsenSys is acquired by another company that is already public, this market will immediately resolve to \"No.\"\n\nThe resolution source for this market is a consensus of credible reporting.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0055,
+      "volume": 38541.872363,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "macron-out-in-2025-834",
+      "question": "Macron out in 2025?",
+      "description": "This market will resolve to \"Yes\" if Emmanuel Macron ceases to be President of France for any length of time between January 2 and December 31, 2025, 11:59 PM ET (inclusive). Otherwise, this market will resolve to \"No\".\n\nIf Macron departs from office before the expiry date, the market should resolve immediately.\n\nThe primary resolution source for this market will be information from the government of France, however a consensus of credible reporting will also be used.",
+      "end_date": "2026-01-01T04:59:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0025,
+      "volume": 1386219.767204,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "congress-authorizes-military-force-against-iran-in-2025",
+      "question": "Congress authorizes military force against Iran in 2025?",
+      "description": "This market will resolve to \"Yes\" if the United States enacts an Authorization for Use of Military Force (AUMF) specifically targeting Iran between June 23, 2025 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nTo qualify, both chambers of Congress must pass, and the President (currently Donald Trump) must sign into law, a bill that explicitly authorizes the use of U.S. military force against Iran. The authorization does not need to use the exact phrase “Authorization for Use of Military Force,” but it must clearly and specifically authorize military action against Iran as a state actor.\n\nGeneral defense appropriations, intelligence findings, covert action approvals, or broader regional authorizations that do not explicitly pertain to Iran will not qualify. Presidential orders or military action without such a law being passed and signed will not qualify.\n\nThe primary resolution source will be official U.S. government records (e.g., Congress.gov, White House releases) however a consensus of credible reporting will also be used.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0045,
+      "volume": 54734.484901,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "rainbow-fdv-above-3b-one-day-after-launch-443-682-926",
+      "question": "Rainbow FDV above $3B one day after launch?",
+      "description": "This market will resolve to \"Yes\" if the Fully Diluted Valuation of Rainbow's token is greater than the value specified in the title 1 day after launch. Otherwise, the market will resolve to \"No.\"\n\nThe token must be actively, publicly transferable and tradable to be considered a launch.\n\n\"1 day after launch\" is defined as 4:00 PM ET on the calendar day following launch. The resolution source for this market is the most liquid price source available. If Rainbow (https://rainbow.me/) doesn't launch a token by December 31, 2025, 11:59 PM ET, this market will resolve to \"No\".",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0055,
+      "volume": 29014.437957,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-ethena-dip-to-0pt08-by-december-31-2026",
+      "question": "Will Ethena dip to $0.08 by December 31, 2026?",
+      "description": "This market will immediately resolve to “Yes” if any Binance 1-minute candle for Ethena (ENA/USDT) between November 24, 2025, 15:45 and December 31, 2026, 23:59 in the ET timezone has a final “Low” price equal to or lower than the price specified in the title. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is Binance, specifically the ENA/USDT “Low” prices available at:\nhttps://www.binance.com/en/trade/ENA_USDT\nwith the chart settings on “1m” (one-minute candles) selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance ENA/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.55,
+      "volume": 60324.54775799999,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-monad-public-sale-commitments-be-between-1pt2b-and-1pt4b",
+      "question": "Will the Monad public sale commitments be between $1.2B and $1.4B?",
+      "description": "This market will resolve according to the total commitments for the Monad raise on Coinbase.\n\nThe resolution source is the \"Total requested\" value displayed on the Coinbase raise page available at https://www.coinbase.com/token-sales/monad.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nIf the final commitment amount cannot be verified by December 31, 2025, 11:59 PM ET, or if relevant information becomes permanently unavailable within the market timeframe, this market will resolve to “No.”",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 161474.880972,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "usde-depeg-by-december-31",
+      "question": "USDE depeg by December 31?",
+      "description": "This market will resolve to “Yes” immediately if all Pyth 1-minute candles for USDE-USD for any 24-hour period are below 98 cents, for candles between 27 Oct ’25 15:00 and 31 Dec ’25 23:59 ET. Otherwise, this market will resolve to “No.”\n\nBelow 98 cents means all candles in the period have a final “High” price below 0.98000 (i.e., 0.97999 or lower). A 24-hour period of USDE below 98 cents that starts on the last day in 2025 will count.\n\nThe resolution source for this market is TradingView, specifically the USDE-USD “High” prices currently available at https://tradingview.com/chart/?symbol=PYTH%3AUSDEUSD with “1m” and “Candles” selected on the top bar. To see the “High” prices, mouse over particular candles and look at the value after “H” at the top of the chart.\n\nPlease note that this market is about the price according to Pyth USDE-USD. If Pyth stops having the necessary USDE information to resolve this market, a consensus of credible sources for whether USDE was below 98 cents for 24 hours or more may be used to resolve this market.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.003,
+      "volume": 32857.83849,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-xrp-reach-3pt20-before-2026-161",
+      "question": "Will XRP reach $3.20 before 2026?",
+      "description": "This market will immediately resolve to \"Yes\" if any Binance 1 minute candle for XRP/USDT between August 31, 2025, 18:00 and December 31, 2025, 23:59 in the ET timezone has a final \"High\" price equal to or greater than the price specified in the title. Otherwise, this market will resolve to \"No.\"\n\nThe resolution source for this market is Binance, specifically the XRP/USDT \"High\" prices available at https://www.binance.com/en/trade/XRP_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance XRP/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0065,
+      "volume": 393777.439753,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-eyearea-win-the-synthetix-trading-competition",
+      "question": "Will Eyearea win the Synthetix trading competition?",
+      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Synthetix trading competition starting on October 20, 2025.\n\nThe resolution source will be the Synthetix Leaderboard on https://www.synthetix.io/.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Synthetix leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or results are unavailable, the market will remain open until reliable data is published by Synthetix. If no such data is available by December 31, 2025, the market will resolve to “Other.”\n\nNote: The official competition includes 100 participants, but this market will resolve solely based on a selected group of KOL participants. Traders who are not eligible KOLs will not be considered. E.g. an eligible KOL will be considered to have won if they are the top trader out of eligible KOLs regardless of if one of the non KOL participants finishes ahead of them.  \n\nAdditional KOLs may be added as options later to reflect the full set of eligible KOLs.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 20524.90612,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-nflx-dip-to-105-in-december",
+      "question": "Will Netflix dip to $105 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Netflix, Inc. (NFLX) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Netflix, Inc. (NFLX) \"Low\" prices available at https://finance.yahoo.com/quote/NFLX/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 2234.7734,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-msft-dip-to-450-in-december",
+      "question": "Will Microsoft dip to $450 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Microsoft Corporation (MSFT) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Microsoft Corporation (MSFT) \"Low\" prices available at https://finance.yahoo.com/quote/MSFT/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.037,
+      "volume": 4115.926121,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-nft-2731-win-the-based-trading-competition",
+      "question": "Will NFT #2731 win the Based trading competition?",
+      "description": "This market will resolve to the NFT with the highest ROI at the end of the Based AI trading competition beginning on December 2, 2025.\n\nThe resolution source is the official Based leaderboard available at: https://app.based.one/arena\n\nIf two or more NFTs are tied for the highest ROI at resolution time, the market will resolve to the NFT with the lowest ID number according to the official Based leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or final results are unavailable, the market will remain open until Based publishes reliable data. If no such data becomes available by that date, the market will resolve to “Other.”",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 1075.6865,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-agora-win-the-usdh-ticker",
+      "question": "Will Agora win the USDH ticker?",
+      "description": "This market will resolve to the winner of Hyperliquid’s USDH on-chain validator vote taking place on September 14.\n\nThe resolution source for this market will be official information from Hyperliquid.\n\nIf the vote is not completed or no winner is declared by December 31 11:59PM ET, the market will resolve to \"Other\"",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 303405.627316,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-meta-dip-to-560-in-december",
+      "question": "Will Meta dip to $560 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Meta Platforms, Inc. (META) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Meta Platforms, Inc. (META) \"Low\" prices available at https://finance.yahoo.com/quote/META/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.024,
+      "volume": 6683.626807,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-nft-2779-win-the-based-trading-competition",
+      "question": "Will NFT #2779 win the Based trading competition?",
+      "description": "This market will resolve to the NFT with the highest ROI at the end of the Based AI trading competition beginning on December 2, 2025.\n\nThe resolution source is the official Based leaderboard available at: https://app.based.one/arena\n\nIf two or more NFTs are tied for the highest ROI at resolution time, the market will resolve to the NFT with the lowest ID number according to the official Based leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or final results are unavailable, the market will remain open until Based publishes reliable data. If no such data becomes available by that date, the market will resolve to “Other.”",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 1347.9225,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-gold-mansacks-win-the-orderly-trading-competition",
+      "question": "Will Gold Mansacks win the Orderly trading competition?",
+      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Orderly trading competition starting on November 14, 2025.\n\nThe resolution source will be the Orderly Heavyweight Leaderboard on https://app.orderly.network/campaigns.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Orderly Heavyweight Leaderboard.\n\nIf the competition is not completed or the official leaderboard is unavailable, the market will remain open until reliable data is published by Orderly. If no such data becomes available by December 31, 2025 ET, the market will resolve to “Other\".",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 20359.745466,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-wsw-mac-2026-01-01-btts",
+      "question": "Western Sydney Wanderers FC vs. Macarthur FC: Both Teams to Score",
+      "description": "In the upcoming A-League game between Western Sydney Wanderers FC and Macarthur FC, scheduled for January 1 at 3:00 AM ET:\n\nThis market will resolve to \"Yes\" if both Western Sydney Wanderers FC and Macarthur FC each score at least one goal during the game.\n\nThis market will resolve to \"No\" if either team fails to score (i.e., if one or both teams finish with zero goals).\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50–50.\n\nIf the game is started but not completed, this market will resolve according to the official final score published on a-league.com.au. This market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T08:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 72375.39265,
+      "volume": 6009.09371,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "solana-above-115-on-september-10-2026",
-      "question": "Will the price of Solana be above $115 on September 10?",
-      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
-      "end_date": "2026-09-10T16:00:00Z",
+      "slug": "will-msft-dip-to-323-in-december",
+      "question": "Will Microsoft dip to $323 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Microsoft Corporation (MSFT) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Microsoft Corporation (MSFT) \"Low\" prices available at https://finance.yahoo.com/quote/MSFT/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.505,
-      "volume": 1021.73826,
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.0065,
+      "volume": 4070.438,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     },
     {
-      "slug": "solana-above-125-on-september-10-2026",
-      "question": "Will the price of Solana be above $125 on September 10?",
-      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
-      "end_date": "2026-09-10T16:00:00Z",
+      "slug": "will-win-the-aster-trading-competition-389",
+      "question": "Will 风无向 win the Aster trading competition?",
+      "description": "This market will resolve according to the Human trader with the highest Total PnL at the end of the Aster Human vs AI trading competition. The resolution source will be the Human leaderboard on https://www.asterdex.com/en/campaigns/human-vs-ai, viewable under the Human tab.\n\nIf two or more participants are tied for the highest Total PnL at the time of resolution, the market will resolve to the participant whose display name appears first in the ordering used on the official Aster Human leaderboard.\n\nIf the competition is not completed or the official leaderboard is unavailable, the market will remain open until reliable data is published by Aster. If no such data becomes available by December 31, 2025 ET, the market will resolve to “Other”.",
+      "end_date": "2026-01-01T05:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 1017.49,
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0005,
+      "volume": 11245.022,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "lighter-market-cap-fdv-10b-one-day-after-launch-978-517",
+      "question": "Lighter market cap (FDV) >$10B one day after launch?",
+      "description": "This market will resolve to \"Yes\" if the Fully Diluted Valuation of Lighter's token is greater than $10,000,000,000 1 day after launch. Otherwise, the market will resolve to \"No.\"\n\nFor the purposes of this market \"locked\" tokens or non-swappable tokens will not be considered a launch.\n\n\"1 day after launch\" is defined as 24 hours after launch. The resolution source for this market is the most liquid price source available. If Lighter doesn't launch a token by December 31, 2025, 11:59 PM ET, this market will resolve to \"No.\"",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0085,
+      "volume": 903399.79443,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-ethena-reach-0pt41-in-december",
+      "question": "Will Ethena reach $0.41 in December?",
+      "description": "This market will immediately resolve to “Yes” if any Binance 1 minute candle for ENA/USDT during the month specified in the title (from 00:00 AM ET on the first day to 11:59 PM ET on the last) has a final High price equal to or greater than the price specified in the title. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is Binance, specifically the ENA/USDT High prices available at https://www.binance.com/en/trade/ENA_USDT, with the chart settings on “1m” for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance ENA/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0315,
+      "volume": 13947.986855,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-hyperliquid-dip-to-24-in-december",
+      "question": "Will Hyperliquid dip to $24 in December?",
+      "description": "This market will immediately resolve to “Yes” if any Binance 1 minute candle for HYPEUSDT during the month specified in the title (from 00:00 AM ET on the first day to 11:59 PM ET on the last) has a final Low price equal to or lower than the price specified in the title. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is Binance, specifically the HYPEUSDT Low prices available at https://www.binance.com/en/futures/HYPEUSDT, with the chart settings on “1m” for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance HYPEUSDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.9995,
+      "volume": 22528.311716,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "axiom-daily-fees-above-5m-in-2025",
+      "question": "Axiom daily fees above $5M in 2025?",
+      "description": "This market will resolve to \"Yes\" if Axiom's daily fees exceed $5M on any day between August 19 and December 31, 2025. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Defillama, specifically the \"Fees and Revenue\" bar chart set on \"Daily\" available at https://defillama.com/protocol/fees/axiom.\n\nThis market will resolve once any daily bar meets the specified threshold, or once the bar for \"31 Dec 2025\" is finalized and no bar within the timeframe has met that threshold.\n\nThe \"Fees\" value displayed when hovering over the bar for \"31 Dec 2025\" will be considered finalized once any bar for January 1 is published.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.034,
+      "volume": 7783.162645,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "elon-musk-of-tweets-december-2025-1360-1399",
+      "question": "Will Elon Musk post 1360-1399 tweets in December 2025?",
+      "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X during the month of December 2025.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total.\n\nThe resolution source for this market is the 'Post Counter' figure for posts found at https://www.xtracker.io/. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.1415,
+      "volume": 165613.340628,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-icobeast-win-the-synthetix-trading-competition-491",
+      "question": "Will IcoBeast win the Synthetix trading competition?",
+      "description": "This market will resolve to the listed participant with the highest PnL at the end of the Synthetix trading competition starting on October 20, 2025.\n\nThe resolution source will be the Synthetix Leaderboard on https://www.synthetix.io/.\n\nIf two or more participants are tied for the highest PnL at the time of resolution, the market will resolve to the participant whose display name appears first in alphabetical order on the official Synthetix leaderboard.\n\nIf the competition is not completed by December 31, 2025, 11:59 PM ET, or if the official leaderboard or results are unavailable, the market will remain open until reliable data is published by Synthetix. If no such data is available by December 31, 2025, the market will resolve to “Other.”\n\nNote: The official competition includes 100 participants, but this market will resolve solely based on a selected group of KOL participants. Traders who are not eligible KOLs will not be considered. E.g. an eligible KOL will be considered to have won if they are the top trader out of eligible KOLs regardless of if one of the non KOL participants finishes ahead of them.  \n\nAdditional KOLs may be added as options later to reflect the full set of eligible KOLs.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 7545.447166,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-xrp-dip-to-2pt70-before-2026-164",
+      "question": "Will XRP dip to $2.70 before 2026?",
+      "description": "This market will immediately resolve to \"Yes\" if any Binance 1 minute candle for XRP/USDT between August 31, 2025, 18:00 and December 31, 2025, 23:59 in the ET timezone has a final \"Low\" price equal to or lower than the price specified in the title. Otherwise, this market will resolve to \"No.\"\n\nThe resolution source for this market is Binance, specifically the XRP/USDT \"Low\" prices available at https://www.binance.com/en/trade/XRP_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance XRP/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 16332.151514,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "over-10m-committed-to-the-vooi-public-sale",
+      "question": "Over $10M committed to the VOOI public sale?",
+      "description": "This market will resolve to “Yes” if total commitments for the VOOI raise on Legion exceeds the number specified in the title before the raise closes. Otherwise, it will resolve to “No.”\n\nThe resolution source is the \"Allocation Requested\" value displayed on the raise page available at https://cookie.legion.cc/app/invest.\n\nIf the final commitment amount cannot be verified by December 31, 2025, 11:59 PM ET, or if relevant information becomes permanently unavailable within the market timeframe, this market will resolve to “No.”",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": null,
+      "volume": 423553.015644,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-nvda-reach-228-in-december",
+      "question": "Will NVIDIA reach $228 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for NVIDIA (NVDA) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the NVIDIA (NVDA) \"High\" prices available at https://finance.yahoo.com/quote/NVDA/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.0025,
+      "volume": 12018.45457,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-john-fetterman-leave-the-democratic-party-in-2025",
+      "question": "Will John Fetterman leave the Democratic Party in 2025?",
+      "description": "This market will resolve to \"Yes\" if John Fetterman leaves the Democratic Party by December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis includes switching to the Republican Party, registering as an Independent, or affiliating with any other political party. An official announcement from Fetterman stating that he is leaving the Democratic Party or will no longer caucus with the Democrats will qualify, regardless of when the change takes effect.\n\nThe primary resolution source will be an official announcement from John Fetterman or a change in his registration in government records. However, a consensus of credible reporting may also be used.\n",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.0075,
+      "volume": 17916.780497,
       "llm_probability_estimate": null,
       "llm_reasoning_brief": null
     }
