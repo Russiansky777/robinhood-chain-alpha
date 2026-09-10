@@ -3,8 +3,69 @@
     "cutoff_date": "2026-06-01T00:00:00+00:00",
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
-    "n_markets": 0,
+    "n_markets": 4,
     "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null"
   },
-  "markets": []
+  "markets": [
+    {
+      "slug": "solana-above-110-on-september-10-2026",
+      "question": "Will the price of Solana be above $110 on September 10?",
+      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
+      "end_date": "2026-09-10T16:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.505,
+      "volume": 3668.0434480000004,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "bitcoin-above-86k-on-september-10-2026",
+      "question": "Will the price of Bitcoin be above $86,000 on September 10?",
+      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for BTC/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the BTC/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/BTC_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance BTC/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
+      "end_date": "2026-09-10T16:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 72375.39265,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "solana-above-115-on-september-10-2026",
+      "question": "Will the price of Solana be above $115 on September 10?",
+      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
+      "end_date": "2026-09-10T16:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.505,
+      "volume": 1021.7382600000001,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "solana-above-125-on-september-10-2026",
+      "question": "Will the price of Solana be above $125 on September 10?",
+      "description": "This market will resolve to \"Yes\" if the Binance 1 minute candle for SOL/USDT 12:00 in the ET timezone (noon) on the date specified in the title has a final \"Close\" price higher than the price specified in the title. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Binance, specifically the SOL/USDT \"Close\" prices currently available at https://www.binance.com/en/trade/SOL_USDT with \"1m\" and \"Candles\" selected on the top bar.\n\nPlease note that this market is about the price according to Binance SOL/USDT, not according to other exchanges or trading pairs.\n\nPrice precision is determined by the number of decimal places in the source.",
+      "end_date": "2026-09-10T16:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2026-09-03T16:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 1017.49,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    }
+  ]
 }
