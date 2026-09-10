@@ -25,7 +25,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).parent))
 from taskC_sports_matcher import fetch_polymarket_bulk, normalize  # НЕ переписываем -- реально уже написан и работал
-from polymarket_multi_outcome_trades_arb import get_fee_rate  # Задача 2: реальная формула baseRate x min(P,1-P) x shares,
+from polymarket_multi_outcome_trades_arb import get_fee_rate, CLOB_BASE as ARB_CLOB_BASE, HEADERS as ARB_HEADERS
+# Задача 2: реальная формула baseRate x min(P,1-P) x shares,
 # GET /fee-rate?token_id=... -- живой эндпоинт, Polymarket прямо предупреждает не хардкодить процент
 
 HEADERS = {"User-Agent": "robinhood-chain-alpha-taskD-pinnacle-analysis/1.0"}
@@ -171,6 +172,7 @@ def run() -> int:
     now = datetime.now(timezone.utc)
     n_price_history_ok = 0
     n_price_history_empty_diag = []
+    fee_rate_raw_diag = []
     all_pairs = []  # (event_id, timestamp, discrepancy, sign)
     pairs_by_event: dict[str, list[tuple[int, float, float]]] = {}
 
@@ -199,6 +201,18 @@ def run() -> int:
         # отличаться).
         fee_rate = get_fee_rate(home_token)
         _fee_rate_by_event[ev["id"]] = fee_rate
+        if fee_rate is None and len(fee_rate_raw_diag) < 5:
+            # 2026-09-10, диагностика (не патч) -- get_fee_rate() молча
+            # возвращает None на ЛЮБой причине отказа (не-200, не-dict,
+            # нет ожидаемого ключа). Реально нужно увидеть, какая именно,
+            # прежде чем считать издержки нулевыми.
+            try:
+                r_diag = requests.get(f"{ARB_CLOB_BASE}/fee-rate", params={"token_id": home_token},
+                                       headers=ARB_HEADERS, timeout=15)
+                fee_rate_raw_diag.append({"event_id": ev["id"], "token_id": home_token,
+                                           "status": r_diag.status_code, "body_snippet": r_diag.text[:300]})
+            except requests.exceptions.RequestException as exc:
+                fee_rate_raw_diag.append({"event_id": ev["id"], "token_id": home_token, "exception": str(exc)[:200]})
         time.sleep(0.1)
 
         try:
@@ -318,10 +332,16 @@ def run() -> int:
         result["fee_rate_blocker"] = ("Эндпоинт /fee-rate не вернул значение ни для одного сопоставленного "
                                         "события -- расхождение считается БЕЗ вычета комиссии (fee=0), явно "
                                         "занижает реальные издержки, честно помечено.")
+        result["fee_rate_raw_diagnostics"] = fee_rate_raw_diag
 
     result["preregistration_met"] = (
         frac_ge_2pct >= 0.15 and frac_persisted is not None and frac_persisted > 0.5
     )
+    # Владелец явно просил учесть реальную комиссию перед сравнением с порогом --
+    # если baseRate НИ РАЗУ не измерен, результат посчитан на завышенном
+    # (без вычета издержек) расхождении и НЕ является ответом на его вопрос,
+    # даже если формально preregistration_met=true.
+    result["preregistration_met_reliable"] = len(real_fee_rates) > 0
 
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     print(f"\n[taskD_analysis] Доля пар с расхождением >=2%: {frac_ge_2pct:.1%} (порог >=15%)")
