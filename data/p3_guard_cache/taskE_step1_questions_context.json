@@ -3,225 +3,594 @@
     "cutoff_date": "2026-01-01T00:00:00+00:00",
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
-    "n_markets": 28,
-    "llm_estimates": "ЗАПОЛНЕНО вручную владельцем сессии на этом шаге -- см. llm_probability_estimate/llm_reasoning_brief в каждой записи.",
-    "n_excluded_sports_filter_gap": 2,
-    "excluded_sports_filter_gap_slugs": [
-      "aus-wsw-mac-2026-01-01-btts",
-      "cbb-stjohn-george-2025-12-31"
-    ],
-    "n_excluded_no_price_snapshot": 10
+    "n_markets": 40,
+    "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null"
   },
   "markets": [
     {
-      "slug": "french-election-called-by-december-31-355-325-146-483-711",
-      "question": "French election called by December 31?",
-      "description": "This market will resolve to \"Yes\" if the date of the next French legislative election is declared by December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor this market to resolve to \"Yes\" it is only necessary that the election date be declared, not that the election actually occur within the market timeframe.\n\nThe primary resolution source for this market will be official information from the government of the France, however a consensus of credible reporting will also be used.\n",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0055,
-      "volume": 420953.664332,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Франция не демонстрировала явных признаков нового досрочного роспуска парламента на конец 2025 — конституционные ограничения на повторный роспуск после цикла 2024 делают объявление даты выборов маловероятным именно в этом узком окне. Оценка ниже базовой ставки, близко к рыночной, так как известного триггера кризиса на конец декабря нет."
-    },
-    {
-      "slug": "ukraine-election-held-in-2025",
-      "question": "Ukraine election held by December 31, 2025?",
-      "description": "This market will resolve to \"Yes\" if national elections for the parliament and/or presidency of Ukraine are held between February 12 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is based on whether national elections are actually held in Ukraine within the specified dates. Merely scheduling an election will not be sufficient to resolve this market to \"Yes\".\n\nIf elections are officially scheduled for a date outside of 2025, this market will immediately resolve to \"No\".\n\nThe primary resolution source for this market will be official information from the government of Ukraine, however a consensus of credible reporting will also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.003,
-      "volume": 1589428.067032,
-      "llm_probability_estimate": 0.01,
-      "llm_reasoning_brief": "Украина находится под военным положением из-за продолжающейся войны, а конституция прямо запрещает проведение выборов в этот период — устойчивый и хорошо известный факт, а не предположение об исходе. Вероятность проведения реальных выборов до конца 2025 крайне мала."
-    },
-    {
-      "slug": "will-gavin-newsom-announce-a-presidential-run-by-december-31-2025",
-      "question": "Will Gavin Newsom announce a Presidential run by December 31, 2025?",
-      "description": "This market will resolve to \"Yes\" if Gavin Newsom officially announces that he is running for U.S. President in the 2028 presidential election, by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nFor the purpose of resolving this market, an announcement by Gavin Newsom will be sufficient to trigger a \"Yes\" resolution, regardless of whether he actually filed a nomination to run, or whether he actually files a nomination to run in the future.\n\nThe primary resolution source for this market will be official statements by Gavin Newsom (e.g., via speech, social media, etc.) or his official or legal representatives; however, a consensus of credible reporting may also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.005,
-      "volume": 31734.824838,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Официальные объявления о президентской гонке 2028 обычно делаются намного ближе к выборам, а не за три года; действующие губернаторы редко анонсируют национальные амбиции до завершения текущего срока и промежуточных выборов 2026. Базовая ставка для настолько раннего объявления очень низкая."
-    },
-    {
-      "slug": "mike-johnson-out-as-speaker-in-2025",
-      "question": "Mike Johnson out as Speaker by December 31?",
-      "description": "This market will resolve to \"Yes\" if Mike Johnson announces that he will resign from his position as Speaker of the US House of Representatives, or otherwise ceases to be Speaker for any length of time, between April 9, and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nNote that an announcement of his resignation before the resolution date will suffice to resolve this market to \"Yes\" regardless of if/when he actually steps down.\n\nThe primary resolution source for this market will be official information from the Government of the United States of America or official statements by Mike Johnson or his representative, however a consensus of credible reporting will suffice.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.004,
-      "volume": 58738.705808,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Смена спикера Палаты представителей — редкое событие вне явного внутрипартийного кризиса; у меня нет оснований полагать, что к декабрю 2025 сложилась ситуация, сопоставимая по остроте с той, что привела к смещению предыдущего спикера в 2023. Оцениваю близко к базовой ставке для непредвиденной отставки."
-    },
-    {
-      "slug": "polish-snap-election-called-in-2025",
-      "question": "Polish snap election called in 2025?",
-      "description": "This market will resolve to \"Yes\" if the date for the next Polish parliamentary election is set between June 2 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Polish election is announced within the stated timeframe. The date the election is scheduled to take place on will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Poland however a consensus of credible reporting may also be used.",
+      "slug": "will-santa-tell-me-ariana-grande-be-the-1-song-on-us-spotify-this-week-994",
+      "question": "Will Santa Tell Me - Ariana Grande be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
       "end_date": "2026-01-01T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0025,
-      "volume": 286784.250608,
-      "llm_probability_estimate": 0.01,
-      "llm_reasoning_brief": "Правящая коалиция Туска не демонстрировала явных сигналов к досрочному роспуску сейма во второй половине 2025; президентские выборы 2025 были отдельным, уже запланированным событием и не создают структурного давления на досрочные парламентские выборы."
+      "market_price_first_outcome_n_days_before": 0.495,
+      "volume": 3589.619287,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
-      "slug": "ukraine-election-called-in-2025",
-      "question": "Ukraine election called in 2025?",
-      "description": "This market will resolve to \"Yes\" if the next Ukrainian presidential election is scheduled in 2025. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Ukrainian election is announced between February 14 and December 31, 2025, 11:59 PM ET. Whether the election is supposed to take place in 2025 or later will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Ukraine however a consensus of credible reporting may also be used.\n",
-      "end_date": "2026-01-01T04:59:00Z",
+      "slug": "will-tsla-reach-503-in-december",
+      "question": "Will Tesla reach $503 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Tesla, Inc. (TSLA) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Tesla, Inc. (TSLA) \"High\" prices available at https://finance.yahoo.com/quote/TSLA/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0095,
-      "volume": 982716.694339,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "Тема послевоенных выборов на Украине периодически поднималась в контексте мирных переговоров и внешнего дипломатического давления в течение 2025, что даёт немного больше веса, чем нулю, но формальное назначение даты выборов при сохраняющемся военном положении маловероятно до конца года."
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.34,
+      "volume": 13047.694958,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
-      "slug": "ai-industry-downturn-by-december-31-2025",
-      "question": "AI Industry Downturn by December 31, 2025?",
-      "description": "This market will resolve to \"Yes\" if the AI industry experiences an industry downturn by the specified date, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purposes of this market, the AI industry will be considered to have experienced an industry downturn once at least three of the following events have occurred within 90 days of this market's specified timeframe:\n- NVIDIA Corporation (NVDA) closing stock price is down 50% from its all-time high.\n- iShares PHLX Semiconductor ETF (SOXX) closing stock price is down 40% from its all-time high.\n- OpenAI, Inc. or Anthropic PBC declares bankruptcy.\n- OpenAI, Inc. is acquired.\n- H100 rental price falls to $1.00 or lower for five consecutive days, as shown on the SiliconData Silicon Index at:\nhttps://www.silicondata.com/products/silicon-index.\n- Major AI Hardware Supplier Collapse: Taiwan Semiconductor Manufacturing Company Limited (TSM), ASML Holding N.V. (ASML), Broadcom Inc. (AVGO), Arista Networks, Inc. (ANET), or Super Micro Computer, Inc. (SMCI), closing stock price is down 50% from its all-time high.\n\nThis market may resolve immediately once three conditions have been met within 90 days of the specified timeframe.\n\nThis market will not resolve to \"Yes\" until three conditions have been met, regardless of reporting of an industry downturn or similar claims.\n\nThe primary resolution source will be official information from the respective companies and listing exchanges; however, a consensus of credible reporting will also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0035,
-      "volume": 202990.851035,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Составное условие требует срабатывания минимум трёх из пяти жёстких индикаторов (обвал акций на 40-50% от максимума, банкротство/поглощение крупного игрока и т.д.); по доступным мне данным AI-сектор оставался в фазе роста без признаков одновременного срабатывания нескольких из этих условий к концу 2025."
-    },
-    {
-      "slug": "spain-snap-election-called-in-2025",
-      "question": "Spain snap election called in 2025?",
-      "description": "This market will resolve to \"Yes\" if the next Spanish general election is scheduled between May 28 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis market is about whether a date for the next Spanish election is announced within the stated timeframe. The date the election is scheduled to take place on will have no effect on the resolution to this market.\n\nThe primary resolution source for this market is official information from the Government of Spain however a consensus of credible reporting may also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0075,
-      "volume": 93498.302024,
-      "llm_probability_estimate": 0.04,
-      "llm_reasoning_brief": "Правительство Санчеса сталкивалось с коррупционными скандалами и напряжённостью в коалиции на протяжении 2024-2025, что создаёт реальный фон нестабильности, но конкретного объявления досрочных выборов к этому сроку я подтвердить не могу. Оценка чуть выше рыночной с учётом реального политического шума."
-    },
-    {
-      "slug": "will-the-next-uk-election-is-called-by-december-31",
-      "question": "Will the next UK election be called by December 31?",
-      "description": "This market will resolve to \"Yes\" if the date of the next UK general election is declared by  December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor this market to resolve to \"Yes\" it is only necessary that the election date be declared, not that the election actually occur within the market timeframe.\n\nThe primary resolution source for this market will be official information from the government of the United Kingdom, however a consensus of credible reporting will also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0045,
-      "volume": 91962.29858,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Всеобщие выборы в Великобритании прошли в июле 2024, следующие по закону ожидаются не ранее ~2029 без досрочного роспуска; на конец 2025 у меня нет сведений о кризисе такого масштаба, который обычно предшествует объявлению досрочных выборов."
-    },
-    {
-      "slug": "will-kamala-harris-announce-california-governor-run-in-2025",
-      "question": "Will Kamala Harris announce California Governor run in 2025?",
-      "description": "This market will resolve to \"Yes\" if Former United States Vice President Kamala Harris announces that she is running for Governor of California in the 2026 midterm election, between June 23 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purpose of resolving this market, an announcement by Kamala Harris will be sufficient to trigger a \"Yes\" resolution, regardless of whether she actually filed a nomination to run, or whether she actually files a nomination to run in the future.\n\nThe primary resolution source for this market will be official statements by Kamala Harris (ex: via speech, social media, etc.) or her official or legal representatives, however a consensus of credible reporting may also be used. ",
+      "slug": "will-rockin-around-the-christmas-tree-brenda-lee-be-the-1-song-on-spotify-this-week-598",
+      "question": "Will Rockin' Around The Christmas Tree - Brenda Lee be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
       "end_date": "2026-01-01T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0025,
-      "volume": 36220.725824,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "По доступной мне информации к середине-концу 2025 появлялись сообщения, что Харрис склоняется не участвовать в губернаторской гонке Калифорнии, сохраняя опцию на федеральную политику; это снижает вероятность относительно чистой базовой ставки, но недостаточно уверенно, чтобы оценивать ближе к нулю, чем рынок."
+      "market_price_first_outcome_n_days_before": 0.335,
+      "volume": 18326.344746,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
-      "slug": "will-consensys-ipo-by-december-31-2025",
-      "question": "Will Consensys IPO by December 31 2025?",
-      "description": "This market will resolve to \"Yes\" if ConsenSys (the parent company of MetaMask) completes an Initial Public Offering (IPO) by the listed date ET, as confirmed by official company announcements and credible news sources. Otherwise, this market will resolve to \"No.\"\n\nThe IPO refers to the first sale of stock by the listed company to the public on any recognized stock exchange.\n\nIf ConsenSys is acquired by another company that is already public, this market will immediately resolve to \"No.\"\n\nThe resolution source for this market is a consensus of credible reporting.",
+      "slug": "elon-musk-of-tweets-december-2025-1400plus",
+      "question": "Will Elon Musk post 1400+ tweets in December 2025?",
+      "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X during the month of December 2025.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total.\n\nThe resolution source for this market is the 'Post Counter' figure for posts found at https://www.xtracker.io/. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
       "end_date": "2026-01-01T05:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0055,
-      "volume": 38541.872363,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Слухи об IPO ConsenSys циркулируют с начала 2020-х без завершённого публичного размещения; в узком окне до конца 2025 нет известных мне конкретных сигналов готовности к листингу именно в этот период."
+      "market_price_first_outcome_n_days_before": 0.7965,
+      "volume": 156608.596152,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
-      "slug": "macron-out-in-2025-834",
-      "question": "Macron out in 2025?",
-      "description": "This market will resolve to \"Yes\" if Emmanuel Macron ceases to be President of France for any length of time between January 2 and December 31, 2025, 11:59 PM ET (inclusive). Otherwise, this market will resolve to \"No\".\n\nIf Macron departs from office before the expiry date, the market should resolve immediately.\n\nThe primary resolution source for this market will be information from the government of France, however a consensus of credible reporting will also be used.",
-      "end_date": "2026-01-01T04:59:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0025,
-      "volume": 1386219.767204,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Макрон пережил череду отставок премьер-министров и вотумов недоверия правительству в 2024-2025, но сам президент институционально защищён от отставки вне импичмента или добровольного ухода, признаков которого не было."
-    },
-    {
-      "slug": "congress-authorizes-military-force-against-iran-in-2025",
-      "question": "Congress authorizes military force against Iran in 2025?",
-      "description": "This market will resolve to \"Yes\" if the United States enacts an Authorization for Use of Military Force (AUMF) specifically targeting Iran between June 23, 2025 and December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No.\"\n\nTo qualify, both chambers of Congress must pass, and the President (currently Donald Trump) must sign into law, a bill that explicitly authorizes the use of U.S. military force against Iran. The authorization does not need to use the exact phrase “Authorization for Use of Military Force,” but it must clearly and specifically authorize military action against Iran as a state actor.\n\nGeneral defense appropriations, intelligence findings, covert action approvals, or broader regional authorizations that do not explicitly pertain to Iran will not qualify. Presidential orders or military action without such a law being passed and signed will not qualify.\n\nThe primary resolution source will be official U.S. government records (e.g., Congress.gov, White House releases) however a consensus of credible reporting will also be used.",
+      "slug": "will-trumps-approval-rating-be-40pt041pt9-on-september-12",
+      "question": "Will Trump’s approval rating be 40.0–41.9% on December 31?",
+      "description": "This market will resolve according to Silver Bulletin's approval rating for Donald Trump on December 31, 2025.\n\nNote that the approval ratings for this date must be finalized before it is considered for this market (namely, once the next data point is available, the previous one is finalized).\n\nThis market's resolution source will be Silver Bulletin's approval rating poll aggregator, https://www.natesilver.net/p/trump-approval-ratings-nate-silver-bulletin, specifically the approval rating indicated by the green trend line for the resolution date. Changes in the methodology by which Silver Bulletin calculates the approval rating will have no bearing on the resolution of this market. If Silver Bulletin's approval rating becomes permanently unavailable, RealClearPolitics will be used.\n\nThe resolution source reports the rating value to only one decimal point (e.g. 42.8%, 33.9%, etc). Thus, this is the level of precision that will be used when resolving the market.",
       "end_date": "2026-01-01T00:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0045,
-      "volume": 54734.484901,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "Летом 2025 обострение вокруг Ирана (включая удары по ядерным объектам) реально повышало политическую salience темы, но формальное принятие AUMF Конгрессом — редкий и юридически тяжёлый шаг, обычно избегаемый администрацией в пользу исполнительных полномочий; конкретных признаков голосования по такому закону к декабрю у меня нет."
+      "market_price_first_outcome_n_days_before": 0.58,
+      "volume": 103888.182655,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
-      "slug": "rainbow-fdv-above-3b-one-day-after-launch-443-682-926",
-      "question": "Rainbow FDV above $3B one day after launch?",
-      "description": "This market will resolve to \"Yes\" if the Fully Diluted Valuation of Rainbow's token is greater than the value specified in the title 1 day after launch. Otherwise, the market will resolve to \"No.\"\n\nThe token must be actively, publicly transferable and tradable to be considered a launch.\n\n\"1 day after launch\" is defined as 4:00 PM ET on the calendar day following launch. The resolution source for this market is the most liquid price source available. If Rainbow (https://rainbow.me/) doesn't launch a token by December 31, 2025, 11:59 PM ET, this market will resolve to \"No\".",
+      "slug": "will-jingle-bell-rock-bobby-helms-be-the-1-song-on-us-spotify-this-week-925",
+      "question": "Will Jingle Bell Rock - Bobby Helms be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 10772.80815,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-last-christmas-wham-be-the-1-song-on-us-spotify-this-week-385",
+      "question": "Will Last Christmas - Wham! be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 9019.556665,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-microstrategy-hold-680k-btc-by-december-31",
+      "question": "Will MicroStrategy hold 680k+ BTC by December 31?",
+      "description": "This market will resolve to \"Yes\" if MicroStrategy Incorporated's total Bitcoin holdings are equal to or greater than the number specified in the title at any point by December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market will be announcements from MicroStrategy or Michael Saylor as to their total BTC holdings.\n\nFor reference, MicroStrategy’s reported BTC holdings can be tracked at: https://www.strategy.com/purchases\n",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.218,
+      "volume": 658464.091762,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-all-i-want-for-christmas-is-you-mariah-carey-be-the-1-song-on-us-spotify-this-week-895",
+      "question": "Will All I Want For Christmas Is You - Mariah Carey be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.505,
+      "volume": 11165.400603,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-santa-tell-me-ariana-grande-be-the-1-song-on-spotify-this-week-543",
+      "question": "Will Santa Tell Me - Ariana Grande be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 18862.881471,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-clair-obscur-expedition-33-win-game-of-the-year-in-the-2025-steam-awards",
+      "question": "Will 'Clair Obscur: Expedition 33' win Game of the Year in the 2025 Steam Awards?",
+      "description": "The winners of the Steam Award for 2025 will be chosen by community vote. Results will be announced on January 3, 2026.\n\nThis market will resolve according to the game which wins Game of the Year in the 2025 Steam Awards.\n\nIf for any reason no winner is declared by January 31, 2026, 11:59 PM ET, this market will resolve to \"Other\". In case of a tie for winner, this market will resolve in favor of the game whose name comes first in alphabetical order.\n\nThe primary resolution source for this market will be information from Steam, however a consensus of credible information will also be used.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.71,
+      "volume": 405955.578165,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-nvda-reach-192-in-december",
+      "question": "Will NVIDIA reach $192 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for NVIDIA (NVDA) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the NVIDIA (NVDA) \"High\" prices available at https://finance.yahoo.com/quote/NVDA/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.68,
+      "volume": 42269.414488,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-last-christmas-wham-be-the-1-song-on-spotify-this-week-266",
+      "question": "Will Last Christmas - Wham! be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.31,
+      "volume": 20771.075055,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-fate-of-ophelia-taylor-swift-be-the-1-song-on-spotify-this-week-557",
+      "question": "Will The Fate of Ophelia - Taylor Swift be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.64,
+      "volume": 26915.34864,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-wsw-mac-2026-01-01-mac",
+      "question": "Will Macarthur FC win on 2026-01-01?",
+      "description": "In the upcoming game, scheduled for January 1, 2026\nIf Macarthur FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T08:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.255,
+      "volume": 90607.350764,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-wsw-mac-2026-01-01-wsw",
+      "question": "Will Western Sydney Wanderers FC win on 2026-01-01?",
+      "description": "In the upcoming game, scheduled for January 1, 2026\nIf Western Sydney Wanderers FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T08:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 47899.567174,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-auc-new-2025-12-31-new",
+      "question": "Will Newcastle United Jets FC win on 2025-12-31?",
+      "description": "In the upcoming game, scheduled for December 31, 2025\nIf Newcastle United Jets FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.23,
+      "volume": 102804.726503,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-pltr-reach-201-in-december",
+      "question": "Will Palantir reach $201 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Palantir Technologies Inc. (PLTR) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Palantir Technologies Inc. (PLTR) \"High\" prices available at https://finance.yahoo.com/quote/PLTR/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.37,
+      "volume": 5310.655849,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-let-it-snow-let-it-snow-let-it-snow-dean-martin-be-the-1-song-on-us-spotify-this-week-437",
+      "question": "Will Let It Snow! Let It Snow! Let It Snow! - Dean Martin be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.355,
+      "volume": 19342.164525,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "lighter-market-cap-fdv-3b-one-day-after-launch-227",
+      "question": "Lighter market cap (FDV) >$3B one day after launch?",
+      "description": "This market will resolve to \"Yes\" if the Fully Diluted Valuation of Lighter's token is greater than $3,000,000,000 1 day after launch. Otherwise, the market will resolve to \"No.\"\n\nFor the purposes of this market \"locked\" tokens or non-swappable tokens will not be considered a launch.\n\n\"1 day after launch\" is defined as 24 hours after launch. The resolution source for this market is the most liquid price source available. If Lighter doesn't launch a token by December 31, 2025, 11:59 PM ET, this market will resolve to \"No.\"",
       "end_date": "2026-01-01T05:00:00Z",
       "outcome_names": [
         "Yes",
         "No"
       ],
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0055,
-      "volume": 29014.437957,
-      "llm_probability_estimate": 0.05,
-      "llm_reasoning_brief": "У меня нет достоверной информации о конкретных параметрах запуска токена Rainbow к декабрю 2025; порог $3B FDV — высокая планка даже для востребованных кошельков, поэтому оценка остаётся низкой, но не нулевой из-за общей неопределённости по срокам и хайпу запуска."
+      "market_price_first_outcome_n_days_before": 0.535,
+      "volume": 9575649.779967,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-its-the-most-wonderful-time-of-the-year-andy-williams-be-the-1-song-on-us-spotify-this-week-546",
+      "question": "Will It's the Most Wonderful Time of the Year - Andy Williams be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.495,
+      "volume": 18530.998343,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-trumps-approval-rating-be-42pt043pt9-on-september-12-146",
+      "question": "Will Trump’s approval rating be 42.0–43.9% on December 31?",
+      "description": "This market will resolve according to Silver Bulletin's approval rating for Donald Trump on December 31, 2025.\n\nNote that the approval ratings for this date must be finalized before it is considered for this market (namely, once the next data point is available, the previous one is finalized).\n\nThis market's resolution source will be Silver Bulletin's approval rating poll aggregator, https://www.natesilver.net/p/trump-approval-ratings-nate-silver-bulletin, specifically the approval rating indicated by the green trend line for the resolution date. Changes in the methodology by which Silver Bulletin calculates the approval rating will have no bearing on the resolution of this market. If Silver Bulletin's approval rating becomes permanently unavailable, RealClearPolitics will be used.\n\nThe resolution source reports the rating value to only one decimal point (e.g. 42.8%, 33.9%, etc). Thus, this is the level of precision that will be used when resolving the market.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.39,
+      "volume": 64911.10315,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-man-i-need-olivia-dean-be-the-1-song-on-spotify-this-week-138",
+      "question": "Will Man I Need - Olivia Dean be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.34,
+      "volume": 5796.224156,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-amzn-dip-to-216-in-december",
+      "question": "Will Amazon dip to $216 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Amazon.com, Inc. (AMZN) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Amazon.com, Inc. (AMZN) \"Low\" prices available at https://finance.yahoo.com/quote/AMZN/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.47,
+      "volume": 10239.282432,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-auc-new-2025-12-31-draw",
+      "question": "Will Auckland FC vs. Newcastle United Jets FC end in a draw?",
+      "description": "In the upcoming game, scheduled for December 31, 2025\nIf the game ends in a draw, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve to \"Yes\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.24,
+      "volume": 16886.246783,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-back-to-friends-sombr-be-the-1-song-on-spotify-this-week-743",
+      "question": "Will back to friends - sombr be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.235,
+      "volume": 5612.295242,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-golden-huntrx-be-the-1-song-on-spotify-this-week-674",
+      "question": "Will Golden - HUNTR/X be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.335,
+      "volume": 3994.989764,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-jingle-bell-rock-bobby-helms-be-the-1-song-on-spotify-this-week-846",
+      "question": "Will Jingle Bell Rock - Bobby Helms be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 18247.5455,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-msft-reach-495-in-december",
+      "question": "Will Microsoft reach $495 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Microsoft Corporation (MSFT) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Microsoft Corporation (MSFT) \"High\" prices available at https://finance.yahoo.com/quote/MSFT/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.485,
+      "volume": 3177.01512,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-amzn-reach-240-in-december",
+      "question": "Will Amazon reach $240 in December?",
+      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Amazon.com, Inc. (AMZN) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Amazon.com, Inc. (AMZN) \"High\" prices available at https://finance.yahoo.com/quote/AMZN/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
+      "end_date": "2026-01-01T04:59:59.999Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
+      "market_price_first_outcome_n_days_before": 0.245,
+      "volume": 10745.194963,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-the-christmas-song-merry-christmas-to-you-nat-king-cole-be-the-1-song-on-us-spotify-this-week-585",
+      "question": "Will The Christmas Song (Merry Christmas To You) - Nat King Cole be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.495,
+      "volume": 18078.56311,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-auc-new-2025-12-31-auc",
+      "question": "Will Auckland FC win on 2025-12-31?",
+      "description": "In the upcoming game, scheduled for December 31, 2025\nIf Auckland FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T04:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.54,
+      "volume": 72947.861546,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-bitcoin-hit-80k-or-100k-first",
+      "question": "Will Bitcoin hit $80k or $100k first?",
+      "description": "This market will resolve to the lower price in the title if Bitcoin’s price dips to that level or below before it hits the higher title price between November 18, 2025 at 1:30 PM ET and December 31, 2025 at 11:59 PM ET. It will resolve to the higher price in the title if Bitcoin’s price first reaches that level or above before it dips to the lower title price during the same period.\n\nIf neither price level is reached within the market timeframe, the market will resolve 50–50.\n\nThe resolution source for this market is Binance, specifically the BTC/USDT \"High\" and \"Low\" prices currently available at https://www.binance.com/en/trade/BTC_USDT with “1m” and “Candles” selected on the top bar.\n\nPlease note that this market is about the price according to Binance BTC/USDT, not according to other sources or spot markets.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "80k",
+        "100k"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.515,
+      "volume": 305951.09719,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-all-i-want-for-christmas-is-you-mariah-carey-be-the-1-song-on-spotify-this-week-791",
+      "question": "Will All I Want For Christmas Is You - Mariah Carey be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.315,
+      "volume": 19672.011659,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-ordinary-alex-warren-be-the-1-song-on-spotify-this-week-277",
+      "question": "Will Ordinary - Alex Warren be the #1 song on Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song globally on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs chart can be found on open.spotify.com under the \"Charts\" heading. ",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 19371.720625,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-rockin-around-the-christmas-tree-brenda-lee-be-the-1-song-on-us-spotify-this-week-446",
+      "question": "Will Rockin' Around The Christmas Tree - Brenda Lee be the #1 song on US Spotify this week?",
+      "description": "Spotify curates a playlist of the most streamed songs globally and updates it on Fridays to reflect streaming data for the previous week, beginning on the preceding Friday and ending on Thursday.\n\nThis market will resolve according to the most-streamed song in the U.S. on Spotify for the week labeled January 2.\n\nIf Spotify does not release its top song for the week labeled January 2 by January 3, 2026, 11:59 PM ET, this market will default to \"Other\".\n\nThe resolution source for this market will be official information from Spotify. The weekly top songs - USA chart can be found on open.spotify.com under the \"Charts\" heading.",
+      "end_date": "2026-01-01T00:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 20052.198127,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "cwbb-tcu-byu-2025-12-31",
+      "question": "TCU Horned Frogs vs. BYU Cougars (W)",
+      "description": "In the upcoming WBB game, scheduled for December 31 at 9:00 PM ET:\n\nIf the TCU Horned Frogs win, the market will resolve to \"TCU Horned Frogs\".\n\nIf the BYU Cougars win, the market will resolve to \"BYU Cougars\".\n\nIf the game is postponed, this market will remain open until the game has been completed.\n\nIf the game is canceled entirely, with no make-up game, this market will resolve 50-50.\n\nThe result will be determined based on the final score including any overtime periods.",
+      "end_date": "2026-01-01T02:00:00Z",
+      "outcome_names": [
+        "TCU Horned Frogs",
+        "BYU Cougars"
+      ],
+      "price_snapshot_date": "2025-12-25T02:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.5,
+      "volume": 1118.394575,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "will-xrp-dip-to-1pt70-in-december",
+      "question": "Will XRP dip to $1.70 in December?",
+      "description": "This market will immediately resolve to \"Yes\" if any Binance 1 minute candle for XRP/USDT during the month specified in the title (from 00:00 AM ET on the first day to 11:59 PM ET on the last), has a final Low price equal to or lower than the price specified in the title. Otherwise, this market will resolve to \"No.\"\n\nThe resolution source for this market is Binance, specifically the XRP/USDT Low prices available at https://www.binance.com/en/trade/XRP_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance XRP/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
+      "end_date": "2026-01-01T05:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.24,
+      "volume": 169916.835782,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
+    },
+    {
+      "slug": "aus-wsw-mac-2026-01-01-draw",
+      "question": "Will Western Sydney Wanderers FC vs. Macarthur FC end in a draw?",
+      "description": "In the upcoming game, scheduled for January 1, 2026\nIf the game ends in a draw, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve to \"Yes\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
+      "end_date": "2026-01-01T08:00:00Z",
+      "outcome_names": [
+        "Yes",
+        "No"
+      ],
+      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
+      "market_price_first_outcome_n_days_before": 0.25,
+      "volume": 11640.593529,
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     },
     {
       "slug": "will-ethena-dip-to-0pt08-by-december-31-2026",
@@ -235,203 +604,8 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.55,
       "volume": 60324.54775799999,
-      "llm_probability_estimate": 0.4,
-      "llm_reasoning_brief": "ENA торговался волатильно в 2024-2025 с заметными просадками во время слабости альткоинов, но падение до $0.08 требует ещё одной существенной волны снижения от типичных уровней; рынок оценивает это примерно паритетно, у меня нет информационного преимущества, чтобы уверенно отклониться от этого, поэтому даю оценку чуть ниже паритета."
-    },
-    {
-      "slug": "usde-depeg-by-december-31",
-      "question": "USDE depeg by December 31?",
-      "description": "This market will resolve to “Yes” immediately if all Pyth 1-minute candles for USDE-USD for any 24-hour period are below 98 cents, for candles between 27 Oct ’25 15:00 and 31 Dec ’25 23:59 ET. Otherwise, this market will resolve to “No.”\n\nBelow 98 cents means all candles in the period have a final “High” price below 0.98000 (i.e., 0.97999 or lower). A 24-hour period of USDE below 98 cents that starts on the last day in 2025 will count.\n\nThe resolution source for this market is TradingView, specifically the USDE-USD “High” prices currently available at https://tradingview.com/chart/?symbol=PYTH%3AUSDEUSD with “1m” and “Candles” selected on the top bar. To see the “High” prices, mouse over particular candles and look at the value after “H” at the top of the chart.\n\nPlease note that this market is about the price according to Pyth USDE-USD. If Pyth stops having the necessary USDE information to resolve this market, a consensus of credible sources for whether USDE was below 98 cents for 24 hours or more may be used to resolve this market.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.003,
-      "volume": 32857.83849,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "USDe в целом удерживал привязку к доллару на протяжении 2025 несмотря на отдельные периоды стресса в крипторынке; устойчивый суточный депег на 24 часа ниже $0.98 — редкое и заметное событие, о котором у меня нет сведений применительно к этому окну."
-    },
-    {
-      "slug": "will-xrp-reach-3pt20-before-2026-161",
-      "question": "Will XRP reach $3.20 before 2026?",
-      "description": "This market will immediately resolve to \"Yes\" if any Binance 1 minute candle for XRP/USDT between August 31, 2025, 18:00 and December 31, 2025, 23:59 in the ET timezone has a final \"High\" price equal to or greater than the price specified in the title. Otherwise, this market will resolve to \"No.\"\n\nThe resolution source for this market is Binance, specifically the XRP/USDT \"High\" prices available at https://www.binance.com/en/trade/XRP_USDT, with the chart settings on \"1m\" for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance XRP/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0065,
-      "volume": 393777.439753,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "XRP действительно переживал сильное ралли в 2025, но конкретное окно (конец августа - конец декабря 2025) и очень низкая рыночная цена намекают, что либо пик был пройден до начала окна, либо цена к декабрю была заметно ниже порога; без точных котировок на дату среза ориентируюсь на рыночную оценку."
-    },
-    {
-      "slug": "will-msft-dip-to-450-in-december",
-      "question": "Will Microsoft dip to $450 in December?",
-      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Microsoft Corporation (MSFT) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Microsoft Corporation (MSFT) \"Low\" prices available at https://finance.yahoo.com/quote/MSFT/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
-      "end_date": "2026-01-01T04:59:59.999Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
-      "market_price_first_outcome_n_days_before": 0.037,
-      "volume": 4115.926121,
-      "llm_probability_estimate": 0.05,
-      "llm_reasoning_brief": "MSFT торговалась в 2025 в диапазоне заметно выше $450 на фоне устойчивого роста облачного и AI-бизнеса; просадка до этого уровня потребовала бы существенной коррекции рынка, для которой у меня нет специфических признаков именно в декабре 2025."
-    },
-    {
-      "slug": "will-meta-dip-to-560-in-december",
-      "question": "Will Meta dip to $560 in December?",
-      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Meta Platforms, Inc. (META) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Meta Platforms, Inc. (META) \"Low\" prices available at https://finance.yahoo.com/quote/META/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
-      "end_date": "2026-01-01T04:59:59.999Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
-      "market_price_first_outcome_n_days_before": 0.024,
-      "volume": 6683.626807,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "META также торговалась в 2025 значительно выше уровня $560 на фоне сильных результатов рекламного бизнеса; необходим заметный обвал акции для достижения этого уровня, конкретных признаков которого у меня нет."
-    },
-    {
-      "slug": "will-msft-dip-to-323-in-december",
-      "question": "Will Microsoft dip to $323 in December?",
-      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for Microsoft Corporation (MSFT) has a final \"Low\" price equal to or below the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the Microsoft Corporation (MSFT) \"Low\" prices available at https://finance.yahoo.com/quote/MSFT/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
-      "end_date": "2026-01-01T04:59:59.999Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
-      "market_price_first_outcome_n_days_before": 0.0065,
-      "volume": 4070.438,
-      "llm_probability_estimate": 0.01,
-      "llm_reasoning_brief": "Порог $323 существенно ниже типичного диапазона торгов MSFT в 2025 — потребовался бы обвал, сопоставимый по масштабу с крупным рыночным кризисом; у меня нет оснований считать это вероятным в декабре 2025."
-    },
-    {
-      "slug": "will-win-the-aster-trading-competition-389",
-      "question": "Will 风无向 win the Aster trading competition?",
-      "description": "This market will resolve according to the Human trader with the highest Total PnL at the end of the Aster Human vs AI trading competition. The resolution source will be the Human leaderboard on https://www.asterdex.com/en/campaigns/human-vs-ai, viewable under the Human tab.\n\nIf two or more participants are tied for the highest Total PnL at the time of resolution, the market will resolve to the participant whose display name appears first in the ordering used on the official Aster Human leaderboard.\n\nIf the competition is not completed or the official leaderboard is unavailable, the market will remain open until reliable data is published by Aster. If no such data becomes available by December 31, 2025 ET, the market will resolve to “Other”.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0005,
-      "volume": 11245.022,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "Соревнование с широким пулом участников без известной мне информации о текущем лидерборде для конкретного трейдера '风无向'; при отсутствии информационного преимущества оценка близка к равномерной для одного участника среди многих, что отражает и низкая рыночная цена."
-    },
-    {
-      "slug": "lighter-market-cap-fdv-10b-one-day-after-launch-978-517",
-      "question": "Lighter market cap (FDV) >$10B one day after launch?",
-      "description": "This market will resolve to \"Yes\" if the Fully Diluted Valuation of Lighter's token is greater than $10,000,000,000 1 day after launch. Otherwise, the market will resolve to \"No.\"\n\nFor the purposes of this market \"locked\" tokens or non-swappable tokens will not be considered a launch.\n\n\"1 day after launch\" is defined as 24 hours after launch. The resolution source for this market is the most liquid price source available. If Lighter doesn't launch a token by December 31, 2025, 11:59 PM ET, this market will resolve to \"No.\"",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0085,
-      "volume": 903399.79443,
-      "llm_probability_estimate": 0.12,
-      "llm_reasoning_brief": "Проект Lighter был одним из заметно хайпуемых DeFi/перп-протоколов в крипто-сообществе в 2025, со сравнениями по масштабу с Hyperliquid, что делает высокую оценку при листинге не исключённой; но точных данных по фактическому запуску и оценке у меня нет, поэтому держу оценку выше рыночной, но умеренно."
-    },
-    {
-      "slug": "will-ethena-reach-0pt41-in-december",
-      "question": "Will Ethena reach $0.41 in December?",
-      "description": "This market will immediately resolve to “Yes” if any Binance 1 minute candle for ENA/USDT during the month specified in the title (from 00:00 AM ET on the first day to 11:59 PM ET on the last) has a final High price equal to or greater than the price specified in the title. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is Binance, specifically the ENA/USDT High prices available at https://www.binance.com/en/trade/ENA_USDT, with the chart settings on “1m” for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance ENA/USDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0315,
-      "volume": 13947.986855,
-      "llm_probability_estimate": 0.05,
-      "llm_reasoning_brief": "Уровень $0.41 заметно выше типичных котировок ENA во второй половине 2025, которые я связываю с ослаблением после ранних максимумов; для достижения этого потребовалось бы заметное ралли, признаков которого у меня нет."
-    },
-    {
-      "slug": "will-hyperliquid-dip-to-24-in-december",
-      "question": "Will Hyperliquid dip to $24 in December?",
-      "description": "This market will immediately resolve to “Yes” if any Binance 1 minute candle for HYPEUSDT during the month specified in the title (from 00:00 AM ET on the first day to 11:59 PM ET on the last) has a final Low price equal to or lower than the price specified in the title. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is Binance, specifically the HYPEUSDT Low prices available at https://www.binance.com/en/futures/HYPEUSDT, with the chart settings on “1m” for one-minute candles selected on the top bar.\n\nPlease note that the outcome of this market depends solely on the price data from the Binance HYPEUSDT trading pair. Prices from other exchanges, different trading pairs, or spot markets will not be considered for the resolution of this market.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.9995,
-      "volume": 22528.311716,
-      "llm_probability_estimate": 0.85,
-      "llm_reasoning_brief": "HYPE прошёл мощное ралли в течение 2025 на фоне взрывного роста объёмов платформы, но к декабрю рыночная цена этого контракта близка к единице, что указывает на высокую вероятность того, что либо цена уже вблизи этого уровня, либо коррекция уже произошла; ориентируюсь на этот сильный сигнал, немного смягчая уверенность."
-    },
-    {
-      "slug": "axiom-daily-fees-above-5m-in-2025",
-      "question": "Axiom daily fees above $5M in 2025?",
-      "description": "This market will resolve to \"Yes\" if Axiom's daily fees exceed $5M on any day between August 19 and December 31, 2025. Otherwise, this market will resolve to \"No\".\n\nThe resolution source for this market is Defillama, specifically the \"Fees and Revenue\" bar chart set on \"Daily\" available at https://defillama.com/protocol/fees/axiom.\n\nThis market will resolve once any daily bar meets the specified threshold, or once the bar for \"31 Dec 2025\" is finalized and no bar within the timeframe has met that threshold.\n\nThe \"Fees\" value displayed when hovering over the bar for \"31 Dec 2025\" will be considered finalized once any bar for January 1 is published.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.034,
-      "volume": 7783.162645,
-      "llm_probability_estimate": 0.05,
-      "llm_reasoning_brief": "Axiom как интерфейс для мем-коин трейдинга на Solana демонстрировал сильный рост комиссий в отдельные пиковые периоды 2025, но низкая рыночная цена ближе к концу окна говорит, что порог $5M за день пока не достигнут и, вероятно, уже не будет достигнут за оставшиеся дни года."
-    },
-    {
-      "slug": "elon-musk-of-tweets-december-2025-1360-1399",
-      "question": "Will Elon Musk post 1360-1399 tweets in December 2025?",
-      "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X during the month of December 2025.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total.\n\nThe resolution source for this market is the 'Post Counter' figure for posts found at https://www.xtracker.io/. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
-      "end_date": "2026-01-01T05:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T05:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.1415,
-      "volume": 165613.340628,
-      "llm_probability_estimate": 0.13,
-      "llm_reasoning_brief": "Это один из множества конкурирующих числовых интервалов для количества постов Маска за месяц; без специфических данных о его активности именно в декабре 2025 я не могу дать существенно иную оценку, чем подразумевает распределение по соседним интервалам, поэтому держусь близко к рыночной."
-    },
-    {
-      "slug": "will-nvda-reach-228-in-december",
-      "question": "Will NVIDIA reach $228 in December?",
-      "description": "This market will resolve to \"Yes\" if, at any point during December 2025 (ET), any 1-minute candle for NVIDIA (NVDA) has a final \"High\" price equal to or above the listed price. Otherwise, this market will resolve to \"No\".\n\nOnly prices achieved during regular trading hours (ET) will be considered.\n\nThe resolution source for this market is Yahoo Finance — specifically, the NVIDIA (NVDA) \"High\" prices available at https://finance.yahoo.com/quote/NVDA/, with the chart settings on \"1m\" for candle intervals.\n\nIn the event of a stock split, reverse stock split, or similar corporate action affecting the listed company during the listed time frame, this market will resolve based on split-adjusted prices as displayed on Yahoo Finance.",
-      "end_date": "2026-01-01T04:59:59.999Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
-      "market_price_first_outcome_n_days_before": 0.0025,
-      "volume": 12018.45457,
-      "llm_probability_estimate": 0.02,
-      "llm_reasoning_brief": "NVDA была в устойчивом растущем тренде на фоне спроса на AI-чипы в 2025, но конкретный уровень $228 (с учётом возможного сплита акций) я не могу точно сопоставить с фактическим диапазоном торгов на конец года; очень низкая рыночная цена предполагает, что уровень либо уже пройден задолго до декабря, либо далёк от текущих котировок."
-    },
-    {
-      "slug": "will-john-fetterman-leave-the-democratic-party-in-2025",
-      "question": "Will John Fetterman leave the Democratic Party in 2025?",
-      "description": "This market will resolve to \"Yes\" if John Fetterman leaves the Democratic Party by December 31, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nThis includes switching to the Republican Party, registering as an Independent, or affiliating with any other political party. An official announcement from Fetterman stating that he is leaving the Democratic Party or will no longer caucus with the Democrats will qualify, regardless of when the change takes effect.\n\nThe primary resolution source will be an official announcement from John Fetterman or a change in his registration in government records. However, a consensus of credible reporting may also be used.\n",
-      "end_date": "2026-01-01T00:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T00:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.0075,
-      "volume": 17916.780497,
-      "llm_probability_estimate": 0.03,
-      "llm_reasoning_brief": "Феттерман публично расходился с частью демократической платформы по ряду вопросов (в частности, по поддержке Израиля) в течение 2025, что даёт немного повышенный фон по сравнению с типичным сенатором, но формальный выход из партии — гораздо более редкий и решительный шаг, признаков подготовки которого у меня нет."
+      "llm_probability_estimate": null,
+      "llm_reasoning_brief": null
     }
   ]
 }
