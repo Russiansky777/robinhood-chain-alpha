@@ -1,0 +1,60 @@
+name: "Задача 4 -- медленный арбитраж, Шаг 1: оценка на одной цепи (Robinhood) за один день (потолок 300 кредитов Mozila)"
+
+# Владелец, 2026-09-10: потолок 300 кредитов на задачу "медленный
+# арбитраж", "оценка стоимости на одной цепи за один день до полного" --
+# ОБЯЗАТЕЛЬНА перед полным пайплайном. Этот воркфлоу -- ТОЛЬКО реальная
+# оценка (полный список колонок dex.trades + активность по пулам на
+# Robinhood за один день), не полный анализ. OWNER_CONFIRMED_DEX_TRADES_
+# ROBINHOOD=yes -- то же явное подтверждение, что для Задач 1 и 2
+# (владелец явно авторизовал самостоятельные решения в рамках потолков
+# задач без переспроса, 2026-09-10).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASK4_ARB_STAGE1_REQUEST"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Задача 4, Шаг 1 -- оценка на Robinhood за один день"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task4_arb_slow_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+          OWNER_CONFIRMED_DEX_TRADES_ROBINHOOD: "yes"
+        run: python -u analysis/task4_arb_stage1.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK4_ARB_STAGE1_REQUEST
+          [ -e data/p3_guard_cache/task4_arb_stage1_result.json ] && git add data/p3_guard_cache/task4_arb_stage1_result.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          [ -d data/task4_arb_slow_mozila_cache ] && git add data/task4_arb_slow_mozila_cache/
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 4, Шаг 1: оценка на одной цепи/дне, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
