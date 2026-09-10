@@ -217,6 +217,25 @@ def run() -> int:
             outcomes_names = None
         if vol < 1000 or not tokens or not outcomes_names:
             continue
+        # 2026-09-10, реальная находка: n_price_snapshot_ok=0/40, причина
+        # -- 200 OK с ПУСТЫМ history (не ошибка вызова). Многие рынки
+        # живут меньше N_DAYS_BEFORE_RESOLUTION дней (создаются и
+        # разрешаются в тот же день) -- "цена за 7 дней до разрешения"
+        # структурно не существует, токен ещё не торговался. Требуем
+        # реальный срок жизни >= N_DAYS_BEFORE_RESOLUTION + запас 1 день.
+        start_str = m.get("eventStartTime") or m.get("startDate")
+        end_str = m.get("endDate")
+        if start_str and end_str:
+            try:
+                start_dt = datetime.fromisoformat(str(start_str).replace("Z", "+00:00"))
+                end_dt = datetime.fromisoformat(str(end_str).replace("Z", "+00:00"))
+                lifespan_days = (end_dt - start_dt).total_seconds() / 86400
+                if lifespan_days < N_DAYS_BEFORE_RESOLUTION + 1:
+                    continue
+            except (ValueError, TypeError):
+                continue  # даты не распознались -- честно не считаем "достаточно долгоживущим"
+        else:
+            continue  # нет дат старта -- не можем проверить срок жизни, не гадаем
         quality.append(m)
     diag["n_after_quality_filter"] = len(quality)
     print(f"[taskE_step1] после фильтра качества (объём>=$1000, есть clobTokenIds): {len(quality)}")
