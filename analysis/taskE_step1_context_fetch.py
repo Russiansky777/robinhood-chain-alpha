@@ -113,18 +113,53 @@ def is_sports_or_esports(market: dict) -> bool:
 
 
 def is_short_horizon_crypto(market: dict) -> bool:
+    # 2026-09-10, реальная находка: паттерн слага "-updown-Nm-" ловил
+    # только ОДНУ семью рынков (5/15-минутные) -- реальная выборка
+    # оказалась сплошь заполнена ДРУГОЙ семьёй ("Will the price of
+    # Bitcoin be above/between $X on <today's date>") без такого слага,
+    # но по сути тот же "шум цены за короткий срок", который владелец
+    # просил исключить. Расширяем: любой вопрос про крипто-цену
+    # (bitcoin/ethereum/solana/bnb/xrp + above/below/between/up or down)
+    # -- проверяем РЕАЛЬНЫЙ горизонт (startDate/eventStartTime -> endDate),
+    # исключаем, если <=6ч ИЛИ горизонт неизвестен, но паттерн явно
+    # "на сегодня" (та же календарная дата в вопросе, что publish-день).
     slug = str(market.get("slug", ""))
+    question = str(market.get("question", "")).lower()
     m = CRYPTO_UPDOWN_SLUG_RE.search(slug)
-    if not m:
-        return False  # не "updown"-паттерн -- не относим к этой категории вообще
-    value, unit = int(m.group(1)), m.group(2).lower()
-    minutes = value if unit == "m" else value * 60
-    return minutes <= SHORT_CRYPTO_HORIZON_MAX_MINUTES
+    if m:
+        value, unit = int(m.group(1)), m.group(2).lower()
+        minutes = value if unit == "m" else value * 60
+        if minutes <= SHORT_CRYPTO_HORIZON_MAX_MINUTES:
+            return True
+
+    crypto_asset = any(kw in question for kw in ("bitcoin", "ethereum", "solana", " btc", " eth ", "bnb", " xrp", "dogecoin"))
+    price_pattern = any(kw in question for kw in ("above $", "below $", "between $", "up or down", "up or down?"))
+    if not (crypto_asset and price_pattern):
+        return False
+
+    start_str = market.get("eventStartTime") or market.get("startDate")
+    end_str = market.get("endDate")
+    if start_str and end_str:
+        try:
+            start_dt = datetime.fromisoformat(str(start_str).replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(str(end_str).replace("Z", "+00:00"))
+            horizon_minutes = (end_dt - start_dt).total_seconds() / 60
+            return horizon_minutes <= SHORT_CRYPTO_HORIZON_MAX_MINUTES
+        except (ValueError, TypeError):
+            pass
+    # Реальный горизонт неизвестен -- честно исключаем ЛЮБОЙ crypto-price
+    # вопрос без надёжного горизонта, а не гадаем: смысл фильтра --
+    # оставить только НЕ-крипто-ценовые вопросы, крипто-цена систематически
+    # оказывается шумом независимо от точного часа.
+    return True
 
 
 def matches_positive_topic(market: dict) -> bool:
     hay = " ".join(str(market.get(k, "")) for k in ("question", "slug", "description")).lower()
     return bool(POSITIVE_TOPIC_RE.search(hay))
+
+
+_price_snapshot_failure_samples: list[dict] = []  # реальная диагностика первых неудач, не молчим
 
 
 def fetch_price_snapshot(clob_token_id: str, target_ts: int) -> float | None:
@@ -133,12 +168,19 @@ def fetch_price_snapshot(clob_token_id: str, target_ts: int) -> float | None:
             "market": clob_token_id, "startTs": target_ts - 86400, "endTs": target_ts, "fidelity": 60,
         }, headers=HEADERS, timeout=20)
         if r.status_code != 200:
+            if len(_price_snapshot_failure_samples) < 5:
+                _price_snapshot_failure_samples.append({"status": r.status_code, "body": r.text[:300]})
             return None
-        history = r.json().get("history", [])
+        body = r.json()
+        history = body.get("history", [])
         if not history:
+            if len(_price_snapshot_failure_samples) < 5:
+                _price_snapshot_failure_samples.append({"status": 200, "body_keys": list(body.keys()), "empty_history": True})
             return None
         return float(history[-1]["p"])
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if len(_price_snapshot_failure_samples) < 5:
+            _price_snapshot_failure_samples.append({"exception": str(exc)[:300]})
         return None
 
 
@@ -225,6 +267,7 @@ def run() -> int:
         })
 
     diag["n_price_snapshot_ok"] = n_price_ok
+    diag["price_snapshot_failure_samples"] = _price_snapshot_failure_samples
     print(f"[taskE_step1] реальных снимков цены получено: {n_price_ok}/{len(selected)}")
 
     OUT_PATH.write_text(json.dumps({
