@@ -88,7 +88,14 @@ def run() -> int:
     plans_with_historical = [c for c in cards if c["historical_included"]]
     result["plans_with_historical_included"] = plans_with_historical
     if plans_with_historical:
-        cheapest = min(plans_with_historical, key=lambda c: c["title"] or "")
+        # 2026-09-10, реальный найденный баг: сортировка по title как по
+        # строке дала "100K" ($59) вместо реально самого дешёвого "20K"
+        # ($30) -- строковое "100K" < "20K" алфавитно, но 30 < 59 по
+        # цене. Сортируем по РЕАЛЬНОМУ числу из price_raw, не по имени плана.
+        def _price_num(c: dict) -> float:
+            m = re.search(r"[\d.]+", c["price_raw"] or "")
+            return float(m.group()) if m else float("inf")
+        cheapest = min(plans_with_historical, key=_price_num)
         result["cheapest_plan_with_historical_raw"] = cheapest
         print(f"\n[taskD_pricing] реальный САМЫЙ ДЕШЁВЫЙ план с включённым Historical Odds: "
               f"{cheapest['title']} -- {cheapest['price_raw']}")
