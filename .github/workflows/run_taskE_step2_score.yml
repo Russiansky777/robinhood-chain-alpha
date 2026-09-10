@@ -1,0 +1,46 @@
+name: "Задача E -- Шаг 2: реальный Brier score (отдельный поздний запуск, только агрегаты на выход)"
+
+# Владелец, 2026-09-10: запускать ТОЛЬКО после того, как коммит Шага 1
+# (с уже заполненными llm_probability_estimate) виден в истории git.
+# Скрипт сам запрашивает реальные исходы и сам считает Brier score --
+# в результат попадают только агрегаты, ни одного сырого исхода.
+# Публичный Polymarket API, не Dune/GT -- безопасно параллельно с
+# ретро-сторожком (не тронут).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача E, Шаг 2 -- реальный Brier score (только агрегаты)"
+        run: python -u analysis/taskE_step2_score.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/p3_guard_cache/taskE_step2_brier_result.json ] && git add data/p3_guard_cache/taskE_step2_brier_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача E, Шаг 2: Brier score, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

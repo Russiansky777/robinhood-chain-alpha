@@ -1,0 +1,52 @@
+name: "Задача E -- Шаг 1: реальный fetch контекста (код физически не ссылается на исходы)"
+
+# Владелец, 2026-09-10: структурное (не файловое/дисциплинарное)
+# разделение по времени. Этот шаг физически не содержит кода, который
+# бы читал/писал поле исхода (outcomePrices) -- см. docstring скрипта.
+# Публичный Polymarket API, не Dune/GT -- безопасно параллельно с
+# ретро-сторожком (не тронут).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKE_STEP1_CONTEXT_FETCH_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача E, Шаг 1 -- реальный fetch контекста, без ссылок на исходы"
+        run: python -u analysis/taskE_step1_context_fetch.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKE_STEP1_CONTEXT_FETCH_REQUEST
+          [ -e data/p3_guard_cache/taskE_step1_questions_context.json ] && git add data/p3_guard_cache/taskE_step1_questions_context.json
+          [ -e data/p3_guard_cache/taskE_step1_diagnostics.json ] && git add data/p3_guard_cache/taskE_step1_diagnostics.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача E, Шаг 1: контекст рынков (без исходов), результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
