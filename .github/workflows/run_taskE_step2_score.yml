@@ -6,9 +6,24 @@ name: "Задача E -- Шаг 2: реальный Brier score (отдельн�
 # в результат попадают только агрегаты, ни одного сырого исхода.
 # Публичный Polymarket API, не Dune/GT -- безопасно параллельно с
 # ретро-сторожком (не тронут).
+#
+# 2026-09-10, реальная находка: workflow_dispatch-only воркфлоу без
+# единого срабатывания на исходной ветке не регистрируется GitHub
+# Actions (нет workflow_id) и не вызывается через API/UI (404) --
+# это не связано с временным разделением, а с тем, как GitHub вообще
+# узнаёт о существовании воркфлоу вне дефолтной ветки. Добавлен
+# push-триггер на маркер-файл -- та же уже принятая в проекте схема,
+# что у Шага 1 (run_taskE_step1_context_fetch.yml). Порядок реально
+# соблюдён: этот файл добавляется и коммит с маркером делается уже
+# ПОСЛЕ того, как коммит Шага 1 с заполненными оценками виден в git.
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKE_STEP2_SCORE_REQUEST"
 
 jobs:
   score:
@@ -32,6 +47,7 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKE_STEP2_SCORE_REQUEST
           [ -e data/p3_guard_cache/taskE_step2_brier_result.json ] && git add data/p3_guard_cache/taskE_step2_brier_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача E, Шаг 2: Brier score, результат [automated]"
