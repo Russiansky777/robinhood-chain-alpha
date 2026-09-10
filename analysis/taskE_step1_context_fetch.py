@@ -89,7 +89,17 @@ SPORTS_ESPORTS_KEYWORDS = (
     "hltv", "map winner", "maps won", "best-of-", " bo3", " bo5",
     "cbb", "cwbb", "wbb", "a-league", "btts", "both teams to score",
     "college basketball", "college football", "la liga", "bundesliga",
-    "serie a", "ligue 1", "mls", "wnba", "ncaaf", "ncaab", "cfb", "cfl", "afl",
+    "serie a", "série a", "ligue 1", "liga 1", "mls", "wnba", "ncaaf",
+    "ncaab", "cfb", "cfl", "afl",
+    # 2026-09-10, реальная находка доказательного прогона: описания
+    # футбольных "Exact Score" рынков РЕАЛЬНО называют лигу текстом
+    # ("In the upcoming Liga MX game...", "...NWSL game...", "...USL
+    # Championship game...", "...Primera División Argentina game...",
+    # "...Peru Liga 1 game...", "...Brazil Série A game...") -- просто
+    # не было в списке. Это не команды без спортивных слов (тот случай
+    # по-прежнему требует ручной проверки), а прямой пробел в списке лиг.
+    "liga mx", "nwsl", "usl championship", "primera división argentina",
+    "primera division argentina", "exact score",
     # 2026-09-10, реальное известное ограничение (не исправлено этим
     # прогоном): команды без спортивных слов в тексте ("In the upcoming
     # game... If Macarthur FC wins...") этот список НЕ ловит -- нужна
