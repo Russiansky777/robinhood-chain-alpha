@@ -11,17 +11,7 @@ name: "Задача D -- выгрузка Pinnacle + сопоставление 
 # автоматически маскирует значение в логах, нигде не печатается.
 
 on:
-  workflow_dispatch:
-    inputs:
-      window_days:
-        description: "Окно в днях (по умолчанию -- полный план 30)"
-        default: "30"
-      snapshots_per_day:
-        description: "Снимков в день (по умолчанию -- полный план 12)"
-        default: "12"
-      sports:
-        description: "Список спортов через запятую"
-        default: "americanfootball_nfl,basketball_nba,baseball_mlb"
+  workflow_dispatch: {}
   push:
     branches:
       - claude/sc1-pons-v2-launcher-efdbyt
@@ -61,9 +51,12 @@ jobs:
         if: hashFiles('data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST') != ''
         env:
           THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
-          TASKD_WINDOW_DAYS: ${{ github.event.inputs.window_days || '30' }}
-          TASKD_SNAPSHOTS_PER_DAY: ${{ github.event.inputs.snapshots_per_day || '12' }}
-          TASKD_SPORTS: ${{ github.event.inputs.sports || 'americanfootball_nfl,basketball_nba,baseball_mlb' }}
+          # Подтверждённый владельцем план (2026-09-10), захардкожено
+          # намеренно -- реальные деньги, не полагаемся на вычисление
+          # github.event.inputs при push-триггере (может быть пустым).
+          TASKD_WINDOW_DAYS: "30"
+          TASKD_SNAPSHOTS_PER_DAY: "12"
+          TASKD_SPORTS: "americanfootball_nfl,basketball_nba,baseball_mlb"
         run: python -u analysis/taskD_pinnacle_historical_fetch.py
 
       - name: "Задача D -- бесплатный анализ (сопоставление + расхождение)"
