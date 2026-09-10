@@ -31,7 +31,11 @@ def fetch_outcome_prices(slug: str) -> list[float] | None:
     # реальном запуске -- логируем ТОЛЬКО статус-код и форму ответа
     # (тип/длина списка, есть ли ключ outcomePrices), НИКОГДА не сами
     # значения outcomePrices -- это раскрыло бы исход прямо в логах.
-    r = requests.get(f"{GAMMA_BASE}/markets", params={"slug": slug}, headers=HEADERS, timeout=20)
+    # 2026-09-10, первая точечная правка по факту диагностики: 28/28
+    # запросов вернули status=200, body=[] -- без closed=true gamma-api
+    # не находит уже закрытые рынки по slug (тот же паттерн, что уже
+    # был реально обнаружен и исправлен в fetch_closed_markets() Шага 1).
+    r = requests.get(f"{GAMMA_BASE}/markets", params={"slug": slug, "closed": "true"}, headers=HEADERS, timeout=20)
     if r.status_code != 200:
         print(f"[taskE_step2][diag] slug={slug} status={r.status_code} (не 200)")
         return None

@@ -68,6 +68,13 @@ SPORTS_ESPORTS_KEYWORDS = (
     "dota 2", "overwatch", "rocket league", "starcraft", "fortnite", "esports",
     "esport", "call of duty", "rainbow six", "apex legends", "warzone",
     "hltv", "map winner", "maps won", "best-of-", " bo3", " bo5",
+    # 2026-09-10, реальная находка Шага 2 -- Polymarket использует
+    # аббревиатуры лиг вместо развёрнутых слов, что пропускало
+    # college basketball (cbb-stjohn-george...) и футбол A-League
+    # (aus-wsw-mac...btts) через фильтр:
+    "cbb", "a-league", "btts", "both teams to score", "college basketball",
+    "college football", "la liga", "bundesliga", "serie a", "ligue 1",
+    "mls", "wnba", "ncaaf", "ncaab", "cfb", "cfl", "afl",
 )
 SPORTS_ESPORTS_RE = re.compile(
     r"\b(" + "|".join(re.escape(kw) for kw in SPORTS_ESPORTS_KEYWORDS) + r")\b", re.IGNORECASE)
