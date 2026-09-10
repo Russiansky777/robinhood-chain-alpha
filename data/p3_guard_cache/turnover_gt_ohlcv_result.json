@@ -1,0 +1,365 @@
+{
+  "purpose": "Ретро-сторожок через GT OHLCV (обход отсутствия volume в DefiLlama chart): эпизоды TVL>=$2M пулов с оборотом >20x TVL >=3 дня подряд, 90 дней, 0 кредитов",
+  "generated_at_utc": "2026-09-10T16:28:02Z",
+  "tvl_min_usd": 2000000.0,
+  "turnover_mult_min": 20.0,
+  "episode_min_days": 3,
+  "n_gt_networks": 227,
+  "n_pools_total_snapshot": 17127,
+  "n_pools_tvl_ge_2m_now": 1905,
+  "sample_raw_pool_record": {
+    "chain": "Ethereum",
+    "project": "lido",
+    "symbol": "STETH",
+    "tvlUsd": 23559472109,
+    "apyBase": 2.247,
+    "apyReward": null,
+    "apy": 2.247,
+    "rewardTokens": null,
+    "pool": "747c1d2a-c668-4682-b9f9-296708a3dd90",
+    "apyPct1D": -0.084,
+    "apyPct7D": 0.056,
+    "apyPct30D": 0.064,
+    "stablecoin": false,
+    "ilRisk": "no",
+    "exposure": "single",
+    "predictions": {
+      "predictedClass": "Stable/Up",
+      "predictedProbability": 72,
+      "binnedConfidence": 2
+    },
+    "poolMeta": null,
+    "mu": 3.43129,
+    "sigma": 0.05385,
+    "count": 1559,
+    "outlier": false,
+    "underlyingTokens": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "il7d": null,
+    "apyBase7d": null,
+    "apyMean30d": 2.22546,
+    "volumeUsd1d": null,
+    "volumeUsd7d": null,
+    "apyBaseInception": null
+  },
+  "n_pools_with_address_field": 544,
+  "n_distinct_chains": 60,
+  "n_chains_mapped_to_gt": 39,
+  "chain_to_gt_network": {
+    "Katana": "katana",
+    "Etherlink": "etherlink",
+    "BSC": "bsc",
+    "Fraxtal": "fraxtal",
+    "Cardano": "cardano",
+    "ICP": "icp",
+    "ZIGChain": "zigchain",
+    "Sonic": "sonic",
+    "Mantle": "mantle",
+    "Starknet": "starknet-alpha",
+    "Tron": "tron",
+    "Mezo": "mezo",
+    "Berachain": "berachain",
+    "Xlayer": "x-layer",
+    "Ethereum": "eth",
+    "MegaETH": "megaeth",
+    "Linea": "linea",
+    "XRPL": "xrpl",
+    "Arbitrum": "arbitrum",
+    "Stellar": "stellar",
+    "Aptos": "aptos",
+    "Pharos": "pharos",
+    "Avalanche": "avax",
+    "Fantom": "ftm",
+    "Ink": "ink",
+    "Solana": "solana",
+    "Monad": "monad",
+    "Thorchain": "thorchain",
+    "Base": "base",
+    "Stable": "stable",
+    "Stacks": "stacks",
+    "Tempo": "tempo",
+    "Flare": "flare",
+    "Citrea": "citrea",
+    "Cronos": "cro",
+    "Filecoin": "filecoin",
+    "TON": "ton",
+    "Plasma": "plasma",
+    "Kava": "kava"
+  },
+  "chains_unmapped": [
+    "Algorand",
+    "Bifrost Network",
+    "Bitcoin",
+    "Bob",
+    "Flow",
+    "Gnosis",
+    "Heco",
+    "Hyperliquid L1",
+    "Move",
+    "MultiversX",
+    "Neutron",
+    "Noble",
+    "OP Mainnet",
+    "Osmosis",
+    "Plume Mainnet",
+    "Polkadot",
+    "Polygon",
+    "Robinhood Chain",
+    "Sei",
+    "Sui",
+    "Venom"
+  ],
+  "n_candidates": 518,
+  "diag_sample_size": 15,
+  "diag_match_rate": 0.6,
+  "diag_detail": [
+    {
+      "pool_uuid": "33c732f6-a78d-41da-af5b-ccd9fa5e52d5",
+      "project": "kelp",
+      "symbol": "RSETH",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 1072126180,
+      "token_addrs": [
+        "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+        "0xA35b1B31Ce002FBF2058D22F30f95D405200A15b"
+      ],
+      "diag_status": "не найден пул на GT с обоими токенами"
+    },
+    {
+      "pool_uuid": "712ce948-bd9e-4f4a-8916-b72c447f7578",
+      "project": "usd-ai",
+      "symbol": "SUSDAI",
+      "chain": "Arbitrum",
+      "gt_network": "arbitrum",
+      "tvl_usd_now": 462729491,
+      "token_addrs": [
+        "0x46850aD61C2B7d64d08c9C754F45254596696984",
+        "0x0a1a1a107e45b7ced86833863f482bc5f4ed82ef"
+      ],
+      "diag_status": "ошибка: 429 после 4 попыток"
+    },
+    {
+      "pool_uuid": "8276be38-acc6-4005-ab0d-62680f49f4df",
+      "project": "morpho-blue",
+      "symbol": "SIRLOINUSDC",
+      "chain": "Base",
+      "gt_network": "base",
+      "tvl_usd_now": 384571944,
+      "token_addrs": [
+        "0xa0d7a0D7F0A3CE1336B90Def568FA83b2DB157A8",
+        "0xBAa5CC21fd487B8Fcc2F632f3F4E8D37262a0842"
+      ],
+      "diag_status": "не найден пул на GT с обоими токенами"
+    },
+    {
+      "pool_uuid": "1c312830-ee96-40c9-b55f-b0f209ca6ebd",
+      "project": "re",
+      "symbol": "REUSD",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 243659574,
+      "token_addrs": [
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x3416cf6c708da44db2624d63ea0aaef7113527c6",
+      "gt_reserve_usd": 34079474.6234,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "25171c4c-1877-449a-9f88-45a9f153ee31",
+      "project": "curve-dex",
+      "symbol": "DAI-USDC-USDT",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 160310828,
+      "token_addrs": [
+        "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7",
+      "gt_reserve_usd": 160133618.1864,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "8ac917c6-12fa-49df-aa0b-ced2ebe54e91",
+      "project": "uniswap-v2",
+      "symbol": "WISE-WETH",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 138407521,
+      "token_addrs": [
+        "0x66a0f676479cee1d7373f3dc2e2952778bff5bd6",
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x21b8065d10f73ee2e260e5b47d3344d3ced7596e",
+      "gt_reserve_usd": 138620746.8805,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "9829fc1f-8f3a-5b29-a4b1-843b2996c95d",
+      "project": "aave-v3",
+      "symbol": "SYRUPUSDC",
+      "chain": "Monad",
+      "gt_network": "monad",
+      "tvl_usd_now": 125573142,
+      "token_addrs": [
+        "0x561Ad6156D0106E7a59EE788759dF7B7Ec679BD0",
+        "0xbCB741D432D56B07F4Ccc2E9A8fE044EB6b4B3F6"
+      ],
+      "diag_status": "не найден пул на GT с обоими токенами"
+    },
+    {
+      "pool_uuid": "b99bcdf5-1350-4269-981e-0e9b5cccb007",
+      "project": "uniswap-v3",
+      "symbol": "WETH-USDC",
+      "chain": "Base",
+      "gt_network": "base",
+      "tvl_usd_now": 117584139,
+      "token_addrs": [
+        "0x4200000000000000000000000000000000000006",
+        "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x6c561b446416e1a00e8e93e221854d6ea4171372",
+      "gt_reserve_usd": 117755636.7558,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "fc9f488e-8183-416f-a61e-4e5c571d4395",
+      "project": "uniswap-v3",
+      "symbol": "WETH-USDT",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 108382371,
+      "token_addrs": [
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "0xdac17f958d2ee523a2206206994597c13d831ec7"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x4e68ccd3e89f51c3074ca5072bbac773960dfa36",
+      "gt_reserve_usd": 108316704.359,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "665dc8bc-c79d-4800-97f7-304bf368e547",
+      "project": "uniswap-v3",
+      "symbol": "USDC-WETH",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 105351903,
+      "token_addrs": [
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+      "gt_reserve_usd": 105382772.0271,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "0899ff3d-adc8-4dae-a516-a94998db3332",
+      "project": "uniswap-v4",
+      "symbol": "PYUSD-USDS",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 100132501,
+      "token_addrs": [
+        "0x6c3ea9036406852006290770bedfcaba0e23a0e8",
+        "0xdc035d45d973e3ec169d2276ddab16f1e407384f"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0xe63e32b2ae40601662f760d6bf5d771057324fbd97784fe1d3717069f7b75d45",
+      "gt_reserve_usd": 100094073.042,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "57d30b9c-fc66-4ac2-b666-69ad5f410cce",
+      "project": "curve-dex",
+      "symbol": "ETH-STETH",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 99416296,
+      "token_addrs": [
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0xdc24316b9ae028f1497c275eb9192a3ea0f67022",
+      "gt_reserve_usd": 99343963.3759,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "3c4132bf-ef75-5162-8558-70fd4fa91c81",
+      "project": "uniswap-v4",
+      "symbol": "BMD-USDC",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 97053729,
+      "token_addrs": [
+        "0x9b525165b10e6da960fdfa6b34544771f442d9c4",
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+      ],
+      "diag_status": "не найден пул на GT с обоими токенами"
+    },
+    {
+      "pool_uuid": "4f715567-420c-400d-9a62-0059331e3940",
+      "project": "fluid-dex",
+      "symbol": "WSTETH-ETH",
+      "chain": "Ethereum",
+      "gt_network": "eth",
+      "tvl_usd_now": 86029569,
+      "token_addrs": [
+        "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "diag_status": "OK",
+      "gt_pool_address": "0x1d5b2949ece8754c2d736991c62c5162bd144f497b2212182401b9bae77e2d76",
+      "gt_reserve_usd": 462977.7723,
+      "n_ohlcv_days": 90
+    },
+    {
+      "pool_uuid": "34f65227-f3f9-5c3f-9182-f6eca85ae729",
+      "project": "aave-v3",
+      "symbol": "USDE",
+      "chain": "Monad",
+      "gt_network": "monad",
+      "tvl_usd_now": 84309681,
+      "token_addrs": [
+        "0x418C18F3D2086b0a44C50341682B45A5c369876A",
+        "0x561Ad6156D0106E7a59EE788759dF7B7Ec679BD0"
+      ],
+      "diag_status": "не найден пул на GT с обоими токенами"
+    }
+  ],
+  "episodes_by_pool": {},
+  "processed_pool_uuids": [
+    "0899ff3d-adc8-4dae-a516-a94998db3332",
+    "128b253a-0903-476f-9a70-6007b336e395",
+    "17e0b32c-db36-4ecd-9cfc-25943ebb756b",
+    "1c312830-ee96-40c9-b55f-b0f209ca6ebd",
+    "25171c4c-1877-449a-9f88-45a9f153ee31",
+    "33c732f6-a78d-41da-af5b-ccd9fa5e52d5",
+    "34f65227-f3f9-5c3f-9182-f6eca85ae729",
+    "3c4132bf-ef75-5162-8558-70fd4fa91c81",
+    "4f715567-420c-400d-9a62-0059331e3940",
+    "57d30b9c-fc66-4ac2-b666-69ad5f410cce",
+    "665dc8bc-c79d-4800-97f7-304bf368e547",
+    "712ce948-bd9e-4f4a-8916-b72c447f7578",
+    "8276be38-acc6-4005-ab0d-62680f49f4df",
+    "8ac917c6-12fa-49df-aa0b-ced2ebe54e91",
+    "9829fc1f-8f3a-5b29-a4b1-843b2996c95d",
+    "b99bcdf5-1350-4269-981e-0e9b5cccb007",
+    "d3abc08b-8d68-412c-9c77-f31b7bfba672",
+    "da5e182c-b440-4b80-ab54-c1bc94a4ffd4",
+    "e91e23af-9099-45d9-8ba5-ea5b4638e453",
+    "fc9f488e-8183-416f-a61e-4e5c571d4395"
+  ],
+  "resolve_errors": {},
+  "n_processed_so_far": 20
+}
