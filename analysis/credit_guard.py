@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -419,7 +420,18 @@ def _save(state: dict) -> None:
 
 def _git_commit(message: str) -> None:
     """Коммитит data/credits_spent.json немедленно, не дожидаясь
-    финального шага workflow -- см. docstring модуля."""
+    финального шага workflow -- см. docstring модуля.
+
+    2026-09-10, реальная находка (run 34493254959, turnover_gt_ohlcv.py --
+    та же голая `git push`-логика без ретрая): при конкурентном пуше с
+    другой ветки/воркфлоу на ту же ветку push молча (check=False)
+    проваливался 10/10 раз подряд, и весь прогресс остался только
+    локально в раннере -- потерян безвозвратно при завершении джоба.
+    Для credit_guard это КРИТИЧНЕЕ: здесь коммитятся реальные траты
+    Dune-денег -- потерянный пуш означает, что реальный расход НЕ
+    отражён в леджере, и будущие проверки бюджета его не увидят. Тот
+    же pull-rebase-retry, что уже используется в финальных шагах
+    воркфлоу."""
     try:
         subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=False)
         subprocess.run(
@@ -431,7 +443,15 @@ def _git_commit(message: str) -> None:
         if diff.returncode == 0:
             return  # нечего коммитить
         subprocess.run(["git", "commit", "-m", message], check=False)
-        subprocess.run(["git", "push"], check=False)
+        for attempt in range(5):
+            push = subprocess.run(["git", "push"], check=False)
+            if push.returncode == 0:
+                return
+            print(f"[credit_guard] push отклонён, попытка {attempt+1}/5 -- git pull --rebase и повтор")
+            subprocess.run(["git", "pull", "--rebase"], check=False)
+            time.sleep(3)
+        print(f"[credit_guard] КРИТИЧНО: не удалось запушить {CREDITS_FILE} после 5 попыток -- "
+              "реальная трата закоммичена только ЛОКАЛЬНО в раннере, будет потеряна при завершении джоба.")
     except Exception as exc:  # никогда не роняем пайплайн из-за коммита гарда
         print(f"[credit_guard] ПРЕДУПРЕЖДЕНИЕ: не удалось закоммитить {CREDITS_FILE}: {exc}")
 

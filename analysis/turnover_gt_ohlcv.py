@@ -186,13 +186,28 @@ def compute_episodes(daily_turnover: list[tuple[str, float]]) -> list[dict]:
 
 
 def _git_checkpoint(message: str) -> None:
+    """2026-09-10, реальная находка (run 34493254959): голый `git push`
+    без ретрая -- 10/10 реальных чекпоинтов (20..200/516 кандидатов,
+    77 минут реальной работы) закоммитились ЛОКАЛЬНО, но НИ ОДИН не
+    запушился (`! [rejected] ... fetch first` -- конкурентные пуши от
+    параллельного воркфлоу Задачи 4 на ту же ветку), и всё было
+    потеряно при отмене джоба. Тот же pull-rebase-retry, что уже
+    используется в финальных шагах воркфлоу -- 5 попыток."""
     try:
         subprocess.run(["git", "add", str(OUT_PATH)], check=False)
         diff = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
         if diff.returncode == 0:
             return
         subprocess.run(["git", "commit", "-m", message], check=False)
-        subprocess.run(["git", "push"], check=False)
+        for attempt in range(5):
+            push = subprocess.run(["git", "push"], check=False)
+            if push.returncode == 0:
+                return
+            print(f"[turnover_gt_ohlcv] push чекпоинта отклонён, попытка {attempt+1}/5 -- git pull --rebase и повтор")
+            subprocess.run(["git", "pull", "--rebase"], check=False)
+            time.sleep(3)
+        print("[turnover_gt_ohlcv] чекпоинт НЕ запушился после 5 попыток -- прогресс остаётся только локально в раннере, "
+              "риск потери при отмене/таймауте (зафиксировано честно, не молчим).")
     except Exception as exc:  # noqa: BLE001
         print(f"[turnover_gt_ohlcv] чекпоинт-коммит не удался (не критично, продолжаем): {exc}")
 

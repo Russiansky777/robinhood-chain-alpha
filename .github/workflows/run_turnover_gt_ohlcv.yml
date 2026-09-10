@@ -41,10 +41,23 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          # 2026-09-10, реальная находка (run 34493254959): скрипт сам
+          # коммитит чекпоинты локально каждые 20 пулов, но при отмене/
+          # сбое джоба эти коммиты остаются НЕПУШЕННЫМИ, если push
+          # внутри скрипта не смог пробиться (конкурентный пуш с другой
+          # ветки/воркфлоу). Старая версия этого шага делала `git diff
+          # --cached --quiet && exit 0` -- если новых изменений для
+          # коммита нет (последний чекпоинт уже закоммичен локально),
+          # шаг выходил, ДАЖЕ НЕ ПОПЫТАВШИСЬ запушить уже накопленные
+          # непушенные коммиты. Итог -- 77 минут реальной работы (10
+          # чекпоинтов, 200/516 кандидатов) потеряны безвозвратно при
+          # отмене джоба. Теперь: коммитим, если есть что коммитить, но
+          # PUSH пробуем ВСЕГДА, независимо от того, был ли новый коммит.
           git rm -f --ignore-unmatch data/p3_guard_cache/TURNOVER_GT_OHLCV_REQUEST
           [ -e data/p3_guard_cache/turnover_gt_ohlcv_result.json ] && git add data/p3_guard_cache/turnover_gt_ohlcv_result.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Ретро-сторожок GT OHLCV: финальный результат/чекпоинт [automated]"
+          if ! git diff --cached --quiet; then
+            git commit -m "Ретро-сторожок GT OHLCV: финальный результат/чекпоинт [automated]"
+          fi
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
