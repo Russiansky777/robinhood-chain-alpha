@@ -87,7 +87,8 @@ def fetch_kalshi_games(series_ticker: str) -> list[dict]:
     return list(games.values())
 
 
-def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100) -> list[dict]:
+def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100,
+                           window_min_override: str | None = None, window_max_override: str | None = None) -> list[dict]:
     """Bulk-fetch -- ЕДИНСТВЕННЫЙ реально работающий путь для активных
     рынков (tag_slug/search НЕ фильтруют, см. taskC_polymarket_btc_
     probe_result.json / taskC_sports_match_probe_result.json).
@@ -110,11 +111,20 @@ def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100) -> list[dic
     фильтра вообще) РЕАЛЬНО фильтруют /markets -- проверено эмпирически,
     не на слово документации. Используем их напрямую для closed-среза,
     скоуп -- ровно наше окно [-WINDOW_DAYS_BACK; +WINDOW_DAYS_FWD], без
-    пагинации через нерелевантные категории."""
+    пагинации через нерелевантные категории.
+
+    2026-09-10, Задача D переоткрыта повторно на СЫГРАННЫХ сезонах
+    2025/начала 2026 -- окно по умолчанию (относительно "сейчас")
+    структурно не может покрыть данные годичной давности, это не баг
+    логики сопоставления, а параметр под другой сценарий (недавнее
+    прошлое). `window_min_override`/`window_max_override` (ISO8601)
+    позволяют вызвать closed-срез с ЯВНЫМ окном под реальный диапазон
+    дат события, не трогая поведение по умолчанию для существующих
+    вызовов (Задача 2, сама Задача C)."""
     out = {}
     now = datetime.now(timezone.utc)
-    window_min = (now - timedelta(days=WINDOW_DAYS_BACK)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    window_max = (now + timedelta(days=WINDOW_DAYS_FWD)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    window_min = window_min_override or (now - timedelta(days=WINDOW_DAYS_BACK)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    window_max = window_max_override or (now + timedelta(days=WINDOW_DAYS_FWD)).strftime("%Y-%m-%dT%H:%M:%SZ")
     passes = [
         {"active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
         {"active": "true", "closed": "false", "order": "endDate", "ascending": "true"},

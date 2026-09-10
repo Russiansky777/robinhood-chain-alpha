@@ -107,9 +107,25 @@ def run() -> int:
     result["n_unique_pinnacle_events"] = len(events_by_id)
     print(f"[taskD_analysis] уникальных событий Pinnacle: {len(events_by_id)}")
 
-    # 2. Polymarket bulk-fetch -- переиспользуем taskC как есть.
+    # 2. Polymarket bulk-fetch -- переиспользуем taskC как есть, но с
+    # ЯВНЫМ окном под реальный диапазон дат событий (2026-09-10, Задача D
+    # переоткрыта повторно на сыгранных сезонах 2025/начала 2026 --
+    # окно по умолчанию функции считается от "сейчас" и НЕ покрывает
+    # данные годичной давности; сама логика сопоставления не тронута).
+    commence_dts = []
+    for ev in events_by_id.values():
+        try:
+            commence_dts.append(datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")))
+        except (ValueError, AttributeError):
+            pass
+    window_min_override = window_max_override = None
+    if commence_dts:
+        window_min_override = (min(commence_dts) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        window_max_override = (max(commence_dts) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"[taskD_analysis] реальное окно событий: {min(commence_dts)} .. {max(commence_dts)} "
+              f"-> Polymarket closed-окно с запасом {window_min_override} .. {window_max_override}")
     print("[taskD_analysis] Polymarket bulk-fetch (переиспользуем taskC_sports_matcher.fetch_polymarket_bulk)...")
-    pm_markets = fetch_polymarket_bulk()
+    pm_markets = fetch_polymarket_bulk(window_min_override=window_min_override, window_max_override=window_max_override)
     print(f"[taskD_analysis] реальных рынков Polymarket загружено: {len(pm_markets)}")
     result["n_polymarket_markets_scanned"] = len(pm_markets)
 
