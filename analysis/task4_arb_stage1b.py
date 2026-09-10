@@ -177,23 +177,58 @@ def run() -> int:
         return 1
     print(f"[stage1b] реальный референс-пул: {ref['address']} (reserve ${ref['reserve_usd']:,.0f} vs хвост ${probe_pool['reserve_usd']:,.0f})")
 
-    print(f"\n=== РЕАЛЬНЫЙ Dune-запрос: сырые свопы для (хвост+референс), один день -- оценка Шага 2 ===")
+    # 2026-09-10, реальная находка ЭТОГО же шага (первая попытка): пул с
+    # максимальным TVL для пары -- 924 923 реальных строки за один день
+    # (~10 свопов/сек) -- ботовый/wash-trading, не органический
+    # ценовой ориентир, credit_guard отказался платить за чтение
+    # (expected_max_rows=50000 жёстко превышен). Референс-цене НЕ нужна
+    # построчная детализация (время жизни расхождения считается на
+    # ХВОСТОВОМ пуле, где свопов на порядки меньше) -- минутный VWAP
+    # достаточен для "медленного" арбитража (порог >=10с) и схлопывает
+    # любое число строк в максимум 1440 бакетов/день. Раздельные
+    # запросы: сырые свопы ТОЛЬКО для хвостового пула, минутный VWAP
+    # для референс-пула.
+    print(f"\n=== РЕАЛЬНЫЙ Dune-запрос 1: сырые свопы хвостового пула, один день ===")
     spent_before2 = credit_guard.load_state()[ns]["spent"]
-    pool_list_sql = ",".join(f"from_hex('{a[2:].lower()}')" for a in (probe_pool["pool_address"], ref["address"]))
-    sql_raw = (read_sql("task4/task4_arb_raw_swaps")
+    tail_list_sql = f"from_hex('{probe_pool['pool_address'][2:].lower()}')"
+    sql_tail = (read_sql("task4/task4_arb_raw_swaps")
+                .replace("{{chain}}", PROBE_CHAIN)
+                .replace("{{pool_address_list}}", tail_list_sql)
+                .replace("{{day_start}}", day_start_dt.strftime("%Y-%m-%d %H:%M:%S"))
+                .replace("{{day_end}}", day_end_dt.strftime("%Y-%m-%d %H:%M:%S")))
+    qid_tail = client.create_query("task4_arb_tail_raw_swaps_probe", sql_tail)
+    df_tail = client.run_sql_cached("task4_arb_raw_swaps_tail", sql_tail, query_id=qid_tail,
+                                     estimated_credits=5.0, expected_max_rows=5000, expected_columns=8)
+    spent_after_tail = credit_guard.load_state()[ns]["spent"]
+    cost_tail_day = spent_after_tail - spent_before2
+    n_rows_tail = len(df_tail) if df_tail is not None else 0
+    print(f"[stage1b] реальная стоимость (хвостовой пул, 1 день): {cost_tail_day:.4f} кредита, строк: {n_rows_tail}")
+
+    print(f"\n=== РЕАЛЬНЫЙ Dune-запрос 2: минутный VWAP референс-пула, один день ===")
+    ref_list_sql = f"from_hex('{ref['address'][2:].lower()}')"
+    token_list_sql = f"from_hex('{probe_pool['base_token'][2:].lower()}')" if probe_pool.get("base_token") else tail_list_sql
+    sql_ref = (read_sql("task4/task4_arb_reference_minute_vwap")
                .replace("{{chain}}", PROBE_CHAIN)
-               .replace("{{pool_address_list}}", pool_list_sql)
+               .replace("{{pool_address_list}}", ref_list_sql)
+               .replace("{{token_address_list}}", token_list_sql)
                .replace("{{day_start}}", day_start_dt.strftime("%Y-%m-%d %H:%M:%S"))
                .replace("{{day_end}}", day_end_dt.strftime("%Y-%m-%d %H:%M:%S")))
-    qid_raw = client.create_query("task4_arb_raw_swaps_probe", sql_raw)
-    df_raw = client.run_sql_cached("task4_arb_raw_swaps", sql_raw, query_id=qid_raw,
-                                    estimated_credits=5.0, expected_max_rows=50000, expected_columns=8)
-    spent_after2 = credit_guard.load_state()[ns]["spent"]
-    cost_pair_day = spent_after2 - spent_before2
-    n_rows = len(df_raw) if df_raw is not None else 0
+    qid_ref = client.create_query("task4_arb_reference_minute_vwap_probe", sql_ref)
+    df_ref = client.run_sql_cached("task4_arb_reference_minute_vwap", sql_ref, query_id=qid_ref,
+                                    estimated_credits=5.0, expected_max_rows=1500, expected_columns=4)
+    spent_after_ref = credit_guard.load_state()[ns]["spent"]
+    cost_ref_day = spent_after_ref - spent_after_tail
+    n_rows_ref = len(df_ref) if df_ref is not None else 0
+    print(f"[stage1b] реальная стоимость (референс-пул, минутный VWAP, 1 день): {cost_ref_day:.4f} кредита, строк: {n_rows_ref}")
+
+    spent_after2 = spent_after_ref
+    cost_pair_day = cost_tail_day + cost_ref_day
+    result["tail_raw_swaps_probe_cost_credits"] = cost_tail_day
+    result["tail_raw_swaps_probe_n_rows"] = n_rows_tail
+    result["reference_minute_vwap_probe_cost_credits"] = cost_ref_day
+    result["reference_minute_vwap_probe_n_rows"] = n_rows_ref
     result["raw_swaps_probe_cost_credits"] = cost_pair_day
-    result["raw_swaps_probe_n_rows"] = n_rows
-    print(f"[stage1b] реальная стоимость (1 пара пулов, 1 день): {cost_pair_day:.4f} кредита, строк: {n_rows}")
+    print(f"[stage1b] реальная суммарная стоимость (хвост+референс, 1 день): {cost_pair_day:.4f} кредита")
 
     # Честная экстраполяция ДОМИНИРУЮЩЕЙ статьи расходов: реальная доля
     # хвостовых пулов x реальное число >=50-своп-пулов x 30 дней x 3
@@ -208,7 +243,10 @@ def run() -> int:
     result["extrapolated_stage2_3chains_month_credits_ASSUMING_SAME_SCALE"] = extrapolated_stage2_3chains_month
     result["extrapolation_caveat"] = ("Base/Arbitrum масштаб активности и доля хвостовых пулов НЕ проверены -- "
                                        "это ОЦЕНКА СВЕРХУ по аналогии с Robinhood, не реальные данные для тех цепей. "
-                                       "Нужен отдельный Шаг 1 на Base и Arbitrum перед реальным запуском там.")
+                                       "Нужен отдельный Шаг 1 на Base и Arbitrum перед реальным запуском там. "
+                                       "Также это ВЕРХНЯЯ граница: несколько хвостовых пулов одной пары могут "
+                                       "делить ОДИН референс-пул -- реальный Шаг 2 может дедуплицировать "
+                                       "референс-запросы по паре и выйти дешевле этой оценки.")
     print(f"\n[stage1b] реальная оценка хвостовых пулов на Robinhood (полная, экстраполяция доли на весь день): {n_tail_estimate_robinhood_full:.0f}")
     print(f"[stage1b] экстраполяция Шага 2 ТОЛЬКО на Robinhood, месяц: {extrapolated_stage2_robinhood_month:.2f} кредита")
     print(f"[stage1b] экстраполяция Шага 2 на 3 цепи (ПРЕДПОЛОЖЕНИЕ такого же масштаба для Base/Arbitrum), месяц: "
