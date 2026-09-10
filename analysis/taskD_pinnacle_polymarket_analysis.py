@@ -116,10 +116,33 @@ def run() -> int:
     # 3. Сопоставление -- та же логика "команды + дата", что в taskC, адаптированная
     # под форму события The Odds API (не переписываем сам matcher, воспроизводим его
     # критерий на другом формате входа, т.к. match_game_to_polymarket ожидает Kalshi-форму).
+    # 2026-09-10, владелец: 2.3% сопоставления (10/430) заподозрено как
+    # проблема -- диагностика на 20 случайных событиях
+    # (taskD_matching_diagnostic.py, реальный прогон) дала: 16/20 --
+    # рынка на Polymarket реально нет (в основном MLB regular season,
+    # проверено узким независимым поиском +/-3д), 4/20 -- "матчер не
+    # находит", из них РОВНО 2 -- чистая, однозначная евиденция реального
+    # бага нормализации: NFL-рынки Polymarket называют команды КОРОТКИМ
+    # nickname'ом без города ("Broncos vs. Chiefs", slug=nfl-den-kc-...),
+    # а строгий predicate требовал ПОЛНОЕ имя команды с городом
+    # ("kansascitychiefs") как целую подстроку -- никогда не совпадёт.
+    # (Остальные 2 "matcher_misses_it" из диагностики -- MLB O/U-рынок с
+    # РЕАЛЬНО другой игровой датой в slug, отклонён датой корректно, не
+    # баг нормализации -- не чиним.)
+    # Точечный фикс: fallback на nickname (последнее значимое слово
+    # названия команды) ТОЛЬКО когда полное имя не совпало, тот же
+    # порог даты -- не ослабляем дисамбигуацию по дате, расширяем
+    # ТОЛЬКО способ найти команду в тексте.
+    def team_nickname(team: str) -> str:
+        words = [w for w in re.sub(r"[^a-zA-Z0-9 ]", " ", team).lower().split()]
+        return normalize(words[-1]) if words else ""
+
     matched = []
     n_team_matched_date_rejected = 0
+    n_matched_via_nickname_fallback = 0
     for ev in events_by_id.values():
         home_n, away_n = normalize(ev["home_team"]), normalize(ev["away_team"])
+        home_nick, away_nick = team_nickname(ev["home_team"]), team_nickname(ev["away_team"])
         try:
             commence_dt = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
         except (ValueError, AttributeError):
@@ -127,7 +150,12 @@ def run() -> int:
         best = None
         for pm in pm_markets:
             q = normalize((pm.get("question") or "") + " " + (pm.get("slug") or ""))
-            if home_n not in q or away_n not in q:
+            via_nickname = False
+            if home_n in q and away_n in q:
+                pass
+            elif home_nick and away_nick and home_nick in q and away_nick in q:
+                via_nickname = True
+            else:
                 continue
             compare_date_str = pm.get("gameStartTime") or pm.get("endDate")
             if not compare_date_str:
@@ -143,10 +171,13 @@ def run() -> int:
                 n_team_matched_date_rejected += 1
                 continue
             if best is None or diff_days < best[0]:
-                best = (diff_days, pm)
+                best = (diff_days, pm, via_nickname)
         if best:
-            matched.append({"event": ev, "polymarket": best[1], "date_diff_days": best[0]})
+            matched.append({"event": ev, "polymarket": best[1], "date_diff_days": best[0], "matched_via_nickname_fallback": best[2]})
+            if best[2]:
+                n_matched_via_nickname_fallback += 1
     result["n_matched_events"] = len(matched)
+    result["n_matched_via_nickname_fallback"] = n_matched_via_nickname_fallback
     result["n_team_matched_but_date_rejected"] = n_team_matched_date_rejected
     print(f"[taskD_analysis] реально сопоставлено событий: {len(matched)} "
           f"(команды совпали, но дата не прошла: {n_team_matched_date_rejected})")
