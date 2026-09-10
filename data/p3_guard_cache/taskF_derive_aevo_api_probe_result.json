@@ -1,0 +1,382 @@
+{
+  "generated_at_utc": "2026-09-10T20:20:47Z",
+  "derive_probe": [
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/public/get_instruments",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option",
+        "expired": "false"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "POST",
+      "path": "/public/get_instruments",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option",
+        "expired": "false"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/public/get_all_currencies",
+      "params": null,
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "POST",
+      "path": "/public/get_all_currencies",
+      "params": null,
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/public/get_option_settlement_history",
+      "params": {
+        "currency": "BTC"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "POST",
+      "path": "/public/get_option_settlement_history",
+      "params": {
+        "currency": "BTC"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/public/get_trade_history",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "POST",
+      "path": "/public/get_trade_history",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option"
+      },
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/openapi.json",
+      "params": null,
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.derive.xyz",
+      "method": "GET",
+      "path": "/swagger.json",
+      "params": null,
+      "status": 404,
+      "content_type": "",
+      "body_snippet": ""
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/public/get_instruments",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option",
+        "expired": "false"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": [{\"instrument_type\": \"option\", \"instrument_name\": \"BTC-20261030-180000-C\", \"scheduled_activation\": 1784665544, \"scheduled_deactivation\": 1793347140, \"is_active\": true, \"tick_size\": \"1\", \"minimum_amount\": \"0.01\", \"maximum_amount\": \"1000\", \"amount_step\": \"0.00001\", \"mark_price_fee_rate_cap\": \"0.125\", \"maker_fee_rate\": \"0.0001\", \"taker_fee_rate\": \"0.0003\", \"base_fee\": \"0.5\", \"base_currency\": \"BTC\", \"quote_currency\": \"USDC\", \"option_details\": {\"index\": \"BTC-USD\", \"expiry\": 1793347200, \"st",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "POST",
+      "path": "/public/get_instruments",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option",
+        "expired": "false"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": [{\"instrument_type\": \"option\", \"instrument_name\": \"BTC-20261030-180000-C\", \"scheduled_activation\": 1784665544, \"scheduled_deactivation\": 1793347140, \"is_active\": true, \"tick_size\": \"1\", \"minimum_amount\": \"0.01\", \"maximum_amount\": \"1000\", \"amount_step\": \"0.00001\", \"mark_price_fee_rate_cap\": \"0.125\", \"maker_fee_rate\": \"0.0001\", \"taker_fee_rate\": \"0.0003\", \"base_fee\": \"0.5\", \"base_currency\": \"BTC\", \"quote_currency\": \"USDC\", \"option_details\": {\"index\": \"BTC-USD\", \"expiry\": 1793347200, \"st",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/public/get_all_currencies",
+      "params": null,
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": [{\"currency\": \"USDC\", \"instrument_types\": [\"erc20\"], \"protocol_asset_addresses\": {\"perp\": null, \"option\": null, \"spot\": \"0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b\", \"underlying_erc20\": \"0x6879287835A86F50f784313dBEd5E5cCC5bb8481\"}, \"managers\": [{\"address\": \"0x6251D8D67563789599c833c5d6ceC69E78BAED39\", \"margin_type\": \"PM2\", \"currency\": \"ZEC\"}, {\"address\": \"0x4695A17dCF9d52a7eE4540fC8aE0C54B787E2135\", \"margin_type\": \"PM2\", \"currency\": \"ADA\"}, {\"address\": \"0x3D04C31b4cCd13cf815289E7EC7E",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "POST",
+      "path": "/public/get_all_currencies",
+      "params": null,
+      "status": 400,
+      "content_type": "application/json",
+      "body_snippet": "{\"error\": {\"code\": -32700, \"message\": \"Parse error\"}, \"id\": \"06ea25b6-9659-41ed-8a94-00e2008edaef\"}"
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/public/get_option_settlement_history",
+      "params": {
+        "currency": "BTC"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": {\"settlements\": [{\"subaccount_id\": 68687, \"instrument_name\": \"ETH-20260910-2400-P\", \"amount\": \"0.8\", \"settlement_price\": \"2468.230146836712177777\", \"option_settlement_pnl\": \"-4.8\", \"option_settlement_pnl_excl_fees\": \"-4.8\", \"expiry\": 1789027200}, {\"subaccount_id\": 62911, \"instrument_name\": \"ETH-20260910-2400-P\", \"amount\": \"-6\", \"settlement_price\": \"2468.230146836712177777\", \"option_settlement_pnl\": \"14.725\", \"option_settlement_pnl_excl_fees\": \"17.4\", \"expiry\": 1789027200}, {\"subaccoun",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "POST",
+      "path": "/public/get_option_settlement_history",
+      "params": {
+        "currency": "BTC"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": {\"settlements\": [{\"subaccount_id\": 65262, \"instrument_name\": \"ETH-20260910-2450-P\", \"amount\": \"2.5\", \"settlement_price\": \"2468.230146836712177777\", \"option_settlement_pnl\": \"-18.851055971284134671\", \"option_settlement_pnl_excl_fees\": \"-16.5\", \"expiry\": 1789027200}, {\"subaccount_id\": 68687, \"instrument_name\": \"ETH-20260910-2400-P\", \"amount\": \"0.8\", \"settlement_price\": \"2468.230146836712177777\", \"option_settlement_pnl\": \"-4.8\", \"option_settlement_pnl_excl_fees\": \"-4.8\", \"expiry\": 178902",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/public/get_trade_history",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": {\"trades\": [{\"trade_id\": \"731fe2a0-ac13-4814-a51b-ec83a58be1b4\", \"instrument_name\": \"BTC-20261225-70000-C\", \"timestamp\": 1789071065290, \"trade_price\": \"11436\", \"trade_amount\": \"0.0176\", \"mark_price\": \"11230.048032225840870524\", \"index_price\": \"77266.10419844722491689\", \"direction\": \"buy\", \"quote_id\": null, \"rfq_id\": null, \"wallet\": \"0x0320D502b0F5Ab31c1d851fD31C93a3A36412A9F\", \"subaccount_id\": 68187, \"tx_status\": \"settled\", \"tx_hash\": \"0xde1469827fb8ab76365377d3c7fd7853d3ab018be548f32",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "POST",
+      "path": "/public/get_trade_history",
+      "params": {
+        "currency": "BTC",
+        "instrument_type": "option"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"result\": {\"trades\": [{\"trade_id\": \"731fe2a0-ac13-4814-a51b-ec83a58be1b4\", \"instrument_name\": \"BTC-20261225-70000-C\", \"timestamp\": 1789071065290, \"trade_price\": \"11436\", \"trade_amount\": \"0.0176\", \"mark_price\": \"11230.048032225840870524\", \"index_price\": \"77266.10419844722491689\", \"direction\": \"buy\", \"quote_id\": null, \"rfq_id\": null, \"wallet\": \"0x0320D502b0F5Ab31c1d851fD31C93a3A36412A9F\", \"subaccount_id\": 68187, \"tx_status\": \"settled\", \"tx_hash\": \"0xde1469827fb8ab76365377d3c7fd7853d3ab018be548f32",
+      "json_top_keys": [
+        "result",
+        "id"
+      ]
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/openapi.json",
+      "params": null,
+      "status": 404,
+      "content_type": "text/html",
+      "body_snippet": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    {
+      "platform": "derive",
+      "base": "https://api.lyra.finance",
+      "method": "GET",
+      "path": "/swagger.json",
+      "params": null,
+      "status": 404,
+      "content_type": "text/html",
+      "body_snippet": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    }
+  ],
+  "aevo_probe": [
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/markets",
+      "params": {
+        "asset": "BTC",
+        "instrument_type": "OPTION"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "[{\"instrument_id\":\"130838\",\"instrument_name\":\"BTC-11SEP26-60000-P\",\"instrument_type\":\"OPTION\",\"underlying_asset\":\"BTC\",\"quote_asset\":\"USDC\",\"price_step\":\"2.5\",\"amount_step\":\"0.01\",\"min_order_value\":\"0.05\",\"max_order_value\":\"2000000\",\"max_notional_value\":\"10000000\",\"price_band\":\"0.7\",\"mark_price\":\"0\",\"forward_price\":\"77324.85\",\"index_price\":\"77321.378076\",\"is_active\":true,\"option_type\":\"put\",\"expiry\":\"1789113600000000000\",\"strike\":\"60000\",\"greeks\":{\"delta\":\"-0.000000\",\"theta\":\"-0.000000\",\"gamma\":",
+      "json_type": "list",
+      "json_len": 942,
+      "json_item0_keys": [
+        "instrument_id",
+        "instrument_name",
+        "instrument_type",
+        "underlying_asset",
+        "quote_asset",
+        "price_step",
+        "amount_step",
+        "min_order_value",
+        "max_order_value",
+        "max_notional_value",
+        "price_band",
+        "mark_price",
+        "forward_price",
+        "index_price",
+        "is_active",
+        "option_type",
+        "expiry",
+        "strike",
+        "greeks",
+        "is_rwa"
+      ]
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/index",
+      "params": {
+        "asset": "BTC"
+      },
+      "status": 200,
+      "content_type": "application/json",
+      "body_snippet": "{\"timestamp\":\"1789071665137577888\",\"price\":\"77321.378076\"}",
+      "json_top_keys": [
+        "timestamp",
+        "price"
+      ]
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/ticker",
+      "params": null,
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "body_snippet": "404 page not found\n"
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/trade-history",
+      "params": {
+        "asset": "BTC",
+        "instrument_type": "OPTION"
+      },
+      "status": 401,
+      "content_type": "application/json",
+      "body_snippet": "{\"error\":\"UNAUTHORIZED\"}"
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/history/trades",
+      "params": {
+        "asset": "BTC",
+        "instrument_type": "OPTION"
+      },
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "body_snippet": "404 page not found\n"
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/openapi.json",
+      "params": null,
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "body_snippet": "404 page not found\n"
+    },
+    {
+      "platform": "aevo",
+      "base": "https://api.aevo.xyz",
+      "method": "GET",
+      "path": "/swagger.json",
+      "params": null,
+      "status": 404,
+      "content_type": "text/plain; charset=utf-8",
+      "body_snippet": "404 page not found\n"
+    }
+  ],
+  "n_derive_200": 7,
+  "n_aevo_200": 2
+}
