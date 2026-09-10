@@ -33,36 +33,54 @@ OUT_PATH = Path("data/p3_guard_cache/taskE_spotify_dec2024_market_brier_result.j
 
 
 def fetch_closed_spotify_markets() -> tuple[list[dict], dict]:
+    """2026-09-10, реальная находка при первом запуске: сплошной запрос
+    на всё окно (~51 день) упёрся в HTTP 422 на странице 22 (offset~2100)
+    -- тот же потолок пагинации, что уже был найден и исправлен в Шаге 1
+    доказательного прогона Задачи E. n_matched=0 в этих условиях НЕ
+    доказательство отсутствия рынков -- окно могло не дойти до декабря
+    физически. Фикс -- та же понедельная пагинация, что уже проверена
+    рабочей в Шаге 1 (первая правка по факту диагностики, не вторая
+    вслепую: причина уже известна из реального предыдущего инцидента)."""
     out = {}
-    window_min = WINDOW_MIN.strftime("%Y-%m-%dT%H:%M:%SZ")
-    window_max = WINDOW_MAX.strftime("%Y-%m-%dT%H:%M:%SZ")
-    n_pages = 0
-    stop_reason = None
-    for offset in range(0, 30 * 100, 100):
-        r = requests.get(f"{GAMMA_BASE}/markets", params={
-            "limit": 100, "offset": offset, "closed": "true",
-            "order": "endDate", "ascending": "true",
-            "end_date_min": window_min, "end_date_max": window_max,
-        }, headers=HEADERS, timeout=30)
-        n_pages += 1
-        if r.status_code != 200:
-            stop_reason = f"http_status_{r.status_code}_at_page_{n_pages}"
-            break
-        body = r.json()
-        if not isinstance(body, list) or not body:
-            stop_reason = f"empty_body_at_page_{n_pages}"
-            break
-        for m in body:
-            q = str(m.get("question", "")).lower()
-            if "spotify" in q and "1 song" in q:
-                out[m["slug"]] = m
-        if len(body) < 100:
-            stop_reason = f"short_page_at_page_{n_pages}"
-            break
-        time.sleep(0.15)
-    else:
-        stop_reason = "max_pages_reached"
-    return list(out.values()), {"n_pages": n_pages, "stop_reason": stop_reason, "n_matched": len(out)}
+    weekly_diag = []
+    week_start = WINDOW_MIN
+    while week_start < WINDOW_MAX:
+        week_end = min(week_start + timedelta(days=7), WINDOW_MAX)
+        window_min = week_start.strftime("%Y-%m-%dT%H:%M:%SZ")
+        window_max = week_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+        n_pages = 0
+        stop_reason = None
+        n_matched_week = 0
+        for offset in range(0, 25 * 100, 100):
+            r = requests.get(f"{GAMMA_BASE}/markets", params={
+                "limit": 100, "offset": offset, "closed": "true",
+                "order": "endDate", "ascending": "true",
+                "end_date_min": window_min, "end_date_max": window_max,
+            }, headers=HEADERS, timeout=30)
+            n_pages += 1
+            if r.status_code != 200:
+                stop_reason = f"http_status_{r.status_code}_at_page_{n_pages}"
+                break
+            body = r.json()
+            if not isinstance(body, list) or not body:
+                stop_reason = f"empty_body_at_page_{n_pages}"
+                break
+            for m in body:
+                q = str(m.get("question", "")).lower()
+                if "spotify" in q and "1 song" in q:
+                    out[m["slug"]] = m
+                    n_matched_week += 1
+            if len(body) < 100:
+                stop_reason = f"short_page_at_page_{n_pages}"
+                break
+            time.sleep(0.15)
+        else:
+            stop_reason = "max_pages_reached"
+        weekly_diag.append({"week_start": week_start.isoformat(), "week_end": week_end.isoformat(),
+                             "n_pages": n_pages, "stop_reason": stop_reason, "n_matched": n_matched_week})
+        week_start = week_end
+        time.sleep(0.1)
+    return list(out.values()), {"n_weeks_queried": len(weekly_diag), "weekly_diag": weekly_diag, "n_matched_total": len(out)}
 
 
 def fetch_price_snapshot(clob_token_id: str, end_date: datetime) -> float | None:
