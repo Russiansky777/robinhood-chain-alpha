@@ -104,7 +104,10 @@ def fetch_closed_markets(max_pages: int = 40, page_size: int = 100) -> tuple[lis
     for offset in range(0, max_pages * page_size, page_size):
         r = requests.get(f"{GAMMA_BASE}/markets", params={
             "limit": page_size, "offset": offset, "closed": "true",
-            "order": "endDate", "ascending": "false",
+            "order": "endDate", "ascending": "true",  # 2026-09-10, реальный найденный баг (диагностика пагинации,
+            # run 34512620072): ascending=false обрывался на HTTP 422 после offset=2100, застряв в плотном
+            # кластере СЕГОДНЯШНИХ рынков (endDate 15:00-16:00 на страницах 9-21), не доходя даже до вчера --
+            # ascending=true начинает с window_min (январь), сначала выдавая разрежённые ранние месяцы.
             "end_date_min": window_min, "end_date_max": window_max,
         }, headers=HEADERS, timeout=30)
         n_pages += 1
