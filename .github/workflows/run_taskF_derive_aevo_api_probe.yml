@@ -14,11 +14,14 @@ on:
       - "data/p3_guard_cache/TASKF_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKF_LIQUIDITY_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKF_RV_SOURCE_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASKF_TRADE_FETCH_REQUEST"
+      - "data/p3_guard_cache/TASKF_IV_ANALYSIS_REQUEST"
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     permissions:
       contents: write
     steps:
@@ -41,13 +44,26 @@ jobs:
       - name: "Задача F, Шаг 0c -- проверка ликвидности near-ATM опционов"
         if: hashFiles('data/p3_guard_cache/TASKF_LIQUIDITY_PROBE_REQUEST') != ''
         run: python -u analysis/taskF_derive_liquidity_probe.py
+      - name: "Задача F, Шаг 1a -- разведка источника RV (Kraken/Coinbase/Binance)"
+        if: hashFiles('data/p3_guard_cache/TASKF_RV_SOURCE_PROBE_REQUEST') != ''
+        run: python -u analysis/taskF_rv_source_probe.py
+      - name: "Задача F, Шаг 1b -- сбор near-ATM сделок Derive за 90 дней (бесплатно, резюмируемо)"
+        if: hashFiles('data/p3_guard_cache/TASKF_TRADE_FETCH_REQUEST') != ''
+        run: python -u analysis/taskF_derive_trade_fetch.py
+      - name: "Задача F, Шаг 2 -- расчёт IV/RV, издержки, предрегистрация"
+        if: hashFiles('data/p3_guard_cache/TASKF_IV_ANALYSIS_REQUEST') != ''
+        run: python -u analysis/taskF_iv_rv_analysis.py
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASKF_PROBE_REQUEST data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST data/p3_guard_cache/TASKF_LIQUIDITY_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKF_PROBE_REQUEST data/p3_guard_cache/TASKF_DEPTH_PROBE_REQUEST data/p3_guard_cache/TASKF_LIQUIDITY_PROBE_REQUEST data/p3_guard_cache/TASKF_RV_SOURCE_PROBE_REQUEST data/p3_guard_cache/TASKF_TRADE_FETCH_REQUEST data/p3_guard_cache/TASKF_IV_ANALYSIS_REQUEST
           [ -e data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json
           [ -e data/p3_guard_cache/taskF_derive_depth_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_depth_probe_result.json
           [ -e data/p3_guard_cache/taskF_derive_liquidity_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_liquidity_probe_result.json
+          [ -e data/p3_guard_cache/taskF_rv_source_probe_result.json ] && git add data/p3_guard_cache/taskF_rv_source_probe_result.json
+          [ -e data/p3_guard_cache/taskF_derive_near_atm_trades.json ] && git add data/p3_guard_cache/taskF_derive_near_atm_trades.json
+          [ -e data/p3_guard_cache/taskF_derive_trade_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskF_derive_trade_fetch_diagnostics.json
+          [ -e data/p3_guard_cache/taskF_iv_rv_result.json ] && git add data/p3_guard_cache/taskF_iv_rv_result.json
           if ! git diff --cached --quiet; then
             git commit -m "Задача F, Шаг 0: разведка API Derive/Aevo, результат [automated]"
           fi
