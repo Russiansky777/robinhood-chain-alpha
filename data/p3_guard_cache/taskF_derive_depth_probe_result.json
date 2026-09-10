@@ -1,0 +1,92 @@
+{
+  "generated_at_utc": "2026-09-10T20:25:14Z",
+  "n_btc_option_instruments_live": 850,
+  "n_btc_instruments_expiry_7_30d": 262,
+  "sample_instrument_full": {
+    "instrument_type": "option",
+    "instrument_name": "BTC-20260918-95000-C",
+    "scheduled_activation": 1787904000,
+    "scheduled_deactivation": 1789718340,
+    "is_active": true,
+    "tick_size": "1",
+    "minimum_amount": "0.01",
+    "maximum_amount": "1000",
+    "amount_step": "0.00001",
+    "mark_price_fee_rate_cap": "0.125",
+    "maker_fee_rate": "0.0001",
+    "taker_fee_rate": "0.0003",
+    "base_fee": "0.5",
+    "base_currency": "BTC",
+    "quote_currency": "USDC",
+    "option_details": {
+      "index": "BTC-USD",
+      "expiry": 1789718400,
+      "strike": "95000",
+      "option_type": "C",
+      "settlement_price": null
+    },
+    "perp_details": null,
+    "erc20_details": null,
+    "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+    "base_asset_sub_id": "39614122059321480798561693568",
+    "pro_rata_fraction": "0.8",
+    "fifo_min_allocation": "1",
+    "pro_rata_amount_step": "0.001"
+  },
+  "sample_instrument_name": "BTC-20260918-95000-C",
+  "trade_history_90d_status": 200,
+  "trade_history_90d_body_snippet": "{\"result\": {\"trades\": [{\"trade_id\": \"6f2c7a1e-b1f2-412f-96f9-3c9fce8652c2\", \"instrument_name\": \"BTC-20261030-80000-C\", \"timestamp\": 1789070759934, \"trade_price\": \"3263\", \"trade_amount\": \"0.01491\", \"mark_price\": \"3198.919091573733567202\", \"index_price\": \"77150.551865547779016197\", \"direction\": \"sell\", \"quote_id\": null, \"rfq_id\": null, \"wallet\": \"0xE1DC5576b36c78C75e6Abf2E1B121Db20A6069b7\", \"subaccount_id\": 51032, \"tx_status\": \"settled\", \"tx_hash\": \"0x0a8117e7018a316aa6b1d13a40026eaf1576b6b499673bebc901f025f6f7b61e\", \"trade_fee\": \"0\", \"expected_rebate\": \"0.057515736415765869\", \"liquidity_role\": \"maker\", \"realized_pnl\": \"0\", \"realized_pnl_excl_fees\": \"0\", \"extra_fee\": \"0\"}, {\"trade_id\": \"6f2c7a1e-b1f2-412f-96f9-3c9fce8652c2\", \"instrument_name\": \"BTC-20261030-80000-C\", \"timestamp\": 17890707599",
+  "trade_history_90d_n_trades_page1": 100,
+  "trade_history_90d_oldest_trade": "2026-09-10T15:34:27.675000+00:00",
+  "trade_history_90d_newest_trade": "2026-09-10T20:05:59.934000+00:00",
+  "trade_history_sample_record": {
+    "trade_id": "6f2c7a1e-b1f2-412f-96f9-3c9fce8652c2",
+    "instrument_name": "BTC-20261030-80000-C",
+    "timestamp": 1789070759934,
+    "trade_price": "3263",
+    "trade_amount": "0.01491",
+    "mark_price": "3198.919091573733567202",
+    "index_price": "77150.551865547779016197",
+    "direction": "sell",
+    "quote_id": null,
+    "rfq_id": null,
+    "wallet": "0xE1DC5576b36c78C75e6Abf2E1B121Db20A6069b7",
+    "subaccount_id": 51032,
+    "tx_status": "settled",
+    "tx_hash": "0x0a8117e7018a316aa6b1d13a40026eaf1576b6b499673bebc901f025f6f7b61e",
+    "trade_fee": "0",
+    "expected_rebate": "0.057515736415765869",
+    "liquidity_role": "maker",
+    "realized_pnl": "0",
+    "realized_pnl_excl_fees": "0",
+    "extra_fee": "0"
+  },
+  "trade_history_pagination_keys": [
+    "trades",
+    "pagination"
+  ],
+  "single_instrument_trade_history_status": 200,
+  "single_instrument_n_trades": 0,
+  "perp_candles_probe": [
+    {
+      "path": "/public/get_tradehistory_candles",
+      "status": 404,
+      "body_snippet": "\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Not Found</title>\n</head>\n<body>\n  <h1>Not Found</h1><p>The requested resource was not found on this server.</p>\n</body>\n</html>\n"
+    },
+    {
+      "path": "/public/get_candles",
+      "status": 404,
+      "body_snippet": "\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Not Found</title>\n</head>\n<body>\n  <h1>Not Found</h1><p>The requested resource was not found on this server.</p>\n</body>\n</html>\n"
+    },
+    {
+      "path": "/public/get_perp_history",
+      "status": 404,
+      "body_snippet": "\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Not Found</title>\n</head>\n<body>\n  <h1>Not Found</h1><p>The requested resource was not found on this server.</p>\n</body>\n</html>\n"
+    },
+    {
+      "path": "/public/get_ticker",
+      "status": 200,
+      "body_snippet": "{\"result\": {\"instrument_type\": \"perp\", \"instrument_name\": \"BTC-PERP\", \"scheduled_activation\": 1701840228, \"scheduled_deactivation\": 9223372036854775807, \"is_active\": true, \"tick_size\": \"0.1\", \"minimum_amount\": \"0.01\", \"maximum_amount\": \"10000\", \"amount_step\": \"0.0001\", \"mark_price_fee_rate_cap\": \"0\""
+    }
+  ]
+}
