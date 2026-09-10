@@ -209,8 +209,20 @@ def run() -> int:
             try:
                 r_diag = requests.get(f"{ARB_CLOB_BASE}/fee-rate", params={"token_id": home_token},
                                        headers=ARB_HEADERS, timeout=15)
-                fee_rate_raw_diag.append({"event_id": ev["id"], "token_id": home_token,
-                                           "status": r_diag.status_code, "body_snippet": r_diag.text[:300]})
+                diag_entry = {"event_id": ev["id"], "token_id": home_token,
+                              "status": r_diag.status_code, "body_snippet": r_diag.text[:300]}
+                # 2026-09-10, доп. диагностика -- независимый источник для
+                # МАСШТАБА значения base_fee (не гадаем делитель): паспорт
+                # проекта уже упоминает CLOB-поля maker_base_fee/taker_base_fee
+                # на market-эндпоинте -- сверяем то же самое число с другого
+                # реального эндпоинта.
+                try:
+                    r_mkt = requests.get(f"{ARB_CLOB_BASE}/markets/{home_token}", headers=ARB_HEADERS, timeout=15)
+                    diag_entry["market_endpoint_status"] = r_mkt.status_code
+                    diag_entry["market_endpoint_body_snippet"] = r_mkt.text[:500]
+                except requests.exceptions.RequestException as exc2:
+                    diag_entry["market_endpoint_exception"] = str(exc2)[:150]
+                fee_rate_raw_diag.append(diag_entry)
             except requests.exceptions.RequestException as exc:
                 fee_rate_raw_diag.append({"event_id": ev["id"], "token_id": home_token, "exception": str(exc)[:200]})
         time.sleep(0.1)
