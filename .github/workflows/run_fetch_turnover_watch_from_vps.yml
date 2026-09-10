@@ -1,0 +1,69 @@
+name: "Сторожок оборота -- забрать накопленный ряд с NL VPS (только чтение по SSH + коммит)"
+
+# По образцу run_fetch_subsidy_watch_from_vps.yml -- turnover_watch.py
+# (расширенная версия с p5-bot/subsidy) запускается автономно на VPS
+# по cron :51 (см. run_vps_setup_turnover_watch_cron_nl.yml /
+# run_vps_extend_turnover_watch_p5bot.yml / run_vps_extend_
+# turnover_watch_subsidy.yml), пишет живой файл ВНЕ git-репозитория --
+# /home/bot/turnover_watch_live_data/turnover_watch.jsonl. Этот
+# workflow ТОЛЬКО читает по SSH то, что cron уже накопил, и коммитит
+# в data/turnover_watch_vps.jsonl (ОТДЕЛЬНО от data/turnover_watch.jsonl,
+# который пишется ad-hoc прогоном turnover_watch.py внутри самого GH
+# Actions, публичным DefiLlama/GT API -- НЕ тот же файл, не тот же
+# источник, не путать).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/FETCH_TURNOVER_WATCH_FROM_VPS_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Забрать накопленный ряд (вне git на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/turnover_watch_live_data/turnover_watch.jsonl' > /tmp/vps_turnover_watch.jsonl
+          echo "реальных строк на VPS: $(wc -l < /tmp/vps_turnover_watch.jsonl)"
+          echo "последние 3 строки:"
+          tail -3 /tmp/vps_turnover_watch.jsonl
+
+      - name: Commit results
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FETCH_TURNOVER_WATCH_FROM_VPS_REQUEST
+          cp /tmp/vps_turnover_watch.jsonl data/turnover_watch_vps.jsonl
+          git add data/turnover_watch_vps.jsonl
+          git diff --cached --quiet && exit 0
+          git commit -m "Сторожок оборота: забор накопленного turnover_watch.jsonl с VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
