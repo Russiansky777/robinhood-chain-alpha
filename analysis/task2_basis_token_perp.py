@@ -43,7 +43,15 @@ from run_pipeline import read_sql  # noqa: E402
 from task1_liquidity_v3_roundtrip import find_pool_addr_cache  # noqa: E402
 from task1_pool_liquidity import find_v3_pool, get_gt_reserve_usd, read_fee_bps, round_trip_cost_pct  # noqa: E402
 
-BUDGET = 200.0  # namespace-потолок (санитарный, не тратим больше без владельца) -- реальный потолок задачи 60, см. проверку ниже
+# РЕАЛЬНЫЙ баг первого прогона: BUDGET=200 оказался НИЖЕ forced-250
+# (credit_guard форсирует минимум 250 для dex.trades(blockchain='robinhood'),
+# когда реальной истории исполнений ещё нет -- та же проверка, что уже
+# ловилась в Задаче 1) -- PROBE не смог выполниться вообще, даже не
+# дошёл до реального execute(). BUDGET -- ТЕХНИЧЕСКИЙ потолок namespace
+# (переживает forced-250 gate), НЕ настоящий потолок задачи -- настоящий
+# потолок (60 кредитов, владелец) применяется отдельно ниже, ПОСЛЕ
+# реальной стоимости PROBE, до запуска full.
+BUDGET = 600.0
 TASK_CEILING_CREDITS = 60.0  # владелец, 2026-09-10: потолок именно этой задачи
 PROBE_DAYS = 1
 FULL_DAYS = 30  # реальный дефолт этого проекта для "недель устойчивости" (см. другие линии) -- явно не указан владельцем, помечено
