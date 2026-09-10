@@ -48,7 +48,6 @@ KRAKEN_PAIR = {"BTC": "XBTUSD", "ETH": "ETHUSD"}
 LYRA_PERP = {"BTC": "BTC-PERP", "ETH": "ETH-PERP"}
 
 RISK_FREE_RATE = 0.0  # владелец не задавал -- крипто-опционы традиционно считаются с r=0 (Deribit/Lyra конвенция)
-ANNUALIZE_HOURS = math.sqrt(24 * 365)
 
 # Реальные значения полей комиссии Derive на спот-опционах (Шаг 0b, live /public/get_instruments)
 DERIVE_BASE_FEE_USDC = 0.5
@@ -112,14 +111,33 @@ def bs_vega_per_1pct(S: float, K: float, T: float, r: float, sigma: float, is_ca
 
 
 # ---------- Kraken RV source ----------
+# 2026-09-10, реальный найденный баг (не догадка -- проверено численно
+# и подтверждено источником docs.kraken.com через WebSearch):
+# interval=60 (часовой) отдал ровно 723 точки при запросе since=90д
+# назад -- Kraken реально отдаёт МАКСИМУМ ~720 последних свечей ОТ
+# ТЕКУЩЕГО МОМЕНТА, `since` работает только для пагинации ВПЕРЁД внутри
+# уже видимого окна, а не для запроса вглубь истории за пределами
+# retention. На часовом интервале это ~30 дней -- RV на самом деле
+# считался по смещённому к последним 30 дням окну, а не по 90-дневному,
+# как предполагалось. Реальный фикс: интервал 1440 (дневной) -- Kraken
+# документированно отдаёт ~720 ДНЕЙ на этом интервале, чего с запасом
+# хватает на 90+30 дней; дневные бары -- к тому же стандартная
+# конвенция для расчёта RV на опционах с недельным/месячным тенором
+# (меньше микроструктурного шума, чем часовые бары), не понижение
+# точности, а более консервативный/общепринятый выбор.
+KRAKEN_INTERVAL_MIN = 1440
+ANNUALIZE_PERIODS = math.sqrt(365)  # дневные бары -- аннуализация через sqrt(365), не sqrt(24*365)
+MIN_RETURNS_FOR_RV = 4  # 7-дневный тенор даёт всего ~6-7 дневных баров -- порог ниже, чем был для часовых
+
+
 def fetch_kraken_ohlc_full(pair: str, since_ts: int) -> list[tuple[int, float]]:
     """Пагинация вперёд по времени через реальный курсор `last`,
     подтверждено Шагом 1a (реальный 200, error:[])."""
     out: list[tuple[int, float]] = []
     cur_since = since_ts
-    for _ in range(30):  # предохранитель -- Kraken отдаёт ~720 свечей/вызов, 30 вызовов с запасом покрывают весь диапазон
+    for _ in range(10):  # дневной интервал -- ~720д/вызов, с запасом хватает пары вызовов на весь диапазон
         try:
-            r = requests.get(f"{KRAKEN_BASE}/OHLC", params={"pair": pair, "interval": 60, "since": cur_since},
+            r = requests.get(f"{KRAKEN_BASE}/OHLC", params={"pair": pair, "interval": KRAKEN_INTERVAL_MIN, "since": cur_since},
                               headers=HEADERS, timeout=20)
         except requests.exceptions.RequestException:
             break
@@ -138,8 +156,8 @@ def fetch_kraken_ohlc_full(pair: str, since_ts: int) -> list[tuple[int, float]]:
         if last is None or last <= cur_since:
             break
         cur_since = last
-        if last * 1000 >= int(time.time() * 1000) - 3600_000:
-            break  # дошли до текущего часа
+        if last * 1000 >= int(time.time() * 1000) - 86400_000:
+            break  # дошли до текущего дня (дневной интервал)
         time.sleep(0.5)
     out.sort(key=lambda x: x[0])
     return out
@@ -207,7 +225,7 @@ def run() -> int:
         if not pair:
             continue
         earliest_trade_ts = min(t["timestamp"] for t in trades) / 1000
-        since_ts = int(earliest_trade_ts) - 3600
+        since_ts = int(earliest_trade_ts) - 2 * 86400  # запас 2 дня на дневном интервале
         ohlc = fetch_kraken_ohlc_full(pair, since_ts)
         print(f"[taskF_analysis] {currency}: Kraken OHLC получено {len(ohlc)} часовых точек, "
               f"{datetime.fromtimestamp(ohlc[0][0], tz=timezone.utc) if ohlc else '?'} -> "
@@ -245,21 +263,26 @@ def run() -> int:
         def realized_vol_forward(t_ms: int, tenor_days: float) -> float | None:
             t_s = t_ms / 1000
             end_s = t_s + tenor_days * 86400
-            if end_s > ohlc_ts[-1] if ohlc_ts else True:
+            if not ohlc_ts or end_s > ohlc_ts[-1]:
                 return None  # окно ещё не наступило целиком -- не считаем, честно пропускаем
+            if t_s < ohlc_ts[0]:
+                return None  # 2026-09-10, тот же класс бага, что уже нашли на часовом интервале:
+                # если начало окна РАНЬШЕ самой старой доступной точки Kraken, bisect молча
+                # обрежет окно по факту начала данных, а не по факту начала тенора -- честно
+                # пропускаем вместо тихого искажения RV усечённым окном
             import bisect
             i0 = bisect.bisect_left(ohlc_ts, t_s)
             i1 = bisect.bisect_right(ohlc_ts, end_s)
             window_px = ohlc_px[i0:i1]
-            if len(window_px) < 8:
+            if len(window_px) < MIN_RETURNS_FOR_RV + 1:
                 return None
             log_rets = [math.log(window_px[i] / window_px[i - 1]) for i in range(1, len(window_px))
                         if window_px[i - 1] > 0 and window_px[i] > 0]
-            if len(log_rets) < 5:
+            if len(log_rets) < MIN_RETURNS_FOR_RV:
                 return None
             mean = sum(log_rets) / len(log_rets)
             var = sum((x - mean) ** 2 for x in log_rets) / (len(log_rets) - 1)
-            return math.sqrt(var) * ANNUALIZE_HOURS
+            return math.sqrt(var) * ANNUALIZE_PERIODS
 
         observations = []
         n_skipped_future = 0
