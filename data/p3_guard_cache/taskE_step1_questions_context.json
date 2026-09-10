@@ -3,8 +3,19 @@
     "cutoff_date": "2026-01-01T00:00:00+00:00",
     "n_days_before_resolution": 7,
     "random_seed": 20260910,
-    "n_markets": 40,
-    "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null"
+    "n_markets": 33,
+    "llm_estimates": "ЗАПОЛНЕНО вручную владельцем сессии на этом шаге -- см. llm_probability_estimate/llm_reasoning_brief/llm_edge_plausible в каждой записи.",
+    "n_excluded_sports_team_recognition": 7,
+    "excluded_sports_team_recognition_slugs": [
+      "aus-auc-new-2025-12-31-auc",
+      "aus-auc-new-2025-12-31-draw",
+      "aus-auc-new-2025-12-31-new",
+      "aus-wsw-mac-2026-01-01-draw",
+      "aus-wsw-mac-2026-01-01-mac",
+      "aus-wsw-mac-2026-01-01-wsw",
+      "cwbb-tcu-byu-2025-12-31"
+    ],
+    "note_edge_plausible": "llm_edge_plausible=false означает, что исход рынка зависит от будущего движения цены актива или от будущих действий третьей стороны, а не от разбора уже известных фактов -- по таким рынкам у LLM нет информационного преимущества в принципе, даже теоретически."
   },
   "markets": [
     {
@@ -19,8 +30,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.495,
       "volume": 3589.619287,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.04,
+      "llm_reasoning_brief": "Все 8 кандидатов в US-чарте на этой неделе -- рождественские стандарты; среди них 'Santa Tell Me' Арианы Гранде исторически заметно уступает по стриминговым объёмам лидеру жанра (Мэрайе Кэри). Реальное информационное преимущество есть (известный паттерн доминирования конкретных рождественских хитов), но это не гарантированный факт конкретного года.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-tsla-reach-503-in-december",
@@ -34,8 +46,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.34,
       "volume": 13047.694958,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "Зависит от будущего движения цены акции TSLA -- у меня нет информационного преимущества сверх общей осведомлённости о высокой волатильности бумаги в 2025 году. Оценка близка к рыночной, реального рассуждения здесь по сути нет.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-rockin-around-the-christmas-tree-brenda-lee-be-the-1-song-on-spotify-this-week-598",
@@ -49,8 +62,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.335,
       "volume": 18326.344746,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.06,
+      "llm_reasoning_brief": "Тот же трек и логика, что и для парного US-варианта (446): узнаваемый, но не топовый по абсолютным стримам рождественский стандарт. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "elon-musk-of-tweets-december-2025-1400plus",
@@ -64,8 +78,9 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.7965,
       "volume": 156608.596152,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.75,
+      "llm_reasoning_brief": "Маск известен экстремально высокой активностью на X (публично известный факт о его типичном поведении -- тысячи постов в месяц не редкость), это даёт содержательное базовое основание для оценки выше 50%, а не просто копирование цены рынка. Преимущество в принципе есть (известный паттерн поведения), хотя точный порог 1400 остаётся неопределённым.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-trumps-approval-rating-be-40pt041pt9-on-september-12",
@@ -79,8 +94,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.58,
       "volume": 103888.182655,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.4,
+      "llm_reasoning_brief": "Рейтинг одобрения президента -- в принципе прогнозируемая через известные политические тренды величина, но конкретное значение на 31 декабря 2025 могло реально присутствовать в моих обучающих данных как факт, а не как предмет рассуждения -- честно отмечаю риск утечки через память, а не через рассуждение, и намеренно не даю крайних значений.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-jingle-bell-rock-bobby-helms-be-the-1-song-on-us-spotify-this-week-925",
@@ -94,8 +110,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 10772.80815,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.05,
+      "llm_reasoning_brief": "Тот же рождественский пул кандидатов; 'Jingle Bell Rock' популярен, но не входит в число главных стриминговых лидеров жанра. Преимущество в принципе есть за счёт известной относительной популярности рождественских хитов друг относительно друга.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-last-christmas-wham-be-the-1-song-on-us-spotify-this-week-385",
@@ -109,8 +126,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 9019.556665,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.06,
+      "llm_reasoning_brief": "'Last Christmas' -- один из самых узнаваемых рождественских хитов, но в реальных чартах последних лет обычно уступает Мэрайе Кэри по абсолютному числу стримов. Преимущество в принципе есть (известная относительная иерархия), оценка ниже 50%.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-microstrategy-hold-680k-btc-by-december-31",
@@ -124,8 +142,9 @@
       "price_snapshot_date": "2025-12-25T04:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.218,
       "volume": 658464.091762,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.22,
+      "llm_reasoning_brief": "Зависит от будущих решений компании о покупке BTC -- это решение чужой стороны (менеджмента MicroStrategy), а не разбор известных фактов; у меня есть общее представление о продолжающейся стратегии накопления, но точный объём на конкретную дату не могу оценить точнее рынка.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-all-i-want-for-christmas-is-you-mariah-carey-be-the-1-song-on-us-spotify-this-week-895",
@@ -139,8 +158,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.505,
       "volume": 11165.400603,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.3,
+      "llm_reasoning_brief": "Реально известный факт: 'All I Want For Christmas Is You' стабильно доминирует по стриминговым объёмам среди рождественских хитов в США каждый декабрь. Но неделя разрешения -- уже ПОСЛЕ Рождества (25 декабря), а стриминг рождественской музыки резко падает сразу после праздника, что снижает уверенность даже в этом фаворите. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-santa-tell-me-ariana-grande-be-the-1-song-on-spotify-this-week-543",
@@ -154,8 +174,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 18862.881471,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Тот же трек, что и в US-версии, но в глобальном чарте, где нерождественские хиты 2025 года (Golden, Ordinary, Fate of Ophelia) реально составляют более сильную конкуренцию, чем в США. Преимущество в принципе есть, оценка ниже, чем для US-версии.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-clair-obscur-expedition-33-win-game-of-the-year-in-the-2025-steam-awards",
@@ -169,8 +190,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.71,
       "volume": 405955.578165,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "'Clair Obscur: Expedition 33' реально был одной из самых высоко оценённых критиками и игроками игр 2025 года -- широко известный факт о её приёме, а не догадка. Преимущество в принципе есть, хотя голосование сообщества (а не жюри) добавляет непредсказуемости.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-nvda-reach-192-in-december",
@@ -184,8 +206,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.68,
       "volume": 42269.414488,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.65,
+      "llm_reasoning_brief": "Зависит от будущего движения цены акции NVDA; у меня есть общее представление об устойчивом восходящем тренде на фоне спроса на AI-чипы в 2025, но точных котировок на дату среза не знаю -- это не даёт реального преимущества над рынком.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-last-christmas-wham-be-the-1-song-on-spotify-this-week-266",
@@ -199,8 +222,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.31,
       "volume": 20771.075055,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.04,
+      "llm_reasoning_brief": "Глобальный чарт более конкурентен из-за сильных нерождественских хитов 2025 года; 'Last Christmas' исторически не лидер жанра по абсолютным стримам. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-the-fate-of-ophelia-taylor-swift-be-the-1-song-on-spotify-this-week-557",
@@ -214,53 +238,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.64,
       "volume": 26915.34864,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-wsw-mac-2026-01-01-mac",
-      "question": "Will Macarthur FC win on 2026-01-01?",
-      "description": "In the upcoming game, scheduled for January 1, 2026\nIf Macarthur FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T08:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.255,
-      "volume": 90607.350764,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-wsw-mac-2026-01-01-wsw",
-      "question": "Will Western Sydney Wanderers FC win on 2026-01-01?",
-      "description": "In the upcoming game, scheduled for January 1, 2026\nIf Western Sydney Wanderers FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T08:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 47899.567174,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-auc-new-2025-12-31-new",
-      "question": "Will Newcastle United Jets FC win on 2025-12-31?",
-      "description": "In the upcoming game, scheduled for December 31, 2025\nIf Newcastle United Jets FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.23,
-      "volume": 102804.726503,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.12,
+      "llm_reasoning_brief": "Трек с альбома Тейлор Свифт 'The Life of a Showgirl' (вышел в октябре 2025) реально был одним из самых прослушиваемых треков года при выходе; к концу декабря хайп мог ослабнуть, но трек остаётся сильным нерождественским конкурентом на глобальном чарте. Преимущество в принципе есть (известная реальная популярность альбома).",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-pltr-reach-201-in-december",
@@ -274,8 +254,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.37,
       "volume": 5310.655849,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "Зависит от будущего движения цены акции PLTR; известна общая история сильного роста бумаги в 2025, но точный уровень цены на дату среза не знаю -- оценка близка к рыночной без реального информационного преимущества.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-let-it-snow-let-it-snow-let-it-snow-dean-martin-be-the-1-song-on-us-spotify-this-week-437",
@@ -289,8 +270,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.355,
       "volume": 19342.164525,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Классический, но нишевый рождественский хит с исторически более низкими стриминговыми объёмами, чем у лидеров жанра (Мэрайя Кэри, Brenda Lee). Преимущество в принципе есть за счёт известной иерархии популярности.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "lighter-market-cap-fdv-3b-one-day-after-launch-227",
@@ -304,8 +286,9 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.535,
       "volume": 9575649.779967,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "Зависит от того, как рынок оценит токен в момент запуска -- это будущее коллективное решение трейдеров, а не разбор известных фактов; у меня есть общее представление о значительном хайпе вокруг проекта Lighter в 2025, что оправдывает оценку выше 50%, но точной цифры оценить точнее рынка не могу.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-its-the-most-wonderful-time-of-the-year-andy-williams-be-the-1-song-on-us-spotify-this-week-546",
@@ -319,8 +302,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.495,
       "volume": 18530.998343,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Тот же паттерн: узнаваемый, но не топовый по стримингу рождественский стандарт. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-trumps-approval-rating-be-42pt043pt9-on-september-12-146",
@@ -334,8 +318,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.39,
       "volume": 64911.10315,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.3,
+      "llm_reasoning_brief": "Тот же риск, что и для соседнего диапазона рейтинга (40.0-41.9%): конкретное значение на 31 декабря 2025 могло быть в обучающих данных как факт, а не выведено рассуждением -- честно отмечаю этот риск, оценка умеренная, не крайняя.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-man-i-need-olivia-dean-be-the-1-song-on-spotify-this-week-138",
@@ -349,8 +334,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.34,
       "volume": 5796.224156,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.04,
+      "llm_reasoning_brief": "Нерождественский хит на фоне глобального чарта, перегруженного более крупными релизами 2025 года (Golden, Ordinary, Fate of Ophelia); у меня нет специфического знания о его относительной популярности к декабрю 2025, оценка низкая по остаточному принципу.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-amzn-dip-to-216-in-december",
@@ -364,23 +350,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.47,
       "volume": 10239.282432,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-auc-new-2025-12-31-draw",
-      "question": "Will Auckland FC vs. Newcastle United Jets FC end in a draw?",
-      "description": "In the upcoming game, scheduled for December 31, 2025\nIf the game ends in a draw, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve to \"Yes\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.24,
-      "volume": 16886.246783,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.45,
+      "llm_reasoning_brief": "Зависит от будущего движения цены акции AMZN -- у меня нет специфической информации о котировках на декабрь 2025 сверх общей осведомлённости, оценка близка к рыночной без реального преимущества.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-back-to-friends-sombr-be-the-1-song-on-spotify-this-week-743",
@@ -394,8 +366,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.235,
       "volume": 5612.295242,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.04,
+      "llm_reasoning_brief": "Аналогично -- у меня нет специфической информации о траектории популярности этого конкретного трека к декабрю 2025 относительно других кандидатов; оценка низкая по остаточному принципу, без реального информационного преимущества.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-golden-huntrx-be-the-1-song-on-spotify-this-week-674",
@@ -409,8 +382,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.335,
       "volume": 3994.989764,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.14,
+      "llm_reasoning_brief": "'Golden' (саундтрек 'KPop Demon Hunters') реально был одним из главных вирусных феноменов 2025 года по стримингу -- это известный факт о культурном явлении, а не спекуляция. Преимущество в принципе есть, оценка заметно выше базовой для одного из 10 кандидатов.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-jingle-bell-rock-bobby-helms-be-the-1-song-on-spotify-this-week-846",
@@ -424,8 +398,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 18247.5455,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Тот же паттерн, что и для US-версии, но на более конкурентном глобальном чарте с сильными нерождественскими хитами. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-msft-reach-495-in-december",
@@ -439,8 +414,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.485,
       "volume": 3177.01512,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.45,
+      "llm_reasoning_brief": "Зависит от будущего движения цены акции MSFT; нет специфической информации о котировках на дату среза -- оценка близка к рыночной, без реального информационного преимущества.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-amzn-reach-240-in-december",
@@ -454,8 +430,9 @@
       "price_snapshot_date": "2025-12-25T04:59:59.999000+00:00",
       "market_price_first_outcome_n_days_before": 0.245,
       "volume": 10745.194963,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.25,
+      "llm_reasoning_brief": "Аналогично -- зависит от будущего движения цены, нет специфических данных о котировках AMZN на декабрь 2025 сверх общих представлений.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-the-christmas-song-merry-christmas-to-you-nat-king-cole-be-the-1-song-on-us-spotify-this-week-585",
@@ -469,23 +446,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.495,
       "volume": 18078.56311,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-auc-new-2025-12-31-auc",
-      "question": "Will Auckland FC win on 2025-12-31?",
-      "description": "In the upcoming game, scheduled for December 31, 2025\nIf Auckland FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T04:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T04:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.54,
-      "volume": 72947.861546,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.03,
+      "llm_reasoning_brief": "Узнаваемый, но не лидирующий по стримингу рождественский стандарт в семье из 8 кандидатов US-чарта. Преимущество в принципе есть за счёт известной иерархии.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-bitcoin-hit-80k-or-100k-first",
@@ -499,8 +462,9 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.515,
       "volume": 305951.09719,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.5,
+      "llm_reasoning_brief": "Классический вопрос 'что произойдёт раньше' на будущем ценовом пути актива -- у меня есть общее представление о высокой волатильности BTC в 2025 (обе планки реалистичны), но без точных котировок на дату среза это не даёт информационного преимущества над рынком, оценка около паритета.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-all-i-want-for-christmas-is-you-mariah-carey-be-the-1-song-on-spotify-this-week-791",
@@ -514,8 +478,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.315,
       "volume": 19672.011659,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.18,
+      "llm_reasoning_brief": "Тот же реально доминирующий рождественский хит, что и в US-версии, но на глобальном чарте, где сильные нерождественские хиты 2025 (Golden, Ordinary, Fate of Ophelia) реально более конкурентны, чем в США -- оценка ниже, чем для US-версии того же трека.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-ordinary-alex-warren-be-the-1-song-on-spotify-this-week-277",
@@ -529,8 +494,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 19371.720625,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.1,
+      "llm_reasoning_brief": "'Ordinary' Алекса Уоррена был одним из главных хитов 2025 года (многонедельное лидерство в чартах ранее в году) -- это реальный, известный факт, хотя к декабрю трек уже мог пройти пик популярности. Преимущество в принципе есть.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-rockin-around-the-christmas-tree-brenda-lee-be-the-1-song-on-us-spotify-this-week-446",
@@ -544,23 +510,9 @@
       "price_snapshot_date": "2025-12-25T00:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 20052.198127,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "cwbb-tcu-byu-2025-12-31",
-      "question": "TCU Horned Frogs vs. BYU Cougars (W)",
-      "description": "In the upcoming WBB game, scheduled for December 31 at 9:00 PM ET:\n\nIf the TCU Horned Frogs win, the market will resolve to \"TCU Horned Frogs\".\n\nIf the BYU Cougars win, the market will resolve to \"BYU Cougars\".\n\nIf the game is postponed, this market will remain open until the game has been completed.\n\nIf the game is canceled entirely, with no make-up game, this market will resolve 50-50.\n\nThe result will be determined based on the final score including any overtime periods.",
-      "end_date": "2026-01-01T02:00:00Z",
-      "outcome_names": [
-        "TCU Horned Frogs",
-        "BYU Cougars"
-      ],
-      "price_snapshot_date": "2025-12-25T02:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.5,
-      "volume": 1118.394575,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.06,
+      "llm_reasoning_brief": "Один из классических рождественских хитов, но исторически заметно уступает 'All I Want For Christmas Is You' по стримингу. Преимущество в принципе есть (известная иерархия популярности рождественских стандартов), оценка ниже рыночной 50% отражает эту иерархию.",
+      "llm_edge_plausible": true
     },
     {
       "slug": "will-xrp-dip-to-1pt70-in-december",
@@ -574,23 +526,9 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.24,
       "volume": 169916.835782,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
-    },
-    {
-      "slug": "aus-wsw-mac-2026-01-01-draw",
-      "question": "Will Western Sydney Wanderers FC vs. Macarthur FC end in a draw?",
-      "description": "In the upcoming game, scheduled for January 1, 2026\nIf the game ends in a draw, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve to \"Yes\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.",
-      "end_date": "2026-01-01T08:00:00Z",
-      "outcome_names": [
-        "Yes",
-        "No"
-      ],
-      "price_snapshot_date": "2025-12-25T08:00:00+00:00",
-      "market_price_first_outcome_n_days_before": 0.25,
-      "volume": 11640.593529,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.25,
+      "llm_reasoning_brief": "Зависит от будущего движения цены XRP -- нет специфической информации о котировках на декабрь 2025, оценка близка к рыночной без реального преимущества.",
+      "llm_edge_plausible": false
     },
     {
       "slug": "will-ethena-dip-to-0pt08-by-december-31-2026",
@@ -604,8 +542,9 @@
       "price_snapshot_date": "2025-12-25T05:00:00+00:00",
       "market_price_first_outcome_n_days_before": 0.55,
       "volume": 60324.54775799999,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.4,
+      "llm_reasoning_brief": "Зависит от будущего движения цены ENA; у меня есть общее представление о волатильности токена в 2024-2025, но не точных котировок на дату среза -- оценка отражает искреннюю неопределённость, а не информационное преимущество.",
+      "llm_edge_plausible": false
     }
   ]
 }
