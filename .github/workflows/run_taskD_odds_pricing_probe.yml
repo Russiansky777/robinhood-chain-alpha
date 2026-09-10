@@ -1,0 +1,50 @@
+name: "Задача D -- реальная цена The Odds API за историческую выдачу (0 кредитов, не Dune/GT)"
+
+# Владелец, 2026-09-10: узнать РЕАЛЬНУЮ цену (не оценку) за
+# историческую выдачу The Odds API -- месячная подписка или разовый
+# доступ. Betfair не трогать в этом прогоне. Не покупать самостоятельно
+# -- только доложить цифру.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKD_ODDS_PRICING_PROBE_REQUEST"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача D -- реальная цена исторической выдачи The Odds API"
+        run: python -u analysis/taskD_odds_pricing_probe.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_ODDS_PRICING_PROBE_REQUEST
+          [ -e data/p3_guard_cache/taskD_odds_pricing_probe_result.json ] && git add data/p3_guard_cache/taskD_odds_pricing_probe_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача D: реальная цена исторической выдачи, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
