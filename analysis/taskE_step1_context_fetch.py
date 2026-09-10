@@ -47,6 +47,7 @@ CLOB_BASE = "https://clob.polymarket.com"
 
 CUTOFF_DATE = datetime(2026, 6, 1, tzinfo=timezone.utc)
 N_DAYS_BEFORE_RESOLUTION = 7
+MIN_LIFESPAN_DAYS = 5  # владелец, 2026-09-10: понижено с 8 после n_selected=0
 TARGET_N_MARKETS = 40
 RANDOM_SEED = 20260910
 SHORT_CRYPTO_HORIZON_MAX_MINUTES = 360  # 6 часов, владелец
@@ -162,10 +163,18 @@ def matches_positive_topic(market: dict) -> bool:
 _price_snapshot_failure_samples: list[dict] = []  # реальная диагностика первых неудач, не молчим
 
 
-def fetch_price_snapshot(clob_token_id: str, target_ts: int) -> float | None:
+def fetch_price_snapshot(clob_token_id: str, end_date: datetime) -> float | None:
+    """Владелец, 2026-09-10 (точечная правка после n_selected=0): вместо
+    жёсткой точки ровно на N_DAYS_BEFORE_RESOLUTION -- ближайшая
+    реально доступная точка prices-history в окне [3; 14] дней до
+    разрешения, предпочтение -- ближе к 7 дням. Один реальный запрос
+    на весь window, не гадаем узкий 24-часовой срез заранее."""
+    window_start_ts = int((end_date - timedelta(days=14)).timestamp())
+    window_end_ts = int((end_date - timedelta(days=3)).timestamp())
+    preferred_ts = int((end_date - timedelta(days=N_DAYS_BEFORE_RESOLUTION)).timestamp())
     try:
         r = requests.get(f"{CLOB_BASE}/prices-history", params={
-            "market": clob_token_id, "startTs": target_ts - 86400, "endTs": target_ts, "fidelity": 60,
+            "market": clob_token_id, "startTs": window_start_ts, "endTs": window_end_ts, "fidelity": 60,
         }, headers=HEADERS, timeout=20)
         if r.status_code != 200:
             if len(_price_snapshot_failure_samples) < 5:
@@ -175,9 +184,12 @@ def fetch_price_snapshot(clob_token_id: str, target_ts: int) -> float | None:
         history = body.get("history", [])
         if not history:
             if len(_price_snapshot_failure_samples) < 5:
-                _price_snapshot_failure_samples.append({"status": 200, "body_keys": list(body.keys()), "empty_history": True})
+                _price_snapshot_failure_samples.append({"status": 200, "body_keys": list(body.keys()), "empty_history": True,
+                                                          "window_start_ts": window_start_ts, "window_end_ts": window_end_ts})
             return None
-        return float(history[-1]["p"])
+        # Реальная ближайшая к предпочтительному моменту точка (по |t - preferred_ts|).
+        best = min(history, key=lambda pt: abs(pt.get("t", preferred_ts) - preferred_ts))
+        return float(best["p"])
     except Exception as exc:  # noqa: BLE001
         if len(_price_snapshot_failure_samples) < 5:
             _price_snapshot_failure_samples.append({"exception": str(exc)[:300]})
@@ -217,12 +229,10 @@ def run() -> int:
             outcomes_names = None
         if vol < 1000 or not tokens or not outcomes_names:
             continue
-        # 2026-09-10, реальная находка: n_price_snapshot_ok=0/40, причина
-        # -- 200 OK с ПУСТЫМ history (не ошибка вызова). Многие рынки
-        # живут меньше N_DAYS_BEFORE_RESOLUTION дней (создаются и
-        # разрешаются в тот же день) -- "цена за 7 дней до разрешения"
-        # структурно не существует, токен ещё не торговался. Требуем
-        # реальный срок жизни >= N_DAYS_BEFORE_RESOLUTION + запас 1 день.
+        # 2026-09-10, владелец: точечная правка -- порог понижен с
+        # N_DAYS_BEFORE_RESOLUTION+1 (8) до MIN_LIFESPAN_DAYS (5), и
+        # снимок цены теперь ищет ближайшую точку в окне [3;14] дней
+        # (см. fetch_price_snapshot), не жёстко на 7-й день.
         start_str = m.get("eventStartTime") or m.get("startDate")
         end_str = m.get("endDate")
         if start_str and end_str:
@@ -230,7 +240,7 @@ def run() -> int:
                 start_dt = datetime.fromisoformat(str(start_str).replace("Z", "+00:00"))
                 end_dt = datetime.fromisoformat(str(end_str).replace("Z", "+00:00"))
                 lifespan_days = (end_dt - start_dt).total_seconds() / 86400
-                if lifespan_days < N_DAYS_BEFORE_RESOLUTION + 1:
+                if lifespan_days < MIN_LIFESPAN_DAYS:
                     continue
             except (ValueError, TypeError):
                 continue  # даты не распознались -- честно не считаем "достаточно долгоживущим"
@@ -264,13 +274,12 @@ def run() -> int:
             end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
         except (ValueError, TypeError, AttributeError):
             continue
-        target_ts = int((end_date - timedelta(days=N_DAYS_BEFORE_RESOLUTION)).timestamp())
         tokens_raw = m.get("clobTokenIds")
         tokens = json.loads(tokens_raw) if isinstance(tokens_raw, str) else tokens_raw
         outcomes_names_raw = m.get("outcomes")
         outcomes_names = json.loads(outcomes_names_raw) if isinstance(outcomes_names_raw, str) else outcomes_names_raw
 
-        price_snapshot = fetch_price_snapshot(tokens[0], target_ts) if tokens else None
+        price_snapshot = fetch_price_snapshot(tokens[0], end_date) if tokens else None
         if price_snapshot is not None:
             n_price_ok += 1
         time.sleep(0.15)
