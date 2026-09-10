@@ -18,6 +18,7 @@ import json
 import re
 import sys
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -112,21 +113,45 @@ def run() -> int:
     # переоткрыта повторно на сыгранных сезонах 2025/начала 2026 --
     # окно по умолчанию функции считается от "сейчас" и НЕ покрывает
     # данные годичной давности; сама логика сопоставления не тронута).
-    commence_dts = []
+    # 2026-09-10, второй реальный найденный баг после первого фикса окна:
+    # ОДИН широкий вызов на весь 11.5-месячный диапазон (авг2025-июн2026)
+    # дал n_matched_events=0 повторно -- closed-срез идёт ORDER BY
+    # endDate DESC с потолком 2000 рынков (max_pages=20 x page_size=100,
+    # тот же параметр функции, не тронут), и при таком широком окне
+    # пагинация, идущая от самого свежего конца назад, упирается в
+    # потолок раньше, чем доходит до старых (авг-окт 2025) дат --
+    # подтверждено: n_team_matched_but_date_rejected=138 (команды
+    # находятся, но по датам 2026 года -- пересезонный повтор той же
+    # команды, а не наше событие). Фикс -- НЕ увеличивать потолок
+    # страниц, а звать fetch_polymarket_bulk ОТДЕЛЬНО на каждый спорт
+    # с его реальным узким диапазоном дат вместо одного широкого окна на
+    # все 4 спорта сразу; результаты объединяются по slug (дедуп).
+    events_by_sport: dict[str, list] = defaultdict(list)
     for ev in events_by_id.values():
-        try:
-            commence_dts.append(datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")))
-        except (ValueError, AttributeError):
-            pass
-    window_min_override = window_max_override = None
-    if commence_dts:
-        window_min_override = (min(commence_dts) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        window_max_override = (max(commence_dts) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        print(f"[taskD_analysis] реальное окно событий: {min(commence_dts)} .. {max(commence_dts)} "
-              f"-> Polymarket closed-окно с запасом {window_min_override} .. {window_max_override}")
-    print("[taskD_analysis] Polymarket bulk-fetch (переиспользуем taskC_sports_matcher.fetch_polymarket_bulk)...")
-    pm_markets = fetch_polymarket_bulk(window_min_override=window_min_override, window_max_override=window_max_override)
-    print(f"[taskD_analysis] реальных рынков Polymarket загружено: {len(pm_markets)}")
+        events_by_sport[ev["sport_key"]].append(ev)
+
+    pm_by_slug: dict[str, dict] = {}
+    for sport_key, evs in events_by_sport.items():
+        commence_dts = []
+        for ev in evs:
+            try:
+                commence_dts.append(datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")))
+            except (ValueError, AttributeError):
+                pass
+        if not commence_dts:
+            continue
+        w_min = (min(commence_dts) - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        w_max = (max(commence_dts) + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"[taskD_analysis] {sport_key}: реальное окно {min(commence_dts)} .. {max(commence_dts)} "
+              f"-> Polymarket closed-окно {w_min} .. {w_max} ({len(evs)} событий)")
+        sport_markets = fetch_polymarket_bulk(window_min_override=w_min, window_max_override=w_max)
+        for m in sport_markets:
+            if m.get("slug"):
+                pm_by_slug[m["slug"]] = m
+        print(f"[taskD_analysis] {sport_key}: рынков загружено в этом окне -- {len(sport_markets)}, "
+              f"суммарно уникальных slug -- {len(pm_by_slug)}")
+    pm_markets = list(pm_by_slug.values())
+    print(f"[taskD_analysis] реальных рынков Polymarket загружено (все спорты, объединено): {len(pm_markets)}")
     result["n_polymarket_markets_scanned"] = len(pm_markets)
 
     # 3. Сопоставление -- та же логика "команды + дата", что в taskC, адаптированная
