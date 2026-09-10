@@ -100,7 +100,14 @@ def get_gt_reserve_usd(pool_address: str) -> float | None:
             return None
         if r.status_code == 429:
             retry_after = r.headers.get("Retry-After")
-            wait = float(retry_after) if retry_after else GT_MIN_INTERVAL_S * (2 ** attempt)
+            exp_wait = GT_MIN_INTERVAL_S * (2 ** attempt)
+            # 2026-09-10, реальная находка (лог задачи 2, run 34485453676):
+            # GT реально отдаёт Retry-After: 0 на каждый 429 -- если слепо
+            # доверять заголовку, ретрай не делает никакой паузы вообще и
+            # долбит 429 4/4 раз подряд (наблюдалось на ~15 из 21 пула).
+            # Retry-After -- ТОЛЬКО нижняя граница поверх экспоненциального
+            # бэкоффа, не замена ему.
+            wait = max(float(retry_after), exp_wait) if retry_after else exp_wait
             print(f"[task1_pool_liquidity] GT 429 на {pool_address}, попытка {attempt+1}/{GT_MAX_RETRIES}, "
                   f"жду {wait:.1f}с (реальный rate-limit, не отсутствие данных)")
             last_exc = requests.HTTPError(f"429 после {attempt+1} попыток")

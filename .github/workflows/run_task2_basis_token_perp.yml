@@ -46,6 +46,13 @@ jobs:
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK2_BASIS_TOKEN_PERP_REQUEST
           [ -e data/p3_guard_cache/task2_basis_token_perp_result.json ] && git add data/p3_guard_cache/task2_basis_token_perp_result.json
           [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          # 2026-09-10: постоянный дисковый кэш Dune (data/task2_basis_mozila_cache/*.csv,*.done)
+          # раньше НЕ коммитился -- он гибнет вместе с эфемерным раннером, и любой
+          # сбой ПОСЛЕ реального оплаченного execute() (как здесь -- json.dumps упал
+          # на uint32-ключах уже после PROBE+FULL) делает результат невосстановимым,
+          # а повторный прогон -- новым реальным списанием, а не кэш-хитом. Коммитим
+          # его тоже, чтобы повторный прогон с тем же текстом SQL был бесплатным.
+          [ -d data/task2_basis_mozila_cache ] && git add data/task2_basis_mozila_cache/
           git diff --cached --quiet && exit 0
           git commit -m "Задача 2: базис токен/перп, результат [automated]"
           for i in 1 2 3 4 5; do

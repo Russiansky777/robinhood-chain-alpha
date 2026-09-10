@@ -238,7 +238,7 @@ def run() -> int:
         per_ticker[sym] = {
             "n_hours": len(merged), "mean_D_pct": d.mean() * 100, "median_abs_D_pct": d.abs().median() * 100,
             "max_abs_D_pct": d.abs().max() * 100, "sign_positive_frac": (d > 0).mean(),
-            "n_weeks": n_weeks, "weekly_sign_positive_frac_by_week": weekly_signs.to_dict(),
+            "n_weeks": n_weeks, "weekly_sign_positive_frac_by_week": {int(k): float(v) for k, v in weekly_signs.items()},
             "n_convergence_episodes": len(convergence_hours),
             "median_convergence_hours": (sorted(convergence_hours)[len(convergence_hours) // 2] if convergence_hours else None),
             "pool_round_trip_cost_pct_5000": pool_cost_pct,
