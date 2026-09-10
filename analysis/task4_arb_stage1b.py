@@ -160,7 +160,14 @@ def run() -> int:
         print(f"\n[stage1b] {result['blocker']}")
         return 1
 
-    probe_pool = max(tail_pools, key=lambda p: p["n_swaps_this_day"])
+    # 2026-09-10, реальная находка: max() по числу свопов выбирал
+    # ПАТОЛОГИЧЕСКИЙ выброс (реально 17 906 свопов/день на "хвостовом"
+    # по TVL пуле -- credit_guard отказался читать при expected_max_rows=
+    # 5000) -- не представительный зонд, а худший случай. Медиана по
+    # реальной активности -- честная представительная оценка для
+    # экстраполяции, не худший случай.
+    tail_pools_sorted = sorted(tail_pools, key=lambda p: p["n_swaps_this_day"])
+    probe_pool = tail_pools_sorted[len(tail_pools_sorted) // 2]
     print(f"\n=== Реальный поиск референс-пула (та же пара, максимальный TVL) для {probe_pool['pool_address']} ===")
     ref = None
     if probe_pool.get("base_token") and probe_pool.get("quote_token"):
@@ -198,7 +205,7 @@ def run() -> int:
                 .replace("{{day_end}}", day_end_dt.strftime("%Y-%m-%d %H:%M:%S")))
     qid_tail = client.create_query("task4_arb_tail_raw_swaps_probe", sql_tail)
     df_tail = client.run_sql_cached("task4_arb_raw_swaps_tail", sql_tail, query_id=qid_tail,
-                                     estimated_credits=5.0, expected_max_rows=5000, expected_columns=8)
+                                     estimated_credits=5.0, expected_max_rows=20000, expected_columns=8)
     spent_after_tail = credit_guard.load_state()[ns]["spent"]
     cost_tail_day = spent_after_tail - spent_before2
     n_rows_tail = len(df_tail) if df_tail is not None else 0
