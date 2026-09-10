@@ -27,17 +27,31 @@ OUT_PATH = Path("data/p3_guard_cache/taskE_step2_brier_result.json")
 
 
 def fetch_outcome_prices(slug: str) -> list[float] | None:
+    # 2026-09-10, диагностика (не патч): n_fetch_failed=28/28 в первом
+    # реальном запуске -- логируем ТОЛЬКО статус-код и форму ответа
+    # (тип/длина списка, есть ли ключ outcomePrices), НИКОГДА не сами
+    # значения outcomePrices -- это раскрыло бы исход прямо в логах.
     r = requests.get(f"{GAMMA_BASE}/markets", params={"slug": slug}, headers=HEADERS, timeout=20)
     if r.status_code != 200:
+        print(f"[taskE_step2][diag] slug={slug} status={r.status_code} (не 200)")
         return None
     body = r.json()
     if not isinstance(body, list) or not body:
+        print(f"[taskE_step2][diag] slug={slug} status=200 body_type={type(body).__name__} "
+              f"body_len={len(body) if isinstance(body, list) else 'n/a'} -- пустой список")
         return None
+    has_key = "outcomePrices" in body[0]
     raw = body[0].get("outcomePrices")
     try:
         prices = json.loads(raw) if isinstance(raw, str) else raw
-        return [float(p) for p in prices] if prices else None
-    except (json.JSONDecodeError, TypeError, ValueError):
+        result = [float(p) for p in prices] if prices else None
+        if result is None:
+            print(f"[taskE_step2][diag] slug={slug} status=200 has_outcomePrices_key={has_key} "
+                  f"raw_type={type(raw).__name__} -- распарсилось в None/пусто")
+        return result
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        print(f"[taskE_step2][diag] slug={slug} status=200 has_outcomePrices_key={has_key} "
+              f"raw_type={type(raw).__name__} parse_error={exc.__class__.__name__}")
         return None
 
 
