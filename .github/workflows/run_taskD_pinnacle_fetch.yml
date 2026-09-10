@@ -23,6 +23,7 @@ on:
       - "data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKD_REOPEN_CALENDAR_PROBE_REQUEST"
       - "data/p3_guard_cache/TASKD_REOPEN_GAME_CALENDAR_REQUEST"
+      - "data/p3_guard_cache/TASKD_REOPEN_SEASONS_FETCH_REQUEST"
 
 jobs:
   run_task:
@@ -90,10 +91,17 @@ jobs:
           THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
         run: python -u analysis/taskD_reopen_game_calendar.py
 
+      - name: "Задача D -- фетч сыгранных сезонов NFL/NBA/EPL/UFC (реальные деньги, ~8280 кредитов)"
+        if: hashFiles('data/p3_guard_cache/TASKD_REOPEN_SEASONS_FETCH_REQUEST') != ''
+        timeout-minutes: 30
+        env:
+          THE_ODDS_API: ${{ secrets.THE_ODDS_API }}
+        run: python -u analysis/taskD_reopen_seasons_fetch.py
+
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKD_SMOKE_TEST_REQUEST data/p3_guard_cache/TASKD_FULL_FETCH_REQUEST data/p3_guard_cache/TASKD_ANALYSIS_REQUEST data/p3_guard_cache/TASKD_MATCHING_DIAG_REQUEST data/p3_guard_cache/TASKD_REOPEN_DEPTH_PROBE_REQUEST data/p3_guard_cache/TASKD_REOPEN_CALENDAR_PROBE_REQUEST data/p3_guard_cache/TASKD_REOPEN_GAME_CALENDAR_REQUEST data/p3_guard_cache/TASKD_REOPEN_SEASONS_FETCH_REQUEST
           [ -e data/p3_guard_cache/taskD_pinnacle_snapshots.json ] && git add data/p3_guard_cache/taskD_pinnacle_snapshots.json
           [ -e data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskD_pinnacle_fetch_diagnostics.json
           [ -e data/p3_guard_cache/taskD_pinnacle_polymarket_result.json ] && git add data/p3_guard_cache/taskD_pinnacle_polymarket_result.json
