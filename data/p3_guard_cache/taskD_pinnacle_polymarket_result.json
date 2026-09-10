@@ -1,10 +1,29 @@
 {
-  "generated_at_utc": "2026-09-10T23:14:01Z",
+  "generated_at_utc": "2026-09-10T23:28:21Z",
   "n_snapshots_loaded": 828,
   "n_unique_pinnacle_events": 403,
-  "n_polymarket_markets_scanned": 0,
-  "n_matched_events": 0,
-  "n_matched_via_nickname_fallback": 0,
-  "n_team_matched_but_date_rejected": 0,
-  "blocker": "0 сопоставленных событий -- дальше считать нечего."
+  "n_polymarket_markets_scanned": 35255,
+  "n_matched_events": 108,
+  "n_matched_via_nickname_fallback": 94,
+  "n_team_matched_but_date_rejected": 526,
+  "n_events_with_price_history": 50,
+  "n_event_snapshot_pairs": 2190,
+  "price_history_empty_diagnostics": [],
+  "n_pairs_discrepancy_ge_2pct": 66,
+  "frac_pairs_discrepancy_ge_2pct": 0.030136986301369864,
+  "n_persistence_checked": 64,
+  "n_persisted": 56,
+  "frac_persisted": 0.875,
+  "polymarket_fee_formula": "usdcFee = baseRate x min(price, 1-price) x shares (CalculatorHelper.sol, Polymarket/ctf-exchange) -- Задача 2",
+  "polymarket_fee_note": "baseRate измерен ЖИВЬЁМ (GET /fee-rate?token_id=...) для каждого реального сопоставленного спортивного события в этом прогоне -- НЕ хардкожен и НЕ перенесён из Задачи 2 (там были 15-мин крипто-рынки). Формула из исходника не различает тип рынка -- применена как есть; фактическое значение baseRate проверено заново на спортивных токенах. Одна комиссия на вход (не round-trip) -- погашение выигравших токенов бесплатно (установлено в Задаче 2).",
+  "n_events_with_real_fee_rate": 50,
+  "n_events_fee_rate_unavailable": 0,
+  "real_fee_rate_min": 0.0,
+  "real_fee_rate_max": 0.0,
+  "real_fee_rate_mean": 0.0,
+  "real_fee_rate_distinct_values": [
+    0.0
+  ],
+  "preregistration_met": false,
+  "preregistration_met_reliable": true
 }
