@@ -1,0 +1,50 @@
+name: "Задача F, Шаг 0 -- разведка API Derive и Aevo (без капитала, без Dune, бесплатно)"
+
+# Владелец, 2026-09-10: Задача F -- премия за волатильность на on-chain
+# опционах (Derive/Lyra, Aevo). Шаг 0 -- разведка, реально проверяем
+# наличие публичного API с историей опционных цен/IV, не по памяти.
+# Публичные REST API, не Dune/GT -- 0 кредитов, безопасно.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKF_PROBE_REQUEST"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача F, Шаг 0 -- разведка API Derive/Aevo"
+        run: python -u analysis/taskF_derive_aevo_api_probe.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKF_PROBE_REQUEST
+          [ -e data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json ] && git add data/p3_guard_cache/taskF_derive_aevo_api_probe_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача F, Шаг 0: разведка API Derive/Aevo, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
