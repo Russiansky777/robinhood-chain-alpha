@@ -89,29 +89,49 @@ OUT_PATH = Path("data/p3_guard_cache/taskE_step1_questions_context.json")
 OUT_DIAG = Path("data/p3_guard_cache/taskE_step1_diagnostics.json")
 
 
-def fetch_closed_markets(max_pages: int = 40, page_size: int = 100) -> list[dict]:
+def fetch_closed_markets(max_pages: int = 40, page_size: int = 100) -> tuple[list[dict], dict]:
+    """Владелец, 2026-09-10: ДИАГНОСТИКА, не патч -- проверяем гипотезу
+    (реальная нехватка старых рынков vs преждевременный обрыв пагинации),
+    логируем реальное число страниц и endDate последнего элемента КАЖДОЙ
+    страницы, ничего не меняем в логике фильтрации."""
     out = {}
     now = datetime.now(timezone.utc)
     window_min = CUTOFF_DATE.strftime("%Y-%m-%dT%H:%M:%SZ")
     window_max = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    pages_log = []
+    stop_reason = None
+    n_pages = 0
     for offset in range(0, max_pages * page_size, page_size):
         r = requests.get(f"{GAMMA_BASE}/markets", params={
             "limit": page_size, "offset": offset, "closed": "true",
             "order": "endDate", "ascending": "false",
             "end_date_min": window_min, "end_date_max": window_max,
         }, headers=HEADERS, timeout=30)
+        n_pages += 1
         if r.status_code != 200:
+            stop_reason = f"http_status_{r.status_code}_at_page_{n_pages}"
+            pages_log.append({"page": n_pages, "offset": offset, "status": r.status_code})
             break
         body = r.json()
         if not isinstance(body, list) or not body:
+            stop_reason = f"empty_body_at_page_{n_pages}"
+            pages_log.append({"page": n_pages, "offset": offset, "n_items": 0})
             break
         for m in body:
             if m.get("slug"):
                 out[m["slug"]] = m
+        pages_log.append({"page": n_pages, "offset": offset, "n_items": len(body),
+                           "last_item_end_date": body[-1].get("endDate"),
+                           "first_item_end_date": body[0].get("endDate")})
         if len(body) < page_size:
+            stop_reason = f"short_page_({len(body)}<{page_size})_at_page_{n_pages}"
             break
         time.sleep(0.2)
-    return list(out.values())
+    else:
+        stop_reason = f"max_pages_reached_({max_pages})"
+    diag_info = {"n_pages_fetched": n_pages, "stop_reason": stop_reason, "pages_log": pages_log,
+                 "window_min": window_min, "window_max": window_max}
+    return list(out.values()), diag_info
 
 
 def is_sports_or_esports(market: dict) -> bool:
@@ -208,9 +228,15 @@ def run() -> int:
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"=== Реальный fetch closed Polymarket рынков, окно >= {CUTOFF_DATE.date()} ===")
-    markets = fetch_closed_markets()
+    markets, pagination_diag = fetch_closed_markets()
     diag["n_closed_markets_in_window"] = len(markets)
+    diag["pagination_diagnostics"] = pagination_diag
     print(f"[taskE_step1] реальных closed-рынков: {len(markets)}")
+    print(f"[taskE_step1] пагинация: страниц={pagination_diag['n_pages_fetched']}, "
+          f"причина остановки={pagination_diag['stop_reason']}")
+    for pl in pagination_diag["pages_log"]:
+        print(f"  страница {pl.get('page')}: offset={pl.get('offset')}, n_items={pl.get('n_items')}, "
+              f"first_endDate={pl.get('first_item_end_date')}, last_endDate={pl.get('last_item_end_date')}")
 
     no_sports = [m for m in markets if not is_sports_or_esports(m)]
     diag["n_after_sports_esports_exclusion"] = len(no_sports)
