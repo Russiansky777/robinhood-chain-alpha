@@ -98,6 +98,7 @@ _SUFFIX = "" if FRIDAY == "2026-09-04" else f"_{_FRIDAY_SLUG}"
 PREDICT_PATH = Path(f"data/p3_guard_cache/task1_oos_check4_predict_result{_SUFFIX}.json")
 VERIFY_PATH = Path(f"data/p3_guard_cache/task1_oos_check4_verify_result{_SUFFIX}.json")
 HIT_RATE_THRESHOLD = 0.60  # предрегистрировано владельцем ДО прогноза -- проверяется на ТОРГУЕМЫХ (2026-09-05)
+MIN_N_FOR_VERDICT = 5  # владелец, 2026-09-10: при N_tradeable < 5 формальный вердикт не выносится, только факт
 
 
 def fetch_weekend_df(trades_end_hours_after_friday: int) -> pd.DataFrame:
@@ -241,8 +242,15 @@ def verify() -> int:
     # Предрегистрация владельца (2026-09-05): порог 60% проверяется на
     # ТОРГУЕМЫХ (|X| > round-trip), не на всех -- все посчитаны для
     # честного сравнения, но вердикт выносится по торгуемой подвыборке.
+    # Владелец, 2026-09-10 (после реконструкции с N_tradeable=2): при
+    # N < MIN_N_FOR_VERDICT формальный вердикт "прошла/не прошла" НЕ
+    # выносится -- только фиксируется факт (число слишком мало для
+    # статистической значимости, см. паспорт).
     verdict = None
-    if hit_rate_tradeable is not None:
+    if hit_rate_tradeable is not None and len(scored_tradeable) < MIN_N_FOR_VERDICT:
+        verdict = (f"ВЕРДИКТ НЕ ВЫНОСИТСЯ (N_tradeable={len(scored_tradeable)} < {MIN_N_FOR_VERDICT}, "
+                   f"недостаточно для значимости) -- зафиксировано: hit_rate_tradeable={hit_rate_tradeable:.1%}")
+    elif hit_rate_tradeable is not None:
         verdict = (f"ПРОШЛА (hit_rate_tradeable={hit_rate_tradeable:.1%} >= {HIT_RATE_THRESHOLD:.0%}, N_tradeable={len(scored_tradeable)})"
                    if hit_rate_tradeable >= HIT_RATE_THRESHOLD
                    else f"НЕ ПРОШЛА (hit_rate_tradeable={hit_rate_tradeable:.1%} < {HIT_RATE_THRESHOLD:.0%}, N_tradeable={len(scored_tradeable)})")
