@@ -32,7 +32,21 @@ ctf-exchange -- НЕ по памяти):
     baseRate × min(price, 1-price) × shares` (`CalculatorHelper.sol`,
     `Polymarket/ctf-exchange`). `baseRate` -- живой эндпоинт
     `GET /fee-rate?token_id=...` (сам Polymarket предупреждает не
-    хардкодить).
+    хардкодить). Реальный ключ ответа -- `base_fee`, в bps
+    (÷10_000) -- подтверждено 2026-09-10 в Задаче D двумя
+    первоисточниками: сам `CalculatorHelper.sol` (`BPS_DIVISOR=10_000`)
+    и `Polymarket/py-clob-client` issue #326. Тот же исходник даёт
+    точную ончейн-формулу для BUY (комиссия списывается токенами):
+    `fee_tokens = feeRateBps × min(p,1-p) × outcomeTokens / (price × BPS_DIVISOR)`.
+    Перепроверено численно (2026-09-10): `fee_tokens × price` (пересчёт
+    в USDC по текущей цене -- естественная мера "цена входа сейчас",
+    которая и нужна для сравнения с $1 полного набора исходов) в
+    точности равно `baseRate × min(p,1-p) × outcomeTokens` при ЛЮБОЙ p
+    -- т.е. формула здесь НЕ приближение, а точный алгебраический
+    эквивалент реальной BUY-комиссии в долларовом выражении. (Отличие
+    появляется только если оценивать удержанные токены по номиналу $1
+    вместо текущей цены -- это другой вопрос, не применимый к разделу
+    "цена входа".)
 
 Метод (честная НИЖНЯЯ ГРАНИЦА -- по сделкам, не по стакану, явно
 помечено в каждой записи результата):
@@ -184,11 +198,23 @@ def get_fee_rate(token_id: str) -> float | None:
         return _fee_rate_cache[token_id]
     status, body = _get(f"{CLOB_BASE}/fee-rate", {"token_id": token_id})
     rate = None
+    # "base_fee" -- реальный ключ ответа (проверено вживую в Задаче D,
+    # 2026-09-10: {"base_fee": 1000} для спортивных токенов). Единица --
+    # bps (denominator 10_000), подтверждено ДВУМЯ независимыми
+    # первоисточниками: (1) сам исходник CalculatorHelper.sol
+    # (Polymarket/ctf-exchange, тег 0.0.1) объявляет
+    # `BPS_DIVISOR = 10_000` и параметр `feeRateBps`; (2) реальный баг-
+    # репорт владельцев API, Polymarket/py-clob-client issue #326
+    # ("Fee documentation contradicts CLOB API fee-rate endpoint for
+    # Sports markets"), где те же значения base_fee=1000 для NBA/MLB
+    # прямо названы "1000 bps". Ключ отсутствовал в прежнем списке --
+    # раньше get_fee_rate() молча возвращал None на спортивных рынках.
+    BPS_KEYS = ("feeRateBps", "fee_rate_bps", "base_fee")
     if status == 200 and isinstance(body, dict):
-        for key in ("baseRate", "base_rate", "feeRateBps", "fee_rate_bps", "rate"):
+        for key in ("baseRate", "base_rate", *BPS_KEYS, "rate"):
             if key in body:
                 raw = body[key]
-                rate = raw / 10000 if "Bps" in key or "bps" in key else raw
+                rate = raw / 10000 if key in BPS_KEYS else raw
                 break
     _fee_rate_cache[token_id] = rate
     return rate
