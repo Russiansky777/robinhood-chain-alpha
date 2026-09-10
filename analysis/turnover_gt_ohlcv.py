@@ -65,11 +65,21 @@ def fetch_defillama_pools() -> list[dict]:
 
 
 def fetch_gt_networks() -> list[dict]:
-    """Реальный список сетей GT, постранично, пока страница не пуста."""
+    """Реальный список сетей GT, постранично, пока страница не пуста.
+    2026-09-10, реальная находка (run 34492555244): GT на странице ЗА
+    ПРЕДЕЛАМИ реального диапазона отдаёт не пустой список и не 404, а
+    HTTP 400 (наблюдалось на странице 4) -- трактуем как конец пагинации,
+    как и 404; любая ДРУГАЯ ошибка (не 400/404) по-прежнему падает
+    по-настоящему, не глушим её здесь."""
     out: list[dict] = []
     page = 1
     while True:
-        r = gt.gt_get(f"{GT_BASE}/networks", params={"page": page})
+        try:
+            r = gt.gt_get(f"{GT_BASE}/networks", params={"page": page})
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 400:
+                break
+            raise
         if r is None or r.status_code == 404:
             break
         data = r.json().get("data", [])
