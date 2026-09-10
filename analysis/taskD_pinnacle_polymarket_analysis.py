@@ -130,6 +130,19 @@ def run() -> int:
     for ev in events_by_id.values():
         events_by_sport[ev["sport_key"]].append(ev)
 
+    # 2026-09-10, четвёртый реальный найденный баг на том же прогоне:
+    # fetch_polymarket_bulk молча глотал не-200 (голый `break`, без
+    # следа) -- по факту 0 рынков на всех 4 спортах БЕЗ единого признака
+    # ошибки. Прямой тест (taskD_gamma_historical_probe.py) нашёл
+    # реальную причину: Gamma API `end_date_min`/`end_date_max` реально
+    # отдаёт 200 при ширине окна 14 дней, но 500 (internal server error)
+    # уже при 30 днях и шире (проверено на 30/60/90/180/365 -- везде
+    # 500). Наши окна (74-165 дней) все попадали в эту зону. Фикс --
+    # НЕ менять сам эндпоинт/фильтр, а бить окно каждого спорта на
+    # подокна по 13 дней (запас от подтверждённых рабочих 14), вызывая
+    # fetch_polymarket_bulk на каждое подокно отдельно, объединяя по slug.
+    SUB_WINDOW_DAYS = 13
+
     pm_by_slug: dict[str, dict] = {}
     for sport_key, evs in events_by_sport.items():
         commence_dts = []
@@ -140,15 +153,24 @@ def run() -> int:
                 pass
         if not commence_dts:
             continue
-        w_min = (min(commence_dts) - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        w_max = (max(commence_dts) + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        full_min = min(commence_dts) - timedelta(days=14)
+        full_max = max(commence_dts) + timedelta(days=14)
         print(f"[taskD_analysis] {sport_key}: реальное окно {min(commence_dts)} .. {max(commence_dts)} "
-              f"-> Polymarket closed-окно {w_min} .. {w_max} ({len(evs)} событий)")
-        sport_markets = fetch_polymarket_bulk(window_min_override=w_min, window_max_override=w_max, skip_active_passes=True)
-        for m in sport_markets:
-            if m.get("slug"):
-                pm_by_slug[m["slug"]] = m
-        print(f"[taskD_analysis] {sport_key}: рынков загружено в этом окне -- {len(sport_markets)}, "
+              f"-> Polymarket closed-окно {full_min} .. {full_max} ({len(evs)} событий), "
+              f"бьём на подокна по {SUB_WINDOW_DAYS}д")
+        cur = full_min
+        n_sub = 0
+        while cur < full_max:
+            sub_end = min(cur + timedelta(days=SUB_WINDOW_DAYS), full_max)
+            w_min = cur.strftime("%Y-%m-%dT%H:%M:%SZ")
+            w_max = sub_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+            sport_markets = fetch_polymarket_bulk(window_min_override=w_min, window_max_override=w_max, skip_active_passes=True)
+            for m in sport_markets:
+                if m.get("slug"):
+                    pm_by_slug[m["slug"]] = m
+            n_sub += 1
+            cur = sub_end
+        print(f"[taskD_analysis] {sport_key}: {n_sub} подокон обработано, "
               f"суммарно уникальных slug -- {len(pm_by_slug)}")
     pm_markets = list(pm_by_slug.values())
     print(f"[taskD_analysis] реальных рынков Polymarket загружено (все спорты, объединено): {len(pm_markets)}")
