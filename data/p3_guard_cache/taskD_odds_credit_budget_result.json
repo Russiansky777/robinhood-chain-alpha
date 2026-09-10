@@ -1,0 +1,81 @@
+{
+  "generated_at_utc": "2026-09-10T20:41:06Z",
+  "sports_endpoint_status": 200,
+  "sports_endpoint_usage": {
+    "x-requests-used": "0",
+    "x-requests-remaining": "20000",
+    "x-requests-last": "0"
+  },
+  "n_sports_listed": 87,
+  "target_sports_found": {
+    "americanfootball_nfl": true,
+    "basketball_nba": true,
+    "baseball_mlb": true
+  },
+  "historical_events_status": 200,
+  "historical_events_usage": {
+    "x-requests-used": "1",
+    "x-requests-remaining": "19999",
+    "x-requests-last": "1"
+  },
+  "historical_events_n_sample": 272,
+  "historical_events_body_snippet": "{\"timestamp\":\"2026-08-26T20:40:38Z\",\"previous_timestamp\":\"2026-08-26T20:35:38Z\",\"next_timestamp\":\"2026-08-26T20:45:38Z\",\"data\":[{\"id\":\"8c94552d022acec4a0458d70c19d3da9\",\"sport_key\":\"americanfootball_nfl\",\"sport_title\":\"NFL\",\"commence_time\":\"2026-09-10T00:15:00Z\",\"home_team\":\"Seattle Seahawks\",\"away_team\":\"New England Patriots\"},{\"id\":\"acc580d74344ea3b31bbcdd057fe6a9c\",\"sport_key\":\"americanfootball_nfl\",\"sport_title\":\"NFL\",\"commence_time\":\"2026-09-11T00:35:00Z\",\"home_team\":\"Los Angeles Rams\",\"away_team\":\"San Francisco 49ers\"},{\"id\":\"95c01d1bb797d6df14824b106c5a9130\",\"sport_key\":\"americanfootbal",
+  "credits_used_by_events_call": 1,
+  "historical_odds_probe_status": 200,
+  "historical_odds_probe_usage": {
+    "x-requests-used": "11",
+    "x-requests-remaining": "19989",
+    "x-requests-last": "10"
+  },
+  "historical_odds_probe_body_snippet": "{\"timestamp\":\"2026-08-26T20:40:38Z\",\"previous_timestamp\":\"2026-08-26T20:35:38Z\",\"next_timestamp\":\"2026-08-26T20:45:38Z\",\"data\":[{\"id\":\"8c94552d022acec4a0458d70c19d3da9\",\"sport_key\":\"americanfootball_nfl\",\"sport_title\":\"NFL\",\"commence_time\":\"2026-09-10T00:15:00Z\",\"home_team\":\"Seattle Seahawks\",\"away_team\":\"New England Patriots\",\"bookmakers\":[{\"key\":\"pinnacle\",\"title\":\"Pinnacle\",\"last_update\":\"2026-08-26T20:40:03Z\",\"markets\":[{\"key\":\"h2h\",\"last_update\":\"2026-08-26T20:40:03Z\",\"outcomes\":[{\"name\":\"New England Patriots\",\"price\":2.59},{\"name\":\"Seattle Seahawks\",\"price\":1.55}]}]}]},{\"id\":\"acc580d74344ea3b31bbcdd057fe6a9c\",\"sport_key\":\"americanfootball_nfl\",\"sport_title\":\"NFL\",\"commence_time\":\"2026-09-11T00:35:00Z\",\"home_team\":\"Los Angeles Rams\",\"away_team\":\"San Francisco 49ers\",\"bookmakers\":[{\"ke",
+  "historical_odds_probe_n_events_total": 272,
+  "historical_odds_probe_n_events_with_pinnacle": 16,
+  "real_credits_per_single_snapshot_call": 10,
+  "extrapolation": {
+    "1_snapshots_per_day": {
+      "total_calls": 90,
+      "total_credits": 900,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 4.5
+    },
+    "2_snapshots_per_day": {
+      "total_calls": 180,
+      "total_credits": 1800,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 9.0
+    },
+    "4_snapshots_per_day": {
+      "total_calls": 360,
+      "total_credits": 3600,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 18.0
+    },
+    "6_snapshots_per_day": {
+      "total_calls": 540,
+      "total_credits": 5400,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 27.0
+    },
+    "8_snapshots_per_day": {
+      "total_calls": 720,
+      "total_credits": 7200,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 36.0
+    },
+    "12_snapshots_per_day": {
+      "total_calls": 1080,
+      "total_credits": 10800,
+      "fits_budget_20000": true,
+      "pct_of_monthly_limit": 54.0
+    },
+    "24_snapshots_per_day": {
+      "total_calls": 2160,
+      "total_credits": 21600,
+      "fits_budget_20000": false,
+      "pct_of_monthly_limit": 108.0
+    }
+  },
+  "total_credits_used_this_probe": 11,
+  "monthly_limit": 20000,
+  "remaining_after_probe": 19989
+}
