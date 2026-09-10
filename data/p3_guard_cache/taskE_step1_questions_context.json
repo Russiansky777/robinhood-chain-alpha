@@ -6,7 +6,7 @@
     "random_seed": 20260910,
     "n_markets": 45,
     "n_weeks_covered": 11,
-    "llm_estimates": "ЗАПОЛНЯЕТСЯ ОТДЕЛЬНО, ВРУЧНУЮ, ПОСЛЕ этого коммита -- см. поле 'llm_probability_estimate' в каждой записи markets[], изначально null. Поле 'llm_edge_plausible' УЖЕ вычислено детерминированным кодом (classify_edge_plausible), НЕ меняется вручную."
+    "llm_estimates": "ЗАПОЛНЕНО вручную владельцем сессии на этом шаге -- см. llm_probability_estimate/llm_reasoning_brief в каждой записи."
   },
   "markets": [
     {
@@ -23,8 +23,8 @@
       "market_price_first_outcome_n_days_before": 0.235,
       "volume": 17097.828996,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.3,
+      "llm_reasoning_brief": "Партия Фухимори (Fuerza Popular) и Renovación Popular López Aliaga -- два конкурирующих правых блока; без точных текущих данных опросов по сенатским местам держусь чуть выше рыночной, отражая общую конкурентоспособность правого фланга в фрагментированном поле."
     },
     {
       "slug": "will-there-be-exactly-5-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-27-may-3",
@@ -40,8 +40,8 @@
       "market_price_first_outcome_n_days_before": 0.28,
       "volume": 6949.118798000001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "Пуассоновский расчёт при λ≈5.5/неделю (компромиссная оценка между грубой базовой ставкой USGS и подразумеваемой рынком частотой) даёт P(ровно 5)≈0.171 -- держусь ближе к своему расчёту, чем к рыночной цене 0.28."
     },
     {
       "slug": "will-there-be-exactly-8-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-27-may-3",
@@ -57,8 +57,8 @@
       "market_price_first_outcome_n_days_before": 0.295,
       "volume": 7019.421593000001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.15,
+      "llm_reasoning_brief": "Тот же расчёт (λ≈5.5) даёт P(ровно 8)≈0.085 -- заметно ниже рыночной 0.295; оценка между своим расчётом и рынком, честно признавая неопределённость точного λ."
     },
     {
       "slug": "will-trump-agree-to-iranian-oil-sanction-relief-by-may-31",
@@ -74,8 +74,8 @@
       "market_price_first_outcome_n_days_before": 0.425,
       "volume": 818932.5132730104,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "Честно: специфических сведений об этом сценарии (датирован апрелем-маем 2026, за пределами моих знаний) у меня нет -- только общее рассуждение, что переговорные уступки по санкциям обычно занимают больше времени, чем оптимистичные дедлайны предполагают."
     },
     {
       "slug": "will-tisza-win-at-least-110-seats",
@@ -91,8 +91,8 @@
       "market_price_first_outcome_n_days_before": 0.615,
       "volume": 78759.69511600002,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.58,
+      "llm_reasoning_brief": "Реально известный факт: TISZA под руководством Мадьяра демонстрировала устойчивое опережение или конкурентность с Fidesz в опросах 2025 года -- широко освещаемый тренд венгерской политики. 110 из 199 мест (простое большинство) правдоподобно при таком моментуме, хотя смешанная система может смягчать перевод голосов в места."
     },
     {
       "slug": "will-290-to-319-tornadoes-occur-in-the-united-states-in-april-2026-746",
@@ -108,8 +108,8 @@
       "market_price_first_outcome_n_days_before": 0.4325,
       "volume": 2796.7317300000004,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "Апрель -- исторически один из пиковых месяцев торнадо-сезона в США; у меня есть общее представление, что активные апрели дают порядка 150-300+ торнадо, но нет точных данных за конкретный узкий диапазон 290-319. Оценка близка к рыночной, честно без точной статистики."
     },
     {
       "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-20-april-26",
@@ -125,8 +125,8 @@
       "market_price_first_outcome_n_days_before": 0.225,
       "volume": 4730.849846,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.16,
+      "llm_reasoning_brief": "Тот же Пуассоновский расчёт (λ≈5.5) даёт P(ровно 7)≈0.123, ниже рыночной 0.225 -- держусь ближе к прямому расчёту по известному физическому процессу."
     },
     {
       "slug": "will-president-trump-sign-6-pieces-of-legislation-into-law-in-may",
@@ -142,8 +142,8 @@
       "market_price_first_outcome_n_days_before": 0.4,
       "volume": 2083.569233,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "У меня нет специфических данных о законодательном календаре Конгресса на май 2026; темп подписания законов сильно варьируется по месяцам. Оценка близка к рыночной без сильного информационного преимущества."
     },
     {
       "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-may-4-10",
@@ -159,8 +159,8 @@
       "market_price_first_outcome_n_days_before": 0.255,
       "volume": 3620.1507180000003,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.32,
+      "llm_reasoning_brief": "Пуассоновский расчёт при λ≈0.9/неделю для M6.5+ (интерполяция реальной статистики USGS через степенной закон Гутенберга-Рихтера) даёт P(ровно 1)≈0.366 -- выше рыночной 0.255, компромиссная оценка между расчётом и рынком."
     },
     {
       "slug": "will-trump-post-fed-or-federal-reserve-on-truth-social-this-week",
@@ -176,8 +176,8 @@
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 1655.646529,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.7,
+      "llm_reasoning_brief": "Реально хорошо задокументированная поведенческая особенность Трампа -- частые публичные комментарии о ФРС и процентных ставках на протяжении обоих президентских сроков. Это реальное информационное преимущество (известный паттерн поведения, не догадка), оценка заметно выше рыночного паритета 0.5."
     },
     {
       "slug": "will-morality-unity-honour-mech-win-at-least-one-seat-in-the-2026-bulgarian-parliamentary-election",
@@ -193,8 +193,8 @@
       "market_price_first_outcome_n_days_before": 0.305,
       "volume": 27235.682164,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.25,
+      "llm_reasoning_brief": "Незнакомая мне мелкая партия; базовая ставка для небольших партий на преодоление 4%-ного порога в Болгарии обычно невысока. Оценка близка к рыночной, честно без специфической информации."
     },
     {
       "slug": "will-turnout-in-the-second-round-of-the-2026-peruvian-presidential-election-be-between-70-and-75",
@@ -210,8 +210,8 @@
       "market_price_first_outcome_n_days_before": 0.465,
       "volume": 16577.891895999997,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "Реальный известный факт: в Перу голосование обязательно по закону, что реально даёт стабильно высокую явку (типично в диапазоне 70%+) -- это структурное знание, а не догадка. Оценка заметно выше рыночной 0.465, которая кажется заниженной относительно этого известного механизма."
     },
     {
       "slug": "will-keiko-fujimori-win-the-first-round-of-the-2026-peruvian-presidential-elections-by-less-than-5",
@@ -227,8 +227,8 @@
       "market_price_first_outcome_n_days_before": 0.21,
       "volume": 209115.1354730001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.25,
+      "llm_reasoning_brief": "Перуанские первые туры исторически фрагментированы среди множества кандидатов -- узкий отрыв между топ-2 кандидатами (менее 5 п.п.) правдоподобен в такой конкурентной среде. Оценка немного выше рыночной."
     },
     {
       "slug": "will-there-be-exactly-7-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-27-may-3",
@@ -244,8 +244,8 @@
       "market_price_first_outcome_n_days_before": 0.31,
       "volume": 9248.332281999996,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.18,
+      "llm_reasoning_brief": "Тот же Пуассоновский расчёт (λ≈5.5, P(ровно 7)≈0.123) для другой недели -- держусь ближе к расчёту, чем к рыночной 0.31."
     },
     {
       "slug": "will-edouard-philippe-be-the-next-mayor-of-le-havre",
@@ -261,8 +261,8 @@
       "market_price_first_outcome_n_days_before": 0.725,
       "volume": 66906.39812099999,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.85,
+      "llm_reasoning_brief": "Филипп -- широко известный бывший премьер-министр Франции (2017-2020) и мэр Гавра с 2010 года (за вычетом периода на посту премьера) с устойчивой личной популярностью и укоренённой местной базой. Реальный, хорошо известный факт об инкумбентстве и профиле, оценка заметно выше рыночной."
     },
     {
       "slug": "will-there-be-more-than-9-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-18-24",
@@ -278,8 +278,8 @@
       "market_price_first_outcome_n_days_before": 0.33,
       "volume": 38069.424468000005,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "Пуассоновский расчёт (λ≈5.5) даёт P(X>9)≈0.06, заметно ниже рыночной 0.33 -- держу компромиссную оценку, честно признавая низкую уверенность в точном значении λ на хвосте распределения."
     },
     {
       "slug": "will-voter-turnout-be-7174-in-the-2026-hungarian-parliamentary-election",
@@ -295,8 +295,8 @@
       "market_price_first_outcome_n_days_before": 0.345,
       "volume": 131973.10526399998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.3,
+      "llm_reasoning_brief": "Венгерские выборы 2022 года (тоже конкурентные) показали явку около 69.5%; в этом цикле реальная конкурентность TISZA против Fidesz может дополнительно повысить явку. Оценка близка к рыночной, без точных данных для узкого 3-процентного диапазона."
     },
     {
       "slug": "will-the-slovenian-democratic-party-sds-win-30-34-seats-in-the-slovenian-national-assembly-in-this-election",
@@ -312,8 +312,8 @@
       "market_price_first_outcome_n_days_before": 0.285,
       "volume": 36727.23163700001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.27,
+      "llm_reasoning_brief": "Узкий диапазон мест без специфических данных по опросам; оценка близка к рыночной."
     },
     {
       "slug": "will-paloma-valencia-place-3rd-in-the-1st-round-of-the-2026-colombian-presidential-election",
@@ -329,8 +329,8 @@
       "market_price_first_outcome_n_days_before": 0.495,
       "volume": 4605.681678999999,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.4,
+      "llm_reasoning_brief": "Валенсия -- заметная право-уэртистская кандидатка, но колумбийское поле кандидатов исторически сильно фрагментировано; 3-е место правдоподобно, но не единственный вероятный исход. Оценка немного ниже рыночной."
     },
     {
       "slug": "will-partido-socialista-obrero-espaol-de-andaluca-psoe-a-win-30-32-seats-in-the-2026-andalusia-regional-election",
@@ -346,8 +346,8 @@
       "market_price_first_outcome_n_days_before": 0.21,
       "volume": 2364.402548,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "PSOE-A в структурном упадке в Андалусии с 2018-2022; узкий диапазон без точных данных, оценка близка к рыночной."
     },
     {
       "slug": "will-tisza-respect-and-freedom-party-tisza-win-the-most-seats-in-the-next-hungarian-parliamentary-election",
@@ -363,8 +363,8 @@
       "market_price_first_outcome_n_days_before": 0.695,
       "volume": 4782714.49172103,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.62,
+      "llm_reasoning_brief": "Планка ниже (просто большинство мест, не абсолютное большинство) при реально задокументированном моментуме TISZA в опросах 2025 делает эту оценку обоснованно высокой, хотя институциональные преимущества Fidesz (одномандатные округа, гос. СМИ) оправдывают небольшую поправку вниз от рыночной."
     },
     {
       "slug": "will-progressive-bulgaria-pb-win-between-85-89-seats-in-the-2026-bulgarian-parliamentary-election",
@@ -380,8 +380,8 @@
       "market_price_first_outcome_n_days_before": 0.235,
       "volume": 18534.578797,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.12,
+      "llm_reasoning_brief": "85-89 из 240 мест (~35-37%) -- очень высокая планка для партии, которая мне не известна как признанная крупная сила в болгарской политике; честно отмечаю подозрение, что эта планка завышена для не-мейнстримной партии, если это не переименованная/коалиционная структура более крупных известных сил, чего я не могу подтвердить."
     },
     {
       "slug": "will-vox-vox-win-16-18-seats-in-the-2026-andalusia-regional-election",
@@ -397,8 +397,8 @@
       "market_price_first_outcome_n_days_before": 0.405,
       "volume": 5704.772411000001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "VOX -- растущая правая сила в Испании в целом, но узкий 3-местный диапазон без точных данных по Андалусии специфически; оценка близка к рыночной."
     },
     {
       "slug": "will-the-slovenian-democratic-party-sds-win-the-second-most-seats-in-the-2026-slovenian-parliamentary-election",
@@ -414,8 +414,8 @@
       "market_price_first_outcome_n_days_before": 0.295,
       "volume": 21529.105110000004,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.4,
+      "llm_reasoning_brief": "SDS Янши исторически сплочённый, устойчивый оппозиционный блок, вероятно занимающий как минимум 2-е место на фоне более фрагментированного левого поля -- оценка выше рыночной на основе этого известного паттерна."
     },
     {
       "slug": "will-there-be-3-or-fewer-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-may-11-17",
@@ -431,8 +431,8 @@
       "market_price_first_outcome_n_days_before": 0.25,
       "volume": 68287.93550300002,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.22,
+      "llm_reasoning_brief": "Пуассоновский расчёт (λ≈5.5) даёт P(<=3)≈0.202, близко к рыночной 0.25 -- оценка чуть ниже."
     },
     {
       "slug": "will-fidesz-kdnp-win-at-least-80-seats",
@@ -448,8 +448,8 @@
       "market_price_first_outcome_n_days_before": 0.445,
       "volume": 211595.80792399985,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "80 из 199 мест (~40%) -- относительно скромная планка, которую даже ослабленный на фоне подъёма TISZA Fidesz правдоподобно преодолевает благодаря устойчивой институциональной базе. Оценка выше рыночной."
     },
     {
       "slug": "will-fuerza-popular-fp-win-the-most-seats-in-the-2026-peruvian-senate-election",
@@ -465,8 +465,8 @@
       "market_price_first_outcome_n_days_before": 0.245,
       "volume": 41470.216893000004,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "Историческая партия Фухимори (Fuerza Popular, отдельно от Renovación Popular) реально ослабла электорально за годы повторных президентских поражений семьи Фухимори -- известный паттерн упадка бренда партии. Оценка немного ниже рыночной."
     },
     {
       "slug": "will-the-next-prime-minister-of-hungary-be-pter-magyar",
@@ -482,8 +482,8 @@
       "market_price_first_outcome_n_days_before": 0.655,
       "volume": 24555476.477281053,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.6,
+      "llm_reasoning_brief": "Согласуется с моей оценкой 'TISZA побеждает по числу мест' (0.62) -- при таком исходе Мадьяр закономерно становится премьером; небольшая поправка вниз отражает возможность коалиционных сложностей даже при относительном большинстве."
     },
     {
       "slug": "will-trump-agree-to-unfreeze-iranian-assets-by-may-31",
@@ -499,8 +499,8 @@
       "market_price_first_outcome_n_days_before": 0.73,
       "volume": 904480.9446749925,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.6,
+      "llm_reasoning_brief": "Тот же честный недостаток специфической информации о конкретном ирано-американском сценарии 2026 года; общее геополитическое рассуждение об уступках, требующих больше времени, чем оптимистичные дедлайны. Оценка ниже рыночной 0.73."
     },
     {
       "slug": "will-partido-socialista-obrero-espaol-de-andaluca-psoe-a-win-27-29-seats-in-the-2026-andalusia-regional-election",
@@ -516,8 +516,8 @@
       "market_price_first_outcome_n_days_before": 0.57,
       "volume": 3416.374767,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.5,
+      "llm_reasoning_brief": "Реальный информативный сигнал: рынок оценивает ЭТОТ (более низкий) диапазон гораздо выше (0.57), чем соседний более высокий диапазон 30-32 (0.21) для той же партии -- внутренне согласованная сигнализация о том, что PSOE-A, вероятно, окажется именно в нижней полосе на фоне структурного упадка. Учитываю этот относительный сигнал, оценка близка к рыночной."
     },
     {
       "slug": "will-there-be-exactly-1-earthquake-of-magnitude-6pt5-or-higher-worldwide-from-april-27-may-3",
@@ -533,8 +533,8 @@
       "market_price_first_outcome_n_days_before": 0.345,
       "volume": 3524.8393150000006,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.35,
+      "llm_reasoning_brief": "Тот же Пуассоновский расчёт для M6.5+ (λ≈0.9, P(ровно 1)≈0.366), что и для соседней недели -- глобальная сейсмическая активность этого класса приблизительно стационарна между неделями, оценка близка к своему расчёту и к рыночной цене."
     },
     {
       "slug": "will-abelardo-de-la-espriella-place-1st-in-the-antioquia-department",
@@ -550,8 +550,8 @@
       "market_price_first_outcome_n_days_before": 0.5,
       "volume": 5215.787007999998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "Антьокия исторически консервативный, анти-Петро регион (база уэртизма) -- де ла Эсприелья как правый кандидат имеет реальное географическое преимущество именно в этом департаменте. Оценка выше рыночных 50%."
     },
     {
       "slug": "will-there-be-exactly-0-earthquakes-of-magnitude-6pt5-or-higher-worldwide-from-may-25-31",
@@ -567,8 +567,8 @@
       "market_price_first_outcome_n_days_before": 0.465,
       "volume": 16412.897500000003,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.42,
+      "llm_reasoning_brief": "Пуассоновский расчёт (λ≈0.9 для M6.5+) даёт P(ровно 0)=e^-0.9≈0.407, близко к рыночной 0.465 -- оценка чуть ниже."
     },
     {
       "slug": "will-juntos-por-el-per-jp-win-the-most-seats-in-the-2026-peruvian-senate-election",
@@ -584,8 +584,8 @@
       "market_price_first_outcome_n_days_before": 0.2815,
       "volume": 26202.868114999987,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.22,
+      "llm_reasoning_brief": "Левая партия без выраженного явного лидерства в текущем фрагментированном сенатском поле Перу, о котором у меня есть специфические данные; оценка близка к рыночной."
     },
     {
       "slug": "will-donald-trump-announce-that-the-united-states-blockade-of-the-strait-of-hormuz-has-been-lifted-by-june-21-2026",
@@ -601,8 +601,8 @@
       "market_price_first_outcome_n_days_before": 0.59,
       "volume": 113425.45657199998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.5,
+      "llm_reasoning_brief": "Честно: специфических сведений об этой блокаде (сценарий апреля 2026, за пределами моих знаний) у меня нет -- только общее рассуждение о том, что подобные меры часто сохраняются дольше первоначальных ожиданий. Оценка ниже рыночной 0.59."
     },
     {
       "slug": "will-turnout-in-the-2026-slovenian-parliamentary-elections-be-between-65-and-70",
@@ -618,8 +618,8 @@
       "market_price_first_outcome_n_days_before": 0.315,
       "volume": 92225.488424,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.3,
+      "llm_reasoning_brief": "Явка в Словении была заметно выше в конкурентных выборах 2022 года; у меня нет точных данных для узкого диапазона 65-70%, оценка близка к рыночной."
     },
     {
       "slug": "will-fidesz-kdnp-win-70-seats-in-the-hungarian-national-assembly-in-this-election",
@@ -635,8 +635,8 @@
       "market_price_first_outcome_n_days_before": 0.325,
       "volume": 110236.49942799986,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "Согласуется с моей оценкой 'Fidesz-KDNP >= 80 мест' (0.55) -- если Fidesz вероятно преодолевает 80, то результат ниже 70 менее вероятен. Оценка ниже рыночной 0.325."
     },
     {
       "slug": "will-carlos-lvarez-win-the-2026-peruvian-presidential-election",
@@ -652,8 +652,8 @@
       "market_price_first_outcome_n_days_before": 0.3155,
       "volume": 13208030.096722003,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.15,
+      "llm_reasoning_brief": "Альварес -- комик, ставший политиком, с более скромными историческими результатами (2021 год); рыночная цена 31.5% кажется завышенной относительно его известного уровня поддержки, если не произошло значительных изменений, о которых у меня нет сведений. Оценка заметно ниже рыночной, с честным признанием неопределённости."
     },
     {
       "slug": "will-fujimori-win-the-2nd-round-of-the-2026-peru-presidential-election-by-48",
@@ -669,8 +669,8 @@
       "market_price_first_outcome_n_days_before": 0.335,
       "volume": 158555.36007499998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.28,
+      "llm_reasoning_brief": "Конкретный диапазон отрыва во втором туре при условии, что Фухимори вообще в нём участвует и побеждает -- составная условная вероятность с реальной неопределённостью; оценка немного ниже рыночной, отражая общий скептицизм по поводу её результатов во вторых турах исторически."
     },
     {
       "slug": "will-tisza-win-at-least-120-seats",
@@ -686,8 +686,8 @@
       "market_price_first_outcome_n_days_before": 0.515,
       "volume": 255452.33773099998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.42,
+      "llm_reasoning_brief": "120 из 199 мест -- уже значительное большинство (60%), требующее существенного перевода опросного моментума TISZA в реальные места с учётом смешанной системы округов. Оценка ниже рыночной 0.515."
     },
     {
       "slug": "hungary-election-tisza-wins-a-constitutional-majority",
@@ -703,8 +703,8 @@
       "market_price_first_outcome_n_days_before": 0.26,
       "volume": 491721.66888800083,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.15,
+      "llm_reasoning_brief": "133+ места -- конституционное сверхбольшинство (2/3), экстремальный сценарий landslide даже при сильном моментуме TISZA; исторически такие результаты редки даже для доминирующих партий. Оценка заметно ниже рыночной 0.26."
     },
     {
       "slug": "will-there-be-exactly-9-earthquakes-of-magnitude-5pt5-or-higher-worldwide-from-april-20-april-26",
@@ -720,8 +720,8 @@
       "market_price_first_outcome_n_days_before": 0.28,
       "volume": 6277.409563000001,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.15,
+      "llm_reasoning_brief": "Пуассоновский расчёт (λ≈5.5) даёт P(ровно 9)≈0.052, заметно ниже рыночной 0.28 -- компромиссная оценка, отражая честную неуверенность в точном λ на хвосте распределения."
     },
     {
       "slug": "will-there-be-exactly-0-earthquakes-of-magnitude-6pt5-or-higher-worldwide-from-may-11-17",
@@ -737,8 +737,8 @@
       "market_price_first_outcome_n_days_before": 0.535,
       "volume": 33721.13026499998,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.42,
+      "llm_reasoning_brief": "Тот же расчёт (λ≈0.9, P(0)≈0.407), что и для другой недели -- держусь консистентно с своим базовым расчётом, немного ниже рыночной 0.535."
     },
     {
       "slug": "will-keiko-fujimori-finish-in-first-place-in-the-first-round-of-the-2026-peruvian-presidential-election",
@@ -754,8 +754,8 @@
       "market_price_first_outcome_n_days_before": 0.57,
       "volume": 945469.5048370016,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.55,
+      "llm_reasoning_brief": "В отличие от итоговой победы (где исторически консолидируется анти-фухимористский электорат во втором туре), лидерство именно в первом туре среди фрагментированного поля кандидатов -- более правдоподобный для неё исход, близко к рыночной оценке."
     },
     {
       "slug": "will-voter-turnout-be-57-60-in-the-first-round-of-the-2026-colombian-presidential-election",
@@ -771,8 +771,8 @@
       "market_price_first_outcome_n_days_before": 0.243,
       "volume": 9569.660620999999,
       "llm_edge_plausible": true,
-      "llm_probability_estimate": null,
-      "llm_reasoning_brief": null
+      "llm_probability_estimate": 0.2,
+      "llm_reasoning_brief": "Реальная историческая явка на первых турах президентских выборов Колумбии в последних циклах была около 53-55% (2018, 2022) -- диапазон 57-60% заметно выше этого недавнего ориентира. Оценка ниже рыночной."
     }
   ]
 }
