@@ -18,11 +18,22 @@ LLM рынка) -- НИ ОДНОГО поля per-market с фактически
 считаем Brier score ДВАЖДЫ: по всей выборке и отдельно по подмножеству
 markets[].llm_edge_plausible=true (рынки, где у LLM в принципе может
 быть информационное преимущество -- разбор известных фактов/паттернов,
-а не гадание о будущем движении цены или чужих действиях)."""
+а не гадание о будущем движении цены или чужих действиях).
+
+2026-09-10, ДОКАЗАТЕЛЬНЫЙ повторный прогон: добавлен кластерный
+бутстрап ПО НЕДЕЛЯМ (не по отдельным рынкам) для разницы Brier
+(рынок - LLM) -- markets[].week_key из Шага 1 задаёт кластер.
+Ресэмплируем недели с возвращением (не рынки внутри недели по
+отдельности) -- это честно учитывает, что рынки одной недели (напр.
+Spotify-чарт) коррелированы, а не независимы. Предрегистрация
+владельца: гипотеза жива, если 90%-интервал разницы (рынок - LLM) на
+подмножестве > 0 и не включает ноль, при N>=40 из >=10 недель."""
 from __future__ import annotations
 
 import json
+import random
 import time
+from collections import defaultdict
 from pathlib import Path
 
 import requests
@@ -94,6 +105,69 @@ def score_group(scored_items: list[tuple[float, float | None, float]]) -> dict:
     }
 
 
+BOOTSTRAP_N_RESAMPLES = 1000
+BOOTSTRAP_SEED = 20260910
+CI_LEVEL = 0.90
+
+
+def cluster_bootstrap_diff(items_by_week: dict[str, list[tuple[float, float | None, float]]]) -> dict:
+    """Кластерный бутстрап ПО НЕДЕЛЯМ (владелец, 2026-09-10): ресэмплируем
+    недели с возвращением (не отдельные рынки) -- рынки внутри одной
+    недели (напр. один Spotify-чарт) коррелированы, псевдо-независимая
+    выборка отдельных рынков переоценила бы уверенность в разнице.
+    Считает разницу Brier (рынок - LLM), пуляя рынки резэмплированных
+    недель вместе на каждой итерации. Никаких per-market значений на
+    выход -- только распределение агрегатов."""
+    weeks = list(items_by_week.keys())
+    if not weeks:
+        return {"n_weeks_in_subset": 0, "n_resamples_used": 0, "ci90_low": None, "ci90_high": None,
+                "point_diff_market_minus_llm": None, "excludes_zero_and_positive": False}
+
+    rng = random.Random(BOOTSTRAP_SEED)
+    diffs = []
+    for _ in range(BOOTSTRAP_N_RESAMPLES):
+        resampled_weeks = [rng.choice(weeks) for _ in range(len(weeks))]
+        pooled = []
+        for wk in resampled_weeks:
+            pooled.extend(items_by_week[wk])
+        comparable = [(llm_p, market_p, actual) for llm_p, market_p, actual in pooled if market_p is not None]
+        if not comparable:
+            continue
+        mean_sq_err_llm = sum((llm_p - actual) ** 2 for llm_p, _mp, actual in comparable) / len(comparable)
+        mean_sq_err_market = sum((market_p - actual) ** 2 for _lp, market_p, actual in comparable) / len(comparable)
+        diffs.append(mean_sq_err_market - mean_sq_err_llm)
+
+    diffs.sort()
+    n = len(diffs)
+    if n == 0:
+        return {"n_weeks_in_subset": len(weeks), "n_resamples_used": 0, "ci90_low": None, "ci90_high": None,
+                "point_diff_market_minus_llm": None, "excludes_zero_and_positive": False}
+
+    alpha = (1 - CI_LEVEL) / 2  # 0.05 с каждой стороны для 90%
+    lo_idx = max(0, int(alpha * n))
+    hi_idx = min(n - 1, int((1 - alpha) * n))
+    # Точечная оценка -- по НЕ-ресэмплированным исходным данным (среднее
+    # по всем неделям без повторов), не среднее по бутстрап-распределению.
+    all_comparable = [(llm_p, market_p, actual) for wk in weeks for llm_p, market_p, actual in items_by_week[wk]
+                       if market_p is not None]
+    point_diff = None
+    if all_comparable:
+        mean_llm = sum((llm_p - actual) ** 2 for llm_p, _mp, actual in all_comparable) / len(all_comparable)
+        mean_market = sum((market_p - actual) ** 2 for _lp, market_p, actual in all_comparable) / len(all_comparable)
+        point_diff = mean_market - mean_llm
+
+    return {
+        "n_weeks_in_subset": len(weeks),
+        "n_resamples_requested": BOOTSTRAP_N_RESAMPLES,
+        "n_resamples_used": n,
+        "ci_level": CI_LEVEL,
+        "point_diff_market_minus_llm": point_diff,
+        "ci90_low": diffs[lo_idx],
+        "ci90_high": diffs[hi_idx],
+        "excludes_zero_and_positive": diffs[lo_idx] > 0,
+    }
+
+
 def run() -> int:
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +191,10 @@ def run() -> int:
     n_fetch_failed = 0
     all_scored: list[tuple[float, float | None, float]] = []
     edge_scored: list[tuple[float, float | None, float]] = []
+    all_by_week: dict[str, list[tuple[float, float | None, float]]] = defaultdict(list)
+    edge_by_week: dict[str, list[tuple[float, float | None, float]]] = defaultdict(list)
     n_edge_plausible = sum(1 for m in markets if m.get("llm_edge_plausible") is True)
+    n_weeks_total = len({m.get("week_key") for m in markets if m.get("week_key")})
 
     for m in markets:
         outcome_prices = fetch_outcome_prices(m["slug"])
@@ -128,21 +205,32 @@ def run() -> int:
         actual_first_outcome = outcome_prices[0]  # 1.0 или 0.0 -- НЕ печатается, НЕ сохраняется per-market
         llm_p = m["llm_probability_estimate"]
         market_p = m.get("market_price_first_outcome_n_days_before")
+        wk = m.get("week_key") or "unknown_week"
 
         triple = (llm_p, market_p, actual_first_outcome)
         all_scored.append(triple)
+        all_by_week[wk].append(triple)
         if m.get("llm_edge_plausible") is True:
             edge_scored.append(triple)
+            edge_by_week[wk].append(triple)
 
     result["n_markets_total"] = len(markets)
     result["n_fetch_failed"] = n_fetch_failed
     result["n_edge_plausible_total"] = n_edge_plausible
+    result["n_weeks_total"] = n_weeks_total
     result["overall"] = score_group(all_scored)
+    result["overall"]["cluster_bootstrap_by_week"] = cluster_bootstrap_diff(all_by_week)
     result["edge_plausible_subset"] = score_group(edge_scored)
+    result["edge_plausible_subset"]["cluster_bootstrap_by_week"] = cluster_bootstrap_diff(edge_by_week)
+    result["preregistration_met"] = (
+        result["edge_plausible_subset"]["cluster_bootstrap_by_week"]["excludes_zero_and_positive"]
+        and result["edge_plausible_subset"]["n_scored"] >= 40
+        and result["edge_plausible_subset"]["cluster_bootstrap_by_week"]["n_weeks_in_subset"] >= 10
+    )
     # Намеренно: НИ ОДНОГО per-market поля с фактическим исходом или
     # даже булевым "угадал" не пишется в result -- только агрегаты,
     # посчитанные дважды (вся выборка и подмножество с теоретическим
-    # информационным преимуществом).
+    # информационным преимуществом), плюс кластерный бутстрап по неделям.
 
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     print(f"[taskE_step2] ВСЕ: n_scored={result['overall']['n_scored']}, "
@@ -152,7 +240,11 @@ def run() -> int:
           f"LLM Brier={result['edge_plausible_subset']['llm_brier_score']}, "
           f"market Brier={result['edge_plausible_subset']['market_brier_score']}, "
           f"LLM лучше рынка: {result['edge_plausible_subset']['llm_beats_market_overall']}")
-    print(f"[taskE_step2] записано {OUT_PATH} -- только агрегаты (дважды), без сырых исходов.")
+    print(f"[taskE_step2] Бутстрап (подмножество): 90% CI разницы (рынок-LLM) = "
+          f"[{result['edge_plausible_subset']['cluster_bootstrap_by_week']['ci90_low']}, "
+          f"{result['edge_plausible_subset']['cluster_bootstrap_by_week']['ci90_high']}], "
+          f"предрегистрация выполнена: {result['preregistration_met']}")
+    print(f"[taskE_step2] записано {OUT_PATH} -- только агрегаты (дважды + бутстрап), без сырых исходов.")
     return 0
 
 

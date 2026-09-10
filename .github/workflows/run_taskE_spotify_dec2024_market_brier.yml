@@ -1,0 +1,51 @@
+name: "Задача E, п.6 -- Spotify декабрь 2024, реальная рыночная калибровка (без LLM, дёшево)"
+
+# Владелец, 2026-09-10: отдельно, дёшево, без LLM. Проверка гипотезы
+# "структурная слепота толпы в нише Spotify-чартов, повторяемая каждый
+# декабрь". LLM здесь не участвует -- нет оценки, нет блайнд-теста,
+# нет риска утечки. Публичный Polymarket API, не Dune/GT -- безопасно
+# параллельно с ретро-сторожком.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKE_SPOTIFY_DEC2024_REQUEST"
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача E, п.6 -- реальная рыночная калибровка Spotify дек.2024"
+        run: python -u analysis/taskE_spotify_dec2024_market_brier.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKE_SPOTIFY_DEC2024_REQUEST
+          [ -e data/p3_guard_cache/taskE_spotify_dec2024_market_brier_result.json ] && git add data/p3_guard_cache/taskE_spotify_dec2024_market_brier_result.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача E, п.6: Spotify дек.2024 рыночный Brier, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
