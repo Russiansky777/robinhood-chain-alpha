@@ -1,0 +1,28 @@
+{
+  "generated_at_utc": "2026-09-10T13:42:49Z",
+  "purpose": "Ретро-сторожок: эпизоды пул TVL>=$2M с оборотом >20x TVL, 90 дней, 0 кредитов (публичный DefiLlama)",
+  "tvl_min_usd": 2000000.0,
+  "turnover_mult_min": 20.0,
+  "window_days": 90,
+  "n_pools_total_snapshot": 17138,
+  "n_pools_tvl_ge_2m_now": 1903,
+  "probe_pool": {
+    "pool": "747c1d2a-c668-4682-b9f9-296708a3dd90",
+    "project": "lido",
+    "symbol": "STETH",
+    "chain": "Ethereum",
+    "n_chart_points": 1592
+  },
+  "probe_chart_sample": {
+    "timestamp": "2026-09-10T13:01:32.337Z",
+    "tvlUsd": 23484198861,
+    "apy": 2.247,
+    "apyBase": 2.247,
+    "apyReward": null,
+    "il7d": null,
+    "apyBase7d": null,
+    "pricePerShare": null
+  },
+  "chart_has_volume_field": false,
+  "blocker": "РЕАЛЬНОЕ ОГРАНИЧЕНИЕ: /yields/chart/{pool} не содержит поля volume (только TVL/APY) -- исторического объёма по пулу за 90 дней через этот публичный эндпоинт нет. volumeUsd1d есть только в ТЕКУЩЕМ снимке /yields/pools (один день, не история). Полный 90-дневный скан оборота НЕВОЗМОЖЕН через публичный DefiLlama API как задумано -- останавливаюсь здесь, не гадаю на суррогатных метриках без явного решения владельца."
+}
