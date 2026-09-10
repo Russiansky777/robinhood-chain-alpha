@@ -1,0 +1,55 @@
+name: "Задача E -- LLM vs рынок (Polymarket), Шаг 1: реальный fetch + запечатанное разделение вопросов/исходов"
+
+# Владелец, 2026-09-10 (задача дана отдельно от C/D, начата заново):
+# может ли LLM дать более точную оценку вероятности, чем цена рынка,
+# на settled-рынках Polymarket после 2026-06-01 (не спорт)? Этот шаг
+# ТОЛЬКО реальный fetch + честное разделение на "вопросы+контекст,
+# без исхода" и "исходы отдельно" -- LLM формирует оценки, читая
+# ТОЛЬКО первый файл. Публичный Polymarket API, не Dune/GT --
+# безопасно параллельно с ретро-сторожком.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+    paths:
+      - "data/p3_guard_cache/TASKE_LLM_FORECAST_FETCH_REQUEST"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Задача E, Шаг 1 -- реальный fetch + запечатанное разделение"
+        run: python -u analysis/taskE_llm_forecast_fetch.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASKE_LLM_FORECAST_FETCH_REQUEST
+          [ -e data/p3_guard_cache/taskE_questions_sealed.json ] && git add data/p3_guard_cache/taskE_questions_sealed.json
+          [ -e data/p3_guard_cache/taskE_outcomes_sealed.json ] && git add data/p3_guard_cache/taskE_outcomes_sealed.json
+          [ -e data/p3_guard_cache/taskE_fetch_diagnostics.json ] && git add data/p3_guard_cache/taskE_fetch_diagnostics.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Задача E, Шаг 1: fetch + запечатанное разделение, результат [automated]"
+          fi
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
