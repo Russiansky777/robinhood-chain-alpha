@@ -151,6 +151,15 @@ def run() -> int:
     now = datetime.now(timezone.utc)
 
     # ШАГ 1: PROBE -- короткое окно, реальная стоимость СНАЧАЛА
+    # 2026-09-10, реальный найденный баг (run 34487140753): здесь читалось
+    # state[ns]["spent"] ПОСЛЕ probe как "стоимость пробы", а это поле --
+    # НАКОПЛЕННЫЙ расход всего namespace за ВСЕ прогоны (включая прошлый
+    # реальный FULL на 30д, уже потраченный ранее). Экстраполяция на этой
+    # базе дала 123.59 кредитов вместо настоящих ~3-4 -- ложно упёрлась в
+    # потолок задачи. Фикс: берём инкремент (после минус до), а не сырой
+    # накопленный total.
+    ns = credit_guard.namespace()
+    spent_before_probe = credit_guard.load_state().get(ns, {}).get("spent", 0.0)
     probe_start = now - timedelta(days=PROBE_DAYS)
     print(f"\n=== Шаг 1 (владелец: оценка на коротком окне): PROBE {PROBE_DAYS}д, {len(universe)} пулов ===")
     try:
@@ -160,10 +169,12 @@ def run() -> int:
         OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         return 1
     state = credit_guard.load_state()
-    ns = credit_guard.namespace()
-    probe_spent = state[ns]["spent"]
+    namespace_spent_after_probe = state[ns]["spent"]
+    probe_spent = namespace_spent_after_probe - spent_before_probe  # инкремент ТОЛЬКО этой пробы
     result["probe_real_cost_credits"] = probe_spent
-    print(f"[task2_basis] реальная стоимость PROBE (namespace spent после probe): {probe_spent:.3f} кредитов")
+    result["namespace_spent_total_after_probe"] = namespace_spent_after_probe
+    print(f"[task2_basis] реальная стоимость PROBE (инкремент): {probe_spent:.3f} кредитов "
+          f"(накопленный total namespace: {namespace_spent_after_probe:.3f})")
 
     # Экстраполяция полного окна от РЕАЛЬНОЙ стоимости пробы (не слепая догадка)
     extrapolated_full_estimate = probe_spent * (FULL_DAYS / PROBE_DAYS) * 1.3  # 30% запас
@@ -183,9 +194,14 @@ def run() -> int:
     print(f"\n=== Шаг 2: ПОЛНЫЙ прогон {FULL_DAYS}д, {len(universe)} пулов (в пределах потолка) ===")
     full_df = fetch_hourly_vwap(client, universe, full_start, now, "full")
     state = credit_guard.load_state()
-    full_spent_total = state[ns]["spent"]
-    result["real_cost_total_credits"] = full_spent_total
-    print(f"[task2_basis] реальная суммарная стоимость (probe+full): {full_spent_total:.3f} кредитов")
+    namespace_spent_after_full = state[ns]["spent"]
+    full_spent = namespace_spent_after_full - namespace_spent_after_probe  # инкремент только FULL
+    result["full_real_cost_credits"] = full_spent
+    result["real_cost_this_run_credits"] = probe_spent + full_spent  # честный итог именно этого запуска
+    result["namespace_spent_total_after_full"] = namespace_spent_after_full
+    print(f"[task2_basis] реальная стоимость FULL (инкремент): {full_spent:.3f}; "
+          f"этот прогон (probe+full): {probe_spent + full_spent:.3f}; "
+          f"накопленный total namespace: {namespace_spent_after_full:.3f}")
 
     if full_df is None or not len(full_df):
         result["blocker"] = "полный прогон вернул пусто -- реальных свопов по этим пулам за окно нет"
