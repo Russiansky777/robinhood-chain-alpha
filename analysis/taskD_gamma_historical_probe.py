@@ -54,6 +54,22 @@ def run() -> int:
                                     "end_date_min": "2025-01-01T00:00:00Z", "end_date_max": "2025-12-31T00:00:00Z",
                                     "limit": 20}),
         ("no_date_filter_closed_only", {"closed": "true", "order": "endDate", "ascending": "false", "limit": 20}),
+        # 2026-09-10, целенаправленная бисекция ширины окна -- реальный
+        # прогон дал 0 за ~2.2с (один запрос, не пагинация) на окнах
+        # 74-165 дней, а тест на 365 дней дал 500 -- ищем реальную границу.
+        ("nfl_exact_window_limit100", {"closed": "true", "order": "endDate", "ascending": "false",
+                                         "end_date_min": "2025-08-22T00:20:00Z", "end_date_max": "2025-11-04T02:01:00Z",
+                                         "limit": 100}),
+        ("window_14d", {"closed": "true", "order": "endDate", "ascending": "false",
+                         "end_date_min": "2025-09-01T00:00:00Z", "end_date_max": "2025-09-15T00:00:00Z", "limit": 20}),
+        ("window_30d", {"closed": "true", "order": "endDate", "ascending": "false",
+                         "end_date_min": "2025-09-01T00:00:00Z", "end_date_max": "2025-10-01T00:00:00Z", "limit": 20}),
+        ("window_60d", {"closed": "true", "order": "endDate", "ascending": "false",
+                         "end_date_min": "2025-08-01T00:00:00Z", "end_date_max": "2025-10-01T00:00:00Z", "limit": 20}),
+        ("window_90d", {"closed": "true", "order": "endDate", "ascending": "false",
+                         "end_date_min": "2025-08-01T00:00:00Z", "end_date_max": "2025-11-01T00:00:00Z", "limit": 20}),
+        ("window_180d", {"closed": "true", "order": "endDate", "ascending": "false",
+                          "end_date_min": "2025-07-01T00:00:00Z", "end_date_max": "2025-12-31T00:00:00Z", "limit": 20}),
     ]
     for label, params in windows:
         entry = probe(label, params)

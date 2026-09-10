@@ -155,6 +155,12 @@ def fetch_polymarket_bulk(max_pages: int = 20, page_size: int = 100,
                 "limit": page_size, "offset": offset, **params_base,
             }, headers=HEADERS, timeout=30)
             if r.status_code != 200:
+                # 2026-09-10, реальный найденный четвёртый баг: не-200 молча
+                # проглатывался (break без следа) -- по факту привело к
+                # тихому "0 рынков" на всех 4 спортах без единого признака
+                # ошибки в результате. Печатаем реальный статус/тело, не
+                # меняя поведение (return всё ещё пустой список на ошибке).
+                print(f"    [fetch_polymarket_bulk] HTTP {r.status_code} на {params_base} -- {r.text[:200]}")
                 break
             body = r.json()
             if not isinstance(body, list) or not body:
