@@ -276,10 +276,18 @@ def run() -> int:
         overall_frac = sum(v["n_hours"] * v["frac_hours_abs_D_gt_total_cost"] for v in valid) / sum(v["n_hours"] for v in valid)
         all_convergence = [v["median_convergence_hours"] for v in valid if v.get("median_convergence_hours") is not None]
         overall_median_convergence = sorted(all_convergence)[len(all_convergence) // 2] if all_convergence else None
-        alive = (overall_frac >= 0.20) and (overall_median_convergence is not None and overall_median_convergence < 24)
+        # 2026-09-10, реальный найденный баг: overall_frac -- numpy.float64
+        # (из pandas .mean()), поэтому "overall_frac >= 0.20" -- numpy.bool_,
+        # а Python `and` на коротком замыкании возвращает ЕГО как есть, не
+        # приводя к обычному bool. json.dumps не умеет numpy.bool_, и
+        # default=str превращал итог в СТРОКУ "False"/"True" вместо
+        # булева false/true. Явный bool(...) чинит сериализацию -- сам
+        # вердикт (1.3% против требуемых 20%, не пограничный случай) не
+        # менялся, это только гигиена представления.
+        alive = bool((overall_frac >= 0.20) and (overall_median_convergence is not None and overall_median_convergence < 24))
         result["prereg_summary"] = {
             "n_tickers_scored": len(valid),
-            "overall_frac_hours_abs_D_gt_total_cost": overall_frac,
+            "overall_frac_hours_abs_D_gt_total_cost": float(overall_frac),
             "overall_median_convergence_hours": overall_median_convergence,
             "verdict_line_alive": alive,
         }
