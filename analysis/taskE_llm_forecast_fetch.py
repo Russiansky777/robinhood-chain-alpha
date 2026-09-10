@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,7 +42,10 @@ RANDOM_SEED = 20260910  # владелец, 2026-09-10 -- воспроизвод
 SPORTS_KEYWORDS = ("nfl", "nba", "mlb", "nhl", "ncaa", "soccer", "football", "basketball",
                     "baseball", "hockey", "ufc", "mma", "tennis", "golf", "boxing", "epl",
                     "premier league", "champions league", "olympics", "world cup", "cricket",
-                    "rugby", "f1", "formula 1", "nascar", "wins the game", "vs.")
+                    "rugby", "formula 1", "nascar", "wins the game")
+# 2026-09-10: "f1" и "vs." убраны -- короткие/пунктуационные ключи дают
+# реальные ложные срабатывания (см. is_sports docstring) и плохо
+# работают с границей слова \b (точка -- не словообразующий символ).
 
 OUT_QUESTIONS = Path("data/p3_guard_cache/taskE_questions_sealed.json")
 OUT_OUTCOMES = Path("data/p3_guard_cache/taskE_outcomes_sealed.json")
@@ -76,11 +80,24 @@ def fetch_closed_markets(max_pages: int = 40, page_size: int = 100) -> list[dict
     return list(out.values())
 
 
+SPORTS_KEYWORD_RE = re.compile(
+    r"\b(" + "|".join(re.escape(kw) for kw in SPORTS_KEYWORDS) + r")\b", re.IGNORECASE)
+
+
 def is_sports(market: dict) -> bool:
-    hay = " ".join(str(market.get(k, "")) for k in ("question", "slug", "category", "description")).lower()
-    tags = market.get("tags") or market.get("events", [])
-    hay += " " + json.dumps(tags, default=str).lower()
-    return any(kw in hay for kw in SPORTS_KEYWORDS)
+    """2026-09-10, реальный найденный баг: прежняя версия дампила ВЕСЬ
+    вложенный market['events'] через json.dumps() в общий "хаистек" и
+    искала ключевые слова НАИВНОЙ подстрокой -- короткий ключ "f1"
+    совпадал с случайными hex-подстроками внутри длинных
+    conditionId/clobTokenIds/questionID и т.п. полей ("...af1..."),
+    что дало n_non_sports=0 из 2100 (100% ложных срабатываний).
+    Реальная схема Polymarket НЕ содержит category/tags вообще (см.
+    sample_raw_market_fields) -- используем ТОЛЬКО читаемые текстовые
+    поля самого рынка (question/slug/description) и НЕ дампим
+    произвольные вложенные структуры; ищем по границе слова (\\b),
+    не по голой подстроке."""
+    hay = " ".join(str(market.get(k, "")) for k in ("question", "slug", "description")).lower()
+    return bool(SPORTS_KEYWORD_RE.search(hay))
 
 
 def fetch_price_snapshot(clob_token_id: str, target_ts: int) -> float | None:
