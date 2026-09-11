@@ -403,10 +403,19 @@ def run() -> int:
     for r in rows:
         print(f"  {r}")
 
+    # РЕАЛЬНЫЙ БАГ (найден 2026-09-11, первый прогон): pandas отдаёт SQL NULL
+    # в строковой колонке size_bucket как float NaN, а не Python None --
+    # `v is None` НЕ ловит NaN (`NaN is not None` -- True), из-за чего все
+    # 20 строк (включая grouping-sets агрегат по всем размерам) попадали в
+    # table1, а table2 оставалась пустой. `v != v` -- истинно только для NaN
+    # (в т.ч. без импорта math), безопасно и для строк, и для None.
+    def _is_all_sizes(v: object) -> bool:
+        return v is None or v != v
+
     # Table 1: distance x size (size_bucket не null)
-    table1 = [r for r in rows if r.get("size_bucket") is not None]
+    table1 = [r for r in rows if not _is_all_sizes(r.get("size_bucket"))]
     # Table 2: distance-only (size_bucket null -- grouping-sets агрегат по всем размерам)
-    table2 = [r for r in rows if r.get("size_bucket") is None]
+    table2 = [r for r in rows if _is_all_sizes(r.get("size_bucket"))]
 
     result["table1_distance_x_size"] = table1
     result["table2_distance_x_gas_survival"] = table2

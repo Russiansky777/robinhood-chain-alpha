@@ -17,18 +17,28 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "task5_active_arb_mozila")
+os.environ.setdefault("CREDIT_GUARD_NAMESPACE", "task5_no_catalyst")
 os.environ.setdefault("CREDIT_GUARD_FILE", "data/credits_spent_mozila.json")
 
-from credit_guard import ensure_namespace  # noqa: E402
+import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_no_catalyst_probe_result.json")
-NAMESPACE_BUDGET = 1650.0
+# Владелец, 2026-09-11: "потолок 120" -- ОБЩИЙ на всё пространство
+# task5_no_catalyst (эту разведку И task5_no_catalyst_extend.py вместе).
+# РЕАЛЬНЫЙ БАГ первого прогона (2026-09-11): здесь стоял хардкод
+# ensure_namespace("task5_active_arb_mozila", 1650.0) -- инициализировал
+# ЧУЖОЕ пространство, а не то, что реально читает credit_guard.namespace()
+# (из CREDIT_GUARD_NAMESPACE, выставленного workflow'ом в
+# 'task5_no_catalyst') -- guard корректно отказал исполнять ПЕРЕД
+# execute (0 кредитов потрачено), но с неверным диагнозом. Исправлено:
+# инициализируем РЕАЛЬНОЕ активное пространство.
+NAMESPACE_BUDGET = 120.0
 
 
 def run() -> int:
-    ensure_namespace("task5_active_arb_mozila", NAMESPACE_BUDGET)
+    ns = credit_guard.namespace()
+    credit_guard.ensure_namespace(ns, NAMESPACE_BUDGET)
     client = DuneClient()
     out: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
