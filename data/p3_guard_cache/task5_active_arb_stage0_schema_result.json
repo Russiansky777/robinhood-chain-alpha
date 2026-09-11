@@ -1,0 +1,815 @@
+{
+  "generated_at_utc": "2026-09-10T23:55:32Z",
+  "v3_evt_swap_columns": [
+    {
+      "column_name": "contract_address",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "evt_tx_hash",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "evt_tx_from",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "evt_tx_to",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "evt_tx_index",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "evt_index",
+      "data_type": "bigint"
+    },
+    {
+      "column_name": "evt_block_time",
+      "data_type": "timestamp(3)"
+    },
+    {
+      "column_name": "evt_block_number",
+      "data_type": "bigint"
+    },
+    {
+      "column_name": "evt_block_date",
+      "data_type": "date"
+    },
+    {
+      "column_name": "amount0",
+      "data_type": "int256"
+    },
+    {
+      "column_name": "amount1",
+      "data_type": "int256"
+    },
+    {
+      "column_name": "liquidity",
+      "data_type": "uint256"
+    },
+    {
+      "column_name": "recipient",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "sender",
+      "data_type": "varbinary"
+    },
+    {
+      "column_name": "sqrtpricex96",
+      "data_type": "uint256"
+    },
+    {
+      "column_name": "tick",
+      "data_type": "integer"
+    }
+  ],
+  "v3_factory_table_candidates": [
+    {
+      "table_name": "uniswapv3factory_call_createpool"
+    },
+    {
+      "table_name": "uniswapv3factory_call_enablefeeamount"
+    },
+    {
+      "table_name": "uniswapv3factory_call_feeamounttickspacing"
+    },
+    {
+      "table_name": "uniswapv3factory_call_getpool"
+    },
+    {
+      "table_name": "uniswapv3factory_call_owner"
+    },
+    {
+      "table_name": "uniswapv3factory_call_parameters"
+    },
+    {
+      "table_name": "uniswapv3factory_call_setowner"
+    },
+    {
+      "table_name": "uniswapv3factory_evt_feeamountenabled"
+    },
+    {
+      "table_name": "uniswapv3factory_evt_ownerchanged"
+    },
+    {
+      "table_name": "uniswapv3factory_evt_poolcreated"
+    },
+    {
+      "table_name": "uniswapv3pool_call_factory"
+    }
+  ],
+  "v3_factory_table_columns": {
+    "uniswapv3factory_call_createpool": [
+      {
+        "column_name": "contract_address",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "call_tx_hash",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_from",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_to",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_index",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "call_trace_address",
+        "data_type": "array(bigint)"
+      },
+      {
+        "column_name": "call_block_time",
+        "data_type": "timestamp(3)"
+      },
+      {
+        "column_name": "call_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "call_block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "fee",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "output_pool",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "tokena",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "tokenb",
+        "data_type": "varbinary"
+      }
+    ],
+    "uniswapv3factory_call_enablefeeamount": [
+      {
+        "column_name": "contract_address",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "call_tx_hash",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_from",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_to",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_index",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "call_trace_address",
+        "data_type": "array(bigint)"
+      },
+      {
+        "column_name": "call_block_time",
+        "data_type": "timestamp(3)"
+      },
+      {
+        "column_name": "call_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "call_block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "fee",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "tickspacing",
+        "data_type": "integer"
+      }
+    ],
+    "uniswapv3factory_call_feeamounttickspacing": [
+      {
+        "column_name": "contract_address",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "call_tx_hash",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_from",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_to",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "call_tx_index",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "call_trace_address",
+        "data_type": "array(bigint)"
+      },
+      {
+        "column_name": "call_block_time",
+        "data_type": "timestamp(3)"
+      },
+      {
+        "column_name": "call_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "call_block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "_0",
+        "data_type": "integer"
+      },
+      {
+        "column_name": "output_0",
+        "data_type": "integer"
+      }
+    ]
+  },
+  "transactions_table_candidates": [
+    {
+      "table_name": "transactions",
+      "table_schema": "robinhood"
+    },
+    {
+      "table_name": "transactions_0000",
+      "table_schema": "robinhood"
+    },
+    {
+      "table_name": "transactions_0001",
+      "table_schema": "robinhood"
+    },
+    {
+      "table_name": "inbox_call_sendcontracttransaction",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "inbox_call_sendl1fundedcontracttransaction",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "inbox_call_sendl1fundedunsignedtransaction",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "inbox_call_sendl1fundedunsignedtransactiontofork",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "inbox_call_sendunsignedtransaction",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "inbox_call_sendunsignedtransactiontofork",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "outbox_call_executetransaction",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "outbox_call_executetransactionsimulation",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "outbox_evt_outboxtransactionexecuted",
+      "table_schema": "robinhood_ethereum"
+    },
+    {
+      "table_name": "arbsys_evt_l2tol1transaction",
+      "table_schema": "robinhood_robinhood"
+    }
+  ],
+  "transactions_table_columns": {
+    "robinhood.transactions": [
+      {
+        "column_name": "block_time",
+        "data_type": "timestamp(3)"
+      },
+      {
+        "column_name": "block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "block_hash",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "value",
+        "data_type": "uint256"
+      },
+      {
+        "column_name": "index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "from",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "to",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "gas_limit",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "gas_price",
+        "data_type": "uint256"
+      },
+      {
+        "column_name": "gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_constant",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_scalar",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_gas_price",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee_scalar",
+        "data_type": "double"
+      },
+      {
+        "column_name": "l1_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_timestamp",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_tx_origin",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "l1_batch_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_batch_tx_index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "chain_id",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "nonce",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "data",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "hash",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "type",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "access_list",
+        "data_type": "array(row(address varbinary, storagekeys array(varbinary)))"
+      },
+      {
+        "column_name": "authorization_list",
+        "data_type": "array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))"
+      },
+      {
+        "column_name": "block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "gas_used_for_l1",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "effective_gas_price",
+        "data_type": "bigint"
+      }
+    ],
+    "robinhood.transactions_0000": [
+      {
+        "column_name": "block_time",
+        "data_type": "timestamp(3) with time zone"
+      },
+      {
+        "column_name": "value",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "value_uint256",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "gas_limit",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "gas_price",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "gas_price_uint256",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_constant",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_scalar",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "nonce",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "type",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "chain_id",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "l1_gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_gas_price",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee_scalar",
+        "data_type": "double"
+      },
+      {
+        "column_name": "l1_batch_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_batch_tx_index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_timestamp",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_tx_origin",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "l1_tx_origin_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "from",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "from_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "to",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "to_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_hash",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "block_hash_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "data",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "data_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "hash",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "hash_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "access_list",
+        "data_type": "array(row(address varchar, storagekeys array(varchar)))"
+      },
+      {
+        "column_name": "access_list_bytearray",
+        "data_type": "array(row(address varbinary, storagekeys array(varbinary)))"
+      },
+      {
+        "column_name": "authorization_list",
+        "data_type": "array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))"
+      },
+      {
+        "column_name": "gas_used_for_l1",
+        "data_type": "bigint"
+      }
+    ],
+    "robinhood.transactions_0001": [
+      {
+        "column_name": "block_time",
+        "data_type": "timestamp(3) with time zone"
+      },
+      {
+        "column_name": "value",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "value_uint256",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "gas_limit",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "gas_price",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "gas_price_uint256",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_constant",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "operator_fee_scalar",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "max_priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "priority_fee_per_gas",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "nonce",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "success",
+        "data_type": "boolean"
+      },
+      {
+        "column_name": "type",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "chain_id",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "l1_gas_used",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_gas_price",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_fee_scalar",
+        "data_type": "double"
+      },
+      {
+        "column_name": "l1_batch_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_batch_tx_index",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_block_number",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_timestamp",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "l1_tx_origin",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "l1_tx_origin_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_date",
+        "data_type": "date"
+      },
+      {
+        "column_name": "from",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "from_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "to",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "to_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "block_hash",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "block_hash_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "data",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "data_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "hash",
+        "data_type": "varchar"
+      },
+      {
+        "column_name": "hash_bytearray",
+        "data_type": "varbinary"
+      },
+      {
+        "column_name": "access_list",
+        "data_type": "array(row(address varchar, storagekeys array(varchar)))"
+      },
+      {
+        "column_name": "access_list_bytearray",
+        "data_type": "array(row(address varbinary, storagekeys array(varbinary)))"
+      },
+      {
+        "column_name": "authorization_list",
+        "data_type": "array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))"
+      },
+      {
+        "column_name": "gas_used_for_l1",
+        "data_type": "bigint"
+      },
+      {
+        "column_name": "effective_gas_price",
+        "data_type": "bigint"
+      }
+    ]
+  },
+  "total_stage0_cost_credits": 5.30101004
+}
