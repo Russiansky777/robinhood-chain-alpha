@@ -82,12 +82,22 @@ class SequencerFeedClient:
 
 
 def decode_l2_message(l2_msg_hex: str) -> dict | None:
-    """Best-effort декодер L2MessageType_signedTx (байт-константа 4,
-    Nitro `arbos/l2message.go`, публичная документация -- НЕ проверено
-    вживую на этой цепи, задача первой недели dry-run см. PROJECT_STATE.md).
-    Возвращает {"to": ..., "data": ...} для дальнейшего сопоставления с
-    сигнатурой Uniswap V3 `swap()`, либо None (тип не распознан/не
-    поддержан -- честно, не подделываем "распознавание")."""
+    """Декодер L2MessageType_signedTx (байт-константа 4, Nitro
+    `arbos/l2message.go`, публичная документация) -- ПРОВЕРЕНО живым
+    прогоном `task5_bot_feed_decode_probe.py` 2026-09-12, см.
+    PROJECT_STATE.md для реальных примеров. Возвращает
+    {"to": "0x...", "data": "0x...", "msg_type": <int>} либо
+    {"unhandled_msg_type": <int>} (тип НЕ 4 -- честно, не гадаем), либо
+    None (декодирование не удалось вообще).
+
+    Payload после байта типа -- это САМА подписанная транзакция ровно
+    как отправлена в сеть (EIP-2718): если первый байт >= 0xc0, это
+    legacy RLP-список напрямую (9 полей: nonce, gasPrice, gasLimit, to,
+    value, data, v, r, s); если первый байт в диапазоне типов (0x01-
+    0x7f), это typed-транзакция -- байт типа + RLP-список полей,
+    специфичных для типа (для 0x02 EIP-1559: chainId, nonce,
+    maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
+    accessList, yParity, r, s -- to/data по индексам 5/7)."""
     try:
         raw = bytes.fromhex(l2_msg_hex[2:] if l2_msg_hex.startswith("0x") else l2_msg_hex)
     except ValueError:
@@ -95,15 +105,43 @@ def decode_l2_message(l2_msg_hex: str) -> dict | None:
     if not raw:
         return None
     msg_type = raw[0]
-    if msg_type != 4:  # L2MessageType_signedTx -- ЕДИНСТВЕННЫЙ обрабатываемый тип в этой версии
+    if msg_type != 4:
+        return {"unhandled_msg_type": msg_type}
+
+    tx_bytes = raw[1:]
+    if not tx_bytes:
         return None
+
     try:
         import rlp
-        tx_rlp = raw[1:]
-        decoded = rlp.decode(tx_rlp)
-        # decoded -- список полей RLP-транзакции; извлекаем to/data по
-        # позиции (стандартная EIP-1559/legacy раскладка) -- полная
-        # валидация сигнатуры/nonce не нужна для детекции факта свопа.
-        return {"raw_fields": [f.hex() if isinstance(f, bytes) else f for f in decoded]}
-    except Exception:
-        return None
+        first_byte = tx_bytes[0]
+        if first_byte >= 0xC0:
+            # legacy, нетипизированная транзакция -- RLP-список сразу
+            decoded = rlp.decode(tx_bytes)
+            if len(decoded) < 6:
+                return None
+            to_field, data_field = decoded[3], decoded[5]
+            tx_kind = "legacy"
+        elif first_byte in (0x01, 0x02, 0x03):
+            decoded = rlp.decode(tx_bytes[1:])
+            if first_byte == 0x02:  # EIP-1559
+                if len(decoded) < 8:
+                    return None
+                to_field, data_field = decoded[5], decoded[7]
+            elif first_byte == 0x01:  # EIP-2930
+                if len(decoded) < 7:
+                    return None
+                to_field, data_field = decoded[3], decoded[5]
+            else:  # 0x03 EIP-4844 -- редкий случай, поля те же смещения, что 1559 + doc не гарантирована
+                if len(decoded) < 8:
+                    return None
+                to_field, data_field = decoded[5], decoded[7]
+            tx_kind = f"typed_0x{first_byte:02x}"
+        else:
+            return {"unrecognized_first_byte": first_byte}
+
+        to_hex = "0x" + to_field.hex() if isinstance(to_field, bytes) and to_field else None
+        data_hex = "0x" + data_field.hex() if isinstance(data_field, bytes) else "0x"
+        return {"to": to_hex, "data": data_hex, "msg_type": msg_type, "tx_kind": tx_kind}
+    except Exception as exc:
+        return {"decode_error": str(exc)}

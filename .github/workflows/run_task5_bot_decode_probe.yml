@@ -1,0 +1,81 @@
+name: "Задача 5, живой бот, приоритет 1 (владелец 2026-09-12) -- декодер L2-сообщений против ЖИВОГО фида"
+
+# "Единственный шаг с неизвестной длительностью. Как только сообщения
+# парсятся -- доложить с примерами реальных транзакций из фида. Если
+# формат не совпадает -- доложить сразу, не разбирать молча."
+#
+# Только слушает публичный фид секвенсера и пытается декодировать --
+# НИКАКИХ транзакций не отправляется, никаких ключей не используется.
+# NL VPS: тот же безопасный паттерн, что run_seq_feed_latency_probe.yml
+# -- файлы копируются в /tmp, временный venv, существующий git-клон/
+# cron/systemd на VPS не трогаются вообще.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_DECODE_PROBE_REQUEST"
+
+jobs:
+  decode_probe_nl_vps:
+    name: "Декодер L2-сообщений -- живой фид, NL VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Скопировать нужные файлы во временный каталог VPS (НЕ трогая существующий git-клон/venv на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /tmp/task5_decode_probe'
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/task5_decode_probe/task5_bot_config.py' < analysis/task5_bot_config.py
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/task5_decode_probe/task5_bot_feed_client.py' < analysis/task5_bot_feed_client.py
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/task5_decode_probe/task5_bot_feed_decode_probe.py' < analysis/task5_bot_feed_decode_probe.py
+
+      - name: Поставить зависимости во временный venv и запустить декодер против живого фида (120 секунд)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            python3 -m venv /tmp/task5_decode_venv
+            source /tmp/task5_decode_venv/bin/activate
+            pip install --quiet requests websockets rlp
+            cd /tmp/task5_decode_probe
+            python3 -u task5_bot_feed_decode_probe.py --duration 120 --max-examples 15 --out /tmp/task5_decode_probe_result.json
+          ' | tee /tmp/vps_decode_probe_stdout.log
+          ssh $SSH_OPTS root@45.59.170.76 'cat /tmp/task5_decode_probe_result.json' > /tmp/task5_decode_probe_result.json
+
+      - name: Commit results
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_DECODE_PROBE_REQUEST
+          cp /tmp/task5_decode_probe_result.json data/p3_guard_cache/task5_bot_decode_probe_result.json
+          git add data/p3_guard_cache/task5_bot_decode_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: результат декодера L2-сообщений против живого фида [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
