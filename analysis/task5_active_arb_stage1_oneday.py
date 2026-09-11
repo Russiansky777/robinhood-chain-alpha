@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
-"""Задача 5 владельца (2026-09-10), Шаг 1 -- ОБЯЗАТЕЛЬНАЯ оценка
-стоимости на ОДНОМ дне перед полным 30-дневным прогоном. Считает
-атомарный внутриблочный арбитраж (транзакции с >=2 свопами РАЗНЫХ
-пулов) на Robinhood chain, используя ТОЛЬКО декодированные схемы
-(uniswap_v3_robinhood + uniswap_v4_robinhood), без dex.trades (владелец
-явно запретил -- узкие предикаты напрямую по декодированным таблицам).
+"""Задача 5 владельца, Шаг 1 -- ОБЯЗАТЕЛЬНАЯ оценка на ОДНОМ дне перед
+30-дневным прогоном. v3 этого скрипта (2026-09-11, после реального
+разбора владельцем причины $178.8M/день в v2): добавлены ТРИ фильтра
+владельца, применяются ВМЕСТЕ:
 
-Реальные схемы -- см. предыдущую версию/Шаг 0/0b, не повторяем здесь.
+1. Только КАНОНИЧЕСКИЙ Factory (`0x1f7d7550b1b028f7571e69a784071f0205fd2efa`,
+   PROJECT_STATE) -- отсекает ~430k спам-фабрик (Шаг 0b).
+2. Реальная ликвидность: >=4 различных адреса-контрагента в пуле за
+   день (владелец: "пул, где торгуют <=3 адреса -- не рынок").
+3. Исключение самоторговли (тот же метод, что уже применялся к
+   0x65050a на этой же цепи, см. P5/docs/PROJECT_STATE.md):
+   (a) исполнитель (evt_tx_from) -- LP-провайдер (`owner` из реального
+       Mint-события, Шаг 0c) этого же пула, ИЛИ
+   (b) доля свопов исполнителя в этом пуле за этот день > 50%.
 
-2026-09-10, РЕАЛЬНЫЙ найденный баг первой версии этого скрипта (не
-догадка -- проверено на скачанном кэше): `limit 20000` на построчный
-результат детекции обрезал выдачу ПЕРВЫМИ 20000 строками по
-block_time -- и все 20000 реально уместились в ПЕРВЫЕ 29 МИНУТ суток
-(00:00-00:29 UTC). Это НЕ репрезентативная случайная выборка дня, а
-конкретный ранний burst -- экстраполяция "профиль дня похож на первые
-29 минут" была бы нечестной (могла и завысить, и занизить факт, дневная
-активность не обязана быть равномерной). Реальный fix: НЕ тянуть
-построчные результаты детекции в Python вообще (тот же архитектурный
-принцип "сырые данные не покидают Dune", что уже в этом репозитории,
-см. credit_guard.py) -- детекция МАТЕРИАЛИЗУЕТСЯ на Dune один раз
-(fetch_results=False, referenced далее как query_<id>), а три
-ЛЁГКИХ follow-up запроса агрегируют её на стороне Dune ЗА ВЕСЬ ДЕНЬ,
-без обрезки: (1) дневная сводка (1 строка), (2) топ-500 исполнителей по
-прибыли (агрегация GROUP BY, не построчный дамп), (3) почасовое
-распределение (24 строки). Каждый follow-up ссылается на уже оплаченный
-query_<id> детекции -- дорогая часть (сканы v3/v4 + JOIN Factory)
-считается РОВНО ОДИН РАЗ, не трижды."""
+v4 (`uniswap_v4_robinhood.swaps`) не имеет ни классического Factory
+(singleton PoolManager, уже трактуется как канонический), ни Mint-
+события в этой форме (другая модель ликвидности) -- фильтр 1/3a к нему
+не применяется; фильтры 2/3b применяются с `sender` как ПРИБЛИЖЕНИЕM
+исполнителя (дешевле, чем join на transactions для ВСЕХ v4-свопов
+дня, не только кандидатов в арбитраж) -- честно помечено, тот же
+класс оговорки, что уже принят в этом репозитории для `sender` в
+Uniswap-событиях (dune_pool_volume_query1.py: "sender -- это msg.sender
+ПУЛА... может отражать 'все ходят через один роутер'").
+
+Санитарная проверка владельца: суммарная прибыль за день не может
+правдоподобно превышать разумную долю оборота цепи (~$1.5B/день на
+пике) -- если total_profit_usd > $1-2M, результат ЯВНО помечается как
+всё ещё контаминированный, НЕ как факт."""
 from __future__ import annotations
 
 import json
@@ -49,47 +51,91 @@ WETH = "0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "5fc5360d0400a0fd4f2af552add042d716f1d168"
 WETH_USDG_POOL = "52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 WETH_DECIMALS, USDG_DECIMALS = 18, 6
-DUST_THRESHOLD_USD = 1.0  # владелец не задавал -- отсекаем шум округления вокруг нуля (см. находка: n_legs=2 медиана ровно $0)
+CANONICAL_FACTORY = "1f7d7550b1b028f7571e69a784071f0205fd2efa"
+DUST_THRESHOLD_USD = 1.0
+MIN_DISTINCT_TRADERS_PER_POOL_DAY = 4  # владелец: "<=3 -- не рынок"
+MAX_DOMINANT_SHARE = 0.5  # владелец: "> 50%"
 
 PREREG_THRESHOLD_USD_PER_DAY = 500.0
+SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD = 2_000_000.0  # владелец, 2026-09-11: явный санитарный потолок
 
 
 def build_detect_sql(day_start: str, day_end: str) -> str:
-    """Детекция + прибыль -- МАТЕРИАЛИЗУЕТСЯ (fetch_results=False), не
-    скачивается построчно. eth_price подставляется здесь же (Python-
-    константа из отдельного дешёвого запроса B), чтобы profit_usd был
-    готовым столбцом для дальнейшей агрегации на Dune."""
     return f"""
-with v3_legs as (
+with canonical_pools as (
+    select pool, token0, token1
+    from uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated
+    where contract_address = from_hex('{CANONICAL_FACTORY}')
+),
+lp_providers as (
+    select distinct m.contract_address as pool, m.evt_tx_from as lp_address
+    from uniswap_v3_robinhood.uniswapv3pool_evt_mint m
+    where m.contract_address in (select pool from canonical_pools)
+),
+v3_swaps_raw as (
     select
         s.evt_tx_hash as tx_hash,
         s.evt_block_number as block_number,
         s.evt_block_time as block_time,
+        s.evt_block_date as block_date,
+        s.contract_address as pool_addr,
         to_hex(s.contract_address) as pool_key,
+        s.evt_tx_from as executor_raw,
         to_hex(s.evt_tx_from) as executor,
         case
-            when p.token0 = from_hex('{WETH}') then cast(-s.amount0 as double) / 1e{WETH_DECIMALS}
-            when p.token1 = from_hex('{WETH}') then cast(-s.amount1 as double) / 1e{WETH_DECIMALS}
+            when cp.token0 = from_hex('{WETH}') then cast(-s.amount0 as double) / 1e{WETH_DECIMALS}
+            when cp.token1 = from_hex('{WETH}') then cast(-s.amount1 as double) / 1e{WETH_DECIMALS}
             else 0.0
         end as weth_delta,
         case
-            when p.token0 = from_hex('{USDG}') then cast(-s.amount0 as double) / 1e{USDG_DECIMALS}
-            when p.token1 = from_hex('{USDG}') then cast(-s.amount1 as double) / 1e{USDG_DECIMALS}
+            when cp.token0 = from_hex('{USDG}') then cast(-s.amount0 as double) / 1e{USDG_DECIMALS}
+            when cp.token1 = from_hex('{USDG}') then cast(-s.amount1 as double) / 1e{USDG_DECIMALS}
             else 0.0
         end as usdg_delta
     from uniswap_v3_robinhood.uniswapv3pool_evt_swap s
-    left join uniswap_v3_robinhood.uniswapv3factory_evt_poolcreated p
-        on p.pool = s.contract_address
+    inner join canonical_pools cp on cp.pool = s.contract_address
     where s.evt_block_time >= timestamp '{day_start}' and s.evt_block_time < timestamp '{day_end}'
 ),
-v4_legs as (
+v3_pool_day_diversity as (
+    select pool_addr, block_date, count(distinct executor_raw) as n_distinct_traders
+    from v3_swaps_raw
+    group by pool_addr, block_date
+),
+v3_pool_day_address_counts as (
+    select pool_addr, block_date, executor_raw, count(*) as n_swaps
+    from v3_swaps_raw
+    group by pool_addr, block_date, executor_raw
+),
+v3_pool_day_totals as (
+    select pool_addr, block_date, sum(n_swaps) as total_swaps
+    from v3_pool_day_address_counts
+    group by pool_addr, block_date
+),
+v3_legs as (
+    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.executor, r.weth_delta, r.usdg_delta
+    from v3_swaps_raw r
+    inner join v3_pool_day_diversity div
+        on div.pool_addr = r.pool_addr and div.block_date = r.block_date
+        and div.n_distinct_traders >= {MIN_DISTINCT_TRADERS_PER_POOL_DAY}
+    inner join v3_pool_day_address_counts cnt
+        on cnt.pool_addr = r.pool_addr and cnt.block_date = r.block_date and cnt.executor_raw = r.executor_raw
+    inner join v3_pool_day_totals tot
+        on tot.pool_addr = r.pool_addr and tot.block_date = r.block_date
+    left join lp_providers lp
+        on lp.pool = r.pool_addr and lp.lp_address = r.executor_raw
+    where lp.lp_address is null
+      and cast(cnt.n_swaps as double) / tot.total_swaps <= {MAX_DOMINANT_SHARE}
+),
+v4_swaps_raw as (
     select
         w.tx_hash as tx_hash,
         w.block_number as block_number,
         w.block_time as block_time,
+        w.block_date as block_date,
         concat(to_hex(least(w.token_bought_address, w.token_sold_address)), '-',
                to_hex(greatest(w.token_bought_address, w.token_sold_address)), '-',
                cast(w.fee as varchar), '-', to_hex(w.hooks)) as pool_key,
+        w.sender as executor_raw,
         cast(null as varchar) as executor,
         case
             when w.token_bought_address = from_hex('{WETH}') then cast(w.token_bought_amount_raw as double) / 1e{WETH_DECIMALS}
@@ -103,6 +149,33 @@ v4_legs as (
         end as usdg_delta
     from uniswap_v4_robinhood.swaps w
     where w.block_time >= timestamp '{day_start}' and w.block_time < timestamp '{day_end}'
+),
+v4_pool_day_diversity as (
+    select pool_key, block_date, count(distinct executor_raw) as n_distinct_traders
+    from v4_swaps_raw
+    group by pool_key, block_date
+),
+v4_pool_day_address_counts as (
+    select pool_key, block_date, executor_raw, count(*) as n_swaps
+    from v4_swaps_raw
+    group by pool_key, block_date, executor_raw
+),
+v4_pool_day_totals as (
+    select pool_key, block_date, sum(n_swaps) as total_swaps
+    from v4_pool_day_address_counts
+    group by pool_key, block_date
+),
+v4_legs as (
+    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.executor, r.weth_delta, r.usdg_delta
+    from v4_swaps_raw r
+    inner join v4_pool_day_diversity div
+        on div.pool_key = r.pool_key and div.block_date = r.block_date
+        and div.n_distinct_traders >= {MIN_DISTINCT_TRADERS_PER_POOL_DAY}
+    inner join v4_pool_day_address_counts cnt
+        on cnt.pool_key = r.pool_key and cnt.block_date = r.block_date and cnt.executor_raw = r.executor_raw
+    inner join v4_pool_day_totals tot
+        on tot.pool_key = r.pool_key and tot.block_date = r.block_date
+    where cast(cnt.n_swaps as double) / tot.total_swaps <= {MAX_DOMINANT_SHARE}
 ),
 all_legs as (
     select * from v3_legs
@@ -189,7 +262,15 @@ def run() -> int:
     print(f"[task5_stage1] остаток общего цикла Dune (Mozila): {remaining:.1f} кредитов")
 
     client = DuneClient()
-    result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     "filters_applied": {
+                         "canonical_factory_only": CANONICAL_FACTORY,
+                         "min_distinct_traders_per_pool_day": MIN_DISTINCT_TRADERS_PER_POOL_DAY,
+                         "max_dominant_share": MAX_DOMINANT_SHARE,
+                         "v4_note": "v4 не имеет Factory/Mint в этой форме -- фильтр 1/3a только v3, "
+                                     "фильтры 2/3b на v4 используют 'sender' как приближение исполнителя "
+                                     "(дешевле полного join на transactions для всех свопов дня)",
+                     }}
 
     now = datetime.now(timezone.utc)
     day_end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -199,11 +280,11 @@ def run() -> int:
     result["probe_day_start_utc"] = day_start
     result["probe_day_end_utc"] = day_end
 
-    print(f"\n=== B (сначала, нужна для подстановки в детекцию). Реальная медианная цена ETH/USDG ===")
+    print(f"\n=== B. Реальная медианная цена ETH/USDG ===")
     spent_before_b = credit_guard.load_state()[ns]["spent"]
     sql_price = build_price_sql(day_start, day_end)
-    qid_price = client.create_query("task5_eth_usdg_price_oneday_v2", sql_price)
-    df_price = client.run_sql_cached("task5_eth_usdg_price_oneday_v2", sql_price, query_id=qid_price,
+    qid_price = client.create_query("task5_eth_usdg_price_oneday_v3", sql_price)
+    df_price = client.run_sql_cached("task5_eth_usdg_price_oneday_v3", sql_price, query_id=qid_price,
                                       estimated_credits=3.0, expected_max_rows=5, expected_columns=1)
     spent_after_b = credit_guard.load_state()[ns]["spent"]
     cost_b = spent_after_b - spent_before_b
@@ -214,22 +295,22 @@ def run() -> int:
     result["eth_price_usdg_median_this_day"] = eth_price_usdg
     print(f"[task5_stage1] Шаг B стоимость: {cost_b:.4f}, медианная цена ETH/USDG: {eth_price_usdg}")
     if eth_price_usdg is None:
-        result["blocker"] = "Реальная цена ETH/USDG не получена -- нет смысла продолжать вслепую с price=0."
+        result["blocker"] = "Реальная цена ETH/USDG не получена -- останов."
         OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         print(f"[task5_stage1] {result['blocker']}")
         return 1
 
-    print(f"\n=== A. Материализация детекции (fetch_results=False -- НЕ скачиваем построчно) ===")
+    print(f"\n=== A. Материализация детекции С ТРЕМЯ ФИЛЬТРАМИ (fetch_results=False) ===")
     spent_before_a = credit_guard.load_state()[ns]["spent"]
     sql_detect = build_detect_sql(day_start, day_end).replace("{eth_price}", repr(eth_price_usdg))
-    qid_detect = client.create_query("task5_arb_detect_oneday_v2", sql_detect)
-    client.run_sql_cached("task5_arb_detect_oneday_v2", sql_detect, query_id=qid_detect,
-                           estimated_credits=15.0, fetch_results=False)
+    qid_detect = client.create_query("task5_arb_detect_oneday_v3", sql_detect)
+    client.run_sql_cached("task5_arb_detect_oneday_v3", sql_detect, query_id=qid_detect,
+                           estimated_credits=30.0, fetch_results=False)
     spent_after_a = credit_guard.load_state()[ns]["spent"]
     cost_a = spent_after_a - spent_before_a
     result["step_a_materialize_cost_credits"] = cost_a
-    print(f"[task5_stage1] Шаг A (материализация) стоимость: {cost_a:.4f}, query_id={qid_detect}")
+    print(f"[task5_stage1] Шаг A (материализация, с фильтрами) стоимость: {cost_a:.4f}, query_id={qid_detect}")
 
     def run_followup(name: str, sql_template: str, max_rows: int, max_cols: int, est: float) -> list[dict]:
         sql = sql_template.replace("query_DETECT_ID", f"query_{qid_detect}")
@@ -244,26 +325,26 @@ def run() -> int:
         result[f"{name}_cost_credits"] = cost
         return rows
 
-    print(f"\n=== A1. Дневная сводка (1 строка, агрегация на Dune -- НЕ обрезана LIMIT'ом) ===")
-    summary_rows = run_followup("task5_arb_summary_oneday", SUMMARY_SQL, max_rows=5, max_cols=6, est=3.0)
+    print(f"\n=== A1. Дневная сводка ===")
+    summary_rows = run_followup("task5_arb_summary_oneday_v3", SUMMARY_SQL, max_rows=5, max_cols=6, est=3.0)
     if summary_rows:
         result.update(summary_rows[0])
 
-    print(f"\n=== A2. Топ-500 исполнителей по прибыли (агрегация на Dune) ===")
-    executor_rows = run_followup("task5_arb_top_executors_oneday", TOP_EXECUTORS_SQL, max_rows=500, max_cols=3, est=3.0)
+    print(f"\n=== A2. Топ-500 исполнителей ===")
+    executor_rows = run_followup("task5_arb_top_executors_oneday_v3", TOP_EXECUTORS_SQL, max_rows=500, max_cols=3, est=3.0)
     result["top_executors_by_profit_usd"] = executor_rows
 
-    print(f"\n=== A3. Почасовое распределение (24 строки) ===")
-    hourly_rows = run_followup("task5_arb_hourly_oneday", HOURLY_SQL, max_rows=30, max_cols=3, est=3.0)
+    print(f"\n=== A3. Почасовое распределение ===")
+    hourly_rows = run_followup("task5_arb_hourly_oneday_v3", HOURLY_SQL, max_rows=30, max_cols=3, est=3.0)
     result["hourly_distribution"] = hourly_rows
 
     total_cost = (result.get("step_b_cost_credits", 0.0) + result.get("step_a_materialize_cost_credits", 0.0)
-                  + result.get("task5_arb_summary_oneday_cost_credits", 0.0)
-                  + result.get("task5_arb_top_executors_oneday_cost_credits", 0.0)
-                  + result.get("task5_arb_hourly_oneday_cost_credits", 0.0))
+                  + result.get("task5_arb_summary_oneday_v3_cost_credits", 0.0)
+                  + result.get("task5_arb_top_executors_oneday_v3_cost_credits", 0.0)
+                  + result.get("task5_arb_hourly_oneday_v3_cost_credits", 0.0))
     result["total_cost_this_run_credits"] = total_cost
     result["extrapolated_30day_credits"] = total_cost * 30 * 1.3
-    print(f"\n[task5_stage1] РЕАЛЬНАЯ суммарная стоимость Шага 1 (1 день, все под-запросы): {total_cost:.4f}")
+    print(f"\n[task5_stage1] РЕАЛЬНАЯ суммарная стоимость (с фильтрами, 1 день): {total_cost:.4f}")
     print(f"[task5_stage1] экстраполяция на 30 дней (+30% запас): {result['extrapolated_30day_credits']:.2f}")
 
     if executor_rows:
@@ -273,15 +354,25 @@ def run() -> int:
             result["sum_profit_usd_positions_2_10_this_day"] = sum(r["total_profit_usd"] for r in positions_2_10)
         else:
             result["sum_profit_usd_positions_2_10_this_day"] = 0.0
-        print(f"[task5_stage1] сумма прибыли позиций 2-10 за ЭТОТ день: "
-              f"${result['sum_profit_usd_positions_2_10_this_day']:.2f} "
-              f"(порог владельца: ${PREREG_THRESHOLD_USD_PER_DAY}/день, ОДИН день -- не окончательный вывод)")
 
     result["preregistration_threshold_usd_per_day"] = PREREG_THRESHOLD_USD_PER_DAY
-    result["preregistration_note"] = ("Это ОДИН день, полный (не обрезан LIMIT'ом -- агрегация на стороне Dune) -- "
-                                       "но предрегистрация владельца требует суточной суммы как устойчивого факта, "
-                                       "не одного замера -- честная проверка порога только после 30-дневного прогона "
-                                       "(медиана по дням, не единичный день, который может быть нетипичным).")
+
+    total_profit = result.get("total_profit_usd")
+    result["sanity_check_max_plausible_usd"] = SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD
+    if total_profit is not None:
+        result["sanity_check_passed"] = total_profit <= SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD
+        if not result["sanity_check_passed"]:
+            result["sanity_check_verdict"] = (
+                f"ПРОВАЛЕНА: total_profit_usd={total_profit:,.2f} > "
+                f"{SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD:,.0f} -- результат ВСЁ ЕЩЁ контаминирован, "
+                "НЕ докладывать как факт, нужен дальнейший разбор методологии, не 30-дневный прогон."
+            )
+        else:
+            result["sanity_check_verdict"] = "ПРОЙДЕНА -- результат правдоподобен по масштабу, можно рассматривать как реальную оценку."
+        print(f"\n[task5_stage1] САНИТАРНАЯ ПРОВЕРКА: {result['sanity_check_verdict']}")
+
+    result["preregistration_note"] = ("Это ОДИН день -- предрегистрация требует устойчивого суточного факта, "
+                                       "честная проверка порога только после 30-дневного прогона (медиана по дням).")
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
