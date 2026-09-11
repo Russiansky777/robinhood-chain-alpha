@@ -1,0 +1,74 @@
+name: "Задача 5, живой бот -- п.2: замер времени включения (RPC vs sequencer) с Dallas VPS, LOCATION_LABEL=dallas"
+
+# Владелец, 2026-09-12: "Потом то же на Далласе с LOCATION_LABEL=dallas."
+# Тот же скрипт (scripts/writepath_test.sh), тот же SSH-паттерн, что и
+# NL-вариант (run_task5_writepath_test_vps.yml), но целевой хост --
+# 216.146.25.26 (Даллас, США -- уже существующий, забутстрапленный P5
+# VPS, тот же секрет VPS_SSH_KEY / "extravm_dallas", тот же
+# PRIVATE_KEY_NOX в /etc/bot/env -- см. run_vps_bootstrap.yml). Только
+# LOCATION_LABEL меняется на "dallas" для результата.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_WRITEPATH_TEST_VPS_DALLAS_REQUEST"
+
+jobs:
+  writepath_test_vps_dallas:
+    name: "Замер с Dallas VPS (216.146.25.26)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 216.146.25.26 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Запустить scripts/writepath_test.sh во временном venv на Dallas VPS (существующий клон/cron/systemd не трогаются), LOCATION_LABEL=dallas
+        run: |
+          ssh $SSH_OPTS root@216.146.25.26 '
+            set -e
+            python3 -m venv /tmp/writepath_test_venv
+            source /tmp/writepath_test_venv/bin/activate
+            export LOCATION_LABEL=dallas
+            bash -s
+          ' < scripts/writepath_test.sh > /tmp/writepath_test_dallas_result.json 2> /tmp/writepath_test_dallas_stderr.log
+          echo "--- stderr (диагностика NTP/старта) ---"
+          cat /tmp/writepath_test_dallas_stderr.log || true
+          echo "--- stdout (результат) ---"
+          cat /tmp/writepath_test_dallas_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_WRITEPATH_TEST_VPS_DALLAS_REQUEST
+          [ -e /tmp/writepath_test_dallas_result.json ] && cp /tmp/writepath_test_dallas_result.json data/p3_guard_cache/task5_writepath_test_dallas_result.json
+          [ -e data/p3_guard_cache/task5_writepath_test_dallas_result.json ] && git add data/p3_guard_cache/task5_writepath_test_dallas_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: результат замера времени включения (RPC vs sequencer) с Dallas VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
