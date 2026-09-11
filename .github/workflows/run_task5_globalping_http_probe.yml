@@ -1,0 +1,53 @@
+name: "Задача 5, живой бот -- проверка 2: Globalping полный HTTP-круг eth_blockNumber из 15+ городов"
+
+# Владелец, 2026-09-12: "Город origin. Globalping с полным HTTP-запросом
+# eth_blockNumber к RPC из 15+ городов -- не TCP-connect до edge, а полный
+# круг до ответа... Отдельно то же к фиду: WebSocket-handshake до первого
+# сообщения." Только чтение публичного Globalping API -- ноль Dune-кредитов,
+# ноль VPS, ноль транзакций, egress-прокси этой песочницы блокирует
+# globalping.io напрямую -- запускается через GH Actions (полный интернет).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_GLOBALPING_HTTP_PROBE_REQUEST"
+
+jobs:
+  globalping_http_probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install requests
+      - name: Run Globalping HTTP probe
+        run: python -u analysis/task5_globalping_http_probe.py --out /tmp/task5_globalping_http_probe_result.json
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_GLOBALPING_HTTP_PROBE_REQUEST
+          [ -e /tmp/task5_globalping_http_probe_result.json ] && cp /tmp/task5_globalping_http_probe_result.json data/p3_guard_cache/task5_globalping_http_probe_result.json
+          [ -e data/p3_guard_cache/task5_globalping_http_probe_result.json ] && git add data/p3_guard_cache/task5_globalping_http_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: Globalping HTTP-круг eth_blockNumber из 15+ городов [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
