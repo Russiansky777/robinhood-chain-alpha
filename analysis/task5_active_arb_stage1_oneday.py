@@ -250,31 +250,35 @@ all_flows as (
     union all
     select * from v4_flows
 ),
-arb_candidates as (
-    -- каждый исходный своп даёт РОВНО 2 строки в all_flows -- дубликат
-    -- не влияет на count(distinct pool_key)
-    select tx_hash
-    from all_flows
-    group by tx_hash
-    having count(distinct pool_key) >= 2
+-- ВАЖНО (реальная находка #2, 2026-09-11): предыдущая версия сканировала
+-- all_flows ТРИ раза (arb_candidates, tx_meta, tx_token_flow каждый со
+-- своим join к arb_candidates) -- реальная стоимость упала со 129.60
+-- только до 80.86 (всё ещё > порога 80 = 2x оценки, овеrrun сработал повторно).
+-- Здесь считаем n_pools_tx ОДНИМ оконным проходом по all_flows и
+-- фильтруем один раз -- tx_meta/tx_token_flow читают уже отфильтрованный
+-- qualifying_flows, не all_flows заново.
+flow_annotated as (
+    select f.*, count(distinct pool_key) over (partition by tx_hash) as n_pools_tx
+    from all_flows f
+),
+qualifying_flows as (
+    select * from flow_annotated where n_pools_tx >= 2
 ),
 tx_meta as (
     select
-        f.tx_hash,
-        min(f.block_number) as block_number,
-        min(f.block_time) as block_time,
+        tx_hash,
+        min(block_number) as block_number,
+        min(block_time) as block_time,
         count(*) / 2 as n_legs,  -- ровно 2 строки на исходный своп, см. выше
-        count(distinct f.pool_key) as n_pools,
-        max(f.executor) as v3_executor
-    from all_flows f
-    inner join arb_candidates c on c.tx_hash = f.tx_hash
-    group by f.tx_hash
+        max(n_pools_tx) as n_pools,
+        max(executor) as v3_executor
+    from qualifying_flows
+    group by tx_hash
 ),
 tx_token_flow as (
-    select f.tx_hash, f.token, sum(f.delta_raw) as net_flow_raw, sum(abs(f.delta_raw)) as gross_raw
-    from all_flows f
-    inner join arb_candidates c on c.tx_hash = f.tx_hash
-    group by f.tx_hash, f.token
+    select tx_hash, token, sum(delta_raw) as net_flow_raw, sum(abs(delta_raw)) as gross_raw
+    from qualifying_flows
+    group by tx_hash, token
 ),
 tx_token_flagged as (
     select tx_hash, token, net_flow_raw, gross_raw,
