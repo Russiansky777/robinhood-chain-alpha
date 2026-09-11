@@ -15,6 +15,7 @@ on:
     paths:
       - "data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST"
+      - "data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST"
 
@@ -52,6 +53,14 @@ jobs:
           CREDIT_GUARD_FILE: data/credits_spent_mozila.json
         run: python -u analysis/task5_active_arb_stage0b_poolcreated.py
 
+      - name: "Задача 5, Шаг 0c -- дозапрос Mint (LP-провайдеры для фильтра самоторговли)"
+        if: hashFiles('data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_active_arb_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_active_arb_stage0c_mint_schema.py
+
       - name: "Задача 5, Шаг 1 -- оценка на одном дне (обязательна перед полным прогоном)"
         if: hashFiles('data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST') != ''
         env:
@@ -71,9 +80,10 @@ jobs:
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
           [ -e data/p3_guard_cache/task5_active_arb_stage0_schema_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0_schema_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage0b_poolcreated_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0b_poolcreated_result.json
+          [ -e data/p3_guard_cache/task5_active_arb_stage0c_mint_schema_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0c_mint_schema_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage1_oneday_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage1_oneday_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage2_full_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage2_full_result.json
           [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
