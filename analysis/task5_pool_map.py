@@ -40,7 +40,9 @@ import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_pool_map_result.json")
-NAMESPACE_BUDGET = 1650.0
+NAMESPACE_BUDGET = 2400.0  # поднято с 1650.0 (2026-09-12) -- реальный прогон упёрся именно в этот
+# внутренний потолок пространства (1621.60 потрачено из 1650.0), а НЕ в реальный остаток цикла
+# (490 из лимита 2493.6) -- намеренный запас, реальный цикл остаётся единственной твёрдой границей
 
 WETH = "0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "5fc5360d0400a0fd4f2af552add042d716f1d168"

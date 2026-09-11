@@ -43,6 +43,7 @@ KNOWN_SELECTORS = {
 
 async def run(duration_s: float, max_examples: int) -> dict:
     client = SequencerFeedClient(SEQUENCER_FEED_URL_MAINNET)
+    cumulative_diag: Counter = Counter()
     type_counter: Counter = Counter()
     tx_kind_counter: Counter = Counter()
     selector_counter: Counter = Counter()
@@ -88,16 +89,37 @@ async def run(duration_s: float, max_examples: int) -> dict:
     print(f"[decode_probe] слушаю {SEQUENCER_FEED_URL_MAINNET} {duration_s:.0f} секунд "
           "(собственный декодер -- готовая библиотека rhfeed НЕ интегрирована в этой сессии, "
           "см. docstring и PROJECT_STATE.md)...")
-    try:
-        await asyncio.wait_for(client.listen(on_message), timeout=duration_s)
-    except asyncio.TimeoutError:
-        pass
+    # РЕАЛЬНАЯ находка первого прогона (2026-09-11): прямое подключение (без
+    # рекомендованного авторами rhfeed локального relay) реально обрывается
+    # сервером ~через 85с без close-фрейма (websockets.exceptions.
+    # ConnectionClosedError) -- согласуется с предупреждением README
+    # стороннего инструмента про "rate-limits per client, not per
+    # connection". Честно обрабатываем переподключением, не считаем это
+    # фатальной ошибкой скрипта.
+    deadline = time.monotonic() + duration_s
+    n_reconnects = 0
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            await asyncio.wait_for(client.listen(on_message), timeout=remaining)
+        except asyncio.TimeoutError:
+            break
+        except Exception as exc:
+            n_reconnects += 1
+            print(f"[decode_probe] соединение оборвалось ({exc}) -- переподключение #{n_reconnects}")
+            cumulative_diag.update(client.diag)
+            client = SequencerFeedClient(SEQUENCER_FEED_URL_MAINNET)
+            await asyncio.sleep(1.0)
+    cumulative_diag.update({k: v for k, v in client.diag.items() if isinstance(v, (int, float))})
 
     return {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "decoder_used": "собственный best-effort (см. docstring про rhfeed)",
+        "n_reconnects": n_reconnects,
         "duration_s": duration_s,
-        "feed_diag": client.diag,
+        "feed_diag": dict(cumulative_diag),
         "message_type_counts": dict(type_counter),
         "tx_kind_counts": dict(tx_kind_counter),
         "top_selectors": dict(selector_counter.most_common(20)),
