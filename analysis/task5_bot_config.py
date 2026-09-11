@@ -52,8 +52,31 @@ V4_POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 # заменой -- бот сам строит полную вселенную канонических v3-пулов
 # через PoolCreated (0 кредитов Dune), список ниже даёт ПРИОРИТЕТНЫЕ,
 # уже доказанно прибыльные пулы для более быстрого/уверенного старта.
+# РЕАЛЬНЫЙ результат task5_pool_map.py, 2026-09-12: калибровка на ПЕРВЫХ
+# 3 ЧАСАХ 09-10 (не полный день -- честно: полный день экстраполировался
+# в ~1325 кредитов, далеко за потолком 300 и большей частью остатка
+# цикла 490, НЕ запущен). 45 пулов найдено всего, из них ТОЛЬКО 15 --
+# v3 (ниже) -- v4-пулы (30 из 45, часто с БОЛЬШЕЙ прибылью, топ-2 пула
+# по $ вообще НЕ WETH/USDG) реально существуют в данных, но
+# PoolRegistry/V3PoolState в этой версии НЕ поддерживает v4 (singleton
+# PoolManager, другая архитектура цены/событий) -- честный, известный
+# gap, не добавлены сюда специально, а не по недосмотру.
 TASK5_KNOWN_PROFITABLE_POOLS: list[dict] = [
-    # Заполняется после task5_pool_map.py -- ПОКА ПУСТО, запрос в процессе.
+    {"pool_key": "0x52E65B17FB6E5BA00ED806F37AFCD2DAA50271CA", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "total_profit_usd_3h_window": 373.98},
+    {"pool_key": "0x995C1AD5EB998B1BDD89F515C4BB64760C411B62", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0xB90A19FF0AF67F7779AFF50A882A9CFF42446400", "total_profit_usd_3h_window": 204.01},
+    {"pool_key": "0xC4A21F9D6485FC5893DD4A491B320A83DAF4DA1D", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x2E8C31162B855A2FFA90F6F8634643AD6F111E18", "total_profit_usd_3h_window": 138.28},
+    {"pool_key": "0xA4BDB396A69617EB7F70E2CC1EF526F7340B1B0D", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0xC0D6457C16CC70D6790DD43521C899C87CE02F35", "total_profit_usd_3h_window": 130.00},
+    {"pool_key": "0xD4EB21209C4D6093F80B5B84F5C45CC093EA14A3", "token0": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "token1": "0xD0601CE157DB5BDC3162BBAC2A2C8AF5320D9EEC", "total_profit_usd_3h_window": 102.14},
+    {"pool_key": "0x10CC6BD38112CAC182DB90B6A71D8BB5939526BA", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x39DBED3A2BD333467115DE45665CC57F813C4571", "total_profit_usd_3h_window": 70.55},
+    {"pool_key": "0x34D0DC122CF9A8EB296FC5E0D3A233625D7D19B7", "token0": "0x2E0847E8910A9732EB3FB1BB4B70A580ADAD4FE3", "token1": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "total_profit_usd_3h_window": 63.85},
+    {"pool_key": "0xE2C12A7379706A291CADAAEC1D22458BE2F7239D", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x385F4F8AE47651CE5F58F5265395A669F8281E18", "total_profit_usd_3h_window": 62.44},
+    {"pool_key": "0x69BFAF19C9F377BB306A89AED9F6B07E2C1A8D9A", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "total_profit_usd_3h_window": 23.69},
+    {"pool_key": "0xBD5CD6515CA6285941FBC177381DC8ED4844E6B8", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x98096D17E191B3DA1D5F99A6D7B3584351B11E18", "total_profit_usd_3h_window": 23.69},
+    {"pool_key": "0xD78480CAFEF722D75519E13B9F516E5704D0D659", "token0": "0x0BD7D308F8E1639FAB988DF18A8011F41EACAD73", "token1": "0x2E8C31162B855A2FFA90F6F8634643AD6F111E18", "total_profit_usd_3h_window": 19.90},
+    {"pool_key": "0xE547C18F46DB55AB788343BCC503F9CF0BD7D564", "token0": "0x2E8C31162B855A2FFA90F6F8634643AD6F111E18", "token1": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "total_profit_usd_3h_window": 15.07},
+    {"pool_key": "0x0EBD4650C9E641E9745B5A508A2D46935DFE753E", "token0": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "token1": "0xF6589F11BC40B669E584073F428B05562F568733", "total_profit_usd_3h_window": 12.71},
+    {"pool_key": "0xC8C90D3A1C1A24967E773AC2AD0D456BA3E31F64", "token0": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "token1": "0xCCEE82FE024C36FA15E1005EDE3E9E4787E23D09", "total_profit_usd_3h_window": 10.64},
+    {"pool_key": "0x8AC92DA74AB5F3B1D024DC1943AD7E15DC4179EF", "token0": "0x12F190A9F9D7D37A250758B26824B97CE941BF54", "token1": "0x5FC5360D0400A0FD4F2AF552ADD042D716F1D168", "total_profit_usd_3h_window": 10.15},
 ]
 POOL_DISCOVERY_LOOKBACK_BLOCKS = 2_000_000  # ~2.8 дня при блоке 120мс -- разумный старт, настраивается
 
