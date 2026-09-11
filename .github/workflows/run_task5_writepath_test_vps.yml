@@ -1,0 +1,77 @@
+name: "Задача 5, живой бот -- п.2: замер времени включения (RPC vs sequencer) с NL VPS, реальная копеечная транзакция"
+
+# Владелец, 2026-09-12: "SSH с моей машины не работает... Запусти
+# scripts/writepath_test.sh сам через GH Actions на NL-хосте, как делал
+# всё это время." Тот же паттерн SSH-доступа, что run_seq_feed_latency_probe.yml
+# и рабочие P5/P6 live-workflow'ы этого репозитория (root@45.59.170.76,
+# secrets.VPS_SSH_KEY) -- используется УЖЕ существующий SSH-доступ,
+# скрипт выполняется через временный venv в /tmp, существующий
+# git-клон/cron/systemd на VPS НЕ трогаются. Скрипт сам читает
+# PRIVATE_KEY_NOX из /etc/bot/env НА ВПС (эта переменная там уже
+# существует -- ничего нового не создаётся) и отправляет РЕАЛЬНУЮ
+# копеечную (~$0.01) транзакцию самому себе, чередуя публичный RPC и
+# найденный sequencer-эндпоинт.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_WRITEPATH_TEST_VPS_REQUEST"
+
+jobs:
+  writepath_test_vps:
+    name: "Замер с NL VPS (45.59.170.76)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Запустить scripts/writepath_test.sh во временном venv на VPS (существующий клон/cron/systemd не трогаются)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            python3 -m venv /tmp/writepath_test_venv
+            source /tmp/writepath_test_venv/bin/activate
+            bash -s
+          ' < scripts/writepath_test.sh > /tmp/writepath_test_nl_result.json 2> /tmp/writepath_test_nl_stderr.log
+          echo "--- stderr (диагностика NTP/старта) ---"
+          cat /tmp/writepath_test_nl_stderr.log || true
+          echo "--- stdout (результат) ---"
+          cat /tmp/writepath_test_nl_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_WRITEPATH_TEST_VPS_REQUEST
+          [ -e /tmp/writepath_test_nl_result.json ] && cp /tmp/writepath_test_nl_result.json data/p3_guard_cache/task5_writepath_test_nl_result.json
+          [ -e data/p3_guard_cache/task5_writepath_test_nl_result.json ] && git add data/p3_guard_cache/task5_writepath_test_nl_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: результат замера времени включения (RPC vs sequencer) с NL VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
