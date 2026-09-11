@@ -98,11 +98,21 @@ def _rpc_call(method: str, params: list, rpc_url: str = RPC_URL_MAINNET, timeout
 
 
 def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
-                                 lookback_blocks: int = POOL_DISCOVERY_LOOKBACK_BLOCKS) -> PoolRegistry:
+                                 lookback_blocks: int = POOL_DISCOVERY_LOOKBACK_BLOCKS,
+                                 populate_prices: bool = True, batch_size: int = 25) -> PoolRegistry:
     """Единственное место, где бот делает RPC-запросы в НЕ-горячем пути
     (только при старте). Реальный, а не выдуманный метод: PoolCreated --
     стандартное indexed-событие Uniswap V3 Factory, topic0 вычислен через
-    keccak (тот же метод, что sc1_v2_recon.py/G1 в этом проекте)."""
+    keccak (тот же метод, что sc1_v2_recon.py/G1 в этом проекте).
+
+    Владелец, 2026-09-13, п.2: `populate_prices=True` (по умолчанию) --
+    сразу после скана PoolCreated читает slot0()/liquidity() КАЖДОГО
+    найденного пула батчами (см. populate_initial_prices() ниже) --
+    заполняет реальные начальные цены ДО горячего пути, честный пробел
+    прошлых раундов (ни один пул раньше не имел цены до первого реально
+    декодированного свопа, а декодер свопов сам по себе ненадёжен --
+    см. task5_bot_feed_client.py) -- закрыт здесь, независимо от
+    состояния декодера."""
     latest_hex = _rpc_call("eth_blockNumber", [], rpc_url)
     latest = int(latest_hex, 16)
     from_block = max(0, latest - lookback_blocks)
@@ -125,7 +135,89 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
         registry.register(V3PoolState(address=pool_address, token0=token0, token1=token1, fee=fee))
 
     _merge_known_profitable_pools(registry)
+    if populate_prices:
+        populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size)
     return registry
+
+
+# slot0()/liquidity() -- стандартные view-функции Uniswap V3 Pool, селекторы
+# вычислены тем же способом (keccak-256, первые 4 байта), что POOL_CREATED_TOPIC0
+# выше -- НЕ найдены подстрочным совпадением, реально посчитаны.
+_SLOT0_SELECTOR = "0x" + keccak_topic("slot0()")[2:10]
+_LIQUIDITY_SELECTOR = "0x" + keccak_topic("liquidity()")[2:10]
+
+
+def _decode_signed_word(hex_word: str) -> int:
+    """ABI всегда знак-расширяет signed-типы (int24 tick и т.п.) до полных
+    32 байт -- стандартное двухкомплементное декодирование полного слова,
+    не специфичное для конкретной битности исходного типа."""
+    raw = int(hex_word, 16)
+    return raw - (1 << 256) if raw >= (1 << 255) else raw
+
+
+def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINNET,
+                             batch_size: int = 25, timeout: float = 20.0) -> dict:
+    """Владелец, 2026-09-13, п.2: "slot0 при bootstrap -- для ВСЕХ пулов,
+    батчами, чтобы не упереться в лимит." Один-единственный, разовый вызов
+    ДО горячего пути (тот же принцип, что PoolCreated-скан выше) -- читает
+    `slot0()` (sqrtPriceX96/tick) и `liquidity()` каждого пула через
+    JSON-RPC batch-запросы (несколько `eth_call` в одном HTTP POST -- нода
+    отвечает МАССИВОМ, не по одному round-trip'у на пул). `batch_size` --
+    число ПУЛОВ на один HTTP POST (2 запроса/пул -- slot0+liquidity, то
+    есть `2*batch_size` элементов в массиве) -- 25 пулов/50 запросов --
+    консервативный размер, ниже типичного лимита провайдеров (100-1000).
+
+    Честно: пулы, для которых `eth_call` вернул ошибку (несуществующий
+    контракт слот, нестандартный ABI и т.п.) -- остаются с
+    `sqrt_price_x96=None` (как и было до вызова), НЕ подставляется 0/угаданное
+    значение -- такие пулы просто не участвуют в детекции расхождений
+    (`_normalized_price` вернёт None), это уже штатно обрабатывается
+    `check_pair_for_divergence`."""
+    pools = list(registry.by_address.values())
+    stats = {"n_pools": len(pools), "n_ok": 0, "n_error": 0, "errors_sample": []}
+
+    for i in range(0, len(pools), batch_size):
+        chunk = pools[i:i + batch_size]
+        batch_body = []
+        for j, pool in enumerate(chunk):
+            batch_body.append({"jsonrpc": "2.0", "id": f"{j}-slot0",
+                                "method": "eth_call",
+                                "params": [{"to": pool.address, "data": _SLOT0_SELECTOR}, "latest"]})
+            batch_body.append({"jsonrpc": "2.0", "id": f"{j}-liquidity",
+                                "method": "eth_call",
+                                "params": [{"to": pool.address, "data": _LIQUIDITY_SELECTOR}, "latest"]})
+        try:
+            resp = requests.post(rpc_url, json=batch_body, timeout=timeout)
+            resp.raise_for_status()
+            by_id = {r.get("id"): r for r in resp.json()}
+        except Exception as exc:
+            stats["n_error"] += len(chunk)
+            if len(stats["errors_sample"]) < 3:
+                stats["errors_sample"].append(f"batch HTTP error: {exc}")
+            continue
+
+        for j, pool in enumerate(chunk):
+            slot0_r = by_id.get(f"{j}-slot0")
+            liq_r = by_id.get(f"{j}-liquidity")
+            if not slot0_r or "error" in slot0_r or not slot0_r.get("result") or slot0_r["result"] == "0x":
+                stats["n_error"] += 1
+                if len(stats["errors_sample"]) < 3:
+                    stats["errors_sample"].append(f"{pool.address}: slot0 -> {slot0_r}")
+                continue
+            try:
+                slot0_hex = slot0_r["result"][2:]
+                sqrt_price_x96 = int(slot0_hex[0:64], 16)
+                tick = _decode_signed_word(slot0_hex[64:128])
+                liquidity = int(liq_r["result"], 16) if liq_r and liq_r.get("result") not in (None, "0x") else 0
+            except Exception as exc:
+                stats["n_error"] += 1
+                if len(stats["errors_sample"]) < 3:
+                    stats["errors_sample"].append(f"{pool.address}: decode error {exc}")
+                continue
+            pool.apply_swap(sqrt_price_x96=sqrt_price_x96, liquidity=liquidity, tick=tick, block_number=None)
+            stats["n_ok"] += 1
+
+    return stats
 
 
 def _merge_known_profitable_pools(registry: PoolRegistry) -> None:
