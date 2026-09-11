@@ -6,13 +6,29 @@ net-flow по WETH/USDG слепа к остальным токенам -- в т
 Честная арбитражная транзакция должна обнулять net-flow по ВСЕМ
 токенам, кроме одного (входного/выходного актива).
 
-Точечный lookup (НЕ скан диапазона дат) по ДВУМ конкретным tx_hash:
+Точечный lookup (НЕ скан диапазона дат) по ОДНОМУ конкретному tx_hash:
   - 0xf342eb74...d73f8 (B8F305F27CCC..., 22 плеча, 9 пулов, $885k)
     -- главный кандидат гипотезы владельца.
-  - 0x... (2-леговый случай, $116k) -- контрольная проверка: если
-    гипотеза верна, здесь остаток должен быть МАЛ (2 плеча -- почти
-    нет места для несвязанных токенов), значит эта прибыль либо
-    реальна, либо баг другого класса."""
+
+ВАЖНО (реальная, только что обнаруженная ошибка в оценке стоимости,
+исправлено 2026-09-11): предыдущая версия скрипта пыталась сначала
+найти tx_hash 2-легового выброса ($116k) через SELECT со ссылкой на
+уже материализованный query_8673700, посчитав это "почти бесплатным
+чтением кэша". Это оказалось НЕВЕРНО -- ссылка на query_<id> в новом
+запросе на Dune ПЕРЕИСПОЛНЯЕТ всю логику исходного запроса заново, а
+не читает готовый результат. Реальная стоимость составила 25.86
+кредита вместо оценённых 1.0, что вызвало срабатывание
+check_overrun_after_execute() (actual > 2x estimate AND actual >= 25.0)
+и остановило скрипт ДО того, как он дошёл до настоящего point-lookup
+по сырым таблицам. Контрольная 2-леговая проверка убрана полностью
+(инструкция владельца: "кредиты не тратить сверх точечного SELECT по
+уже оплаченному query_id" -- сам этот дозапрос НЕ был точечным дешёвым
+чтением, а был вторым таким же дорогим переисполнением). Остаётся
+только настоящий point-lookup по сырым базовым таблицам
+(uniswap_v3_robinhood.uniswapv3pool_evt_swap /
+uniswap_v4_robinhood.swaps), отфильтрованный точным tx_hash -- это
+честный узкий WHERE на базовой таблице, а не ре-исполнение сложного
+CTE-запроса, и должен быть действительно дёшев."""
 from __future__ import annotations
 
 import json
@@ -31,7 +47,10 @@ from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_active_arb_diag_full_legs_result.json")
 CANONICAL_FACTORY = "1f7d7550b1b028f7571e69a784071f0205fd2efa"
-DETECT_QID = 8673700  # уже оплаченный материализованный запрос (task5_arb_detect_oneday_v3)
+# ПРИМЕЧАНИЕ: query_id больше НЕ используется в этом скрипте -- ссылка
+# на query_<id> переисполняет всю логику заново (реальная стоимость
+# 25.86 кредита вместо ожидаемых ~1, подтверждено 2026-09-11). Ниже --
+# только point-lookup по сырым таблицам, отфильтрованный точным tx_hash.
 
 # Реальные tx_hash из предыдущей диагностики (task5_active_arb_diag_single_tx_result.json)
 TARGET_TXS = {
@@ -66,26 +85,6 @@ def run() -> int:
     ensure_namespace("task5_active_arb_mozila", 400.0)
     client = DuneClient()
     out: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "transactions": {}}
-
-    # Контрольная проверка: реальный tx_hash 2-легового выброса ($116k) --
-    # почти по уже оплаченному query_id, тривиальный доп. lookup.
-    print("=== Поиск tx_hash для 2-легового выброса (>$100k) по уже оплаченному query_id ===")
-    sql_find = f"""
-select tx_hash, profit_usd
-from query_{DETECT_QID}
-where n_legs = 2 and profit_usd > 100000
-order by profit_usd desc
-limit 10
-"""
-    qid_find = client.create_query("task5_diag_find_2leg_outlier", sql_find)
-    df_find = client.run_sql_cached("task5_diag_find_2leg_outlier", sql_find, query_id=qid_find,
-                                     estimated_credits=1.0, expected_max_rows=10, expected_columns=2)
-    if df_find is not None and len(df_find):
-        found_hash = str(df_find["tx_hash"].iloc[0]).replace("0x", "")
-        TARGET_TXS["2leg_outlier_116k"] = found_hash
-        print(f"  найден: 0x{found_hash} (profit_usd={df_find['profit_usd'].iloc[0]:,.2f})")
-    else:
-        print("  не найден -- пропускаю контрольную проверку.")
 
     for label, tx_hash in TARGET_TXS.items():
         print(f"\n=== {label} (tx=0x{tx_hash}) ===")
