@@ -1,33 +1,64 @@
 #!/usr/bin/env python3
 """Задача 5 владельца, Шаг 1 -- ОБЯЗАТЕЛЬНАЯ оценка на ОДНОМ дне перед
-30-дневным прогоном. v3 этого скрипта (2026-09-11, после реального
-разбора владельцем причины $178.8M/день в v2): добавлены ТРИ фильтра
-владельца, применяются ВМЕСТЕ:
+30-дневным прогоном.
 
-1. Только КАНОНИЧЕСКИЙ Factory (`0x1f7d7550b1b028f7571e69a784071f0205fd2efa`,
-   PROJECT_STATE) -- отсекает ~430k спам-фабрик (Шаг 0b).
-2. Реальная ликвидность: >=4 различных адреса-контрагента в пуле за
-   день (владелец: "пул, где торгуют <=3 адреса -- не рынок").
-3. Исключение самоторговли (тот же метод, что уже применялся к
-   0x65050a на этой же цепи, см. P5/docs/PROJECT_STATE.md):
-   (a) исполнитель (evt_tx_from) -- LP-провайдер (`owner` из реального
-       Mint-события, Шаг 0c) этого же пула, ИЛИ
-   (b) доля свопов исполнителя в этом пуле за этот день > 50%.
+v4 этого скрипта (2026-09-11) -- ПЕРЕПИСАНА САМА ФОРМУЛА ПРИБЫЛИ, не
+добавлен ещё один фильтр пула. Причина: диагностика на реальной
+транзакции 0xf342eb74...d73f8 (см. docs/PROJECT_STATE.md, "Задача 5 --
+гипотеза владельца о слепоте формулы ПОДТВЕРЖДЕНА") показала, что
+старая формула (net-flow только по WETH/USDG) слепа СИСТЕМНО к любому
+токену вне этих двух -- включая нативный ETH в v4 (address(0)) и любой
+промежуточный токен многохоповой транзакции. В этой транзакции
+обнулился ровно ОДИН из пяти затронутых токенов; формула засчитала
+$885,502 "прибыли" по WETH-ноге, полностью проигнорировав крупный
+невозмещённый отток другого токена -- это НЕ проверенная прибыль от
+арбитража, а неизвестно что.
 
-v4 (`uniswap_v4_robinhood.swaps`) не имеет ни классического Factory
-(singleton PoolManager, уже трактуется как канонический), ни Mint-
-события в этой форме (другая модель ликвидности) -- фильтр 1/3a к нему
-не применяется; фильтры 2/3b применяются с `sender` как ПРИБЛИЖЕНИЕM
-исполнителя (дешевле, чем join на transactions для ВСЕХ v4-свопов
-дня, не только кандидатов в арбитраж) -- честно помечено, тот же
-класс оговорки, что уже принят в этом репозитории для `sender` в
-Uniswap-событиях (dune_pool_volume_query1.py: "sender -- это msg.sender
-ПУЛА... может отражать 'все ходят через один роутер'").
+Новое определение (владелец, 2026-09-11, дословно): "профит
+засчитывается только если net-flow обнуляется (в пределах разумного
+эпсилон -- пыль округления) по всем токенам, кроме ровно одного.
+Профит = net-flow этого одного токена × его цена." Это формальное
+определение замкнутого арбитражного цикла: вошёл в один актив, прошёл
+цепочку свопов, вышел в тот же (или другой) один актив -- все
+промежуточные токены должны обнулиться.
 
-Санитарная проверка владельца: суммарная прибыль за день не может
-правдоподобно превышать разумную долю оборота цепи (~$1.5B/день на
-пике) -- если total_profit_usd > $1-2M, результат ЯВНО помечается как
-всё ещё контаминированный, НЕ как факт."""
+Реализация:
+1. Net-flow считается по КАЖДОМУ токену, затронутому транзакцией
+   (не только WETH/USDG) -- включая address(0) как отдельный токен
+   для нативного ETH в v4 (НЕ объединяется с WETH -- владелец явно
+   попросил считать их раздельно; это может НЕДО-считать реальные
+   циклы, которые заканчиваются unwrap'ом WETH->ETH, но это
+   консервативная ошибка (недосчёт), не фабрикация профита).
+2. "Обнулился" = |net_flow_raw| / gross_raw <= DUST_REL_EPS, где
+   gross_raw = сумма |delta| по всем плечам этого токена в этой
+   транзакции. Это ОТНОШЕНИЕ в сырых единицах одного и того же
+   токена -- не зависит от decimals (не нужно их знать/угадывать для
+   токенов, чья идентичность не установлена, как Token X в диагностике).
+   DUST_REL_EPS=1e-6 выбран из первых принципов: атомарный мультихоп-
+   роутер передаёт amountOut хопа N как amountIn хопа N+1 БЕЗ потерь,
+   кроме округления AMM-математики на уровне wei -- относительная
+   погрешность такого рода на много порядков меньше 1e-6 для любой
+   сделки разумного размера; реальный найденный residual (Token X,
+   ~100% от gross) на много порядков БОЛЬШЕ этого порога -- граница не
+   пограничная.
+3. Профит в USD считается ТОЛЬКО если единственный необнулившийся
+   токен -- WETH, address(0) (нативный ETH, цена = цена WETH) или USDG
+   -- единственные токены с реальной, не выдуманной ценой в этом
+   проекте. Если единственный необнулившийся токен -- что-то другое
+   (как Token X в диагностике) -- транзакция помечается
+   `is_closed_cycle=true, is_priced_exit=false` и НЕ участвует в
+   total_profit_usd (честно исключена, не оценена наугад).
+
+Три фильтра владельца (канонический Factory, >=4 трейдера/пул/день,
+исключение самоторговли) СОХРАНЕНЫ как пред-фильтр КАЧЕСТВА ПУЛА (это
+отдельная, всё ещё действительная забота про спам/wash-trading), но
+больше НЕ являются защитой от переоценки прибыли -- эту роль теперь
+играет net-flow-closed-cycle проверка.
+
+Санитарная проверка владельца (не изменилась): суммарная прибыль за
+день не может правдоподобно превышать разумную долю оборота цепи --
+если total_profit_usd > $1-2M, результат ЯВНО помечается как всё ещё
+контаминированный."""
 from __future__ import annotations
 
 import json
@@ -49,10 +80,12 @@ NAMESPACE_BUDGET = 400.0
 
 WETH = "0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "5fc5360d0400a0fd4f2af552add042d716f1d168"
+ZERO_ADDR = "0000000000000000000000000000000000000000"  # нативный ETH, конвенция Uniswap v4 (Currency.wrap(address(0)))
 WETH_USDG_POOL = "52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 WETH_DECIMALS, USDG_DECIMALS = 18, 6
 CANONICAL_FACTORY = "1f7d7550b1b028f7571e69a784071f0205fd2efa"
-DUST_THRESHOLD_USD = 1.0
+DUST_THRESHOLD_USD = 1.0  # порог "профит не шум" в USD -- как и раньше
+DUST_REL_EPS = 1e-6  # порог "токен обнулился" -- ОТНОШЕНИЕ net/gross в сырых единицах, см. докстринг
 MIN_DISTINCT_TRADERS_PER_POOL_DAY = 4  # владелец: "<=3 -- не рынок"
 MAX_DOMINANT_SHARE = 0.5  # владелец: "> 50%"
 
@@ -72,7 +105,7 @@ lp_providers as (
     from uniswap_v3_robinhood.uniswapv3pool_evt_mint m
     where m.contract_address in (select pool from canonical_pools)
 ),
-v3_swaps_raw as (
+v3_swaps_qual as (
     select
         s.evt_tx_hash as tx_hash,
         s.evt_block_number as block_number,
@@ -82,28 +115,22 @@ v3_swaps_raw as (
         to_hex(s.contract_address) as pool_key,
         s.evt_tx_from as executor_raw,
         to_hex(s.evt_tx_from) as executor,
-        case
-            when cp.token0 = from_hex('{WETH}') then cast(-s.amount0 as double) / 1e{WETH_DECIMALS}
-            when cp.token1 = from_hex('{WETH}') then cast(-s.amount1 as double) / 1e{WETH_DECIMALS}
-            else 0.0
-        end as weth_delta,
-        case
-            when cp.token0 = from_hex('{USDG}') then cast(-s.amount0 as double) / 1e{USDG_DECIMALS}
-            when cp.token1 = from_hex('{USDG}') then cast(-s.amount1 as double) / 1e{USDG_DECIMALS}
-            else 0.0
-        end as usdg_delta
+        cp.token0 as token0,
+        cp.token1 as token1,
+        s.amount0 as amount0,
+        s.amount1 as amount1
     from uniswap_v3_robinhood.uniswapv3pool_evt_swap s
     inner join canonical_pools cp on cp.pool = s.contract_address
     where s.evt_block_time >= timestamp '{day_start}' and s.evt_block_time < timestamp '{day_end}'
 ),
 v3_pool_day_diversity as (
     select pool_addr, block_date, count(distinct executor_raw) as n_distinct_traders
-    from v3_swaps_raw
+    from v3_swaps_qual
     group by pool_addr, block_date
 ),
 v3_pool_day_address_counts as (
     select pool_addr, block_date, executor_raw, count(*) as n_swaps
-    from v3_swaps_raw
+    from v3_swaps_qual
     group by pool_addr, block_date, executor_raw
 ),
 v3_pool_day_totals as (
@@ -111,9 +138,9 @@ v3_pool_day_totals as (
     from v3_pool_day_address_counts
     group by pool_addr, block_date
 ),
-v3_legs as (
-    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.executor, r.weth_delta, r.usdg_delta
-    from v3_swaps_raw r
+v3_swaps_filtered as (
+    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.executor, r.token0, r.token1, r.amount0, r.amount1
+    from v3_swaps_qual r
     inner join v3_pool_day_diversity div
         on div.pool_addr = r.pool_addr and div.block_date = r.block_date
         and div.n_distinct_traders >= {MIN_DISTINCT_TRADERS_PER_POOL_DAY}
@@ -126,7 +153,7 @@ v3_legs as (
     where lp.lp_address is null
       and cast(cnt.n_swaps as double) / tot.total_swaps <= {MAX_DOMINANT_SHARE}
 ),
-v4_swaps_raw as (
+v4_swaps_qual as (
     select
         w.tx_hash as tx_hash,
         w.block_number as block_number,
@@ -136,28 +163,21 @@ v4_swaps_raw as (
                to_hex(greatest(w.token_bought_address, w.token_sold_address)), '-',
                cast(w.fee as varchar), '-', to_hex(w.hooks)) as pool_key,
         w.sender as executor_raw,
-        cast(null as varchar) as executor,
-        case
-            when w.token_bought_address = from_hex('{WETH}') then cast(w.token_bought_amount_raw as double) / 1e{WETH_DECIMALS}
-            when w.token_sold_address = from_hex('{WETH}') then -cast(w.token_sold_amount_raw as double) / 1e{WETH_DECIMALS}
-            else 0.0
-        end as weth_delta,
-        case
-            when w.token_bought_address = from_hex('{USDG}') then cast(w.token_bought_amount_raw as double) / 1e{USDG_DECIMALS}
-            when w.token_sold_address = from_hex('{USDG}') then -cast(w.token_sold_amount_raw as double) / 1e{USDG_DECIMALS}
-            else 0.0
-        end as usdg_delta
+        w.token_bought_address as token_bought,
+        w.token_sold_address as token_sold,
+        w.token_bought_amount_raw as amount_bought,
+        w.token_sold_amount_raw as amount_sold
     from uniswap_v4_robinhood.swaps w
     where w.block_time >= timestamp '{day_start}' and w.block_time < timestamp '{day_end}'
 ),
 v4_pool_day_diversity as (
     select pool_key, block_date, count(distinct executor_raw) as n_distinct_traders
-    from v4_swaps_raw
+    from v4_swaps_qual
     group by pool_key, block_date
 ),
 v4_pool_day_address_counts as (
     select pool_key, block_date, executor_raw, count(*) as n_swaps
-    from v4_swaps_raw
+    from v4_swaps_qual
     group by pool_key, block_date, executor_raw
 ),
 v4_pool_day_totals as (
@@ -165,9 +185,9 @@ v4_pool_day_totals as (
     from v4_pool_day_address_counts
     group by pool_key, block_date
 ),
-v4_legs as (
-    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.executor, r.weth_delta, r.usdg_delta
-    from v4_swaps_raw r
+v4_swaps_filtered as (
+    select r.tx_hash, r.block_number, r.block_time, r.pool_key, r.token_bought, r.token_sold, r.amount_bought, r.amount_sold
+    from v4_swaps_qual r
     inner join v4_pool_day_diversity div
         on div.pool_key = r.pool_key and div.block_date = r.block_date
         and div.n_distinct_traders >= {MIN_DISTINCT_TRADERS_PER_POOL_DAY}
@@ -177,58 +197,112 @@ v4_legs as (
         on tot.pool_key = r.pool_key and tot.block_date = r.block_date
     where cast(cnt.n_swaps as double) / tot.total_swaps <= {MAX_DOMINANT_SHARE}
 ),
-all_legs as (
-    select * from v3_legs
+swaps_level as (
+    select tx_hash, block_number, block_time, pool_key, executor from v3_swaps_filtered
     union all
-    select * from v4_legs
+    select tx_hash, block_number, block_time, pool_key, cast(null as varchar) as executor from v4_swaps_filtered
 ),
 arb_candidates as (
     select tx_hash
-    from all_legs
+    from swaps_level
     group by tx_hash
     having count(distinct pool_key) >= 2
 ),
-arb_agg as (
+tx_meta as (
     select
-        l.tx_hash,
-        min(l.block_number) as block_number,
-        min(l.block_time) as block_time,
+        sl.tx_hash,
+        min(sl.block_number) as block_number,
+        min(sl.block_time) as block_time,
         count(*) as n_legs,
-        count(distinct l.pool_key) as n_pools,
-        sum(l.weth_delta) as profit_weth,
-        sum(l.usdg_delta) as profit_usdg,
-        max(l.executor) as v3_executor
-    from all_legs l
-    inner join arb_candidates c on c.tx_hash = l.tx_hash
-    group by l.tx_hash
+        count(distinct sl.pool_key) as n_pools,
+        max(sl.executor) as v3_executor
+    from swaps_level sl
+    inner join arb_candidates c on c.tx_hash = sl.tx_hash
+    group by sl.tx_hash
+),
+v3_flows as (
+    select tx_hash, token0 as token, cast(-amount0 as double) as delta_raw from v3_swaps_filtered
+    union all
+    select tx_hash, token1 as token, cast(-amount1 as double) as delta_raw from v3_swaps_filtered
+),
+v4_flows as (
+    select tx_hash, token_bought as token, cast(amount_bought as double) as delta_raw from v4_swaps_filtered
+    union all
+    select tx_hash, token_sold as token, -cast(amount_sold as double) as delta_raw from v4_swaps_filtered
+),
+all_flows as (
+    select * from v3_flows
+    union all
+    select * from v4_flows
+),
+tx_token_flow as (
+    select f.tx_hash, f.token, sum(f.delta_raw) as net_flow_raw, sum(abs(f.delta_raw)) as gross_raw
+    from all_flows f
+    inner join arb_candidates c on c.tx_hash = f.tx_hash
+    group by f.tx_hash, f.token
+),
+tx_token_flagged as (
+    select tx_hash, token, net_flow_raw, gross_raw,
+        case when gross_raw > 0 and abs(net_flow_raw) / gross_raw > {DUST_REL_EPS} then 1 else 0 end as is_nondust
+    from tx_token_flow
+),
+tx_nondust_count as (
+    select tx_hash, sum(is_nondust) as n_nondust_tokens, count(*) as n_tokens_touched
+    from tx_token_flagged
+    group by tx_hash
+),
+closed_cycle_exit as (
+    select f.tx_hash, f.token as exit_token, f.net_flow_raw as exit_net_flow_raw
+    from tx_token_flagged f
+    inner join tx_nondust_count n on n.tx_hash = f.tx_hash and n.n_nondust_tokens = 1
+    where f.is_nondust = 1
 )
 select
-    a.tx_hash, a.block_number, a.block_time, a.n_legs, a.n_pools,
-    coalesce(a.v3_executor, to_hex(t."from")) as executor,
-    hour(a.block_time) as hour_utc,
-    a.profit_usdg + a.profit_weth * {{eth_price}} as profit_usd
-from arb_agg a
+    m.tx_hash,
+    m.block_number,
+    m.block_time,
+    m.n_legs,
+    m.n_pools,
+    coalesce(m.v3_executor, to_hex(t."from")) as executor,
+    hour(m.block_time) as hour_utc,
+    n.n_nondust_tokens,
+    n.n_tokens_touched,
+    (ce.exit_token is not null) as is_closed_cycle,
+    to_hex(ce.exit_token) as exit_token_hex,
+    ce.exit_net_flow_raw,
+    case
+        when ce.exit_token = from_hex('{WETH}') then ce.exit_net_flow_raw / 1e{WETH_DECIMALS} * {{eth_price}}
+        when ce.exit_token = from_hex('{ZERO_ADDR}') then ce.exit_net_flow_raw / 1e{WETH_DECIMALS} * {{eth_price}}
+        when ce.exit_token = from_hex('{USDG}') then ce.exit_net_flow_raw / 1e{USDG_DECIMALS}
+        else cast(null as double)
+    end as profit_usd,
+    coalesce(ce.exit_token in (from_hex('{WETH}'), from_hex('{ZERO_ADDR}'), from_hex('{USDG}')), false) as is_priced_exit
+from tx_meta m
+inner join tx_nondust_count n on n.tx_hash = m.tx_hash
+left join closed_cycle_exit ce on ce.tx_hash = m.tx_hash
 left join robinhood.transactions t
-    on t.hash = a.tx_hash
+    on t.hash = m.tx_hash
     and t.block_date >= date '{day_start[:10]}' and t.block_date <= date '{day_end[:10]}'
 """
 
 
 SUMMARY_SQL = f"""
 select
-    count(*) as n_arb_txs,
-    count(*) filter (where profit_usd > {DUST_THRESHOLD_USD}) as n_profitable_arb_txs,
-    sum(profit_usd) filter (where profit_usd > {DUST_THRESHOLD_USD}) as total_profit_usd,
-    approx_percentile(profit_usd, 0.5) filter (where profit_usd > {DUST_THRESHOLD_USD}) as median_profit_usd,
-    approx_percentile(profit_usd, 0.9) filter (where profit_usd > {DUST_THRESHOLD_USD}) as p90_profit_usd,
-    count(distinct executor) filter (where profit_usd > {DUST_THRESHOLD_USD}) as n_distinct_profitable_executors
+    count(*) as n_candidates_total,
+    count(*) filter (where is_closed_cycle) as n_closed_cycle,
+    count(*) filter (where is_closed_cycle and is_priced_exit) as n_closed_cycle_priced,
+    count(*) filter (where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}) as n_profitable_arb_txs,
+    sum(profit_usd) filter (where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}) as total_profit_usd,
+    approx_percentile(profit_usd, 0.5) filter (where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}) as median_profit_usd,
+    approx_percentile(profit_usd, 0.9) filter (where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}) as p90_profit_usd,
+    count(distinct executor) filter (where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}) as n_distinct_profitable_executors
 from query_DETECT_ID
 """
 
 TOP_EXECUTORS_SQL = f"""
 select executor, sum(profit_usd) as total_profit_usd, count(*) as n_profitable_txs
 from query_DETECT_ID
-where profit_usd > {DUST_THRESHOLD_USD} and executor is not null
+where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD} and executor is not null
 group by executor
 order by total_profit_usd desc
 limit 500
@@ -237,7 +311,7 @@ limit 500
 HOURLY_SQL = f"""
 select hour_utc, count(*) as n_profitable_txs, sum(profit_usd) as total_profit_usd
 from query_DETECT_ID
-where profit_usd > {DUST_THRESHOLD_USD}
+where is_closed_cycle and is_priced_exit and profit_usd > {DUST_THRESHOLD_USD}
 group by hour_utc
 order by hour_utc
 """
@@ -263,13 +337,23 @@ def run() -> int:
 
     client = DuneClient()
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     "formula_version": "v4_closed_cycle_all_tokens",
+                     "formula_note": ("Профит засчитывается только если net-flow обнуляется "
+                                      "(|net|/gross <= 1e-6) по всем токенам транзакции, кроме "
+                                      "ровно одного (включая address(0) как отдельный нативный ETH "
+                                      "в v4, не объединён с WETH). Профит = net-flow этого токена x "
+                                      "его цена, ТОЛЬКО если это WETH/nativeETH/USDG -- иначе "
+                                      "is_closed_cycle=true, is_priced_exit=false, не в total_profit_usd."),
                      "filters_applied": {
                          "canonical_factory_only": CANONICAL_FACTORY,
                          "min_distinct_traders_per_pool_day": MIN_DISTINCT_TRADERS_PER_POOL_DAY,
                          "max_dominant_share": MAX_DOMINANT_SHARE,
-                         "v4_note": "v4 не имеет Factory/Mint в этой форме -- фильтр 1/3a только v3, "
-                                     "фильтры 2/3b на v4 используют 'sender' как приближение исполнителя "
-                                     "(дешевле полного join на transactions для всех свопов дня)",
+                         "note": "Эти три фильтра -- пред-фильтр качества пула (спам-фабрики, wash-trading), "
+                                 "больше НЕ единственная защита от переоценки прибыли -- эту роль теперь "
+                                 "играет net-flow-closed-cycle проверка (см. formula_note).",
+                         "v4_note": "v4 не имеет Factory/Mint в этой форме -- фильтр канонической фабрики/LP только "
+                                     "v3, фильтры диверсификации/доминирования на v4 используют 'sender' как "
+                                     "приближение исполнителя.",
                      }}
 
     now = datetime.now(timezone.utc)
@@ -283,8 +367,8 @@ def run() -> int:
     print(f"\n=== B. Реальная медианная цена ETH/USDG ===")
     spent_before_b = credit_guard.load_state()[ns]["spent"]
     sql_price = build_price_sql(day_start, day_end)
-    qid_price = client.create_query("task5_eth_usdg_price_oneday_v3", sql_price)
-    df_price = client.run_sql_cached("task5_eth_usdg_price_oneday_v3", sql_price, query_id=qid_price,
+    qid_price = client.create_query("task5_eth_usdg_price_oneday_v4", sql_price)
+    df_price = client.run_sql_cached("task5_eth_usdg_price_oneday_v4", sql_price, query_id=qid_price,
                                       estimated_credits=3.0, expected_max_rows=5, expected_columns=1)
     spent_after_b = credit_guard.load_state()[ns]["spent"]
     cost_b = spent_after_b - spent_before_b
@@ -301,16 +385,16 @@ def run() -> int:
         print(f"[task5_stage1] {result['blocker']}")
         return 1
 
-    print(f"\n=== A. Материализация детекции С ТРЕМЯ ФИЛЬТРАМИ (fetch_results=False) ===")
+    print(f"\n=== A. Материализация детекции, ФОРМУЛА v4 (closed-cycle net-flow по всем токенам) ===")
     spent_before_a = credit_guard.load_state()[ns]["spent"]
     sql_detect = build_detect_sql(day_start, day_end).replace("{eth_price}", repr(eth_price_usdg))
-    qid_detect = client.create_query("task5_arb_detect_oneday_v3", sql_detect)
-    client.run_sql_cached("task5_arb_detect_oneday_v3", sql_detect, query_id=qid_detect,
-                           estimated_credits=30.0, fetch_results=False)
+    qid_detect = client.create_query("task5_arb_detect_oneday_v4", sql_detect)
+    client.run_sql_cached("task5_arb_detect_oneday_v4", sql_detect, query_id=qid_detect,
+                           estimated_credits=40.0, fetch_results=False)
     spent_after_a = credit_guard.load_state()[ns]["spent"]
     cost_a = spent_after_a - spent_before_a
     result["step_a_materialize_cost_credits"] = cost_a
-    print(f"[task5_stage1] Шаг A (материализация, с фильтрами) стоимость: {cost_a:.4f}, query_id={qid_detect}")
+    print(f"[task5_stage1] Шаг A (материализация, формула v4) стоимость: {cost_a:.4f}, query_id={qid_detect}")
 
     def run_followup(name: str, sql_template: str, max_rows: int, max_cols: int, est: float) -> list[dict]:
         sql = sql_template.replace("query_DETECT_ID", f"query_{qid_detect}")
@@ -325,26 +409,31 @@ def run() -> int:
         result[f"{name}_cost_credits"] = cost
         return rows
 
-    print(f"\n=== A1. Дневная сводка ===")
-    summary_rows = run_followup("task5_arb_summary_oneday_v3", SUMMARY_SQL, max_rows=5, max_cols=6, est=3.0)
+    print(f"\n=== A1. Дневная сводка (воронка: кандидаты -> закрытый цикл -> оценённый -> прибыльный) ===")
+    summary_rows = run_followup("task5_arb_summary_oneday_v4", SUMMARY_SQL, max_rows=5, max_cols=8, est=35.0)
     if summary_rows:
         result.update(summary_rows[0])
+        s = summary_rows[0]
+        print(f"[task5_stage1] воронка: кандидатов={s.get('n_candidates_total')}, "
+              f"закрытый цикл={s.get('n_closed_cycle')}, "
+              f"закрытый+оценён={s.get('n_closed_cycle_priced')}, "
+              f"прибыльных={s.get('n_profitable_arb_txs')}")
 
     print(f"\n=== A2. Топ-500 исполнителей ===")
-    executor_rows = run_followup("task5_arb_top_executors_oneday_v3", TOP_EXECUTORS_SQL, max_rows=500, max_cols=3, est=3.0)
+    executor_rows = run_followup("task5_arb_top_executors_oneday_v4", TOP_EXECUTORS_SQL, max_rows=500, max_cols=3, est=35.0)
     result["top_executors_by_profit_usd"] = executor_rows
 
     print(f"\n=== A3. Почасовое распределение ===")
-    hourly_rows = run_followup("task5_arb_hourly_oneday_v3", HOURLY_SQL, max_rows=30, max_cols=3, est=3.0)
+    hourly_rows = run_followup("task5_arb_hourly_oneday_v4", HOURLY_SQL, max_rows=30, max_cols=3, est=35.0)
     result["hourly_distribution"] = hourly_rows
 
     total_cost = (result.get("step_b_cost_credits", 0.0) + result.get("step_a_materialize_cost_credits", 0.0)
-                  + result.get("task5_arb_summary_oneday_v3_cost_credits", 0.0)
-                  + result.get("task5_arb_top_executors_oneday_v3_cost_credits", 0.0)
-                  + result.get("task5_arb_hourly_oneday_v3_cost_credits", 0.0))
+                  + result.get("task5_arb_summary_oneday_v4_cost_credits", 0.0)
+                  + result.get("task5_arb_top_executors_oneday_v4_cost_credits", 0.0)
+                  + result.get("task5_arb_hourly_oneday_v4_cost_credits", 0.0))
     result["total_cost_this_run_credits"] = total_cost
     result["extrapolated_30day_credits"] = total_cost * 30 * 1.3
-    print(f"\n[task5_stage1] РЕАЛЬНАЯ суммарная стоимость (с фильтрами, 1 день): {total_cost:.4f}")
+    print(f"\n[task5_stage1] РЕАЛЬНАЯ суммарная стоимость (формула v4, 1 день): {total_cost:.4f}")
     print(f"[task5_stage1] экстраполяция на 30 дней (+30% запас): {result['extrapolated_30day_credits']:.2f}")
 
     if executor_rows:
@@ -364,8 +453,9 @@ def run() -> int:
         if not result["sanity_check_passed"]:
             result["sanity_check_verdict"] = (
                 f"ПРОВАЛЕНА: total_profit_usd={total_profit:,.2f} > "
-                f"{SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD:,.0f} -- результат ВСЁ ЕЩЁ контаминирован, "
-                "НЕ докладывать как факт, нужен дальнейший разбор методологии, не 30-дневный прогон."
+                f"{SANITY_MAX_PLAUSIBLE_DAILY_PROFIT_USD:,.0f} -- результат ВСЁ ЕЩЁ контаминирован даже "
+                "после фикса формулы -- есть ЕЩЁ один источник загрязнения, НЕ докладывать как факт, "
+                "нужен дальнейший разбор, не 30-дневный прогон."
             )
         else:
             result["sanity_check_verdict"] = "ПРОЙДЕНА -- результат правдоподобен по масштабу, можно рассматривать как реальную оценку."
