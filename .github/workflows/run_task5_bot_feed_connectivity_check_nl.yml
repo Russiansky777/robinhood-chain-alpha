@@ -1,0 +1,77 @@
+name: "Задача 5, живой бот -- диагностика: жив ли фид с NL (отличить бан IP Огайо от общей проблемы)"
+
+# Владелец, 2026-09-13: Ohio дважды подряд получил HTTP 403 от
+# wss://feed.mainnet.chain.robinhood.com после нескольких подключений за
+# ~20 минут -- похоже на временный rate-limit/бан конкретно этого IP, не
+# на общую проблему. Быстрая, дешёвая проверка (1 сообщение, таймаут 15с)
+# с NL -- IP, который НЕ делал недавних переподключений к фиду -- отличит
+# "забанен именно Ohio-IP" от "фид/наш подход сломаны вообще".
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_FEED_CONNECTIVITY_CHECK_NL_REQUEST"
+
+jobs:
+  feed_connectivity_check_nl:
+    name: "Проверка фида с NL VPS (45.59.170.76)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код и проверить фид (1 сообщение, таймаут 15с)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha
+              ./venv/bin/python analysis/task5_bot_feed_structure_probe.py 1 15
+            "
+          ' > /tmp/feed_check_nl_result.json 2> /tmp/feed_check_nl_stderr.log
+          echo "--- stderr ---"; cat /tmp/feed_check_nl_stderr.log
+          echo "--- stdout ---"; cat /tmp/feed_check_nl_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_FEED_CONNECTIVITY_CHECK_NL_REQUEST
+          {
+            echo "# Feed connectivity check from NL -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "## stdout"; cat /tmp/feed_check_nl_result.json 2>/dev/null || echo "(нет данных)"
+            echo "## stderr"; cat /tmp/feed_check_nl_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_bot_feed_connectivity_check_nl_log.txt
+          git add data/p3_guard_cache/task5_bot_feed_connectivity_check_nl_log.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: проверка живости фида с NL [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
