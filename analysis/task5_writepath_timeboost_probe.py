@@ -79,6 +79,16 @@ def probe_endpoint(label: str, url: str) -> dict:
     out["timeboost_sendExpressLaneTransaction_probe"] = rpc_post(
         url, "timeboost_sendExpressLaneTransaction", [{"probe": "invalid_params_intentionally"}]
     )
+    # ЧЕСТНО: заведомо НЕВАЛИДНЫЙ raw-tx hex ("0xdeadbeef") -- это НЕ
+    # отправка транзакции (подпись отсутствует/некорректна, узел её
+    # отклонит на этапе парсинга RLP до попадания в очередь секвенсера).
+    # Цель -- только узнать, СУЩЕСТВУЕТ ли метод eth_sendRawTransaction
+    # на этом эндпоинте (метод отсутствует -> -32601 "does not exist";
+    # метод есть -> ошибка парсинга RLP/подписи, другой код/текст).
+    out["eth_sendRawTransaction_method_exists_probe"] = rpc_post(url, "eth_sendRawTransaction", ["0xdeadbeef"])
+    out["eth_getTransactionCount_probe"] = rpc_post(
+        url, "eth_getTransactionCount", ["0x0000000000000000000000000000000000000000", "latest"]
+    )
     return out
 
 
