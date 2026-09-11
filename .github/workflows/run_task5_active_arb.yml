@@ -17,6 +17,7 @@ on:
       - "data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST"
+      - "data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST"
 
 jobs:
@@ -69,6 +70,14 @@ jobs:
           CREDIT_GUARD_FILE: data/credits_spent_mozila.json
         run: python -u analysis/task5_active_arb_stage1_oneday.py
 
+      - name: "Задача 5, диагностика конкретной аномалии (по уже оплаченному query_id, почти бесплатно)"
+        if: hashFiles('data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_active_arb_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_active_arb_diag_single_tx.py
+
       - name: "Задача 5, Шаг 2 -- полный прогон 30 дней (только если Шаг 1 в пределах бюджета)"
         if: hashFiles('data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST') != ''
         env:
@@ -80,7 +89,8 @@ jobs:
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          [ -e data/p3_guard_cache/task5_active_arb_diag_single_tx_result.json ] && git add data/p3_guard_cache/task5_active_arb_diag_single_tx_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage0_schema_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0_schema_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage0b_poolcreated_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0b_poolcreated_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage0c_mint_schema_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage0c_mint_schema_result.json
