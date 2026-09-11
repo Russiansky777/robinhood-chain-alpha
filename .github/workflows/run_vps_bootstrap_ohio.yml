@@ -105,7 +105,7 @@ jobs:
             sudo -u bot git config --global --get user.name || sudo -u bot git config --global user.name "task5-arb-bot"
             sudo -u bot git config --global --get user.email || sudo -u bot git config --global user.email "task5-arb-bot@localhost"
 
-            if [ -d /home/bot/robinhood-chain-alpha/.git ]; then
+            if sudo test -d /home/bot/robinhood-chain-alpha/.git; then
               sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
               sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
               sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
@@ -159,7 +159,7 @@ jobs:
 
       - name: 8. logrotate по размеру
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 'mkdir -p /home/bot/robinhood-chain-alpha/logs && sudo chown bot:bot /home/bot/robinhood-chain-alpha/logs && sudo tee /etc/logrotate.d/task5-arb-bot > /dev/null' <<'EOF'
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot mkdir -p /home/bot/robinhood-chain-alpha/logs && sudo chown bot:bot /home/bot/robinhood-chain-alpha/logs && sudo tee /etc/logrotate.d/task5-arb-bot > /dev/null' <<'EOF'
           /home/bot/robinhood-chain-alpha/logs/*.log {
               size 200M
               rotate 5
