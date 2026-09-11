@@ -1,0 +1,124 @@
+name: "Задача 5, п.2 владельца (2026-09-11) -- регион секвенсера: RTT + feed-lead-time с NL VPS и GH Actions раннера"
+
+# Только измерение (пассивное чтение публичного фида секвенсера +
+# публичного RPC), НИКАКИХ транзакций не отправляется. Cron/SSH на NL
+# VPS НЕ трогаются -- используется УЖЕ существующий SSH-доступ (тот же
+# паттерн, что run_fetch_live_divergence_from_vps.yml), но скрипт
+# копируется напрямую в /tmp и запускается во ВРЕМЕННОМ venv в /tmp --
+# существующий git-клон/venv/crontab/systemd на VPS НЕ трогаются вообще
+# (сознательно не делаем git pull в существующем клоне -- неизвестно,
+# какую ветку он отслеживает, и это могло бы задеть уже работающие
+# cron-скрипты).
+#
+# ЧЕСТНАЯ ОГОВОРКА: GitHub НЕ гарантирует и не документирует регион
+# hosted-раннера (`ubuntu-latest`) для бесплатных/стандартных аккаунтов
+# -- это НЕ настоящий "us-east"/"us-west"/"eu-central" по выбору, а
+# ЕДИНСТВЕННАЯ дополнительная реальная точка измерения, регион которой
+# не подтверждён. NL VPS -- реальный, известный регион (Нидерланды,
+# 45.59.170.76). Полное покрытие трёх конкретных регионов (us-east,
+# us-west, eu-central) требует либо платных GH Actions larger runners
+# с выбором региона, либо реального провижининга VPS в этих регионах --
+# ни то ни другое не сделано в этом прогоне (нет облачных credentials
+# в этой песочнице), см. доклад владельцу.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/SEQ_FEED_LATENCY_PROBE_REQUEST"
+
+jobs:
+  probe_gh_runner:
+    name: "Замер с GH Actions раннера (регион не подтверждён GitHub)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install requests websockets
+      - name: Probe
+        run: python -u analysis/seq_feed_latency_probe.py --duration 40 --out /tmp/seq_feed_probe_gh_runner.json
+      - name: Commit results
+        run: |
+          mkdir -p data/p3_guard_cache
+          cp /tmp/seq_feed_probe_gh_runner.json data/p3_guard_cache/seq_feed_latency_probe_gh_runner_result.json
+          git add data/p3_guard_cache/seq_feed_latency_probe_gh_runner_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, п.2: результат измерения фида секвенсера с GH Actions раннера [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
+
+  probe_nl_vps:
+    name: "Замер с NL VPS (45.59.170.76, реальный известный регион)"
+    needs: probe_gh_runner  # последовательно, чтобы избежать гонки при git push в одну ветку
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Скопировать скрипт во временный каталог VPS (НЕ трогая существующий git-клон/venv на VPS)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/seq_feed_latency_probe.py' < analysis/seq_feed_latency_probe.py
+
+      - name: Поставить зависимости во временный venv и запустить пробу (никаких изменений в существующем клоне/cron/systemd)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            python3 -m venv /tmp/seq_probe_venv
+            source /tmp/seq_probe_venv/bin/activate
+            pip install --quiet requests websockets
+            python3 -u /tmp/seq_feed_latency_probe.py --duration 40 --out /tmp/seq_feed_probe_nl.json
+          ' | tee /tmp/vps_probe_stdout.log
+          ssh $SSH_OPTS root@45.59.170.76 'cat /tmp/seq_feed_probe_nl.json' > /tmp/seq_feed_probe_nl.json
+
+      - name: Commit results
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/SEQ_FEED_LATENCY_PROBE_REQUEST
+          cp /tmp/seq_feed_probe_nl.json data/p3_guard_cache/seq_feed_latency_probe_nl_result.json
+          git add data/p3_guard_cache/seq_feed_latency_probe_nl_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, п.2: результат измерения фида секвенсера с NL VPS [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
