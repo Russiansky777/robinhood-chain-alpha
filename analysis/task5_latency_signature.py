@@ -43,7 +43,7 @@ import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_latency_signature_result.json")
-NAMESPACE_BUDGET = 1000.0
+NAMESPACE_BUDGET = 1650.0
 
 WETH = "0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "5fc5360d0400a0fd4f2af552add042d716f1d168"
