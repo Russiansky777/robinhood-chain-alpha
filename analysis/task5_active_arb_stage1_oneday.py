@@ -90,7 +90,7 @@ import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_active_arb_stage1_oneday_result.json")
-NAMESPACE_BUDGET = 600.0  # поднято с 400.0 (2026-09-11): реальный расход достиг 336.96/400.0
+NAMESPACE_BUDGET = 700.0  # поднято с 400.0 (2026-09-11): реальный расход достиг 336.96/400.0
 # после легитимного (не ошибочного) овеrrun-стопа на первой версии разбивки по
 # токенам (129.60 вместо оценённых 40 -- см. докстринг выше) -- общий цикл
 # Mozila (лимит 2000, реально потрачено ~717) имеет достаточный запас,

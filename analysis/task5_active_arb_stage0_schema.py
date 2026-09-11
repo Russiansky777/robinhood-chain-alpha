@@ -61,7 +61,7 @@ from credit_guard import ensure_namespace, remaining_cycle_budget, load_state  #
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_active_arb_stage0_schema_result.json")
-NAMESPACE_BUDGET = 600.0  # поднято с 400.0 (2026-09-11, см. task5_active_arb_stage1_oneday.py) --
+NAMESPACE_BUDGET = 700.0  # поднято с 400.0 (2026-09-11, см. task5_active_arb_stage1_oneday.py) --
 # владелец: "бюджет свободный в рамках остатка Mozila" -- технический потолок пространства
 
 

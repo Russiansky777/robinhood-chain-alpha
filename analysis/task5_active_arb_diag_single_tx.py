@@ -31,7 +31,7 @@ TARGET_EXECUTORS = [
 
 
 def run() -> int:
-    ensure_namespace("task5_active_arb_mozila", 600.0)
+    ensure_namespace("task5_active_arb_mozila", 700.0)
     client = DuneClient()
     out: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
