@@ -293,7 +293,7 @@ def run() -> int:
     client.run_sql_cached(f"task5_s2_detect_{n_days}d", sql_detect, query_id=qid_detect,
                            estimated_credits=280.0, fetch_results=False)
     cost_detect = next((e["credits"] for e in reversed(client.credit_ledger)
-                         if e["name"] == f"task5_s2_detect_{n_days}d" and e["op"] == "execute"), None)
+                         if e["name"] == f"task5_s2_detect_{n_days}d" and not e.get("cached")), None)
     result["step_b_materialize_cost_credits"] = cost_detect
     print(f"[stage2] материализация: {cost_detect}")
 
