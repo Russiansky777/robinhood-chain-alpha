@@ -21,7 +21,7 @@ jobs:
   dryrun_smoketest_ohio:
     name: "Dry-run смоук-тест на Ohio VPS (3.151.160.108)"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 16
     permissions:
       contents: write
     steps:
@@ -40,7 +40,7 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
           chmod 600 ~/.ssh/vps_key_ohio
           ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
-          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=6" >> "$GITHUB_ENV"
 
       - name: Подтянуть актуальный код на Ohio (существующий клон bot'а)
         run: |
@@ -52,13 +52,13 @@ jobs:
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
           '
 
-      - name: "Запустить task5_bot_run.py --duration-seconds 90 (БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
+      - name: "Запустить task5_bot_run.py --duration-seconds 600 (10 минут, БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo -u bot bash -c "
               cd /home/bot/robinhood-chain-alpha
               rm -f data/task5_bot_live/attempts.jsonl
-              ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 90
+              ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 600
             "
           ' > /tmp/task5_bot_dryrun_stdout.log 2> /tmp/task5_bot_dryrun_stderr.log
           echo "--- stdout ---"; cat /tmp/task5_bot_dryrun_stdout.log
