@@ -1,0 +1,211 @@
+name: "Задача 5, живой бот -- bootstrap третьего VPS: AWS us-east-2 Огайо (3.151.160.108)"
+
+# Владелец, 2026-09-13: третий сервер -- AWS EC2 us-east-2 (та же
+# область AWS, что и найденный sequencer-хост
+# sequencer.mainnet.chain.robinhood.com, см. docs/PROJECT_STATE.md) --
+# цель: минимальный сетевой путь до секвенсера, целиться в блок 0.
+# Ubuntu 26.04 LTS Arm, c7g.xlarge, вход -- пользователь `ubuntu` (не
+# root, как на NL/Dallas), ключ -- отдельный секрет VPS_SSH_KEY_OHIO.
+# Тот же паттерн настройки, что run_vps_bootstrap_nl.yml (ufw/fail2ban/
+# PasswordAuthentication no/пользователь bot без sudo/секреты в
+# /etc/bot/env/logrotate), адаптирован под sudo вместо root-логина и без
+# Lighter-специфичных шагов (эта машина -- под Задачу 5, не под P5/Lighter).
+# PRIVATE_KEY_NOX -- ТОТ ЖЕ ключ/адрес, что на NL и Dallas (владелец,
+# 2026-09-13: "для газа и инвентаря").
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_BOOTSTRAP_OHIO_REQUEST"
+
+jobs:
+  bootstrap_ohio:
+    name: "Bootstrap Ohio VPS (3.151.160.108)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: 1. Идентификация хоста
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            echo "=== whoami ==="; whoami
+            echo "=== hostname ==="; hostname
+            echo "=== uptime ==="; uptime
+            echo "=== os-release ==="; cat /etc/os-release | head -3
+            echo "=== arch ==="; uname -m
+            echo "=== disk (до настройки) ==="; df -h /
+          ' | tee /tmp/ohio_bootstrap_step1.log
+
+      - name: 2. Обновление системы
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            sudo apt-get update
+            sudo apt-get -y upgrade
+            sudo apt-get -y autoremove
+          '
+
+      - name: 3. ufw (22/tcp только) + fail2ban + отключение PasswordAuthentication
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            sudo apt-get install -y ufw fail2ban
+
+            sudo ufw allow 22/tcp
+            sudo ufw default deny incoming
+            sudo ufw default allow outgoing
+            sudo ufw --force enable
+            sudo ufw status verbose
+
+            sudo systemctl enable --now fail2ban
+            sudo systemctl status fail2ban --no-pager | head -5
+
+            sudo sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication no/" /etc/ssh/sshd_config
+            grep -q "^PasswordAuthentication no" /etc/ssh/sshd_config
+            sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd
+          ' | tee /tmp/ohio_bootstrap_step3.log
+
+      - name: 3б. Проверка -- НОВОЕ соединение после смены sshd_config (не залочились)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'echo "новое соединение по ключу работает"'
+
+      - name: 4-5. Пользователь bot (без sudo), зависимости, клон репозитория
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            sudo apt-get install -y python3-venv python3-pip git
+
+            id -u bot &>/dev/null || sudo useradd -m -s /bin/bash bot
+            id bot
+
+            sudo -u bot git config --global --get user.name || sudo -u bot git config --global user.name "task5-arb-bot"
+            sudo -u bot git config --global --get user.email || sudo -u bot git config --global user.email "task5-arb-bot@localhost"
+
+            if [ -d /home/bot/robinhood-chain-alpha/.git ]; then
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+              sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            else
+              sudo -u bot git clone --branch claude/nifty-sagan-r0polg https://github.com/russiansky777/robinhood-chain-alpha.git /home/bot/robinhood-chain-alpha
+            fi
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+
+            sudo -u bot python3 -m venv /home/bot/robinhood-chain-alpha/venv
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q --upgrade pip
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: 6. Секреты -> /etc/bot/env (напрямую по SSH stdin, не через -c/echo)
+        env:
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo mkdir -p /etc/bot && sudo tee /etc/bot/env > /dev/null && sudo chmod 640 /etc/bot/env && sudo chown root:bot /etc/bot/env && wc -l /etc/bot/env' <<EOF
+          PRIVATE_KEY_NOX=$PRIVATE_KEY_NOX
+          EOF
+
+      - name: 6б. bot реально может прочитать /etc/bot/env (проверка группы/прав, не значения)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot test -r /etc/bot/env && echo "OK: bot читает /etc/bot/env" || echo "ОШИБКА: bot НЕ может прочитать /etc/bot/env"'
+
+      - name: 7. systemd-юнит (установлен, НЕ включён -- executor всё ещё NotImplementedError)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo tee /etc/systemd/system/task5-arb-bot.service > /dev/null' <<'EOF'
+          [Unit]
+          Description=Task5 Robinhood Chain DEX-arb bot (detection/telemetry only -- executor NotImplementedError)
+          After=network-online.target
+          Wants=network-online.target
+          StartLimitIntervalSec=600
+          StartLimitBurst=5
+
+          [Service]
+          Type=simple
+          User=bot
+          Group=bot
+          WorkingDirectory=/home/bot/robinhood-chain-alpha
+          EnvironmentFile=/etc/bot/env
+          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/robinhood-chain-alpha/analysis/task5_bot_run.py
+          Restart=always
+          RestartSec=10
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo systemctl daemon-reload && sudo systemctl status task5-arb-bot --no-pager || true'
+
+      - name: 8. logrotate по размеру
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'mkdir -p /home/bot/robinhood-chain-alpha/logs && sudo chown bot:bot /home/bot/robinhood-chain-alpha/logs && sudo tee /etc/logrotate.d/task5-arb-bot > /dev/null' <<'EOF'
+          /home/bot/robinhood-chain-alpha/logs/*.log {
+              size 200M
+              rotate 5
+              compress
+              delaycompress
+              missingok
+              notifempty
+              copytruncate
+              su bot bot
+          }
+          EOF
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo logrotate -d /etc/logrotate.d/task5-arb-bot 2>&1 | tail -20'
+
+      - name: 9. Свободное место на диске (после всей настройки)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'df -h /' | tee /tmp/ohio_bootstrap_step9.log
+
+      - name: Собрать честный лог bootstrap для паспорта
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Ohio VPS bootstrap -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## Шаг 1 -- идентификация хоста"
+            cat /tmp/ohio_bootstrap_step1.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## Шаг 3 -- ufw/fail2ban"
+            cat /tmp/ohio_bootstrap_step3.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## Шаг 9 -- диск после настройки"
+            cat /tmp/ohio_bootstrap_step9.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/vps_bootstrap_ohio_log.txt
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/VPS_BOOTSTRAP_OHIO_REQUEST
+          git add data/p3_guard_cache/vps_bootstrap_ohio_log.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: bootstrap VPS Огайо (us-east-2, 3.151.160.108) -- лог настройки [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
