@@ -23,6 +23,7 @@ on:
       - "data/p3_guard_cache/TASK5_OPERATORS_CONTRACTS_COLS_REQUEST"
       - "data/p3_guard_cache/TASK5_OPERATORS_TX_TABLE_PROBE_REQUEST"
       - "data/p3_guard_cache/TASK5_OPERATORS_REQUEST"
+      - "data/p3_guard_cache/TASK5_STAGE2_CALIBRATE_REQUEST"
       - "data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST"
       - "data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST"
@@ -125,6 +126,15 @@ jobs:
           CREDIT_GUARD_FILE: data/credits_spent_mozila.json
         run: python -u analysis/task5_operators.py
 
+      - name: "Задача 5, измерение 3 -- калибровка Stage 2 на 2 днях (оценка перед 30-дневным прогоном)"
+        if: hashFiles('data/p3_guard_cache/TASK5_STAGE2_CALIBRATE_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_active_arb_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+          TASK5_S2_DAYS: "2"
+        run: python -u analysis/task5_stage2_multiday.py
+
       - name: "Задача 5, диагностика конкретной аномалии (по уже оплаченному query_id, почти бесплатно)"
         if: hashFiles('data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST') != ''
         env:
@@ -152,7 +162,8 @@ jobs:
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_CONTRACTS_COLS_REQUEST data/p3_guard_cache/TASK5_OPERATORS_TX_TABLE_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_CONTRACTS_COLS_REQUEST data/p3_guard_cache/TASK5_OPERATORS_TX_TABLE_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_REQUEST data/p3_guard_cache/TASK5_STAGE2_CALIBRATE_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          [ -e data/p3_guard_cache/task5_stage2_multiday_result.json ] && git add data/p3_guard_cache/task5_stage2_multiday_result.json
           [ -e data/p3_guard_cache/task5_operators_result.json ] && git add data/p3_guard_cache/task5_operators_result.json
           [ -e data/p3_guard_cache/task5_operators_tx_table_probe_result.json ] && git add data/p3_guard_cache/task5_operators_tx_table_probe_result.json
           [ -e data/p3_guard_cache/task5_operators_contracts_cols_result.json ] && git add data/p3_guard_cache/task5_operators_contracts_cols_result.json
