@@ -1,0 +1,54 @@
+name: "Задача 5, живой бот -- три бесплатные проверки до продолжения + локация секвенсера (Globalping, без VPS)"
+
+# Владелец, 2026-09-12: "Три проверки до продолжения бота, все
+# бесплатные" (Timeboost, фондирование топ-5, декомпиляция контрактов
+# топ-3) + "Локация секвенсера -- без VPS: whois/ipinfo, затем
+# Globalping из 10+ европейских точек." Только чтение публичных API
+# (Blockscout, openchain.xyz, ipinfo.io, Globalping, прямой RPC
+# eth_getCode) -- ноль Dune-кредитов, ноль VPS, ноль транзакций.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/sc1-pons-v2-launcher-efdbyt
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_PRETRUST_CHECKS_REQUEST"
+
+jobs:
+  pretrust_checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install requests
+      - name: Run pretrust checks
+        run: python -u analysis/task5_bot_pretrust_checks.py --out /tmp/task5_pretrust_checks_result.json
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_PRETRUST_CHECKS_REQUEST
+          [ -e /tmp/task5_pretrust_checks_result.json ] && cp /tmp/task5_pretrust_checks_result.json data/p3_guard_cache/task5_bot_pretrust_checks_result.json
+          [ -e data/p3_guard_cache/task5_bot_pretrust_checks_result.json ] && git add data/p3_guard_cache/task5_bot_pretrust_checks_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: три проверки до продолжения + локация секвенсера [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
