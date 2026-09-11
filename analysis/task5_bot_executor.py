@@ -113,6 +113,24 @@ class Executor:
 # не вызывается на реальных данных -- готова заранее, чтобы телеметрия сразу
 # писала осмысленные категории, как только появится первая реальная попытка,
 # а не собирать их только текстом ошибки постфактум.
+#
+# Владелец, 2026-09-13: "точные типы, без додумывания" -- 4-байтовые
+# селекторы custom errors из contracts/ClosedCycleExecutorV3.sol, реально
+# вычислены (keccak-256 сигнатуры ошибки, первые 4 байта), НЕ найдены
+# подстрочным совпадением текста -- нода, возвращающая revert data в hex
+# (не декодированный текст), даёт эти байты НАПРЯМУЮ в начале `data` поля
+# ошибки JSON-RPC (`error.data`, обычно `0x<selector><abi-encoded args>`).
+# web3.py/eth_call с ABI контракта декодирует это в читаемое имя ошибки
+# САМ (см. docs/TASK5_BOT_EXECUTOR_SPEC.md, шаг 5) -- тогда достаточно
+# текстового совпадения ниже; при "сыром" JSON-RPC без ABI-декодирования
+# -- сравнивать первые 4 байта `error.data` с этими селекторами напрямую,
+# это надёжнее произвольного текста.
+CUSTOM_ERROR_SELECTORS = {
+    "0xc39ba758": "InsufficientProfit",   # InsufficientProfit(uint256,uint256,uint256)
+    "0xc2221189": "UnexpectedCallback",   # UnexpectedCallback(address)
+    "0x37ed32e8": "ReentrantCall",        # ReentrantCall()
+    "0x30cd7471": "NotOwner",             # NotOwner()
+}
 _KNOWN_CONTRACT_ERRORS = {
     "InsufficientProfit": "price_moved_or_slippage",  # минимальная прибыль не набралась -- цена
     # успела сдвинуться между детекцией и включением, либо оценка minProfit была завышена
@@ -132,15 +150,26 @@ _NETWORK_ERROR_MARKERS = (
 )
 
 
-def classify_revert_reason(error_message: str | None, receipt: dict | None = None) -> str:
+def classify_revert_reason(error_message: str | None, receipt: dict | None = None,
+                            revert_data_hex: str | None = None) -> str:
     """Возвращает одну из категорий `revert_reason` для
     `task5_bot_telemetry.AttemptRecord`: "price_moved_or_slippage" (цикл
     не набрал minProfit / не хватило на возврат долга -- ожидаемое,
     рыночное явление, не баг), "execution_error" (баг контракта/бота --
     неверный адрес пула, реентерабельность, не тот owner),
     "network_error" (проблема отправки/газа/nonce, не самого цикла) или
-    "unknown" (текст ошибки не совпал ни с одной известной сигнатурой --
-    честно, не гадаем дальше подстрочного совпадения)."""
+    "unknown" (ни селектор, ни текст ошибки не совпали ни с одной
+    известной сигнатурой -- честно, не гадаем дальше этого).
+
+    `revert_data_hex` -- сырые байты `error.data` из JSON-RPC ответа
+    (если нода их возвращает НЕ декодированными в текст) -- проверяется
+    ПЕРВЫМ и приоритетно (точное совпадение 4 байт, не подстрока текста)."""
+    if revert_data_hex:
+        prefix = revert_data_hex[:10].lower()  # "0x" + 8 hex = 4 байта
+        name = CUSTOM_ERROR_SELECTORS.get(prefix)
+        if name is not None:
+            return _KNOWN_CONTRACT_ERRORS[name]
+
     text = (error_message or "").lower()
     for name, category in _KNOWN_CONTRACT_ERRORS.items():
         if name.lower() in text:
@@ -152,6 +181,6 @@ def classify_revert_reason(error_message: str | None, receipt: dict | None = Non
         if marker in text:
             return "network_error"
     if receipt is not None and str(receipt.get("status", "0x1")) in ("0x0", "0"):
-        return "execution_error"  # revert без узнаваемого текста -- честно помечаем как execution_error,
-        # не unknown, раз хотя бы известен факт отката по статусу рецепта
+        return "execution_error"  # revert без узнаваемого текста/селектора -- честно помечаем как
+        # execution_error, не unknown, раз хотя бы известен факт отката по статусу рецепта
     return "unknown"

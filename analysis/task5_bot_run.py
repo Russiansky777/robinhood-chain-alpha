@@ -65,6 +65,10 @@ def main() -> int:
                      help="Адрес задеплоенного ClosedCycleExecutorV3 (нужен только для --confirm-mainnet).")
     ap.add_argument("--size-fraction", type=float, default=1.0,
                      help="Доля от целевого размера позиции -- владелец: неделя 1 теста = 0.5.")
+    ap.add_argument("--duration-seconds", type=float, default=None,
+                     help="Владелец, 2026-09-13: ограниченный по времени dry-run смоук-тест ПЕРЕД реальными "
+                          "деньгами -- слушает фид ровно это число секунд, затем аккуратно завершается и "
+                          "печатает диагностику (по умолчанию -- бесконечно, как раньше, для реального прод-режима).")
     args = ap.parse_args()
 
     dry_run = is_dry_run(args.confirm_mainnet)
@@ -132,11 +136,21 @@ def main() -> int:
 
     client = SequencerFeedClient(feed_url)
     print(f"[task5_bot] подключение к фиду: {feed_url}")
+    if args.duration_seconds is not None:
+        print(f"[task5_bot] СМОУК-ТЕСТ: ограничено {args.duration_seconds}с (владелец, 2026-09-13, "
+              f"первый безопасный dry-run перед реальными деньгами)")
     try:
-        asyncio.run(client.listen(on_feed_message))
+        if args.duration_seconds is not None:
+            try:
+                asyncio.run(asyncio.wait_for(client.listen(on_feed_message), timeout=args.duration_seconds))
+            except asyncio.TimeoutError:
+                pass  # штатное завершение смоук-теста по времени, не ошибка
+        else:
+            asyncio.run(client.listen(on_feed_message))
     except KeyboardInterrupt:
         pass
     print(f"[task5_bot] диагностика фида: {client.diag}")
+    print(f"[task5_bot] последний известный номер блока с фида: {last_seen_block_number[0]}")
     return 0
 
 

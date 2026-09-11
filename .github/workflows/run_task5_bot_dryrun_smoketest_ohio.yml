@@ -1,0 +1,99 @@
+name: "Задача 5, живой бот -- смоук-тест dry-run (без executor) на Ohio VPS"
+
+# Владелец, 2026-09-13, п. dry-run: "убедись, что task5_bot_run.py умеет
+# работать без executor -- детектит расхождения на живом фиде, пишет
+# телеметрию, ничего не отправляет. Это первый безопасный запуск, до
+# реальных денег." Ограниченный по времени (--duration-seconds), БЕЗ
+# --confirm-mainnet (ключ не читается, Account не создаётся) -- только
+# bootstrap (read-only PoolCreated-скан) + подписка на реальный фид
+# (read-only WS). Использует УЖЕ настроенный venv бота на Ohio (bootstrap
+# -- run_vps_bootstrap_ohio.yml), сначала подтягивает актуальный код.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_DRYRUN_SMOKETEST_OHIO_REQUEST"
+
+jobs:
+  dryrun_smoketest_ohio:
+    name: "Dry-run смоук-тест на Ohio VPS (3.151.160.108)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на Ohio (существующий клон bot'а)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: "Запустить task5_bot_run.py --duration-seconds 90 (БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha
+              rm -f data/task5_bot_live/attempts.jsonl
+              ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 90
+            "
+          ' > /tmp/task5_bot_dryrun_stdout.log 2> /tmp/task5_bot_dryrun_stderr.log
+          echo "--- stdout ---"; cat /tmp/task5_bot_dryrun_stdout.log
+          echo "--- stderr ---"; cat /tmp/task5_bot_dryrun_stderr.log
+
+      - name: Забрать телеметрию (если что-то записано) для паспорта
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_live/attempts.jsonl 2>/dev/null' > /tmp/task5_bot_dryrun_attempts.jsonl || true
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Task5 bot dry-run смоук-тест (Ohio) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/task5_bot_dryrun_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/task5_bot_dryrun_stderr.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## telemetry attempts.jsonl (n строк: $(wc -l < /tmp/task5_bot_dryrun_attempts.jsonl 2>/dev/null || echo 0))"
+            cat /tmp/task5_bot_dryrun_attempts.jsonl 2>/dev/null || echo "(пусто -- ни одной попытки не записано)"
+          } > data/p3_guard_cache/task5_bot_dryrun_smoketest_ohio_log.txt
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_DRYRUN_SMOKETEST_OHIO_REQUEST
+          git add data/p3_guard_cache/task5_bot_dryrun_smoketest_ohio_log.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: dry-run смоук-тест на Ohio VPS -- лог + телеметрия [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
