@@ -1,0 +1,84 @@
+# Ohio VPS bootstrap -- 2026-09-11T21:59:09Z
+
+## Шаг 1 -- идентификация хоста
+=== whoami ===
+ubuntu
+=== hostname ===
+ip-172-31-32-98
+=== uptime ===
+ 21:56:20 up 12 min,  1 user,  load average: 0.00, 0.00, 0.00
+=== os-release ===
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+=== arch ===
+aarch64
+=== disk (до настройки) ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        58G  2.1G   56G   4% /
+
+## Шаг 3 -- ufw/fail2ban
+Reading package lists...
+Building dependency tree...
+Reading state information...
+ufw is already the newest version (0.36.2-9build1).
+ufw set to manually installed.
+Solving dependencies...
+The following additional packages will be installed:
+  python3-pyasyncore python3-pyinotify whois
+Suggested packages:
+  mailx monit sqlite3 python-pyinotify-doc
+The following NEW packages will be installed:
+  fail2ban python3-pyasyncore python3-pyinotify whois
+0 upgraded, 4 newly installed, 0 to remove and 7 not upgraded.
+Need to get 507 kB of archives.
+After this operation, 2706 kB of additional disk space will be used.
+Get:1 http://us-east-2.ec2.archive.ubuntu.com/ubuntu resolute/universe arm64 fail2ban all 1.1.0-9 [421 kB]
+Get:2 http://us-east-2.ec2.archive.ubuntu.com/ubuntu resolute/main arm64 python3-pyasyncore all 1.0.2-3build1 [10.4 kB]
+Get:3 http://us-east-2.ec2.archive.ubuntu.com/ubuntu resolute/main arm64 python3-pyinotify all 0.9.6-5build1 [25.5 kB]
+Get:4 http://us-east-2.ec2.archive.ubuntu.com/ubuntu resolute/main arm64 whois arm64 5.6.6 [49.3 kB]
+Fetched 507 kB in 0s (3972 kB/s)
+Selecting previously unselected package fail2ban.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 88861 files and directories currently installed.)
+Preparing to unpack .../fail2ban_1.1.0-9_all.deb ...
+Unpacking fail2ban (1.1.0-9) ...
+Selecting previously unselected package python3-pyasyncore.
+Preparing to unpack .../python3-pyasyncore_1.0.2-3build1_all.deb ...
+Unpacking python3-pyasyncore (1.0.2-3build1) ...
+Selecting previously unselected package python3-pyinotify.
+Preparing to unpack .../python3-pyinotify_0.9.6-5build1_all.deb ...
+Unpacking python3-pyinotify (0.9.6-5build1) ...
+Selecting previously unselected package whois.
+Preparing to unpack .../archives/whois_5.6.6_arm64.deb ...
+Unpacking whois (5.6.6) ...
+Setting up whois (5.6.6) ...
+Setting up fail2ban (1.1.0-9) ...
+Created symlink '/etc/systemd/system/multi-user.target.wants/fail2ban.service' → '/usr/lib/systemd/system/fail2ban.service'.
+Setting up python3-pyasyncore (1.0.2-3build1) ...
+Setting up python3-pyinotify (0.9.6-5build1) ...
+Processing triggers for man-db (2.13.1-1build1) ...
+Rules updated
+Rules updated (v6)
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+Firewall is active and enabled on system startup
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere                  
+22/tcp (v6)                ALLOW IN    Anywhere (v6)             
+
+● fail2ban.service - Fail2Ban Service
+     Loaded: loaded (/usr/lib/systemd/system/fail2ban.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-09-11 21:58:21 UTC; 4s ago
+ Invocation: dc195dc68c5549a38876b0943ac62aa7
+       Docs: man:fail2ban(1)
+
+## Шаг 9 -- диск после настройки
+(нет данных)
