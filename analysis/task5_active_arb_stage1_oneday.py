@@ -55,6 +55,20 @@ $885,502 "прибыли" по WETH-ноге, полностью проигно�
 больше НЕ являются защитой от переоценки прибыли -- эту роль теперь
 играет net-flow-closed-cycle проверка.
 
+Реальная находка при первом прогоне (2026-09-11): первая версия
+разбивки на токены строила v3_flows/v4_flows через UNION ALL с ДВУМЯ
+ссылками на один и тот же v3_swaps_filtered/v4_swaps_filtered, плюс
+ещё одна ссылка в отдельном swaps_level -- три пересчёта всей цепочки
+фильтров (диверсификация/доминирование/LP-join) на каждую версию.
+Реальная стоимость материализации оказалась 129.60 кредита против
+оценённых 40 (втрое дороже) -- тот же класс бага, что уже
+задокументирован в credit_guard.py (03c_cap_summary: "движок Dune не
+делит вычисление общих CTE между ветками UNION ALL"). Исправлено:
+`CROSS JOIN UNNEST` разбивает 1 строку свопа на 2 строки потока ОДНИМ
+проходом, без повторной ссылки на CTE; `tx_meta` тоже переведён на
+единый источник `all_flows` (count(*)/2 для n_legs, т.к. на каждый
+исходный своп теперь ровно 2 строки).
+
 Санитарная проверка владельца (не изменилась): суммарная прибыль за
 день не может правдоподобно превышать разумную долю оборота цепи --
 если total_profit_usd > $1-2M, результат ЯВНО помечается как всё ещё
@@ -76,7 +90,13 @@ import credit_guard  # noqa: E402
 from dune_client import DuneClient  # noqa: E402
 
 OUT_PATH = Path("data/p3_guard_cache/task5_active_arb_stage1_oneday_result.json")
-NAMESPACE_BUDGET = 400.0
+NAMESPACE_BUDGET = 600.0  # поднято с 400.0 (2026-09-11): реальный расход достиг 336.96/400.0
+# после легитимного (не ошибочного) овеrrun-стопа на первой версии разбивки по
+# токенам (129.60 вместо оценённых 40 -- см. докстринг выше) -- общий цикл
+# Mozila (лимит 2000, реально потрачено ~717) имеет достаточный запас,
+# поднятие лимита ПРОСТРАНСТВА -- явное решение, не тихий обход гарда
+# (docstring credit_guard.ensure_namespace прямо это разрешает: "аналог
+# поднятия лимита Sprint 1.5").
 
 WETH = "0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "5fc5360d0400a0fd4f2af552add042d716f1d168"
@@ -197,43 +217,58 @@ v4_swaps_filtered as (
         on tot.pool_key = r.pool_key and tot.block_date = r.block_date
     where cast(cnt.n_swaps as double) / tot.total_swaps <= {MAX_DOMINANT_SHARE}
 ),
-swaps_level as (
-    select tx_hash, block_number, block_time, pool_key, executor from v3_swaps_filtered
-    union all
-    select tx_hash, block_number, block_time, pool_key, cast(null as varchar) as executor from v4_swaps_filtered
-),
-arb_candidates as (
-    select tx_hash
-    from swaps_level
-    group by tx_hash
-    having count(distinct pool_key) >= 2
-),
-tx_meta as (
-    select
-        sl.tx_hash,
-        min(sl.block_number) as block_number,
-        min(sl.block_time) as block_time,
-        count(*) as n_legs,
-        count(distinct sl.pool_key) as n_pools,
-        max(sl.executor) as v3_executor
-    from swaps_level sl
-    inner join arb_candidates c on c.tx_hash = sl.tx_hash
-    group by sl.tx_hash
-),
 v3_flows as (
-    select tx_hash, token0 as token, cast(-amount0 as double) as delta_raw from v3_swaps_filtered
-    union all
-    select tx_hash, token1 as token, cast(-amount1 as double) as delta_raw from v3_swaps_filtered
+    -- ВАЖНО (реальная находка, 2026-09-11): раньше здесь было
+    -- UNION ALL из ДВУХ select-ов, каждый заново ссылавшийся на
+    -- v3_swaps_filtered -- ровно тот же класс бага, что уже
+    -- задокументирован в credit_guard.py (03c_cap_summary, ревизия 2:
+    -- "движок Dune не делит вычисление общих CTE между ветками
+    -- UNION ALL, а пересчитывает его в каждой ветке"). Вместе с
+    -- дублирующей ссылкой в swaps_level это давало ТРИ пересчёта
+    -- всей цепочки фильтров (диверсификация/доминирование/LP-join) на
+    -- v3_swaps_filtered -- реально стоило 129.60 кредита вместо
+    -- оценённых 40 (в ~3 раза дороже старой формулы без разбивки по
+    -- токенам). Фикс: CROSS JOIN UNNEST разбивает 1 строку свопа на 2
+    -- строки потока ОДНИМ проходом, без повторной ссылки на CTE.
+    select tx_hash, block_number, block_time, pool_key, executor, token, delta_raw
+    from v3_swaps_filtered
+    cross join unnest(
+        array[token0, token1],
+        array[cast(-amount0 as double), cast(-amount1 as double)]
+    ) as u(token, delta_raw)
 ),
 v4_flows as (
-    select tx_hash, token_bought as token, cast(amount_bought as double) as delta_raw from v4_swaps_filtered
-    union all
-    select tx_hash, token_sold as token, -cast(amount_sold as double) as delta_raw from v4_swaps_filtered
+    select tx_hash, block_number, block_time, pool_key, cast(null as varchar) as executor, token, delta_raw
+    from v4_swaps_filtered
+    cross join unnest(
+        array[token_bought, token_sold],
+        array[cast(amount_bought as double), -cast(amount_sold as double)]
+    ) as u(token, delta_raw)
 ),
 all_flows as (
     select * from v3_flows
     union all
     select * from v4_flows
+),
+arb_candidates as (
+    -- каждый исходный своп даёт РОВНО 2 строки в all_flows -- дубликат
+    -- не влияет на count(distinct pool_key)
+    select tx_hash
+    from all_flows
+    group by tx_hash
+    having count(distinct pool_key) >= 2
+),
+tx_meta as (
+    select
+        f.tx_hash,
+        min(f.block_number) as block_number,
+        min(f.block_time) as block_time,
+        count(*) / 2 as n_legs,  -- ровно 2 строки на исходный своп, см. выше
+        count(distinct f.pool_key) as n_pools,
+        max(f.executor) as v3_executor
+    from all_flows f
+    inner join arb_candidates c on c.tx_hash = f.tx_hash
+    group by f.tx_hash
 ),
 tx_token_flow as (
     select f.tx_hash, f.token, sum(f.delta_raw) as net_flow_raw, sum(abs(f.delta_raw)) as gross_raw
