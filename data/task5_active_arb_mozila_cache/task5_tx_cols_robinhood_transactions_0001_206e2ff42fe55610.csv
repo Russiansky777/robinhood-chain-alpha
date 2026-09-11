@@ -1,0 +1,45 @@
+column_name,data_type
+block_time,timestamp(3) with time zone
+value,varchar
+value_uint256,varbinary
+block_number,bigint
+gas_limit,bigint
+gas_price,varchar
+gas_price_uint256,varbinary
+gas_used,bigint
+operator_fee_constant,bigint
+operator_fee_scalar,bigint
+max_fee_per_gas,bigint
+max_priority_fee_per_gas,bigint
+priority_fee_per_gas,bigint
+nonce,bigint
+index,bigint
+success,boolean
+type,varchar
+chain_id,varchar
+l1_gas_used,bigint
+l1_gas_price,bigint
+l1_fee,bigint
+l1_fee_scalar,double
+l1_batch_number,bigint
+l1_batch_tx_index,bigint
+l1_block_number,bigint
+l1_timestamp,bigint
+l1_tx_origin,varchar
+l1_tx_origin_bytearray,varbinary
+block_date,date
+from,varchar
+from_bytearray,varbinary
+to,varchar
+to_bytearray,varbinary
+block_hash,varchar
+block_hash_bytearray,varbinary
+data,varchar
+data_bytearray,varbinary
+hash,varchar
+hash_bytearray,varbinary
+access_list,"array(row(address varchar, storagekeys array(varchar)))"
+access_list_bytearray,"array(row(address varbinary, storagekeys array(varbinary)))"
+authorization_list,"array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))"
+gas_used_for_l1,bigint
+effective_gas_price,bigint
