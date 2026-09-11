@@ -123,7 +123,7 @@ jobs:
         env:
           PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo mkdir -p /etc/bot && sudo tee /etc/bot/env > /dev/null && sudo chmod 640 /etc/bot/env && sudo chown root:bot /etc/bot/env && wc -l /etc/bot/env' <<EOF
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo mkdir -p /etc/bot && sudo tee /etc/bot/env > /dev/null && sudo chmod 640 /etc/bot/env && sudo chown root:bot /etc/bot/env && sudo wc -l /etc/bot/env' <<EOF
           PRIVATE_KEY_NOX=$PRIVATE_KEY_NOX
           EOF
 

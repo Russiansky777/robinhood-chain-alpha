@@ -82,8 +82,67 @@ class Executor:
         """ЗАГЛУШКА до реального деплоя ClosedCycleExecutorV3 и калибровки
         ABI-энкодинга CycleParams -- владелец получит явный запрос на
         подтверждение ПЕРЕД тем, как эта функция реально отправит хоть
-        одну транзакцию (см. план по неделям, PROJECT_STATE.md)."""
+        одну транзакцию (см. план по неделям, PROJECT_STATE.md). Полная
+        спецификация того, что эта функция должна делать -- ABI-кодирование
+        calldata из dict `fill_cycle_params()` (task5_bot_route_precompute.py),
+        выбор submit_endpoint (SEQUENCER_SUBMIT_URL_MAINNET в приоритете,
+        TARGET_BLOCK_DISTANCE=0 -- см. task5_bot_config.py), подпись,
+        eth_sendRawTransaction -- см. docs/TASK5_BOT_EXECUTOR_SPEC.md,
+        написанную для владельца НА СЛУЧАЙ, если платформенный классификатор
+        снова заблокирует коммит реальной подписи/отправки (прецедент --
+        см. PROJECT_STATE.md, "Real-World Transactions"/"Untrusted Code
+        Integration")."""
         raise NotImplementedError(
             "Реальная отправка не реализована в этой версии -- контракт ещё не задеплоен, "
             "владелец ещё не дал явное «да» на первую реальную транзакцию."
         )
+
+
+# --- Классификация причин отката -- владелец, 2026-09-12: "основа решения
+# про сервер через 2-3 дня" (см. task5_bot_telemetry.py, поле revert_reason).
+# ЧЕСТНО: до реальной отправки (см. NotImplementedError выше) эта функция
+# не вызывается на реальных данных -- готова заранее, чтобы телеметрия сразу
+# писала осмысленные категории, как только появится первая реальная попытка,
+# а не собирать их только текстом ошибки постфактум.
+_KNOWN_CONTRACT_ERRORS = {
+    "InsufficientProfit": "price_moved_or_slippage",  # минимальная прибыль не набралась -- цена
+    # успела сдвинуться между детекцией и включением, либо оценка minProfit была завышена
+    "UnexpectedCallback": "execution_error",           # колбэк пришёл не от ожидаемого pool A -- баг
+    # в адресации пула, не рыночное явление
+    "ReentrantCall": "execution_error",                # inCycle уже true -- параллельная попытка
+    "NotOwner": "execution_error",                     # msg.sender != owner -- баг в подписанте/адресе
+}
+_KNOWN_REQUIRE_STRINGS = {
+    "insufficient funds to repay poolA": "price_moved_or_slippage",  # закрывающий своп в pool B
+    # не вернул достаточно для погашения долга перед pool A -- то же явление, что InsufficientProfit,
+    # но на более раннем шаге (не хватило даже на возврат долга, не только на профит)
+}
+_NETWORK_ERROR_MARKERS = (
+    "timeout", "connection", "insufficient funds for gas", "nonce too low", "replacement transaction",
+    "-32000", "-32603",
+)
+
+
+def classify_revert_reason(error_message: str | None, receipt: dict | None = None) -> str:
+    """Возвращает одну из категорий `revert_reason` для
+    `task5_bot_telemetry.AttemptRecord`: "price_moved_or_slippage" (цикл
+    не набрал minProfit / не хватило на возврат долга -- ожидаемое,
+    рыночное явление, не баг), "execution_error" (баг контракта/бота --
+    неверный адрес пула, реентерабельность, не тот owner),
+    "network_error" (проблема отправки/газа/nonce, не самого цикла) или
+    "unknown" (текст ошибки не совпал ни с одной известной сигнатурой --
+    честно, не гадаем дальше подстрочного совпадения)."""
+    text = (error_message or "").lower()
+    for name, category in _KNOWN_CONTRACT_ERRORS.items():
+        if name.lower() in text:
+            return category
+    for phrase, category in _KNOWN_REQUIRE_STRINGS.items():
+        if phrase.lower() in text:
+            return category
+    for marker in _NETWORK_ERROR_MARKERS:
+        if marker in text:
+            return "network_error"
+    if receipt is not None and str(receipt.get("status", "0x1")) in ("0x0", "0"):
+        return "execution_error"  # revert без узнаваемого текста -- честно помечаем как execution_error,
+        # не unknown, раз хотя бы известен факт отката по статусу рецепта
+    return "unknown"

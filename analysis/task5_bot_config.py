@@ -5,7 +5,17 @@
 этой сессии данных (Dune, WebSearch), НЕ придуманы. Секреты (приватный
 ключ) -- ТОЛЬКО из переменной окружения, тот же протокол, что
 sc1_launcher.py (`--confirm-mainnet`-подобный флаг, dry-run по
-умолчанию)."""
+умолчанию).
+
+**Владелец, 2026-09-13: третий VPS в AWS us-east-2 (Огайо) -- та же
+область, что и sequencer-хост -- "целиться в блок 0, не в +1".**
+`TARGET_BLOCK_DISTANCE` ниже обновлён с прежних 1 на 0 -- пересмотр
+прежней спецификации, не опечатка (см. история этого файла/паспорт).
+Пересчёт по реальным данным (`analysis/task5_writepath_block_recompute.py`,
+NL/Dallas) уже показал, что путь через `sequencer.mainnet...` даёт
+отрицательный `blocks_to_inclusion` (попадание РАНЬШЕ наивной оценки
+"текущего" блока) в обеих локациях -- колокация в Огайо должна усилить
+этот эффект дальше, отсюда и пересмотр цели с +1 на 0."""
 from __future__ import annotations
 
 import os
@@ -17,6 +27,14 @@ RPC_URL_MAINNET = "https://rpc.mainnet.chain.robinhood.com"
 RPC_URL_TESTNET = "https://rpc.testnet.chain.robinhood.com"
 SEQUENCER_FEED_URL_MAINNET = "wss://feed.mainnet.chain.robinhood.com"
 SEQUENCER_FEED_URL_TESTNET = "wss://feed.testnet.chain.robinhood.com"
+# Write-only приёмник секвенсера (eth_sendRawTransaction), НЕ за Cloudflare
+# -- см. docs/PROJECT_STATE.md ("sequencer-эндпоинт -- точная формулировка")
+# и docs/TASK5_WRITEPATH_CLEAN_SPEC.md. Имя mainnet-хоста -- по аналогии с
+# документированным testnet-эндпоинтом (blockrazor.io), поведение
+# подтверждено живыми запросами (scripts/writepath_test.sh,
+# scripts/writepath_test_clean.sh) в прошлых раундах этой сессии.
+SEQUENCER_SUBMIT_URL_MAINNET = "https://sequencer.mainnet.chain.robinhood.com"
+SEQUENCER_SUBMIT_URL_TESTNET = "https://sequencer.testnet.chain.robinhood.com"
 
 # WETH/USDG -- те же адреса, что во всех измерениях Задачи 5.
 WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
@@ -83,7 +101,11 @@ POOL_DISCOVERY_LOOKBACK_BLOCKS = 2_000_000  # ~2.8 дня при блоке 120�
 # --- Пороги входа (владелец, 2026-09-11/12) ---
 ENTRY_THRESHOLD_USD = 10.0          # ожидаемый захват >= $10 ПОСЛЕ газа и допущения по откатам
 ASSUMED_REVERT_RATE = 0.55          # владелец: "закладывай 55%" (реально измерено 54.5% на топ-20, 09-10)
-TARGET_BLOCK_DISTANCE = 1           # владелец: "целевой блок -- +1, не +3"
+TARGET_BLOCK_DISTANCE = 0           # ПЕРЕСМОТРЕНО владельцем 2026-09-13 (было 1): "целиться в блок 0, не в
+# +1" -- обоснование, VPS в Огайо (us-east-2, та же область, что sequencer-хост) даёт минимальный сетевой
+# путь до секвенсера, см. docstring модуля выше и docs/TASK5_WRITEPATH_CLEAN_SPEC.md. Это цель ВКЛЮЧЕНИЯ
+# СОБСТВЕННОЙ транзакции бота относительно момента детекции -- НЕ то же самое, что MIN_DIVERGENCE_AGE_BLOCKS
+# ниже (тот порог -- про возраст ЧУЖОГО расхождения перед входом, разные величины, не путать).
 MIN_DIVERGENCE_AGE_BLOCKS = 1       # бот НЕ участвует в блоке 0 (тот сегмент -- коллоцированные боты)
 
 # --- Инвентарь и размер позиции (владелец, 2026-09-11/12) ---
