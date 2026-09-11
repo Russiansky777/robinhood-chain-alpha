@@ -45,6 +45,7 @@ from task5_bot_detector import check_pair_for_divergence
 from task5_bot_executor import Executor
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
 from task5_bot_pool_state import bootstrap_registry_from_rpc
+from task5_bot_route_precompute import RoutePrecomputeTable
 from task5_bot_telemetry import TelemetryLog
 
 # Оценка стоимости газа одной попытки -- честно, ЗАГЛУШКА до реального
@@ -79,9 +80,25 @@ def main() -> int:
     registry = bootstrap_registry_from_rpc(rpc_url=rpc_url)
     print(f"[task5_bot] найдено пулов: {len(registry.by_address)}")
 
+    # Предрасчёт маршрутов -- ОДИН РАЗ здесь, до listen() (владелец,
+    # 2026-09-13, п.4) -- см. task5_bot_route_precompute.py. exit_token=WETH --
+    # та же заглушка, что exit_token в on_feed_message ниже (реальный выбор
+    # exit_token зависит от направления цикла, не решено для общего случая).
+    route_table = RoutePrecomputeTable()
+    n_routes = route_table.build_for_registry(registry, exit_token=WETH)
+    print(f"[task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): {n_routes}")
+
     telemetry = TelemetryLog()
     executor = Executor(confirm_mainnet=args.confirm_mainnet, contract_address=args.contract_address,
-                         telemetry=telemetry, chain_id=chain_id)
+                         telemetry=telemetry, chain_id=chain_id, registry=registry, route_table=route_table)
+
+    # Последний известный на фиде номер блока -- нужен ТОЛЬКО для будущего
+    # block_before_send в телеметрии (см. docs/TASK5_WRITEPATH_CLEAN_SPEC.md);
+    # sequenceNumber == номер L2-блока на этой цепи (та же оговорка про
+    # источник, что в спецификации). Список из одного элемента -- простейший
+    # изменяемый холдер для замыкания on_feed_message ниже, не разделяемое
+    # состояние между потоками (весь бот -- один asyncio-луп).
+    last_seen_block_number: list[int | None] = [None]
 
     def on_feed_message(msg: FeedMessage) -> None:
         """ГОРЯЧИЙ ПУТЬ -- ни одного сетевого вызова здесь. Реальный
@@ -89,6 +106,7 @@ def main() -> int:
         честную оговорку в task5_bot_feed_client.py; при неудачном
         декодировании применяем НЕЙТРАЛЬНОЕ обновление (реестр не
         трогаем без реальных данных о свопе) -- НЕ гадаем."""
+        last_seen_block_number[0] = msg.sequence_number
         parsed = decode_l2_message(msg.raw_l2_msg_hex) if msg.raw_l2_msg_hex else None
         if parsed is None:
             return  # честно: без декодированного свопа нечего применять к реестру в этой версии

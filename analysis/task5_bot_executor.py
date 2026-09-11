@@ -17,6 +17,8 @@ from task5_bot_config import (
     get_private_key,
 )
 from task5_bot_detector import Opportunity
+from task5_bot_pool_state import PoolRegistry
+from task5_bot_route_precompute import RoutePrecomputeTable
 from task5_bot_telemetry import AttemptRecord, TelemetryLog
 
 import os
@@ -24,11 +26,18 @@ import os
 
 class Executor:
     def __init__(self, confirm_mainnet: bool, contract_address: str, telemetry: TelemetryLog,
-                 chain_id: int = CHAIN_ID_MAINNET) -> None:
+                 chain_id: int = CHAIN_ID_MAINNET, registry: PoolRegistry | None = None,
+                 route_table: RoutePrecomputeTable | None = None) -> None:
         self.confirm_mainnet = confirm_mainnet  # без этого -- ВСЕГДА dry-run
         self.contract_address = contract_address
         self.telemetry = telemetry
         self.chain_id = chain_id
+        # registry/route_table -- нужны ТОЛЬКО _build_sign_send() (см.
+        # docs/TASK5_BOT_EXECUTOR_SPEC.md, шаг 1) -- уже проложены сюда,
+        # чтобы владелец не собирал эту часть заново отдельно от
+        # остального бота, когда будет реализовывать саму отправку.
+        self.registry = registry
+        self.route_table = route_table
         self.account = None
         if confirm_mainnet:
             priv = get_private_key()
