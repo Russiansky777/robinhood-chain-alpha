@@ -1,0 +1,96 @@
+{
+  "nl": {
+    "location_label": "nl",
+    "n_included": 10,
+    "block_cadence": {
+      "n_pairs": 9,
+      "median_s_per_block_from_block_timestamp": 0.10909090909090909,
+      "median_s_per_block_from_t_send_wall_clock": 0.11342151797547632
+    },
+    "blocks_to_inclusion_by_endpoint": {
+      "rpc_mainnet": {
+        "n": 5,
+        "median": 2.301337517797947,
+        "mean": 1.751039870083332,
+        "min": -4.67018586397171,
+        "max": 6.2657258957624435,
+        "stdev": 3.998712270089158
+      },
+      "sequencer_mainnet_guess": {
+        "n": 5,
+        "median": -2.0034751296043396,
+        "mean": -0.6786739021539688,
+        "min": -2.978393964469433,
+        "max": 2.2093584164977074,
+        "stdev": 2.3167233673147516
+      }
+    },
+    "raw_blocks_between_inclusions_by_endpoint_CAUTION_confounded": {
+      "rpc_mainnet": {
+        "n": 4,
+        "median": 53.0,
+        "mean": 55.5,
+        "min": 38,
+        "max": 78,
+        "stdev": 17.853571071357123
+      },
+      "sequencer_mainnet_guess": {
+        "n": 5,
+        "median": 55,
+        "mean": 58.4,
+        "min": 31,
+        "max": 81,
+        "stdev": 18.2822318112423
+      }
+    }
+  },
+  "dallas": {
+    "location_label": "dallas",
+    "n_included": 10,
+    "block_cadence": {
+      "n_pairs": 9,
+      "median_s_per_block_from_block_timestamp": 0.10204081632653061,
+      "median_s_per_block_from_t_send_wall_clock": 0.10447049736976624
+    },
+    "blocks_to_inclusion_by_endpoint": {
+      "rpc_mainnet": {
+        "n": 5,
+        "median": 0.2537230998277664,
+        "mean": 1.6264461636543275,
+        "min": -4.540002003312111,
+        "max": 10.851696968078613,
+        "stdev": 5.039858947308163
+      },
+      "sequencer_mainnet_guess": {
+        "n": 5,
+        "median": -2.568475343286991,
+        "mean": -2.6507737025618554,
+        "min": -6.129699945449829,
+        "max": 1.5028005838394165,
+        "stdev": 2.6791127261832512
+      }
+    },
+    "raw_blocks_between_inclusions_by_endpoint_CAUTION_confounded": {
+      "rpc_mainnet": {
+        "n": 4,
+        "median": 48.5,
+        "mean": 41,
+        "min": 17,
+        "max": 50,
+        "stdev": 13.874436925511608
+      },
+      "sequencer_mainnet_guess": {
+        "n": 5,
+        "median": 40,
+        "mean": 47.6,
+        "min": 26,
+        "max": 72,
+        "stdev": 16.84755175092215
+      }
+    }
+  },
+  "verdict": [
+    "nl: median blocks_to_inclusion rpc=2.30 seq=-2.00 (faster/earlier: sequencer_mainnet_guess); stdev rpc=4.00 seq=2.32 (tighter: sequencer_mainnet_guess)",
+    "dallas: median blocks_to_inclusion rpc=0.25 seq=-2.57 (faster/earlier: sequencer_mainnet_guess); stdev rpc=5.04 seq=2.68 (tighter: sequencer_mainnet_guess)"
+  ]
+}
