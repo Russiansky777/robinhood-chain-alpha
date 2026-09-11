@@ -301,7 +301,7 @@ def run() -> int:
     sql_summary = SUMMARY_SQL_TEMPLATE.replace("query_DETECT_ID", f"query_{qid_detect}")
     qid_summary = client.create_query(f"task5_s2_summary_{n_days}d", sql_summary)
     df_summary = client.run_sql_cached(f"task5_s2_summary_{n_days}d", sql_summary, query_id=qid_summary,
-                                        estimated_credits=280.0, expected_max_rows=n_days + 5, expected_columns=9)
+                                        estimated_credits=280.0, expected_max_rows=n_days + 5, expected_columns=10)
     rows = df_summary.to_dict("records") if df_summary is not None else []
     result["daily_summary"] = rows
     for r in rows:
