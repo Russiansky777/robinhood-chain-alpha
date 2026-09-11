@@ -117,6 +117,41 @@ def run() -> dict:
         }
         out["rpc_eth_blockNumber_attempt_b"] = submit_measurement(body_b)
 
+    # ЧЕСТНАЯ находка первого запуска (2026-09-12): оба варианта A/B
+    # отклонены реальной ошибкой валидации Globalping --
+    # "measurementOptions.request.method" must be one of [GET, HEAD, OPTIONS]"
+    # -- API "http" НЕ поддерживает POST вообще, значит буквальный
+    # eth_blockNumber JSON-RPC (требует POST-тело) через Globalping
+    # НЕВОЗМОЖЕН в принципе, это не ошибка схемы запроса. Попытка C --
+    # честный суррогат: GET-запрос на RPC-хост. Это НЕ вызовет
+    # eth_blockNumber, но заставит запрос пройти ПОЛНЫЙ круг мимо edge до
+    # реального обработчика на сервере (получит JSON-RPC ошибку метода
+    # или HTML-страницу), а не просто TCP/TLS до Cloudflare -- честная,
+    # измеримая замена полного HTTP-круга, раз POST недоступен.
+    if out.get("rpc_eth_blockNumber_attempt_a", {}).get("http_status") not in (200, 202):
+        print("=== Попытка C: GET-суррогат (POST недоступен в Globalping http-типе) ===")
+        body_c = {
+            "type": "http",
+            "target": RPC_HOST,
+            "locations": LOCATIONS_15PLUS,
+            "limit": len(LOCATIONS_15PLUS),
+            "measurementOptions": {
+                "request": {"method": "GET", "path": "/"},
+                "protocol": "HTTPS",
+                "port": 443,
+            },
+        }
+        out["rpc_full_circle_GET_surrogate_POST_not_supported_by_globalping"] = submit_measurement(body_c)
+        out["rpc_get_surrogate_note"] = (
+            "ЧЕСТНО: Globalping API вернул реальную ошибку валидации -- "
+            "'measurementOptions.request.method' must be one of [GET, HEAD, OPTIONS] -- "
+            "POST не поддерживается типом 'http' вообще, значит буквальный полный круг "
+            "eth_blockNumber (требует POST JSON-тело) через Globalping НЕДОСТИЖИМ ни при "
+            "какой корректировке схемы запроса. GET-суррогат ниже -- реальная задержка "
+            "полного круга мимо Cloudflare edge до обработчика на сервере (RPC вернёт "
+            "ошибку метода вместо номера блока), не TCP-connect до edge."
+        )
+
     print("=== Попытка: WS-handshake к фиду -- ЧЕСТНАЯ проверка отсутствия типа 'ws' ===")
     # Globalping не документирует measurement type "ws"/"websocket" нигде,
     # что удалось найти в этой сессии (только ping/dns/traceroute/mtr/http).
