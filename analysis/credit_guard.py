@@ -72,7 +72,26 @@ def namespace() -> str:
 # в каждой ветке. См. docs/COST_POSTMORTEM.md, ревизия 3. Эта проверка --
 # защита от ПОВТОРЕНИЯ именно этого паттерна, а не общая линтинг SQL.
 SANITY_MAX_ESTIMATE = 40.0
+# Владелец, 2026-09-11 (Задача 5, три новых измерения + Stage 2/30 дней):
+# "потолок на блок 300" -- явное разовое поднятие потолка оценки ДЛЯ
+# ЭТОЙ задачи, не общее ослабление гарда для всех остальных скриптов.
+# Читается заново при каждом вызове check_sql_sanity (см.
+# _sanity_max_estimate) -- скрипт должен явно установить переменную
+# окружения ДО вызова, иначе действует обычный потолок 40.0. Тот же
+# паттерн явного opt-in, что уже используется для dex.trades ниже.
+SANITY_MAX_ESTIMATE_ENV = "CREDIT_GUARD_SANITY_MAX_ESTIMATE"
 HEAVY_SOURCE_MARKERS = ("query_02_swaps_raw_july", "dex.trades")
+
+
+def _sanity_max_estimate() -> float:
+    raw = os.environ.get(SANITY_MAX_ESTIMATE_ENV, "").strip()
+    if not raw:
+        return SANITY_MAX_ESTIMATE
+    try:
+        val = float(raw)
+    except ValueError:
+        return SANITY_MAX_ESTIMATE
+    return max(val, SANITY_MAX_ESTIMATE)  # override может только ПОДНЯТЬ потолок, не понизить
 
 # Владелец, 2026-09-06 -- после реального инцидента (форензика fomo, п.2):
 # LIMIT 100 на стороне подвыборки НЕ ограничивал сам JOIN со стороной
@@ -153,13 +172,17 @@ def check_sql_sanity(name: str, sql: str, estimated_credits: float) -> float:
             f"[credit_guard] {OWNER_OK_DEX_TRADES_ROBINHOOD_ENV}=yes присутствует -- явное подтверждение "
             "владельца есть, обычный потолок SANITY_MAX_ESTIMATE к этому правилу не применяется."
         )
-    elif estimated_credits > SANITY_MAX_ESTIMATE:
-        print(
-            f"[credit_guard] СТОП (санитарная проверка): оценка '{name}' = "
-            f"{estimated_credits:.1f} > {SANITY_MAX_ESTIMATE} -- жёсткий стоп ДО исполнения, "
-            "независимо от остатка лимита. Пересмотрите SQL или оценку перед повторной попыткой."
-        )
-        raise BudgetGuardStop(1)
+    else:
+        max_estimate = _sanity_max_estimate()
+        if max_estimate != SANITY_MAX_ESTIMATE:
+            print(f"[credit_guard] Потолок оценки поднят явным override: {max_estimate:.1f} (обычно {SANITY_MAX_ESTIMATE:.1f}).")
+        if estimated_credits > max_estimate:
+            print(
+                f"[credit_guard] СТОП (санитарная проверка): оценка '{name}' = "
+                f"{estimated_credits:.1f} > {max_estimate:.1f} -- жёсткий стоп ДО исполнения, "
+                "независимо от остатка лимита. Пересмотрите SQL или оценку перед повторной попыткой."
+            )
+            raise BudgetGuardStop(1)
     lower = sql.lower()
     has_union_all = "union all" in lower
     has_heavy_source = any(marker.lower() in lower for marker in HEAVY_SOURCE_MARKERS)
