@@ -64,11 +64,12 @@ jobs:
           ssh $SSH_OPTS root@45.59.170.76 'cat /tmp/task5_decode_probe_result.json' > /tmp/task5_decode_probe_result.json
 
       - name: Commit results
+        if: always()
         run: |
           mkdir -p data/p3_guard_cache
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_DECODE_PROBE_REQUEST
-          cp /tmp/task5_decode_probe_result.json data/p3_guard_cache/task5_bot_decode_probe_result.json
-          git add data/p3_guard_cache/task5_bot_decode_probe_result.json
+          [ -e /tmp/task5_decode_probe_result.json ] && cp /tmp/task5_decode_probe_result.json data/p3_guard_cache/task5_bot_decode_probe_result.json
+          [ -e data/p3_guard_cache/task5_bot_decode_probe_result.json ] && git add data/p3_guard_cache/task5_bot_decode_probe_result.json
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, живой бот: результат декодера L2-сообщений против живого фида [automated]"
           for i in 1 2 3 4 5; do
