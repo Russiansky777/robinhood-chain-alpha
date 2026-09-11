@@ -1,0 +1,100 @@
+name: "Задача 5, живой бот -- 10-минутный dry-run (без executor) на NL VPS"
+
+# Владелец, 2026-09-13, п.3: реальные детекции, 10 минут. Ohio дважды
+# подряд получил HTTP 403 от фида (похоже на временный rate-limit/бан IP
+# после нескольких переподключений за короткое время, см. паспорт) --
+# NL подтверждён живым (task5_bot_feed_connectivity_check_nl.yml, 1/1
+# сообщение получено без проблем) и НЕ делал недавних переподключений.
+# Тот же код, та же логика (decode_l2_message/refresh_pool_price/
+# check_pair_for_divergence) -- расположение VPS не влияет на корректность
+# детекции, только на задержку включения (не тестируется здесь). БЕЗ
+# --confirm-mainnet -- ключ не читается, ничего не отправляется.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_DRYRUN_SMOKETEST_NL_REQUEST"
+
+jobs:
+  dryrun_smoketest_nl:
+    name: "Dry-run 10 минут на NL VPS (45.59.170.76)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=6" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на NL (существующий клон bot'а)
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: "Запустить task5_bot_run.py --duration-seconds 600 (10 минут, БЕЗ --confirm-mainnet)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha
+              rm -f data/task5_bot_live/attempts.jsonl
+              ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 600
+            "
+          ' > /tmp/task5_bot_dryrun_nl_stdout.log 2> /tmp/task5_bot_dryrun_nl_stderr.log
+          echo "--- stdout ---"; cat /tmp/task5_bot_dryrun_nl_stdout.log
+          echo "--- stderr ---"; cat /tmp/task5_bot_dryrun_nl_stderr.log
+
+      - name: Забрать телеметрию для паспорта
+        if: always()
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_live/attempts.jsonl 2>/dev/null' > /tmp/task5_bot_dryrun_nl_attempts.jsonl || true
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Task5 bot 10-минутный dry-run (NL) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/task5_bot_dryrun_nl_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/task5_bot_dryrun_nl_stderr.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## telemetry attempts.jsonl (n строк: $(wc -l < /tmp/task5_bot_dryrun_nl_attempts.jsonl 2>/dev/null || echo 0))"
+            cat /tmp/task5_bot_dryrun_nl_attempts.jsonl 2>/dev/null || echo "(пусто -- ни одной попытки не записано)"
+          } > data/p3_guard_cache/task5_bot_dryrun_smoketest_nl_log.txt
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_DRYRUN_SMOKETEST_NL_REQUEST
+          git add data/p3_guard_cache/task5_bot_dryrun_smoketest_nl_log.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: 10-минутный dry-run на NL VPS -- лог + телеметрия [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
