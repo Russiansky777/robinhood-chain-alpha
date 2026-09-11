@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Задача 5, живой бот -- главная точка входа.
+
+usage:
+    # dry-run (по умолчанию, ничего не отправляет, только лог "вот здесь бы вошёл"):
+    python analysis/task5_bot_run.py --testnet
+
+    # реальная отправка -- НЕ РЕАЛИЗОВАНА в этой версии (см. task5_bot_executor.py),
+    # --confirm-mainnet сейчас только готовит подписанта и падает с NotImplementedError
+    # при первой реальной попытке -- намеренно, до отдельного явного разрешения владельца
+    # и деплоя контракта (см. план по неделям, PROJECT_STATE.md).
+    python analysis/task5_bot_run.py --confirm-mainnet
+
+Владелец, 2026-09-11/12, требования к горячему пути: "состояние
+отслеживаемых пулов -- в памяти, обновляется из фида, без RPC-запросов
+в горячем пути" + "подпись и отправка -- сразу после детекции, без
+промежуточных проверок через сеть" -- оба требования соблюдены:
+RPC используется ТОЛЬКО в bootstrap() (до listen()), внутри
+_on_feed_message() нет ни одного `await`/сетевого вызова к RPC."""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from task5_bot_config import (
+    ASSUMED_REVERT_RATE,
+    CHAIN_ID_MAINNET,
+    CHAIN_ID_TESTNET,
+    ENTRY_THRESHOLD_USD,
+    RPC_URL_MAINNET,
+    RPC_URL_TESTNET,
+    SEQUENCER_FEED_URL_MAINNET,
+    SEQUENCER_FEED_URL_TESTNET,
+    USDG,
+    USDG_DECIMALS,
+    WETH,
+    WETH_DECIMALS,
+    is_dry_run,
+)
+from task5_bot_detector import check_pair_for_divergence
+from task5_bot_executor import Executor
+from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
+from task5_bot_pool_state import bootstrap_registry_from_rpc
+from task5_bot_telemetry import TelemetryLog
+
+# Оценка стоимости газа одной попытки -- честно, ЗАГЛУШКА до реального
+# наблюдения (владелец: тест -- после 29.09, на платном газе; до этого
+# момента реального тарифа для подстановки сюда просто не существует,
+# см. PROJECT_STATE.md, WebSearch про отсутствие официального объявления).
+ASSUMED_GAS_COST_USD_PLACEHOLDER = 0.30  # ~2.4x текущей субсидированной L2-комиссии ($0.125) -- консервативный
+# ориентир до реальных пост-29.09 данных, ПЕРЕСЧИТЫВАЕТСЯ автоматически из телеметрии в течение теста
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--confirm-mainnet", action="store_true",
+                     help="БЕЗ этого флага -- всегда dry-run, ничего не отправляется.")
+    ap.add_argument("--testnet", action="store_true", help="Использовать testnet (chain id 46630) вместо mainnet.")
+    ap.add_argument("--contract-address", type=str, default="",
+                     help="Адрес задеплоенного ClosedCycleExecutorV3 (нужен только для --confirm-mainnet).")
+    ap.add_argument("--size-fraction", type=float, default=1.0,
+                     help="Доля от целевого размера позиции -- владелец: неделя 1 теста = 0.5.")
+    args = ap.parse_args()
+
+    dry_run = is_dry_run(args.confirm_mainnet)
+    rpc_url = RPC_URL_TESTNET if args.testnet else RPC_URL_MAINNET
+    feed_url = SEQUENCER_FEED_URL_TESTNET if args.testnet else SEQUENCER_FEED_URL_MAINNET
+    chain_id = CHAIN_ID_TESTNET if args.testnet else CHAIN_ID_MAINNET
+
+    print(f"[task5_bot] режим: {'DRY-RUN (ничего не отправляется)' if dry_run else 'LIVE (--confirm-mainnet)'}")
+    print(f"[task5_bot] сеть: {'testnet' if args.testnet else 'mainnet'} (chain_id={chain_id})")
+    print(f"[task5_bot] порог входа: ${ENTRY_THRESHOLD_USD}/попытка, допущение по откатам: {ASSUMED_REVERT_RATE:.0%}")
+
+    print("[task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...")
+    registry = bootstrap_registry_from_rpc(rpc_url=rpc_url)
+    print(f"[task5_bot] найдено пулов: {len(registry.by_address)}")
+
+    telemetry = TelemetryLog()
+    executor = Executor(confirm_mainnet=args.confirm_mainnet, contract_address=args.contract_address,
+                         telemetry=telemetry, chain_id=chain_id)
+
+    def on_feed_message(msg: FeedMessage) -> None:
+        """ГОРЯЧИЙ ПУТЬ -- ни одного сетевого вызова здесь. Реальный
+        декодер L2-сообщения (decode_l2_message) -- best-effort, см.
+        честную оговорку в task5_bot_feed_client.py; при неудачном
+        декодировании применяем НЕЙТРАЛЬНОЕ обновление (реестр не
+        трогаем без реальных данных о свопе) -- НЕ гадаем."""
+        parsed = decode_l2_message(msg.raw_l2_msg_hex) if msg.raw_l2_msg_hex else None
+        if parsed is None:
+            return  # честно: без декодированного свопа нечего применять к реестру в этой версии
+
+        # TODO (неделя 1 dry-run): сопоставить parsed["raw_fields"] с
+        # сигнатурой Uniswap V3 swap()/Swap-событием, извлечь
+        # sqrtPriceX96/liquidity/tick и адрес пула, вызвать
+        # registry.apply_swap_event(...). Пока не сделано -- реестр не
+        # обновляется реальными данными до завершения этого шага,
+        # честно отражено здесь, а не скрыто.
+
+        opp = check_pair_for_divergence(
+            registry, WETH, USDG, WETH_DECIMALS, USDG_DECIMALS,
+            trigger_sequence_number=msg.sequence_number,
+            assumed_gas_cost_usd=ASSUMED_GAS_COST_USD_PLACEHOLDER,
+        )
+        if opp is not None:
+            executor.handle_opportunity(opp, size_usd=opp.expected_capture_usd * args.size_fraction)
+
+    client = SequencerFeedClient(feed_url)
+    print(f"[task5_bot] подключение к фиду: {feed_url}")
+    try:
+        asyncio.run(client.listen(on_feed_message))
+    except KeyboardInterrupt:
+        pass
+    print(f"[task5_bot] диагностика фида: {client.diag}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

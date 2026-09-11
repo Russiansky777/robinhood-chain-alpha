@@ -11,3 +11,4 @@ cfgrib>=0.9.10        # декодирование GRIB2 (NOAA GEFS, noaa_gefs_p
 eccodes>=1.7.0         # C-библиотека для cfgrib -- pip-пакет с бандлом бинарников (ecmwflibs), см. докстринг noaa_gefs_poc_one_city.py, не факт что ставится без apt на GH Actions -- диагностика это проверяет
 xarray>=2023.1         # РЕАЛЬНЫЙ фикс после первого прогона диагностики: cfgrib импортировался успешно (значит eccodes реально встал), упало именно "No module named 'xarray'" -- xarray не тянется транзитивно cfgrib, нужен отдельной строкой
 websockets>=12.0       # Задача 5, владелец 2026-09-11: измерение задержки фида секвенсера Robinhood Chain (wss://feed.mainnet.chain.robinhood.com) -- seq_feed_latency_probe.py, только пассивное чтение
+rlp>=4.0                # Задача 5, живой бот: декодирование RLP-транзакций из L2MessageType_signedTx фида секвенсера -- task5_bot_feed_client.py
