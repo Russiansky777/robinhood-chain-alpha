@@ -1,0 +1,53 @@
+name: "Задача 5, живой бот -- пересмотр: путь записи транзакции + точная проверка Timeboost на chain 4663"
+
+# Владелец, 2026-09-12 (пересмотр): "Гонка блока 0 -- это СКОРОСТЬ ЗАПИСИ,
+# не чтения." Проверки 1 (путь записи -- тот же Cloudflare-хост или
+# отдельный sequencer-эндпоинт) и 4 (Timeboost конкретно для chain 4663,
+# не общий поиск). Только DNS/ipinfo/JSON-RPC интроспекция (web3_clientVersion,
+# rpc_modules, один заведомо невалидный вызов timeboost_sendExpressLaneTransaction
+# для чтения текста ошибки) -- ноль транзакций, ноль трат, ноль риска.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/chat-update-nmh1sv
+    paths:
+      - "data/p3_guard_cache/TASK5_WRITEPATH_TIMEBOOST_PROBE_REQUEST"
+
+jobs:
+  writepath_timeboost_probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install requests
+      - name: Run write-path + Timeboost probe
+        run: python -u analysis/task5_writepath_timeboost_probe.py --out /tmp/task5_writepath_timeboost_probe_result.json
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_WRITEPATH_TIMEBOOST_PROBE_REQUEST
+          [ -e /tmp/task5_writepath_timeboost_probe_result.json ] && cp /tmp/task5_writepath_timeboost_probe_result.json data/p3_guard_cache/task5_writepath_timeboost_probe_result.json
+          [ -e data/p3_guard_cache/task5_writepath_timeboost_probe_result.json ] && git add data/p3_guard_cache/task5_writepath_timeboost_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: путь записи транзакции + точная проверка Timeboost на chain 4663 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
