@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - claude/sc1-pons-v2-launcher-efdbyt
+      - claude/chat-update-nmh1sv
     paths:
       - "data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST"
@@ -27,6 +28,9 @@ on:
       - "data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST"
       - "data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST"
+      - "data/p3_guard_cache/TASK5_LATENCY_GAS_CROSSTAB_REQUEST"
+      - "data/p3_guard_cache/TASK5_NO_CATALYST_PROBE_REQUEST"
+      - "data/p3_guard_cache/TASK5_NO_CATALYST_EXTEND_REQUEST"
 
 jobs:
   run:
@@ -159,11 +163,38 @@ jobs:
           CREDIT_GUARD_FILE: data/credits_spent_mozila.json
         run: python -u analysis/task5_active_arb_stage2_full.py
 
+      - name: "Задача 5, дозапрос -- кросс-таб дистанция x размер x газ (09-10, владелец 2026-09-11)"
+        if: hashFiles('data/p3_guard_cache/TASK5_LATENCY_GAS_CROSSTAB_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_active_arb_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_latency_gas_crosstab.py
+
+      - name: "Задача 5, без катализатора -- дешёвая разведка Burn(v3)/ликвидность(v4)"
+        if: hashFiles('data/p3_guard_cache/TASK5_NO_CATALYST_PROBE_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_no_catalyst
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_no_catalyst_probe.py
+
+      - name: "Задача 5, без катализатора -- расширение порога/окна/Mint-Burn (потолок пространства 120)"
+        if: hashFiles('data/p3_guard_cache/TASK5_NO_CATALYST_EXTEND_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_no_catalyst
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_no_catalyst_extend.py
+
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_CONTRACTS_COLS_REQUEST data/p3_guard_cache/TASK5_OPERATORS_TX_TABLE_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_REQUEST data/p3_guard_cache/TASK5_STAGE2_CALIBRATE_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_CONTRACTS_COLS_REQUEST data/p3_guard_cache/TASK5_OPERATORS_TX_TABLE_PROBE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_REQUEST data/p3_guard_cache/TASK5_STAGE2_CALIBRATE_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST data/p3_guard_cache/TASK5_LATENCY_GAS_CROSSTAB_REQUEST data/p3_guard_cache/TASK5_NO_CATALYST_PROBE_REQUEST data/p3_guard_cache/TASK5_NO_CATALYST_EXTEND_REQUEST
           [ -e data/p3_guard_cache/task5_stage2_multiday_result.json ] && git add data/p3_guard_cache/task5_stage2_multiday_result.json
+          [ -e data/p3_guard_cache/task5_latency_gas_crosstab_result.json ] && git add data/p3_guard_cache/task5_latency_gas_crosstab_result.json
+          [ -e data/p3_guard_cache/task5_no_catalyst_probe_result.json ] && git add data/p3_guard_cache/task5_no_catalyst_probe_result.json
+          [ -e data/p3_guard_cache/task5_no_catalyst_extend_result.json ] && git add data/p3_guard_cache/task5_no_catalyst_extend_result.json
           [ -e data/p3_guard_cache/task5_operators_result.json ] && git add data/p3_guard_cache/task5_operators_result.json
           [ -e data/p3_guard_cache/task5_operators_tx_table_probe_result.json ] && git add data/p3_guard_cache/task5_operators_tx_table_probe_result.json
           [ -e data/p3_guard_cache/task5_operators_contracts_cols_result.json ] && git add data/p3_guard_cache/task5_operators_contracts_cols_result.json
