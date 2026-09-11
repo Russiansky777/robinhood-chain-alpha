@@ -14,9 +14,22 @@ usage:
 Владелец, 2026-09-11/12, требования к горячему пути: "состояние
 отслеживаемых пулов -- в памяти, обновляется из фида, без RPC-запросов
 в горячем пути" + "подпись и отправка -- сразу после детекции, без
-промежуточных проверок через сеть" -- оба требования соблюдены:
-RPC используется ТОЛЬКО в bootstrap() (до listen()), внутри
-_on_feed_message() нет ни одного `await`/сетевого вызова к RPC."""
+промежуточных проверок через сеть".
+
+**ЧЕСТНОЕ ОБНОВЛЕНИЕ, 2026-09-13 (владелец, п.3 -- реальные детекции):**
+первое требование ("ноль RPC в горячем пути") сейчас НАРУШЕНО осознанно
+и явно, не тихо -- фид секвенсера отдаёт RAW-транзакции ДО исполнения
+(подтверждено реальной разведкой формы сообщений,
+`task5_bot_feed_structure_probe.py`), не постсвоповую цену; без полного
+симулятора математики Uniswap V3 (не написан в этой сессии) единственный
+способ узнать РЕАЛЬНУЮ (не устаревшую) цену после того, как пул реально
+затронут -- точечный `eth_call slot0()/liquidity()` именно для этого
+пула (`refresh_pool_price()` в `task5_bot_pool_state.py`), с кулдауном.
+Это диагностический компромисс для dry-run -- см. докстринг
+`refresh_pool_price()` для полного разбора и того, что нужно вместо
+него для настоящего низколатентного горячего пути. Второе требование
+("подпись сразу после детекции") по-прежнему соблюдено -- executor всё
+ещё `NotImplementedError`, ничего не подписывается и не отправляется."""
 from __future__ import annotations
 
 import argparse
@@ -41,12 +54,20 @@ from task5_bot_config import (
     WETH_DECIMALS,
     is_dry_run,
 )
+import time
+
 from task5_bot_detector import check_pair_for_divergence
 from task5_bot_executor import Executor
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
-from task5_bot_pool_state import bootstrap_registry_from_rpc
+from task5_bot_pool_state import bootstrap_registry_from_rpc, refresh_pool_price
 from task5_bot_route_precompute import RoutePrecomputeTable
 from task5_bot_telemetry import TelemetryLog
+
+# Владелец, 2026-09-13, п.3: минимальный кулдаун между RPC-рефрешами ОДНОГО
+# и того же пула -- реальная разведка (task5_bot_feed_structure_probe.py)
+# показала блоки с ДЕСЯТКАМИ транзакций каждый; без кулдауна один и тот же
+# горячий пул мог бы триггерить рефреш на каждой транзакции в блоке.
+POOL_REFRESH_COOLDOWN_S = 1.0
 
 # Оценка стоимости газа одной попытки -- честно, ЗАГЛУШКА до реального
 # наблюдения (владелец: тест -- после 29.09, на платном газе; до этого
@@ -103,24 +124,53 @@ def main() -> int:
     # изменяемый холдер для замыкания on_feed_message ниже, не разделяемое
     # состояние между потоками (весь бот -- один asyncio-луп).
     last_seen_block_number: list[int | None] = [None]
+    last_refresh_wall: dict[str, float] = {}  # pool_address.lower() -> time.time() последнего RPC-рефреша
+    n_touches_seen = [0]
+    n_refreshes_done = [0]
 
     def on_feed_message(msg: FeedMessage) -> None:
-        """ГОРЯЧИЙ ПУТЬ -- ни одного сетевого вызова здесь. Реальный
-        декодер L2-сообщения (decode_l2_message) -- best-effort, см.
-        честную оговорку в task5_bot_feed_client.py; при неудачном
-        декодировании применяем НЕЙТРАЛЬНОЕ обновление (реестр не
-        трогаем без реальных данных о свопе) -- НЕ гадаем."""
+        """Владелец, 2026-09-13: реальная разведка формы сообщений фида
+        (`task5_bot_feed_structure_probe.py`) нашла реальную причину, по
+        которой детекция раньше молчала (0/2286 декодировано) -- l2Msg
+        base64, не hex, и это batch МНОГИХ транзакций, не одна. Декодер
+        (`decode_l2_message`) исправлен, реально проверен на пойманных
+        сэмплах. ЧЕСТНЫЙ КОМПРОМИСС (не тихая замена архитектуры,
+        см. `refresh_pool_price()`): фид даёт RAW-намерение ДО исполнения,
+        не постсвоповую цену -- полного симулятора математики V3 в этой
+        сессии нет, поэтому для пулов, ЗАТРОНУТЫХ напрямую (`to` ==
+        адрес пула -- реальный паттерн активных ботов, см. паспорт про
+        `0x65050a9b...`), делается ТОЧЕЧНЫЙ (не на каждый пул, не на
+        каждое сообщение) RPC-рефреш `slot0()`/`liquidity()` -- это уже
+        НЕ "ноль RPC в горячем пути", нарушение явное и залогированное,
+        не скрытое."""
         last_seen_block_number[0] = msg.sequence_number
-        parsed = decode_l2_message(msg.raw_l2_msg_hex) if msg.raw_l2_msg_hex else None
-        if parsed is None:
-            return  # честно: без декодированного свопа нечего применять к реестру в этой версии
+        decoded = decode_l2_message(msg.raw_l2_msg_hex) if msg.raw_l2_msg_hex else []
 
-        # TODO (неделя 1 dry-run): сопоставить parsed["raw_fields"] с
-        # сигнатурой Uniswap V3 swap()/Swap-событием, извлечь
-        # sqrtPriceX96/liquidity/tick и адрес пула, вызвать
-        # registry.apply_swap_event(...). Пока не сделано -- реестр не
-        # обновляется реальными данными до завершения этого шага,
-        # честно отражено здесь, а не скрыто.
+        touched_pairs: set[tuple[str, str]] = set()
+        now = time.time()
+        for entry in decoded:
+            to_addr = entry.get("to")
+            if not to_addr:
+                continue
+            pool = registry.by_address.get(to_addr.lower())
+            if pool is None:
+                continue  # цель -- не известный нам пул (роутер, другой контракт и т.п.) -- честно пропускаем,
+                # не пытаемся угадать внутренний своп через роутер без декодирования его calldata
+            n_touches_seen[0] += 1
+            last_ts = last_refresh_wall.get(pool.address.lower(), 0.0)
+            if now - last_ts < POOL_REFRESH_COOLDOWN_S:
+                continue  # кулдаун -- этот же пул уже рефрешился недавно в этом же блоке
+            if refresh_pool_price(pool, rpc_url=rpc_url, record_block_number=msg.sequence_number):
+                last_refresh_wall[pool.address.lower()] = now
+                n_refreshes_done[0] += 1
+                touched_pairs.add(registry._pair_key(pool.token0, pool.token1))
+
+        # Детекция -- ТОЛЬКО для пары WETH/USDG (та же заглушка, что раньше:
+        # decimals/exit_token завязаны конкретно на эту пару, обобщение на
+        # произвольные пары -- отдельная задача, не сделана здесь).
+        weth_usdg_key = registry._pair_key(WETH, USDG)
+        if weth_usdg_key not in touched_pairs:
+            return
 
         opp = check_pair_for_divergence(
             registry, WETH, USDG, WETH_DECIMALS, USDG_DECIMALS,
@@ -151,6 +201,7 @@ def main() -> int:
         pass
     print(f"[task5_bot] диагностика фида: {client.diag}")
     print(f"[task5_bot] последний известный номер блока с фида: {last_seen_block_number[0]}")
+    print(f"[task5_bot] касаний известных пулов: {n_touches_seen[0]}, реальных RPC-рефрешей цены: {n_refreshes_done[0]}")
     return 0
 
 

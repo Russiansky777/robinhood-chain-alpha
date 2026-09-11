@@ -81,60 +81,111 @@ class SequencerFeedClient:
         return None
 
 
-def decode_l2_message(l2_msg_hex: str) -> dict | None:
-    """Декодер L2MessageType_signedTx (байт-константа 4, Nitro
-    `arbos/l2message.go`, публичная документация) -- ПРОВЕРЕНО живым
-    прогоном `task5_bot_feed_decode_probe.py` 2026-09-12, см.
-    PROJECT_STATE.md для реальных примеров. Возвращает
-    {"to": "0x...", "data": "0x...", "msg_type": <int>} либо
-    {"unhandled_msg_type": <int>} (тип НЕ 4 -- честно, не гадаем), либо
-    None (декодирование не удалось вообще).
+def decode_l2_message(l2_msg_field: str) -> list[dict]:
+    """Владелец, 2026-09-13: реальная разведка живого фида
+    (`analysis/task5_bot_feed_structure_probe.py`, результат --
+    `data/p3_guard_cache/task5_bot_feed_structure_probe_result.json`,
+    3 реальных сообщения) нашла ДВЕ реальные причины прошлого 100%-ного
+    провала декодера (2286/2286 `decode_returned_none`) -- **JSON-путь
+    `message.message.l2Msg` был угадан ПРАВИЛЬНО с самого начала**,
+    проблема была ниже:
 
-    Payload после байта типа -- это САМА подписанная транзакция ровно
-    как отправлена в сеть (EIP-2718): если первый байт >= 0xc0, это
-    legacy RLP-список напрямую (9 полей: nonce, gasPrice, gasLimit, to,
-    value, data, v, r, s); если первый байт в диапазоне типов (0x01-
-    0x7f), это typed-транзакция -- байт типа + RLP-список полей,
-    специфичных для типа (для 0x02 EIP-1559: chainId, nonce,
-    maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
-    accessList, yParity, r, s -- to/data по индексам 5/7)."""
+    1. **`l2Msg` -- Base64, НЕ hex.** Старый код звал `bytes.fromhex(...)`
+       на base64-строке -- гарантированный `ValueError` на КАЖДОМ реальном
+       сообщении (base64-алфавит содержит символы вне `0-9a-f`).
+    2. **Тип сообщения -- 3 (`L2MessageType_batch`), не 4.** Один элемент
+       фида (= один L2-блок, `sequenceNumber`) несёт ЦЕЛЫЙ БЛОК
+       транзакций ОДНИМ batch-сообщением: байт типа `0x03`, дальше
+       повторяющиеся записи `[uint64 big-endian длина][под-сообщение]`
+       до конца буфера. Реально пойманные под-сообщения (3 сэмпла,
+       десятки под-сообщений) -- ВСЕ типа `4` (`L2MessageType_signedTx`),
+       декодируются тем же RLP-путём, что и раньше (эта часть кода была
+       верна с самого начала, просто до неё не доходило).
+
+    Возвращает СПИСОК декодированных под-сообщений (обычно много -- один
+    L2-блок содержит много транзакций, не одну): каждый элемент --
+    `{"to":.., "data":.., "msg_type":.., "tx_kind":..}` (успех) |
+    `{"unhandled_msg_type":..}` (под-сообщение не типа 4 -- честно, не
+    гадаем) | `{"decode_error":..}`. Пустой список -- ничего не удалось
+    декодировать вообще (base64 невалиден и т.п.), не путать с "0
+    транзакций в блоке" (реально не наблюдалось ни разу за 3 сэмпла)."""
+    raw = _decode_l2_msg_bytes(l2_msg_field)
+    if raw is None:
+        return []
+    return _decode_message_bytes(raw)
+
+
+def _decode_l2_msg_bytes(l2_msg_field: str) -> bytes | None:
+    """Base64 -- реальный, подтверждённый формат (см. докстринг выше).
+    Hex -- fallback НА СЛУЧАЙ будущего изменения формата бродкастер-
+    протокола -- пробуем оба честно, не считаем один единственно
+    возможным навсегда."""
+    import base64
     try:
-        raw = bytes.fromhex(l2_msg_hex[2:] if l2_msg_hex.startswith("0x") else l2_msg_hex)
+        return base64.b64decode(l2_msg_field, validate=True)
+    except Exception:
+        pass
+    try:
+        return bytes.fromhex(l2_msg_field[2:] if l2_msg_field.startswith("0x") else l2_msg_field)
     except ValueError:
         return None
+
+
+def _decode_message_bytes(raw: bytes, _depth: int = 0) -> list[dict]:
     if not raw:
-        return None
+        return []
     msg_type = raw[0]
+    if msg_type == 3:  # L2MessageType_batch -- рекурсивно разворачиваем под-сообщения
+        if _depth > 4:  # честная защита от аномальной вложенности -- реально не наблюдалась
+            return [{"decode_error": "batch nesting too deep (>4), aborting"}]
+        out: list[dict] = []
+        pos = 1
+        while pos + 8 <= len(raw):
+            size = int.from_bytes(raw[pos:pos + 8], "big")
+            pos += 8
+            if size < 0 or pos + size > len(raw):
+                break  # честно останавливаемся на первом несогласованном размере, не гадаем остаток буфера
+            out.extend(_decode_message_bytes(raw[pos:pos + size], _depth=_depth + 1))
+            pos += size
+        return out
     if msg_type != 4:
-        return {"unhandled_msg_type": msg_type}
+        return [{"unhandled_msg_type": msg_type}]
+    return [_decode_signed_tx(raw[1:], msg_type)]
 
-    tx_bytes = raw[1:]
+
+def _decode_signed_tx(tx_bytes: bytes, msg_type: int) -> dict:
+    """RLP-декодер сигнатуры signedTx -- НЕ изменился, эта часть была
+    верна с самого начала (см. докстринг `decode_l2_message`). Payload --
+    сама подписанная транзакция ровно как отправлена в сеть (EIP-2718):
+    первый байт >= 0xc0 -- legacy RLP-список напрямую (9 полей: nonce,
+    gasPrice, gasLimit, to, value, data, v, r, s); первый байт в
+    диапазоне типов (0x01-0x7f) -- typed-транзакция (для 0x02 EIP-1559:
+    chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to,
+    value, data, accessList, yParity, r, s -- to/data по индексам 5/7)."""
     if not tx_bytes:
-        return None
-
+        return {"decode_error": "empty tx_bytes after type-4 prefix"}
     try:
         import rlp
         first_byte = tx_bytes[0]
         if first_byte >= 0xC0:
-            # legacy, нетипизированная транзакция -- RLP-список сразу
             decoded = rlp.decode(tx_bytes)
             if len(decoded) < 6:
-                return None
+                return {"decode_error": "legacy tx: too few RLP fields"}
             to_field, data_field = decoded[3], decoded[5]
             tx_kind = "legacy"
         elif first_byte in (0x01, 0x02, 0x03):
             decoded = rlp.decode(tx_bytes[1:])
             if first_byte == 0x02:  # EIP-1559
                 if len(decoded) < 8:
-                    return None
+                    return {"decode_error": "0x02 tx: too few RLP fields"}
                 to_field, data_field = decoded[5], decoded[7]
             elif first_byte == 0x01:  # EIP-2930
                 if len(decoded) < 7:
-                    return None
+                    return {"decode_error": "0x01 tx: too few RLP fields"}
                 to_field, data_field = decoded[3], decoded[5]
             else:  # 0x03 EIP-4844 -- редкий случай, поля те же смещения, что 1559 + doc не гарантирована
                 if len(decoded) < 8:
-                    return None
+                    return {"decode_error": "0x03 tx: too few RLP fields"}
                 to_field, data_field = decoded[5], decoded[7]
             tx_kind = f"typed_0x{first_byte:02x}"
         else:

@@ -136,7 +136,13 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
 
     _merge_known_profitable_pools(registry)
     if populate_prices:
-        populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size)
+        # block_number=latest (не None) -- ВАЖНО: check_pair_for_divergence меряет
+        # divergence_age_blocks от last_update_block; None трактуется как "age=0",
+        # что при первом же реальном сообщении сделало бы ЛЮБУЮ пару "слишком свежей"
+        # (age=0 < MIN_DIVERGENCE_AGE_BLOCKS=1) и заблокировало детекцию НАВСЕГДА --
+        # реальный баг, найденный при подготовке к живому 10-минутному прогону
+        # (владелец, 2026-09-13, п.3), исправлен здесь, не оставлен молча.
+        populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size, block_number=latest)
     return registry
 
 
@@ -156,7 +162,8 @@ def _decode_signed_word(hex_word: str) -> int:
 
 
 def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINNET,
-                             batch_size: int = 25, timeout: float = 20.0) -> dict:
+                             batch_size: int = 25, timeout: float = 20.0,
+                             block_number: int | None = None) -> dict:
     """Владелец, 2026-09-13, п.2: "slot0 при bootstrap -- для ВСЕХ пулов,
     батчами, чтобы не упереться в лимит." Один-единственный, разовый вызов
     ДО горячего пути (тот же принцип, что PoolCreated-скан выше) -- читает
@@ -214,10 +221,54 @@ def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINN
                 if len(stats["errors_sample"]) < 3:
                     stats["errors_sample"].append(f"{pool.address}: decode error {exc}")
                 continue
-            pool.apply_swap(sqrt_price_x96=sqrt_price_x96, liquidity=liquidity, tick=tick, block_number=None)
+            pool.apply_swap(sqrt_price_x96=sqrt_price_x96, liquidity=liquidity, tick=tick, block_number=block_number)
             stats["n_ok"] += 1
 
     return stats
+
+
+def refresh_pool_price(pool: V3PoolState, rpc_url: str = RPC_URL_MAINNET, record_block_number: int | None = None,
+                        timeout: float = 5.0) -> bool:
+    """Владелец, 2026-09-13, п.3 (повторный dry-run, реальные детекции):
+    ЧЕСТНЫЙ, ОСОЗНАННЫЙ КОМПРОМИСС, не тихая замена архитектуры. Фид
+    секвенсера отдаёт RAW подписанные транзакции ДО исполнения (сырое
+    намерение), НЕ результат исполнения -- у него физически нет
+    постсвоповых sqrtPriceX96/liquidity (это подтверждено реальной
+    разведкой формы сообщений, см. `decode_l2_message`). Два пути дать
+    боту реальную (не устаревшую) цену: (а) полный симулятор математики
+    Uniswap V3 (tick-crossing, liquidityNet по тикам) -- отдельная,
+    существенная задача, не сделана в этой сессии; (б) точечный RPC-запрос
+    `slot0()`/`liquidity()` ИМЕННО для пула, который только что реально
+    тронут (не всех пулов, не по расписанию) -- этот вариант.
+
+    Это НАРУШАЕТ первоначальное требование "ноль RPC в горячем пути" --
+    честно, не скрыто: вызывается СИНХРОННО из `on_feed_message()`,
+    блокирует event loop на время запроса (десятки мс). Годится для
+    ДИАГНОСТИКИ/dry-run (только логирование "здесь бы вошёл", ничего не
+    отправляется) -- для реальной низколатентной торговли этот компромисс
+    нужно будет заменить симулятором (а) или принять сознательно, не по
+    умолчанию."""
+    # ВСЕГДА "latest" для самого eth_call -- нужна РЕАЛЬНАЯ текущая цена,
+    # `record_block_number` -- ОТДЕЛЬНО, только для bookkeeping в
+    # `pool.last_update_block` (divergence_age_blocks в детекторе), не для
+    # запроса истории (запрос по номеру только что вышедшего из секвенсера
+    # блока рискует не найтись на индексирующей RPC-ноде из-за небольшого
+    # лага индексации -- честно, не рискуем этим).
+    try:
+        slot0_hex = _rpc_call("eth_call", [{"to": pool.address, "data": _SLOT0_SELECTOR}, "latest"],
+                               rpc_url, timeout)
+        liq_hex = _rpc_call("eth_call", [{"to": pool.address, "data": _LIQUIDITY_SELECTOR}, "latest"],
+                             rpc_url, timeout)
+        if not slot0_hex or slot0_hex == "0x":
+            return False
+        body = slot0_hex[2:]
+        sqrt_price_x96 = int(body[0:64], 16)
+        tick = _decode_signed_word(body[64:128])
+        liquidity = int(liq_hex, 16) if liq_hex and liq_hex != "0x" else 0
+    except Exception:
+        return False  # честно: не удалось обновить -- пул остаётся со старой ценой, не гадаем
+    pool.apply_swap(sqrt_price_x96=sqrt_price_x96, liquidity=liquidity, tick=tick, block_number=record_block_number)
+    return True
 
 
 def _merge_known_profitable_pools(registry: PoolRegistry) -> None:
