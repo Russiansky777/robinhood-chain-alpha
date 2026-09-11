@@ -19,6 +19,7 @@ on:
       - "data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST"
       - "data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST"
+      - "data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST"
       - "data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST"
       - "data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST"
       - "data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST"
@@ -89,6 +90,14 @@ jobs:
           CREDIT_GUARD_FILE: data/credits_spent_mozila.json
         run: python -u analysis/task5_latency_signature.py
 
+      - name: "Задача 5, измерение 2 -- дешёвая разведка схемы (байткод/переводы)"
+        if: hashFiles('data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST') != ''
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+          CREDIT_GUARD_NAMESPACE: task5_active_arb_mozila
+          CREDIT_GUARD_FILE: data/credits_spent_mozila.json
+        run: python -u analysis/task5_operators_schema_probe.py
+
       - name: "Задача 5, диагностика конкретной аномалии (по уже оплаченному query_id, почти бесплатно)"
         if: hashFiles('data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST') != ''
         env:
@@ -116,7 +125,8 @@ jobs:
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_STAGE0_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE0B_POOLCREATED_REQUEST data/p3_guard_cache/TASK5_STAGE0C_MINT_SCHEMA_REQUEST data/p3_guard_cache/TASK5_STAGE1_ONEDAY_REQUEST data/p3_guard_cache/TASK5_STAGE1_HOURLY_ONLY_REQUEST data/p3_guard_cache/TASK5_LATENCY_SIGNATURE_REQUEST data/p3_guard_cache/TASK5_OPERATORS_SCHEMA_PROBE_REQUEST data/p3_guard_cache/TASK5_DIAG_SINGLE_TX_REQUEST data/p3_guard_cache/TASK5_DIAG_FULL_LEGS_REQUEST data/p3_guard_cache/TASK5_STAGE2_FULL_REQUEST
+          [ -e data/p3_guard_cache/task5_operators_schema_probe_result.json ] && git add data/p3_guard_cache/task5_operators_schema_probe_result.json
           [ -e data/p3_guard_cache/task5_latency_signature_result.json ] && git add data/p3_guard_cache/task5_latency_signature_result.json
           [ -e data/p3_guard_cache/task5_active_arb_stage1_hourly_only_result.json ] && git add data/p3_guard_cache/task5_active_arb_stage1_hourly_only_result.json
           [ -e data/p3_guard_cache/task5_active_arb_diag_single_tx_result.json ] && git add data/p3_guard_cache/task5_active_arb_diag_single_tx_result.json
