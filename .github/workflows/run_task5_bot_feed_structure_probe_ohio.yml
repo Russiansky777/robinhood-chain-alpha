@@ -1,0 +1,71 @@
+name: "Задача 5, живой бот -- разведка реальной формы сообщений фида (структура, не декодирование)"
+
+# Владелец, 2026-09-13: перед rhfeed/сторонней зависимостью -- проверить,
+# не чинится ли декодер собственным JSON-путём, реально увидев форму
+# живого сообщения. Read-only, ничего не отправляет, новых зависимостей
+# не требует (websockets уже в venv Ohio).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_FEED_STRUCTURE_PROBE_OHIO_REQUEST"
+
+jobs:
+  feed_structure_probe:
+    name: "Разведка формы фида на Ohio VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код и запустить разведку (3 сообщения, до 30с)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha
+              ./venv/bin/python analysis/task5_bot_feed_structure_probe.py 3 30
+            "
+          ' > /tmp/feed_structure_probe_result.json 2> /tmp/feed_structure_probe_stderr.log
+          echo "--- stderr ---"; cat /tmp/feed_structure_probe_stderr.log
+          echo "--- stdout ---"; cat /tmp/feed_structure_probe_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_FEED_STRUCTURE_PROBE_OHIO_REQUEST
+          [ -e /tmp/feed_structure_probe_result.json ] && cp /tmp/feed_structure_probe_result.json data/p3_guard_cache/task5_bot_feed_structure_probe_result.json
+          [ -e data/p3_guard_cache/task5_bot_feed_structure_probe_result.json ] && git add data/p3_guard_cache/task5_bot_feed_structure_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: разведка реальной формы сообщений фида (структура) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
