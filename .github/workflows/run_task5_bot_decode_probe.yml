@@ -51,7 +51,7 @@ jobs:
           ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/task5_decode_probe/task5_bot_feed_client.py' < analysis/task5_bot_feed_client.py
           ssh $SSH_OPTS root@45.59.170.76 'cat > /tmp/task5_decode_probe/task5_bot_feed_decode_probe.py' < analysis/task5_bot_feed_decode_probe.py
 
-      - name: Поставить зависимости во временный venv и запустить декодер против живого фида (120 секунд)
+      - name: Поставить зависимости во временный venv и запустить декодер против живого фида (180 секунд)
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
             set -e
@@ -59,7 +59,7 @@ jobs:
             source /tmp/task5_decode_venv/bin/activate
             pip install --quiet requests websockets rlp
             cd /tmp/task5_decode_probe
-            python3 -u task5_bot_feed_decode_probe.py --duration 120 --max-examples 15 --out /tmp/task5_decode_probe_result.json
+            python3 -u task5_bot_feed_decode_probe.py --duration 180 --max-examples 15 --out /tmp/task5_decode_probe_result.json
           ' | tee /tmp/vps_decode_probe_stdout.log
           ssh $SSH_OPTS root@45.59.170.76 'cat /tmp/task5_decode_probe_result.json' > /tmp/task5_decode_probe_result.json
 

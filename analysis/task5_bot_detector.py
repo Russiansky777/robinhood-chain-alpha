@@ -27,10 +27,13 @@ class Opportunity:
     detection_sequence_number: int
     pool_a: str
     pool_b: str
+    exit_token: str  # WETH или USDG -- в каком токене меряется профит (для контракта, см. executor.py)
     expected_capture_usd: float
     expected_capture_after_gas_and_reverts_usd: float
     catalyst_sequence_number: int | None  # какое сообщение фида вызвало расхождение, если известно
     divergence_age_blocks: int  # сколько блоков расхождение уже существует (для фильтра ">=1")
+    forced_min_profit_wei: int | None = None  # ТОЛЬКО для task5_bot_intentional_loss_test.py --
+    # заведомо недостижимый minProfit для проверки revert-on-loss, None в обычной работе (contract requires 0)
 
 
 def _normalized_price(pool: V3PoolState, token0_decimals: int, token1_decimals: int) -> float | None:
@@ -48,6 +51,7 @@ def check_pair_for_divergence(
     token1_decimals: int,
     trigger_sequence_number: int,
     assumed_gas_cost_usd: float,
+    exit_token: str,
 ) -> Opportunity | None:
     """Вызывается ПОСЛЕ применения каждого свопа к реестру -- сравнивает
     подразумеваемые цены всех известных пулов этой пары, без сети,
@@ -105,6 +109,7 @@ def check_pair_for_divergence(
         detection_sequence_number=trigger_sequence_number,
         pool_a=cheap_pool.address,
         pool_b=expensive_pool.address,
+        exit_token=exit_token,
         expected_capture_usd=expected_capture_usd,
         expected_capture_after_gas_and_reverts_usd=expected_after_reverts,
         catalyst_sequence_number=trigger_sequence_number,

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 """Задача 5, живой бот -- владелец 2026-09-12: "Декодер L2-сообщений
-против живого фида -- первое и главное. Единственный шаг с неизвестной
-длительностью." Этот скрипт слушает РЕАЛЬНЫЙ фид, пытается декодировать
-каждое сообщение через decode_l2_message(), и честно репортит: сколько
-сообщений какого типа реально встретилось, сколько успешно
-декодировано до to/data, и -- если декодирование удалось -- реальные
-примеры (to-адрес, длина calldata, первые 4 байта calldata = селектор
-функции) для сверки владельцем."""
+против живого фида -- первое и главное." Владелец также попросил
+использовать готовый декодер (Offchain Labs Nitro / сторонние клиенты)
+вместо своего -- см. ЧЕСТНУЮ ОГОВОРКУ ниже: реальная, готовая, судя по
+описанию рабочая Python-библиотека НАЙДЕНА (`rhfeed`,
+https://github.com/chainstacklabs/robinhood-chain-sequencer-feed,
+подтверждено WebFetch реального README: `FeedConsumer(url=...).live()`,
+поля `tx.to`/`tx.selector`/`tx.value` и т.д.), НО автоматический
+инструмент безопасности этой сессии отказался позволить закоммитить
+файл, устанавливающий стороннюю git-зависимость в проект живого
+торгового бота ("Untrusted Code Integration") -- НЕ потому что
+библиотека не работает, а потому что среда не даёт МНЕ её интегрировать
+без ручного участия владельца. Установочная команда и код интеграции --
+в docs/PROJECT_STATE.md, чтобы владелец мог применить её сам (на VPS,
+вне ограничений этой сессии) при желании.
+
+Этот скрипт -- собственный best-effort декодер (та же логика, что была
+изначально), используется как ПЕРВЫЙ реальный шаг проверки, пока
+интеграция готовой библиотеки не сделана вручную владельцем."""
 from __future__ import annotations
 
 import asyncio
@@ -21,9 +32,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from task5_bot_config import SEQUENCER_FEED_URL_MAINNET
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
 
-# Известные селекторы функций для сверки (первые 4 байта keccak сигнатуры) --
-# если реальные calldata начинаются с одного из этих селекторов, декодер
-# точно работает правильно (это прямое, недвусмысленное подтверждение).
 KNOWN_SELECTORS = {
     "128acb08": "Uniswap V3 swap(address,bool,int256,uint160,bytes)",
     "414bf389": "Uniswap V3 SwapRouter exactInputSingle(...)",
@@ -74,10 +82,12 @@ async def run(duration_s: float, max_examples: int) -> dict:
                 "data_len_bytes": (len(data_hex) - 2) // 2,
                 "selector": selector,
                 "selector_known_as": KNOWN_SELECTORS.get(selector) if selector else None,
-                "data_prefix": data_hex[:74],  # селектор + первые 32 байта аргументов, для ручной сверки
+                "data_prefix": data_hex[:74],
             })
 
-    print(f"[decode_probe] слушаю {SEQUENCER_FEED_URL_MAINNET} {duration_s:.0f} секунд...")
+    print(f"[decode_probe] слушаю {SEQUENCER_FEED_URL_MAINNET} {duration_s:.0f} секунд "
+          "(собственный декодер -- готовая библиотека rhfeed НЕ интегрирована в этой сессии, "
+          "см. docstring и PROJECT_STATE.md)...")
     try:
         await asyncio.wait_for(client.listen(on_message), timeout=duration_s)
     except asyncio.TimeoutError:
@@ -85,6 +95,7 @@ async def run(duration_s: float, max_examples: int) -> dict:
 
     return {
         "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "decoder_used": "собственный best-effort (см. docstring про rhfeed)",
         "duration_s": duration_s,
         "feed_diag": client.diag,
         "message_type_counts": dict(type_counter),
@@ -103,7 +114,7 @@ if __name__ == "__main__":
     import argparse
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--duration", type=float, default=120.0)
+    ap.add_argument("--duration", type=float, default=180.0)
     ap.add_argument("--max-examples", type=int, default=15)
     ap.add_argument("--out", type=str, default=None)
     args = ap.parse_args()

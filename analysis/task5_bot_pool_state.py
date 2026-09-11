@@ -124,4 +124,23 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
         pool_address = "0x" + data[-40:]
         registry.register(V3PoolState(address=pool_address, token0=token0, token1=token1, fee=fee))
 
+    _merge_known_profitable_pools(registry)
     return registry
+
+
+def _merge_known_profitable_pools(registry: PoolRegistry) -> None:
+    """Владелец, 2026-09-12: "RPC-скан оставить как дополнение, не
+    замену" -- список TASK5_KNOWN_PROFITABLE_POOLS (из
+    `analysis/task5_pool_map.py`, реальные данные Dune) добавляется
+    ПОВЕРХ RPC-скана, на случай если lookback RPC-скана не покрыл
+    старый пул (пул мог быть создан раньше POOL_DISCOVERY_LOOKBACK_BLOCKS)."""
+    from task5_bot_config import TASK5_KNOWN_PROFITABLE_POOLS
+
+    for entry in TASK5_KNOWN_PROFITABLE_POOLS:
+        addr = entry.get("pool_key") or entry.get("address")
+        if not addr or addr.lower() in registry.by_address:
+            continue
+        token0, token1 = entry.get("token0"), entry.get("token1")
+        if not token0 or not token1:
+            continue
+        registry.register(V3PoolState(address=addr, token0=token0, token1=token1, fee=entry.get("fee", 0)))

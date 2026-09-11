@@ -104,6 +104,10 @@ def main() -> int:
             registry, WETH, USDG, WETH_DECIMALS, USDG_DECIMALS,
             trigger_sequence_number=msg.sequence_number,
             assumed_gas_cost_usd=ASSUMED_GAS_COST_USD_PLACEHOLDER,
+            exit_token=WETH,  # ЗАГЛУШКА: реальный exit_token зависит от направления цикла
+            # (какой токен на самом деле "выходит" из net-flow) -- та же логика, что
+            # closed_cycle_exit в Dune-запросах этой сессии, здесь пока не воспроизведена
+            # для WETH/USDG пары в общем виде (нужна проверка первой недели/дня).
         )
         if opp is not None:
             executor.handle_opportunity(opp, size_usd=opp.expected_capture_usd * args.size_fraction)

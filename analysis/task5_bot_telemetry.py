@@ -35,9 +35,11 @@ class AttemptRecord:
     mode: str  # "dry_run" | "live"
     size_usd: float
     inclusion_sequence_number: int | None = None  # заполняется отдельной строкой-обновлением
-    result: str = "pending"  # "would_enter" (dry-run) | "sent" | "success" | "reverted" | "error"
+    result: str = "pending"  # "would_enter" (dry-run) | "sent" | "success" | "reverted" | "halted" | "error"
     tx_hash: str | None = None
     error: str | None = None
+    revert_reason: str | None = None  # "price_moved" | "slippage" | "execution_error" | "unknown" -- владелец,
+    # 2026-09-12: "основа решения про сервер через 2-3 дня" -- см. classify_revert_reason() в task5_bot_executor.py
     event: str = "detection"  # "detection" | "inclusion_update"
 
 
@@ -54,7 +56,8 @@ class TelemetryLog:
             fh.write(json.dumps(asdict(record), ensure_ascii=False) + "\n")
 
     def write_inclusion_update(self, attempt_id: str, inclusion_sequence_number: int, result: str,
-                                tx_hash: str | None = None, error: str | None = None) -> None:
+                                tx_hash: str | None = None, error: str | None = None,
+                                revert_reason: str | None = None, pnl_usd: float | None = None) -> None:
         rec = {
             "attempt_id": attempt_id,
             "ts_wall": time.time(),
@@ -63,6 +66,8 @@ class TelemetryLog:
             "result": result,
             "tx_hash": tx_hash,
             "error": error,
+            "revert_reason": revert_reason,
+            "pnl_usd": pnl_usd,
         }
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
