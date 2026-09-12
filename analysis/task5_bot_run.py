@@ -251,6 +251,13 @@ def main() -> int:
         "requested_n": args.latency_sample_n,
         "feed_let_us_in": client.diag.get("n_messages_total", 0) > 0,
         "last_disconnect_error": client.diag.get("last_disconnect_error"),
+        # Владелец, 2026-09-12: полные заголовки/тело последнего 403 (если
+        # он был) -- см. SequencerFeedClient.listen()/InvalidStatus handling
+        # в task5_bot_feed_client.py. None, если этого поля не было
+        # (не было 403 именно с этим типом исключения) -- не подставляем.
+        "last_invalid_status_code": client.diag.get("last_invalid_status_code"),
+        "last_invalid_status_headers": client.diag.get("last_invalid_status_headers"),
+        "last_invalid_status_body": client.diag.get("last_invalid_status_body"),
         "samples": latency_samples,
         "min_latency_s": min(latencies) if latencies else None,
         "max_latency_s": max(latencies) if latencies else None,

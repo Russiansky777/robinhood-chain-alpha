@@ -171,6 +171,21 @@ class SequencerFeedClient:
                 async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
                     self.diag["connected_at_wall"] = time.time()
                     await self._consume(ws, on_message)
+            except websockets.exceptions.InvalidStatus as exc:
+                # Владелец, 2026-09-12: "покажи полные заголовки последнего
+                # 403-ответа" -- ЗА ВСЮ ИСТОРИЮ проекта это ни разу не было
+                # захвачено (генерик except ниже отбрасывал structured
+                # exc.response до строки). Честно фиксируем ВСЁ, что даёт
+                # сама библиотека -- status_code, ПОЛНЫЕ заголовки (включая
+                # cf-ray/cf-mitigated/server, если Cloudflare их вернул) и
+                # тело, БЕЗ догадок о том, что "обычно" там бывает.
+                resp = exc.response
+                self.diag["last_disconnect_error"] = str(exc)
+                self.diag["last_invalid_status_code"] = resp.status_code
+                self.diag["last_invalid_status_headers"] = dict(resp.headers) if resp.headers else {}
+                self.diag["last_invalid_status_body"] = (
+                    resp.body.decode("utf-8", errors="replace") if resp.body else None
+                )
             except Exception as exc:
                 self.diag["last_disconnect_error"] = str(exc)
             # Соединение закрылось (штатно или с ошибкой) -- это и есть "обрыв". Реконнект
