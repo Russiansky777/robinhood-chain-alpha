@@ -1,0 +1,84 @@
+name: "Задача 5, живой бот -- проверка остатка cooldown фида (без попытки подключения)"
+
+# Дешёвая read-only проверка ПЕРЕД тем, как гонять полный 10-минутный
+# dry-run: `SequencerFeedClient.listen()` не отказывает мгновенно при
+# активном cooldown, а ЖДЁТ остаток паузы внутри самого прогона -- если
+# cooldown больше окна dry-run, весь прогон уйдёт в ожидание и не
+# задетектирует ничего. Этот workflow только читает
+# state-файл/арифметику (`task5_feed_cooldown_check.py`), НЕ пытается
+# подключиться к фиду -- не может само по себе спровоцировать 403 или
+# сбросить cooldown.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_FEED_COOLDOWN_CHECK_REQUEST"
+
+jobs:
+  cooldown_check:
+    name: "Остаток cooldown фида (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть код и прочитать остаток cooldown (task5_feed_cooldown_check.py)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              set -e
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python3 task5_feed_cooldown_check.py
+            "
+          ' > /tmp/cooldown_check.log 2> /tmp/cooldown_check_stderr.log
+          echo "--- stdout ---"; cat /tmp/cooldown_check.log
+          echo "--- stderr ---"; cat /tmp/cooldown_check_stderr.log
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_FEED_COOLDOWN_CHECK_REQUEST
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Остаток cooldown фида -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            cat /tmp/cooldown_check.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/cooldown_check_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_feed_cooldown_check_log.txt
+          git add data/p3_guard_cache/task5_feed_cooldown_check_log.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: остаток cooldown фида -- лог [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
