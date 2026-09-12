@@ -19,10 +19,65 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import websockets
+
+# Владелец, 2026-09-13, правило после повторных реальных 403 (структурная
+# разведка прошла с 15+ минутным простоем IP, следующий 10-минутный
+# dry-run с тем же IP через ~10-15 минут снова упал -- см. PROJECT_STATE.md,
+# "честный пересмотр 403"): "одно соединение при старте, реконнект только
+# при обрыве, с паузой 30+ минут, никаких повторных подключений в тестах."
+# Это НЕ просто дисциплина оператора -- закреплено в коде как жёсткий
+# гард, персистентный НА ДИСКЕ ХОСТА (не в эфемерном /tmp GH Actions
+# раннера), так что даже отдельный, новый процесс/workflow-прогон не
+# может подключиться раньше времени по ошибке/забывчивости.
+FEED_RECONNECT_COOLDOWN_S = 1800.0  # 30 минут -- нижняя граница, не гарантированно достаточная
+FEED_STATE_FILE_DEFAULT = Path(os.environ.get(
+    "TASK5_FEED_STATE_FILE", "/home/bot/data/task5_feed_connect_state.json"
+))
+
+
+def seconds_until_feed_connect_allowed(state_file: Path = FEED_STATE_FILE_DEFAULT,
+                                        cooldown_s: float = FEED_RECONNECT_COOLDOWN_S) -> float:
+    """0.0, если подключаться можно прямо сейчас; иначе -- сколько секунд
+    ещё ждать. НЕ записывает попытку сама -- см. record_feed_connect_attempt()
+    (раздельно, чтобы можно было проверить не трогая состояние)."""
+    if not state_file.exists():
+        return 0.0
+    try:
+        last = json.loads(state_file.read_text()).get("last_connect_attempt_at")
+    except Exception:
+        return 0.0
+    if last is None:
+        return 0.0
+    return max(0.0, cooldown_s - (time.time() - last))
+
+
+def record_feed_connect_attempt(state_file: Path = FEED_STATE_FILE_DEFAULT) -> None:
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps({"last_connect_attempt_at": time.time()}))
+
+
+def require_feed_connect_allowed_now(state_file: Path = FEED_STATE_FILE_DEFAULT,
+                                      cooldown_s: float = FEED_RECONNECT_COOLDOWN_S) -> None:
+    """Для ОДНОРАЗОВЫХ диагностических скриптов (не живого бота) --
+    владелец: "никаких повторных подключений в тестах". Останавливается
+    (raise), НЕ ждёт молча -- одноразовый GH Actions job всё равно короче
+    типичного cooldown, ждать внутри него бессмысленно, честнее отказать
+    сразу с ясной причиной."""
+    wait_s = seconds_until_feed_connect_allowed(state_file, cooldown_s)
+    if wait_s > 0:
+        raise RuntimeError(
+            f"Feed reconnect cooldown активен -- последняя попытка подключения была "
+            f"{cooldown_s - wait_s:.0f}с назад, нужно ещё {wait_s:.0f}с. Реальные повторные "
+            f"HTTP 403 в этой сессии подтвердили cooldown по IP -- см. docs/PROJECT_STATE.md. "
+            f"НЕ повторять эту попытку раньше."
+        )
+    record_feed_connect_attempt(state_file)
 
 # Владелец, 2026-09-13: HTTP 403 на подключениях к фиду (Ohio дважды, NL
 # один раз сразу после успешного) -- версия "rate-limit по IP" не
@@ -83,37 +138,65 @@ class FeedMessage:
 
 
 class SequencerFeedClient:
-    def __init__(self, feed_url: str, headers: dict | None = BROWSER_LIKE_HEADERS) -> None:
+    def __init__(self, feed_url: str, headers: dict | None = BROWSER_LIKE_HEADERS,
+                 state_file: Path = FEED_STATE_FILE_DEFAULT, cooldown_s: float = FEED_RECONNECT_COOLDOWN_S) -> None:
         self.feed_url = feed_url
         self.headers = headers
-        self.diag: dict = {"n_messages_total": 0, "n_with_seq": 0, "n_unparsed": 0, "n_confirmation_only": 0}
+        self.state_file = state_file
+        self.cooldown_s = cooldown_s
+        self.diag: dict = {"n_messages_total": 0, "n_with_seq": 0, "n_unparsed": 0, "n_confirmation_only": 0,
+                            "n_connect_attempts": 0, "n_reconnects": 0}
 
     async def listen(self, on_message):
-        """on_message(FeedMessage) вызывается синхронно для каждого
-        реального сообщения фида с sequenceNumber -- вызывающий код
-        (детектор) должен быть быстрым, это горячий путь без сети."""
-        async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
-            self.diag["connected_at_wall"] = time.time()
-            async for raw in ws:
-                t_wall = time.time()
-                self.diag["n_messages_total"] += 1
-                try:
-                    payload = json.loads(raw)
-                except Exception:
-                    self.diag["n_unparsed"] += 1
+        """Владелец, 2026-09-13: "одно соединение при старте, реконнект
+        только при обрыве, с паузой 30+ минут" -- реализовано как внешний
+        цикл: КАЖДАЯ попытка подключения (включая самую первую) проверяет
+        cooldown и ЖДЁТ (не отказывает -- это живой бот, не одноразовый
+        скрипт) остаток паузы, если предыдущая попытка была недавно.
+        on_message(FeedMessage) вызывается синхронно для каждого реального
+        сообщения фида с sequenceNumber -- вызывающий код (детектор) должен
+        быть быстрым, это горячий путь без сети."""
+        while True:
+            wait_s = seconds_until_feed_connect_allowed(self.state_file, self.cooldown_s)
+            if wait_s > 0:
+                print(f"[feed] cooldown активен -- жду {wait_s:.0f}с перед подключением")
+                await asyncio.sleep(wait_s)
+            record_feed_connect_attempt(self.state_file)
+            self.diag["n_connect_attempts"] += 1
+            try:
+                async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
+                    self.diag["connected_at_wall"] = time.time()
+                    await self._consume(ws, on_message)
+            except Exception as exc:
+                self.diag["last_disconnect_error"] = str(exc)
+            # Соединение закрылось (штатно или с ошибкой) -- это и есть "обрыв". Реконнект
+            # -- на следующей итерации цикла, но ТОЛЬКО после того же cooldown (проверка
+            # в начале цикла), не сразу -- владелец: "с паузой 30+ минут".
+            self.diag["n_reconnects"] += 1
+            print(f"[feed] соединение прервано ({self.diag.get('last_disconnect_error', 'штатное закрытие')}) -- "
+                  f"реконнект не раньше чем через {self.cooldown_s:.0f}с")
+
+    async def _consume(self, ws, on_message) -> None:
+        async for raw in ws:
+            t_wall = time.time()
+            self.diag["n_messages_total"] += 1
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                self.diag["n_unparsed"] += 1
+                continue
+            msgs = payload.get("messages") if isinstance(payload, dict) else None
+            if not msgs:
+                if "confirmedSequenceNumberMessage" in (payload or {}):
+                    self.diag["n_confirmation_only"] += 1
+                continue
+            for m in msgs:
+                seq = m.get("sequenceNumber")
+                if seq is None:
                     continue
-                msgs = payload.get("messages") if isinstance(payload, dict) else None
-                if not msgs:
-                    if "confirmedSequenceNumberMessage" in (payload or {}):
-                        self.diag["n_confirmation_only"] += 1
-                    continue
-                for m in msgs:
-                    seq = m.get("sequenceNumber")
-                    if seq is None:
-                        continue
-                    self.diag["n_with_seq"] += 1
-                    l2_msg_hex = self._extract_l2_msg_hex(m)
-                    on_message(FeedMessage(t_wall=t_wall, sequence_number=seq, raw_l2_msg_hex=l2_msg_hex))
+                self.diag["n_with_seq"] += 1
+                l2_msg_hex = self._extract_l2_msg_hex(m)
+                on_message(FeedMessage(t_wall=t_wall, sequence_number=seq, raw_l2_msg_hex=l2_msg_hex))
 
     @staticmethod
     def _extract_l2_msg_hex(m: dict) -> str | None:

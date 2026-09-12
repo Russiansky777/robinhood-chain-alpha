@@ -44,6 +44,8 @@ from task5_bot_config import (
     CHAIN_ID_MAINNET,
     CHAIN_ID_TESTNET,
     ENTRY_THRESHOLD_USD,
+    EXECUTOR_CONTRACT_ADDRESS_MAINNET,
+    EXECUTOR_CONTRACT_ADDRESS_TESTNET,
     RPC_URL_MAINNET,
     RPC_URL_TESTNET,
     SEQUENCER_FEED_URL_MAINNET,
@@ -96,6 +98,13 @@ def main() -> int:
     rpc_url = RPC_URL_TESTNET if args.testnet else RPC_URL_MAINNET
     feed_url = SEQUENCER_FEED_URL_TESTNET if args.testnet else SEQUENCER_FEED_URL_MAINNET
     chain_id = CHAIN_ID_TESTNET if args.testnet else CHAIN_ID_MAINNET
+    # --contract-address явно передан -- приоритет; иначе -- запасное значение
+    # из конфига (заполняется владельцем после реального деплоя, см.
+    # contracts/build/deploy_params.json и EXECUTOR_CONTRACT_ADDRESS_MAINNET/
+    # _TESTNET в task5_bot_config.py) -- не забыть/не потерять адрес между запусками.
+    contract_address = args.contract_address or (
+        (EXECUTOR_CONTRACT_ADDRESS_TESTNET if args.testnet else EXECUTOR_CONTRACT_ADDRESS_MAINNET) or ""
+    )
 
     print(f"[task5_bot] режим: {'DRY-RUN (ничего не отправляется)' if dry_run else 'LIVE (--confirm-mainnet)'}")
     print(f"[task5_bot] сеть: {'testnet' if args.testnet else 'mainnet'} (chain_id={chain_id})")
@@ -114,7 +123,7 @@ def main() -> int:
     print(f"[task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): {n_routes}")
 
     telemetry = TelemetryLog()
-    executor = Executor(confirm_mainnet=args.confirm_mainnet, contract_address=args.contract_address,
+    executor = Executor(confirm_mainnet=args.confirm_mainnet, contract_address=contract_address,
                          telemetry=telemetry, chain_id=chain_id, registry=registry, route_table=route_table)
 
     # Последний известный на фиде номер блока -- нужен ТОЛЬКО для будущего

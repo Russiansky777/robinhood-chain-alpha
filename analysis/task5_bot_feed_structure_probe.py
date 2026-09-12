@@ -20,12 +20,16 @@ import time
 
 import websockets
 
-from task5_bot_feed_client import BROWSER_LIKE_HEADERS, connect_with_headers
+from task5_bot_feed_client import BROWSER_LIKE_HEADERS, connect_with_headers, require_feed_connect_allowed_now
 
 FEED_URL = "wss://feed.mainnet.chain.robinhood.com"
 
 
 async def probe(n_samples: int, timeout_s: float, use_browser_headers: bool = True) -> dict:
+    # Владелец, 2026-09-13: "никаких повторных подключений в тестах" --
+    # см. task5_bot_feed_client.py::require_feed_connect_allowed_now(),
+    # честный отказ (не молчаливое ожидание), если cooldown ещё активен.
+    require_feed_connect_allowed_now()
     samples = []
     diag = {"n_messages_total": 0, "n_with_seq": 0, "n_confirmation_only": 0, "n_unparsed": 0}
     headers = BROWSER_LIKE_HEADERS if use_browser_headers else None

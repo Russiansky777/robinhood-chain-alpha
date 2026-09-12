@@ -123,6 +123,15 @@ SUCCESS_CRITERION_USD_PER_DAY = 200.0
 PRIVATE_KEY_ENV_VAR = "PRIVATE_KEY_TASK5_BOT"  # ТОЛЬКО из окружения, никогда в коде/логах
 EXPECTED_WALLET_ENV_VAR = "TASK5_BOT_WALLET_ADDRESS"  # сверяется с адресом, выведенным из приватного ключа
 
+# --- Адрес задеплоенного ClosedCycleExecutorV3 -- владелец, 2026-09-13:
+# заполняется здесь ПОСЛЕ реального деплоя (contracts/build/deploy_params.json --
+# байткод/ABI/constructor args готовы, сам деплой -- скрипт владельца, не эта сессия).
+# None -- контракт ещё не задеплоен; --contract-address из CLI (task5_bot_run.py)
+# по-прежнему имеет приоритет, если передан явно, это только запасное значение по
+# умолчанию, чтобы не забыть/не потерять адрес между запусками.
+EXECUTOR_CONTRACT_ADDRESS_MAINNET: str | None = None
+EXECUTOR_CONTRACT_ADDRESS_TESTNET: str | None = None
+
 # --- Телеметрия (владелец: "обязательная часть, не довесок") ---
 TELEMETRY_JSONL_PATH = "data/task5_bot_live/attempts.jsonl"  # вне git по умолчанию на живом хосте,
 # коммитится в git ТОЛЬКО через отдельный маркер-триггер по аналогии с P5/funding/turnover_watch
