@@ -1,0 +1,93 @@
+name: "Задача 5, живой бот -- сухая самопроверка task5_bot_sender.py на Ohio VPS (НЕ отправляет)"
+
+# Владелец, 2026-09-13: "сухая проверка на Огайо: python
+# analysis/task5_bot_sender.py -- ожидаю адрес 0x893f4a7e..., nonce,
+# can_send: true, rpc_block. Ни одной транзакции." Файл task5_bot_sender.py
+# написан и закоммичен владельцем самим -- этот workflow только запускает
+# его __main__ блок (создаёт Sender(), печатает диагностику), НЕ вызывает
+# send_cycle() -- реальная отправка здесь не происходит.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_BOT_SENDER_SELFCHECK_OHIO_REQUEST"
+
+jobs:
+  sender_selfcheck_ohio:
+    name: "task5_bot_sender.py self-check на Ohio VPS (3.151.160.108)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на Ohio
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: "Сухая проверка: python task5_bot_sender.py (создаёт Sender(), печатает диагностику, НЕ шлёт)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              set -a; source /etc/bot/env; set +a
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_bot_sender.py
+            "
+          ' > /tmp/sender_selfcheck_stdout.log 2> /tmp/sender_selfcheck_stderr.log
+          echo "--- stdout ---"; cat /tmp/sender_selfcheck_stdout.log
+          echo "--- stderr ---"; cat /tmp/sender_selfcheck_stderr.log
+
+      - name: Собрать честный лог для паспорта
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# task5_bot_sender.py self-check (Ohio) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/sender_selfcheck_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/sender_selfcheck_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_bot_sender_selfcheck_ohio_log.txt
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_SENDER_SELFCHECK_OHIO_REQUEST
+          git add data/p3_guard_cache/task5_bot_sender_selfcheck_ohio_log.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, живой бот: task5_bot_sender.py self-check на Ohio -- лог [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
