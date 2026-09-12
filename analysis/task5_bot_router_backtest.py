@@ -38,6 +38,16 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
     eth_price = current_weth_usd_price(registry)
     print(f"[backtest] текущая цена WETH/USDG в реестре: {eth_price}")
 
+    # Диагностика: ЧЕСТНО -- если current_weth_usd_price() вернул None,
+    # нужно увидеть ПОЧЕМУ (нет пулов пары в реестре вообще, или пулы есть,
+    # но sqrt_price_x96 не заполнен) -- не гадаем, смотрим напрямую.
+    weth_usdg_pools = registry.pools_for_pair(WETH, USDG)
+    weth_usdg_debug = [
+        {"address": p.address, "fee": p.fee, "sqrt_price_x96": p.sqrt_price_x96, "liquidity": p.liquidity}
+        for p in weth_usdg_pools
+    ]
+    print(f"[backtest] пулов WETH/USDG в реестре: {len(weth_usdg_pools)}: {weth_usdg_debug}")
+
     n_rows = 0
     n_selector_match = 0
     n_intents_decoded_full = 0  # token_in/token_out/fee/amount_in все известны
@@ -48,6 +58,8 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
     n_opportunities = 0
     usd_buckets = Counter()  # для priced-and-pool-found случаев
     opportunities_sample = []
+    pool_found_sample = []  # какие ПАРЫ реально совпали с реестром (не обязательно priced)
+    priced_sample = []  # какие priced-input свопы НЕ нашли пул (для честного объяснения 0 пересечения)
 
     def bucket(usd: float) -> str:
         if usd >= 2000:
@@ -84,6 +96,9 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
                 pool_found = touched_pool is not None
                 if pool_found:
                     n_pool_found += 1
+                    if len(pool_found_sample) < 15:
+                        pool_found_sample.append({"token_in": intent.token_in, "token_out": intent.token_out,
+                                                   "fee": intent.fee, "pool": touched_pool.address})
 
                 token_in_l = intent.token_in.lower()
                 priced_usd = None
@@ -93,6 +108,9 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
                     priced_usd = intent.amount_in / 1e6
                 if priced_usd is not None:
                     n_priced += 1
+                    if not pool_found and len(priced_sample) < 15:
+                        priced_sample.append({"token_in": intent.token_in, "token_out": intent.token_out,
+                                               "fee": intent.fee, "amount_usd_approx": round(priced_usd, 2)})
                     if pool_found:
                         n_pool_found_and_priced += 1
                         usd_buckets[bucket(priced_usd)] += 1
@@ -135,6 +153,9 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
         "usd_size_distribution_of_pool_found_and_priced": dict(usd_buckets),
         "n_opportunities_would_have_fired": n_opportunities,
         "opportunities_sample": opportunities_sample,
+        "weth_usdg_pools_in_registry_debug": weth_usdg_debug,
+        "pool_found_sample": pool_found_sample,
+        "priced_input_but_no_pool_match_sample": priced_sample,
     }
 
 
