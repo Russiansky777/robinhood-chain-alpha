@@ -1,0 +1,90 @@
+name: "Задача 5, Путь А -- бэктест детекции на уже захваченном дампе (RPC + офлайн, без фида)"
+
+# Владелец, 2026-09-12, п.5: "если ноль -- гистограмма должна объяснить,
+# почему." Живой 10-минутный dry-run (run_task5_bot_dryrun_smoketest_ohio.yml,
+# коммит bfaf00e) дал 0 детекций Пути А. Этот workflow -- честная проверка
+# ПРИЧИНЫ: прогоняет ТУ ЖЕ детекцию (check_router_triggered_opportunity)
+# против уже реального универсума пулов (один RPC bootstrap, не фид) и
+# УЖЕ ЗАХВАЧЕННОГО дампа calldata (data/task5_bot_router_capture/dump.jsonl.gz,
+# коммит a0703be) -- НЕ открывает ни одного нового подключения к
+# relay/фиду. Read-only, без confirm-барьера (не деньги, не сигнатуры).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  backtest:
+    name: "Бэктест Пути А на Ohio VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на Ohio (включая уже закоммиченный дамп)
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "Бэктест (bootstrap RPC + офлайн-дамп, без фида)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha
+              ./venv/bin/python analysis/task5_bot_router_backtest.py
+            "
+          ' > /tmp/backtest_stdout.log 2> /tmp/backtest_stderr.log
+          echo "--- stdout ---"; cat /tmp/backtest_stdout.log
+          echo "--- stderr ---"; cat /tmp/backtest_stderr.log
+
+      - name: Забрать результат
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_router_backtest_result.json 2>/dev/null' > /tmp/backtest_result.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Бэктест детекции Пути А на уже захваченном дампе -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## stdout"; cat /tmp/backtest_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"; cat /tmp/backtest_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_bot_router_backtest_log.txt
+          git add data/p3_guard_cache/task5_bot_router_backtest_log.txt
+          if [ -s /tmp/backtest_result.json ] && python3 -c "import json; json.load(open('/tmp/backtest_result.json'))" 2>/dev/null; then
+            cp /tmp/backtest_result.json data/task5_bot_router_backtest_result.json
+            git add data/task5_bot_router_backtest_result.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, Путь А: бэктест детекции на захваченном дампе [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
