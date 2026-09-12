@@ -41,7 +41,9 @@ from task5_v4_pilot_accounting import (  # noqa: E402
     check_no_unexpected_token_spend,
 )
 from task5_v4_quote_replay import quote_exact_input_single  # noqa: E402
-from task5_v4_route_registry import RouteCycle, RouteRegistry, USDG, seed_routes  # noqa: E402
+from task5_v4_route_registry import (  # noqa: E402
+    RouteCycle, RouteRegistry, USDG, bootstrap_registry, check_route_liveness,
+)
 
 # Реальный slot0() того же WETH/USDG V3-пула, что уже используется для
 # живой цены в этом проекте (task5_true_arbitrageur_scan.py) -- нужен,
@@ -190,6 +192,29 @@ class HotPath:
         if latest <= self.last_checked_block:
             return
 
+        from_block = self.last_checked_block + 1
+
+        # --- Непрерывное обнаружение (владелец, 2026-09-13: "обнаружение
+        # должно идти непрерывно, а не только при старте. Каждая новая
+        # успешная транзакция 0x1b357e7a... из фида -> извлечь пулы ->
+        # добавить в реестр без перезапуска"). Тот же узкий диапазон
+        # блоков, что и проверка отслеживаемых пулов ниже -- не полное
+        # пересканирование заново, инкрементально по одному новому
+        # диапазону за раз. Честная цена: +1 eth_getLogs на каждый опрос
+        # (обычно 0 результатов -- арбитражник не свопает каждый блок),
+        # не бесплатно, но необходимо по прямому указанию владельца. ---
+        try:
+            new_routes = self.registry.discover_new_arbitrageur_routes(from_block, latest)
+            for route in new_routes:
+                res = check_route_liveness(route, latest)
+                res["checked_at_block"] = latest
+                res["checked_at_wall"] = time.time()
+                self.registry.liveness[route.route_id] = res
+                print(f"[hotpath][реестр] новый маршрут от арбитражника (без перезапуска): "
+                      f"{route.label} live={res['live']}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[hotpath] непрерывное обнаружение упало (честно, не молчим): {exc}", file=sys.stderr)
+
         pool_ids = list(self.registry.pool_to_routes.keys())
         if not pool_ids:
             self.last_checked_block = latest
@@ -197,7 +222,7 @@ class HotPath:
 
         recv_t_monotonic = time.monotonic()
         logs = list(_chunked_get_logs(
-            self.last_checked_block + 1, latest,
+            from_block, latest,
             topics=[SWAP_TOPIC0, pool_ids], address=POOL_MANAGER,
             chunk_size=latest - self.last_checked_block,
         ))
@@ -343,10 +368,14 @@ def main() -> None:
     ap.add_argument("--duration-seconds", type=float, default=None)
     args = ap.parse_args()
 
-    registry = RouteRegistry()
-    registry.add_routes(seed_routes())
-    latest = int(_rpc_call("eth_blockNumber", []), 16)
-    registry.refresh_liveness_all(latest)
+    # Владелец, 2026-09-13: "подключай полный реестр (сид + обнаружение
+    # из арбитражника) в task5_v4_hotpath.py::main(). Работать по всем
+    # живым маршрутам, не по двум мёртвым сидам." -- bootstrap_registry()
+    # это ТОТ ЖЕ код, что уже реально прогонялся диагностическим
+    # запуском task5_v4_route_registry.py (166 маршрутов, 117 живых,
+    # 88 новых пулов от арбитражника на 2026-09-13), не дублирован.
+    print("[hotpath] бутстрап реестра (сид + обнаружение пулов арбитражника)...")
+    registry, latest = bootstrap_registry()
     print(f"[hotpath] реестр: {len(registry.routes)} маршрутов, живых: {len(registry.live_routes())}")
 
     budget = PilotBudget()
