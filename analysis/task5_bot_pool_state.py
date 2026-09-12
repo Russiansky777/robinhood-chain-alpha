@@ -175,6 +175,21 @@ def _rpc_call(method: str, params: list, rpc_url: str = RPC_URL_MAINNET, timeout
     return data["result"]
 
 
+def _redact_secret_url(text: str, secret_url: str | None) -> str:
+    """РЕАЛЬНАЯ находка (2026-09-12): `requests`-исключения (HTTPError и
+    т.п.) включают ПОЛНЫЙ URL запроса в текст ошибки -- если этот URL несёт
+    ключ провайдера (Alchemy/Chainstack, см. `RPC_URL_PROVIDER`) в самом
+    пути, простой `print(exc)` печатает секрет в лог/файл в открытом виде
+    (реально произошло -- см. docs/PROJECT_STATE.md). GitHub маскирует
+    ТОЛЬКО значения, явно зарегистрированные как `secrets.X` в ДАННОМ job'е
+    -- этот код бежит на VPS, GH ничего не знает про `RPC_URL_PROVIDER` из
+    /etc/bot/env, маскировка НЕ сработает сама. Редактируем ЛЮБОЙ текст
+    (исключения, тела ответов) ПЕРЕД печатью, если известен секретный URL."""
+    if not secret_url or secret_url not in text:
+        return text
+    return text.replace(secret_url, "***REDACTED_PROVIDER_URL***")
+
+
 def _rpc_call_with_provider_fallback(method: str, params: list, fallback_rpc_url: str = RPC_URL_MAINNET,
                                       timeout: float = 10.0) -> dict:
     """Владелец, 2026-09-12: "публичный RPC не для bootstrap... провайдерский
@@ -182,13 +197,16 @@ def _rpc_call_with_provider_fallback(method: str, params: list, fallback_rpc_url
     (см. task5_bot_config.py) -- полный URL, из /etc/bot/env, задаётся
     владельцем. Если не задан -- ведёт себя ровно как раньше (публичный
     напрямую). Если задан, но провайдер сам упал (сеть/429/что угодно) --
-    честный fallback на публичный, не тихий отказ и не падение всего вызова."""
+    честный fallback на публичный, не тихий отказ и не падение всего вызова.
+    Текст исключения ОБЯЗАТЕЛЬНО редактируется (см. `_redact_secret_url`)
+    ПЕРЕД печатью -- реальный ключ уже один раз попал в лог до этого фикса."""
     provider_url = os.environ.get(RPC_URL_PROVIDER_ENV_VAR)
     if provider_url:
         try:
             return _rpc_call(method, params, provider_url, timeout)
         except Exception as exc:  # noqa: BLE001
-            print(f"[bootstrap] провайдерский RPC упал ({exc}) -- fallback на публичный {fallback_rpc_url}",
+            safe_msg = _redact_secret_url(str(exc), provider_url)
+            print(f"[bootstrap] провайдерский RPC упал ({safe_msg}) -- fallback на публичный {fallback_rpc_url}",
                   file=sys.stderr)
     return _rpc_call(method, params, fallback_rpc_url, timeout)
 
@@ -197,7 +215,8 @@ def _post_batch_with_provider_fallback(batch_body: list, fallback_rpc_url: str =
                                         timeout: float = 20.0) -> list:
     """Та же логика provider-with-fallback, что `_rpc_call_with_provider_
     fallback`, но для СЫРОГО batched JSON-RPC POST (не через `_rpc_call`,
-    см. `populate_initial_prices` ниже -- один HTTP POST = много eth_call)."""
+    см. `populate_initial_prices` ниже -- один HTTP POST = много eth_call).
+    Та же редакция секрета ПЕРЕД печатью, см. `_redact_secret_url`."""
     provider_url = os.environ.get(RPC_URL_PROVIDER_ENV_VAR)
     if provider_url:
         try:
@@ -205,7 +224,8 @@ def _post_batch_with_provider_fallback(batch_body: list, fallback_rpc_url: str =
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:  # noqa: BLE001
-            print(f"[bootstrap] провайдерский RPC (batch) упал ({exc}) -- fallback на публичный {fallback_rpc_url}",
+            safe_msg = _redact_secret_url(str(exc), provider_url)
+            print(f"[bootstrap] провайдерский RPC (batch) упал ({safe_msg}) -- fallback на публичный {fallback_rpc_url}",
                   file=sys.stderr)
     resp = requests.post(fallback_rpc_url, json=batch_body, timeout=timeout)
     resp.raise_for_status()
@@ -244,7 +264,16 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
     latest = int(latest_hex, 16)
     from_block = max(0, latest - lookback_blocks)
 
-    logs = _rpc_call_with_provider_fallback("eth_getLogs", [{
+    # ЧЕСТНАЯ, РЕАЛЬНАЯ находка (2026-09-12, alchemy_key_probe_result.json,
+    # тест ЭТОГО ЖЕ ключа): free tier Alchemy отдаёт "400 Bad Request" на
+    # eth_getLogs с диапазоном ШИРЕ 10 БЛОКОВ ("Under the Free tier plan,
+    # you can make eth_getLogs requests with up to a 10 block range") --
+    # наш lookback ({lookback_blocks} блоков) НИКОГДА не пройдёт через
+    # провайдера, это НЕ рейт-лимит, а жёсткий тарифный потолок. Не тратим
+    # попытку+fallback впустую -- eth_getLogs идёт СРАЗУ на публичный RPC
+    # (доказанно работает для такого диапазона), провайдер -- только для
+    # batched eth_call ниже (populate_initial_prices), где он реально нужен.
+    logs = _rpc_call("eth_getLogs", [{
         "fromBlock": hex(from_block),
         "toBlock": hex(latest),
         "address": CANONICAL_V3_FACTORY,
