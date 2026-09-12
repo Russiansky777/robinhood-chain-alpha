@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 import time
 import urllib.parse
 from dataclasses import dataclass
@@ -187,7 +188,12 @@ class SequencerFeedClient:
             if not self.is_loopback:
                 wait_s = seconds_until_feed_connect_allowed(self.state_file, self.cooldown_s)
                 if wait_s > 0:
-                    print(f"[feed] cooldown активен -- жду {wait_s:.0f}с перед подключением")
+                    # Владелец, 2026-09-12: диагностические print() -- в stderr, НЕ в
+                    # stdout. Реальный найденный баг: task5_feed_relay_validate.py печатает
+                    # ЧИСТЫЙ JSON-результат в stdout последней строкой -- эти print()
+                    # (через SequencerFeedClient.listen()) шли ТУДА ЖЕ и портили парсинг
+                    # (deploy_feed_relay.sh пытался json.load() всё содержимое файла).
+                    print(f"[feed] cooldown активен -- жду {wait_s:.0f}с перед подключением", file=sys.stderr)
                     await asyncio.sleep(wait_s)
                 record_feed_connect_attempt(self.state_file)
             self.diag["n_connect_attempts"] += 1
@@ -223,7 +229,7 @@ class SequencerFeedClient:
             # в начале цикла), не сразу -- владелец: "с паузой 30+ минут".
             self.diag["n_reconnects"] += 1
             print(f"[feed] соединение прервано ({self.diag.get('last_disconnect_error', 'штатное закрытие')}) -- "
-                  f"реконнект не раньше чем через {self.cooldown_s:.0f}с")
+                  f"реконнект не раньше чем через {self.cooldown_s:.0f}с", file=sys.stderr)
 
     async def _consume(self, ws, on_message) -> None:
         async for raw in ws:
