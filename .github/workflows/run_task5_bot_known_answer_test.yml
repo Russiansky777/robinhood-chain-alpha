@@ -77,6 +77,7 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_test_result.json 2>/dev/null' > /tmp/known_answer_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_pool_registry_cache.json 2>/dev/null' > /tmp/pool_registry_cache.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_diag_block_result.json 2>/dev/null' > /tmp/diag_block_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_full_report.json 2>/dev/null' > /tmp/full_report_result.json || true
 
       - name: Commit results
         if: always()
@@ -101,6 +102,10 @@ jobs:
           if [ -s /tmp/diag_block_result.json ] && python3 -c "import json; json.load(open('/tmp/diag_block_result.json'))" 2>/dev/null; then
             cp /tmp/diag_block_result.json data/task5_bot_known_answer_diag_block_result.json
             git add data/task5_bot_known_answer_diag_block_result.json
+          fi
+          if [ -s /tmp/full_report_result.json ] && python3 -c "import json; json.load(open('/tmp/full_report_result.json'))" 2>/dev/null; then
+            cp /tmp/full_report_result.json data/task5_bot_known_answer_full_report.json
+            git add data/task5_bot_known_answer_full_report.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: проверка против известного ответа (10 реальных захватов) [automated]"
