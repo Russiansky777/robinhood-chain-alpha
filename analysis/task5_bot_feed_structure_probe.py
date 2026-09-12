@@ -20,23 +20,32 @@ import time
 
 import websockets
 
-from task5_bot_feed_client import BROWSER_LIKE_HEADERS, connect_with_headers, require_feed_connect_allowed_now
+from task5_bot_feed_client import (
+    BROWSER_LIKE_HEADERS,
+    _is_loopback_feed_url,
+    connect_with_headers,
+    require_feed_connect_allowed_now,
+)
 
 FEED_URL = "wss://feed.mainnet.chain.robinhood.com"
 
 
-async def probe(n_samples: int, timeout_s: float, use_browser_headers: bool = True) -> dict:
+async def probe(n_samples: int, timeout_s: float, use_browser_headers: bool = True,
+                 feed_url: str = FEED_URL) -> dict:
     # Владелец, 2026-09-13: "никаких повторных подключений в тестах" --
     # см. task5_bot_feed_client.py::require_feed_connect_allowed_now(),
     # честный отказ (не молчаливое ожидание), если cooldown ещё активен.
-    require_feed_connect_allowed_now()
+    # Владелец, 2026-09-12: loopback (собственный feed relay) -- НЕ
+    # публичный Cloudflare-хост, cooldown здесь не нужен и не применяется.
+    if not _is_loopback_feed_url(feed_url):
+        require_feed_connect_allowed_now()
     samples = []
     diag = {"n_messages_total": 0, "n_with_seq": 0, "n_confirmation_only": 0, "n_unparsed": 0}
     headers = BROWSER_LIKE_HEADERS if use_browser_headers else None
     diag["headers_used"] = headers or "none"
     deadline = time.monotonic() + timeout_s
     try:
-        async with connect_with_headers(FEED_URL, headers, open_timeout=10, close_timeout=5) as ws:
+        async with connect_with_headers(feed_url, headers, open_timeout=10, close_timeout=5) as ws:
             diag["connect_failed"] = False
             return await _drain(ws, n_samples, deadline, samples, diag)
     except websockets.exceptions.InvalidStatus as exc:
@@ -89,5 +98,8 @@ if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
     timeout_s = float(sys.argv[2]) if len(sys.argv) > 2 else 30.0
     use_browser_headers = sys.argv[3] != "no-headers" if len(sys.argv) > 3 else True
-    result = asyncio.run(probe(n, timeout_s, use_browser_headers=use_browser_headers))
+    # Владелец, 2026-09-12: 4-й аргумент -- оверрайд URL фида, например
+    # ws://127.0.0.1:9642 (собственный feed relay) вместо публичного.
+    feed_url = sys.argv[4] if len(sys.argv) > 4 else FEED_URL
+    result = asyncio.run(probe(n, timeout_s, use_browser_headers=use_browser_headers, feed_url=feed_url))
     print(json.dumps(result, indent=2, ensure_ascii=False, default=str))

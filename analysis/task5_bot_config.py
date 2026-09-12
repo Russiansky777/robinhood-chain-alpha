@@ -27,6 +27,14 @@ RPC_URL_MAINNET = "https://rpc.mainnet.chain.robinhood.com"
 RPC_URL_TESTNET = "https://rpc.testnet.chain.robinhood.com"
 SEQUENCER_FEED_URL_MAINNET = "wss://feed.mainnet.chain.robinhood.com"
 SEQUENCER_FEED_URL_TESTNET = "wss://feed.testnet.chain.robinhood.com"
+# Владелец, 2026-09-12: официальный Nitro feed relay (Offchain Labs,
+# тот же образ offchainlabs/nitro-node, --entrypoint relay) на Ohio --
+# ОДНО постоянное подключение к SEQUENCER_FEED_URL_MAINNET, локальная
+# раздача бота/замеров через это (не отдельным подключением каждого
+# потребителя к публичному хосту). Не константа по умолчанию -- явный
+# --feed-url оверрайд в CLI-скриптах (task5_bot_run.py и т.п.), пока
+# relay не поднят и не провалидирован (см. scripts/deploy_feed_relay.sh).
+SEQUENCER_FEED_URL_LOCAL_RELAY = "ws://127.0.0.1:9642"
 # Write-only приёмник секвенсера (eth_sendRawTransaction), НЕ за Cloudflare
 # -- см. docs/PROJECT_STATE.md ("sequencer-эндпоинт -- точная формулировка")
 # и docs/TASK5_WRITEPATH_CLEAN_SPEC.md. Имя mainnet-хоста -- по аналогии с

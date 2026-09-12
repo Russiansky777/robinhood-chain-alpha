@@ -101,11 +101,17 @@ def main() -> int:
                           "sequencer_timestamp из заголовка), пишет data/task5_feed_latency_measurement.json.")
     ap.add_argument("--latency-out", type=str, default="data/task5_feed_latency_measurement.json",
                      help="Куда писать результат замера задержки чтения (см. --latency-sample-n).")
+    ap.add_argument("--feed-url", type=str, default="",
+                     help="Владелец, 2026-09-12: явный оверрайд URL фида -- например, "
+                          "ws://127.0.0.1:9642 (собственный feed relay, см. scripts/deploy_feed_relay.sh) "
+                          "вместо публичного wss://feed.mainnet.chain.robinhood.com. Пусто -- обычное "
+                          "поведение по умолчанию (публичный mainnet/testnet URL). Для loopback-адресов "
+                          "cooldown-гард НЕ применяется (см. task5_bot_feed_client.py::_is_loopback_feed_url).")
     args = ap.parse_args()
 
     dry_run = is_dry_run(args.confirm_mainnet)
     rpc_url = RPC_URL_TESTNET if args.testnet else RPC_URL_MAINNET
-    feed_url = SEQUENCER_FEED_URL_TESTNET if args.testnet else SEQUENCER_FEED_URL_MAINNET
+    feed_url = args.feed_url or (SEQUENCER_FEED_URL_TESTNET if args.testnet else SEQUENCER_FEED_URL_MAINNET)
     chain_id = CHAIN_ID_TESTNET if args.testnet else CHAIN_ID_MAINNET
     # --contract-address явно передан -- приоритет; иначе -- запасное значение
     # из конфига (заполняется владельцем после реального деплоя, см.

@@ -21,6 +21,7 @@ import asyncio
 import json
 import os
 import time
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -141,6 +142,23 @@ class FeedMessage:
     # заголовок отсутствует/не распознан -- не подставляем 0/угаданное значение.
 
 
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
+
+
+def _is_loopback_feed_url(feed_url: str) -> bool:
+    """Владелец, 2026-09-12: наш собственный feed relay (Ohio,
+    ws://127.0.0.1:9642) -- НЕ публичный Cloudflare-хост, cooldown-гард
+    существует ИМЕННО для защиты публичного upstream'а от частых
+    переподключений, не для локального сервиса на этой же машине.
+    Подключение к loopback можно реконнектить без ограничений (владелец:
+    "без ограничений на переподключения бота")."""
+    try:
+        host = urllib.parse.urlparse(feed_url).hostname
+    except Exception:
+        return False
+    return host in _LOOPBACK_HOSTS
+
+
 class SequencerFeedClient:
     def __init__(self, feed_url: str, headers: dict | None = BROWSER_LIKE_HEADERS,
                  state_file: Path = FEED_STATE_FILE_DEFAULT, cooldown_s: float = FEED_RECONNECT_COOLDOWN_S) -> None:
@@ -148,6 +166,7 @@ class SequencerFeedClient:
         self.headers = headers
         self.state_file = state_file
         self.cooldown_s = cooldown_s
+        self.is_loopback = _is_loopback_feed_url(feed_url)
         self.diag: dict = {"n_messages_total": 0, "n_with_seq": 0, "n_unparsed": 0, "n_confirmation_only": 0,
                             "n_connect_attempts": 0, "n_reconnects": 0}
 
@@ -159,13 +178,18 @@ class SequencerFeedClient:
         скрипт) остаток паузы, если предыдущая попытка была недавно.
         on_message(FeedMessage) вызывается синхронно для каждого реального
         сообщения фида с sequenceNumber -- вызывающий код (детектор) должен
-        быть быстрым, это горячий путь без сети."""
+        быть быстрым, это горячий путь без сети.
+
+        Владелец, 2026-09-12: для loopback (собственный feed relay) --
+        cooldown НЕ применяется вообще, это локальный сервис, не
+        публичный Cloudflare-хост."""
         while True:
-            wait_s = seconds_until_feed_connect_allowed(self.state_file, self.cooldown_s)
-            if wait_s > 0:
-                print(f"[feed] cooldown активен -- жду {wait_s:.0f}с перед подключением")
-                await asyncio.sleep(wait_s)
-            record_feed_connect_attempt(self.state_file)
+            if not self.is_loopback:
+                wait_s = seconds_until_feed_connect_allowed(self.state_file, self.cooldown_s)
+                if wait_s > 0:
+                    print(f"[feed] cooldown активен -- жду {wait_s:.0f}с перед подключением")
+                    await asyncio.sleep(wait_s)
+                record_feed_connect_attempt(self.state_file)
             self.diag["n_connect_attempts"] += 1
             try:
                 async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:

@@ -1,0 +1,130 @@
+name: "Задача 5, feed relay -- ЗАПУСК официального Nitro relay на Ohio (одна попытка, только после 12ч окна)"
+
+# Владелец, 2026-09-12: Chainstack официально держит Offchain Labs Nitro
+# relay (не имитацию TLS-отпечатка -- их README подтверждает "Robinhood
+# rate-limits per client, not per connection") -- ОДНО постоянное
+# подключение к публичному фиду, локальная раздача на 127.0.0.1:9642.
+# Бот и диагностические скрипты переключаются на этот локальный relay
+# (--feed-url ws://127.0.0.1:9642) вместо публичного URL напрямую.
+#
+# КРИТИЧНО (см. scripts/deploy_feed_relay.sh): у Nitro-клиента фида
+# задокументирован встроенный реконнект-backoff 1с->64с БЕЗ известного
+# флага отключения -- если апстрим-хендшейк словит 403, наивный
+# restart-policy превратит "одну попытку" в "попытку каждые ~64с
+# навсегда". Поэтому: (1) жёсткая проверка 12-часового окна ПЕРЕД
+# запуском (отдельно от обычного 1800с код-кулдауна бота), (2) relay
+# стартует БЕЗ restart-policy, (3) внешняя валидация (реальные ли
+# сообщения идут через localhost), (4) restart-policy включается
+# ТОЛЬКО при подтверждённом успехе, иначе контейнер останавливается и
+# удаляется.
+#
+# Намеренно ТОЛЬКО workflow_dispatch (как run_task5_deploy_executor.yml/
+# run_task5_test5_revert.yml) -- это ЕДИНСТВЕННАЯ разрешённая попытка
+# подключения к публичному фиду за 12+ часов, обычный push не должен
+# иметь шанс её случайно запустить.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите ровно "DEPLOY_RELAY", чтобы подтвердить: это ЕДИНСТВЕННАЯ разрешённая попытка подключения к публичному фиду секвенсера за последние 12+ часов.'
+        required: true
+        type: string
+
+jobs:
+  deploy_feed_relay:
+    name: "Nitro feed relay (Ohio VPS, одна попытка)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "DEPLOY_RELAY" ]; then
+            echo "confirm != 'DEPLOY_RELAY' -- остановлено, relay НЕ запущен." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на Ohio
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: "ЖЁСТКАЯ проверка 12-часового окна (read-only, не пишет state)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python3 task5_feed_relay_precheck.py
+            "
+          ' | tee /tmp/relay_precheck.log
+
+      - name: "Запустить deploy_feed_relay.sh (ОДНА попытка -- см. осторожности в самом скрипте)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo bash /home/bot/robinhood-chain-alpha/scripts/deploy_feed_relay.sh
+          ' > /tmp/deploy_relay_stdout.log 2> /tmp/deploy_relay_stderr.log
+          echo "--- stdout ---"; cat /tmp/deploy_relay_stdout.log
+          echo "--- stderr ---"; cat /tmp/deploy_relay_stderr.log
+
+      - name: Забрать результат деплоя
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo cat /home/bot/data/task5_feed_relay_deploy_result.json' > /tmp/task5_feed_relay_deploy_result.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Деплой Nitro feed relay (Ohio) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## проверка 12-часового окна"
+            cat /tmp/relay_precheck.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/deploy_relay_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/deploy_relay_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_deploy_feed_relay_log.txt
+          git add data/p3_guard_cache/task5_deploy_feed_relay_log.txt
+          if [ -s /tmp/task5_feed_relay_deploy_result.json ] && python3 -c "import json; json.load(open('/tmp/task5_feed_relay_deploy_result.json'))" 2>/dev/null; then
+            cp /tmp/task5_feed_relay_deploy_result.json data/task5_feed_relay_deploy_result.json
+            git add data/task5_feed_relay_deploy_result.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: результат запуска feed relay на Ohio [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
