@@ -1,0 +1,77 @@
+name: "Задача 5, деплой -- read-only оценка газа (eth_estimateGas, без подписи)"
+
+# Владелец, 2026-09-13: "оценку газа на деплой" -- eth_estimateGas не
+# требует подписи (симуляция на ноде), только from+data. Через Ohio VPS
+# (тот же путь, что все остальные RPC-вызовы проекта).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_DEPLOY_GAS_ESTIMATE_REQUEST"
+
+jobs:
+  deploy_gas_estimate:
+    name: "eth_estimateGas для деплоя ClosedCycleExecutorV3 (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код (deploy_params.json + скрипт) и посчитать газ
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_deploy_gas_estimate.py
+            "
+            cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json
+          ' > /tmp/deploy_params_updated.json 2> /tmp/deploy_gas_stderr.log
+          echo "--- stderr ---"; cat /tmp/deploy_gas_stderr.log
+          echo "--- stdout (последний JSON -- обновлённый deploy_params.json) ---"; cat /tmp/deploy_params_updated.json
+
+      - name: Забрать обновлённый deploy_params.json (с gas_estimate)
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json' > /tmp/deploy_params_final.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_DEPLOY_GAS_ESTIMATE_REQUEST
+          if [ -s /tmp/deploy_params_final.json ] && python3 -c "import json,sys; json.load(open('/tmp/deploy_params_final.json'))" 2>/dev/null; then
+            cp /tmp/deploy_params_final.json contracts/build/deploy_params.json
+            git add contracts/build/deploy_params.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: реальный eth_estimateGas для деплоя ClosedCycleExecutorV3 [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
