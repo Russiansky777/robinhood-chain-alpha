@@ -12,3 +12,4 @@ eccodes>=1.7.0         # C-библиотека для cfgrib -- pip-пакет 
 xarray>=2023.1         # РЕАЛЬНЫЙ фикс после первого прогона диагностики: cfgrib импортировался успешно (значит eccodes реально встал), упало именно "No module named 'xarray'" -- xarray не тянется транзитивно cfgrib, нужен отдельной строкой
 websockets>=12.0       # Задача 5, владелец 2026-09-11: измерение задержки фида секвенсера Robinhood Chain (wss://feed.mainnet.chain.robinhood.com) -- seq_feed_latency_probe.py, только пассивное чтение
 rlp>=4.0                # Задача 5, живой бот: декодирование RLP-транзакций из L2MessageType_signedTx фида секвенсера -- task5_bot_feed_client.py
+web3>=6.0               # Задача 5, живой бот: task5_bot_sender.py (владелец, 2026-09-13) -- Web3 HTTPProvider для RPC/sequencer, подпись/отправка/рецепт
