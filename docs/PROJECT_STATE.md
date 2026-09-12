@@ -2412,3 +2412,42 @@ Actions job'а (там всё равно короче, чем 30 минут). Л
 ошибке.**
 
 Cron `:51` на NL, SSH read-only на NL/Dallas, слепой OOS -- не тронуты.
+
+## Владелец, 2026-09-13 (продолжение): реальная оценка газа на деплой получена
+
+**Найден и исправлен баг в `deploy_params.json` до получения оценки.**
+Первый прогон `run_task5_deploy_gas_estimate.yml` (run
+`34667642663`) формально завершился `success`, но diff'а не дал --
+изнутри `sudo -u bot bash -c "..."` не было `set -e`, поэтому провал
+`task5_deploy_gas_estimate.py` молча маскировался последующим `cat`
+(его успешный exit-код "перекрыл" реальную ошибку). Полные логи job'а
+(не только failed-only) показали настоящую причину:
+`eth_estimateGas` вернул `invalid argument 0: ... cannot unmarshal
+invalid hex string into Go struct field TransactionArgs.data`, а в
+логах `deploy_tx_data_hex` явно начинался с `0x0x...` -- двойной
+префикс. Корень: `deploy_tx_data_hex` в исходном одноразовом Python-
+скрипте собирался как `'0x' + (bytecode + args_hex)`, а `bytecode` (из
+`.bytecode.txt`) уже сам по себе начинался с `0x`. Исправлено:
+`deploy_tx_data_hex = bytecode + constructor_args_encoded_hex[2:]`
+(ровно один префикс `0x`), `deploy_tx_data_len_bytes` пересчитан:
+3609 байт (было ошибочно 3610 -- на 1 байт больше из-за лишних `0x`).
+Проверено локально перед коммитом: склейка байткод+аргументы без
+разрывов, строка оканчивается на адрес владельца в hex, длина в байтах
+совпадает с фактической длиной строки.
+
+**После фикса -- повторный прогон (`run_task5_writepath...` не путать,
+это `run_task5_deploy_gas_estimate.yml`, run `34667957295`) дал реальный
+результат:** `gas_estimate = 804411` (реальный `eth_estimateGas` через
+`rpc.mainnet.chain.robinhood.com` с Ohio VPS, `from` = адрес владельца
+`0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75`, `data` = полный
+`deploy_tx_data_hex`, `to` отсутствует -- транзакция создания
+контракта). `base_fee` на момент проверки = 100942000 wei; иллюстративная
+стоимость деплоя в ETH при этом base_fee записана в файл как ТОЛЬКО
+ориентир на момент проверки -- на момент реального деплоя `base_fee`
+будет другим, честно оговорено в `gas_estimate_note` самого файла.
+`contracts/build/deploy_params.json` теперь полностью укомплектован:
+байткод, ABI, constructor args, ожидаемый адрес владельца, реальная
+(не выдуманная) оценка газа -- готов для деплоя владельцем через его
+собственный скрипт.
+
+Cron `:51` на NL, SSH read-only на NL/Dallas, слепой OOS -- не тронуты.
