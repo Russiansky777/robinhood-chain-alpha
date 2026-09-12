@@ -205,19 +205,27 @@ CUSTOM_ERROR_SELECTORS = {
     "0xc2221189": "UnexpectedCallback",   # UnexpectedCallback(address)
     "0x37ed32e8": "ReentrantCall",        # ReentrantCall()
     "0x30cd7471": "NotOwner",             # NotOwner()
+    "0xb95380e9": "RepayShortfall",       # RepayShortfall(uint256,uint256) -- ревизия владельца
+    # 2026-09-12 после код-ревью (фикс UnexpectedCallback на внутреннем свопе pool B и
+    # перепутанного направления zeroForOne/долга). Селектор перепроверен независимо
+    # (keccak256("RepayShortfall(uint256,uint256)")[:4] = 0xb95380e9).
 }
 _KNOWN_CONTRACT_ERRORS = {
     "InsufficientProfit": "price_moved_or_slippage",  # минимальная прибыль не набралась -- цена
     # успела сдвинуться между детекцией и включением, либо оценка minProfit была завышена
-    "UnexpectedCallback": "execution_error",           # колбэк пришёл не от ожидаемого pool A -- баг
+    "UnexpectedCallback": "execution_error",           # колбэк пришёл не от ожидаемого pool A/B -- баг
     # в адресации пула, не рыночное явление
     "ReentrantCall": "execution_error",                # inCycle уже true -- параллельная попытка
     "NotOwner": "execution_error",                     # msg.sender != owner -- баг в подписанте/адресе
+    "RepayShortfall": "price_moved_or_slippage",        # закрывающий своп в pool B не вернул
+    # достаточно для погашения долга перед pool A -- то же явление, что InsufficientProfit, но
+    # на более раннем шаге (не хватило даже на возврат долга, не только на профит). Заменяет
+    # прежний require-string "insufficient funds to repay poolA" из добаговой версии контракта.
 }
-_KNOWN_REQUIRE_STRINGS = {
-    "insufficient funds to repay poolA": "price_moved_or_slippage",  # закрывающий своп в pool B
-    # не вернул достаточно для погашения долга перед pool A -- то же явление, что InsufficientProfit,
-    # но на более раннем шаге (не хватило даже на возврат долга, не только на профит)
+_KNOWN_REQUIRE_STRINGS: dict[str, str] = {
+    # Прежний require-string "insufficient funds to repay poolA" (добаговая версия
+    # контракта) заменён явным custom error RepayShortfall(uint256,uint256) -- см.
+    # CUSTOM_ERROR_SELECTORS/_KNOWN_CONTRACT_ERRORS выше, здесь больше не встречается.
 }
 _NETWORK_ERROR_MARKERS = (
     "timeout", "connection", "insufficient funds for gas", "nonce too low", "replacement transaction",

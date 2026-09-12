@@ -52,6 +52,9 @@ REVERT_SELECTORS: dict[str, str] = {
     "0xc2221189": "UnexpectedCallback",  # UnexpectedCallback(address)
     "0x37ed32e8": "ReentrantCall",       # ReentrantCall()
     "0x30cd7471": "NotOwner",            # NotOwner()
+    "0xb95380e9": "RepayShortfall",      # RepayShortfall(uint256,uint256) -- ревизия владельца
+    # 2026-09-12 после код-ревью (фикс UnexpectedCallback/zeroForOne). Селектор
+    # перепроверен независимо (keccak256("RepayShortfall(uint256,uint256)")[:4]).
 }
 
 

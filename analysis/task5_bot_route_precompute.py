@@ -59,6 +59,19 @@ EXECUTE_CYCLE_SELECTOR = _selector(_EXECUTE_CYCLE_SIGNATURE)
 # факту первой недели dry-run, как и остальные заглушки этого модуля.
 DEFAULT_SLIPPAGE_BPS = 50
 
+# Владелец, 2026-09-12 (код-ревью контракта): TickMath-константы Uniswap V3
+# (contracts/ClosedCycleExecutorV3.sol не переопределяет проверку "SPL" --
+# она в самом пуле). ВАЖНО: `sqrtPriceLimitX96 = 0` -- НЕ "без лимита" --
+# пул V3 требует zeroForOne ? (MIN_SQRT_RATIO < limit < currentPrice)
+# : (currentPrice < limit < MAX_SQRT_RATIO); 0 не проходит НИ ОДНУ из
+# половин этой проверки (0 < MIN_SQRT_RATIO всегда) -- своп с limit=0
+# гарантированно откатится с "SPL" на самом первом pool.swap(), то есть
+# каждая попытка executeCycle() билась бы о это ДО того, как вообще
+# дошла бы до реальной логики цикла. Прежняя заглушка "0 = без лимита"
+# была неверна для реального протокола -- заменено на реальный расчёт.
+MIN_SQRT_RATIO = 4295128739
+MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342
+
 
 @dataclass
 class RouteSkeleton:
@@ -123,6 +136,28 @@ class RoutePrecomputeTable:
         return self._by_pool_pair.get(self._key(pool_a, pool_b))
 
 
+def _sqrt_price_limit(sqrt_price_x96: int, zero_for_one: bool, slippage_bps: int) -> int:
+    """Реальный (не заглушка) sqrtPriceLimitX96 для `IUniswapV3Pool.swap()`:
+    zeroForOne=true двигает цену ВНИЗ (лимит должен быть СТРОГО меньше
+    текущей sqrtPriceX96 и строго больше MIN_SQRT_RATIO); zeroForOne=false
+    двигает цену ВВЕРХ (лимит строго больше текущей и строго меньше
+    MAX_SQRT_RATIO) -- см. `MIN_SQRT_RATIO`/`MAX_SQRT_RATIO` выше. Считаем
+    лимит как sqrtPrice * sqrt(1 ± slippage), затем зажимаем внутрь
+    допустимого полуинтервала -- если бы отдали 0 или "сырое" значение без
+    зажима, своп в pool A/B откатился бы на входной проверке пула ("SPL"),
+    ДО того, как дошёл бы до логики цикла в контракте."""
+    frac = slippage_bps / 10_000.0
+    if zero_for_one:
+        limit = int(sqrt_price_x96 * ((1.0 - frac) ** 0.5))
+        limit = min(limit, sqrt_price_x96 - 1)
+        limit = max(limit, MIN_SQRT_RATIO + 1)
+    else:
+        limit = int(sqrt_price_x96 * ((1.0 + frac) ** 0.5))
+        limit = max(limit, sqrt_price_x96 + 1)
+        limit = min(limit, MAX_SQRT_RATIO - 1)
+    return limit
+
+
 def fill_cycle_params(
     skeleton: RouteSkeleton,
     cheap_pool: V3PoolState,
@@ -156,6 +191,18 @@ def fill_cycle_params(
     min_profit_wei = int(max(min_profit_usd, 0.0) / max(price_usd_per_exit_token, 1e-9) * 1e18) \
         if skeleton.exit_token.lower() != "usdg" else int(max(min_profit_usd, 0.0) * 1e6)
 
+    if cheap_pool.sqrt_price_x96 is None or expensive_pool.sqrt_price_x96 is None:
+        raise ValueError(
+            "fill_cycle_params: sqrt_price_x96 не заполнен -- вызывающий код (executor) "
+            "должен вызывать это только после успешной check_pair_for_divergence "
+            "(которая сама требует непустой sqrt_price_x96 для обеих сторон)"
+        )
+    zero_for_one_b = not zero_for_one_a
+    # poolB = expensive_pool (см. докстринг выше: poolA -- дешёвый, где занимаем,
+    # poolB -- дорогой, где закрываем встречным свопом).
+    sqrt_price_limit_a = _sqrt_price_limit(cheap_pool.sqrt_price_x96, zero_for_one_a, slippage_bps)
+    sqrt_price_limit_b = _sqrt_price_limit(expensive_pool.sqrt_price_x96, zero_for_one_b, slippage_bps)
+
     return {
         "poolA": cheap_pool.address,
         "poolB": expensive_pool.address,
@@ -163,9 +210,7 @@ def fill_cycle_params(
         "amountSpecifiedA": -int(notional_wei),  # отрицательное = exact output заимствования (см. .sol)
         "exitToken": skeleton.exit_token,
         "minProfit": min_profit_wei,
-        "sqrtPriceLimitA": 0,  # ЗАГЛУШКА: 0 = "без лимита" в текущей версии -- реальный лимит
-        "sqrtPriceLimitB": 0,  # (± slippage_bps от текущего sqrtPriceX96) добавляется при калибровке
-        # на testnet (см. план по неделям, PROJECT_STATE.md) -- честно не подставляем не откалиброванное
-        # число вместо 0, чтобы не создавать ложное ощущение точности.
+        "sqrtPriceLimitA": sqrt_price_limit_a,
+        "sqrtPriceLimitB": sqrt_price_limit_b,
         "execute_cycle_selector": skeleton.execute_cycle_selector,
     }
