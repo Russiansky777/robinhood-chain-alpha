@@ -67,7 +67,9 @@ def current_weth_usdg_price() -> float | None:
 SWAP_TOPIC0 = topic0("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)")
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 
-POLL_INTERVAL_S = 2.0
+POLL_INTERVAL_S = 0.5  # = alchemy_fallback._MIN_REQUEST_INTERVAL_S -- опрашивать чаще
+                       # не даст выигрыша (eth_blockNumber всё равно упрётся в тот же
+                       # самотроттлинг), реже -- добавляет задержку детекции сверх нужного.
 LIVENESS_REFRESH_INTERVAL_S = 60.0  # владелец: "раз в минуту"
 
 # Собственный подбор размера (та же сетка, что task5_v4_observation_hour.py,
@@ -84,7 +86,29 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
     (amount_in, amount_out, profit_raw) ИЛИ причину отказа. Не
     подставляет заранее известный ответ -- пересчитывает КАЖДЫЙ раз из
     реального состояния пулов на blockNumber (событие свопа уже
-    подтверждено -- это состояние РЕАЛЬНОЕ, не из будущего)."""
+    подтверждено -- это состояние РЕАЛЬНОЕ, не из будущего).
+
+    НАЙДЕНА И ИСПРАВЛЕНА ПРИЧИНА "6 проверок за 90 секунд" (владелец,
+    2026-09-13, "заведомо мимо, найти причину" -- диагноз по реальным
+    данным task5_v4_observation_hour.py): узкое место -- НЕ таймер опроса
+    (POLL_INTERVAL_S), а САМОТРОТТЛИНГ RPC (alchemy_fallback._throttle,
+    _MIN_REQUEST_INTERVAL_S=0.5с МЕЖДУ ЛЮБЫМИ запросами, project-wide,
+    сознательно введён после реальных инцидентов с 429 -- не трогаем)
+    в сочетании со СПЛОШНЫМ перебором ВСЕЙ сетки размеров (до 8 точек x
+    до 3 ног = до 24 последовательных eth_call) даже когда САМЫЙ МЕЛКИЙ
+    размер уже падает с NotEnoughLiquidity: 24 x 0.5с = 12с на один
+    пересчёт -- ровно наблюдавшийся порядок (90с / ~10-12с ~= 6-7
+    проверок).
+    Реальное, не выдуманное свойство V4-пулов с концентрированной
+    ликвидностью, на котором строится исправление: если ДАЖЕ САМЫЙ
+    МЕЛКИЙ размер в сетке (или мелкий размер на КАКОЙ-ЛИБО ноге цепочки)
+    падает с NotEnoughLiquidity -- ликвидности в диапазоне текущей цены
+    нет вообще, и ЛЮБОЙ БОЛЬШИЙ размер (которому нужно СТРОГО НЕ МЕНЬШЕ
+    ликвидности) тоже упадёт тем же образом. Поэтому сетка перебирается
+    по возрастанию, и при первом NotEnoughLiquidity -- немедленный
+    останов (не перебор оставшихся точек): для мёртвого маршрута (наша
+    текущая реальность -- оба сид-маршрута сейчас без ликвидности) это
+    1 запрос вместо до 24, не до 12с, а меньше 1с на пересчёт."""
     start_token = route.legs[0].input_currency.lower()
     grid = SIZE_GRID_BY_START_TOKEN.get(start_token, SIZE_GRID_BY_START_TOKEN[USDG.lower()])
     best = None
@@ -99,6 +123,12 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
                 best = {"amount_in": amount_in, "amount_out": cur, "profit_raw": profit_raw}
         except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
+            if "NotEnoughLiquidity" in last_error:
+                # Больший размер строго не может пройти там, где не прошёл
+                # меньший -- дальше по сетке идти бессмысленно и дорого
+                # (см. докстринг выше). Если best уже найден на МЕНЬШЕМ
+                # размере до этого сбоя -- он остаётся в силе, это не потеря.
+                break
             continue
     if best is None:
         reason = REASON_NO_LIQUIDITY if last_error and "NotEnoughLiquidity" in last_error else REASON_CALC_ERROR
