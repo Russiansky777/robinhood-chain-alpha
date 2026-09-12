@@ -1,0 +1,36 @@
+name: "Задача 5, feed relay -- диагностика текущего состояния Ohio (read-only)"
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diag:
+    name: "Диагностика Docker/relay состояния (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Состояние Docker/relay на Ohio
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            echo "--- docker version ---"; docker --version 2>&1 || echo "docker CLI не найден"
+            echo "--- docker ps -a (все контейнеры) ---"; sudo docker ps -a 2>&1 || echo "docker ps не удался"
+            echo "--- docker images ---"; sudo docker images 2>&1 || true
+            echo "--- docker logs task5-feed-relay (если есть) ---"; sudo docker logs task5-feed-relay 2>&1 || echo "контейнера нет/логов нет"
+            echo "--- df -h (место на диске) ---"; df -h 2>&1
+            echo "--- systemctl status docker (кратко) ---"; systemctl is-active docker 2>&1 || true
+          ' 2>&1 | tee /tmp/relay_diag.log || true
+
+      - name: Печать результата
+        if: always()
+        run: cat /tmp/relay_diag.log || echo "нет данных"
