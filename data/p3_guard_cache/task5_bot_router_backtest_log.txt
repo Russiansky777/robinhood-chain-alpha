@@ -1,24 +1,24 @@
-# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T12:11:56Z
+# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T12:14:14Z
 
 ## stdout
 [backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC (--refresh-cache)...
 [backtest] реестр сохранён в кеш: data/task5_bot_pool_registry_cache.json
-[backtest] пулов в реестре: 1138, текущая цена WETH/USDG: 2533.351857269288
+[backtest] пулов в реестре: 1140, текущая цена WETH/USDG: 2533.855218800265
 {
   "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
-  "n_pools_in_registry": 1138,
-  "current_weth_usd_price": 2533.351857269288,
+  "n_pools_in_registry": 1140,
+  "current_weth_usd_price": 2533.855218800265,
   "weth_usdg_pools_in_registry_debug": [
     {
       "address": "0x52E65B17FB6E5BA00ED806F37AFCD2DAA50271CA",
       "fee": 0,
-      "sqrt_price_x96": 3987744643230069780249917,
-      "liquidity": 10099166774314765726
+      "sqrt_price_x96": 3988140793797247849428306,
+      "liquidity": 10785497456577779106
     },
     {
       "address": "0x69BFAF19C9F377BB306A89AED9F6B07E2C1A8D9A",
       "fee": 0,
-      "sqrt_price_x96": 3988261326908240827670750,
+      "sqrt_price_x96": 3988303932014510634797015,
       "liquidity": 1355151185463091953
     }
   ],
@@ -28,7 +28,7 @@
   "n_selector_match": 3224,
   "n_intents_decoded_full": 2109,
   "n_pool_found_in_registry": 233,
-  "n_priced_via_pool": 2,
+  "n_priced_via_pool": 3,
   "version1_notional_usd": {
     "n_hits": 0,
     "top10": []
@@ -59,10 +59,4 @@
 [bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
 [bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
 [bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] провайдерский RPC (batch) упал (429 Client Error: Too Many Requests for url: ***REDACTED_PROVIDER_URL***) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
-[bootstrap] populate_initial_prices: 263/1138 успешно, 875 ошибок, примеры: ["0x88bc3554f3c06f8a1f7b663ae9394fa6f5da3f5f: slot0 -> {'jsonrpc': '2.0', 'id': '2-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}", "0xbdb2976270c22e2cd34f53dfcf42fd5675fe1987: slot0 -> {'jsonrpc': '2.0', 'id': '3-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}", "0xd26c55915f58dd7f69b29b394bcb82a2bc4b9853: slot0 -> {'jsonrpc': '2.0', 'id': '8-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}"]
+[bootstrap] populate_initial_prices: 571/1140 успешно, 569 ошибок, примеры: ["0x7b399c57b4389ad47c8fdd46137908c70a7c8225: slot0 -> {'jsonrpc': '2.0', 'id': '6-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}", "0x7aee9818930deae501a60ee37bb9d159abce774f: slot0 -> {'jsonrpc': '2.0', 'id': '0-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}", "0xc9eb746399cdf415a4f0d6ef0deb2c7d2c679b04: slot0 -> {'jsonrpc': '2.0', 'id': '4-slot0', 'error': {'code': 429, 'message': 'Your app has exceeded its compute units per second capacity. If you have retries enabled, you can safely ignore this message. If not, check out https://docs.alchemy.com/reference/throughput'}}"]
