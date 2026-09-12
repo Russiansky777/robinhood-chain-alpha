@@ -129,7 +129,12 @@ EXPECTED_WALLET_ENV_VAR = "TASK5_BOT_WALLET_ADDRESS"  # сверяется с а
 # None -- контракт ещё не задеплоен; --contract-address из CLI (task5_bot_run.py)
 # по-прежнему имеет приоритет, если передан явно, это только запасное значение по
 # умолчанию, чтобы не забыть/не потерять адрес между запусками.
-EXECUTOR_CONTRACT_ADDRESS_MAINNET: str | None = None
+#
+# Реальный деплой (владелец, 2026-09-12, scripts/deploy_executor.sh через
+# run_task5_deploy_executor.yml, Ohio VPS): tx_hash
+# 0x8e4cab21411a9838a7c7bd3746c4491a8a7e72d5ad2e10b6e3ee25eb982407b4,
+# block 60775091, gas_used 796881 -- см. contracts/build/deploy_result.json.
+EXECUTOR_CONTRACT_ADDRESS_MAINNET: str | None = "0xeFBf06bCB9B0c6d0956c5bF149c0D9d9F34D5010"
 EXECUTOR_CONTRACT_ADDRESS_TESTNET: str | None = None
 
 # --- Телеметрия (владелец: "обязательная часть, не довесок") ---
