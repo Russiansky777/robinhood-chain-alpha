@@ -1,21 +1,38 @@
-# Предварительная проверка ворот $5-теста (eth_call) -- 2026-09-12T03:47:31Z
+# Предварительная проверка ворот $5-теста (eth_call) -- 2026-09-12T03:54:02Z
 
 Your branch is behind 'origin/claude/nifty-sagan-r0polg' by 4 commits, and can be fast-forwarded.
   (use "git pull" to update your local branch)
-HEAD is now at be6a83f Задача 5: предварительная бесплатная проверка ворот $5-теста (eth_call, read-only)
+HEAD is now at 34b95a5 Задача 5: маркер повтора проверки ворот с полными raw revert-данными
 {
   "contract_address": "0xeFBf06bCB9B0c6d0956c5bF149c0D9d9F34D5010",
   "from": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+  "calldata_hex": "0x22962aa400000000000000000000000069bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a00000000000000000000000052e65b17fb6e5ba00ed806f37afcd2daa50271ca0000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffff8edee0b25f2530000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad730000000000000000000000000000000000000000000000000046b4b3908488c2000000000000000000000000000000000000000000034b06548773e2000000000000000000000000000000000000000000000000000346d8194088c5a0000000",
   "rpc_url": "https://rpc.mainnet.chain.robinhood.com",
+  "raw_json_rpc_response": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "error": {
+      "code": 3,
+      "message": "execution reverted",
+      "data": "0xb95380e900000000000000000000000000000000000000000000000000000000004c4f0700000000000000000000000000000000000000000000000000000000004c5634"
+    }
+  },
   "reverted": true,
+  "rpc_error_message": "execution reverted",
+  "error_data_raw": "0xb95380e900000000000000000000000000000000000000000000000000000000004c4f0700000000000000000000000000000000000000000000000000000000004c5634",
   "selector": "0xb95380e9",
+  "revert_kind": "contract_custom_error",
   "revert_name": "RepayShortfall",
+  "decoded_args": [
+    "5000967",
+    "5002804"
+  ],
   "gate_would_pass": false,
-  "note": "\u0432\u043e\u0440\u043e\u0442\u0430 \u041d\u0415 \u043f\u0440\u043e\u0439\u0434\u0435\u043d\u044b -- \u043f\u043e\u043b\u0443\u0447\u0435\u043d RepayShortfall, \u043e\u0436\u0438\u0434\u0430\u043b\u0441\u044f InsufficientProfit"
+  "note": "\u0432\u043e\u0440\u043e\u0442\u0430 \u041d\u0415 \u043f\u0440\u043e\u0439\u0434\u0435\u043d\u044b -- \u043f\u043e\u043b\u0443\u0447\u0435\u043d custom error \u043a\u043e\u043d\u0442\u0440\u0430\u043a\u0442\u0430 RepayShortfall (\u041d\u0415 \u0442\u0435\u043a\u0441\u0442\u043e\u0432\u044b\u0439 revert \u043f\u0443\u043b\u0430 -- \u044d\u0442\u043e \u043d\u0430\u0448 \u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u043d\u044b\u0439 error, \u0441\u0435\u043b\u0435\u043a\u0442\u043e\u0440 -- keccak256 \u0441\u0438\u0433\u043d\u0430\u0442\u0443\u0440\u044b RepayShortfall(...), \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0435 \u0441\u043b\u0443\u0447\u0430\u0439\u043d\u044b\u043c \u043d\u0435 \u0431\u044b\u0432\u0430\u0435\u0442)"
 }
 
 ## stderr
 From https://github.com/russiansky777/robinhood-chain-alpha
  * branch            claude/nifty-sagan-r0polg -> FETCH_HEAD
-   712c8c3..be6a83f  claude/nifty-sagan-r0polg -> origin/claude/nifty-sagan-r0polg
+   be6a83f..34b95a5  claude/nifty-sagan-r0polg -> origin/claude/nifty-sagan-r0polg
 Already on 'claude/nifty-sagan-r0polg'
