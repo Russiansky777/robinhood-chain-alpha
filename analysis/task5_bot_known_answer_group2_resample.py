@@ -271,11 +271,19 @@ if __name__ == "__main__":
           f"{len(candidates)}")
 
     group2_rows = []
+    all_candidate_diag = []  # владелец, следующий шаг после первого 0/30: честная диагностика ВСЕХ
+    # кандидатов (не только квалифицировавшихся) -- чтобы отличить "реально нет катализатора" от бага.
     skipped = {"group1_executor": 0, "group1_to_contract": 0, "no_catalyst": 0, "other_skip": 0}
     for c in candidates:
-        if len(group2_rows) >= TARGET_N:
-            break
         cls = classify_and_find_catalyst(c, registry)
+        diag_row = {
+            "tx_hash": c["tx_hash"], "block_number": c["block_number"], "executor": c["executor"],
+            "profit_usd": c["profit_usd"], "skip_reason": cls.get("skip_reason"),
+            "real_pools_touched": cls.get("real_pools_touched"), "arb_to": cls.get("arb_to"),
+            "is_group2": cls.get("is_group2"),
+        }
+        all_candidate_diag.append(diag_row)
+
         if cls.get("skip_reason") in ("group1_executor", "group1_to_contract"):
             skipped[cls["skip_reason"]] += 1
             continue
@@ -285,6 +293,8 @@ if __name__ == "__main__":
         if not cls["is_group2"]:
             skipped["no_catalyst"] += 1
             continue
+        if len(group2_rows) >= TARGET_N:
+            continue  # уже набрали 10 -- дальше ТОЛЬКО диагностика (см. all_candidate_diag), не полный прогон триггеров
         row = evaluate_known_answer(c, cls, registry)
         group2_rows.append(row)
         print(f"[group2_resample] Группа 2 #{len(group2_rows)}: {c['tx_hash']} old={row['old_trigger_would_detect']} "
@@ -297,10 +307,31 @@ if __name__ == "__main__":
     result = {
         "n_candidates_scanned": len(candidates), "n_group2_found": len(group2_rows),
         "skipped": skipped, "n_old_trigger_yes": n_old_yes, "n_new_pairwise_trigger_yes": n_new_yes,
-        "rows": group2_rows,
+        "rows": group2_rows, "all_candidate_diag": all_candidate_diag,
     }
     text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
     print(text)
     Path("data/task5_bot_known_answer_group2_resample_result.json").write_text(text)
     print(f"[group2_resample] {len(group2_rows)}/{TARGET_N} найдено, старый триггер {n_old_yes}/{len(group2_rows)}, "
           f"новый попарный {n_new_yes}/{len(group2_rows)} -- записано")
+
+    # Владелец, честная диагностика ПЕРЕД тем, как доверять "no_catalyst": руками
+    # проверить один реальный случай -- вдруг это баг сопоставления, не реальное
+    # отсутствие катализатора (та же дисциплина, что и в известном ответе выше).
+    no_catalyst_example = next((d for d in all_candidate_diag if d["skip_reason"] is None and d["is_group2"] is False),
+                                None)
+    if no_catalyst_example is not None:
+        print(f"\n[group2_resample][диагностика no_catalyst] {no_catalyst_example['tx_hash']} "
+              f"(блок {no_catalyst_example['block_number']}, пулы {no_catalyst_example['real_pools_touched']})")
+        for depth in range(0, CATALYST_LOOKBACK_BLOCKS + 1):
+            block_n = no_catalyst_example["block_number"] - depth
+            txs = _get_block_txs(block_n)
+            print(f"  --- блок {block_n} (depth={depth}), {len(txs)} tx ---")
+            for j, tx in enumerate(txs):
+                to_addr = (tx.get("to") or "").lower()
+                data_hex = tx.get("input") or tx.get("data") or "0x"
+                selector = ("0x" + data_hex[2:10]) if len(data_hex) >= 10 else None
+                is_target = (tx.get("hash") or "").lower() == no_catalyst_example["tx_hash"].lower()
+                marker = " <== САМА ARB-TX" if is_target else ""
+                known = KNOWN_SWAP_SELECTORS.get(selector, "")
+                print(f"    [{j}] {tx.get('hash')} to={to_addr} selector={selector} known_fn={known!r}{marker}")
