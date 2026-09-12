@@ -1,10 +1,10 @@
-# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T04:32:40Z
+# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T05:21:08Z
 
 ## NTP-статус хоста (для честности замера задержки чтения)
 --- timedatectl ---
-               Local time: Sat 2026-09-12 04:22:34 UTC
-           Universal time: Sat 2026-09-12 04:22:34 UTC
-                 RTC time: Sat 2026-09-12 04:22:35
+               Local time: Sat 2026-09-12 05:11:01 UTC
+           Universal time: Sat 2026-09-12 05:11:01 UTC
+                 RTC time: Sat 2026-09-12 05:11:02
                 Time zone: Etc/UTC (UTC, +0000)
 System clock synchronized: yes
               NTP service: active
@@ -12,16 +12,16 @@ System clock synchronized: yes
 --- chronyc tracking ---
 Reference ID    : A9FEA97B (169.254.169.123)
 Stratum         : 4
-Ref time (UTC)  : Sat Sep 12 04:22:32 2026
-System time     : 0.000000551 seconds fast of NTP time
-Last offset     : -0.000001557 seconds
-RMS offset      : 0.000010367 seconds
-Frequency       : 4.373 ppm fast
-Residual freq   : -0.001 ppm
-Skew            : 0.377 ppm
-Root delay      : 0.000321019 seconds
-Root dispersion : 0.000381638 seconds
-Update interval : 16.3 seconds
+Ref time (UTC)  : Sat Sep 12 05:10:46 2026
+System time     : 0.000000028 seconds fast of NTP time
+Last offset     : -0.000028114 seconds
+RMS offset      : 0.000015791 seconds
+Frequency       : 4.140 ppm fast
+Residual freq   : -0.280 ppm
+Skew            : 1.615 ppm
+Root delay      : 0.000309111 seconds
+Root dispersion : 0.000408927 seconds
+Update interval : 16.2 seconds
 Leap status     : Normal
 
 ## stdout
@@ -29,16 +29,44 @@ Leap status     : Normal
 [task5_bot] сеть: mainnet (chain_id=4663)
 [task5_bot] порог входа: $10.0/попытка, допущение по откатам: 55%
 [task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...
-[task5_bot] найдено пулов: 1187
+[task5_bot] найдено пулов: 1185
 [task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): 44
-[task5_bot] подключение к фиду: wss://feed.mainnet.chain.robinhood.com
+[task5_bot] подключение к фиду: ws://127.0.0.1:9642
 [task5_bot] СМОУК-ТЕСТ: ограничено 600.0с (владелец, 2026-09-13, первый безопасный dry-run перед реальными деньгами)
-[feed] соединение прервано (server rejected WebSocket connection: HTTP 403) -- реконнект не раньше чем через 1800с
-[feed] cooldown активен -- жду 1800с перед подключением
-[task5_bot] диагностика фида: {'n_messages_total': 0, 'n_with_seq': 0, 'n_unparsed': 0, 'n_confirmation_only': 0, 'n_connect_attempts': 1, 'n_reconnects': 1, 'last_disconnect_error': 'server rejected WebSocket connection: HTTP 403'}
-[task5_bot] последний известный номер блока с фида: None
+[task5_bot][latency] seq=60846588 latency_s=75.981 (n=1/30)
+[task5_bot][latency] seq=60846589 latency_s=75.981 (n=2/30)
+[task5_bot][latency] seq=60846590 latency_s=75.981 (n=3/30)
+[task5_bot][latency] seq=60846591 latency_s=74.981 (n=4/30)
+[task5_bot][latency] seq=60846592 latency_s=74.981 (n=5/30)
+[task5_bot][latency] seq=60846593 latency_s=74.981 (n=6/30)
+[task5_bot][latency] seq=60846594 latency_s=74.981 (n=7/30)
+[task5_bot][latency] seq=60846595 latency_s=74.981 (n=8/30)
+[task5_bot][latency] seq=60846596 latency_s=74.981 (n=9/30)
+[task5_bot][latency] seq=60846597 latency_s=74.981 (n=10/30)
+[task5_bot][latency] seq=60846598 latency_s=74.981 (n=11/30)
+[task5_bot][latency] seq=60846599 latency_s=74.981 (n=12/30)
+[task5_bot][latency] seq=60846600 latency_s=74.981 (n=13/30)
+[task5_bot][latency] seq=60846601 latency_s=73.981 (n=14/30)
+[task5_bot][latency] seq=60846602 latency_s=73.981 (n=15/30)
+[task5_bot][latency] seq=60846603 latency_s=73.981 (n=16/30)
+[task5_bot][latency] seq=60846604 latency_s=73.981 (n=17/30)
+[task5_bot][latency] seq=60846605 latency_s=73.981 (n=18/30)
+[task5_bot][latency] seq=60846606 latency_s=73.981 (n=19/30)
+[task5_bot][latency] seq=60846607 latency_s=73.981 (n=20/30)
+[task5_bot][latency] seq=60846608 latency_s=73.981 (n=21/30)
+[task5_bot][latency] seq=60846609 latency_s=73.981 (n=22/30)
+[task5_bot][latency] seq=60846610 latency_s=73.981 (n=23/30)
+[task5_bot][latency] seq=60846611 latency_s=72.981 (n=24/30)
+[task5_bot][latency] seq=60846612 latency_s=72.981 (n=25/30)
+[task5_bot][latency] seq=60846613 latency_s=72.981 (n=26/30)
+[task5_bot][latency] seq=60846614 latency_s=72.981 (n=27/30)
+[task5_bot][latency] seq=60846615 latency_s=72.981 (n=28/30)
+[task5_bot][latency] seq=60846616 latency_s=72.981 (n=29/30)
+[task5_bot][latency] seq=60846617 latency_s=72.981 (n=30/30)
+[task5_bot] диагностика фида: {'n_messages_total': 5919, 'n_with_seq': 6648, 'n_unparsed': 0, 'n_confirmation_only': 20, 'n_connect_attempts': 1, 'n_reconnects': 0, 'connected_at_wall': 1789189864.9714494}
+[task5_bot] последний известный номер блока с фида: 60853235
 [task5_bot] касаний известных пулов: 0, реальных RPC-рефрешей цены: 0
-[task5_bot] замер задержки чтения: n=0/30, min=None, mean=None, max=None
+[task5_bot] замер задержки чтения: n=30/30, min=72.98114967346191, mean=74.28114967346191, max=75.98114967346191
 [task5_bot] результат замера задержки записан в data/task5_feed_latency_measurement.json
 
 ## stderr
@@ -47,13 +75,197 @@ Leap status     : Normal
 
 ## замер задержки чтения (data/task5_feed_latency_measurement.json)
 {
-  "n_samples": 0,
+  "n_samples": 30,
   "requested_n": 30,
-  "feed_let_us_in": false,
-  "last_disconnect_error": "server rejected WebSocket connection: HTTP 403",
-  "samples": [],
-  "min_latency_s": null,
-  "max_latency_s": null,
-  "mean_latency_s": null,
-  "note": "0 \u0441\u044d\u043c\u043f\u043b\u043e\u0432 -- \u0444\u0438\u0434 \u041d\u0415 \u043f\u0443\u0441\u0442\u0438\u043b \u043d\u0438 \u043e\u0434\u043d\u043e\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u0441 sequencer_timestamp \u0437\u0430 \u044d\u0442\u043e \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 (\u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430: {'n_messages_total': 0, 'n_with_seq': 0, 'n_unparsed': 0, 'n_confirmation_only': 0, 'n_connect_attempts': 1, 'n_reconnects': 1, 'last_disconnect_error': 'server rejected WebSocket connection: HTTP 403'}). \u0427\u0435\u0441\u0442\u043d\u043e: \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 \u043b\u0438\u0431\u043e \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c (403/\u043e\u0431\u0440\u044b\u0432), \u043b\u0438\u0431\u043e \u0437\u0430\u043a\u0440\u044b\u043b\u043e\u0441\u044c \u0434\u043e \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f -- \u041d\u0415 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u043c \u043f\u043e\u043f\u044b\u0442\u043a\u0443 \u0432 \u0440\u0430\u043c\u043a\u0430\u0445 \u044d\u0442\u043e\u0433\u043e \u0437\u0430\u043f\u0443\u0441\u043a\u0430."
+  "feed_let_us_in": true,
+  "last_disconnect_error": null,
+  "last_invalid_status_code": null,
+  "last_invalid_status_headers": null,
+  "last_invalid_status_body": null,
+  "samples": [
+    {
+      "sequence_number": 60846588,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189789,
+      "latency_s": 75.98114967346191
+    },
+    {
+      "sequence_number": 60846589,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189789,
+      "latency_s": 75.98114967346191
+    },
+    {
+      "sequence_number": 60846590,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189789,
+      "latency_s": 75.98114967346191
+    },
+    {
+      "sequence_number": 60846591,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846592,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846593,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846594,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846595,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846596,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846597,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846598,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846599,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846600,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189790,
+      "latency_s": 74.98114967346191
+    },
+    {
+      "sequence_number": 60846601,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846602,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846603,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846604,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846605,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846606,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846607,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846608,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846609,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846610,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189791,
+      "latency_s": 73.98114967346191
+    },
+    {
+      "sequence_number": 60846611,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846612,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846613,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846614,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846615,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846616,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    },
+    {
+      "sequence_number": 60846617,
+      "t_wall": 1789189864.9811497,
+      "sequencer_timestamp": 1789189792,
+      "latency_s": 72.98114967346191
+    }
+  ],
+  "min_latency_s": 72.98114967346191,
+  "max_latency_s": 75.98114967346191,
+  "mean_latency_s": 74.28114967346191,
+  "note": "sequencer_timestamp -- \u0446\u0435\u043b\u044b\u0435 unix-\u0441\u0435\u043a\u0443\u043d\u0434\u044b (\u043d\u0435 \u043c\u0441), \u0442\u043e\u0447\u043d\u043e\u0441\u0442\u044c \u0437\u0430\u043c\u0435\u0440\u0430 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0430 ~1\u0441; \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f (t_wall) \u0434\u043e\u043b\u0436\u043d\u043e \u0431\u044b\u0442\u044c NTP-\u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u043d\u0430 \u0445\u043e\u0441\u0442\u0435 \u0434\u043b\u044f \u0447\u0435\u0441\u0442\u043d\u043e\u0433\u043e \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0430 -- \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u0442\u0441\u044f \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e (timedatectl/chronyc), \u043d\u0435 \u044d\u0442\u0438\u043c \u0441\u043a\u0440\u0438\u043f\u0442\u043e\u043c."
 }
