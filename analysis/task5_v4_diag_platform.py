@@ -40,6 +40,33 @@ for cmd in (["apt-cache", "policy", "solc"], ["which", "solc"], ["lsb_release", 
     except Exception as exc:  # noqa: BLE001
         result[f"cmd_{key}_error"] = str(exc)
 
+# apt-cache policy solc вернул ПУСТО (returncode 0) -- пакет неизвестен
+# apt целиком (не просто не установлен), вероятно нет в архиве Ubuntu
+# 26.04 ("resolute") под этим именем. Проверяем альтернативный путь:
+# официальный Docker-образ ethereum/solc публикует multi-arch манифесты
+# (включая linux/arm64) в отличие от голых бинарников
+# binaries.soliditylang.org -- это ЧИТАЕМАЯ проверка (which docker +
+# один versioned run), ничего не меняет в системе необратимо.
+for cmd in (["which", "docker"], ["docker", "--version"]):
+    key = "_".join(cmd).replace("-", "_").replace(".", "_")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result[f"cmd_{key}_stdout"] = proc.stdout.strip()
+        result[f"cmd_{key}_stderr"] = proc.stderr.strip()
+        result[f"cmd_{key}_returncode"] = proc.returncode
+    except Exception as exc:  # noqa: BLE001
+        result[f"cmd_{key}_error"] = str(exc)
+
+if result.get("cmd_docker___version_returncode") == 0:
+    try:
+        proc = subprocess.run(["docker", "run", "--rm", "ethereum/solc:0.8.24", "--version"],
+                               capture_output=True, text=True, timeout=120)
+        result["docker_solc_0_8_24_stdout"] = proc.stdout.strip()
+        result["docker_solc_0_8_24_stderr"] = proc.stderr.strip()[-2000:]
+        result["docker_solc_0_8_24_returncode"] = proc.returncode
+    except Exception as exc:  # noqa: BLE001
+        result["docker_solc_0_8_24_error"] = str(exc)
+
 print(json.dumps(result, indent=2))
 out_path = Path(__file__).parent.parent / "data" / "task5_v4_diag_platform_result.json"
 out_path.parent.mkdir(parents=True, exist_ok=True)
