@@ -1,0 +1,80 @@
+name: "Задача 5, деплой -- read-only проверка ЗАДЕПЛОЕННОГО ClosedCycleExecutorV3 (eth_getCode/owner(), без подписи)"
+
+# После реального деплоя (scripts/deploy_executor.sh, владелец,
+# workflow_dispatch) -- независимая проверка НА ЦЕПИ: код по адресу
+# совпадает с deployedBytecode.txt, owner() возвращает ожидаемый адрес.
+# Только eth_getCode/eth_call (read-only), НИКАКОЙ подписи/отправки.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_VERIFY_DEPLOY_REQUEST"
+
+jobs:
+  verify_deploy:
+    name: "eth_getCode + owner() для ClosedCycleExecutorV3 (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код и проверить деплой на цепи
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              set -e
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_verify_deploy.py
+              cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_verification.json
+            "
+          ' > /tmp/verify_deploy_stdout.log 2> /tmp/verify_deploy_stderr.log
+          echo "--- stdout ---"; cat /tmp/verify_deploy_stdout.log
+          echo "--- stderr ---"; cat /tmp/verify_deploy_stderr.log
+
+      - name: Забрать deploy_verification.json
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_verification.json' > /tmp/deploy_verification.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_VERIFY_DEPLOY_REQUEST
+          if [ -s /tmp/deploy_verification.json ] && python3 -c "import json; json.load(open('/tmp/deploy_verification.json'))" 2>/dev/null; then
+            cp /tmp/deploy_verification.json contracts/build/deploy_verification.json
+            git add contracts/build/deploy_verification.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: результат проверки задеплоенного контракта на цепи [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
