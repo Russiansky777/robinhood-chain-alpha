@@ -104,15 +104,26 @@ def eth_hook_route_profit(amount_in_wei: int, block_number: int) -> tuple[int, i
 
 
 def best_over_grid(profit_fn, grid: list[int], block_number: int) -> dict:
+    """Возвращает лучший (по прибыли) размер из сетки. Если КАЖДЫЙ
+    размер сетки упал -- честно возвращает причину последней ошибки
+    (`all_failed_last_error`), а не молча пустой словарь: реальный
+    случай этой сессии -- на текущем состоянии сети конкретный пул
+    может быть полностью лишён ликвидности (NotEnoughLiquidity(poolId),
+    см. data/task5_v4_diag_current_liquidity_result.json), и это
+    само по себе значимый результат наблюдения, не сбой скрипта."""
     best = None
+    last_error = None
     for amount in grid:
         try:
             profit, out = profit_fn(amount, block_number)
         except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)[:300]
             continue
         if best is None or profit > best["profit_raw"]:
             best = {"amount_in_raw": amount, "profit_raw": profit, "amount_out_raw": out}
-    return best or {}
+    if best is None:
+        return {"all_failed": True, "all_failed_last_error": last_error} if last_error else {}
+    return best
 
 
 def current_gas_price_wei() -> int | None:
@@ -274,6 +285,24 @@ async def main_async(duration_s: float, feed_url: str, out_path: Path) -> None:
                 ("eth_hook_3pool", best_eth, GAS_USED_ETH_HOOK_ROUTE, 18),
             ):
                 if not best:
+                    continue
+                if best.get("all_failed"):
+                    # Честно фиксируем ПОЧЕМУ маршрут недоступен на этом
+                    # блоке (напр. NotEnoughLiquidity у конкретного пула) --
+                    # это реальный результат наблюдения, не сбой скрипта.
+                    # Если сигнал был открыт -- закрываем его (маршрут
+                    # больше не исполним, живучесть кончилась), не
+                    # оставляем висеть "открытым" вечно.
+                    obs["routes"][label] = {"all_failed": True, "last_error": best.get("all_failed_last_error")}
+                    if label in open_signals:
+                        sig = open_signals.pop(label)
+                        sig["closed_at_block"] = block_number
+                        sig["closed_at_wall"] = time.time()
+                        sig["closed_reason"] = "all_failed"
+                        sig["duration_blocks"] = block_number - sig["opened_at_block"]
+                        sig["duration_wall_s"] = sig["closed_at_wall"] - sig["opened_at_wall"]
+                        closed_signals.append(sig)
+                        print(f"[obs_hour][{label}] сигнал ЗАКРЫТ (маршрут перестал исполняться) на блоке {block_number}")
                     continue
                 profit_raw = best["profit_raw"]
                 profit_human = profit_raw / 10**decimals
