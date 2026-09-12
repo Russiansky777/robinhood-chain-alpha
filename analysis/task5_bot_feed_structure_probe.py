@@ -45,7 +45,11 @@ async def probe(n_samples: int, timeout_s: float, use_browser_headers: bool = Tr
     diag["headers_used"] = headers or "none"
     deadline = time.monotonic() + timeout_s
     try:
-        async with connect_with_headers(feed_url, headers, open_timeout=10, close_timeout=5) as ws:
+        # max_size=None -- см. task5_bot_feed_client.py::SequencerFeedClient.listen()
+        # -- реальный relay прислал сообщение 3.57МБ, дефолтный лимит websockets
+        # (1МиБ) разрывал соединение ДО обработки сообщения.
+        async with connect_with_headers(feed_url, headers, open_timeout=10, close_timeout=5,
+                                         max_size=None) as ws:
             diag["connect_failed"] = False
             return await _drain(ws, n_samples, deadline, samples, diag)
     except websockets.exceptions.InvalidStatus as exc:

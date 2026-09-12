@@ -192,7 +192,13 @@ class SequencerFeedClient:
                 record_feed_connect_attempt(self.state_file)
             self.diag["n_connect_attempts"] += 1
             try:
-                async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
+                # max_size=None -- владелец, 2026-09-12: реальный relay прислал сообщение
+                # 3.57МБ, дефолтный лимит websockets (1МиБ) разорвал соединение ДО того,
+                # как _consume() вообще увидел сообщение (n_messages_total осталось 0) --
+                # реальный факт из первого прогона relay, не предположение. Нитро-батчи
+                # (много L2-транзакций в одном сообщении фида) законно большие.
+                async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5,
+                                                 max_size=None) as ws:
                     self.diag["connected_at_wall"] = time.time()
                     await self._consume(ws, on_message)
             except websockets.exceptions.InvalidStatus as exc:
