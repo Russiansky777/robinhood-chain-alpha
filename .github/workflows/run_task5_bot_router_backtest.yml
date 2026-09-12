@@ -58,6 +58,7 @@ jobs:
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             sudo -u bot bash -c '
+              set -a; . /etc/bot/env 2>/dev/null; set +a
               cd /home/bot/robinhood-chain-alpha
               ./venv/bin/python analysis/task5_bot_router_backtest.py $REFRESH_CACHE_FLAG
             '

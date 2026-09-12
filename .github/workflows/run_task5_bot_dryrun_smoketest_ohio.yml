@@ -71,6 +71,7 @@ jobs:
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo -u bot bash -c "
+              set -a; . /etc/bot/env 2>/dev/null; set +a
               cd /home/bot/robinhood-chain-alpha
               rm -f data/task5_bot_live/attempts.jsonl data/task5_feed_latency_measurement.json
               ./venv/bin/python analysis/task5_bot_run.py --feed-url ws://127.0.0.1:9642 --duration-seconds 600
