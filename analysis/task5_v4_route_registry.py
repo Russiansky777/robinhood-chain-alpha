@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
 from alchemy_fallback import _chunked_get_logs, _rpc_call, topic0  # noqa: E402
+from task5_v4_hook_route_audit import fetch_initialize_event  # noqa: E402
 from task5_v4_pool_math import PoolKey, pool_id  # noqa: E402
 from task5_v4_quote_replay import quote_exact_input_single  # noqa: E402
 
@@ -47,6 +48,18 @@ NATIVE = "0x0000000000000000000000000000000000000000"
 USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
 MOSIAI = "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a"
 HOOK_ETH_MOSIAI = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044"
+
+# Владелец, 2026-09-13 (дополнение к спецификации реестра): "Стартовый
+# источник реестра -- успешные транзакции 0x1b357e7a... из фида в
+# реальном времени: из Swap-логов извлекать пулы... Его сделка -- не
+# сигнал для нашей отправки, только для пополнения списка." Внешний
+# аудит подтвердил этот адрес реальным атомарным арбитражником этой
+# цепи (см. эту же сессию) -- пулы, которые он реально и УСПЕШНО
+# использует (Swap-событие эмитится ТОЛЬКО при успешном свопе), почти
+# наверняка живы прямо сейчас, в отличие от слепого перебора ВСЕХ
+# когда-либо инициализированных пулов.
+KNOWN_ARBITRAGEUR = "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251"
+SWAP_TOPIC0 = topic0("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)")
 
 # Токены, которыми маршрут ОБЯЗАН начинаться и заканчиваться (владелец:
 # "начало и конец в USDG или ETH/WETH"). NATIVE (0x0) -- нативный ETH в
@@ -155,11 +168,60 @@ def discover_pools_from_initialize_events(from_block: int, to_block: int) -> dic
     return pools
 
 
+def find_arbitrageur_pool_ids(from_block: int, to_block: int, arbitrageur: str = KNOWN_ARBITRAGEUR) -> set[str]:
+    """Реальные Swap-события PoolManager, где sender (topics[2],
+    индексирован) == арбитражник -- пулы, которые он реально и УСПЕШНО
+    использовал в этом окне (Swap-событие эмитится ТОЛЬКО при успешном
+    свопе, не при revert). Узкий, дешёвый фильтр (address=PoolManager +
+    topic0=Swap + topic2=sender), не сканирование блоков/tx.from."""
+    sender_topic = "0x" + arbitrageur[2:].rjust(64, "0").lower()
+    logs = _chunked_get_logs(
+        from_block, to_block, topics=[SWAP_TOPIC0, None, sender_topic], address=POOL_MANAGER,
+        chunk_size=max(1, to_block - from_block + 1),
+    )
+    return {log["topics"][1] for log in logs}
+
+
+def seed_pools_from_arbitrageur(from_block: int, to_block: int, known_pool_ids: set[str] | None = None,
+                                 arbitrageur: str = KNOWN_ARBITRAGEUR) -> dict[str, PoolKey]:
+    """Для КАЖДОГО НОВОГО (не в known_pool_ids) пула, реально
+    использованного арбитражником -- реальный PoolKey через его
+    Initialize-событие (не предполагается, не собирается из общего
+    скана всех когда-либо созданных пулов). Владелец: "его сделка -- не
+    сигнал для нашей отправки, только для пополнения списка" -- эта
+    функция НЕ принимает решений об отправке, только строит {pool_id:
+    PoolKey}."""
+    known_pool_ids = known_pool_ids or set()
+    found_ids = find_arbitrageur_pool_ids(from_block, to_block, arbitrageur)
+    new_ids = found_ids - known_pool_ids
+    pools: dict[str, PoolKey] = {}
+    for pid in new_ids:
+        info = fetch_initialize_event(pid, to_block)
+        if info is None:
+            continue  # честно пропускаем -- Initialize не найден (не должно случаться для реального пула, но не гадаем)
+        pools[pid] = PoolKey(info["currency0"], info["currency1"], info["fee"], info["tick_spacing"], info["hooks"])
+    return pools
+
+
 def build_cycles_from_pools(pools: dict[str, PoolKey]) -> list[RouteCycle]:
     """Строит циклы из 2 (та же пара, 2 разных пула) и 3 обменов
     (треугольник через разные пары), начинающиеся и заканчивающиеся в
     USDG/NATIVE (см. START_TOKENS). Граф маленький (десятки пулов) --
-    прямой перебор, не нужен сложный поиск путей."""
+    прямой перебор, не нужен сложный поиск путей.
+
+    Сознательное ограничение старта пилота (владелец, 2026-09-13):
+    "Поддерживаемые циклы на старте -- только чистые V4 (2-3 плеча).
+    Смешанные V3+V4 -- позже, по пропускам." Каждая нога здесь --
+    RouteLeg с V4 PoolKey (currency0/currency1/fee/tick_spacing/hooks),
+    исполняется через executeCycle() ClosedCycleExecutorV4 (единственный
+    unlockCallback на весь цикл, все ноги -- V4 PoolManager). Пути,
+    смешивающие V3-пул (например WETH_USDG_POOL_V3, используемый здесь
+    только для чтения цены, не как нога цикла) внутри одного атомарного
+    цикла, сюда сознательно не включаются -- это отдельная, более
+    сложная схема (два разных unlock-контракта в одной атомарной
+    транзакции), которую решено делать позже, по факту наблюдаемых
+    пропусков (маршрутов, которые нельзя закрыть чистым V4), а не
+    заранее."""
     # adjacency[token] = список (other_token, pool_key) -- пул связывает currency0<->currency1
     adjacency: dict[str, list[tuple[str, PoolKey]]] = {}
     for key in pools.values():
@@ -275,34 +337,44 @@ class RouteRegistry:
         }
 
 
+ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS = 40_000  # ~1 час на измеренной этой сессией плотности блоков
+
+
 def main() -> None:
     """Самопроверка/диагностика: сид + реальное обнаружение пулов из
-    Initialize-событий (0..latest -- тот же паттерн, что уже реально
-    работал в Этапе 2 для получения PoolKey хук-маршрута) + построение
-    циклов + живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC
-    (eth_getLogs + Quoter), read-only, ничего не отправляет.
+    УСПЕШНЫХ Swap-событий известного арбитражника (KNOWN_ARBITRAGEUR,
+    последний час) -- владелец, 2026-09-13, дополнение к спецификации:
+    "стартовый источник реестра -- успешные транзакции 0x1b357e7a...
+    из фида в реальном времени... Его сделка -- не сигнал для нашей
+    отправки, только для пополнения списка." + построение циклов +
+    живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC (eth_getLogs
+    + Quoter), read-only, ничего не отправляет.
 
     Реальный повод сделать это ЗДЕСЬ, не только сид: оба сид-маршрута
     на момент написания честно оказались НЕ живы (пересохшая
     ликвидность, см. data/task5_v4_diag_current_liquidity_result.json)
-    -- обнаружение новых пулов может найти РЕАЛЬНО исполнимые сейчас
-    маршруты, а не полагаться только на исторически проверенные, но
-    сейчас мёртвые."""
+    -- пулы АКТИВНОГО арбитражника почти наверняка живы прямо сейчас
+    (иначе его Swap-событие не появилось бы -- оно эмитится только при
+    успехе), в отличие от слепого перебора ВСЕХ когда-либо
+    инициализированных пулов."""
     latest = int(_rpc_call("eth_blockNumber", []), 16)
     registry = RouteRegistry()
     registry.add_routes(seed_routes())
     print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
 
-    print(f"[route_registry] сканирую Initialize-события PoolManager (0..{latest})...")
+    from_block = max(0, latest - ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS)
+    print(f"[route_registry] ищу пулы известного арбитражника {KNOWN_ARBITRAGEUR} "
+          f"(блоки {from_block}..{latest})...")
     try:
-        pools = discover_pools_from_initialize_events(0, latest)
-        print(f"[route_registry] найдено пулов: {len(pools)}")
+        known_ids = {leg.pool_id_hex for r in registry.routes.values() for leg in r.legs}
+        pools = seed_pools_from_arbitrageur(from_block, latest, known_pool_ids=known_ids)
+        print(f"[route_registry] найдено НОВЫХ пулов арбитражника: {len(pools)}")
         discovered_cycles = build_cycles_from_pools(pools)
         print(f"[route_registry] построено кандидатных циклов (2-3 обмена, начало/конец USDG/NATIVE): "
               f"{len(discovered_cycles)}")
         registry.add_routes(discovered_cycles)
     except Exception as exc:  # noqa: BLE001
-        print(f"[route_registry] обнаружение пулов упало (честно, не молчим): {exc}", file=sys.stderr)
+        print(f"[route_registry] обнаружение пулов арбитражника упало (честно, не молчим): {exc}", file=sys.stderr)
 
     print(f"[route_registry] проверяю живучесть всех {len(registry.routes)} маршрутов на блоке {latest}...")
     results = registry.refresh_liveness_all(latest)
