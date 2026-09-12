@@ -21,12 +21,17 @@ on:
         required: false
         default: 'analysis/task5_bot_known_answer_test.py'
         type: string
+      script_args:
+        description: 'Доп. аргументы командной строки для script_path (напр. "--duration-seconds 90" для смоук-теста часа наблюдения перед реальным часовым прогоном).'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   known_answer_test:
     name: "10 реальных захватов -- проверка декодера + триггера на Ohio VPS"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 80
     permissions:
       contents: write
     steps:
@@ -60,12 +65,13 @@ jobs:
       - name: "Проверка против известного ответа (RPC receipt+block, декодер, триггер)"
         env:
           SCRIPT_PATH: ${{ inputs.script_path }}
+          SCRIPT_ARGS: ${{ inputs.script_args }}
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             sudo -u bot bash -c '
               set -a; . /etc/bot/env 2>/dev/null; set +a
               cd /home/bot/robinhood-chain-alpha
-              ./venv/bin/python $SCRIPT_PATH
+              ./venv/bin/python $SCRIPT_PATH $SCRIPT_ARGS
             '
           " > /tmp/known_answer_stdout.log 2> /tmp/known_answer_stderr.log
           echo "--- stdout ---"; cat /tmp/known_answer_stdout.log
