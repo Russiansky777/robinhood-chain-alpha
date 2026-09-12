@@ -1,34 +1,62 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T20:29:00Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T20:42:17Z
 
 ## stdout
-{
-  "tx_hash": "0x658c2ab808cd0fa30f5dc14a5ea0e6259fe11714b842efcb5721c3acd320274f",
-  "quote_block": 61248714,
-  "amount_in_eth_wei": 324259173170675712,
-  "real_gross_swap_amount1": 2910227184914870645595017,
-  "real_net_to_executor": 2852022641216573232683117,
-  "real_hook_skim": 58204543698297412911900,
-  "quoter_amount_out": 2868359535282985455396810,
-  "diff_vs_gross": -41867649631885190198207,
-  "diff_vs_net": 16336894066412222713693,
-  "matches_gross": false,
-  "matches_net": false
-}
-{
-  "tx_hash": "0x9976a38fec4f4d2be228118da68b1276a26e7f33927ea606d11348d31e2ed98c",
-  "quote_block": 61248774,
-  "amount_in_eth_wei": 81064793292668928,
-  "real_gross_swap_amount1": 1360925357002413753012724,
-  "real_net_to_executor": 1333706849862365477952470,
-  "real_hook_skim": 27218507140048275060254,
-  "quoter_amount_out": 1343596811726756813840636,
-  "diff_vs_gross": -17328545275656939172088,
-  "diff_vs_net": 9889961864391335888166,
-  "matches_gross": false,
-  "matches_net": false
-}
-[hook_quote_check] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_hook_quote_check_result.json
+[v4_executor_compile_check] устанавливаю solc 0.8.24...
 
 ## stderr
-[hook_quote_check] Alchemy напрямую дал результат там, где публичный RPC отказал
-[hook_quote_check] Alchemy напрямую дал результат там, где публичный RPC отказал
+Traceback (most recent call last):
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 697, in _validate_installation
+    installed_version = wrapper.get_version_str_from_solc_binary(binary_path)
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/wrapper.py", line 16, in get_version_str_from_solc_binary
+    stdout_data = subprocess.check_output([str(solc_binary), "--version"], encoding="utf8")
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 1875, in _execute_child
+    self._posix_spawn(args, executable, env, restore_signals, close_fds,
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      p2cread, p2cwrite,
+                      ^^^^^^^^^^^^^^^^^^
+                      c2pread, c2pwrite,
+                      ^^^^^^^^^^^^^^^^^^
+                      errread, errwrite)
+                      ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 1819, in _posix_spawn
+    self.pid = os.posix_spawn(executable, args, env, **kwargs)
+               ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 8] Exec format error: '/home/bot/.solcx/solc-v0.8.24'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_v4_executor_compile_check.py", line 103, in <module>
+    main()
+    ~~~~^^
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_v4_executor_compile_check.py", line 34, in main
+    solcx.install_solc(SOLC_VERSION)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 501, in install_solc
+    raise exc
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 494, in install_solc
+    _validate_installation(Version(base_version), solcx_binary_path=solcx_binary_path)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 700, in _validate_installation
+    raise SolcInstallationError(
+        "Downloaded binary would not execute, or returned unexpected output."
+    )
+solcx.exceptions.SolcInstallationError: Downloaded binary would not execute, or returned unexpected output. If this issue persists, you can try to compile from source code using `solcx.compile_solc('0.8.24')`.
