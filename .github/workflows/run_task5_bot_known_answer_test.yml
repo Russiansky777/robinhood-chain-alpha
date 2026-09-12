@@ -82,6 +82,7 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_profit_formula_audit_result.json 2>/dev/null' > /tmp/profit_audit_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_profit_formula_audit_contract_balance_result.json 2>/dev/null' > /tmp/contract_balance_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_pool_pair_divergence_measurement_result.json 2>/dev/null' > /tmp/pool_pair_divergence_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_arb_suspect_audit_3tx_result.json 2>/dev/null' > /tmp/arb_suspect_3tx_result.json || true
 
       - name: Commit results
         if: always()
@@ -126,6 +127,10 @@ jobs:
           if [ -s /tmp/pool_pair_divergence_result.json ] && python3 -c "import json; json.load(open('/tmp/pool_pair_divergence_result.json'))" 2>/dev/null; then
             cp /tmp/pool_pair_divergence_result.json data/task5_pool_pair_divergence_measurement_result.json
             git add data/task5_pool_pair_divergence_measurement_result.json
+          fi
+          if [ -s /tmp/arb_suspect_3tx_result.json ] && python3 -c "import json; json.load(open('/tmp/arb_suspect_3tx_result.json'))" 2>/dev/null; then
+            cp /tmp/arb_suspect_3tx_result.json data/task5_arb_suspect_audit_3tx_result.json
+            git add data/task5_arb_suspect_audit_3tx_result.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: проверка против известного ответа (10 реальных захватов) [automated]"
