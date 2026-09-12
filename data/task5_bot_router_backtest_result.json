@@ -1,18 +1,18 @@
 {
   "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
-  "n_pools_in_registry": 1140,
-  "current_weth_usd_price": 2533.855218800265,
+  "n_pools_in_registry": 1142,
+  "current_weth_usd_price": 2534.490829236043,
   "weth_usdg_pools_in_registry_debug": [
     {
       "address": "0x52E65B17FB6E5BA00ED806F37AFCD2DAA50271CA",
       "fee": 0,
-      "sqrt_price_x96": 3988140793797247849428306,
-      "liquidity": 10785497456577779106
+      "sqrt_price_x96": 3988640969367786011810318,
+      "liquidity": 10462440856972820573
     },
     {
       "address": "0x69BFAF19C9F377BB306A89AED9F6B07E2C1A8D9A",
       "fee": 0,
-      "sqrt_price_x96": 3988303932014510634797015,
+      "sqrt_price_x96": 3988060117483223530608146,
       "liquidity": 1355151185463091953
     }
   ],
@@ -22,10 +22,55 @@
   "n_selector_match": 3224,
   "n_intents_decoded_full": 2109,
   "n_pool_found_in_registry": 233,
-  "n_priced_via_pool": 3,
+  "n_priced_via_pool": 232,
   "version1_notional_usd": {
-    "n_hits": 0,
-    "top10": []
+    "n_hits": 4,
+    "top10": [
+      {
+        "sequence_number": 61052179,
+        "router": "0xaf9d6fa019328d8cf8598d0d5be22cc6622b09f1",
+        "function": "UniversalRouter.execute (with deadline)",
+        "pool": "0x08d77885047c0d4e82a197627a565bfb8b541e1c",
+        "token_in": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token_out": "0x2b9a7fa8492aebe5efc01c01e2eecdc64ba562aa",
+        "fee": 100,
+        "amount_in_raw": 960000000000000000,
+        "usd_via_pool_approx": 2433.11
+      },
+      {
+        "sequence_number": 61052421,
+        "router": "0xaf9d6fa019328d8cf8598d0d5be22cc6622b09f1",
+        "function": "UniversalRouter.execute (with deadline)",
+        "pool": "0x08d77885047c0d4e82a197627a565bfb8b541e1c",
+        "token_in": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token_out": "0x2b9a7fa8492aebe5efc01c01e2eecdc64ba562aa",
+        "fee": 100,
+        "amount_in_raw": 960000000000000000,
+        "usd_via_pool_approx": 2433.11
+      },
+      {
+        "sequence_number": 61051574,
+        "router": "0xaf9d6fa019328d8cf8598d0d5be22cc6622b09f1",
+        "function": "UniversalRouter.execute (with deadline)",
+        "pool": "0x08d77885047c0d4e82a197627a565bfb8b541e1c",
+        "token_in": "0x2b9a7fa8492aebe5efc01c01e2eecdc64ba562aa",
+        "token_out": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "fee": 100,
+        "amount_in_raw": 24627321840722767931488505,
+        "usd_via_pool_approx": 2310.29
+      },
+      {
+        "sequence_number": 61050761,
+        "router": "0xaf9d6fa019328d8cf8598d0d5be22cc6622b09f1",
+        "function": "UniversalRouter.execute (with deadline)",
+        "pool": "0x08d77885047c0d4e82a197627a565bfb8b541e1c",
+        "token_in": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "token_out": "0x2b9a7fa8492aebe5efc01c01e2eecdc64ba562aa",
+        "fee": 100,
+        "amount_in_raw": 830000000000000000,
+        "usd_via_pool_approx": 2103.63
+      }
+    ]
   },
   "version2_price_impact": {
     "n_hits": 0,
