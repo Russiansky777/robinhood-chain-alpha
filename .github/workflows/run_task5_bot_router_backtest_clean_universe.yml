@@ -1,0 +1,134 @@
+name: "Задача 5, Путь А -- бэктест на ЧИСТОМ УНИВЕРСУМЕ (Dune-45 + liquidity>0 + анти-накрутка)"
+
+# Владелец, 2026-09-12 (после разбора шиткоин-пула 0x08d77885...):
+# "Универсум сужаем: только пулы из Dune-карты (45 с реальными захватами)
+# плюс WETH/USDG, и обязательно -- у пары есть второй пул с liquidity > 0
+# в реестре. Пулы, где свопы идут от 1-2 адресов, исключать как накрутку.
+# Повторить офлайн-прогон на том же дампе с чистым универсумом."
+#
+# ЧЕСТНО: третий фильтр (>=3 различных отправителей) требует реального
+# адреса-отправителя (`from`), а старый дамп (`dump.jsonl.gz`, закоммичен
+# ранее) его не содержал -- захват тогда писал только `to`/`data`. Этот
+# workflow делает СВЕЖИЙ захват той же продолжительности (300с) через УЖЕ
+# разрешённый локальный relay (loopback, `ws://127.0.0.1:9642`, БЕЗ
+# кулдауна на переподключение) -- relay не трогается, ни одного нового
+# внешнего подключения, тот же паттерн, что все предыдущие захваты. Адрес
+# отправителя восстанавливается ecrecover'ом по подписи уже отправленной
+# публичной транзакции (см. `_recover_sender` в `task5_bot_feed_client.py`)
+# -- НЕ RPC-запрос, НЕ подпись/отправка, чисто офлайн-криптография.
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration_seconds:
+        description: 'Сколько секунд слушать relay для свежего захвата (по умолчанию 300 = 5 минут, как исходный дамп).'
+        required: false
+        default: '300'
+        type: string
+
+jobs:
+  clean_universe_backtest:
+    name: "Свежий захват (с отправителем) + чистый универсум + бэктест (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=6" >> "$GITHUB_ENV"
+
+      - name: Подтянуть актуальный код на Ohio
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+          '
+
+      - name: "Свежий захват через ws://127.0.0.1:9642 (relay, loopback), теперь с полем from (ecrecover)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            sudo -u bot bash -c '
+              cd /home/bot/robinhood-chain-alpha
+              rm -f data/task5_bot_router_capture/dump.jsonl.gz data/task5_bot_router_capture_summary.json
+              ./venv/bin/python analysis/task5_bot_router_capture.py --duration-seconds ${{ inputs.duration_seconds }} --feed-url ws://127.0.0.1:9642
+            '
+          " > /tmp/capture_stdout.log 2> /tmp/capture_stderr.log
+          echo "--- stdout ---"; cat /tmp/capture_stdout.log
+          echo "--- stderr ---"; cat /tmp/capture_stderr.log
+
+      - name: "Бэктест на чистом универсуме (Dune-45 v3 + liquidity>0 второй пул + анти-накрутка >=3 отправителя), --price-missing реально дозаливает через RPC"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              set -a; . /etc/bot/env 2>/dev/null; set +a
+              cd /home/bot/robinhood-chain-alpha
+              ./venv/bin/python analysis/task5_bot_router_backtest_clean_universe.py --price-missing
+            "
+          ' > /tmp/clean_stdout.log 2> /tmp/clean_stderr.log
+          echo "--- stdout ---"; cat /tmp/clean_stdout.log
+          echo "--- stderr ---"; cat /tmp/clean_stderr.log
+
+      - name: Забрать результаты
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_router_backtest_clean_universe_result.json 2>/dev/null' > /tmp/clean_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_pool_registry_cache.json 2>/dev/null' > /tmp/pool_registry_cache.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_router_capture/dump.jsonl.gz 2>/dev/null' > /tmp/dump.jsonl.gz || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache data/task5_bot_router_capture
+          {
+            echo "# Чистый универсум -- свежий захват (с отправителем) + бэктест -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## capture stdout"; cat /tmp/capture_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## capture stderr"; cat /tmp/capture_stderr.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## clean_universe stdout"; cat /tmp/clean_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## clean_universe stderr"; cat /tmp/clean_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_bot_router_backtest_clean_universe_log.txt
+          git add data/p3_guard_cache/task5_bot_router_backtest_clean_universe_log.txt
+
+          if [ -s /tmp/clean_result.json ] && python3 -c "import json; json.load(open('/tmp/clean_result.json'))" 2>/dev/null; then
+            cp /tmp/clean_result.json data/task5_bot_router_backtest_clean_universe_result.json
+            git add data/task5_bot_router_backtest_clean_universe_result.json
+          fi
+          if [ -s /tmp/pool_registry_cache.json ] && python3 -c "import json; json.load(open('/tmp/pool_registry_cache.json'))" 2>/dev/null; then
+            cp /tmp/pool_registry_cache.json data/task5_bot_pool_registry_cache.json
+            git add data/task5_bot_pool_registry_cache.json
+          fi
+          if [ -s /tmp/dump.jsonl.gz ]; then
+            cp /tmp/dump.jsonl.gz data/task5_bot_router_capture/dump.jsonl.gz
+            git add data/task5_bot_router_capture/dump.jsonl.gz
+          fi
+
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5, Путь А: бэктест на чистом универсуме (Dune-45 + liquidity>0 + анти-накрутка) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

@@ -71,6 +71,13 @@ async def run(duration_s: float, feed_url: str, out_path: str) -> dict:
                 "sequence_number": msg.sequence_number,
                 "to": entry["to"].lower(),
                 "data": data_hex,
+                # Владелец, 2026-09-12 ('чистый универсум'): "пулы, где свопы
+                # идут от 1-2 адресов -- исключать как накрутку". Реальный
+                # адрес отправителя -- ecrecover по подписи уже отправленной
+                # публичной транзакции (см. _recover_sender в
+                # task5_bot_feed_client.py), НЕ RPC-запрос, НЕ подпись/отправка.
+                # None -- честно, если восстановить не удалось (не гадаем).
+                "from": entry.get("from"),
             }) + "\n")
             n_tx_decoded += 1
 

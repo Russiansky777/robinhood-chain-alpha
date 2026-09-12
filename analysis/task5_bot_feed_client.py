@@ -402,6 +402,27 @@ def _decode_signed_tx(tx_bytes: bytes, msg_type: int) -> dict:
 
         to_hex = "0x" + to_field.hex() if isinstance(to_field, bytes) and to_field else None
         data_hex = "0x" + data_field.hex() if isinstance(data_field, bytes) else "0x"
-        return {"to": to_hex, "data": data_hex, "msg_type": msg_type, "tx_kind": tx_kind}
+        result = {"to": to_hex, "data": data_hex, "msg_type": msg_type, "tx_kind": tx_kind}
+        result["from"] = _recover_sender(tx_bytes)
+        return result
     except Exception as exc:
         return {"decode_error": str(exc)}
+
+
+def _recover_sender(tx_bytes: bytes) -> str | None:
+    """Владелец, 2026-09-12 ('чистый универсум'): "пулы, где свопы идут от
+    1-2 адресов -- исключать как накрутку" -- для этого нужен реальный
+    адрес отправителя, а не выдуманный/угаданный. `tx_bytes` -- это уже
+    ПОЛНАЯ подписанная сетевая транзакция (EIP-2718), ecrecover по её
+    подписи (v/r/s) -- стандартная, чисто криптографическая операция БЕЗ
+    сети (никакого RPC/ноды не требуется, это НЕ подпись/отправка --
+    расшифровка отправителя УЖЕ ОТПРАВЛЕННОЙ, публичной транзакции, ровно
+    то же самое, что делает любой блок-эксплорер). `eth_account.Account.
+    recover_transaction` принимает сырые байты как есть. Честно: при любой
+    ошибке (нестандартная транзакция, повреждённая сигнатура и т.п.) --
+    `None`, не гадаем."""
+    try:
+        from eth_account import Account
+        return Account.recover_transaction(tx_bytes).lower()
+    except Exception:
+        return None
