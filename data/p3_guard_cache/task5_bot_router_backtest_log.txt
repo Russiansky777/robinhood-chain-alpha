@@ -1,11 +1,12 @@
-# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T11:49:19Z
+# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T11:51:29Z
 
 ## stdout
-[backtest] реестр загружен ИЗ КЕША (офлайн, RPC не вызывался): data/task5_bot_pool_registry_cache.json
-[backtest] пулов в реестре: 1160, текущая цена WETH/USDG: None
+[backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC (--refresh-cache)...
+[backtest] реестр сохранён в кеш: data/task5_bot_pool_registry_cache.json
+[backtest] пулов в реестре: 1150, текущая цена WETH/USDG: None
 {
   "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
-  "n_pools_in_registry": 1160,
+  "n_pools_in_registry": 1150,
   "current_weth_usd_price": null,
   "weth_usdg_pools_in_registry_debug": [
     {
@@ -40,3 +41,4 @@
 [backtest] результат записан в data/task5_bot_router_backtest_result.json
 
 ## stderr
+[bootstrap] populate_initial_prices: 0/1150 успешно, 1150 ошибок, примеры: ['batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/', 'batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/', 'batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/']
