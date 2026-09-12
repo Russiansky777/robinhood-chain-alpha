@@ -43,9 +43,16 @@ RECEIPT_TIMEOUT_S = 15.0
 RECEIPT_POLL_S = 0.05
 PRIORITY_FEE_WEI = int(1e8)                     # 0.1 gwei — FCFS, приоритет не покупается
 
-# Селекторы custom errors контракта. Заполнить из docs/TASK5_BOT_EXECUTOR_SPEC.md
-# (там они уже вычислены). Формат: "0xabcdef12": "ИмяОшибки".
-REVERT_SELECTORS: dict[str, str] = {}
+# Селекторы custom errors контракта (ClosedCycleExecutorV3.sol) -- реально
+# вычислены (keccak-256, первые 4 байта сигнатуры), см.
+# docs/TASK5_BOT_EXECUTOR_SPEC.md и CUSTOM_ERROR_SELECTORS в
+# task5_bot_executor.py (тот же словарь, значения побайтово совпадают).
+REVERT_SELECTORS: dict[str, str] = {
+    "0xc39ba758": "InsufficientProfit",  # InsufficientProfit(uint256,uint256,uint256)
+    "0xc2221189": "UnexpectedCallback",  # UnexpectedCallback(address)
+    "0x37ed32e8": "ReentrantCall",       # ReentrantCall()
+    "0x30cd7471": "NotOwner",            # NotOwner()
+}
 
 
 @dataclass
