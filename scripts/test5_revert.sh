@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # test5_revert.sh — $5-тест отката: одна намеренно убыточная попытка executeCycle.
 # Запуск на Ohio: curl -fsSL <raw>/scripts/test5_revert.sh | sudo -u bot bash
-# Ворота: eth_call ДОЛЖЕН откатиться с InsufficientProfit (0xc39ba758) — иначе стоп, ничего не шлём.
+# Ворота: eth_call ДОЛЖЕН откатиться с InsufficientProfit (0xc39ba758) ИЛИ
+# RepayShortfall (0xb95380e9) — иначе стоп, ничего не шлём. Владелец, 2026-09-12:
+# RepayShortfall тоже валиден — цикл проходит обе своп-ноги, откатывается на
+# проверке достаточности средств для repay (раньше проверки minProfit), капитал
+# защищён так же, как при InsufficientProfit — то же семейство ожидаемого
+# "безопасного отката", не баг.
 # Ожидание: реальная tx со status=0, тот же селектор, баланс exitToken контракта не изменился.
 set -euo pipefail
 
@@ -30,7 +35,12 @@ from eth_account import Account
 
 SEL = {"0xc39ba758":"InsufficientProfit","0xc2221189":"UnexpectedCallback","0x37ed32e8":"ReentrantCall",
        "0x30cd7471":"NotOwner","0xb95380e9":"RepayShortfall"}
-EXPECT = "0xc39ba758"
+# Владелец, 2026-09-12: RepayShortfall принят как валидный результат наравне с
+# InsufficientProfit — оба означают, что обе своп-ноги реально исполнились и
+# откат случился только на защитной проверке (repay или minProfit), капитал
+# не теряется сверх газа. Условие ворот/успеха теперь — принадлежность
+# множеству, не равенство одному значению.
+EXPECT = {"0xc39ba758", "0xb95380e9"}  # InsufficientProfit, RepayShortfall
 
 rpc = Web3(Web3.HTTPProvider(os.environ["RPC_URL"], request_kwargs={"timeout": 15}))
 seq = Web3(Web3.HTTPProvider(os.environ["SEQ_URL"], request_kwargs={"timeout": 10}))
@@ -59,8 +69,10 @@ try:
 except Exception as e:
     sim_sel = revert_selector(e); sim = SEL.get(sim_sel, f"unknown:{sim_sel}")
 print(json.dumps({"phase":"simulate","result":sim,"selector":sim_sel}), flush=True)
-if sim_sel != EXPECT:
-    print(json.dumps({"ok":False,"stopped_before_send":True,"reason":f"simulate returned {sim}, expected InsufficientProfit"}, indent=2))
+if sim_sel not in EXPECT:
+    print(json.dumps({"ok":False,"stopped_before_send":True,
+                       "reason":f"simulate returned {sim}, expected one of {sorted(EXPECT)} "
+                                f"(InsufficientProfit/RepayShortfall)"}, indent=2))
     raise SystemExit(0)
 
 # --- реальная отправка ---
@@ -94,7 +106,7 @@ except Exception as e:
 bal_after = bal()
 
 result = {
-    "ok": receipt["status"]==0 and rep_sel==EXPECT and bal_after==bal_before,
+    "ok": receipt["status"]==0 and rep_sel in EXPECT and bal_after==bal_before,
     "tx_hash": txh.hex(), "block": receipt["blockNumber"], "status": receipt["status"],
     "gas_used": receipt["gasUsed"], "gas_cost_eth": receipt["gasUsed"]*receipt.get("effectiveGasPrice", max_fee)/1e18,
     "submit_endpoint": endpoint, "simulate_selector": sim, "replay_selector": rep,
