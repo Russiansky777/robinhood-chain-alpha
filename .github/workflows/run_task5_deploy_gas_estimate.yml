@@ -46,8 +46,8 @@ jobs:
             sudo -u bot bash -c "
               cd /home/bot/robinhood-chain-alpha/analysis
               /home/bot/robinhood-chain-alpha/venv/bin/python task5_deploy_gas_estimate.py
+              cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json
             "
-            cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json
           ' > /tmp/deploy_params_updated.json 2> /tmp/deploy_gas_stderr.log
           echo "--- stderr ---"; cat /tmp/deploy_gas_stderr.log
           echo "--- stdout (последний JSON -- обновлённый deploy_params.json) ---"; cat /tmp/deploy_params_updated.json
@@ -55,7 +55,7 @@ jobs:
       - name: Забрать обновлённый deploy_params.json (с gas_estimate)
         if: always()
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 'cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json' > /tmp/deploy_params_final.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_params.json' > /tmp/deploy_params_final.json || true
 
       - name: Commit results
         if: always()
