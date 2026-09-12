@@ -63,8 +63,14 @@ WETH_USDG_POOL = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 WETH_DECIMALS, USDG_DECIMALS = 18, 6
 DUST_RAW_THRESHOLD = 1000
 
-TIME_BUDGET_LOG_SCAN_S = 480.0  # честный бюджет на этап 2 (сбор Swap-логов) -- оставляет запас на приёмку
-TIME_BUDGET_TOTAL_S = 700.0  # общий честный бюджет всего скрипта
+
+# ЧЕСТНАЯ КОРРЕКТИРОВКА после первого реального прогона (падение на баге
+# 'data':'0x', но реальные тайминги ДО падения сохранены): 15000 блоков
+# (42% часового окна) заняли 559с сбора логов -- полный час на этой
+# плотности потребует ~1300-1400с. Бюджеты подняты под РЕАЛЬНО измеренную
+# плотность (v3=62239 + v4=102185 логов на 15000 блоков), не угаданы.
+TIME_BUDGET_LOG_SCAN_S = 1500.0  # честный бюджет на этап 2 (сбор Swap-логов) -- покрывает полный час на измеренной плотности
+TIME_BUDGET_TOTAL_S = 2100.0  # общий честный бюджет всего скрипта -- оставляет ~10 минут на проверку sender-групп
 
 
 def _get_transaction_receipt_fast(tx_hash: str) -> dict:
@@ -159,7 +165,8 @@ def check_tx_against_criterion(tx_hash: str, eth_price_usdg: float | None) -> di
         token = (log.get("address") or "").lower()
         frm = _topic_to_addr(topics[1])
         to = _topic_to_addr(topics[2])
-        value = int(log.get("data") or "0x0", 16)
+        data_hex = log.get("data") or "0x0"
+        value = int(data_hex, 16) if data_hex not in ("0x", "") else 0
         if frm == contract:
             contract_net[token] = contract_net.get(token, 0) - value
         if to == contract:
@@ -220,7 +227,7 @@ def main() -> None:
 
     tx_pools: dict[str, set[str]] = {}
     tx_senders: dict[str, set[str]] = {}
-    CHUNK = 5000
+    CHUNK = 2000  # честно уменьшен с 5000 -- реже промахиваемся мимо TIME_BUDGET_LOG_SCAN_S на одном большом чанке
     block = from_block
     last_covered = from_block - 1
     scan_timed_out = False
