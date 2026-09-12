@@ -1,52 +1,20 @@
-# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T02:05:08Z
+# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T03:31:40Z
 
 ## stdout
 [task5_bot] режим: DRY-RUN (ничего не отправляется)
 [task5_bot] сеть: mainnet (chain_id=4663)
 [task5_bot] порог входа: $10.0/попытка, допущение по откатам: 55%
 [task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...
-[task5_bot] найдено пулов: 1208
+[task5_bot] найдено пулов: 1199
 [task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): 44
 [task5_bot] подключение к фиду: wss://feed.mainnet.chain.robinhood.com
 [task5_bot] СМОУК-ТЕСТ: ограничено 600.0с (владелец, 2026-09-13, первый безопасный dry-run перед реальными деньгами)
+[feed] соединение прервано (server rejected WebSocket connection: HTTP 403) -- реконнект не раньше чем через 1800с
+[feed] cooldown активен -- жду 1800с перед подключением
+[task5_bot] диагностика фида: {'n_messages_total': 0, 'n_with_seq': 0, 'n_unparsed': 0, 'n_confirmation_only': 0, 'n_connect_attempts': 1, 'n_reconnects': 1, 'last_disconnect_error': 'server rejected WebSocket connection: HTTP 403'}
+[task5_bot] последний известный номер блока с фида: None
+[task5_bot] касаний известных пулов: 0, реальных RPC-рефрешей цены: 0
 
 ## stderr
-Traceback (most recent call last):
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_run.py", line 209, in <module>
-    raise SystemExit(main())
-                     ~~~~^^
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_run.py", line 195, in main
-    asyncio.run(asyncio.wait_for(client.listen(on_feed_message), timeout=args.duration_seconds))
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.14/asyncio/runners.py", line 204, in run
-    return runner.run(main)
-           ~~~~~~~~~~^^^^^^
-  File "/usr/lib/python3.14/asyncio/runners.py", line 127, in run
-    return self._loop.run_until_complete(task)
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
-  File "/usr/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
-    return future.result()
-           ~~~~~~~~~~~~~^^
-  File "/usr/lib/python3.14/asyncio/tasks.py", line 488, in wait_for
-    return await fut
-           ^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_feed_client.py", line 95, in listen
-    async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
-               ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/asyncio/client.py", line 576, in __aenter__
-    self.connection = await self
-                      ^^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/asyncio/client.py", line 526, in connect
-    await connection.handshake(
-    ...<2 lines>...
-    )
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/asyncio/client.py", line 113, in handshake
-    raise self.protocol.handshake_exc
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/client.py", line 334, in parse
-    self.process_response(response)
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/client.py", line 145, in process_response
-    raise InvalidStatus(response)
-websockets.exceptions.InvalidStatus: server rejected WebSocket connection: HTTP 403
 
 ## telemetry attempts.jsonl (n строк: 0)
