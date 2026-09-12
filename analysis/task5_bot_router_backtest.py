@@ -33,17 +33,67 @@ from task5_bot_detector import (
     check_router_triggered_opportunity,
     current_weth_usd_price,
 )
-from task5_bot_pool_state import bootstrap_registry_from_rpc, load_registry_cache, save_registry_cache
+from task5_bot_pool_state import (
+    bootstrap_registry_from_rpc,
+    load_registry_cache,
+    populate_initial_prices,
+    save_registry_cache,
+)
 from task5_bot_router_decode import KNOWN_SELF_TRADE_ADDRESSES, KNOWN_SWAP_SELECTORS, decode_calldata
 
 DEFAULT_DUMP = "data/task5_bot_router_capture/dump.jsonl.gz"
 
 
-def get_registry(use_cache: bool, refresh_cache: bool, cache_path: str):
+def _find_touched_pools(dump_path: str, registry) -> list:
+    """Владелец, 2026-09-12 (реальная находка после 2 прогонов): free tier
+    Alchemy физически не успевает оценить ВСЕ ~1140 пулов (CU/s потолок,
+    ~50% в лучшем случае) -- для офлайн-анализа КОНКРЕТНОГО дампа нужны
+    цены ТОЛЬКО тех пулов, что реально в нём затронуты (на порядок меньше,
+    233 совпадения на ~1140 пулов). Один проход по дампу, БЕЗ сети (только
+    локальный decode_calldata + find_pool_by_tokens_fee)."""
+    touched: dict[str, object] = {}
+    with gzip.open(dump_path, "rt") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            to_addr = row["to"]
+            if to_addr in KNOWN_SELF_TRADE_ADDRESSES:
+                continue
+            data_hex = row.get("data") or "0x"
+            selector = ("0x" + data_hex[2:10]) if len(data_hex) >= 10 else None
+            if selector not in KNOWN_SWAP_SELECTORS:
+                continue
+            for intent in decode_calldata(to_addr, data_hex):
+                if intent.token_in is None or intent.token_out is None or intent.fee is None:
+                    continue
+                pool = registry.find_pool_by_tokens_fee(intent.token_in, intent.token_out, intent.fee)
+                if pool is not None:
+                    touched[pool.address.lower()] = pool
+    return list(touched.values())
+
+
+def get_registry(use_cache: bool, refresh_cache: bool, cache_path: str, dump_path: str):
     if refresh_cache or not use_cache or not Path(cache_path).exists():
         print(f"[backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC "
-              f"({'--refresh-cache' if refresh_cache else 'кеша нет'})...")
-        registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET)
+              f"({'--refresh-cache' if refresh_cache else 'кеша нет'}), БЕЗ eager-оценки цен "
+              f"(только PoolCreated-скан, один eth_getLogs)...")
+        registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET, populate_prices=False)
+        touched_pools = _find_touched_pools(dump_path, registry)
+        # WETH/USDG-референс нужен ВСЕГДА (current_weth_usd_price -- для конвертации
+        # $-суммы через ЛЮБОЙ другой затронутый пул, см. _price_amount_via_pool) --
+        # добавляем явно, даже если сам дамп не тронул именно эту пару напрямую.
+        touched_addrs = {p.address.lower() for p in touched_pools}
+        for p in registry.pools_for_pair(WETH, USDG):
+            if p.address.lower() not in touched_addrs:
+                touched_pools.append(p)
+                touched_addrs.add(p.address.lower())
+        print(f"[backtest] реально затронутых пулов в дампе (+ WETH/USDG референс): {len(touched_pools)} из "
+              f"{len(registry.by_address)} (оцениваем цену ТОЛЬКО их -- на порядок меньше запросов)")
+        price_stats = populate_initial_prices(registry, rpc_url=RPC_URL_MAINNET, pools_subset=touched_pools)
+        print(f"[backtest] populate_initial_prices (subset): {price_stats['n_ok']}/{price_stats['n_pools']} "
+              f"успешно, {price_stats['n_error']} ошибок, примеры: {price_stats['errors_sample']}", file=sys.stderr)
         save_registry_cache(registry, cache_path)
         print(f"[backtest] реестр сохранён в кеш: {cache_path}")
     else:
@@ -173,7 +223,8 @@ if __name__ == "__main__":
         print(f"[backtest] ЧЕСТНО: дамп {args.dump} не найден.", file=sys.stderr)
         raise SystemExit(1)
 
-    registry = get_registry(use_cache=True, refresh_cache=args.refresh_cache, cache_path=args.cache)
+    registry = get_registry(use_cache=True, refresh_cache=args.refresh_cache, cache_path=args.cache,
+                             dump_path=args.dump)
     result = run(args.dump, registry, args.min_notional_usd, args.min_price_impact)
     text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
     print(text)

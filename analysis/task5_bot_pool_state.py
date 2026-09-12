@@ -336,7 +336,8 @@ def _decode_signed_word(hex_word: str) -> int:
 
 def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINNET,
                              batch_size: int = 8, timeout: float = 20.0,
-                             block_number: int | None = None) -> dict:
+                             block_number: int | None = None,
+                             pools_subset: list["V3PoolState"] | None = None) -> dict:
     """Владелец, 2026-09-13, п.2: "slot0 при bootstrap -- для ВСЕХ пулов,
     батчами, чтобы не упереться в лимит." Один-единственный, разовый вызов
     ДО горячего пути (тот же принцип, что PoolCreated-скан выше) -- читает
@@ -347,13 +348,20 @@ def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINN
     есть `2*batch_size` элементов в массиве) -- 25 пулов/50 запросов --
     консервативный размер, ниже типичного лимита провайдеров (100-1000).
 
+    `pools_subset` -- РЕАЛЬНАЯ находка (2026-09-12): при ~1140 пулах free
+    tier Alchemy (CU/s потолок) физически не успевает оценить все за один
+    прогон (~50% в лучшем случае). Для офлайн-анализа КОНКРЕТНОГО дампа
+    нужны цены ТОЛЬКО тех пулов, что реально затронуты в нём (на порядок
+    меньше) -- если передан этот параметр, оцениваются ТОЛЬКО эти пулы,
+    не вся вселенная (см. `task5_bot_router_backtest.py`).
+
     Честно: пулы, для которых `eth_call` вернул ошибку (несуществующий
     контракт слот, нестандартный ABI и т.п.) -- остаются с
     `sqrt_price_x96=None` (как и было до вызова), НЕ подставляется 0/угаданное
     значение -- такие пулы просто не участвуют в детекции расхождений
     (`_normalized_price` вернёт None), это уже штатно обрабатывается
     `check_pair_for_divergence`."""
-    pools = list(registry.by_address.values())
+    pools = pools_subset if pools_subset is not None else list(registry.by_address.values())
     stats = {"n_pools": len(pools), "n_ok": 0, "n_error": 0, "errors_sample": []}
 
     for i in range(0, len(pools), batch_size):
