@@ -1,0 +1,215 @@
+{
+  "hook_permissions": {
+    "BEFORE_INITIALIZE_FLAG": true,
+    "AFTER_INITIALIZE_FLAG": false,
+    "BEFORE_ADD_LIQUIDITY_FLAG": false,
+    "AFTER_ADD_LIQUIDITY_FLAG": false,
+    "BEFORE_REMOVE_LIQUIDITY_FLAG": false,
+    "AFTER_REMOVE_LIQUIDITY_FLAG": false,
+    "BEFORE_SWAP_FLAG": false,
+    "AFTER_SWAP_FLAG": true,
+    "BEFORE_DONATE_FLAG": false,
+    "AFTER_DONATE_FLAG": false,
+    "BEFORE_SWAP_RETURNS_DELTA_FLAG": false,
+    "AFTER_SWAP_RETURNS_DELTA_FLAG": true,
+    "AFTER_ADD_LIQUIDITY_RETURNS_DELTA_FLAG": false,
+    "AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG": false
+  },
+  "hook_code_len_bytes": 15167,
+  "pool_infos": {
+    "ETH_MOSIAI": {
+      "pool_id": "0xf6562daa10e734d41846562b5f418f7833849643bf6c937eeeb0147b8ea94c2f",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+      "fee": 0,
+      "tick_spacing": 200,
+      "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+      "init_sqrt_price_x96": 552276925551777202739159458572441,
+      "init_tick": 176998,
+      "block_number": "0x3a67aa5",
+      "poolkey_to_poolid_match": true
+    },
+    "USDG_MOSIAI": {
+      "pool_id": "0x784df9b627194fffd79fa5475edc4bb67c458ac7e8b7890f55eb6a522d4a442c",
+      "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "currency1": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+      "fee": 75000,
+      "tick_spacing": 2,
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "init_sqrt_price_x96": 3233579650099289495543811611692841990,
+      "init_tick": 350508,
+      "block_number": "0x3a6851b",
+      "poolkey_to_poolid_match": true
+    },
+    "ETH_USDG": {
+      "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 100,
+      "tick_spacing": 1,
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "init_sqrt_price_x96": 3192942963744063452651919,
+      "init_tick": -202393,
+      "block_number": "0x117f58",
+      "poolkey_to_poolid_match": true
+    }
+  },
+  "control_tx_audits": [
+    {
+      "tx_hash": "0x658c2ab808cd0fa30f5dc14a5ea0e6259fe11714b842efcb5721c3acd320274f",
+      "block_number": "0x3a694cb",
+      "status": "success",
+      "tx_value_wei": "0x0",
+      "gas_used": 970755,
+      "n_v4_swaps": 3,
+      "swaps": [
+        {
+          "pool_id": "0xf6562daa10e734d41846562b5f418f7833849643bf6c937eeeb0147b8ea94c2f",
+          "amount0": -324259173170675712,
+          "amount1": 2910227184914870645595017,
+          "sqrt_price_x96": 233449081997724268724434687613747,
+          "liquidity": 29277002188455995779456,
+          "tick": 159775,
+          "fee": 0
+        },
+        {
+          "pool_id": "0x784df9b627194fffd79fa5475edc4bb67c458ac7e8b7890f55eb6a522d4a442c",
+          "amount0": 986159240,
+          "amount1": -2852022641216573232683117,
+          "sqrt_price_x96": 4273333085777894650466559424197009486,
+          "liquidity": 521239826354095153,
+          "tick": 356084,
+          "fee": 75925
+        },
+        {
+          "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+          "amount0": 389353250227933244,
+          "amount1": -986159240,
+          "sqrt_price_x96": 3987175751453054400512239,
+          "liquidity": 375896932707636486,
+          "tick": -197950,
+          "fee": 125
+        }
+      ],
+      "n_transfers": 5,
+      "transfers": [
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+          "value_raw": 58204543698297412911900
+        },
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "value_raw": 2852022641216573232683117
+        },
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "value_raw": 2852022641216573232683117
+        },
+        {
+          "token": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "value_raw": 986159240
+        },
+        {
+          "token": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "from": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "value_raw": 986159240
+        }
+      ],
+      "hook_direct_transfers": [
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+          "value_raw": 58204543698297412911900
+        }
+      ]
+    },
+    {
+      "tx_hash": "0x9976a38fec4f4d2be228118da68b1276a26e7f33927ea606d11348d31e2ed98c",
+      "block_number": "0x3a69507",
+      "status": "success",
+      "tx_value_wei": "0x0",
+      "gas_used": 417943,
+      "n_v4_swaps": 3,
+      "swaps": [
+        {
+          "pool_id": "0xf6562daa10e734d41846562b5f418f7833849643bf6c937eeeb0147b8ea94c2f",
+          "amount0": -81064793292668928,
+          "amount1": 1360925357002413753012724,
+          "sqrt_price_x96": 322787763134797900264105222776550,
+          "liquidity": 29277002188455995779456,
+          "tick": 166256,
+          "fee": 0
+        },
+        {
+          "pool_id": "0x784df9b627194fffd79fa5475edc4bb67c458ac7e8b7890f55eb6a522d4a442c",
+          "amount0": 292195057,
+          "amount1": -1333706849862365477952470,
+          "sqrt_price_x96": 5494480747989162987220500289353043479,
+          "liquidity": 49766003683526180,
+          "tick": 361111,
+          "fee": 75925
+        },
+        {
+          "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+          "amount0": 115354078894873807,
+          "amount1": -292195057,
+          "sqrt_price_x96": 3987270929194640064133583,
+          "liquidity": 375896932707636486,
+          "tick": -197950,
+          "fee": 125
+        }
+      ],
+      "n_transfers": 5,
+      "transfers": [
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+          "value_raw": 27218507140048275060254
+        },
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "value_raw": 1333706849862365477952470
+        },
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "value_raw": 1333706849862365477952470
+        },
+        {
+          "token": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "value_raw": 292195057
+        },
+        {
+          "token": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "from": "0x1b357e7acd2a32aebfa2de286c9e8e617d39a251",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "value_raw": 292195057
+        }
+      ],
+      "hook_direct_transfers": [
+        {
+          "token": "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+          "value_raw": 27218507140048275060254
+        }
+      ]
+    }
+  ]
+}
