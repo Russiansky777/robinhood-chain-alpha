@@ -38,7 +38,7 @@ jobs:
           ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: Подтянуть актуальный код и запустить разведку (3 сообщения, до 30с)
+      - name: "Одна проверка с браузерными заголовками (5 сообщений, до 20с) -- владелец, 2026-09-13"
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
@@ -46,7 +46,7 @@ jobs:
             sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
             sudo -u bot bash -c "
               cd /home/bot/robinhood-chain-alpha
-              ./venv/bin/python analysis/task5_bot_feed_structure_probe.py 3 30
+              ./venv/bin/python analysis/task5_bot_feed_structure_probe.py 5 20
             "
           ' > /tmp/feed_structure_probe_result.json 2> /tmp/feed_structure_probe_stderr.log
           echo "--- stderr ---"; cat /tmp/feed_structure_probe_stderr.log
