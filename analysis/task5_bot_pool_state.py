@@ -79,6 +79,18 @@ class PoolRegistry:
         key = self._pair_key(token0, token1)
         return [self.by_address[a] for a in self.by_pair.get(key, [])]
 
+    def find_pool_by_tokens_fee(self, token_a: str, token_b: str, fee: int) -> V3PoolState | None:
+        """Владелец, 2026-09-12 ('добавка', Путь А): маппинг (token0, token1,
+        fee) -> pool из уже существующего реестра. Роутер-calldata (см.
+        `task5_bot_router_decode.py`) даёт `tokenIn`/`tokenOut` НЕ обязательно
+        в том же порядке, что `token0`/`token1` пула (порядок в пуле --
+        канонический, по возрастанию адреса) -- сверяем оба токена как
+        неупорядоченную пару + fee, не гадаем по порядку из calldata."""
+        for pool in self.pools_for_pair(token_a, token_b):
+            if pool.fee == fee:
+                return pool
+        return None
+
     def apply_swap_event(self, pool_address: str, sqrt_price_x96: int, liquidity: int, tick: int,
                           block_number: int | None) -> None:
         pool = self.by_address.get(pool_address.lower())
