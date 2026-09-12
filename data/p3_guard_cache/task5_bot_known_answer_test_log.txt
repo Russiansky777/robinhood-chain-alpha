@@ -1,62 +1,11 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T23:28:39Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T23:34:05Z
 
 ## stdout
-[v4_executor_compile_check] устанавливаю solc 0.8.24...
+[v4_executor_compile_check] forge build (solc 0.8.24, evmVersion=paris)...
+[v4_executor_compile_check] ОШИБКА КОМПИЛЯЦИИ (forge build):
+
+Error: failed to extract foundry config:
+foundry config error: Invalid contract output selection: ast for setting `extra_output.1`
+
 
 ## stderr
-Traceback (most recent call last):
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 697, in _validate_installation
-    installed_version = wrapper.get_version_str_from_solc_binary(binary_path)
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/wrapper.py", line 16, in get_version_str_from_solc_binary
-    stdout_data = subprocess.check_output([str(solc_binary), "--version"], encoding="utf8")
-  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
-    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
-           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-               **kwargs).stdout
-               ^^^^^^^^^
-  File "/usr/lib/python3.14/subprocess.py", line 555, in run
-    with Popen(*popenargs, **kwargs) as process:
-         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.14/subprocess.py", line 1039, in __init__
-    self._execute_child(args, executable, preexec_fn, close_fds,
-    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                        pass_fds, cwd, env,
-                        ^^^^^^^^^^^^^^^^^^^
-    ...<5 lines>...
-                        gid, gids, uid, umask,
-                        ^^^^^^^^^^^^^^^^^^^^^^
-                        start_new_session, process_group)
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.14/subprocess.py", line 1875, in _execute_child
-    self._posix_spawn(args, executable, env, restore_signals, close_fds,
-    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                      p2cread, p2cwrite,
-                      ^^^^^^^^^^^^^^^^^^
-                      c2pread, c2pwrite,
-                      ^^^^^^^^^^^^^^^^^^
-                      errread, errwrite)
-                      ^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.14/subprocess.py", line 1819, in _posix_spawn
-    self.pid = os.posix_spawn(executable, args, env, **kwargs)
-               ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-OSError: [Errno 8] Exec format error: '/home/bot/.solcx/solc-v0.8.24'
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_v4_executor_compile_check.py", line 189, in <module>
-    main()
-    ~~~~^^
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_v4_executor_compile_check.py", line 68, in main
-    solcx.install_solc(SOLC_VERSION)
-    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 501, in install_solc
-    raise exc
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 494, in install_solc
-    _validate_installation(Version(base_version), solcx_binary_path=solcx_binary_path)
-    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/solcx/install.py", line 700, in _validate_installation
-    raise SolcInstallationError(
-        "Downloaded binary would not execute, or returned unexpected output."
-    )
-solcx.exceptions.SolcInstallationError: Downloaded binary would not execute, or returned unexpected output. If this issue persists, you can try to compile from source code using `solcx.compile_solc('0.8.24')`.
