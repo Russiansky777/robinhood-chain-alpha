@@ -1,21 +1,14 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T17:11:14Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T18:06:12Z
 
 ## stdout
-[true_arb_scan] окно: блоки 61231198..61266539 (35341 блоков), latest=61266539
-[true_arb_scan] реальная текущая цена WETH/USDG: 2531.7679345635493
-[true_arb_scan] РЕАЛЬНОЕ покрытие: блоки 61231198..61246197 (ЧАСТИЧНОЕ -- бюджет времени исчерпан), всего tx с Swap-событием: 94182, многопуловых (>=2 пула): 36973
-[true_arb_scan] уникальных sender-групп среди многопуловых tx: 408
 
 ## stderr
-[true_arb_scan] покрыто до блока 61236197, v3_logs=19781 v4_logs=31483 tx_учтено=31223 прошло_236с
-[true_arb_scan] покрыто до блока 61241197, v3_logs=37142 v4_logs=62905 tx_учтено=59687 прошло_362с
-[true_arb_scan] покрыто до блока 61246197, v3_logs=62239 v4_logs=102185 tx_учтено=94182 прошло_559с
-Traceback (most recent call last):
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_true_arbitrageur_scan.py", line 331, in <module>
-    main()
-    ~~~~^^
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_true_arbitrageur_scan.py", line 280, in main
-    sample_result = check_tx_against_criterion(sample_tx, eth_price)
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_true_arbitrageur_scan.py", line 162, in check_tx_against_criterion
-    value = int(log.get("data") or "0x0", 16)
-ValueError: invalid literal for int() with base 16: '0x'
+[true_arb_scan] покрыто до блока 61265743, v3_logs=6617 v4_logs=12413 tx_учтено=11406 прошло_65с
+[true_arb_scan] покрыто до блока 61267743, v3_logs=13076 v4_logs=22908 tx_учтено=21875 прошло_107с
+[true_arb_scan] покрыто до блока 61269743, v3_logs=20973 v4_logs=34130 tx_учтено=33561 прошло_249с
+[true_arb_scan] покрыто до блока 61271743, v3_logs=30714 v4_logs=45539 tx_учтено=45926 прошло_308с
+[true_arb_scan] покрыто до блока 61273743, v3_logs=37958 v4_logs=56212 tx_учтено=56385 прошло_354с
+[true_arb_scan] покрыто до блока 61275743, v3_logs=43528 v4_logs=65966 tx_учтено=66478 прошло_405с
+[true_arb_scan] покрыто до блока 61277743, v3_logs=49326 v4_logs=75727 tx_учтено=76279 прошло_455с
+[true_arb_scan] покрыто до блока 61279743, v3_logs=55340 v4_logs=85603 tx_учтено=86488 прошло_509с
+[true_arb_scan] покрыто до блока 61281743, v3_logs=61333 v4_logs=94771 tx_учтено=95969 прошло_556с
