@@ -86,7 +86,8 @@ evm_version = "{EVM_VERSION}"
 optimizer = true
 optimizer_runs = 200
 build_info = true
-extra_output = ["metadata", "ast"]
+extra_output = ["metadata"]
+ast = true
 """
     (BUILD_ROOT / "foundry.toml").write_text(foundry_toml)
 
