@@ -135,6 +135,10 @@ class FeedMessage:
     t_wall: float
     sequence_number: int
     raw_l2_msg_hex: str | None  # None, если не удалось извлечь -- честно, не подделываем
+    sequencer_timestamp: int | None = None  # message.message.header.timestamp -- unix-секунды
+    # (ЦЕЛЫЕ секунды, не мс -- реальная разведка структуры сообщения показала именно
+    # такую гранулярность, см. task5_bot_feed_structure_probe_result.json), None если
+    # заголовок отсутствует/не распознан -- не подставляем 0/угаданное значение.
 
 
 class SequencerFeedClient:
@@ -196,7 +200,9 @@ class SequencerFeedClient:
                     continue
                 self.diag["n_with_seq"] += 1
                 l2_msg_hex = self._extract_l2_msg_hex(m)
-                on_message(FeedMessage(t_wall=t_wall, sequence_number=seq, raw_l2_msg_hex=l2_msg_hex))
+                seq_ts = self._extract_sequencer_timestamp(m)
+                on_message(FeedMessage(t_wall=t_wall, sequence_number=seq, raw_l2_msg_hex=l2_msg_hex,
+                                        sequencer_timestamp=seq_ts))
 
     @staticmethod
     def _extract_l2_msg_hex(m: dict) -> str | None:
@@ -213,6 +219,24 @@ class SequencerFeedClient:
             if isinstance(c, str) and c:
                 return c
         return None
+
+    @staticmethod
+    def _extract_sequencer_timestamp(m: dict) -> int | None:
+        """`message.message.header.timestamp` -- РЕАЛЬНО подтверждено на
+        живых сэмплах (task5_bot_feed_structure_probe_result.json,
+        header={"kind":3,...,"timestamp":1789176677,...}) -- unix-секунды,
+        не мс. Владелец, 2026-09-12: нужен для замера задержки чтения
+        (таймстемп секвенсера против локального времени получения)."""
+        header = None
+        msg_msg = m.get("message")
+        if isinstance(msg_msg, dict):
+            inner = msg_msg.get("message")
+            if isinstance(inner, dict):
+                header = inner.get("header")
+        if not isinstance(header, dict):
+            return None
+        ts = header.get("timestamp")
+        return int(ts) if isinstance(ts, (int, float)) else None
 
 
 def decode_l2_message(l2_msg_field: str) -> list[dict]:

@@ -52,25 +52,37 @@ jobs:
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
           '
 
-      - name: "Запустить task5_bot_run.py --duration-seconds 600 (10 минут, БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
+      - name: "Проверить NTP-синхронизацию времени на хосте (нужно для честного замера задержки чтения)"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            echo "--- timedatectl ---"; timedatectl status 2>&1 || true
+            echo "--- chronyc tracking ---"; chronyc tracking 2>&1 || true
+          ' > /tmp/ntp_status.log 2>&1 || true
+          echo "--- NTP status ---"; cat /tmp/ntp_status.log
+
+      - name: "Запустить task5_bot_run.py --duration-seconds 600 (10 минут, ОДНО подключение -- дет + замер задержки чтения по первым сообщениям, БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo -u bot bash -c "
               cd /home/bot/robinhood-chain-alpha
-              rm -f data/task5_bot_live/attempts.jsonl
+              rm -f data/task5_bot_live/attempts.jsonl data/task5_feed_latency_measurement.json
               ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 600
             "
           ' > /tmp/task5_bot_dryrun_stdout.log 2> /tmp/task5_bot_dryrun_stderr.log
           echo "--- stdout ---"; cat /tmp/task5_bot_dryrun_stdout.log
           echo "--- stderr ---"; cat /tmp/task5_bot_dryrun_stderr.log
 
-      - name: Забрать телеметрию (если что-то записано) для паспорта
+      - name: Забрать телеметрию и замер задержки чтения для паспорта
         if: always()
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_live/attempts.jsonl 2>/dev/null' > /tmp/task5_bot_dryrun_attempts.jsonl || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_feed_latency_measurement.json 2>/dev/null' > /tmp/task5_feed_latency_measurement.json || true
           mkdir -p data/p3_guard_cache
           {
             echo "# Task5 bot dry-run смоук-тест (Ohio) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## NTP-статус хоста (для честности замера задержки чтения)"
+            cat /tmp/ntp_status.log 2>/dev/null || echo "(нет данных)"
             echo ""
             echo "## stdout"
             cat /tmp/task5_bot_dryrun_stdout.log 2>/dev/null || echo "(нет данных)"
@@ -80,13 +92,20 @@ jobs:
             echo ""
             echo "## telemetry attempts.jsonl (n строк: $(wc -l < /tmp/task5_bot_dryrun_attempts.jsonl 2>/dev/null || echo 0))"
             cat /tmp/task5_bot_dryrun_attempts.jsonl 2>/dev/null || echo "(пусто -- ни одной попытки не записано)"
+            echo ""
+            echo "## замер задержки чтения (data/task5_feed_latency_measurement.json)"
+            cat /tmp/task5_feed_latency_measurement.json 2>/dev/null || echo "(нет данных)"
           } > data/p3_guard_cache/task5_bot_dryrun_smoketest_ohio_log.txt
+          if [ -s /tmp/task5_feed_latency_measurement.json ] && python3 -c "import json; json.load(open('/tmp/task5_feed_latency_measurement.json'))" 2>/dev/null; then
+            cp /tmp/task5_feed_latency_measurement.json data/task5_feed_latency_measurement.json
+          fi
 
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_BOT_DRYRUN_SMOKETEST_OHIO_REQUEST
           git add data/p3_guard_cache/task5_bot_dryrun_smoketest_ohio_log.txt 2>/dev/null || true
+          git add data/task5_feed_latency_measurement.json 2>/dev/null || true
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, живой бот: dry-run смоук-тест на Ohio VPS -- лог + телеметрия [automated]"
           for i in 1 2 3 4 5; do

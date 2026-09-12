@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -92,6 +94,13 @@ def main() -> int:
                      help="Владелец, 2026-09-13: ограниченный по времени dry-run смоук-тест ПЕРЕД реальными "
                           "деньгами -- слушает фид ровно это число секунд, затем аккуратно завершается и "
                           "печатает диагностику (по умолчанию -- бесконечно, как раньше, для реального прод-режима).")
+    ap.add_argument("--latency-sample-n", type=int, default=30,
+                     help="Владелец, 2026-09-12: 'один длинный коннект... внутри него первым делом -- замер "
+                          "задержки чтения по первым 20-30 сообщениям' -- ВНУТРИ ЭТОГО ЖЕ подключения, не "
+                          "отдельным соединением. Для первых N сообщений считает (t_wall получения -- "
+                          "sequencer_timestamp из заголовка), пишет data/task5_feed_latency_measurement.json.")
+    ap.add_argument("--latency-out", type=str, default="data/task5_feed_latency_measurement.json",
+                     help="Куда писать результат замера задержки чтения (см. --latency-sample-n).")
     args = ap.parse_args()
 
     dry_run = is_dry_run(args.confirm_mainnet)
@@ -134,6 +143,8 @@ def main() -> int:
     # состояние между потоками (весь бот -- один asyncio-луп).
     last_seen_block_number: list[int | None] = [None]
     last_refresh_wall: dict[str, float] = {}  # pool_address.lower() -> time.time() последнего RPC-рефреша
+    latency_samples: list[dict] = []  # владелец, 2026-09-12: замер задержки чтения по первым N сообщениям
+    # ЭТОГО ЖЕ подключения (не отдельным соединением) -- см. --latency-sample-n
     n_touches_seen = [0]
     n_refreshes_done = [0]
 
@@ -152,6 +163,23 @@ def main() -> int:
         каждое сообщение) RPC-рефреш `slot0()`/`liquidity()` -- это уже
         НЕ "ноль RPC в горячем пути", нарушение явное и залогированное,
         не скрытое."""
+        # Владелец, 2026-09-12: замер задержки чтения ВНУТРИ этого же
+        # подключения (не отдельным соединением) -- по первым N сообщениям.
+        # ЧЕСТНАЯ ОГОВОРКА: sequencer_timestamp -- ЦЕЛЫЕ unix-секунды (не мс),
+        # это ограничивает точность замера до ~1с -- реальная суб-секундная
+        # задержка чтения этим полем не разрешима, честно фиксируем то, что
+        # есть, не обманываем себя мнимой точностью.
+        if len(latency_samples) < args.latency_sample_n and msg.sequencer_timestamp is not None:
+            latency_s = msg.t_wall - msg.sequencer_timestamp
+            latency_samples.append({
+                "sequence_number": msg.sequence_number,
+                "t_wall": msg.t_wall,
+                "sequencer_timestamp": msg.sequencer_timestamp,
+                "latency_s": latency_s,
+            })
+            print(f"[task5_bot][latency] seq={msg.sequence_number} "
+                  f"latency_s={latency_s:.3f} (n={len(latency_samples)}/{args.latency_sample_n})")
+
         last_seen_block_number[0] = msg.sequence_number
         decoded = decode_l2_message(msg.raw_l2_msg_hex) if msg.raw_l2_msg_hex else []
 
@@ -211,6 +239,41 @@ def main() -> int:
     print(f"[task5_bot] диагностика фида: {client.diag}")
     print(f"[task5_bot] последний известный номер блока с фида: {last_seen_block_number[0]}")
     print(f"[task5_bot] касаний известных пулов: {n_touches_seen[0]}, реальных RPC-рефрешей цены: {n_refreshes_done[0]}")
+
+    # Владелец, 2026-09-12: замер задержки чтения -- ВНУТРИ того же
+    # подключения, что и весь остальной dry-run (см. on_feed_message выше).
+    # Если фид вообще не пустил (403/обрыв до первого сообщения) --
+    # latency_samples пуст, честно фиксируем это, а не молчим и не
+    # подставляем выдуманные числа.
+    latencies = [s["latency_s"] for s in latency_samples]
+    latency_summary = {
+        "n_samples": len(latency_samples),
+        "requested_n": args.latency_sample_n,
+        "feed_let_us_in": client.diag.get("n_messages_total", 0) > 0,
+        "last_disconnect_error": client.diag.get("last_disconnect_error"),
+        "samples": latency_samples,
+        "min_latency_s": min(latencies) if latencies else None,
+        "max_latency_s": max(latencies) if latencies else None,
+        "mean_latency_s": (sum(latencies) / len(latencies)) if latencies else None,
+        "note": "sequencer_timestamp -- целые unix-секунды (не мс), точность замера ограничена ~1с; "
+                "локальное время (t_wall) должно быть NTP-синхронизировано на хосте для честного "
+                "результата -- проверяется отдельно (timedatectl/chronyc), не этим скриптом.",
+    }
+    if not latency_samples:
+        latency_summary["note"] = (
+            f"0 сэмплов -- фид НЕ пустил ни одного сообщения с sequencer_timestamp за это подключение "
+            f"(диагностика: {client.diag}). Честно: подключение либо не удалось (403/обрыв), либо "
+            f"закрылось до первого сообщения -- НЕ повторяем попытку в рамках этого запуска."
+        )
+    print(f"[task5_bot] замер задержки чтения: n={latency_summary['n_samples']}/{args.latency_sample_n}, "
+          f"min={latency_summary['min_latency_s']}, mean={latency_summary['mean_latency_s']}, "
+          f"max={latency_summary['max_latency_s']}")
+    latency_out_path = args.latency_out
+    os.makedirs(os.path.dirname(latency_out_path) or ".", exist_ok=True)
+    with open(latency_out_path, "w") as f:
+        json.dump(latency_summary, f, indent=2)
+        f.write("\n")
+    print(f"[task5_bot] результат замера задержки записан в {latency_out_path}")
     return 0
 
 
