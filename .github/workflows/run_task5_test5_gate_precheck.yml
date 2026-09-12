@@ -1,0 +1,80 @@
+name: "Задача 5, $5-тест -- ПРЕДВАРИТЕЛЬНАЯ проверка ворот (eth_call, бесплатно, без подписи)"
+
+# Отдельная от scripts/test5_revert.sh проверка: eth_call с
+# calldata_hex из data/task5_test_params.json от адреса владельца --
+# честно докладывает селектор отката ДО решения запускать основной
+# $5-тест. Read-only, НИКАКОЙ подписи/отправки.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_TEST5_GATE_PRECHECK_REQUEST"
+
+jobs:
+  gate_precheck:
+    name: "eth_call ворота для $5-теста (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: Подтянуть код и сделать eth_call ворота
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              set -e
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python3 task5_test5_gate_precheck.py
+            "
+          ' > /tmp/gate_precheck_stdout.log 2> /tmp/gate_precheck_stderr.log
+          echo "--- stdout ---"; cat /tmp/gate_precheck_stdout.log
+          echo "--- stderr ---"; cat /tmp/gate_precheck_stderr.log
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_TEST5_GATE_PRECHECK_REQUEST
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# Предварительная проверка ворот \$5-теста (eth_call) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            cat /tmp/gate_precheck_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/gate_precheck_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_test5_gate_precheck_log.txt
+          git add data/p3_guard_cache/task5_test5_gate_precheck_log.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: предварительная проверка ворот \$5-теста (eth_call) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
