@@ -90,6 +90,8 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_v4_executor_compile_check_result.json 2>/dev/null' > /tmp/v4_executor_compile_check_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot tar -C /home/bot/robinhood-chain-alpha/contracts/build -czf - . 2>/dev/null' > /tmp/contracts_build.tar.gz || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_v4_diag_platform_result.json 2>/dev/null' > /tmp/v4_diag_platform_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_v4_diag_foundry_result.json 2>/dev/null' > /tmp/v4_diag_foundry_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_v4_fork_simulation_result.json 2>/dev/null' > /tmp/v4_fork_simulation_result.json || true
 
       - name: Commit results
         if: always()
@@ -166,6 +168,14 @@ jobs:
           if [ -s /tmp/v4_diag_platform_result.json ] && python3 -c "import json; json.load(open('/tmp/v4_diag_platform_result.json'))" 2>/dev/null; then
             cp /tmp/v4_diag_platform_result.json data/task5_v4_diag_platform_result.json
             git add data/task5_v4_diag_platform_result.json
+          fi
+          if [ -s /tmp/v4_diag_foundry_result.json ] && python3 -c "import json; json.load(open('/tmp/v4_diag_foundry_result.json'))" 2>/dev/null; then
+            cp /tmp/v4_diag_foundry_result.json data/task5_v4_diag_foundry_result.json
+            git add data/task5_v4_diag_foundry_result.json
+          fi
+          if [ -s /tmp/v4_fork_simulation_result.json ] && python3 -c "import json; json.load(open('/tmp/v4_fork_simulation_result.json'))" 2>/dev/null; then
+            cp /tmp/v4_fork_simulation_result.json data/task5_v4_fork_simulation_result.json
+            git add data/task5_v4_fork_simulation_result.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: проверка против известного ответа (10 реальных захватов) [automated]"
