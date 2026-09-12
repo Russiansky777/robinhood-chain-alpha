@@ -61,6 +61,7 @@ jobs:
         if: always()
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_router_backtest_result.json 2>/dev/null' > /tmp/backtest_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_pool_registry_cache.json 2>/dev/null' > /tmp/pool_registry_cache.json || true
 
       - name: Commit results
         if: always()
@@ -77,6 +78,10 @@ jobs:
           if [ -s /tmp/backtest_result.json ] && python3 -c "import json; json.load(open('/tmp/backtest_result.json'))" 2>/dev/null; then
             cp /tmp/backtest_result.json data/task5_bot_router_backtest_result.json
             git add data/task5_bot_router_backtest_result.json
+          fi
+          if [ -s /tmp/pool_registry_cache.json ] && python3 -c "import json; json.load(open('/tmp/pool_registry_cache.json'))" 2>/dev/null; then
+            cp /tmp/pool_registry_cache.json data/task5_bot_pool_registry_cache.json
+            git add data/task5_bot_pool_registry_cache.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: бэктест детекции на захваченном дампе [automated]"

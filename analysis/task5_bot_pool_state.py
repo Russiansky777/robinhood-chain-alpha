@@ -137,6 +137,16 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
     }], rpc_url)
 
     registry = PoolRegistry()
+    # Владелец, 2026-09-12: реальная находка при разборе двух прогонов бэктеста --
+    # `current_weth_usd_price()` стабильно возвращал None, а `n_priced_via_pool`
+    # был 0 для ВСЕХ 233 совпавших пулов -- т.е. `populate_initial_prices()` ниже
+    # массово не успевает заполнить цены (RPC 429 при большом батч-потоке, см.
+    # PROJECT_STATE.md). `TASK5_KNOWN_PROFITABLE_POOLS` (наши единственные
+    # известные WETH/USDG-пулы, они же самые ценные для бота) регистрируются
+    # здесь ПЕРВЫМИ (до PoolCreated-скана), чтобы список пулов для батчей ниже
+    # начинался именно с них -- если рейт-лимит и обрежет хвост батчей, наши
+    # приоритетные пулы уже будут в САМОМ ПЕРВОМ, а не последнем батче.
+    _merge_known_profitable_pools(registry)
     for log in logs:
         topics = log["topics"]
         token0 = "0x" + topics[1][-40:]
@@ -144,9 +154,10 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
         fee = int(topics[3], 16)
         data = log["data"][2:]  # tickSpacing (int24, паддинг до 32 байт) + address pool (32 байта)
         pool_address = "0x" + data[-40:]
+        if pool_address.lower() in registry.by_address:
+            continue  # уже зарегистрирован выше (известный профитный пул) -- не перезаписываем правильный fee
         registry.register(V3PoolState(address=pool_address, token0=token0, token1=token1, fee=fee))
 
-    _merge_known_profitable_pools(registry)
     if populate_prices:
         # block_number=latest (не None) -- ВАЖНО: check_pair_for_divergence меряет
         # divergence_age_blocks от last_update_block; None трактуется как "age=0",
@@ -154,7 +165,9 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
         # (age=0 < MIN_DIVERGENCE_AGE_BLOCKS=1) и заблокировало детекцию НАВСЕГДА --
         # реальный баг, найденный при подготовке к живому 10-минутному прогону
         # (владелец, 2026-09-13, п.3), исправлен здесь, не оставлен молча.
-        populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size, block_number=latest)
+        price_stats = populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size, block_number=latest)
+        print(f"[bootstrap] populate_initial_prices: {price_stats['n_ok']}/{price_stats['n_pools']} успешно, "
+              f"{price_stats['n_error']} ошибок, примеры: {price_stats['errors_sample']}", file=__import__("sys").stderr)
     return registry
 
 
@@ -196,6 +209,15 @@ def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINN
     stats = {"n_pools": len(pools), "n_ok": 0, "n_error": 0, "errors_sample": []}
 
     for i in range(0, len(pools), batch_size):
+        if i > 0:
+            # Владелец, 2026-09-12: реальная находка -- два независимых прогона
+            # bootstrap подряд оба вернули `sqrt_price_x96=None` практически для
+            # ВСЕХ пулов (0/233 совпадений оценены), при том что eth_getLogs (один
+            # запрос) отрабатывал нормально -- похоже на 429 внутри самого этого
+            # батч-потока (~47 POST подряд без паузы), не только между отдельными
+            # запусками. Небольшая пауза между батчами -- честная попытка снизить
+            # частоту запросов, не гарантия (RPC не публикует точный лимит).
+            time.sleep(0.25)
         chunk = pools[i:i + batch_size]
         batch_body = []
         for j, pool in enumerate(chunk):
