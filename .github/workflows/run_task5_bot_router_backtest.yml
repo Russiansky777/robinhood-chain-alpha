@@ -10,7 +10,13 @@ name: "Задача 5, Путь А -- бэктест детекции на уж�
 # relay/фиду. Read-only, без confirm-барьера (не деньги, не сигнатуры).
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      refresh_cache:
+        description: 'true -- пересобрать реестр через RPC заново (игнорируя уже существующий локальный кеш на VPS), false -- использовать кеш если есть.'
+        required: false
+        default: 'false'
+        type: string
 
 jobs:
   backtest:
@@ -47,13 +53,15 @@ jobs:
           '
 
       - name: "Бэктест (bootstrap RPC + офлайн-дамп, без фида)"
+        env:
+          REFRESH_CACHE_FLAG: ${{ inputs.refresh_cache == 'true' && '--refresh-cache' || '' }}
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 '
-            sudo -u bot bash -c "
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            sudo -u bot bash -c '
               cd /home/bot/robinhood-chain-alpha
-              ./venv/bin/python analysis/task5_bot_router_backtest.py
-            "
-          ' > /tmp/backtest_stdout.log 2> /tmp/backtest_stderr.log
+              ./venv/bin/python analysis/task5_bot_router_backtest.py $REFRESH_CACHE_FLAG
+            '
+          " > /tmp/backtest_stdout.log 2> /tmp/backtest_stderr.log
           echo "--- stdout ---"; cat /tmp/backtest_stdout.log
           echo "--- stderr ---"; cat /tmp/backtest_stderr.log
 
