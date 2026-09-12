@@ -1,10 +1,15 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T23:38:23Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T23:50:24Z
 
 ## stdout
-[v4_executor_compile_check] forge build (solc 0.8.24, evmVersion=paris)...
-[v4_executor_compile_check] ClosedCycleExecutorV4: bytecode=6556 байт, deployed=6288 байт
-[v4_executor_compile_check] immutable-позиции (из компилятора, не угаданы): {"owner": [{"start": 174, "length": 32}, {"start": 345, "length": 32}, {"start": 1051, "length": 32}], "poolManager": [{"start": 300, "length": 32}, {"start": 649, "length": 32}, {"start": 1484, "length": 32}, {"start": 1819, "length": 32}, {"start": 2759, "length": 32}, {"start": 2927, "length": 32}, {"start": 3040, "length": 32}, {"start": 3237, "length": 32}, {"start": 3428, "length": 32}]}
-[v4_executor_compile_check] обновлён /home/bot/robinhood-chain-alpha/contracts/build/deploy_params_v4.json
-[v4_executor_compile_check] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_executor_compile_check_result.json
+[safety_check] anvil --fork-block-number 61248736...
+[safety_check] деплою ClosedCycleExecutorV4 (ИСПРАВЛЕННЫЙ, closed-currency guard)...
+[safety_check] пополняю контракт 20000000 raw USDG (импersonate PoolManager)...
+[safety_check] сценарий 1: заведомо убыточный цикл (реверснутый порядок плеч)...
+[safety_check] сценарий 1: tx_reverted=True (по РЕАЛЬНОМУ рецепту, status=0x0), balance_unchanged=True -> PASS
+[safety_check] сценарий 2: РЕАЛЬНЫЕ прибыльные плечи, но exitToken заявлен НЕВЕРНО (MOSIAI вместо USDG)...
+[safety_check] сценарий 2: tx_reverted=True (по РЕАЛЬНОМУ рецепту, status=0x0), balance_unchanged=True, diagnostic_shows_cycle_not_closed=True -> PASS
+
+[safety_check] ИТОГ: PASS
+[safety_check] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_fork_safety_check_loss_revert_result.json
 
 ## stderr
