@@ -1,0 +1,104 @@
+name: "Задача 5, деплой -- ЗАПУСК ClosedCycleExecutorV3 на mainnet (реальная транзакция, владелец кнопкой)"
+
+# Владелец, 2026-09-12: "Workflow run_task5_deploy_executor.yml: на Ohio,
+# curl -fsSL <raw>/scripts/deploy_executor.sh | sudo -u bot bash, результат
+# /home/bot/data/deploy_result.json закоммитить. Сам деплой запустит
+# владелец кнопкой."
+#
+# scripts/deploy_executor.sh -- НАПИСАН И ЗАКОММИЧЕН ВЛАДЕЛЬЦЕМ САМИМ
+# (commit be608a5). Этот workflow -- ТОЛЬКО CI-обвязка (SSH на VPS,
+# получить+закоммитить результат), signing/sending внутри скрипта
+# владельца, не здесь и не написано этой сессией.
+#
+# ЭТО РЕАЛЬНАЯ, НЕОБРАТИМАЯ, ДЕНЕЖНАЯ ТРАНЗАКЦИЯ -- намеренно ТОЛЬКО
+# workflow_dispatch, БЕЗ push-триггера по маркер-файлу (в отличие от
+# всех остальных workflow'ов этого проекта): обычный push в ветку
+# (документация, рефакторинг) не должен даже теоретически мочь
+# случайно запустить реальный деплой. Плюс текстовое подтверждение
+# ниже -- дополнительный барьер перед необратимым действием.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите ровно "DEPLOY", чтобы подтвердить: это реальная транзакция создания контракта на mainnet, тратит реальный ETH с кошелька владельца.'
+        required: true
+        type: string
+
+jobs:
+  deploy_executor:
+    name: "Деплой ClosedCycleExecutorV3 (Ohio VPS, scripts/deploy_executor.sh владельца)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "DEPLOY" ]; then
+            echo "confirm != 'DEPLOY' -- остановлено, деплой НЕ запущен." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Запустить scripts/deploy_executor.sh (владельца) на Ohio -- ОДНА транзакция создания контракта"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            curl -fsSL "https://raw.githubusercontent.com/russiansky777/robinhood-chain-alpha/claude/nifty-sagan-r0polg/scripts/deploy_executor.sh" | sudo -u bot bash
+          ' > /tmp/deploy_executor_stdout.log 2> /tmp/deploy_executor_stderr.log
+          echo "--- stdout ---"; cat /tmp/deploy_executor_stdout.log
+          echo "--- stderr ---"; cat /tmp/deploy_executor_stderr.log
+
+      - name: Забрать deploy_result.json
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/data/deploy_result.json' > /tmp/deploy_result.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# scripts/deploy_executor.sh -- запуск $(date -u +%Y-%m-%dT%H:%M:%SZ) (владелец, workflow_dispatch)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/deploy_executor_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/deploy_executor_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_deploy_executor_log.txt
+          git add data/p3_guard_cache/task5_deploy_executor_log.txt
+          if [ -s /tmp/deploy_result.json ] && python3 -c "import json; json.load(open('/tmp/deploy_result.json'))" 2>/dev/null; then
+            mkdir -p contracts/build
+            cp /tmp/deploy_result.json contracts/build/deploy_result.json
+            git add contracts/build/deploy_result.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: результат запуска scripts/deploy_executor.sh (владелец) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
