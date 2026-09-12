@@ -1,25 +1,23 @@
-# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T11:32:02Z
+# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T11:33:47Z
 
 ## stdout
 [backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC (единственный сетевой вызов, не фид)...
-[backtest] пулов в реестре: 1165
-[backtest] текущая цена WETH/USDG в реестре: None
-{
-  "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
-  "n_pools_in_registry": 1165,
-  "current_weth_usd_price": null,
-  "min_notional_usd": 2000.0,
-  "n_rows_total": 41695,
-  "n_selector_match": 3224,
-  "n_intents_decoded_full": 2109,
-  "n_pool_found_in_registry": 233,
-  "n_priced_weth_or_usdg_input": 36,
-  "n_pool_found_and_priced": 0,
-  "n_pool_found_and_priced_pair_has_2plus_pools": 0,
-  "usd_size_distribution_of_pool_found_and_priced": {},
-  "n_opportunities_would_have_fired": 0,
-  "opportunities_sample": []
-}
-[backtest] результат записан в data/task5_bot_router_backtest_result.json
 
 ## stderr
+Traceback (most recent call last):
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_router_backtest.py", line 174, in <module>
+    result = run(args.dump)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_router_backtest.py", line 36, in run
+    registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_pool_state.py", line 132, in bootstrap_registry_from_rpc
+    logs = _rpc_call("eth_getLogs", [{
+        "fromBlock": hex(from_block),
+    ...<2 lines>...
+        "topics": [POOL_CREATED_TOPIC0],
+    }], rpc_url)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_pool_state.py", line 105, in _rpc_call
+    resp.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/requests/models.py", line 1167, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/
