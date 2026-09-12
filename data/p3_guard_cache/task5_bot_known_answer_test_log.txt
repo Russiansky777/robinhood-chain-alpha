@@ -1,14 +1,48 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T18:06:12Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T18:37:35Z
 
 ## stdout
+[v4_quote_replay] шаг 0: сверка PoolKey <-> PoolId (собственный пересчёт, не из аудита)
+{
+  "pool_a_computed": "0xcb90948a1ef145614fc4a20418956f7273690abca77804d2a0cf68c7092aea03",
+  "pool_a_expected": "0xcb90948a1ef145614fc4a20418956f7273690abca77804d2a0cf68c7092aea03",
+  "pool_a_match": true,
+  "pool_b_computed": "0x92ed62e7bcdca7aed7e2d17f60621781ae62ff3d80e87dc4702f1cfb17e3534a",
+  "pool_b_expected": "0x92ed62e7bcdca7aed7e2d17f60621781ae62ff3d80e87dc4702f1cfb17e3534a",
+  "pool_b_match": true
+}
+[v4_quote_replay] шаг 1: независимая проверка Swap-логов самой контрольной tx (реальный eth_getTransactionReceipt)
+{
+  "n_v4_swap_logs": 2,
+  "swaps": [
+    {
+      "pool_id": "0xcb90948a1ef145614fc4a20418956f7273690abca77804d2a0cf68c7092aea03",
+      "amount0": -9437184,
+      "amount1": 33799343199676397819454,
+      "sqrt_price_x96": 4874310732138028643415335313270743556,
+      "liquidity": 31472390587198044,
+      "tick": 358716,
+      "fee": 70000
+    },
+    {
+      "pool_id": "0x92ed62e7bcdca7aed7e2d17f60621781ae62ff3d80e87dc4702f1cfb17e3534a",
+      "amount0": 10242566,
+      "amount1": -33799343199676397819454,
+      "sqrt_price_x96": 4404433018173288075171276765395351367,
+      "liquidity": 81102491641012747,
+      "tick": 356688,
+      "fee": 70000
+    }
+  ],
+  "block": "0x3a694e1"
+}
+[v4_quote_replay] шаг 2: N-1 (блок 61248736) -- воспроизвести заданный размер 9.437184 USDG
+[v4_quote_replay] шаг 3: N-10 (блок 61248727) -- тот же размер, контрольный отрицательный случай
+[v4_quote_replay] шаг 4: самостоятельный выбор НАПРАВЛЕНИЯ на N-1 (реверс: сперва pool B)
+[v4_quote_replay] шаг 5: самостоятельный выбор РАЗМЕРА на N-1 (грубый скан)
+[v4_quote_replay] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_quote_replay_result.json
 
 ## stderr
-[true_arb_scan] покрыто до блока 61265743, v3_logs=6617 v4_logs=12413 tx_учтено=11406 прошло_65с
-[true_arb_scan] покрыто до блока 61267743, v3_logs=13076 v4_logs=22908 tx_учтено=21875 прошло_107с
-[true_arb_scan] покрыто до блока 61269743, v3_logs=20973 v4_logs=34130 tx_учтено=33561 прошло_249с
-[true_arb_scan] покрыто до блока 61271743, v3_logs=30714 v4_logs=45539 tx_учтено=45926 прошло_308с
-[true_arb_scan] покрыто до блока 61273743, v3_logs=37958 v4_logs=56212 tx_учтено=56385 прошло_354с
-[true_arb_scan] покрыто до блока 61275743, v3_logs=43528 v4_logs=65966 tx_учтено=66478 прошло_405с
-[true_arb_scan] покрыто до блока 61277743, v3_logs=49326 v4_logs=75727 tx_учтено=76279 прошло_455с
-[true_arb_scan] покрыто до блока 61279743, v3_logs=55340 v4_logs=85603 tx_учтено=86488 прошло_509с
-[true_arb_scan] покрыто до блока 61281743, v3_logs=61333 v4_logs=94771 tx_учтено=95969 прошло_556с
+[v4_quote_replay] ошибка quote на N-1: RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 61248739'}
+[v4_quote_replay] ошибка quote на N-10: RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 61248730'}
+[v4_quote_replay] ошибка реверс-направления: RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 61248739'}
+[v4_quote_replay] ошибка size-скана: RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 61248739'}
