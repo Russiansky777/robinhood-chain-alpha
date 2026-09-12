@@ -62,7 +62,7 @@ from task5_bot_config import (
 )
 import time
 
-from task5_bot_detector import check_pair_for_divergence, check_router_triggered_opportunity
+from task5_bot_detector import check_all_pairs_price_divergence, check_router_triggered_opportunity
 from task5_bot_executor import Executor
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
 from task5_bot_pool_state import apply_swap_price_update_from_calldata, bootstrap_registry_from_rpc, refresh_pool_price
@@ -248,10 +248,12 @@ def main() -> int:
                             if refresh_pool_price(touched_pool, rpc_url=rpc_url, record_block_number=msg.sequence_number):
                                 last_refresh_wall[touched_pool.address.lower()] = now
                                 n_refreshes_done[0] += 1
+                                touched_pairs.add(registry._pair_key(touched_pool.token0, touched_pool.token1))
                     else:
                         zero_for_one_router = intent.token_in.lower() == touched_pool.token0.lower()
-                        apply_swap_price_update_from_calldata(touched_pool, zero_for_one_router, intent.amount_in,
-                                                               block_number=msg.sequence_number)
+                        if apply_swap_price_update_from_calldata(touched_pool, zero_for_one_router, intent.amount_in,
+                                                                  block_number=msg.sequence_number):
+                            touched_pairs.add(registry._pair_key(touched_pool.token0, touched_pool.token1))
 
                     router_opp = check_router_triggered_opportunity(
                         registry, touched_pool, intent.token_in, intent.token_out, intent.amount_in,
@@ -302,24 +304,22 @@ def main() -> int:
                                                           block_number=msg.sequence_number):
                     touched_pairs.add(registry._pair_key(pool.token0, pool.token1))
 
-        # Детекция -- ТОЛЬКО для пары WETH/USDG (та же заглушка, что раньше:
-        # decimals/exit_token завязаны конкретно на эту пару, обобщение на
-        # произвольные пары -- отдельная задача, не сделана здесь).
-        weth_usdg_key = registry._pair_key(WETH, USDG)
-        if weth_usdg_key not in touched_pairs:
+        # Владелец, 2026-09-12 ('правильный триггер', после разбора известного
+        # ответа/групп 1-2-3): "между двумя пулами одной пары цены разошлись
+        # больше порога -> стреляем, независимо от того, что разрыв создало."
+        # Заменяет прежний хардкод "только WETH/USDG" -- generic по ЛЮБОЙ
+        # паре, у которой в реестре >=2 пула и хотя бы одна из них была
+        # реально затронута этим сообщением (touched_pairs, не сканируем
+        # ВСЕ пары на каждое сообщение фида без необходимости).
+        if not touched_pairs:
             return
 
-        opp = check_pair_for_divergence(
-            registry, WETH, USDG, WETH_DECIMALS, USDG_DECIMALS,
-            trigger_sequence_number=msg.sequence_number,
-            assumed_gas_cost_usd=ASSUMED_GAS_COST_USD_PLACEHOLDER,
-            exit_token=WETH,  # ЗАГЛУШКА: реальный exit_token зависит от направления цикла
-            # (какой токен на самом деле "выходит" из net-flow) -- та же логика, что
-            # closed_cycle_exit в Dune-запросах этой сессии, здесь пока не воспроизведена
-            # для WETH/USDG пары в общем виде (нужна проверка первой недели/дня).
-        )
-        if opp is not None:
-            executor.handle_opportunity(opp, size_usd=opp.expected_capture_usd * args.size_fraction)
+        for pair_opp in check_all_pairs_price_divergence(
+            registry, trigger_sequence_number=msg.sequence_number,
+        ):
+            print(f"[task5_bot][попарный разрыв] pool_a(cheap)={pair_opp.pool_a} pool_b(expensive)={pair_opp.pool_b} "
+                  f"разрыв={pair_opp.rel_divergence_fraction:.4%} комиссия(round-trip)={pair_opp.combined_fee_fraction:.4%}")
+            executor.handle_opportunity(pair_opp, size_usd=pair_opp.expected_capture_usd * args.size_fraction)
 
     client = SequencerFeedClient(feed_url)
     print(f"[task5_bot] подключение к фиду: {feed_url}")

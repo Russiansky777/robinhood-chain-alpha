@@ -49,6 +49,12 @@ class Opportunity:
     touched_amount_in_human: float | None = None
     touched_amount_in_usd_approx: float | None = None
     price_impact_fraction_approx: float | None = None  # владелец, 2026-09-12, "усиление": amountIn/liquidity
+    # --- Попарный сравнитель цен (владелец, 2026-09-12, "правильный триггер"):
+    # "между двумя пулами одной пары цены разошлись больше порога -> стреляем,
+    # независимо от того, что разрыв создало" -- generic по ЛЮБОЙ паре с >=2
+    # пулами в реестре, не только WETH/USDG. trigger_kind="pairwise_divergence".
+    rel_divergence_fraction: float | None = None
+    combined_fee_fraction: float | None = None  # сумма fee обоих пулов (round-trip), для контекста в логах
 
 
 def _normalized_price(pool: V3PoolState, token0_decimals: int, token1_decimals: int) -> float | None:
@@ -130,6 +136,79 @@ def check_pair_for_divergence(
         catalyst_sequence_number=trigger_sequence_number,
         divergence_age_blocks=divergence_age_blocks,
     )
+
+
+def check_all_pairs_price_divergence(
+    registry: PoolRegistry,
+    trigger_sequence_number: int,
+    min_gap_over_combined_fee_multiple: float = 2.0,
+) -> list[Opportunity]:
+    """Владелец, 2026-09-12 ('правильный триггер', после разбора известного
+    ответа): "Сейчас: 'крупный своп в пуле -> реагируем'. Правильнее:
+    'между двумя пулами одной пары цены разошлись больше порога ->
+    стреляем', независимо от того, что разрыв создало. Это покрывает и
+    группу 2 [катализатор найден], и часть группы 3 [катализатора не
+    нашли, но разрыв был]." Реализация -- generic по ЛЮБОЙ паре, у которой
+    в реестре >=2 пула (не только WETH/USDG, в отличие от
+    `check_pair_for_divergence` выше), вызывается ПОСЛЕ каждого
+    обновления цены любого пула, без сети (только память).
+
+    ЧЕСТНО про decimals: сравнение -- ОТНОСИТЕЛЬНОЕ между пулами ОДНОЙ И
+    ТОЙ ЖЕ пары (одинаковые token0/token1 у обоих) -- поправка на decimals
+    была бы ОДИНАКОВЫМ множителем для обеих сторон сравнения и полностью
+    сокращается в rel_divergence, поэтому её можно честно не делать (в
+    отличие от `_price_amount_via_pool`/`current_weth_usd_price`, которым
+    нужна АБСОЛЮТНАЯ $-цена -- там сокращения нет). Это и даёт generic
+    работу на произвольных парах без знания их decimals.
+
+    Порог -- владелец: "триггер при разрыве >= 2x комиссии" -- разрыв
+    должен перекрывать суммарную комиссию ОБЕИХ ног цикла (round-trip)
+    минимум в `min_gap_over_combined_fee_multiple` раз, иначе цикл
+    заведомо не может быть прибыльным даже без учёта проскальзывания --
+    простой, но реальный экономический гейт (не $-эвристика через
+    liquidity, как в `check_pair_for_divergence`)."""
+    opportunities: list[Opportunity] = []
+    for addrs in registry.by_pair.values():
+        if len(addrs) < 2:
+            continue
+        pools = [registry.by_address[a] for a in addrs]
+        priced = [(p, p.implied_price_token1_per_token0()) for p in pools]
+        priced = [(p, pr) for p, pr in priced if pr is not None and pr > 0]
+        if len(priced) < 2:
+            continue
+
+        priced.sort(key=lambda x: x[1])
+        cheap_pool, cheap_price = priced[0]
+        expensive_pool, expensive_price = priced[-1]
+        if cheap_pool.address.lower() == expensive_pool.address.lower():
+            continue
+
+        rel_divergence = (expensive_price - cheap_price) / cheap_price
+        if rel_divergence <= 0:
+            continue
+
+        combined_fee_fraction = ((cheap_pool.fee or 0) + (expensive_pool.fee or 0)) / 1_000_000
+        threshold = min_gap_over_combined_fee_multiple * combined_fee_fraction
+        if rel_divergence < threshold:
+            continue
+
+        opportunities.append(Opportunity(
+            detected_at_wall=time.time(),
+            detection_sequence_number=trigger_sequence_number,
+            pool_a=cheap_pool.address,
+            pool_b=expensive_pool.address,
+            exit_token=cheap_pool.token0,  # ЗАГЛУШКА, тот же честный компромисс, что и в
+            # check_pair_for_divergence -- реальный exit_token зависит от направления
+            # цикла, здесь пока не воспроизведён closed_cycle_exit в общем виде.
+            expected_capture_usd=0.0,  # честно: нет notional-симулятора для произвольной пары
+            expected_capture_after_gas_and_reverts_usd=0.0,  # без RPC/USD-цены пары не оценить -- не гадаем
+            catalyst_sequence_number=trigger_sequence_number,
+            divergence_age_blocks=0,  # владелец не просил фильтр по возрасту для этой версии триггера
+            trigger_kind="pairwise_divergence",
+            rel_divergence_fraction=rel_divergence,
+            combined_fee_fraction=combined_fee_fraction,
+        ))
+    return opportunities
 
 
 def current_weth_usd_price(registry: PoolRegistry) -> float | None:

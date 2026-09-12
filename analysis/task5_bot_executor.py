@@ -95,6 +95,16 @@ class Executor:
                       f"function={opp.router_function_label} touched_pool={opp.touched_pool} "
                       f"zeroForOne={opp.touched_zero_for_one} сдвиг~{impact_str} "
                       f"amount_in~{amount_str} (~{usd_str}) pool_a={opp.pool_a} pool_b={opp.pool_b}")
+            elif opp.trigger_kind == "pairwise_divergence":
+                # Владелец, 2026-09-12 ('правильный триггер'): expected_capture_usd
+                # честно 0.0 здесь (нет notional-симулятора для произвольной пары) --
+                # печатаем то, что реально измерено (разрыв vs суммарная комиссия),
+                # не притворяемся, что знаем ожидаемый $-захват.
+                gap_str = (f"{opp.rel_divergence_fraction:.4%}" if opp.rel_divergence_fraction is not None else "?")
+                fee_str = (f"{opp.combined_fee_fraction:.4%}" if opp.combined_fee_fraction is not None else "?")
+                print(f"[dry-run][попарный разрыв] вот здесь я бы вошёл: pool_a(cheap)={opp.pool_a} "
+                      f"pool_b(expensive)={opp.pool_b} разрыв~{gap_str} комиссия(round-trip)~{fee_str} "
+                      f"(expected_capture_usd не оценён -- нет notional-симулятора)")
             else:
                 print(f"[dry-run] вот здесь я бы вошёл: pool_a={opp.pool_a} pool_b={opp.pool_b} "
                       f"ожидаемый_захват=${opp.expected_capture_after_gas_and_reverts_usd:.2f} "
