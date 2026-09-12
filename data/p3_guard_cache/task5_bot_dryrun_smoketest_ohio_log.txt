@@ -1,11 +1,11 @@
-# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-11T23:07:34Z
+# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T02:05:08Z
 
 ## stdout
 [task5_bot] режим: DRY-RUN (ничего не отправляется)
 [task5_bot] сеть: mainnet (chain_id=4663)
 [task5_bot] порог входа: $10.0/попытка, допущение по откатам: 55%
 [task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...
-[task5_bot] найдено пулов: 1262
+[task5_bot] найдено пулов: 1208
 [task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): 44
 [task5_bot] подключение к фиду: wss://feed.mainnet.chain.robinhood.com
 [task5_bot] СМОУК-ТЕСТ: ограничено 600.0с (владелец, 2026-09-13, первый безопасный dry-run перед реальными деньгами)
@@ -30,9 +30,9 @@ Traceback (most recent call last):
   File "/usr/lib/python3.14/asyncio/tasks.py", line 488, in wait_for
     return await fut
            ^^^^^^^^^
-  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_feed_client.py", line 44, in listen
-    async with websockets.connect(self.feed_url, open_timeout=10, close_timeout=5) as ws:
-               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_feed_client.py", line 95, in listen
+    async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/websockets/asyncio/client.py", line 576, in __aenter__
     self.connection = await self
                       ^^^^^^^^^^
