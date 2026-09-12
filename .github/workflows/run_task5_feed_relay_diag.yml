@@ -26,7 +26,7 @@ jobs:
             echo "--- docker version ---"; docker --version 2>&1 || echo "docker CLI не найден"
             echo "--- docker ps -a (все контейнеры) ---"; sudo docker ps -a 2>&1 || echo "docker ps не удался"
             echo "--- docker images ---"; sudo docker images 2>&1 || true
-            echo "--- docker logs task5-feed-relay (если есть) ---"; sudo docker logs task5-feed-relay 2>&1 || echo "контейнера нет/логов нет"
+            echo "--- docker logs task5-feed-relay --tail 50 ---"; sudo docker logs --tail 50 task5-feed-relay 2>&1 || echo "контейнера нет/логов нет"
             echo "--- df -h (место на диске) ---"; df -h 2>&1
             echo "--- systemctl status docker (кратко) ---"; systemctl is-active docker 2>&1 || true
           ' 2>&1 | tee /tmp/relay_diag.log || true
@@ -34,3 +34,20 @@ jobs:
       - name: Печать результата
         if: always()
         run: cat /tmp/relay_diag.log || echo "нет данных"
+
+      - name: "Подтянуть код с фиксом max_size и повторно проверить relay (read-only, без перезапуска контейнера)"
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot bash -c "
+              cd /home/bot/robinhood-chain-alpha/analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python3 task5_feed_relay_validate.py 30 1
+            "
+          ' 2>&1 | tee /tmp/relay_revalidate.log || true
+
+      - name: Печать результата повторной проверки
+        if: always()
+        run: cat /tmp/relay_revalidate.log || echo "нет данных"
