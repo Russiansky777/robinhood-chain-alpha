@@ -66,6 +66,18 @@ pragma solidity ^0.8.24;
  * Инвентарь (ERC20 ИЛИ нативный ETH) пополняется заранее (обычный
  * transfer / send на адрес контракта) -- executeCycle НЕ принимает
  * msg.value, использует уже имеющийся баланс, как и V3-версия.
+ *
+ * ПРАВКА 2026-09-13 (внешнее ревью, ДО деплоя -- деплой этой версии ещё
+ * не запускался): найдена реальная дыра защиты -- сведение балансов
+ * оплачивало ЛЮБУЮ отрицательную дельту из инвентаря контракта, а
+ * проверка прибыли в executeCycle смотрела ТОЛЬКО на exitToken. Кривой
+ * (по ошибке или намеренно сконструированный) маршрут мог незаметно
+ * потратить ДРУГУЮ валюту инвентаря, пока exitToken формально показывал
+ * прибыль. Исправлено: (а) unlockCallback теперь требует, чтобы РОВНО
+ * exitToken мог иметь ненулевую итоговую дельту -- любая другая
+ * ненулевая дельта revert'ит CycleNotClosed ДО единого settle()/take();
+ * (б) executeCycle требует p.minProfit > 0 (раньше 0 пропускал любой,
+ * включая нулевой, исход).
  */
 
 interface IPoolManagerMinimal {
@@ -115,6 +127,15 @@ contract ClosedCycleExecutorV4 {
     error LegCurrencyMismatch(uint256 legIndex);
     error InsufficientProfit(uint256 balanceBefore, uint256 balanceAfter, uint256 required);
     error TooManyLegs();
+    /// Внешнее ревью (2026-09-13): сведение балансов раньше оплачивало
+    /// ЛЮБУЮ отрицательную дельту из инвентаря контракта, а проверка
+    /// прибыли смотрела ТОЛЬКО на exitToken -- кривой (ошибочный или
+    /// злонамеренно сконструированный) маршрут мог незаметно потратить
+    /// другую валюту нашего инвентаря, пока exitToken формально
+    /// показывал "прибыль". CycleNotClosed -- любая валюта, кроме
+    /// exitToken, с НЕНУЛЕВОЙ итоговой дельтой после всех плеч -- цикл
+    /// не замкнут, revert ДО единого settle()/take() (см. unlockCallback).
+    error CycleNotClosed(address currency, int256 delta);
 
     bool private inCycle;
 
@@ -172,6 +193,10 @@ contract ClosedCycleExecutorV4 {
     function executeCycle(CycleParams calldata p) external onlyOwner {
         if (inCycle) revert ReentrantCall();
         require(p.legs.length >= 2, "cycle needs >=2 legs");
+        // Внешнее ревью (2026-09-13): minProfit=0 раньше пропускал ЛЮБОЙ
+        // исход (включая точный ноль или скрытую от этой проверки потерю
+        // другой валюты) -- требуем строго положительный порог.
+        require(p.minProfit > 0, "minProfit must be > 0");
         inCycle = true;
 
         uint256 balanceBefore = _balanceOf(p.exitToken, address(this));
@@ -248,6 +273,21 @@ contract ClosedCycleExecutorV4 {
                 if (nextInputCurrency != outputCurrency) revert LegCurrencyMismatch(i + 1);
 
                 nextAmountSpecified = -int256(outputAmount); // V4: отрицательное = точный вход
+            }
+        }
+
+        // Внешнее ревью (2026-09-13): проверка "цикл замкнут" -- РОВНО
+        // одна валюта (exitToken) вправе иметь ненулевую итоговую дельту
+        // после всех плеч; ЛЮБАЯ другая ненулевая дельта значит маршрут
+        // не сходится (ошибка построения или злонамеренная calldata) и
+        // иначе была бы молча оплачена/получена из инвентаря контракта в
+        // цикле settle()/take() ниже, оставаясь НЕЗАМЕЧЕННОЙ проверкой
+        // прибыли в executeCycle (та смотрит только на exitToken).
+        // Проверяем И РЕВЕРТИМ ДО единого settle()/take() -- при
+        // несомкнутом цикле не должно произойти ни одного перевода.
+        for (uint256 i = 0; i < nTouched; i++) {
+            if (touchedCurrencies[i] != p.exitToken && touchedDeltas[i] != 0) {
+                revert CycleNotClosed(touchedCurrencies[i], touchedDeltas[i]);
             }
         }
 
