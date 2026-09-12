@@ -79,6 +79,7 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_diag_block_result.json 2>/dev/null' > /tmp/diag_block_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_full_report.json 2>/dev/null' > /tmp/full_report_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_group2_resample_result.json 2>/dev/null' > /tmp/group2_resample_result.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_profit_formula_audit_result.json 2>/dev/null' > /tmp/profit_audit_result.json || true
 
       - name: Commit results
         if: always()
@@ -111,6 +112,10 @@ jobs:
           if [ -s /tmp/group2_resample_result.json ] && python3 -c "import json; json.load(open('/tmp/group2_resample_result.json'))" 2>/dev/null; then
             cp /tmp/group2_resample_result.json data/task5_bot_known_answer_group2_resample_result.json
             git add data/task5_bot_known_answer_group2_resample_result.json
+          fi
+          if [ -s /tmp/profit_audit_result.json ] && python3 -c "import json; json.load(open('/tmp/profit_audit_result.json'))" 2>/dev/null; then
+            cp /tmp/profit_audit_result.json data/task5_bot_profit_formula_audit_result.json
+            git add data/task5_bot_profit_formula_audit_result.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: проверка против известного ответа (10 реальных захватов) [automated]"
