@@ -1,11 +1,35 @@
-# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T03:31:40Z
+# Task5 bot dry-run смоук-тест (Ohio) -- 2026-09-12T04:32:40Z
+
+## NTP-статус хоста (для честности замера задержки чтения)
+--- timedatectl ---
+               Local time: Sat 2026-09-12 04:22:34 UTC
+           Universal time: Sat 2026-09-12 04:22:34 UTC
+                 RTC time: Sat 2026-09-12 04:22:35
+                Time zone: Etc/UTC (UTC, +0000)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no
+--- chronyc tracking ---
+Reference ID    : A9FEA97B (169.254.169.123)
+Stratum         : 4
+Ref time (UTC)  : Sat Sep 12 04:22:32 2026
+System time     : 0.000000551 seconds fast of NTP time
+Last offset     : -0.000001557 seconds
+RMS offset      : 0.000010367 seconds
+Frequency       : 4.373 ppm fast
+Residual freq   : -0.001 ppm
+Skew            : 0.377 ppm
+Root delay      : 0.000321019 seconds
+Root dispersion : 0.000381638 seconds
+Update interval : 16.3 seconds
+Leap status     : Normal
 
 ## stdout
 [task5_bot] режим: DRY-RUN (ничего не отправляется)
 [task5_bot] сеть: mainnet (chain_id=4663)
 [task5_bot] порог входа: $10.0/попытка, допущение по откатам: 55%
 [task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...
-[task5_bot] найдено пулов: 1199
+[task5_bot] найдено пулов: 1187
 [task5_bot] предрасчитано маршрутов (poolA/poolB, оба порядка): 44
 [task5_bot] подключение к фиду: wss://feed.mainnet.chain.robinhood.com
 [task5_bot] СМОУК-ТЕСТ: ограничено 600.0с (владелец, 2026-09-13, первый безопасный dry-run перед реальными деньгами)
@@ -14,7 +38,22 @@
 [task5_bot] диагностика фида: {'n_messages_total': 0, 'n_with_seq': 0, 'n_unparsed': 0, 'n_confirmation_only': 0, 'n_connect_attempts': 1, 'n_reconnects': 1, 'last_disconnect_error': 'server rejected WebSocket connection: HTTP 403'}
 [task5_bot] последний известный номер блока с фида: None
 [task5_bot] касаний известных пулов: 0, реальных RPC-рефрешей цены: 0
+[task5_bot] замер задержки чтения: n=0/30, min=None, mean=None, max=None
+[task5_bot] результат замера задержки записан в data/task5_feed_latency_measurement.json
 
 ## stderr
 
 ## telemetry attempts.jsonl (n строк: 0)
+
+## замер задержки чтения (data/task5_feed_latency_measurement.json)
+{
+  "n_samples": 0,
+  "requested_n": 30,
+  "feed_let_us_in": false,
+  "last_disconnect_error": "server rejected WebSocket connection: HTTP 403",
+  "samples": [],
+  "min_latency_s": null,
+  "max_latency_s": null,
+  "mean_latency_s": null,
+  "note": "0 \u0441\u044d\u043c\u043f\u043b\u043e\u0432 -- \u0444\u0438\u0434 \u041d\u0415 \u043f\u0443\u0441\u0442\u0438\u043b \u043d\u0438 \u043e\u0434\u043d\u043e\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u0441 sequencer_timestamp \u0437\u0430 \u044d\u0442\u043e \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 (\u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430: {'n_messages_total': 0, 'n_with_seq': 0, 'n_unparsed': 0, 'n_confirmation_only': 0, 'n_connect_attempts': 1, 'n_reconnects': 1, 'last_disconnect_error': 'server rejected WebSocket connection: HTTP 403'}). \u0427\u0435\u0441\u0442\u043d\u043e: \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 \u043b\u0438\u0431\u043e \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c (403/\u043e\u0431\u0440\u044b\u0432), \u043b\u0438\u0431\u043e \u0437\u0430\u043a\u0440\u044b\u043b\u043e\u0441\u044c \u0434\u043e \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f -- \u041d\u0415 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u043c \u043f\u043e\u043f\u044b\u0442\u043a\u0443 \u0432 \u0440\u0430\u043c\u043a\u0430\u0445 \u044d\u0442\u043e\u0433\u043e \u0437\u0430\u043f\u0443\u0441\u043a\u0430."
+}
