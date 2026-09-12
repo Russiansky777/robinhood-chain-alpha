@@ -1,0 +1,246 @@
+# Деплой Nitro feed relay (Ohio) -- 2026-09-12T05:01:20Z
+
+## stdout
+=== deploy_feed_relay.sh: 2026-09-12T05:00:00Z ===
+Docker не найден -- устанавливаю (apt, официальный пакет docker.io)
+Preconfiguring packages ...
+Selecting previously unselected package pigz.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 96760 files and directories currently installed.)
+Preparing to unpack .../0-pigz_2.8-1build1_arm64.deb ...
+Unpacking pigz (2.8-1build1) ...
+Selecting previously unselected package bridge-utils.
+Preparing to unpack .../1-bridge-utils_1.7.1-4ubuntu3_arm64.deb ...
+Unpacking bridge-utils (1.7.1-4ubuntu3) ...
+Selecting previously unselected package runc.
+Preparing to unpack .../2-runc_1.4.0-0ubuntu1_arm64.deb ...
+Unpacking runc (1.4.0-0ubuntu1) ...
+Selecting previously unselected package containerd.
+Preparing to unpack .../3-containerd_2.2.2-0ubuntu1.1_arm64.deb ...
+Unpacking containerd (2.2.2-0ubuntu1.1) ...
+Selecting previously unselected package dns-root-data.
+Preparing to unpack .../4-dns-root-data_2025080400build1_all.deb ...
+Unpacking dns-root-data (2025080400build1) ...
+Selecting previously unselected package dnsmasq-base.
+Preparing to unpack .../5-dnsmasq-base_2.92-1ubuntu0.4_arm64.deb ...
+Unpacking dnsmasq-base (2.92-1ubuntu0.4) ...
+Selecting previously unselected package docker.io.
+Preparing to unpack .../6-docker.io_29.1.3-0ubuntu4.1_arm64.deb ...
+Unpacking docker.io (29.1.3-0ubuntu4.1) ...
+Selecting previously unselected package ubuntu-fan.
+Preparing to unpack .../7-ubuntu-fan_0.12.17_all.deb ...
+Unpacking ubuntu-fan (0.12.17) ...
+Setting up dnsmasq-base (2.92-1ubuntu0.4) ...
+Setting up runc (1.4.0-0ubuntu1) ...
+Setting up dns-root-data (2025080400build1) ...
+Setting up bridge-utils (1.7.1-4ubuntu3) ...
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+Setting up pigz (2.8-1build1) ...
+Setting up containerd (2.2.2-0ubuntu1.1) ...
+Created symlink '/etc/systemd/system/multi-user.target.wants/containerd.service' → '/usr/lib/systemd/system/containerd.service'.
+Setting up ubuntu-fan (0.12.17) ...
+Created symlink '/etc/systemd/system/multi-user.target.wants/ubuntu-fan.service' → '/usr/lib/systemd/system/ubuntu-fan.service'.
+Setting up docker.io (29.1.3-0ubuntu4.1) ...
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+Created symlink '/etc/systemd/system/multi-user.target.wants/docker.service' → '/usr/lib/systemd/system/docker.service'.
+Created symlink '/etc/systemd/system/sockets.target.wants/docker.socket' → '/usr/lib/systemd/system/docker.socket'.
+Processing triggers for dbus (1.16.2-2ubuntu4) ...
+Processing triggers for man-db (2.13.1-1build1) ...
+--- pull ---
+v3.11.2-3599aca: Pulling from offchainlabs/nitro-node
+e623e05355ed: Pulling fs layer
+af302a8de245: Pulling fs layer
+7b873b3fa5eb: Pulling fs layer
+7b234372e8b7: Pulling fs layer
+c96097874205: Pulling fs layer
+0211e3919b8b: Pulling fs layer
+ef5945ab0c3b: Pulling fs layer
+689e3f2e4f14: Pulling fs layer
+fb8dbd3b1bc8: Pulling fs layer
+5e85dd7aced2: Pulling fs layer
+819eb4b4d8bf: Pulling fs layer
+7f23f3da883d: Pulling fs layer
+e2a48dd00547: Pulling fs layer
+0f8d12077b49: Pulling fs layer
+c9598df3af50: Pulling fs layer
+6e44d80c5f06: Pulling fs layer
+c042983686c0: Pulling fs layer
+06c33f0af6cb: Pulling fs layer
+353abb0ea128: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+584ea14ef8cc: Pulling fs layer
+82276cead2c7: Pulling fs layer
+feea969dc0f7: Pulling fs layer
+64ccece32258: Pulling fs layer
+d88a1daf0424: Pulling fs layer
+0bdca23765e3: Pulling fs layer
+ed7182ea38ea: Pulling fs layer
+87de40febcdc: Pulling fs layer
+b0b15cd361ae: Pulling fs layer
+ae28b43bfe36: Pulling fs layer
+4f65d0959b9f: Pulling fs layer
+3248962f54e0: Pulling fs layer
+5e85dd7aced2: Download complete
+7b234372e8b7: Download complete
+ef5945ab0c3b: Download complete
+e623e05355ed: Download complete
+4f4fb700ef54: Download complete
+ae28b43bfe36: Download complete
+353abb0ea128: Download complete
+feea969dc0f7: Download complete
+af302a8de245: Download complete
+689e3f2e4f14: Download complete
+0f8d12077b49: Download complete
+6e44d80c5f06: Download complete
+819eb4b4d8bf: Download complete
+c042983686c0: Download complete
+e2a48dd00547: Download complete
+fb8dbd3b1bc8: Download complete
+ed7182ea38ea: Download complete
+3248962f54e0: Download complete
+ed7182ea38ea: Pull complete
+7b873b3fa5eb: Download complete
+7f23f3da883d: Download complete
+0bdca23765e3: Download complete
+353abb0ea128: Pull complete
+b0b15cd361ae: Download complete
+87de40febcdc: Download complete
+0211e3919b8b: Download complete
+c9598df3af50: Download complete
+4f65d0959b9f: Download complete
+c96097874205: Download complete
+82276cead2c7: Download complete
+584ea14ef8cc: Download complete
+06c33f0af6cb: Download complete
+d88a1daf0424: Download complete
+64ccece32258: Download complete
+7b234372e8b7: Pull complete
+feea969dc0f7: Pull complete
+5e85dd7aced2: Pull complete
+0211e3919b8b: Pull complete
+87de40febcdc: Pull complete
+4f4fb700ef54: Pull complete
+4f65d0959b9f: Pull complete
+ae28b43bfe36: Pull complete
+7b873b3fa5eb: Pull complete
+ef5945ab0c3b: Pull complete
+7f23f3da883d: Pull complete
+c9598df3af50: Pull complete
+6e44d80c5f06: Pull complete
+c96097874205: Pull complete
+af302a8de245: Pull complete
+fb8dbd3b1bc8: Pull complete
+689e3f2e4f14: Pull complete
+b0b15cd361ae: Pull complete
+e2a48dd00547: Pull complete
+c042983686c0: Pull complete
+82276cead2c7: Pull complete
+3248962f54e0: Pull complete
+819eb4b4d8bf: Pull complete
+0f8d12077b49: Pull complete
+06c33f0af6cb: Pull complete
+584ea14ef8cc: Pull complete
+64ccece32258: Pull complete
+d88a1daf0424: Pull complete
+0bdca23765e3: Pull complete
+e623e05355ed: Pull complete
+Digest: sha256:ebc985e3b105980734630744981e1542001c22d74cba57509fe0d5ed8bb84c14
+Status: Downloaded newer image for offchainlabs/nitro-node:v3.11.2-3599aca
+docker.io/offchainlabs/nitro-node:v3.11.2-3599aca
+recorded feed connect attempt (relay upstream) in shared state file
+--- запуск с --restart=unless-stopped (владелец: 'поднять сразу, не ждать, не перезапускать вручную при 403') ---
+cb07002cc7d3a40dd122fe86b6c94837e86bc651b68229b006d792fbc6f946bb
+--- жду 3с инициализации контейнера перед проверкой ---
+--- ИНФОРМАЦИОННАЯ внешняя проверка (task5_feed_relay_validate.py, 25с) -- НЕ решает судьбу контейнера ---
+[feed] соединение прервано (sent 1009 (message too big) frame with 3572047 bytes exceeds limit of 1048576 bytes; no close frame received) -- реконнект не раньше чем через 1800с
+{
+  "relay_url": "ws://127.0.0.1:9642",
+  "n_messages_received": 0,
+  "n_required": 1,
+  "samples": [],
+  "diag": {
+    "n_messages_total": 0,
+    "n_with_seq": 0,
+    "n_unparsed": 0,
+    "n_confirmation_only": 0,
+    "n_connect_attempts": 2,
+    "n_reconnects": 1,
+    "connected_at_wall": 1789189274.4620848,
+    "last_disconnect_error": "sent 1009 (message too big) frame with 3572047 bytes exceeds limit of 1048576 bytes; no close frame received"
+  },
+  "ok": false,
+  "checked_at_unix": 1789189279.4691339
+}
+--- ЕЩЁ НЕ ПОДКЛЮЧЁН (0 сообщений за 25с) -- контейнер ОСТАЁТСЯ работать, 
+    встроенный backoff relay'я (1с->64с, задокументировано, без нашего вмешательства) 
+    продолжит пробовать сам. НЕ перезапускаем и НЕ трогаем контейнер вручную.
+--- container status: running, restart-policy: unless-stopped ---
+
+## stderr
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart getty@tty1.service
+ systemctl restart networkd-dispatcher.service
+ systemctl restart serial-getty@ttyS0.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/usr/lib/python3.14/json/__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "/usr/lib/python3.14/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.14/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
