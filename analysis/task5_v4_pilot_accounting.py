@@ -51,6 +51,7 @@ resolve_pending_tx_if_any/wait_for_real_receipt)."""
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -292,10 +293,17 @@ class AttemptTable:
     def __init__(self, path: str = "/home/bot/data/task5_v4_pilot_attempts.jsonl") -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+        # Счётчик попыток за ЭТОТ запуск процесса -- для статусных
+        # отчётов (владелец, доп.: отчёты на $5/$10/по часу должны
+        # показывать реальную картину, включая "попыток было 0").
+        self.count = 0
 
     def write(self, row: AttemptTableRow) -> None:
-        with self.path.open("a") as fh:
-            fh.write(json.dumps(asdict(row), ensure_ascii=False) + "\n")
+        with self._lock:
+            with self.path.open("a") as fh:
+                fh.write(json.dumps(asdict(row), ensure_ascii=False) + "\n")
+            self.count += 1
 
 
 class ReasonLog:
