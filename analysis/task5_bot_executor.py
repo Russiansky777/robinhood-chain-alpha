@@ -76,7 +76,10 @@ class Executor:
             expected_capture_after_gas_and_reverts_usd=opp.expected_capture_after_gas_and_reverts_usd,
             divergence_age_blocks=opp.divergence_age_blocks,
             catalyst_sequence_number=opp.catalyst_sequence_number,
-            catalyst_type="unknown",  # честно: этот бот-скелет пока не классифицирует тип катализатора детально
+            # Владелец, 2026-09-12 ('добавка', Путь А): `opp.trigger_kind` различает
+            # "divergence" (Swap-цена уже в реестре) от "router_calldata" (декодер
+            # роутера, до исполнения) -- честнее, чем всегда "unknown".
+            catalyst_type=opp.trigger_kind,
             mode="live" if self.confirm_mainnet else "dry_run",
             size_usd=size_usd,
         )
@@ -84,9 +87,15 @@ class Executor:
         if not self.confirm_mainnet:
             record.result = "would_enter"
             self.telemetry.write(record)
-            print(f"[dry-run] вот здесь я бы вошёл: pool_a={opp.pool_a} pool_b={opp.pool_b} "
-                  f"ожидаемый_захват=${opp.expected_capture_after_gas_and_reverts_usd:.2f} "
-                  f"возраст_расхождения={opp.divergence_age_blocks} блоков")
+            if opp.trigger_kind == "router_calldata":
+                print(f"[dry-run][Путь А] вот здесь я бы вошёл: router={opp.router_to} "
+                      f"function={opp.router_function_label} touched_pool={opp.touched_pool} "
+                      f"zeroForOne={opp.touched_zero_for_one} amount_in~{opp.touched_amount_in_human:.6f} "
+                      f"(~${opp.touched_amount_in_usd_approx:.2f}) pool_a={opp.pool_a} pool_b={opp.pool_b}")
+            else:
+                print(f"[dry-run] вот здесь я бы вошёл: pool_a={opp.pool_a} pool_b={opp.pool_b} "
+                      f"ожидаемый_захват=${opp.expected_capture_after_gas_and_reverts_usd:.2f} "
+                      f"возраст_расхождения={opp.divergence_age_blocks} блоков")
             return
 
         # Реальная отправка -- ТОЛЬКО после --confirm-mainnet.

@@ -81,6 +81,21 @@ KNOWN_SWAP_SELECTORS = {
 _UR_COMMAND_TYPE_MASK = 0x3F
 _UR_V3_SWAP_EXACT_IN = 0x00
 
+# РЕАЛЬНАЯ находка при разборе живого захвата (2026-09-12): amountIn
+# команды V3_SWAP_EXACT_IN может быть НЕ буквальным числом, а протокольным
+# сентинелом Universal Router -- `Constants.CONTRACT_BALANCE = 1 << 255`
+# (открытый исходник Uniswap `universal-router/contracts/libraries/
+# Constants.sol`) -- означает "взять ВЕСЬ баланс роутера в этом токене на
+# момент исполнения" (используется при цепочках команд, например
+# WRAP_ETH -> V3_SWAP_EXACT_IN всей суммы, полученной предыдущей
+# командой) -- РЕАЛЬНОЕ значение в calldata, НЕ ошибка парсинга (перепроверено
+# на 2 независимых живых транзакциях из захвата: `0x8876789976decbfcbbbe
+# 364623c63652db8c0904`/`0xbfbb2bcbc9dffa029c27a249ae9be031e1d83b1c`, обе
+# дают РОВНО 2**255). Честно помечаем как "сумма неизвестна на этом шаге",
+# а НЕ как буквальный amountIn -- иначе $-оценка взрывается до абсурдных
+# величин (реально найдено при первом прогоне гистограммы: ~9e71$).
+_UR_AMOUNT_CONTRACT_BALANCE_SENTINEL = 1 << 255
+
 
 @dataclass
 class SwapIntent:
@@ -247,6 +262,8 @@ def _decode_universal_router_execute(data_no_selector: bytes, to_addr: str, sele
         if len(item_data) < 5 * 32:
             continue
         amount_in = _word(item_data, 1)
+        if amount_in == _UR_AMOUNT_CONTRACT_BALANCE_SENTINEL:
+            amount_in = None  # честно: сумма определяется в рантайме предыдущей командой, не число
         path_offset = _word(item_data, 3)
         path_len = int.from_bytes(item_data[path_offset:path_offset + 32], "big")
         path = item_data[path_offset + 32:path_offset + 32 + path_len]

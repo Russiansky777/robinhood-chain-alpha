@@ -52,15 +52,36 @@ def _open_dump(path: str):
     return open(path, "r")
 
 
-def _amount_to_usd_if_priced(token_addr: str | None, amount_raw: int | None) -> float | None:
+# Честный защитный порог: РЕАЛЬНО найден (2026-09-12, разбор этого же
+# захвата) случай, где Universal Router кладёт в поле amountIn протокольный
+# сентинел `CONTRACT_BALANCE = 2**255` (см. task5_bot_router_decode.py) --
+# декодер теперь сам превращает его в `amount_in=None`, но это ВТОРАЯ
+# линия защиты на случай ещё не опознанного сентинела/битых данных: любая
+# $-сумма за ОДНУ транзакцию свыше этого порога -- физически невозможна
+# для реального свопа на этой цепи (см. реальные объёмы этой сессии --
+# крупнейший обнаруженный "крупный своп" в замерах Задачи 5 был $5k), не
+# включаем её молча в сумму, честно фиксируем как аномалию.
+MAX_PLAUSIBLE_SINGLE_SWAP_USD = 100_000_000.0
+
+
+def _amount_to_usd_if_priced(token_addr: str | None, amount_raw: int | None,
+                              anomalies: list | None = None, to_addr: str | None = None) -> float | None:
     if token_addr is None or amount_raw is None:
         return None
     t = token_addr.lower()
+    usd = None
     if t == WETH.lower():
-        return amount_raw / (10 ** WETH_DECIMALS) * REFERENCE_ETH_USD_PRICE_20260910
-    if t == USDG.lower():
-        return amount_raw / (10 ** USDG_DECIMALS)
-    return None
+        usd = amount_raw / (10 ** WETH_DECIMALS) * REFERENCE_ETH_USD_PRICE_20260910
+    elif t == USDG.lower():
+        usd = amount_raw / (10 ** USDG_DECIMALS)
+    else:
+        return None
+    if usd > MAX_PLAUSIBLE_SINGLE_SWAP_USD:
+        if anomalies is not None:
+            anomalies.append({"to": to_addr, "token": token_addr, "amount_raw": amount_raw,
+                               "usd_would_be": usd})
+        return None
+    return usd
 
 
 def run(dump_path: str, top_n: int = 20, unknown_selector_min_count: int = 20) -> dict:
@@ -73,6 +94,7 @@ def run(dump_path: str, top_n: int = 20, unknown_selector_min_count: int = 20) -
     by_to_examples: dict = {}
     selector_totals: Counter = Counter()
     decode_errors_sample: list = []
+    amount_anomalies: list = []
 
     with _open_dump(dump_path) as f:
         for line in f:
@@ -108,7 +130,8 @@ def run(dump_path: str, top_n: int = 20, unknown_selector_min_count: int = 20) -
                 for intent in intents:
                     if intent.amount_in is None:
                         continue
-                    usd = _amount_to_usd_if_priced(intent.token_in, intent.amount_in)
+                    usd = _amount_to_usd_if_priced(intent.token_in, intent.amount_in,
+                                                    anomalies=amount_anomalies, to_addr=to_addr)
                     if usd is not None:
                         by_to_notional_usd[to_addr] += usd
 
@@ -170,6 +193,8 @@ def run(dump_path: str, top_n: int = 20, unknown_selector_min_count: int = 20) -
         },
         "frequent_unknown_selectors": frequent_unknown_selectors,
         "decode_errors_sample": decode_errors_sample,
+        "amount_anomalies_excluded_from_notional": amount_anomalies[:20],
+        "n_amount_anomalies_total": len(amount_anomalies),
         "answer_which_router_carries_user_swaps": answer,
     }
 

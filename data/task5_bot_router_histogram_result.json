@@ -1,5 +1,5 @@
 {
-  "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
+  "dump_path": "../data/task5_bot_router_capture/dump.jsonl.gz",
   "n_rows_total": 41695,
   "n_rows_excluded_self_trade_known": 2565,
   "excluded_self_trade_addresses": [
@@ -92,7 +92,7 @@
       "is_known_pool_direct_call": false,
       "n_tx_known_swap_selector": 962,
       "n_tx_known_swap_decoded_ok": 962,
-      "notional_usd_approx_ref_2026_09_10_price": 9.263367151801683e+71,
+      "notional_usd_approx_ref_2026_09_10_price": 71050.25,
       "top_selectors": {
         "0x3593564c": 900,
         "0x24856bc3": 62
@@ -296,13 +296,8 @@
   "top20_by_notional_usd_approx": [
     {
       "to": "0x8876789976decbfcbbbe364623c63652db8c0904",
-      "notional_usd_approx": 9.263367151801683e+71,
+      "notional_usd_approx": 71050.25,
       "n_tx": 962
-    },
-    {
-      "to": "0xbfbb2bcbc9dffa029c27a249ae9be031e1d83b1c",
-      "notional_usd_approx": 1.4240429236592743e+62,
-      "n_tx": 1
     },
     {
       "to": "0xcaf681a66d020601342297493863e78c959e5cb2",
@@ -318,6 +313,11 @@
       "to": "0x06afba43fd06227fa663b0daecf536f6eaa6bf99",
       "notional_usd_approx": 80.79,
       "n_tx": 4
+    },
+    {
+      "to": "0xbfbb2bcbc9dffa029c27a249ae9be031e1d83b1c",
+      "notional_usd_approx": 2.95,
+      "n_tx": 1
     }
   ],
   "known_swap_selector_totals": {
@@ -707,6 +707,8 @@
     }
   ],
   "decode_errors_sample": [],
+  "amount_anomalies_excluded_from_notional": [],
+  "n_amount_anomalies_total": 0,
   "answer_which_router_carries_user_swaps": {
     "to": "0xcaf681a66d020601342297493863e78c959e5cb2",
     "n_tx": 1749,

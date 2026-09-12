@@ -48,6 +48,8 @@ from task5_bot_config import (
     ENTRY_THRESHOLD_USD,
     EXECUTOR_CONTRACT_ADDRESS_MAINNET,
     EXECUTOR_CONTRACT_ADDRESS_TESTNET,
+    PATH_A_KNOWN_ROUTER_ADDRESSES_FROM_HISTOGRAM,
+    PATH_A_MIN_NOTIONAL_USD,
     RPC_URL_MAINNET,
     RPC_URL_TESTNET,
     SEQUENCER_FEED_URL_MAINNET,
@@ -60,11 +62,12 @@ from task5_bot_config import (
 )
 import time
 
-from task5_bot_detector import check_pair_for_divergence
+from task5_bot_detector import check_pair_for_divergence, check_router_triggered_opportunity
 from task5_bot_executor import Executor
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
 from task5_bot_pool_state import bootstrap_registry_from_rpc, refresh_pool_price
 from task5_bot_route_precompute import RoutePrecomputeTable
+from task5_bot_router_decode import KNOWN_SELF_TRADE_ADDRESSES, KNOWN_SWAP_SELECTORS, decode_calldata
 from task5_bot_telemetry import TelemetryLog
 
 # Владелец, 2026-09-13, п.3: минимальный кулдаун между RPC-рефрешами ОДНОГО
@@ -195,10 +198,48 @@ def main() -> int:
             to_addr = entry.get("to")
             if not to_addr:
                 continue
-            pool = registry.by_address.get(to_addr.lower())
+            to_addr_l = to_addr.lower()
+
+            # Путь А, минимальный (владелец, 2026-09-12, 'добавка'): calldata
+            # роутера, ДО исполнения -- проверяется НЕЗАВИСИМО от того, известен
+            # ли нам сам `to_addr` как ПУЛ (роутер почти никогда не совпадает с
+            # адресом пула -- это другой контракт). Триггер -- по СЕЛЕКТОРУ
+            # calldata (`KNOWN_SWAP_SELECTORS`), не по конкретному адресу
+            # роутера -- реальная гистограмма (`task5_bot_router_histogram.py`,
+            # захват через relay 2026-09-12) нашла минимум 3 разных адреса,
+            # использующих ОДИН и тот же стандартный интерфейс (SwapRouter02/
+            # UniversalRouter) -- см. `PATH_A_KNOWN_ROUTER_ADDRESSES_FROM_HISTOGRAM`
+            # в конфиге (только для читаемости логов, не источник истины).
+            data_hex = entry.get("data") or "0x"
+            selector = ("0x" + data_hex[2:10]) if len(data_hex) >= 10 else None
+            if selector in KNOWN_SWAP_SELECTORS and to_addr_l not in KNOWN_SELF_TRADE_ADDRESSES:
+                for intent in decode_calldata(to_addr, data_hex):
+                    if None in (intent.token_in, intent.token_out, intent.fee, intent.amount_in):
+                        continue  # честно: этот хоп/команда декодирована не полностью -- не гадаем (см. router_decode.py)
+                    touched_pool = registry.find_pool_by_tokens_fee(intent.token_in, intent.token_out, intent.fee)
+                    if touched_pool is None:
+                        continue  # пул вне нашей вселенной -- не наш случай
+                    router_opp = check_router_triggered_opportunity(
+                        registry, touched_pool, intent.token_in, intent.token_out, intent.amount_in,
+                        trigger_sequence_number=msg.sequence_number,
+                        min_notional_usd=PATH_A_MIN_NOTIONAL_USD,
+                        assumed_gas_cost_usd=ASSUMED_GAS_COST_USD_PLACEHOLDER,
+                        exit_token=WETH,  # та же заглушка, что и divergence-путь ниже
+                        router_to=to_addr,
+                        router_function_label=KNOWN_SWAP_SELECTORS.get(selector),
+                    )
+                    if router_opp is not None:
+                        print(f"[task5_bot][Путь А] триггер по calldata роутера: "
+                              f"router={router_opp.router_to} ({router_opp.router_function_label}) "
+                              f"pool={router_opp.touched_pool} zeroForOne={router_opp.touched_zero_for_one} "
+                              f"amount_in~{router_opp.touched_amount_in_human:.6f} "
+                              f"(~${router_opp.touched_amount_in_usd_approx:.2f})")
+                        executor.handle_opportunity(router_opp, size_usd=router_opp.expected_capture_usd * args.size_fraction)
+
+            pool = registry.by_address.get(to_addr_l)
             if pool is None:
-                continue  # цель -- не известный нам пул (роутер, другой контракт и т.п.) -- честно пропускаем,
-                # не пытаемся угадать внутренний своп через роутер без декодирования его calldata
+                continue  # цель -- не известный нам пул (роутер, другой контракт и т.п.) -- честно пропускаем
+                # для ЭТОЙ, direct-touch ветки (роутер-ветка выше уже обработана независимо)
             n_touches_seen[0] += 1
             last_ts = last_refresh_wall.get(pool.address.lower(), 0.0)
             if now - last_ts < POOL_REFRESH_COOLDOWN_S:
