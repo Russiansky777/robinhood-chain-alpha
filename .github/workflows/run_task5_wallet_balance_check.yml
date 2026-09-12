@@ -1,0 +1,75 @@
+name: "Задача 5, живой бот -- проверка баланса ETH на боевом кошельке (read-only)"
+
+# Владелец, 2026-09-13: "Инвентарь на кошельке -- проверь баланс, если
+# меньше $50 в ETH -- доложить, владелец пополнит." Публичный
+# eth_getBalance -- read-only, без SSH на VPS (запрос идёт прямо с
+# GH Actions runner к публичному RPC).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/TASK5_WALLET_BALANCE_CHECK_REQUEST"
+
+jobs:
+  balance_check:
+    name: "Баланс 0x893f4a7e... (read-only eth_getBalance)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: eth_getBalance (публичный RPC, read-only)
+        run: |
+          python3 - <<'PYEOF' > /tmp/balance_result.json
+          import json, urllib.request
+
+          ADDR = "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75"
+          RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
+
+          def rpc(method, params):
+              req = urllib.request.Request(
+                  RPC_URL, method="POST",
+                  data=json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": 1}).encode(),
+                  headers={"Content-Type": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  return json.loads(resp.read())["result"]
+
+          bal_wei = int(rpc("eth_getBalance", [ADDR, "latest"]), 16)
+          block = int(rpc("eth_blockNumber", []), 16)
+          result = {
+              "address": ADDR,
+              "balance_wei": bal_wei,
+              "balance_eth": bal_wei / 1e18,
+              "checked_at_block": block,
+          }
+          print(json.dumps(result, indent=2))
+          PYEOF
+          cat /tmp/balance_result.json
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          git rm -f --ignore-unmatch data/p3_guard_cache/TASK5_WALLET_BALANCE_CHECK_REQUEST
+          [ -e /tmp/balance_result.json ] && cp /tmp/balance_result.json data/p3_guard_cache/task5_wallet_balance_check_result.json
+          [ -e data/p3_guard_cache/task5_wallet_balance_check_result.json ] && git add data/p3_guard_cache/task5_wallet_balance_check_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: проверка баланса ETH на боевом кошельке [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
