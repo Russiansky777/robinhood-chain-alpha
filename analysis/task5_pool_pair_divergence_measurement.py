@@ -50,14 +50,27 @@ def _rpc_provider(method, params):
 
 
 def fetch_last_n_swaps(pool_addr: str, latest_block: int, n: int = N_SWAPS_PER_POOL) -> list[dict]:
-    lookback = INITIAL_LOOKBACK_BLOCKS
+    """ЧЕСТНАЯ НАХОДКА (первый реальный прогон): пул P5 (0x52e65b17...)
+    настолько активен, что 20000 блоков уже дают >10000 логов -- нода
+    реально отвечает ошибкой 'logs matched by query exceeds limit of
+    10000' (не гадаем, не игнорируем) -- начинаем с МАЛЕНЬКОГО окна и
+    расширяем только при нехватке; при этой конкретной ошибке -- сужаем
+    окно (не считаем это фатальным сбоем, реальный, ожидаемый предел
+    ноды на очень активный контракт)."""
+    lookback = 50
     logs: list[dict] = []
     while lookback <= MAX_LOOKBACK_BLOCKS:
         from_block = max(0, latest_block - lookback)
-        logs = _rpc_call("eth_getLogs", [{
-            "fromBlock": hex(from_block), "toBlock": hex(latest_block),
-            "address": pool_addr, "topics": [SWAP_TOPIC0],
-        }], RPC_URL_MAINNET)
+        try:
+            logs = _rpc_call("eth_getLogs", [{
+                "fromBlock": hex(from_block), "toBlock": hex(latest_block),
+                "address": pool_addr, "topics": [SWAP_TOPIC0],
+            }], RPC_URL_MAINNET)
+        except RuntimeError as exc:
+            if "exceeds limit" in str(exc) and lookback > 1:
+                lookback = max(1, lookback // 4)
+                continue
+            raise
         if len(logs) >= n:
             break
         lookback *= 4
