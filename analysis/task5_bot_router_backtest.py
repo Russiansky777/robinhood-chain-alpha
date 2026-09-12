@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Задача 5, минимальный Путь А -- честное объяснение результата dry-run
-(владелец, 2026-09-12, п.5: "если ноль -- гистограмма должна объяснить,
-почему"). ОФЛАЙН по данным (использует УЖЕ захваченный дамп
-`data/task5_bot_router_capture/dump.jsonl.gz`, БЕЗ нового подключения к
-фиду/relay), но требует ОДИН реальный RPC-вызов на старте --
-`bootstrap_registry_from_rpc()` -- чтобы прогнать ТОЧНО ТУ ЖЕ детекцию
-(`check_router_triggered_opportunity`), что и живой бот, против уже
-реального универсума пулов (не против урезанного статического списка).
+"""Задача 5, минимальный Путь А -- офлайн-сравнение ДВУХ версий триггера
+(владелец, 2026-09-12, "усиление", п.3): "оценка по пулу с порогом $2000"
+против "триггер по сдвигу цены >= 0.3%" -- на уже захваченном дампе
+(`data/task5_bot_router_capture/dump.jsonl.gz`) и реестре пулов.
 
-Отвечает на вопрос: сколько РЕАЛЬНО декодированных свопов из захвата
-прошли бы триггер (пул из универсума + amountIn >= порога), и если
-немного/ноль -- показывает распределение $-размеров, чтобы честно
-объяснить, а не предположить, почему порог редко/никогда не пробивается
-за короткое окно."""
+Владелец, п.4: "429 -- тот же урок, что с фидом: bootstrap один раз,
+кешировать реестр на диск, не перезапрашивать RPC каждый прогон." --
+по умолчанию скрипт грузит реестр из кеша (`--use-cache`, файл
+`POOL_REGISTRY_CACHE_PATH`), и делает РЕАЛЬНЫЙ RPC bootstrap ТОЛЬКО если
+кеша ещё нет или явно передан `--refresh-cache` -- не бьёт RPC на
+каждый прогон, как это дважды сделал прошлый раунд (2x 429 подряд)."""
 from __future__ import annotations
 
 import gzip
@@ -23,54 +20,56 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from task5_bot_config import PATH_A_MIN_NOTIONAL_USD, RPC_URL_MAINNET, USDG, WETH
-from task5_bot_detector import check_router_triggered_opportunity, current_weth_usd_price
-from task5_bot_pool_state import bootstrap_registry_from_rpc
+from task5_bot_config import (
+    PATH_A_MIN_NOTIONAL_USD,
+    PATH_A_MIN_PRICE_IMPACT_FRACTION,
+    POOL_REGISTRY_CACHE_PATH,
+    RPC_URL_MAINNET,
+    USDG,
+    WETH,
+)
+from task5_bot_detector import (
+    _price_amount_via_pool,
+    check_router_triggered_opportunity,
+    current_weth_usd_price,
+)
+from task5_bot_pool_state import bootstrap_registry_from_rpc, load_registry_cache, save_registry_cache
 from task5_bot_router_decode import KNOWN_SELF_TRADE_ADDRESSES, KNOWN_SWAP_SELECTORS, decode_calldata
 
 DEFAULT_DUMP = "data/task5_bot_router_capture/dump.jsonl.gz"
 
 
-def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> dict:
-    print("[backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC (единственный сетевой вызов, не фид)...")
-    registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET)
-    print(f"[backtest] пулов в реестре: {len(registry.by_address)}")
-    eth_price = current_weth_usd_price(registry)
-    print(f"[backtest] текущая цена WETH/USDG в реестре: {eth_price}")
+def get_registry(use_cache: bool, refresh_cache: bool, cache_path: str):
+    if refresh_cache or not use_cache or not Path(cache_path).exists():
+        print(f"[backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC "
+              f"({'--refresh-cache' if refresh_cache else 'кеша нет'})...")
+        registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET)
+        save_registry_cache(registry, cache_path)
+        print(f"[backtest] реестр сохранён в кеш: {cache_path}")
+    else:
+        print(f"[backtest] реестр загружен ИЗ КЕША (офлайн, RPC не вызывался): {cache_path}")
+        registry = load_registry_cache(cache_path)
+    return registry
 
-    # Диагностика: ЧЕСТНО -- если current_weth_usd_price() вернул None,
-    # нужно увидеть ПОЧЕМУ (нет пулов пары в реестре вообще, или пулы есть,
-    # но sqrt_price_x96 не заполнен) -- не гадаем, смотрим напрямую.
+
+def run(dump_path: str, registry, min_notional_usd: float, min_price_impact_fraction: float) -> dict:
+    eth_price = current_weth_usd_price(registry)
+    print(f"[backtest] пулов в реестре: {len(registry.by_address)}, текущая цена WETH/USDG: {eth_price}")
+
     weth_usdg_pools = registry.pools_for_pair(WETH, USDG)
     weth_usdg_debug = [
         {"address": p.address, "fee": p.fee, "sqrt_price_x96": p.sqrt_price_x96, "liquidity": p.liquidity}
         for p in weth_usdg_pools
     ]
-    print(f"[backtest] пулов WETH/USDG в реестре: {len(weth_usdg_pools)}: {weth_usdg_debug}")
 
     n_rows = 0
     n_selector_match = 0
-    n_intents_decoded_full = 0  # token_in/token_out/fee/amount_in все известны
-    n_priced = 0  # token_in ∈ {WETH,USDG} -- умеем оценить в $
-    n_pool_found = 0  # (token_in,token_out,fee) нашёлся в НАШЕМ реестре
-    n_pool_found_and_priced = 0
-    n_pair_has_2plus_pools = 0
-    n_opportunities = 0
-    usd_buckets = Counter()  # для priced-and-pool-found случаев
-    opportunities_sample = []
-    pool_found_sample = []  # какие ПАРЫ реально совпали с реестром (не обязательно priced)
-    priced_sample = []  # какие priced-input свопы НЕ нашли пул (для честного объяснения 0 пересечения)
+    n_intents_decoded_full = 0
+    n_pool_found = 0
+    n_priced_via_pool = 0  # НОВОЕ (владелец, "усиление"): цена через сам пул, не через tokenIn
 
-    def bucket(usd: float) -> str:
-        if usd >= 2000:
-            return ">=2000"
-        if usd >= 500:
-            return "500-2000"
-        if usd >= 100:
-            return "100-500"
-        if usd >= 10:
-            return "10-100"
-        return "<10"
+    notional_hits = []  # версия "$2000 через цену пула"
+    impact_hits = []  # версия "сдвиг >= 0.3%"
 
     with gzip.open(dump_path, "rt") as f:
         for line in f:
@@ -93,69 +92,67 @@ def run(dump_path: str, min_notional_usd: float = PATH_A_MIN_NOTIONAL_USD) -> di
                 n_intents_decoded_full += 1
 
                 touched_pool = registry.find_pool_by_tokens_fee(intent.token_in, intent.token_out, intent.fee)
-                pool_found = touched_pool is not None
-                if pool_found:
-                    n_pool_found += 1
-                    if len(pool_found_sample) < 15:
-                        pool_found_sample.append({"token_in": intent.token_in, "token_out": intent.token_out,
-                                                   "fee": intent.fee, "pool": touched_pool.address})
-
-                token_in_l = intent.token_in.lower()
-                priced_usd = None
-                if token_in_l == WETH.lower() and eth_price is not None:
-                    priced_usd = intent.amount_in / 1e18 * eth_price
-                elif token_in_l == USDG.lower():
-                    priced_usd = intent.amount_in / 1e6
-                if priced_usd is not None:
-                    n_priced += 1
-                    if not pool_found and len(priced_sample) < 15:
-                        priced_sample.append({"token_in": intent.token_in, "token_out": intent.token_out,
-                                               "fee": intent.fee, "amount_usd_approx": round(priced_usd, 2)})
-                    if pool_found:
-                        n_pool_found_and_priced += 1
-                        usd_buckets[bucket(priced_usd)] += 1
-                        if len(registry.pools_for_pair(intent.token_in, intent.token_out)) >= 2:
-                            n_pair_has_2plus_pools += 1
-
-                if not pool_found:
+                if touched_pool is None:
                     continue
+                n_pool_found += 1
+
+                # --- Версия 1: оценка по пулу (не по tokenIn), порог $2000 ---
+                usd_via_pool = _price_amount_via_pool(touched_pool, intent.token_in, intent.amount_in, eth_price)
+                if usd_via_pool is not None:
+                    n_priced_via_pool += 1
+                    if usd_via_pool >= min_notional_usd:
+                        notional_hits.append({
+                            "sequence_number": row.get("sequence_number"), "router": to_addr,
+                            "function": KNOWN_SWAP_SELECTORS.get(selector),
+                            "pool": touched_pool.address, "token_in": intent.token_in,
+                            "token_out": intent.token_out, "fee": intent.fee,
+                            "amount_in_raw": intent.amount_in, "usd_via_pool_approx": round(usd_via_pool, 2),
+                        })
+
+                # --- Версия 2: триггер по сдвигу цены (amountIn/liquidity) >= 0.3% ---
                 opp = check_router_triggered_opportunity(
                     registry, touched_pool, intent.token_in, intent.token_out, intent.amount_in,
                     trigger_sequence_number=row.get("sequence_number", 0),
-                    min_notional_usd=min_notional_usd,
+                    min_price_impact_fraction=min_price_impact_fraction,
                     assumed_gas_cost_usd=0.3,
                     exit_token=WETH,
                     router_to=to_addr,
                     router_function_label=KNOWN_SWAP_SELECTORS.get(selector),
                 )
                 if opp is not None:
-                    n_opportunities += 1
-                    if len(opportunities_sample) < 20:
-                        opportunities_sample.append({
-                            "router": opp.router_to, "function": opp.router_function_label,
-                            "pool": opp.touched_pool, "zeroForOne": opp.touched_zero_for_one,
-                            "amount_in_human": opp.touched_amount_in_human,
-                            "amount_in_usd_approx": opp.touched_amount_in_usd_approx,
-                        })
+                    impact_hits.append({
+                        "sequence_number": row.get("sequence_number"), "router": opp.router_to,
+                        "function": opp.router_function_label, "pool": opp.touched_pool,
+                        "token_in": intent.token_in, "token_out": intent.token_out, "fee": intent.fee,
+                        "amount_in_raw": intent.amount_in,
+                        "price_impact_fraction_approx": round(opp.price_impact_fraction_approx, 6),
+                        "usd_via_pool_approx": (round(opp.touched_amount_in_usd_approx, 2)
+                                                if opp.touched_amount_in_usd_approx is not None else None),
+                    })
+
+    notional_hits.sort(key=lambda r: -r["usd_via_pool_approx"])
+    impact_hits.sort(key=lambda r: -r["price_impact_fraction_approx"])
 
     return {
         "dump_path": dump_path,
         "n_pools_in_registry": len(registry.by_address),
         "current_weth_usd_price": eth_price,
+        "weth_usdg_pools_in_registry_debug": weth_usdg_debug,
         "min_notional_usd": min_notional_usd,
+        "min_price_impact_fraction": min_price_impact_fraction,
         "n_rows_total": n_rows,
         "n_selector_match": n_selector_match,
         "n_intents_decoded_full": n_intents_decoded_full,
         "n_pool_found_in_registry": n_pool_found,
-        "n_priced_weth_or_usdg_input": n_priced,
-        "n_pool_found_and_priced": n_pool_found_and_priced,
-        "n_pool_found_and_priced_pair_has_2plus_pools": n_pair_has_2plus_pools,
-        "usd_size_distribution_of_pool_found_and_priced": dict(usd_buckets),
-        "n_opportunities_would_have_fired": n_opportunities,
-        "opportunities_sample": opportunities_sample,
-        "weth_usdg_pools_in_registry_debug": weth_usdg_debug,
-        "pool_found_sample": pool_found_sample,
-        "priced_input_but_no_pool_match_sample": priced_sample,
+        "n_priced_via_pool": n_priced_via_pool,  # владелец: "это даёт все 233" -- проверяем реально
+        "version1_notional_usd": {
+            "n_hits": len(notional_hits),
+            "top10": notional_hits[:10],
+        },
+        "version2_price_impact": {
+            "n_hits": len(impact_hits),
+            "top10": impact_hits[:10],
+        },
     }
 
 
@@ -165,13 +162,19 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dump", type=str, default=DEFAULT_DUMP)
     ap.add_argument("--out", type=str, default="data/task5_bot_router_backtest_result.json")
+    ap.add_argument("--cache", type=str, default=POOL_REGISTRY_CACHE_PATH)
+    ap.add_argument("--refresh-cache", action="store_true",
+                     help="Принудительно пересобрать реестр через RPC, даже если кеш уже есть.")
+    ap.add_argument("--min-notional-usd", type=float, default=PATH_A_MIN_NOTIONAL_USD)
+    ap.add_argument("--min-price-impact", type=float, default=PATH_A_MIN_PRICE_IMPACT_FRACTION)
     args = ap.parse_args()
 
     if not Path(args.dump).exists():
         print(f"[backtest] ЧЕСТНО: дамп {args.dump} не найден.", file=sys.stderr)
         raise SystemExit(1)
 
-    result = run(args.dump)
+    registry = get_registry(use_cache=True, refresh_cache=args.refresh_cache, cache_path=args.cache)
+    result = run(args.dump, registry, args.min_notional_usd, args.min_price_impact)
     text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
     print(text)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)

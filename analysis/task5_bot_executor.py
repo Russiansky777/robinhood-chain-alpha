@@ -88,10 +88,13 @@ class Executor:
             record.result = "would_enter"
             self.telemetry.write(record)
             if opp.trigger_kind == "router_calldata":
+                amount_str = f"{opp.touched_amount_in_human:.6f}" if opp.touched_amount_in_human is not None else "?"
+                usd_str = f"${opp.touched_amount_in_usd_approx:.2f}" if opp.touched_amount_in_usd_approx is not None else "не оценено"
+                impact_str = f"{opp.price_impact_fraction_approx:.4%}" if opp.price_impact_fraction_approx is not None else "?"
                 print(f"[dry-run][Путь А] вот здесь я бы вошёл: router={opp.router_to} "
                       f"function={opp.router_function_label} touched_pool={opp.touched_pool} "
-                      f"zeroForOne={opp.touched_zero_for_one} amount_in~{opp.touched_amount_in_human:.6f} "
-                      f"(~${opp.touched_amount_in_usd_approx:.2f}) pool_a={opp.pool_a} pool_b={opp.pool_b}")
+                      f"zeroForOne={opp.touched_zero_for_one} сдвиг~{impact_str} "
+                      f"amount_in~{amount_str} (~{usd_str}) pool_a={opp.pool_a} pool_b={opp.pool_b}")
             else:
                 print(f"[dry-run] вот здесь я бы вошёл: pool_a={opp.pool_a} pool_b={opp.pool_b} "
                       f"ожидаемый_захват=${opp.expected_capture_after_gas_and_reverts_usd:.2f} "

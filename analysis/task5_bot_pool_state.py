@@ -299,3 +299,48 @@ def _merge_known_profitable_pools(registry: PoolRegistry) -> None:
         if not token0 or not token1:
             continue
         registry.register(V3PoolState(address=addr, token0=token0, token1=token1, fee=entry.get("fee", 0)))
+
+
+def save_registry_cache(registry: PoolRegistry, path: str) -> None:
+    """Владелец, 2026-09-12: "429 -- тот же урок, что с фидом: bootstrap один
+    раз, кешировать реестр на диск, не перезапрашивать RPC каждый прогон."
+    ТОЛЬКО для повторных офлайн-анализов (`task5_bot_router_backtest.py`) --
+    живой бот (`task5_bot_run.py`) этим кешем НЕ пользуется, всегда бутстрапит
+    заново (кеш устаревает, живой торговле нужны свежие цены)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    data = {
+        "generated_at_wall": time.time(),
+        "pools": [
+            {
+                "address": p.address, "token0": p.token0, "token1": p.token1, "fee": p.fee,
+                "sqrt_price_x96": p.sqrt_price_x96, "tick": p.tick, "liquidity": p.liquidity,
+                "last_update_block": p.last_update_block,
+            }
+            for p in registry.by_address.values()
+        ],
+    }
+    _Path(path).parent.mkdir(parents=True, exist_ok=True)
+    _Path(path).write_text(_json.dumps(data, indent=2))
+
+
+def load_registry_cache(path: str) -> PoolRegistry:
+    """Обратная операция к `save_registry_cache` -- ЧИСТО ОФЛАЙН, ни одного
+    сетевого вызова. Честно падает, если файла нет (вызывающий код должен
+    сам решить -- бутстрапить через RPC или сообщить об ошибке, не гадаем
+    молча пустым реестром)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    data = _json.loads(_Path(path).read_text())
+    registry = PoolRegistry()
+    for entry in data["pools"]:
+        pool = V3PoolState(address=entry["address"], token0=entry["token0"], token1=entry["token1"],
+                            fee=entry["fee"])
+        pool.sqrt_price_x96 = entry.get("sqrt_price_x96")
+        pool.tick = entry.get("tick")
+        pool.liquidity = entry.get("liquidity")
+        pool.last_update_block = entry.get("last_update_block")
+        registry.register(pool)
+    return registry

@@ -49,7 +49,7 @@ from task5_bot_config import (
     EXECUTOR_CONTRACT_ADDRESS_MAINNET,
     EXECUTOR_CONTRACT_ADDRESS_TESTNET,
     PATH_A_KNOWN_ROUTER_ADDRESSES_FROM_HISTOGRAM,
-    PATH_A_MIN_NOTIONAL_USD,
+    PATH_A_MIN_PRICE_IMPACT_FRACTION,
     RPC_URL_MAINNET,
     RPC_URL_TESTNET,
     SEQUENCER_FEED_URL_MAINNET,
@@ -222,18 +222,22 @@ def main() -> int:
                     router_opp = check_router_triggered_opportunity(
                         registry, touched_pool, intent.token_in, intent.token_out, intent.amount_in,
                         trigger_sequence_number=msg.sequence_number,
-                        min_notional_usd=PATH_A_MIN_NOTIONAL_USD,
+                        min_price_impact_fraction=PATH_A_MIN_PRICE_IMPACT_FRACTION,
                         assumed_gas_cost_usd=ASSUMED_GAS_COST_USD_PLACEHOLDER,
                         exit_token=WETH,  # та же заглушка, что и divergence-путь ниже
                         router_to=to_addr,
                         router_function_label=KNOWN_SWAP_SELECTORS.get(selector),
                     )
                     if router_opp is not None:
-                        print(f"[task5_bot][Путь А] триггер по calldata роутера: "
+                        amount_str = (f"{router_opp.touched_amount_in_human:.6f}"
+                                      if router_opp.touched_amount_in_human is not None else "?")
+                        usd_str = (f"${router_opp.touched_amount_in_usd_approx:.2f}"
+                                   if router_opp.touched_amount_in_usd_approx is not None else "не оценено")
+                        print(f"[task5_bot][Путь А] триггер по сдвигу цены: "
                               f"router={router_opp.router_to} ({router_opp.router_function_label}) "
                               f"pool={router_opp.touched_pool} zeroForOne={router_opp.touched_zero_for_one} "
-                              f"amount_in~{router_opp.touched_amount_in_human:.6f} "
-                              f"(~${router_opp.touched_amount_in_usd_approx:.2f})")
+                              f"сдвиг~{router_opp.price_impact_fraction_approx:.4%} "
+                              f"amount_in~{amount_str} (~{usd_str})")
                         executor.handle_opportunity(router_opp, size_usd=router_opp.expected_capture_usd * args.size_fraction)
 
             pool = registry.by_address.get(to_addr_l)

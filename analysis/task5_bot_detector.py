@@ -48,6 +48,7 @@ class Opportunity:
     touched_zero_for_one: bool | None = None
     touched_amount_in_human: float | None = None
     touched_amount_in_usd_approx: float | None = None
+    price_impact_fraction_approx: float | None = None  # владелец, 2026-09-12, "усиление": amountIn/liquidity
 
 
 def _normalized_price(pool: V3PoolState, token0_decimals: int, token1_decimals: int) -> float | None:
@@ -146,6 +147,45 @@ def current_weth_usd_price(registry: PoolRegistry) -> float | None:
     return None
 
 
+def _price_amount_via_pool(pool: V3PoolState, token_in: str, amount_in_raw: int,
+                            eth_usd_price: float | None) -> float | None:
+    """Владелец, 2026-09-12 ('усиление'): "Оценка по пулу, а не по tokenIn --
+    пул найден -> его цена из slot0 известна -> конвертировать amountIn в $
+    через неё, независимо от направления. Это даёт все 233." -- в отличие от
+    прежней версии (которая оценивала в $ ТОЛЬКО если сам `token_in` --
+    буквально WETH/USDG), здесь используется РЕАЛЬНАЯ подразумеваемая цена
+    ЗАТРОНУТОГО пула (`implied_price_token1_per_token0()`, raw-соотношение
+    token1/token0 БЕЗ поправки на decimals -- поправка не нужна, она
+    одинаково входит и выходит при переводе через одну и ту же пару) --
+    конвертирует `amountIn` в RAW-эквивалент ПРОТИВОПОЛОЖНОЙ стороны пула,
+    затем ищет, какая из двух сторон пула (token0 ИЛИ token1) -- WETH/USDG,
+    и переводит именно её RAW-количество в $. Честно возвращает None, если
+    НИ ОДНА сторона пула не WETH/USDG (курс не известен без внешней цены)."""
+    raw_ratio = pool.implied_price_token1_per_token0()  # token1_raw / token0_raw
+    if raw_ratio is None or raw_ratio <= 0:
+        return None
+    token_in_l = token_in.lower()
+    if token_in_l == pool.token0.lower():
+        amount_token0_raw = amount_in_raw
+        amount_token1_raw = amount_in_raw * raw_ratio
+    elif token_in_l == pool.token1.lower():
+        amount_token1_raw = amount_in_raw
+        amount_token0_raw = amount_in_raw / raw_ratio
+    else:
+        return None  # честно: tokenIn calldata не совпадает ни с одной стороной ЭТОГО пула
+
+    t0, t1 = pool.token0.lower(), pool.token1.lower()
+    if t0 == WETH.lower() and eth_usd_price is not None:
+        return amount_token0_raw / (10 ** WETH_DECIMALS) * eth_usd_price
+    if t0 == USDG.lower():
+        return amount_token0_raw / (10 ** USDG_DECIMALS)
+    if t1 == WETH.lower() and eth_usd_price is not None:
+        return amount_token1_raw / (10 ** WETH_DECIMALS) * eth_usd_price
+    if t1 == USDG.lower():
+        return amount_token1_raw / (10 ** USDG_DECIMALS)
+    return None  # честно: ни одна сторона пула -- не WETH/USDG, курс не известен, не гадаем
+
+
 def check_router_triggered_opportunity(
     registry: PoolRegistry,
     touched_pool: V3PoolState,
@@ -153,43 +193,38 @@ def check_router_triggered_opportunity(
     token_out: str,
     amount_in_raw: int,
     trigger_sequence_number: int,
-    min_notional_usd: float,
+    min_price_impact_fraction: float,
     assumed_gas_cost_usd: float,
     exit_token: str,
     router_to: str,
     router_function_label: str | None,
 ) -> Opportunity | None:
-    """Задача 5, минимальный Путь А (владелец, 2026-09-12, 'добавка').
-    "Триггер: точность не нужна -- лидеры стреляют с 54% откатов, контракт
-    отсеивает сам. Пул из нашего универсума + amountIn >= порога -> Opportunity
-    сразу в executor, БЕЗ предсказания цены." -- в отличие от
-    `check_pair_for_divergence` (который требует УЖЕ измеримое расхождение
-    цен между пулами), этот триггер срабатывает на РАЗМЕРЕ входящего свопа,
-    ДО того как своп исполнился и разница вообще появилась в реестре --
-    поэтому здесь НЕТ проверки `rel_divergence > 0`/`divergence_age_blocks`
-    (они физически ещё не могут быть измерены для события, которое ещё не
-    исполнилось). Безопасность капитала обеспечивает КОНТРАКТ (revert при
-    недостижимом minProfit, см. ClosedCycleExecutorV3.sol), не эта проверка.
+    """Задача 5, минимальный Путь А (владелец, 2026-09-12, 'усиление').
+    "Триггер -- по ожидаемому сдвигу цены, не по размеру в долларах. Считать
+    из amountIn и liquidity: сдвиг = amountIn/liquidity, порог >= 0.3%. Это
+    убирает произвольные $2000 и ловит тонкие пулы, где двигают малые суммы
+    -- именно там и живёт наша ниша. Точная формула не нужна -- грубой
+    оценки достаточно, контракт всё равно проверит сам."
 
-    ЧЕСТНАЯ ОГОВОРКА про размер: `token_in`/`token_out` этой сессии оценены
-    в $ ТОЛЬКО если один из них -- WETH или USDG (та же граница охвата, что
-    и во всём остальном боте -- WETH/USDG-пара, не произвольные токены) --
-    для прочих пар возвращаем None, честно, не гадаем курс."""
+    В отличие от `check_pair_for_divergence` (требует УЖЕ измеримое
+    расхождение цен), этот триггер срабатывает на ОЖИДАЕМОМ СДВИГЕ цены ДО
+    исполнения -- поэтому здесь НЕТ проверки `rel_divergence > 0`/
+    `divergence_age_blocks` (физически не измеримы для события, которое ещё
+    не исполнилось). Безопасность капитала обеспечивает КОНТРАКТ (revert при
+    недостижимом minProfit), не эта проверка.
+
+    ЧЕСТНАЯ ОГОВОРКА про формулу: `amountIn / liquidity` -- НЕ настоящая
+    формула сдвига цены Uniswap V3 (та требует tick-by-tick интеграции по
+    ликвидности в диапазоне, не сделана в этой сессии) -- грубый, безразмерный
+    прокси, намеренно принятый владельцем взамен точности."""
     if len(registry.pools_for_pair(token_in, token_out)) < 2:
         return None  # нет второй ноги цикла для этой пары в нашей вселенной -- нечего строить
 
-    token_in_l = token_in.lower()
-    if token_in_l == WETH.lower():
-        price = current_weth_usd_price(registry)
-        if price is None:
-            return None
-        amount_in_usd = amount_in_raw / (10 ** WETH_DECIMALS) * price
-    elif token_in_l == USDG.lower():
-        amount_in_usd = amount_in_raw / (10 ** USDG_DECIMALS)
-    else:
-        return None  # честно: курс токена вне WETH/USDG здесь не известен, не гадаем
+    if touched_pool.liquidity is None or touched_pool.liquidity <= 0:
+        return None  # честно: без liquidity сдвиг не оценить, не гадаем
 
-    if amount_in_usd < min_notional_usd:
+    price_impact_fraction = amount_in_raw / touched_pool.liquidity
+    if price_impact_fraction < min_price_impact_fraction:
         return None
 
     pools = registry.pools_for_pair(token_in, token_out)
@@ -203,10 +238,19 @@ def check_router_triggered_opportunity(
     if cheap_pool.address.lower() == expensive_pool.address.lower():
         return None
 
+    token_in_l = token_in.lower()
     zero_for_one = token_in_l == touched_pool.token0.lower()
+    eth_usd_price = current_weth_usd_price(registry)
+    amount_in_usd_approx = _price_amount_via_pool(touched_pool, token_in, amount_in_raw, eth_usd_price)
+    if token_in_l == WETH.lower():
+        amount_in_human = amount_in_raw / (10 ** WETH_DECIMALS)
+    elif token_in_l == USDG.lower():
+        amount_in_human = amount_in_raw / (10 ** USDG_DECIMALS)
+    else:
+        amount_in_human = None  # честно: decimals токена вне WETH/USDG здесь не известны, не гадаем
 
     # Владелец: "точность не нужна" -- НЕ моделируем итоговый профит по
-    # размеру свопа (нет симулятора price-impact в этой сессии), контракт
+    # размеру сдвига (нет симулятора price-impact в этой сессии), контракт
     # сам откатит цикл целиком, если реальной прибыли не наберётся до
     # ENTRY_THRESHOLD_USD (тот же пол, что и divergence-путь, не ноль).
     return Opportunity(
@@ -215,7 +259,7 @@ def check_router_triggered_opportunity(
         pool_a=cheap_pool.address,
         pool_b=expensive_pool.address,
         exit_token=exit_token,
-        expected_capture_usd=amount_in_usd,  # информационно: размер триггернувшего свопа, не оценка прибыли
+        expected_capture_usd=amount_in_usd_approx or 0.0,  # информационно, может быть 0.0 если не оценено
         expected_capture_after_gas_and_reverts_usd=ENTRY_THRESHOLD_USD,  # пол minProfit -- контракт проверит реальность
         catalyst_sequence_number=trigger_sequence_number,
         divergence_age_blocks=0,  # не применимо к этому триггеру -- расхождение ещё не исполнилось
@@ -224,6 +268,7 @@ def check_router_triggered_opportunity(
         router_function_label=router_function_label,
         touched_pool=touched_pool.address,
         touched_zero_for_one=zero_for_one,
-        touched_amount_in_human=amount_in_raw / (10 ** (WETH_DECIMALS if token_in_l == WETH.lower() else USDG_DECIMALS)),
-        touched_amount_in_usd_approx=amount_in_usd,
+        touched_amount_in_human=amount_in_human,
+        touched_amount_in_usd_approx=amount_in_usd_approx,
+        price_impact_fraction_approx=price_impact_fraction,
     )
