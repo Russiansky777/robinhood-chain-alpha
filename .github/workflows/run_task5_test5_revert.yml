@@ -1,0 +1,105 @@
+name: "Задача 5, $5-тест -- ЗАПУСК intentional-revert теста (реальная транзакция, владелец кнопкой)"
+
+# Владелец, 2026-09-12: "Сделай workflow run_task5_test5_revert.yml --
+# workflow_dispatch с подтверждением TEST5, запуск на Ohio как деплой,
+# результат /home/bot/data/test5_revert_result.json закоммитить."
+#
+# scripts/test5_revert.sh -- НАПИСАН И ЗАКОММИЧЕН ВЛАДЕЛЬЦЕМ САМИМ
+# (commit 17c1b32). Этот workflow -- ТОЛЬКО CI-обвязка (SSH на VPS,
+# получить+закоммитить результат), signing/sending внутри скрипта
+# владельца, не здесь и не написано этой сессией. Сам скрипт САМ
+# делает eth_call воротами первым шагом: если селектор не
+# InsufficientProfit -- останавливается без отправки (см. сам скрипт).
+#
+# ЭТО РЕАЛЬНАЯ ТРАНЗАКЦИЯ (пусть и ожидаемо реверт-транзакция, газ
+# всё равно тратится реально) -- намеренно ТОЛЬКО workflow_dispatch,
+# БЕЗ push-триггера по маркер-файлу (как и run_task5_deploy_executor.yml):
+# обычный push в ветку не должен даже теоретически мочь запустить
+# реальную отправку. Текстовое подтверждение ("TEST5") -- дополнительный
+# барьер перед транзакцией.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите ровно "TEST5", чтобы подтвердить: это реальная транзакция (intentional-revert $5-тест), тратит реальный газ с кошелька владельца.'
+        required: true
+        type: string
+
+jobs:
+  test5_revert:
+    name: "$5-тест intentional-revert (Ohio VPS, scripts/test5_revert.sh владельца)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "TEST5" ]; then
+            echo "confirm != 'TEST5' -- остановлено, тест НЕ запущен." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Запустить scripts/test5_revert.sh (владельца) на Ohio -- ворота eth_call, затем (если пройдены) ОДНА транзакция"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            set -e
+            curl -fsSL "https://raw.githubusercontent.com/russiansky777/robinhood-chain-alpha/claude/nifty-sagan-r0polg/scripts/test5_revert.sh" | sudo -u bot bash
+          ' > /tmp/test5_revert_stdout.log 2> /tmp/test5_revert_stderr.log
+          echo "--- stdout ---"; cat /tmp/test5_revert_stdout.log
+          echo "--- stderr ---"; cat /tmp/test5_revert_stderr.log
+
+      - name: Забрать test5_revert_result.json
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/data/test5_revert_result.json' > /tmp/test5_revert_result.json || true
+
+      - name: Commit results
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          {
+            echo "# scripts/test5_revert.sh -- запуск $(date -u +%Y-%m-%dT%H:%M:%SZ) (владелец, workflow_dispatch)"
+            echo ""
+            echo "## stdout"
+            cat /tmp/test5_revert_stdout.log 2>/dev/null || echo "(нет данных)"
+            echo ""
+            echo "## stderr"
+            cat /tmp/test5_revert_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > data/p3_guard_cache/task5_test5_revert_log.txt
+          git add data/p3_guard_cache/task5_test5_revert_log.txt
+          if [ -s /tmp/test5_revert_result.json ] && python3 -c "import json; json.load(open('/tmp/test5_revert_result.json'))" 2>/dev/null; then
+            mkdir -p data
+            cp /tmp/test5_revert_result.json data/test5_revert_result.json
+            git add data/test5_revert_result.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: результат \$5-теста intentional-revert (владелец) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
