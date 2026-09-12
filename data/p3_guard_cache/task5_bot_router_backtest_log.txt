@@ -1,44 +1,26 @@
-# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T12:05:42Z
+# Бэктест детекции Пути А на уже захваченном дампе -- 2026-09-12T12:06:58Z
 
 ## stdout
 [backtest] bootstrap реестра через РЕАЛЬНЫЙ RPC (--refresh-cache)...
-[backtest] реестр сохранён в кеш: data/task5_bot_pool_registry_cache.json
-[backtest] пулов в реестре: 1150, текущая цена WETH/USDG: None
-{
-  "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
-  "n_pools_in_registry": 1150,
-  "current_weth_usd_price": null,
-  "weth_usdg_pools_in_registry_debug": [
-    {
-      "address": "0x52E65B17FB6E5BA00ED806F37AFCD2DAA50271CA",
-      "fee": 0,
-      "sqrt_price_x96": null,
-      "liquidity": null
-    },
-    {
-      "address": "0x69BFAF19C9F377BB306A89AED9F6B07E2C1A8D9A",
-      "fee": 0,
-      "sqrt_price_x96": null,
-      "liquidity": null
-    }
-  ],
-  "min_notional_usd": 2000.0,
-  "min_price_impact_fraction": 0.003,
-  "n_rows_total": 41695,
-  "n_selector_match": 3224,
-  "n_intents_decoded_full": 2109,
-  "n_pool_found_in_registry": 233,
-  "n_priced_via_pool": 0,
-  "version1_notional_usd": {
-    "n_hits": 0,
-    "top10": []
-  },
-  "version2_price_impact": {
-    "n_hits": 0,
-    "top10": []
-  }
-}
-[backtest] результат записан в data/task5_bot_router_backtest_result.json
 
 ## stderr
-[bootstrap] populate_initial_prices: 0/1150 успешно, 1150 ошибок, примеры: ['batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/', 'batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/', 'batch HTTP error: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/']
+[bootstrap] провайдерский RPC упал (400 Client Error: Bad Request for url: https://robinhood-mainnet.g.alchemy.com/v2/alch_1I62j-Av44Ga_TRKRuLuK) -- fallback на публичный https://rpc.mainnet.chain.robinhood.com
+Traceback (most recent call last):
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_router_backtest.py", line 176, in <module>
+    registry = get_registry(use_cache=True, refresh_cache=args.refresh_cache, cache_path=args.cache)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_router_backtest.py", line 46, in get_registry
+    registry = bootstrap_registry_from_rpc(rpc_url=RPC_URL_MAINNET)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_pool_state.py", line 247, in bootstrap_registry_from_rpc
+    logs = _rpc_call_with_provider_fallback("eth_getLogs", [{
+        "fromBlock": hex(from_block),
+    ...<2 lines>...
+        "topics": [POOL_CREATED_TOPIC0],
+    }], rpc_url)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_pool_state.py", line 193, in _rpc_call_with_provider_fallback
+    return _rpc_call(method, params, fallback_rpc_url, timeout)
+  File "/home/bot/robinhood-chain-alpha/analysis/task5_bot_pool_state.py", line 171, in _rpc_call
+    resp.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/bot/robinhood-chain-alpha/venv/lib/python3.14/site-packages/requests/models.py", line 1167, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://rpc.mainnet.chain.robinhood.com/
