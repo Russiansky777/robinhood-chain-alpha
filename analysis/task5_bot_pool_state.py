@@ -335,7 +335,7 @@ def _decode_signed_word(hex_word: str) -> int:
 
 
 def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINNET,
-                             batch_size: int = 25, timeout: float = 20.0,
+                             batch_size: int = 8, timeout: float = 20.0,
                              block_number: int | None = None) -> dict:
     """Владелец, 2026-09-13, п.2: "slot0 при bootstrap -- для ВСЕХ пулов,
     батчами, чтобы не упереться в лимит." Один-единственный, разовый вызов
@@ -358,14 +358,14 @@ def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINN
 
     for i in range(0, len(pools), batch_size):
         if i > 0:
-            # Владелец, 2026-09-12: реальная находка -- два независимых прогона
-            # bootstrap подряд оба вернули `sqrt_price_x96=None` практически для
-            # ВСЕХ пулов (0/233 совпадений оценены), при том что eth_getLogs (один
-            # запрос) отрабатывал нормально -- похоже на 429 внутри самого этого
-            # батч-потока (~47 POST подряд без паузы), не только между отдельными
-            # запусками. Небольшая пауза между батчами -- честная попытка снизить
-            # частоту запросов, не гарантия (RPC не публикует точный лимит).
-            time.sleep(0.25)
+            # Владелец, 2026-09-12: реальная находка -- через провайдера (Alchemy)
+            # реальный ответ был "Your app has exceeded its compute units per
+            # second capacity" (не общий 429 неизвестной природы -- конкретно
+            # CU/s free tier), 263/1138 успели пройти до срабатывания лимита.
+            # batch_size уменьшен с 25 до 8 (меньше eth_call за один HTTP POST
+            # = меньше CU одним всплеском), пауза увеличена до 0.6с -- честная
+            # попытка снизить частоту всплесков под реальный, а не угаданный лимит.
+            time.sleep(0.6)
         chunk = pools[i:i + batch_size]
         batch_body = []
         for j, pool in enumerate(chunk):
