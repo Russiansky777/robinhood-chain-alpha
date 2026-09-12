@@ -65,9 +65,14 @@ import time
 from task5_bot_detector import check_pair_for_divergence, check_router_triggered_opportunity
 from task5_bot_executor import Executor
 from task5_bot_feed_client import FeedMessage, SequencerFeedClient, decode_l2_message
-from task5_bot_pool_state import bootstrap_registry_from_rpc, refresh_pool_price
+from task5_bot_pool_state import apply_swap_price_update_from_calldata, bootstrap_registry_from_rpc, refresh_pool_price
 from task5_bot_route_precompute import RoutePrecomputeTable
-from task5_bot_router_decode import KNOWN_SELF_TRADE_ADDRESSES, KNOWN_SWAP_SELECTORS, decode_calldata
+from task5_bot_router_decode import (
+    KNOWN_SELF_TRADE_ADDRESSES,
+    KNOWN_SWAP_SELECTORS,
+    decode_calldata,
+    decode_pool_swap_calldata,
+)
 from task5_bot_telemetry import TelemetryLog
 
 # Владелец, 2026-09-13, п.3: минимальный кулдаун между RPC-рефрешами ОДНОГО
@@ -219,6 +224,25 @@ def main() -> int:
                     touched_pool = registry.find_pool_by_tokens_fee(intent.token_in, intent.token_out, intent.fee)
                     if touched_pool is None:
                         continue  # пул вне нашей вселенной -- не наш случай
+
+                    # Владелец, 2026-09-12: "пока ключа [провайдера] нет -- цены из
+                    # фида. Для пулов, в которых декодер видел своп, цена восстанавливается
+                    # из amountIn/направления. Bootstrap через RPC -- только для пулов
+                    # БЕЗ активности." Реализовано буквально: RPC -- ТОЛЬКО на первое
+                    # касание пула (нет базовой цены вообще), дальше -- пересчёт из
+                    # calldata, без сети (см. task5_bot_pool_state.py::apply_swap_
+                    # price_update_from_calldata, реальные формулы Uniswap V3, in-tick).
+                    if touched_pool.sqrt_price_x96 is None:
+                        last_ts = last_refresh_wall.get(touched_pool.address.lower(), 0.0)
+                        if now - last_ts >= POOL_REFRESH_COOLDOWN_S:
+                            if refresh_pool_price(touched_pool, rpc_url=rpc_url, record_block_number=msg.sequence_number):
+                                last_refresh_wall[touched_pool.address.lower()] = now
+                                n_refreshes_done[0] += 1
+                    else:
+                        zero_for_one_router = intent.token_in.lower() == touched_pool.token0.lower()
+                        apply_swap_price_update_from_calldata(touched_pool, zero_for_one_router, intent.amount_in,
+                                                               block_number=msg.sequence_number)
+
                     router_opp = check_router_triggered_opportunity(
                         registry, touched_pool, intent.token_in, intent.token_out, intent.amount_in,
                         trigger_sequence_number=msg.sequence_number,
@@ -245,13 +269,28 @@ def main() -> int:
                 continue  # цель -- не известный нам пул (роутер, другой контракт и т.п.) -- честно пропускаем
                 # для ЭТОЙ, direct-touch ветки (роутер-ветка выше уже обработана независимо)
             n_touches_seen[0] += 1
-            last_ts = last_refresh_wall.get(pool.address.lower(), 0.0)
-            if now - last_ts < POOL_REFRESH_COOLDOWN_S:
-                continue  # кулдаун -- этот же пул уже рефрешился недавно в этом же блоке
-            if refresh_pool_price(pool, rpc_url=rpc_url, record_block_number=msg.sequence_number):
-                last_refresh_wall[pool.address.lower()] = now
-                n_refreshes_done[0] += 1
-                touched_pairs.add(registry._pair_key(pool.token0, pool.token1))
+
+            if pool.sqrt_price_x96 is None:
+                # Первое касание этого пула вообще -- нужен ОДИН точечный RPC-запрос
+                # для базовой цены (см. комментарий в роутер-ветке выше -- тот же принцип).
+                last_ts = last_refresh_wall.get(pool.address.lower(), 0.0)
+                if now - last_ts < POOL_REFRESH_COOLDOWN_S:
+                    continue
+                if refresh_pool_price(pool, rpc_url=rpc_url, record_block_number=msg.sequence_number):
+                    last_refresh_wall[pool.address.lower()] = now
+                    n_refreshes_done[0] += 1
+                    touched_pairs.add(registry._pair_key(pool.token0, pool.token1))
+                continue
+
+            # Базовая цена уже есть -- прямой вызов пула (`to==pool`, реальный паттерн
+            # `0x65050a9b...` из паспорта) декодируется НАПРЯМУЮ (swap(address,bool,
+            # int256,uint160,bytes)), без RPC (владелец, 2026-09-12, п.2).
+            decoded_swap = decode_pool_swap_calldata(data_hex)
+            if decoded_swap is not None:
+                zero_for_one_direct, amount_specified = decoded_swap
+                if apply_swap_price_update_from_calldata(pool, zero_for_one_direct, amount_specified,
+                                                          block_number=msg.sequence_number):
+                    touched_pairs.add(registry._pair_key(pool.token0, pool.token1))
 
         # Детекция -- ТОЛЬКО для пары WETH/USDG (та же заглушка, что раньше:
         # decimals/exit_token завязаны конкретно на эту пару, обобщение на

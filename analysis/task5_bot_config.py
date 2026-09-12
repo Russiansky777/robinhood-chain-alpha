@@ -44,6 +44,31 @@ SEQUENCER_FEED_URL_LOCAL_RELAY = "ws://127.0.0.1:9642"
 SEQUENCER_SUBMIT_URL_MAINNET = "https://sequencer.mainnet.chain.robinhood.com"
 SEQUENCER_SUBMIT_URL_TESTNET = "https://sequencer.testnet.chain.robinhood.com"
 
+# Владелец, 2026-09-12: "публичный RPC не для bootstrap 1257 пулов -- Robinhood
+# сам пишет 'not for production' и отправляет к провайдерам. Alchemy и
+# Chainstack официально поддерживают Robinhood Chain на бесплатном плане."
+# Реально подтверждено (WebSearch, 2026-09-12): Alchemy -- нативная поддержка,
+# URL-формат `https://robinhood-mainnet.g.alchemy.com/v2/<API_KEY>` (testnet --
+# `https://robinhood-testnet.g.alchemy.com/v2/<API_KEY>`, https://www.alchemy.com/rpc/robinhood).
+# Chainstack -- поддержка подтверждена (https://chainstack.com/build-better-with-robinhood-chain/),
+# но у Chainstack URL выдаётся ЦЕЛИКОМ (с ключом внутри пути) из дашборда после
+# создания Global Node (типичный паттерн для их остальных цепей --
+# `https://nd-<id>.p2pify.com/<key>`, конкретно для Robinhood Chain -- см.
+# "Access and credentials" в докс Chainstack) -- нет фиксированного шаблона,
+# который можно было бы собрать самим из одного API-ключа, в отличие от Alchemy.
+# Поэтому здесь -- ОДНА переменная окружения на ГОТОВЫЙ, полный URL (владелец
+# либо сам подставит свой Alchemy-ключ в шаблон выше, либо вставит то, что дал
+# Chainstack дашборд целиком) -- код одинаково работает с любым HTTP JSON-RPC
+# эндпоинтом, не разбирает провайдера отдельно.
+#
+# /etc/bot/env (тот же протокол, что PRIVATE_KEY_NOX/EXPECTED_WALLET -- ТОЛЬКО
+# из окружения, никогда в репозитории): RPC_URL_PROVIDER=<полный URL>. Пусто/не
+# задано -- используется публичный RPC_URL_MAINNET напрямую, как раньше.
+# Публичный RPC остаётся резервом (fallback при ошибке провайдера) и
+# единственным путём для write-side (отправка/чтение рецептов -- вне этой
+# сессии, sender/executor).
+RPC_URL_PROVIDER_ENV_VAR = "RPC_URL_PROVIDER"
+
 # WETH/USDG -- те же адреса, что во всех измерениях Задачи 5.
 WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
 USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"

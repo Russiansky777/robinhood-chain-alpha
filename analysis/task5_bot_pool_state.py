@@ -8,13 +8,20 @@ PoolCreated-события (0 кредитов Dune -- прямой eth_getLogs,
 их начальный slot0 (sqrtPriceX96/tick/liquidity)."""
 from __future__ import annotations
 
+import os
+import sys
 import time
 from dataclasses import dataclass, field
 
 import requests
 from Crypto.Hash import keccak  # pycryptodome, уже зависимость проекта (topic0 для G1/этой сессии)
 
-from task5_bot_config import CANONICAL_V3_FACTORY, POOL_DISCOVERY_LOOKBACK_BLOCKS, RPC_URL_MAINNET
+from task5_bot_config import (
+    CANONICAL_V3_FACTORY,
+    POOL_DISCOVERY_LOOKBACK_BLOCKS,
+    RPC_URL_MAINNET,
+    RPC_URL_PROVIDER_ENV_VAR,
+)
 
 
 def keccak_topic(signature: str) -> str:
@@ -56,6 +63,65 @@ class V3PoolState:
         self.tick = tick
         self.last_update_wall = time.time()
         self.last_update_block = block_number
+
+
+_Q96 = 1 << 96
+
+
+def apply_swap_price_update_from_calldata(pool: "V3PoolState", zero_for_one: bool, amount_in_raw: int,
+                                           block_number: int | None = None) -> bool:
+    """Владелец, 2026-09-12: "Пока ключа [провайдера] нет -- цены из фида.
+    Для пулов, в которых декодер видел своп, цена после свопа
+    восстанавливается из amountIn/направления и предыдущего состояния."
+    Реальные, публичные формулы Uniswap V3 (`SqrtPriceMath.getNextSqrtPrice
+    FromInput`, within-tick, БЕЗ пересечения границ тика):
+
+        zeroForOne (token0 -> pool):  sqrtP' = L*sqrtP*Q96 / (L*Q96 + amountIn*sqrtP)
+        !zeroForOne (token1 -> pool): sqrtP' = sqrtP + amountIn*Q96 / L
+
+    `amountIn` -- ПОСЛЕ вычета комиссии пула (`pool.fee` в hundredths of a
+    bip, тот же формат, что и остальной проект) -- комиссия остаётся LP,
+    не двигает цену, это тоже реальная часть формулы, не отдельная догадка.
+
+    ЧЕСТНАЯ ОГОВОРКА (владелец: "точность не нужна, контракт отсеивает
+    сам" -- тот же принцип, что и везде в этом детекторе): формула -- ТОЛЬКО
+    в пределах ТЕКУЩЕГО тика (постоянная виртуальная ликвидность `L`), БЕЗ
+    симуляции пересечения границ тика (нужен полный тик-бай-тик проход по
+    initialized tick'ам с их `liquidityNet` -- не сделано в этой сессии).
+    Для свопа, требующего пересечь хотя бы одну границу тика, результат
+    будет НЕТОЧНЫМ (обычно недооценивает итоговый сдвиг цены) -- приемлемо
+    для триггера (владелец явно принял этот компромисс), НЕ для реального
+    расчёта минимального профита (это уже делает контракт при исполнении).
+
+    Возвращает False (не трогает `pool`), если нет базовой цены/ликвидности
+    для обновления -- вызывающий код должен в этом случае сначала сделать
+    ОДНОРАЗОВЫЙ RPC-запрос (`refresh_pool_price`), не гадать с нуля."""
+    if pool.sqrt_price_x96 is None or not pool.liquidity:
+        return False
+    if amount_in_raw <= 0:
+        return False
+    fee_pips = pool.fee or 0  # hundredths of a bip, напр. 3000 = 0.3% = 3000/1e6
+    amount_in_after_fee = amount_in_raw * (1_000_000 - fee_pips) // 1_000_000
+    if amount_in_after_fee <= 0:
+        return False
+
+    liquidity = pool.liquidity
+    sqrt_p = pool.sqrt_price_x96
+    if zero_for_one:
+        numerator = liquidity * sqrt_p * _Q96
+        denominator = liquidity * _Q96 + amount_in_after_fee * sqrt_p
+        if denominator <= 0:
+            return False
+        sqrt_p_new = numerator // denominator
+    else:
+        sqrt_p_new = sqrt_p + (amount_in_after_fee * _Q96) // liquidity
+
+    if sqrt_p_new <= 0:
+        return False
+    pool.sqrt_price_x96 = sqrt_p_new
+    pool.last_update_wall = time.time()
+    pool.last_update_block = block_number
+    return True
 
 
 class PoolRegistry:
@@ -109,9 +175,47 @@ def _rpc_call(method: str, params: list, rpc_url: str = RPC_URL_MAINNET, timeout
     return data["result"]
 
 
+def _rpc_call_with_provider_fallback(method: str, params: list, fallback_rpc_url: str = RPC_URL_MAINNET,
+                                      timeout: float = 10.0) -> dict:
+    """Владелец, 2026-09-12: "публичный RPC не для bootstrap... провайдерский
+    RPC (Alchemy/Chainstack) с fallback на публичный." `RPC_URL_PROVIDER`
+    (см. task5_bot_config.py) -- полный URL, из /etc/bot/env, задаётся
+    владельцем. Если не задан -- ведёт себя ровно как раньше (публичный
+    напрямую). Если задан, но провайдер сам упал (сеть/429/что угодно) --
+    честный fallback на публичный, не тихий отказ и не падение всего вызова."""
+    provider_url = os.environ.get(RPC_URL_PROVIDER_ENV_VAR)
+    if provider_url:
+        try:
+            return _rpc_call(method, params, provider_url, timeout)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[bootstrap] провайдерский RPC упал ({exc}) -- fallback на публичный {fallback_rpc_url}",
+                  file=sys.stderr)
+    return _rpc_call(method, params, fallback_rpc_url, timeout)
+
+
+def _post_batch_with_provider_fallback(batch_body: list, fallback_rpc_url: str = RPC_URL_MAINNET,
+                                        timeout: float = 20.0) -> list:
+    """Та же логика provider-with-fallback, что `_rpc_call_with_provider_
+    fallback`, но для СЫРОГО batched JSON-RPC POST (не через `_rpc_call`,
+    см. `populate_initial_prices` ниже -- один HTTP POST = много eth_call)."""
+    provider_url = os.environ.get(RPC_URL_PROVIDER_ENV_VAR)
+    if provider_url:
+        try:
+            resp = requests.post(provider_url, json=batch_body, timeout=timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[bootstrap] провайдерский RPC (batch) упал ({exc}) -- fallback на публичный {fallback_rpc_url}",
+                  file=sys.stderr)
+    resp = requests.post(fallback_rpc_url, json=batch_body, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
                                  lookback_blocks: int = POOL_DISCOVERY_LOOKBACK_BLOCKS,
-                                 populate_prices: bool = True, batch_size: int = 25) -> PoolRegistry:
+                                 populate_prices: bool = True, batch_size: int = 25,
+                                 lazy_pricing: bool = False) -> PoolRegistry:
     """Единственное место, где бот делает RPC-запросы в НЕ-горячем пути
     (только при старте). Реальный, а не выдуманный метод: PoolCreated --
     стандартное indexed-событие Uniswap V3 Factory, topic0 вычислен через
@@ -124,12 +228,23 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
     прошлых раундов (ни один пул раньше не имел цены до первого реально
     декодированного свопа, а декодер свопов сам по себе ненадёжен --
     см. task5_bot_feed_client.py) -- закрыт здесь, независимо от
-    состояния декодера."""
-    latest_hex = _rpc_call("eth_blockNumber", [], rpc_url)
+    состояния декодера.
+
+    Владелец, 2026-09-12 ('пока ключа [провайдера] нет'): `lazy_pricing=True`
+    ПОЛНОСТЬЮ пропускает этот эager-батч-проход (0 дополнительных RPC-вызовов
+    сверх одного eth_getLogs) -- цены пулов заполняются ЛЕНИВО, по факту
+    первого реального касания в горячем пути (см. `task5_bot_run.py`:
+    первое касание пула -- один точечный `refresh_pool_price()`, дальше --
+    пересчёт из calldata без сети, `task5_bot_price_from_calldata.py`).
+    "Это сокращает нагрузку [на bootstrap] на порядок" -- честно: nагрузка
+    переносится на горячий путь по чуть-чуть, не исчезает совсем, но
+    ВСЕГДА ограничена реально ТРОНУТЫМИ пулами за время работы, а не всей
+    вселенной ~1150+ сразу одним взрывом запросов."""
+    latest_hex = _rpc_call_with_provider_fallback("eth_blockNumber", [], rpc_url)
     latest = int(latest_hex, 16)
     from_block = max(0, latest - lookback_blocks)
 
-    logs = _rpc_call("eth_getLogs", [{
+    logs = _rpc_call_with_provider_fallback("eth_getLogs", [{
         "fromBlock": hex(from_block),
         "toBlock": hex(latest),
         "address": CANONICAL_V3_FACTORY,
@@ -158,7 +273,11 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
             continue  # уже зарегистрирован выше (известный профитный пул) -- не перезаписываем правильный fee
         registry.register(V3PoolState(address=pool_address, token0=token0, token1=token1, fee=fee))
 
-    if populate_prices:
+    if lazy_pricing:
+        print(f"[bootstrap] lazy_pricing=True -- populate_initial_prices ПРОПУЩЕН для всех "
+              f"{len(registry.by_address)} пулов, цены заполнятся по факту касания в горячем пути "
+              f"(0 доп. RPC-вызовов сейчас)", file=sys.stderr)
+    elif populate_prices:
         # block_number=latest (не None) -- ВАЖНО: check_pair_for_divergence меряет
         # divergence_age_blocks от last_update_block; None трактуется как "age=0",
         # что при первом же реальном сообщении сделало бы ЛЮБУЮ пару "слишком свежей"
@@ -167,7 +286,7 @@ def bootstrap_registry_from_rpc(rpc_url: str = RPC_URL_MAINNET,
         # (владелец, 2026-09-13, п.3), исправлен здесь, не оставлен молча.
         price_stats = populate_initial_prices(registry, rpc_url=rpc_url, batch_size=batch_size, block_number=latest)
         print(f"[bootstrap] populate_initial_prices: {price_stats['n_ok']}/{price_stats['n_pools']} успешно, "
-              f"{price_stats['n_error']} ошибок, примеры: {price_stats['errors_sample']}", file=__import__("sys").stderr)
+              f"{price_stats['n_error']} ошибок, примеры: {price_stats['errors_sample']}", file=sys.stderr)
     return registry
 
 
@@ -228,9 +347,8 @@ def populate_initial_prices(registry: PoolRegistry, rpc_url: str = RPC_URL_MAINN
                                 "method": "eth_call",
                                 "params": [{"to": pool.address, "data": _LIQUIDITY_SELECTOR}, "latest"]})
         try:
-            resp = requests.post(rpc_url, json=batch_body, timeout=timeout)
-            resp.raise_for_status()
-            by_id = {r.get("id"): r for r in resp.json()}
+            raw_results = _post_batch_with_provider_fallback(batch_body, fallback_rpc_url=rpc_url, timeout=timeout)
+            by_id = {r.get("id"): r for r in raw_results}
         except Exception as exc:
             stats["n_error"] += len(chunk)
             if len(stats["errors_sample"]) < 3:
@@ -289,10 +407,10 @@ def refresh_pool_price(pool: V3PoolState, rpc_url: str = RPC_URL_MAINNET, record
     # блока рискует не найтись на индексирующей RPC-ноде из-за небольшого
     # лага индексации -- честно, не рискуем этим).
     try:
-        slot0_hex = _rpc_call("eth_call", [{"to": pool.address, "data": _SLOT0_SELECTOR}, "latest"],
-                               rpc_url, timeout)
-        liq_hex = _rpc_call("eth_call", [{"to": pool.address, "data": _LIQUIDITY_SELECTOR}, "latest"],
-                             rpc_url, timeout)
+        slot0_hex = _rpc_call_with_provider_fallback(
+            "eth_call", [{"to": pool.address, "data": _SLOT0_SELECTOR}, "latest"], rpc_url, timeout)
+        liq_hex = _rpc_call_with_provider_fallback(
+            "eth_call", [{"to": pool.address, "data": _LIQUIDITY_SELECTOR}, "latest"], rpc_url, timeout)
         if not slot0_hex or slot0_hex == "0x":
             return False
         body = slot0_hex[2:]

@@ -1,0 +1,74 @@
+name: "Задача 5, Путь А -- RPC_URL_PROVIDER (Alchemy) в /etc/bot/env на Ohio"
+
+# Владелец, 2026-09-12: "Публичный RPC не для bootstrap -- Robinhood сам
+# пишет 'not for production'. Ключ Alchemy уже есть в секретах GitHub
+# (ALCHEMY_API_KEY, добавлен владельцем 2026-09-03, см. run_alchemy_key_
+# probe.yml/data/p3_guard_cache/alchemy_key_probe_result.json -- уже
+# реально подтверждён рабочим для Robinhood Chain mainnet, хост
+# robinhood-mainnet.g.alchemy.com, auth_ok:true, 0 429 до ~8 req/s).
+# Собрать URL и положить в /etc/bot/env как RPC_URL_PROVIDER (тот же
+# протокол секретов, что PRIVATE_KEY_NOX -- ключ НИКОГДА не в команде/
+# логе, только через env секрета GH Actions + stdin ssh, GH маскирует
+# известное значение секрета в выводе job'а)."
+#
+# ЧЕСТНО: файл /etc/bot/env уже содержит PRIVATE_KEY_NOX (см.
+# run_vps_bootstrap_ohio.yml) -- эта запись ДОБАВЛЯЕТ/ЗАМЕНЯЕТ строку
+# RPC_URL_PROVIDER, не перезаписывает файл целиком (иначе стёрли бы
+# существующий приватный ключ). Слияние -- ЦЕЛИКОМ на удалённой стороне
+# (grep/mv), содержимое файла НИКОГДА не печатается в лог job'а (только
+# число строк, как и в остальных секрет-шагах проекта).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  set_rpc_provider:
+    name: "Записать RPC_URL_PROVIDER на Ohio VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "RPC_URL_PROVIDER -> /etc/bot/env (stdin, слияние на удалённой стороне, содержимое не печатается)"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: |
+          if [ -z "$ALCHEMY_API_KEY" ]; then
+            echo "ALCHEMY_API_KEY не задан в секретах GH Actions -- СТОП, не пишем пустой/угаданный URL." >&2
+            exit 1
+          fi
+          RPC_URL_PROVIDER_VALUE="https://robinhood-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo bash -s' <<EOF
+          set -e
+          TMP=\$(mktemp)
+          if [ -f /etc/bot/env ]; then grep -v '^RPC_URL_PROVIDER=' /etc/bot/env > "\$TMP" || true; fi
+          echo "RPC_URL_PROVIDER=$RPC_URL_PROVIDER_VALUE" >> "\$TMP"
+          mkdir -p /etc/bot
+          mv "\$TMP" /etc/bot/env
+          chmod 640 /etc/bot/env
+          chown root:bot /etc/bot/env
+          echo "строк в /etc/bot/env: \$(wc -l < /etc/bot/env)"
+          EOF
+
+      - name: "Проверка: RPC_URL_PROVIDER реально проходит auth (eth_blockNumber), значение не печатается"
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+            sudo -u bot bash -c "
+              set -a; . /etc/bot/env 2>/dev/null; set +a
+              if [ -z \"\$RPC_URL_PROVIDER\" ]; then echo NO_RPC_URL_PROVIDER; exit 1; fi
+              curl -s -o /tmp/rpc_check.json -w \"%{http_code}\" -X POST -H \"Content-Type: application/json\" \
+                --data \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"eth_blockNumber\\\",\\\"params\\\":[]}\" \
+                \"\$RPC_URL_PROVIDER\" > /tmp/rpc_status.txt
+              echo \"HTTP status: \$(cat /tmp/rpc_status.txt)\"
+              python3 -c \"import json; d=json.load(open(\\\"/tmp/rpc_check.json\\\")); print(\\\"result:\\\", d.get(\\\"result\\\"), \\\"error:\\\", d.get(\\\"error\\\"))\"
+            "
+          '

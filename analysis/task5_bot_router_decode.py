@@ -53,6 +53,13 @@ SEL_MULTICALL_NO_DEADLINE = _selector("multicall(bytes[])")
 SEL_MULTICALL_WITH_DEADLINE = _selector("multicall(uint256,bytes[])")
 SEL_UR_EXECUTE_WITH_DEADLINE = _selector("execute(bytes,bytes[],uint256)")
 SEL_UR_EXECUTE_NO_DEADLINE = _selector("execute(bytes,bytes[])")
+# Владелец, 2026-09-12: "для пулов, в которых декодер видел своп, цена
+# восстанавливается из amountIn/направления" -- это касается и ПРЯМЫХ
+# вызовов пула (не через роутер, см. `0x65050a9b...` self-trade в паспорте).
+# swap(address,bool,int256,uint160,bytes) -- стандартный IUniswapV3PoolActions.swap,
+# реально вычислен тем же способом, уже перепроверялся в этой сессии раньше
+# (`SWAP_TOPIC0`-соседний селектор в `task5_bot_feed_decode_probe.py`).
+SEL_POOL_SWAP = _selector("swap(address,bool,int256,uint160,bytes)")
 
 # Владелец дал эти же значения текстом ("0x04e45aaf exactInputSingle, 0xb858183f
 # exactInput, 0xac9650d8 / 0x5ae401dc multicall, 0x3593564c UniversalRouter.execute")
@@ -64,6 +71,9 @@ _EXPECTED_FROM_OWNER = {
     "0xac9650d8": SEL_MULTICALL_NO_DEADLINE,
     "0x5ae401dc": SEL_MULTICALL_WITH_DEADLINE,
     "0x3593564c": SEL_UR_EXECUTE_WITH_DEADLINE,
+    # Уже независимо вычислялся и проверялся раньше в этой сессии (аналогично
+    # topic0 событий) -- 0x128acb08, тот же принцип самопроверки, не молчим.
+    "0x128acb08": SEL_POOL_SWAP,
 }
 
 KNOWN_SWAP_SELECTORS = {
@@ -302,6 +312,38 @@ def decode_calldata(to_addr: str | None, data_hex: str, _depth: int = 0) -> list
     if selector == SEL_UR_EXECUTE_NO_DEADLINE:
         return _decode_universal_router_execute(body, to_addr, selector, has_deadline=False, _depth=_depth)
     return []  # честно: неизвестный/нецелевой селектор -- не декодируем, не угадываем
+
+
+def decode_pool_swap_calldata(data_hex: str) -> tuple[bool, int] | None:
+    """Владелец, 2026-09-12: "для пулов, в которых декодер видел своп, цена
+    восстанавливается из amountIn/направления" -- это ПРЯМОЙ вызов
+    `IUniswapV3PoolActions.swap()` (не через роутер, `to == адрес пула`,
+    реальный паттерн `0x65050a9b...` из паспорта). Аргументы: (address
+    recipient, bool zeroForOne, int256 amountSpecified, uint160
+    sqrtPriceLimitX96, bytes data) -- ПОСЛЕДНИЙ аргумент динамический
+    (`bytes`), поэтому вся голова -- 5 слов (4-е -- офсет на data, сама
+    data нам не нужна).
+
+    Возвращает `(zeroForOne, amountSpecified)` ТОЛЬКО если `amountSpecified
+    > 0` -- Uniswap V3 использует ЗНАК как флаг exact-input (>0) / exact-
+    output (<0): при exact-output реальная сумма, ушедшая В пул, физически
+    НЕ известна из calldata (вычисляется пулом при исполнении) -- честно
+    None, не гадаем через эвристику."""
+    if not data_hex or len(data_hex) < 10:
+        return None
+    raw = bytes.fromhex(data_hex[2:] if data_hex.startswith("0x") else data_hex)
+    if "0x" + raw[:4].hex() != SEL_POOL_SWAP:
+        return None
+    body = raw[4:]
+    if len(body) < 4 * 32:
+        return None
+    zero_for_one = body[63] != 0  # bool -- последний байт слова #1 (0-индексация)
+    amount_specified_raw = int.from_bytes(body[64:96], "big")
+    amount_specified = (amount_specified_raw - (1 << 256)
+                         if amount_specified_raw >= (1 << 255) else amount_specified_raw)
+    if amount_specified <= 0:
+        return None  # честно: exact-output (или 0) -- не наш случай
+    return zero_for_one, amount_specified
 
 
 def _verify_selectors_self_check() -> None:
