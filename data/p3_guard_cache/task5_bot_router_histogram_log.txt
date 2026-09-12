@@ -1,0 +1,768 @@
+# Захват + гистограмма роутеров через relay -- 2026-09-12T10:58:39Z
+
+## capture stdout
+[router_capture] слушаю ws://127.0.0.1:9642 300с, пишу decoded tx в data/task5_bot_router_capture/dump.jsonl.gz (gzip JSONL, диск -- для офлайн-гистограммы без новых подключений)...
+{
+  "generated_at_utc": "2026-09-12T10:58:34Z",
+  "feed_url": "ws://127.0.0.1:9642",
+  "duration_s": 300.0,
+  "n_reconnects": 0,
+  "n_messages": 3600,
+  "n_tx_decoded": 41695,
+  "n_tx_skipped_no_to": 136,
+  "diag": {
+    "unrecognized_first_byte": 76,
+    "unhandled_type_0": 21,
+    "unhandled_type_189": 1,
+    "unhandled_type_114": 1
+  },
+  "feed_client_diag": {
+    "n_messages_total": 2985,
+    "n_with_seq": 3600,
+    "n_unparsed": 0,
+    "n_confirmation_only": 14,
+    "n_connect_attempts": 1,
+    "n_reconnects": 0,
+    "connected_at_wall": 1789210413.4674711
+  },
+  "out_path": "data/task5_bot_router_capture/dump.jsonl.gz"
+}
+
+## capture stderr
+
+## histogram stdout
+{
+  "dump_path": "data/task5_bot_router_capture/dump.jsonl.gz",
+  "n_rows_total": 41695,
+  "n_rows_excluded_self_trade_known": 2565,
+  "excluded_self_trade_addresses": [
+    "0x65050a9b7e5075a2ba5ced7b1b64ee66262c40dc"
+  ],
+  "n_distinct_to_addresses": 4534,
+  "n_addresses_with_priced_notional": 5,
+  "reference_eth_usd_price_note": "2459.6549436821965 -- реальная медиана ETH/USDG за 2026-09-10 (task5_latency_signature_result.json), НЕ живая цена -- $-суммы здесь ПРИБЛИЗИТЕЛЬНЫЕ",
+  "top20_by_tx_count": [
+    {
+      "to": "0x198f7836093961c4e66f0cd9f5af000fb1666a76",
+      "n_tx": 3852,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0xad5f0941": 3852
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0xcaf681a66d020601342297493863e78c959e5cb2",
+      "n_tx": 1749,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 1740,
+      "n_tx_known_swap_decoded_ok": 1740,
+      "notional_usd_approx_ref_2026_09_10_price": 55212.39,
+      "top_selectors": {
+        "0x04e45aaf": 885,
+        "0xac9650d8": 443,
+        "0x5ae401dc": 398,
+        "0xb858183f": 14,
+        "0x09b81346": 5,
+        "0x472b43f3": 4
+      },
+      "selectors_known_as": {
+        "0x04e45aaf": "exactInputSingle (SwapRouter02)",
+        "0xac9650d8": "multicall(bytes[])",
+        "0x5ae401dc": "multicall(uint256,bytes[])",
+        "0xb858183f": "exactInput (SwapRouter02)"
+      }
+    },
+    {
+      "to": "0xccc88a9d1b4ed6b0eaba998850414b24f1c315be",
+      "n_tx": 1574,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x0a2b8f36": 1551,
+        "0xf9e4bab4": 23
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x89e5db8b5aa49aa85ac63f691524311aeb649eba",
+      "n_tx": 1001,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0xb6f9de95": 746,
+        "0x791ac947": 220,
+        "0x7ff36ab5": 25,
+        "0x5c11d795": 9,
+        "0x18cbafe5": 1
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0xa749ec38562b1ccb76a062d77536702134cc7fba",
+      "n_tx": 971,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x59a87bc1": 638,
+        "0xd04c6983": 312,
+        "0x3729bb9a": 21
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x8876789976decbfcbbbe364623c63652db8c0904",
+      "n_tx": 962,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 962,
+      "n_tx_known_swap_decoded_ok": 962,
+      "notional_usd_approx_ref_2026_09_10_price": 9.263367151801683e+71,
+      "top_selectors": {
+        "0x3593564c": 900,
+        "0x24856bc3": 62
+      },
+      "selectors_known_as": {
+        "0x3593564c": "UniversalRouter.execute (with deadline)",
+        "0x24856bc3": "UniversalRouter.execute (no deadline)"
+      }
+    },
+    {
+      "to": "0x4337084d9e255ff0702461cf8895ce9e3b5ff108",
+      "n_tx": 861,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x765e827f": 861
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e",
+      "n_tx": 695,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x4e71d92d": 383,
+        "0x32f289cf": 293,
+        "0x379607f5": 17,
+        "0x1698755f": 2
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x9689992f5b5c09447f15906d8d11214944488341",
+      "n_tx": 659,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x3e0f9c3c": 659
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0xef161b8b000810944017a69af3b4bb28c87ae318",
+      "n_tx": 620,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x39ecce49": 620
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x6e2f50fd7eb113c6842fa73c12912f3eab192ef1",
+      "n_tx": 617,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x(short)": 617
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x7776f2af82386fde64dfdbfbe8ee9348e5327c17",
+      "n_tx": 615,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x59a87bc1": 327,
+        "0xd04c6983": 269,
+        "0x3729bb9a": 19
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x58daec3116aae6d93017baaea7749052e8a04fa7",
+      "n_tx": 515,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 67,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0xdd46508f": 429,
+        "0xac9650d8": 67,
+        "0xb88d4fde": 14,
+        "0x095ea7b3": 5
+      },
+      "selectors_known_as": {
+        "0xac9650d8": "multicall(bytes[])"
+      }
+    },
+    {
+      "to": "0x26330dbba903e3f44a6c4de66e0571ae610a15f2",
+      "n_tx": 486,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x627dd56a": 486
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x7358c4adee4ef61dbfccff5a03fe06691f8bce38",
+      "n_tx": 437,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0xd04c6983": 314,
+        "0x59a87bc1": 116,
+        "0x3729bb9a": 7
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919",
+      "n_tx": 429,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x0c307f76": 359,
+        "0xf2c42696": 70
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x69cdacec93a8a06942c46c2d2ba441e97282465a",
+      "n_tx": 393,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0xd04c6983": 197,
+        "0x59a87bc1": 187,
+        "0x3729bb9a": 9
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x92818ea869861519002fb77f1f05804bd08e414a",
+      "n_tx": 349,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x(short)": 349
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x77058091a6a1cf0ea6862467db88c44cf04fdd86",
+      "n_tx": 338,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x552ff595": 1,
+        "0x7d420235": 1,
+        "0x23480cfc": 1,
+        "0xf0f1206c": 1,
+        "0x902c807a": 1,
+        "0x8f886800": 1,
+        "0x0738bcd5": 1,
+        "0x60e09c74": 1
+      },
+      "selectors_known_as": {}
+    },
+    {
+      "to": "0x1521027b665fa38fa4a642991607ad708376dd7b",
+      "n_tx": 330,
+      "is_known_pool_direct_call": false,
+      "n_tx_known_swap_selector": 0,
+      "n_tx_known_swap_decoded_ok": 0,
+      "notional_usd_approx_ref_2026_09_10_price": 0.0,
+      "top_selectors": {
+        "0x00000000": 330
+      },
+      "selectors_known_as": {}
+    }
+  ],
+  "top20_by_notional_usd_approx": [
+    {
+      "to": "0x8876789976decbfcbbbe364623c63652db8c0904",
+      "notional_usd_approx": 9.263367151801683e+71,
+      "n_tx": 962
+    },
+    {
+      "to": "0xbfbb2bcbc9dffa029c27a249ae9be031e1d83b1c",
+      "notional_usd_approx": 1.4240429236592743e+62,
+      "n_tx": 1
+    },
+    {
+      "to": "0xcaf681a66d020601342297493863e78c959e5cb2",
+      "notional_usd_approx": 55212.39,
+      "n_tx": 1749
+    },
+    {
+      "to": "0xaf9d6fa019328d8cf8598d0d5be22cc6622b09f1",
+      "notional_usd_approx": 30593.26,
+      "n_tx": 197
+    },
+    {
+      "to": "0x06afba43fd06227fa663b0daecf536f6eaa6bf99",
+      "notional_usd_approx": 80.79,
+      "n_tx": 4
+    }
+  ],
+  "known_swap_selector_totals": {
+    "0x04e45aaf": {
+      "label": "exactInputSingle (SwapRouter02)",
+      "n_tx": 885
+    },
+    "0xb858183f": {
+      "label": "exactInput (SwapRouter02)",
+      "n_tx": 14
+    },
+    "0xac9650d8": {
+      "label": "multicall(bytes[])",
+      "n_tx": 544
+    },
+    "0x5ae401dc": {
+      "label": "multicall(uint256,bytes[])",
+      "n_tx": 398
+    },
+    "0x3593564c": {
+      "label": "UniversalRouter.execute (with deadline)",
+      "n_tx": 1320
+    },
+    "0x24856bc3": {
+      "label": "UniversalRouter.execute (no deadline)",
+      "n_tx": 63
+    }
+  },
+  "frequent_unknown_selectors": [
+    {
+      "selector": "0x(short)",
+      "n_tx": 5194,
+      "sample_to": [
+        "0x11022c3e51ad6f9bb418ee21a3ed7318a805b8a0",
+        "0xd6987e6e944b5632e9dd9d014684bf9348b1a880",
+        "0x0ab4364c0faf7734079ab3c7e3df4e3563b98728",
+        "0x6e2f50fd7eb113c6842fa73c12912f3eab192ef1",
+        "0xb354b596d2dfffd82c7dd167f232364f796ee06e"
+      ]
+    },
+    {
+      "selector": "0x095ea7b3",
+      "n_tx": 4786,
+      "sample_to": [
+        "0x10b409f69989bc34e36a5105874f6d64e3eb0bff",
+        "0x840ba7657891b0862a75c22de7310d56e827290c",
+        "0xfdbb27e971e72e38c41b1c772fb409c94dd92789",
+        "0xaf838cbe17e02b7eaefab5d15affdaa55c090f26",
+        "0x6d95399619673d0a667482b7adec2bf55f1025f5"
+      ]
+    },
+    {
+      "selector": "0xad5f0941",
+      "n_tx": 3852,
+      "sample_to": [
+        "0x198f7836093961c4e66f0cd9f5af000fb1666a76"
+      ]
+    },
+    {
+      "selector": "0x59a87bc1",
+      "n_tx": 1558,
+      "sample_to": [
+        "0x69cdacec93a8a06942c46c2d2ba441e97282465a",
+        "0xa749ec38562b1ccb76a062d77536702134cc7fba",
+        "0x7358c4adee4ef61dbfccff5a03fe06691f8bce38",
+        "0xd579dea02c6cf5b047cebd264564ecd34b376b2e",
+        "0x9cabea0797f3e391463daa44b13d19a18ecfca2d"
+      ]
+    },
+    {
+      "selector": "0x0a2b8f36",
+      "n_tx": 1551,
+      "sample_to": [
+        "0xccc88a9d1b4ed6b0eaba998850414b24f1c315be"
+      ]
+    },
+    {
+      "selector": "0xd04c6983",
+      "n_tx": 1424,
+      "sample_to": [
+        "0xa749ec38562b1ccb76a062d77536702134cc7fba",
+        "0x7358c4adee4ef61dbfccff5a03fe06691f8bce38",
+        "0x69cdacec93a8a06942c46c2d2ba441e97282465a",
+        "0x182d800bef19c5fb0b5f29856b339ac8ed2d52cf",
+        "0x0000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "selector": "0x765e827f",
+      "n_tx": 1125,
+      "sample_to": [
+        "0x4337084d9e255ff0702461cf8895ce9e3b5ff108",
+        "0x0000000071727de22e5e9d8baf0edac6f37da032"
+      ]
+    },
+    {
+      "selector": "0x3729bb9a",
+      "n_tx": 924,
+      "sample_to": [
+        "0x5cee9ab60315b06bc23b414a3f9e27fb5eddada5",
+        "0x42cfc1956539b9a7feffd46c9cec9cf2b1c6c947",
+        "0xdff5b512c7db5673f53883e4e82fb5753a0e8143",
+        "0x0cda135564930c11cad4db247c6972d8f1e4fe50",
+        "0xf079989e342a5b8743ef8876782792431c7a758e"
+      ]
+    },
+    {
+      "selector": "0xa9059cbb",
+      "n_tx": 903,
+      "sample_to": [
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+        "0x5b4cd530e132b6650c40c382a7b0f8e78bcb8d5d",
+        "0x0e63e46964cc69d99a0f4120f731ba57e6e69871",
+        "0x1ae9075209f8b664c2387514a63068395d4d7e55",
+        "0xf8bc08092c06db6148114dcf82af881f1085f92b"
+      ]
+    },
+    {
+      "selector": "0xb6f9de95",
+      "n_tx": 746,
+      "sample_to": [
+        "0x89e5db8b5aa49aa85ac63f691524311aeb649eba"
+      ]
+    },
+    {
+      "selector": "0x3e0f9c3c",
+      "n_tx": 659,
+      "sample_to": [
+        "0x9689992f5b5c09447f15906d8d11214944488341"
+      ]
+    },
+    {
+      "selector": "0x39ecce49",
+      "n_tx": 620,
+      "sample_to": [
+        "0xef161b8b000810944017a69af3b4bb28c87ae318"
+      ]
+    },
+    {
+      "selector": "0x627dd56a",
+      "n_tx": 486,
+      "sample_to": [
+        "0x26330dbba903e3f44a6c4de66e0571ae610a15f2"
+      ]
+    },
+    {
+      "selector": "0x00000000",
+      "n_tx": 433,
+      "sample_to": [
+        "0x1521027b665fa38fa4a642991607ad708376dd7b",
+        "0x39b37fe004b9bcda781784345d2ffc84ef4b8ce6",
+        "0x7e9c97c3abc5bce23b182b05bbe5833ce0588894",
+        "0xe59ab114a78f3818b514085b3b8c13e8ff507a24",
+        "0x545908ef28627547de3b2d26f2d7c9b46aa49c5f"
+      ]
+    },
+    {
+      "selector": "0xdd46508f",
+      "n_tx": 429,
+      "sample_to": [
+        "0x58daec3116aae6d93017baaea7749052e8a04fa7"
+      ]
+    },
+    {
+      "selector": "0x4e71d92d",
+      "n_tx": 394,
+      "sample_to": [
+        "0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e",
+        "0x57cfbafbd3aa0909b469d1db02ae1f61f0ae7250",
+        "0x39096e5d15f1b418f6239bf8ff43d1528ae00d33",
+        "0xaf8a5de4399e308fc1d85af65e269e4951b8ae7b",
+        "0xca6bfb7b24ae61fc844be59c092aac26fcd55cab"
+      ]
+    },
+    {
+      "selector": "0x0c307f76",
+      "n_tx": 359,
+      "sample_to": [
+        "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919"
+      ]
+    },
+    {
+      "selector": "0xe6cb474f",
+      "n_tx": 326,
+      "sample_to": [
+        "0x17b36cd3a1ccac142d2504c86754851e99664588"
+      ]
+    },
+    {
+      "selector": "0x32f289cf",
+      "n_tx": 294,
+      "sample_to": [
+        "0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e",
+        "0xc2057f4ce6a574e221beaa71fd47ea6408310459"
+      ]
+    },
+    {
+      "selector": "0x810c705b",
+      "n_tx": 257,
+      "sample_to": [
+        "0xb300000b72deaeb607a12d5f54773d1c19c7028d"
+      ]
+    },
+    {
+      "selector": "0x87517c45",
+      "n_tx": 243,
+      "sample_to": [
+        "0x000000000022d473030f116ddee9f6b43ac78ba3"
+      ]
+    },
+    {
+      "selector": "0x4d819a2a",
+      "n_tx": 239,
+      "sample_to": [
+        "0xe492912f37c2a4eca45d42dc67548f4c6cd7ce2b"
+      ]
+    },
+    {
+      "selector": "0xf27f4948",
+      "n_tx": 232,
+      "sample_to": [
+        "0x89a8901faf3c6660d761f52acf531f0e27aae149"
+      ]
+    },
+    {
+      "selector": "0x791ac947",
+      "n_tx": 220,
+      "sample_to": [
+        "0x89e5db8b5aa49aa85ac63f691524311aeb649eba"
+      ]
+    },
+    {
+      "selector": "0x174dea71",
+      "n_tx": 197,
+      "sample_to": [
+        "0xca11bde05977b3631167028862be2a173976ca11"
+      ]
+    },
+    {
+      "selector": "0x2213bc0b",
+      "n_tx": 151,
+      "sample_to": [
+        "0x0000000000001ff3684f28c67538d4d072c22734",
+        "0x50c4e75a512f2a14a7b304787adf79c4531a5909"
+      ]
+    },
+    {
+      "selector": "0xb2460c48",
+      "n_tx": 138,
+      "sample_to": [
+        "0x520ed467860d840ec6ca20f1dacb9c0fa5168aa7"
+      ]
+    },
+    {
+      "selector": "0x49290c1c",
+      "n_tx": 134,
+      "sample_to": [
+        "0x4cd00e387622c35bddb9b4c962c136462338bc31"
+      ]
+    },
+    {
+      "selector": "0x5fc3c09f",
+      "n_tx": 121,
+      "sample_to": [
+        "0xa49f317086368da903ea40a286ad675664c9e123"
+      ]
+    },
+    {
+      "selector": "0x40e5c1ee",
+      "n_tx": 114,
+      "sample_to": [
+        "0xb05500000af543df9da65c536340f472aeffbc77"
+      ]
+    },
+    {
+      "selector": "0xf99df3d4",
+      "n_tx": 114,
+      "sample_to": [
+        "0x8f6782c5aa37804d08a9b7bf3984ff3245fd6cd4"
+      ]
+    },
+    {
+      "selector": "0xa00597a0",
+      "n_tx": 105,
+      "sample_to": [
+        "0x278d858f05b94576c1e6f73285886876ff6ef8d2"
+      ]
+    },
+    {
+      "selector": "0x27772d13",
+      "n_tx": 104,
+      "sample_to": [
+        "0x81da6bcd98ae46621a1e9743a3f51b10b7e16d97"
+      ]
+    },
+    {
+      "selector": "0x002798fa",
+      "n_tx": 103,
+      "sample_to": [
+        "0x524a5114848c5cba631998d89771f1f13b3265d9"
+      ]
+    },
+    {
+      "selector": "0x01000000",
+      "n_tx": 100,
+      "sample_to": [
+        "0x39b37fe004b9bcda781784345d2ffc84ef4b8ce6",
+        "0x7e9c97c3abc5bce23b182b05bbe5833ce0588894"
+      ]
+    },
+    {
+      "selector": "0x1dcd4dad",
+      "n_tx": 96,
+      "sample_to": [
+        "0x00000000e91fc5bad977c0cc4ad60557c06886a2"
+      ]
+    },
+    {
+      "selector": "0x63e6245a",
+      "n_tx": 93,
+      "sample_to": [
+        "0x85331fbf7ce874edf526c0b734698d7e72758853"
+      ]
+    },
+    {
+      "selector": "0xda9ff964",
+      "n_tx": 85,
+      "sample_to": [
+        "0x960722d98ab6276c8020d891ea9a34f8c2c26ce6"
+      ]
+    },
+    {
+      "selector": "0xde12a9cb",
+      "n_tx": 85,
+      "sample_to": [
+        "0x15c9e9f128478cb20f10213492391ef870de4910"
+      ]
+    },
+    {
+      "selector": "0x000000e7",
+      "n_tx": 84,
+      "sample_to": [
+        "0xc33acc93942105c57602e59e8e448c20ba718a85"
+      ]
+    },
+    {
+      "selector": "0x0f0f000e",
+      "n_tx": 84,
+      "sample_to": [
+        "0x6d0217935d75bd5a4c5e0452cfa7ee71d9624322"
+      ]
+    },
+    {
+      "selector": "0xcd44fe09",
+      "n_tx": 83,
+      "sample_to": [
+        "0x9e4e01d2c3c939d870c040192aa143cb139bcc9f"
+      ]
+    },
+    {
+      "selector": "0xe21fd0e9",
+      "n_tx": 77,
+      "sample_to": [
+        "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+      ]
+    },
+    {
+      "selector": "0x1172dd72",
+      "n_tx": 73,
+      "sample_to": [
+        "0x9e69595ff6cace3e599be5371686cb9998304fbe"
+      ]
+    },
+    {
+      "selector": "0xf2c42696",
+      "n_tx": 70,
+      "sample_to": [
+        "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919"
+      ]
+    },
+    {
+      "selector": "0x3d61055e",
+      "n_tx": 68,
+      "sample_to": [
+        "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044"
+      ]
+    }
+  ],
+  "decode_errors_sample": [],
+  "answer_which_router_carries_user_swaps": {
+    "to": "0xcaf681a66d020601342297493863e78c959e5cb2",
+    "n_tx": 1749,
+    "is_known_pool_direct_call": false,
+    "n_tx_known_swap_selector": 1740,
+    "n_tx_known_swap_decoded_ok": 1740,
+    "notional_usd_approx_ref_2026_09_10_price": 55212.39,
+    "top_selectors": {
+      "0x04e45aaf": 885,
+      "0xac9650d8": 443,
+      "0x5ae401dc": 398,
+      "0xb858183f": 14,
+      "0x09b81346": 5,
+      "0x472b43f3": 4
+    },
+    "selectors_known_as": {
+      "0x04e45aaf": "exactInputSingle (SwapRouter02)",
+      "0xac9650d8": "multicall(bytes[])",
+      "0x5ae401dc": "multicall(uint256,bytes[])",
+      "0xb858183f": "exactInput (SwapRouter02)"
+    }
+  }
+}
+[router_histogram] результат записан в data/task5_bot_router_histogram_result.json
+
+## histogram stderr
