@@ -14,7 +14,13 @@ name: "Задача 5, Путь А -- проверка против извест
 # деньги, не сигнатуры).
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      script_path:
+        description: 'Какой скрипт запустить на VPS (по умолчанию -- основная проверка против известного ответа; можно временно указать диагностический скрипт).'
+        required: false
+        default: 'analysis/task5_bot_known_answer_test.py'
+        type: string
 
 jobs:
   known_answer_test:
@@ -52,14 +58,16 @@ jobs:
           '
 
       - name: "Проверка против известного ответа (RPC receipt+block, декодер, триггер)"
+        env:
+          SCRIPT_PATH: ${{ inputs.script_path }}
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 '
-            sudo -u bot bash -c "
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            sudo -u bot bash -c '
               set -a; . /etc/bot/env 2>/dev/null; set +a
               cd /home/bot/robinhood-chain-alpha
-              ./venv/bin/python analysis/task5_bot_known_answer_test.py
-            "
-          ' > /tmp/known_answer_stdout.log 2> /tmp/known_answer_stderr.log
+              ./venv/bin/python $SCRIPT_PATH
+            '
+          " > /tmp/known_answer_stdout.log 2> /tmp/known_answer_stderr.log
           echo "--- stdout ---"; cat /tmp/known_answer_stdout.log
           echo "--- stderr ---"; cat /tmp/known_answer_stderr.log
 
@@ -68,6 +76,7 @@ jobs:
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_test_result.json 2>/dev/null' > /tmp/known_answer_result.json || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_pool_registry_cache.json 2>/dev/null' > /tmp/pool_registry_cache.json || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_bot_known_answer_diag_block_result.json 2>/dev/null' > /tmp/diag_block_result.json || true
 
       - name: Commit results
         if: always()
@@ -88,6 +97,10 @@ jobs:
           if [ -s /tmp/pool_registry_cache.json ] && python3 -c "import json; json.load(open('/tmp/pool_registry_cache.json'))" 2>/dev/null; then
             cp /tmp/pool_registry_cache.json data/task5_bot_pool_registry_cache.json
             git add data/task5_bot_pool_registry_cache.json
+          fi
+          if [ -s /tmp/diag_block_result.json ] && python3 -c "import json; json.load(open('/tmp/diag_block_result.json'))" 2>/dev/null; then
+            cp /tmp/diag_block_result.json data/task5_bot_known_answer_diag_block_result.json
+            git add data/task5_bot_known_answer_diag_block_result.json
           fi
           git diff --cached --quiet && exit 0
           git commit -m "Задача 5, Путь А: проверка против известного ответа (10 реальных захватов) [automated]"
