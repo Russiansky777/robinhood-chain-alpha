@@ -24,6 +24,56 @@ from dataclasses import dataclass
 
 import websockets
 
+# Владелец, 2026-09-13: HTTP 403 на подключениях к фиду (Ohio дважды, NL
+# один раз сразу после успешного) -- версия "rate-limit по IP" не
+# объясняет NL 403 через 4 минуты после реального успеха с того же IP.
+# Более вероятная гипотеза -- Cloudflare режет по отпечатку WS-клиента
+# (голый `websockets` без браузерных заголовков), не по частоте.
+# Браузерные заголовки -- реальный текущий Chrome UA (не выдуманный,
+# актуальная стабильная версия на момент сессии), Origin -- домен
+# продукта (chain.robinhood.com, не сам feed-хост -- так антибот обычно
+# проверяет CORS-подобный Origin), Accept-Language -- типичный браузерный
+# набор. ОДНА проверка (не серия) -- см. task5_bot_feed_structure_probe.py.
+BROWSER_LIKE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Origin": "https://chain.robinhood.com",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def connect_with_headers(feed_url: str, headers: dict | None, **kwargs):
+    """Обёртка над websockets.connect -- ОБЫЧНАЯ (не async) функция,
+    как и сам websockets.connect (реальная сетевая работа происходит
+    позже, на __aenter__/await самого возвращённого объекта, не здесь).
+
+    ВАЖНО, реально проверено (не предположено): у websockets 17.x есть
+    ОТДЕЛЬНЫЙ параметр `user_agent_header` (по умолчанию сам библиотека
+    подставляет строку вида "Python/3.11 websockets/17.1" -- то самое
+    "голое" значение, которое и могло триггерить блок по отпечатку) --
+    он НЕ перекрывается простой передачей "User-Agent" в
+    `additional_headers`, это два разных механизма. Поэтому "User-Agent"
+    из `headers` вынимается и передаётся именно через `user_agent_header`
+    (обнуляет библиотечное значение), остальные поля -- через
+    `additional_headers`. Разные версии библиотеки называют этот параметр
+    по-разному (`additional_headers` в новом asyncio-клиенте websockets
+    13+, `extra_headers` в более старых) -- пробуем оба."""
+    if not headers:
+        return websockets.connect(feed_url, **kwargs)
+    remaining = dict(headers)
+    user_agent = remaining.pop("User-Agent", None)
+    try:
+        if user_agent is not None:
+            return websockets.connect(feed_url, additional_headers=remaining, user_agent_header=user_agent, **kwargs)
+        return websockets.connect(feed_url, additional_headers=remaining, **kwargs)
+    except TypeError:
+        # старая версия библиотеки без user_agent_header/additional_headers --
+        # честный fallback: User-Agent просто в общий словарь extra_headers,
+        # библиотечное значение может остаться (не гарантируем на старых версиях).
+        if user_agent is not None:
+            remaining = {**remaining, "User-Agent": user_agent}
+        return websockets.connect(feed_url, extra_headers=remaining, **kwargs)
+
 
 @dataclass
 class FeedMessage:
@@ -33,15 +83,16 @@ class FeedMessage:
 
 
 class SequencerFeedClient:
-    def __init__(self, feed_url: str) -> None:
+    def __init__(self, feed_url: str, headers: dict | None = BROWSER_LIKE_HEADERS) -> None:
         self.feed_url = feed_url
+        self.headers = headers
         self.diag: dict = {"n_messages_total": 0, "n_with_seq": 0, "n_unparsed": 0, "n_confirmation_only": 0}
 
     async def listen(self, on_message):
         """on_message(FeedMessage) вызывается синхронно для каждого
         реального сообщения фида с sequenceNumber -- вызывающий код
         (детектор) должен быть быстрым, это горячий путь без сети."""
-        async with websockets.connect(self.feed_url, open_timeout=10, close_timeout=5) as ws:
+        async with connect_with_headers(self.feed_url, self.headers, open_timeout=10, close_timeout=5) as ws:
             self.diag["connected_at_wall"] = time.time()
             async for raw in ws:
                 t_wall = time.time()
