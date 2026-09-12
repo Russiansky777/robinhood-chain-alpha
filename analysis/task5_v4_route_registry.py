@@ -276,17 +276,42 @@ class RouteRegistry:
 
 
 def main() -> None:
-    """Самопроверка/диагностика: сид + актуальная живучесть на latest
-    блоке. Реальный RPC (Quoter), read-only, ничего не отправляет."""
+    """Самопроверка/диагностика: сид + реальное обнаружение пулов из
+    Initialize-событий (0..latest -- тот же паттерн, что уже реально
+    работал в Этапе 2 для получения PoolKey хук-маршрута) + построение
+    циклов + живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC
+    (eth_getLogs + Quoter), read-only, ничего не отправляет.
+
+    Реальный повод сделать это ЗДЕСЬ, не только сид: оба сид-маршрута
+    на момент написания честно оказались НЕ живы (пересохшая
+    ликвидность, см. data/task5_v4_diag_current_liquidity_result.json)
+    -- обнаружение новых пулов может найти РЕАЛЬНО исполнимые сейчас
+    маршруты, а не полагаться только на исторически проверенные, но
+    сейчас мёртвые."""
     latest = int(_rpc_call("eth_blockNumber", []), 16)
     registry = RouteRegistry()
     registry.add_routes(seed_routes())
     print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
+
+    print(f"[route_registry] сканирую Initialize-события PoolManager (0..{latest})...")
+    try:
+        pools = discover_pools_from_initialize_events(0, latest)
+        print(f"[route_registry] найдено пулов: {len(pools)}")
+        discovered_cycles = build_cycles_from_pools(pools)
+        print(f"[route_registry] построено кандидатных циклов (2-3 обмена, начало/конец USDG/NATIVE): "
+              f"{len(discovered_cycles)}")
+        registry.add_routes(discovered_cycles)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[route_registry] обнаружение пулов упало (честно, не молчим): {exc}", file=sys.stderr)
+
+    print(f"[route_registry] проверяю живучесть всех {len(registry.routes)} маршрутов на блоке {latest}...")
     results = registry.refresh_liveness_all(latest)
     for rid, res in results.items():
         route = registry.routes[rid]
-        print(f"  {route.label}: live={res['live']} "
+        print(f"  [{route.source}] {route.label}: live={res['live']} "
               f"({res.get('error') or ('amount_out=' + str(res['test_amount_out']))})")
+
+    print(f"[route_registry] ИТОГ: живых {len(registry.live_routes())} из {len(registry.routes)}")
 
     out_path = Path(__file__).parent.parent / "data" / "task5_v4_route_registry_result.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)

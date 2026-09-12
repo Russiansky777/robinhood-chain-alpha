@@ -1,16 +1,11 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T22:25:37Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T22:44:17Z
 
 ## stdout
-[safety_check] anvil --fork-block-number 61248736...
-[safety_check] деплою ClosedCycleExecutorV4...
-[safety_check] пополняю контракт 20000000 raw USDG (импersonate PoolManager)...
-[safety_check] баланс контракта ДО попытки: 20000000 raw USDG
-[safety_check] вызываю executeCycle с ЗАВЕДОМО УБЫТОЧНЫМ (реверснутым) порядком плеч...
-[safety_check] tx_reverted=True
-[safety_check] баланс ДО=20000000, ПОСЛЕ=20000000, balance_unchanged=True
-[safety_check] stderr: 
-
-[safety_check] ИТОГ: PASS
-[safety_check] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_fork_safety_check_loss_revert_result.json
+[route_registry] сид: 2 маршрутов
+  USDG<->MOSIAI (2 пула той же пары): live=False (RPC eth_call error: {'code': 3, 'message': 'execution reverted', 'data': '0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000247a5ed734cb90948a1ef145614fc4a20418956f7273690abca77804d2a0cf68c7092aea030000000000000000)
+  ETH->MOSIAI(хук)->USDG->ETH: live=False (RPC eth_call error: {'code': 3, 'message': 'execution reverted', 'data': '0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000247a5ed734784df9b627194fffd79fa5475edc4bb67c458ac7e8b7890f55eb6a522d4a442c0000000000000000)
+[route_registry] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_route_registry_result.json
 
 ## stderr
+[v4_quote_replay] Alchemy напрямую тоже отказал: {'code': 3, 'message': 'execution reverted', 'data': '0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000247a5ed734cb90948a1ef145614fc4a20418956f7273690abca77804d2a0cf68c7092aea0300000000000000000000000000000000000000000000000000000000'}
+[v4_quote_replay] Alchemy напрямую тоже отказал: {'code': 3, 'message': 'execution reverted', 'data': '0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000247a5ed734784df9b627194fffd79fa5475edc4bb67c458ac7e8b7890f55eb6a522d4a442c00000000000000000000000000000000000000000000000000000000'}
