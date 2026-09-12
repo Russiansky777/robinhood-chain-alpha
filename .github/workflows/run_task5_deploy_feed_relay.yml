@@ -1,4 +1,4 @@
-name: "Задача 5, feed relay -- ЗАПУСК официального Nitro relay на Ohio (одна попытка, только после 12ч окна)"
+name: "Задача 5, feed relay -- ЗАПУСК официального Nitro relay на Ohio"
 
 # Владелец, 2026-09-12: Chainstack официально держит Offchain Labs Nitro
 # relay (не имитацию TLS-отпечатка -- их README подтверждает "Robinhood
@@ -7,33 +7,33 @@ name: "Задача 5, feed relay -- ЗАПУСК официального Nitro
 # Бот и диагностические скрипты переключаются на этот локальный relay
 # (--feed-url ws://127.0.0.1:9642) вместо публичного URL напрямую.
 #
-# КРИТИЧНО (см. scripts/deploy_feed_relay.sh): у Nitro-клиента фида
-# задокументирован встроенный реконнект-backoff 1с->64с БЕЗ известного
-# флага отключения -- если апстрим-хендшейк словит 403, наивный
-# restart-policy превратит "одну попытку" в "попытку каждые ~64с
-# навсегда". Поэтому: (1) жёсткая проверка 12-часового окна ПЕРЕД
-# запуском (отдельно от обычного 1800с код-кулдауна бота), (2) relay
-# стартует БЕЗ restart-policy, (3) внешняя валидация (реальные ли
-# сообщения идут через localhost), (4) restart-policy включается
-# ТОЛЬКО при подтверждённом успехе, иначе контейнер останавливается и
-# удаляется.
+# Владелец, 2026-09-12 (уточнение): docs.robinhood.com/chain/connecting
+# ПРЯМО подтверждает -- точное число (лимит/окно) НЕ публикуется вообще
+# ("Robinhood does not publish a specific rate-limit number"). Поэтому
+# НЕ гейтим запуск на угаданное число часов -- "поднять сразу, не ждать.
+# Если упрётся в 403 -- не перезапускать вручную, оставить встроенный
+# backoff." См. scripts/deploy_feed_relay.sh: контейнер стартует СРАЗУ
+# с --restart=unless-stopped и остаётся работать независимо от
+# результата первой проверки -- relay сам, своим встроенным backoff
+# (1с->64с, задокументировано Arbitrum), продолжит пробовать, мы не
+# вмешиваемся руками.
 #
 # Намеренно ТОЛЬКО workflow_dispatch (как run_task5_deploy_executor.yml/
-# run_task5_test5_revert.yml) -- это ЕДИНСТВЕННАЯ разрешённая попытка
-# подключения к публичному фиду за 12+ часов, обычный push не должен
-# иметь шанс её случайно запустить.
+# run_task5_test5_revert.yml) -- явное текстовое подтверждение как
+# барьер перед действием, обычный push не должен иметь шанс его
+# случайно запустить.
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Введите ровно "DEPLOY_RELAY", чтобы подтвердить: это ЕДИНСТВЕННАЯ разрешённая попытка подключения к публичному фиду секвенсера за последние 12+ часов.'
+        description: 'Введите ровно "DEPLOY_RELAY", чтобы подтвердить запуск feed relay на Ohio.'
         required: true
         type: string
 
 jobs:
   deploy_feed_relay:
-    name: "Nitro feed relay (Ohio VPS, одна попытка)"
+    name: "Nitro feed relay (Ohio VPS)"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -75,16 +75,7 @@ jobs:
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
           '
 
-      - name: "ЖЁСТКАЯ проверка 12-часового окна (read-only, не пишет state)"
-        run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 '
-            sudo -u bot bash -c "
-              cd /home/bot/robinhood-chain-alpha/analysis
-              /home/bot/robinhood-chain-alpha/venv/bin/python3 task5_feed_relay_precheck.py
-            "
-          ' | tee /tmp/relay_precheck.log
-
-      - name: "Запустить deploy_feed_relay.sh (ОДНА попытка -- см. осторожности в самом скрипте)"
+      - name: "Запустить deploy_feed_relay.sh (запускает СРАЗУ, оставляет встроенный backoff relay'я работать при неудаче)"
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo bash /home/bot/robinhood-chain-alpha/scripts/deploy_feed_relay.sh
@@ -103,9 +94,6 @@ jobs:
           mkdir -p data/p3_guard_cache
           {
             echo "# Деплой Nitro feed relay (Ohio) -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo ""
-            echo "## проверка 12-часового окна"
-            cat /tmp/relay_precheck.log 2>/dev/null || echo "(нет данных)"
             echo ""
             echo "## stdout"
             cat /tmp/deploy_relay_stdout.log 2>/dev/null || echo "(нет данных)"
