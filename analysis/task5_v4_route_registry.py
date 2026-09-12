@@ -298,15 +298,51 @@ class RouteRegistry:
         self.routes: dict[str, RouteCycle] = {}
         self.liveness: dict[str, dict] = {}
         self.pool_to_routes: dict[str, set[str]] = {}
+        # Плоский {pool_id: PoolKey} по ВСЕМ пулам, когда-либо вошедшим в
+        # реестр (сид + обнаруженные) -- нужен для непрерывного
+        # обнаружения (discover_new_arbitrageur_routes): новый пул от
+        # арбитражника должен связываться в циклы НЕ только с другими
+        # новыми пулами того же вызова, но и со ВСЕМИ уже известными --
+        # иначе циклы вида "старый пул A + новый пул B" были бы упущены.
+        self.known_pools: dict[str, PoolKey] = {}
 
     def add_route(self, route: RouteCycle) -> None:
         self.routes[route.route_id] = route
-        for pid in route.pool_ids():
-            self.pool_to_routes.setdefault(pid, set()).add(route.route_id)
+        for leg in route.legs:
+            self.known_pools[leg.pool_id_hex] = leg.pool_key
+            self.pool_to_routes.setdefault(leg.pool_id_hex, set()).add(route.route_id)
 
     def add_routes(self, routes: list[RouteCycle]) -> None:
         for r in routes:
             self.add_route(r)
+
+    def discover_new_arbitrageur_routes(self, from_block: int, to_block: int,
+                                         arbitrageur: str = KNOWN_ARBITRAGEUR) -> list[RouteCycle]:
+        """НЕПРЕРЫВНОЕ обнаружение (владелец, 2026-09-13: "обнаружение
+        должно идти непрерывно... каждая новая успешная транзакция
+        0x1b357e7a... из фида -> извлечь пулы -> добавить в реестр без
+        перезапуска"). Вызывается КАЖДЫЙ раз, когда есть новый диапазон
+        блоков (тот же диапазон, что горячий путь и так проверяет на
+        Swap-логи отслеживаемых пулов) -- узкий, дешёвый запрос
+        (address=PoolManager, topic0=Swap, topic2=sender), не полное
+        пересканирование с нуля.
+
+        Новые пулы объединяются со ВСЕМИ уже известными (self.known_pools)
+        перед построением циклов -- новый пул может замкнуть цикл со
+        СТАРЫМ, не только с другим новым в этом же вызове. Циклы,
+        которые уже есть в реестре (route_id совпал), не добавляются
+        повторно. Возвращает СПИСОК НОВЫХ маршрутов (для немедленной
+        точечной проверки живучести вызывающим кодом -- не всего
+        реестра, это дорого)."""
+        new_pools = seed_pools_from_arbitrageur(from_block, to_block, known_pool_ids=set(self.known_pools.keys()),
+                                                 arbitrageur=arbitrageur)
+        if not new_pools:
+            return []
+        merged_pools = {**self.known_pools, **new_pools}
+        all_cycles = build_cycles_from_pools(merged_pools)
+        new_cycles = [c for c in all_cycles if c.route_id not in self.routes]
+        self.add_routes(new_cycles)
+        return new_cycles
 
     def refresh_liveness_all(self, block_number: int) -> dict[str, dict]:
         results = {}
@@ -340,45 +376,62 @@ class RouteRegistry:
 ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS = 40_000  # ~1 час на измеренной этой сессией плотности блоков
 
 
-def main() -> None:
-    """Самопроверка/диагностика: сид + реальное обнаружение пулов из
-    УСПЕШНЫХ Swap-событий известного арбитражника (KNOWN_ARBITRAGEUR,
-    последний час) -- владелец, 2026-09-13, дополнение к спецификации:
-    "стартовый источник реестра -- успешные транзакции 0x1b357e7a...
-    из фида в реальном времени... Его сделка -- не сигнал для нашей
-    отправки, только для пополнения списка." + построение циклов +
-    живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC (eth_getLogs
-    + Quoter), read-only, ничего не отправляет.
+def bootstrap_registry(latest: int | None = None,
+                        lookback_blocks: int = ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS,
+                        log: bool = True) -> tuple[RouteRegistry, int]:
+    """Сид + реальное обнаружение пулов из УСПЕШНЫХ Swap-событий
+    известного арбитражника (последний час по умолчанию) + построение
+    циклов + живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC
+    (eth_getLogs + Quoter), read-only, ничего не отправляет.
 
-    Реальный повод сделать это ЗДЕСЬ, не только сид: оба сид-маршрута
-    на момент написания честно оказались НЕ живы (пересохшая
-    ликвидность, см. data/task5_v4_diag_current_liquidity_result.json)
-    -- пулы АКТИВНОГО арбитражника почти наверняка живы прямо сейчас
-    (иначе его Swap-событие не появилось бы -- оно эмитится только при
-    успехе), в отличие от слепого перебора ВСЕХ когда-либо
-    инициализированных пулов."""
-    latest = int(_rpc_call("eth_blockNumber", []), 16)
+    Вынесено из main() в отдельную функцию (владелец, 2026-09-13:
+    "подключай полный реестр (сид + обнаружение из арбитражника) в
+    task5_v4_hotpath.py::main()") -- ОДИН и тот же, уже проверенный
+    реальным прогоном код бутстрапа используется и здесь для
+    самопроверки/диагностики, и в горячем пути для боевого старта, а не
+    дублируется.
+
+    Реальный повод делать обнаружение вообще, не только сид: оба
+    сид-маршрута на момент написания честно оказались НЕ живы
+    (пересохшая ликвидность, см.
+    data/task5_v4_diag_current_liquidity_result.json) -- пулы АКТИВНОГО
+    арбитражника почти наверняка живы прямо сейчас (иначе его
+    Swap-событие не появилось бы -- оно эмитится только при успехе), в
+    отличие от слепого перебора ВСЕХ когда-либо инициализированных
+    пулов. Реальный прогон (2026-09-13, блоки latest-40000..latest):
+    88 новых пулов, 164 кандидатных цикла, 117 живых из 166 маршрутов."""
+    if latest is None:
+        latest = int(_rpc_call("eth_blockNumber", []), 16)
     registry = RouteRegistry()
     registry.add_routes(seed_routes())
-    print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
+    if log:
+        print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
 
-    from_block = max(0, latest - ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS)
-    print(f"[route_registry] ищу пулы известного арбитражника {KNOWN_ARBITRAGEUR} "
-          f"(блоки {from_block}..{latest})...")
+    from_block = max(0, latest - lookback_blocks)
+    if log:
+        print(f"[route_registry] ищу пулы известного арбитражника {KNOWN_ARBITRAGEUR} "
+              f"(блоки {from_block}..{latest})...")
     try:
-        known_ids = {leg.pool_id_hex for r in registry.routes.values() for leg in r.legs}
-        pools = seed_pools_from_arbitrageur(from_block, latest, known_pool_ids=known_ids)
-        print(f"[route_registry] найдено НОВЫХ пулов арбитражника: {len(pools)}")
-        discovered_cycles = build_cycles_from_pools(pools)
-        print(f"[route_registry] построено кандидатных циклов (2-3 обмена, начало/конец USDG/NATIVE): "
-              f"{len(discovered_cycles)}")
-        registry.add_routes(discovered_cycles)
+        new_cycles = registry.discover_new_arbitrageur_routes(from_block, latest)
+        if log:
+            print(f"[route_registry] найдено новых пулов/циклов арбитражника: {len(new_cycles)} маршрутов")
     except Exception as exc:  # noqa: BLE001
         print(f"[route_registry] обнаружение пулов арбитражника упало (честно, не молчим): {exc}", file=sys.stderr)
 
-    print(f"[route_registry] проверяю живучесть всех {len(registry.routes)} маршрутов на блоке {latest}...")
-    results = registry.refresh_liveness_all(latest)
-    for rid, res in results.items():
+    if log:
+        print(f"[route_registry] проверяю живучесть всех {len(registry.routes)} маршрутов на блоке {latest}...")
+    registry.refresh_liveness_all(latest)
+    return registry, latest
+
+
+def main() -> None:
+    """Самопроверка/диагностика: см. bootstrap_registry(). Владелец,
+    2026-09-13, дополнение к спецификации: "стартовый источник реестра --
+    успешные транзакции 0x1b357e7a... из фида в реальном времени...
+    Его сделка -- не сигнал для нашей отправки, только для пополнения
+    списка.\""""
+    registry, latest = bootstrap_registry()
+    for rid, res in registry.liveness.items():
         route = registry.routes[rid]
         print(f"  [{route.source}] {route.label}: live={res['live']} "
               f"({res.get('error') or ('amount_out=' + str(res['test_amount_out']))})")
