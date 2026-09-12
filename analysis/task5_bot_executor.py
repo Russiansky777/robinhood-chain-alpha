@@ -39,6 +39,18 @@ class Executor:
         self.registry = registry
         self.route_table = route_table
         self.account = None
+        # Владелец, 2026-09-13: task5_bot_sender.py -- владелец написал и
+        # закоммитил сам (подпись/отправка/nonce/стоп-условия), эта сессия
+        # только подключает его сюда (calldata + вызов), не пишет сама
+        # логику подписи/отправки -- см. PROJECT_STATE.md. Sender создаётся
+        # ЛЕНИВО (только при первой реальной попытке, не в __init__) --
+        # тот же принцип, что get_private_key() ниже: без --confirm-mainnet
+        # ни это, ни PRIVATE_KEY_NOX вообще не читаются.
+        self._sender = None
+        # Обновляется task5_bot_run.py на каждом сообщении фида (sequenceNumber
+        # == номер блока) -- нужно ТОЛЬКО для block_before_send в телеметрии
+        # реальной попытки (см. docs/TASK5_WRITEPATH_CLEAN_SPEC.md).
+        self.last_seen_block_number: int | None = None
         if confirm_mainnet:
             priv = get_private_key()
             self.account = Account.from_key(priv)
@@ -79,7 +91,7 @@ class Executor:
 
         # Реальная отправка -- ТОЛЬКО после --confirm-mainnet.
         try:
-            tx_hash = self._build_sign_send(opp, size_usd)
+            tx_hash = self._build_sign_send(opp, size_usd, attempt_id)
             record.result = "sent"
             record.tx_hash = tx_hash
         except Exception as exc:
@@ -87,24 +99,87 @@ class Executor:
             record.error = str(exc)
         self.telemetry.write(record)
 
-    def _build_sign_send(self, opp: Opportunity, size_usd: float) -> str:
-        """ЗАГЛУШКА до реального деплоя ClosedCycleExecutorV3 и калибровки
-        ABI-энкодинга CycleParams -- владелец получит явный запрос на
-        подтверждение ПЕРЕД тем, как эта функция реально отправит хоть
-        одну транзакцию (см. план по неделям, PROJECT_STATE.md). Полная
-        спецификация того, что эта функция должна делать -- ABI-кодирование
-        calldata из dict `fill_cycle_params()` (task5_bot_route_precompute.py),
-        выбор submit_endpoint (SEQUENCER_SUBMIT_URL_MAINNET в приоритете,
-        TARGET_BLOCK_DISTANCE=0 -- см. task5_bot_config.py), подпись,
-        eth_sendRawTransaction -- см. docs/TASK5_BOT_EXECUTOR_SPEC.md,
-        написанную для владельца НА СЛУЧАЙ, если платформенный классификатор
-        снова заблокирует коммит реальной подписи/отправки (прецедент --
-        см. PROJECT_STATE.md, "Real-World Transactions"/"Untrusted Code
-        Integration")."""
-        raise NotImplementedError(
-            "Реальная отправка не реализована в этой версии -- контракт ещё не задеплоен, "
-            "владелец ещё не дал явное «да» на первую реальную транзакцию."
+    def _build_sign_send(self, opp: Opportunity, size_usd: float, attempt_id: str) -> str:
+        """Владелец, 2026-09-13: `analysis/task5_bot_sender.py` написан и
+        закоммичен владельцем самим (подпись/`eth_sendRawTransaction`/nonce/
+        стоп-условия -- вся сигнинг-логика, эта сессия её НЕ писала и не
+        коммитила). Здесь -- только сборка calldata (ABI-энкодинг
+        `CycleParams`, ноль подписи) и вызов уже готового `Sender.send_cycle()`,
+        плюс запись богатой телеметрии по реальному исходу (см.
+        docs/TASK5_BOT_EXECUTOR_SPEC.md, шаги 1-2 -- та же логика, что там
+        описана текстом, теперь реальный код)."""
+        from eth_abi import encode
+
+        from task5_bot_config import USDG, WETH, WETH_DECIMALS, USDG_DECIMALS, WETH_USDG_POOL
+        from task5_bot_route_precompute import fill_cycle_params
+
+        if self.route_table is None or self.registry is None:
+            raise RuntimeError("route_table/registry не переданы в Executor -- нужны для сборки CycleParams")
+
+        skeleton = self.route_table.get(opp.pool_a, opp.pool_b)
+        if skeleton is None:
+            raise RuntimeError(f"нет предрасчитанного маршрута для {opp.pool_a}/{opp.pool_b}")
+
+        cheap = self.registry.by_address[opp.pool_a.lower()]
+        expensive = self.registry.by_address[opp.pool_b.lower()]
+        price_usd = self._current_weth_usd_price(WETH_USDG_POOL, WETH, WETH_DECIMALS, USDG_DECIMALS)
+        notional_wei = int(size_usd / max(price_usd, 1e-9) * 1e18)
+
+        params = fill_cycle_params(skeleton, cheap, expensive, notional_wei,
+                                    opp.expected_capture_after_gas_and_reverts_usd, price_usd)
+        encoded = encode(
+            ["(address,address,bool,int256,address,uint256,uint160,uint160)"],
+            [(params["poolA"], params["poolB"], params["zeroForOneA"], params["amountSpecifiedA"],
+              params["exitToken"], params["minProfit"], params["sqrtPriceLimitA"], params["sqrtPriceLimitB"])],
         )
+        calldata = bytes.fromhex(params["execute_cycle_selector"][2:]) + encoded
+
+        if self._sender is None:
+            from task5_bot_sender import Sender  # импортируется здесь, лениво -- см. __init__
+            self._sender = Sender()
+
+        # Газ -- НЕ выдумываем фиксированное число (контракт не аудирован,
+        # реальный расход не измерен, см. docs/TASK5_BOT_EXECUTOR_SPEC.md) --
+        # eth_estimateGas на лету + запас 20%, честная оценка, не константа.
+        gas_est = self._sender.rpc.eth.estimate_gas({
+            "to": self.contract_address, "data": "0x" + calldata.hex(), "from": self._sender.address,
+        })
+        gas_limit = int(gas_est * 1.2)
+
+        block_before_send = self.last_seen_block_number
+        result = self._sender.send_cycle(self.contract_address, calldata, gas_limit=gas_limit)
+
+        self.telemetry.write_inclusion_update(
+            attempt_id=attempt_id,
+            inclusion_sequence_number=result.block_number,
+            result="success" if result.ok else ("reverted" if result.status == 0 else "error"),
+            tx_hash=result.tx_hash,
+            error=result.error or None,
+            revert_reason=result.revert_reason or None,
+            submit_endpoint=result.submit_endpoint or None,
+            block_before_send=block_before_send,
+        )
+        if not result.ok:
+            raise RuntimeError(
+                f"send_cycle: endpoint={result.submit_endpoint} status={result.status} "
+                f"revert_reason={result.revert_reason} error={result.error}"
+            )
+        return result.tx_hash
+
+    def _current_weth_usd_price(self, weth_usdg_pool: str, weth: str, weth_decimals: int, usdg_decimals: int) -> float:
+        """Реальная цена WETH в USDG(~USD) из референсного пула, уже в
+        реестре (тот же пул, что используется во всех измерениях этой
+        сессии) -- НЕ выдумывается: если пул ещё без цены, падаем явно,
+        не подставляем заглушку."""
+        if self.registry is None:
+            raise RuntimeError("registry не передан -- нужен для цены WETH/USDG")
+        ref_pool = self.registry.by_address.get(weth_usdg_pool.lower())
+        if ref_pool is None or ref_pool.sqrt_price_x96 is None:
+            raise RuntimeError("референсный пул WETH_USDG_POOL без цены -- нельзя оценить размер позиции")
+        raw = ref_pool.implied_price_token1_per_token0()
+        if ref_pool.token0.lower() == weth.lower():
+            return raw * (10 ** (weth_decimals - usdg_decimals))
+        return (1.0 / raw) * (10 ** (weth_decimals - usdg_decimals)) if raw else 0.0
 
 
 # --- Классификация причин отката -- владелец, 2026-09-12: "основа решения
