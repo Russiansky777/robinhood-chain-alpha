@@ -1,261 +1,277 @@
 [
   {
+    "type": "constructor",
     "inputs": [
       {
-        "internalType": "address",
         "name": "_owner",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "address",
         "name": "_poolManager",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
+    "stateMutability": "nonpayable"
   },
   {
+    "type": "receive",
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "executeCycle",
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "balanceBefore",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "balanceAfter",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "required",
-        "type": "uint256"
-      }
-    ],
-    "name": "InsufficientProfit",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "legIndex",
-        "type": "uint256"
-      }
-    ],
-    "name": "LegCurrencyMismatch",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "legIndex",
-        "type": "uint256"
-      }
-    ],
-    "name": "LegProducedNoOutput",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ReentrantCall",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TooManyLegs",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "caller",
-        "type": "address"
-      }
-    ],
-    "name": "UnexpectedCallback",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "exitToken",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "profit",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "nLegs",
-        "type": "uint256"
-      }
-    ],
-    "name": "CycleExecuted",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct ClosedCycleExecutorV4.CycleParams",
         "components": [
           {
+            "name": "legs",
+            "type": "tuple[]",
+            "internalType": "struct ClosedCycleExecutorV4.LegParams[]",
             "components": [
               {
-                "internalType": "address",
                 "name": "currency0",
-                "type": "address"
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "internalType": "address",
                 "name": "currency1",
-                "type": "address"
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "internalType": "uint24",
                 "name": "fee",
-                "type": "uint24"
+                "type": "uint24",
+                "internalType": "uint24"
               },
               {
-                "internalType": "int24",
                 "name": "tickSpacing",
-                "type": "int24"
+                "type": "int24",
+                "internalType": "int24"
               },
               {
-                "internalType": "address",
                 "name": "hooks",
-                "type": "address"
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "internalType": "bool",
                 "name": "zeroForOne",
-                "type": "bool"
+                "type": "bool",
+                "internalType": "bool"
               },
               {
-                "internalType": "uint160",
                 "name": "sqrtPriceLimitX96",
-                "type": "uint160"
+                "type": "uint160",
+                "internalType": "uint160"
               },
               {
-                "internalType": "bytes",
                 "name": "hookData",
-                "type": "bytes"
+                "type": "bytes",
+                "internalType": "bytes"
               }
-            ],
-            "internalType": "struct ClosedCycleExecutorV4.LegParams[]",
-            "name": "legs",
-            "type": "tuple[]"
+            ]
           },
           {
-            "internalType": "int256",
             "name": "firstAmountSpecified",
-            "type": "int256"
+            "type": "int256",
+            "internalType": "int256"
           },
           {
-            "internalType": "address",
             "name": "exitToken",
-            "type": "address"
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "internalType": "uint256",
             "name": "minProfit",
-            "type": "uint256"
+            "type": "uint256",
+            "internalType": "uint256"
           }
-        ],
-        "internalType": "struct ClosedCycleExecutorV4.CycleParams",
-        "name": "p",
-        "type": "tuple"
+        ]
       }
     ],
-    "name": "executeCycle",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "owner",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "poolManager",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "contract IPoolManagerMinimal",
         "name": "",
-        "type": "address"
+        "type": "address",
+        "internalType": "contract IPoolManagerMinimal"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [
-      {
-        "internalType": "bytes",
-        "name": "data",
-        "type": "bytes"
-      }
-    ],
+    "type": "function",
     "name": "unlockCallback",
-    "outputs": [
-      {
-        "internalType": "bytes",
-        "name": "",
-        "type": "bytes"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "to",
-        "type": "address"
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    "name": "withdraw",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
-    "stateMutability": "payable",
-    "type": "receive"
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "CycleExecuted",
+    "inputs": [
+      {
+        "name": "exitToken",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "profit",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "nLegs",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "CycleNotClosed",
+    "inputs": [
+      {
+        "name": "currency",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "delta",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientProfit",
+    "inputs": [
+      {
+        "name": "balanceBefore",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "balanceAfter",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "LegCurrencyMismatch",
+    "inputs": [
+      {
+        "name": "legIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "LegProducedNoOutput",
+    "inputs": [
+      {
+        "name": "legIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooManyLegs",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnexpectedCallback",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   }
 ]

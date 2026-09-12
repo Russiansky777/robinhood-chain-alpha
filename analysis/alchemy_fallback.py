@@ -23,6 +23,7 @@ Alchemy `eth_getLogs` за диапазон блоков, без прохода 
 """
 from __future__ import annotations
 
+import threading
 import time
 from typing import Callable, Iterator
 
@@ -137,6 +138,14 @@ _RATE_LIMIT_WAIT_BUDGET_S = 900.0  # 15 минут суммарного ожид
 _BACKOFF_CAP_S = 25.0
 _MIN_REQUEST_INTERVAL_S = 0.5  # ~2 req/s -- ещё консервативнее прежних 0.35с/~2.9 req/с, см. оговорку выше про общий IP-пул
 _last_request_at = 0.0
+# ПРАВКА 2026-09-13 (живой пилот: фоновый поток обнаружения/живучести
+# параллельно горячему пути): раньше проверка-и-обновление
+# _last_request_at была НЕ атомарна (гонка между потоками могла
+# пропустить двух вызывающих через троттл одновременно) -- при
+# однопоточном использовании этого модуля до сих пор это было
+# безвредно. Теперь минимум ДВА потока реально делят этот троттлинг --
+# лок делает check-then-set атомарным.
+_throttle_lock = threading.Lock()
 
 
 def _throttle() -> None:
@@ -147,10 +156,11 @@ def _throttle() -> None:
     попыток и весь прогон падает. Проактивный самотроттлинг снижает
     частоту 429 в принципе, а не только реагирует на них постфактум."""
     global _last_request_at
-    wait = _last_request_at + _MIN_REQUEST_INTERVAL_S - time.monotonic()
-    if wait > 0:
-        time.sleep(wait)
-    _last_request_at = time.monotonic()
+    with _throttle_lock:
+        wait = _last_request_at + _MIN_REQUEST_INTERVAL_S - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at = time.monotonic()
 
 
 def _post_with_fallback(payload: dict) -> dict:

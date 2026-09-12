@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -305,16 +306,23 @@ class RouteRegistry:
         # новыми пулами того же вызова, но и со ВСЕМИ уже известными --
         # иначе циклы вида "старый пул A + новый пул B" были бы упущены.
         self.known_pools: dict[str, PoolKey] = {}
+        # ПРАВКА 2026-09-13 (живой пилот: фоновый поток обнаружения/
+        # живучести параллельно горячему пути читает/пишет тот же
+        # реестр) -- RLock (не Lock): discover_new_arbitrageur_routes
+        # вызывает add_route изнутри уже удерживаемого лока (реентрантно).
+        self._lock = threading.RLock()
 
     def add_route(self, route: RouteCycle) -> None:
-        self.routes[route.route_id] = route
-        for leg in route.legs:
-            self.known_pools[leg.pool_id_hex] = leg.pool_key
-            self.pool_to_routes.setdefault(leg.pool_id_hex, set()).add(route.route_id)
+        with self._lock:
+            self.routes[route.route_id] = route
+            for leg in route.legs:
+                self.known_pools[leg.pool_id_hex] = leg.pool_key
+                self.pool_to_routes.setdefault(leg.pool_id_hex, set()).add(route.route_id)
 
     def add_routes(self, routes: list[RouteCycle]) -> None:
-        for r in routes:
-            self.add_route(r)
+        with self._lock:
+            for r in routes:
+                self.add_route(r)
 
     def discover_new_arbitrageur_routes(self, from_block: int, to_block: int,
                                          arbitrageur: str = KNOWN_ARBITRAGEUR) -> list[RouteCycle]:
@@ -333,44 +341,90 @@ class RouteRegistry:
         которые уже есть в реестре (route_id совпал), не добавляются
         повторно. Возвращает СПИСОК НОВЫХ маршрутов (для немедленной
         точечной проверки живучести вызывающим кодом -- не всего
-        реестра, это дорого)."""
-        new_pools = seed_pools_from_arbitrageur(from_block, to_block, known_pool_ids=set(self.known_pools.keys()),
+        реестра, это дорого).
+
+        ПРАВКА (живой пилот, фоновый поток): сетевой вызов
+        (seed_pools_from_arbitrageur) и построение циклов -- ВНЕ лока
+        (снимок known_pools делается под локом, но сам RPC/расчёт его
+        не держат) -- не блокирует горячий путь на время сетевого
+        запроса; лок берётся только на короткую мутацию реестра."""
+        with self._lock:
+            known_ids_snapshot = set(self.known_pools.keys())
+            known_pools_snapshot = dict(self.known_pools)
+
+        new_pools = seed_pools_from_arbitrageur(from_block, to_block, known_pool_ids=known_ids_snapshot,
                                                  arbitrageur=arbitrageur)
         if not new_pools:
             return []
-        merged_pools = {**self.known_pools, **new_pools}
+        merged_pools = {**known_pools_snapshot, **new_pools}
         all_cycles = build_cycles_from_pools(merged_pools)
-        new_cycles = [c for c in all_cycles if c.route_id not in self.routes]
-        self.add_routes(new_cycles)
+        with self._lock:
+            new_cycles = [c for c in all_cycles if c.route_id not in self.routes]
+            for c in new_cycles:
+                self.add_route(c)
         return new_cycles
 
     def refresh_liveness_all(self, block_number: int) -> dict[str, dict]:
+        """ПРАВКА (живой пилот, фоновый поток): снимок маршрутов -- под
+        локом (быстро), сами RPC-проверки живучести (check_route_liveness,
+        может быть МЕДЛЕННО -- десятки-сотни маршрутов) -- ВНЕ лока, не
+        блокируют горячий путь на время всей проверки; запись результата
+        каждого маршрута -- снова под локом, коротко."""
+        with self._lock:
+            routes_snapshot = list(self.routes.items())
         results = {}
-        for route_id, route in self.routes.items():
+        for route_id, route in routes_snapshot:
             res = check_route_liveness(route, block_number)
             res["checked_at_block"] = block_number
             res["checked_at_wall"] = time.time()
-            self.liveness[route_id] = res
+            with self._lock:
+                self.liveness[route_id] = res
             results[route_id] = res
         return results
 
     def live_routes(self) -> list[RouteCycle]:
-        return [self.routes[rid] for rid, st in self.liveness.items() if st.get("live")]
+        with self._lock:
+            return [self.routes[rid] for rid, st in self.liveness.items() if st.get("live")]
 
     def routes_touched_by_pool(self, pool_id_hex: str) -> list[RouteCycle]:
-        return [self.routes[rid] for rid in self.pool_to_routes.get(pool_id_hex, set())]
+        with self._lock:
+            return [self.routes[rid] for rid in self.pool_to_routes.get(pool_id_hex, set())]
+
+    def snapshot_pool_ids(self) -> list[str]:
+        """Потокобезопасный снимок отслеживаемых pool_id -- горячий путь
+        читает ЭТО, не итерирует self.pool_to_routes напрямую (тот может
+        мутироваться фоновым потоком обнаружения в это же время)."""
+        with self._lock:
+            return list(self.pool_to_routes.keys())
+
+    def is_live(self, route_id: str) -> bool:
+        with self._lock:
+            return bool(self.liveness.get(route_id, {}).get("live", True))
+
+    def get_route(self, route_id: str) -> RouteCycle | None:
+        with self._lock:
+            return self.routes.get(route_id)
+
+    def set_liveness(self, route_id: str, liveness_result: dict) -> None:
+        """Публичный потокобезопасный сеттер -- фоновый поток
+        (BackgroundRegistryWorker) пишет живучесть НОВООБНАРУЖЕННОГО
+        маршрута сразу после его добавления, без прямого доступа к
+        внутреннему _lock из другого модуля."""
+        with self._lock:
+            self.liveness[route_id] = liveness_result
 
     def to_summary(self) -> dict:
-        return {
-            "n_routes": len(self.routes),
-            "n_live": sum(1 for st in self.liveness.values() if st.get("live")),
-            "routes": [
-                {"route_id": rid, "label": r.label, "source": r.source, "n_legs": len(r.legs),
-                 "pool_ids": r.pool_ids(), "exit_token": r.exit_token,
-                 "liveness": self.liveness.get(rid)}
-                for rid, r in self.routes.items()
-            ],
-        }
+        with self._lock:
+            return {
+                "n_routes": len(self.routes),
+                "n_live": sum(1 for st in self.liveness.values() if st.get("live")),
+                "routes": [
+                    {"route_id": rid, "label": r.label, "source": r.source, "n_legs": len(r.legs),
+                     "pool_ids": r.pool_ids(), "exit_token": r.exit_token,
+                     "liveness": self.liveness.get(rid)}
+                    for rid, r in self.routes.items()
+                ],
+            }
 
 
 ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS = 40_000  # ~1 час на измеренной этой сессией плотности блоков
