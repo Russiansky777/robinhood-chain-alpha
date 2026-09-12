@@ -67,6 +67,20 @@ if result.get("cmd_docker___version_returncode") == 0:
     except Exception as exc:  # noqa: BLE001
         result["docker_solc_0_8_24_error"] = str(exc)
 
+# docker run как bot упал: "permission denied ... docker.sock" -- bot,
+# судя по всему, не в группе docker. Пробуем sudo БЕЗ смены группы
+# (наименее инвазивный путь -- ничего не меняем в системе, просто
+# используем то, что уже разрешено sudoers, если разрешено): `sudo -n`
+# -- сразу проваливается, если нужен пароль, не виснет.
+try:
+    proc = subprocess.run(["sudo", "-n", "docker", "run", "--rm", "ethereum/solc:0.8.24", "--version"],
+                           capture_output=True, text=True, timeout=120)
+    result["sudo_docker_solc_stdout"] = proc.stdout.strip()
+    result["sudo_docker_solc_stderr"] = proc.stderr.strip()[-2000:]
+    result["sudo_docker_solc_returncode"] = proc.returncode
+except Exception as exc:  # noqa: BLE001
+    result["sudo_docker_solc_error"] = str(exc)
+
 print(json.dumps(result, indent=2))
 out_path = Path(__file__).parent.parent / "data" / "task5_v4_diag_platform_result.json"
 out_path.parent.mkdir(parents=True, exist_ok=True)
