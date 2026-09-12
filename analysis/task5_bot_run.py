@@ -133,8 +133,18 @@ def main() -> int:
     print(f"[task5_bot] сеть: {'testnet' if args.testnet else 'mainnet'} (chain_id={chain_id})")
     print(f"[task5_bot] порог входа: ${ENTRY_THRESHOLD_USD}/попытка, допущение по откатам: {ASSUMED_REVERT_RATE:.0%}")
 
-    print("[task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути)...")
-    registry = bootstrap_registry_from_rpc(rpc_url=rpc_url)
+    # Владелец, 2026-09-12: "пока ключа [провайдера] нет -- цены из фида, bootstrap
+    # через RPC только для пулов БЕЗ активности." Реальная находка бэктеста
+    # (2026-09-12): eager-оценка ВСЕХ ~1140 пулов упирается в CU/s free tier
+    # Alchemy (571/1140 в лучшем случае); target-оценка ТОЛЬКО реально
+    # затронутых пулов дала 12/12 (100%). lazy_pricing=True -- тот же принцип
+    # для живого бота: bootstrap делает ТОЛЬКО дешёвый PoolCreated-скан (один
+    # eth_getLogs), цены заполняются по факту первого касания в горячем пути
+    # (см. on_feed_message ниже -- один точечный RPC-запрос на пул при первом
+    # касании, дальше -- пересчёт из calldata, без сети).
+    print("[task5_bot] bootstrap: сканирование PoolCreated через RPC (единственный сетевой вызов ДО горячего пути, "
+          "БЕЗ eager-оценки цен -- см. lazy_pricing)...")
+    registry = bootstrap_registry_from_rpc(rpc_url=rpc_url, lazy_pricing=True)
     print(f"[task5_bot] найдено пулов: {len(registry.by_address)}")
 
     # Предрасчёт маршрутов -- ОДИН РАЗ здесь, до listen() (владелец,
