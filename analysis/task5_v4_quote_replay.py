@@ -50,7 +50,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 # за тем же самым честным пробросом переменной окружения.
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
-from alchemy_fallback import _rpc_call  # noqa: E402
+import requests  # noqa: E402
+
+from alchemy_fallback import _alchemy_direct_endpoint, _BASE_HEADERS, _rpc_call  # noqa: E402
 
 from task5_v4_pool_math import (  # noqa: E402
     PoolKey, decode_quote_result, decode_v4_swap_log_data, pool_id,
@@ -72,12 +74,53 @@ CONTROL_EXPECT_N1_OUTPUT_RAW = 10242566  # заявлено владельцем
 CONTROL_EXPECT_N10_OUTPUT_RAW = 8953460  # 9437184 - 483724
 
 
+def _eth_call_alchemy_direct(to: str, data: str, block_tag: str) -> str | None:
+    """Прямой POST на Alchemy-эндпоинт (в обход публичный-RPC-первого
+    порядка `_rpc_call`), для одного конкретного случая: публичный RPC
+    вернул НЕ-транзиентную JSON-RPC-ошибку (напр. "metadata is not
+    found" -- похоже на отсутствие исторического state за пределами
+    хранимого горизонта), и `_post_with_fallback` по своему
+    задокументированному контракту НЕ идёт дальше к Alchemy для
+    не-транзиентных ошибок (см. alchemy_fallback._post_with_fallback).
+    Для eth_call это разумно попробовать явно -- Alchemy может
+    архивировать глубже, чем публичный RPC. Возвращает None, если
+    Alchemy не настроен или тоже вернул ошибку (вызывающий код решает,
+    что делать -- не глотаем тихо)."""
+    url = _alchemy_direct_endpoint()
+    if not url:
+        return None
+    try:
+        resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
+                                         "params": [{"to": to, "data": data}, block_tag]},
+                             headers=_BASE_HEADERS, timeout=20)
+    except Exception:  # noqa: BLE001
+        return None
+    if resp.status_code != 200:
+        return None
+    body = resp.json()
+    if "error" in body:
+        print(f"[v4_quote_replay] Alchemy напрямую тоже отказал: {body['error']}", file=sys.stderr)
+        return None
+    print("[v4_quote_replay] Alchemy напрямую дал результат там, где публичный RPC отказал", file=sys.stderr)
+    return body.get("result")
+
+
 def quote_exact_input_single(key: PoolKey, zero_for_one: bool, amount_in: int, block_number: int) -> int:
-    """РЕАЛЬНЫЙ eth_call к V4Quoter через наш доверенный RPC-путь
+    """РЕАЛЬНЫЙ eth_call к V4Quoter. Порядок: наш доверенный RPC-путь
     (alchemy_fallback._rpc_call -- публичный RPC первым, Alchemy
-    фолбэком; НЕ домены из приложенного аудита)."""
+    фолбэком по транзиентным ошибкам); если публичный RPC вернул
+    НЕ-транзиентную ошибку (типично для исторических блоков вне его
+    горизонта хранения state), пробуем Alchemy напрямую как отдельную
+    попытку, а не молча сдаёмся. НЕ домены из приложенного аудита."""
     calldata = quote_exact_input_single_calldata(key, zero_for_one, amount_in)
-    raw = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": calldata}, hex(block_number)])
+    block_tag = hex(block_number)
+    try:
+        raw = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": calldata}, block_tag])
+    except RuntimeError as exc:
+        alt = _eth_call_alchemy_direct(V4_QUOTER, calldata, block_tag)
+        if alt is None:
+            raise RuntimeError(f"{exc} (Alchemy напрямую тоже не дал результата)") from exc
+        raw = alt
     amount_out, _gas_estimate = decode_quote_result(raw)
     return amount_out
 
