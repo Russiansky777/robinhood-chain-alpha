@@ -52,6 +52,22 @@ def main() -> int:
 
     bytecode_match = onchain_code.lower() == expected_deployed_bytecode.lower()
 
+    # ЧЕСТНАЯ проверка гипотезы про `immutable owner`: Solidity инлайнит
+    # immutable-переменные прямо в runtime-код на этапе деплоя -- шаблон
+    # (deployedBytecode.txt) содержит PUSH32<32 нулевых байта> в местах
+    # чтения `owner` (getter + обе проверки onlyOwner), деплой заменяет
+    # эти нули на реальный адрес владельца. Если это ЕДИНСТВЕННОЕ отличие --
+    # это ожидаемое поведение компилятора, не расхождение кода.
+    template_body = expected_deployed_bytecode[2:]
+    owner_word = expected_owner[2:].lower().rjust(64, "0")
+    placeholder_pushed = "7f" + "00" * 32
+    n_placeholders = template_body.lower().count(placeholder_pushed)
+    patched_template = template_body.lower().replace(placeholder_pushed, "7f" + owner_word)
+    onchain_body = onchain_code[2:].lower()
+    bytecode_match_after_immutable_substitution = (
+        n_placeholders > 0 and patched_template == onchain_body
+    )
+
     owner_call_result = rpc.eth.call({"to": checksum_addr, "data": OWNER_SELECTOR})
     onchain_owner_raw = owner_call_result.hex()
     # address -- правые 20 байт 32-байтного слова возврата
@@ -66,10 +82,14 @@ def main() -> int:
         "onchain_code_len_bytes": (len(onchain_code) - 2) // 2,
         "expected_code_len_bytes": (len(expected_deployed_bytecode) - 2) // 2,
         "deployed_bytecode_matches_expected": bytecode_match,
+        "n_immutable_owner_placeholders_in_template": n_placeholders,
+        "deployed_bytecode_matches_after_immutable_owner_substitution": bytecode_match_after_immutable_substitution,
         "onchain_owner": onchain_owner,
         "expected_owner": expected_owner,
         "owner_matches_expected": owner_match,
-        "all_checks_passed": bool(bytecode_match and owner_match),
+        "all_checks_passed": bool(
+            (bytecode_match or bytecode_match_after_immutable_substitution) and owner_match
+        ),
     }
     print(json.dumps(result, indent=2))
 
