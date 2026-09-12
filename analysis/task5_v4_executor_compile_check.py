@@ -9,46 +9,55 @@ binaries.soliditylang.org (403 через агент-прокси, провер�
 каналом (workflow_dispatch -> SSH), что и весь остальной анализ в этой
 задаче.
 
-Компилятор: solc 0.8.24 -- та же версия, которой реально скомпилирован
-уже развёрнутый ClosedCycleExecutorV3 (contracts/build/
-ClosedCycleExecutorV3.metadata.json, compiler.version =
-"0.8.24+commit.e11b9ed9") -- не выбрана заново, а взята из уже
-существующего проекта, чтобы оставаться в одной версии со старым
-контрактом. evmVersion="paris" передаётся ЯВНО (не дефолт solc для этой
-версии, который может быть "shanghai" с PUSH0) -- совпадает с
-contracts/build/deploy_params_v4.json, сверенным владельцем локально.
+ПРАВКА 2026-09-13 (реальная находка на живом прогоне, не предположение):
+Ohio VPS -- aarch64 (data/task5_v4_diag_platform_result.json,
+platform_machine="aarch64"), а `solcx.install_solc()` (использовался
+раньше в этом скрипте) тянет ОФИЦИАЛЬНЫЙ бинарь solc с
+binaries.soliditylang.org, который для Linux собирается ТОЛЬКО под
+amd64/x86_64 -- реальный прогон 2026-09-13 упал с `OSError: [Errno 8]
+Exec format error: '/home/bot/.solcx/solc-v0.8.24'` (см. data/
+task5_v4_executor_compile_check_result.json той попытки). Solc через
+solcx-раньше НИКОГДА реально не запускался на Ohio -- существующие
+contracts/build/*.bytecode.txt были скомпилированы ВЛАДЕЛЬЦЕМ локально
+(см. историю deploy_params_v4.json), не этой сессией.
 
-ПРАВКА 2026-09-13: переход с compile_files (combined-json) на
-compile_standard (полный standard-json), чтобы получить
-evm.deployedBytecode.immutableReferences -- РЕАЛЬНЫЕ байтовые позиции
-(start, length) каждой immutable-переменной в задеплоенном байткоде,
-как их знает САМ компилятор, а не как их выводит верификатор
-(task5_verify_deploy_v4.py) угадыванием "любое нулевое 32-байтовое
-слово -- потенциальный плейсхолдер" (внешнее ревью: ненадёжно при 2
-immutable с одинаковым нулевым паттерном). immutableReferences ключ --
-AST id переменной (как строка), не имя -- имя восстанавливается через
-AST (VariableDeclaration.mutability == "immutable"), запрошенный тем же
-вызовом. Результат сохраняется в contracts/build/
-ClosedCycleExecutorV4.immutables.json как {name: {start, length}}."""
+Переход на `forge build` (Foundry, УЖЕ реально установлен и работает на
+этой aarch64 VPS -- v1.8.1, использовался весь этот проект для anvil/
+cast): встроенный в forge менеджер версий solc (svm) реально скачивает
+aarch64-линковки solc (в отличие от официальных бинарей
+binaries.soliditylang.org) -- тот же принцип, по которому anvil/cast уже
+были выбраны вместо голого solc/geth на этой VPS в этой сессии.
+
+Компилятор: solc 0.8.24, evmVersion=paris, optimizer 200 runs -- те же
+параметры, что contracts/build/deploy_params_v4.json (сверено владельцем
+локально для оригинальной версии контракта, ДО этой правки)."""
 from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
-import solcx
-
 REPO_ROOT = Path(__file__).parent.parent
-CONTRACT_PATH = REPO_ROOT / "contracts" / "ClosedCycleExecutorV4.sol"
+CONTRACT_SRC = REPO_ROOT / "contracts" / "ClosedCycleExecutorV4.sol"
 CONTRACT_NAME = "ClosedCycleExecutorV4"
-SOURCE_UNIT_NAME = "ClosedCycleExecutorV4.sol"
+FOUNDRY_BIN = Path.home() / ".foundry" / "bin"
+FORGE = str(FOUNDRY_BIN / "forge")
 SOLC_VERSION = "0.8.24"
 EVM_VERSION = "paris"
+BUILD_ROOT = REPO_ROOT / "contracts" / ".forge_build_tmp"
+
+
+def run(cmd: list[str], cwd: Path | None = None, timeout: int = 600) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True, text=True, timeout=timeout)
 
 
 def _find_immutables(ast_node, found: dict) -> None:
     """Рекурсивный обход AST в поисках VariableDeclaration с
-    mutability == "immutable" -- собирает {ast_id_str: name}."""
+    mutability == "immutable" -- собирает {ast_id_str: name} (см. ниже,
+    зачем нужна эта карта -- immutableReferences ключ это AST id, не
+    имя переменной)."""
     if isinstance(ast_node, dict):
         if ast_node.get("nodeType") == "VariableDeclaration" and ast_node.get("mutability") == "immutable":
             found[str(ast_node["id"])] = ast_node["name"]
@@ -60,63 +69,73 @@ def _find_immutables(ast_node, found: dict) -> None:
 
 
 def main() -> None:
-    result: dict = {"contract_path": str(CONTRACT_PATH), "solc_version": SOLC_VERSION, "evm_version": EVM_VERSION}
+    result: dict = {"contract_path": str(CONTRACT_SRC), "solc_version": SOLC_VERSION, "evm_version": EVM_VERSION,
+                     "compiler_toolchain": "forge build (Foundry svm -- аналог solcx официальных бинарей "
+                                           "не работает на aarch64, см. докстринг)"}
 
-    installed = solcx.get_installed_solc_versions()
-    if not any(str(v) == SOLC_VERSION for v in installed):
-        print(f"[v4_executor_compile_check] устанавливаю solc {SOLC_VERSION}...")
-        solcx.install_solc(SOLC_VERSION)
-    solcx.set_solc_version(SOLC_VERSION)
+    if BUILD_ROOT.exists():
+        shutil.rmtree(BUILD_ROOT)
+    (BUILD_ROOT / "src").mkdir(parents=True)
+    shutil.copy(CONTRACT_SRC, BUILD_ROOT / "src" / CONTRACT_SRC.name)
+    foundry_toml = f"""[profile.default]
+src = "src"
+out = "out"
+libs = []
+solc_version = "{SOLC_VERSION}"
+evm_version = "{EVM_VERSION}"
+optimizer = true
+optimizer_runs = 200
+build_info = true
+extra_output = ["metadata", "ast"]
+"""
+    (BUILD_ROOT / "foundry.toml").write_text(foundry_toml)
 
-    source_text = CONTRACT_PATH.read_text()
-    input_json = {
-        "language": "Solidity",
-        "sources": {SOURCE_UNIT_NAME: {"content": source_text}},
-        "settings": {
-            "optimizer": {"enabled": True, "runs": 200},
-            "evmVersion": EVM_VERSION,
-            "outputSelection": {
-                "*": {
-                    "": ["ast"],
-                    "*": ["abi", "metadata", "evm.bytecode.object", "evm.deployedBytecode.object",
-                          "evm.deployedBytecode.immutableReferences"],
-                }
-            },
-        },
-    }
-
-    try:
-        out = solcx.compile_standard(input_json, solc_version=SOLC_VERSION)
-    except solcx.exceptions.SolcError as exc:
+    print(f"[v4_executor_compile_check] forge build (solc {SOLC_VERSION}, evmVersion={EVM_VERSION})...")
+    proc = run([FORGE, "build", "--root", str(BUILD_ROOT)], timeout=300)
+    result["forge_build_returncode"] = proc.returncode
+    result["forge_build_stdout"] = proc.stdout[-4000:]
+    result["forge_build_stderr"] = proc.stderr[-4000:]
+    if proc.returncode != 0:
         result["ok"] = False
-        result["solc_error"] = str(exc)
-        print(f"[v4_executor_compile_check] ОШИБКА КОМПИЛЯЦИИ:\n{exc}")
+        print(f"[v4_executor_compile_check] ОШИБКА КОМПИЛЯЦИИ (forge build):\n{proc.stdout}\n{proc.stderr}")
         _save(result)
         raise SystemExit(1)
 
-    errors = [e for e in out.get("errors", []) if e.get("severity") == "error"]
-    if errors:
+    artifact_path = BUILD_ROOT / "out" / CONTRACT_SRC.name / f"{CONTRACT_NAME}.json"
+    if not artifact_path.exists():
         result["ok"] = False
-        result["solc_errors"] = errors
-        print(f"[v4_executor_compile_check] ОШИБКА КОМПИЛЯЦИИ:\n{json.dumps(errors, indent=2)}")
+        result["error"] = f"forge build не создал ожидаемый артефакт: {artifact_path}"
+        print(f"[v4_executor_compile_check] {result['error']}")
         _save(result)
         raise SystemExit(1)
-    warnings = [e for e in out.get("errors", []) if e.get("severity") != "error"]
-    for w in warnings:
-        print(f"[v4_executor_compile_check] предупреждение solc: {w.get('formattedMessage', w)}")
+    artifact = json.loads(artifact_path.read_text())
 
-    contract_out = out["contracts"][SOURCE_UNIT_NAME][CONTRACT_NAME]
-    abi = contract_out["abi"]
-    metadata = contract_out.get("metadata", "{}")
-    bytecode = contract_out["evm"]["bytecode"]["object"]
-    deployed = contract_out["evm"]["deployedBytecode"]["object"]
-    immutable_refs_by_id = contract_out["evm"]["deployedBytecode"].get("immutableReferences", {})
+    abi = artifact["abi"]
+    bytecode = artifact["bytecode"]["object"]
+    deployed = artifact["deployedBytecode"]["object"]
+    immutable_refs_by_id = artifact["deployedBytecode"].get("immutableReferences", {})
+    metadata_raw = artifact.get("rawMetadata") or artifact.get("metadata")
+    if isinstance(metadata_raw, dict):
+        metadata_raw = json.dumps(metadata_raw)
 
-    # Имя immutable-переменной по её AST id (immutableReferences ключ --
-    # id, не имя) -- обходим AST того же результата компиляции.
-    ast_root = out["sources"][SOURCE_UNIT_NAME]["ast"]
+    bytecode_hex = bytecode[2:] if bytecode.startswith("0x") else bytecode
+    deployed_hex = deployed[2:] if deployed.startswith("0x") else deployed
+
+    # --- Имя immutable-переменной по AST id -- из build-info (полный
+    # standard-json output, включает "ast"), а не угадано по порядку. ---
     id_to_name: dict[str, str] = {}
-    _find_immutables(ast_root, id_to_name)
+    build_info_dir = BUILD_ROOT / "out" / "build-info"
+    if build_info_dir.exists():
+        for bi_file in build_info_dir.glob("*.json"):
+            bi = json.loads(bi_file.read_text())
+            sources = bi.get("output", {}).get("sources", {})
+            src_entry = sources.get(CONTRACT_SRC.name) or next(iter(sources.values()), None)
+            if src_entry and "ast" in src_entry:
+                _find_immutables(src_entry["ast"], id_to_name)
+    if not id_to_name:
+        print("[v4_executor_compile_check] ПРЕДУПРЕЖДЕНИЕ: не нашёл AST для сопоставления имён immutable "
+              "(build-info отсутствует или не содержит ast) -- immutables останутся ключами по AST id, не именами.",
+              )
 
     immutables_by_name: dict[str, list[dict]] = {}
     for ref_id, refs in immutable_refs_by_id.items():
@@ -124,8 +143,8 @@ def main() -> None:
         immutables_by_name[name] = refs
 
     result["ok"] = True
-    result["bytecode_len_bytes"] = len(bytecode) // 2 if bytecode else 0
-    result["deployed_bytecode_len_bytes"] = len(deployed) // 2 if deployed else 0
+    result["bytecode_len_bytes"] = len(bytecode_hex) // 2
+    result["deployed_bytecode_len_bytes"] = len(deployed_hex) // 2
     result["immutables"] = immutables_by_name
     print(f"[v4_executor_compile_check] {CONTRACT_NAME}: bytecode={result['bytecode_len_bytes']} байт, "
           f"deployed={result['deployed_bytecode_len_bytes']} байт")
@@ -135,17 +154,18 @@ def main() -> None:
     out_dir = REPO_ROOT / "contracts" / "build"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{CONTRACT_NAME}.abi.json").write_text(json.dumps(abi, indent=2))
-    (out_dir / f"{CONTRACT_NAME}.bytecode.txt").write_text(bytecode)
-    (out_dir / f"{CONTRACT_NAME}.deployedBytecode.txt").write_text(deployed)
-    (out_dir / f"{CONTRACT_NAME}.metadata.json").write_text(metadata)
+    (out_dir / f"{CONTRACT_NAME}.bytecode.txt").write_text("0x" + bytecode_hex)
+    (out_dir / f"{CONTRACT_NAME}.deployedBytecode.txt").write_text("0x" + deployed_hex)
+    if metadata_raw:
+        (out_dir / f"{CONTRACT_NAME}.metadata.json").write_text(metadata_raw)
     (out_dir / f"{CONTRACT_NAME}.immutables.json").write_text(json.dumps(immutables_by_name, indent=2))
 
     # --- Хэши для contracts/build/deploy_params_v4.json (владелец,
     # 2026-09-13: "Перекомпилировать, обновить артефакты") -- обновляем
     # ТОЛЬКО хэш-поля и note, остальное (constructor_args, адреса) не
     # трогаем -- это факты о деплое, не о коде. ---
-    source_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
-    creation_bytecode_sha256 = hashlib.sha256(bytes.fromhex(bytecode)).hexdigest()
+    source_sha256 = hashlib.sha256(CONTRACT_SRC.read_bytes()).hexdigest()
+    creation_bytecode_sha256 = hashlib.sha256(bytes.fromhex(bytecode_hex)).hexdigest()
     result["source_sha256"] = source_sha256
     result["creation_bytecode_sha256"] = creation_bytecode_sha256
 
@@ -156,7 +176,7 @@ def main() -> None:
         params["creation_bytecode_sha256"] = creation_bytecode_sha256
         params["note"] = (
             "Перекомпилировано и хэши обновлены ЭТОЙ СЕССИЕЙ на Ohio VPS "
-            "(analysis/task5_v4_executor_compile_check.py, solc 0.8.24, "
+            "(analysis/task5_v4_executor_compile_check.py, forge build -- solc 0.8.24, "
             "optimizer 200, evmVersion paris) после исправления closed-currency "
             "guard + minProfit>0 по внешнему ревью 2026-09-13 -- НЕ прежние "
             "хэши владельца (те относились к версии ДО фикса)."
@@ -166,11 +186,10 @@ def main() -> None:
 
     result_path = REPO_ROOT / "data" / "task5_v4_executor_compile_check_result.json"
     result_path.parent.mkdir(parents=True, exist_ok=True)
-    # ABI/immutables могут быть большими -- в data/ кладём компактную
-    # сводку, полные версии уже сохранены в contracts/build/ отдельно.
     summary = {
         "contract_path": result["contract_path"], "solc_version": SOLC_VERSION, "evm_version": EVM_VERSION,
-        "ok": result["ok"], "bytecode_len_bytes": result["bytecode_len_bytes"],
+        "compiler_toolchain": result["compiler_toolchain"], "ok": result["ok"],
+        "bytecode_len_bytes": result["bytecode_len_bytes"],
         "deployed_bytecode_len_bytes": result["deployed_bytecode_len_bytes"],
         "immutables": immutables_by_name,
         "source_sha256": source_sha256, "creation_bytecode_sha256": creation_bytecode_sha256,
@@ -178,11 +197,14 @@ def main() -> None:
     result_path.write_text(json.dumps(summary, indent=2))
     print(f"[v4_executor_compile_check] сохранено: {result_path}")
 
+    shutil.rmtree(BUILD_ROOT, ignore_errors=True)
+
 
 def _save(result: dict) -> None:
     result_path = REPO_ROOT / "data" / "task5_v4_executor_compile_check_result.json"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(json.dumps(result, indent=2))
+    shutil.rmtree(BUILD_ROOT, ignore_errors=True)
 
 
 if __name__ == "__main__":
