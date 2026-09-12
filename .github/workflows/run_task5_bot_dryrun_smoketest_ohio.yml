@@ -8,6 +8,13 @@ name: "Задача 5, живой бот -- смоук-тест dry-run (без 
 # bootstrap (read-only PoolCreated-скан) + подписка на реальный фид
 # (read-only WS). Использует УЖЕ настроенный venv бота на Ohio (bootstrap
 # -- run_vps_bootstrap_ohio.yml), сначала подтягивает актуальный код.
+#
+# Владелец, 2026-09-12: подключение теперь через СОБСТВЕННЫЙ feed relay
+# (см. run_task5_deploy_feed_relay.yml, scripts/deploy_feed_relay.sh --
+# официальный Offchain Labs Nitro relay, ОДНО постоянное подключение к
+# публичному фиду, локальная раздача на 127.0.0.1:9642), а не напрямую к
+# публичному хосту -- cooldown-гард НЕ применяется (loopback), можно
+# переподключаться без ограничений.
 
 on:
   workflow_dispatch: {}
@@ -60,13 +67,13 @@ jobs:
           ' > /tmp/ntp_status.log 2>&1 || true
           echo "--- NTP status ---"; cat /tmp/ntp_status.log
 
-      - name: "Запустить task5_bot_run.py --duration-seconds 600 (10 минут, ОДНО подключение -- дет + замер задержки чтения по первым сообщениям, БЕЗ --confirm-mainnet -- dry-run, ничего не отправляет)"
+      - name: "Запустить task5_bot_run.py --feed-url ws://127.0.0.1:9642 (через собственный feed relay, БЕЗ ограничений на переподключения -- loopback, не публичный хост) --duration-seconds 600"
         run: |
           ssh $SSH_OPTS ubuntu@3.151.160.108 '
             sudo -u bot bash -c "
               cd /home/bot/robinhood-chain-alpha
               rm -f data/task5_bot_live/attempts.jsonl data/task5_feed_latency_measurement.json
-              ./venv/bin/python analysis/task5_bot_run.py --duration-seconds 600
+              ./venv/bin/python analysis/task5_bot_run.py --feed-url ws://127.0.0.1:9642 --duration-seconds 600
             "
           ' > /tmp/task5_bot_dryrun_stdout.log 2> /tmp/task5_bot_dryrun_stderr.log
           echo "--- stdout ---"; cat /tmp/task5_bot_dryrun_stdout.log
