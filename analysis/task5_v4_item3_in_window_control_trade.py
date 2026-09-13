@@ -102,6 +102,31 @@ PREVIOUSLY_USED_PRE_PILOT_BLOCK = 61630766
 REASON_LOG_FILE = Path("/home/bot/data/task5_v4_pilot_no_send_log.jsonl")
 ATTEMPT_TABLE_FILE = Path("/home/bot/data/task5_v4_pilot_attempts.jsonl")
 
+# ПРАВКА (девятый раунд, разбор владельца, пункт 3 -- по факту зависания
+# прогона на ~601 кандидате): тот же принцип, что владелец уже указал для
+# фазы реплея ("данные Initialize получи ЗАРАНЕЕ... не повторяй широкий
+# запрос через провайдера с известным лимитом 10 блоков"), здесь
+# распространяется на ВЕСЬ скан -- full_fund_flow_check() вызывался для
+# КАЖДОГО из ~601 кандидатов и для КАЖДОГО плеча заново дёргал
+# fetch_initialize_event() (ОДИН широкий eth_getLogs(0, to_block) на
+# вызов, см. её докстринг) -- но один и тот же pool_id РЕАЛЬНО повторяется
+# у одного конкурента много раз (он торгует ограниченным набором пулов).
+# Initialize -- событие ОДНОРАЗОВОЕ (пул инициализируется один раз в своей
+# истории) -- kэшировать РЕЗУЛЬТАТ по pool_id (не по to_block) безопасно и
+# не меняет ничего в итоговых данных, только устраняет ПОВТОРНЫЕ широкие
+# запросы за уже известным pool_id. Это и было реальной причиной, почему
+# прогон 34766908632 не завершился за 30 минут (job timeout) -- отменён,
+# см. коммит.
+_POOL_INIT_CACHE: dict[str, dict | None] = {}
+
+
+def _cached_fetch_initialize(pool_id_hex: str, to_block: int) -> dict | None:
+    if pool_id_hex in _POOL_INIT_CACHE:
+        return _POOL_INIT_CACHE[pool_id_hex]
+    init = fetch_initialize_event(pool_id_hex, to_block)
+    _POOL_INIT_CACHE[pool_id_hex] = init
+    return init
+
 # ПРАВКА (первый реальный прогон): фиксированная верхняя граница
 # (62600000) оказалась ЗА пределами реально существующей на данный
 # момент цепи (get_block вернул None) -- "не удалось получить границы"
@@ -216,7 +241,7 @@ def full_fund_flow_check(tx_hash: str) -> dict:
     for log in sorted(swap_logs, key=lambda l: int(l["logIndex"], 16)):
         pool_id_hex = log["topics"][1]
         decoded = decode_v4_swap_log_data(log["data"])
-        init = fetch_initialize_event(pool_id_hex, int(receipt["blockNumber"], 16))
+        init = _cached_fetch_initialize(pool_id_hex, int(receipt["blockNumber"], 16))
         if init is None:
             legs.append({"pool_id": pool_id_hex, **decoded, "currency0": None, "currency1": None,
                          "note": "Initialize не найден -- пропускаем в net-flow, честно фиксируем"})
@@ -229,10 +254,30 @@ def full_fund_flow_check(tx_hash: str) -> dict:
         legs.append({"pool_id": pool_id_hex, "currency0": c0, "currency1": c1, **decoded})
     result["legs"] = legs
     result["net_trader_flow_by_token_raw"] = net_trader_flow
-    is_cycle = any(v > 0 for v in net_trader_flow.values()) and len(
-        [t for t, v in net_trader_flow.items() if v != 0]) >= 1
-    result["pool_level_profitable_cycle"] = is_cycle
-    result["pool_level_profit_tokens"] = {t: v for t, v in net_trader_flow.items() if v > 0}
+
+    # ПРАВКА (восьмой раунд, разбор владельца, пункт 3): "сначала проверь
+    # потоки ВСЕХ активов: замкнутый цикл, положительный остаток БАЗОВОГО
+    # актива, отсутствие расхода ДРУГИХ собственных токенов. Обмен ETH на
+    # другой токен НЕ называть подтверждённой прибылью." Прежняя проверка
+    # (`any(v>0)`) принимала ЛЮБОЙ токен с положительным нетто -- в том
+    # числе НЕзамкнутые directional-сделки (ETH потрачен, ДРУГОЙ токен
+    # получен, ETH никогда не возвращается) -- ЭТО и произошло в первом
+    # прогоне (0x20a30efd..., ETH -> токен, ложно принято как "цикл").
+    # СТРОГОЕ условие замкнутого цикла: РОВНО один токен имеет ненулевой
+    # чистый поток на уровне Swap-дельт -- он же база/вход/выход цикла --
+    # и он ПОЛОЖИТЕЛЕН (профит); ВСЕ остальные (промежуточные) токены
+    # обязаны полностью раскрутиться до нуля. Если ненулевых токенов
+    # больше одного -- это НЕ доказанный замкнутый цикл (либо
+    # directional-сделка, либо часть средств утеряна/не учтена), какой
+    # бы положительный токен там ни был.
+    nonzero_tokens = {t: v for t, v in net_trader_flow.items() if v != 0}
+    is_closed_cycle = len(nonzero_tokens) == 1 and next(iter(nonzero_tokens.values())) > 0
+    result["nonzero_net_flow_tokens"] = nonzero_tokens
+    result["pool_level_profitable_cycle"] = is_closed_cycle  # имя поля сохранено для совместимости со старым кодом
+    result["pool_level_closed_cycle_valid"] = is_closed_cycle
+    result["pool_level_profit_tokens"] = dict(nonzero_tokens) if is_closed_cycle else {}
+    base_token = next(iter(nonzero_tokens)) if is_closed_cycle else None
+    result["base_token"] = base_token
 
     all_transfers = decode_receipt_transfers_all(receipt)
     result["all_transfers_in_receipt"] = all_transfers
@@ -247,14 +292,33 @@ def full_fund_flow_check(tx_hash: str) -> dict:
                       for addr, toks in net_by_address_token.items()}
     beneficiaries = {a: t for a, t in beneficiaries.items() if t}
     result["positive_net_transfer_addresses"] = beneficiaries
+
+    # "отсутствие расхода ДРУГИХ собственных токенов" -- для исполняющего
+    # адреса (tx.to, если это контракт, иначе tx.from) любые ERC20-
+    # Transfer ВНЕ множества токенов, реально участвующих в Swap-плечах,
+    # означали бы, что эта же tx попутно тронула ДРУГИЕ активы этого
+    # адреса (комиссия в постороннем токене, утечка и т.п.) -- честно
+    # проверяем, а не молчим.
+    swap_leg_tokens = {c for leg in legs for c in (leg.get("currency0"), leg.get("currency1")) if c}
+    executor_addr = result["tx_to"] if result["tx_to"] else result["tx_from"]
+    executor_transfers = net_by_address_token.get(executor_addr, {})
+    other_token_spend = {tok: amt for tok, amt in executor_transfers.items()
+                          if tok not in swap_leg_tokens and amt != 0}
+    result["executor_address_checked"] = executor_addr
+    result["other_token_spend_by_executor"] = other_token_spend
+    no_other_token_spent = len(other_token_spend) == 0
+
+    result["fully_valid_closed_cycle"] = is_closed_cycle and no_other_token_spent
     result["verdict"] = (
-        "прибыльный цикл ПОДТВЕРЖДЁН на уровне самих Swap-дельт пулов (позиция трейдера положительна "
-        f"в токене(ах) {list(result['pool_level_profit_tokens'].keys())}) -- ERC20 Transfer-анализ "
-        f"({len(beneficiaries)} адрес(ов) с положительным чистым переводом) добавлен для полноты, "
-        "НЕ заменяет вывод об отсутствии/наличии Transfer у tx.from единственным критерием"
-        if is_cycle else
-        "Swap-дельты пулов НЕ показывают положительную чистую позицию трейдера ни в одном токене -- "
-        "НЕ арбитраж (или маршрут не является замкнутым циклом одного токена)"
+        (f"ЗАМКНУТЫЙ ЦИКЛ подтверждён: РОВНО один токен ({base_token}) имеет ненулевой чистый поток "
+         f"на уровне Swap-дельт пулов, он положителен ({nonzero_tokens.get(base_token) if base_token else None} "
+         f"raw) -- ВСЕ остальные токены раскрутились до нуля. Посторонних Transfer у исполняющего адреса вне "
+         f"токенов маршрута: {len(other_token_spend)} (ожидание 0)."
+         if is_closed_cycle else
+         f"НЕ доказанный замкнутый цикл: {len(nonzero_tokens)} токен(ов) с ненулевым чистым потоком "
+         f"({list(nonzero_tokens.keys())}) -- либо directional-сделка (напр. ETH -> другой токен, БЕЗ "
+         f"возврата в ETH), либо часть средств не учтена. Обмен одного актива на другой БЕЗ возврата "
+         f"в исходный НЕ считается подтверждённой прибылью.")
     )
     return result
 
@@ -314,22 +378,30 @@ def impersonate_and_send(from_addr: str, to_addr: str | None, data: str, value_h
     return {"returncode": p.returncode, "stdout": p.stdout.strip(), "stderr": p.stderr.strip(), "tx_hash": tx_hash}
 
 
-def _build_route_from_fund_flow_legs(ff_legs: list[dict], target_block: int) -> dict:
+def _build_route_from_fund_flow_legs(ff_legs: list[dict], pool_init_by_id: dict[str, dict]) -> dict:
     """Собираем RouteCycle НАПРЯМУЮ из реальных Swap-логов целевой
-    транзакции (currency0/currency1 -- из full_fund_flow_check, УЖЕ
-    получены через Initialize; fee/tick_spacing/hooks -- честно
-    ДОЗАПРАШИВАЕМ Initialize ещё раз здесь, а НЕ берём runtime-поле
-    "fee" из самого Swap-лога -- это поле отражает ФАКТИЧЕСКИ применённую
-    комиссию, а PoolKey/pool_id используют ЗАРЕГИСТРИРОВАННУЮ комиссию
-    пула, которые могут различаться у динамических пулов)."""
+    транзакции. ПРАВКА (восьмой раунд, разбор владельца, пункт 3):
+    "данные Initialize получи ЗАРАНЕЕ через доступный источник и передай
+    в реплей -- не повторяй широкий запрос через провайдера с известным
+    лимитом 10 блоков". Раньше fetch_initialize_event() вызывался ЗДЕСЬ,
+    ПОСЛЕ патча af.CONFIG на локальный anvil-форк (см. вызывающий код) --
+    широкий eth_getLogs [0, target_block] в один вызов (chunk_size=
+    to_block+1, см. её докстринг) проксировался через форк на апстрим-
+    источник форка, у которого free-tier лимит 10 блоков -- реально
+    воспроизведено ("Excess blob gas not set" -- другая история, здесь
+    же была "Under the Free tier plan... up to a 10 block range").
+    pool_init_by_id -- УЖЕ полученный (на РЕАЛЬНОМ RPC, ДО патча
+    af.CONFIG) словарь pool_id -> Initialize-инфо (currency0/currency1/
+    fee/tick_spacing/hooks) -- никакого повторного запроса здесь."""
     legs = []
     for leg in ff_legs:
         if leg.get("currency0") is None:
             return {"ok": False, "reason": f"Initialize не найден для пула {leg.get('pool_id')} -- "
                                             "маршрут НЕ реконструирован"}
-        init = fetch_initialize_event(leg["pool_id"], target_block)
+        init = pool_init_by_id.get(leg["pool_id"])
         if init is None:
-            return {"ok": False, "reason": f"повторный запрос Initialize для {leg['pool_id']} не удался"}
+            return {"ok": False, "reason": f"Initialize для {leg['pool_id']} не был предзагружен -- "
+                                            "маршрут НЕ реконструирован (честно, без повторного запроса)"}
         zero_for_one = leg["amount0"] > 0  # пул ПОЛУЧИЛ currency0 -- трейдер платил currency0
         legs.append(RouteLeg(init["currency0"], init["currency1"], init["fee"], init["tick_spacing"],
                               init["hooks"], zero_for_one))
@@ -344,7 +416,8 @@ def _build_route_from_fund_flow_legs(ff_legs: list[dict], target_block: int) -> 
     return {"ok": True, "route": route}
 
 
-def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_legs: list[dict]) -> dict:
+def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_legs: list[dict],
+                                       pool_init_by_id: dict[str, dict]) -> dict:
     result: dict = {"target_block": target_block, "target_tx_hash": target_tx_hash}
     block_full = _rpc_call("eth_getBlockByNumber", [hex(target_block), True])
     txs = block_full["transactions"]
@@ -370,15 +443,44 @@ def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_
         result["fork_block"] = target_block - 1
         result["deployer_addr"] = deployer_addr
 
+        # ПРАВКА (восьмой раунд, разбор владельца, пункт 3): "если одна
+        # [предшествующая tx] не воспроизводится -- либо исправь
+        # причину, либо выбери другой пример; не объявляй пропуск
+        # некритичным без доказательства". Первый прогон (0x20a30efd...)
+        # дал 9/10 с ОДНОЙ ошибкой "intrinsic gas too low" -- РЕАЛЬНАЯ,
+        # НАЙДЕННАЯ причина: исторический tx.gas каждой предшествующей
+        # tx мог быть МЕНЬШЕ, чем требуется, если её calldata на
+        # РЕАЛЬНОЙ цепи стоила дешевле газа (сжатие calldata и т.п.) --
+        # для ЦЕЛИ "воссоздать СОСТОЯНИЕ" (не "воспроизвести газовые
+        # метрики") щедрый фиксированный лимит газа НЕ меняет итоговое
+        # состояние (лишний газ просто не тратится) -- используем его
+        # ЗДЕСЬ (для предшествующих tx), но НЕ для самой целевой (там
+        # сохраняем её родной gas -- см. ниже, чтобы честно повторить её
+        # реальное поведение). Если tx ВСЁ РАВНО не проходит даже с
+        # щедрым газом -- это ИНАЯ причина, требующая либо
+        # диагностирования, либо смены примера (см. ok-гейт ниже,
+        # честно останавливает реконструкцию, не проезжает молча).
+        GENEROUS_PRECEDING_GAS = hex(5_000_000)
         replayed = []
         for i in range(tx_index):
             t = txs[i]
             r = impersonate_and_send(t["from"], t.get("to"), t.get("input", "0x"),
-                                      t.get("value", "0x0"), t.get("gas", "0x2dc6c0"))
-            replayed.append({"orig_hash": t["hash"], "from": t["from"], "send_result": r})
+                                      t.get("value", "0x0"), GENEROUS_PRECEDING_GAS)
+            replayed.append({"orig_hash": t["hash"], "from": t["from"], "orig_gas": t.get("gas"),
+                              "replay_gas_used": GENEROUS_PRECEDING_GAS, "send_result": r})
         result["replayed_preceding_txs"] = replayed
-        result["all_preceding_replayed_ok"] = all(
-            r["send_result"]["returncode"] == 0 for r in replayed)
+        failed_preceding = [r for r in replayed if r["send_result"]["returncode"] != 0]
+        result["all_preceding_replayed_ok"] = len(failed_preceding) == 0
+        if failed_preceding:
+            result["ok"] = False
+            result["error"] = (
+                f"{len(failed_preceding)} из {tx_index} предшествующих транзакций НЕ реплеились даже со "
+                f"щедрым фиксированным газом (5,000,000) -- честно ОСТАНАВЛИВАЕМ реконструкцию ЭТОГО "
+                f"кандидата (не проезжаем молча, не объявляем некритичным без доказательства); "
+                f"см. replayed_preceding_txs для точных ошибок: "
+                f"{[(r['orig_hash'], r['send_result']['stderr']) for r in failed_preceding]}"
+            )
+            return result
 
         block_before_target_proc = run([CAST, "block-number", "--rpc-url", RPC], timeout=10)
         local_block_before_target = int(block_before_target_proc.stdout.strip())
@@ -389,7 +491,7 @@ def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_
         af._alchemy_direct_url = None
         af.CONFIG = dataclasses.replace(af.CONFIG, public_rpc_url=RPC, alchemy_rpc_url="", alchemy_api_key="")
 
-        route_build = _build_route_from_fund_flow_legs(ff_legs, target_block)
+        route_build = _build_route_from_fund_flow_legs(ff_legs, pool_init_by_id)
         result["reconstructed_route"] = (
             {"ok": True, "route_id": route_build["route"].route_id,
              "legs": [{"currency0": l.currency0, "currency1": l.currency1, "fee": l.fee,
@@ -554,48 +656,115 @@ def main() -> None:
 
     print(f"[item3] скан Swap-логов конкурента в окне пилота {from_block}..{to_block}...")
     scan_result = competitor_scan(from_block, to_block)
-    result["competitor_scan_summary"] = scan_result["multi_leg_candidates_summary"]
-
-    candidates = scan_result["multi_leg_candidates_full"]
-    result["n_candidates_in_window"] = len(candidates)
-    print(f"[item3] {len(candidates)} многоходовых кандидатов конкурента внутри окна пилота")
+    # ПРАВКА (восьмой раунд): task5_v4_competitor_trade_scan.py кэширует
+    # ПОЛНЫЕ данные плеч только для первых 50 (multi_leg_candidates_full)
+    # -- multi_leg_candidates_summary содержит tx_hash/block ДЛЯ ВСЕХ
+    # (601 в прошлом прогоне), а full_fund_flow_check() НИЖЕ сам заново
+    # получает receipt/Swap-логи по tx_hash -- НЕ зависит от урезанного
+    # кэша, поэтому используем ПОЛНЫЙ список кандидатов, а не только 50.
+    candidates_summary = scan_result["multi_leg_candidates_summary"]
+    result["competitor_scan_summary"] = candidates_summary
+    result["n_candidates_in_window"] = len(candidates_summary)
+    print(f"[item3] {len(candidates_summary)} многоходовых кандидатов конкурента внутри окна пилота")
 
     fund_flow_checks = []
-    chosen = None
-    for c in candidates:
+    valid_candidates = []
+    scan_t0 = time.monotonic()
+    for idx, c in enumerate(candidates_summary):
         ff = full_fund_flow_check(c["tx_hash"])
         ff["block"] = c["block"]
         fund_flow_checks.append(ff)
-        if chosen is None and ff.get("pool_level_profitable_cycle"):
-            chosen = c
-            chosen_ff = ff
+        if (idx + 1) % 25 == 0 or (idx + 1) == len(candidates_summary):
+            elapsed = time.monotonic() - scan_t0
+            print(f"[item3] fund-flow проверено {idx + 1}/{len(candidates_summary)} "
+                  f"(валидных замкнутых циклов пока: {len(valid_candidates)}, "
+                  f"прошло {elapsed:.0f}с, кэш Initialize: {len(_POOL_INIT_CACHE)} pool_id)")
+        # ПРАВКА (восьмой раунд, пункт 3): гейт -- ТОЛЬКО
+        # fully_valid_closed_cycle (замкнутый цикл В БАЗОВОМ токене И
+        # отсутствие расхода посторонних токенов исполняющим адресом),
+        # НЕ прежний слабый pool_level_profitable_cycle (тот принимал
+        # directional ETH->токен как "цикл" -- реально воспроизведено и
+        # исправлено выше в full_fund_flow_check).
+        if ff.get("fully_valid_closed_cycle"):
+            valid_candidates.append((c, ff))
     result["fund_flow_checks"] = fund_flow_checks
+    result["n_fully_valid_closed_cycle_candidates"] = len(valid_candidates)
 
-    if chosen is None:
+    if not valid_candidates:
         result["chosen_control_trade"] = None
         result["ok"] = True
         result["conclusion"] = (
-            "ни один кандидат конкурента внутри окна пилота не подтверждён как прибыльный цикл "
-            "полным разбором движения средств -- честно фиксируем отсутствие подходящего примера, "
-            "а НЕ подставляем первый попавшийся"
+            "ни один кандидат конкурента внутри окна пилота не подтверждён как ПОЛНОСТЬЮ ЗАМКНУТЫЙ "
+            "цикл (строгая проверка: ровно один токен с положительным чистым потоком, отсутствие "
+            "расхода посторонних токенов) -- честно фиксируем отсутствие подходящего примера, а НЕ "
+            "подставляем directional-сделку как 'цикл'"
         )
         print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
         _save(result)
         return
 
-    print(f"[item3] выбран контрольный пример: {chosen['tx_hash']} (блок {chosen['block']})")
-    result["chosen_control_trade"] = {"tx_hash": chosen["tx_hash"], "block": chosen["block"],
-                                       "fund_flow": chosen_ff}
+    # ПРАВКА (восьмой раунд, пункт 3): "если одна предшествующая tx не
+    # воспроизводится -- выбери ДРУГОЙ пример" -- перебираем валидные
+    # (по фондовому потоку) кандидаты В ПОРЯДКЕ БЛОКА, пока форк-
+    # реконструкция (включая реплей ВСЕХ предшествующих tx) не пройдёт
+    # полностью хотя бы для одного.
+    attempts_log = []
+    final_chosen = None
+    final_ff = None
+    final_reconstruction = None
+    for c, ff in valid_candidates:
+        print(f"[item3] пробуем кандидата {c['tx_hash']} (блок {c['block']}) для форк-реконструкции...")
+        # Пункт 3: Initialize ЗАРАНЕЕ, на РЕАЛЬНОМ RPC (ДО патча af.CONFIG
+        # на локальный форк внутри replay_preceding_and_reconstruct) --
+        # НЕ повторяем широкий запрос через провайдер форка (лимит 10 блоков).
+        pool_init_by_id = {}
+        init_ok = True
+        for leg in ff["legs"]:
+            if leg.get("currency0") is None:
+                init_ok = False
+                continue
+            init = _cached_fetch_initialize(leg["pool_id"], c["block"])
+            if init is None:
+                init_ok = False
+                continue
+            pool_init_by_id[leg["pool_id"]] = init
+        if not init_ok:
+            attempts_log.append({"tx_hash": c["tx_hash"], "block": c["block"],
+                                   "skipped_reason": "не удалось предзагрузить Initialize для одного из пулов "
+                                                       "НА РЕАЛЬНОМ RPC -- пробуем следующего кандидата"})
+            continue
 
-    print("[item3] форк-реконструкция состояния непосредственно перед контрольной tx...")
-    result["fork_reconstruction"] = replay_preceding_and_reconstruct(chosen["block"], chosen["tx_hash"],
-                                                                       chosen_ff["legs"])
+        recon = replay_preceding_and_reconstruct(c["block"], c["tx_hash"], ff["legs"], pool_init_by_id)
+        attempts_log.append({"tx_hash": c["tx_hash"], "block": c["block"],
+                               "all_preceding_replayed_ok": recon.get("all_preceding_replayed_ok"),
+                               "reconstruction_ok": recon.get("ok")})
+        if recon.get("all_preceding_replayed_ok") and recon.get("ok"):
+            final_chosen, final_ff, final_reconstruction = c, ff, recon
+            break
+    result["candidate_reconstruction_attempts"] = attempts_log
 
-    pool_ids = [leg["pool_id"] for leg in chosen["legs"]]
-    target_blk = get_block(chosen["block"])
+    if final_chosen is None:
+        result["chosen_control_trade"] = None
+        result["ok"] = True
+        result["conclusion"] = (
+            f"из {len(valid_candidates)} кандидатов с подтверждённым замкнутым циклом НИ ОДИН не прошёл "
+            "полную форк-реконструкцию (все предшествующие транзакции блока реплеятся успешно) -- честно "
+            "фиксируем; см. candidate_reconstruction_attempts для причин по каждому"
+        )
+        print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+        _save(result)
+        return
+
+    print(f"[item3] выбран контрольный пример: {final_chosen['tx_hash']} (блок {final_chosen['block']})")
+    result["chosen_control_trade"] = {"tx_hash": final_chosen["tx_hash"], "block": final_chosen["block"],
+                                       "fund_flow": final_ff}
+    result["fork_reconstruction"] = final_reconstruction
+
+    pool_ids = [leg["pool_id"] for leg in final_ff["legs"]]
+    target_blk = get_block(final_chosen["block"])
     target_ts = int(target_blk["timestamp"], 16) if target_blk else int(time.time())
     print("[item3] сверка с нашими собственными логами (reason_log/attempts)...")
-    result["own_log_cross_reference"] = cross_reference_own_logs(pool_ids, chosen["block"], target_ts)
+    result["own_log_cross_reference"] = cross_reference_own_logs(pool_ids, final_chosen["block"], target_ts)
 
     result["ok"] = True
     print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
