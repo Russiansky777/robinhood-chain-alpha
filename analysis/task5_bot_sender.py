@@ -77,13 +77,18 @@ from web3 import Web3
 CHAIN_ID = 4663
 RPC_URL = os.environ.get("RH_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 SEQUENCER_URL = os.environ.get("RH_SEQUENCER_URL", "https://sequencer.mainnet.chain.robinhood.com")
-# Пункт 6 (третий раунд): отдельный ключ отдельного кошелька пилота --
-# НОВАЯ переменная окружения, ПРИОРИТЕТНАЯ, если задана; иначе -- ПРЕЖНЕЕ
-# поведение (PRIVATE_KEY_NOX) БЕЗ ИЗМЕНЕНИЙ для всех остальных задач,
-# которые её не задают. Ключ отдельного кошелька пилота хранится ТОЛЬКО
-# на Ohio, в файле с ограниченными правами (см.
-# task5_v4_prepare_pilot_wallet.py) -- никогда не в чате/коммитах/логах.
-PRIVATE_KEY = os.environ.get("PRIVATE_KEY_TASK5_V4_PILOT") or os.environ.get("PRIVATE_KEY_NOX", "")
+# ПРАВКА (четвёртый раунд ревью, пункт 1): владелец явно вернул пилот на
+# СУЩЕСТВУЮЩИЙ кошелёк (0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75) и
+# ключ PRIVATE_KEY_NOX -- отдельный кошелёк пилота (третий раунд) для
+# ЭТОГО запуска НЕ финансируется и НЕ используется. Приоритет
+# PRIVATE_KEY_TASK5_V4_PILOT НАД PRIVATE_KEY_NOX -- убран целиком (не
+# просто понижен), чтобы эта переменная, если она осталась заданной ГДЕ-
+# ТО в окружении бота (напр. случайно не выгруженный /etc/bot/env или
+# systemd unit из прошлого раунда), НЕ МОГЛА подменить ключ реальной
+# отправки молча. Файл task5_v4_prepare_pilot_wallet.py и сгенерированный
+# им ключ остаются на диске (не удалены), но НИКАКОЙ код в этом модуле
+# их больше не читает.
+PRIVATE_KEY = os.environ.get("PRIVATE_KEY_NOX", "")
 
 STOP_FILE = Path("/etc/bot/STOP")               # touch этот файл — бот перестаёт отправлять
 # Пункт 6 (внешнее ревью, третий раунд): "отдельные файлы состояния
@@ -251,9 +256,23 @@ class Sender:
 
     # ---------- nonce ----------
 
-    def _resync_nonce(self) -> None:
-        self.state.nonce = self.rpc.eth.get_transaction_count(self.address, "pending")
+    def resync_nonce_to_chain(self, source: str = "pending") -> int:
+        """Пункт 4 (четвёртый раунд ревью): ЯВНАЯ, вызываемая ТОЛЬКО
+        вызывающим кодом (task5_v4_hotpath.py::verify_nonce_consistency),
+        который САМ решил, что резинхронизация БЕЗОПАСНА (нет наших
+        pending-попыток, другие отправители с этого кошелька на время
+        пилота остановлены, ончейн pending/latest СОГЛАСОВАНЫ друг с
+        другом). Сама эта функция ничего не проверяет -- она только
+        читает ончейн-nonce (по умолчанию "pending", т.е. с учётом
+        мемпула) и сохраняет его как новый self.state.nonce. Возвращает
+        новое значение (для логирования вызывающим кодом)."""
+        self.state.nonce = self.rpc.eth.get_transaction_count(self.address, source)
         self.state.save()
+        return self.state.nonce
+
+    def _resync_nonce(self) -> None:
+        """Обратная совместимость (старое имя) -- см. resync_nonce_to_chain."""
+        self.resync_nonce_to_chain("pending")
 
     # ---------- отправка (двухфазно: подготовить -> [бюджет проверяет
     # вызывающий код] -> подписать -> отправить, см. докстринг модуля) ----------

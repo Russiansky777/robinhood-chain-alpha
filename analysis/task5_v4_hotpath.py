@@ -71,16 +71,17 @@ from __future__ import annotations
 
 import argparse
 import fcntl
-import math
 import os
 import sys
 import threading
 import time
+from decimal import ROUND_CEILING, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
+import alchemy_fallback  # noqa: E402
 from alchemy_fallback import _chunked_get_logs, _rpc_call, topic0  # noqa: E402
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
@@ -90,7 +91,7 @@ from task5_v4_pilot_accounting import (  # noqa: E402
 )
 from task5_v4_quote_replay import quote_exact_input_single  # noqa: E402
 from task5_v4_route_registry import (  # noqa: E402
-    RouteCycle, RouteRegistry, USDG, bootstrap_registry, check_route_liveness,
+    RouteCycle, RouteRegistry, USDG, bootstrap_registry, check_route_liveness, save_registry_state,
 )
 
 NATIVE = "0x0000000000000000000000000000000000000000"
@@ -139,6 +140,28 @@ PENDING_TX_RECEIPT_POLL_S = 2.0
 # уступает дорогу, когда видит недавнюю торговую активность.
 TRADING_PRIORITY_WINDOW_S = 2.0
 
+# Пункт 2 (внешнее ревью, четвёртый раунд): "обычный опрос блоков не
+# должен бессрочно запрещать discovery -- у сборщика должна быть
+# гарантированная возможность продвигаться в пределах лимитов RPC".
+# Фон гарантированно получает ход не реже раза в это время, НЕЗАВИСИМО
+# от того, насколько активен торговый путь (см. _RpcPriorityHint).
+# Один eth_blockNumber фона раз в ~5с тривиально укладывается в общий
+# троттлинг (alchemy_fallback._MIN_REQUEST_INTERVAL_S=0.5с) -- нагрузка
+# на провайдера НЕ повышается.
+MAX_BACKGROUND_STARVATION_S = 5.0
+
+# Пункт 2, доп.: "полная проверка живучести не должна занимать фон
+# неделимым проходом на сотни запросов -- обрабатывай небольшими
+# порциями, между которыми возможно обнаружение новых пулов". Раньше
+# refresh_liveness_all() гоняла ВСЕ маршруты (десятки-сотни, до
+# len(route.legs) RPC-вызовов каждый) ОДНИМ неделимым проходом внутри
+# ОДНОЙ итерации фонового цикла -- discover_new_arbitrageur_routes на
+# это время не вызывался вообще. Полный проход теперь разбит на
+# порции по LIVENESS_BATCH_SIZE маршрутов -- discovery проверяется на
+# КАЖДОЙ итерации цикла, независимо от того, идёт ли ещё проход
+# живучести.
+LIVENESS_BATCH_SIZE = 10
+
 # Владелец, доп.: "минимально ненулевой порог на контракте -- НЕ
 # покрытие газа отката, обещать это нельзя" (внешнее ревью, второй
 # раунд, пункт 6). Контракт требует minProfit>0 (см. ClosedCycleExecutorV4.sol,
@@ -158,6 +181,18 @@ MIN_PROFIT_FLOOR_RAW = 1
 # платит profit вообще, откат остаётся расходом общего бюджета пилота.
 MIN_PROFIT_MARGIN_FRACTION = 0.05
 
+# Пункт 6 (внешнее ревью, четвёртый раунд): "ограниченно пересобрать и
+# проверить, либо пропустить кандидата -- не делать бесконечный подбор".
+# Между ДВУМЯ подготовками транзакции (каждая читает СВЕЖИЙ baseFee
+# отдельным RPC-вызовом) комиссия может измениться настолько, что
+# minProfit, закодированный по ПЕРВОЙ подготовке, перестаёт покрывать
+# газ ВТОРОЙ -- реально воспроизведено владельцем (требовалось 788 raw,
+# в calldata осталось 263). Ниже -- ЦИКЛ "подготовить -> сверить
+# закодированный порог с требуемым ПО ЭТОЙ ЖЕ подготовке -> если не
+# сходится, пересобрать ещё раз", ограниченный этим числом
+# ДОПОЛНИТЕЛЬНЫХ кругов сверх первого.
+MAX_MIN_PROFIT_RECONCILE_ROUNDS = 2
+
 # Пункт 2/4 (внешнее ревью, третий раунд): "не превращать неизвестный
 # результат в бесконечное блокирующее ожидание без возможности штатно
 # завершить процесс". Ограниченное, но щедрое (реальная confirmation-
@@ -165,6 +200,19 @@ MIN_PROFIT_MARGIN_FRACTION = 0.05
 # которого решение "результат неизвестен" фиксируется (halt, pending
 # сохраняется) и процесс штатно завершается -- НЕ ждём буквально вечно.
 UNRESOLVED_RECOVERY_TIMEOUT_S = 300.0
+
+# Пункт 8 (внешнее ревью, четвёртый раунд): "убрать исторические ретраи
+# из торгового пути -- внешнее ожидание receipt на 300с не является
+# реальной верхней границей, если ОДИН внутренний RPC-вызов способен
+# ждать до 900с НА КАЖДОМ из нескольких эндпоинтов (в сумме -- до ~45
+# минут на один _rpc_call)". Устанавливается ОДИН раз в _main(), ДО
+# любого RPC-вызова этого процесса (см. alchemy_fallback.
+# set_rate_limit_wait_budget_s) -- модульный глобал МУТИРУЕТСЯ только
+# внутри ЭТОГО процесса, поведение остальных (исторических) задач,
+# запускаемых СВОИМИ отдельными процессами, не меняется НИКАК. Меньше
+# UNRESOLVED_RECOVERY_TIMEOUT_S -- иначе внешний "ограниченный" таймаут
+# сам по себе перестаёт быть реальной верхней границей.
+LIVE_RPC_RETRY_BUDGET_S = 20.0
 
 # CycleExecuted(address exitToken, uint256 profit, uint256 nLegs) --
 # реальное событие ClosedCycleExecutorV4.sol (проверено НЕЗАВИСИМО
@@ -181,11 +229,24 @@ UNRESOLVED_RECOVERY_TIMEOUT_S = 300.0
 CYCLE_EXECUTED_TOPIC0 = topic0("CycleExecuted(address,uint256,uint256)")
 
 
-def parse_cycle_executed_profit(receipt: dict, contract_address: str) -> int | None:
+def parse_cycle_executed_profit(receipt: dict, contract_address: str, expected_exit_token: str | None = None) -> int | None:
     """Ищет CycleExecuted ИМЕННО от contract_address в логах рецепта,
     возвращает поле profit (raw, в единицах exitToken). None, если лог
-    не найден/не распознан -- вызывающий код обязан честно откатиться
-    на baance-diff (с осознанием её слабости после простоя), не молчать."""
+    не найден/не распознан/структура не соответствует ожидаемой --
+    вызывающий код обязан честно откатиться на balance-diff (с
+    осознанием её слабости после простоя), не молчать.
+
+    ПРАВКА (внешнее ревью, четвёртый раунд, пункт 7): "парсер должен
+    проверять адрес контракта, exitToken и корректность структуры
+    события" -- раньше проверялись ТОЛЬКО address+topic0 и БЕРЁТСЯ
+    слово[1] без проверки числа слов/декодирования exitToken. Теперь:
+    ровно ТРИ 32-байтных слова (address exitToken, uint256 profit,
+    uint256 nLegs -- ровно столько нон-индексированных полей в событии,
+    ни больше, ни меньше), верхние 12 байт слова exitToken -- нули (это
+    и есть корректно ABI-закодированный address, не произвольный
+    мусор), и, если expected_exit_token передан -- он ДОЛЖЕН совпасть с
+    декодированным exitToken (иначе это лог совсем другого маршрута/
+    другой попытки, случайно совпавший по topic0 -- не наш профит)."""
     try:
         for log in receipt.get("logs", []):
             if log.get("address", "").lower() != contract_address.lower():
@@ -196,7 +257,16 @@ def parse_cycle_executed_profit(receipt: dict, contract_address: str) -> int | N
             data = log.get("data", "")
             data = data[2:] if data.startswith("0x") else data
             words = [data[i:i + 64] for i in range(0, len(data), 64)]
-            if len(words) < 2:
+            if len(words) != 3:  # address exitToken, uint256 profit, uint256 nLegs -- ровно 3, не "хотя бы 2"
+                continue
+            exit_token_word = words[0]
+            if exit_token_word[:24] != "0" * 24:  # верхние 12 байт address-слова обязаны быть нулевыми
+                continue
+            decoded_exit_token = "0x" + exit_token_word[24:]
+            if expected_exit_token is not None and decoded_exit_token.lower() != expected_exit_token.lower():
+                continue  # лог другого exitToken -- не наша попытка, честно НЕ подставляем чужой profit
+            n_legs = int(words[2], 16)
+            if n_legs not in (2, 3):  # поддерживаемые в этом пилоте длины цикла -- см. build_cycles_from_pools
                 continue
             return int(words[1], 16)
     except Exception:  # noqa: BLE001
@@ -211,25 +281,39 @@ def compute_min_profit_raw(gas_limit: int, max_fee_per_gas_wei: int, exit_token:
     транзакции и небольшого положительного остатка". Худший случай
     стоимости газа -- gas_limit x maxFeePerGas -- ТА ЖЕ величина, что
     используется для резерва бюджета (см. reserve_for_send), не отдельная
-    оценка. Округление ВВЕРХ (math.ceil) -- порог не должен быть
-    заниженным из-за отбрасывания дробной части. НЕ утверждаем, что это
-    компенсирует газ ОТКАТОВ -- revert вообще не платит profit, откат
-    остаётся расходом общего бюджета пилота (PilotBudget.finalize_gas).
-    None, если курс нужен, но недоступен -- честно отказываемся считать
-    порог, не гадаем (вызывающий код должен пропустить кандидата)."""
-    max_gas_cost_wei = gas_limit * max_fee_per_gas_wei
+    оценка. НЕ утверждаем, что это компенсирует газ ОТКАТОВ -- revert
+    вообще не платит profit, откат остаётся расходом общего бюджета
+    пилота (PilotBudget.finalize_gas). None, если курс нужен, но
+    недоступен -- честно отказываемся считать порог, не гадаем
+    (вызывающий код должен пропустить кандидата).
+
+    ПРАВКА (внешнее ревью, четвёртый раунд, пункт 6): "для арифметики
+    wei и округления вверх использовать целые числа; для конвертации
+    курса -- Decimal ... вместо промежуточного float". gas_limit и
+    max_fee_per_gas_wei -- УЖЕ целые (их произведение точное); курс
+    (weth_usdg_price) -- float ТОЛЬКО потому, что так его отдаёт
+    current_weth_usdg_price() (реальная цена из slot0(), сама по себе
+    внутренне float-производная -- отдельная, не решаемая здесь задача),
+    но ЗДЕСЬ он конвертируется в Decimal ЧЕРЕЗ str() (то самое
+    десятичное представление, что и печатается/логируется -- не
+    протаскиваем двоичную неточность float дальше произвольно), и ВСЯ
+    последующая арифметика (включая финальное округление вверх) --
+    Decimal/int, без единого промежуточного float."""
+    max_gas_cost_wei = gas_limit * max_fee_per_gas_wei  # int * int -- точно
+    margin = Decimal(1) + Decimal(str(MIN_PROFIT_MARGIN_FRACTION))
     if exit_token.lower() == USDG.lower():
         # USDG (6 decimals) допущено ==$1 -- тот же честный курс, что
         # везде в проекте (см. _raw_to_usd в task5_v4_pilot_accounting.py).
         if weth_usdg_price is None:
             return None
-        max_gas_cost_usd = (max_gas_cost_wei / 1e18) * weth_usdg_price
-        max_gas_cost_raw = max_gas_cost_usd * 10**USDG_DECIMALS
+        price_dec = Decimal(str(weth_usdg_price))
+        max_gas_cost_raw_dec = (Decimal(max_gas_cost_wei) / (Decimal(10) ** WETH_DECIMALS)) * price_dec * (Decimal(10) ** USDG_DECIMALS)
     else:
         # exit_token == NATIVE -- та же валюта, что и газ (wei ETH),
-        # конвертация курса не нужна.
-        max_gas_cost_raw = float(max_gas_cost_wei)
-    return math.ceil(max_gas_cost_raw * (1.0 + MIN_PROFIT_MARGIN_FRACTION))
+        # конвертация курса не нужна -- ровно целое число wei.
+        max_gas_cost_raw_dec = Decimal(max_gas_cost_wei)
+    threshold_dec = (max_gas_cost_raw_dec * margin).to_integral_value(rounding=ROUND_CEILING)
+    return int(threshold_dec)
 
 # Владелец, доп.: "как остановить бота" -- ТОТ ЖЕ файл-флаг, что уже
 # понимает task5_bot_sender.py::STOP_FILE ("touch этот файл — бот
@@ -407,12 +491,47 @@ def verify_wallet_consistency(contract_address: str, declared_wallet: str, sende
     return contract_owner
 
 
+def _new_send_forbidden_now(budget: PilotBudget) -> str | None:
+    """Пункт 5 (внешнее ревью, четвёртый раунд): ЕДИНАЯ причина, почему
+    новая (или повторная, после краха ДО отправки) отправка СЕЙЧАС
+    запрещена -- используется И при восстановлении ДО сети
+    (_recover_before_broadcast, ДО того как появляется HotPath), И
+    внутри HotPath._gate_blocks_new_send (там же ДОПОЛНИТЕЛЬНО
+    проверяется _no_new_candidates/can_send() -- см. её докстринг).
+    Проверяет STOP-файл НАПРЯМУЮ (не полагается на то, что что-то уже
+    его заметило и защёлкнуло Event) -- это самый дешёвый, всегда
+    актуальный сигнал."""
+    if STOP_FILE_PATH.exists():
+        return "обнаружен STOP-файл"
+    if budget.pilot_completed:
+        return f"пилот уже завершён ({budget.pilot_completed_reason})"
+    if budget.halted:
+        return f"пилот остановлен ({budget.halt_reason})"
+    return None
+
+
 def verify_nonce_consistency(sender, budget: PilotBudget) -> None:
-    """Пункт 1 (внешнее ревью, третий раунд): "Проверять актуальность
-    nonce при старте и объяснять обнаруженные расхождения." Read-only,
-    НЕ резинхронизирует автоматически -- расхождение печатается с
-    возможным честным объяснением, решение -- за владельцем/следующим
-    рестартом после ручного разбора."""
+    """Пункт 1 (третий раунд) + пункт 4 (четвёртый раунд, "довести
+    согласование nonce на старте и при восстановлении"): read-only
+    сравнение локального счётчика с ончейн, и, КОГДА ЭТО БЕЗОПАСНО --
+    ЯВНАЯ резинхронизация (не просто предупреждение, как раньше).
+
+    Резинхронизация выполняется, ТОЛЬКО когда ОБА условия выполнены:
+      1. У НАС нет pending-попытки (resolve_pending_tx_if_any уже
+         отработал ДО этой функции, см. main()) -- расхождение НЕ
+         объясняется нашей же неразрешённой попыткой;
+      2. Ончейн pending-nonce == ончейн latest-nonce -- цепь САМА С
+         СОБОЙ согласована: НЕТ НИКАКОЙ неподтверждённой транзакции с
+         этого адреса в мемпуле (ни нашей -- см. п.1, ни чужой).
+         Владелец подтвердил остановку других отправителей с этого
+         кошелька на время пилота (пункт 1) -- это НЕЗАВИСИМАЯ
+         проверка того же факта по факту состояния цепи, а не просто
+         доверие декларации.
+    Если ончейн pending != latest, А у нас pending нет -- значит
+    неподтверждённая транзакция НЕ наша (другой процесс с этого же
+    кошелька, вопреки требованию его остановить) -- ЭТО И ЕСТЬ
+    "необъяснимое расхождение": halt, НЕ отправляем заведомо
+    некорректную транзакцию, НЕ резинхронизируем вслепую."""
     try:
         info = sender.describe_nonce_state()
     except Exception as exc:  # noqa: BLE001
@@ -424,21 +543,30 @@ def verify_nonce_consistency(sender, budget: PilotBudget) -> None:
           + (f", nonce висящей попытки={pending_nonce}" if pending_nonce is not None else ""))
     if info["matches_pending"] and info["matches_latest"]:
         return
-    if pending_nonce is not None:
-        # Это ОЖИДАЕМОЕ расхождение, пока висящая попытка не разрешена
-        # (resolve_pending_tx_if_any уже отработал ДО этой проверки, см.
-        # main() -- если мы здесь и pending всё ещё есть, значит попытка
-        # намеренно не закрыта, это НЕ повод пугаться отдельно).
+
+    if budget.pending is not None:
+        # Ожидаемое расхождение, пока НАША висящая попытка не разрешена.
         print(f"[hotpath][nonce] расхождение объяснимо: висящая (неразрешённая) попытка держит nonce "
-              f"{pending_nonce}, ончейн ещё не продвинулся дальше -- ожидаемо.")
+              f"{pending_nonce}, ончейн ещё не продвинулся дальше -- ожидаемо, резинхронизация НЕ выполняется.")
         return
-    print(f"[hotpath][nonce][ВНИМАНИЕ] локальный nonce ({info['local_nonce']}) НЕ совпадает с ончейн "
-          f"(pending={info['onchain_nonce_pending']}, latest={info['onchain_nonce_latest']}), pending-попыток НЕТ -- "
-          f"возможные причины: (а) локальный счётчик ОТСТАЛ -- была отправлена транзакция с этого адреса ВНЕ "
-          f"этого процесса; (б) локальный счётчик ОБОГНАЛ -- была подготовлена, но не сохранена/не подтверждена "
-          f"попытка из давнего сбоя, ДО правки третьего раунда ревью (nonce больше не коммитится при простой "
-          f"подписи). НЕ резинхронизируем автоматически -- если это НЕ ожидаемо, разберитесь вручную "
-          f"(файл состояния Sender'а) перед продолжением.")
+
+    if info["onchain_nonce_pending"] != info["onchain_nonce_latest"]:
+        budget.halt(f"nonce: у нас НЕТ pending-попытки, но ончейн pending ({info['onchain_nonce_pending']}) != "
+                    f"latest ({info['onchain_nonce_latest']}) -- на этом адресе есть НЕ НАША неподтверждённая "
+                    f"транзакция (другой отправитель с этого кошелька, возможно, НЕ остановлен -- см. пункт 1) "
+                    f"-- НЕ резинхронизируем и НЕ торгуем, пока это не разъяснится вручную")
+        print(f"[hotpath][nonce][СТОП] {budget.halt_reason}")
+        return
+
+    # Безопасно: у нас нет pending, цепь согласована сама с собой
+    # (pending == latest) -- явная резинхронизация. Реальная причина,
+    # найденная владельцем: деплой с ЭТОГО ЖЕ кошелька тратит nonce ВНЕ
+    # Sender -- локальный счётчик после деплоя отстаёт от ончейн.
+    old_local = info["local_nonce"]
+    new_local = sender.resync_nonce_to_chain("pending")
+    print(f"[hotpath][nonce] РЕЗИНХРОНИЗИРОВАНО: локальный nonce {old_local} -> {new_local} "
+          f"(ончейн pending=latest={info['onchain_nonce_latest']}, pending-попыток нет -- безопасно, "
+          f"напр. могло быть вызвано деплоем с этого же кошелька ВНЕ Sender).")
 
 
 class _SingleInstanceLock:
@@ -478,19 +606,46 @@ class _RpcPriorityHint:
     проверки должны получать приоритет." Не отдельная очередь приоритетов
     внутри самого _throttle (не меняем alchemy_fallback.py второй раз
     без нужды) -- лёгкий, отдельный механизм: фон явно уступает,
-    пропуская СВОЙ такт, если видит недавнюю торговую активность."""
+    пропуская СВОЙ такт, если видит недавнюю торговую активность.
+
+    ПРАВКА (внешнее ревью, четвёртый раунд, пункт 2): "обычный опрос
+    блоков не должен БЕССРОЧНО запрещать discovery -- у сборщика должна
+    быть ГАРАНТИРОВАННАЯ возможность продвигаться". РАНЬШЕ
+    poll_once() (детектор, каждые POLL_INTERVAL_S=0.5с) отмечал
+    ЛЮБОЙ реальный RPC-вызов как "торговую активность" -- при
+    0.5с-опросе против TRADING_PRIORITY_WINDOW_S=2.0с окна фон видел
+    "недавнюю активность" ПОСТОЯННО и уступал НАВСЕГДА (воспроизведено
+    владельцем: 20 отметок раз в 1.5с -> фон уступил 20 из 20). Теперь
+    should_background_yield() ГАРАНТИРУЕТ фону ход не реже, чем раз в
+    MAX_BACKGROUND_STARVATION_S, НЕЗАВИСИМО от торговой активности --
+    один вызов eth_blockNumber фона раз в ~MAX_BACKGROUND_STARVATION_S
+    секунд тривиально укладывается в общий троттлинг провайдера
+    (_MIN_REQUEST_INTERVAL_S=0.5с -- см. alchemy_fallback.py), не
+    "повышает нагрузку сверх лимитов провайдера" (сам троттлинг НЕ
+    меняется)."""
 
     def __init__(self) -> None:
         self._last_trading_rpc_at = 0.0
+        self._last_background_progress_at = time.monotonic()
         self._lock = threading.Lock()
 
     def mark_trading_active(self) -> None:
         with self._lock:
             self._last_trading_rpc_at = time.monotonic()
 
+    def mark_background_progressed(self) -> None:
+        """Фон вызывает ПОСЛЕ того, как реально сделал свой такт работы
+        (не после холостого should_background_yield()==True такта) --
+        сбрасывает таймер гарантии прогресса."""
+        with self._lock:
+            self._last_background_progress_at = time.monotonic()
+
     def should_background_yield(self) -> bool:
         with self._lock:
-            return (time.monotonic() - self._last_trading_rpc_at) < TRADING_PRIORITY_WINDOW_S
+            now = time.monotonic()
+            if now - self._last_background_progress_at >= MAX_BACKGROUND_STARVATION_S:
+                return False  # гарантированное продвижение -- НЕЗАВИСИМО от торговой активности
+            return (now - self._last_trading_rpc_at) < TRADING_PRIORITY_WINDOW_S
 
 
 def _tx_fields_to_storable(tx_fields: dict) -> dict:
@@ -561,6 +716,22 @@ def _recover_before_broadcast(pending: dict, sender, budget: PilotBudget) -> dic
                     f"отсутствие в сети вообще)")
         return None
 
+    # Пункт 5 (четвёртый раунд): "на рестарте после STOP/завершённого
+    # часа разрешено читать receipt и завершать учёт -- автоматическую
+    # повторную отправку РАНЕЕ подготовленной транзакции НЕ выполнять в
+    # обход действующего запрета отправок". Рецепт мы УЖЕ проверили
+    # выше (fetch_real_receipt в начале функции) -- его нет, значит
+    # транзакция ГЕНУИННО ни разу не уходила в сеть. Если запрет
+    # действует ПРЯМО СЕЙЧАС -- не отправляем автоматически, даже если
+    # nonce свободен и мы могли бы это сделать безопасно технически.
+    stop_reason = _new_send_forbidden_now(budget)
+    if stop_reason is not None:
+        budget.halt(f"pending {tx_hash} ни разу не отправлялась (рецепта нет), nonce свободен -- технически "
+                    f"можно было бы безопасно переотправить ТУ ЖЕ транзакцию, но {stop_reason} -- "
+                    f"автоматическая отправка ЗАПРЕЩЕНА (пункт 5: не в обход действующего запрета), pending "
+                    f"СОХРАНЯЕТСЯ, требуется явное решение владельца")
+        return None
+
     # Nonce ещё свободен -- безопасно пересобрать, переподписать (тем же
     # ключом) и СВЕРИТЬ хэш ПЕРЕД повторной отправкой.
     tx_fields = _tx_fields_from_storable(stored_fields)
@@ -620,10 +791,17 @@ def _recover_profit_half(budget: PilotBudget, sender, attempt_table: AttemptTabl
     tx_hash = p.get("tx_hash")
     contract_address = p.get("contract_address")
     exit_token = p.get("exit_token")
+    # Пункт 4 (четвёртый раунд): gas_recorded=True здесь ЗНАЧИТ рецепт
+    # УЖЕ был получен (см. finalize_gas) -- nonce РЕАЛЬНО израсходован
+    # на цепи; подтверждаем его Sender'у ЗДЕСЬ (идемпотентно), на
+    # случай если предыдущий процесс упал ПОСЛЕ finalize_gas, но ДО
+    # того, как успел вызвать confirm_nonce_used сам.
+    if sender is not None and p.get("nonce") is not None:
+        sender.confirm_nonce_used(p["nonce"])
     try:
         if receipt is None:
             receipt = fetch_real_receipt(tx_hash)
-        actual_gain_raw = parse_cycle_executed_profit(receipt, contract_address) if receipt else None
+        actual_gain_raw = parse_cycle_executed_profit(receipt, contract_address, exit_token) if receipt else None
         used_event_log = actual_gain_raw is not None
         if not used_event_log:
             print(f"[hotpath][restart][ВНИМАНИЕ] CycleExecuted не найден/не распознан в рецепте {tx_hash} "
@@ -700,6 +878,16 @@ def resolve_pending_tx_if_any(budget: PilotBudget, sender, attempt_table: Attemp
         print(f"[hotpath][restart] висящая попытка {tx_hash} уже финансово закрыта (finalized=True) с "
               f"прошлого запуска -- дописываю строку попытки (если ещё не записана) и очищаю pending, "
               f"БЕЗ повторного начисления газа/прибыли.")
+        # Пункт 4 (четвёртый раунд): "согласуй nonce во всех ветках с
+        # подтверждённым результатом, включая случай сбоя после
+        # финансового учёта, но до обновления Sender" -- gas_recorded/
+        # finalized уже True здесь ЗНАЧИТ рецепт БЫЛ, nonce РЕАЛЬНО
+        # израсходован; если процесс упал ПОСЛЕ finalize_* но ДО
+        # confirm_nonce_used (тот вызывается ПОЗЖЕ, в самом
+        # _evaluate_and_maybe_send) -- Sender об этом мог не узнать.
+        # confirm_nonce_used идемпотентен -- безопасно вызывать всегда.
+        if sender is not None and p.get("nonce") is not None:
+            sender.confirm_nonce_used(p["nonce"])
         _ensure_pending_row_written(p, attempt_table, budget)
         budget.mark_pending_row_written()
         res = budget.clear_finalized_pending()
@@ -715,6 +903,8 @@ def resolve_pending_tx_if_any(budget: PilotBudget, sender, attempt_table: Attemp
     if p.get("gas_recorded") and p.get("tx_status") == 0:
         print(f"[hotpath][restart] висящая попытка {tx_hash} -- ОТКАТ, газ учтён, но finalized не был "
               f"выставлен (неожиданно) -- закрываю явно как откат, БЕЗ расчёта прибыли.")
+        if sender is not None and p.get("nonce") is not None:
+            sender.confirm_nonce_used(p["nonce"])
         budget.pending["finalized"] = True
         budget._save()
         _ensure_pending_row_written(budget.pending, attempt_table, budget)
@@ -804,16 +994,39 @@ class _CoalescingRouteQueue:
 class BackgroundRegistryWorker(threading.Thread):
     """Отдельный поток: непрерывное обнаружение новых пулов известного
     арбитражника (инкрементально, по новым блокам) + периодическая (раз
-    в минуту) полная проверка живучести ВСЕХ маршрутов. НЕ в горячем
-    пути -- пишет в общий (потокобезопасный, RLock) реестр."""
+    в минуту) проверка живучести ВСЕХ маршрутов, теперь ПОРЦИЯМИ (пункт
+    2, четвёртый раунд -- см. LIVENESS_BATCH_SIZE). НЕ в горячем пути --
+    пишет в общий (потокобезопасный, RLock) реестр."""
 
-    def __init__(self, registry: RouteRegistry, priority_hint: _RpcPriorityHint) -> None:
+    def __init__(self, registry: RouteRegistry, priority_hint: _RpcPriorityHint, start_from_block: int,
+                 state_path: str | None = None) -> None:
+        """start_from_block -- ОБЯЗАТЕЛЬНЫЙ (пункт 3, четвёртый раунд:
+        "фоновый курсор должен продолжать с последнего обработанного
+        bootstrap-блока -- сейчас при первом запуске фона он
+        устанавливается в НОВЫЙ latest, пропуская промежуток длительного
+        bootstrap"). Раньше self._last_checked_block инициализировался
+        None и на ПЕРВОЙ итерации ЭТОГО потока (которая может произойти
+        через десятки секунд-минуты ПОСЛЕ того, как bootstrap_registry()
+        уже просканировал блоки ДО СВОЕГО latest) устанавливался в
+        latest НА ТОТ МОМЕНТ -- блоки МЕЖДУ concом bootstrap и первым
+        реальным тактом фона никогда никем не сканировались. Теперь
+        вызывающий код (main()) передаёт СЮДА тот самый latest, на
+        котором bootstrap_registry() закончил работу -- разрыва нет
+        независимо от того, сколько фон "спал" перед первым тактом."""
         super().__init__(name="registry-discovery-liveness", daemon=True)
         self.registry = registry
         self.priority_hint = priority_hint
         self._stop_event = threading.Event()
-        self._last_checked_block: int | None = None
+        self._last_checked_block: int = start_from_block
         self._last_liveness_refresh_wall = time.monotonic()  # первая полная проверка уже была в bootstrap_registry()
+        # Порционный проход живучести -- None, когда проход не идёт.
+        self._liveness_pass_route_ids: list[str] | None = None
+        self._liveness_pass_cursor = 0
+        # Пункт 3 (четвёртый раунд): периодически сохраняем реестр +
+        # курсор (не на КАЖДЫЙ такт -- ограничено по времени, чтобы не
+        # превратиться в "большой сканер"/лишнюю нагрузку на диск).
+        self.state_path = state_path
+        self._last_state_save_wall = 0.0
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -822,33 +1035,67 @@ class BackgroundRegistryWorker(threading.Thread):
         while not self._stop_event.is_set():
             if self.priority_hint.should_background_yield():
                 # Торговый путь только что делал реальный RPC-запрос --
-                # уступаем дорогу (владелец, доп.: "торговые проверки
-                # должны получать приоритет" при общем троттле).
+                # уступаем дорогу, НО НЕ БЕССРОЧНО (см. докстринг
+                # _RpcPriorityHint/MAX_BACKGROUND_STARVATION_S).
                 self._stop_event.wait(DISCOVERY_POLL_INTERVAL_S)
                 continue
             try:
                 latest = int(_rpc_call("eth_blockNumber", []), 16)
-                if self._last_checked_block is None:
-                    self._last_checked_block = latest
-                elif latest > self._last_checked_block:
+                if latest > self._last_checked_block:
                     from_block = self._last_checked_block + 1
                     new_routes = self.registry.discover_new_arbitrageur_routes(from_block, latest)
                     for route in new_routes:
                         res = check_route_liveness(route, latest)
                         res["checked_at_block"] = latest
                         res["checked_at_wall"] = time.time()
-                        self.registry.set_liveness(route.route_id, res)
+                        if res.get("live") is not None:  # None -- RPC-ошибка, не путать с "не живой" (пункт 3)
+                            self.registry.set_liveness(route.route_id, res)
                         print(f"[registry-worker] новый маршрут от арбитражника (без перезапуска): "
-                              f"{route.label} live={res['live']}")
+                              f"{route.label} live={res.get('live')} ({res.get('error_kind') or 'ok'})")
                     self._last_checked_block = latest
+                    self.priority_hint.mark_background_progressed()
 
                 now = time.monotonic()
-                if now - self._last_liveness_refresh_wall >= LIVENESS_REFRESH_INTERVAL_S:
-                    results = self.registry.refresh_liveness_all(latest)
-                    n_live = sum(1 for r in results.values() if r.get("live"))
-                    print(f"[registry-worker] полная проверка живучести: {n_live}/{len(results)} живых "
-                          f"(блок {latest})")
-                    self._last_liveness_refresh_wall = now
+                # Пункт 2: "обрабатывай небольшими порциями, между
+                # которыми возможно обнаружение новых пулов" -- НАЧАТЬ
+                # новый проход, только если предыдущий уже завершён (не
+                # идёт) И интервал истёк; ПРОДВИНУТЬ текущий проход (если
+                # идёт) -- на КАЖДОЙ итерации, независимо от интервала.
+                # discover_new_arbitrageur_routes выше уже отработал
+                # ДО этого -- т.е. discovery ГАРАНТИРОВАННО не блокируется
+                # проходом живучести, даже если тот занимает много тактов.
+                if self._liveness_pass_route_ids is None and now - self._last_liveness_refresh_wall >= LIVENESS_REFRESH_INTERVAL_S:
+                    with self.registry._lock:
+                        self._liveness_pass_route_ids = list(self.registry.routes.keys())
+                    self._liveness_pass_cursor = 0
+                    print(f"[registry-worker] начинаю порционную проверку живучести "
+                          f"({len(self._liveness_pass_route_ids)} маршрутов, по {LIVENESS_BATCH_SIZE} за такт)...")
+
+                if self._liveness_pass_route_ids is not None:
+                    batch = self._liveness_pass_route_ids[
+                        self._liveness_pass_cursor:self._liveness_pass_cursor + LIVENESS_BATCH_SIZE]
+                    if batch:
+                        self.registry.refresh_liveness_batch(latest, batch)
+                        self._liveness_pass_cursor += len(batch)
+                        self.priority_hint.mark_background_progressed()
+                    if self._liveness_pass_cursor >= len(self._liveness_pass_route_ids):
+                        n_live = sum(1 for rid in self._liveness_pass_route_ids if self.registry.is_live(rid))
+                        print(f"[registry-worker] порционная проверка живучести завершена: "
+                              f"{n_live}/{len(self._liveness_pass_route_ids)} живых (последний блок {latest})")
+                        self._liveness_pass_route_ids = None
+                        self._last_liveness_refresh_wall = now
+
+                # Пункт 3: периодическая персистентность (не на КАЖДЫЙ
+                # такт) -- следующий рестарт сможет догнать инкрементально
+                # от cursor_block=self._last_checked_block, а не заново
+                # полным lookback-сканом.
+                if self.state_path and (time.monotonic() - self._last_state_save_wall >= 30.0):
+                    try:
+                        save_registry_state(self.registry, self._last_checked_block, self.state_path)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"[registry-worker] не удалось сохранить состояние реестра (не критично): {exc}",
+                              file=sys.stderr)
+                    self._last_state_save_wall = time.monotonic()
             except Exception as exc:  # noqa: BLE001
                 print(f"[registry-worker] ошибка фона (честно, не молчим): {exc}", file=sys.stderr)
             self._stop_event.wait(DISCOVERY_POLL_INTERVAL_S)
@@ -884,8 +1131,23 @@ class HotPath:
         до конца естественным образом."""
         self._no_new_candidates.set()
 
-    def is_idle(self) -> bool:
-        return not self.busy and self.budget.pending is None
+    def evaluator_finished_current_work(self) -> bool:
+        """Пункт 5 (внешнее ревью, четвёртый раунд): ЧЕСТНО означает
+        ТОЛЬКО "поток-оценщик закончил текущую единицу работы" (не
+        занят прямо сейчас) -- И НИЧЕГО про то, разрешилась ли pending-
+        попытка. РАНЬШЕ этот метод (тогда назывался is_idle) требовал
+        ЕЩЁ и self.budget.pending is None -- если после ограниченного
+        ожидания рецепта попытка остаётся ГЕНУИННО неизвестной (halt,
+        pending СОХРАНЁН -- намеренно, см. wait_for_receipt_bounded),
+        self.busy становится False, НО pending остаётся НЕ-None
+        НАВСЕГДА (ничто больше его не тронет -- новые кандидаты не
+        берутся) -- старое условие НИКОГДА не становилось True, главный
+        цикл бесконечно печатал "жду завершения" (реально
+        воспроизведено владельцем). "Поток закончил работу" и
+        "результат транзакции известен" -- РАЗНЫЕ вопросы (см. main()::
+        решение "неизвестный результат" -- отдельная, явная терминальная
+        ветка завершения пилота, не блокирующее ожидание)."""
+        return not self.busy
 
     def _gate_blocks_new_send(self) -> str | None:
         """Пункт 4 (внешнее ревью, третий раунд): "остановка обязана
@@ -897,6 +1159,13 @@ class HotPath:
         разрешена; иначе -- причина (не отправляем, кандидат пропущен)."""
         if self._no_new_candidates.is_set():
             return "остановка запрошена (истёк --duration-seconds или обнаружен STOP-файл) во время расчёта этого кандидата"
+        # _new_send_forbidden_now проверяет STOP-файл НАПРЯМУЮ (не
+        # только через уже защёлкнутый _no_new_candidates) -- страхует
+        # от гонки "файл появился, а главный цикл ещё не успел дойти до
+        # своей следующей проверки и вызвать request_stop_new_candidates".
+        forbidden = _new_send_forbidden_now(self.budget)
+        if forbidden is not None:
+            return forbidden
         can_send, why = self.budget.can_send()
         if not can_send:
             return why
@@ -949,9 +1218,34 @@ class HotPath:
             if route is None:
                 continue
             if not self.registry.is_live(route_id):
-                self.reason_log.log(route_id, route.label, REASON_NO_LIQUIDITY,
-                                     "маршрут временно исключён (последняя проверка живучести)")
-                continue
+                # Пункт 3 (внешнее ревью, четвёртый раунд): "исключённый
+                # маршрут перепроверять при изменениях его пулов" -- этот
+                # самый сигнал (block_number/recv_t_monotonic из очереди)
+                # ЗНАЧИТ, что один из пулов маршрута ТОЛЬКО ЧТО тронулся
+                # (см. poll_once -> _queue.mark) -- РЕАЛЬНАЯ причина
+                # перепроверить СЕЙЧАС, а не ждать до минутного батча
+                # фона. RPC-ошибку (error_kind == "rpc") ОТЛИЧАЕМ от
+                # подтверждённого отсутствия ликвидности -- инконклюзивный
+                # результат НЕ обновляет статус и НЕ считается "снова не
+                # живой", маршрут остаётся с прежним статусом.
+                recheck = check_route_liveness(route, block_number)
+                if recheck.get("live") is not None:
+                    recheck["checked_at_block"] = block_number
+                    recheck["checked_at_wall"] = time.time()
+                    self.registry.set_liveness(route_id, recheck)
+                if recheck.get("live") is True:
+                    print(f"[hotpath] маршрут {route.label} ОЖИЛ по свежему сигналу -- оцениваю немедленно.")
+                elif recheck.get("live") is False:
+                    self.reason_log.log(route_id, route.label, REASON_NO_LIQUIDITY,
+                                         f"маршрут исключён, перепроверка ПО СВЕЖЕМУ сигналу (не по расписанию) "
+                                         f"подтвердила: {recheck.get('error')}")
+                    continue
+                else:  # None -- RPC/транспортная ошибка, НЕ подтверждённое отсутствие ликвидности
+                    self.reason_log.log(route_id, route.label, REASON_CALC_ERROR,
+                                         f"проверка живучести по свежему сигналу не удалась (RPC): "
+                                         f"{recheck.get('error')} -- статус маршрута НЕ изменён, пропускаю "
+                                         f"этот сигнал")
+                    continue
             self.busy = True
             try:
                 self._evaluate_and_maybe_send(route, block_number, recv_t_monotonic)
@@ -1033,9 +1327,18 @@ class HotPath:
         # цепочка котировок (quote_route_at_size), НЕ вся сетка заново
         # (внешнее ревью, второй раунд, пункт 6). Если уже не подходит
         # -- пропускаем этот кандидат целиком, следующий сигнал придёт
-        # своим чередом из очереди (не ищем альтернативный размер здесь). ---
+        # своим чередом из очереди (не ищем альтернативный размер здесь).
+        #
+        # ПРАВКА (четвёртый раунд, пункт 9): block_number (исходный блок
+        # ДЕТЕКЦИИ) НЕ подменяется здесь -- свежий блок ре-котировки
+        # хранится ОТДЕЛЬНО (final_quote_block). Иначе computed_at_block
+        # "молодел" бы до fresh_latest, а state_age_blocks, посчитанный
+        # ДО подмены, продолжал бы отражать УЖЕ неактуальный (более
+        # старый) разрыв -- ровно найденная владельцем нестыковка полей.
+        # Согласованный state_age_blocks пересчитывается ЕЩЁ РАЗ, прямо
+        # перед begin_attempt (см. ниже), относительно final_quote_block. ---
         fresh_latest = int(_rpc_call("eth_blockNumber", []), 16)
-        state_age_blocks = max(0, fresh_latest - block_number)
+        final_quote_block = block_number
         final_amount_in = recompute["amount_in"]
         final_profit_raw = recompute["profit_raw"]
         if fresh_latest > block_number:
@@ -1043,14 +1346,14 @@ class HotPath:
             if not final_quote["ok"] or final_quote["profit_raw"] <= 0:
                 self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
                                      f"финальная проверка размера {final_amount_in} на блоке {fresh_latest} "
-                                     f"(решение было на {block_number}, возраст {state_age_blocks} блоков) -- "
-                                     f"уже не подходит, пропускаем кандидата")
+                                     f"(решение было на {block_number}, возраст {fresh_latest - block_number} "
+                                     f"блоков) -- уже не подходит, пропускаем кандидата")
                 return
             final_profit_raw = final_quote["profit_raw"]
-            block_number = fresh_latest
-            # calldata НЕ меняется -- amount_in/minProfit/маршрут те же,
-            # calldata не зависит от состояния блока; пересчитываем
-            # только оценку газа (могла измениться) и итоговый профит.
+            final_quote_block = fresh_latest
+            # calldata (кроме minProfit, согласуемого ниже) НЕ меняется --
+            # amount_in/маршрут те же; пересчитываем только оценку газа
+            # (могла измениться) и итоговый профит НА СВЕЖЕМ блоке.
             gas_res = estimate_gas(self.contract_address, calldata, self.from_address)
             if not gas_res["ok"]:
                 self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res["error"])
@@ -1076,7 +1379,7 @@ class HotPath:
         gate_reason = self._gate_blocks_new_send()
         if gate_reason is not None:
             self.reason_log.log(route.route_id, route.label, gate_reason,
-                                 "единый гейт отправки сработал ПОСЛЕ расчёта, ДО отправки (пункт 4)")
+                                 "единый гейт отправки сработал ПОСЛЕ расчёта, ДО подготовки к отправке (пункт 4)")
             return
 
         # --- Пункт 1 (третий раунд): ВСЕ предварительные RPC-чтения
@@ -1086,49 +1389,56 @@ class HotPath:
         route_tokens = sorted({leg.currency0.lower() for leg in route.legs} | {leg.currency1.lower() for leg in route.legs})
         pre_balances = {t: _token_balance(t, self.contract_address) for t in route_tokens}
 
-        # --- Подготовка (СЕМЯ: calldata/gas_res выше уже посчитаны с
-        # MIN_PROFIT_FLOOR_RAW -- см. докстринг константы). ---
-        try:
-            tx_fields_seed = self.sender.prepare_transaction_fields(self.contract_address, calldata,
-                                                                      gas_res["gas_estimate"])
-        except RuntimeError as exc:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                 f"prepare_transaction_fields (семя) отказал: {exc}")
-            return
-
-        # --- Пункт 5 (третий раунд): СОГЛАСОВАННЫЙ minProfit -- из
-        # стоимости газа ИМЕННО этой (семенной) подготовленной
-        # транзакции + небольшой запас (compute_min_profit_raw).
-        # Пересобираем calldata с НИМ и делаем РОВНО ОДИН дополнительный
-        # круг оценки газа/подготовки -- ограниченная последовательность
-        # (не бесконечный пересчёт), после которой газ-оценка и резерв
-        # СОГЛАСОВАНЫ с фактически отправляемой транзакцией. ---
-        reconciled_min_profit = compute_min_profit_raw(tx_fields_seed["gas"], tx_fields_seed["maxFeePerGas"],
-                                                         route.exit_token, weth_usdg_price)
-        if reconciled_min_profit is None:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                 "не удалось согласовать minProfit со стоимостью газа (курс WETH/USDG "
-                                 "недоступен) -- честно пропускаем кандидата, не гадаем")
-            return
-
-        calldata_final = build_execute_cycle_calldata(route, first_amount_specified, min_profit=reconciled_min_profit)
-        gas_res_final = estimate_gas(self.contract_address, calldata_final, self.from_address)
-        if not gas_res_final["ok"]:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res_final["error"])
-            return
-        try:
-            tx_fields = self.sender.prepare_transaction_fields(self.contract_address, calldata_final,
-                                                                 gas_res_final["gas_estimate"])
-        except RuntimeError as exc:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                 f"prepare_transaction_fields (согласованная) отказал: {exc}")
-            return
+        # --- Пункт 5/6 (третий/четвёртый раунд): СОГЛАСОВАННЫЙ minProfit
+        # -- цикл "подготовить -> сверить закодированный порог с
+        # требуемым ПО ЭТОЙ ЖЕ подготовленной транзакции -> при
+        # несовпадении пересобрать" (см. докстринг
+        # MAX_MIN_PROFIT_RECONCILE_ROUNDS про то, ПОЧЕМУ одного круга
+        # недостаточно -- комиссия может измениться МЕЖДУ двумя
+        # чтениями baseFee). Ограниченная последовательность -- НЕ
+        # бесконечный подбор: после MAX_MIN_PROFIT_RECONCILE_ROUNDS
+        # дополнительных кругов без совпадения -- честно пропускаем
+        # кандидата. ---
+        calldata_final = calldata  # семя (MIN_PROFIT_FLOOR_RAW=1) -- заведомо не пройдёт первую же сверку, запустит круг 0
+        encoded_min_profit = MIN_PROFIT_FLOOR_RAW
+        tx_fields: dict | None = None
+        gas_res_final: dict | None = None
+        for round_i in range(MAX_MIN_PROFIT_RECONCILE_ROUNDS + 1):
+            gas_res_final = estimate_gas(self.contract_address, calldata_final, self.from_address)
+            if not gas_res_final["ok"]:
+                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res_final["error"])
+                return
+            try:
+                tx_fields = self.sender.prepare_transaction_fields(self.contract_address, calldata_final,
+                                                                     gas_res_final["gas_estimate"])
+            except RuntimeError as exc:
+                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
+                                     f"prepare_transaction_fields (круг {round_i}) отказал: {exc}")
+                return
+            required_min_profit = compute_min_profit_raw(tx_fields["gas"], tx_fields["maxFeePerGas"],
+                                                           route.exit_token, weth_usdg_price)
+            if required_min_profit is None:
+                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
+                                     "не удалось согласовать minProfit со стоимостью газа (курс WETH/USDG "
+                                     "недоступен) -- честно пропускаем кандидата, не гадаем")
+                return
+            if encoded_min_profit >= required_min_profit:
+                break  # закодированный порог УЖЕ покрывает требуемый ПО ЭТОЙ ЖЕ подготовленной транзакции
+            if round_i == MAX_MIN_PROFIT_RECONCILE_ROUNDS:
+                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
+                                     f"minProfit не удалось согласовать за {MAX_MIN_PROFIT_RECONCILE_ROUNDS} "
+                                     f"доп. круга (закодировано {encoded_min_profit} raw, требуется "
+                                     f"{required_min_profit} raw) -- комиссия колеблется быстрее, чем успеваем "
+                                     f"пересобрать, пропускаем кандидата (ограниченный, не бесконечный подбор)")
+                return
+            calldata_final = build_execute_cycle_calldata(route, first_amount_specified, min_profit=required_min_profit)
+            encoded_min_profit = required_min_profit
 
         # Консервативная проверка ПОСЛЕ согласования (пункт 5: "избегать
         # бесконечного перебора... консервативная проверка") -- худший
-        # случай стоимости газа (maxFeePerGas), та же величина, что идёт
-        # в резерв. НЕ утверждаем, что порог покрывает газ ИМЕННО
-        # ОТКАТА -- revert profit не платит вообще.
+        # случай стоимости газа (maxFeePerGas) ИТОГОВОЙ (после цикла)
+        # подготовленной транзакции. НЕ утверждаем, что порог покрывает
+        # газ ИМЕННО ОТКАТА -- revert profit не платит вообще.
         profit_after_gas_final, err_final = _profit_after_gas(final_profit_raw, gas_res_final["gas_estimate"],
                                                                 tx_fields["maxFeePerGas"], weth_usdg_price)
         if profit_after_gas_final is None:
@@ -1136,7 +1446,7 @@ class HotPath:
             return
         if profit_after_gas_final <= 0:
             self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"после согласования minProfit с газом ({reconciled_min_profit} raw) профит "
+                                 f"после согласования minProfit с газом ({encoded_min_profit} raw) профит "
                                  f"после газа {profit_after_gas_final:.6f} <= 0 -- не отправляем")
             return
         profit_after_gas = profit_after_gas_final
@@ -1149,7 +1459,15 @@ class HotPath:
 
         prepared = self.sender.sign_prepared_transaction(tx_fields)  # tx_hash ЛОКАЛЬНО, ДО сети; nonce НЕ продвигается (см. sender.py, пункт 1)
 
-        latency_s = time.monotonic() - recv_t_monotonic
+        # Пункт 9 (четвёртый раунд): "записывать согласованные значения"
+        # -- пересчитываем state_age_blocks ЗДЕСЬ, ЕЩЁ РАЗ, относительно
+        # final_quote_block (а не старого fresh_latest выше) -- честная
+        # мера "насколько устарел computed_at_block ПРЯМО СЕЙЧАС, в
+        # момент коммита попытки", без двойного смысла одного поля.
+        commit_latest = int(_rpc_call("eth_blockNumber", []), 16)
+        state_age_blocks = max(0, commit_latest - final_quote_block)
+
+        latency_recv_to_commit_s = time.monotonic() - recv_t_monotonic
         # "Сохранить... данные попытки до первого сетевого обращения" --
         # begin_attempt ПЕРЕД submit_prepared. tx_fields_for_recovery
         # (пункт 2, третий раунд): НЕподписанные поля в сериализуемой
@@ -1158,17 +1476,62 @@ class HotPath:
         # eth_account/RFC6979) и сверить хэш побайтово при восстановлении
         # после краха ДО отправки, без хранения на диске готовой к
         # немедленной отправке подписи (см. _recover_before_broadcast).
+        # latency_recv_to_send_s ЗДЕСЬ -- ТОЛЬКО оценка на момент коммита
+        # (для восстановления после краха ДО отправки); честная,
+        # ИЗМЕРЕННАЯ В МОМЕНТ ФАКТИЧЕСКОЙ ОТПРАВКИ величина считается
+        # НИЖЕ (пункт 9: "время до отправки -- от фактической передачи
+        # транзакции Sender'ом") и используется в ИТОГОВОЙ строке.
         self.budget.begin_attempt({
             **prepared.to_context(),
             "route_id": route.route_id, "route_label": route.label, "exit_token": route.exit_token,
             "size_in_raw": final_amount_in, "expected_profit_after_gas": profit_after_gas,
-            "latency_recv_to_send_s": latency_s, "computed_at_block": block_number,
+            "latency_recv_to_send_s": latency_recv_to_commit_s, "computed_at_block": final_quote_block,
             "state_age_blocks": state_age_blocks, "contract_address": self.contract_address,
             "route_tokens": route_tokens, "pre_balances": pre_balances,
             "reserved_price_used": weth_usdg_price,
             "tx_fields_for_recovery": _tx_fields_to_storable(tx_fields),
         })
 
+        # --- Пункт 5 (четвёртый раунд): "проверять стоп непосредственно
+        # перед отправкой -- если ещё не отправили, не отправлять после
+        # остановки". Между гейтом выше и ЭТОЙ строкой прошли ещё RPC-
+        # обращения (предчтения баланса, согласование minProfit,
+        # резерв, подпись, begin_attempt) -- STOP/дедлайн МОГЛИ наступить
+        # ИМЕННО в этом окне (воспроизведено владельцем: STOP выставлен
+        # при чтении баланса, submit_prepared всё равно вызывался). Мы
+        # ТОЧНО знаем, что submit_prepared ЕЩЁ НЕ вызывался -- ничего не
+        # уходило в сеть -- поэтому НЕ гадаем и не пытаемся определить
+        # состояние: просто НЕ отправляем, halt, pending СОХРАНЁН (без
+        # gas_recorded) для следующего запуска (resolve_pending_tx_if_any,
+        # ветка D, которая САМА откажется автоматически переотправлять
+        # ТУ ЖЕ транзакцию, пока действует запрет -- см. её докстринг). ---
+        # ВАЖНО: НЕ переиспользуем _gate_blocks_new_send() целиком здесь
+        # -- та включает budget.can_send(), а can_send() блокирует по
+        # "уже есть неподтверждённая транзакция", ЧТО ИМЕННО ТОЛЬКО ЧТО
+        # СТАЛО ИСТИНОЙ строкой begin_attempt() выше (наша ЖЕ попытка) --
+        # такой гейт срабатывал бы ВСЕГДА и блокировал КАЖДУЮ реальную
+        # отправку. Здесь нужны ТОЛЬКО STOP/завершённый пилот/halted --
+        # см. _new_send_forbidden_now (она НЕ проверяет pending).
+        final_gate_reason = ("остановка запрошена (--duration-seconds/STOP) во время подготовки" if
+                              self._no_new_candidates.is_set() else _new_send_forbidden_now(self.budget))
+        if final_gate_reason is not None:
+            self.budget.halt(f"{final_gate_reason} -- обнаружено МЕЖДУ подготовкой (begin_attempt) и "
+                             f"сетевой отправкой (submit_prepared); транзакция {prepared.tx_hash} ТОЧНО НЕ "
+                             f"отправлялась в этом процессе -- НЕ отправляем после остановки, pending "
+                             f"сохранён для явного разбора (следующий запуск НЕ отправит её автоматически, "
+                             f"см. _recover_before_broadcast)")
+            print(f"[hotpath] СТОП: {self.budget.halt_reason}")
+            return
+
+        # Пункт 9 (четвёртый раунд): "время до отправки -- от
+        # ФАКТИЧЕСКОЙ передачи транзакции Sender'ом, отдельно от
+        # времени получения логов/ожидания очереди/расчёта" -- честная
+        # задержка меряется ЗДЕСЬ, непосредственно перед фактическим
+        # сетевым вызовом (не раньше, когда ещё шли prepare/reserve/
+        # sign/begin_attempt -- это отдельная величина, см.
+        # latency_recv_to_commit_s выше, используется ТОЛЬКО для
+        # восстановления после краха ДО отправки).
+        actual_send_latency_s = time.monotonic() - recv_t_monotonic
         result = self.sender.submit_prepared(prepared)
         # tx_hash ИЗВЕСТЕН ВСЕГДА (см. PreparedTx) -- "неопределённая
         # отправка" теперь означает result.unresolved=True, НЕ "не ушла".
@@ -1234,7 +1597,7 @@ class HotPath:
         actual_gain_base_asset = None
         if tx_status == 1:
             try:
-                actual_gain_raw = parse_cycle_executed_profit(receipt, self.contract_address) if receipt else None
+                actual_gain_raw = parse_cycle_executed_profit(receipt, self.contract_address, route.exit_token) if receipt else None
                 used_event_log = actual_gain_raw is not None
                 post_balances = {t: _token_balance(t, self.contract_address) for t in route_tokens}
                 if not used_event_log:
@@ -1275,13 +1638,13 @@ class HotPath:
                 ts_wall=time.time(), route_label=route.label, route_id=route.route_id,
                 size_in_raw=final_amount_in, exit_token=route.exit_token,
                 expected_profit_after_gas=profit_after_gas,
-                latency_recv_to_send_s=latency_s, tx_hash=prepared.tx_hash,
+                latency_recv_to_send_s=actual_send_latency_s, tx_hash=prepared.tx_hash,
                 result="success" if tx_status == 1 else "reverted",
                 actual_gain_base_asset=actual_gain_base_asset if tx_status == 1 else None,
                 gas_used=gas_used, gas_cost_native=gas_cost_native,
                 cumulative_gas_loss_usd=self.budget.cumulative_gas_loss_usd,
                 cumulative_net_pnl_usd=self.budget.cumulative_net_pnl_usd,
-                computed_at_block=block_number, state_age_blocks=state_age_blocks,
+                computed_at_block=final_quote_block, state_age_blocks=state_age_blocks,
             )
             self.attempt_table.write(row)
             self.budget.mark_pending_row_written()
@@ -1320,6 +1683,10 @@ def main() -> None:
                      help="Владелец: часовой пилот -- 3600. Отсчёт от завершения bootstrap реестра, "
                           "переживает рестарт (PilotBudget.pilot_started_at)")
     args = ap.parse_args()
+
+    # Пункт 8 (четвёртый раунд): ДО ЛЮБОГО RPC-вызова этого процесса --
+    # см. докстринг LIVE_RPC_RETRY_BUDGET_S.
+    alchemy_fallback.set_rate_limit_wait_budget_s(LIVE_RPC_RETRY_BUDGET_S)
 
     lock = _SingleInstanceLock(args.from_address)
     lock.acquire()
@@ -1368,8 +1735,16 @@ def _main(args) -> None:
               f"автоматически. Для нового пилота -- явное решение владельца (напр. новое состояние budget).")
         return
 
-    print("[hotpath] бутстрап реестра (сид + обнаружение пулов арбитражника)...")
-    registry, latest = bootstrap_registry()
+    # Пункт 3 (четвёртый раунд): "сохранять реестр и позицию обработанных
+    # блоков для продолжения после рестарта" -- ПО УМОЛЧАНИЮ путь ниже
+    # (новый, ничего раньше не занимал) -- если файла ещё нет,
+    # bootstrap_registry() честно делает полный lookback-скан, как
+    # раньше; со второго запуска -- инкрементальный докат от сохранённого
+    # курсора.
+    route_registry_state_path = os.environ.get(
+        "ROUTE_REGISTRY_STATE_FILE", "/home/bot/data/task5_v4_route_registry_state.json")
+    print("[hotpath] бутстрап реестра (сид/сохранённое состояние + обнаружение пулов арбитражника)...")
+    registry, latest = bootstrap_registry(state_path=route_registry_state_path)
     # Владелец: "Час пилота отсчитывай после завершения первоначального
     # наполнения реестра" + "Перезапуск не должен... начинать новый час
     # после завершённого пилота" -- persisted, НЕ time.time() каждый раз.
@@ -1393,7 +1768,8 @@ def _main(args) -> None:
     print(f"[hotpath] =====================")
 
     priority_hint = _RpcPriorityHint()
-    background_worker = BackgroundRegistryWorker(registry, priority_hint)
+    background_worker = BackgroundRegistryWorker(registry, priority_hint, start_from_block=latest,
+                                                  state_path=route_registry_state_path)
     background_worker.start()
 
     hotpath = HotPath(registry, args.contract_address, args.from_address, budget, attempt_table,
@@ -1438,18 +1814,55 @@ def _main(args) -> None:
                     stopping = True
 
             if stopping:
-                if hotpath.is_idle():
+                # Пункт 5 (четвёртый раунд): "раздели 'поток закончил
+                # текущую работу' и 'результат транзакции известен'".
+                # РАНЬШЕ условие выхода требовало ЕЩЁ и budget.pending
+                # is None -- после ограниченного ожидания рецепта
+                # halt+pending СОХРАНЁН НАВСЕГДА (намеренно, никто
+                # больше его не тронет, пока идёт остановка), поэтому
+                # старое условие никогда не выполнялось -- главный цикл
+                # печатал "жду завершения" бесконечно (реально
+                # воспроизведено владельцем). Теперь выход -- как только
+                # поток-оценщик закончил ТЕКУЩУЮ единицу работы,
+                # НЕЗАВИСИМО от того, разрешилась ли pending-попытка;
+                # "неизвестный результат" -- явная, отдельно
+                # напечатанная терминальная ветка, а не блокирующее
+                # ожидание.
+                if hotpath.evaluator_finished_current_work():
                     reason = why if (budget.halted or budget.pilot_completed) else "истёк --duration-seconds"
-                    budget.complete_pilot(reason)
                     unresolved = budget.pending is not None
+                    # pilot_completed выставляется ВСЕГДА (даже при
+                    # unresolved) -- пункт 4: "завершение часа никогда
+                    # не переавторизует новую торговлю"; resolve_pending_
+                    # tx_if_any на следующем запуске всё равно отработает
+                    # ДО этой проверки (см. main()) и сможет закрыть
+                    # pending, не начиная новых сделок.
+                    budget.complete_pilot(reason)
                     print(f"[hotpath] === ИТОГ ПИЛОТА ===")
                     print(f"[hotpath]   причина завершения: {reason}")
                     print(f"[hotpath]   неизвестные (неразрешённые) результаты остались: {unresolved}")
+                    if unresolved:
+                        print(f"[hotpath]   ВНИМАНИЕ: результат попытки {budget.pending.get('tx_hash')} НЕ "
+                              f"определён -- pending СОХРАНЁН, бюджет/резерв НЕ обнулены. Итог пилота -- "
+                              f"'неизвестный результат', НЕ 'успешно завершён'. Требуется resolve_pending_tx_if_any "
+                              f"на следующем запуске (читает receipt/завершает учёт, НЕ отправляет новых сделок).")
+                    # Пункт 9 (четвёртый раунд): "известные ограничения
+                    # указать в итоговом отчёте -- чистые V4-циклы,
+                    # старт USDG/native ETH, текущая конечная сетка
+                    # размеров. Не выдавать это за полный охват маршрутов
+                    # чужого бота." -- честно печатается БЕЗУСЛОВНО, не
+                    # только в чат-отчёте владельцу.
+                    print(f"[hotpath]   ИЗВЕСТНЫЕ ОГРАНИЧЕНИЯ ЭТОГО ПИЛОТА (не полный охват): только чистые "
+                          f"V4-циклы из 2-3 плеч (без смешанных V3+V4 маршрутов -- см. докстринг "
+                          f"build_cycles_from_pools); маршруты обязаны начинаться/заканчиваться в "
+                          f"USDG или нативном ETH (START_TOKENS); подбор размера -- по ФИКСИРОВАННОЙ сетке "
+                          f"SIZE_GRID_BY_START_TOKEN, не непрерывный поиск оптимума. Это НЕ полный охват "
+                          f"маршрутов, которые может использовать другой (наблюдаемый) арбитражник.")
                     _print_status_report("ИТОГ", registry, budget, attempt_table, pilot_start_wall)
                     print(f"[hotpath] ====================")
                     break
                 else:
-                    print(f"[hotpath] ...жду завершения текущей попытки перед остановкой "
+                    print(f"[hotpath] ...жду завершения текущей оценки перед остановкой "
                           f"(busy={hotpath.busy}, pending={budget.pending is not None})...")
                     time.sleep(POLL_INTERVAL_S)
                     continue
@@ -1473,6 +1886,14 @@ def _main(args) -> None:
     finally:
         background_worker.stop()
         hotpath.stop()
+        # Пункт 3 (четвёртый раунд): финальное сохранение реестра при
+        # штатном завершении -- следующий запуск догонит от актуального
+        # курсора, а не от того, что было записано до 30с назад.
+        try:
+            save_registry_state(registry, background_worker._last_checked_block, route_registry_state_path)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[hotpath] не удалось сохранить финальное состояние реестра (не критично): {exc}",
+                  file=sys.stderr)
 
 
 if __name__ == "__main__":

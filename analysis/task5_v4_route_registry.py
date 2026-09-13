@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -53,7 +54,7 @@ os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVI
 from alchemy_fallback import _chunked_get_logs, _rpc_call, topic0  # noqa: E402
 from task5_v4_hook_route_audit import fetch_initialize_event  # noqa: E402
 from task5_v4_pool_math import PoolKey, pool_id  # noqa: E402
-from task5_v4_quote_replay import quote_exact_input_single  # noqa: E402
+from task5_v4_quote_replay import _looks_like_confirmed_revert, quote_exact_input_single  # noqa: E402
 
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 NATIVE = "0x0000000000000000000000000000000000000000"
@@ -196,7 +197,14 @@ def find_arbitrageur_pool_ids(from_block: int, to_block: int, arbitrageur: str =
 
 def seed_pools_from_arbitrageur(from_block: int, to_block: int, known_pool_ids: set[str] | None = None,
                                  arbitrageur: str = KNOWN_ARBITRAGEUR) -> dict[str, PoolKey]:
-    """Для КАЖДОГО НОВОГО (не в known_pool_ids) пула, реально
+    """НЕ используется RouteRegistry.discover_new_arbitrageur_routes с
+    четвёртого раунда ревью (тот теперь инлайнит ту же логику, чтобы
+    отдельно отслеживать пулы, чьё Initialize временно не удалось
+    получить -- см. RouteRegistry._pending_retry_pool_ids) -- оставлена
+    для автономного использования/диагностики со СТАРЫМ поведением
+    (молча пропускает неполученные пулы, НЕ откладывает их на повтор).
+
+    Для КАЖДОГО НОВОГО (не в known_pool_ids) пула, реально
     использованного арбитражником -- реальный PoolKey через его
     Initialize-событие (не предполагается, не собирается из общего
     скана всех когда-либо созданных пулов). Владелец: "его сделка -- не
@@ -289,16 +297,32 @@ def build_cycles_from_pools(pools: dict[str, PoolKey]) -> list[RouteCycle]:
 def check_route_liveness(route: RouteCycle, block_number: int) -> dict:
     """Котируем маршрут КАНОНИЧЕСКИМ (не боевым) размером через реальный
     V4Quoter -- живой, если ВСЕ плечи прошли без revert (не про
-    прибыльность, только про исполнимость -- см. докстринг модуля)."""
+    прибыльность, только про исполнимость -- см. докстринг модуля).
+
+    ПРАВКА (внешнее ревью, четвёртый раунд, пункт 3): "RPC-ошибку
+    отличать от отсутствия ликвидности". "live" теперь ТРОЙНОЙ:
+      True  -- живой, все плечи прошли;
+      False -- ПОДТВЕРЖДЁННО не живой (execution revert, напр.
+               NotEnoughLiquidity -- то же состояние на этом блоке дало
+               бы ТОТ ЖЕ ответ у любого честного провайдера);
+      None  -- ИНКОНКЛЮЗИВНО (транспорт/RPC/отсутствие state) -- НЕ
+               доказывает отсутствие ликвидности, вызывающий код НЕ
+               должен считать это "снова не живой" и НЕ должен
+               перезаписывать предыдущий известный статус (см.
+               RouteRegistry.refresh_liveness_batch/discover_new_
+               arbitrageur_routes)."""
     start_token = route.legs[0].input_currency
     amount = CANONICAL_TEST_SIZE.get(start_token.lower(), CANONICAL_TEST_SIZE[USDG])
     cur = amount
     try:
         for leg in route.legs:
             cur = quote_exact_input_single(leg.pool_key, leg.zero_for_one, cur, block_number)
-        return {"live": True, "test_amount_in": amount, "test_amount_out": cur, "error": None}
+        return {"live": True, "test_amount_in": amount, "test_amount_out": cur, "error": None, "error_kind": None}
     except Exception as exc:  # noqa: BLE001
-        return {"live": False, "test_amount_in": amount, "test_amount_out": None, "error": str(exc)[:300]}
+        detail = str(exc)[:300]
+        confirmed = _looks_like_confirmed_revert(detail)
+        return {"live": (False if confirmed else None), "test_amount_in": amount, "test_amount_out": None,
+                "error": detail, "error_kind": "revert" if confirmed else "rpc"}
 
 
 class RouteRegistry:
@@ -317,6 +341,15 @@ class RouteRegistry:
         # новыми пулами того же вызова, но и со ВСЕМИ уже известными --
         # иначе циклы вида "старый пул A + новый пул B" были бы упущены.
         self.known_pools: dict[str, PoolKey] = {}
+        # Пункт 3 (внешнее ревью, четвёртый раунд): пулы, реально
+        # найденные через Swap арбитражника, чьё Initialize-событие
+        # ВРЕМЕННО не удалось получить (транзиентная RPC-ошибка) --
+        # НЕ теряются: остаются здесь и повторно пробуются на КАЖДОМ
+        # следующем вызове discover_new_arbitrageur_routes, НЕЗАВИСИМО
+        # от того, попадут ли они снова в диапазон блоков Swap-скана
+        # (одноразовое историческое событие иначе никогда не всплыло бы
+        # снова).
+        self._pending_retry_pool_ids: set[str] = set()
         # ПРАВКА 2026-09-13 (живой пилот: фоновый поток обнаружения/
         # живучести параллельно горячему пути читает/пишет тот же
         # реестр) -- RLock (не Lock): discover_new_arbitrageur_routes
@@ -346,29 +379,64 @@ class RouteRegistry:
         (address=PoolManager, topic0=Swap, topic2=sender), не полное
         пересканирование с нуля.
 
-        Новые пулы объединяются со ВСЕМИ уже известными (self.known_pools)
-        перед построением циклов -- новый пул может замкнуть цикл со
-        СТАРЫМ, не только с другим новым в этом же вызове. Циклы,
-        которые уже есть в реестре (route_id совпал), не добавляются
-        повторно. Возвращает СПИСОК НОВЫХ маршрутов (для немедленной
-        точечной проверки живучести вызывающим кодом -- не всего
-        реестра, это дорого).
+        ПРАВКА (внешнее ревью, четвёртый раунд, пункт 3): "сохраняй
+        new_pools в накопительный реестр НЕЗАВИСИМО от количества
+        построенных циклов -- затем строй маршруты по объединённому
+        набору." РАНЬШЕ known_pools пополнялся ТОЛЬКО через add_route
+        (т.е. только для пулов, УЖЕ образовавших цикл в момент
+        обнаружения) -- пул A без пары терялся НАВСЕГДА (одноразовое
+        историческое Swap-событие не переоткроется на следующем скане),
+        даже если ПОЗЖЕ находился пул B той же пары (реально
+        воспроизведено владельцем). Теперь ВСЕ успешно полученные пулы
+        (fetched) СРАЗУ мержатся в self.known_pools, ПОТОМ строятся
+        циклы по ПОЛНОМУ накопленному набору -- пул A, сохранённый
+        сейчас без пары, участвует в построении цикла, когда ПОЗЖЕ
+        появится пул B.
+
+        Возвращает СПИСОК НОВЫХ маршрутов (для немедленной точечной
+        проверки живучести вызывающим кодом -- не всего реестра, это
+        дорого).
 
         ПРАВКА (живой пилот, фоновый поток): сетевой вызов
-        (seed_pools_from_arbitrageur) и построение циклов -- ВНЕ лока
-        (снимок known_pools делается под локом, но сам RPC/расчёт его
-        не держат) -- не блокирует горячий путь на время сетевого
-        запроса; лок берётся только на короткую мутацию реестра."""
+        (find_arbitrageur_pool_ids/fetch_initialize_event) и построение
+        циклов -- ВНЕ лока (снимок known_pools делается под локом, но
+        сам RPC/расчёт его не держат) -- не блокирует горячий путь на
+        время сетевого запроса; лок берётся только на короткие мутации
+        реестра."""
         with self._lock:
             known_ids_snapshot = set(self.known_pools.keys())
+            retry_ids_snapshot = set(self._pending_retry_pool_ids)
+
+        found_ids = find_arbitrageur_pool_ids(from_block, to_block, arbitrageur)
+        # Пункт 3: пробуем и НОВЫЕ (из этого скана), И ранее отложенные
+        # из-за временной ошибки получения Initialize -- НЕЗАВИСИМО от
+        # того, попали ли они в ЭТОТ диапазон блоков.
+        candidate_ids = (found_ids - known_ids_snapshot) | retry_ids_snapshot
+        if not candidate_ids:
+            return []
+
+        fetched: dict[str, PoolKey] = {}
+        still_failed: set[str] = set()
+        for pid in candidate_ids:
+            info = fetch_initialize_event(pid, to_block)
+            if info is None:
+                # Пункт 3: "не теряй пул навсегда, если его параметры
+                # временно не удалось получить -- оставь на повторную
+                # обработку" -- НЕ пропускаем молча, откладываем.
+                still_failed.add(pid)
+                continue
+            fetched[pid] = PoolKey(info["currency0"], info["currency1"], info["fee"], info["tick_spacing"], info["hooks"])
+
+        with self._lock:
+            self._pending_retry_pool_ids = still_failed
+            if fetched:
+                self.known_pools.update(fetched)  # накопительно, НЕЗАВИСИМО от циклов -- см. докстринг выше
             known_pools_snapshot = dict(self.known_pools)
 
-        new_pools = seed_pools_from_arbitrageur(from_block, to_block, known_pool_ids=known_ids_snapshot,
-                                                 arbitrageur=arbitrageur)
-        if not new_pools:
-            return []
-        merged_pools = {**known_pools_snapshot, **new_pools}
-        all_cycles = build_cycles_from_pools(merged_pools)
+        if not fetched:
+            return []  # ничего успешно получено ЭТОТ раз -- still_failed попробуется на следующем вызове
+
+        all_cycles = build_cycles_from_pools(known_pools_snapshot)
         with self._lock:
             new_cycles = [c for c in all_cycles if c.route_id not in self.routes]
             for c in new_cycles:
@@ -380,7 +448,13 @@ class RouteRegistry:
         локом (быстро), сами RPC-проверки живучести (check_route_liveness,
         может быть МЕДЛЕННО -- десятки-сотни маршрутов) -- ВНЕ лока, не
         блокируют горячий путь на время всей проверки; запись результата
-        каждого маршрута -- снова под локом, коротко."""
+        каждого маршрута -- снова под локом, коротко.
+
+        ПРАВКА (четвёртый раунд, пункт 3): результат с live=None
+        (RPC-ошибка, НЕ подтверждённое отсутствие ликвидности -- см.
+        check_route_liveness) НЕ перезаписывает предыдущий известный
+        статус -- инконклюзивный результат сам по себе НЕ довод считать
+        маршрут "снова не живым"."""
         with self._lock:
             routes_snapshot = list(self.routes.items())
         results = {}
@@ -388,8 +462,29 @@ class RouteRegistry:
             res = check_route_liveness(route, block_number)
             res["checked_at_block"] = block_number
             res["checked_at_wall"] = time.time()
+            if res.get("live") is not None:
+                with self._lock:
+                    self.liveness[route_id] = res
+            results[route_id] = res
+        return results
+
+    def refresh_liveness_batch(self, block_number: int, route_ids: list[str]) -> dict[str, dict]:
+        """Пункт 2 (четвёртый раунд): версия refresh_liveness_all,
+        ограниченная ПЕРЕЧИСЛЕННЫМИ route_ids (порция полного прохода) --
+        см. BackgroundRegistryWorker про то, зачем нужны порции (полный
+        проход НЕ должен занимать фон неделимо на сотни запросов)."""
+        results = {}
+        for route_id in route_ids:
             with self._lock:
-                self.liveness[route_id] = res
+                route = self.routes.get(route_id)
+            if route is None:
+                continue
+            res = check_route_liveness(route, block_number)
+            res["checked_at_block"] = block_number
+            res["checked_at_wall"] = time.time()
+            if res.get("live") is not None:
+                with self._lock:
+                    self.liveness[route_id] = res
             results[route_id] = res
         return results
 
@@ -437,13 +532,99 @@ class RouteRegistry:
                 ],
             }
 
+    def to_state_dict(self) -> dict:
+        """Пункт 3 (внешнее ревью, четвёртый раунд): "сохранять реестр
+        ... для продолжения после рестарта" -- полное, JSON-сериализуемое
+        состояние (известные пулы, маршруты, живучесть, отложенные на
+        повтор пулы). Курсор ОБРАБОТАННЫХ БЛОКОВ хранится ОТДЕЛЬНО
+        вызывающим кодом (см. save_registry_state) -- сам реестр о нём
+        не знает."""
+        with self._lock:
+            return {
+                "known_pools": {pid: {"currency0": k.currency0, "currency1": k.currency1, "fee": k.fee,
+                                       "tick_spacing": k.tick_spacing, "hooks": k.hooks}
+                                for pid, k in self.known_pools.items()},
+                "routes": {
+                    rid: {"legs": [{"currency0": leg.currency0, "currency1": leg.currency1, "fee": leg.fee,
+                                     "tick_spacing": leg.tick_spacing, "hooks": leg.hooks,
+                                     "zero_for_one": leg.zero_for_one} for leg in r.legs],
+                          "exit_token": r.exit_token, "label": r.label, "source": r.source}
+                    for rid, r in self.routes.items()
+                },
+                "liveness": dict(self.liveness),
+                "pending_retry_pool_ids": sorted(self._pending_retry_pool_ids),
+            }
+
+    @classmethod
+    def from_state_dict(cls, data: dict) -> "RouteRegistry":
+        registry = cls()
+        registry.known_pools = {
+            pid: PoolKey(v["currency0"], v["currency1"], v["fee"], v["tick_spacing"], v["hooks"])
+            for pid, v in data.get("known_pools", {}).items()
+        }
+        for rid, rv in data.get("routes", {}).items():
+            legs = tuple(
+                RouteLeg(leg["currency0"], leg["currency1"], leg["fee"], leg["tick_spacing"], leg["hooks"],
+                         leg["zero_for_one"])
+                for leg in rv["legs"]
+            )
+            route = RouteCycle(rid, legs, rv["exit_token"], rv["label"], rv["source"])
+            registry.routes[rid] = route
+            for leg in legs:
+                registry.pool_to_routes.setdefault(leg.pool_id_hex, set()).add(rid)
+        registry.liveness = dict(data.get("liveness", {}))
+        registry._pending_retry_pool_ids = set(data.get("pending_retry_pool_ids", []))
+        return registry
+
+
+def save_registry_state(registry: RouteRegistry, cursor_block: int, path: str) -> None:
+    """Атомарная запись (tempfile в той же директории + os.replace) --
+    ТОТ ЖЕ паттерн, что PilotBudget._save (task5_v4_pilot_accounting.py)
+    -- частично записанный файл при падении процесса посередине
+    невозможен."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {**registry.to_state_dict(), "cursor_block": cursor_block}
+    fd, tmp_path = tempfile.mkstemp(dir=str(p.parent), prefix=".route_registry_tmp_")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(payload, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, p)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def load_registry_state(path: str) -> tuple[RouteRegistry, int] | None:
+    """None, если файла нет ИЛИ он не читается -- честный ЧИСТЫЙ старт
+    (полный bootstrap с нуля), НЕ halt: потеря реестра пулов -- потеря
+    времени на повторное обнаружение, НЕ потеря денег (в отличие от
+    PilotBudget, где повреждённый файл -- halt)."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text())
+        registry = RouteRegistry.from_state_dict(data)
+        cursor_block = int(data["cursor_block"])
+        return registry, cursor_block
+    except Exception as exc:  # noqa: BLE001
+        print(f"[route_registry] сохранённое состояние {path} повреждено/не читается ({exc}) -- "
+              f"честный полный bootstrap с нуля", file=sys.stderr)
+        return None
+
 
 ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS = 40_000  # ~1 час на измеренной этой сессией плотности блоков
 
 
 def bootstrap_registry(latest: int | None = None,
                         lookback_blocks: int = ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS,
-                        log: bool = True) -> tuple[RouteRegistry, int]:
+                        log: bool = True, state_path: str | None = None) -> tuple[RouteRegistry, int]:
     """Сид + реальное обнаружение пулов из УСПЕШНЫХ Swap-событий
     известного арбитражника (последний час по умолчанию) + построение
     циклов + живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC
@@ -456,6 +637,16 @@ def bootstrap_registry(latest: int | None = None,
     самопроверки/диагностики, и в горячем пути для боевого старта, а не
     дублируется.
 
+    ПРАВКА (внешнее ревью, четвёртый раунд, пункт 3): если state_path
+    задан и по нему есть РАНЕЕ сохранённое состояние (см.
+    save_registry_state) -- НЕ пересобираем реестр с нуля полным
+    lookback_blocks-сканом, а ДОГОНЯЕМ инкрементально от сохранённого
+    курсора (ограничено СВЕРХУ тем же lookback_blocks -- "большой
+    сканер всей сети не нужен": долгий простой между рестартами не
+    должен обернуться сканом ШИРЕ обычного lookback-окна). Без
+    state_path (или без сохранённого файла) -- прежнее поведение
+    (сид + полный lookback-скан) БЕЗ ИЗМЕНЕНИЙ.
+
     Реальный повод делать обнаружение вообще, не только сид: оба
     сид-маршрута на момент написания честно оказались НЕ живы
     (пересохшая ликвидность, см.
@@ -467,12 +658,25 @@ def bootstrap_registry(latest: int | None = None,
     88 новых пулов, 164 кандидатных цикла, 117 живых из 166 маршрутов."""
     if latest is None:
         latest = int(_rpc_call("eth_blockNumber", []), 16)
-    registry = RouteRegistry()
-    registry.add_routes(seed_routes())
-    if log:
-        print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
 
-    from_block = max(0, latest - lookback_blocks)
+    resumed = load_registry_state(state_path) if state_path else None
+    if resumed is not None:
+        registry, cursor_block = resumed
+        from_block = max(0, latest - lookback_blocks, cursor_block + 1)
+        if log:
+            print(f"[route_registry] ВОССТАНОВЛЕНО состояние из {state_path}: {len(registry.routes)} "
+                  f"маршрутов, курсор={cursor_block} -- инкрементальный докат {from_block}..{latest} "
+                  f"(НЕ полный lookback-скан {lookback_blocks} блоков заново)")
+    else:
+        registry = RouteRegistry()
+        registry.add_routes(seed_routes())
+        from_block = max(0, latest - lookback_blocks)
+        if log:
+            print(f"[route_registry] сид: {len(registry.routes)} маршрутов")
+            if state_path:
+                print(f"[route_registry] сохранённого состояния в {state_path} нет -- полный "
+                      f"lookback-скан (блоки {from_block}..{latest})...")
+
     if log:
         print(f"[route_registry] ищу пулы известного арбитражника {KNOWN_ARBITRAGEUR} "
               f"(блоки {from_block}..{latest})...")
@@ -486,6 +690,14 @@ def bootstrap_registry(latest: int | None = None,
     if log:
         print(f"[route_registry] проверяю живучесть всех {len(registry.routes)} маршрутов на блоке {latest}...")
     registry.refresh_liveness_all(latest)
+
+    if state_path:
+        try:
+            save_registry_state(registry, latest, state_path)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[route_registry] не удалось сохранить состояние в {state_path} (не критично, "
+                  f"следующий запуск просто сделает полный bootstrap): {exc}", file=sys.stderr)
+
     return registry, latest
 
 
