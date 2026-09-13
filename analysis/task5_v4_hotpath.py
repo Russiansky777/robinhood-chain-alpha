@@ -1304,10 +1304,20 @@ class BackgroundRegistryWorker(threading.Thread):
     арбитражника (инкрементально, по новым блокам) + периодическая (раз
     в минуту) проверка живучести ВСЕХ маршрутов, теперь ПОРЦИЯМИ (пункт
     2, четвёртый раунд -- см. LIVENESS_BATCH_SIZE). НЕ в горячем пути --
-    пишет в общий (потокобезопасный, RLock) реестр."""
+    пишет в общий (потокобезопасный, RLock) реестр.
+
+    ПРАВКА (владелец: "докачку истории и живучесть -- в существующий
+    фоновый worker, порциями, с приоритетом торговых запросов"): этот
+    ЖЕ, уже существующий механизм (discover_new_arbitrageur_routes на
+    каждом такте от `start_from_block`, refresh_liveness_batch по
+    LIVENESS_BATCH_SIZE) теперь ЕЩЁ И ДОГОНЯЕТ первоначальный bootstrap,
+    когда bootstrap_registry() вызван с
+    defer_discovery_catchup_and_liveness=True (см. её докстринг) --
+    НИЧЕГО не дублируется, тот же код, что и обычный фоновый прогресс,
+    просто начинает раньше и с более старой точки курсора."""
 
     def __init__(self, registry: RouteRegistry, priority_hint: _RpcPriorityHint, start_from_block: int,
-                 state_path: str | None = None) -> None:
+                 state_path: str | None = None, defer_first_liveness_pass: bool = False) -> None:
         """start_from_block -- ОБЯЗАТЕЛЬНЫЙ (пункт 3, четвёртый раунд:
         "фоновый курсор должен продолжать с последнего обработанного
         bootstrap-блока -- сейчас при первом запуске фона он
@@ -1320,13 +1330,36 @@ class BackgroundRegistryWorker(threading.Thread):
         реальным тактом фона никогда никем не сканировались. Теперь
         вызывающий код (main()) передаёт СЮДА тот самый latest, на
         котором bootstrap_registry() закончил работу -- разрыва нет
-        независимо от того, сколько фон "спал" перед первым тактом."""
+        независимо от того, сколько фон "спал" перед первым тактом.
+
+        ПРАВКА (владелец, "докачку истории и живучесть -- в фон,
+        порциями"): когда bootstrap_registry() вызван с
+        defer_discovery_catchup_and_liveness=True, ОН НЕ делает ни
+        догоняющее discover_new_arbitrageur_routes, ни
+        refresh_liveness_all -- start_from_block здесь тогда ДОЛЖЕН быть
+        resume_from_block - 1 (первый ещё НЕ проверенный блок, возвращён
+        bootstrap_registry() третьим элементом), НЕ latest -- run() ниже
+        сам докатит discover_new_arbitrageur_routes от этой точки, тем
+        же кодом, что и обычный инкрементальный прогресс. `defer_first_
+        liveness_pass=True` (используется ВМЕСТЕ с этим) говорит, что
+        НИКАКОЙ полной проверки живучести ЕЩЁ не было -- первая
+        порционная проверка должна начаться на САМОМ ПЕРВОМ такте, а не
+        ждать LIVENESS_REFRESH_INTERVAL_S (та пауза предполагает, что
+        полная проверка уже недавно была -- см. её докстринг ниже).
+        По умолчанию (False) -- ПРЕЖНЕЕ поведение без изменений."""
         super().__init__(name="registry-discovery-liveness", daemon=True)
         self.registry = registry
         self.priority_hint = priority_hint
         self._stop_event = threading.Event()
         self._last_checked_block: int = start_from_block
-        self._last_liveness_refresh_wall = time.monotonic()  # первая полная проверка уже была в bootstrap_registry()
+        # ПРЕЖНЕЕ поведение (defer_first_liveness_pass=False): полная
+        # проверка "уже была" (в bootstrap_registry()) -- ждём обычный
+        # интервал перед первым порционным проходом. НОВОЕ (True): полной
+        # проверки ЕЩЁ не было вовсе -- запускаем порционный проход
+        # немедленно на первом такте (см. условие в run() ниже).
+        self._last_liveness_refresh_wall = (
+            time.monotonic() - LIVENESS_REFRESH_INTERVAL_S if defer_first_liveness_pass else time.monotonic()
+        )
         # Порционный проход живучести -- None, когда проход не идёт.
         self._liveness_pass_route_ids: list[str] | None = None
         self._liveness_pass_cursor = 0
@@ -2246,10 +2279,23 @@ def _main(args) -> None:
     # bootstrap_registry() честно делает полный lookback-скан, как
     # раньше; со второго запуска -- инкрементальный докат от сохранённого
     # курсора.
+    #
+    # ПРАВКА (владелец: "восстановление сохранённого реестра не должно
+    # блокироваться на refresh_liveness_all() -- после загрузки запускай
+    # детектор и оценщик; докачку истории и живучесть -- в фон,
+    # порциями"): defer_discovery_catchup_and_liveness=True -- bootstrap_
+    # registry() восстанавливает/сеет реестр и возвращается СРАЗУ, БЕЗ
+    # блокирующих discover_new_arbitrageur_routes/refresh_liveness_all
+    # (см. её докстринг). resume_from_block -- первый ещё не проверенный
+    # блок -- передаётся в BackgroundRegistryWorker ниже: тот доганяет
+    # ОБА прохода на своих обычных тактах, порциями, уступая место
+    # торговому пути (уже существующий, не переделанный механизм).
     route_registry_state_path = os.environ.get(
         "ROUTE_REGISTRY_STATE_FILE", "/home/bot/data/task5_v4_route_registry_state.json")
-    print("[hotpath] бутстрап реестра (сид/сохранённое состояние + обнаружение пулов арбитражника)...")
-    registry, latest = bootstrap_registry(state_path=route_registry_state_path)
+    print("[hotpath] бутстрап реестра (сид/сохранённое состояние -- без блокирующей докачки истории/"
+          "живучести, они уйдут в фон)...")
+    registry, latest, resume_from_block = bootstrap_registry(
+        state_path=route_registry_state_path, defer_discovery_catchup_and_liveness=True)
     # Владелец: "Час пилота отсчитывай после завершения первоначального
     # наполнения реестра" + "Перезапуск не должен... начинать новый час
     # после завершённого пилота" -- persisted, НЕ time.time() каждый раз.
@@ -2264,7 +2310,8 @@ def _main(args) -> None:
     print(f"[hotpath]   адрес подписанта (Sender): {sender.address if sender is not None else '(dry-run -- нет Sender)'}")
     print(f"[hotpath]   owner() контракта: {contract_owner}")
     print(f"[hotpath]   контракт: {args.contract_address}")
-    print(f"[hotpath]   маршрутов известно: {len(registry.routes)}, живых: {len(registry.live_routes())}")
+    print(f"[hotpath]   маршрутов известно: {len(registry.routes)}, живых (ПРЕДВАРИТЕЛЬНО, по сохранённому "
+          f"состоянию -- полная проверка ещё идёт в фоне порциями): {len(registry.live_routes())}")
     print(f"[hotpath]   остаток бюджета газа: ${BUDGET_STOP_USD - budget.cumulative_gas_loss_usd:.2f} "
           f"из ${BUDGET_STOP_USD:.0f} (потрачено ${budget.cumulative_gas_loss_usd:.2f})")
     print(f"[hotpath]   незавершённая транзакция: {budget.pending is not None}")
@@ -2273,8 +2320,15 @@ def _main(args) -> None:
     print(f"[hotpath] =====================")
 
     priority_hint = _RpcPriorityHint()
-    background_worker = BackgroundRegistryWorker(registry, priority_hint, start_from_block=latest,
-                                                  state_path=route_registry_state_path)
+    # ПРАВКА (владелец): start_from_block=resume_from_block-1 (НЕ latest)
+    # -- фон сам догоняет discover_new_arbitrageur_routes с ТОЙ ЖЕ точки,
+    # с которой это раньше делал блокирующий bootstrap_registry();
+    # defer_first_liveness_pass=True -- полной проверки живучести ЕЩЁ не
+    # было (bootstrap её не делал) -- порционный проход должен начаться
+    # на первом же такте, а не ждать обычный интервал.
+    background_worker = BackgroundRegistryWorker(
+        registry, priority_hint, start_from_block=max(0, resume_from_block - 1),
+        state_path=route_registry_state_path, defer_first_liveness_pass=True)
     background_worker.start()
 
     hotpath = HotPath(registry, args.contract_address, args.from_address, budget, attempt_table,
