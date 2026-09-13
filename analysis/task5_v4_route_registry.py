@@ -624,11 +624,51 @@ ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS = 40_000  # ~1 час на измерен�
 
 def bootstrap_registry(latest: int | None = None,
                         lookback_blocks: int = ARBITRAGEUR_BOOTSTRAP_LOOKBACK_BLOCKS,
-                        log: bool = True, state_path: str | None = None) -> tuple[RouteRegistry, int]:
+                        log: bool = True, state_path: str | None = None,
+                        defer_discovery_catchup_and_liveness: bool = False) -> tuple[RouteRegistry, int, int]:
     """Сид + реальное обнаружение пулов из УСПЕШНЫХ Swap-событий
     известного арбитражника (последний час по умолчанию) + построение
     циклов + живучесть ВСЕХ маршрутов на latest блоке. Реальный RPC
     (eth_getLogs + Quoter), read-only, ничего не отправляет.
+
+    ПРАВКА (владелец: "восстановление сохранённого реестра не должно
+    блокироваться на refresh_liveness_all() -- после загрузки запускай
+    детектор и оценщик; докачку истории и перепроверку живучести
+    перенеси в существующий фоновый worker, порциями, с приоритетом
+    торговых запросов"): `defer_discovery_catchup_and_liveness=True` --
+    восстановление/сид отрабатывает как обычно (быстро, чисто локально
+    + один короткий eth_blockNumber), но ДОГОНЯЮЩЕЕ обнаружение новых
+    пулов арбитражника (discover_new_arbitrageur_routes) и ПОЛНАЯ
+    проверка живучести ВСЕХ маршрутов (refresh_liveness_all) -- НЕ
+    вызываются здесь, функция возвращает СРАЗУ. Третий элемент
+    возвращаемого кортежа, `resume_from_block`, -- ТА ЖЕ точка (первый
+    непроверенный блок), с которой без этого флага начиналось бы
+    discover_new_arbitrageur_routes -- вызывающий код (task5_v4_hotpath.py,
+    _main()) передаёт её в BackgroundRegistryWorker(start_from_block=
+    resume_from_block - 1), который на СВОИХ обычных, УЖЕ существующих
+    тактах (run(): discover_new_arbitrageur_routes инкрементально +
+    refresh_liveness_batch порциями по LIVENESS_BATCH_SIZE, уступая
+    место торговому пути через priority_hint.should_background_yield())
+    ДОГОНИТ и историю, и живучесть -- НЕ дублирующим кодом, тем же
+    самым уже проверенным механизмом, что и обычный фоновый прогресс.
+    Детектор/оценщик (evaluator_loop) стартуют сразу после этого
+    возврата, НЕ дожидаясь ни одного из этих двух проходов.
+
+    Сохранённые статусы живучести восстановленных маршрутов при этом
+    ЧЕСТНО остаются ПРЕДВАРИТЕЛЬНЫМИ до своей очереди в порционном
+    проходе фона -- RouteRegistry.is_live() как и раньше отдаёт их
+    напрямую (умолчание True для ещё не проверенных вовсе), а
+    ФАКТИЧЕСКАЯ безопасность обеспечивается НЕ доверием этому флагу, а
+    тем, что котировка перед отправкой ВСЕГДА пересчитывается заново на
+    актуальном состоянии (quote_route_at_size/_quote_and_estimate_gas_consistent
+    в HotPath, см. task5_v4_hotpath.py) -- эта правка их НЕ трогает.
+    Событие по уже помеченному НЕ живым маршруту по-прежнему честно
+    переоценивает его немедленно (см. evaluator_loop, ветка "исключённый
+    маршрут перепроверять при изменениях его пулов") -- без изменений.
+
+    По умолчанию (False) -- ПРЕЖНЕЕ поведение БЕЗ ИЗМЕНЕНИЙ (используется
+    task5_v4_route_registry.py::main(), самопроверка/диагностика, где
+    синхронный полный проход уместен и ожидаем).
 
     Вынесено из main() в отдельную функцию (владелец, 2026-09-13:
     "подключай полный реестр (сид + обнаружение из арбитражника) в
@@ -677,6 +717,13 @@ def bootstrap_registry(latest: int | None = None,
                 print(f"[route_registry] сохранённого состояния в {state_path} нет -- полный "
                       f"lookback-скан (блоки {from_block}..{latest})...")
 
+    if defer_discovery_catchup_and_liveness:
+        if log:
+            print(f"[route_registry] докачка истории ({from_block}..{latest}) и полная проверка живучести "
+                  f"{len(registry.routes)} маршрутов ОТЛОЖЕНЫ в фоновый worker (порциями, приоритет у "
+                  f"торгового пути) -- детектор/оценщик стартуют немедленно, не дожидаясь этих проходов")
+        return registry, latest, from_block
+
     if log:
         print(f"[route_registry] ищу пулы известного арбитражника {KNOWN_ARBITRAGEUR} "
               f"(блоки {from_block}..{latest})...")
@@ -698,7 +745,7 @@ def bootstrap_registry(latest: int | None = None,
             print(f"[route_registry] не удалось сохранить состояние в {state_path} (не критично, "
                   f"следующий запуск просто сделает полный bootstrap): {exc}", file=sys.stderr)
 
-    return registry, latest
+    return registry, latest, from_block
 
 
 def main() -> None:
@@ -707,7 +754,7 @@ def main() -> None:
     успешные транзакции 0x1b357e7a... из фида в реальном времени...
     Его сделка -- не сигнал для нашей отправки, только для пополнения
     списка.\""""
-    registry, latest = bootstrap_registry()
+    registry, latest, _resume_from_block = bootstrap_registry()
     for rid, res in registry.liveness.items():
         route = registry.routes[rid]
         print(f"  [{route.source}] {route.label}: live={res['live']} "
