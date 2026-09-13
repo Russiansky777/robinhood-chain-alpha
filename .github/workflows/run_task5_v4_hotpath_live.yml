@@ -107,17 +107,37 @@ jobs:
           # run_task5_deploy_executor_v4.yml и run_task5_verify_deploy_v4.yml).
           # $LOG/$PIDFILE/$!/$(...) НАРОЧНО экранированы (\$) -- это
           # переменные УДАЛЁННОГО bash, вычисляются ПОСЛЕ доставки по SSH.
+          #
+          # ПРАВКА (продолжение шестого раунда ревью): загрузка окружения
+          # (/etc/bot/env, PRIVATE_KEY_NOX) была ПРОПУЩЕНА -- Sender внутри
+          # task5_v4_hotpath.py читает PRIVATE_KEY_NOX из окружения ЭТОГО
+          # процесса, а не подхватывает его сам. `set -a; . /etc/bot/env;
+          # set +a` -- ДО cd/запуска Python; `: "${PRIVATE_KEY_NOX:?...}"`
+          # -- явная остановка (под `set -u` внутри `set -euo pipefail`
+          # это ШТАТНАЯ, не аварийная форма проверки: `:?` перехватывает
+          # незаданную/пустую переменную сам, до того как nounset успеет
+          # её увидеть) с понятным сообщением, БЕЗ печати значения ключа
+          # -- ни здесь, ни где-либо ещё в этом шаге. `\"...\"` и `\$` --
+          # то же экранирование через вложенную (outer ssh -> sudo bash -c
+          # в одинарных кавычках) строку, что и везде в этом шаге.
+          # `python -u` -- без буферизации stdout/stderr, чтобы лог на
+          # диске отражал прогресс пилота НЕМЕДЛЕННО, а не только после
+          # закрытия файлового дескриптора.
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -euo pipefail
             sudo -u bot bash -c '
               set -euo pipefail
+              set -a
+              . /etc/bot/env
+              set +a
+              : \"\${PRIVATE_KEY_NOX:?PRIVATE_KEY_NOX не загружен}\"
               cd /home/bot/robinhood-chain-alpha
               git fetch origin $LIVE_SHA
               git checkout $LIVE_SHA
               cd analysis
               LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
               PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
-              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds 3600 > \"\$LOG\" 2>&1 < /dev/null &
+              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds 3600 > \"\$LOG\" 2>&1 < /dev/null &
               echo \$! > \"\$PIDFILE\"
               sleep 1
               echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
