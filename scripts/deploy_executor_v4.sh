@@ -15,13 +15,21 @@ CHAIN_ID="${CHAIN_ID:-4663}"
 OUT="${OUT:-/home/bot/data/deploy_result_v4.json}"
 
 if [ -r /etc/bot/env ]; then set -a; . /etc/bot/env; set +a; fi
-: "${PRIVATE_KEY_NOX:?PRIVATE_KEY_NOX не найден в /etc/bot/env}"
+# Пункт 6 (внешнее ревью, третий раунд): деплой ОТДЕЛЬНЫМ кошельком
+# пилота -- его ключ лежит в СВОЁМ файле (task5_v4_prepare_pilot_wallet.py),
+# НЕ в /etc/bot/env. Явно источаем этот файл, ЕСЛИ он существует, ДО
+# проверки обязательных переменных -- /etc/bot/env (PRIVATE_KEY_NOX)
+# остаётся НЕТРОНУТЫМ для всех остальных задач.
+PILOT_WALLET_ENV="${PILOT_WALLET_ENV:-/home/bot/data/task5_v4_pilot_wallet.env}"
+if [ -r "$PILOT_WALLET_ENV" ]; then set -a; . "$PILOT_WALLET_ENV"; set +a; fi
+DEPLOY_PRIVATE_KEY="${PRIVATE_KEY_TASK5_V4_PILOT:-${PRIVATE_KEY_NOX:-}}"
+: "${DEPLOY_PRIVATE_KEY:?ни PRIVATE_KEY_TASK5_V4_PILOT (см. $PILOT_WALLET_ENV), ни PRIVATE_KEY_NOX не найдены}"
 
 WORK="$(mktemp -d)"; cd "$WORK"
 curl -fsSL "$RAW/contracts/build/ClosedCycleExecutorV4.bytecode.txt" -o bytecode.txt
 python3 -m venv v >/dev/null && . v/bin/activate && pip install -q web3 eth-account >/dev/null
 
-PRIVATE_KEY_NOX="$PRIVATE_KEY_NOX" OWNER="$OWNER" POOL_MANAGER="$POOL_MANAGER" RPC_URL="$RPC_URL" SEQ_URL="$SEQ_URL" CHAIN_ID="$CHAIN_ID" OUT="$OUT" python3 - <<'PY'
+DEPLOY_PRIVATE_KEY="$DEPLOY_PRIVATE_KEY" OWNER="$OWNER" POOL_MANAGER="$POOL_MANAGER" RPC_URL="$RPC_URL" SEQ_URL="$SEQ_URL" CHAIN_ID="$CHAIN_ID" OUT="$OUT" python3 - <<'PY'
 import json, os, time
 from web3 import Web3
 from eth_account import Account
@@ -29,7 +37,7 @@ from eth_abi import encode
 
 rpc = Web3(Web3.HTTPProvider(os.environ["RPC_URL"], request_kwargs={"timeout": 15}))
 seq = Web3(Web3.HTTPProvider(os.environ["SEQ_URL"], request_kwargs={"timeout": 10}))
-acct = Account.from_key(os.environ["PRIVATE_KEY_NOX"])
+acct = Account.from_key(os.environ["DEPLOY_PRIVATE_KEY"])
 owner = Web3.to_checksum_address(os.environ["OWNER"])
 pool_manager = Web3.to_checksum_address(os.environ["POOL_MANAGER"])
 chain_id = int(os.environ["CHAIN_ID"])
