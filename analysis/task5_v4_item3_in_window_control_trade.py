@@ -102,12 +102,14 @@ PREVIOUSLY_USED_PRE_PILOT_BLOCK = 61630766
 REASON_LOG_FILE = Path("/home/bot/data/task5_v4_pilot_no_send_log.jsonl")
 ATTEMPT_TABLE_FILE = Path("/home/bot/data/task5_v4_pilot_attempts.jsonl")
 
-# Границы шире, чем в task5_v4_control_and_revert_deep_dive.py (та охватывала
-# только окрестность контрольной tx 61630766) -- окно ПИЛОТА (03:19:20Z..11:51:03Z,
-# 8.5ч) может выходить за старые границы; честная проверка "вне диапазона" в
-# find_block_by_timestamp сама укажет, если и этих границ не хватит.
+# ПРАВКА (первый реальный прогон): фиксированная верхняя граница
+# (62600000) оказалась ЗА пределами реально существующей на данный
+# момент цепи (get_block вернул None) -- "не удалось получить границы"
+# без уточнения, какая именно граница. Нижняя -- по-прежнему фиксирована
+# (заведомо ДО старта пилота, реально существует), верхняя -- РЕАЛЬНЫЙ
+# "latest" тек момента запуска (гарантированно существует и заведомо
+# после конца пилота, т.к. пилот уже закончился в прошлом).
 BINSEARCH_LOW = 61600000
-BINSEARCH_HIGH = 62600000
 
 
 def _iso_to_epoch(iso: str) -> float:
@@ -116,14 +118,18 @@ def _iso_to_epoch(iso: str) -> float:
         tzinfo=datetime.timezone.utc).timestamp()
 
 
-def find_block_by_timestamp(target_ts: float) -> dict:
-    lo, hi = BINSEARCH_LOW, BINSEARCH_HIGH
+def find_block_by_timestamp(target_ts: float, hi_bound: int | None = None) -> dict:
+    lo = BINSEARCH_LOW
+    hi = hi_bound if hi_bound is not None else int(_rpc_call("eth_blockNumber", []), 16)
     lo_block = get_block(lo)
     hi_block = get_block(hi)
-    if lo_block is None or hi_block is None:
-        return {"ok": False, "error": "не удалось получить границы бинарного поиска"}
+    if lo_block is None:
+        return {"ok": False, "error": f"не удалось получить нижнюю границу (блок {lo})"}
+    if hi_block is None:
+        return {"ok": False, "error": f"не удалось получить верхнюю границу (блок {hi})"}
     if not (int(lo_block["timestamp"], 16) <= target_ts <= int(hi_block["timestamp"], 16)):
-        return {"ok": False, "error": "target_ts вне границ поиска", "lo_ts": int(lo_block["timestamp"], 16),
+        return {"ok": False, "error": "target_ts вне границ поиска", "lo": lo, "hi": hi,
+                 "lo_ts": int(lo_block["timestamp"], 16),
                  "hi_ts": int(hi_block["timestamp"], 16), "target_ts": target_ts}
     while hi - lo > 1:
         mid = (lo + hi) // 2
@@ -514,8 +520,10 @@ def main() -> None:
     }
 
     print("[item3] бинарный поиск блоков начала/конца пилота...")
-    start_block_lookup = find_block_by_timestamp(_iso_to_epoch(PILOT_START_UTC))
-    end_block_lookup = find_block_by_timestamp(_iso_to_epoch(PILOT_END_UTC))
+    latest_block_now = int(_rpc_call("eth_blockNumber", []), 16)
+    result["latest_block_at_script_run"] = latest_block_now
+    start_block_lookup = find_block_by_timestamp(_iso_to_epoch(PILOT_START_UTC), hi_bound=latest_block_now)
+    end_block_lookup = find_block_by_timestamp(_iso_to_epoch(PILOT_END_UTC), hi_bound=latest_block_now)
     result["pilot_start_block_lookup"] = start_block_lookup
     result["pilot_end_block_lookup"] = end_block_lookup
     if not start_block_lookup.get("ok") or not end_block_lookup.get("ok"):
