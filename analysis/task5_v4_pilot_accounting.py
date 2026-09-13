@@ -103,6 +103,13 @@ class AttemptTableRow:
     computed_at_block: int | None = None
     state_age_blocks: int | None = None
     rpc_call_count: int | None = None  # пункт 6 (седьмой раунд): число RPC-вызовов торгового пути на ЭТОГО кандидата
+    # ПРАВКА (восьмой раунд, пункт 2): разбивка latency_recv_to_send_s (уже
+    # существующее, суммарное) на стадии -- queue_wait_s (сигнал получен ->
+    # забран из очереди evaluator'ом) и calc_duration_s (забран из очереди ->
+    # непосредственно перед сетевой отправкой). Обе -- монотонные, None если
+    # соответствующие метки не были доступны в этом пути (напр. dry-run).
+    queue_wait_s: float | None = None
+    calc_duration_s: float | None = None
 
 
 class PilotBudget:
@@ -621,17 +628,36 @@ class ReasonLog:
 
     def log(self, route_id: str, route_label: str, reason: str, detail: str = "", *,
             size_in_raw: int | None = None, quote_block: int | None = None,
-            calldata_hex: str | None = None, rpc_call_count: int | None = None) -> None:
-        """Пункт 6 (седьмой раунд, разбор владельца): "для прибыльных
-        кандидатов и ошибок симуляции -- сохранять размер, calldata,
-        блок котировки, параметры оценки газа". Необязательные
-        keyword-only поля -- обратная совместимость с существующими
-        вызовами (все старые остаются рабочими без изменений); заданы
-        ТОЛЬКО там, где вызывающий код уже реально держит эти значения
-        под рукой (не выдумываются задним числом)."""
+            calldata_hex: str | None = None, rpc_call_count: int | None = None,
+            signal_block: int | None = None, t_detected_monotonic: float | None = None,
+            t_dequeued_monotonic: float | None = None, t_calc_start_monotonic: float | None = None,
+            t_calc_end_monotonic: float | None = None) -> None:
+        """Пункт 6 (седьмой раунд): "для прибыльных кандидатов и ошибок
+        симуляции -- сохранять размер, calldata, блок котировки,
+        параметры оценки газа". Необязательные keyword-only поля --
+        обратная совместимость с существующими вызовами.
+
+        ПРАВКА (восьмой раунд, разбор владельца, пункт 2): "для каждого
+        РЕАЛЬНО НАЧАТОГО расчёта -- route_id, блок сигнала, время
+        получения/постановки в очередь, начало и конец расчёта, итоговую
+        причину, число RPC-вызовов; длительности -- монотонными часами;
+        пиши результат ТАКЖЕ при раннем отказе и исключении". Сами
+        monotonic-метки (time.monotonic()) сравнимы ТОЛЬКО внутри одного
+        процесса -- поэтому в журнал пишутся не сырые метки, а ПРОИЗВОДНЫЕ
+        длительности (queue_wait_s = t_dequeued-t_detected, calc_duration_s
+        = t_calc_end-t_calc_start), посчитанные ЗДЕСЬ, один раз, а не в
+        каждом месте вызова -- иначе риск разъехаться при копировании
+        формулы по ~15 местам _evaluate_and_maybe_send. None, если
+        соответствующая пара меток не передана (вызывающий код ДО начала
+        расчёта -- см. вызовы из evaluator_loop до _evaluate_and_maybe_send)."""
+        queue_wait_s = (t_dequeued_monotonic - t_detected_monotonic
+                         if t_dequeued_monotonic is not None and t_detected_monotonic is not None else None)
+        calc_duration_s = (t_calc_end_monotonic - t_calc_start_monotonic
+                            if t_calc_end_monotonic is not None and t_calc_start_monotonic is not None else None)
         rec = {"ts_wall": time.time(), "route_id": route_id, "route_label": route_label,
                "reason": reason, "detail": detail, "size_in_raw": size_in_raw, "quote_block": quote_block,
-               "calldata_hex": calldata_hex, "rpc_call_count": rpc_call_count}
+               "calldata_hex": calldata_hex, "rpc_call_count": rpc_call_count, "signal_block": signal_block,
+               "queue_wait_s": queue_wait_s, "calc_duration_s": calc_duration_s}
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         print(f"[pilot][не отправлено] {route_label}: {reason} ({detail})")

@@ -1467,15 +1467,59 @@ class HotPath:
                                          f"{recheck.get('error')} -- статус маршрута НЕ изменён, пропускаю "
                                          f"этот сигнал")
                     continue
+            # ПРАВКА (восьмой раунд, разбор владельца, пункт 2): момент,
+            # когда сигнал РЕАЛЬНО забран из очереди evaluator'ом --
+            # ОТДЕЛЬНАЯ метка от recv_t_monotonic (момент обнаружения/
+            # постановки в очередь, см. _CoalescingRouteQueue.mark) --
+            # разница между ними и есть время ожидания в очереди.
+            t_dequeued_monotonic = time.monotonic()
             self.busy = True
             try:
-                self._evaluate_and_maybe_send(route, block_number, recv_t_monotonic)
+                self._evaluate_and_maybe_send(route, block_number, recv_t_monotonic, t_dequeued_monotonic)
             except Exception as exc:  # noqa: BLE001
                 print(f"[hotpath] ошибка при оценке маршрута {route.label}: {exc}", file=sys.stderr)
+                # ПРАВКА (восьмой раунд, пункт 2): "пиши результат ТАКЖЕ
+                # при исключении" -- раньше необработанное исключение
+                # уходило ТОЛЬКО в stderr, reason_log про этот кандидат
+                # молчал (тот самый "молчаливого ожидания быть не
+                # должно", который и оправдывает существование
+                # reason_log, здесь же нарушался). t_calc_start здесь --
+                # честно t_dequeued (реальное начало _evaluate_and_
+                # maybe_send неизвестно -- исключение могло случиться и
+                # ДО первой содержательной строки функции).
+                self.reason_log.log(route.route_id, route.label, REASON_CALC_ERROR,
+                                     f"необработанное исключение при оценке: {exc}",
+                                     signal_block=block_number, t_detected_monotonic=recv_t_monotonic,
+                                     t_dequeued_monotonic=t_dequeued_monotonic,
+                                     t_calc_start_monotonic=t_dequeued_monotonic,
+                                     t_calc_end_monotonic=time.monotonic(),
+                                     rpc_call_count=_read_rpc_call_count())
             finally:
                 self.busy = False
 
-    def _evaluate_and_maybe_send(self, route: RouteCycle, block_number: int, recv_t_monotonic: float) -> None:
+    def _evaluate_and_maybe_send(self, route: RouteCycle, block_number: int, recv_t_monotonic: float,
+                                  t_dequeued_monotonic: float) -> None:
+        # ПРАВКА (восьмой раунд, разбор владельца, пункт 2): "для каждого
+        # РЕАЛЬНО НАЧАТОГО расчёта -- route_id, блок сигнала, время
+        # получения/постановки в очередь, начало и конец расчёта, итоговую
+        # причину, число RPC-вызовов; длительности -- монотонными часами;
+        # пиши результат ТАКЖЕ при раннем отказе". t_calc_start -- ЗДЕСЬ,
+        # реальное начало содержательного расчёта (сразу после того, как
+        # evaluator_loop забрал сигнал из очереди и решил, что маршрут
+        # живой). Локальная замкнутая _log_reason() ниже -- ЕДИНАЯ точка,
+        # через которую идут ВСЕ выходы этой функции без отправки, чтобы
+        # не копировать 5 monotonic-меток в ~15 мест вручную (риск
+        # разъехаться при правке одного места и забыть другое).
+        t_calc_start_monotonic = time.monotonic()
+
+        def _log_reason(reason: str, detail: str = "", *, size_in_raw: int | None = None,
+                         quote_block: int | None = None, calldata_hex: str | None = None) -> None:
+            self.reason_log.log(route.route_id, route.label, reason, detail,
+                                 size_in_raw=size_in_raw, quote_block=quote_block, calldata_hex=calldata_hex,
+                                 rpc_call_count=_read_rpc_call_count(), signal_block=block_number,
+                                 t_detected_monotonic=recv_t_monotonic, t_dequeued_monotonic=t_dequeued_monotonic,
+                                 t_calc_start_monotonic=t_calc_start_monotonic, t_calc_end_monotonic=time.monotonic())
+
         # Пункт 6 (седьмой раунд, разбор владельца): "минимальная
         # инструментация -- ... количество RPC-вызовов" -- сброс В НАЧАЛЕ
         # оценки ЭТОГО кандидата (см. докстринг rpc_call_trading_path
@@ -1487,12 +1531,12 @@ class HotPath:
         # подбор размера"). ---
         recompute = recompute_route(route, block_number)
         if not recompute["ok"]:
-            self.reason_log.log(route.route_id, route.label, recompute["reason"], recompute["detail"])
+            _log_reason(recompute["reason"], recompute["detail"])
             return
         if recompute["profit_raw"] <= 0:
-            self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"лучший размер {recompute['amount_in']}, профит(до газа)={recompute['profit_raw']} "
-                                 f"(блок {block_number})")
+            _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                        f"лучший размер {recompute['amount_in']}, профит(до газа)={recompute['profit_raw']} "
+                        f"(блок {block_number})", size_in_raw=recompute["amount_in"])
             return
 
         exit_decimals = 6 if route.exit_token.lower() == USDG.lower() else 18
@@ -1526,12 +1570,12 @@ class HotPath:
         first_check = _quote_and_estimate_gas_consistent(route, recompute["amount_in"], self.contract_address,
                                                            calldata, self.from_address)
         if not first_check["ok"]:
-            self.reason_log.log(route.route_id, route.label, first_check["reason"],
-                                 f"{first_check['detail']} (режим={first_check['mode']}, "
-                                 f"блок_до={first_check['block_before']}, блок_после={first_check['block_after']}, "
-                                 f"сигнал был на {block_number})",
-                                 size_in_raw=recompute["amount_in"], quote_block=first_check.get("block"),
-                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
+            _log_reason(first_check["reason"],
+                        f"{first_check['detail']} (режим={first_check['mode']}, "
+                        f"блок_до={first_check['block_before']}, блок_после={first_check['block_after']}, "
+                        f"сигнал был на {block_number})",
+                        size_in_raw=recompute["amount_in"], quote_block=first_check.get("block"),
+                        calldata_hex="0x" + calldata.hex())
             return
         effective_block = first_check["block"]
         effective_profit_raw = first_check["profit_raw"]
@@ -1542,9 +1586,8 @@ class HotPath:
         profit_after_gas, err = _profit_after_gas(effective_profit_raw, gas_res["gas_estimate"], gas_price,
                                                    weth_usdg_price)
         if profit_after_gas is None:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err,
-                                 size_in_raw=recompute["amount_in"], quote_block=effective_block,
-                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
+            _log_reason(REASON_SIMULATION_FAILED, err, size_in_raw=recompute["amount_in"],
+                        quote_block=effective_block, calldata_hex="0x" + calldata.hex())
             return
         if profit_after_gas <= 0:
             # ПРАВКА (седьмой раунд): для mode="block_param" состояние
@@ -1560,20 +1603,21 @@ class HotPath:
             # recompute["profit_raw"]<=0 выше, уже прошёл) -- ЭТО и есть
             # "прибыльный кандидат", отклонённый позже (после газа) --
             # сохраняем размер/calldata/блок котировки/число RPC-вызовов.
-            self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"профит после газа {profit_after_gas:.6f} <= 0 на {state_note} "
-                                 f"(сигнал был на {block_number})",
-                                 size_in_raw=recompute["amount_in"], quote_block=effective_block,
-                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
+            _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                        f"профит после газа {profit_after_gas:.6f} <= 0 на {state_note} "
+                        f"(сигнал был на {block_number})",
+                        size_in_raw=recompute["amount_in"], quote_block=effective_block,
+                        calldata_hex="0x" + calldata.hex())
             return
 
         can_send, why = self.budget.can_send()
         if not can_send:
-            self.reason_log.log(route.route_id, route.label, why, "")
+            _log_reason(why)
             return
 
         if self.dry_run or self.sender is None:
-            latency_s = time.monotonic() - recv_t_monotonic
+            t_send_monotonic = time.monotonic()
+            latency_s = t_send_monotonic - recv_t_monotonic
             print(f"[hotpath][DRY-RUN] отправил бы: {route.label} размер={recompute['amount_in']} "
                   f"профит_после_газа~{profit_after_gas:.6f} latency={latency_s*1000:.0f}мс блок={block_number}")
             row = AttemptTableRow(
@@ -1587,6 +1631,8 @@ class HotPath:
                 cumulative_net_pnl_usd=self.budget.cumulative_net_pnl_usd,
                 computed_at_block=block_number, state_age_blocks=0,
                 rpc_call_count=_read_rpc_call_count(),
+                queue_wait_s=t_dequeued_monotonic - recv_t_monotonic,
+                calc_duration_s=t_send_monotonic - t_calc_start_monotonic,
             )
             self.attempt_table.write(row)
             return
@@ -1618,12 +1664,14 @@ class HotPath:
             if not final_check["ok"] or final_check["profit_raw"] <= 0:
                 detail = final_check.get("detail", "") if not final_check["ok"] else (
                     f"профит {final_check['profit_raw']} <= 0")
-                self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"финальная проверка размера {final_amount_in} (режим="
-                                     f"{final_check.get('mode')}, блок_до={final_check.get('block_before')}, "
-                                     f"блок_после={final_check.get('block_after')}) не прошла: {detail} "
-                                     f"(согласованное решение было на {effective_block}, сигнал -- на "
-                                     f"{block_number}) -- уже не подходит, пропускаем кандидата")
+                _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                            f"финальная проверка размера {final_amount_in} (режим="
+                            f"{final_check.get('mode')}, блок_до={final_check.get('block_before')}, "
+                            f"блок_после={final_check.get('block_after')}) не прошла: {detail} "
+                            f"(согласованное решение было на {effective_block}, сигнал -- на "
+                            f"{block_number}) -- уже не подходит, пропускаем кандидата",
+                            size_in_raw=final_amount_in, quote_block=final_check.get("block"),
+                            calldata_hex="0x" + calldata.hex())
                 return
             final_profit_raw = final_check["profit_raw"]
             final_quote_block = final_check["block"]
@@ -1633,12 +1681,15 @@ class HotPath:
             profit_after_gas, err = _profit_after_gas(final_profit_raw, gas_res["gas_estimate"], gas_price,
                                                        weth_usdg_price)
             if profit_after_gas is None:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err)
+                _log_reason(REASON_SIMULATION_FAILED, err, size_in_raw=final_amount_in,
+                            quote_block=final_quote_block, calldata_hex="0x" + calldata.hex())
                 return
             if profit_after_gas <= 0:
-                self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"финальная проверка: после газа {profit_after_gas:.6f} <= 0 на согласованном "
-                                     f"блоке {final_quote_block} -- не отправляем")
+                _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                            f"финальная проверка: после газа {profit_after_gas:.6f} <= 0 на согласованном "
+                            f"блоке {final_quote_block} -- не отправляем",
+                            size_in_raw=final_amount_in, quote_block=final_quote_block,
+                            calldata_hex="0x" + calldata.hex())
                 return
 
         # --- Пункт 4 (третий раунд): единый гейт "новых отправок" --
@@ -1649,8 +1700,10 @@ class HotPath:
         # считалась (не только при заборе из очереди). ---
         gate_reason = self._gate_blocks_new_send()
         if gate_reason is not None:
-            self.reason_log.log(route.route_id, route.label, gate_reason,
-                                 "единый гейт отправки сработал ПОСЛЕ расчёта, ДО подготовки к отправке (пункт 4)")
+            _log_reason(gate_reason,
+                        "единый гейт отправки сработал ПОСЛЕ расчёта, ДО подготовки к отправке (пункт 4)",
+                        size_in_raw=final_amount_in, quote_block=final_quote_block,
+                        calldata_hex="0x" + calldata.hex())
             return
 
         # --- Пункт 1 (третий раунд): ВСЕ предварительные RPC-чтения
@@ -1677,30 +1730,33 @@ class HotPath:
         for round_i in range(MAX_MIN_PROFIT_RECONCILE_ROUNDS + 1):
             gas_res_final = estimate_gas(self.contract_address, calldata_final, self.from_address)
             if not gas_res_final["ok"]:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res_final["error"])
+                _log_reason(REASON_SIMULATION_FAILED, gas_res_final["error"], size_in_raw=final_amount_in,
+                            calldata_hex="0x" + calldata_final.hex())
                 return
             try:
                 tx_fields = self.sender.prepare_transaction_fields(self.contract_address, calldata_final,
                                                                      gas_res_final["gas_estimate"])
             except RuntimeError as exc:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                     f"prepare_transaction_fields (круг {round_i}) отказал: {exc}")
+                _log_reason(REASON_SIMULATION_FAILED, f"prepare_transaction_fields (круг {round_i}) отказал: {exc}",
+                            size_in_raw=final_amount_in, calldata_hex="0x" + calldata_final.hex())
                 return
             required_min_profit = compute_min_profit_raw(tx_fields["gas"], tx_fields["maxFeePerGas"],
                                                            route.exit_token, weth_usdg_price)
             if required_min_profit is None:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                     "не удалось согласовать minProfit со стоимостью газа (курс WETH/USDG "
-                                     "недоступен) -- честно пропускаем кандидата, не гадаем")
+                _log_reason(REASON_SIMULATION_FAILED,
+                            "не удалось согласовать minProfit со стоимостью газа (курс WETH/USDG "
+                            "недоступен) -- честно пропускаем кандидата, не гадаем",
+                            size_in_raw=final_amount_in, calldata_hex="0x" + calldata_final.hex())
                 return
             if encoded_min_profit >= required_min_profit:
                 break  # закодированный порог УЖЕ покрывает требуемый ПО ЭТОЙ ЖЕ подготовленной транзакции
             if round_i == MAX_MIN_PROFIT_RECONCILE_ROUNDS:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED,
-                                     f"minProfit не удалось согласовать за {MAX_MIN_PROFIT_RECONCILE_ROUNDS} "
-                                     f"доп. круга (закодировано {encoded_min_profit} raw, требуется "
-                                     f"{required_min_profit} raw) -- комиссия колеблется быстрее, чем успеваем "
-                                     f"пересобрать, пропускаем кандидата (ограниченный, не бесконечный подбор)")
+                _log_reason(REASON_SIMULATION_FAILED,
+                            f"minProfit не удалось согласовать за {MAX_MIN_PROFIT_RECONCILE_ROUNDS} "
+                            f"доп. круга (закодировано {encoded_min_profit} raw, требуется "
+                            f"{required_min_profit} raw) -- комиссия колеблется быстрее, чем успеваем "
+                            f"пересобрать, пропускаем кандидата (ограниченный, не бесконечный подбор)",
+                            size_in_raw=final_amount_in, calldata_hex="0x" + calldata_final.hex())
                 return
             calldata_final = build_execute_cycle_calldata(route, first_amount_specified, min_profit=required_min_profit)
             encoded_min_profit = required_min_profit
@@ -1724,9 +1780,11 @@ class HotPath:
             block_before_pf = int(rpc_call_trading_path("eth_blockNumber", []), 16)
             requote_pf = quote_route_at_size(route, final_amount_in, block_before_pf)
             if not requote_pf["ok"]:
-                self.reason_log.log(route.route_id, route.label, requote_pf["reason"],
-                                     f"пере-котировка перед итоговой проверкой (после согласования minProfit) "
-                                     f"не прошла: {requote_pf['detail']} (блок {block_before_pf})")
+                _log_reason(requote_pf["reason"],
+                            f"пере-котировка перед итоговой проверкой (после согласования minProfit) "
+                            f"не прошла: {requote_pf['detail']} (блок {block_before_pf})",
+                            size_in_raw=final_amount_in, quote_block=block_before_pf,
+                            calldata_hex="0x" + calldata_final.hex())
                 return
             block_after_pf = int(rpc_call_trading_path("eth_blockNumber", []), 16)
             if block_after_pf == block_before_pf:
@@ -1734,9 +1792,10 @@ class HotPath:
                 final_quote_block = block_before_pf
                 break
             if _pf_attempt == 1:
-                self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"блок сдвинулся ДВАЖДЫ подряд перед итоговой проверкой ({block_before_pf}"
-                                     f"->{block_after_pf}) -- кандидат устарел, пропускаем (не бесконечный подбор)")
+                _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                            f"блок сдвинулся ДВАЖДЫ подряд перед итоговой проверкой ({block_before_pf}"
+                            f"->{block_after_pf}) -- кандидат устарел, пропускаем (не бесконечный подбор)",
+                            size_in_raw=final_amount_in, calldata_hex="0x" + calldata_final.hex())
                 return
 
         # Консервативная проверка ПОСЛЕ согласования (пункт 5: "избегать
@@ -1747,19 +1806,23 @@ class HotPath:
         profit_after_gas_final, err_final = _profit_after_gas(final_profit_raw, gas_res_final["gas_estimate"],
                                                                 tx_fields["maxFeePerGas"], weth_usdg_price)
         if profit_after_gas_final is None:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err_final)
+            _log_reason(REASON_SIMULATION_FAILED, err_final, size_in_raw=final_amount_in,
+                        quote_block=final_quote_block, calldata_hex="0x" + calldata_final.hex())
             return
         if profit_after_gas_final <= 0:
-            self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"после согласования minProfit с газом ({encoded_min_profit} raw) профит "
-                                 f"после газа {profit_after_gas_final:.6f} <= 0 -- не отправляем")
+            _log_reason(REASON_NO_PROFITABLE_CYCLE,
+                        f"после согласования minProfit с газом ({encoded_min_profit} raw) профит "
+                        f"после газа {profit_after_gas_final:.6f} <= 0 -- не отправляем",
+                        size_in_raw=final_amount_in, quote_block=final_quote_block,
+                        calldata_hex="0x" + calldata_final.hex())
             return
         profit_after_gas = profit_after_gas_final
 
         ok_reserve, why_reserve = self.budget.reserve_for_send(tx_fields["gas"], tx_fields["maxFeePerGas"],
                                                                 weth_usdg_price)
         if not ok_reserve:
-            self.reason_log.log(route.route_id, route.label, why_reserve, "")
+            _log_reason(why_reserve, size_in_raw=final_amount_in, quote_block=final_quote_block,
+                        calldata_hex="0x" + calldata_final.hex())
             return
 
         prepared = self.sender.sign_prepared_transaction(tx_fields)  # tx_hash ЛОКАЛЬНО, ДО сети; nonce НЕ продвигается (см. sender.py, пункт 1)
@@ -1836,7 +1899,8 @@ class HotPath:
         # sign/begin_attempt -- это отдельная величина, см.
         # latency_recv_to_commit_s выше, используется ТОЛЬКО для
         # восстановления после краха ДО отправки).
-        actual_send_latency_s = time.monotonic() - recv_t_monotonic
+        t_send_monotonic = time.monotonic()
+        actual_send_latency_s = t_send_monotonic - recv_t_monotonic
         result = self.sender.submit_prepared(prepared)
         # tx_hash ИЗВЕСТЕН ВСЕГДА (см. PreparedTx) -- "неопределённая
         # отправка" теперь означает result.unresolved=True, НЕ "не ушла".
@@ -1956,6 +2020,8 @@ class HotPath:
                 cumulative_net_pnl_usd=self.budget.cumulative_net_pnl_usd,
                 computed_at_block=final_quote_block, state_age_blocks=state_age_blocks,
                 rpc_call_count=_read_rpc_call_count(),
+                queue_wait_s=t_dequeued_monotonic - recv_t_monotonic,
+                calc_duration_s=t_send_monotonic - t_calc_start_monotonic,
             )
             self.attempt_table.write(row)
             self.budget.mark_pending_row_written()

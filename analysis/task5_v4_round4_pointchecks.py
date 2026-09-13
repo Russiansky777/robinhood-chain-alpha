@@ -313,7 +313,7 @@ def check4_stop_between_gate_and_send() -> None:
     try:
         hotpath = hp.HotPath(registry, "0x0000000000000000000000000000000000000002", sender.address,
                               budget, attempt_table, reason_log, hp._RpcPriorityHint(), sender=sender, dry_run=False)
-        hotpath._evaluate_and_maybe_send(route, 1000, hp.time.monotonic())
+        hotpath._evaluate_and_maybe_send(route, 1000, hp.time.monotonic(), hp.time.monotonic())
     finally:
         hp.STOP_FILE_PATH = orig_stop_file
         hp._rpc_call = orig_rpc_call
@@ -408,7 +408,7 @@ def check6_fee_changes_between_prepares() -> None:
     try:
         hotpath = hp.HotPath(registry, "0x0000000000000000000000000000000000000003", sender.address,
                               budget, attempt_table, reason_log, hp._RpcPriorityHint(), sender=sender, dry_run=False)
-        hotpath._evaluate_and_maybe_send(route, 2000, hp.time.monotonic())
+        hotpath._evaluate_and_maybe_send(route, 2000, hp.time.monotonic(), hp.time.monotonic())
     finally:
         hp._rpc_call = orig_rpc_call
         hp.rpc_call_trading_path = orig_rpc_call_trading_path
