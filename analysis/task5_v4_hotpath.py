@@ -119,9 +119,10 @@ def _read_rpc_call_count() -> int:
         return _rpc_call_count
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
-    BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_HOOK_MODEL_ABSENT, REASON_INVALID_POOL_CONFIG, REASON_NO_LIQUIDITY,
-    REASON_NO_PROFITABLE_CYCLE, REASON_SIMULATION_FAILED, AttemptTable, AttemptTableRow, PilotBudget, ReasonLog,
-    check_accounting_consistency, check_no_unexpected_token_spend,
+    BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_HOOK_MODEL_ABSENT, REASON_INVALID_POOL_CONFIG,
+    REASON_LIVENESS_RECHECK_DEFERRED, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE, REASON_SIMULATION_FAILED,
+    AttemptTable, AttemptTableRow, PilotBudget, ReasonLog, check_accounting_consistency,
+    check_no_unexpected_token_spend,
 )
 from task5_v4_quote_replay import quote_exact_input_single, V4_QUOTER  # noqa: E402
 from task5_v4_pool_math import decode_quote_result, decode_v4_swap_log_data, quote_exact_input_multihop_calldata  # noqa: E402
@@ -156,11 +157,12 @@ def current_weth_usdg_price() -> float | None:
 
 SWAP_TOPIC0 = topic0("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)")
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
-# Потолок отдельной, НЕ приоритетной очереди хук-маршрутов без
-# подтверждённой модели (см. HotPath._mark_hook_review) -- намеренно
+# Потолок отдельных, НЕ приоритетных очередей (хук-маршруты без модели /
+# маршруты, помеченные не живыми -- см. HotPath._mark_bounded) -- намеренно
 # небольшой: цель -- не дать им забить основную очередь/RPC-бюджет
 # (владелец), а не гарантировать, что каждый такой маршрут дождётся оценки.
 HOOK_REVIEW_QUEUE_MAXLEN = 200
+LIVENESS_RECHECK_QUEUE_MAXLEN = 200
 OWNER_SELECTOR = "0x8da5cb5b"  # keccak256("owner()")[:4] -- переиспользован, уже проверен этой сессией
 
 # ПРАВКА (шестой раунд, пункт 5A/5F): poll_once() (детектор) теперь
@@ -1477,6 +1479,14 @@ class HotPath:
         self._pool_cache = PoolStateCache()
         self._hook_review_queue: dict[str, tuple[int, float, float]] = {}
         self._hook_review_lock = threading.Lock()
+        # ПРАВКА (владелец: "неактивный маршрут не должен обходить отбор и
+        # без ограничений занимать главную очередь -- перепроверку живучести
+        # направь в ограниченный фоновый путь"): ТА ЖЕ ограниченная,
+        # неприоритетная семантика, что и очередь пересмотра хуков выше,
+        # для маршрутов, уже помеченных не живыми -- раньше они шли В
+        # ГЛАВНУЮ очередь БЕЗ ОГРАНИЧЕНИЙ на каждое касание.
+        self._liveness_recheck_queue: dict[str, tuple[int, float, float]] = {}
+        self._liveness_recheck_lock = threading.Lock()
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -1586,29 +1596,33 @@ class HotPath:
                 self._admit_touched_route(route, latest, recv_t_monotonic)
 
     def _admit_touched_route(self, route: RouteCycle, block_number: int, recv_t_monotonic: float) -> None:
-        """Куда идёт задетый маршрут (владелец, уточнение перед
-        реализацией): ТОЛЬКО живые маршруты проходят через дешёвый
-        фильтр -- маршруты, уже исключённые как не живые, идут В
-        ГЛАВНУЮ очередь БЕЗ ИЗМЕНЕНИЙ (там их ждёт РЕАЛЬНАЯ, уже
-        существующая перепроверка живучести по свежему сигналу в
-        evaluator_loop -- эта правка её не трогает, слишком рискованно
-        менять два механизма одним изменением). Для живых маршрутов:
+        """Куда идёт задетый маршрут:
+          - маршрут, уже помеченный не живым -- владелец: "не должен
+            обходить отбор и без ограничений занимать главную очередь --
+            перепроверку живучести направь в ограниченный фоновый путь.
+            После восстановления состояния/живучести возвращай их в
+            обычный отбор." -- ОТДЕЛЬНАЯ, ОГРАНИЧЕННАЯ очередь пересмотра
+            живучести (НЕ self._queue); как только is_live() снова станет
+            True, СЛЕДУЮЩЕЕ касание этого route_id естественно пойдёт
+            через обычный дешёвый фильтр ниже (проверка is_live выполняется
+            заново на КАЖДОМ вызове, никакого отдельного "возврата" не
+            требуется -- он уже гарантирован тем, что решение не кэшируется);
           - пул(ы) ещё не в кэше -- тихо пропускаем касание (транзиентно,
             следующее реальное событие проинициализирует; "маршрут
             допускается к фильтру ПОСЛЕ инициализации всех его пулов" --
             владелец), НЕ создаём кандидата и НЕ логируем шум;
           - фильтр пройден (verdict="passed") -- в ГЛАВНУЮ очередь, как раньше;
           - фильтр честно отклонил по цене (verdict="rejected_by_price") --
-            кандидат НЕ создаётся вовсе (это и есть цель: перестать
-            гонять полную сетку на заведомо не расходящемся касании) --
-            ничего не логируем (не был посчитан, не был отсеян -- просто
-            не подан; см. докстринг cheap_filter_route: это оценка
-            расхождения, не гарантия прибыли);
+            кандидат НЕ создаётся вовсе -- ничего не логируем (не был
+            посчитан, не был отсеян -- просто не подан; см. докстринг
+            cheap_filter_route: это оценка расхождения, не гарантия прибыли);
           - verdict="hook_model_absent" -- ОТДЕЛЬНАЯ, ОГРАНИЧЕННАЯ очередь
             (НЕ основная) -- владелец: "не отправляй все непокрытые
             хук-маршруты автоматически в прежнюю очередь"."""
         if not self.registry.is_live(route.route_id):
-            self._queue.mark(route.route_id, block_number, recv_t_monotonic)
+            self._mark_bounded(self._liveness_recheck_queue, self._liveness_recheck_lock,
+                                LIVENESS_RECHECK_QUEUE_MAXLEN, route.route_id, block_number, recv_t_monotonic,
+                                REASON_LIVENESS_RECHECK_DEFERRED, "очереди пересмотра живучести")
             return
 
         result = cheap_filter_route(route, self._pool_cache, block_number)
@@ -1620,40 +1634,50 @@ class HotPath:
         if result.verdict == "rejected_by_price":
             return  # см. докстринг выше -- намеренно НЕ логируется как "невыгодно"
         # result.verdict == "hook_model_absent"
-        self._mark_hook_review(route.route_id, block_number, recv_t_monotonic)
+        self._mark_bounded(self._hook_review_queue, self._hook_review_lock, HOOK_REVIEW_QUEUE_MAXLEN,
+                            route.route_id, block_number, recv_t_monotonic, REASON_HOOK_MODEL_ABSENT,
+                            "очереди пересмотра хуков")
 
-    def _mark_hook_review(self, route_id: str, block_number: int, recv_t_monotonic: float) -> None:
-        """Ограниченная, НЕ приоритетная очередь для хук-маршрутов без
-        подтверждённой модели -- та же коалесцирующая семантика
-        (первое/последнее касание раздельно), но с потолком размера:
-        при переполнении вытесняется САМАЯ старая запись (FIFO) с ЧЕСТНЫМ
-        логом REASON_HOOK_MODEL_ABSENT ("не оценивалось", НЕ "невыгодно"
-        -- владелец) -- никогда не молчим про кандидата, которого не
-        стали считать."""
-        with self._hook_review_lock:
-            prev = self._hook_review_queue.get(route_id)
+    def _mark_bounded(self, queue: dict, lock: threading.Lock, maxlen: int, route_id: str, block_number: int,
+                       recv_t_monotonic: float, evict_reason: str, evict_queue_label: str) -> None:
+        """Общая, ОГРАНИЧЕННАЯ, НЕ приоритетная коалесцирующая очередь
+        (та же семантика first/last-touch, что и главная _CoalescingRouteQueue,
+        но с потолком размера) -- используется И для хук-маршрутов без
+        подтверждённой модели, И для маршрутов, уже помеченных не живыми
+        (владелец, тот же принцип для обоих: "не должны без ограничений
+        занимать главную очередь"). При переполнении вытесняется САМАЯ
+        старая запись (FIFO) с ЧЕСТНЫМ логом (НЕ "невыгодно" -- кандидат
+        вообще не был оценён)."""
+        with lock:
+            prev = queue.get(route_id)
             if prev is None:
-                if len(self._hook_review_queue) >= HOOK_REVIEW_QUEUE_MAXLEN:
-                    evicted_id, (evicted_block, evicted_first_t, _) = next(iter(self._hook_review_queue.items()))
-                    del self._hook_review_queue[evicted_id]
+                if len(queue) >= maxlen:
+                    evicted_id, (evicted_block, evicted_first_t, _) = next(iter(queue.items()))
+                    del queue[evicted_id]
                     evicted_route = self.registry.get_route(evicted_id)
                     if evicted_route is not None:
-                        self.reason_log.log(evicted_id, evicted_route.label, REASON_HOOK_MODEL_ABSENT,
-                                             f"вытеснено из ограниченной очереди пересмотра хуков (потолок "
-                                             f"{HOOK_REVIEW_QUEUE_MAXLEN}) сигналом на блоке {evicted_block} -- "
-                                             f"не оценивалось вовсе, НЕ 'невыгодно'",
+                        self.reason_log.log(evicted_id, evicted_route.label, evict_reason,
+                                             f"вытеснено из ограниченной {evict_queue_label} (потолок {maxlen}) "
+                                             f"сигналом на блоке {evicted_block} -- не оценивалось вовсе",
                                              t_first_enqueued_monotonic=evicted_first_t)
-                self._hook_review_queue[route_id] = (block_number, recv_t_monotonic, recv_t_monotonic)
+                queue[route_id] = (block_number, recv_t_monotonic, recv_t_monotonic)
             elif block_number >= prev[0]:
-                self._hook_review_queue[route_id] = (block_number, prev[1], recv_t_monotonic)
+                queue[route_id] = (block_number, prev[1], recv_t_monotonic)
+
+    @staticmethod
+    def _pop_bounded(queue: dict, lock: threading.Lock) -> tuple[str, int, float, float] | None:
+        with lock:
+            if not queue:
+                return None
+            route_id = next(iter(queue))
+            block_number, first_t, last_t = queue.pop(route_id)
+            return route_id, block_number, first_t, last_t
 
     def _pop_hook_review_one(self) -> tuple[str, int, float, float] | None:
-        with self._hook_review_lock:
-            if not self._hook_review_queue:
-                return None
-            route_id = next(iter(self._hook_review_queue))
-            block_number, first_t, last_t = self._hook_review_queue.pop(route_id)
-            return route_id, block_number, first_t, last_t
+        return self._pop_bounded(self._hook_review_queue, self._hook_review_lock)
+
+    def _pop_liveness_recheck_one(self) -> tuple[str, int, float, float] | None:
+        return self._pop_bounded(self._liveness_recheck_queue, self._liveness_recheck_lock)
 
     # --- ОЦЕНЩИК/ОТПРАВИТЕЛЬ: отдельный поток, разбирает очередь по
     # одному маршруту, всегда по САМОМУ СВЕЖЕМУ известному состоянию. ---
@@ -1662,11 +1686,14 @@ class HotPath:
             item = self._queue.pop_one(timeout_s=0.5)
             if item is None:
                 # Главная очередь пуста -- ПРИОРИТЕТ у неё уже отдан (полное
-                # ожидание timeout_s выше); теперь, и ТОЛЬКО теперь, один
-                # неблокирующий заход в ограниченную очередь хуков без
-                # модели -- "не блокирует кандидатов, прошедших быстрый
-                # фильтр" (владелец): она никогда не задерживает основную.
+                # ожидание timeout_s выше); теперь, и ТОЛЬКО теперь, по
+                # одному неблокирующему заходу в КАЖДУЮ из двух ограниченных
+                # очередей (хуки без модели / маршруты, помеченные не
+                # живыми) -- "не блокирует кандидатов, прошедших быстрый
+                # фильтр" (владелец): они никогда не задерживают основную.
                 item = self._pop_hook_review_one()
+                if item is None:
+                    item = self._pop_liveness_recheck_one()
                 if item is None:
                     continue
             if self._no_new_candidates.is_set():

@@ -123,7 +123,7 @@ def check4_unconfirmed_hook_goes_to_review_queue_not_main(tmp_path):
             ok, f"main={main_item}, hook_review={hook_item}")
 
 
-def check5_not_live_route_bypasses_filter_unchanged(tmp_path):
+def check5_not_live_route_goes_to_bounded_queue_not_main(tmp_path):
     hotpath, registry, _ = _make_hotpath(tmp_path)
     key_a = rr.PoolKey(rr.USDG, rr.MOSIAI, 3000, 60, rr.NATIVE)
     route = rr.RouteCycle("route_notlive", (rr.RouteLeg(key_a.currency0, key_a.currency1, key_a.fee,
@@ -131,13 +131,44 @@ def check5_not_live_route_bypasses_filter_unchanged(tmp_path):
                           rr.USDG, "notlive-route", "discovered")
     registry.add_route(route)
     registry.set_liveness(route.route_id, {"live": False})  # явно НЕ живой (по умолчанию is_live()==True!)
-    # НЕ применяем apply_swap_batch -- кэш пуст, но это НЕ должно иметь значения для этой ветки
     hotpath._admit_touched_route(route, 100, time.monotonic())
-    item = hotpath._queue.pop_one(timeout_s=0.1)
-    ok = item is not None and item[0] == route.route_id
-    _record("HP.5", "не-живой маршрут ИДЁТ В ГЛАВНУЮ очередь БЕЗ фильтра (перепроверка живучести "
-                     "в evaluator_loop не тронута этой правкой)",
-            ok, f"main queue item={item}")
+    main_item = hotpath._queue.pop_one(timeout_s=0.1)
+    liveness_item = hotpath._pop_liveness_recheck_one()
+    ok = main_item is None and liveness_item is not None and liveness_item[0] == route.route_id
+    _record("HP.5", "не-живой маршрут НЕ занимает главную очередь -- уходит в ограниченную очередь "
+                     "пересмотра живучести",
+            ok, f"main={main_item}, liveness_recheck={liveness_item}")
+
+
+def check5b_route_returns_to_normal_admission_after_liveness_restored(tmp_path):
+    hotpath, registry, _ = _make_hotpath(tmp_path)
+    key_a = rr.PoolKey(rr.USDG, rr.MOSIAI, 3000, 60, rr.NATIVE)
+    pid = rr.pool_id(key_a)
+    route = rr.RouteCycle("route_recovers", (rr.RouteLeg(key_a.currency0, key_a.currency1, key_a.fee,
+                                                          key_a.tick_spacing, key_a.hooks, True),),
+                          rr.USDG, "recovers-route", "discovered")
+    registry.add_route(route)
+    registry.set_liveness(route.route_id, {"live": False})
+    hotpath._admit_touched_route(route, 100, time.monotonic())
+    still_not_live_main = hotpath._queue.pop_one(timeout_s=0.1)
+    hotpath._pop_liveness_recheck_one()  # осушаем очередь пересмотра, как это сделал бы evaluator_loop
+
+    # Живучесть "восстановилась" (как это реально делает evaluator_loop после check_route_liveness)
+    registry.set_liveness(route.route_id, {"live": True})
+    sqrt_price = int((2.0 ** 0.5) * (2 ** 96))
+    hotpath._pool_cache.apply_swap_batch([{
+        "pool_id": pid, "block_number": 101, "log_index": 0,
+        "sqrt_price_x96": sqrt_price, "liquidity": 10 ** 20, "tick": 1000, "fee": 3000,
+    }])
+    hotpath._admit_touched_route(route, 101, time.monotonic())
+    main_item_after = hotpath._queue.pop_one(timeout_s=0.1)
+    liveness_item_after = hotpath._pop_liveness_recheck_one()
+    ok = (still_not_live_main is None and main_item_after is not None
+          and main_item_after[0] == route.route_id and liveness_item_after is None)
+    _record("HP.5b", "после восстановления живучести следующее касание идёт через обычный дешёвый "
+                      "фильтр (в главную очередь), не в очередь пересмотра",
+            ok, f"main_before={still_not_live_main}, main_after={main_item_after}, "
+                f"liveness_after={liveness_item_after}")
 
 
 def check6_confirmed_hook_model_matches_registry_key(tmp_path):
@@ -158,7 +189,8 @@ def main():
             check1_hookless_favorable_admitted, check2_hookless_unfavorable_dropped_silently,
             check3_not_yet_initialized_dropped_silently_not_queued,
             check4_unconfirmed_hook_goes_to_review_queue_not_main,
-            check5_not_live_route_bypasses_filter_unchanged,
+            check5_not_live_route_goes_to_bounded_queue_not_main,
+            check5b_route_returns_to_normal_admission_after_liveness_restored,
         ]):
             sub = Path(tmp) / f"case{i}"
             sub.mkdir(parents=True, exist_ok=True)
