@@ -363,20 +363,57 @@ def main() -> None:
             return
 
         # --- (c) реплей РЕАЛЬНОЙ tx конкурента -- на снимке ДО нашей сделки ---
+        # Баланс исполнителя и отправителя ДО отправки (тот же локальный блок,
+        # что и общий снимок) -- обычный eth_getBalance с явным номером блока,
+        # НЕ требует debug_* и не проксируется на платный тариф апстрима.
+        executor_addr_native = row.get("tx_to") or row.get("tx_from")
+        balances_before = {
+            "executor": int(_rpc_call("eth_getBalance", [executor_addr_native, hex(local_block_before_target)]), 16),
+            "tx_from": int(_rpc_call("eth_getBalance", [target_tx["from"], hex(local_block_before_target)]), 16),
+        }
+        result["balances_before_competitor_tx"] = balances_before
+
         target_tx = txs[tx_index]
         target_replay = impersonate_and_send(target_tx["from"], target_tx.get("to"), target_tx.get("input", "0x"),
                                               target_tx.get("value", "0x0"), target_tx.get("gas", "0x2dc6c0"))
         result["competitor_target_tx_replay"] = target_replay
         if target_replay["returncode"] == 0 and target_replay["tx_hash"]:
             local_hash = target_replay["tx_hash"]
-            comp_receipt = _rpc_call("eth_getTransactionReceipt", [local_hash])
+            comp_receipt = None
+            for _ in range(10):
+                comp_receipt = _rpc_call("eth_getTransactionReceipt", [local_hash])
+                if comp_receipt is not None:
+                    break
+                time.sleep(1)
             result["competitor_replay_receipt_status"] = int(comp_receipt["status"], 16) if comp_receipt else None
             result["competitor_replay_matches_real_status"] = (
                 comp_receipt is not None and int(comp_receipt["status"], 16) == row.get("status")
             )
+
+            local_block_after_target = int(run([CAST, "block-number", "--rpc-url", RPC], timeout=10).stdout.strip())
+            balances_after = {
+                "executor": int(_rpc_call("eth_getBalance", [executor_addr_native, hex(local_block_after_target)]),
+                                 16),
+                "tx_from": int(_rpc_call("eth_getBalance", [target_tx["from"], hex(local_block_after_target)]), 16),
+            }
+            result["balances_after_competitor_tx"] = balances_after
+            result["balance_diff_competitor_tx"] = {
+                "executor_native_eth_delta": balances_after["executor"] - balances_before["executor"],
+                "tx_from_native_eth_delta": balances_after["tx_from"] - balances_before["tx_from"],
+                "tx_from_delta_note": ("НЕ показательно -- impersonate_and_send() искусственно выставляет "
+                                        "tx.from баланс в 10**20 перед отправкой (anvil_setBalance) для гарантии "
+                                        "газа/value; только executor_native_eth_delta -- органический, честный "
+                                        "показатель (баланс исполнителя импersonate не трогает)"),
+            }
+
             # value-трасса локально СМАЙНЕННОЙ tx -- debug_traceTransaction на
-            # УЖЕ существующей tx (не гипотетический блок) -- см. итем4,
-            # тот же обходной путь тех же проблем "Excess blob gas not set".
+            # УЖЕ существующей tx (не гипотетический блок) -- см. итем4, тот
+            # же обходной путь проблемы "Excess blob gas not set". ПРАВКА
+            # (этот прогон): здесь debug_traceTransaction упал с ДРУГОЙ,
+            # честно зафиксированной причиной -- "not available on the Free
+            # tier" апстрим-провайдера форка (не hardfork/blob-gas) -- трасса
+            # необязательна, т.к. balance_diff выше уже даёт честный ответ
+            # на native-ETH профит без неё.
             trace_proc = run([CAST, "rpc", "debug_traceTransaction", local_hash,
                                json.dumps({"tracer": "callTracer"}), "--rpc-url", RPC], timeout=30)
             if trace_proc.returncode == 0:
