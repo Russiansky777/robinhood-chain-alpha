@@ -8,7 +8,12 @@ name: "Задача 5, деплой -- read-only проверка ЗАДЕПЛО
 # (read-only), НИКАКОЙ подписи/отправки.
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA (та же версия, что деплой) -- пусто -- текущий HEAD ветки claude/nifty-sagan-r0polg (обратная совместимость, напр. при push-триггере).'
+        required: false
+        default: ''
   push:
     branches:
       - claude/nifty-sagan-r0polg
@@ -40,20 +45,32 @@ jobs:
           ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: Подтянуть актуальный код и проверить деплой на цепи
+      - name: Подтянуть зафиксированную версию и проверить деплой на цепи
+        env:
+          VERIFY_REF: ${{ inputs.commit_sha }}
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+          # Пятый раунд ревью, пункт 4: "не используй git reset --hard
+          # как обязательный шаг запуска -- подготовь checkout выбранного
+          # коммита без уничтожения локальных изменений." `git checkout
+          # <ref>` (БЕЗ --hard/force) отказывается молча затирать
+          # конфликтующие незакоммиченные изменения (честная ошибка
+          # вместо тихого уничтожения) -- этого достаточно, раз рабочее
+          # дерево бота не редактируется вручную между запусками.
+          # REF -- ЗАФИКСИРОВАННЫЙ commit SHA (та же версия, что деплой),
+          # если явно передан; иначе -- ветка (обратная совместимость с
+          # push-триггером, где commit_sha не задаётся).
+          if [ -z "$VERIFY_REF" ]; then VERIFY_REF="claude/nifty-sagan-r0polg"; fi
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -e
-            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
-            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
-            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
-            sudo -u bot bash -c "
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin '$VERIFY_REF'
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout '$VERIFY_REF'
+            sudo -u bot bash -c '
               set -e
               cd /home/bot/robinhood-chain-alpha/analysis
               /home/bot/robinhood-chain-alpha/venv/bin/python task5_verify_deploy_v4.py
               cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_verification_v4.json
-            "
-          ' > /tmp/verify_deploy_v4_stdout.log 2> /tmp/verify_deploy_v4_stderr.log
+            '
+          " > /tmp/verify_deploy_v4_stdout.log 2> /tmp/verify_deploy_v4_stderr.log
           echo "--- stdout ---"; cat /tmp/verify_deploy_v4_stdout.log
           echo "--- stderr ---"; cat /tmp/verify_deploy_v4_stderr.log
 

@@ -233,8 +233,13 @@ def parse_cycle_executed_profit(receipt: dict, contract_address: str, expected_e
     """Ищет CycleExecuted ИМЕННО от contract_address в логах рецепта,
     возвращает поле profit (raw, в единицах exitToken). None, если лог
     не найден/не распознан/структура не соответствует ожидаемой --
-    вызывающий код обязан честно откатиться на balance-diff (с
-    осознанием её слабости после простоя), не молчать.
+    ПРАВКА (внешнее ревью, пятый раунд, пункт 2): вызывающий код НЕ
+    ДОЛЖЕН откатываться на разницу балансов как замену профиту (за
+    время простоя/восстановления контракт мог получить/потратить
+    средства ДРУГИМИ транзакциями -- balance-diff до latest НЕ
+    доказывает принадлежность прироста ИМЕННО этой попытке) -- прибыль
+    остаётся неустановленной, пилот останавливается с явной причиной
+    (см. HotPath._evaluate_and_maybe_send / _recover_profit_half).
 
     ПРАВКА (внешнее ревью, четвёртый раунд, пункт 7): "парсер должен
     проверять адрес контракта, exitToken и корректность структуры
@@ -324,8 +329,17 @@ STOP_FILE_PATH = Path("/etc/bot/STOP")
 
 # Собственный подбор размера (та же сетка, что task5_v4_observation_hour.py,
 # см. её докстринг про то, что размер НЕ подставляется вслепую).
+# Пункт 3 (внешнее ревью, пятый раунд): расширение КОНЕЧНОЙ пробной
+# сетки USDG -- 100/300/1000 USDG (100_000_000/300_000_000/
+# 1_000_000_000 raw, 6 decimals) добавлены СВЕРХ всех прежних меньших
+# размеров (НЕ заменяют их). ETH-сетка НЕ трогается. Это НЕ поиск
+# математического оптимума -- та же конечная сетка, только шире; новые
+# размеры НЕ обязывают отправлять крупную сделку -- recompute_route
+# (ниже) выбирает ЛУЧШИЙ размер из ВСЕХ прошедших котировку и проверку
+# прибыли, каким бы он ни оказался.
 SIZE_GRID_BY_START_TOKEN = {
-    USDG.lower(): [1_000_000, 3_000_000, 5_000_000, 7_000_000, 10_000_000, 15_000_000, 20_000_000, 30_000_000],
+    USDG.lower(): [1_000_000, 3_000_000, 5_000_000, 7_000_000, 10_000_000, 15_000_000, 20_000_000, 30_000_000,
+                   100_000_000, 300_000_000, 1_000_000_000],
     NATIVE: [int(x * 1e18) for x in (0.02, 0.05, 0.08, 0.1, 0.15, 0.2, 0.3)],
 }
 
@@ -362,7 +376,17 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
     свойство V4-пулов с концентрированной ликвидностью: больший размер
     строго не может пройти там, где не прошёл меньший -- сетка
     перебирается по возрастанию, при первом NotEnoughLiquidity --
-    немедленный останов."""
+    немедленный останов.
+
+    Пункт 3 (внешнее ревью, пятый раунд): при расширении сетки крупными
+    размерами (100/300/1000 USDG) `best` НИКОГДА не обнуляется и не
+    заменяется провалом -- если 100 USDG уже не котируется (или
+    котируется хуже уже найденного), УЖЕ найденный лучший МЕНЬШИЙ
+    размер остаётся в `best` и именно он возвращается; при этом более
+    крупный размер, если он и правда котируется ВЫГОДНЕЕ, законно его
+    заменит (`res["profit_raw"] > best["profit_raw"]`) -- выбирается
+    лучший из ВСЕХ реально прошедших котировку, а не обязательно самый
+    крупный."""
     start_token = route.legs[0].input_currency.lower()
     grid = SIZE_GRID_BY_START_TOKEN.get(start_token, SIZE_GRID_BY_START_TOKEN[USDG.lower()])
     best = None
@@ -535,7 +559,15 @@ def verify_nonce_consistency(sender, budget: PilotBudget) -> None:
     try:
         info = sender.describe_nonce_state()
     except Exception as exc:  # noqa: BLE001
-        print(f"[hotpath][nonce] не удалось проверить nonce при старте: {exc}", file=sys.stderr)
+        # ПРАВКА (пятый раунд ревью, пункт 1): раньше -- print + return,
+        # пилот мог начать торговать со СТАРЫМ, ни разу не проверенным
+        # nonce. Ончейн-nonce -- обязательное условие безопасной
+        # отправки (иначе можем сжечь/повторить чужой nonce) -- сбой
+        # ЭТОЙ проверки ТАК ЖЕ фатален, как сбой describe_nonce_state
+        # внутри самой отправки: honest halt, не тихое продолжение.
+        budget.halt(f"не удалось проверить актуальность nonce при старте ({exc}) -- НЕ отправляем со "
+                    f"старым, ни разу не подтверждённым nonce, СТОП")
+        print(f"[hotpath][nonce][СТОП] {budget.halt_reason}", file=sys.stderr)
         return
     pending_nonce = (budget.pending or {}).get("nonce")
     print(f"[hotpath][nonce] локальный={info['local_nonce']}, ончейн(pending)={info['onchain_nonce_pending']}, "
@@ -785,9 +817,22 @@ def _recover_profit_half(budget: PilotBudget, sender, attempt_table: AttemptTabl
                           receipt: dict | None = None) -> None:
     """Ветка C: газ уже учтён (gas_recorded=True), tx_status==1,
     finalized==False -- восстанавливаем ТОЛЬКО прибыльную половину.
-    Пункт 3 (третий раунд): предпочитаем CycleExecuted ЭТОЙ конкретной
-    транзакции (не подвержено контаминации другими транзакциями за время
-    простоя) вместо разницы балансов до неопределённого latest."""
+
+    ПРАВКА (внешнее ревью, пятый раунд, пункт 2): "нельзя записывать
+    разницу между старым балансом и latest как прибыль конкретной
+    сделки, если ожидаемое CycleExecuted отсутствует/некорректно." За
+    время между отправкой и восстановлением (может быть ДОЛГИМ --
+    рестарт после сбоя, дни простоя) контракт МОГ получить/потратить
+    средства ДРУГИМИ транзакциями (другой маршрут, другая попытка) --
+    balance-diff до неопределённого latest НЕ доказывает, что весь
+    прирост принадлежит ИМЕННО этой попытке. Раньше это использовалось
+    как "честный fallback" -- теперь: событие отсутствует -> прибыль
+    ОСТАЁТСЯ НЕУСТАНОВЛЕННОЙ, pending СОХРАНЯЕТСЯ (finalize_profit_
+    and_close НЕ вызывается), пилот останавливается с явной причиной.
+    Газ УЖЕ учтён (finalize_gas, до этой функции) -- это НЕ теряется.
+    Проверка балансов (check_no_unexpected_token_spend) ОСТАЁТСЯ -- но
+    ТОЛЬКО как независимый сигнал "утечки" токенов, НЕ как источник
+    числа для прибыли."""
     tx_hash = p.get("tx_hash")
     contract_address = p.get("contract_address")
     exit_token = p.get("exit_token")
@@ -802,23 +847,30 @@ def _recover_profit_half(budget: PilotBudget, sender, attempt_table: AttemptTabl
         if receipt is None:
             receipt = fetch_real_receipt(tx_hash)
         actual_gain_raw = parse_cycle_executed_profit(receipt, contract_address, exit_token) if receipt else None
-        used_event_log = actual_gain_raw is not None
-        if not used_event_log:
-            print(f"[hotpath][restart][ВНИМАНИЕ] CycleExecuted не найден/не распознан в рецепте {tx_hash} "
-                  f"-- честный fallback на разницу балансов (слабее после долгого простоя -- см. докстринг "
-                  f"parse_cycle_executed_profit).")
-            route_tokens = p["route_tokens"]
-            pre_balances = p["pre_balances"]
-            post_balances = {t: _token_balance(t, contract_address) for t in route_tokens}
-            actual_gain_raw = post_balances[exit_token.lower()] - pre_balances[exit_token.lower()]
-            ok_tokens, why_tokens = check_no_unexpected_token_spend(pre_balances, post_balances, exit_token)
-            if not ok_tokens:
-                budget.halt(why_tokens)
-                print(f"[hotpath][restart] СТОП: {why_tokens}")
-                return
+        if actual_gain_raw is None:
+            route_tokens = p.get("route_tokens")
+            pre_balances = p.get("pre_balances")
+            if route_tokens and pre_balances:
+                # НЕ как источник профита -- ТОЛЬКО как независимая
+                # проверка "не утекли ли другие токены маршрута".
+                try:
+                    post_balances = {t: _token_balance(t, contract_address) for t in route_tokens}
+                    ok_tokens, why_tokens = check_no_unexpected_token_spend(pre_balances, post_balances, exit_token)
+                    if not ok_tokens:
+                        budget.halt(why_tokens)
+                        print(f"[hotpath][restart] СТОП: {why_tokens}")
+                        return
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[hotpath][restart][ВНИМАНИЕ] проверка расхода токенов не удалась: {exc} "
+                          f"(не меняет решение ниже -- прибыль и так не подтверждена событием)")
+            budget.halt(f"не удалось подтвердить прибыль по событию CycleExecuted для {tx_hash} -- газ уже "
+                        f"учтён, прибыль ОСТАЁТСЯ НЕУСТАНОВЛЕННОЙ (разница балансов до неопределённого "
+                        f"latest НЕ используется как замена), pending СОХРАНЯЕТСЯ, требуется ручной разбор")
+            print(f"[hotpath][restart] СТОП: {budget.halt_reason}")
+            return
         budget.finalize_profit_and_close(actual_gain_raw)
-        print(f"[hotpath][restart] висящая попытка -- УСПЕХ, факт. прирост восстановлен и учтён "
-              f"({'CycleExecuted' if used_event_log else 'balance-diff'}).")
+        print(f"[hotpath][restart] висящая попытка -- УСПЕХ, факт. прирост подтверждён событием CycleExecuted "
+              f"и учтён.")
         _ensure_pending_row_written(budget.pending, attempt_table, budget)
         budget.mark_pending_row_written()
         budget.clear_finalized_pending()
@@ -1590,34 +1642,39 @@ class HotPath:
 
         # --- Остальное (балансы, сверка учёта, прибыльная половина PnL)
         # -- сбой здесь переводит пилот в ОСТАНОВКУ. Газ уже учтён выше в
-        # любом случае. Пункт 3 (третий раунд): прибыль -- ПРЕДПОЧТИТЕЛЬНО
-        # из CycleExecuted ЭТОЙ конкретной транзакции (не подвержено
-        # контаминации другими транзакциями за время простоя), разница
-        # балансов -- честный fallback с предупреждением. ---
+        # любом случае. ПРАВКА (пятый раунд, пункт 2): прибыль
+        # начисляется ИСКЛЮЧИТЕЛЬНО из CycleExecuted ЭТОЙ конкретной
+        # транзакции -- разница балансов ДО latest БОЛЬШЕ НЕ
+        # используется как замена отсутствующему/некорректному событию
+        # (за время между отправкой и обработкой контракт МОГ получить/
+        # потратить средства другими транзакциями -- balance-diff не
+        # доказывает принадлежность прироста ИМЕННО этой попытке).
+        # Проверка балансов (check_no_unexpected_token_spend) ОСТАЁТСЯ
+        # -- как НЕЗАВИСИМЫЙ сигнал утечки токенов, НЕ как источник
+        # числа для профита. ---
         actual_gain_base_asset = None
         if tx_status == 1:
             try:
                 actual_gain_raw = parse_cycle_executed_profit(receipt, self.contract_address, route.exit_token) if receipt else None
-                used_event_log = actual_gain_raw is not None
                 post_balances = {t: _token_balance(t, self.contract_address) for t in route_tokens}
-                if not used_event_log:
-                    print(f"[hotpath][ВНИМАНИЕ] CycleExecuted не найден/не распознан в рецепте "
-                          f"{prepared.tx_hash} -- честный fallback на разницу балансов (слабее -- см. "
-                          f"докстринг parse_cycle_executed_profit).")
-                    actual_gain_raw = post_balances[route.exit_token.lower()] - pre_balances[route.exit_token.lower()]
-                actual_gain_base_asset = actual_gain_raw / 10**exit_decimals
-
                 ok_tokens, why_tokens = check_no_unexpected_token_spend(pre_balances, post_balances, route.exit_token)
                 if not ok_tokens:
                     self.budget.halt(why_tokens)
                     print(f"[hotpath] СТОП: {why_tokens}")
 
-                ok_acct, why_acct = check_accounting_consistency(final_profit_raw, actual_gain_raw)
-                if not ok_acct:
-                    self.budget.halt(why_acct)
-                    print(f"[hotpath] СТОП: {why_acct}")
-
-                self.budget.finalize_profit_and_close(actual_gain_raw)
+                if actual_gain_raw is None:
+                    self.budget.halt(f"не удалось подтвердить прибыль по событию CycleExecuted для "
+                                     f"{prepared.tx_hash} -- газ уже учтён, прибыль ОСТАЁТСЯ "
+                                     f"НЕУСТАНОВЛЕННОЙ (разница балансов до latest НЕ используется как "
+                                     f"замена), pending СОХРАНЯЕТСЯ, требуется ручной разбор")
+                    print(f"[hotpath] СТОП: {self.budget.halt_reason}")
+                else:
+                    actual_gain_base_asset = actual_gain_raw / 10**exit_decimals
+                    ok_acct, why_acct = check_accounting_consistency(final_profit_raw, actual_gain_raw)
+                    if not ok_acct:
+                        self.budget.halt(why_acct)
+                        print(f"[hotpath] СТОП: {why_acct}")
+                    self.budget.finalize_profit_and_close(actual_gain_raw)
             except Exception as exc:  # noqa: BLE001
                 self.budget.halt(f"пост-обработка после отправки (баланс/PnL) упала: {exc} -- "
                                   f"газ уже учтён, прибыль/закрытие попытки -- НЕТ, требуется разбор")

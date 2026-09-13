@@ -25,6 +25,10 @@ on:
         description: 'Введите ровно "DEPLOY_V4", чтобы подтвердить: это реальная транзакция создания контракта ClosedCycleExecutorV4 на mainnet, тратит реальный ETH с кошелька владельца.'
         required: true
         type: string
+      commit_sha:
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA (не имя ветки) -- та же версия должна использоваться для деплоя, верификации (run_task5_verify_deploy_v4.yml) и LIVE-запуска, иначе байткод/код могут разойтись (пятый раунд ревью, пункт 4).'
+        required: true
+        type: string
 
 jobs:
   deploy_executor_v4:
@@ -60,12 +64,27 @@ jobs:
           ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: "Запустить scripts/deploy_executor_v4.sh (владельца) на Ohio -- ОДНА транзакция создания контракта"
+      - name: "Запустить scripts/deploy_executor_v4.sh (владельца) на Ohio -- ОДНА транзакция создания контракта, ЗАФИКСИРОВАННЫЙ commit"
+        env:
+          DEPLOY_SHA: ${{ inputs.commit_sha }}
         run: |
-          ssh $SSH_OPTS ubuntu@3.151.160.108 '
+          # Пятый раунд ревью, пункт 4: раньше URL скрипта был на
+          # ДВИЖУЩЕЙСЯ ветке (claude/nifty-sagan-r0polg) -- теперь ОДИН
+          # и тот же зафиксированный commit_sha используется И в URL
+          # скрипта, И как BRANCH внутри самого скрипта (для его
+          # СОБСТВЕННОГО curl байткода) -- деплой/верификация/LIVE
+          # согласованы одной версией. `$DEPLOY_SHA` подставляется ЭТОЙ
+          # (вызывающей, GH Actions runner) оболочкой ДО отправки команды
+          # по SSH -- значение попадает в удалённую команду как литерал,
+          # без зависимости от передачи окружения через sudo/pipe.
+          # `env BRANCH=... bash -c '...'` -- ЕДИНСТВЕННЫЙ надёжный
+          # способ дать BRANCH дочерним curl/bash (см. исправленный
+          # комментарий в самом deploy_executor_v4.sh про то, почему
+          # `VAR=... | sudo -E bash` НЕ работает).
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -e
-            curl -fsSL "https://raw.githubusercontent.com/russiansky777/robinhood-chain-alpha/claude/nifty-sagan-r0polg/scripts/deploy_executor_v4.sh" | sudo -u bot bash
-          ' > /tmp/deploy_executor_v4_stdout.log 2> /tmp/deploy_executor_v4_stderr.log
+            sudo -u bot env BRANCH='$DEPLOY_SHA' bash -c 'curl -fsSL https://raw.githubusercontent.com/russiansky777/robinhood-chain-alpha/$DEPLOY_SHA/scripts/deploy_executor_v4.sh | bash'
+          " > /tmp/deploy_executor_v4_stdout.log 2> /tmp/deploy_executor_v4_stderr.log
           echo "--- stdout ---"; cat /tmp/deploy_executor_v4_stdout.log
           echo "--- stderr ---"; cat /tmp/deploy_executor_v4_stderr.log
 
