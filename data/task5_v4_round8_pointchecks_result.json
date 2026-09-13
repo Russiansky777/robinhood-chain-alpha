@@ -4,13 +4,13 @@
       "point": "R8.1",
       "title": "самый ранний отказ (recompute_route<=0) -- всё равно несёт полную временную инструментацию",
       "ok": true,
-      "detail": "signal_block=4242 (ожидание 4242), queue_wait_s=0.05015027000035843 (ожидание >0, ~0.05с), calc_duration_s=3.6161000025458634e-05 (ожидание >0, ~0.03с), rpc_call_count=0, size_in_raw=1000000 (ожидание 1000000) -- запись: {'ts_wall': 1789315713.6842332, 'route_id': 'route_test_r8', 'route_label': 'USDG<->TEST', 'reason': 'нет прибыльного цикла', 'detail': 'лучший размер 1000000, профит(до газа)=-1000 (блок 4242)', 'size_in_raw': 1000000, 'quote_block': None, 'calldata_hex': None, 'rpc_call_count': 0, 'signal_block': 4242, 'queue_wait_s': 0.05015027000035843, 'calc_duration_s': 3.6161000025458634e-05}"
+      "detail": "signal_block=4242 (ожидание 4242), queue_wait_s=0.05018566400030977 (ожидание >0, ~0.05с), calc_duration_s=4.350400013208855e-05 (ожидание >0, ~0.03с), rpc_call_count=0, size_in_raw=1000000 (ожидание 1000000) -- запись: {'ts_wall': 1789320198.0577955, 'route_id': 'route_test_r8', 'route_label': 'USDG<->TEST', 'reason': 'нет прибыльного цикла', 'detail': 'лучший размер 1000000, профит(до газа)=-1000 (блок 4242)', 'size_in_raw': 1000000, 'quote_block': None, 'calldata_hex': None, 'rpc_call_count': 0, 'signal_block': 4242, 'queue_wait_s': 0.05018566400030977, 'calc_duration_s': 4.350400013208855e-05}"
     },
     {
       "point": "R8.2",
       "title": "необработанное исключение внутри оценки -- РЕАЛЬНЫЙ evaluator_loop пишет в reason_log (раньше уходило ТОЛЬКО в stderr, молча для журнала)",
       "ok": true,
-      "detail": "reason_log содержит запись: True, запись: {'ts_wall': 1789315713.6862123, 'route_id': 'route_test_r8', 'route_label': 'USDG<->TEST', 'reason': 'ошибка расчёта', 'detail': 'необработанное исключение при оценке: тестовое необработанное исключение (имитация сетевого сбоя внутри расчёта)', 'size_in_raw': None, 'quote_block': None, 'calldata_hex': None, 'rpc_call_count': 0, 'signal_block': 5050, 'queue_wait_s': 9.51570000324864e-05, 'calc_duration_s': 6.447999976444407e-05}"
+      "detail": "reason_log содержит запись: True, запись: {'ts_wall': 1789320198.0597303, 'route_id': 'route_test_r8', 'route_label': 'USDG<->TEST', 'reason': 'ошибка расчёта', 'detail': 'необработанное исключение при оценке: тестовое необработанное исключение (имитация сетевого сбоя внутри расчёта)', 'size_in_raw': None, 'quote_block': None, 'calldata_hex': None, 'rpc_call_count': 0, 'signal_block': 5050, 'queue_wait_s': 0.00022347100002662046, 'calc_duration_s': 8.558899980926071e-05}"
     }
   ],
   "all_passed": true
