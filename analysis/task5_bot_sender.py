@@ -36,12 +36,20 @@ task5_bot_sender.py — модуль подписи и отправки для �
       поля. tx_hash считается ЛОКАЛЬНО (signed.hash -- keccak RLP,
       БЕЗ единого сетевого обращения) -- известен ДО первой отправки,
       поэтому "нет tx_hash -- значит не ушла" для отправленной попытки
-      больше НЕВОЗМОЖНО в принципе (внешнее ревью, пункт 3: "локально
-      вычисленный хеш должен быть известен до отправки"). Резервирует
-      nonce ЗА этой попыткой (self.state.nonce += 1 сразу после
-      подписи, не после подтверждения сети) -- безопаснее один раз
-      пропустить nonce, чем рискнуть переиспользовать его на другой,
-      независимой сделке, если отправка этой окажется неопределённой.
+      больше НЕВОЗМОЖНО в принципе. ПРАВКА (третий раунд ревью,
+      пункт 1): подпись САМА ПО СЕБЕ больше НЕ продвигает
+      self.state.nonce (раньше продвигала сразу после подписи -- если
+      что-то между подписью и надёжным сохранением попытки падало,
+      nonce "сгорал" без единой сохранённой попытки на него). Теперь
+      nonce продвигается ТОЛЬКО через confirm_nonce_used(), вызываемый
+      ПОСЛЕ того, как рецепт подтвердил его реальный расход на цепи.
+    - confirm_nonce_used(nonce) -- НОВОЕ: продвигает self.state.nonce
+      ТОЛЬКО когда nonce реально подтверждён израсходованным (success
+      ИЛИ revert -- оба тратят nonce). Идемпотентно.
+    - describe_nonce_state() -- НОВОЕ: read-only сравнение локального
+      счётчика nonce с реальным ончейн (pending и latest), БЕЗ
+      автоматической резинхронизации -- расхождения объясняются
+      вызывающим кодом, не скрываются.
     - submit_prepared(...) -- отправляет ИМЕННО эту уже подписанную
       raw-транзакцию (не строит и не подписывает заново). "already
       known"/"already imported" от узла -- НЕ ошибка, а подтверждение,
@@ -69,10 +77,23 @@ from web3 import Web3
 CHAIN_ID = 4663
 RPC_URL = os.environ.get("RH_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 SEQUENCER_URL = os.environ.get("RH_SEQUENCER_URL", "https://sequencer.mainnet.chain.robinhood.com")
-PRIVATE_KEY = os.environ.get("PRIVATE_KEY_NOX", "")
+# Пункт 6 (третий раунд): отдельный ключ отдельного кошелька пилота --
+# НОВАЯ переменная окружения, ПРИОРИТЕТНАЯ, если задана; иначе -- ПРЕЖНЕЕ
+# поведение (PRIVATE_KEY_NOX) БЕЗ ИЗМЕНЕНИЙ для всех остальных задач,
+# которые её не задают. Ключ отдельного кошелька пилота хранится ТОЛЬКО
+# на Ohio, в файле с ограниченными правами (см.
+# task5_v4_prepare_pilot_wallet.py) -- никогда не в чате/коммитах/логах.
+PRIVATE_KEY = os.environ.get("PRIVATE_KEY_TASK5_V4_PILOT") or os.environ.get("PRIVATE_KEY_NOX", "")
 
 STOP_FILE = Path("/etc/bot/STOP")               # touch этот файл — бот перестаёт отправлять
-STATE_FILE = Path("/home/bot/data/sender_state.json")
+# Пункт 6 (внешнее ревью, третий раунд): "отдельные файлы состояния
+# nonce/бюджета/лока, чтобы не сталкивались с другими задачами". ПО
+# УМОЛЧАНИЮ путь -- ТОТ ЖЕ, что и раньше (НИЧЕГО не меняется для уже
+# существующих вызывающих кодов/других задач, использующих этот же
+# адрес/ключ); НОВЫЙ отдельный кошелёк пилота получает СВОЙ путь через
+# переменную окружения SENDER_STATE_FILE в СВОЁМ, отдельном launch-
+# окружении -- не трогая общий sender_state.json остальных задач.
+STATE_FILE = Path(os.environ.get("SENDER_STATE_FILE", "/home/bot/data/sender_state.json"))
 
 MAX_DAILY_LOSS_USD = float(os.environ.get("SENDER_MAX_DAILY_LOSS_USD", "50"))
 MAX_CONSECUTIVE_LOSSES = int(os.environ.get("SENDER_MAX_CONSECUTIVE_LOSSES", "3"))
@@ -268,23 +289,58 @@ class Sender:
         """Шаг 3 (ПОСЛЕ проверки бюджета вызывающим кодом на полях из
         prepare_transaction_fields, шаг 2): подписывает. tx_hash --
         ЛОКАЛЬНО (signed.hash, keccak RLP), БЕЗ сетевого обращения --
-        известен и сохраняем ДО первого сетевого обращения (внешнее
-        ревью, пункт 3). Резервирует nonce ЗА этой попыткой немедленно
-        (self.state.nonce += 1) -- безопаснее один раз пропустить nonce,
-        чем рискнуть его переиспользовать на другой сделке, если судьба
-        этой отправки станет неопределённой."""
+        известен и сохраняем ДО первого сетевого обращения.
+
+        ПРАВКА (внешнее ревью, третий раунд, пункт 1): подпись САМА ПО
+        СЕБЕ НЕ продвигает self.state.nonce. Раньше это происходило
+        здесь же -- если ЧТО-ТО между подписью и надёжным сохранением
+        попытки (task5_v4_hotpath.py::begin_attempt) падало (например,
+        чтение баланса), nonce оказывался молча "сожжён" без единой
+        сохранённой попытки, ссылающейся на него. Теперь nonce
+        продвигается ТОЛЬКО через confirm_nonce_used() -- вызывается
+        ПОСЛЕ того, как ончейн-рецепт подтвердил, что именно этот nonce
+        реально израсходован (успех ИЛИ откат -- оба тратят nonce на
+        Ethereum). Реальная попытка ссылается на prepared.nonce и,
+        пока она не подтверждена, self.state.nonce остаётся ТЕМ ЖЕ --
+        повторная подготовка (после рестарта, до подтверждения) даст
+        ТОТ ЖЕ nonce, не следующий, что и нужно для повторной отправки
+        ТЕХ ЖЕ данных (см. sign_prepared_transaction, вызванный повторно
+        с теми же tx_fields, детерминированно даёт тот же tx_hash)."""
         signed = self.account.sign_transaction(tx)
         raw = signed.raw_transaction if hasattr(signed, "raw_transaction") else signed.rawTransaction
         tx_hash = (signed.hash.hex() if hasattr(signed, "hash") else Web3.keccak(raw).hex())
         if not tx_hash.startswith("0x"):
             tx_hash = "0x" + tx_hash
-        self.state.nonce += 1
-        self.state.save()
         return PreparedTx(
             tx_fields=tx, raw_transaction=raw, tx_hash=tx_hash, nonce=tx["nonce"], chain_id=tx["chainId"],
             from_address=self.address, to=tx["to"], gas_limit=tx["gas"], max_fee_per_gas=tx["maxFeePerGas"],
             max_priority_fee_per_gas=tx["maxPriorityFeePerGas"], value_wei=tx["value"],
         )
+
+    def confirm_nonce_used(self, nonce: int) -> None:
+        """Вызывать ТОЛЬКО когда РЕАЛЬНЫЙ рецепт подтвердил, что nonce
+        действительно израсходован на цепи (status 0 ИЛИ 1 -- оба
+        тратят nonce). Идемпотентно и защищено от отката назад:
+        повторный вызов (после рестарта, тот же nonce уже учтён) ничего
+        не меняет."""
+        if nonce >= self.state.nonce:
+            self.state.nonce = nonce + 1
+            self.state.save()
+
+    def describe_nonce_state(self) -> dict:
+        """Пункт 1 (внешнее ревью, третий раунд): "проверять актуальность
+        nonce при старте и объяснять обнаруженные расхождения" --
+        read-only сравнение локального счётчика с реальным ончейн-nonce
+        (НЕ резинхронизирует автоматически -- решение о резинхронизации
+        осознанно оставлено вызывающему коду/владельцу)."""
+        onchain_pending = self.rpc.eth.get_transaction_count(self.address, "pending")
+        onchain_latest = self.rpc.eth.get_transaction_count(self.address, "latest")
+        local = self.state.nonce
+        return {
+            "address": self.address, "local_nonce": local,
+            "onchain_nonce_pending": onchain_pending, "onchain_nonce_latest": onchain_latest,
+            "matches_pending": local == onchain_pending, "matches_latest": local == onchain_latest,
+        }
 
     def submit_prepared(self, prepared: PreparedTx) -> SendResult:
         """Шаг 4: отправляет ИМЕННО подготовленную (prepared.raw_transaction)
@@ -346,17 +402,26 @@ class Sender:
         return result
 
     def send_cycle(self, to: str, calldata: bytes, gas_limit: int, value_wei: int = 0) -> SendResult:
-        """Обратная совместимость/самопроверка -- собирает три новых
-        шага БЕЗ отдельной проверки бюджета между ними (та проверка --
-        ответственность вызывающего кода в task5_v4_hotpath.py, который
-        использует prepare_transaction_fields/sign_prepared_transaction/
-        submit_prepared напрямую, а не этот метод, для реальных
-        LIVE-отправок пилота)."""
+        """Обратная совместимость (task5_bot_executor.py, V3-путь) --
+        собирает три новых шага БЕЗ отдельной проверки бюджета между
+        ними (та проверка -- ответственность вызывающего кода в
+        task5_v4_hotpath.py, который использует
+        prepare_transaction_fields/sign_prepared_transaction/
+        submit_prepared напрямую и продвигает nonce через
+        confirm_nonce_used ПОСЛЕ подтверждения, а не этот метод).
+
+        ЭТОТ метод -- ради обратной совместимости с уже существующим
+        вызывающим кодом (task5_bot_executor.py), который НЕ знает о
+        confirm_nonce_used -- воспроизводит СТАРОЕ поведение (nonce
+        продвигается сразу после подписи, до отправки/подтверждения),
+        не меняем его логику молча."""
         try:
             tx = self.prepare_transaction_fields(to, calldata, gas_limit, value_wei)
         except RuntimeError as exc:
             return SendResult(ok=False, error=str(exc))
         prepared = self.sign_prepared_transaction(tx)
+        self.state.nonce = prepared.nonce + 1
+        self.state.save()
         return self.submit_prepared(prepared)
 
     # ---------- разбор отката ----------
