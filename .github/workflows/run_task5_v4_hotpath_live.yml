@@ -123,6 +123,22 @@ jobs:
           # `python -u` -- без буферизации stdout/stderr, чтобы лог на
           # диске отражал прогресс пилота НЕМЕДЛЕННО, а не только после
           # закрытия файлового дескриптора.
+          #
+          # ПРАВКА: у ЭТОГО шага (как у ЛЮБОГО `run:` в GitHub Actions)
+          # оболочка по умолчанию -- `bash -e {0}` (errexit). Раньше `ssh
+          # ... > out 2> err` был ПРОСТОЙ командой БЕЗ `||`/`if` -- при
+          # ненулевом коде возврата errexit прерывал шаг СРАЗУ, ДО строк
+          # `cat /tmp/live_launch_stdout.log` / `cat .../stderr.log` --
+          # диагностика падения терялась целиком (виден был только общий
+          # "Process completed with exit code 1", без единой строки
+          # причины). `ssh ... || SSH_RC=$?` -- команда становится левой
+          # частью `||`, поэтому её ненулевой код НЕ триггерит errexit
+          # (это стандартное исключение bash для `&&`/`||`-списков);
+          # `$SSH_RC` при этом сохраняет РЕАЛЬНЫЙ код возврата. stdout/
+          # stderr печатаются ВСЕГДА (успех или провал), последней
+          # строкой -- `exit $SSH_RC`, чтобы шаг всё равно честно
+          # завершился ошибкой при провале (не "тихим успехом").
+          SSH_RC=0
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -euo pipefail
             sudo -u bot bash -c '
@@ -142,9 +158,11 @@ jobs:
               sleep 1
               echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
             '
-          " > /tmp/live_launch_stdout.log 2> /tmp/live_launch_stderr.log
+          " > /tmp/live_launch_stdout.log 2> /tmp/live_launch_stderr.log || SSH_RC=$?
           echo "--- stdout ---"; cat /tmp/live_launch_stdout.log
           echo "--- stderr ---"; cat /tmp/live_launch_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
 
       - name: "Ждать завершения пилота (опрос PID на Ohio раз в минуту -- переживает обрыв SSH)"
         run: |
