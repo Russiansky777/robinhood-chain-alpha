@@ -10,13 +10,22 @@ name: "Задача 5, LIVE -- запустить read-only аналитичес
 # дерева бота и БЕЗ прикосновения к git HEAD Ohio.
 #
 # `git fetch origin <commit_sha>` + `git checkout <commit_sha> --
-# <script_path>` -- ТОЧЕЧНЫЙ checkout ОДНОГО файла из указанного
-# коммита в рабочее дерево, БЕЗ смены HEAD и БЕЗ трогания любых других
-# файлов (см. "Изменения после указанного коммита не затирай" --
-# рабочее дерево Ohio на закреплённом коммите LIVE-пилота остаётся
-# нетронутым, кроме ЭТОГО ОДНОГО добавляемого/обновляемого файла).
-# Файл НЕ коммитится обратно -- это одноразовый рабочий файл в
-# нетронутом иначе дереве, не постоянное изменение состояния Ohio.
+# analysis/` -- ТОЧЕЧНЫЙ checkout ТОЛЬКО каталога analysis/ из
+# указанного коммита в рабочее дерево, БЕЗ смены HEAD и БЕЗ трогания
+# любых файлов ВНЕ analysis/ (contracts/, .github/ и т.д. остаются как
+# есть -- см. "Изменения после указанного коммита не затирай"). Первая
+# версия этого workflow точечно брала ОДИН script_path -- оказалось
+# недостаточно, если новый скрипт импортирует ДРУГОЙ, тоже изменённый
+# модуль analysis/ (реально произошло: task5_v4_control_case_
+# investigation.py импортирует новую функцию из task5_v4_pool_math.py,
+# checkout только investigation-скрипта оставил pool_math.py старым --
+# ImportError). Весь analysis/ -- по-прежнему НЕ вся репа (contracts/
+# build-артефакты, .github/workflows и т.п. не трогаются), и внутри
+# analysis/ реально меняются только файлы, ОТЛИЧАЮЩИЕСЯ от закреплённого
+# коммита LIVE-пилота (git checkout -- путь никогда не удаляет
+# нетронутые совпадающие файлы). Ничего НЕ коммитится обратно -- это
+# рабочее дерево для одноразовых диагностических запусков, не
+# постоянное изменение состояния Ohio.
 #
 # Скрипты, запускаемые этим workflow, ДОЛЖНЫ быть read-only
 # (eth_call/eth_getLogs/eth_estimateGas без подписи, локальный
@@ -30,7 +39,7 @@ on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'Commit SHA, из которого точечно берётся script_path (НЕ меняет HEAD рабочего дерева Ohio).'
+        description: 'Commit SHA, из которого точечно берётся весь каталог analysis/ (НЕ меняет HEAD рабочего дерева Ohio, не трогает файлы вне analysis/).'
         required: true
         type: string
       script_path:
@@ -75,7 +84,7 @@ jobs:
               set -euo pipefail
               cd /home/bot/robinhood-chain-alpha
               git fetch origin $COMMIT_SHA
-              git checkout $COMMIT_SHA -- $SCRIPT_PATH
+              git checkout $COMMIT_SHA -- analysis/
               cd analysis
               /home/bot/robinhood-chain-alpha/venv/bin/python \"\$(basename $SCRIPT_PATH)\" $SCRIPT_ARGS
             '
