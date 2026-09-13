@@ -1,0 +1,86 @@
+name: "Задача 5, LIVE -- запустить read-only аналитический скрипт на Ohio (без изменения рабочего дерева/состояния)"
+
+# Шестой раунд ревью: "установить, почему пилот не отправил ни одной
+# сделки, сравнить исполнение с конкурентом, устранить подтверждённые
+# ограничения скорости... Работай самостоятельно до конкретного
+# результата." Нужен способ ЗАПУСКАТЬ новые read-only
+# аналитические/диагностические скрипты (RPC-бенчмарк, разбор
+# конкурента, форк-тесты) на Ohio (единственное место с сетевым
+# доступом к RPC этой цепи) БЕЗ изменения уже работающего рабочего
+# дерева бота и БЕЗ прикосновения к git HEAD Ohio.
+#
+# `git fetch origin <commit_sha>` + `git checkout <commit_sha> --
+# <script_path>` -- ТОЧЕЧНЫЙ checkout ОДНОГО файла из указанного
+# коммита в рабочее дерево, БЕЗ смены HEAD и БЕЗ трогания любых других
+# файлов (см. "Изменения после указанного коммита не затирай" --
+# рабочее дерево Ohio на закреплённом коммите LIVE-пилота остаётся
+# нетронутым, кроме ЭТОГО ОДНОГО добавляемого/обновляемого файла).
+# Файл НЕ коммитится обратно -- это одноразовый рабочий файл в
+# нетронутом иначе дереве, не постоянное изменение состояния Ohio.
+#
+# Скрипты, запускаемые этим workflow, ДОЛЖНЫ быть read-only
+# (eth_call/eth_getLogs/eth_estimateGas без подписи, локальный
+# anvil-форк с тестовыми ключами) -- сам workflow этого не
+# принудительно проверяет (это ответственность автора скрипта,
+# отражённая в его собственном докстринге), поэтому БЕЗ confirm-гейта
+# наравне с run_task5_v4_hotpath_status.yml (тоже read-only,
+# money-риска нет).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA, из которого точечно берётся script_path (НЕ меняет HEAD рабочего дерева Ohio).'
+        required: true
+        type: string
+      script_path:
+        description: 'Путь к скрипту относительно корня репозитория, напр. analysis/task5_v4_control_case_investigation.py'
+        required: true
+        type: string
+      script_args:
+        description: 'Необязательные аргументы командной строки для скрипта (одной строкой).'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  run_script:
+    name: "Точечный checkout + запуск read-only скрипта на Ohio"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout script_path из commit_sha + запуск"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          SCRIPT_PATH: ${{ inputs.script_path }}
+          SCRIPT_ARGS: ${{ inputs.script_args }}
+        run: |
+          SSH_RC=0
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- $SCRIPT_PATH
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python \"\$(basename $SCRIPT_PATH)\" $SCRIPT_ARGS
+            '
+          " > /tmp/analysis_script_stdout.log 2> /tmp/analysis_script_stderr.log || SSH_RC=$?
+          echo "--- stdout ---"; cat /tmp/analysis_script_stdout.log
+          echo "--- stderr ---"; cat /tmp/analysis_script_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
