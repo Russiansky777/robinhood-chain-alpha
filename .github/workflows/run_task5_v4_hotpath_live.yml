@@ -38,10 +38,10 @@ on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). Значение по умолчанию -- уже закреплённый коммит шестого раунда (профит/газ-фикс + быстрая RPC-полоса + многоходовая котировка), контракт НЕ менялся -- редеплой не требуется.'
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). ПРАВКА (восьмой раунд, пункт 1): прежний default (6c5122ba...) был ДО --new-session -- команда запуска уже передавала этот флаг, но скачанный на Ohio код его не содержал (argparse отверг бы неизвестный аргумент); default обновлён ЕЩЁ РАЗ на итоговый коммит восьмого раунда (полная временная инструментация reason_log/attempt_table, пункт 2) -- --help ЭТОЙ версии на Ohio реально проверен (см. отчёт), --new-session присутствует. Контракт НЕ менялся, редеплой не требуется.'
         required: true
         type: string
-        default: '6c5122bafe93cc63cf6005929afc5b257bccd5c8'
+        default: 'fb60960672efe0447bbded0fed7bbf7dbe1da183'
       contract_address:
         description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз. Значение по умолчанию -- уже проверенный контракт пилота (тот же кошелёк/контракт, что предыдущий часовой прогон).'
         required: true
