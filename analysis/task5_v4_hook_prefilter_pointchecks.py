@@ -141,11 +141,13 @@ def check5_not_live_route_bypasses_filter_unchanged(tmp_path):
 
 
 def check6_confirmed_hook_model_matches_registry_key(tmp_path):
-    # Сверяем, что ЕДИНСТВЕННЫЙ подтверждённый ключ реально соответствует
-    # пулу/направлению из отчёта аудита хука (не опечатка адреса/направления).
-    key = ("0xf6562daa10e734d41846562b5f418f7833849643bf6c937eeeb0147b8ea94c2f", True)
-    ok = key in CONFIRMED_HOOK_MODELS and CONFIRMED_HOOK_MODELS[key]["post_swap_output_skim_fraction"] == 0.02
-    _record("HP.6", "единственная подтверждённая модель хука -- ETH/MOSIAI, zero_for_one=True, 2%",
+    # Сверяем, что ДВА подтверждённых ключа (ETH/MOSIAI 2.00% + ETH/0x35a79120 2.90%,
+    # оба хук 0xe5e70264..., РАЗНЫЕ пул/направление/ставка) реально в словаре.
+    key1 = ("0xf6562daa10e734d41846562b5f418f7833849643bf6c937eeeb0147b8ea94c2f", True)
+    key2 = ("0xfaf0d4093602eb2d7f80ce7ba50cffaeece9c5d546b6df363107779e5ff553aa", False)
+    ok = (key1 in CONFIRMED_HOOK_MODELS and CONFIRMED_HOOK_MODELS[key1]["post_swap_output_skim_fraction"] == 0.02
+          and key2 in CONFIRMED_HOOK_MODELS and CONFIRMED_HOOK_MODELS[key2]["post_swap_output_skim_fraction"] == 0.029)
+    _record("HP.6", "две подтверждённые модели хука 0xe5e70264...: ETH/MOSIAI 2.00%, ETH/0x35a79120 2.90%",
             ok, f"CONFIRMED_HOOK_MODELS keys={list(CONFIRMED_HOOK_MODELS.keys())}")
 
 
