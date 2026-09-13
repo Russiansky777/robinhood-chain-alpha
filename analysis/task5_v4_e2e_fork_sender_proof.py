@@ -72,6 +72,8 @@ def main() -> None:
                              "той же сборкой байткода; это проверка ЛОГИКИ контракта+Sender+учёта, "
                              "НЕ утверждение, что 0xAB24907b... существовал на блоке 61248736"}
     anvil_proc = None
+    anvil_log_file = None
+    anvil_log_path = "/tmp/task5_v4_e2e_proof_anvil.log"
     try:
         sys.path.insert(0, str(Path(__file__).parent))
         os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
@@ -83,21 +85,35 @@ def main() -> None:
         result["fork_url_source"] = "alchemy" if _alchemy_direct_endpoint() else "public_rpc"
 
         print(f"[e2e_proof] запускаю anvil --fork-block-number {FORK_BLOCK} на порту {PORT}...")
+        # ПРАВКА (реальный второй прогон -- send зависал до receipt timeout
+        # БЕЗ единой ошибки send_raw_transaction): anvil писал ВЕСЬ свой
+        # стдаут в subprocess.PIPE, который читался ТОЛЬКО до "Listening
+        # on" (баннер) -- дальше НИКТО не вычитывал трубу. ОС-буфер трубы
+        # (обычно 64КБ) заполнялся логами КАЖДОГО RPC-вызова anvil, и сам
+        # anvil БЛОКИРОВАЛСЯ на записи в стдаут -- переставал обрабатывать
+        # новые RPC-вызовы (в т.ч. майнить уже принятую транзакцию),
+        # объясняя ИМЕННО "receipt timeout без единой ошибки отправки".
+        # Пишем в РЕАЛЬНЫЙ файл (не в трубу) -- anvil никогда не
+        # блокируется на записи, и лог доступен для диагностики на любом
+        # шаге (см. anvil_log_path ниже, читается при неудаче).
+        anvil_log_file = open(anvil_log_path, "w")
         anvil_proc = subprocess.Popen(
             [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(FORK_BLOCK), "--port", str(PORT)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            stdout=anvil_log_file, stderr=subprocess.STDOUT, text=True, bufsize=1,
         )
         banner_lines: list[str] = []
         deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            line = anvil_proc.stdout.readline()
-            if not line:
-                if anvil_proc.poll() is not None:
+        with open(anvil_log_path) as tail_fh:
+            while time.monotonic() < deadline:
+                line = tail_fh.readline()
+                if not line:
+                    if anvil_proc.poll() is not None:
+                        break
+                    time.sleep(0.1)
+                    continue
+                banner_lines.append(line.rstrip("\n"))
+                if "Listening on" in line:
                     break
-                continue
-            banner_lines.append(line.rstrip("\n"))
-            if "Listening on" in line:
-                break
         addr_match = re.search(r"\(0\)\s+(0x[0-9a-fA-F]{40})", "\n".join(banner_lines))
         key_match = re.search(r"\(0\)\s+(0x[0-9a-fA-F]{64})", "\n".join(banner_lines))
         if not addr_match or not key_match:
@@ -270,12 +286,29 @@ def main() -> None:
         result["error"] = str(exc)
         print(f"[e2e_proof] ОШИБКА: {exc}", file=sys.stderr)
     finally:
+        if not result.get("ok"):
+            # Диагностика (см. правку выше про блокировку anvil на записи
+            # в непрочитанную трубу) -- хвост РЕАЛЬНОГО лога anvil (файл,
+            # не труба) на момент отказа.
+            try:
+                if anvil_log_file is not None:
+                    anvil_log_file.flush()
+                with open(anvil_log_path) as fh:
+                    log_lines = fh.readlines()
+                result["anvil_log_tail"] = log_lines[-80:]
+            except Exception as log_exc:  # noqa: BLE001
+                result["anvil_log_tail_error"] = str(log_exc)
         if anvil_proc is not None:
             anvil_proc.terminate()
             try:
                 anvil_proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 anvil_proc.kill()
+        if anvil_log_file is not None:
+            try:
+                anvil_log_file.close()
+            except Exception:  # noqa: BLE001
+                pass
 
     print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
     out_path = REPO_ROOT / "data" / "task5_v4_e2e_fork_sender_proof_result.json"
