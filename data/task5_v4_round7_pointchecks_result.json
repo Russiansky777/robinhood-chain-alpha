@@ -1,0 +1,53 @@
+{
+  "results": [
+    {
+      "point": "R7.1",
+      "title": "start_new_session() сбрасывает ТОЛЬКО pilot_completed/pilot_completed_reason/pilot_started_at",
+      "ok": true,
+      "detail": "после вызова: pilot_completed=False (ожидание False), pilot_completed_reason=None (ожидание None), pilot_started_at=None (ожидание None), cumulative_gas_loss_usd=5.37 (ожидание 5.37, СОХРАНЁН), cumulative_net_pnl_usd=2.1 (ожидание 2.10, СОХРАНЁН), cumulative_gross_profit_raw_by_token={'0xusdg': 123456} (ожидание {'0xusdg': 123456}, СОХРАНЁН)"
+    },
+    {
+      "point": "R7.1b",
+      "title": "сброс реально persisted на диск (переживает рестарт процесса)",
+      "ok": true,
+      "detail": "новый объект PilotBudget с тем же state_path: pilot_completed=False, pilot_started_at=None, cumulative_gas_loss_usd=5.37"
+    },
+    {
+      "point": "R7.2",
+      "title": "после start_new_session() ensure_pilot_started() фиксирует НОВЫЙ момент (не старый)",
+      "ok": true,
+      "detail": "старый pilot_started_at=1700000000.0, новый=1789312541.0892432 -- новая 20-минутная сессия отсчитывается от НЕГО, не от старого часа"
+    },
+    {
+      "point": "R7.3",
+      "title": "start_new_session() НЕ трогает halted/halt_reason -- ручная остановка не обходится",
+      "ok": true,
+      "detail": "halted=True (ожидание True, НЕ сброшен), halt_reason='тестовая учётная ошибка' (ожидание сохранён) -- в _main() проверка halted идёт ДО --new-session и вернула бы раньше, чем флаг вообще рассматривается"
+    },
+    {
+      "point": "R7.5a",
+      "title": "rpc_call_trading_path -- обёртка реально считает вызовы, не меняя их поведение",
+      "ok": true,
+      "detail": "before=0 (ожидание 0), after=2 (ожидание 2), реальные вызовы дошли до исходной функции: ['eth_blockNumber', 'eth_gasPrice']"
+    },
+    {
+      "point": "R7.5b",
+      "title": "ReasonLog.log() реально записывает size_in_raw/quote_block/calldata_hex/rpc_call_count",
+      "ok": true,
+      "detail": "записанная строка: {'ts_wall': 1789312541.0913832, 'route_id': 'route_test', 'route_label': 'TEST->TEST', 'reason': 'тестовая причина', 'detail': 'детали', 'size_in_raw': 12345, 'quote_block': 999, 'calldata_hex': '0xdeadbeef', 'rpc_call_count': 7}"
+    },
+    {
+      "point": "R7.5c",
+      "title": "ReasonLog.log() остаётся обратно совместим со старыми вызовами (без новых kwargs)",
+      "ok": true,
+      "detail": "вызов без size_in_raw/quote_block/calldata_hex/rpc_call_count прошёл без ошибок"
+    },
+    {
+      "point": "R7.4",
+      "title": "--new-session зарегистрирован в argparse task5_v4_hotpath.py (реальный --help)",
+      "ok": true,
+      "detail": "'--new-session' в выводе --help: True"
+    }
+  ],
+  "all_passed": true
+}

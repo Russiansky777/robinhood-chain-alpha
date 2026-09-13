@@ -56,7 +56,7 @@ jobs:
   run_script:
     name: "Точечный checkout + запуск read-only скрипта на Ohio"
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -69,7 +69,17 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
           chmod 600 ~/.ssh/vps_key_ohio
           ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
-          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          # ПРАВКА (седьмой раунд, пункт 3): широкий скан Swap-логов конкурента
+          # по всему окну пилота (~8.5ч) + форк-реконструкция -- реально
+          # заняли под 5 минут БЕЗ единого байта на транспорте SSH (stdout
+          # перенаправлен в файл НА OHIO, cat -- только в самом конце) --
+          # реальный прогон оборвался с "client_loop: send disconnect:
+          # Broken pipe" ровно на этом рубеже (похоже на простой NAT/
+          # firewall-таймаут неактивного TCP-соединения). ServerAlive* --
+          # клиент SSH сам шлёт keepalive-пакеты, не дожидаясь вывода
+          # приложения, что обновляет таймер простоя промежуточных
+          # устройств; ничего не меняет для коротких скриптов.
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
 
       - name: "Точечный checkout script_path из commit_sha + запуск"
         env:

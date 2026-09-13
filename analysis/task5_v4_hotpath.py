@@ -82,7 +82,41 @@ sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
 import alchemy_fallback  # noqa: E402
-from alchemy_fallback import _chunked_get_logs, _rpc_call, rpc_call_trading_path, topic0  # noqa: E402
+from alchemy_fallback import _chunked_get_logs, _rpc_call, topic0  # noqa: E402
+from alchemy_fallback import rpc_call_trading_path as _uncounted_rpc_call_trading_path  # noqa: E402
+
+# ПРАВКА (седьмой раунд, разбор владельца, пункт 6): "минимальная
+# инструментация для следующего пилота -- ... количество RPC-вызовов".
+# Тонкая обёртка ПОВЕРХ реального rpc_call_trading_path -- считает
+# КАЖДЫЙ вызов (котировка, estimateGas, gasPrice, blockNumber -- всё,
+# что реально идёт через торговый путь), НЕ меняя ни сигнатуру, ни
+# поведение самого вызова. _evaluate_and_maybe_send сбрасывает счётчик
+# в начале оценки ОДНОГО кандидата и читает его там, где уже логирует
+# результат -- однопоточный evaluator (см. _CoalescingRouteQueue.pop_one,
+# ОДИН кандидат за раз), поэтому глобальный счётчик безопасен без
+# дополнительной изоляции по кандидату; Lock -- всё равно, на случай
+# параллельного вызова из фона (простая защита, не архитектурное
+# решение).
+_rpc_call_count_lock = threading.Lock()
+_rpc_call_count = 0
+
+
+def rpc_call_trading_path(method: str, params: list) -> dict:
+    global _rpc_call_count
+    with _rpc_call_count_lock:
+        _rpc_call_count += 1
+    return _uncounted_rpc_call_trading_path(method, params)
+
+
+def _reset_rpc_call_count() -> None:
+    global _rpc_call_count
+    with _rpc_call_count_lock:
+        _rpc_call_count = 0
+
+
+def _read_rpc_call_count() -> int:
+    with _rpc_call_count_lock:
+        return _rpc_call_count
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
     BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE,
@@ -1442,6 +1476,11 @@ class HotPath:
                 self.busy = False
 
     def _evaluate_and_maybe_send(self, route: RouteCycle, block_number: int, recv_t_monotonic: float) -> None:
+        # Пункт 6 (седьмой раунд, разбор владельца): "минимальная
+        # инструментация -- ... количество RPC-вызовов" -- сброс В НАЧАЛЕ
+        # оценки ЭТОГО кандидата (см. докстринг rpc_call_trading_path
+        # выше -- однопоточный evaluator, безопасно).
+        _reset_rpc_call_count()
         self.priority_hint.mark_trading_active()
         # --- Первоначальный подбор размера (полный перебор сетки --
         # ЭТО оставляем, см. внешнее ревью п.6: "оставь первоначальный
@@ -1490,7 +1529,9 @@ class HotPath:
             self.reason_log.log(route.route_id, route.label, first_check["reason"],
                                  f"{first_check['detail']} (режим={first_check['mode']}, "
                                  f"блок_до={first_check['block_before']}, блок_после={first_check['block_after']}, "
-                                 f"сигнал был на {block_number})")
+                                 f"сигнал был на {block_number})",
+                                 size_in_raw=recompute["amount_in"], quote_block=first_check.get("block"),
+                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
             return
         effective_block = first_check["block"]
         effective_profit_raw = first_check["profit_raw"]
@@ -1501,7 +1542,9 @@ class HotPath:
         profit_after_gas, err = _profit_after_gas(effective_profit_raw, gas_res["gas_estimate"], gas_price,
                                                    weth_usdg_price)
         if profit_after_gas is None:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err)
+            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err,
+                                 size_in_raw=recompute["amount_in"], quote_block=effective_block,
+                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
             return
         if profit_after_gas <= 0:
             # ПРАВКА (седьмой раунд): для mode="block_param" состояние
@@ -1513,9 +1556,15 @@ class HotPath:
                           if first_check["mode"] == "block_param" else
                           f"режим={first_check['mode']}, блок_до={first_check['block_before']}, "
                           f"блок_после={first_check['block_after']}")
+            # Пункт 6: этот кандидат был ПРИБЫЛЕН ДО газа (см. гейт
+            # recompute["profit_raw"]<=0 выше, уже прошёл) -- ЭТО и есть
+            # "прибыльный кандидат", отклонённый позже (после газа) --
+            # сохраняем размер/calldata/блок котировки/число RPC-вызовов.
             self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
                                  f"профит после газа {profit_after_gas:.6f} <= 0 на {state_note} "
-                                 f"(сигнал был на {block_number})")
+                                 f"(сигнал был на {block_number})",
+                                 size_in_raw=recompute["amount_in"], quote_block=effective_block,
+                                 calldata_hex="0x" + calldata.hex(), rpc_call_count=_read_rpc_call_count())
             return
 
         can_send, why = self.budget.can_send()
@@ -1537,6 +1586,7 @@ class HotPath:
                 cumulative_gas_loss_usd=self.budget.cumulative_gas_loss_usd,
                 cumulative_net_pnl_usd=self.budget.cumulative_net_pnl_usd,
                 computed_at_block=block_number, state_age_blocks=0,
+                rpc_call_count=_read_rpc_call_count(),
             )
             self.attempt_table.write(row)
             return
@@ -1905,6 +1955,7 @@ class HotPath:
                 cumulative_gas_loss_usd=self.budget.cumulative_gas_loss_usd,
                 cumulative_net_pnl_usd=self.budget.cumulative_net_pnl_usd,
                 computed_at_block=final_quote_block, state_age_blocks=state_age_blocks,
+                rpc_call_count=_read_rpc_call_count(),
             )
             self.attempt_table.write(row)
             self.budget.mark_pending_row_written()
@@ -1942,6 +1993,13 @@ def main() -> None:
     ap.add_argument("--duration-seconds", type=float, default=None,
                      help="Владелец: часовой пилот -- 3600. Отсчёт от завершения bootstrap реестра, "
                           "переживает рестарт (PilotBudget.pilot_started_at)")
+    ap.add_argument("--new-session", action="store_true",
+                     help="Пункт 5 (седьмой раунд, разбор владельца): явный перезапуск ПОСЛЕ уже "
+                          "завершённого пилота (budget.pilot_completed=true) -- открывает НОВУЮ сессию "
+                          "(pilot_completed/pilot_started_at сбрасываются, PilotBudget.start_new_session()), "
+                          "СОХРАНЯЯ накопленный газ/PnL/общий лимит $20. Если пилот НЕ завершён (или "
+                          "halted -- отдельная, ручная причина) -- флаг НИЧЕГО не меняет: НЕ обходит halt, "
+                          "НЕ отменяет разрешение pending (то уже отработало раньше по коду, см. _main()).")
     args = ap.parse_args()
 
     # Пункт 8 (четвёртый раунд): ДО ЛЮБОГО RPC-вызова этого процесса --
@@ -1989,6 +2047,17 @@ def _main(args) -> None:
     if budget.halted:
         print(f"[hotpath] ОСТАНОВЛЕН (см. состояние бюджета, после разрешения pending): {budget.halt_reason}")
         return
+
+    # Пункт 5 (седьмой раунд, разбор владельца): --new-session -- ПОСЛЕ
+    # halted (halt -- ручная причина, этот флаг её не обходит) и ПОСЛЕ
+    # resolve_pending_tx_if_any (уже отработал выше, независимо от этого
+    # флага) -- ТОЛЬКО если пилот ДЕЙСТВИТЕЛЬНО завершён, открываем новую
+    # сессию (сохраняя газ/PnL/лимит, см. докстринг start_new_session()).
+    if args.new_session and budget.pilot_completed:
+        print(f"[hotpath] --new-session: предыдущая сессия была завершена ({budget.pilot_completed_reason}) -- "
+              f"открываю НОВУЮ (накопленный газ ${budget.cumulative_gas_loss_usd:.2f}, net PnL "
+              f"${budget.cumulative_net_pnl_usd:.2f} -- СОХРАНЕНЫ, общий лимит ${BUDGET_STOP_USD:.0f} не менялся)")
+        budget.start_new_session()
 
     if budget.pilot_completed:
         print(f"[hotpath] ПИЛОТ УЖЕ ЗАВЕРШЁН ({budget.pilot_completed_reason}) -- новый час НЕ начинается "

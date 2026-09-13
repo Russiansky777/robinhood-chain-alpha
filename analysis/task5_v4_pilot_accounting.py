@@ -102,6 +102,7 @@ class AttemptTableRow:
     cumulative_net_pnl_usd: float | None = None
     computed_at_block: int | None = None
     state_age_blocks: int | None = None
+    rpc_call_count: int | None = None  # пункт 6 (седьмой раунд): число RPC-вызовов торгового пути на ЭТОГО кандидата
 
 
 class PilotBudget:
@@ -244,6 +245,29 @@ class PilotBudget:
     def complete_pilot(self, reason: str) -> None:
         self.pilot_completed = True
         self.pilot_completed_reason = reason
+        self._save()
+
+    def start_new_session(self) -> None:
+        """Пункт 5 (седьмой раунд, разбор владельца): "одна кнопка
+        перезапуска -- новая 20-минутная сессия, обновляя ТОЛЬКО её
+        длительность/состояние завершения; накопленный газ, PnL и общий
+        лимит $20 -- сохранить, НЕ выдавать новый бюджет". Сбрасывает
+        РОВНО pilot_completed/pilot_completed_reason/pilot_started_at
+        (следующий ensure_pilot_started() зафиксирует НОВЫЙ момент
+        старта -- новое окно --duration-seconds отсчитывается от него).
+        НЕ трогает cumulative_gas_*/cumulative_net_pnl_usd/
+        cumulative_gross_profit_raw_by_token (накопленный итог по газу и
+        прибыли, тот же общий лимит BUDGET_STOP_USD) и НЕ трогает
+        pending/halted/halt_reason -- resolve_pending_tx_if_any (main())
+        уже отработал СВОЙ круг раньше по коду, а halted -- отдельная,
+        РУЧНАЯ причина остановки (учётная ошибка и т.п.), эта кнопка её
+        не обходит. Вызывающий код (main()) решает, КОГДА звать этот
+        метод (обычно -- только если budget.pilot_completed уже True);
+        сам метод ничего не проверяет и не "восстанавливает предыдущую
+        сессию" -- он ТОЛЬКО открывает новую."""
+        self.pilot_completed = False
+        self.pilot_completed_reason = None
+        self.pilot_started_at = None
         self._save()
 
     # ---------- резерв ПЕРЕД отправкой ----------
@@ -595,9 +619,19 @@ class ReasonLog:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, route_id: str, route_label: str, reason: str, detail: str = "") -> None:
+    def log(self, route_id: str, route_label: str, reason: str, detail: str = "", *,
+            size_in_raw: int | None = None, quote_block: int | None = None,
+            calldata_hex: str | None = None, rpc_call_count: int | None = None) -> None:
+        """Пункт 6 (седьмой раунд, разбор владельца): "для прибыльных
+        кандидатов и ошибок симуляции -- сохранять размер, calldata,
+        блок котировки, параметры оценки газа". Необязательные
+        keyword-only поля -- обратная совместимость с существующими
+        вызовами (все старые остаются рабочими без изменений); заданы
+        ТОЛЬКО там, где вызывающий код уже реально держит эти значения
+        под рукой (не выдумываются задним числом)."""
         rec = {"ts_wall": time.time(), "route_id": route_id, "route_label": route_label,
-               "reason": reason, "detail": detail}
+               "reason": reason, "detail": detail, "size_in_raw": size_in_raw, "quote_block": quote_block,
+               "calldata_hex": calldata_hex, "rpc_call_count": rpc_call_count}
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         print(f"[pilot][не отправлено] {route_label}: {reason} ({detail})")
