@@ -1340,16 +1340,50 @@ class HotPath:
         if not gas_res["ok"]:
             self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res["error"])
             return
+
+        # ПРАВКА (шестой раунд ревью, пункт 3 -- "профит/газ на разных
+        # состояниях"): recompute["profit_raw"] выше посчитан НА
+        # block_number (блок СИГНАЛА), а estimate_gas ВСЕГДА резолвится
+        # на latest/pending (см. докстринг estimate_gas) -- к моменту,
+        # когда мы досюда дошли, latest МОГ уйти вперёд (очередь + сама
+        # котировка + сам estimateGas занимают время). Сравнивать
+        # gross-профит с ОДНОГО состояния и газ с ДРУГОГО --
+        # внутренне несогласованные данные: это и есть причина категории
+        # "профит(до газа) был бы положительным, профит(после газа)
+        # отрицательный", найденной в no_send_log пилота (7 записей,
+        # блоки 61755138 и др.) -- ЛОЖНОЕ "невыгодно", а не обязательно
+        # РЕАЛЬНОЕ. Прежде чем считать profit_after_gas, пере-котируем
+        # ТОТ ЖЕ amount_in НА ТОМ ЖЕ latest, на который резолвился этот
+        # estimateGas -- одно состояние для обеих половин расчёта.
+        # НЕ бесконечный цикл: ОДНА дополнительная пере-котировка здесь;
+        # если фиксируется устаревание -- есть ЕЩЁ одна проверка ниже
+        # ("ФИНАЛЬНАЯ ПРОВЕРКА"), перед самой отправкой.
+        fresh_latest = int(_rpc_call("eth_blockNumber", []), 16)
+        effective_block = block_number
+        effective_profit_raw = recompute["profit_raw"]
+        if fresh_latest != block_number:
+            fresh_quote = quote_route_at_size(route, recompute["amount_in"], fresh_latest)
+            if not fresh_quote["ok"]:
+                self.reason_log.log(route.route_id, route.label, fresh_quote["reason"],
+                                     f"согласованная пере-котировка на {fresh_latest} (то же состояние, на "
+                                     f"которое резолвился estimateGas) не прошла: {fresh_quote['detail']} "
+                                     f"(сигнал был на {block_number})")
+                return
+            effective_block = fresh_latest
+            effective_profit_raw = fresh_quote["profit_raw"]
+
         gas_price = int(_rpc_call("eth_gasPrice", []), 16)
         weth_usdg_price = current_weth_usdg_price()
-        profit_after_gas, err = _profit_after_gas(recompute["profit_raw"], gas_res["gas_estimate"], gas_price,
+        profit_after_gas, err = _profit_after_gas(effective_profit_raw, gas_res["gas_estimate"], gas_price,
                                                    weth_usdg_price)
         if profit_after_gas is None:
             self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err)
             return
         if profit_after_gas <= 0:
             self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"профит после газа {profit_after_gas:.6f} <= 0 (блок {block_number})")
+                                 f"профит после газа {profit_after_gas:.6f} <= 0 на согласованном блоке "
+                                 f"{effective_block} (сигнал был на {block_number}, gross и газ оценены на "
+                                 f"ОДНОМ состоянии)")
             return
 
         can_send, why = self.budget.can_send()
@@ -1384,25 +1418,34 @@ class HotPath:
         # ПРАВКА (четвёртый раунд, пункт 9): block_number (исходный блок
         # ДЕТЕКЦИИ) НЕ подменяется здесь -- свежий блок ре-котировки
         # хранится ОТДЕЛЬНО (final_quote_block). Иначе computed_at_block
-        # "молодел" бы до fresh_latest, а state_age_blocks, посчитанный
+        # "молодел" бы до fresh_latest_final, а state_age_blocks, посчитанный
         # ДО подмены, продолжал бы отражать УЖЕ неактуальный (более
         # старый) разрыв -- ровно найденная владельцем нестыковка полей.
         # Согласованный state_age_blocks пересчитывается ЕЩЁ РАЗ, прямо
-        # перед begin_attempt (см. ниже), относительно final_quote_block. ---
-        fresh_latest = int(_rpc_call("eth_blockNumber", []), 16)
-        final_quote_block = block_number
+        # перед begin_attempt (см. ниже), относительно final_quote_block.
+        #
+        # ПРАВКА (шестой раунд, пункт 3): базой для "уже не подходит"
+        # здесь служит effective_block/effective_profit_raw (СОГЛАСОВАННАЯ
+        # пара выше, ОДНО состояние с уже прошедшим estimateGas), а НЕ
+        # исходные block_number/recompute["profit_raw"] -- та же причина,
+        # что и в первой проверке: сравнивать с состоянием, на котором
+        # gross-профит и газ были посчитаны РАЗНО, было бы внутренне
+        # несогласовано. ---
+        fresh_latest_final = int(_rpc_call("eth_blockNumber", []), 16)
+        final_quote_block = effective_block
         final_amount_in = recompute["amount_in"]
-        final_profit_raw = recompute["profit_raw"]
-        if fresh_latest > block_number:
-            final_quote = quote_route_at_size(route, final_amount_in, fresh_latest)
+        final_profit_raw = effective_profit_raw
+        if fresh_latest_final > effective_block:
+            final_quote = quote_route_at_size(route, final_amount_in, fresh_latest_final)
             if not final_quote["ok"] or final_quote["profit_raw"] <= 0:
                 self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"финальная проверка размера {final_amount_in} на блоке {fresh_latest} "
-                                     f"(решение было на {block_number}, возраст {fresh_latest - block_number} "
+                                     f"финальная проверка размера {final_amount_in} на блоке {fresh_latest_final} "
+                                     f"(согласованное решение было на {effective_block}, сигнал -- на "
+                                     f"{block_number}, возраст {fresh_latest_final - effective_block} "
                                      f"блоков) -- уже не подходит, пропускаем кандидата")
                 return
             final_profit_raw = final_quote["profit_raw"]
-            final_quote_block = fresh_latest
+            final_quote_block = fresh_latest_final
             # calldata (кроме minProfit, согласуемого ниже) НЕ меняется --
             # amount_in/маршрут те же; пересчитываем только оценку газа
             # (могла измениться) и итоговый профит НА СВЕЖЕМ блоке.
