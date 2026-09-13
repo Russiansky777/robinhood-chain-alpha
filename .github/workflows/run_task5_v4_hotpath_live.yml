@@ -153,20 +153,45 @@ jobs:
           # завершился ошибкой при провале (не "тихим успехом").
           #
           # ПРАВКА (по факту первого реального падения, run 34734750147):
-          # реальная причина, которую вскрыла предыдущая правка --
           # `error: The following untracked working tree files would be
-          # overwritten by checkout: data/task5_v4_pilot_wallet_prepare_result.json`.
-          # Файл -- побочный вывод task5_v4_prepare_pilot_wallet.py
-          # (третий раунд, отдельный кошелёк пилота), который "для ЭТОГО
-          # запуска НЕ используется" (четвёртый раунд) -- на диске Ohio
-          # остался НЕТРЕКНУТЫМ с прошлого локального запуска того
-          # скрипта, а в ЗАФИКСИРОВАННОМ коммите этот же путь уже
-          # ОТСЛЕЖИВАЕТСЯ git -- честная защита non-destructive checkout
-          # (round 5) сработала как задумано и остановила запуск. Перед
-          # checkout уводим этот файл В СТОРОНУ (mv в /home/bot/data/ под
-          # уникальным для этого run именем) -- НЕ удаляем, существующие
-          # копии не перезаписываем; `2>/dev/null || true` -- безопасно,
-          # если файла нет вообще (уже убран прошлым запуском).
+          # overwritten by checkout: data/task5_v4_pilot_wallet_prepare_result.json`
+          # -- решалось уводом ОДНОГО известного файла в сторону перед
+          # `git checkout $LIVE_SHA` на ОБЩЕМ рабочем дереве Ohio.
+          #
+          # ПРАВКА (по факту ВТОРОГО реального падения): `error: Your local
+          # changes to the following files would be overwritten by checkout:
+          # analysis/task5_v4_hook_prefilter_pointchecks.py, analysis/
+          # task5_v4_hotpath.py, analysis/task5_v4_pilot_accounting.py` --
+          # ТОТ ЖЕ общий репозиторий `/home/bot/robinhood-chain-alpha`
+          # используется ОБОИМИ workflow: этим (LIVE, полный `git checkout
+          # $LIVE_SHA`) И run_task5_v4_analysis_script.yml (read-only
+          # диагностика, `git checkout <sha> -- analysis/` -- ТОЧЕЧНЫЙ
+          # checkout ПОДКАТАЛОГА, намеренно НЕ коммитящий и НЕ сбрасывающий
+          # изменения, см. её же докстринг). Каждый такой диагностический
+          # прогон оставляет `analysis/*.py` в рабочем дереве Ohio
+          # ИЗМЕНЁННЫМИ относительно текущего HEAD -- полный `git checkout
+          # $LIVE_SHA` (переключение HEAD) честно отказывается затирать их
+          # молча (round 5, non-destructive checkout сработал ПРАВИЛЬНО --
+          # но теперь на файлы, изменённые НЕ ботом, а диагностикой). Общая
+          # причина у обоих падений одна: LIVE и read-only диагностика
+          # делят ОДНО физическое рабочее дерево.
+          #
+          # ИСПРАВЛЕНИЕ: LIVE больше НЕ делает `git checkout` на общем
+          # дереве вообще -- `git worktree add --detach` создаёт ОТДЕЛЬНУЮ,
+          # ЧИСТУЮ копию репозитория НА ЭТОТ КОНКРЕТНЫЙ коммит в новом
+          # каталоге (уникальном для RUN_TAG), не трогая общее дерево
+          # (используемое диагностикой) вообще -- никакого конфликта
+          # локальных изменений впредь, при этом НЕ новый checkout по
+          # смыслу задачи (`git worktree` -- тот же коммит, та же git
+          # история, просто другая директория для файлов). venv (уже
+          # установленный, ОБЩИЙ для всех воркдеревьев -- зависимости не
+          # переустанавливаются), /etc/bot/env, PRIVATE_KEY_NOX,
+          # /home/bot/data/* (состояние реестра/бюджета/журналов) -- ВСЕ
+          # абсолютные пути, НЕ зависящие от того, где физически лежит
+          # analysis/ -- НЕ меняются. `git worktree prune` -- перед add,
+          # на случай если предыдущий запуск не успел убрать свою запись
+          # (крах раннера и т.п.) -- безопасно, ничего не удаляет, кроме
+          # мёртвых ссылок на уже несуществующие каталоги.
           # ПРАВКА (седьмой раунд, разбор владельца, пункт 5): "одна кнопка
           # перезапуска" реально утыкалась в ДВЕ немедленные причины
           # завершения, которые этот workflow раньше не устранял:
@@ -206,17 +231,18 @@ jobs:
               set +a
               : \"\${PRIVATE_KEY_NOX:?PRIVATE_KEY_NOX не загружен}\"
               cd /home/bot/robinhood-chain-alpha
-              mkdir -p /home/bot/data
-              mv data/task5_v4_pilot_wallet_prepare_result.json /home/bot/data/task5_v4_pilot_wallet_prepare_result.ohio_backup_${RUN_TAG}.json 2>/dev/null || true
               git fetch origin $LIVE_SHA
-              git checkout $LIVE_SHA
-              cd analysis
+              mkdir -p /home/bot/live_worktrees
+              git worktree prune
+              WORKTREE_DIR=/home/bot/live_worktrees/${RUN_TAG}
+              git worktree add --detach --force \"\$WORKTREE_DIR\" $LIVE_SHA
+              cd \"\$WORKTREE_DIR/analysis\"
               LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
               PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
               setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds $DURATION_SECONDS --new-session > \"\$LOG\" 2>&1 < /dev/null &
               echo \$! > \"\$PIDFILE\"
               sleep 1
-              echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
+              echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG, worktree=\$WORKTREE_DIR (общее дерево /home/bot/robinhood-chain-alpha не тронуто)\"
             '
           " > /tmp/live_launch_stdout.log 2> /tmp/live_launch_stderr.log || SSH_RC=$?
           echo "--- stdout ---"; cat /tmp/live_launch_stdout.log
@@ -276,6 +302,20 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_budget_state.json" > /tmp/live_pilot_report/pilot_budget_state.json 2>>/tmp/live_pilot_report/_fetch_log.err || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_attempts.jsonl" > /tmp/live_pilot_report/pilot_attempts.jsonl 2>>/tmp/live_pilot_report/_fetch_log.err || true
           ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_no_send_log.jsonl" > /tmp/live_pilot_report/pilot_no_send_log.jsonl 2>>/tmp/live_pilot_report/_fetch_log.err || true
+          # Уборка отдельного worktree ЭТОГО запуска (см. предыдущий шаг) --
+          # ТОЛЬКО если процесс подтверждённо не жив (не удаляем каталог,
+          # которым процесс МОЖЕТ ещё пользоваться); безвредно при ошибке
+          # (worktree просто останется до следующей ручной уборки).
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot bash -c '
+            PID=\$(cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid 2>/dev/null || echo 0)
+            if kill -0 \$PID 2>/dev/null; then
+              echo \"[live] процесс \$PID ещё жив -- worktree /home/bot/live_worktrees/${RUN_TAG} НЕ трогаю\"
+            else
+              cd /home/bot/robinhood-chain-alpha
+              git worktree remove --force /home/bot/live_worktrees/${RUN_TAG} 2>&1 || true
+              echo \"[live] worktree /home/bot/live_worktrees/${RUN_TAG} убран\"
+            fi
+          '" 2>>/tmp/live_pilot_report/_fetch_log.err || true
           {
             echo "# LIVE-пилот task5_v4_hotpath.py -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "commit_sha=${{ inputs.commit_sha }}"
