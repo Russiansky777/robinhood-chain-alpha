@@ -42,8 +42,11 @@ def scan(from_block: int, to_block: int) -> dict:
     sender_topic = "0x" + KNOWN_ARBITRAGEUR[2:].rjust(64, "0").lower()
     print(f"[competitor_scan] eth_getLogs sender=арбитражник, блоки {from_block}..{to_block} "
           f"({to_block - from_block} блоков)...")
-    logs = _chunked_get_logs(from_block, to_block, topics=[SWAP_TOPIC0, None, sender_topic],
-                              address=POOL_MANAGER, chunk_size=2000)
+    # ПРАВКА (первый реальный прогон на Ohio): _chunked_get_logs -- это
+    # Iterator[dict] (генератор, отдаёт сырые логи по одному постранично),
+    # НЕ list -- len(generator) кидает TypeError. Материализуем явно.
+    logs = list(_chunked_get_logs(from_block, to_block, topics=[SWAP_TOPIC0, None, sender_topic],
+                                   address=POOL_MANAGER, chunk_size=2000))
     result["n_swap_logs"] = len(logs)
     print(f"[competitor_scan] найдено {len(logs)} Swap-логов арбитражника в окне")
 
