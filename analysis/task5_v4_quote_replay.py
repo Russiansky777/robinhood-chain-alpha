@@ -105,18 +105,51 @@ def _eth_call_alchemy_direct(to: str, data: str, block_tag: str) -> str | None:
     return body.get("result")
 
 
+# Пункт 8 (внешнее ревью, четвёртый раунд): "подтверждённый контрактный
+# revert на ТОМ ЖЕ состоянии не нужно повторять как проблему архивного
+# RPC -- отличай ошибки исполнения от транспорта/отсутствия состояния."
+# Маркеры НЕ-транзиентного, СОДЕРЖАТЕЛЬНОГО отката контракта (сам
+# publicRPC/Alchemy честно исполнили вызов и вернули revert-данные) --
+# повторный запрос ДРУГОГО RPC-провайдера НА ТОМ ЖЕ block_number даст
+# ТОТ ЖЕ детерминированный ответ (состояние на конкретном блоке
+# неизменно), так что повтор бессмысленен и только тратит RPC-бюджет.
+_EXECUTION_REVERT_MARKERS = (
+    "execution reverted", "notenoughliquidity", "revert", "insufficient",
+)
+# Маркеры "нет состояния/архивный горизонт", где ДЕЙСТВИТЕЛЬНО имеет
+# смысл попробовать другого провайдера (может архивировать глубже):
+_MISSING_STATE_MARKERS = (
+    "missing trie node", "state not found", "not found", "metadata is not found",
+    "pruned", "history", "archive",
+)
+
+
+def _looks_like_confirmed_revert(detail: str) -> bool:
+    d = detail.lower()
+    if any(m in d for m in _MISSING_STATE_MARKERS):
+        return False  # похоже на отсутствие state -- НЕ считаем подтверждённым откатом
+    return any(m in d for m in _EXECUTION_REVERT_MARKERS)
+
+
 def quote_exact_input_single(key: PoolKey, zero_for_one: bool, amount_in: int, block_number: int) -> int:
     """РЕАЛЬНЫЙ eth_call к V4Quoter. Порядок: наш доверенный RPC-путь
     (alchemy_fallback._rpc_call -- публичный RPC первым, Alchemy
     фолбэком по транзиентным ошибкам); если публичный RPC вернул
-    НЕ-транзиентную ошибку (типично для исторических блоков вне его
-    горизонта хранения state), пробуем Alchemy напрямую как отдельную
-    попытку, а не молча сдаёмся. НЕ домены из приложенного аудита."""
+    НЕ-транзиентную ошибку, ПОХОЖУЮ на отсутствие исторического state
+    (типично для блоков вне его горизонта хранения), пробуем Alchemy
+    напрямую как отдельную попытку. ПРАВКА (четвёртый раунд): если же
+    ошибка выглядит как ПОДТВЕРЖДЁННЫЙ контрактный revert (напр.
+    NotEnoughLiquidity) -- на ТОМ ЖЕ block_number состояние НЕИЗМЕННО,
+    повторный запрос к другому провайдеру даст ТОТ ЖЕ ответ, поэтому
+    сразу поднимаем исходную ошибку, НЕ тратя лишний RPC-вызов на
+    заведомо бесполезный повтор. НЕ домены из приложенного аудита."""
     calldata = quote_exact_input_single_calldata(key, zero_for_one, amount_in)
     block_tag = hex(block_number)
     try:
         raw = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": calldata}, block_tag])
     except RuntimeError as exc:
+        if _looks_like_confirmed_revert(str(exc)):
+            raise
         alt = _eth_call_alchemy_direct(V4_QUOTER, calldata, block_tag)
         if alt is None:
             raise RuntimeError(f"{exc} (Alchemy напрямую тоже не дал результата)") from exc

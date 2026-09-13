@@ -538,12 +538,52 @@ class AttemptTable:
         # отчётов (владелец, доп.: отчёты на $5/$10/по часу должны
         # показывать реальную картину, включая "попыток было 0").
         self.count = 0
+        # Пункт 7 (внешнее ревью, четвёртый раунд): "запись JSONL и
+        # mark_pending_row_written() -- два отдельных действия, сбой
+        # между ними создаёт дубликат после рестарта" (воспроизведено
+        # владельцем: две строки одного tx_hash). Идемпотентность по
+        # tx_hash -- ЗДЕСЬ, на уровне самой записи (не только флагом в
+        # pending, который сам мог не успеть сохраниться) -- при старте
+        # загружаем УЖЕ записанные хэши из существующего файла.
+        self._written_tx_hashes: set[str] = set()
+        if self.path.exists():
+            try:
+                with self.path.open() as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        h = rec.get("tx_hash")
+                        if h:
+                            self._written_tx_hashes.add(h)
+                        self.count += 1
+            except OSError:
+                pass
 
-    def write(self, row: AttemptTableRow) -> None:
+    def write(self, row: AttemptTableRow) -> bool:
+        """Идемпотентна по tx_hash (пункт 7): если строка с ЭТИМ ЖЕ
+        tx_hash уже была записана (в этом или прошлом запуске процесса),
+        НЕ пишет дубликат и возвращает False -- "не пересчитывать
+        денежные суммы из дублирующейся таблицы" достигается тем, что
+        дубликата просто не появляется на диске. Строки БЕЗ tx_hash
+        (dry-run "would send") идемпотентности не подлежат -- каждая
+        честно отдельное событие. Возвращает True, если строка реально
+        записана."""
         with self._lock:
+            if row.tx_hash and row.tx_hash in self._written_tx_hashes:
+                print(f"[attempt_table][ВНИМАНИЕ] строка для {row.tx_hash} уже записана ранее -- "
+                      f"пропускаю повторную запись (идемпотентность по tx_hash, пункт 7)")
+                return False
             with self.path.open("a") as fh:
                 fh.write(json.dumps(asdict(row), ensure_ascii=False) + "\n")
+            if row.tx_hash:
+                self._written_tx_hashes.add(row.tx_hash)
             self.count += 1
+            return True
 
 
 class ReasonLog:
