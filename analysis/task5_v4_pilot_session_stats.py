@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Задача 5: ЧИСТО ЧИТАЮЩИЙ разбор журналов ЗАВЕРШЁННОГО пилота
-run34771657422_1 (завершение подтверждено НЕЗАВИСИМО от статуса GitHub-джобы --
-см. task5_v4_live_pilot_status_check.py: PID отсутствовал, pilot_completed=true,
-собственный итог бота в логе). По прямому указанию владельца: "новый запуск,
-изменения кода и скан сети пока не нужны" -- этот скрипт ТОЛЬКО читает уже
-существующие файлы на диске (no_send_log.jsonl, attempts.jsonl,
-budget_state.json), ничего не пишет в торговые файлы, ничего не отправляет,
-новых RPC/сети/тестов/пилотов не запускает. Единственная запись на диск --
-ДВА новых файла-среза (только записи ЭТОЙ сессии) для передачи владельцу.
+"""Задача 5: ЧИСТО ЧИТАЮЩИЙ разбор журналов ЗАВЕРШЁННОГО пилота (общий,
+переиспользуемый скрипт -- изначально написан для run34771657422_1,
+повторно применён для run34778703033_1; завершение КАЖДЫЙ раз
+подтверждается НЕЗАВИСИМО от статуса GitHub-джобы, см.
+task5_v4_live_pilot_status_check*.py: PID отсутствует, pilot_completed=true,
+собственный итог бота в логе -- ПРЕЖДЕВРЕМЕННО собранный GitHub artifact
+НЕ используется как источник). По прямому указанию владельца: "новый
+запуск, изменения кода и скан сети пока не нужны" -- этот скрипт ТОЛЬКО
+читает уже существующие файлы на диске (no_send_log.jsonl,
+attempts.jsonl, budget_state.json), ничего не пишет в торговые файлы,
+ничего не отправляет, новых RPC/сети/тестов/пилотов не запускает.
+Единственная запись на диск -- ДВА новых файла-среза (только записи
+ЭТОЙ сессии) для передачи владельцу.
 
 Граница сессии: ts_wall >= pilot_started_at (см. PilotBudget.ensure_pilot_started()
 -- выставляется РОВНО один раз, ПОСЛЕ полного bootstrap_registry(), т.е. это
@@ -133,6 +137,11 @@ def main() -> None:
     result["pilot_started_at"] = pilot_started_at
     result["pilot_completed"] = budget.get("pilot_completed")
     result["pilot_completed_reason"] = budget.get("pilot_completed_reason")
+    result["cumulative_gas_loss_usd"] = budget.get("cumulative_gas_loss_usd")
+    result["cumulative_net_pnl_usd"] = budget.get("cumulative_net_pnl_usd")
+    result["halted"] = budget.get("halted")
+    result["halt_reason"] = budget.get("halt_reason")
+    result["pending"] = budget.get("pending")
 
     if pilot_started_at is None:
         result["ok"] = False
@@ -216,6 +225,11 @@ def main() -> None:
     # чтобы "present/missing" честно относились к записям, где расчёт вообще шёл) --
     qw = [r["queue_wait_s"] for r in real_calc_reason if r.get("queue_wait_s") is not None]
     cd = [r["calc_duration_s"] for r in real_calc_reason if r.get("calc_duration_s") is not None]
+    # ПРАВКА (владелец, метрика очереди): route_full_wait_s -- НОВОЕ поле
+    # (полное ожидание маршрута с ПЕРВОЙ постановки в очередь, отдельно от
+    # queue_wait_s -- возраста ПОСЛЕДНЕГО сигнала). Считаем те же median/p95,
+    # с явным размером выборки -- НЕ по одной записи.
+    rfw = [r["route_full_wait_s"] for r in real_calc_reason if r.get("route_full_wait_s") is not None]
     result["queue_wait_s_n_present"] = len(qw)
     result["queue_wait_s_n_missing_among_real_calculations"] = len(real_calc_reason) - len(qw)
     result["queue_wait_s_median"] = statistics.median(qw) if qw else None
@@ -224,6 +238,15 @@ def main() -> None:
     result["calc_duration_s_n_missing_among_real_calculations"] = len(real_calc_reason) - len(cd)
     result["calc_duration_s_median"] = statistics.median(cd) if cd else None
     result["calc_duration_s_p95"] = pctl(cd, 0.95) if cd else None
+    result["route_full_wait_s_n_present"] = len(rfw)
+    result["route_full_wait_s_n_missing_among_real_calculations"] = len(real_calc_reason) - len(rfw)
+    result["route_full_wait_s_median"] = statistics.median(rfw) if rfw else None
+    result["route_full_wait_s_p95"] = pctl(rfw, 0.95) if rfw else None
+    result["timing_sample_size_note"] = (
+        f"Все медианы/p95 выше посчитаны по ВСЕЙ доступной выборке этой сессии, размер указан явно "
+        f"полем *_n_present (queue_wait_s: {len(qw)}, calc_duration_s: {len(cd)}, route_full_wait_s: "
+        f"{len(rfw)} из {len(real_calc_reason)} реально рассчитанных записей) -- НЕ по одной записи."
+    )
 
     # -- п.5: топ-5 --
     enriched = []
