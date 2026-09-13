@@ -98,7 +98,7 @@ jobs:
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -euo pipefail
             LOCK=/home/bot/data/task5_v4_hotpath_0x893f4a7eadba18c2f8aa1e0e23e11ecf66208e75.lock
-            if [ ! -f \"\$LOCK\" ]; then
+            if ! sudo -u bot test -f \"\$LOCK\"; then
               echo \"[extend] лок-файл \$LOCK не найден -- пилот, похоже, не запущен, СТОП\" >&2
               exit 1
             fi
