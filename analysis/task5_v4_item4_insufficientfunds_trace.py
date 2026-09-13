@@ -271,6 +271,48 @@ def main() -> None:
                 "блок И 'latest') отказали, см. attempts выше для точного текста ошибки каждой"
             )
         result["debug_trace_call_on_local_fork"] = trace_res
+
+        # ПРАВКА (восьмой раунд, разбор владельца, пункт 4): "если
+        # debug_traceCall остаётся недоступным -- попробуй ЛОКАЛЬНУЮ
+        # ОТПРАВКУ воспроизводимого вызова и трассу ПОЛУЧЕННОЙ
+        # транзакции". debug_traceCall падает НА ЭТАПЕ ПОСТРОЕНИЯ
+        # окружения ГИПОТЕТИЧЕСКОГО блока (валидация next-block env
+        # требует excessBlobGas, которого у форкнутого источника нет);
+        # debug_traceTransaction же трассирует УЖЕ РЕАЛЬНО СМАЙНЕННУЮ
+        # транзакцию -- окружение блока к этому моменту уже построено
+        # anvil'ом САМИМ (при майнинге), а не гипотетически для трейса,
+        # так что эта конкретная валидация не применяется. Отправка --
+        # ТОЛЬКО на локальный anvil (impersonate OWNER, тот же call_obj,
+        # что и estimateGas выше) -- НЕ реальная сеть, НЕ реальные деньги.
+        if not trace_res.get("ok"):
+            send_trace_res: dict = {}
+            try:
+                run([CAST, "rpc", "anvil_impersonateAccount", OWNER, "--rpc-url", RPC], timeout=15)
+                run([CAST, "rpc", "anvil_setBalance", OWNER, hex(10 ** 19), "--rpc-url", RPC], timeout=15)
+                send_call_obj = json.dumps({**call_obj, "gas": "0x2dc6c0"})
+                send_proc = run([CAST, "rpc", "eth_sendTransaction", send_call_obj, "--rpc-url", RPC], timeout=30)
+                send_trace_res["send_returncode"] = send_proc.returncode
+                send_trace_res["send_stdout"] = send_proc.stdout.strip()
+                send_trace_res["send_stderr"] = send_proc.stderr.strip()
+                if send_proc.returncode == 0:
+                    try:
+                        local_tx_hash = json.loads(send_proc.stdout.strip())
+                    except (ValueError, json.JSONDecodeError):
+                        local_tx_hash = send_proc.stdout.strip()
+                    send_trace_res["local_tx_hash"] = local_tx_hash
+                    local_receipt = _rpc_call("eth_getTransactionReceipt", [local_tx_hash])
+                    send_trace_res["local_receipt_status"] = (
+                        int(local_receipt["status"], 16) if local_receipt else None)
+                    trace2 = _rpc_call("debug_traceTransaction", [local_tx_hash, {"tracer": "callTracer"}])
+                    send_trace_res["ok"] = True
+                    send_trace_res["raw_trace"] = trace2
+                    send_trace_res["first_erroring_call"] = _first_erroring_call(trace2)
+                else:
+                    send_trace_res["ok"] = False
+            except Exception as exc:  # noqa: BLE001
+                send_trace_res["ok"] = False
+                send_trace_res["error"] = str(exc)
+            result["debug_trace_transaction_on_local_send"] = send_trace_res
         result["ok"] = True
     except Exception as exc:  # noqa: BLE001
         result["ok"] = False
