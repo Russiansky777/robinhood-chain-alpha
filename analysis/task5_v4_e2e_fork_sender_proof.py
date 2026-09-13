@@ -38,6 +38,7 @@ task5_bot_sender (модуль читает их из os.environ на уровн
 реальную сеть."""
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -174,9 +175,55 @@ def main() -> None:
 
         import task5_bot_sender
         import task5_v4_hotpath as hp
+        import alchemy_fallback as af
         from task5_v4_pilot_accounting import PilotBudget
         from task5_v4_route_registry import RouteCycle, RouteLeg
         from task5_v4_executor_calldata import build_execute_cycle_calldata
+
+        # ПРАВКА (разбор владельца после первого "успешного" прогона):
+        # RH_RPC_URL/RH_SEQUENCER_URL перенаправляют ТОЛЬКО task5_bot_
+        # sender.Sender (свои модульные константы RPC_URL/SEQUENCER_URL,
+        # читаются из этих ИМЕННО переменных). hp.estimate_gas()/
+        # quote_route_at_size() внутри зовут alchemy_fallback.
+        # rpc_call_trading_path()/_rpc_call(), которые читают СОВЕРШЕННО
+        # ДРУГИЕ переменные (alchemy_fallback.CONFIG.public_rpc_url/
+        # alchemy_rpc_url/alchemy_api_key -- из PUBLIC_RPC_URL/ALCHEMY_*)
+        # -- НИКАК не связанные с RH_RPC_URL. Без этой правки gas_estimate
+        # реально считался на ПРОДАКШН-RPC, где адрес форкового контракта
+        # НЕ существует (пустой код) -- вызов вёл себя как простой перевод,
+        # оценка газа получалась околоминимальной (объясняет прежнюю
+        # "подозрительно низкую" оценку 26763 -- это была НЕ особенность
+        # anvil, тот вывод отзываю). Правим ТОЛЬКО in-memory состояние
+        # ЭТОГО процесса (кэш _alchemy_direct_endpoint + сам объект CONFIG)
+        # -- продакшн-настройки (.env/секреты/остальные скрипты) не
+        # трогаем никак.
+        af._alchemy_direct_checked = True
+        af._alchemy_direct_url = None
+        af.CONFIG = dataclasses.replace(af.CONFIG, public_rpc_url=RPC, alchemy_rpc_url="", alchemy_api_key="")
+        result["rpc_redirect_note"] = (
+            "alchemy_fallback.CONFIG.public_rpc_url принудительно указывает на локальный anvil "
+            f"({RPC}); alchemy_rpc_url/alchemy_api_key очищены -- rpc_call_trading_path/_rpc_call "
+            "внутри ЭТОГО процесса могут попасть ТОЛЬКО на локальный форк, не на продакшн RPC."
+        )
+
+        def _endpoint_sanity_check(label: str, address_to_check: str) -> dict:
+            """Пункт 1 (разбор владельца): "перед оценкой и отправкой
+            проверь на используемом endpoint номер блока и наличие
+            ожидаемого кода по адресу исполнителя" -- реальные cast-вызовы
+            на RPC (тот же RPC, что видит и Sender, и rpc_call_trading_path
+            после правки выше), не предположение."""
+            bn_proc = run([CAST, "block-number", "--rpc-url", RPC], timeout=10)
+            code_proc = run([CAST, "code", address_to_check, "--rpc-url", RPC], timeout=10)
+            code_hex = code_proc.stdout.strip()
+            check = {
+                "label": label, "rpc_url": RPC, "block_number": bn_proc.stdout.strip(),
+                "code_at_address_len_hex_chars": len(code_hex), "code_present": code_hex not in ("0x", ""),
+            }
+            print(f"[e2e_proof] endpoint sanity ({label}): блок={check['block_number']}, "
+                  f"код по адресу {address_to_check} присутствует={check['code_present']}")
+            return check
+
+        result["endpoint_checks"] = [_endpoint_sanity_check("до деплоя-независимой проверки (контракт)", contract_addr)]
 
         # ПРАВКА (реальный первый прогон): task5_bot_sender.STOP_FILE --
         # ЖЁСТКО закодированный /etc/bot/STOP (НЕ управляется переменной
@@ -206,34 +253,53 @@ def main() -> None:
         result["sender_address"] = sender.address
         result["sender_address_matches_deployer"] = sender.address.lower() == deployer_addr.lower()
 
-        gas_estimate_proc = run([CAST, "estimate", contract_addr, "--rpc-url", RPC,
-                                  "--from", deployer_addr, "--json"], timeout=15)
+        # ПРАВКА (разбор владельца): "cast estimate сейчас вызывается БЕЗ
+        # calldata. Передай точные данные executeCycle, тот же from/to/
+        # value". Прежний вызов (`cast estimate <to> --from <from>`, без
+        # calldata) оценивал ПУСТОЙ вызов, не executeCycle -- бессмысленное
+        # сравнение. Правильный независимый кросс-чек -- ТОТ ЖЕ самый
+        # JSON-RPC запрос (eth_estimateGas), что шлёт hp.estimate_gas(),
+        # но через cast rpc (независимый транспорт, та же нода после
+        # правки CONFIG выше) -- ЭТО и есть "то же from/to/value/data".
+        est_call_obj = json.dumps({"from": deployer_addr, "to": contract_addr, "data": "0x" + calldata.hex()})
+        cast_estimate_proc = run([CAST, "rpc", "eth_estimateGas", est_call_obj, "--rpc-url", RPC], timeout=15)
         result["cast_estimate_independent"] = {
-            "returncode": gas_estimate_proc.returncode,
-            "stdout": gas_estimate_proc.stdout.strip(), "stderr": gas_estimate_proc.stderr.strip(),
+            "call_object": est_call_obj, "returncode": cast_estimate_proc.returncode,
+            "stdout": cast_estimate_proc.stdout.strip(), "stderr": cast_estimate_proc.stderr.strip(),
         }
+        cast_gas_estimate = None
+        if cast_estimate_proc.returncode == 0 and cast_estimate_proc.stdout.strip():
+            try:
+                cast_gas_estimate = int(cast_estimate_proc.stdout.strip(), 16)
+            except ValueError:
+                pass
+        result["cast_estimate_gas_value"] = cast_gas_estimate
+
+        result["endpoint_checks"].append(_endpoint_sanity_check("перед estimate_gas/send", contract_addr))
+
         # estimate_gas() -- та же функция, что в hotpath.py (eth_estimateGas без явного block -- см.
-        # часть D task5_v4_control_case_investigation.py про то, что это означает).
+        # часть D task5_v4_control_case_investigation.py про то, что это означает). После правки CONFIG
+        # выше уходит ТОЛЬКО на локальный anvil (RPC), не на продакшн.
         gas_res = hp.estimate_gas(contract_addr, calldata, deployer_addr)
         if not gas_res["ok"]:
             raise RuntimeError(f"estimate_gas (реальная функция hotpath.py) отказала: {gas_res}")
         result["gas_estimate"] = gas_res["gas_estimate"]
 
-        # ПРАВКА (реальный четвёртый прогон): gas_estimate=26763 --
-        # ПОДОЗРИТЕЛЬНО близко к голому intrinsic-полу этой calldata
-        # (836 байт -> ровно 26420 по EIP-2028) -- запаса на РЕАЛЬНОЕ
-        # исполнение (SLOAD/SSTORE/CALL) практически нет. Похоже на тот
-        # же "USDG/MOSIAI пулы A/B уже сухие" случай, документированный
-        # РАНЬШЕ в этой же сессии (task5_v4_fork_simulation.py) -- вызов,
-        # видимо, откатывается СРАЗУ на входе, а eth_estimateGas anvil,
-        # видимо, для БЕЗУСЛОВНОГО отката возвращает голый intrinsic-пол
-        # вместо явной ошибки. Честная диагностика: посылаем С ЗАПАСОМ
-        # газа (не доверяя этой конкретной оценке слепо) -- если tx
-        # ВСЁ РАВНО не находится в цепи, проблема НЕ в газе.
-        intrinsic_floor = 21000 + sum(4 if b == 0 else 16 for b in calldata)
-        result["intrinsic_gas_floor"] = intrinsic_floor
-        result["gas_estimate_suspiciously_low"] = gas_res["gas_estimate"] < intrinsic_floor * 2
-        send_gas_limit = max(gas_res["gas_estimate"], intrinsic_floor * 10, 500_000)
+        # ПРАВКА (разбор владельца, отзываю прежний вывод "anvil
+        # недооценивает газ в 5-7 раз" -- измерения были НЕСОПОСТАВИМЫ,
+        # см. выше про rpc_call_trading_path на продакшн-RPC). Реальный
+        # запас теперь -- ПРОПОРЦИОНАЛЬНАЯ надбавка к ИСПРАВЛЕННОЙ (той же
+        # ноды) оценке, НЕ безусловный пол 500000 (тот маскировал бы
+        # реальную величину недооценки, если бы она была). Величина
+        # надбавки (50%) -- НЕ существующий продакшн-стандарт (в реальном
+        # горячем пути gas_limit используется РОВНО из estimate_gas, без
+        # запаса вообще -- см. _evaluate_and_maybe_send) -- отдельный,
+        # честно обозначенный выбор ТОЛЬКО для этого диагностического
+        # прогона, чтобы не терять сквозной прогон из-за небольшой
+        # погрешности оценки.
+        GAS_SAFETY_MARGIN_FRACTION = 0.5
+        send_gas_limit = int(gas_res["gas_estimate"] * (1 + GAS_SAFETY_MARGIN_FRACTION)) + 1
+        result["gas_safety_margin_fraction"] = GAS_SAFETY_MARGIN_FRACTION
         result["send_gas_limit_used"] = send_gas_limit
 
         tx_fields = sender.prepare_transaction_fields(contract_addr, calldata, send_gas_limit)
@@ -248,6 +314,7 @@ def main() -> None:
         result["anvil_chain_id"] = chain_id_proc.stdout.strip()
         pending_nonce_proc = run([CAST, "nonce", deployer_addr, "--rpc-url", RPC], timeout=10)
         result["anvil_pending_nonce_before_send"] = pending_nonce_proc.stdout.strip()
+        result["endpoint_checks"].append(_endpoint_sanity_check("непосредственно перед send", contract_addr))
 
         print("[e2e_proof] Sender: submit_prepared (РЕАЛЬНАЯ отправка в ЛОКАЛЬНЫЙ anvil, ждём receipt)...")
         send_result = sender.submit_prepared(prepared)
@@ -287,6 +354,21 @@ def main() -> None:
         result["contract_usdg_balance_after"] = balance_after
         result["actual_balance_diff_raw"] = balance_after - balance_before
         result["cycle_executed_matches_balance_diff"] = cycle_profit == (balance_after - balance_before)
+
+        # Пункт 1 (разбор владельца): "покажи оценку через cast, оценку
+        # через функцию бота, отправленный gas limit, фактический
+        # gasUsed, статус, прибыль по событию и изменение баланса" --
+        # единая сводная таблица, все значения уже честно посчитаны выше.
+        result["comparison_table"] = {
+            "cast_rpc_eth_estimateGas": cast_gas_estimate,
+            "hp_estimate_gas": gas_res["gas_estimate"],
+            "gas_limit_sent": send_gas_limit,
+            "gas_used_actual": receipt["gasUsed"],
+            "receipt_status": receipt["status"],
+            "cycle_executed_profit_raw": cycle_profit,
+            "actual_balance_diff_raw": balance_after - balance_before,
+        }
+        print("[e2e_proof] сводная таблица: " + json.dumps(result["comparison_table"], default=str))
 
         print("[e2e_proof] запись газа/прибыли через РЕАЛЬНЫЙ PilotBudget (task5_v4_pilot_accounting.py)...")
         budget = PilotBudget(state_path="/tmp/task5_v4_e2e_proof_budget_state.json")
