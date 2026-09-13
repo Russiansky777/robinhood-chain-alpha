@@ -71,6 +71,15 @@ REASON_NO_PROFITABLE_CYCLE = "нет прибыльного цикла"
 REASON_NO_LIQUIDITY = "нет ликвидности"
 REASON_CALC_ERROR = "ошибка расчёта"
 REASON_SIMULATION_FAILED = "симуляция не прошла"
+# Владелец (доп., расшифровка ошибок): "если причина не зависит от
+# размера -- например, подтверждённо неверный PoolKey -- прекращай
+# перебор размеров". ОТДЕЛЬНО от REASON_NO_LIQUIDITY -- это НЕ вопрос
+# ликвидности, а подтверждённая (по реальному, декодированному ABI-
+# селектору -- см. task5_v4_revert_decode.py) структурная невозможность
+# ИМЕННО этого PoolKey (PoolNotInitialized/CurrenciesOutOfOrderOrEqual/
+# TickSpacingTooLarge/TickSpacingTooSmall/PoolAlreadyInitialized) --
+# истинна для ЛЮБОГО размера сделки на этом же PoolKey.
+REASON_INVALID_POOL_CONFIG = "неверная конфигурация пула (подтверждено)"
 REASON_GAS_LIMIT = "лимит газа"
 REASON_TX_IN_FLIGHT = "уже есть неподтверждённая транзакция"
 REASON_HALTED = "пилот остановлен (см. halt_reason)"
@@ -110,6 +119,15 @@ class AttemptTableRow:
     # соответствующие метки не были доступны в этом пути (напр. dry-run).
     queue_wait_s: float | None = None
     calc_duration_s: float | None = None
+    # ПРАВКА (уточнение метрики очереди, владелец): раньше повторный
+    # сигнал по уже стоящему в очереди маршруту ЗАТИРАЛ время его
+    # первой постановки (см. _CoalescingRouteQueue.mark) -- queue_wait_s
+    # выше по факту всегда был "возраст ПОСЛЕДНЕГО сигнала", НЕ полное
+    # время ожидания маршрута с момента, когда он ВПЕРВЫЕ попал в
+    # очередь. route_full_wait_s -- НОВОЕ, ОТДЕЛЬНОЕ поле: с первой
+    # постановки до забора очередью (queue_wait_s выше остаётся ровно
+    # тем же, чем был -- возрастом последнего сигнала, НЕ переопределён).
+    route_full_wait_s: float | None = None
 
 
 class PilotBudget:
@@ -631,7 +649,8 @@ class ReasonLog:
             calldata_hex: str | None = None, rpc_call_count: int | None = None,
             signal_block: int | None = None, t_detected_monotonic: float | None = None,
             t_dequeued_monotonic: float | None = None, t_calc_start_monotonic: float | None = None,
-            t_calc_end_monotonic: float | None = None) -> None:
+            t_calc_end_monotonic: float | None = None,
+            t_first_enqueued_monotonic: float | None = None) -> None:
         """Пункт 6 (седьмой раунд): "для прибыльных кандидатов и ошибок
         симуляции -- сохранять размер, calldata, блок котировки,
         параметры оценки газа". Необязательные keyword-only поля --
@@ -649,15 +668,33 @@ class ReasonLog:
         каждом месте вызова -- иначе риск разъехаться при копировании
         формулы по ~15 местам _evaluate_and_maybe_send. None, если
         соответствующая пара меток не передана (вызывающий код ДО начала
-        расчёта -- см. вызовы из evaluator_loop до _evaluate_and_maybe_send)."""
+        расчёта -- см. вызовы из evaluator_loop до _evaluate_and_maybe_send).
+
+        ПРАВКА (уточнение метрики очереди, владелец): "сейчас повторный
+        сигнал обновляет время элемента -- сохраняй отдельно время
+        первой постановки в очередь, время последнего обновления
+        сигнала, время начала расчёта; пиши отдельно полное ожидание
+        маршрута и возраст последнего сигнала". `t_detected_monotonic`
+        остаётся ТЕМ ЖЕ, чем был -- моментом ПОСЛЕДНЕГО сигнала (см.
+        _CoalescingRouteQueue.mark/pop_one) -- `queue_wait_s` НЕ
+        переопределяется этой правкой, это по-прежнему "возраст
+        последнего сигнала". `t_first_enqueued_monotonic` -- НОВЫЙ,
+        отдельный параметр (момент, когда маршрут ВПЕРВЫЕ попал в
+        очередь, до любых коалесцирующих перезаписей) -- если передан,
+        добавляет `route_full_wait_s` (полное ожидание маршрута с
+        первой постановки до забора очередью), НЕ подменяя queue_wait_s."""
         queue_wait_s = (t_dequeued_monotonic - t_detected_monotonic
                          if t_dequeued_monotonic is not None and t_detected_monotonic is not None else None)
         calc_duration_s = (t_calc_end_monotonic - t_calc_start_monotonic
                             if t_calc_end_monotonic is not None and t_calc_start_monotonic is not None else None)
+        route_full_wait_s = (t_dequeued_monotonic - t_first_enqueued_monotonic
+                              if t_dequeued_monotonic is not None and t_first_enqueued_monotonic is not None
+                              else None)
         rec = {"ts_wall": time.time(), "route_id": route_id, "route_label": route_label,
                "reason": reason, "detail": detail, "size_in_raw": size_in_raw, "quote_block": quote_block,
                "calldata_hex": calldata_hex, "rpc_call_count": rpc_call_count, "signal_block": signal_block,
-               "queue_wait_s": queue_wait_s, "calc_duration_s": calc_duration_s}
+               "queue_wait_s": queue_wait_s, "calc_duration_s": calc_duration_s,
+               "route_full_wait_s": route_full_wait_s}
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         print(f"[pilot][не отправлено] {route_label}: {reason} ({detail})")

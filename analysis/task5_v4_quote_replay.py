@@ -43,6 +43,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -131,20 +132,45 @@ def _looks_like_confirmed_revert(detail: str) -> bool:
     return any(m in d for m in _EXECUTION_REVERT_MARKERS)
 
 
-def quote_exact_input_single(key: PoolKey, zero_for_one: bool, amount_in: int, block_number: int) -> int:
-    """РЕАЛЬНЫЙ eth_call к V4Quoter. Порядок: наш доверенный RPC-путь
-    (alchemy_fallback._rpc_call -- публичный RPC первым, Alchemy
-    фолбэком по транзиентным ошибкам); если публичный RPC вернул
-    НЕ-транзиентную ошибку, ПОХОЖУЮ на отсутствие исторического state
-    (типично для блоков вне его горизонта хранения), пробуем Alchemy
-    напрямую как отдельную попытку. ПРАВКА (четвёртый раунд): если же
-    ошибка выглядит как ПОДТВЕРЖДЁННЫЙ контрактный revert (напр.
-    NotEnoughLiquidity) -- на ТОМ ЖЕ block_number состояние НЕИЗМЕННО,
-    повторный запрос к другому провайдеру даст ТОТ ЖЕ ответ, поэтому
-    сразу поднимаем исходную ошибку, НЕ тратя лишний RPC-вызов на
-    заведомо бесполезный повтор. НЕ домены из приложенного аудита."""
+def quote_exact_input_single(key: PoolKey, zero_for_one: bool, amount_in: int, block_number: int,
+                              rpc_call: Callable[[str, list], object] = _rpc_call) -> int:
+    """РЕАЛЬНЫЙ eth_call к V4Quoter. Порядок ПО УМОЛЧАНИЮ (rpc_call не
+    передан -- ВСЕ существующие вызывающие места, поведение НЕ
+    меняется): наш доверенный RPC-путь (alchemy_fallback._rpc_call --
+    публичный RPC первым, Alchemy фолбэком по транзиентным ошибкам);
+    если публичный RPC вернул НЕ-транзиентную ошибку, ПОХОЖУЮ на
+    отсутствие исторического state (типично для блоков вне его
+    горизонта хранения), пробуем Alchemy напрямую как отдельную
+    попытку. ПРАВКА (четвёртый раунд): если же ошибка выглядит как
+    ПОДТВЕРЖДЁННЫЙ контрактный revert (напр. NotEnoughLiquidity) -- на
+    ТОМ ЖЕ block_number состояние НЕИЗМЕННО, повторный запрос к
+    другому провайдеру даст ТОТ ЖЕ ответ, поэтому сразу поднимаем
+    исходную ошибку, НЕ тратя лишний RPC-вызов на заведомо бесполезный
+    повтор. НЕ домены из приложенного аудита.
+
+    ПРАВКА (владелец, "подключи быстрый RPC-путь ко всем торговым
+    котировкам"): `rpc_call` -- ЯВНЫЙ, необязательный параметр. Торговый
+    горячий путь (task5_v4_hotpath.py::quote_route_at_size) передаёт
+    сюда СВОЙ rpc_call_trading_path (Alchemy напрямую, ~10 req/с,
+    отдельный от фонового троттлинг-бюджета -- см. alchemy_fallback.
+    rpc_call_trading_path). Когда `rpc_call` ОТЛИЧАЕТСЯ от дефолтного
+    `_rpc_call` -- код НИЖЕ (missing-state Alchemy-direct фолбэк,
+    _looks_like_confirmed_revert) СОЗНАТЕЛЬНО пропускается: инъецируемая
+    функция УЖЕ реализует свой честный транспорт-vs-revert разбор (см.
+    её собственный докстринг: подтверждённый revert поднимается СРАЗУ,
+    без повторного похода на другой провайдер) -- накладывать здесь
+    ЕЩЁ один слой ретрая поверх было бы риском повторить подтверждённый
+    revert как будто это временный сбой транспорта, ровно то, что
+    просили НЕ делать. Фоновая проверка живучести (check_route_liveness,
+    task5_v4_route_registry.py) НЕ передаёт rpc_call -- продолжает идти
+    прежним путём БЕЗ изменений (владелец: "фоновую проверку живучести
+    оставь на фоновом пути")."""
     calldata = quote_exact_input_single_calldata(key, zero_for_one, amount_in)
     block_tag = hex(block_number)
+    if rpc_call is not _rpc_call:
+        raw = rpc_call("eth_call", [{"to": V4_QUOTER, "data": calldata}, block_tag])
+        amount_out, _gas_estimate = decode_quote_result(raw)
+        return amount_out
     try:
         raw = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": calldata}, block_tag])
     except RuntimeError as exc:

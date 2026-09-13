@@ -261,7 +261,12 @@ def check3_multihop_only_for_hookless_routes() -> None:
         assert method == "eth_call"
         return "0xdeadbeef"
 
-    def fake_quote_single(pool_key, zero_for_one, amount_in, block_number):
+    def fake_quote_single(pool_key, zero_for_one, amount_in, block_number, rpc_call=None):
+        # ПРАВКА (владелец, "подключи быстрый RPC-путь..."): реальная
+        # quote_exact_input_single теперь принимает необязательный
+        # rpc_call (quote_route_at_size передаёт rpc_call_trading_path
+        # для hook-маршрутов) -- фейк обязан принимать тот же параметр,
+        # иначе падает с TypeError на РЕАЛЬНОМ (не переделанном) вызове.
         sequential_calls.append(pool_key.currency0)
         return amount_in + 1
 

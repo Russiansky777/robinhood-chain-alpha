@@ -119,12 +119,13 @@ def _read_rpc_call_count() -> int:
         return _rpc_call_count
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
-    BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE,
-    REASON_SIMULATION_FAILED, AttemptTable, AttemptTableRow, PilotBudget, ReasonLog,
+    BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_INVALID_POOL_CONFIG, REASON_NO_LIQUIDITY,
+    REASON_NO_PROFITABLE_CYCLE, REASON_SIMULATION_FAILED, AttemptTable, AttemptTableRow, PilotBudget, ReasonLog,
     check_accounting_consistency, check_no_unexpected_token_spend,
 )
 from task5_v4_quote_replay import quote_exact_input_single, V4_QUOTER  # noqa: E402
 from task5_v4_pool_math import decode_quote_result, quote_exact_input_multihop_calldata  # noqa: E402
+from task5_v4_revert_decode import decode_v4_revert_detail  # noqa: E402
 from task5_v4_route_registry import (  # noqa: E402
     RouteCycle, RouteRegistry, USDG, bootstrap_registry, check_route_liveness, save_registry_state,
 )
@@ -428,18 +429,62 @@ def quote_route_at_size(route: RouteCycle, amount_in: int, block_number: int) ->
             return {"ok": True, "amount_in": amount_in, "amount_out": amount_out, "profit_raw": amount_out - amount_in}
         except Exception as exc:  # noqa: BLE001
             detail = str(exc)
-            reason = REASON_NO_LIQUIDITY if "NotEnoughLiquidity" in detail else REASON_CALC_ERROR
-            return {"ok": False, "reason": reason, "detail": detail}
+            return {"ok": False, **_classify_quote_error(detail)}
 
     try:
         cur = amount_in
         for leg in route.legs:
-            cur = quote_exact_input_single(leg.pool_key, leg.zero_for_one, cur, block_number)
+            # ПРАВКА (владелец, "подключи быстрый RPC-путь ко всем
+            # торговым котировкам"): rpc_call_trading_path (СЧИТАННЫЙ
+            # локальный враппер этого модуля, см. его определение выше)
+            # -- та же быстрая (Alchemy напрямую, ~10 req/с, отдельный
+            # троттлинг-бюджет от фона) полоса, что уже используется для
+            # hookless-маршрутов ВЫШЕ и для estimateGas/gasPrice/
+            # blockNumber этого же торгового пути -- РАНЬШЕ маршруты С
+            # хуками (большинство реестра) шли через ДЕФОЛТНЫЙ (медленный,
+            # публичный-RPC-первый, 0.5с троттлинг, ОБЩИЙ с фоном) путь
+            # quote_exact_input_single, единственные в горячем пути.
+            # Порядок плеч/направление/calldata/математика НЕ меняются --
+            # меняется ТОЛЬКО то, КАКАЯ RPC-функция делает вызов.
+            cur = quote_exact_input_single(leg.pool_key, leg.zero_for_one, cur, block_number,
+                                            rpc_call=rpc_call_trading_path)
         return {"ok": True, "amount_in": amount_in, "amount_out": cur, "profit_raw": cur - amount_in}
     except Exception as exc:  # noqa: BLE001
         detail = str(exc)
-        reason = REASON_NO_LIQUIDITY if "NotEnoughLiquidity" in detail else REASON_CALC_ERROR
-        return {"ok": False, "reason": reason, "detail": detail}
+        return {"ok": False, **_classify_quote_error(detail)}
+
+
+def _classify_quote_error(detail: str) -> dict:
+    """ПРАВКА (владелец, "не называй любой revert отсутствием
+    ликвидности" + "если причина не зависит от размера -- прекращай
+    перебор"): раньше `reason = REASON_NO_LIQUIDITY if "NotEnoughLiquidity"
+    in detail else REASON_CALC_ERROR` -- подстрочный поиск, который
+    НИКОГДА не совпадал на реальных ABI-закодированных revert-ах (см.
+    task5_v4_revert_decode.py, докстринг модуля, за честным разбором
+    сохранённого no_send_log.jsonl этой сессии -- 43/43 подтверждённых
+    revert-ов, 0 совпадений по тексту). Теперь -- РЕАЛЬНАЯ декодировка
+    селектора (внешний + внутренний, если это обёртка Quoter'а
+    UnexpectedRevertBytes): REASON_NO_LIQUIDITY -- ТОЛЬКО когда
+    подтверждено NotEnoughLiquidity; REASON_INVALID_POOL_CONFIG --
+    подтверждённо неверный/несуществующий PoolKey (PoolNotInitialized и
+    т.п., см. KNOWN_SELECTORS) -- ОБА эти случая честно size-независимы
+    (тот же PoolKey/та же ликвидность на любом размере сетки), ОБА
+    помечаются stop_size_iteration=True. Всё, что декодер не смог
+    уверенно опознать (неизвестный селектор, хуковский revert без ABI,
+    транспортная ошибка без 'data') -- REASON_CALC_ERROR,
+    stop_size_iteration=False (владелец: "не распространяй такое
+    прекращение на неизвестные ошибки или размерозависимую логику
+    хуков")."""
+    decoded = decode_v4_revert_detail(detail)
+    real_name = decoded["inner_name"] or decoded["outer_name"]  # inner, если это обёртка -- иначе внешний сам по себе
+    if decoded["size_independent"] and real_name == "NotEnoughLiquidity(bytes32)":
+        reason = REASON_NO_LIQUIDITY
+    elif decoded["size_independent"]:
+        reason = REASON_INVALID_POOL_CONFIG
+    else:
+        reason = REASON_CALC_ERROR
+    return {"reason": reason, "detail": detail, "stop_size_iteration": decoded["size_independent"],
+            "decoded_selector": decoded}
 
 
 def recompute_route(route: RouteCycle, block_number: int) -> dict:
@@ -455,8 +500,22 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
     самый мелкий размер уже падает с NotEnoughLiquidity. Реальное
     свойство V4-пулов с концентрированной ликвидностью: больший размер
     строго не может пройти там, где не прошёл меньший -- сетка
-    перебирается по возрастанию, при первом NotEnoughLiquidity --
-    немедленный останов.
+    перебирается по возрастанию, при первом ПОДТВЕРЖДЁННО
+    размеро-независимом отказе -- немедленный останов.
+
+    ПРАВКА (владелец, "расшифруй повторяющиеся ошибки... если причина
+    не зависит от размера -- прекращай перебор размеров для этого
+    кандидата... не распространяй на неизвестные ошибки или
+    размерозависимую логику хуков"): останов теперь по явному флагу
+    `stop_size_iteration`, который `_classify_quote_error()` (см.
+    quote_route_at_size) выставляет ТОЛЬКО для ПОДТВЕРЖДЁННОГО (по
+    реально декодированному ABI-селектору, task5_v4_revert_decode.py)
+    NotEnoughLiquidity или структурно неверного PoolKey -- НЕ по
+    подстрочному поиску текста (который на реальных данных этой сессии
+    НИКОГДА не совпадал, см. докстринг _classify_quote_error). Любая
+    НЕопознанная ошибка (в т.ч. любой revert хук-контракта, для
+    которого у нас нет ABI) НЕ останавливает перебор -- сетка идёт
+    дальше, как раньше делала бы для REASON_CALC_ERROR.
 
     Пункт 3 (внешнее ревью, пятый раунд): при расширении сетки крупными
     размерами (100/300/1000 USDG) `best` НИКОГДА не обнуляется и не
@@ -479,8 +538,8 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
                 best = res
         else:
             last_reason, last_detail = res["reason"], res["detail"]
-            if res["reason"] == REASON_NO_LIQUIDITY:
-                break  # больший размер тоже упадёт -- см. докстринг
+            if res.get("stop_size_iteration"):
+                break  # подтверждённо размеро-независимая причина -- больший размер тоже упадёт, см. докстринг
     if best is None:
         return {"ok": False, "reason": last_reason or REASON_CALC_ERROR, "detail": last_detail or "неизвестная ошибка"}
     return {"ok": True, **best}
@@ -1194,29 +1253,50 @@ class _CoalescingRouteQueue:
     """"Не обрабатывай накопившуюся очередь устаревших состояний. Пока
     идёт расчёт, новые изменения одного маршрута объединяй в последнее
     доступное состояние." НЕ FIFO-очередь событий -- словарь
-    route_id -> (последний_блок, время_получения), перезаписываемый при
-    повторном касании того же маршрута, пока он ещё не забран."""
+    route_id -> (последний_блок, время_первой_постановки, время_последнего_сигнала),
+    перезаписываемый при повторном касании того же маршрута, пока он ещё не забран.
+
+    ПРАВКА (владелец, "уточни метрику очереди... сейчас повторный сигнал
+    обновляет время элемента -- сохраняй отдельно время первой постановки
+    в очередь, время последнего обновления сигнала, время начала
+    расчёта"): раньше `mark()` при повторном касании ЗАТИРАЛ время,
+    сохранённое при ПЕРВОЙ постановке -- "время ожидания в очереди",
+    посчитанное при заборе, было НА САМОМ ДЕЛЕ "возраст последнего
+    сигнала", а не "сколько маршрут реально ждал с первой постановки".
+    Теперь хранятся ОБА момента отдельно; `first_enqueued` НЕ
+    перезаписывается повторными касаниями. Порядок обработки (FIFO по
+    ПЕРВОЙ постановке -- `next(iter(self._pending))` по-прежнему
+    сохраняет позицию ключа при in-place перезаписи значения, не удаляя
+    и не перевстав в конец) НЕ меняется этой правкой."""
 
     def __init__(self) -> None:
         self._cv = threading.Condition()
-        self._pending: dict[str, tuple[int, float]] = {}
+        # route_id -> (последний_блок, t_first_enqueued_monotonic, t_last_signal_monotonic)
+        self._pending: dict[str, tuple[int, float, float]] = {}
 
     def mark(self, route_id: str, block_number: int, recv_t_monotonic: float) -> None:
         with self._cv:
             prev = self._pending.get(route_id)
-            if prev is None or block_number >= prev[0]:
-                self._pending[route_id] = (block_number, recv_t_monotonic)
+            if prev is None:
+                self._pending[route_id] = (block_number, recv_t_monotonic, recv_t_monotonic)
+                self._cv.notify()
+            elif block_number >= prev[0]:
+                first_enqueued_t = prev[1]  # ПРЕСЕРВ -- повторный сигнал больше НЕ затирает первую постановку
+                self._pending[route_id] = (block_number, first_enqueued_t, recv_t_monotonic)
                 self._cv.notify()
 
-    def pop_one(self, timeout_s: float = 0.5) -> tuple[str, int, float] | None:
+    def pop_one(self, timeout_s: float = 0.5) -> tuple[str, int, float, float] | None:
+        """Возвращает (route_id, block_number, t_first_enqueued_monotonic,
+        t_last_signal_monotonic) -- ОБА времени, раздельно (см. докстринг
+        класса)."""
         with self._cv:
             if not self._pending:
                 self._cv.wait(timeout=timeout_s)
             if not self._pending:
                 return None
             route_id = next(iter(self._pending))
-            block_number, recv_t = self._pending.pop(route_id)
-            return route_id, block_number, recv_t
+            block_number, first_enqueued_t, last_signal_t = self._pending.pop(route_id)
+            return route_id, block_number, first_enqueued_t, last_signal_t
 
 
 class BackgroundRegistryWorker(threading.Thread):
@@ -1445,7 +1525,7 @@ class HotPath:
                     self.reason_log.log(route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
                                          "пилот завершает работу (--duration-seconds истёк) -- новые кандидаты не берутся")
                 continue
-            route_id, block_number, recv_t_monotonic = item
+            route_id, block_number, first_enqueued_t_monotonic, recv_t_monotonic = item
             route = self.registry.get_route(route_id)
             if route is None:
                 continue
@@ -1468,7 +1548,19 @@ class HotPath:
                 if recheck.get("live") is True:
                     print(f"[hotpath] маршрут {route.label} ОЖИЛ по свежему сигналу -- оцениваю немедленно.")
                 elif recheck.get("live") is False:
-                    self.reason_log.log(route_id, route.label, REASON_NO_LIQUIDITY,
+                    # ПРАВКА (владелец, "не называй любой revert
+                    # отсутствием ликвидности"): раньше здесь БЕЗУСЛОВНО
+                    # писался REASON_NO_LIQUIDITY для ЛЮБОГО подтверждённого
+                    # revert (check_route_liveness/_looks_like_confirmed_
+                    # revert различают только "подтверждённый revert" vs
+                    # "инконклюзивно", НЕ то, КАКОЙ именно revert) -- теперь
+                    # декодируем реальный ABI-селектор из recheck['error']
+                    # (см. task5_v4_revert_decode.py) и пишем правдивую
+                    # причину; live остаётся False в РЕЕСТРЕ независимо от
+                    # того, что именно за revert -- это классификация ТОЛЬКО
+                    # для журнала, статус живучести не меняется этой правкой.
+                    classified = _classify_quote_error(str(recheck.get("error") or ""))
+                    self.reason_log.log(route_id, route.label, classified["reason"],
                                          f"маршрут исключён, перепроверка ПО СВЕЖЕМУ сигналу (не по расписанию) "
                                          f"подтвердила: {recheck.get('error')}")
                     continue
@@ -1486,7 +1578,8 @@ class HotPath:
             t_dequeued_monotonic = time.monotonic()
             self.busy = True
             try:
-                self._evaluate_and_maybe_send(route, block_number, recv_t_monotonic, t_dequeued_monotonic)
+                self._evaluate_and_maybe_send(route, block_number, recv_t_monotonic, t_dequeued_monotonic,
+                                               first_enqueued_t_monotonic)
             except Exception as exc:  # noqa: BLE001
                 print(f"[hotpath] ошибка при оценке маршрута {route.label}: {exc}", file=sys.stderr)
                 # ПРАВКА (восьмой раунд, пункт 2): "пиши результат ТАКЖЕ
@@ -1504,12 +1597,13 @@ class HotPath:
                                      t_dequeued_monotonic=t_dequeued_monotonic,
                                      t_calc_start_monotonic=t_dequeued_monotonic,
                                      t_calc_end_monotonic=time.monotonic(),
-                                     rpc_call_count=_read_rpc_call_count())
+                                     rpc_call_count=_read_rpc_call_count(),
+                                     t_first_enqueued_monotonic=first_enqueued_t_monotonic)
             finally:
                 self.busy = False
 
     def _evaluate_and_maybe_send(self, route: RouteCycle, block_number: int, recv_t_monotonic: float,
-                                  t_dequeued_monotonic: float) -> None:
+                                  t_dequeued_monotonic: float, first_enqueued_t_monotonic: float | None = None) -> None:
         # ПРАВКА (восьмой раунд, разбор владельца, пункт 2): "для каждого
         # РЕАЛЬНО НАЧАТОГО расчёта -- route_id, блок сигнала, время
         # получения/постановки в очередь, начало и конец расчёта, итоговую
@@ -1529,7 +1623,8 @@ class HotPath:
                                  size_in_raw=size_in_raw, quote_block=quote_block, calldata_hex=calldata_hex,
                                  rpc_call_count=_read_rpc_call_count(), signal_block=block_number,
                                  t_detected_monotonic=recv_t_monotonic, t_dequeued_monotonic=t_dequeued_monotonic,
-                                 t_calc_start_monotonic=t_calc_start_monotonic, t_calc_end_monotonic=time.monotonic())
+                                 t_calc_start_monotonic=t_calc_start_monotonic, t_calc_end_monotonic=time.monotonic(),
+                                 t_first_enqueued_monotonic=first_enqueued_t_monotonic)
 
         # Пункт 6 (седьмой раунд, разбор владельца): "минимальная
         # инструментация -- ... количество RPC-вызовов" -- сброс В НАЧАЛЕ
@@ -1644,6 +1739,8 @@ class HotPath:
                 rpc_call_count=_read_rpc_call_count(),
                 queue_wait_s=t_dequeued_monotonic - recv_t_monotonic,
                 calc_duration_s=t_send_monotonic - t_calc_start_monotonic,
+                route_full_wait_s=(t_dequeued_monotonic - first_enqueued_t_monotonic
+                                    if first_enqueued_t_monotonic is not None else None),
             )
             self.attempt_table.write(row)
             return
@@ -2033,6 +2130,8 @@ class HotPath:
                 rpc_call_count=_read_rpc_call_count(),
                 queue_wait_s=t_dequeued_monotonic - recv_t_monotonic,
                 calc_duration_s=t_send_monotonic - t_calc_start_monotonic,
+                route_full_wait_s=(t_dequeued_monotonic - first_enqueued_t_monotonic
+                                    if first_enqueued_t_monotonic is not None else None),
             )
             self.attempt_table.write(row)
             self.budget.mark_pending_row_written()
