@@ -152,7 +152,7 @@ def _run_evaluate(stale_profit_raw: int, fresh_profit_raw: int, sender: _FakeSen
     hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = fake_recompute
     hp.quote_route_at_size = fake_quote_at_size
-    hp.estimate_gas = lambda addr, calldata, frm: {"ok": True, "gas_estimate": 200_000}  # -> 1.0 USDG газа при 2500 WETH/USDG
+    hp.estimate_gas = lambda addr, calldata, frm, block_number=None: {"ok": True, "gas_estimate": 200_000}  # -> 1.0 USDG газа при 2500 WETH/USDG
     hp.current_weth_usdg_price = lambda: 2500.0
     hp._token_balance = lambda token, account: 0
     hp.build_execute_cycle_calldata = lambda route, amt, min_profit, sqrt_price_limits=None: (

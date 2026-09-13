@@ -441,7 +441,8 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
     return {"ok": True, **best}
 
 
-def estimate_gas(contract_address: str, calldata: bytes, from_address: str) -> dict:
+def estimate_gas(contract_address: str, calldata: bytes, from_address: str,
+                  block_number: int | None = None) -> dict:
     """eth_estimateGas -- РЕАЛЬНЫЙ read-only вызов (не отправка).
 
     ПРАВКА (шестой раунд, пункт 5A): rpc_call_trading_path (не голый
@@ -449,14 +450,102 @@ def estimate_gas(contract_address: str, calldata: bytes, from_address: str) -> d
     (Alchemy напрямую, ~10 req/с троттлинг, измерено; см. её докстринг
     в alchemy_fallback.py), НЕ делящая бюджет с фоновым обнаружением/
     живучестью (те продолжают идти через _rpc_call/_chunked_get_logs,
-    0.5с, не изменены)."""
+    0.5с, не изменены).
+
+    ПРАВКА (седьмой раунд, разбор владельца, пункт 2): необязательный
+    block_number -- ВТОРОЙ параметр eth_estimateGas (blockParameter),
+    ЕСЛИ вызывающий код хочет оценку НА ТОМ ЖЕ блоке, что и котировка
+    (см. _quote_and_estimate_gas_consistent ниже). None (по умолчанию)
+    -- прежнее поведение (latest/pending), НЕ меняет существующих
+    вызывающих (recompute_route и т.д. по-прежнему получают gas на
+    latest неявно, если явно не передан блок)."""
     try:
-        raw = rpc_call_trading_path("eth_estimateGas", [{
-            "from": from_address, "to": contract_address, "data": "0x" + calldata.hex(),
-        }])
+        params = [{"from": from_address, "to": contract_address, "data": "0x" + calldata.hex()}]
+        if block_number is not None:
+            params.append(hex(block_number))
+        raw = rpc_call_trading_path("eth_estimateGas", params)
         return {"ok": True, "gas_estimate": int(raw, 16)}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
+
+
+_BLOCK_PARAM_UNSUPPORTED_MARKERS = (
+    "unsupported", "not supported", "invalid block", "block parameter", "method not found",
+    "-32601", "-32602", "invalid argument",
+)
+
+
+def _looks_like_block_param_unsupported(detail: str) -> bool:
+    """Отличаем "этот RPC не принимает второй параметр eth_estimateGas"
+    (транспортная/протокольная несовместимость -- повод для честного
+    fallback) от ОБЫЧНОГО отката исполнения (revert -- НЕ повод менять
+    режим, кандидат просто отклоняется как обычно)."""
+    d = detail.lower()
+    return any(m in d for m in _BLOCK_PARAM_UNSUPPORTED_MARKERS)
+
+
+def _quote_and_estimate_gas_consistent(route: RouteCycle, amount_in: int, contract_address: str,
+                                        calldata: bytes, from_address: str) -> dict:
+    """Пункт 2 (седьмой раунд, разбор владельца): "estimateGas(latest)
+    -> blockNumber -> quote(blockNumber) не гарантирует одинаковое
+    состояние". Получаем КОНКРЕТНЫЙ блок B ПЕРВЫМ (один eth_blockNumber),
+    затем котировку И оценку газа -- НА ЭТОМ B (estimate_gas с явным
+    параметром блока, если RPC его поддерживает -- реально проверено:
+    этот RPC принимает исторический блок для eth_estimateGas, см.
+    task5_v4_control_case_investigation.py, часть D). Если параметр
+    блока НЕ поддержан этим RPC (честно определяется по тексту ошибки,
+    см. _looks_like_block_param_unsupported) -- fallback: фиксируем
+    НОМЕРА блока ДО и ПОСЛЕ пары запросов, НЕ заявляем "одно состояние
+    доказано". При сдвиге блока между ДО/ПОСЛЕ -- РОВНО ОДНА повторная
+    попытка; при повторном сдвиге -- честный отказ (устаревший
+    кандидат), НЕ бесконечный подбор.
+
+    Возвращает {"ok": True, "block": B, "profit_raw": ..., "gas_estimate": ...,
+    "mode": "block_param"|"fallback_stable"|"fallback_retried_stable",
+    "block_before": ..., "block_after": ...} либо {"ok": False, "reason": ...,
+    "detail": ..., "mode": ..., блоки для честного лога}."""
+    block_b = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+    quote_res = quote_route_at_size(route, amount_in, block_b)
+    if not quote_res["ok"]:
+        return {"ok": False, "mode": "block_param", "block": block_b, "block_before": block_b,
+                "block_after": block_b, "reason": quote_res["reason"], "detail": quote_res["detail"]}
+    gas_res = estimate_gas(contract_address, calldata, from_address, block_number=block_b)
+    if gas_res["ok"]:
+        return {"ok": True, "mode": "block_param", "block": block_b, "block_before": block_b,
+                "block_after": block_b, "profit_raw": quote_res["profit_raw"],
+                "gas_estimate": gas_res["gas_estimate"]}
+    if not _looks_like_block_param_unsupported(gas_res["error"]):
+        # Обычная ошибка исполнения (revert и т.п.) -- НЕ вопрос
+        # согласованности состояний, пробрасываем как есть.
+        return {"ok": False, "mode": "block_param", "block": block_b, "block_before": block_b,
+                "block_after": block_b, "reason": REASON_SIMULATION_FAILED, "detail": gas_res["error"]}
+
+    # --- Fallback: этот RPC не принял явный параметр блока у eth_estimateGas ---
+    for attempt in range(2):  # РОВНО одна повторная попытка при сдвиге блока, не более
+        block_before = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+        quote_res = quote_route_at_size(route, amount_in, block_before)
+        if not quote_res["ok"]:
+            return {"ok": False, "mode": "fallback", "block": block_before, "block_before": block_before,
+                     "block_after": block_before, "reason": quote_res["reason"], "detail": quote_res["detail"]}
+        gas_res = estimate_gas(contract_address, calldata, from_address)  # БЕЗ блока -- параметр не поддержан
+        if not gas_res["ok"]:
+            return {"ok": False, "mode": "fallback", "block": block_before, "block_before": block_before,
+                     "block_after": block_before, "reason": REASON_SIMULATION_FAILED, "detail": gas_res["error"]}
+        block_after = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+        if block_after == block_before:
+            mode = "fallback_stable" if attempt == 0 else "fallback_retried_stable"
+            return {"ok": True, "mode": mode, "block": block_before, "block_before": block_before,
+                     "block_after": block_after, "profit_raw": quote_res["profit_raw"],
+                     "gas_estimate": gas_res["gas_estimate"]}
+        if attempt == 0:
+            continue  # блок сдвинулся -- ровно одна повторная попытка
+        return {"ok": False, "mode": "fallback_unstable", "block": block_after, "block_before": block_before,
+                 "block_after": block_after, "reason": REASON_NO_PROFITABLE_CYCLE,
+                 "detail": f"блок сдвинулся ДВАЖДЫ подряд между котировкой и оценкой газа "
+                            f"({block_before}->{block_after}) -- параметр блока не поддержан этим RPC, "
+                            f"состояние НЕ зафиксировано как одно, кандидат устарел, пропускаем "
+                            f"(не бесконечный подбор)"}
+    raise AssertionError("недостижимо")  # цикл всегда либо return, либо continue один раз
 
 
 def _token_balance(token: str, account: str) -> int:
@@ -1382,41 +1471,30 @@ class HotPath:
         first_amount_specified = -recompute["amount_in"]
         calldata = build_execute_cycle_calldata(route, first_amount_specified, min_profit=MIN_PROFIT_FLOOR_RAW)
 
-        gas_res = estimate_gas(self.contract_address, calldata, self.from_address)
-        if not gas_res["ok"]:
-            self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res["error"])
+        # ПРАВКА (седьмой раунд, разбор владельца, пункт 2): раньше здесь
+        # было estimateGas(latest) -> blockNumber -> quote(blockNumber) --
+        # ТРИ отдельных вызова НЕ гарантируют одно и то же состояние
+        # (latest МОГ измениться МЕЖДУ первым eth_estimateGas и
+        # последующим eth_blockNumber). Теперь -- ОДНА функция
+        # (_quote_and_estimate_gas_consistent), которая либо получает
+        # блок B ПЕРВЫМ и котирует+оценивает газ ИМЕННО на нём (явный
+        # параметр блока у eth_estimateGas, реально поддержан этим RPC),
+        # либо -- честный fallback с зафиксированными block_before/
+        # block_after и одной повторной попыткой при сдвиге (см. её
+        # докстринг). Это и есть причина категории "профит(до газа) был
+        # бы положительным, профит(после газа) отрицательный" из
+        # no_send_log пилота (7 записей, блоки 61755138 и др.).
+        first_check = _quote_and_estimate_gas_consistent(route, recompute["amount_in"], self.contract_address,
+                                                           calldata, self.from_address)
+        if not first_check["ok"]:
+            self.reason_log.log(route.route_id, route.label, first_check["reason"],
+                                 f"{first_check['detail']} (режим={first_check['mode']}, "
+                                 f"блок_до={first_check['block_before']}, блок_после={first_check['block_after']}, "
+                                 f"сигнал был на {block_number})")
             return
-
-        # ПРАВКА (шестой раунд ревью, пункт 3 -- "профит/газ на разных
-        # состояниях"): recompute["profit_raw"] выше посчитан НА
-        # block_number (блок СИГНАЛА), а estimate_gas ВСЕГДА резолвится
-        # на latest/pending (см. докстринг estimate_gas) -- к моменту,
-        # когда мы досюда дошли, latest МОГ уйти вперёд (очередь + сама
-        # котировка + сам estimateGas занимают время). Сравнивать
-        # gross-профит с ОДНОГО состояния и газ с ДРУГОГО --
-        # внутренне несогласованные данные: это и есть причина категории
-        # "профит(до газа) был бы положительным, профит(после газа)
-        # отрицательный", найденной в no_send_log пилота (7 записей,
-        # блоки 61755138 и др.) -- ЛОЖНОЕ "невыгодно", а не обязательно
-        # РЕАЛЬНОЕ. Прежде чем считать profit_after_gas, пере-котируем
-        # ТОТ ЖЕ amount_in НА ТОМ ЖЕ latest, на который резолвился этот
-        # estimateGas -- одно состояние для обеих половин расчёта.
-        # НЕ бесконечный цикл: ОДНА дополнительная пере-котировка здесь;
-        # если фиксируется устаревание -- есть ЕЩЁ одна проверка ниже
-        # ("ФИНАЛЬНАЯ ПРОВЕРКА"), перед самой отправкой.
-        fresh_latest = int(rpc_call_trading_path("eth_blockNumber", []), 16)
-        effective_block = block_number
-        effective_profit_raw = recompute["profit_raw"]
-        if fresh_latest != block_number:
-            fresh_quote = quote_route_at_size(route, recompute["amount_in"], fresh_latest)
-            if not fresh_quote["ok"]:
-                self.reason_log.log(route.route_id, route.label, fresh_quote["reason"],
-                                     f"согласованная пере-котировка на {fresh_latest} (то же состояние, на "
-                                     f"которое резолвился estimateGas) не прошла: {fresh_quote['detail']} "
-                                     f"(сигнал был на {block_number})")
-                return
-            effective_block = fresh_latest
-            effective_profit_raw = fresh_quote["profit_raw"]
+        effective_block = first_check["block"]
+        effective_profit_raw = first_check["profit_raw"]
+        gas_res = {"ok": True, "gas_estimate": first_check["gas_estimate"]}
 
         gas_price = int(rpc_call_trading_path("eth_gasPrice", []), 16)
         weth_usdg_price = current_weth_usdg_price()
@@ -1426,10 +1504,18 @@ class HotPath:
             self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, err)
             return
         if profit_after_gas <= 0:
+            # ПРАВКА (седьмой раунд): для mode="block_param" состояние
+            # ДЕЙСТВИТЕЛЬНО одно (явный блок у обоих вызовов) -- честно
+            # так и пишем. Для fallback-режимов НЕ заявляем "одно
+            # состояние доказано" -- называем режим и фактические номера
+            # блоков ДО/ПОСЛЕ, как они были получены.
+            state_note = (f"согласованный блок {effective_block} (явный параметр блока у estimateGas)"
+                          if first_check["mode"] == "block_param" else
+                          f"режим={first_check['mode']}, блок_до={first_check['block_before']}, "
+                          f"блок_после={first_check['block_after']}")
             self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                 f"профит после газа {profit_after_gas:.6f} <= 0 на согласованном блоке "
-                                 f"{effective_block} (сигнал был на {block_number}, gross и газ оценены на "
-                                 f"ОДНОМ состоянии)")
+                                 f"профит после газа {profit_after_gas:.6f} <= 0 на {state_note} "
+                                 f"(сигнал был на {block_number})")
             return
 
         can_send, why = self.budget.can_send()
@@ -1463,42 +1549,35 @@ class HotPath:
         #
         # ПРАВКА (четвёртый раунд, пункт 9): block_number (исходный блок
         # ДЕТЕКЦИИ) НЕ подменяется здесь -- свежий блок ре-котировки
-        # хранится ОТДЕЛЬНО (final_quote_block). Иначе computed_at_block
-        # "молодел" бы до fresh_latest_final, а state_age_blocks, посчитанный
-        # ДО подмены, продолжал бы отражать УЖЕ неактуальный (более
-        # старый) разрыв -- ровно найденная владельцем нестыковка полей.
-        # Согласованный state_age_blocks пересчитывается ЕЩЁ РАЗ, прямо
-        # перед begin_attempt (см. ниже), относительно final_quote_block.
+        # хранится ОТДЕЛЬНО (final_quote_block).
         #
-        # ПРАВКА (шестой раунд, пункт 3): базой для "уже не подходит"
-        # здесь служит effective_block/effective_profit_raw (СОГЛАСОВАННАЯ
-        # пара выше, ОДНО состояние с уже прошедшим estimateGas), а НЕ
-        # исходные block_number/recompute["profit_raw"] -- та же причина,
-        # что и в первой проверке: сравнивать с состоянием, на котором
-        # gross-профит и газ были посчитаны РАЗНО, было бы внутренне
-        # несогласовано. ---
-        fresh_latest_final = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+        # ПРАВКА (седьмой раунд, разбор владельца, пункт 2): та же
+        # _quote_and_estimate_gas_consistent, что и в первой проверке --
+        # НЕ отдельные eth_blockNumber/quote_route_at_size/estimate_gas
+        # по очереди (тот же класс несогласованности, что уже исправлен
+        # выше). Перезапускаем ТОЛЬКО если reset действительно нужен
+        # (текущий блок ушёл вперёд относительно effective_block) --
+        # иначе оставляем уже согласованную пару без лишнего вызова. ---
         final_quote_block = effective_block
         final_amount_in = recompute["amount_in"]
         final_profit_raw = effective_profit_raw
+        fresh_latest_final = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         if fresh_latest_final > effective_block:
-            final_quote = quote_route_at_size(route, final_amount_in, fresh_latest_final)
-            if not final_quote["ok"] or final_quote["profit_raw"] <= 0:
+            final_check = _quote_and_estimate_gas_consistent(route, final_amount_in, self.contract_address,
+                                                               calldata, self.from_address)
+            if not final_check["ok"] or final_check["profit_raw"] <= 0:
+                detail = final_check.get("detail", "") if not final_check["ok"] else (
+                    f"профит {final_check['profit_raw']} <= 0")
                 self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"финальная проверка размера {final_amount_in} на блоке {fresh_latest_final} "
+                                     f"финальная проверка размера {final_amount_in} (режим="
+                                     f"{final_check.get('mode')}, блок_до={final_check.get('block_before')}, "
+                                     f"блок_после={final_check.get('block_after')}) не прошла: {detail} "
                                      f"(согласованное решение было на {effective_block}, сигнал -- на "
-                                     f"{block_number}, возраст {fresh_latest_final - effective_block} "
-                                     f"блоков) -- уже не подходит, пропускаем кандидата")
+                                     f"{block_number}) -- уже не подходит, пропускаем кандидата")
                 return
-            final_profit_raw = final_quote["profit_raw"]
-            final_quote_block = fresh_latest_final
-            # calldata (кроме minProfit, согласуемого ниже) НЕ меняется --
-            # amount_in/маршрут те же; пересчитываем только оценку газа
-            # (могла измениться) и итоговый профит НА СВЕЖЕМ блоке.
-            gas_res = estimate_gas(self.contract_address, calldata, self.from_address)
-            if not gas_res["ok"]:
-                self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res["error"])
-                return
+            final_profit_raw = final_check["profit_raw"]
+            final_quote_block = final_check["block"]
+            gas_res = {"ok": True, "gas_estimate": final_check["gas_estimate"]}
             gas_price = int(rpc_call_trading_path("eth_gasPrice", []), 16)
             weth_usdg_price = current_weth_usdg_price()
             profit_after_gas, err = _profit_after_gas(final_profit_raw, gas_res["gas_estimate"], gas_price,
@@ -1508,7 +1587,8 @@ class HotPath:
                 return
             if profit_after_gas <= 0:
                 self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
-                                     f"финальная проверка: после газа {profit_after_gas:.6f} <= 0 -- не отправляем")
+                                     f"финальная проверка: после газа {profit_after_gas:.6f} <= 0 на согласованном "
+                                     f"блоке {final_quote_block} -- не отправляем")
                 return
 
         # --- Пункт 4 (третий раунд): единый гейт "новых отправок" --
@@ -1574,6 +1654,40 @@ class HotPath:
                 return
             calldata_final = build_execute_cycle_calldata(route, first_amount_specified, min_profit=required_min_profit)
             encoded_min_profit = required_min_profit
+
+        # ПРАВКА (седьмой раунд, разбор владельца, пункт 2): "после
+        # окончательного изменения calldata пересчёт комиссии и minProfit
+        # должен относиться к ОКОНЧАТЕЛЬНОЙ транзакции". final_profit_raw
+        # до этой точки посчитан НА БОЛЕЕ РАННЕМ блоке (до цикла
+        # согласования minProfit выше), а каждый круг того цикла заново
+        # зовёт estimate_gas БЕЗ явного блока -- gas_res_final (итоговый,
+        # использованный для tx_fields, который реально уйдёт в сеть)
+        # мог резолвиться на более позднем состоянии. Пере-котируем
+        # final_amount_in ПРЯМО СЕЙЧАС (протокол "блок до/после, ровно
+        # одна повторная попытка" -- тот же, что в
+        # _quote_and_estimate_gas_consistent) -- НЕ вызываем estimate_gas
+        # заново (это запустило бы ЕЩЁ один круг prepare/sign, ровно тот
+        # "бесконечный перебор", которого просили избегать); используем
+        # УЖЕ зафиксированный gas_res_final/tx_fields (то, что реально
+        # будет отправлено).
+        for _pf_attempt in range(2):
+            block_before_pf = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+            requote_pf = quote_route_at_size(route, final_amount_in, block_before_pf)
+            if not requote_pf["ok"]:
+                self.reason_log.log(route.route_id, route.label, requote_pf["reason"],
+                                     f"пере-котировка перед итоговой проверкой (после согласования minProfit) "
+                                     f"не прошла: {requote_pf['detail']} (блок {block_before_pf})")
+                return
+            block_after_pf = int(rpc_call_trading_path("eth_blockNumber", []), 16)
+            if block_after_pf == block_before_pf:
+                final_profit_raw = requote_pf["profit_raw"]
+                final_quote_block = block_before_pf
+                break
+            if _pf_attempt == 1:
+                self.reason_log.log(route.route_id, route.label, REASON_NO_PROFITABLE_CYCLE,
+                                     f"блок сдвинулся ДВАЖДЫ подряд перед итоговой проверкой ({block_before_pf}"
+                                     f"->{block_after_pf}) -- кандидат устарел, пропускаем (не бесконечный подбор)")
+                return
 
         # Консервативная проверка ПОСЛЕ согласования (пункт 5: "избегать
         # бесконечного перебора... консервативная проверка") -- худший

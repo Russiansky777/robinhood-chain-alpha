@@ -268,6 +268,7 @@ def check4_stop_between_gate_and_send() -> None:
     orig_rpc_call_trading_path = hp.rpc_call_trading_path  # ПРАВКА (шестой раунд, пункт 5A): отдельная быстрая полоса
     orig_recompute = hp.recompute_route
     orig_estimate_gas = hp.estimate_gas
+    orig_quote_at_size = hp.quote_route_at_size  # ПРАВКА (седьмой раунд): _quote_and_estimate_gas_consistent зовёт её всегда
     orig_weth_price = hp.current_weth_usdg_price
     orig_token_balance = hp._token_balance
     orig_build_calldata = hp.build_execute_cycle_calldata
@@ -282,8 +283,13 @@ def check4_stop_between_gate_and_send() -> None:
     def fake_recompute(route, block_number):
         return {"ok": True, "amount_in": 1_000_000, "amount_out": 21_000_000, "profit_raw": 20_000_000}
 
-    def fake_estimate_gas(contract_address, calldata, from_address):
+    def fake_estimate_gas(contract_address, calldata, from_address, block_number=None):
         return {"ok": True, "gas_estimate": 200_000}
+
+    def fake_quote_at_size(route, amount_in, block_number):
+        # ПРАВКА (седьмой раунд): блок ВСЕГДА 1000 в этом тесте (fake_rpc_call
+        # не двигает eth_blockNumber) -- тот же результат, что recompute.
+        return {"ok": True, "amount_in": amount_in, "amount_out": amount_in + 20_000_000, "profit_raw": 20_000_000}
 
     token_balance_calls = {"n": 0}
 
@@ -299,6 +305,7 @@ def check4_stop_between_gate_and_send() -> None:
     hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = fake_recompute
     hp.estimate_gas = fake_estimate_gas
+    hp.quote_route_at_size = fake_quote_at_size
     hp.current_weth_usdg_price = lambda: 2500.0
     hp._token_balance = fake_token_balance
     hp.build_execute_cycle_calldata = lambda route, amt, min_profit, sqrt_price_limits=None: b"\x00\x00\x00\x00" + str(min_profit).encode()
@@ -313,6 +320,7 @@ def check4_stop_between_gate_and_send() -> None:
         hp.rpc_call_trading_path = orig_rpc_call_trading_path
         hp.recompute_route = orig_recompute
         hp.estimate_gas = orig_estimate_gas
+        hp.quote_route_at_size = orig_quote_at_size
         hp.current_weth_usdg_price = orig_weth_price
         hp._token_balance = orig_token_balance
         hp.build_execute_cycle_calldata = orig_build_calldata
@@ -361,6 +369,7 @@ def check6_fee_changes_between_prepares() -> None:
     orig_rpc_call = hp._rpc_call
     orig_rpc_call_trading_path = hp.rpc_call_trading_path  # ПРАВКА (шестой раунд, пункт 5A): отдельная быстрая полоса
     orig_recompute = hp.recompute_route
+    orig_quote_at_size = hp.quote_route_at_size  # ПРАВКА (седьмой раунд): _quote_and_estimate_gas_consistent зовёт её всегда
     orig_estimate_gas = hp.estimate_gas
     orig_weth_price = hp.current_weth_usdg_price
     orig_token_balance = hp._token_balance
@@ -376,6 +385,11 @@ def check6_fee_changes_between_prepares() -> None:
             return hex(2_000_000_000)
         raise AssertionError(f"неожиданный _rpc_call в тесте: {method}")
 
+    def fake_quote_at_size(route, amount_in, block_number):
+        # ПРАВКА (седьмой раунд): блок ВСЕГДА 2000 в этом тесте (fake_rpc_call
+        # не двигает eth_blockNumber) -- тот же результат, что recompute.
+        return {"ok": True, "amount_in": amount_in, "amount_out": amount_in + 20_000_000, "profit_raw": 20_000_000}
+
     def fake_build_calldata(route, amt, min_profit, sqrt_price_limits=None):
         encoded_min_profits.append(min_profit)
         return b"\x00\x00\x00\x00" + str(min_profit).encode()
@@ -384,7 +398,8 @@ def check6_fee_changes_between_prepares() -> None:
     hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = lambda route, block: {"ok": True, "amount_in": 1_000_000, "amount_out": 21_000_000,
                                                 "profit_raw": 20_000_000}
-    hp.estimate_gas = lambda addr, calldata, frm: {"ok": True, "gas_estimate": 200_000}
+    hp.quote_route_at_size = fake_quote_at_size
+    hp.estimate_gas = lambda addr, calldata, frm, block_number=None: {"ok": True, "gas_estimate": 200_000}
     hp.current_weth_usdg_price = lambda: 2500.0
     hp._token_balance = lambda token, account: 0
     hp.build_execute_cycle_calldata = fake_build_calldata
@@ -398,6 +413,7 @@ def check6_fee_changes_between_prepares() -> None:
         hp._rpc_call = orig_rpc_call
         hp.rpc_call_trading_path = orig_rpc_call_trading_path
         hp.recompute_route = orig_recompute
+        hp.quote_route_at_size = orig_quote_at_size
         hp.estimate_gas = orig_estimate_gas
         hp.current_weth_usdg_price = orig_weth_price
         hp._token_balance = orig_token_balance
