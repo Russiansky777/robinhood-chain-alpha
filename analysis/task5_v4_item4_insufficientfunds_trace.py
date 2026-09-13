@@ -111,9 +111,23 @@ def anvil_start(fork_block: int) -> subprocess.Popen:
     fork_url = _alchemy_direct_endpoint()
     if not fork_url:
         raise RuntimeError("нет Alchemy-эндпоинта для форка")
+    # ПРАВКА (восьмой раунд, пункт 4): ни london (ломает TSTORE/TLOAD --
+    # V4 требует), ни явный cancun (та же "Excess blob gas not set", что
+    # и с hardfork по умолчанию -- anvil --help подтвердил default=
+    # "latest", т.е. НЕ обязательно cancun, но ошибка идентична) не
+    # решили проблему по отдельности. anvil --help (реально запрошен на
+    # Ohio) назвал --steps-tracing ("Enable steps tracing used for debug
+    # calls returning geth-style traces") -- ОТДЕЛЬНЫЙ переключатель
+    # именно для debug_* трасс, независимый от выбора hardfork; НИКАКОГО
+    # флага, отдельно управляющего excess-blob-gas/blob-base-fee, у этой
+    # версии anvil НЕТ (grep 'blob' по всему --help дал 0 строк) --
+    # --steps-tracing, видимо, включает ДРУГОЙ (инспекторный) путь
+    # трассировки, не требующий валидного blob-окружения следующего
+    # блока. Сохраняем cancun (корректные опкоды V4) + добавляем
+    # --steps-tracing.
     proc = subprocess.Popen(
         [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(fork_block),
-         "--hardfork", ANVIL_HARDFORK, "--port", str(PORT)],
+         "--hardfork", ANVIL_HARDFORK, "--steps-tracing", "--port", str(PORT)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     deadline = time.monotonic() + 30
