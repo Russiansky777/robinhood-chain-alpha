@@ -162,6 +162,19 @@ def main() -> None:
         from task5_v4_route_registry import RouteCycle, RouteLeg
         from task5_v4_executor_calldata import build_execute_cycle_calldata
 
+        # ПРАВКА (реальный первый прогон): task5_bot_sender.STOP_FILE --
+        # ЖЁСТКО закодированный /etc/bot/STOP (НЕ управляется переменной
+        # окружения, в отличие от SENDER_STATE_FILE) -- это РЕАЛЬНЫЙ,
+        # ОБЩИЙ файл, оставленный на диске Ohio штатной остановкой
+        # предыдущего пилота (см. run_task5_v4_hotpath_stop.yml) --
+        # Sender.can_send() честно заблокировал первую попытку этим самым
+        # файлом. Мы НЕ трогаем реальный /etc/bot/STOP (это чужое,
+        # намеренно оставленное состояние -- скрипт обязан быть read-only
+        # к рабочему состоянию бота) -- переопределяем ТОЛЬКО атрибут
+        # модуля В ПАМЯТИ ЭТОГО процесса на заведомо несуществующий путь,
+        # НЕ трогая диск.
+        task5_bot_sender.STOP_FILE = Path("/tmp/task5_v4_e2e_proof_nonexistent_stop_marker")
+
         print("[e2e_proof] строю маршрут (task5_v4_route_registry.RouteCycle/RouteLeg -- реальные типы hotpath.py)...")
         legs = (
             RouteLeg(USDG, MOSIAI, 70000, 4, HOOKS_NONE, True),
