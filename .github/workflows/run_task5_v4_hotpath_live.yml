@@ -1,0 +1,173 @@
+name: "Задача 5, LIVE -- ЧАСОВОЙ ПИЛОТ ClosedCycleExecutorV4 на mainnet (реальные транзакции, владелец кнопкой)"
+
+# ШЕСТОЙ раунд ревью, владелец: "Я запускаю через GitHub Actions, SSH
+# вручную не использую. ... Подготовь запуск часового LIVE-пилота также
+# через workflow_dispatch: выбранный commit SHA, адрес проверенного
+# контракта и явное подтверждение LIVE. Сам бот работает на Ohio.
+# Сохраняй stdout/stderr и существующие журналы на сервере, после
+# завершения забирай отчёт в GitHub Actions artifacts, чтобы я мог
+# скачать его. Бюджет и торговую логику не менять."
+#
+# Этот workflow -- ТОЛЬКО CI-обвязка (SSH на Ohio, запуск УЖЕ
+# СУЩЕСТВУЮЩЕГО analysis/task5_v4_hotpath.py с --confirm-mainnet,
+# получить журналы обратно и опубликовать как ARTIFACT, а не
+# закоммитить в git -- в отличие от run_task5_deploy_executor_v4.yml и
+# run_task5_verify_deploy_v4.yml, которые коммитят результат). Ни
+# бюджет, ни торговая логика ЗДЕСЬ НЕ МЕНЯЮТСЯ и не задаются -- все
+# правила (лимит $20 газа, часовой отсчёт от bootstrap, единственная
+# неподтверждённая транзакция, честный PnL по CycleExecuted и т.д.) уже
+# реализованы в самом task5_v4_hotpath.py, этот workflow их не трогает.
+#
+# ЭТО РЕАЛЬНЫЕ, НЕОБРАТИМЫЕ, ДЕНЕЖНЫЕ ТРАНЗАКЦИИ -- намеренно ТОЛЬКО
+# workflow_dispatch, БЕЗ push-триггера. Три независимых барьера:
+# ЗАФИКСИРОВАННЫЙ commit SHA (та же версия, что деплой и верификация),
+# ЯВНО указанный адрес ПРОВЕРЕННОГО контракта (не подставляется
+# автоматически из предыдущих шагов -- владелец сам копирует его из
+# результата run_task5_verify_deploy_v4.yml, all_checks_passed=true), и
+# точная фраза подтверждения "LIVE_PILOT_V4".
+#
+# ОБРЫВ SSH НЕ ДОЛЖЕН ОБОРВАТЬ ПИЛОТ: процесс запускается на Ohio через
+# `setsid nohup ... &` с перенаправлением stdin/stdout/stderr в файл --
+# полностью отсоединяется от SSH-сессии (новая сессия ОС, SIGHUP
+# игнорируется), поэтому переживает разрыв соединения раннера на все
+# ~60+ минут. Сам этот workflow ОПРАШИВАЕТ (poll) раз в минуту, жив ли
+# процесс на Ohio, вместо того чтобы держать ОДНУ foreground SSH-команду
+# открытой (что сделало бы весь час одной точкой отказа при обрыве).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml).'
+        required: true
+        type: string
+      contract_address:
+        description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз.'
+        required: true
+        type: string
+      confirm:
+        description: 'Введите ровно "LIVE_PILOT_V4", чтобы подтвердить: это часовой пилот с РЕАЛЬНЫМИ транзакциями на mainnet, тратит реальный ETH/USDG с кошелька владельца.'
+        required: true
+        type: string
+
+jobs:
+  live_pilot_v4:
+    name: "Часовой LIVE-пилот task5_v4_hotpath.py (Ohio VPS, --confirm-mainnet --duration-seconds 3600)"
+    runs-on: ubuntu-latest
+    # Бутстрап реестра + 60 минут пилота + опрос (до ~85 итераций по
+    # 60с) + запас на получение/публикацию отчёта.
+    timeout-minutes: 100
+    permissions:
+      contents: read
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "LIVE_PILOT_V4" ]; then
+            echo "confirm != 'LIVE_PILOT_V4' -- остановлено, LIVE-пилот НЕ запущен." >&2
+            exit 1
+          fi
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          # ServerAliveInterval/CountMax -- каждая SSH-команда этого
+          # workflow короткая (запуск, один опрос, финальный забор
+          # отчёта), но job в целом живёт значительно дольше обычного --
+          # keepalive снижает риск разрыва простаивающих соединений.
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=60 -o ServerAliveCountMax=10" >> "$GITHUB_ENV"
+
+      - name: "Зафиксированный checkout + запуск task5_v4_hotpath.py в фоне на Ohio (setsid/nohup)"
+        env:
+          LIVE_SHA: ${{ inputs.commit_sha }}
+          CONTRACT_ADDRESS: ${{ inputs.contract_address }}
+        run: |
+          # RUN_TAG -- уникален для этого запуска workflow (номер run +
+          # попытка), чтобы лог/PID разных запусков не перезаписывали
+          # друг друга на диске Ohio. Сохраняется в GITHUB_ENV для
+          # следующих шагов (опрос, забор отчёта).
+          RUN_TAG="run${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          echo "RUN_TAG=$RUN_TAG" >> "$GITHUB_ENV"
+          # `git checkout <ref>` БЕЗ --hard/force -- честная ошибка при
+          # конфликте вместо тихого уничтожения локальных изменений (тот
+          # же принцип, что в run_task5_verify_deploy_v4.yml). `set -euo
+          # pipefail` В САМОМ НАЧАЛЕ удалённого скрипта -- ошибка
+          # fetch/checkout прерывает запуск ДО старта торговли, а не
+          # продолжает вслепую. $LIVE_SHA/$CONTRACT_ADDRESS/$RUN_TAG
+          # подставляются ЭТОЙ (вызывающей, GH Actions runner) оболочкой
+          # ДО отправки по SSH -- литералами, без передачи через
+          # remote-side окружение (та же схема, что уже работает в
+          # run_task5_deploy_executor_v4.yml и run_task5_verify_deploy_v4.yml).
+          # $LOG/$PIDFILE/$!/$(...) НАРОЧНО экранированы (\$) -- это
+          # переменные УДАЛЁННОГО bash, вычисляются ПОСЛЕ доставки по SSH.
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $LIVE_SHA
+              git checkout $LIVE_SHA
+              cd analysis
+              LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
+              PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
+              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds 3600 > \"\$LOG\" 2>&1 < /dev/null &
+              echo \$! > \"\$PIDFILE\"
+              sleep 1
+              echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
+            '
+          " > /tmp/live_launch_stdout.log 2> /tmp/live_launch_stderr.log
+          echo "--- stdout ---"; cat /tmp/live_launch_stdout.log
+          echo "--- stderr ---"; cat /tmp/live_launch_stderr.log
+
+      - name: "Ждать завершения пилота (опрос PID на Ohio раз в минуту -- переживает обрыв SSH)"
+        run: |
+          echo "опрашиваем task5_v4_hotpath_live_${RUN_TAG}.pid каждые 60с (до ~85 минут)..."
+          STATUS="unknown"
+          for i in $(seq 1 85); do
+            sleep 60
+            STATUS=$(ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot bash -c 'PID=\$(cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid 2>/dev/null || echo 0); if kill -0 \$PID 2>/dev/null; then echo alive; else echo done; fi'" 2>/dev/null || echo "ssh_error")
+            echo "[$i/85] $(date -u +%H:%M:%SZ) статус процесса на Ohio: $STATUS"
+            if [ "$STATUS" = "done" ]; then
+              echo "процесс на Ohio завершился."
+              break
+            fi
+          done
+          if [ "$STATUS" != "done" ]; then
+            echo "::warning::процесс на Ohio НЕ подтвердил завершение за отведённое время опроса (последний статус: $STATUS) -- отчёт будет забран как есть, возможно НЕЗАВЕРШЁННЫМ."
+          fi
+
+      - name: "Забрать stdout/stderr и журналы пилота с Ohio (для artifact)"
+        if: always()
+        run: |
+          mkdir -p /tmp/live_pilot_report
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log" > /tmp/live_pilot_report/hotpath_stdout_stderr.log 2>/tmp/live_pilot_report/_fetch_log.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_budget_state.json" > /tmp/live_pilot_report/pilot_budget_state.json 2>>/tmp/live_pilot_report/_fetch_log.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_attempts.jsonl" > /tmp/live_pilot_report/pilot_attempts.jsonl 2>>/tmp/live_pilot_report/_fetch_log.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_no_send_log.jsonl" > /tmp/live_pilot_report/pilot_no_send_log.jsonl 2>>/tmp/live_pilot_report/_fetch_log.err || true
+          {
+            echo "# LIVE-пилот task5_v4_hotpath.py -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit_sha=${{ inputs.commit_sha }}"
+            echo "contract_address=${{ inputs.contract_address }}"
+            echo "run_tag=${RUN_TAG}"
+            echo ""
+            echo "## Последние 200 строк stdout/stderr"
+            tail -n 200 /tmp/live_pilot_report/hotpath_stdout_stderr.log 2>/dev/null || echo "(нет данных)"
+          } > /tmp/live_pilot_report/SUMMARY.md
+          echo "--- SUMMARY.md ---"; cat /tmp/live_pilot_report/SUMMARY.md
+          ls -la /tmp/live_pilot_report
+
+      - name: "Опубликовать отчёт как GitHub Actions artifact"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task5-v4-live-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/live_pilot_report
+          retention-days: 90
+          if-no-files-found: warn

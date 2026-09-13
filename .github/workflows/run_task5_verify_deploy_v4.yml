@@ -60,13 +60,55 @@ jobs:
           # если явно передан; иначе -- ветка (обратная совместимость с
           # push-триггером, где commit_sha не задаётся).
           if [ -z "$VERIFY_REF" ]; then VERIFY_REF="claude/nifty-sagan-r0polg"; fi
+          # ШЕСТОЙ раунд ревью: "в исходном коммите результата деплоя ещё
+          # нет" -- deploy_executor_v4.sh пишет РЕЗУЛЬТАТ в
+          # /home/bot/data/deploy_result_v4.json (НЕ в репозиторий);
+          # run_task5_deploy_executor_v4.yml коммитит его в
+          # contracts/build/ ОТДЕЛЬНЫМ, БОЛЕЕ ПОЗДНИМ коммитом ПОВЕРХ
+          # зафиксированного SHA -- а мы намеренно проверяем код ИМЕННО
+          # на зафиксированном SHA, не на этом более позднем коммите.
+          # Поэтому копируем СВЕЖИЙ файл с диска Ohio вручную ПЕРЕД
+          # верификацией, и явно проверяем ok=true И совпадение
+          # build_ref с проверяемым SHA -- ДО запуска самого верификатора
+          # (иначе он молча сверил бы байткод со СТАРЫМ/чужим результатом
+          # деплоя). `set -euo pipefail` в самом начале удалённого
+          # скрипта -- ошибка fetch/checkout/копирования/проверки
+          # прерывает весь шаг, а не продолжает вслепую.
+          #
+          # ПРАВКА: первая версия этого шага передавала удалённый скрипт
+          # через ДВА ВЛОЖЕННЫХ bash/python heredoc (<<'REMOTE_SCRIPT'
+          # внутри YAML `run: |`, а внутри него ещё <<'PY') -- терминаторы
+          # heredoc обязаны начинаться С НАЧАЛА СТРОКИ (колонка 0) для
+          # обычного `<<'DELIM'`, а YAML block-scalar сохраняет отступ
+          # ЛИТЕРАЛЬНО, так что терминаторы оказались бы с отступом и
+          # heredoc НЕ закрылся бы корректно. Вместо этого -- ТОЧНО ТА ЖЕ
+          # схема, что уже РАБОТАЕТ в run_task5_deploy_executor_v4.yml:
+          # $VERIFY_REF подставляется ЭТОЙ (вызывающей, GH Actions runner)
+          # оболочкой -- значение попадает в удалённую команду как
+          # литерал ДО отправки по SSH, никакого heredoc и никакой
+          # передачи переменных через remote-side окружение не нужно.
+          # Проверка ok/build_ref -- простым grep по фиксированному
+          # формату json.dumps(..., indent=2) (`"ok": true`,
+          # `"build_ref": "<sha>"`), без встроенного Python.
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
-            set -e
-            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin '$VERIFY_REF'
-            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout '$VERIFY_REF'
+            set -euo pipefail
             sudo -u bot bash -c '
-              set -e
-              cd /home/bot/robinhood-chain-alpha/analysis
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $VERIFY_REF
+              git checkout $VERIFY_REF
+              mkdir -p contracts/build
+              cp /home/bot/data/deploy_result_v4.json contracts/build/deploy_result_v4.json
+              if ! grep -q \"\\\"ok\\\": true\" contracts/build/deploy_result_v4.json; then
+                echo \"[verify] ОШИБКА: deploy_result_v4.json.ok != true -- деплой НЕ был успешным, верификация бессмысленна, СТОП\" >&2
+                exit 1
+              fi
+              if ! grep -q \"\\\"build_ref\\\": \\\"$VERIFY_REF\\\"\" contracts/build/deploy_result_v4.json; then
+                echo \"[verify] ОШИБКА: build_ref в deploy_result_v4.json НЕ совпадает с проверяемым SHA ($VERIFY_REF) -- контракт задеплоен ДРУГОЙ версией кода, СТОП\" >&2
+                exit 1
+              fi
+              echo \"[verify] свежий deploy_result_v4.json: ok=true, build_ref=$VERIFY_REF -- совпадает с проверяемым SHA\"
+              cd analysis
               /home/bot/robinhood-chain-alpha/venv/bin/python task5_verify_deploy_v4.py
               cat /home/bot/robinhood-chain-alpha/contracts/build/deploy_verification_v4.json
             '
