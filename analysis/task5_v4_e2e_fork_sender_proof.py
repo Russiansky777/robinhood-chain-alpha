@@ -208,6 +208,10 @@ def main() -> None:
 
         gas_estimate_proc = run([CAST, "estimate", contract_addr, "--rpc-url", RPC,
                                   "--from", deployer_addr, "--json"], timeout=15)
+        result["cast_estimate_independent"] = {
+            "returncode": gas_estimate_proc.returncode,
+            "stdout": gas_estimate_proc.stdout.strip(), "stderr": gas_estimate_proc.stderr.strip(),
+        }
         # estimate_gas() -- та же функция, что в hotpath.py (eth_estimateGas без явного block -- см.
         # часть D task5_v4_control_case_investigation.py про то, что это означает).
         gas_res = hp.estimate_gas(contract_addr, calldata, deployer_addr)
@@ -215,7 +219,24 @@ def main() -> None:
             raise RuntimeError(f"estimate_gas (реальная функция hotpath.py) отказала: {gas_res}")
         result["gas_estimate"] = gas_res["gas_estimate"]
 
-        tx_fields = sender.prepare_transaction_fields(contract_addr, calldata, gas_res["gas_estimate"])
+        # ПРАВКА (реальный четвёртый прогон): gas_estimate=26763 --
+        # ПОДОЗРИТЕЛЬНО близко к голому intrinsic-полу этой calldata
+        # (836 байт -> ровно 26420 по EIP-2028) -- запаса на РЕАЛЬНОЕ
+        # исполнение (SLOAD/SSTORE/CALL) практически нет. Похоже на тот
+        # же "USDG/MOSIAI пулы A/B уже сухие" случай, документированный
+        # РАНЬШЕ в этой же сессии (task5_v4_fork_simulation.py) -- вызов,
+        # видимо, откатывается СРАЗУ на входе, а eth_estimateGas anvil,
+        # видимо, для БЕЗУСЛОВНОГО отката возвращает голый intrinsic-пол
+        # вместо явной ошибки. Честная диагностика: посылаем С ЗАПАСОМ
+        # газа (не доверяя этой конкретной оценке слепо) -- если tx
+        # ВСЁ РАВНО не находится в цепи, проблема НЕ в газе.
+        intrinsic_floor = 21000 + sum(4 if b == 0 else 16 for b in calldata)
+        result["intrinsic_gas_floor"] = intrinsic_floor
+        result["gas_estimate_suspiciously_low"] = gas_res["gas_estimate"] < intrinsic_floor * 2
+        send_gas_limit = max(gas_res["gas_estimate"], intrinsic_floor * 10, 500_000)
+        result["send_gas_limit_used"] = send_gas_limit
+
+        tx_fields = sender.prepare_transaction_fields(contract_addr, calldata, send_gas_limit)
         prepared = sender.sign_prepared_transaction(tx_fields)
         result["tx_hash_local_precomputed"] = prepared.tx_hash
         # Диагностика (реальный третий прогон подряд без receipt) --
