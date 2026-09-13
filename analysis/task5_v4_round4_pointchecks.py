@@ -265,6 +265,7 @@ def check4_stop_between_gate_and_send() -> None:
     hp.STOP_FILE_PATH = stop_path  # подменяем на временный путь -- НЕ трогаем реальный /etc/bot/STOP
 
     orig_rpc_call = hp._rpc_call
+    orig_rpc_call_trading_path = hp.rpc_call_trading_path  # ПРАВКА (шестой раунд, пункт 5A): отдельная быстрая полоса
     orig_recompute = hp.recompute_route
     orig_estimate_gas = hp.estimate_gas
     orig_weth_price = hp.current_weth_usdg_price
@@ -295,6 +296,7 @@ def check4_stop_between_gate_and_send() -> None:
         return 0
 
     hp._rpc_call = fake_rpc_call
+    hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = fake_recompute
     hp.estimate_gas = fake_estimate_gas
     hp.current_weth_usdg_price = lambda: 2500.0
@@ -308,6 +310,7 @@ def check4_stop_between_gate_and_send() -> None:
     finally:
         hp.STOP_FILE_PATH = orig_stop_file
         hp._rpc_call = orig_rpc_call
+        hp.rpc_call_trading_path = orig_rpc_call_trading_path
         hp.recompute_route = orig_recompute
         hp.estimate_gas = orig_estimate_gas
         hp.current_weth_usdg_price = orig_weth_price
@@ -356,6 +359,7 @@ def check6_fee_changes_between_prepares() -> None:
     registry.add_route(route)
 
     orig_rpc_call = hp._rpc_call
+    orig_rpc_call_trading_path = hp.rpc_call_trading_path  # ПРАВКА (шестой раунд, пункт 5A): отдельная быстрая полоса
     orig_recompute = hp.recompute_route
     orig_estimate_gas = hp.estimate_gas
     orig_weth_price = hp.current_weth_usdg_price
@@ -377,6 +381,7 @@ def check6_fee_changes_between_prepares() -> None:
         return b"\x00\x00\x00\x00" + str(min_profit).encode()
 
     hp._rpc_call = fake_rpc_call
+    hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = lambda route, block: {"ok": True, "amount_in": 1_000_000, "amount_out": 21_000_000,
                                                 "profit_raw": 20_000_000}
     hp.estimate_gas = lambda addr, calldata, frm: {"ok": True, "gas_estimate": 200_000}
@@ -391,6 +396,7 @@ def check6_fee_changes_between_prepares() -> None:
         hotpath._evaluate_and_maybe_send(route, 2000, hp.time.monotonic())
     finally:
         hp._rpc_call = orig_rpc_call
+        hp.rpc_call_trading_path = orig_rpc_call_trading_path
         hp.recompute_route = orig_recompute
         hp.estimate_gas = orig_estimate_gas
         hp.current_weth_usdg_price = orig_weth_price

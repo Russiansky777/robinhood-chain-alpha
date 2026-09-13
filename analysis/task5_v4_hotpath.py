@@ -82,14 +82,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
 import alchemy_fallback  # noqa: E402
-from alchemy_fallback import _chunked_get_logs, _rpc_call, topic0  # noqa: E402
+from alchemy_fallback import _chunked_get_logs, _rpc_call, rpc_call_trading_path, topic0  # noqa: E402
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
     BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE,
     REASON_SIMULATION_FAILED, AttemptTable, AttemptTableRow, PilotBudget, ReasonLog,
     check_accounting_consistency, check_no_unexpected_token_spend,
 )
-from task5_v4_quote_replay import quote_exact_input_single  # noqa: E402
+from task5_v4_quote_replay import quote_exact_input_single, V4_QUOTER  # noqa: E402
+from task5_v4_pool_math import decode_quote_result, quote_exact_input_multihop_calldata  # noqa: E402
 from task5_v4_route_registry import (  # noqa: E402
     RouteCycle, RouteRegistry, USDG, bootstrap_registry, check_route_liveness, save_registry_state,
 )
@@ -121,13 +122,18 @@ SWAP_TOPIC0 = topic0("Swap(bytes32,address,int128,int128,uint160,uint128,int24,u
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 OWNER_SELECTOR = "0x8da5cb5b"  # keccak256("owner()")[:4] -- переиспользован, уже проверен этой сессией
 
-# = alchemy_fallback._MIN_REQUEST_INTERVAL_S -- ЕДИНСТВЕННЫЙ троттлинг
-# RPC во всём проекте (project-wide, потокобезопасный лок), который
-# реально ограничивает частоту запросов; POLL_INTERVAL_S здесь
-# опрашивать чаще этого порога не даст выигрыша (eth_blockNumber всё
-# равно упрётся в тот же _throttle), реже -- добавляет задержку детекции
-# сверх нужного.
-POLL_INTERVAL_S = 0.5
+# ПРАВКА (шестой раунд, пункт 5A/5F): poll_once() (детектор) теперь
+# использует alchemy_fallback.rpc_call_trading_path -- ОТДЕЛЬНЫЙ,
+# более быстрый троттлинг (_ALCHEMY_MIN_REQUEST_INTERVAL_S=0.1с, ~10
+# req/с, если Alchemy настроен -- измерено этой сессией: реальный
+# бёрст дал 14.95 req/с 0 ошибок), НЕ общий alchemy_fallback._
+# MIN_REQUEST_INTERVAL_S=0.5с (тот делит бюджет с фоном discover_new_
+# arbitrageur_routes/liveness -- см. докстринг rpc_call_trading_path).
+# POLL_INTERVAL_S ниже согласован с ЭТИМ более быстрым порогом -- если
+# Alchemy НЕ настроен, rpc_call_trading_path прозрачно падает на
+# _rpc_call (0.5с) и САМ этот троттлинг всё равно не даст опрашивать
+# чаще (лишние пробуждения безвредны, просто не дают выигрыша).
+POLL_INTERVAL_S = 0.1
 LIVENESS_REFRESH_INTERVAL_S = 60.0  # владелец: "раз в минуту"
 DISCOVERY_POLL_INTERVAL_S = 1.0  # фоновый поток -- не торговый цикл, может опрашивать чуть реже
 PENDING_TX_RECEIPT_POLL_S = 2.0
@@ -350,7 +356,36 @@ def quote_route_at_size(route: RouteCycle, amount_in: int, block_number: int) ->
     первоначальным подбором размера (recompute_route, полный перебор
     сетки), и финальной проверкой перед отправкой (ТОЛЬКО этот один
     размер -- внешнее ревью, второй раунд, пункт 6: "не запускать
-    второй полный перебор внутри финальной проверки")."""
+    второй полный перебор внутри финальной проверки").
+
+    ПРАВКА (шестой раунд, пункт 5B): если ВСЕ плечи маршрута БЕЗ hooks
+    -- ОДИН eth_call (quoteExactInput, весь маршрут разом) вместо
+    len(route.legs) последовательных quoteExactInputSingle. Реально
+    провалидировано (task5_v4_control_case_investigation.py, часть C,
+    реальный живой hookless-маршрут на Ohio): результат ИДЕНТИЧЕН
+    последовательной котировке (matches_sequential=true), см.
+    data/task5_v4_control_case_investigation_result.json.
+
+    Маршруты С hooks (в реестре пилота их большинство содержит хотя бы
+    одно такое плечо -- НЕ исключаются "для простоты": идут ПРЕЖНИМ,
+    полностью проверенным последовательным путём -- многоходовая
+    котировка для hook-маршрута НЕ провалидирована (PathKey.hooks
+    потребовал бы РЕАЛЬНОГО адреса хука каждого плеча, а не NONE, что
+    отдельно не проверено против настоящего hook-пула -- ложноположи-
+    тельное совпадение на хукless-случае ничего не говорит о hook-
+    случае)."""
+    if all(leg.hooks.lower() == NATIVE for leg in route.legs):
+        try:
+            path = [(leg.output_currency, leg.fee, leg.tick_spacing, leg.hooks) for leg in route.legs]
+            calldata = quote_exact_input_multihop_calldata(route.legs[0].input_currency, path, amount_in)
+            raw = rpc_call_trading_path("eth_call", [{"to": V4_QUOTER, "data": calldata}, hex(block_number)])
+            amount_out, _gas_estimate = decode_quote_result(raw)
+            return {"ok": True, "amount_in": amount_in, "amount_out": amount_out, "profit_raw": amount_out - amount_in}
+        except Exception as exc:  # noqa: BLE001
+            detail = str(exc)
+            reason = REASON_NO_LIQUIDITY if "NotEnoughLiquidity" in detail else REASON_CALC_ERROR
+            return {"ok": False, "reason": reason, "detail": detail}
+
     try:
         cur = amount_in
         for leg in route.legs:
@@ -407,9 +442,16 @@ def recompute_route(route: RouteCycle, block_number: int) -> dict:
 
 
 def estimate_gas(contract_address: str, calldata: bytes, from_address: str) -> dict:
-    """eth_estimateGas -- РЕАЛЬНЫЙ read-only вызов (не отправка)."""
+    """eth_estimateGas -- РЕАЛЬНЫЙ read-only вызов (не отправка).
+
+    ПРАВКА (шестой раунд, пункт 5A): rpc_call_trading_path (не голый
+    _rpc_call) -- отдельная, более быстрая полоса для торгового пути
+    (Alchemy напрямую, ~10 req/с троттлинг, измерено; см. её докстринг
+    в alchemy_fallback.py), НЕ делящая бюджет с фоновым обнаружением/
+    живучестью (те продолжают идти через _rpc_call/_chunked_get_logs,
+    0.5с, не изменены)."""
     try:
-        raw = _rpc_call("eth_estimateGas", [{
+        raw = rpc_call_trading_path("eth_estimateGas", [{
             "from": from_address, "to": contract_address, "data": "0x" + calldata.hex(),
         }])
         return {"ok": True, "gas_estimate": int(raw, 16)}
@@ -1226,7 +1268,11 @@ class HotPath:
     # --- ДЕТЕКТОР: быстрый, только опрос новых Swap-логов
     # отслеживаемых пулов -- НЕ пересчитывает/отправляет сам. ---
     def poll_once(self) -> None:
-        latest = int(_rpc_call("eth_blockNumber", []), 16)
+        # ПРАВКА (шестой раунд, пункт 5A/5F): rpc_call_trading_path --
+        # отдельная, быстрая полоса для детектора (не делит бюджет с
+        # фоном); напрямую снижает задержку "новый блок -> детектор
+        # заметил" (пункт 5F).
+        latest = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         self.priority_hint.mark_trading_active()
         if self.last_checked_block is None:
             self.last_checked_block = latest - 1
@@ -1358,7 +1404,7 @@ class HotPath:
         # НЕ бесконечный цикл: ОДНА дополнительная пере-котировка здесь;
         # если фиксируется устаревание -- есть ЕЩЁ одна проверка ниже
         # ("ФИНАЛЬНАЯ ПРОВЕРКА"), перед самой отправкой.
-        fresh_latest = int(_rpc_call("eth_blockNumber", []), 16)
+        fresh_latest = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         effective_block = block_number
         effective_profit_raw = recompute["profit_raw"]
         if fresh_latest != block_number:
@@ -1372,7 +1418,7 @@ class HotPath:
             effective_block = fresh_latest
             effective_profit_raw = fresh_quote["profit_raw"]
 
-        gas_price = int(_rpc_call("eth_gasPrice", []), 16)
+        gas_price = int(rpc_call_trading_path("eth_gasPrice", []), 16)
         weth_usdg_price = current_weth_usdg_price()
         profit_after_gas, err = _profit_after_gas(effective_profit_raw, gas_res["gas_estimate"], gas_price,
                                                    weth_usdg_price)
@@ -1431,7 +1477,7 @@ class HotPath:
         # что и в первой проверке: сравнивать с состоянием, на котором
         # gross-профит и газ были посчитаны РАЗНО, было бы внутренне
         # несогласовано. ---
-        fresh_latest_final = int(_rpc_call("eth_blockNumber", []), 16)
+        fresh_latest_final = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         final_quote_block = effective_block
         final_amount_in = recompute["amount_in"]
         final_profit_raw = effective_profit_raw
@@ -1453,7 +1499,7 @@ class HotPath:
             if not gas_res["ok"]:
                 self.reason_log.log(route.route_id, route.label, REASON_SIMULATION_FAILED, gas_res["error"])
                 return
-            gas_price = int(_rpc_call("eth_gasPrice", []), 16)
+            gas_price = int(rpc_call_trading_path("eth_gasPrice", []), 16)
             weth_usdg_price = current_weth_usdg_price()
             profit_after_gas, err = _profit_after_gas(final_profit_raw, gas_res["gas_estimate"], gas_price,
                                                        weth_usdg_price)
@@ -1559,7 +1605,7 @@ class HotPath:
         # final_quote_block (а не старого fresh_latest выше) -- честная
         # мера "насколько устарел computed_at_block ПРЯМО СЕЙЧАС, в
         # момент коммита попытки", без двойного смысла одного поля.
-        commit_latest = int(_rpc_call("eth_blockNumber", []), 16)
+        commit_latest = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         state_age_blocks = max(0, commit_latest - final_quote_block)
 
         latency_recv_to_commit_s = time.monotonic() - recv_t_monotonic

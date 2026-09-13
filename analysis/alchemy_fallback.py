@@ -392,6 +392,67 @@ def get_transaction_fast(tx_hash: str) -> dict:
     return get_transaction(tx_hash)
 
 
+def rpc_call_trading_path(method: str, params: list) -> dict:
+    """Как _rpc_call(), но для ГОРЯЧЕГО (торгового) пути пилота --
+    ЦЕЛЕНАПРАВЛЕННО через Alchemy напрямую (тот же приём, что
+    get_transaction_fast выше), если ключ задан, СВОИМ БОЛЕЕ БЫСТРЫМ
+    троттлингом (_ALCHEMY_MIN_REQUEST_INTERVAL_S=0.1с, ~10 req/с) --
+    измерено этой сессией на РЕАЛЬНЫХ запросах (task5_v4_control_case_
+    investigation.py, часть A): чистый Alchemy-бёрст дал 14.95 req/с,
+    0 ошибок (15 запросов за 1.003с); публичный RPC под нагрузкой дал
+    3.14-4.99 req/с (шумно -- см. её же оговорку про общий IP-пул GH
+    Actions runner'ов). Разница по одиночной задержке (публичный RPC
+    быстрее -- ~25мс против ~60-70мс у Alchemy) НЕ отменяет вывод:
+    торговый путь ограничен СУСТЕЙНЕННОЙ пропускной способностью
+    (несколько последовательных eth_call на маршрут + estimateGas +
+    gasPrice + blockNumber за одну оценку), а не задержкой одного вызова.
+
+    ВАЖНО (пункт 5A, "не блокирует нагрузку фона на торговый путь"):
+    ЭТО ОТДЕЛЬНЫЙ счётчик троттлинга (_alchemy_last_request_at) от
+    фонового _rpc_call/_chunked_get_logs (_MIN_REQUEST_INTERVAL_S=0.5с,
+    НЕ изменён) -- discover_new_arbitrageur_routes/check_route_liveness
+    (RouteRegistry, фон) продолжают идти через СТАРЫЙ, более
+    консервативный путь и НЕ делят бюджет с торговым путём; вызовы
+    ОДНОГО пути не могут исчерпать бюджет ДРУГОГО.
+
+    ВАЖНО (отличие от get_transaction_fast): eth_call/eth_estimateGas на
+    ГОРЯЧЕМ пути регулярно и ЗАКОНОМЕРНО возвращают JSON-RPC-level
+    "error" (revert -- недостаточно ликвидности, невыгодный цикл и
+    т.п., НЕ транспортная ошибка) -- это НЕ повод повторять тот же
+    вызов на публичном RPC (удвоило бы RPC-нагрузку на каждый обычный
+    revert, сведя на нет выигрыш в скорости). Фолбэк на _rpc_call
+    (публичный-RPC-первый путь) -- ТОЛЬКО при ТРАНСПОРТНОМ сбое
+    (сетевое исключение, не-200 статус, нечитаемое тело), тот же
+    принцип, что в get_transaction_fast, но здесь honestly
+    задокументирован отдельно из-за иного профиля вызовов (частые
+    честные reverts вместо почти всегда успешных eth_getTransactionByHash).
+    Если Alchemy не настроен -- прозрачно идёт через _rpc_call (без
+    деградации: тот же путь, что и раньше)."""
+    global _alchemy_last_request_at
+    url = _alchemy_direct_endpoint()
+    if url:
+        wait = _alchemy_last_request_at + _ALCHEMY_MIN_REQUEST_INTERVAL_S - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _alchemy_last_request_at = time.monotonic()
+        try:
+            resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                                  headers=_BASE_HEADERS, timeout=20)
+            if resp.status_code == 200:
+                body = resp.json()
+                if "result" in body:
+                    return body["result"]
+                if "error" in body:
+                    # ЧЕСТНЫЙ ответ ноды (revert и т.п.) -- НЕ транспортная
+                    # ошибка, НЕ повод дублировать вызов на публичном RPC.
+                    raise RuntimeError(f"RPC {method} error: {body['error']}")
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001
+            pass  # транспортный сбой -- честный фолбэк ниже на публичный-RPC-первый путь
+    return _rpc_call(method, params)
+
+
 def _chunked_get_logs(
     from_block: int,
     to_block: int,
