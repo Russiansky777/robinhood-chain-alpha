@@ -38,21 +38,28 @@ on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml).'
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). Значение по умолчанию -- уже закреплённый коммит шестого раунда (профит/газ-фикс + быстрая RPC-полоса + многоходовая котировка), контракт НЕ менялся -- редеплой не требуется.'
         required: true
         type: string
+        default: '25c1a8f62843a1f5290a7ad7ea92dcbfc0e0e4b7'
       contract_address:
-        description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз.'
+        description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз. Значение по умолчанию -- уже проверенный контракт пилота (тот же кошелёк/контракт, что предыдущий часовой прогон).'
         required: true
         type: string
+        default: '0xAB24907bceEF4EDC366a1E4DfA15ed8aA5fdfe71'
+      duration_seconds:
+        description: 'ПРАВКА (шестой раунд, пункт 6 -- "короткий 15-30 мин пилот после фиксов"): длительность в секундах. По умолчанию 1200с (20 минут) -- в диапазоне, запрошенном владельцем. НЕ меняет бюджет/торговую логику -- тот же --duration-seconds, что был жёстко закодирован (3600) в предыдущих часовых прогонах, теперь параметр.'
+        required: false
+        type: string
+        default: '1200'
       confirm:
-        description: 'Введите ровно "LIVE_PILOT_V4", чтобы подтвердить: это часовой пилот с РЕАЛЬНЫМИ транзакциями на mainnet, тратит реальный ETH/USDG с кошелька владельца.'
+        description: 'Введите ровно "LIVE_PILOT_V4", чтобы подтвердить: это пилот с РЕАЛЬНЫМИ транзакциями на mainnet, тратит реальный ETH/USDG с кошелька владельца (длительность -- см. duration_seconds выше).'
         required: true
         type: string
 
 jobs:
   live_pilot_v4:
-    name: "Часовой LIVE-пилот task5_v4_hotpath.py (Ohio VPS, --confirm-mainnet --duration-seconds 3600)"
+    name: "LIVE-пилот task5_v4_hotpath.py (Ohio VPS, --confirm-mainnet --duration-seconds ${{ inputs.duration_seconds }})"
     runs-on: ubuntu-latest
     # Бутстрап реестра + 60 минут пилота + опрос (до ~85 итераций по
     # 60с) + запас на получение/публикацию отчёта.
@@ -88,6 +95,7 @@ jobs:
         env:
           LIVE_SHA: ${{ inputs.commit_sha }}
           CONTRACT_ADDRESS: ${{ inputs.contract_address }}
+          DURATION_SECONDS: ${{ inputs.duration_seconds }}
         run: |
           # RUN_TAG -- уникален для этого запуска workflow (номер run +
           # попытка), чтобы лог/PID разных запусков не перезаписывали
@@ -171,7 +179,7 @@ jobs:
               cd analysis
               LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
               PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
-              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds 3600 > \"\$LOG\" 2>&1 < /dev/null &
+              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds $DURATION_SECONDS > \"\$LOG\" 2>&1 < /dev/null &
               echo \$! > \"\$PIDFILE\"
               sleep 1
               echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
@@ -183,10 +191,18 @@ jobs:
           exit $SSH_RC
 
       - name: "Ждать завершения пилота (опрос PID на Ohio раз в минуту -- переживает обрыв SSH)"
+        env:
+          DURATION_SECONDS: ${{ inputs.duration_seconds }}
         run: |
-          echo "опрашиваем task5_v4_hotpath_live_${RUN_TAG}.pid каждые 60с (до ~85 минут)..."
+          # Опрашиваем не дольше duration_seconds + ~15 минут запаса
+          # (bootstrap реестра + получение/публикация отчёта) -- НЕ
+          # завязано на прежний жёстко закодированный час (пункт 6:
+          # короткий 15-30 мин пилот). Ранний выход по STATUS=done
+          # срабатывает независимо от этой верхней границы.
+          MAX_POLLS=$(( (DURATION_SECONDS / 60) + 15 ))
+          echo "опрашиваем task5_v4_hotpath_live_${RUN_TAG}.pid каждые 60с (до ~${MAX_POLLS} минут, duration_seconds=${DURATION_SECONDS})..."
           STATUS="unknown"
-          for i in $(seq 1 85); do
+          for i in $(seq 1 "$MAX_POLLS"); do
             sleep 60
             STATUS=$(ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot bash -c 'PID=\$(cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid 2>/dev/null || echo 0); if kill -0 \$PID 2>/dev/null; then echo alive; else echo done; fi'" 2>/dev/null || echo "ssh_error")
             echo "[$i/85] $(date -u +%H:%M:%SZ) статус процесса на Ohio: $STATUS"
@@ -211,6 +227,7 @@ jobs:
             echo "# LIVE-пилот task5_v4_hotpath.py -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "commit_sha=${{ inputs.commit_sha }}"
             echo "contract_address=${{ inputs.contract_address }}"
+            echo "duration_seconds=${{ inputs.duration_seconds }}"
             echo "run_tag=${RUN_TAG}"
             echo ""
             echo "## Последние 200 строк stdout/stderr"
