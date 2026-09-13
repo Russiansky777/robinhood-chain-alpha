@@ -211,16 +211,29 @@ def main() -> None:
             result["estimate_gas_error_on_fork"] = msg
 
         trace_res = {}
-        try:
-            trace = _rpc_call("debug_traceCall", [call_obj, hex(block), {"tracer": "callTracer"}])
-            trace_res["ok"] = True
-            trace_res["raw_trace"] = trace
-            first_error = _first_erroring_call(trace)
-            trace_res["first_erroring_call"] = first_error
-        except Exception as exc:  # noqa: BLE001
+        # ПРАВКА (первый прогон): явный исторический блок дал "Excess blob
+        # gas not set" (-32602) -- похоже, anvil строит окружение блока для
+        # debug_traceCall по правилам пост-Cancun (требует excessBlobGas), а
+        # форкнутый исторический блок его не предоставляет. "latest" на
+        # локальном форке -- ЭТО ЖЕ состояние (форк был снят РОВНО на block),
+        # но собственный (не прокси) блок anvil, где эти поля выставлены
+        # корректно -- пробуем как честный fallback, а не выдумываем ответ.
+        for block_tag_label, block_tag in (("historical_block", hex(block)), ("latest_fallback", "latest")):
+            try:
+                trace = _rpc_call("debug_traceCall", [call_obj, block_tag, {"tracer": "callTracer"}])
+                trace_res["ok"] = True
+                trace_res["block_tag_used"] = block_tag_label
+                trace_res["raw_trace"] = trace
+                trace_res["first_erroring_call"] = _first_erroring_call(trace)
+                break
+            except Exception as exc:  # noqa: BLE001
+                trace_res.setdefault("attempts", []).append({"block_tag_label": block_tag_label, "error": str(exc)})
+        else:
             trace_res["ok"] = False
-            trace_res["error"] = str(exc)
-            trace_res["missing_request_named"] = "debug_traceCall (callTracer) на локальном anvil-форке"
+            trace_res["missing_request_named"] = (
+                "debug_traceCall (callTracer) на локальном anvil-форке -- обе попытки (явный исторический "
+                "блок И 'latest') отказали, см. attempts выше для точного текста ошибки каждой"
+            )
         result["debug_trace_call_on_local_fork"] = trace_res
         result["ok"] = True
     except Exception as exc:  # noqa: BLE001
