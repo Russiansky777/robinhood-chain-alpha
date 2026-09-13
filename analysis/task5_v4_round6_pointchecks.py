@@ -119,6 +119,7 @@ def _run_evaluate(stale_profit_raw: int, fresh_profit_raw: int, sender: _FakeSen
     registry.add_route(route)
 
     orig_rpc_call = hp._rpc_call
+    orig_rpc_call_trading_path = hp.rpc_call_trading_path  # ПРАВКА (шестой раунд, пункт 5A): отдельная быстрая полоса
     orig_recompute = hp.recompute_route
     orig_quote_at_size = hp.quote_route_at_size
     orig_estimate_gas = hp.estimate_gas
@@ -148,6 +149,7 @@ def _run_evaluate(stale_profit_raw: int, fresh_profit_raw: int, sender: _FakeSen
                 "profit_raw": fresh_profit_raw}
 
     hp._rpc_call = fake_rpc_call
+    hp.rpc_call_trading_path = fake_rpc_call  # _evaluate_and_maybe_send теперь зовёт именно эту функцию
     hp.recompute_route = fake_recompute
     hp.quote_route_at_size = fake_quote_at_size
     hp.estimate_gas = lambda addr, calldata, frm: {"ok": True, "gas_estimate": 200_000}  # -> 1.0 USDG газа при 2500 WETH/USDG
@@ -163,6 +165,7 @@ def _run_evaluate(stale_profit_raw: int, fresh_profit_raw: int, sender: _FakeSen
         hotpath._evaluate_and_maybe_send(route, 1000, hp.time.monotonic())
     finally:
         hp._rpc_call = orig_rpc_call
+        hp.rpc_call_trading_path = orig_rpc_call_trading_path
         hp.recompute_route = orig_recompute
         hp.quote_route_at_size = orig_quote_at_size
         hp.estimate_gas = orig_estimate_gas
@@ -224,9 +227,77 @@ def check2_stale_positive_fresh_negative_rejects() -> None:
                 f"согласованном состоянии (0.9 USDG gross - 1.0 USDG газа = -0.1) и НЕ отправлен.")
 
 
+# ---------- Проверка 3 (пункт 5B): multihop -- только для hookless-маршрутов ----------
+
+def check3_multihop_only_for_hookless_routes() -> None:
+    """quote_route_at_size (РЕАЛЬНЫЙ, непеределанный) обязан идти
+    ОДНИМ eth_call (quoteExactInput) для маршрута БЕЗ hooks, и СТАРЫМ
+    последовательным путём (quote_exact_input_single на каждое плечо)
+    для маршрута С hooks -- НЕ провалидированная многоходовая
+    котировка не должна тихо применяться к hook-маршрутам."""
+    HOOK_ADDR = "0x00000000000000000000000000000000009999"
+    fake_token = "0x0000000000000000000000000000000000000abc"
+
+    hookless_route = rr.RouteCycle(
+        "route_test_hookless", (
+            rr.RouteLeg(fake_token, rr.USDG, 3000, 60, rr.NATIVE, False),
+            rr.RouteLeg(fake_token, rr.USDG, 3000, 60, rr.NATIVE, True),
+        ), rr.USDG, "hookless", "seed")
+    hooked_route = rr.RouteCycle(
+        "route_test_hooked", (
+            rr.RouteLeg(fake_token, rr.USDG, 3000, 60, HOOK_ADDR, False),
+            rr.RouteLeg(fake_token, rr.USDG, 3000, 60, rr.NATIVE, True),
+        ), rr.USDG, "hooked", "seed")
+
+    orig_rpc_call_trading_path = hp.rpc_call_trading_path
+    orig_quote_single = hp.quote_exact_input_single
+    orig_decode = hp.decode_quote_result
+
+    multihop_calls: list[str] = []
+    sequential_calls: list[str] = []
+
+    def fake_rpc_call_trading_path(method, params):
+        multihop_calls.append(method)
+        assert method == "eth_call"
+        return "0xdeadbeef"
+
+    def fake_quote_single(pool_key, zero_for_one, amount_in, block_number):
+        sequential_calls.append(pool_key.currency0)
+        return amount_in + 1
+
+    hp.rpc_call_trading_path = fake_rpc_call_trading_path
+    hp.quote_exact_input_single = fake_quote_single
+    hp.decode_quote_result = lambda raw: (2_000_000, 100_000)
+
+    try:
+        res_hookless = hp.quote_route_at_size(hookless_route, 1_000_000, 5000)
+        multihop_after_hookless, sequential_after_hookless = len(multihop_calls), len(sequential_calls)
+        res_hooked = hp.quote_route_at_size(hooked_route, 1_000_000, 5000)
+        multihop_after_hooked, sequential_after_hooked = len(multihop_calls), len(sequential_calls)
+    finally:
+        hp.rpc_call_trading_path = orig_rpc_call_trading_path
+        hp.quote_exact_input_single = orig_quote_single
+        hp.decode_quote_result = orig_decode
+
+    ok = (multihop_after_hookless == 1 and sequential_after_hookless == 0 and res_hookless["ok"]
+          and res_hookless["amount_out"] == 2_000_000)
+    _record("R6.3a", "hookless-маршрут -- ОДИН eth_call (quoteExactInput), НЕ последовательные quoteExactInputSingle",
+            ok, f"multihop-вызовов={multihop_after_hookless} (ожидание 1), sequential-вызовов="
+                f"{sequential_after_hookless} (ожидание 0), результат={res_hookless}")
+
+    ok2 = (sequential_after_hooked - sequential_after_hookless == 2
+           and multihop_after_hooked == multihop_after_hookless  # hook-маршрут НЕ добавил ни одного multihop-вызова
+           and res_hooked["ok"] and res_hooked["amount_out"] == 1_000_002)
+    _record("R6.3b", "маршрут С hooks -- ПРЕЖНИЙ последовательный путь (multihop НЕ провалидирован для hooks)",
+            ok2, f"sequential-вызовов ОТ ЭТОГО вызова={sequential_after_hooked - sequential_after_hookless} "
+                 f"(ожидание 2, по одному на плечо), multihop-вызовов ОТ ЭТОГО вызова="
+                 f"{multihop_after_hooked - multihop_after_hookless} (ожидание 0), результат={res_hooked}")
+
+
 def main() -> None:
     check1_stale_negative_fresh_positive_sends()
     check2_stale_positive_fresh_negative_rejects()
+    check3_multihop_only_for_hookless_routes()
 
     n_fail = sum(1 for r in RESULTS if not r["ok"])
     print(f"\n=== ИТОГ: {len(RESULTS) - n_fail}/{len(RESULTS)} проверок пройдено ===")
