@@ -41,7 +41,7 @@ on:
         description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). Значение по умолчанию -- уже закреплённый коммит шестого раунда (профит/газ-фикс + быстрая RPC-полоса + многоходовая котировка), контракт НЕ менялся -- редеплой не требуется.'
         required: true
         type: string
-        default: '25c1a8f62843a1f5290a7ad7ea92dcbfc0e0e4b7'
+        default: '6c5122bafe93cc63cf6005929afc5b257bccd5c8'
       contract_address:
         description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз. Значение по умолчанию -- уже проверенный контракт пилота (тот же кошелёк/контракт, что предыдущий часовой прогон).'
         required: true
