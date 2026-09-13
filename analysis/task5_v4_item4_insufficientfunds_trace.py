@@ -86,12 +86,48 @@ def find_block_by_timestamp(target_ts: float) -> dict:
     return {"ok": True, "block": lo, "block_ts": int(get_block(lo)["timestamp"], 16), "target_ts": target_ts}
 
 
+# ПРАВКА (восьмой раунд, разбор владельца, пункт 4): ПЕРВАЯ попытка --
+# "--hardfork london" (по присутствию/отсутствию полей заголовка) --
+# УСТРАНИЛА "Excess blob gas not set" у debug_traceCall, но СЛОМАЛА
+# реальную реконструкцию: PoolManager.unlock() (V4 flash-accounting)
+# реально использует transient storage (TSTORE/TLOAD, EIP-1153,
+# появился В Cancun) -- под "london" эти опкоды НЕ активны, и первый же
+# вызов unlock() падает с "NotActivated" (это ОШИБКА АКТИВАЦИИ ОПКОДА
+# В REVM, а не наш селектор) -- т.е. london ДАЛ ДРУГОЙ, ЛОЖНЫЙ revert,
+# не тот, что реально произошёл на цепи (0x356680b7, реально
+# воспроизводимый только на Cancun+, где TSTORE работает). Присутствие/
+# отсутствие полей заголовка (excessBlobGas и т.п.) отражает КОНСЕНСУС-
+# уровневые форматы блока (blob-транзакции/beacon withdrawals), а НЕ
+# обязательно набор активных EVM-опкодов кастомной цепи -- цепь вполне
+# может использовать EIP-1153 (Cancun) без blob-транзакций (EIP-4844) и
+# без вывода валидаторов (Shanghai) одновременно. Правильный fix --
+# ЯВНЫЙ "cancun" (сохраняет TSTORE/TLOAD, нужные V4) -- проверено ниже,
+# что при этом debug_traceCall на РЕАЛЬНОМ calldata даёт ТОТ ЖЕ
+# 0x356680b7, что и eth_estimateGas без явного hardfork.
+ANVIL_HARDFORK = "cancun"
+
+
 def anvil_start(fork_block: int) -> subprocess.Popen:
     fork_url = _alchemy_direct_endpoint()
     if not fork_url:
         raise RuntimeError("нет Alchemy-эндпоинта для форка")
+    # ПРАВКА (восьмой раунд, пункт 4): ни london (ломает TSTORE/TLOAD --
+    # V4 требует), ни явный cancun (та же "Excess blob gas not set", что
+    # и с hardfork по умолчанию -- anvil --help подтвердил default=
+    # "latest", т.е. НЕ обязательно cancun, но ошибка идентична) не
+    # решили проблему по отдельности. anvil --help (реально запрошен на
+    # Ohio) назвал --steps-tracing ("Enable steps tracing used for debug
+    # calls returning geth-style traces") -- ОТДЕЛЬНЫЙ переключатель
+    # именно для debug_* трасс, независимый от выбора hardfork; НИКАКОГО
+    # флага, отдельно управляющего excess-blob-gas/blob-base-fee, у этой
+    # версии anvil НЕТ (grep 'blob' по всему --help дал 0 строк) --
+    # --steps-tracing, видимо, включает ДРУГОЙ (инспекторный) путь
+    # трассировки, не требующий валидного blob-окружения следующего
+    # блока. Сохраняем cancun (корректные опкоды V4) + добавляем
+    # --steps-tracing.
     proc = subprocess.Popen(
-        [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(fork_block), "--port", str(PORT)],
+        [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(fork_block),
+         "--hardfork", ANVIL_HARDFORK, "--steps-tracing", "--port", str(PORT)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     deadline = time.monotonic() + 30
@@ -235,6 +271,48 @@ def main() -> None:
                 "блок И 'latest') отказали, см. attempts выше для точного текста ошибки каждой"
             )
         result["debug_trace_call_on_local_fork"] = trace_res
+
+        # ПРАВКА (восьмой раунд, разбор владельца, пункт 4): "если
+        # debug_traceCall остаётся недоступным -- попробуй ЛОКАЛЬНУЮ
+        # ОТПРАВКУ воспроизводимого вызова и трассу ПОЛУЧЕННОЙ
+        # транзакции". debug_traceCall падает НА ЭТАПЕ ПОСТРОЕНИЯ
+        # окружения ГИПОТЕТИЧЕСКОГО блока (валидация next-block env
+        # требует excessBlobGas, которого у форкнутого источника нет);
+        # debug_traceTransaction же трассирует УЖЕ РЕАЛЬНО СМАЙНЕННУЮ
+        # транзакцию -- окружение блока к этому моменту уже построено
+        # anvil'ом САМИМ (при майнинге), а не гипотетически для трейса,
+        # так что эта конкретная валидация не применяется. Отправка --
+        # ТОЛЬКО на локальный anvil (impersonate OWNER, тот же call_obj,
+        # что и estimateGas выше) -- НЕ реальная сеть, НЕ реальные деньги.
+        if not trace_res.get("ok"):
+            send_trace_res: dict = {}
+            try:
+                run([CAST, "rpc", "anvil_impersonateAccount", OWNER, "--rpc-url", RPC], timeout=15)
+                run([CAST, "rpc", "anvil_setBalance", OWNER, hex(10 ** 19), "--rpc-url", RPC], timeout=15)
+                send_call_obj = json.dumps({**call_obj, "gas": "0x2dc6c0"})
+                send_proc = run([CAST, "rpc", "eth_sendTransaction", send_call_obj, "--rpc-url", RPC], timeout=30)
+                send_trace_res["send_returncode"] = send_proc.returncode
+                send_trace_res["send_stdout"] = send_proc.stdout.strip()
+                send_trace_res["send_stderr"] = send_proc.stderr.strip()
+                if send_proc.returncode == 0:
+                    try:
+                        local_tx_hash = json.loads(send_proc.stdout.strip())
+                    except (ValueError, json.JSONDecodeError):
+                        local_tx_hash = send_proc.stdout.strip()
+                    send_trace_res["local_tx_hash"] = local_tx_hash
+                    local_receipt = _rpc_call("eth_getTransactionReceipt", [local_tx_hash])
+                    send_trace_res["local_receipt_status"] = (
+                        int(local_receipt["status"], 16) if local_receipt else None)
+                    trace2 = _rpc_call("debug_traceTransaction", [local_tx_hash, {"tracer": "callTracer"}])
+                    send_trace_res["ok"] = True
+                    send_trace_res["raw_trace"] = trace2
+                    send_trace_res["first_erroring_call"] = _first_erroring_call(trace2)
+                else:
+                    send_trace_res["ok"] = False
+            except Exception as exc:  # noqa: BLE001
+                send_trace_res["ok"] = False
+                send_trace_res["error"] = str(exc)
+            result["debug_trace_transaction_on_local_send"] = send_trace_res
         result["ok"] = True
     except Exception as exc:  # noqa: BLE001
         result["ok"] = False

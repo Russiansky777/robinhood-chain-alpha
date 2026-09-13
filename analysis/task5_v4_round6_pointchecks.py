@@ -162,7 +162,7 @@ def _run_evaluate(stale_profit_raw: int, fresh_profit_raw: int, sender: _FakeSen
     try:
         hotpath = hp.HotPath(registry, "0x0000000000000000000000000000000000000009", sender.address,
                               budget, attempt_table, reason_log, hp._RpcPriorityHint(), sender=sender, dry_run=False)
-        hotpath._evaluate_and_maybe_send(route, 1000, hp.time.monotonic())
+        hotpath._evaluate_and_maybe_send(route, 1000, hp.time.monotonic(), hp.time.monotonic())
     finally:
         hp._rpc_call = orig_rpc_call
         hp.rpc_call_trading_path = orig_rpc_call_trading_path
