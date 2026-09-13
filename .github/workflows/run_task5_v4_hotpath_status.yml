@@ -1,0 +1,90 @@
+name: "Задача 5, LIVE -- READ-ONLY снимок состояния пилота (Ohio VPS, без остановки/изменений)"
+
+# Диагностика "прямо сейчас" по просьбе владельца: посмотреть на Ohio
+# состояние УЖЕ ЗАПУЩЕННОГО пилота (task5_v4_hotpath.py), НЕ
+# останавливая и НЕ меняя ничего -- ни кода, ни состояния. Только
+# `cat`/`tail`/`head`/`wc -l`/`kill -0` (проверка живости БЕЗ отправки
+# сигнала завершения -- kill -0 лишь проверяет существование процесса).
+# Ни одной команды записи/удаления/`kill -TERM`/`kill -KILL` здесь нет.
+#
+# Намеренно БЕЗ `set -euo pipefail` внутри удалённого скрипта -- это
+# диагностика, а не операция с деньгами: если ОДНОГО файла нет (пилот
+# ещё не дошёл до этой стадии), остальные секции всё равно должны быть
+# показаны, а не потеряны из-за раннего abort.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_tag:
+        description: 'RUN_TAG работающего LIVE-пилота -- вида run<GITHUB_RUN_ID>_<GITHUB_RUN_ATTEMPT> (номер run + попытка со страницы нужного run_task5_v4_hotpath_live.yml). Нужен, чтобы найти ЕГО hotpath-лог/pid -- остальные файлы (реестр маршрутов, attempts, no-send, budget) общие, по фиксированным путям, не зависят от run_tag.'
+        required: true
+        type: string
+
+jobs:
+  status_check:
+    name: "Read-only снимок состояния LIVE-пилота на Ohio"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Read-only снимок (PID, hotpath-лог, реестр маршрутов, attempts, no-send, budget)"
+        env:
+          RUN_TAG: ${{ inputs.run_tag }}
+        run: |
+          # $RUN_TAG подставляется ЭТОЙ (GH Actions runner) оболочкой ДО
+          # отправки по SSH -- литералом в пути файлов (та же схема, что
+          # в run_task5_v4_hotpath_live.yml). \"...\" и \$ -- экранирование
+          # для REMOTE bash (переменные PID/PIDFILE/LOG и т.д. читаются
+          # ПОСЛЕ доставки по SSH, не локальной оболочкой).
+          SSH_RC=0
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            sudo -u bot bash -c '
+              PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
+              LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
+              REG=/home/bot/data/task5_v4_route_registry_state.json
+              AT=/home/bot/data/task5_v4_pilot_attempts.jsonl
+              NS=/home/bot/data/task5_v4_pilot_no_send_log.jsonl
+              BS=/home/bot/data/task5_v4_pilot_budget_state.json
+
+              echo \"===PID===\"
+              if [ -f \"\$PIDFILE\" ]; then
+                PID=\$(cat \"\$PIDFILE\")
+                echo \"pidfile=\$PIDFILE pid=\$PID\"
+                if kill -0 \"\$PID\" 2>/dev/null; then echo \"alive=yes\"; else echo \"alive=no\"; fi
+              else
+                echo \"pidfile отсутствует: \$PIDFILE\"
+              fi
+
+              echo \"===LOG_HEAD(200)===\"
+              if [ -f \"\$LOG\" ]; then wc -l \"\$LOG\"; head -n 200 \"\$LOG\"; else echo \"лог отсутствует: \$LOG\"; fi
+
+              echo \"===LOG_TAIL(200)===\"
+              if [ -f \"\$LOG\" ]; then tail -n 200 \"\$LOG\"; else echo \"(нет)\"; fi
+
+              echo \"===REGISTRY_STATE===\"
+              if [ -f \"\$REG\" ]; then wc -c \"\$REG\"; cat \"\$REG\"; else echo \"файл отсутствует: \$REG\"; fi
+
+              echo \"===ATTEMPTS===\"
+              if [ -f \"\$AT\" ]; then wc -l \"\$AT\"; cat \"\$AT\"; else echo \"файл отсутствует: \$AT\"; fi
+
+              echo \"===NO_SEND_LOG===\"
+              if [ -f \"\$NS\" ]; then wc -l \"\$NS\"; cat \"\$NS\"; else echo \"файл отсутствует: \$NS\"; fi
+
+              echo \"===BUDGET_STATE===\"
+              if [ -f \"\$BS\" ]; then cat \"\$BS\"; else echo \"файл отсутствует: \$BS\"; fi
+            '
+          " || SSH_RC=$?
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
