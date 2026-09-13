@@ -246,6 +246,29 @@ class PilotBudget:
         self.pilot_completed_reason = reason
         self._save()
 
+    def start_new_session(self) -> None:
+        """Пункт 5 (седьмой раунд, разбор владельца): "одна кнопка
+        перезапуска -- новая 20-минутная сессия, обновляя ТОЛЬКО её
+        длительность/состояние завершения; накопленный газ, PnL и общий
+        лимит $20 -- сохранить, НЕ выдавать новый бюджет". Сбрасывает
+        РОВНО pilot_completed/pilot_completed_reason/pilot_started_at
+        (следующий ensure_pilot_started() зафиксирует НОВЫЙ момент
+        старта -- новое окно --duration-seconds отсчитывается от него).
+        НЕ трогает cumulative_gas_*/cumulative_net_pnl_usd/
+        cumulative_gross_profit_raw_by_token (накопленный итог по газу и
+        прибыли, тот же общий лимит BUDGET_STOP_USD) и НЕ трогает
+        pending/halted/halt_reason -- resolve_pending_tx_if_any (main())
+        уже отработал СВОЙ круг раньше по коду, а halted -- отдельная,
+        РУЧНАЯ причина остановки (учётная ошибка и т.п.), эта кнопка её
+        не обходит. Вызывающий код (main()) решает, КОГДА звать этот
+        метод (обычно -- только если budget.pilot_completed уже True);
+        сам метод ничего не проверяет и не "восстанавливает предыдущую
+        сессию" -- он ТОЛЬКО открывает новую."""
+        self.pilot_completed = False
+        self.pilot_completed_reason = None
+        self.pilot_started_at = None
+        self._save()
+
     # ---------- резерв ПЕРЕД отправкой ----------
 
     def reserve_for_send(self, gas_limit: int, max_fee_per_gas_wei: int,

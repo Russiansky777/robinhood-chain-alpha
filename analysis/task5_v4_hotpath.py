@@ -1942,6 +1942,13 @@ def main() -> None:
     ap.add_argument("--duration-seconds", type=float, default=None,
                      help="Владелец: часовой пилот -- 3600. Отсчёт от завершения bootstrap реестра, "
                           "переживает рестарт (PilotBudget.pilot_started_at)")
+    ap.add_argument("--new-session", action="store_true",
+                     help="Пункт 5 (седьмой раунд, разбор владельца): явный перезапуск ПОСЛЕ уже "
+                          "завершённого пилота (budget.pilot_completed=true) -- открывает НОВУЮ сессию "
+                          "(pilot_completed/pilot_started_at сбрасываются, PilotBudget.start_new_session()), "
+                          "СОХРАНЯЯ накопленный газ/PnL/общий лимит $20. Если пилот НЕ завершён (или "
+                          "halted -- отдельная, ручная причина) -- флаг НИЧЕГО не меняет: НЕ обходит halt, "
+                          "НЕ отменяет разрешение pending (то уже отработало раньше по коду, см. _main()).")
     args = ap.parse_args()
 
     # Пункт 8 (четвёртый раунд): ДО ЛЮБОГО RPC-вызова этого процесса --
@@ -1989,6 +1996,17 @@ def _main(args) -> None:
     if budget.halted:
         print(f"[hotpath] ОСТАНОВЛЕН (см. состояние бюджета, после разрешения pending): {budget.halt_reason}")
         return
+
+    # Пункт 5 (седьмой раунд, разбор владельца): --new-session -- ПОСЛЕ
+    # halted (halt -- ручная причина, этот флаг её не обходит) и ПОСЛЕ
+    # resolve_pending_tx_if_any (уже отработал выше, независимо от этого
+    # флага) -- ТОЛЬКО если пилот ДЕЙСТВИТЕЛЬНО завершён, открываем новую
+    # сессию (сохраняя газ/PnL/лимит, см. докстринг start_new_session()).
+    if args.new_session and budget.pilot_completed:
+        print(f"[hotpath] --new-session: предыдущая сессия была завершена ({budget.pilot_completed_reason}) -- "
+              f"открываю НОВУЮ (накопленный газ ${budget.cumulative_gas_loss_usd:.2f}, net PnL "
+              f"${budget.cumulative_net_pnl_usd:.2f} -- СОХРАНЕНЫ, общий лимит ${BUDGET_STOP_USD:.0f} не менялся)")
+        budget.start_new_session()
 
     if budget.pilot_completed:
         print(f"[hotpath] ПИЛОТ УЖЕ ЗАВЕРШЁН ({budget.pilot_completed_reason}) -- новый час НЕ начинается "

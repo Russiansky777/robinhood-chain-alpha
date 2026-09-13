@@ -162,9 +162,38 @@ jobs:
           # уникальным для этого run именем) -- НЕ удаляем, существующие
           # копии не перезаписываем; `2>/dev/null || true` -- безопасно,
           # если файла нет вообще (уже убран прошлым запуском).
+          # ПРАВКА (седьмой раунд, разбор владельца, пункт 5): "одна кнопка
+          # перезапуска" реально утыкалась в ДВЕ немедленные причины
+          # завершения, которые этот workflow раньше не устранял:
+          #   1) budget.pilot_completed=true с прошлой (завершившейся)
+          #      сессии -- task5_v4_hotpath.py._main() видит это ПЕРВЫМ и
+          #      выходит, ничего не делая. --new-session (новый флаг,
+          #      см. task5_v4_hotpath.py/task5_v4_pilot_accounting.py --
+          #      PilotBudget.start_new_session()) открывает НОВУЮ сессию,
+          #      сбрасывая РОВНО pilot_completed/pilot_started_at --
+          #      накопленный газ/PnL/общий лимит $20 НЕ трогает (флаг САМ
+          #      по себе безвреден, если пилот НЕ был завершён -- условие
+          #      внутри _main() проверяет budget.pilot_completed ПЕРЕД
+          #      сбросом).
+          #   2) /etc/bot/STOP, оставленный ПРЕДЫДУЩИМ штатным
+          #      завершением -- главный цикл видит файл на САМОЙ ПЕРВОЙ
+          #      итерации и немедленно уходит в "плавную остановку", даже
+          #      не начав работу. Владелец явно подтверждает НОВЫЙ LIVE-
+          #      запуск (фраза confirm) -- это и есть explicit-сигнал
+          #      снять файл КАК ЧАСТЬ этого же запуска (не тихая фоновая
+          #      расчистка). Снимается ДО входа в контекст пользователя
+          #      bot (sudo -u bot САМ не имеет прав на /etc/bot, файл
+          #      root-owned) -- через sudo НАПРЯМУЮ, той же ubuntu-сессией.
           SSH_RC=0
           ssh $SSH_OPTS ubuntu@3.151.160.108 "
             set -euo pipefail
+            echo '[live] пункт 5: снятие leftover STOP (если оставлен предыдущим пилотом)...'
+            if sudo test -f /etc/bot/STOP; then
+              sudo rm -f /etc/bot/STOP
+              echo '[live] /etc/bot/STOP снят -- часть ЭТОГО подтверждённого перезапуска (confirm=LIVE_PILOT_V4)'
+            else
+              echo '[live] /etc/bot/STOP отсутствует -- нечего снимать'
+            fi
             sudo -u bot bash -c '
               set -euo pipefail
               set -a
@@ -179,7 +208,7 @@ jobs:
               cd analysis
               LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
               PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
-              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds $DURATION_SECONDS > \"\$LOG\" 2>&1 < /dev/null &
+              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds $DURATION_SECONDS --new-session > \"\$LOG\" 2>&1 < /dev/null &
               echo \$! > \"\$PIDFILE\"
               sleep 1
               echo \"[live] запущен pid=\$(cat \$PIDFILE), лог=\$LOG\"
