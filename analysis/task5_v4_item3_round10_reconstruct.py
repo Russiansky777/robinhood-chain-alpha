@@ -366,6 +366,7 @@ def main() -> None:
         # Баланс исполнителя и отправителя ДО отправки (тот же локальный блок,
         # что и общий снимок) -- обычный eth_getBalance с явным номером блока,
         # НЕ требует debug_* и не проксируется на платный тариф апстрима.
+        target_tx = txs[tx_index]
         executor_addr_native = row.get("tx_to") or row.get("tx_from")
         balances_before = {
             "executor": int(_rpc_call("eth_getBalance", [executor_addr_native, hex(local_block_before_target)]), 16),
@@ -373,7 +374,6 @@ def main() -> None:
         }
         result["balances_before_competitor_tx"] = balances_before
 
-        target_tx = txs[tx_index]
         target_replay = impersonate_and_send(target_tx["from"], target_tx.get("to"), target_tx.get("input", "0x"),
                                               target_tx.get("value", "0x0"), target_tx.get("gas", "0x2dc6c0"))
         result["competitor_target_tx_replay"] = target_replay
