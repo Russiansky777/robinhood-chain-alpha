@@ -109,6 +109,43 @@ def decode_v4_swap_log_data(data_hex: str) -> dict:
 QUOTE_EXACT_INPUT_SINGLE_SELECTOR = "aa9d21cb"
 QUOTE_EXACT_OUTPUT_SINGLE_SELECTOR = "58733073"
 
+# ПРАВКА (Задача 5, живой пилот, шестой раунд -- "устранить подтверждённые
+# ограничения скорости"): quoteExactInput(QuoteExactParams) -- МНОГОХОДОВАЯ
+# котировка всего маршрута ОДНИМ eth_call вместо len(route.legs)
+# последовательных quoteExactInputSingle (текущий hot path,
+# quote_route_at_size в task5_v4_hotpath.py). Сигнатура и структуры
+# (QuoteExactParams, PathKey) сверены WebFetch с реальным исходником
+# Uniswap/v4-periphery (raw.githubusercontent.com,
+# src/interfaces/IV4Quoter.sol + src/libraries/PathKey.sol) в ЭТОЙ же
+# сессии, НЕ по памяти:
+#   struct PathKey { Currency intermediateCurrency; uint24 fee;
+#                     int24 tickSpacing; IHooks hooks; bytes hookData; }
+#   struct QuoteExactParams { Currency exactCurrency; PathKey[] path;
+#                              uint128 exactAmount; }
+#   function quoteExactInput(QuoteExactParams memory params) external
+#       returns (uint256 amountOut, uint256 gasEstimate);
+# Currency/IHooks -- user-defined value types поверх address (то же
+# самое ABI-кодирование, что и PoolKey.currency0/hooks в
+# quoteExactInputSingle выше). PathKey.intermediateCurrency -- валюта,
+# в которую переходит ЭТО плечо (не пара пула целиком, направление
+# zeroForOne выводится квотером сравнением текущей валюты с
+# intermediateCurrency -- см. PathKey.getPoolAndSwapDirection в
+# исходнике) -- поэтому здесь путь строится из
+# route.legs[i].output_currency (см. quote_route_multihop_calldata
+# ниже), а не currency0/currency1 пула напрямую.
+#
+# Селектор ПЕРЕСЧИТАН тем же методом, что и уже проверенный
+# QUOTE_EXACT_INPUT_SINGLE_SELECTOR выше (keccak256 канонической
+# сигнатуры с ОДНИМ верхнеуровневым tuple-аргументом) -- метод уже
+# независимо подтверждён (aa9d21cb совпал с реально наблюдавшимся
+# вызовом в историческом аудите), это ВТОРОЕ применение ТОГО ЖЕ метода.
+# ДОПОЛНИТЕЛЬНО перепроверяется живым eth_call на реальном V4Quoter в
+# analysis/task5_v4_speed_audit.py -- результат сверяется с суммой
+# последовательных quoteExactInputSingle на ТОМ ЖЕ блоке/маршруте;
+# ИСПОЛЬЗОВАТЬ в горячем пути ТОЛЬКО после того, как этот скрипт
+# подтвердил совпадение (см. его результат перед включением ниже).
+QUOTE_EXACT_INPUT_SELECTOR = "ca253dc9"
+
 
 def _pack_pool_key(key: PoolKey) -> bytes:
     return (
@@ -138,6 +175,38 @@ def decode_quote_result(raw_hex: str) -> tuple[int, int]:
     amount_out = int(h[0:64], 16)
     gas_estimate = int(h[64:128], 16)
     return amount_out, gas_estimate
+
+
+def quote_exact_input_multihop_calldata(exact_currency: str, legs: list[tuple[str, int, int, str]],
+                                         exact_amount: int) -> str:
+    """Калдата quoteExactInput(QuoteExactParams) -- ВЕСЬ маршрут ОДНИМ
+    eth_call (см. докстринг QUOTE_EXACT_INPUT_SELECTOR выше про
+    источник сигнатуры/структур).
+
+    `legs` -- список (intermediate_currency, fee, tick_spacing, hooks)
+    В ПОРЯДКЕ прохождения маршрута -- intermediate_currency ЭТОГО
+    элемента -- валюта, в которую ПРИХОДИМ после этого плеча (не
+    currency0/currency1 пула, направление квотер выводит сам сравнением
+    с текущей валютой, см. PathKey.getPoolAndSwapDirection в исходнике).
+    hookData всегда пусто (см. докстринг quote_exact_input_single_calldata
+    в этом же файле про то, что hookData пуст для известных маршрутов
+    этой сессии) -- если понадобятся непустые hookData, эта функция
+    ТРЕБУЕТ правки (не тихо игнорирует).
+
+    Реализовано через eth_abi.encode (уже транзитивная зависимость --
+    web3/eth-account, которые использует task5_bot_sender.py в ТОМ ЖЕ
+    venv), а НЕ ручной ABI-packing (в отличие от однохоповой версии
+    выше) -- вложенный динамический массив динамических структур
+    (PathKey[] с bytes hookData внутри каждого элемента) достаточно
+    сложен, чтобы риск тихой ошибки ручной упаковки головы/хвоста
+    перевесил цену новой (транзитивно уже присутствующей) зависимости
+    именно здесь."""
+    from eth_abi import encode as _abi_encode
+
+    sig = "(address,(address,uint24,int24,address,bytes)[],uint128)"
+    path = [(addr, fee, tick_spacing, hooks, b"") for (addr, fee, tick_spacing, hooks) in legs]
+    encoded = _abi_encode([sig], [(exact_currency, path, exact_amount)])
+    return "0x" + QUOTE_EXACT_INPUT_SELECTOR + encoded.hex()
 
 
 if __name__ == "__main__":
