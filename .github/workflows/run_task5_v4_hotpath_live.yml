@@ -38,10 +38,10 @@ on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). ПРАВКА (двенадцатый раунд, пункт 4): default обновлён на итоговый коммит двенадцатого раунда -- расширенная ВНИЗ ETH-сетка размеров (0.001/0.002/0.004/0.008 ETH перед прежним минимумом 0.02 ETH; USDG-сетка и контракт НЕ менялись), обоснованная реальным контрольным примером конкурента (~0.0038 ETH, подтверждённая прибыль на форке). --help ЭТОЙ версии на Ohio реально проверен (см. отчёт). Контракт НЕ менялся, редеплой не требуется.'
+        description: 'ЗАФИКСИРОВАННЫЙ полный commit SHA -- ТА ЖЕ версия, что использовалась для деплоя (run_task5_deploy_executor_v4.yml) и верификации (run_task5_verify_deploy_v4.yml). ПРАВКА (тринадцатый раунд, владелец): default обновлён на итоговый коммит с проверенным ускорением торгового RPC-пути -- quote_route_at_size() передаёт rpc_call_trading_path и в хук-маршруты (не только hookless), честная расшифровка revert-селекторов (task5_v4_revert_decode.py, REASON_INVALID_POOL_CONFIG вместо огульного "нет ликвидности"), точная метрика очереди (route_full_wait_s отдельно от возраста последнего сигнала). Реально измерено на 3 сохранённых маршрутах и на полном recompute_route() (вся сетка): ~5.6х ускорение (19.03с -> 3.40с на хук-маршруте, идентичный результат), регрессия round3-8 (41/41) пройдена. Контракт/сетки размеров/кошелёк/бюджет НЕ менялись, редеплой не требуется -- --help ЭТОЙ версии на Ohio реально проверен ранее (тот же CLI, что и прежний коммит).'
         required: true
         type: string
-        default: 'd757453f5e50c1faa4972c8b9927d2508ae0cc54'
+        default: '03b737ff0afed2701517e034c5ddbed48135ee74'
       contract_address:
         description: 'Адрес ClosedCycleExecutorV4, ПРОШЕДШИЙ проверку run_task5_verify_deploy_v4.yml (all_checks_passed=true) -- скопируйте из его результата (contracts/build/deploy_verification_v4.json), не вводите на глаз. Значение по умолчанию -- уже проверенный контракт пилота (тот же кошелёк/контракт, что предыдущий часовой прогон).'
         required: true
@@ -61,8 +61,13 @@ jobs:
   live_pilot_v4:
     name: "LIVE-пилот task5_v4_hotpath.py (Ohio VPS, --confirm-mainnet --duration-seconds ${{ inputs.duration_seconds }})"
     runs-on: ubuntu-latest
-    # Бутстрап реестра + 60 минут пилота + опрос (до ~85 итераций по
-    # 60с) + запас на получение/публикацию отчёта.
+    # ПРАВКА (тринадцатый раунд): опрос теперь до (duration_seconds/60 +
+    # 45) минут (см. шаг ожидания ниже -- честный запас на bootstrap
+    # реестра, реально наблюдавшийся 27+ мин на прошлом прогоне) -- для
+    # текущего default'а 1200с (20 мин) это ~65 минут опроса. 100 минут
+    # общего таймаута job'а по-прежнему с запасом покрывает опрос + запуск
+    # + получение/публикацию отчёта (не требует увеличения для 20-мин
+    # пилота; при большем duration_seconds эту границу нужно будет поднять).
     timeout-minutes: 100
     permissions:
       contents: read
@@ -223,18 +228,37 @@ jobs:
         env:
           DURATION_SECONDS: ${{ inputs.duration_seconds }}
         run: |
-          # Опрашиваем не дольше duration_seconds + ~15 минут запаса
-          # (bootstrap реестра + получение/публикация отчёта) -- НЕ
-          # завязано на прежний жёстко закодированный час (пункт 6:
-          # короткий 15-30 мин пилот). Ранний выход по STATUS=done
-          # срабатывает независимо от этой верхней границы.
-          MAX_POLLS=$(( (DURATION_SECONDS / 60) + 15 ))
-          echo "опрашиваем task5_v4_hotpath_live_${RUN_TAG}.pid каждые 60с (до ~${MAX_POLLS} минут, duration_seconds=${DURATION_SECONDS})..."
+          # ПРАВКА (тринадцатый раунд, известное ограничение обвязки,
+          # владелец): прежний запас "+15 минут" предполагался ТОЛЬКО на
+          # bootstrap реестра + забор отчёта -- РЕАЛЬНО же прошлый LIVE-
+          # прогон (run34771657422_1, эта же сессия) показал bootstrap
+          # (восстановление состояния + discovery + ПОЛНЫЙ проход
+          # живучести ВСЕХ маршрутов, refresh_liveness_all -- см. её
+          # докстринг: НЕ порционный, без прогресс-счётчика) занявшим
+          # 27+ минут ДО начала отсчёта часа пилота (pilot_started_at
+          # выставляется ТОЛЬКО ПОСЛЕ bootstrap_registry(), см.
+          # PilotBudget.ensure_pilot_started()) -- старого запаса "+15"
+          # не хватило бы покрыть ТОЛЬКО bootstrap, не говоря уже про
+          # саму торговую сессию поверх него. Отдельно от bootstrap'а --
+          # ОБНАРУЖЕННЫЕ ускорения (быстрый RPC-путь) сокращают время
+          # ОДНОЙ оценки кандидата на горячем пути, НЕ время
+          # ОДНОРАЗОВОГО bootstrap'а (тот всё ещё вне торгового
+          # rpc_call_trading_path -- обычный check_route_liveness/
+          # discover_new_arbitrageur_routes фоновый путь, который эта
+          # правка НЕ трогала, см. отчёт). Честный запас, основанный на
+          # РЕАЛЬНО НАБЛЮДАВШЕЙСЯ длительности (27+ мин) плюс разумный
+          # резерв -- "+45" минут (не изобретённое число "с потолка": на
+          # ~1.7х больше уже подтверждённого максимума), покрывает и
+          # bootstrap, и всю торговую сессию duration_seconds, и забор
+          # отчёта. Ранний выход по STATUS=done срабатывает независимо
+          # от этой верхней границы -- это ТОЛЬКО потолок ожидания.
+          MAX_POLLS=$(( (DURATION_SECONDS / 60) + 45 ))
+          echo "опрашиваем task5_v4_hotpath_live_${RUN_TAG}.pid каждые 60с (до ~${MAX_POLLS} минут -- покрывает bootstrap реестра [реально наблюдалось 27+ мин] + duration_seconds=${DURATION_SECONDS}с торговли + забор отчёта)..."
           STATUS="unknown"
           for i in $(seq 1 "$MAX_POLLS"); do
             sleep 60
             STATUS=$(ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot bash -c 'PID=\$(cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid 2>/dev/null || echo 0); if kill -0 \$PID 2>/dev/null; then echo alive; else echo done; fi'" 2>/dev/null || echo "ssh_error")
-            echo "[$i/85] $(date -u +%H:%M:%SZ) статус процесса на Ohio: $STATUS"
+            echo "[$i/$MAX_POLLS] $(date -u +%H:%M:%SZ) статус процесса на Ohio: $STATUS"
             if [ "$STATUS" = "done" ]; then
               echo "процесс на Ohio завершился."
               break
