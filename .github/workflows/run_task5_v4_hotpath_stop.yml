@@ -1,0 +1,109 @@
+name: "Задача 5, LIVE -- ОСТАНОВИТЬ пилот (штатная остановка, без перезапуска, Ohio VPS)"
+
+# Владелец: "пилот должен завершиться" -- штатная (не голое убийство)
+# остановка РАБОТАЮЩЕГО task5_v4_hotpath.py, БЕЗ последующего
+# перезапуска (в отличие от run_task5_v4_hotpath_live_extend.yml,
+# который останавливает И сразу запускает новый экземпляр). Торговый
+# код НЕ меняется.
+#
+# Механизм -- ТОТ ЖЕ, уже проверенный штатный /etc/bot/STOP (см.
+# _new_send_forbidden_now/main loop в task5_v4_hotpath.py): новые
+# кандидаты не берутся, текущая оценка (если есть) доводится до конца,
+# ИТОГ печатается, реестр сохраняется в finally -- НЕ обрыв процесса
+# сигналом. PID читается из файла лока (_SingleInstanceLock) -- не
+# зависит от того, каким RUN_TAG процесс был запущен.
+#
+# ПРАВКА (важно, извлечено из аварии run_task5_v4_hotpath_live_extend.yml):
+# штатная остановка ставит budget.pilot_completed=true НАВСЕГДА (по
+# конструкции task5_v4_hotpath.py -- "завершение часа никогда не
+# переавторизует новую торговлю"). Здесь это ПРАВИЛЬНОЕ, ЖЕЛАЕМОЕ
+# поведение (пилот должен завершиться и остаться завершённым, не
+# продолжить сам) -- в отличие от workflow продления, здесь флаг НЕ
+# сбрасывается.
+#
+# STOP-файл НЕ снимается в конце -- он остаётся, чтобы (а) новый
+# экземпляр случайно не запустился, пока владелец явно не решит иначе,
+# (б) сам факт "СТОП запрошен" был виден на диске. Если понадобится
+# новый запуск -- отдельное явное решение (run_task5_v4_hotpath_live.yml
+# заново, или run_task5_v4_hotpath_live_extend.yml, который сам снимает
+# STOP перед перезапуском).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите ровно "STOP_LIVE_V4", чтобы подтвердить: штатная остановка РЕАЛЬНОГО торгующего процесса на mainnet.'
+        required: true
+        type: string
+
+jobs:
+  stop_live_pilot:
+    name: "Штатная остановка task5_v4_hotpath.py (Ohio VPS, /etc/bot/STOP)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "STOP_LIVE_V4" ]; then
+            echo "confirm != 'STOP_LIVE_V4' -- остановлено, пилот НЕ трогаю." >&2
+            exit 1
+          fi
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Штатная остановка (PID из файла лока, /etc/bot/STOP, ждём завершения)"
+        run: |
+          # `ssh ... || SSH_RC=$?` -- та же схема перехвата кода
+          # возврата, что в остальных workflow этой задачи: без неё
+          # `bash -e {0}` (умолчание GitHub Actions) оборвал бы шаг ДО
+          # печати stdout/stderr при ненулевом коде.
+          SSH_RC=0
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            set -euo pipefail
+            LOCK=/home/bot/data/task5_v4_hotpath_0x893f4a7eadba18c2f8aa1e0e23e11ecf66208e75.lock
+            if ! sudo -u bot test -f \"\$LOCK\"; then
+              echo \"[stop] лок-файл \$LOCK не найден -- пилот, похоже, уже не запущен\"
+              exit 0
+            fi
+            OLD_PID=\$(sudo -u bot cat \"\$LOCK\")
+            echo \"[stop] текущий PID пилота (из лок-файла): \$OLD_PID\"
+            if ! sudo -u bot kill -0 \"\$OLD_PID\" 2>/dev/null; then
+              echo \"[stop] процесс \$OLD_PID уже не жив -- нечего останавливать\"
+              exit 0
+            fi
+            echo \"[stop] процесс \$OLD_PID жив -- ставлю /etc/bot/STOP (штатная плавная остановка, существующий механизм task5_v4_hotpath.py)...\"
+            sudo touch /etc/bot/STOP
+            STOPPED=0
+            for i in \$(seq 1 300); do
+              if ! sudo -u bot kill -0 \"\$OLD_PID\" 2>/dev/null; then
+                echo \"[stop] процесс \$OLD_PID штатно завершился через \${i}с\"
+                STOPPED=1
+                break
+              fi
+              sleep 1
+            done
+            if [ \"\$STOPPED\" != \"1\" ]; then
+              echo \"[stop] процесс \$OLD_PID НЕ завершился за 300с -- STOP-файл ОСТАВЛЕН (процесс должен доделать текущую оценку и выйти сам), проверьте статус позже\" >&2
+              exit 1
+            fi
+            echo \"[stop] === ПОДТВЕРЖДЕНИЕ ===\"
+            echo \"[stop] budget state после остановки (pilot_completed должен стать true):\"
+            sudo -u bot cat /home/bot/data/task5_v4_pilot_budget_state.json 2>/dev/null || echo \"(budget state отсутствует)\"
+          " > /tmp/stop_stdout.log 2> /tmp/stop_stderr.log || SSH_RC=$?
+          echo "--- stdout ---"; cat /tmp/stop_stdout.log
+          echo "--- stderr ---"; cat /tmp/stop_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
