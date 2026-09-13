@@ -86,12 +86,29 @@ def find_block_by_timestamp(target_ts: float) -> dict:
     return {"ok": True, "block": lo, "block_ts": int(get_block(lo)["timestamp"], 16), "target_ts": target_ts}
 
 
+# ПРАВКА (восьмой раунд, разбор владельца, пункт 4): "Excess blob gas not
+# set" от debug_traceCall -- НЕ случайная несовместимость версий, а
+# реальное расхождение hardfork'а. task5_v4_item4_hardfork_diagnosis.py
+# (тот же коммит) проверил РЕАЛЬНЫЙ заголовок недавнего блока этой цепи
+# (62066736): baseFeePerGas ЕСТЬ (London+), withdrawalsRoot/excessBlobGas/
+# blobGasUsed -- НЕТ (цепь физически НЕ поддерживает Shanghai/Cancun) --
+# anvil 1.8.1 по умолчанию форкует на более новом hardfork'е, чем
+# реально существует у источника, отсюда и ошибка. "london" --
+# ЕДИНСТВЕННЫЙ hardfork, для которого РЕАЛЬНЫЕ поля заголовка этой цепи
+# совпадают, подтверждено реальным debug_traceCall (returncode 0,
+# см. task5_v4_item4_hardfork_diagnosis_result.json) -- ЭТО приведение
+# окружения форка в соответствие с реальным устройством исходной цепи,
+# а не смягчение правил ради прохождения теста.
+ANVIL_HARDFORK = "london"
+
+
 def anvil_start(fork_block: int) -> subprocess.Popen:
     fork_url = _alchemy_direct_endpoint()
     if not fork_url:
         raise RuntimeError("нет Alchemy-эндпоинта для форка")
     proc = subprocess.Popen(
-        [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(fork_block), "--port", str(PORT)],
+        [ANVIL, "--fork-url", fork_url, "--fork-block-number", str(fork_block),
+         "--hardfork", ANVIL_HARDFORK, "--port", str(PORT)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     deadline = time.monotonic() + 30
