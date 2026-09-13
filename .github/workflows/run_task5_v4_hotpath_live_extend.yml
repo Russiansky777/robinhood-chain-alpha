@@ -30,6 +30,25 @@ name: "Задача 5, LIVE -- ПРОДЛИТЬ работающий пилот 
 #     параллельный автоматический коммit на ветке подменит рабочее
 #     дерево работающего пилота.
 #
+# ПРАВКА (по факту первого реального запуска этого workflow): штатная
+# остановка через /etc/bot/STOP ЗАВЕРШАЕТ пилот теми же средствами, что
+# и истечение --duration-seconds -- main loop task5_v4_hotpath.py
+# вызывает budget.complete_pilot(...), что ставит pilot_completed=true
+# НАВСЕГДА (по конструкции: "завершение часа никогда не переавторизует
+# новую торговлю" -- см. _main()). Это означает: НОВЫЙ экземпляр,
+# запущенный сразу после штатной остановки СТАРОГО, увидел бы
+# pilot_completed=true и немедленно вышёл бы ("ПИЛОТ УЖЕ ЗАВЕРШЁН"),
+# ТАК И НЕ НАЧАВ торговать -- реально воспроизведено (run 34736022121:
+# новый pid стартовал и завершился за секунды). Явное решение владельца
+# продлить пилот -- это и есть та самая "явная переавторизация", которую
+# требует _main() -- поэтому ПЕРЕД перезапуском (после снятия STOP,
+# ПЕРЕД запуском нового процесса) pilot_completed/pilot_completed_reason
+# СБРАСЫВАЮТСЯ узким, проверенным скриптом -- ТОЛЬКО эти два поля,
+# остальное состояние (pilot_started_at, накопленный газ/PnL, pending,
+# halted) НЕ трогается. Если halted=true -- это ДРУГАЯ, более серьёзная
+# причина остановки (не связанная с длительностью) -- сброс НЕ
+# выполняется, новый экземпляр НЕ запускается, требуется отдельный
+# разбор.
 # Итоговый отчёт ПОСЛЕ продлённого срока -- НЕ этим workflow (10 часов
 # опроса делать не нужно): используйте run_task5_v4_hotpath_status.yml
 # в любой момент, включая после истечения продлённого срока -- он
@@ -125,6 +144,28 @@ jobs:
               echo \"[extend] процесс \$OLD_PID уже не жив -- запускаю новый без ожидания\"
             fi
             sudo rm -f /etc/bot/STOP
+
+            sudo -u bot python3 -c \"
+          import json, os
+          p = '/home/bot/data/task5_v4_pilot_budget_state.json'
+          d = json.load(open(p))
+          print('[extend] budget до правки: pilot_completed=', d.get('pilot_completed'), ' pilot_completed_reason=', d.get('pilot_completed_reason'), ' halted=', d.get('halted'))
+          if d.get('halted'):
+              raise SystemExit('[extend] СТОП: halted=true (не связано с продлением срока) -- новый экземпляр НЕ запускаю, требуется отдельный разбор')
+          if d.get('pilot_completed'):
+              d['pilot_completed'] = False
+              d['pilot_completed_reason'] = None
+              tmp = p + '.tmp_extend_reset'
+              f = open(tmp, 'w')
+              json.dump(d, f)
+              f.flush()
+              os.fsync(f.fileno())
+              f.close()
+              os.replace(tmp, p)
+              print('[extend] pilot_completed сброшен в False (был True из-за штатной остановки этим же workflow) -- накопленный расход/pilot_started_at/pending НЕ тронуты')
+          else:
+              print('[extend] pilot_completed уже False -- сброс не требуется')
+          \"
 
             sudo -u bot bash -c '
               set -euo pipefail
