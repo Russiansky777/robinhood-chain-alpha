@@ -123,10 +123,65 @@ def check4_cli_flag_registered() -> None:
             ok, f"'--new-session' в выводе --help: {ok}")
 
 
+def check5_rpc_call_counter_and_reason_log_context() -> None:
+    """Пункт 6 (седьмой раунд): "минимальная инструментация -- число
+    RPC-вызовов; для прибыльных кандидатов/ошибок симуляции -- размер,
+    calldata, блок котировки". Реальная (непеределанная) обёртка
+    rpc_call_trading_path + реальный (непеределанный) ReasonLog.log()."""
+    import tempfile as _tempfile
+    from task5_v4_pilot_accounting import ReasonLog
+
+    orig_uncounted = hp._uncounted_rpc_call_trading_path
+    calls_made = []
+
+    def fake_uncounted(method, params):
+        calls_made.append(method)
+        return "0x1"
+
+    hp._uncounted_rpc_call_trading_path = fake_uncounted
+    try:
+        hp._reset_rpc_call_count()
+        before = hp._read_rpc_call_count()
+        hp.rpc_call_trading_path("eth_blockNumber", [])
+        hp.rpc_call_trading_path("eth_gasPrice", [])
+        after = hp._read_rpc_call_count()
+    finally:
+        hp._uncounted_rpc_call_trading_path = orig_uncounted
+
+    ok_counter = before == 0 and after == 2 and calls_made == ["eth_blockNumber", "eth_gasPrice"]
+    _record("R7.5a", "rpc_call_trading_path -- обёртка реально считает вызовы, не меняя их поведение",
+            ok_counter, f"before={before} (ожидание 0), after={after} (ожидание 2), "
+                        f"реальные вызовы дошли до исходной функции: {calls_made}")
+
+    d = Path(_tempfile.mkdtemp(prefix="task5_v4_r7_check5_"))
+    reason_log = ReasonLog(path=str(d / "reasons.jsonl"))
+    reason_log.log("route_test", "TEST->TEST", "тестовая причина", "детали",
+                    size_in_raw=12345, quote_block=999, calldata_hex="0xdeadbeef", rpc_call_count=7)
+    lines = (d / "reasons.jsonl").read_text().splitlines()
+    rec = json.loads(lines[-1])
+    ok_fields = (rec.get("size_in_raw") == 12345 and rec.get("quote_block") == 999
+                 and rec.get("calldata_hex") == "0xdeadbeef" and rec.get("rpc_call_count") == 7)
+    _record("R7.5b", "ReasonLog.log() реально записывает size_in_raw/quote_block/calldata_hex/rpc_call_count",
+            ok_fields, f"записанная строка: {rec}")
+
+    # Обратная совместимость -- старые вызовы БЕЗ новых kwargs не падают.
+    try:
+        reason_log.log("route_test2", "A->B", "старый стиль вызова", "без новых полей")
+        ok_compat = True
+    except TypeError as exc:
+        ok_compat = False
+        _record("R7.5c", "ReasonLog.log() остаётся обратно совместим со старыми вызовами (без новых kwargs)",
+                False, f"TypeError: {exc}")
+        return
+    _record("R7.5c", "ReasonLog.log() остаётся обратно совместим со старыми вызовами (без новых kwargs)",
+            ok_compat, "вызов без size_in_raw/quote_block/calldata_hex/rpc_call_count прошёл без ошибок")
+
+
 def main() -> None:
     check1_start_new_session_resets_only_completion_fields()
     check2_ensure_pilot_started_gets_fresh_timestamp_after_reset()
     check3_new_session_flag_does_not_bypass_halt()
+    check5_rpc_call_counter_and_reason_log_context()
     check4_cli_flag_registered()
 
     n_fail = sum(1 for r in RESULTS if not r["ok"])

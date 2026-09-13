@@ -102,6 +102,7 @@ class AttemptTableRow:
     cumulative_net_pnl_usd: float | None = None
     computed_at_block: int | None = None
     state_age_blocks: int | None = None
+    rpc_call_count: int | None = None  # пункт 6 (седьмой раунд): число RPC-вызовов торгового пути на ЭТОГО кандидата
 
 
 class PilotBudget:
@@ -618,9 +619,19 @@ class ReasonLog:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, route_id: str, route_label: str, reason: str, detail: str = "") -> None:
+    def log(self, route_id: str, route_label: str, reason: str, detail: str = "", *,
+            size_in_raw: int | None = None, quote_block: int | None = None,
+            calldata_hex: str | None = None, rpc_call_count: int | None = None) -> None:
+        """Пункт 6 (седьмой раунд, разбор владельца): "для прибыльных
+        кандидатов и ошибок симуляции -- сохранять размер, calldata,
+        блок котировки, параметры оценки газа". Необязательные
+        keyword-only поля -- обратная совместимость с существующими
+        вызовами (все старые остаются рабочими без изменений); заданы
+        ТОЛЬКО там, где вызывающий код уже реально держит эти значения
+        под рукой (не выдумываются задним числом)."""
         rec = {"ts_wall": time.time(), "route_id": route_id, "route_label": route_label,
-               "reason": reason, "detail": detail}
+               "reason": reason, "detail": detail, "size_in_raw": size_in_raw, "quote_block": quote_block,
+               "calldata_hex": calldata_hex, "rpc_call_count": rpc_call_count}
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         print(f"[pilot][не отправлено] {route_label}: {reason} ({detail})")

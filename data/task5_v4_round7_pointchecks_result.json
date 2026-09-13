@@ -16,13 +16,31 @@
       "point": "R7.2",
       "title": "после start_new_session() ensure_pilot_started() фиксирует НОВЫЙ момент (не старый)",
       "ok": true,
-      "detail": "старый pilot_started_at=1700000000.0, новый=1789312273.7701685 -- новая 20-минутная сессия отсчитывается от НЕГО, не от старого часа"
+      "detail": "старый pilot_started_at=1700000000.0, новый=1789312541.0892432 -- новая 20-минутная сессия отсчитывается от НЕГО, не от старого часа"
     },
     {
       "point": "R7.3",
       "title": "start_new_session() НЕ трогает halted/halt_reason -- ручная остановка не обходится",
       "ok": true,
       "detail": "halted=True (ожидание True, НЕ сброшен), halt_reason='тестовая учётная ошибка' (ожидание сохранён) -- в _main() проверка halted идёт ДО --new-session и вернула бы раньше, чем флаг вообще рассматривается"
+    },
+    {
+      "point": "R7.5a",
+      "title": "rpc_call_trading_path -- обёртка реально считает вызовы, не меняя их поведение",
+      "ok": true,
+      "detail": "before=0 (ожидание 0), after=2 (ожидание 2), реальные вызовы дошли до исходной функции: ['eth_blockNumber', 'eth_gasPrice']"
+    },
+    {
+      "point": "R7.5b",
+      "title": "ReasonLog.log() реально записывает size_in_raw/quote_block/calldata_hex/rpc_call_count",
+      "ok": true,
+      "detail": "записанная строка: {'ts_wall': 1789312541.0913832, 'route_id': 'route_test', 'route_label': 'TEST->TEST', 'reason': 'тестовая причина', 'detail': 'детали', 'size_in_raw': 12345, 'quote_block': 999, 'calldata_hex': '0xdeadbeef', 'rpc_call_count': 7}"
+    },
+    {
+      "point": "R7.5c",
+      "title": "ReasonLog.log() остаётся обратно совместим со старыми вызовами (без новых kwargs)",
+      "ok": true,
+      "detail": "вызов без size_in_raw/quote_block/calldata_hex/rpc_call_count прошёл без ошибок"
     },
     {
       "point": "R7.4",
