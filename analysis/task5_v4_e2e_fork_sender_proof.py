@@ -269,9 +269,20 @@ def main() -> None:
         }
         cast_gas_estimate = None
         if cast_estimate_proc.returncode == 0 and cast_estimate_proc.stdout.strip():
+            # ПРАВКА (после первого прогона исправленного скрипта): `cast
+            # rpc` печатает JSON-значение результата -- для строкового
+            # eth_estimateGas это КАВЫЧКИ вокруг hex ("0x29528", не
+            # 0x29528) -- голый int(..., 16) падал на кавычках и МОЛЧА
+            # (except ValueError: pass) оставлял cast_gas_estimate=None,
+            # хотя реальное значение было получено (в первом прогоне --
+            # 169256, ТОЧНО равное hp_estimate_gas). json.loads снимает
+            # кавычки честно (а не срез [1:-1], что было бы хрупко, если
+            # cast когда-нибудь не обернёт в кавычки).
             try:
-                cast_gas_estimate = int(cast_estimate_proc.stdout.strip(), 16)
-            except ValueError:
+                raw_stdout = cast_estimate_proc.stdout.strip()
+                parsed = json.loads(raw_stdout)
+                cast_gas_estimate = int(parsed, 16) if isinstance(parsed, str) else int(parsed)
+            except (ValueError, json.JSONDecodeError, TypeError):
                 pass
         result["cast_estimate_gas_value"] = cast_gas_estimate
 
