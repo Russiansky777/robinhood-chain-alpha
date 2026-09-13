@@ -322,6 +322,20 @@ def main() -> None:
                 ]
                 result["anvil_log_n_total_lines"] = len(log_lines)
                 result["anvil_log_tail"] = [l.rstrip("\n") for l in log_lines[-30:]]
+                # ПРАВКА (реальный четвёртый прогон): лог anvil маленький
+                # (332 строки) -- дешевле вернуть ВЕСЬ целиком, чем гадать,
+                # какое окно вокруг какой строки информативно.
+                result["anvil_log_full"] = [l.rstrip("\n") for l in log_lines]
+                # Явная проверка судьбы tx_hash ПРЯМО СЕЙЧАС (после
+                # 15с ожидания receipt) -- в мемпуле ли она вообще ещё,
+                # уже нет, или анвил её видел под другим статусом.
+                pending_tx_proc = run([CAST, "tx", prepared.tx_hash, "--rpc-url", RPC], timeout=10)
+                result["cast_tx_after_timeout"] = {
+                    "returncode": pending_tx_proc.returncode,
+                    "stdout": pending_tx_proc.stdout, "stderr": pending_tx_proc.stderr,
+                }
+                latest_block_proc = run([CAST, "block-number", "--rpc-url", RPC], timeout=10)
+                result["anvil_block_number_after_timeout"] = latest_block_proc.stdout.strip()
             except Exception as log_exc:  # noqa: BLE001
                 result["anvil_log_tail_error"] = str(log_exc)
         if anvil_proc is not None:
