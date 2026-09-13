@@ -102,6 +102,31 @@ PREVIOUSLY_USED_PRE_PILOT_BLOCK = 61630766
 REASON_LOG_FILE = Path("/home/bot/data/task5_v4_pilot_no_send_log.jsonl")
 ATTEMPT_TABLE_FILE = Path("/home/bot/data/task5_v4_pilot_attempts.jsonl")
 
+# ПРАВКА (девятый раунд, разбор владельца, пункт 3 -- по факту зависания
+# прогона на ~601 кандидате): тот же принцип, что владелец уже указал для
+# фазы реплея ("данные Initialize получи ЗАРАНЕЕ... не повторяй широкий
+# запрос через провайдера с известным лимитом 10 блоков"), здесь
+# распространяется на ВЕСЬ скан -- full_fund_flow_check() вызывался для
+# КАЖДОГО из ~601 кандидатов и для КАЖДОГО плеча заново дёргал
+# fetch_initialize_event() (ОДИН широкий eth_getLogs(0, to_block) на
+# вызов, см. её докстринг) -- но один и тот же pool_id РЕАЛЬНО повторяется
+# у одного конкурента много раз (он торгует ограниченным набором пулов).
+# Initialize -- событие ОДНОРАЗОВОЕ (пул инициализируется один раз в своей
+# истории) -- kэшировать РЕЗУЛЬТАТ по pool_id (не по to_block) безопасно и
+# не меняет ничего в итоговых данных, только устраняет ПОВТОРНЫЕ широкие
+# запросы за уже известным pool_id. Это и было реальной причиной, почему
+# прогон 34766908632 не завершился за 30 минут (job timeout) -- отменён,
+# см. коммит.
+_POOL_INIT_CACHE: dict[str, dict | None] = {}
+
+
+def _cached_fetch_initialize(pool_id_hex: str, to_block: int) -> dict | None:
+    if pool_id_hex in _POOL_INIT_CACHE:
+        return _POOL_INIT_CACHE[pool_id_hex]
+    init = fetch_initialize_event(pool_id_hex, to_block)
+    _POOL_INIT_CACHE[pool_id_hex] = init
+    return init
+
 # ПРАВКА (первый реальный прогон): фиксированная верхняя граница
 # (62600000) оказалась ЗА пределами реально существующей на данный
 # момент цепи (get_block вернул None) -- "не удалось получить границы"
@@ -216,7 +241,7 @@ def full_fund_flow_check(tx_hash: str) -> dict:
     for log in sorted(swap_logs, key=lambda l: int(l["logIndex"], 16)):
         pool_id_hex = log["topics"][1]
         decoded = decode_v4_swap_log_data(log["data"])
-        init = fetch_initialize_event(pool_id_hex, int(receipt["blockNumber"], 16))
+        init = _cached_fetch_initialize(pool_id_hex, int(receipt["blockNumber"], 16))
         if init is None:
             legs.append({"pool_id": pool_id_hex, **decoded, "currency0": None, "currency1": None,
                          "note": "Initialize не найден -- пропускаем в net-flow, честно фиксируем"})
@@ -644,10 +669,16 @@ def main() -> None:
 
     fund_flow_checks = []
     valid_candidates = []
-    for c in candidates_summary:
+    scan_t0 = time.monotonic()
+    for idx, c in enumerate(candidates_summary):
         ff = full_fund_flow_check(c["tx_hash"])
         ff["block"] = c["block"]
         fund_flow_checks.append(ff)
+        if (idx + 1) % 25 == 0 or (idx + 1) == len(candidates_summary):
+            elapsed = time.monotonic() - scan_t0
+            print(f"[item3] fund-flow проверено {idx + 1}/{len(candidates_summary)} "
+                  f"(валидных замкнутых циклов пока: {len(valid_candidates)}, "
+                  f"прошло {elapsed:.0f}с, кэш Initialize: {len(_POOL_INIT_CACHE)} pool_id)")
         # ПРАВКА (восьмой раунд, пункт 3): гейт -- ТОЛЬКО
         # fully_valid_closed_cycle (замкнутый цикл В БАЗОВОМ токене И
         # отсутствие расхода посторонних токенов исполняющим адресом),
@@ -692,7 +723,7 @@ def main() -> None:
             if leg.get("currency0") is None:
                 init_ok = False
                 continue
-            init = fetch_initialize_event(leg["pool_id"], c["block"])
+            init = _cached_fetch_initialize(leg["pool_id"], c["block"])
             if init is None:
                 init_ok = False
                 continue
