@@ -368,9 +368,24 @@ def main() -> None:
         # НЕ требует debug_* и не проксируется на платный тариф апстрима.
         target_tx = txs[tx_index]
         executor_addr_native = row.get("tx_to") or row.get("tx_from")
+        # ПРАВКА (баланс исполнителя оказался 0 ДО и ПОСЛЕ -- контракт явно
+        # НЕ держит ETH в себе, пересылает дальше В ТОЙ ЖЕ tx, как и в
+        # разобранном ранее примере с USDG-получателем). debug_traceTransaction
+        # заблокирован тарифом апстрима -- проверяем баланс РЕАЛЬНЫХ адресов-
+        # кандидатов на получение (хуки маршрута, PoolManager, и уже реально
+        # встреченный в этой же сессии адрес-получатель 0x11854ce19d... из
+        # ДРУГОЙ, ранее разобранной tx конкурента) -- честная проверка
+        # гипотезы, не трасса, но тоже обычный eth_getBalance.
+        KNOWN_PROFIT_COLLECTOR = "0x11854ce19dcd63a7eccaa12ded5aa991c94c79c6"
+        addresses_of_interest = {"executor": executor_addr_native, "tx_from": target_tx["from"],
+                                   "pool_manager": POOL_MANAGER, "known_profit_collector": KNOWN_PROFIT_COLLECTOR}
+        for leg in route.legs:
+            if leg.hooks and leg.hooks.lower() != NATIVE:
+                addresses_of_interest[f"hook_{leg.hooks.lower()}"] = leg.hooks
+        result["addresses_of_interest"] = addresses_of_interest
         balances_before = {
-            "executor": int(_rpc_call("eth_getBalance", [executor_addr_native, hex(local_block_before_target)]), 16),
-            "tx_from": int(_rpc_call("eth_getBalance", [target_tx["from"], hex(local_block_before_target)]), 16),
+            name: int(_rpc_call("eth_getBalance", [addr, hex(local_block_before_target)]), 16)
+            for name, addr in addresses_of_interest.items()
         }
         result["balances_before_competitor_tx"] = balances_before
 
@@ -392,19 +407,19 @@ def main() -> None:
 
             local_block_after_target = int(run([CAST, "block-number", "--rpc-url", RPC], timeout=10).stdout.strip())
             balances_after = {
-                "executor": int(_rpc_call("eth_getBalance", [executor_addr_native, hex(local_block_after_target)]),
-                                 16),
-                "tx_from": int(_rpc_call("eth_getBalance", [target_tx["from"], hex(local_block_after_target)]), 16),
+                name: int(_rpc_call("eth_getBalance", [addr, hex(local_block_after_target)]), 16)
+                for name, addr in addresses_of_interest.items()
             }
             result["balances_after_competitor_tx"] = balances_after
-            result["balance_diff_competitor_tx"] = {
-                "executor_native_eth_delta": balances_after["executor"] - balances_before["executor"],
-                "tx_from_native_eth_delta": balances_after["tx_from"] - balances_before["tx_from"],
-                "tx_from_delta_note": ("НЕ показательно -- impersonate_and_send() искусственно выставляет "
-                                        "tx.from баланс в 10**20 перед отправкой (anvil_setBalance) для гарантии "
-                                        "газа/value; только executor_native_eth_delta -- органический, честный "
-                                        "показатель (баланс исполнителя импersonate не трогает)"),
-            }
+            balance_diff = {f"{name}_native_eth_delta": balances_after[name] - balances_before[name]
+                              for name in addresses_of_interest}
+            balance_diff["tx_from_delta_note"] = (
+                "НЕ показательно -- impersonate_and_send() искусственно выставляет tx.from баланс в 10**20 "
+                "перед отправкой (anvil_setBalance) для гарантии газа/value; ВСЕ остальные (executor, "
+                "pool_manager, known_profit_collector, hook_*) -- органические, честные показатели "
+                "(impersonate не трогает их балансы)"
+            )
+            result["balance_diff_competitor_tx"] = balance_diff
 
             # value-трасса локально СМАЙНЕННОЙ tx -- debug_traceTransaction на
             # УЖЕ существующей tx (не гипотетический блок) -- см. итем4, тот
