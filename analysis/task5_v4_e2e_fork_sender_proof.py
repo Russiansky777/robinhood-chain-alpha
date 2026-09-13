@@ -218,6 +218,15 @@ def main() -> None:
         tx_fields = sender.prepare_transaction_fields(contract_addr, calldata, gas_res["gas_estimate"])
         prepared = sender.sign_prepared_transaction(tx_fields)
         result["tx_hash_local_precomputed"] = prepared.tx_hash
+        # Диагностика (реальный третий прогон подряд без receipt) --
+        # сверяем ПОДГОТОВЛЕННЫЕ поля (nonce/chainId/газ) с тем, что anvil
+        # реально видит для этого адреса ПРЯМО СЕЙЧАС, вместо гадания.
+        result["prepared_tx_fields"] = {k: (v.hex() if isinstance(v, (bytes, bytearray)) else v)
+                                          for k, v in tx_fields.items()}
+        chain_id_proc = run([CAST, "chain-id", "--rpc-url", RPC], timeout=10)
+        result["anvil_chain_id"] = chain_id_proc.stdout.strip()
+        pending_nonce_proc = run([CAST, "nonce", deployer_addr, "--rpc-url", RPC], timeout=10)
+        result["anvil_pending_nonce_before_send"] = pending_nonce_proc.stdout.strip()
 
         print("[e2e_proof] Sender: submit_prepared (РЕАЛЬНАЯ отправка в ЛОКАЛЬНЫЙ anvil, ждём receipt)...")
         send_result = sender.submit_prepared(prepared)
@@ -295,7 +304,24 @@ def main() -> None:
                     anvil_log_file.flush()
                 with open(anvil_log_path) as fh:
                     log_lines = fh.readlines()
-                result["anvil_log_tail"] = log_lines[-80:]
+                # ПРАВКА (реальный третий прогон): хвост из последних 80
+                # строк -- ТОЛЬКО повторяющиеся eth_getTransactionReceipt
+                # (300 попыток за 15с), eth_sendRawTransaction (если он
+                # вообще был залогирован) давно вытеснен из этого окна.
+                # Явно ищем ЕГО (и его контекст), а не только последние
+                # строки -- иначе результат неинформативен.
+                send_related = [
+                    (i, l) for i, l in enumerate(log_lines)
+                    if "sendRawTransaction" in l or "SendTransaction" in l or "InsufficientFunds" in l
+                    or "insufficient funds" in l.lower() or "nonce" in l.lower()
+                ]
+                result["anvil_log_send_related"] = [
+                    {"line_no": i, "text": l.rstrip("\n"),
+                     "context": [x.rstrip("\n") for x in log_lines[max(0, i - 2):i + 3]]}
+                    for i, l in send_related
+                ]
+                result["anvil_log_n_total_lines"] = len(log_lines)
+                result["anvil_log_tail"] = [l.rstrip("\n") for l in log_lines[-30:]]
             except Exception as log_exc:  # noqa: BLE001
                 result["anvil_log_tail_error"] = str(log_exc)
         if anvil_proc is not None:
