@@ -1,15 +1,12 @@
-# Проверка против известного ответа (10 реальных захватов) -- 2026-09-12T23:50:24Z
+# Проверка против известного ответа (10 реальных захватов) -- 2026-09-13T00:26:04Z
 
 ## stdout
-[safety_check] anvil --fork-block-number 61248736...
-[safety_check] деплою ClosedCycleExecutorV4 (ИСПРАВЛЕННЫЙ, closed-currency guard)...
-[safety_check] пополняю контракт 20000000 raw USDG (импersonate PoolManager)...
-[safety_check] сценарий 1: заведомо убыточный цикл (реверснутый порядок плеч)...
-[safety_check] сценарий 1: tx_reverted=True (по РЕАЛЬНОМУ рецепту, status=0x0), balance_unchanged=True -> PASS
-[safety_check] сценарий 2: РЕАЛЬНЫЕ прибыльные плечи, но exitToken заявлен НЕВЕРНО (MOSIAI вместо USDG)...
-[safety_check] сценарий 2: tx_reverted=True (по РЕАЛЬНОМУ рецепту, status=0x0), balance_unchanged=True, diagnostic_shows_cycle_not_closed=True -> PASS
-
-[safety_check] ИТОГ: PASS
-[safety_check] сохранено: /home/bot/robinhood-chain-alpha/data/task5_v4_fork_safety_check_loss_revert_result.json
+{
+  "address": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+  "balance_wei": 59803370514107979,
+  "balance_eth": 0.05980337051410797,
+  "checked_at_block": 61528898,
+  "note": "\u0422\u041e\u041b\u042c\u041a\u041e \u0444\u0430\u043a\u0442 \u043e\u043d\u0447\u0435\u0439\u043d-\u0431\u0430\u043b\u0430\u043d\u0441\u0430 ETH \u043d\u0430 \u043c\u043e\u043c\u0435\u043d\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438. \u041d\u0415 \u0434\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u0438 \u041d\u0415 \u043e\u043f\u0440\u043e\u0432\u0435\u0440\u0433\u0430\u0435\u0442, \u0447\u0442\u043e \u044d\u0442\u043e \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0439, \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u044c\u043d\u043e \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043d\u044b\u0439 \u043f\u043e \u0444\u0438\u043d\u0430\u043d\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044e '\u043a\u043e\u0448\u0435\u043b\u0451\u043a \u043f\u0438\u043b\u043e\u0442\u0430' -- \u044d\u0442\u043e \u0432\u043d\u0435\u0448\u043d\u0438\u0439 \u043f\u043e \u043e\u0442\u043d\u043e\u0448\u0435\u043d\u0438\u044e \u043a \u043a\u043e\u0434\u0443 \u0444\u0430\u043a\u0442, \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0435\u0442\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0435\u043c."
+}
 
 ## stderr
