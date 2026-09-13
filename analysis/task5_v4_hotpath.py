@@ -148,6 +148,13 @@ TRADING_PRIORITY_WINDOW_S = 2.0
 # отката не компенсирует (revert не платит profit вообще).
 MIN_PROFIT_FLOOR_RAW = 1
 
+# Владелец, доп.: "как остановить бота" -- ТОТ ЖЕ файл-флаг, что уже
+# понимает task5_bot_sender.py::STOP_FILE ("touch этот файл — бот
+# перестаёт отправлять"). Здесь просто ЧИТАЕМ его существование (не
+# импортируем sender.py в dry-run режиме без нужды) -- при обнаружении
+# запускается ТА ЖЕ плавная остановка, что по --duration-seconds.
+STOP_FILE_PATH = Path("/etc/bot/STOP")
+
 # Собственный подбор размера (та же сетка, что task5_v4_observation_hour.py,
 # см. её докстринг про то, что размер НЕ подставляется вслепую).
 SIZE_GRID_BY_START_TOKEN = {
@@ -934,6 +941,19 @@ def _main(args) -> None:
             if budget.halted or budget.pilot_completed or budget.cumulative_gas_loss_usd >= BUDGET_STOP_USD:
                 if not stopping:
                     print(f"[hotpath] ОСТАНОВЛЕН: {why}")
+                stopping = True
+
+            # Ручная остановка (владелец, доп. отчёта: "как остановить
+            # бота") -- ТОТ ЖЕ файл, что уже понимает task5_bot_sender.py
+            # (STOP_FILE=/etc/bot/STOP, "touch этот файл -- бот
+            # перестаёт отправлять"). Здесь -- та же ПЛАВНАЯ остановка,
+            # что по --duration-seconds: новые кандидаты не берутся,
+            # текущая попытка (если есть) доводится до конца, итог
+            # печатается -- не голое убийство процесса.
+            if not stopping and STOP_FILE_PATH.exists():
+                print(f"[hotpath] обнаружен {STOP_FILE_PATH} -- останавливаюсь ПЛАВНО (новые кандидаты не "
+                      f"берутся, дожидаюсь завершения текущей попытки, если есть)...")
+                hotpath.request_stop_new_candidates()
                 stopping = True
 
             if args.duration_seconds is not None and not stopping:
