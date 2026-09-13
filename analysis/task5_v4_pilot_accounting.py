@@ -378,6 +378,11 @@ class PilotBudget:
         self.pending["tx_status"] = tx_status
         self.pending["gas_cost_wei"] = gas_cost_wei
         self.pending["gas_cost_usd"] = gas_cost_usd
+        # ПРАВКА (третий раунд ревью, пункт 3): сохраняем raw gas_used,
+        # чтобы _ensure_pending_row_written (task5_v4_hotpath.py) могло
+        # восстановить полную, точную строку попытки ТОЛЬКО из pending
+        # на диске, без опоры на память рухнувшего процесса.
+        self.pending["gas_used"] = int(gas_used)
         self._save()
 
         if price is None:
@@ -387,16 +392,20 @@ class PilotBudget:
             return {"resolved": False, "halted_no_price": True, "gas_cost_wei": gas_cost_wei}
 
         if tx_status == 0:
-            # Откат -- вклад в PnL уже полный (только газ), закрываем
-            # попытку целиком ЗДЕСЬ (finalize_profit_and_close для
-            # отката не вызывается).
+            # Откат -- вклад в PnL уже полный (только газ), финансово
+            # попытка закрыта ЗДЕСЬ (finalize_profit_and_close для
+            # отката не вызывается). ПРАВКА (третий раунд ревью, пункт
+            # 3): pending НЕ обнуляется сразу -- остаётся с
+            # finalized=True, пока вызывающий код (task5_v4_hotpath.py)
+            # не запишет итоговую строку попытки и не вызовет
+            # clear_finalized_pending(). Так восстановление после
+            # рестарта (случай "finalized=True, но не очищено") может
+            # безопасно дописать пропущенную строку без повторного
+            # начисления газа/прибыли.
             self.pending["finalized"] = True
             self._save()
-            result = {"resolved": True, "gas_cost_wei": gas_cost_wei, "gas_cost_usd": gas_cost_usd,
-                      "newly_crossed": newly_crossed, "tx_status": 0}
-            self.pending = None
-            self._save()
-            return result
+            return {"resolved": True, "gas_cost_wei": gas_cost_wei, "gas_cost_usd": gas_cost_usd,
+                    "newly_crossed": newly_crossed, "tx_status": 0}
 
         return {"resolved": True, "awaiting_profit": True, "gas_cost_wei": gas_cost_wei,
                 "gas_cost_usd": gas_cost_usd, "newly_crossed": newly_crossed, "tx_status": 1}
@@ -427,12 +436,43 @@ class PilotBudget:
             if actual_gain_usd is not None:
                 self.cumulative_net_pnl_usd += actual_gain_usd
 
+        # ПРАВКА (третий раунд ревью, пункт 3): сохраняем фактическую
+        # raw-прибыль этой попытки, чтобы _ensure_pending_row_written
+        # (task5_v4_hotpath.py) могло восстановить строку попытки
+        # ТОЛЬКО из pending на диске (без памяти рухнувшего процесса).
+        self.pending["actual_gain_raw"] = actual_gain_raw
+        # pending НЕ обнуляется сразу -- см. finalize_gas (ветка
+        # tx_status==0) для того же обоснования: остаётся
+        # finalized=True до записи итоговой строки попытки, затем
+        # clear_finalized_pending().
         self.pending["finalized"] = True
         self._save()
-        result = {"resolved": True, "actual_gain_usd": actual_gain_usd}
+        return {"resolved": True, "actual_gain_usd": actual_gain_usd}
+
+    def mark_pending_row_written(self) -> None:
+        """Вызывать СРАЗУ после успешной записи итоговой строки
+        попытки (AttemptTable.write) -- отдельный флаг (не просто
+        "finalized"), чтобы восстановление после рестарта могло
+        отличить "прибыль/газ учтены, строка ещё НЕ записана" от
+        "всё сделано, просто pending не успел очиститься" -- и не
+        писать строку повторно (пункт 3: "обеспечивать наличие
+        итоговой строки попытки без дубликатов")."""
+        if self.pending is not None:
+            self.pending["row_written"] = True
+            self._save()
+
+    def clear_finalized_pending(self) -> dict:
+        """Финально очищает pending -- вызывать ТОЛЬКО после того, как
+        итоговая строка попытки надёжно записана (mark_pending_row_written).
+        Идемпотентно: если pending уже None или ещё не finalized,
+        честно отказывается (вызывающий код ошибся в порядке)."""
+        if self.pending is None:
+            return {"cleared": True, "no_pending": True}
+        if not self.pending.get("finalized"):
+            return {"cleared": False, "not_finalized": True}
         self.pending = None
         self._save()
-        return result
+        return {"cleared": True}
 
     def halt(self, reason: str) -> None:
         self.halted = True
