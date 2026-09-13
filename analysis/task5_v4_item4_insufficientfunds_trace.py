@@ -86,20 +86,25 @@ def find_block_by_timestamp(target_ts: float) -> dict:
     return {"ok": True, "block": lo, "block_ts": int(get_block(lo)["timestamp"], 16), "target_ts": target_ts}
 
 
-# ПРАВКА (восьмой раунд, разбор владельца, пункт 4): "Excess blob gas not
-# set" от debug_traceCall -- НЕ случайная несовместимость версий, а
-# реальное расхождение hardfork'а. task5_v4_item4_hardfork_diagnosis.py
-# (тот же коммит) проверил РЕАЛЬНЫЙ заголовок недавнего блока этой цепи
-# (62066736): baseFeePerGas ЕСТЬ (London+), withdrawalsRoot/excessBlobGas/
-# blobGasUsed -- НЕТ (цепь физически НЕ поддерживает Shanghai/Cancun) --
-# anvil 1.8.1 по умолчанию форкует на более новом hardfork'е, чем
-# реально существует у источника, отсюда и ошибка. "london" --
-# ЕДИНСТВЕННЫЙ hardfork, для которого РЕАЛЬНЫЕ поля заголовка этой цепи
-# совпадают, подтверждено реальным debug_traceCall (returncode 0,
-# см. task5_v4_item4_hardfork_diagnosis_result.json) -- ЭТО приведение
-# окружения форка в соответствие с реальным устройством исходной цепи,
-# а не смягчение правил ради прохождения теста.
-ANVIL_HARDFORK = "london"
+# ПРАВКА (восьмой раунд, разбор владельца, пункт 4): ПЕРВАЯ попытка --
+# "--hardfork london" (по присутствию/отсутствию полей заголовка) --
+# УСТРАНИЛА "Excess blob gas not set" у debug_traceCall, но СЛОМАЛА
+# реальную реконструкцию: PoolManager.unlock() (V4 flash-accounting)
+# реально использует transient storage (TSTORE/TLOAD, EIP-1153,
+# появился В Cancun) -- под "london" эти опкоды НЕ активны, и первый же
+# вызов unlock() падает с "NotActivated" (это ОШИБКА АКТИВАЦИИ ОПКОДА
+# В REVM, а не наш селектор) -- т.е. london ДАЛ ДРУГОЙ, ЛОЖНЫЙ revert,
+# не тот, что реально произошёл на цепи (0x356680b7, реально
+# воспроизводимый только на Cancun+, где TSTORE работает). Присутствие/
+# отсутствие полей заголовка (excessBlobGas и т.п.) отражает КОНСЕНСУС-
+# уровневые форматы блока (blob-транзакции/beacon withdrawals), а НЕ
+# обязательно набор активных EVM-опкодов кастомной цепи -- цепь вполне
+# может использовать EIP-1153 (Cancun) без blob-транзакций (EIP-4844) и
+# без вывода валидаторов (Shanghai) одновременно. Правильный fix --
+# ЯВНЫЙ "cancun" (сохраняет TSTORE/TLOAD, нужные V4) -- проверено ниже,
+# что при этом debug_traceCall на РЕАЛЬНОМ calldata даёт ТОТ ЖЕ
+# 0x356680b7, что и eth_estimateGas без явного hardfork.
+ANVIL_HARDFORK = "cancun"
 
 
 def anvil_start(fork_block: int) -> subprocess.Popen:
