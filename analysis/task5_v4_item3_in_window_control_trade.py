@@ -356,6 +356,15 @@ def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_
     result["n_preceding_txs"] = tx_index
 
     anvil_proc = None
+    # ПРАВКА (первый реальный прогон): af.CONFIG патчится ниже на локальный anvil
+    # для (a)/(b), но anvil УБИВАЕТСЯ в конце этой функции -- если не откатить
+    # af.CONFIG обратно, ЛЮБОЙ последующий вызов get_block/_rpc_call в main()
+    # (сверка с блоком целевой tx для cross_reference_own_logs) бьётся в уже
+    # мёртвый локальный порт ("Connection refused") вместо реальной цепи --
+    # реально воспроизведено в первом прогоне. Сохраняем/восстанавливаем.
+    orig_config = af.CONFIG
+    orig_alchemy_checked = af._alchemy_direct_checked
+    orig_alchemy_url = af._alchemy_direct_url
     try:
         anvil_proc, deployer_addr, deployer_key = anvil_start(target_block - 1)
         result["fork_block"] = target_block - 1
@@ -460,6 +469,12 @@ def replay_preceding_and_reconstruct(target_block: int, target_tx_hash: str, ff_
                 anvil_proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 anvil_proc.kill()
+        # Откат CONFIG на реальную цепь -- ОБЯЗАТЕЛЬНО ПОСЛЕ убийства anvil,
+        # иначе последующие вызовы в main() (get_block для cross-reference)
+        # попадут на уже мёртвый локальный порт.
+        af.CONFIG = orig_config
+        af._alchemy_direct_checked = orig_alchemy_checked
+        af._alchemy_direct_url = orig_alchemy_url
     return result
 
 
