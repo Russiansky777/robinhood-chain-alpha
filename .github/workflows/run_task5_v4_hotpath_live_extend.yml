@@ -1,0 +1,155 @@
+name: "Задача 5, LIVE -- ПРОДЛИТЬ работающий пилот (штатная остановка + перезапуск с новым --duration-seconds, Ohio VPS)"
+
+# Владелец: "Продли текущий пилот до 10 часов от первоначального
+# pilot_started_at. Бюджет остаётся $20 суммарно... Если нужен
+# перезапуск -- штатно останови текущий процесс и запусти один
+# экземпляр с тем же контрактом, кошельком и файлами состояния. Сохрани
+# первоначальное время старта, накопленный расход, реестр и
+# pending-транзакцию; бюджет и историю не обнуляй."
+#
+# task5_v4_hotpath.py НЕ меняется (торговая логика нетронута) --
+# используется УЖЕ СУЩЕСТВУЮЩИЙ, ранее проверенный механизм:
+#   * PilotBudget.ensure_pilot_started() фиксирует pilot_started_at
+#     НАВСЕГДА при первом вызове за жизнь state-файла и возвращает ТОТ
+#     ЖЕ момент при рестарте -- перезапуск с НОВЫМ --duration-seconds
+#     продлевает срок от ПЕРВОНАЧАЛЬНОГО старта, не начинает заново.
+#   * Бюджет/реестр/attempts/no-send -- ВСЕ по тем же путям (умолчания
+#     task5_v4_hotpath.py), которые здесь НЕ переопределяются -- при
+#     перезапуске подхватываются как есть, без обнуления.
+#   * /etc/bot/STOP -- существующий штатный механизм плавной остановки
+#     (см. _new_send_forbidden_now/main loop в task5_v4_hotpath.py):
+#     новые кандидаты не берутся, текущая оценка (если есть) доводится
+#     до конца, ИТОГ печатается, реестр сохраняется в finally -- НЕ
+#     голое убийство процесса. PID текущего экземпляра читается из
+#     файла лока (_SingleInstanceLock) -- переживает любой RUN_TAG.
+#   * Если пилот не остановился сам за отведённое время -- второй
+#     экземпляр НЕ запускается (лок всё равно бы этого не позволил),
+#     явная ошибка вместо тихого зависания.
+#   * git НЕ трогается (fetch/checkout) -- перезапускается ТА ЖЕ уже
+#     проверенная версия кода, что уже работает, без риска, что
+#     параллельный автоматический коммit на ветке подменит рабочее
+#     дерево работающего пилота.
+#
+# Итоговый отчёт ПОСЛЕ продлённого срока -- НЕ этим workflow (10 часов
+# опроса делать не нужно): используйте run_task5_v4_hotpath_status.yml
+# в любой момент, включая после истечения продлённого срока -- он
+# читает состояние за секунды, без удержания job открытой.
+
+on:
+  workflow_dispatch:
+    inputs:
+      contract_address:
+        description: 'Тот же адрес ClosedCycleExecutorV4, что уже используется работающим пилотом (не меняется этим workflow).'
+        required: true
+        type: string
+      duration_seconds:
+        description: 'НОВОЕ значение --duration-seconds -- отсчитывается от ПЕРВОНАЧАЛЬНОГО pilot_started_at (не от момента перезапуска). Например, 36000 = 10 часов.'
+        required: true
+        type: string
+      confirm:
+        description: 'Введите ровно "EXTEND_LIVE_V4", чтобы подтвердить: остановка и перезапуск РЕАЛЬНОГО торгующего процесса на mainnet с тем же кошельком/бюджетом/историей.'
+        required: true
+        type: string
+
+jobs:
+  extend_live_pilot:
+    name: "Штатная остановка + перезапуск task5_v4_hotpath.py с новым --duration-seconds (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "EXTEND_LIVE_V4" ]; then
+            echo "confirm != 'EXTEND_LIVE_V4' -- остановлено, ничего не остановлено и не перезапущено." >&2
+            exit 1
+          fi
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Штатная остановка текущего экземпляра (если жив) + перезапуск с новым --duration-seconds"
+        env:
+          CONTRACT_ADDRESS: ${{ inputs.contract_address }}
+          DURATION_SECONDS: ${{ inputs.duration_seconds }}
+        run: |
+          # RUN_TAG -- ТОЛЬКО для имени НОВОГО лог/pid файла этого
+          # перезапуска (сам процесс находится через файл ЛОКА, не
+          # через RUN_TAG -- переживает любое количество перезапусков).
+          RUN_TAG="run${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          echo "RUN_TAG=$RUN_TAG" >> "$GITHUB_ENV"
+          # Экранирование -- та же схема, что во всех остальных workflow
+          # этой задачи: $CONTRACT_ADDRESS/$DURATION_SECONDS/$RUN_TAG --
+          # подставляются ЭТОЙ (GH Actions runner) оболочкой ДО отправки
+          # по SSH (литералы); \"...\" и \$ -- для REMOTE bash (читаются
+          # ПОСЛЕ доставки).
+          SSH_RC=0
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            set -euo pipefail
+            LOCK=/home/bot/data/task5_v4_hotpath_0x893f4a7eadba18c2f8aa1e0e23e11ecf66208e75.lock
+            if [ ! -f \"\$LOCK\" ]; then
+              echo \"[extend] лок-файл \$LOCK не найден -- пилот, похоже, не запущен, СТОП\" >&2
+              exit 1
+            fi
+            OLD_PID=\$(sudo -u bot cat \"\$LOCK\")
+            echo \"[extend] текущий PID пилота (из лок-файла): \$OLD_PID\"
+            if sudo -u bot kill -0 \"\$OLD_PID\" 2>/dev/null; then
+              echo \"[extend] процесс \$OLD_PID жив -- ставлю /etc/bot/STOP (штатная плавная остановка, существующий механизм task5_v4_hotpath.py)...\"
+              sudo touch /etc/bot/STOP
+              STOPPED=0
+              for i in \$(seq 1 300); do
+                if ! sudo -u bot kill -0 \"\$OLD_PID\" 2>/dev/null; then
+                  echo \"[extend] процесс \$OLD_PID штатно завершился через \${i}с\"
+                  STOPPED=1
+                  break
+                fi
+                sleep 1
+              done
+              if [ \"\$STOPPED\" != \"1\" ]; then
+                sudo rm -f /etc/bot/STOP
+                echo \"[extend] процесс \$OLD_PID НЕ завершился за 300с -- СТОП, новый экземпляр НЕ запускаю (лок всё равно не позволил бы второй)\" >&2
+                exit 1
+              fi
+            else
+              echo \"[extend] процесс \$OLD_PID уже не жив -- запускаю новый без ожидания\"
+            fi
+            sudo rm -f /etc/bot/STOP
+
+            sudo -u bot bash -c '
+              set -euo pipefail
+              set -a
+              . /etc/bot/env
+              set +a
+              : \"\${PRIVATE_KEY_NOX:?PRIVATE_KEY_NOX не загружен}\"
+              cd /home/bot/robinhood-chain-alpha/analysis
+              LOG=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log
+              PIDFILE=/home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.pid
+              setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u task5_v4_hotpath.py --contract-address $CONTRACT_ADDRESS --from-address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 --confirm-mainnet --duration-seconds $DURATION_SECONDS > \"\$LOG\" 2>&1 < /dev/null &
+              echo \$! > \"\$PIDFILE\"
+              sleep 2
+              echo \"[extend] запущен НОВЫЙ экземпляр pid=\$(cat \"\$PIDFILE\") лог=\$LOG duration-seconds=$DURATION_SECONDS\"
+            '
+
+            sleep 1
+            echo \"[extend] === ПОДТВЕРЖДЕНИЕ ===\"
+            echo -n \"[extend] лок-файл теперь содержит pid=\"; sudo -u bot cat \"\$LOCK\" 2>/dev/null || echo \"(нет)\"
+            echo
+            echo \"[extend] budget state (pilot_started_at/расход/halted не должны обнулиться):\"
+            sudo -u bot cat /home/bot/data/task5_v4_pilot_budget_state.json 2>/dev/null || echo \"(budget state отсутствует)\"
+          " > /tmp/extend_stdout.log 2> /tmp/extend_stderr.log || SSH_RC=$?
+          echo "--- stdout ---"; cat /tmp/extend_stdout.log
+          echo "--- stderr ---"; cat /tmp/extend_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          echo "новый RUN_TAG для run_task5_v4_hotpath_status.yml: $RUN_TAG"
+          exit $SSH_RC

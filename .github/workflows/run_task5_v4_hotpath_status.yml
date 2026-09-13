@@ -88,3 +88,29 @@ jobs:
           " || SSH_RC=$?
           echo "SSH exit code: $SSH_RC"
           exit $SSH_RC
+
+      - name: "Забрать файлы отдельно (для artifact -- итоговый отчёт можно скачать, не читая лог job)"
+        if: always()
+        env:
+          RUN_TAG: ${{ inputs.run_tag }}
+        run: |
+          mkdir -p /tmp/status_report
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_hotpath_live_${RUN_TAG}.log" > /tmp/status_report/hotpath_stdout_stderr.log 2>/tmp/status_report/_fetch.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_route_registry_state.json" > /tmp/status_report/route_registry_state.json 2>>/tmp/status_report/_fetch.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_attempts.jsonl" > /tmp/status_report/pilot_attempts.jsonl 2>>/tmp/status_report/_fetch.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_no_send_log.jsonl" > /tmp/status_report/pilot_no_send_log.jsonl 2>>/tmp/status_report/_fetch.err || true
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "sudo -u bot cat /home/bot/data/task5_v4_pilot_budget_state.json" > /tmp/status_report/pilot_budget_state.json 2>>/tmp/status_report/_fetch.err || true
+          {
+            echo "# Снимок состояния LIVE-пилота -- $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "run_tag=${RUN_TAG}"
+          } > /tmp/status_report/SUMMARY.md
+          ls -la /tmp/status_report
+
+      - name: "Опубликовать снимок как GitHub Actions artifact"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task5-v4-live-pilot-status-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/status_report
+          retention-days: 90
+          if-no-files-found: warn
