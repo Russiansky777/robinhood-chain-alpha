@@ -1,0 +1,35 @@
+{
+  "results": [
+    {
+      "point": "R5.1",
+      "title": "исключение describe_nonce_state() запрещает запуск (halt), не print+return",
+      "ok": true,
+      "detail": "ДО проверки can_send=True; ПОСЛЕ сбоя verify_nonce_consistency: budget.halted=True ('не удалось проверить актуальность nonce при старте (имитация: RPC недоступен для eth_getTransactionCount) -- НЕ отправляем со старым, ни разу не подтверждённым nonce, СТОП'), can_send()=False -- пилот НЕ может начать торговать со старым, непроверенным nonce."
+    },
+    {
+      "point": "R5.2",
+      "title": "отсутствующее CycleExecuted не начисляет прибыль по balance-diff, газ сохраняется",
+      "ok": true,
+      "detail": "рецепт БЕЗ CycleExecuted (logs=[]), фейковый _token_balance вернул бы ОГРОМНУЮ 'прибыль' (998000000 raw), если бы использовался как замена -- РЕАЛЬНЫЙ код НЕ должен был её принять. budget.halted=True ('не удалось подтвердить прибыль по событию CycleExecuted для 0xmissingevent1 -- газ уже учтён, прибыль ОСТАЁТСЯ НЕУСТАНОВЛЕННОЙ (разница балансов до неопределённого latest НЕ используется как замена), pending СОХРАНЯЕТСЯ, требуется ручной разбор'), budget.pending СОХРАНЁН=True, cumulative_gross_profit_raw_by_token[USDG]=0 (ожидание 0 -- профит НЕ начислен), газ ОСТАЛСЯ учтён: $0.9000 (было $0.9000, > 0), net_pnl_usd не изменился доп. профитом: True, строк в attempt_table=0 (ожидание 0 -- не финализирована, дублирования при восстановлении не будет)."
+    },
+    {
+      "point": "R5.3a",
+      "title": "сетка USDG расширена (100/300/1000 USDG), прежние размеры сохранены",
+      "ok": true,
+      "detail": "SIZE_GRID_BY_START_TOKEN[USDG]=[1000000, 3000000, 5000000, 7000000, 10000000, 15000000, 20000000, 30000000, 100000000, 300000000, 1000000000]"
+    },
+    {
+      "point": "R5.3b",
+      "title": "100 USDG не котируется (NotEnoughLiquidity) -- лучший меньший (5 USDG) не теряется",
+      "ok": true,
+      "detail": "recompute_route вернул: {'ok': True, 'amount_in': 5000000, 'amount_out': 5000010, 'profit_raw': 10}"
+    },
+    {
+      "point": "R5.3c",
+      "title": "выгодный больший размер (300 USDG) реально выбирается, когда он лучше",
+      "ok": true,
+      "detail": "recompute_route вернул: {'ok': True, 'amount_in': 300000000, 'amount_out': 300050000, 'profit_raw': 50000}"
+    }
+  ],
+  "all_passed": true
+}
