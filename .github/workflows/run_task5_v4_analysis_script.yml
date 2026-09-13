@@ -82,6 +82,9 @@ jobs:
             set -euo pipefail
             sudo -u bot bash -c '
               set -euo pipefail
+              set -a
+              . /etc/bot/env
+              set +a
               cd /home/bot/robinhood-chain-alpha
               git fetch origin $COMMIT_SHA
               git checkout $COMMIT_SHA -- analysis/

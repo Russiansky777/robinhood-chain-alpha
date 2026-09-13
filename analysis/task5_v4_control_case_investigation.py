@@ -111,12 +111,24 @@ def part_a_rpc_benchmark() -> dict:
         out["alchemy_burst"] = bench(alchemy_url, "alchemy_no_delay")
 
     # eth_call (реальная котировка) -- не только eth_blockNumber, разные
-    # методы могут иметь разную стоимость на стороне нода.
-    quoter_calldata = quote_exact_input_single_calldata(
-        PoolKey(USDG, "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a", 70000, 4), True, 1_000_000)
+    # методы могут иметь разную стоимость на стороне нода. ВАЖНО:
+    # используем ЖИВОЙ ПРЯМО СЕЙЧАС маршрут из реестра (не
+    # захардкоженный seed-пул USDG/MOSIAI -- он ДОКУМЕНТИРОВАНО пересох
+    # ещё до этого пилота, см. докстринг task5_v4_fork_simulation.py) --
+    # иначе замер латентности выродится в замер "как быстро нода честно
+    # отвечает revert на несуществующей ликвидности", а не в замер
+    # реальной стоимости котировки.
     try:
-        latest = int(_rpc_call("eth_blockNumber", []), 16)
+        live = _find_live_two_leg_usdg_route()
+        if live is None:
+            out["eth_call_benchmark_error"] = "ни один живой маршрут не найден для бенчмарка eth_call"
+            return out
+        leg0 = live["legs"][0]
+        key0 = PoolKey(leg0["currency0"], leg0["currency1"], leg0["fee"], leg0["tick_spacing"], leg0["hooks"])
+        quoter_calldata = quote_exact_input_single_calldata(key0, leg0["zero_for_one"], live["amount_in"])
+        latest = live["block"]
         out["latest_block_at_benchmark"] = latest
+        out["eth_call_benchmark_route_id"] = live["route_id"]
         call_params = [{"to": V4_QUOTER, "data": quoter_calldata}, hex(latest)]
 
         def bench_call(url: str, label: str, n: int = 10) -> dict:
@@ -174,31 +186,76 @@ def part_b_block_time() -> dict:
     return out
 
 
+# ---------- поиск ЖИВОГО (прямо сейчас) маршрута из реестра на Ohio ----------
+
+ROUTE_REGISTRY_STATE_FILE = "/home/bot/data/task5_v4_route_registry_state.json"
+
+
+def _find_live_two_leg_usdg_route(max_candidates: int = 30) -> dict | None:
+    """Читает ТЕКУЩИЙ (не устаревший) файл реестра прямо на Ohio и
+    возвращает ПЕРВЫЙ 2-леговый маршрут (старт/конец USDG, без hooks --
+    для чистоты первой проверки кодирования), который реально даёт
+    успешную котировку ПРЯМО СЕЙЧАС (не полагается на поле liveness в
+    файле, которое могло устареть с момента последнего сохранения) --
+    честная проверка, не предположение. Возвращает None, если ни один
+    из первых `max_candidates` кандидатов не прошёл."""
+    try:
+        data = json.load(open(ROUTE_REGISTRY_STATE_FILE))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[speed_audit] не удалось прочитать {ROUTE_REGISTRY_STATE_FILE}: {exc}", file=sys.stderr)
+        return None
+    candidates = []
+    for rid, r in data.get("routes", {}).items():
+        legs = r.get("legs", [])
+        if len(legs) != 2 or r.get("exit_token", "").lower() != USDG.lower():
+            continue
+        if any(leg["hooks"].lower() != "0x0000000000000000000000000000000000000000" for leg in legs):
+            continue
+        candidates.append((rid, r))
+    latest = int(_rpc_call("eth_blockNumber", []), 16)
+    for rid, r in candidates[:max_candidates]:
+        legs = r["legs"]
+        try:
+            amount_in = 1_000_000
+            cur = amount_in
+            for leg in legs:
+                key = PoolKey(leg["currency0"], leg["currency1"], leg["fee"], leg["tick_spacing"], leg["hooks"])
+                zero_for_one = leg["zero_for_one"]
+                cd = quote_exact_input_single_calldata(key, zero_for_one, cur)
+                raw = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": cd}, hex(latest)])
+                cur, _ = decode_quote_result(raw)
+            return {"route_id": rid, "legs": legs, "block": latest, "amount_in": amount_in,
+                     "sequential_amount_out": cur}
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
 # ---------- ЧАСТЬ C: quoteExactInput (многоходовая котировка) ----------
 
 def part_c_multihop_quoter() -> dict:
     out: dict = {}
-    MOSIAI = "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a"
     HOOKS_NONE = "0x0000000000000000000000000000000000000000"
-    pool_a = PoolKey(USDG, MOSIAI, 70000, 4)
-    pool_b = PoolKey(USDG, MOSIAI, 70000, 3)
     try:
-        latest = int(_rpc_call("eth_blockNumber", []), 16)
+        live = _find_live_two_leg_usdg_route()
+        if live is None:
+            out["ok"] = False
+            out["error"] = "ни один кандидат из реестра не дал живую котировку прямо сейчас"
+            return out
+        out["route_id"] = live["route_id"]
+        legs = live["legs"]
+        latest = live["block"]
+        amount_in = live["amount_in"]
         out["block"] = latest
-        amount_in = 1_000_000
-        # Последовательно (текущий hot path).
-        cd1 = quote_exact_input_single_calldata(pool_a, True, amount_in)
-        raw1 = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": cd1}, hex(latest)])
-        mosiai_out, _ = decode_quote_result(raw1)
-        cd2 = quote_exact_input_single_calldata(pool_b, False, mosiai_out)
-        raw2 = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": cd2}, hex(latest)])
-        usdg_out_sequential, _ = decode_quote_result(raw2)
-        out["sequential_two_calls"] = {"mosiai_out": mosiai_out, "usdg_out": usdg_out_sequential,
-                                        "n_eth_call": 2}
+        out["sequential_two_calls"] = {"amount_out": live["sequential_amount_out"], "n_eth_call": len(legs)}
 
-        # Один вызов quoteExactInput (весь маршрут).
-        cd_multi = quote_exact_input_multihop_calldata(
-            USDG, [(MOSIAI, 70000, 4, HOOKS_NONE), (USDG, 70000, 3, HOOKS_NONE)], amount_in)
+        # Один вызов quoteExactInput (весь маршрут) -- path из ВЫХОДНОЙ
+        # валюты каждого плеча (см. докстринг quote_exact_input_multihop_calldata).
+        path = []
+        for leg in legs:
+            out_token = leg["currency1"] if leg["zero_for_one"] else leg["currency0"]
+            path.append((out_token, leg["fee"], leg["tick_spacing"], HOOKS_NONE))
+        cd_multi = quote_exact_input_multihop_calldata(USDG, path, amount_in)
         out["multihop_calldata_selector"] = cd_multi[:10]
         t0 = time.monotonic()
         raw_multi = _rpc_call("eth_call", [{"to": V4_QUOTER, "data": cd_multi}, hex(latest)])
@@ -206,7 +263,7 @@ def part_c_multihop_quoter() -> dict:
         usdg_out_multi, gas_estimate_multi = decode_quote_result(raw_multi)
         out["multihop_one_call"] = {"usdg_out": usdg_out_multi, "gas_estimate": gas_estimate_multi,
                                      "n_eth_call": 1, "latency_s": round(dt_multi, 3)}
-        out["matches_sequential"] = usdg_out_multi == usdg_out_sequential
+        out["matches_sequential"] = usdg_out_multi == live["sequential_amount_out"]
         out["ok"] = True
     except Exception as exc:  # noqa: BLE001
         out["ok"] = False
@@ -220,14 +277,22 @@ def part_d_historical_estimate_gas() -> dict:
     """Проверяет: честно ли эндпоинт учитывает второй (блочный) параметр
     eth_estimateGas, или молча всегда считает на latest/pending
     (JSON-RPC формально допускает block-параметр, но многие ноды его
-    игнорируют для estimateGas -- нужно ПРОВЕРИТЬ, не предполагать)."""
+    игнорируют для estimateGas -- нужно ПРОВЕРИТЬ, не предполагать).
+    Использует ТОТ ЖЕ живой маршрут, что и часть C (не заведомо
+    несвежий/сухой seed-пул)."""
     out: dict = {}
     try:
-        latest = int(_rpc_call("eth_blockNumber", []), 16)
+        live = _find_live_two_leg_usdg_route()
+        if live is None:
+            out["error"] = "ни один кандидат из реестра не дал живую котировку прямо сейчас"
+            return out
+        leg0 = live["legs"][0]
+        out["route_id_used"] = live["route_id"]
+        latest = live["block"]
         old_block = latest - 50
+        key0 = PoolKey(leg0["currency0"], leg0["currency1"], leg0["fee"], leg0["tick_spacing"], leg0["hooks"])
         call = {"from": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75", "to": V4_QUOTER,
-                 "data": quote_exact_input_single_calldata(
-                     PoolKey(USDG, "0xfb6d1a1860277c1399b3141f8b12a1b77257e57a", 70000, 4), True, 1_000_000)}
+                 "data": quote_exact_input_single_calldata(key0, leg0["zero_for_one"], live["amount_in"])}
         # eth_estimateGas С явным блочным тегом.
         try:
             g_latest = int(_rpc_call("eth_estimateGas", [call, "latest"]), 16)
