@@ -366,12 +366,22 @@ def main() -> None:
         result["our_bot_at_competitor_size"] = our_at_competitor_size
         revert_ok_1 = anvil_revert(shared_snapshot)
         result["revert_after_competitor_size_ok"] = revert_ok_1
+        # ПРАВКА: anvil ИНВАЛИДИРУЕТ id снимка после ОДНОГО использования
+        # (evm_revert потребляет snapshot) -- пересоздаём снимок СРАЗУ
+        # после revert, на ТОМ ЖЕ восстановленном состоянии, чтобы
+        # следующий revert указывал на ДЕЙСТВИТЕЛЬНЫЙ id (сама точка
+        # состояния при этом РОВНО та же -- сразу после предшествующих tx,
+        # см. общий докстринг).
+        shared_snapshot = anvil_snapshot()
+        result["shared_snapshot_id_2"] = shared_snapshot
 
         # --- (ii) наш бот на 0.02 ETH (для прямого сравнения В ЭТОМ ЖЕ прогоне) ---
         our_at_0_02_eth = run_our_bot_at_size(20_000_000_000_000_000, "0.02_eth")
         result["our_bot_at_0_02_eth"] = our_at_0_02_eth
         revert_ok_2 = anvil_revert(shared_snapshot)
         result["revert_after_0_02_eth_ok"] = revert_ok_2
+        shared_snapshot = anvil_snapshot()
+        result["shared_snapshot_id_3"] = shared_snapshot
 
         if not (revert_ok_1 and revert_ok_2):
             result["ok"] = False
