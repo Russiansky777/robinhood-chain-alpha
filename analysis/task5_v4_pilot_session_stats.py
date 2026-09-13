@@ -37,6 +37,16 @@ REASON_NO_LIQUIDITY = "нет ликвидности"
 REASON_CALC_ERROR = "ошибка расчёта"
 REASON_SIMULATION_FAILED = "симуляция не прошла"
 
+# НАЙДЕНО отдельным уточняющим read-only проходом (task5_v4_pilot_session_stats_peek.py,
+# см. evaluator_loop, task5_v4_hotpath.py ~строка 1441-1447): когда `_no_new_candidates`
+# уже взведён (--duration-seconds истёк), КАЖДЫЙ элемент, ещё остававшийся в очереди
+# (`self._queue.pop_one(...)`), логируется этой ТОЧНОЙ строкой и пропускается БЕЗ
+# реального расчёта (recompute_route/quote_route_at_size НЕ вызываются). Это НЕ
+# "нет прибыльного цикла" по существу -- это честный, точный счётчик кандидатов,
+# слитых из очереди НЕОБРАБОТАННЫМИ при остановке (отвечает на п.4 запроса
+# владельца: "сколько кандидатов осталось необработанными при остановке").
+QUEUE_DRAIN_AT_SHUTDOWN_DETAIL = "пилот завершает работу (--duration-seconds истёк) -- новые кандидаты не берутся"
+
 
 def read_jsonl(path: Path) -> list[dict]:
     out: list[dict] = []
@@ -63,6 +73,8 @@ def classify_bucket(reason: str, detail: str) -> str:
     а не досчитывает наугад в одну из пяти."""
     d = detail or ""
     dl = d.lower()
+    if reason == REASON_NO_PROFITABLE_CYCLE and d == QUEUE_DRAIN_AT_SHUTDOWN_DETAIL:
+        return "НЕ РАСЧЁТ -- слит из очереди необработанным при остановке пилота"
     if reason == REASON_NO_PROFITABLE_CYCLE:
         if "устарел" in d or "сдвинулся" in d or "уже не подходит" in d:
             return "устаревшее состояние"
@@ -150,20 +162,45 @@ def main() -> None:
         "логе процесса нет, поэтому точнее эту границу не определить без придумывания."
     )
 
-    result["n_completed_calculations_session"] = len(session_reason)
-    result["n_unique_route_ids_session"] = len({r.get("route_id") for r in session_reason if r.get("route_id")})
+    # ВАЖНО (найдено уточняющим проходом, task5_v4_pilot_session_stats_peek.py):
+    # часть записей reason=='нет прибыльного цикла' -- НЕ результат реального
+    # расчёта, а технический слив очереди при остановке пилота (см.
+    # QUEUE_DRAIN_AT_SHUTDOWN_DETAIL выше). Отделяем их ДО подсчёта "завершённых
+    # расчётов", чтобы не завышать эту цифру фиктивными нерасчитанными записями.
+    def _is_drain(r: dict) -> bool:
+        return r.get("reason") == REASON_NO_PROFITABLE_CYCLE and r.get("detail") == QUEUE_DRAIN_AT_SHUTDOWN_DETAIL
+
+    drained_at_shutdown = [r for r in session_reason if _is_drain(r)]
+    real_calc_reason = [r for r in session_reason if not _is_drain(r)]
+
+    result["n_reason_log_entries_session_total"] = len(session_reason)
+    result["n_candidates_drained_unprocessed_at_shutdown"] = len(drained_at_shutdown)
+    result["note_on_drained_at_shutdown"] = (
+        "Это РЕАЛЬНЫЙ счётчик из кода (evaluator_loop, task5_v4_hotpath.py): при взведённом "
+        "_no_new_candidates каждый элемент очереди логируется этой точной строкой и пропускается "
+        "БЕЗ вызова recompute_route/quote_route_at_size -- т.е. это честный ответ на п.4 "
+        "('сколько кандидатов осталось необработанными при остановке'), а НЕ оценка."
+    )
+    result["n_completed_calculations_session"] = len(real_calc_reason)
+    result["n_unique_route_ids_session_all_entries_incl_drained"] = len(
+        {r.get("route_id") for r in session_reason if r.get("route_id")})
+    result["n_unique_route_ids_session_real_calc_only"] = len(
+        {r.get("route_id") for r in real_calc_reason if r.get("route_id")})
     result["n_send_attempts_session"] = len(session_attempts)
 
-    # -- п.3: причины отказа --
+    # -- п.3: причины отказа (ТОЛЬКО реально рассчитанные кандидаты -- слитые
+    # из очереди при остановке не являются "отказом по причине котировки/газа/
+    # revert/RPC/устаревшего состояния", это отдельная, уже посчитанная выше
+    # категория п.4) --
     raw_reason_counts: dict[str, int] = {}
     bucket_counts: dict[str, int] = {}
-    for r in session_reason:
+    for r in real_calc_reason:
         raw = r.get("reason", "?")
         raw_reason_counts[raw] = raw_reason_counts.get(raw, 0) + 1
         b = classify_bucket(raw, r.get("detail", ""))
         bucket_counts[b] = bucket_counts.get(b, 0) + 1
-    result["raw_reason_value_counts_GROUND_TRUTH"] = raw_reason_counts
-    result["reason_bucket_counts_HEURISTIC_MAPPING_TO_5_REQUESTED_CATEGORIES"] = bucket_counts
+    result["raw_reason_value_counts_GROUND_TRUTH_real_calc_only"] = raw_reason_counts
+    result["reason_bucket_counts_HEURISTIC_MAPPING_TO_5_REQUESTED_CATEGORIES_real_calc_only"] = bucket_counts
     result["bucket_mapping_methodology_note"] = (
         "В коде реально существуют ТОЛЬКО 4 константы reason ('нет прибыльного цикла', 'нет ликвидности', "
         "'ошибка расчёта', 'симуляция не прошла') плюс отдельные строки гейта can_send() (бюджет/halt/"
@@ -173,29 +210,24 @@ def main() -> None:
         "честно помечено 'не удалось однозначно отнести', а НЕ досчитано в одну из 5 категорий наугад."
     )
 
-    # -- п.4: медианы/p95 --
-    qw = [r["queue_wait_s"] for r in session_reason if r.get("queue_wait_s") is not None]
-    cd = [r["calc_duration_s"] for r in session_reason if r.get("calc_duration_s") is not None]
+    # -- п.4: медианы/p95 (ТОЛЬКО реально рассчитанные -- слитые из очереди при
+    # остановке структурно не имеют этих полей (см. вызов reason_log.log без
+    # t_*_monotonic в evaluator_loop), поэтому знаменатель считаем по real_calc_reason,
+    # чтобы "present/missing" честно относились к записям, где расчёт вообще шёл) --
+    qw = [r["queue_wait_s"] for r in real_calc_reason if r.get("queue_wait_s") is not None]
+    cd = [r["calc_duration_s"] for r in real_calc_reason if r.get("calc_duration_s") is not None]
     result["queue_wait_s_n_present"] = len(qw)
-    result["queue_wait_s_n_missing"] = len(session_reason) - len(qw)
+    result["queue_wait_s_n_missing_among_real_calculations"] = len(real_calc_reason) - len(qw)
     result["queue_wait_s_median"] = statistics.median(qw) if qw else None
     result["queue_wait_s_p95"] = pctl(qw, 0.95) if qw else None
     result["calc_duration_s_n_present"] = len(cd)
-    result["calc_duration_s_n_missing"] = len(session_reason) - len(cd)
+    result["calc_duration_s_n_missing_among_real_calculations"] = len(real_calc_reason) - len(cd)
     result["calc_duration_s_median"] = statistics.median(cd) if cd else None
     result["calc_duration_s_p95"] = pctl(cd, 0.95) if cd else None
 
-    result["n_candidates_unprocessed_at_shutdown"] = None
-    result["note_on_unprocessed_candidates"] = (
-        "В коде НЕТ счётчика глубины очереди/оставшихся необработанных кандидатов на момент остановки "
-        "(_CoalescingRouteQueue не логирует qsize периодически и не печатает его при выходе, "
-        "evaluator_finished_current_work() сообщает только 'текущая единица работы завершена', без счёта "
-        "остатка). Честно: данных нет, оценку не делаю."
-    )
-
     # -- п.5: топ-5 --
     enriched = []
-    for r in session_reason:
+    for r in real_calc_reason:
         pb = extract_profit_before_gas(r.get("detail", ""))
         pa = extract_profit_after_gas(r.get("detail", ""))
         enriched.append({
