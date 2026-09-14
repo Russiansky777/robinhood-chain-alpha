@@ -1,0 +1,99 @@
+{
+  "n_qualifying_rows_total_from_scan": 1083,
+  "n_excluded_unknown_net_after_gas_usd": 43,
+  "n_enriched_this_run": 1,
+  "selection_note": "Владелец выбрал: обогатить только top-1 по net_after_gas_usd из 1083 прошедших критерий -- НЕ все 1083.",
+  "enriched": [
+    {
+      "tx_hash": "0xcc630e7d525909dd32453101baf311588813279edb5a97e0d386ea9cc4c2ede3",
+      "block_hash": "0x2faa464b1b266c76bb340ce782cc06fc80f32a77c6dc77d85488e5de6fd99f97",
+      "block_number": "0x3be1ac8",
+      "block_number_decimal": 62790344,
+      "transaction_index": "0x4",
+      "full_route_legs_in_log_order": [
+        {
+          "kind": "v4_pool_manager",
+          "log_index": "0x9",
+          "pool_manager_address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "pool_id": "0x935c1401e40a4eeec0e722f1841cc4be9d7a523cf90cdc52900f9e343304f0fe"
+        },
+        {
+          "kind": "v4_pool_manager",
+          "log_index": "0xe",
+          "pool_manager_address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "pool_id": "0x0086a03ec05c3115a0bb90e0d00e84b6228ceb518769f205b4d52a3d432a8fa2"
+        },
+        {
+          "kind": "v3_standalone_pool",
+          "log_index": "0x13",
+          "pool_address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
+        }
+      ],
+      "route_supported_by_our_executor": {
+        "supported": false,
+        "reason": "маршрут включает как минимум один standalone V3-пул -- task5_v4_executor_calldata.py (build_execute_cycle_calldata/RouteLeg) моделирует только V4 PoolManager-циклы, адаптера для standalone V3 в проекте нет"
+      },
+      "trace_attempt": {
+        "available": false,
+        "error": "RuntimeError: RPC debug_traceTransaction error: {'code': -32601, 'message': 'the method debug_traceTransaction does not exist/is not available'}",
+        "note": "debug_traceTransaction не удался -- реальная, не выдуманная попытка, эндпоинт скорее всего не поддерживает этот метод на текущем RPC-провайдере."
+      },
+      "pre_state_accuracy_check": {
+        "block_hash": "0x2faa464b1b266c76bb340ce782cc06fc80f32a77c6dc77d85488e5de6fd99f97",
+        "block_number": "0x3be1ac8",
+        "transaction_index": 4,
+        "n_preceding_txs_in_block": 4,
+        "preceding_txs_touching_same_pools": [],
+        "end_of_previous_block_is_exact_pre_state": true,
+        "pre_state_note": "Проверены все 4 предыдущих транзакций этого блока -- ни одна не затронула те же пулы -- состояние конца ПРЕДЫДУЩЕГО блока можно использовать как точный pre-state для этой сделки."
+      },
+      "raw_receipt": {
+        "blockHash": "0x2faa464b1b266c76bb340ce782cc06fc80f32a77c6dc77d85488e5de6fd99f97",
+        "blockNumber": "0x3be1ac8",
+        "contractAddress": null,
+        "cumulativeGasUsed": "0x12c5b5",
+        "effectiveGasPrice": "0x434c840",
+        "from": "0xddbc5dd838f2efeacc6dbd7cd29c0bd805155680",
+        "gasUsed": "0xd630b",
+        "gasUsedForL1": "0x0",
+        "l1BlockNumber": "0x18c5afa",
+        "status": "0x1",
+        "to": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+        "transactionHash": "0xcc630e7d525909dd32453101baf311588813279edb5a97e0d386ea9cc4c2ede3",
+        "transactionIndex": "0x4",
+        "type": "0x0",
+        "logs": "СОКРАЩЕНО В ЭТОМ ФАЙЛЕ ДЛЯ КРАТКОСТИ -- полный список из 15 логов (Transfer/Swap/hook-события) получен и обработан вживую; ключевые адреса: PoolManager 0x8366a39cc670b4001a1121b8f6a443a643e40951, hook 0xe5e702641ea86f4ae6cc3cdaed2b886f976be044, промежуточный токен-роутер 0x78b96280c3347e0f58a7147b73eb0ec5ffff025d, WETH 0x0bd7d308f8e1639fab988df18a8011f41eacad73, USDG 0x5fc5360d0400a0fd4f2af552add042d716f1d168, V3-пул WETH/USDG 0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca -- полный сырой JSON лога сохранён в выводе GH Actions run 34846820319, job 103984683114 (job_id), доступен для повторного разбора при необходимости."
+      },
+      "original_scan_row": {
+        "tx_hash": "0xcc630e7d525909dd32453101baf311588813279edb5a97e0d386ea9cc4c2ede3",
+        "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+        "initiator": "0xddbc5dd838f2efeacc6dbd7cd29c0bd805155680",
+        "status": "success",
+        "qualifies": true,
+        "contract_net_positive": {"0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.04069110 WETH"},
+        "contract_net_negative": {},
+        "initiator_spent": {},
+        "tx_native_value_wei": 0,
+        "gas_cost_eth": 6.1910929464e-05,
+        "gain_usd": 101.9771739034527,
+        "gas_cost_usd": 0.15515683518848897,
+        "net_after_gas_usd": 101.8220170682642
+      }
+    }
+  ],
+  "scan_context": {
+    "window_from_block": 62778346,
+    "window_to_block_actually_covered": 62813807,
+    "scan_timed_out": false,
+    "elapsed_seconds": 618.9934368133545,
+    "n_tx_with_any_swap": 126556,
+    "n_multi_pool_tx": 40488,
+    "n_unique_sender_groups": 434,
+    "n_sender_groups_checked": 434,
+    "n_sender_groups_qualifying": 43,
+    "n_qualifying_transactions_total": 1083,
+    "current_weth_usdg_price_at_scan_time": 2506.1299601181026,
+    "full_result_saved_on_ohio_at": "/home/bot/robinhood-chain-alpha/data/task5_true_arbitrageur_scan_result.json",
+    "criterion_caveat": "1083 транзакций от 43 разных контрактов прошли ТОЧНЫЙ критерий владельца за ~1 час -- это НЕ единичное редкое явление в этом окне, а систематически наблюдаемый паттерн. Оценка того, является ли сам критерий (netto ровно один токен в плюс, инициатор ничего не вносит) достаточным доказательством НАСТОЯЩЕГО атомарного арбитража (в отличие от иных легитимных однонаправленных паттернов) -- ОТДЕЛЬНЫЙ вопрос, не разбирался в рамках этой заготовки."
+  }
+}
