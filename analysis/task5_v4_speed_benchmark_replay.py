@@ -152,11 +152,20 @@ def main() -> None:
     if args.calc_duration_samples_json:
         data = json.loads(Path(args.calc_duration_samples_json).read_text())
         calc_samples = []
+        # Полный result_*.json (с raw-трейсами) -- честная выборка per-probe сумм.
         for variant_block in data.get("direct_probes", {}).values():
             for probe in variant_block.get("raw", []):
                 total = sum(e["wall_s"] for e in probe.get("trace", []))
                 if total > 0:
                     calc_samples.append(total)
+        # Уже свёрнутый summarize-файл (без raw) -- используем per-variant
+        # total_traced_wall_s_median КАК ОДНУ точку на вариант (честно
+        # меньше точек -- nـварианты, не n_probes, помечено в выводе).
+        if not calc_samples:
+            for variant_block in data.get("direct_stats_by_variant", {}).values():
+                med = variant_block.get("total_traced_wall_s_median")
+                if med:
+                    calc_samples.append(med)
 
     scenario = simulate_queue_scenario(structure, calc_samples)
 

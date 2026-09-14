@@ -19,7 +19,10 @@
     "assumed_arrival_model": "uniform_by_sequence_number",
     "assumption_caveat": "Равномерное распределение -- ПРЕДПОЛОЖЕНИЕ (нет per-message timestamp в захвате), не измеренный реальный интервал.",
     "mean_inter_arrival_s_between_sequence_groups": 0.08386916410399776,
-    "queue_utilization": null,
-    "note": "Нет реальных calc_duration_s (передайте --calc-duration-samples-json с результатом task5_v4_speed_benchmark.py) -- утилизация очереди не вычислена, чтобы не подставлять выдуманное значение времени обслуживания."
+    "measured_calc_duration_median_s": 2.555863983987365,
+    "measured_calc_duration_p95_s": 3.6938862853494356,
+    "queue_utilization_median": 30.474418235742682,
+    "queue_utilization_p95": 44.04343747564977,
+    "interpretation": "utilization > 1 означает: под ЭТИМ (стрессовым, верхняя граница) сценарием прихода однопоточный evaluator НЕ успевал бы обрабатывать кандидатов по мере поступления -- очередь росла бы. utilization < 1 -- успевал бы В СРЕДНЕМ (не гарантия для пиков)."
   }
 }

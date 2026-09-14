@@ -1,0 +1,96 @@
+{
+  "source_file": "/home/bot/robinhood-chain-alpha/data/task5_v4_speed_benchmark/result_1789388051.json",
+  "test_account_address": "0xF3Ee31369d173172b79318519a02B9Eb5cF4584d",
+  "repeats": 5,
+  "variants": ["baseline", "lane", "pool", "both"],
+  "routes": ["route_cb90948az1_92ed62e7z0", "route_f6562daaz1_784df9b6z0_24107d15z0"],
+  "parity_check_all_match_baseline": true,
+  "parity_check_per_variant_match": {"pool": true, "lane": true, "both": true},
+  "direct_stats_by_variant": {
+    "baseline": {
+      "per_stage": {
+        "state_ready_block_fetch": {"n": 10, "median_s": 0.07240895749418996, "p95_s": 0.08728069919598055, "mean_s": 0.07034217769396492, "sum_s": 0.7034217769396491},
+        "route_search_and_sizing": {"n": 10, "median_s": 0.18710102151089814, "p95_s": 0.2364813727530418, "mean_s": 0.1812950830993941, "sum_s": 1.812950830993941},
+        "calldata_build": {"n": 10, "median_s": 0.0003394249943085015, "p95_s": 0.0008624604481155975, "mean_s": 0.00042004410061053933, "sum_s": 0.004200441006105393},
+        "simulate_and_gas_estimate": {"n": 10, "median_s": 0.26035298699571285, "p95_s": 0.3069684356916696, "mean_s": 0.25169628049770837, "sum_s": 2.5169628049770836},
+        "gas_estimate_direct": {"n": 10, "median_s": 0.10453659149061423, "p95_s": 0.11464821300905896, "mean_s": 0.10237804120115471, "sum_s": 1.023780412011547},
+        "token_balance_read": {"n": 25, "median_s": 0.49564962199656293, "p95_s": 1.9833945474005303, "mean_s": 0.7000266130804085, "sum_s": 17.50066532701021},
+        "weth_price_read": {"n": 10, "median_s": 0.9578956875047879, "p95_s": 2.0559325616472046, "mean_s": 1.0602001254010247, "sum_s": 10.602001254010247},
+        "gas_price_read": {"n": 10, "median_s": 0.060016381001332775, "p95_s": 0.07143872073793317, "mean_s": 0.060900793899782, "sum_s": 0.60900793899782},
+        "nonce_calldata_prepare": {"n": 10, "median_s": 0.014045210991753265, "p95_s": 1.56402084355941, "mean_s": 0.3206442258961033, "sum_s": 3.206442258961033},
+        "sign": {"n": 10, "median_s": 0.005206482499488629, "p95_s": 0.005364615251892246, "mean_s": 0.005210071103647351, "sum_s": 0.05210071103647351}
+      },
+      "n_probes": 10, "total_traced_wall_s_median": 3.375479667505715, "rpc_call_count_median": 7.0
+    },
+    "lane": {
+      "per_stage": {
+        "state_ready_block_fetch": {"n": 10, "median_s": 0.07264432100055274, "p95_s": 0.08358385685860412, "mean_s": 0.07086793719499837, "sum_s": 0.7086793719499838},
+        "route_search_and_sizing": {"n": 10, "median_s": 0.17828853649552912, "p95_s": 0.2394674652532558, "mean_s": 0.17958644650352654, "sum_s": 1.7958644650352653},
+        "calldata_build": {"n": 10, "median_s": 0.0003286749997641891, "p95_s": 0.0003705406459630467, "mean_s": 0.0003247921908041462, "sum_s": 0.0032479219080414623},
+        "simulate_and_gas_estimate": {"n": 10, "median_s": 0.256095937002101, "p95_s": 0.30065829770028357, "mean_s": 0.24581883299688342, "sum_s": 2.4581883299688343},
+        "gas_estimate_direct": {"n": 10, "median_s": 0.10787096849526279, "p95_s": 0.1265606895976816, "mean_s": 0.10653655440255534, "sum_s": 1.0653655440255534},
+        "token_balance_read": {"n": 25, "median_s": 0.0933169909985736, "p95_s": 0.10788910259725526, "mean_s": 0.08877973420196213, "sum_s": 2.219493355049053},
+        "weth_price_read": {"n": 10, "median_s": 0.10579592249996495, "p95_s": 0.12574010744428957, "mean_s": 0.10712753339612391, "sum_s": 1.071275333961239},
+        "gas_price_read": {"n": 10, "median_s": 0.09456384650547989, "p95_s": 0.1059799471637234, "mean_s": 0.09294553460495081, "sum_s": 0.9294553460495081},
+        "nonce_calldata_prepare": {"n": 10, "median_s": 0.7174457439978141, "p95_s": 1.7861703492395462, "mean_s": 0.8364090999995824, "sum_s": 8.364090999995824},
+        "sign": {"n": 10, "median_s": 0.0052010894869454205, "p95_s": 0.0053048257599584755, "mean_s": 0.00519703789614141, "sum_s": 0.0519703789614141}
+      },
+      "n_probes": 10, "total_traced_wall_s_median": 1.7362483004690148, "rpc_call_count_median": 10.5
+    },
+    "pool": {
+      "per_stage": {
+        "state_ready_block_fetch": {"n": 10, "median_s": 0.07860208499187138, "p95_s": 0.08178766149503644, "mean_s": 0.07240426920179743, "sum_s": 0.7240426920179743},
+        "route_search_and_sizing": {"n": 10, "median_s": 0.17724119100603275, "p95_s": 0.2350500914384611, "mean_s": 0.17546541179763153, "sum_s": 1.7546541179763153},
+        "calldata_build": {"n": 10, "median_s": 0.0003082200128119439, "p95_s": 0.0003314323068480007, "mean_s": 0.00029959860548842696, "sum_s": 0.00299598605488427},
+        "simulate_and_gas_estimate": {"n": 10, "median_s": 0.24884833450778387, "p95_s": 0.384434298815904, "mean_s": 0.2635935120022623, "sum_s": 2.635935120022623},
+        "gas_estimate_direct": {"n": 10, "median_s": 0.09532523900270462, "p95_s": 0.1046801759977825, "mean_s": 0.09219116330204997, "sum_s": 0.9219116330204997},
+        "token_balance_read": {"n": 25, "median_s": 0.500207033008337, "p95_s": 2.064706859184662, "mean_s": 0.8289455975173041, "sum_s": 20.723639937932603},
+        "weth_price_read": {"n": 10, "median_s": 0.2548571439983789, "p95_s": 2.661136732746671, "mean_s": 0.8055791267921449, "sum_s": 8.05579126792145},
+        "gas_price_read": {"n": 10, "median_s": 0.01919021199864801, "p95_s": 0.021559650446579325, "mean_s": 0.01932470170140732, "sum_s": 0.1932470170140732},
+        "nonce_calldata_prepare": {"n": 10, "median_s": 0.013697143003810197, "p95_s": 1.522472564250347, "mean_s": 0.31374051939928904, "sum_s": 3.1374051939928904},
+        "sign": {"n": 10, "median_s": 0.005161633496754803, "p95_s": 0.005233748804312199, "mean_s": 0.005163742799777537, "sum_s": 0.051637427997775376}
+      },
+      "n_probes": 10, "total_traced_wall_s_median": 3.7500756884983275, "rpc_call_count_median": 7.0
+    },
+    "both": {
+      "per_stage": {
+        "state_ready_block_fetch": {"n": 10, "median_s": 0.05046674700861331, "p95_s": 0.10237477909395234, "mean_s": 0.05480417830112856, "sum_s": 0.5480417830112856},
+        "route_search_and_sizing": {"n": 10, "median_s": 0.17462958648684435, "p95_s": 0.2423045506031485, "mean_s": 0.17536689570115413, "sum_s": 1.7536689570115414},
+        "calldata_build": {"n": 10, "median_s": 0.0002939795085694641, "p95_s": 0.0003336499474244192, "mean_s": 0.0002896574034821242, "sum_s": 0.002896574034821242},
+        "simulate_and_gas_estimate": {"n": 10, "median_s": 0.2603221285098698, "p95_s": 0.33785003180091727, "mean_s": 0.2580970732000424, "sum_s": 2.5809707320004236},
+        "gas_estimate_direct": {"n": 10, "median_s": 0.09721542100305669, "p95_s": 0.10263609159592306, "mean_s": 0.09230755880125799, "sum_s": 0.9230755880125798},
+        "token_balance_read": {"n": 25, "median_s": 0.09953005000716075, "p95_s": 0.10320207581389695, "mean_s": 0.09242742600035854, "sum_s": 2.3106856500089634},
+        "weth_price_read": {"n": 10, "median_s": 0.09951832448132336, "p95_s": 0.10342223653860856, "mean_s": 0.09904859729285817, "sum_s": 0.9904859729285818},
+        "gas_price_read": {"n": 10, "median_s": 0.09892353549366817, "p95_s": 0.14573631180101065, "mean_s": 0.10668200949730818, "sum_s": 1.0668200949730817},
+        "nonce_calldata_prepare": {"n": 10, "median_s": 0.013604981999378651, "p95_s": 1.7391570590407353, "mean_s": 0.650686399298138, "sum_s": 6.50686399298138},
+        "sign": {"n": 10, "median_s": 0.005150916011189111, "p95_s": 0.005268674199760426, "mean_s": 0.005157895508455112, "sum_s": 0.051578955084551126}
+      },
+      "n_probes": 10, "total_traced_wall_s_median": 1.2487708595144795, "rpc_call_count_median": 10.5
+    }
+  },
+  "full_attempt_stats_by_variant": {
+    "baseline": {"n_reached_ready_to_send": 0, "n_returned_without_send": 10, "n_exception": 0,
+      "stats": {"per_stage": {"state_ready_block_fetch": {"n": 10, "median_s": 0.07621431449661031, "p95_s": 0.08666455355414655, "mean_s": 0.07516125249967445, "sum_s": 0.7516125249967445}}, "n_probes": 10, "total_traced_wall_s_median": 0.07621431449661031, "rpc_call_count_median": 1.5},
+      "stop_reasons_sample": ["нет ликвидности", "нет ликвидности", "нет ликвидности"]},
+    "lane": {"n_reached_ready_to_send": 0, "n_returned_without_send": 10, "n_exception": 0,
+      "stats": {"per_stage": {"state_ready_block_fetch": {"n": 10, "median_s": 0.07307189849962015, "p95_s": 0.08507023849233518, "mean_s": 0.07335924559738487, "sum_s": 0.7335924559738487}}, "n_probes": 10, "total_traced_wall_s_median": 0.07307189849962015, "rpc_call_count_median": 1.5},
+      "stop_reasons_sample": ["нет ликвидности", "нет ликвидности", "нет ликвидности"]},
+    "pool": {"n_reached_ready_to_send": 0, "n_returned_without_send": 10, "n_exception": 0,
+      "stats": {"per_stage": {"state_ready_block_fetch": {"n": 10, "median_s": 0.07307477699941956, "p95_s": 0.07999943354225252, "mean_s": 0.06461961520544719, "sum_s": 0.6461961520544719}}, "n_probes": 10, "total_traced_wall_s_median": 0.07307477699941956, "rpc_call_count_median": 1.5},
+      "stop_reasons_sample": ["нет ликвидности", "нет ликвидности", "нет ликвидности"]},
+    "both": {"n_reached_ready_to_send": 0, "n_returned_without_send": 10, "n_exception": 0,
+      "stats": {"per_stage": {"state_ready_block_fetch": {"n": 10, "median_s": 0.07145316850801464, "p95_s": 0.08143536315328674, "mean_s": 0.07398003379639703, "sum_s": 0.7398003379639704}}, "n_probes": 10, "total_traced_wall_s_median": 0.07145316850801464, "rpc_call_count_median": 1.5},
+      "stop_reasons_sample": ["нет ликвидности", "нет ликвидности", "нет ликвидности"]}
+  },
+  "idealized_limits_baseline": {
+    "caveat": "СЦЕНАРИИ, НЕ измеренные результаты -- вычислены из уже собранных медиан этого прогона.",
+    "measured_total_median_s": 3.375479667505715,
+    "measured_rpc_bound_portion_s": 2.7474833407695405,
+    "measured_cpu_bound_portion_s": 0.005630115204257891,
+    "scenario_no_rpc_wait_s": 0.6279963267361746,
+    "scenario_no_queue_note": "нет реальной очереди в прямом вызове этого пробника -- см. отдельный replay-анализ (Component B) для оценки очереди.",
+    "scenario_cpu_half_s": 3.372664609903586,
+    "scenario_cpu_quarter_s": 3.371257081102522
+  },
+  "note_on_full_attempt_instrumentation_gap": "run_full_attempt_probe вызывает РЕАЛЬНЫЙ, НЕИЗМЕНЁННЫЙ _evaluate_and_maybe_send() напрямую -- внутренние стадии (recompute_route и т.д.) там НЕ обёрнуты индивидуально (только явная метка state_ready_block_fetch ДО вызова), поэтому per_stage здесь содержит только один пункт. Оценка полного времени 'сигнал -> решение об отказе' -- через direct-probe того же реального route_search_and_sizing (см. baseline: 72мс block_fetch + 187мс recompute median = порядка 260мс)."
+}
