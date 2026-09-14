@@ -199,19 +199,40 @@ def enrich_one(row: dict) -> dict:
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--top-n", type=int, default=1,
+                     help="Обогащать только top-N по net_after_gas_usd (владелец, ввиду 1083 "
+                          "прошедших критерий транзакций: 'только одна -- максимальная чистая "
+                          "прибыль'). По умолчанию 1 -- НЕ обогащаем все 1083 (не оправданный "
+                          "объём RPC для заготовки одного эпизода).")
+    args = ap.parse_args()
+
     if not RESULT_PATH.exists():
         print(json.dumps({"error": f"{RESULT_PATH} не найден -- сначала запустить "
                                     f"task5_true_arbitrageur_scan.py (через _launch.py/_poll.py)"}))
         return
     scan_result = json.loads(RESULT_PATH.read_text())
-    qualifying_rows = scan_result.get("qualifying_rows", [])
-    if not qualifying_rows:
+    all_qualifying_rows = scan_result.get("qualifying_rows", [])
+    if not all_qualifying_rows:
         out = {"n_qualifying_rows_from_scan": 0,
                "note": "Скан не нашёл ни одной транзакции, прошедшей точный критерий владельца -- "
                        "обогащать нечего, артефакты не создаются, ничего не выдумано."}
         print(json.dumps(out, indent=2, ensure_ascii=False))
         OUT_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False))
         return
+
+    # Владелец: "только одна -- максимальная чистая прибыль" -- сортировка
+    # ПО РЕАЛЬНОМУ, уже посчитанному сканом net_after_gas_usd (None --
+    # честно в конец, не считаем неизвестное большим/малым).
+    with_known_net = [r for r in all_qualifying_rows if r.get("net_after_gas_usd") is not None]
+    without_known_net = [r for r in all_qualifying_rows if r.get("net_after_gas_usd") is None]
+    with_known_net.sort(key=lambda r: r["net_after_gas_usd"], reverse=True)
+    qualifying_rows = with_known_net[:args.top_n]
+    print(f"[enrich] всего прошедших критерий транзакций: {len(all_qualifying_rows)} "
+          f"({len(without_known_net)} с неизвестным net_after_gas_usd -- исключены из ранжирования). "
+          f"Обогащаю top-{args.top_n} по чистой прибыли: "
+          f"{[(r['tx_hash'], r.get('net_after_gas_usd')) for r in qualifying_rows]}", file=sys.stderr)
 
     enriched = []
     for row in qualifying_rows:
@@ -220,7 +241,14 @@ def main() -> None:
         except Exception as exc:  # noqa: BLE001
             enriched.append({"tx_hash": row.get("tx_hash"), "enrichment_error": f"{type(exc).__name__}: {exc}"})
 
-    out = {"n_qualifying_rows_from_scan": len(qualifying_rows), "enriched": enriched}
+    out = {
+        "n_qualifying_rows_total_from_scan": len(all_qualifying_rows),
+        "n_excluded_unknown_net_after_gas_usd": len(without_known_net),
+        "n_enriched_this_run": len(qualifying_rows),
+        "selection_note": (f"Владелец выбрал: обогатить только top-{args.top_n} по net_after_gas_usd "
+                            f"из {len(all_qualifying_rows)} прошедших критерий -- НЕ все 1083."),
+        "enriched": enriched,
+    }
     text = json.dumps(out, indent=2, default=str, ensure_ascii=False)
     print(text)
     OUT_PATH.write_text(text)
