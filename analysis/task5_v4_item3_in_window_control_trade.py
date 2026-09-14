@@ -247,10 +247,22 @@ def full_fund_flow_check(tx_hash: str) -> dict:
                          "note": "Initialize не найден -- пропускаем в net-flow, честно фиксируем"})
             continue
         c0, c1 = init["currency0"].lower(), init["currency1"].lower()
-        # amount0/amount1 -- позиция ПУЛА (положительное = пул получил).
-        # Позиция ТРЕЙДЕРА -- обратная.
-        net_trader_flow[c0] = net_trader_flow.get(c0, 0) - decoded["amount0"]
-        net_trader_flow[c1] = net_trader_flow.get(c1, 0) - decoded["amount1"]
+        # ПРАВКА (владелец, 2026-09-14, третье независимое подтверждение --
+        # tx 0xde38133b... в раунде 10, затем 0xf4c3fe75... и 0x90fe304f...
+        # в этом раунде, каждый раз сверено с буквальными ERC20 Transfer):
+        # реальный V4 PoolManager.Swap даёт amount0/amount1 УЖЕ с позиции
+        # ТРЕЙДЕРА (положительное = трейдер ПОЛУЧИЛ/пул отдал), а НЕ с
+        # позиции пула, как ошибочно предполагал прежний комментарий и
+        # унарный минус ниже. Раунд 10 (коммит 2b4ab85) уже подтвердил эту
+        # инверсию числом, но исправил ТОЛЬКО отдельный одноразовый пересчёт
+        # уже сохранённого JSON (task5_v4_item3_signfix_first_positive.py)
+        # -- САМА эта функция (единственное место, где формируется знак)
+        # исправлена не была, поэтому баг воспроизводился заново при каждом
+        # новом вызове full_fund_flow_check() (в т.ч. дважды в этом раунде).
+        # Прямое суммирование (БЕЗ минуса) -- корректный знак, проверено на
+        # трёх независимых транзакциях против буквальных Transfer.
+        net_trader_flow[c0] = net_trader_flow.get(c0, 0) + decoded["amount0"]
+        net_trader_flow[c1] = net_trader_flow.get(c1, 0) + decoded["amount1"]
         legs.append({"pool_id": pool_id_hex, "currency0": c0, "currency1": c1, **decoded})
     result["legs"] = legs
     result["net_trader_flow_by_token_raw"] = net_trader_flow
