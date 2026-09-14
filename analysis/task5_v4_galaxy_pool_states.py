@@ -26,8 +26,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
-from alchemy_fallback import _rpc_call  # noqa: E402
+from alchemy_fallback import _rpc_call, rpc_call_trading_path  # noqa: E402
 from task5_v4_pool_state_cache import extsload_pool_state  # noqa: E402
+
+# ПРАВКА (на месте, реальный найденный сбой): публичный-RPC-первый путь
+# (_rpc_call) детерминированно вернул "metadata is not found" ИМЕННО на
+# блоках 62371951 (при запросе через _rpc_call) -- НЕ транзиентная
+# ошибка по эвристике _looks_transient (не входит в _TRANSIENT_ERROR_
+# MARKERS), поэтому _post_with_fallback НИКОГДА не пробовал следующий
+# эндпоинт (Alchemy). rpc_call_trading_path -- целенаправленно Alchemy
+# напрямую (тот же путь, что и торговый горячий путь бота) -- реально
+# успешно ответил на ЭТИХ ЖЕ блоках при точечной проверке.
 
 getcontext().prec = 60
 
@@ -57,7 +66,11 @@ def main() -> None:
         block_hex = hex(block)
         cp: dict = {"block": block}
         for pool_label, pool_id in (("pool1_fee5pct", POOL1), ("pool2_fee10pct", POOL2)):
-            state = extsload_pool_state(pool_id, block_hex, _rpc_call, POOL_MANAGER)
+            try:
+                state = extsload_pool_state(pool_id, block_hex, rpc_call_trading_path, POOL_MANAGER)
+            except Exception as exc:  # noqa: BLE001
+                state = extsload_pool_state(pool_id, block_hex, _rpc_call, POOL_MANAGER)
+                state["_fallback_note"] = f"rpc_call_trading_path (Alchemy) failed: {exc}; использован _rpc_call"
             state["human_price_usdg_per_galaxy"] = human_price(state["sqrt_price_x96"])
             cp[pool_label] = state
         result["checkpoints"][cp_label] = cp

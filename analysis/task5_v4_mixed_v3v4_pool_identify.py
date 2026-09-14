@@ -16,8 +16,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
-from alchemy_fallback import _rpc_call  # noqa: E402
+from alchemy_fallback import _rpc_call, rpc_call_trading_path  # noqa: E402
 from task5_v4_pool_state_cache import extsload_pool_state  # noqa: E402
+
+# ПРАВКА (на месте, реальный найденный сбой): публичный-RPC-первый путь
+# (_rpc_call) детерминированно вернул "metadata is not found" на этих же
+# блоках -- не транзиентная ошибка по эвристике, поэтому фолбэк на
+# Alchemy никогда не срабатывал сам. rpc_call_trading_path -- Alchemy
+# напрямую (тот же путь, что торговый горячий путь бота).
 
 getcontext().prec = 60
 
@@ -40,10 +46,14 @@ AFTER_BLOCK = 62373270
 
 
 def eth_call(to: str, data: str, block) -> str | None:
+    block_param = block if isinstance(block, str) else hex(block)
     try:
-        return _rpc_call("eth_call", [{"to": to, "data": data}, block if isinstance(block, str) else hex(block)])
-    except Exception as exc:  # noqa: BLE001
-        return f"ERROR: {exc}"
+        return rpc_call_trading_path("eth_call", [{"to": to, "data": data}, block_param])
+    except Exception:  # noqa: BLE001
+        try:
+            return _rpc_call("eth_call", [{"to": to, "data": data}, block_param])
+        except Exception as exc2:  # noqa: BLE001
+            return f"ERROR: {exc2}"
 
 
 def main() -> None:
@@ -67,7 +77,11 @@ def main() -> None:
     # V4-Swap (tx_index 9) и V3-Swap (tx_index 10) внутри блока 62373270. ---
     for label, block in (("before_both_62373269", BEFORE_BLOCK), ("after_both_62373270", AFTER_BLOCK)):
         cp: dict = {"block": block}
-        cp["v4_pool"] = extsload_pool_state(V4_POOL_ID, hex(block), _rpc_call, POOL_MANAGER)
+        try:
+            cp["v4_pool"] = extsload_pool_state(V4_POOL_ID, hex(block), rpc_call_trading_path, POOL_MANAGER)
+        except Exception as exc:  # noqa: BLE001
+            cp["v4_pool"] = extsload_pool_state(V4_POOL_ID, hex(block), _rpc_call, POOL_MANAGER)
+            cp["v4_pool"]["_fallback_note"] = f"rpc_call_trading_path (Alchemy) failed: {exc}; использован _rpc_call"
         slot0_raw = eth_call(V3_STYLE_POOL, SLOT0_SELECTOR, block)
         liq_raw = eth_call(V3_STYLE_POOL, LIQUIDITY_SELECTOR, block)
         cp["v3_style_pool_slot0_raw"] = slot0_raw
