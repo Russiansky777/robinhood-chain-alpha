@@ -11,11 +11,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+# РЕАЛЬНЫЙ баг, найденный этим же прогоном: без этой строки (та же, что в
+# task5_v4_feed_vs_alchemy_measurement.py) CONFIG.alchemy_rpc_url пуст на
+# Ohio -- ALCHEMY_ROBINHOOD_RPC_URL там не задан напрямую, только
+# RPC_URL_PROVIDER. ДОЛЖНА идти ДО импорта config (CONFIG читает env при
+# инициализации модуля).
+os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
 
 import websockets  # noqa: E402
 
