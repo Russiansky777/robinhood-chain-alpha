@@ -1,0 +1,25 @@
+{
+  "capture_structure": {
+    "capture_duration_s": 300.0,
+    "n_ws_frames": 3600,
+    "n_tx_decoded_total": 41695,
+    "n_distinct_sequence_numbers": 3577,
+    "tx_per_sequence_number": {
+      "min": 1,
+      "median": 10,
+      "max": 321
+    },
+    "missing_fields_for_true_arrival_replay": [
+      "per-record/per-frame monotonic or wall-clock arrival timestamp",
+      "which records correspond to a PoolManager.Swap on a TRACKED pool_id (this capture is unfiltered general router traffic, not the bot's real trigger)"
+    ],
+    "representativeness_caveat": "Этот захват -- ВЕСЬ трафик роутеров, не отфильтрованный по реальному триггеру бота (Swap на отслеживаемых pool_id). Частота ниже -- верхняя граница общей инфраструктуры приёма, НЕ оценка реальной частоты сигналов бота."
+  },
+  "queue_scenario": {
+    "assumed_arrival_model": "uniform_by_sequence_number",
+    "assumption_caveat": "Равномерное распределение -- ПРЕДПОЛОЖЕНИЕ (нет per-message timestamp в захвате), не измеренный реальный интервал.",
+    "mean_inter_arrival_s_between_sequence_groups": 0.08386916410399776,
+    "queue_utilization": null,
+    "note": "Нет реальных calc_duration_s (передайте --calc-duration-samples-json с результатом task5_v4_speed_benchmark.py) -- утилизация очереди не вычислена, чтобы не подставлять выдуманное значение времени обслуживания."
+  }
+}
