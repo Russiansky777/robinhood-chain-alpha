@@ -1,0 +1,75 @@
+{
+  "generated_for": "0xcc630e7d525909dd32453101baf311588813279edb5a97e0d386ea9cc4c2ede3",
+  "block_B": 62790344,
+  "decoded_B_minus_1_txs": [
+    {
+      "tx_hash": "0xe60697bc593cb910ac5d98157563bd89070213d4d3486100e2bb72e86549aabb",
+      "block_number": "0x3be1ac7", "transaction_index": "0x1",
+      "from": "0x43cf0514a882938d46b5d2fa1c6a96dc7de6b7d3",
+      "to": "0x9689992f5b5c09447f15906d8d11214944488341",
+      "actions": [
+        {"kind": "transfer", "log_index": "0x0", "token": "TOKEN_X",
+         "from": "0x43cf0514a882938d46b5d2fa1c6a96dc7de6b7d3",
+         "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "raw": 1383552454112411972015755},
+        {"kind": "v4_swap_pool1", "log_index": "0x1", "sender": "0x9689992f5b5c09447f15906d8d11214944488341",
+         "amount0": 401731217785508372, "amount1": -1383552454112411972015755,
+         "sqrt_price_x96": 148915208237469619657659129941491, "liquidity": 29277002188455995434405,
+         "tick": 150783, "fee": 0}
+      ]
+    },
+    {
+      "tx_hash": "0x3fdbaccf668869d2c35a456d7134f9a8de99190c108690217ba368fb32ae900c",
+      "block_number": "0x3be1ac7", "transaction_index": "0x3",
+      "from": "0xf42a0e02e07c38320152ed0c967d130a112e1e2c",
+      "to": "0x9689992f5b5c09447f15906d8d11214944488341",
+      "actions": [
+        {"kind": "transfer", "log_index": "0x7", "token": "TOKEN_X",
+         "from": "0xf42a0e02e07c38320152ed0c967d130a112e1e2c",
+         "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "raw": 1063080187336901288751705},
+        {"kind": "v4_swap_pool1", "log_index": "0x8", "sender": "0x9689992f5b5c09447f15906d8d11214944488341",
+         "amount0": 295214071813759678, "amount1": -1063080187336901288751705,
+         "sqrt_price_x96": 151792070059109032528846206024000, "liquidity": 29277002188455995434405,
+         "tick": 151166, "fee": 0}
+      ]
+    },
+    {
+      "tx_hash": "0xdabdb359980d0633c33df153d2b320529651e26d3a361faf9027e06d5ca45a07",
+      "block_number": "0x3be1ac7", "transaction_index": "0x4",
+      "from": "0xcc306a3cc14ca191db81281beefad8b1113f58fe",
+      "to": "0x9689992f5b5c09447f15906d8d11214944488341",
+      "actions": [
+        {"kind": "transfer", "log_index": "0xc", "token": "TOKEN_X",
+         "from": "0xcc306a3cc14ca191db81281beefad8b1113f58fe",
+         "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "raw": 1337145588367409550005205},
+        {"kind": "v4_swap_pool1", "log_index": "0xd", "sender": "0x9689992f5b5c09447f15906d8d11214944488341",
+         "amount0": 355801810785000000, "amount1": -1337145588367409550005205,
+         "sqrt_price_x96": 155410595866446540877179850362842, "liquidity": 29277002188455995434405,
+         "tick": 151637, "fee": 0}
+      ]
+    },
+    {
+      "tx_hash": "0xb09332acb935eb354b2e9651c4bb74d92bfcbce1093b2634d041837b56291a4e",
+      "block_number": "0x3be1ac7", "transaction_index": "0x9",
+      "from": "0xe9a0a2171067454e364e4054f35203ce9a7fd982",
+      "to": "0xb0817f2cc3365df7f564f970169026c866a14a44",
+      "actions": [
+        {"kind": "v3_swap", "log_index": "0x33", "sender": "0xcaf681a66d020601342297493863e78c959e5cb2",
+         "recipient": "0xb0817f2cc3365df7f564f970169026c866a14a44",
+         "amount0_weth": -19488412782293491, "amount1_usdg": 48863295,
+         "sqrt_price_x96": 3966989304104763349082643, "tick": -198052,
+         "note": "Никак не касается TOKEN_X/pool1 -- отдельная, не связанная с нашим маршрутом мелкая V3 WETH/USDG сделка (unrelated route: другой sender/recipient, никакого пересечения с pool1/pool2)."}
+      ]
+    }
+  ],
+  "calibration": {
+    "at_B_minus_2_before_B1_events": {
+      "block_tag": "0x3be1ac6", "quoted_weth_out_raw": 603868941346455906, "quoted_weth_out": 0.603868941346456
+    },
+    "at_B_minus_1_after_B1_events": {
+      "block_tag": "0x3be1ac7", "quoted_weth_out_raw": 528258716835434676, "quoted_weth_out": 0.5282587168354347
+    },
+    "caveat": "Оба квота -- через реальный V4Quoter (Alchemy напрямую), направление TOKEN_X->WETH, тот же реальный net-размер, что дошёл до исполнителя в арбитраже. РЕАЛЬНЫЙ арбитраж (блок B) получил 0.5933 WETH -- БОЛЬШЕ обоих квотов. Учитывая подтверждённый AFTER_SWAP_RETURNS_DELTA хука (см. предыдущий прогон), quoter, вероятно, НЕ моделирует реальную hook-логику корректно для этого пула -- та же проблема уже зафиксирована в data/task5_v4_hook_quote_check_result.json для другого пула этого хука. Квот здесь используется ТОЛЬКО как индикатор направления цены, не как доказуемая исполнимая прибыль."
+  },
+  "n_rpc_calls_used": 10,
+  "elapsed_s": 4.5
+}
