@@ -228,28 +228,46 @@ def run_direct_primitive_probe(route, sender, run_index: int) -> dict:
         result["block_number"] = block_number
         recompute = _timed_call("route_search_and_sizing", hp.recompute_route, route, block_number)
         result["recompute_ok"] = recompute["ok"]
+        result["used_fallback_amount_in"] = False
         if not recompute["ok"]:
+            # ЧЕСТНЫЙ, реальный ранний отказ (типично -- см. отчёт: обе
+            # seed-routes сейчас без ликвидности) -- НЕ ошибка бенчмарка.
+            # НО чтобы измерить реальную СТОИМОСТЬ последующих стадий
+            # (симуляция/газ/баланс/подпись) НЕЗАВИСИМО от того, есть ли
+            # СЕЙЧАС прибыльный размер -- продолжаем с ФИКСИРОВАННЫМ,
+            # произвольным amount_in (та же величина, что и в
+            # parity_check). Это ВСЁ ЕЩЁ реальные RPC-вызовы на реальном
+            # состоянии сети (реверт -- тоже реальный, оплаченный полным
+            # RPC round-trip'ом результат, честно измеряется) -- НЕ
+            # выдаётся за "нашёлся прибыльный кандидат".
+            amount_in = 10 ** 15
             result["reason"] = recompute.get("reason")
-            result["ok"] = True  # честный, реальный ранний отказ -- НЕ ошибка бенчмарка
-            return result
-        amount_in = recompute["amount_in"]
-        result["amount_in_raw"] = amount_in
-        result["profit_before_gas_raw"] = recompute["profit_raw"]
+            result["used_fallback_amount_in"] = True
+            profit_raw_for_check = 0
+        else:
+            amount_in = recompute["amount_in"]
+            result["amount_in_raw"] = amount_in
+            result["profit_before_gas_raw"] = recompute["profit_raw"]
+            profit_raw_for_check = recompute["profit_raw"]
         first_amount_specified = -amount_in
         calldata = _timed_call("calldata_build", hp.build_execute_cycle_calldata, route,
                                 first_amount_specified, min_profit=hp.MIN_PROFIT_FLOOR_RAW)
         check = _timed_call("simulate_and_gas_estimate", hp._quote_and_estimate_gas_consistent,
                              route, amount_in, CONTRACT_ADDRESS, calldata, OWNER_ADDRESS,
-                             original_block=block_number, original_profit_raw=recompute["profit_raw"])
+                             original_block=block_number, original_profit_raw=profit_raw_for_check)
         result["quote_gas_check_ok"] = check["ok"]
         gas_estimate = None
+        # gas_estimate_direct таймится ВСЕГДА (даже если check не ok --
+        # это реальный, самостоятельный eth_estimateGas на calldata
+        # текущего пробного размера; реверт при отсутствии ликвидности --
+        # тоже реальный, оплаченный round-trip'ом результат).
+        gas_res = _timed_call("gas_estimate_direct", hp.estimate_gas, CONTRACT_ADDRESS, calldata,
+                               OWNER_ADDRESS)
+        result["gas_estimate_direct_ok"] = gas_res["ok"]
         if check["ok"]:
             gas_estimate = check["gas_estimate"]
-            gas_res = _timed_call("gas_estimate_direct", hp.estimate_gas, CONTRACT_ADDRESS, calldata,
-                                   OWNER_ADDRESS)
-            result["gas_estimate_direct_ok"] = gas_res["ok"]
-            if gas_res["ok"]:
-                gas_estimate = gas_res["gas_estimate"]
+        if gas_res["ok"]:
+            gas_estimate = gas_res["gas_estimate"]
         route_tokens = sorted({leg.currency0.lower() for leg in route.legs} |
                                {leg.currency1.lower() for leg in route.legs})
         for token in route_tokens:
