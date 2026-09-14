@@ -1,0 +1,107 @@
+name: "Задача 5 -- ВЫВОД остатка средств с кошелька PRIVATE_KEY_NOX (реальная транзакция, владелец кнопкой)"
+
+# Владелец (чат, трижды подтверждено с уточнением деталей): "бот не
+# состоялся, переведи остаток (~$150, реально ~0.0597 ETH, см.
+# data/task5_sender_wallet_balance_check_result.json) с кошелька, с
+# которого деплоили контракт (PRIVATE_KEY_NOX -- тот же адрес, что
+# owner 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75), на свой рабочий
+# кошелёк 0x38b69eB7fEC46C8aDac7e456723FFF50C855022b."
+#
+# ЭТО РЕАЛЬНАЯ, НЕОБРАТИМАЯ, ДЕНЕЖНАЯ ТРАНЗАКЦИЯ -- та же схема
+# безопасности, что run_task5_deploy_executor_v4.yml: только
+# workflow_dispatch, текстовое подтверждение перед стартом,
+# фиксированный commit_sha, результат коммитится обратно.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите ровно "SWEEP_CONFIRMED", чтобы подтвердить: это реальный, необратимый перевод остатка нативного ETH с кошелька PRIVATE_KEY_NOX на 0x38b69eB7fEC46C8aDac7e456723FFF50C855022b.'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Фиксированный полный commit SHA скрипта task5_sender_wallet_sweep.py.'
+        required: true
+        type: string
+
+jobs:
+  sweep_sender_wallet:
+    name: "Отправить остаток с кошелька PRIVATE_KEY_NOX (Ohio VPS)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Проверить текстовое подтверждение
+        env:
+          CONFIRM_INPUT: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM_INPUT" != "SWEEP_CONFIRMED" ]; then
+            echo "confirm != 'SWEEP_CONFIRMED' -- остановлено, перевод НЕ отправлен." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY_OHIO: ${{ secrets.VPS_SSH_KEY_OHIO }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY_OHIO" > ~/.ssh/vps_key_ohio
+          chmod 600 ~/.ssh/vps_key_ohio
+          ssh-keyscan -T 10 3.151.160.108 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_ohio -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout script_path из commit_sha + запуск НА OHIO -- ОДНА реальная отправка"
+        env:
+          SWEEP_SHA: ${{ inputs.commit_sha }}
+        run: |
+          SSH_RC=0
+          ssh $SSH_OPTS ubuntu@3.151.160.108 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              set -a
+              . /etc/bot/env
+              set +a
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $SWEEP_SHA
+              git checkout $SWEEP_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_sender_wallet_sweep.py
+            '
+          " > /tmp/sweep_stdout.log 2> /tmp/sweep_stderr.log || SSH_RC=$?
+          echo "--- stdout ---"; cat /tmp/sweep_stdout.log
+          echo "--- stderr ---"; cat /tmp/sweep_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
+
+      - name: Забрать результат
+        if: always()
+        run: |
+          ssh $SSH_OPTS ubuntu@3.151.160.108 'sudo -u bot cat /home/bot/robinhood-chain-alpha/data/task5_sender_wallet_sweep_result.json' > /tmp/task5_sender_wallet_sweep_result.json || true
+
+      - name: Commit результат
+        if: always()
+        run: |
+          mkdir -p data
+          if [ -s /tmp/task5_sender_wallet_sweep_result.json ] && python3 -c "import json; json.load(open('/tmp/task5_sender_wallet_sweep_result.json'))" 2>/dev/null; then
+            cp /tmp/task5_sender_wallet_sweep_result.json data/task5_sender_wallet_sweep_result.json
+            git add data/task5_sender_wallet_sweep_result.json
+          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: результат вывода остатка с кошелька PRIVATE_KEY_NOX (владелец) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
