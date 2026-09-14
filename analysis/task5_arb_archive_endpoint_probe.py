@@ -24,6 +24,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import requests  # noqa: E402
 
+# ЧЕСТНАЯ ПРАВКА после первого прогона этого же скрипта: забыл
+# priming RPC_URL_PROVIDER->ALCHEMY_ROBINHOOD_RPC_URL, который делают
+# ВСЕ остальные скрипты проекта -- в результате Alchemy оказался
+# "не настроен" и проверился только public RPC. Ohio реально хранит
+# ключ Alchemy под именем RPC_URL_PROVIDER (см. любой другой скрипт
+# сессии) -- без этой строки config.CONFIG.alchemy_rpc_url пуст.
+import os  # noqa: E402
+os.environ.setdefault("ALCHEMY_ROBINHOOD_RPC_URL", os.environ.get("RPC_URL_PROVIDER", ""))
+
 from config import CONFIG  # noqa: E402
 
 B = 62_790_344
