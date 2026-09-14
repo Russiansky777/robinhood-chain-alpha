@@ -58,8 +58,13 @@ def main() -> None:
     result["all_logs_summary"] = sorted(all_logs, key=lambda x: x["log_index"])
     result["v3_swap_topic0_computed"] = V3_SWAP_TOPIC0
 
-    # Код по адресу контрагента -- контракт или EOA?
-    code = _rpc_call("eth_getCode", [COUNTERPARTY, hex(block_number)])
+    # Код по адресу контрагента -- контракт или EOA? "latest" (не
+    # исторический блок) -- байткод контракта после деплоя практически
+    # не меняется, а "eth_getCode" на некоторых блоках вернул честную
+    # ошибку провайдера "metadata is not found" (недоступность именно
+    # ЭТОГО исторического снимка для eth_getCode, не для eth_getLogs/
+    # eth_call) -- не нужный здесь риск, вопрос только "это контракт?".
+    code = _rpc_call("eth_getCode", [COUNTERPARTY, "latest"])
     result["counterparty_address"] = COUNTERPARTY
     result["counterparty_is_contract"] = bool(code and code != "0x")
     result["counterparty_code_size_bytes"] = (len(code) - 2) // 2 if code else 0
