@@ -1,0 +1,93 @@
+{
+  "tx_hash": "0xcc630e7d525909dd32453101baf311588813279edb5a97e0d386ea9cc4c2ede3",
+  "block_B": 62790344,
+  "n_rpc_calls_used": 12,
+  "elapsed_s": 7,
+  "phase1_pool_identity": {
+    "original_tx": {
+      "from": "0xddbc5dd838f2efeacc6dbd7cd29c0bd805155680",
+      "to": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "value": "0x0",
+      "gas": "0x22ac90",
+      "input_len_bytes": 1700,
+      "input_selector": "0xe721e1a6"
+    },
+    "pool1": {
+      "pool_id": "0x935c1401e40a4eeec0e722f1841cc4be9d7a523cf90cdc52900f9e343304f0fe",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x78b96280c3347e0f58a7147b73eb0ec5ffff025d",
+      "fee": 0,
+      "tick_spacing": 200,
+      "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+      "init_sqrt_price_x96": 552276925551777206355258376122954,
+      "init_tick": 176998,
+      "block_number": "0x34d3674",
+      "hook_permissions": {
+        "BEFORE_INITIALIZE_FLAG": true,
+        "AFTER_INITIALIZE_FLAG": false,
+        "BEFORE_ADD_LIQUIDITY_FLAG": false,
+        "AFTER_ADD_LIQUIDITY_FLAG": false,
+        "BEFORE_REMOVE_LIQUIDITY_FLAG": false,
+        "AFTER_REMOVE_LIQUIDITY_FLAG": false,
+        "BEFORE_SWAP_FLAG": false,
+        "AFTER_SWAP_FLAG": true,
+        "BEFORE_DONATE_FLAG": false,
+        "AFTER_DONATE_FLAG": false,
+        "BEFORE_SWAP_RETURNS_DELTA_FLAG": false,
+        "AFTER_SWAP_RETURNS_DELTA_FLAG": true,
+        "AFTER_ADD_LIQUIDITY_RETURNS_DELTA_FLAG": false,
+        "AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG": false
+      }
+    },
+    "pool2": {
+      "pool_id": "0x0086a03ec05c3115a0bb90e0d00e84b6228ceb518769f205b4d52a3d432a8fa2",
+      "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "currency1": "0x78b96280c3347e0f58a7147b73eb0ec5ffff025d",
+      "fee": 30000,
+      "tick_spacing": 600,
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "init_sqrt_price_x96": 1345752838618783586877634443688950489,
+      "init_tick": 332974,
+      "block_number": "0x3680cf8",
+      "hook_permissions": {
+        "BEFORE_INITIALIZE_FLAG": false, "AFTER_INITIALIZE_FLAG": false,
+        "BEFORE_ADD_LIQUIDITY_FLAG": false, "AFTER_ADD_LIQUIDITY_FLAG": false,
+        "BEFORE_REMOVE_LIQUIDITY_FLAG": false, "AFTER_REMOVE_LIQUIDITY_FLAG": false,
+        "BEFORE_SWAP_FLAG": false, "AFTER_SWAP_FLAG": false,
+        "BEFORE_DONATE_FLAG": false, "AFTER_DONATE_FLAG": false,
+        "BEFORE_SWAP_RETURNS_DELTA_FLAG": false, "AFTER_SWAP_RETURNS_DELTA_FLAG": false,
+        "AFTER_ADD_LIQUIDITY_RETURNS_DELTA_FLAG": false, "AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG": false
+      }
+    },
+    "v3_pool": {
+      "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee_pips": 100
+    }
+  },
+  "phase2_feasibility": {
+    "replay_original_call_at_B_minus_1": {
+      "ok": false,
+      "error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790346'}"
+    },
+    "replay_original_call_at_B_minus_100": {
+      "ok": false,
+      "error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790247'}"
+    },
+    "debug_traceCall_available": false,
+    "debug_traceCall_error": "RPC debug_traceCall error: {'code': -32601, 'message': 'the method debug_traceCall does not exist/is not available'}",
+    "weth_balanceOf_error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790247'}"
+  },
+  "phase3_calibration": {
+    "pool_keys_confirmed": {
+      "pool1": {"currency0": "0x0000000000000000000000000000000000000000", "currency1": "0x78b96280c3347e0f58a7147b73eb0ec5ffff025d", "fee": 0, "tick_spacing": 200, "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044"},
+      "pool2": {"currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168", "currency1": "0x78b96280c3347e0f58a7147b73eb0ec5ffff025d", "fee": 30000, "tick_spacing": 600, "hooks": "0x0000000000000000000000000000000000000000"}
+    },
+    "pool_id_recompute_check": {"pool1_matches": true, "pool2_matches": true},
+    "v4_multihop_quote_error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790346'}",
+    "v4_single_leg1_error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790346'}",
+    "v4_single_leg2_error": "RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790346'}",
+    "v3_leg3_error": "RuntimeError: RPC eth_call error: {'code': -32000, 'message': 'metadata is not found, 62790346'}",
+    "conclusion": "Все попытки калибровки (V4Quoter multihop/single, V3 slot0) провалились по ОДНОЙ и той же причине -- архивный eth_call недоступен на этом RPC-провайдере даже на B-1. Калибровка не проведена, точная пересимуляция физически невозможна с доступным RPC."
+  }
+}
