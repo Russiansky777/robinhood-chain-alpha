@@ -120,7 +120,8 @@ def _read_rpc_call_count() -> int:
 from task5_v4_executor_calldata import build_execute_cycle_calldata  # noqa: E402
 from task5_v4_pilot_accounting import (  # noqa: E402
     BUDGET_STOP_USD, REASON_CALC_ERROR, REASON_HOOK_MODEL_ABSENT, REASON_INVALID_POOL_CONFIG,
-    REASON_LIVENESS_RECHECK_DEFERRED, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE, REASON_SIMULATION_FAILED,
+    REASON_LIVENESS_RECHECK_DEFERRED, REASON_NO_LIQUIDITY, REASON_NO_PROFITABLE_CYCLE, REASON_REQUOTE_UNPROFITABLE,
+    REASON_SIMULATION_FAILED,
     AttemptTable, AttemptTableRow, PilotBudget, ReasonLog, check_accounting_consistency,
     check_no_unexpected_token_spend,
 )
@@ -597,7 +598,9 @@ def _looks_like_block_param_unsupported(detail: str) -> bool:
 
 
 def _quote_and_estimate_gas_consistent(route: RouteCycle, amount_in: int, contract_address: str,
-                                        calldata: bytes, from_address: str) -> dict:
+                                        calldata: bytes, from_address: str, *,
+                                        original_block: int | None = None,
+                                        original_profit_raw: int | None = None) -> dict:
     """Пункт 2 (седьмой раунд, разбор владельца): "estimateGas(latest)
     -> blockNumber -> quote(blockNumber) не гарантирует одинаковое
     состояние". Получаем КОНКРЕТНЫЙ блок B ПЕРВЫМ (один eth_blockNumber),
@@ -612,15 +615,42 @@ def _quote_and_estimate_gas_consistent(route: RouteCycle, amount_in: int, contra
     попытка; при повторном сдвиге -- честный отказ (устаревший
     кандидат), НЕ бесконечный подбор.
 
+    ПРАВКА (разбор владельца, InsufficientFunds route_7aebd805z0...,
+    2026-09-14, подтверждено одним реальным примером: положительная ДО
+    газа котировка на блоке сигнала устарела за время в очереди --
+    повторная котировка на согласованном блоке САМА оказалась
+    убыточной, а estimateGas всё равно вызывался и откатывался. Это
+    ОДИН лишний RPC-вызов, не вывод о причине остальных 61 отката --
+    другие случаи здесь НЕ переклассифицируются задним числом):
+    ПОСЛЕ каждой успешной повторной котировки (и в основной ветке
+    block_param, и в fallback-цикле), но ДО estimateGas, проверяем знак
+    profit_raw. Если <= 0 -- честный отказ с REASON_REQUOTE_UNPROFITABLE
+    и ОБОИМИ парами (исходный блок/профит, если переданы вызывающим --
+    он их знает по своему recompute/first_check; повторный блок/профит
+    -- всегда), estimateGas НЕ вызывается вовсе.
+
     Возвращает {"ok": True, "block": B, "profit_raw": ..., "gas_estimate": ...,
     "mode": "block_param"|"fallback_stable"|"fallback_retried_stable",
     "block_before": ..., "block_after": ...} либо {"ok": False, "reason": ...,
     "detail": ..., "mode": ..., блоки для честного лога}."""
+
+    def _requote_unprofitable(mode: str, block_b: int, block_before: int, block_after: int,
+                               requote_profit_raw: int) -> dict:
+        orig_note = (f"; исходная котировка -- блок {original_block}, profit_raw={original_profit_raw}"
+                      if original_block is not None else "; исходный блок/профит не переданы вызывающим")
+        return {"ok": False, "mode": mode, "block": block_b, "block_before": block_before,
+                "block_after": block_after, "reason": REASON_REQUOTE_UNPROFITABLE,
+                "detail": f"повторная котировка -- блок {block_b}, profit_raw={requote_profit_raw} <= 0{orig_note}",
+                "requote_block": block_b, "requote_profit_raw": requote_profit_raw,
+                "original_block": original_block, "original_profit_raw": original_profit_raw}
+
     block_b = int(rpc_call_trading_path("eth_blockNumber", []), 16)
     quote_res = quote_route_at_size(route, amount_in, block_b)
     if not quote_res["ok"]:
         return {"ok": False, "mode": "block_param", "block": block_b, "block_before": block_b,
                 "block_after": block_b, "reason": quote_res["reason"], "detail": quote_res["detail"]}
+    if quote_res["profit_raw"] <= 0:
+        return _requote_unprofitable("block_param", block_b, block_b, block_b, quote_res["profit_raw"])
     gas_res = estimate_gas(contract_address, calldata, from_address, block_number=block_b)
     if gas_res["ok"]:
         return {"ok": True, "mode": "block_param", "block": block_b, "block_before": block_b,
@@ -639,6 +669,9 @@ def _quote_and_estimate_gas_consistent(route: RouteCycle, amount_in: int, contra
         if not quote_res["ok"]:
             return {"ok": False, "mode": "fallback", "block": block_before, "block_before": block_before,
                      "block_after": block_before, "reason": quote_res["reason"], "detail": quote_res["detail"]}
+        if quote_res["profit_raw"] <= 0:
+            return _requote_unprofitable("fallback", block_before, block_before, block_before,
+                                          quote_res["profit_raw"])
         gas_res = estimate_gas(contract_address, calldata, from_address)  # БЕЗ блока -- параметр не поддержан
         if not gas_res["ok"]:
             return {"ok": False, "mode": "fallback", "block": block_before, "block_before": block_before,
@@ -1852,7 +1885,9 @@ class HotPath:
         # бы положительным, профит(после газа) отрицательный" из
         # no_send_log пилота (7 записей, блоки 61755138 и др.).
         first_check = _quote_and_estimate_gas_consistent(route, recompute["amount_in"], self.contract_address,
-                                                           calldata, self.from_address)
+                                                           calldata, self.from_address,
+                                                           original_block=block_number,
+                                                           original_profit_raw=recompute["profit_raw"])
         if not first_check["ok"]:
             _log_reason(first_check["reason"],
                         f"{first_check['detail']} (режим={first_check['mode']}, "
@@ -1946,7 +1981,9 @@ class HotPath:
         fresh_latest_final = int(rpc_call_trading_path("eth_blockNumber", []), 16)
         if fresh_latest_final > effective_block:
             final_check = _quote_and_estimate_gas_consistent(route, final_amount_in, self.contract_address,
-                                                               calldata, self.from_address)
+                                                               calldata, self.from_address,
+                                                               original_block=effective_block,
+                                                               original_profit_raw=effective_profit_raw)
             if not final_check["ok"] or final_check["profit_raw"] <= 0:
                 detail = final_check.get("detail", "") if not final_check["ok"] else (
                     f"профит {final_check['profit_raw']} <= 0")
