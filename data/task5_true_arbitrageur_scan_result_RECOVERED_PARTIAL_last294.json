@@ -1,0 +1,4998 @@
+{
+  "_RECOVERY_NOTE": "PARTIAL RECOVERY ONLY. The GitHub Actions get_job_logs tool hard-caps return_content output at the last 5000 lines of the job log regardless of the tail_lines parameter requested (verified: tail_lines=6000 and tail_lines=100000 returned byte-identical output of exactly 5000 lines / 352767 chars). The full raw job log has original_length=18685 lines total. Direct download of the full log archive (via get_workflow_run_logs_url presigned zip URL on results-receiver.actions.githubusercontent.com, and via the per-job blob URL on productionresultssa4.blob.core.windows.net obtained with return_content=false) was attempted via curl and BLOCKED by the sandbox's egress proxy policy (HTTP 403 on CONNECT, 'gateway answered 403 to CONNECT (policy denial or upstream failure)') for both hosts. No workflow-run artifacts exist for this run (list_workflow_run_artifacts returned total_count=0), so there is no alternate artifact-based path to the data. As a result, only the LAST 294 complete qualifying_rows entries (out of the claimed 1083) plus the JSON's closing structure could be recovered. The first ~789 rows and any top-level preamble fields before 'qualifying_rows' in the original JSON object are NOT available from this job's log via any tool accessible in this session.",
+  "recovered_qualifying_rows_count": 294,
+  "recovered_qualifying_rows_tail_slice": [
+    {
+      "tx_hash": "0x480ddb7069ced6f40e1616bee7e63ae184accc78a4da615cd4e655d4f214fa4c",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.070977 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8856367508e-05,
+      "gain_usd": 0.070977,
+      "gas_cost_usd": 0.04725650755079633,
+      "net_after_gas_usd": 0.02372049244920367
+    },
+    {
+      "tx_hash": "0x57d49011726d5bf14541b5dba7e1e054d783d724af2ab03e774429da76fd8a92",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x37ed7b5a220c543ce60799387cc17f679511c828",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.091535 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4039624528e-05,
+      "gain_usd": 0.091535,
+      "gas_cost_usd": 0.0602464232596108,
+      "net_after_gas_usd": 0.03128857674038921
+    },
+    {
+      "tx_hash": "0x1abbfba370c719ebc55fc6144d5aec7d92ffd4fa439224752b38fd33638a7455",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd23249a8406d11c03690d1d27cef05b26d238d7d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.063912 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9380851e-05,
+      "gain_usd": 0.063912,
+      "gas_cost_usd": 0.048570931343684884,
+      "net_after_gas_usd": 0.015341068656315113
+    },
+    {
+      "tx_hash": "0xa3928b0fc2d30c5b757de98a83ab17bbcdc4e4e5c0a06e275aaed5dd13468406",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd27164ab6f65ddaef050b84b58bdadc1bbdcdc71",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.073494 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.814003191e-05,
+      "gain_usd": 0.073494,
+      "gas_cost_usd": 0.045461277447149416,
+      "net_after_gas_usd": 0.028032722552850588
+    },
+    {
+      "tx_hash": "0x636a796c3ad036793c2622daeef422a54ff6f2065a87bb980d7c4282700a935e",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x19090e1054b7069be0ebe1c04c633f43cf0558dc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.090524 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.3194040832e-05,
+      "gain_usd": 0.090524,
+      "gas_cost_usd": 0.058127280625277805,
+      "net_after_gas_usd": 0.03239671937472219
+    },
+    {
+      "tx_hash": "0x0cc6de9a8b7d913f63b51a150bcb8fe5b0f8b7f3b2f6ffef609781ab9d5eedb2",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf681f76c17e6945ac83a32ec127f1b6d7d92de63",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003606 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.2199214336e-05,
+      "gain_usd": 0.09037711007942525,
+      "gas_cost_usd": 0.05563411613853289,
+      "net_after_gas_usd": 0.034742993940892364
+    },
+    {
+      "tx_hash": "0x1a99b174abb3a21509185ff785ca6de61f934568da6ff756ae598684414c449b",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078409 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1675536184e-05,
+      "gain_usd": 0.078409,
+      "gas_cost_usd": 0.029260411031165386,
+      "net_after_gas_usd": 0.04914858896883462
+    },
+    {
+      "tx_hash": "0x5b12758b69aa379662dbf627d2ab671a669e6a9203dc8832c954cb91be342dd6",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xfad5025d8604c3615628ca287b83de014c44b8d9",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.077465 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8449216e-05,
+      "gain_usd": 0.077465,
+      "gas_cost_usd": 0.04623613295829026,
+      "net_after_gas_usd": 0.031228867041709747
+    },
+    {
+      "tx_hash": "0x7cfbe3925c26b69cefef569f4a035daba3d5689fd04c06ffeab044fbfd5cddde",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd23249a8406d11c03690d1d27cef05b26d238d7d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.047189 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1149716528e-05,
+      "gain_usd": 0.047189,
+      "gas_cost_usd": 0.02794263863764479,
+      "net_after_gas_usd": 0.019246361362355212
+    },
+    {
+      "tx_hash": "0xca3085e8932ff640d500bbc3b81e8b0e5fedc1138604749c55af7190a47b61dd",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x19090e1054b7069be0ebe1c04c633f43cf0558dc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.227254 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1776401192e-05,
+      "gain_usd": 0.227254,
+      "gas_cost_usd": 0.054574491450822764,
+      "net_after_gas_usd": 0.17267950854917724
+    },
+    {
+      "tx_hash": "0xf5dc7ca7aeaeaa2445aee9c5698949fc3a619c86de93b279cdfcc1bb1acff4db",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd27164ab6f65ddaef050b84b58bdadc1bbdcdc71",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.049157 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.245183568e-05,
+      "gain_usd": 0.049157,
+      "gas_cost_usd": 0.031205918456115568,
+      "net_after_gas_usd": 0.01795108154388443
+    },
+    {
+      "tx_hash": "0x1ab063797b0f6e2ae36d3cf99c9225ec6e95c1d3af4c73b89cdd225b1e5613b9",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd910b8398b78d532cbc1ca41e9d07509994b280b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.123585 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.743852804e-05,
+      "gain_usd": 0.123585,
+      "gas_cost_usd": 0.04370321758140361,
+      "net_after_gas_usd": 0.07988178241859639
+    },
+    {
+      "tx_hash": "0x5ffca7d4f7af193043b015d4b0b75ff7998fcaf51188695b99edd6cf81fe1f83",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x4cceef8cc103b3fb4506556fdf156350bd703a6a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055567 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5419652536e-05,
+      "gain_usd": 0.055567,
+      "gas_cost_usd": 0.03864365319508068,
+      "net_after_gas_usd": 0.016923346804919318
+    },
+    {
+      "tx_hash": "0xd1b795a3739057fbccc88667bf472e41677edf3659fd9288142fe0de412d43e0",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x1fc07396e78f79a5b33e37fe293843b421a9446c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "1.236260 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.433823188e-05,
+      "gain_usd": 1.23626,
+      "gas_cost_usd": 0.1361786708943126,
+      "net_after_gas_usd": 1.1000813291056872
+    },
+    {
+      "tx_hash": "0x08fe1d6c7ce8f7a57c94aafe4a1fd4ec7c056d078ee33f75ae5882b44c337b3f",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x1fc07396e78f79a5b33e37fe293843b421a9446c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.075297 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.100527548e-05,
+      "gain_usd": 0.075297,
+      "gas_cost_usd": 0.05264195020096216,
+      "net_after_gas_usd": 0.02265504979903784
+    },
+    {
+      "tx_hash": "0xc92f76bd1be833d4d6e8e9ae3c47dd4946cd58c93d22cf5d2b19261c7f246f3d",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd23249a8406d11c03690d1d27cef05b26d238d7d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.158081 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.980193125e-05,
+      "gain_usd": 0.158081,
+      "gas_cost_usd": 0.049626213173823916,
+      "net_after_gas_usd": 0.10845478682617608
+    },
+    {
+      "tx_hash": "0x27c89a1ce33388c9b61e12f2d79d2836431d24784bc9d8a95c7a3c1bed315e47",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.079043 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5377244368e-05,
+      "gain_usd": 0.079043,
+      "gas_cost_usd": 0.06359867241588318,
+      "net_after_gas_usd": 0.015444327584116818
+    },
+    {
+      "tx_hash": "0xdd80e82145c12f326087f7643eefa68a6b9e6ea89e0b3eb920ce00f10056756b",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd27164ab6f65ddaef050b84b58bdadc1bbdcdc71",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.212482 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1661060608e-05,
+      "gain_usd": 0.212482,
+      "gas_cost_usd": 0.05428543295764285,
+      "net_after_gas_usd": 0.15819656704235716
+    },
+    {
+      "tx_hash": "0x310ae4d2c87c18a9efb1b959333f281303e89dda82292583f6f27053ef21dfbd",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x19090e1054b7069be0ebe1c04c633f43cf0558dc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.158010 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.114860257e-05,
+      "gain_usd": 0.15801,
+      "gas_cost_usd": 0.0530011465153077,
+      "net_after_gas_usd": 0.10500885348469231
+    },
+    {
+      "tx_hash": "0x7e30fa9018fe602685f72e16704ac5f7bf0fc2095e3f1664b38e791d670c09c3",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf681f76c17e6945ac83a32ec127f1b6d7d92de63",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.058984 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1801426364e-05,
+      "gain_usd": 0.058984,
+      "gas_cost_usd": 0.029575908182948044,
+      "net_after_gas_usd": 0.029408091817051958
+    },
+    {
+      "tx_hash": "0x0e54204a4f85cb9a197d7ccba2695deda8fe7620a2df35c06b81f9be2eec8758",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf99356a2e4a3e0abf1ad1022d5dd3a067a2ae233",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.087204 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.6086240736e-05,
+      "gain_usd": 0.087204,
+      "gas_cost_usd": 0.09043680905652393,
+      "net_after_gas_usd": -0.0032328090565239276
+    },
+    {
+      "tx_hash": "0xb5a87fc8b58e0659bd8ad404e7e3cc698b19e37ad105db948533994b7aaa0e66",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf681f76c17e6945ac83a32ec127f1b6d7d92de63",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055180 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.2600683432e-05,
+      "gain_usd": 0.05518,
+      "gas_cost_usd": 0.05664024986808002,
+      "net_after_gas_usd": -0.0014602498680800213
+    },
+    {
+      "tx_hash": "0xff49c4ceb756b87e8ab0c5e35b9efd244365b10e81b5ae749cf67f0cc56a0c1a",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.101328 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.2956053746e-05,
+      "gain_usd": 0.101328,
+      "gas_cost_usd": 0.08259215366011304,
+      "net_after_gas_usd": 0.018735846339886966
+    },
+    {
+      "tx_hash": "0x7bf03129080a2a5cd5ac76a1e479d3f38dab8dab934227cb92935db7bca3dcf3",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x1fc07396e78f79a5b33e37fe293843b421a9446c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.038489 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1097124032e-05,
+      "gain_usd": 0.038489,
+      "gas_cost_usd": 0.0278108350077418,
+      "net_after_gas_usd": 0.010678164992258203
+    },
+    {
+      "tx_hash": "0x0c6b3845c57997744f3f908d5842da4f4f180e35442a2fcf7bbf38a807d214f6",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd910b8398b78d532cbc1ca41e9d07509994b280b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.041623 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1316670464e-05,
+      "gain_usd": 0.041623,
+      "gas_cost_usd": 0.028361046898614028,
+      "net_after_gas_usd": 0.013261953101385972
+    },
+    {
+      "tx_hash": "0x70d58ec339e42c1f0d642d0fb4ef502c9ef352917a5cfeb5e25e57352362bf18",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x37ed7b5a220c543ce60799387cc17f679511c828",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.047631 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.7353329372e-05,
+      "gain_usd": 0.047631,
+      "gas_cost_usd": 0.043489698646966654,
+      "net_after_gas_usd": 0.004141301353033346
+    },
+    {
+      "tx_hash": "0x1d5177e481b397dc7ee3c3178763c0bfcbab9f0c2b6aa08245c74a9c2022745f",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf681f76c17e6945ac83a32ec127f1b6d7d92de63",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.084753 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.3407281198e-05,
+      "gain_usd": 0.084753,
+      "gas_cost_usd": 0.05866168869521695,
+      "net_after_gas_usd": 0.026091311304783045
+    },
+    {
+      "tx_hash": "0x8dd0662d3ec19bf81f29e358ae61effd1439d656098dfaca3cbe5cd5d67c8c39",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd910b8398b78d532cbc1ca41e9d07509994b280b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.076799 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.7038088064e-05,
+      "gain_usd": 0.076799,
+      "gas_cost_usd": 0.04269966296032104,
+      "net_after_gas_usd": 0.03409933703967897
+    },
+    {
+      "tx_hash": "0x2fb5093b0e25ab4203c38b9f039906c8c07b2d4f47e78911bd15294704479729",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xfad5025d8604c3615628ca287b83de014c44b8d9",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.076400 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.165537242e-05,
+      "gain_usd": 0.0764,
+      "gas_cost_usd": 0.05427117761927726,
+      "net_after_gas_usd": 0.022128822380722737
+    },
+    {
+      "tx_hash": "0xf6d04ae7ebe0d5d42a459b9b6cd6536b8396a5dd83a74d83aa6077433665f24f",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x4cceef8cc103b3fb4506556fdf156350bd703a6a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.093208 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.444977776e-05,
+      "gain_usd": 0.093208,
+      "gas_cost_usd": 0.06127432056256528,
+      "net_after_gas_usd": 0.03193367943743472
+    },
+    {
+      "tx_hash": "0x9f997b4dc7fe9c1fb05c2497e05046e3106c6b2bce0f46861a4f5e39353342ec",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd23249a8406d11c03690d1d27cef05b26d238d7d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.079284 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.3173185024e-05,
+      "gain_usd": 0.079284,
+      "gas_cost_usd": 0.05807501326000653,
+      "net_after_gas_usd": 0.02120898673999346
+    },
+    {
+      "tx_hash": "0x040463ed9d5e3d7c167d3182616485ada9f07a252782fa7a0cc241b3ed54193f",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078079 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.6755807636e-05,
+      "gain_usd": 0.078079,
+      "gas_cost_usd": 0.0670535311237363,
+      "net_after_gas_usd": 0.011025468876263697
+    },
+    {
+      "tx_hash": "0xdd9f7d0e46e6cc6fa8744c50e6c7665fc54017c17483b87f6750226b1eb076ea",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd910b8398b78d532cbc1ca41e9d07509994b280b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.068082 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1424347664e-05,
+      "gain_usd": 0.068082,
+      "gas_cost_usd": 0.02863089995555566,
+      "net_after_gas_usd": 0.03945110004444434
+    },
+    {
+      "tx_hash": "0x99c73b4c26c0dd66681350cd15d4a3b1337a38f4b158ff942f030a8c0ebee847",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x19090e1054b7069be0ebe1c04c633f43cf0558dc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.098213 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.202145816e-05,
+      "gain_usd": 0.098213,
+      "gas_cost_usd": 0.05518863606026327,
+      "net_after_gas_usd": 0.04302436393973672
+    },
+    {
+      "tx_hash": "0x9520f6c75e0a21056f97f3744f1f7a7abdfd5acb0e485bb938d86d473c9321ce",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd910b8398b78d532cbc1ca41e9d07509994b280b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.170375 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.3139541328e-05,
+      "gain_usd": 0.170375,
+      "gas_cost_usd": 0.08305199738667285,
+      "net_after_gas_usd": 0.08732300261332715
+    },
+    {
+      "tx_hash": "0x685eff9787e3ca05867d310d4be0dfd8ae75686853380e79c417b2ba85214135",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf99356a2e4a3e0abf1ad1022d5dd3a067a2ae233",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.064560 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.72313494e-05,
+      "gain_usd": 0.06456,
+      "gas_cost_usd": 0.04318400098460309,
+      "net_after_gas_usd": 0.02137599901539692
+    },
+    {
+      "tx_hash": "0xea44f270b46b43a4f63c94408597621fddcf93ba0ab654a6015a0e7ba5088a64",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xfad5025d8604c3615628ca287b83de014c44b8d9",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.904112 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.820538926e-05,
+      "gain_usd": 0.904112,
+      "gas_cost_usd": 0.14587026986482243,
+      "net_after_gas_usd": 0.7582417301351776
+    },
+    {
+      "tx_hash": "0x95f9811359bc01b5649a4d70a57f337d74aeb09352743613c59672a13b0e0a7c",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "2.796821 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 8.693658335e-05,
+      "gain_usd": 2.796821,
+      "gas_cost_usd": 0.2178743761637396,
+      "net_after_gas_usd": 2.57894662383626
+    },
+    {
+      "tx_hash": "0x77307f31f72e6151289b07a3abcd59a0f692c216f1c2171361305b1e3c8eef98",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x4cceef8cc103b3fb4506556fdf156350bd703a6a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059376 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.4473541894e-05,
+      "gain_usd": 0.059376,
+      "gas_cost_usd": 0.036272576969577905,
+      "net_after_gas_usd": 0.023103423030422093
+    },
+    {
+      "tx_hash": "0xc34d4b2ff18f498c8a17df395299e4384676761904b2978422d2db3e732d711d",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x01878cdcb3ceead8962cd73874ecc5ec3c85fa11",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.048884 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3745896058e-05,
+      "gain_usd": 0.048884,
+      "gas_cost_usd": 0.03444900193962313,
+      "net_after_gas_usd": 0.014434998060376868
+    },
+    {
+      "tx_hash": "0x4d4f05f9150c9c6f3ff7f1e3ae1cb5a3af9f18090222fc0919f2998476cdb855",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xfad5025d8604c3615628ca287b83de014c44b8d9",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.156291 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1241328168e-05,
+      "gain_usd": 0.156291,
+      "gas_cost_usd": 0.05323352891452537,
+      "net_after_gas_usd": 0.10305747108547464
+    },
+    {
+      "tx_hash": "0x0befe3860059b6c0a44a026674f1c05b620bbfd2e190b911e4f9a65f94f793d0",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xf99356a2e4a3e0abf1ad1022d5dd3a067a2ae233",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.213072 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.10098698e-05,
+      "gain_usd": 0.213072,
+      "gas_cost_usd": 0.05265346416396054,
+      "net_after_gas_usd": 0.1604185358360395
+    },
+    {
+      "tx_hash": "0xf38820dbc496141108c7a01c9cdf76b2e9614afe6452a4ac42872e3fb37cb5ff",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0xd23249a8406d11c03690d1d27cef05b26d238d7d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.060095 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.626093132e-05,
+      "gain_usd": 0.060095,
+      "gas_cost_usd": 0.04075200716047481,
+      "net_after_gas_usd": 0.019342992839525196
+    },
+    {
+      "tx_hash": "0x446398109d92b8eed981c648714ca2c70c6c14ead5b412c70946b6f3268eab17",
+      "contract": "0x40132e775e14ef3a946fa5624468715456fa0be4",
+      "initiator": "0x87edc5258c6436e239ad851d05c52802ea27c19e",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x1eca20cfa4af2e2fa2f4ce2bf8d97bfa184fd4d7": "101963300160892 raw (0x1eca20cfa4af2e2fa2f4ce2bf8d97bfa184fd4d7, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 0.0001032442845,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0x1eca20cfa4af2e2fa2f4ce2bf8d97bfa184fd4d7 -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0x1aa6c8a076630e0721028d2be5672f68f5fab9367f918142d717f49710ed1290",
+      "contract": "0xb01e35278828b9374437a7e40d81775196077458",
+      "initiator": "0xb7face0c68f87a777ca764b289434256a01f768d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.291401 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.3662678572e-05,
+      "gain_usd": 0.291401,
+      "gas_cost_usd": 0.05930174770593384,
+      "net_after_gas_usd": 0.2320992522940662
+    },
+    {
+      "tx_hash": "0xf828a02b7978d91e2661730a2bad66627a9b9b7c13d24875bb0441b33aeb4619",
+      "contract": "0xb01e35278828b9374437a7e40d81775196077458",
+      "initiator": "0xb7face0c68f87a777ca764b289434256a01f768d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.135085 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.468062338e-05,
+      "gain_usd": 0.135085,
+      "gas_cost_usd": 0.08691414928819033,
+      "net_after_gas_usd": 0.04817085071180968
+    },
+    {
+      "tx_hash": "0x8b1cf012e2832a198dbc8a9449b3c660986caf770f229f863205b66a0f14e92a",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.191727 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1836512688e-05,
+      "gain_usd": 0.191727,
+      "gas_cost_usd": 0.029663839070714855,
+      "net_after_gas_usd": 0.16206316092928516
+    },
+    {
+      "tx_hash": "0xf85bfb3a3d15f3089793acb722bd0485174eace05dca90946ac890533b677802",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.328318 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.269152766e-05,
+      "gain_usd": 0.328318,
+      "gas_cost_usd": 0.031806617708393596,
+      "net_after_gas_usd": 0.2965113822916064
+    },
+    {
+      "tx_hash": "0x3605780c38d6b0154becf0c5bb5852f9abb79a44e355518c93f6050b93a86306",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.072197 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.201050049e-05,
+      "gain_usd": 0.072197,
+      "gas_cost_usd": 0.03009987511400215,
+      "net_after_gas_usd": 0.042097124885997844
+    },
+    {
+      "tx_hash": "0xcdb909c07a8ccd93d02734038d2ca12d99b80a1eb7a592a04baa456e2326c94e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.167200 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2547393244e-05,
+      "gain_usd": 0.1672,
+      "gas_cost_usd": 0.03144539813017187,
+      "net_after_gas_usd": 0.13575460186982813
+    },
+    {
+      "tx_hash": "0xc1e3c5af9266063e3a2ab12b2ca9bd8260be0dcf5ca4375974345c7446d0c593",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.109603 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2230091584e-05,
+      "gain_usd": 0.109603,
+      "gas_cost_usd": 0.030650198933650664,
+      "net_after_gas_usd": 0.07895280106634935
+    },
+    {
+      "tx_hash": "0xe08867df28623a813f4523ac0c2a5838df6b469fdf7cff83b529747b78b1fbe2",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.094143 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2836684528e-05,
+      "gain_usd": 0.094143,
+      "gas_cost_usd": 0.032170399684205306,
+      "net_after_gas_usd": 0.0619726003157947
+    },
+    {
+      "tx_hash": "0x0e1dd5dbb566e24747113cabc85d399d392fbbb244826fc8a9354767ef9986f8",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.101646 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2437452808e-05,
+      "gain_usd": 0.101646,
+      "gas_cost_usd": 0.031169873109683822,
+      "net_after_gas_usd": 0.07047612689031618
+    },
+    {
+      "tx_hash": "0x5c8b5151063503eedff652e0b49e17d5539ee101f8b2062809d0714634016ec3",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.093739 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1328748044e-05,
+      "gain_usd": 0.093739,
+      "gas_cost_usd": 0.028391314883697755,
+      "net_after_gas_usd": 0.06534768511630225
+    },
+    {
+      "tx_hash": "0x8b2a464330cefea9c6535f23a8b87052328cfa68cdb53351c5c51d0239f9f504",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.052559 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.22182221e-05,
+      "gain_usd": 0.052559,
+      "gas_cost_usd": 0.03062045246418712,
+      "net_after_gas_usd": 0.021938547535812883
+    },
+    {
+      "tx_hash": "0xfbc657640e0b41bc90d4d154f5b65b76b5311cd86386e827f6ac22c3ea5d6f0e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.073231 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1977810394e-05,
+      "gain_usd": 0.073231,
+      "gas_cost_usd": 0.030017949485017414,
+      "net_after_gas_usd": 0.04321305051498259
+    },
+    {
+      "tx_hash": "0x12ffb808262cd2ce8942e14c42cd242c1e61c64621446e9463f2778fd58192cf",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.050672 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.127632168e-05,
+      "gain_usd": 0.050672,
+      "gas_cost_usd": 0.028259927602177295,
+      "net_after_gas_usd": 0.022412072397822707
+    },
+    {
+      "tx_hash": "0x1450accac938711382216a6e37515dcf2def9b2fd3a35316039a4309b54a347a",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.096897 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2120906544e-05,
+      "gain_usd": 0.096897,
+      "gas_cost_usd": 0.03037656703370997,
+      "net_after_gas_usd": 0.06652043296629002
+    },
+    {
+      "tx_hash": "0xa3e8256f2a5b504f23a2c64995f9ff629b2ef0cc204aeaf23ef5e72bb76f933c",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051678 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.195785847e-05,
+      "gain_usd": 0.051678,
+      "gas_cost_usd": 0.029967947370519016,
+      "net_after_gas_usd": 0.021710052629480985
+    },
+    {
+      "tx_hash": "0xbd712e48f2d1e55f4234f2ff8b67404d3ef6ca85494c6a241e05f1444939fc19",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.544344 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2399425878e-05,
+      "gain_usd": 0.544344,
+      "gas_cost_usd": 0.03107457268111951,
+      "net_after_gas_usd": 0.5132694273188806
+    },
+    {
+      "tx_hash": "0x763da908765982723955b0b59a836d213db0ef3aaa6a23c274144b96a7bd5fe5",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.096662 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.126382688e-05,
+      "gain_usd": 0.096662,
+      "gas_cost_usd": 0.028228614009551612,
+      "net_after_gas_usd": 0.06843338599044839
+    },
+    {
+      "tx_hash": "0x7f5f6578b1199f6acaf0e95b921e37ef1238db7096cbf1b08b372bc8a09018fd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.072006 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2446906458e-05,
+      "gain_usd": 0.072006,
+      "gas_cost_usd": 0.031193565185181297,
+      "net_after_gas_usd": 0.04081243481481871
+    },
+    {
+      "tx_hash": "0x5097ff156f76bd6c17dd69a01fccb34f66484e0f39eb4aecce147655396b4ebd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.819111 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.23412682e-05,
+      "gain_usd": 0.819111,
+      "gas_cost_usd": 0.03092882198187281,
+      "net_after_gas_usd": 0.7881821780181272
+    },
+    {
+      "tx_hash": "0x00b247783a057441031ca0a355c6211ddb6d41d3a6040e59dabf736ff84b5fa9",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.079713 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2020413416e-05,
+      "gain_usd": 0.079713,
+      "gas_cost_usd": 0.030124718194843185,
+      "net_after_gas_usd": 0.04958828180515682
+    },
+    {
+      "tx_hash": "0xf721d8d29870269ab0fdf0207b9f7a4c3113c592f0b320d31143b92216ee50c4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.052768 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1318883944e-05,
+      "gain_usd": 0.052768,
+      "gas_cost_usd": 0.02836659416715815,
+      "net_after_gas_usd": 0.024401405832841852
+    },
+    {
+      "tx_hash": "0x1b29c0a05b7232f66f2695752f790d69783a8f5aa0aa3d023040e27f24d50f54",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055290 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3224533784e-05,
+      "gain_usd": 0.05529,
+      "gas_cost_usd": 0.03314240032467642,
+      "net_after_gas_usd": 0.02214759967532358
+    },
+    {
+      "tx_hash": "0x24859978471f48f64ab38f5f29862c51eb2c9b3c0951593f67efa536963c0062",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.118976 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2049635906e-05,
+      "gain_usd": 0.118976,
+      "gas_cost_usd": 0.030197953552541436,
+      "net_after_gas_usd": 0.08877804644745857
+    },
+    {
+      "tx_hash": "0xab6a664f114a3b31a96bf15987eb5898ea365f4349901a87144d0fcc6dc75481",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051810 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1403892056e-05,
+      "gain_usd": 0.05181,
+      "gas_cost_usd": 0.02857963554349443,
+      "net_after_gas_usd": 0.023230364456505573
+    },
+    {
+      "tx_hash": "0x897195c8577af6c1fe44d6eb03a78414950ef1e891aa92115c6d8c8eb10a1b99",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.733213 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3304825088e-05,
+      "gain_usd": 0.733213,
+      "gas_cost_usd": 0.03334362076716777,
+      "net_after_gas_usd": 0.6998693792328322
+    },
+    {
+      "tx_hash": "0x375770f113439772861260dca0918087c9ac510fddda7c33a3486787ea70b109",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.255554 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2095903598e-05,
+      "gain_usd": 0.255554,
+      "gas_cost_usd": 0.030313906401648154,
+      "net_after_gas_usd": 0.22524009359835184
+    },
+    {
+      "tx_hash": "0xa7b854ce42ad6aa936c5a704b91759a973b2ec8f1f2a0ec610175bbb246da39e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.074702 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2460824428e-05,
+      "gain_usd": 0.074702,
+      "gas_cost_usd": 0.03122844542678232,
+      "net_after_gas_usd": 0.043473554573217686
+    },
+    {
+      "tx_hash": "0x698dd749f35ceb2dc9785f76fce39463a55acbcdbdff9059a6f376b7e931912c",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.138634 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1256025716e-05,
+      "gain_usd": 0.138634,
+      "gas_cost_usd": 0.02820906327872742,
+      "net_after_gas_usd": 0.11042493672127258
+    },
+    {
+      "tx_hash": "0x2f215bd6a3642e4be9ea482b6a84d1c0fa9b6d82b1432f1be9d1c7f253f7901b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.085825 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.211203338e-05,
+      "gain_usd": 0.085825,
+      "gas_cost_usd": 0.03035432973156853,
+      "net_after_gas_usd": 0.05547067026843147
+    },
+    {
+      "tx_hash": "0xc1aa36dc16f5a8c23ebf3bbca565abf75e12c721a42f59c938d17ae371f97b34",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.161453 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.166301225e-05,
+      "gain_usd": 0.161453,
+      "gas_cost_usd": 0.029229024424949443,
+      "net_after_gas_usd": 0.13222397557505056
+    },
+    {
+      "tx_hash": "0x2833b03f3b3be401e665a711c9fce75de53ced9eb7b637d74c98aae3d0d4eb10",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051025 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1736652616e-05,
+      "gain_usd": 0.051025,
+      "gas_cost_usd": 0.029413576752456108,
+      "net_after_gas_usd": 0.021611423247543893
+    },
+    {
+      "tx_hash": "0xcf5704aa4e1b9c86bda270d156e089c6c01cc9dbce88b076a61a22c8f171aa5d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.243160 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2221026692e-05,
+      "gain_usd": 0.24316,
+      "gas_cost_usd": 0.030627481136224228,
+      "net_after_gas_usd": 0.21253251886377575
+    },
+    {
+      "tx_hash": "0xee34d319807962983292aac78f9d2094dbbd25378e42d31db197f8401ba6030d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.076725 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3224982304e-05,
+      "gain_usd": 0.076725,
+      "gas_cost_usd": 0.03314352437408613,
+      "net_after_gas_usd": 0.04358147562591387
+    },
+    {
+      "tx_hash": "0x29181a6b16fa6bb34ff189fbdd58ef7063f2c479afc2bf8151d236f80c9f74a6",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.057190 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.23967232e-05,
+      "gain_usd": 0.05719,
+      "gas_cost_usd": 0.03106779941881116,
+      "net_after_gas_usd": 0.02612220058118884
+    },
+    {
+      "tx_hash": "0x53f8475183067ea42b1af48bded09fe2eff1f814f319cc6e772794234ba3ddd2",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.157242 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.21066125e-05,
+      "gain_usd": 0.157242,
+      "gas_cost_usd": 0.03034074430179032,
+      "net_after_gas_usd": 0.12690125569820968
+    },
+    {
+      "tx_hash": "0xdb3c5461159e3c5e537e9847348ade76d7d7adc109d24bfa3c6a45a1c135094e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.157606 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2215375766e-05,
+      "gain_usd": 0.157606,
+      "gas_cost_usd": 0.03061331918127322,
+      "net_after_gas_usd": 0.12699268081872678
+    },
+    {
+      "tx_hash": "0x56746a6f765631337b70978442192967f28be6c028e2ee178d2ccbd5042336c2",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.077264 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9023907832e-05,
+      "gain_usd": 0.077264,
+      "gas_cost_usd": 0.047676385376300624,
+      "net_after_gas_usd": 0.029587614623699375
+    },
+    {
+      "tx_hash": "0xeef8e5b320fc13a82cc877446a47842a2926b08529a967c3689468245a6c1012",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.060573 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3406717792e-05,
+      "gain_usd": 0.060573,
+      "gas_cost_usd": 0.03359897712537962,
+      "net_after_gas_usd": 0.026974022874620383
+    },
+    {
+      "tx_hash": "0x9fc595db67c4cf18bef3dcf8a6bbad7270f9264f6f4387a4f78404c80451adbf",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055531 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.130208184e-05,
+      "gain_usd": 0.055531,
+      "gas_cost_usd": 0.028324485910930734,
+      "net_after_gas_usd": 0.027206514089069263
+    },
+    {
+      "tx_hash": "0xd893aa7e233ba9b55a87d2be1411ed679748e93759277fb3e0974ffdcadc94c1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.133377 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.21437855e-05,
+      "gain_usd": 0.133377,
+      "gas_cost_usd": 0.03043390467079779,
+      "net_after_gas_usd": 0.1029430953292022
+    },
+    {
+      "tx_hash": "0x13d4407730e1209a40b5b1d71c4c1dee56ae49d6782e524461dbc083a7d8c816",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.124863 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2032942364e-05,
+      "gain_usd": 0.124863,
+      "gas_cost_usd": 0.030156117366794747,
+      "net_after_gas_usd": 0.09470688263320526
+    },
+    {
+      "tx_hash": "0x18734ff77cce54b940496a14db928fd011c1a902229e149114b25538d4b58f62",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.323324 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2086014038e-05,
+      "gain_usd": 0.323324,
+      "gas_cost_usd": 0.030289121879039767,
+      "net_after_gas_usd": 0.29303487812096024
+    },
+    {
+      "tx_hash": "0x479e18865327e620d96abbfb0db2d05e3e9329c88c02841dd5d30be51e9ce436",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.063595 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.214493891e-05,
+      "gain_usd": 0.063595,
+      "gas_cost_usd": 0.03043679526615509,
+      "net_after_gas_usd": 0.03315820473384491
+    },
+    {
+      "tx_hash": "0x059c3c2359773fa719632a73131ef6f5f82065701c6eb278133cfc5c19bda456",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.061396 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2154897816e-05,
+      "gain_usd": 0.061396,
+      "gas_cost_usd": 0.030461753578851693,
+      "net_after_gas_usd": 0.030934246421148306
+    },
+    {
+      "tx_hash": "0xf56f3515183aa3e97917eee05b5281d239e145f440464c517a570872919c560b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.057645 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2124226394e-05,
+      "gain_usd": 0.057645,
+      "gas_cost_usd": 0.03038488700925807,
+      "net_after_gas_usd": 0.027260112990741932
+    },
+    {
+      "tx_hash": "0xaec41f1eb9bc78d320e56004da978a19bf7710392d9b1154b63893aa92835393",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.067422 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3236604836e-05,
+      "gain_usd": 0.067422,
+      "gas_cost_usd": 0.03317265194974377,
+      "net_after_gas_usd": 0.03424934805025623
+    },
+    {
+      "tx_hash": "0xb32a88d9549037633907c3e5862d906717d413d8c6a93e86b64e5fbbd89a8d46",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.082530 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.177877302e-05,
+      "gain_usd": 0.08253,
+      "gas_cost_usd": 0.029519135958852784,
+      "net_after_gas_usd": 0.05301086404114722
+    },
+    {
+      "tx_hash": "0x3065d1821b9e7e50fc74ea5a1e3ff113baca17cf1a131999918178576b442ca1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.079644 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.198214694e-05,
+      "gain_usd": 0.079644,
+      "gas_cost_usd": 0.030028817432871446,
+      "net_after_gas_usd": 0.04961518256712856
+    },
+    {
+      "tx_hash": "0xf629579f46c636229192bcf12862ce1756d429a49edcdf28a79501266b4d1bd7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.378242 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.271857348e-05,
+      "gain_usd": 0.378242,
+      "gas_cost_usd": 0.03187439804819156,
+      "net_after_gas_usd": 0.3463676019518085
+    },
+    {
+      "tx_hash": "0x7be97503cd6ee539e3aedaf1afc9a690cebae56d0c5e0edc02376cc0f6dcc8ff",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053784 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1710489086e-05,
+      "gain_usd": 0.053784,
+      "gas_cost_usd": 0.029348007546060654,
+      "net_after_gas_usd": 0.024435992453939345
+    },
+    {
+      "tx_hash": "0x2f73777c4794f34c3658db48972b61061f09089bc0f08466f4952bb690b3457f",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.062025 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.50373515e-05,
+      "gain_usd": 0.062025,
+      "gas_cost_usd": 0.03768555711497689,
+      "net_after_gas_usd": 0.024339442885023106
+    },
+    {
+      "tx_hash": "0x02ca604820e6a869dddfa6da4fdd3e63274547ddcc04580ffd1bdbca549c1338",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.135536 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2041104992e-05,
+      "gain_usd": 0.135536,
+      "gas_cost_usd": 0.030176573973378848,
+      "net_after_gas_usd": 0.10535942602662114
+    },
+    {
+      "tx_hash": "0x4d592dd5cba1cb271f63eadb47c480b8406dafb2a712a7e7757e8f906aaf42c1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.117193 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.208026025e-05,
+      "gain_usd": 0.117193,
+      "gas_cost_usd": 0.0302747021385488,
+      "net_after_gas_usd": 0.08691829786145121
+    },
+    {
+      "tx_hash": "0x731df333e2a9ab88bbefaf5fc86e6911baff8b760a8bb67370a14da68a8f9e9f",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.193738 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.240697415e-05,
+      "gain_usd": 0.193738,
+      "gas_cost_usd": 0.03109348963172583,
+      "net_after_gas_usd": 0.16264451036827415
+    },
+    {
+      "tx_hash": "0x5ba47f8429ee32fcd12d954a8607e6bc33230c07e44669bb66440740ae8ceab4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.073450 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.175498692e-05,
+      "gain_usd": 0.07345,
+      "gas_cost_usd": 0.029459524901008418,
+      "net_after_gas_usd": 0.04399047509899158
+    },
+    {
+      "tx_hash": "0x52bcfe85cc37dfd4e32b2e3e3e618864019156f2faf2190829b759fe11fc020b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.101248 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.170523153e-05,
+      "gain_usd": 0.101248,
+      "gas_cost_usd": 0.02933483142745206,
+      "net_after_gas_usd": 0.07191316857254795
+    },
+    {
+      "tx_hash": "0x0c5b745f360bb55a77bd2aff1ff74d885a7bb83b75a434643a52f8d90835d5a8",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.448608 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2156446496e-05,
+      "gain_usd": 0.448608,
+      "gas_cost_usd": 0.030465634772198328,
+      "net_after_gas_usd": 0.4181423652278017
+    },
+    {
+      "tx_hash": "0x7328efba3b0bfa1f1923f91778d809eb81369b54fd19ded3c3def7925d79bfcd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.060799 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.24659234e-05,
+      "gain_usd": 0.060799,
+      "gas_cost_usd": 0.031241224113277323,
+      "net_after_gas_usd": 0.029557775886722676
+    },
+    {
+      "tx_hash": "0x789d149d8743d463f07efb7694590b11f593fb7e30471cd882b9fcc184df2ed3",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.052606 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.246481124e-05,
+      "gain_usd": 0.052606,
+      "gas_cost_usd": 0.031238436895780878,
+      "net_after_gas_usd": 0.021367563104219122
+    },
+    {
+      "tx_hash": "0x0c545e6726c2fc959280c504d3276f99b1501939adcecc05ac815445dd22e8b3",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.140569 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.4161396194e-05,
+      "gain_usd": 0.140569,
+      "gas_cost_usd": 0.03549029927888587,
+      "net_after_gas_usd": 0.10507870072111414
+    },
+    {
+      "tx_hash": "0x5d0203ede5071e187ac154aa160af9bcd7622c586b91ab82d86a2bac4adbeadc",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.180047 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3949185542e-05,
+      "gain_usd": 0.180047,
+      "gas_cost_usd": 0.03495847180605247,
+      "net_after_gas_usd": 0.14508852819394755
+    },
+    {
+      "tx_hash": "0x687bf5b52a02dfcae6dd46c26ee7209b0356a0900dbd16d08d6a32254a907b1f",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.063885 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.4554915492e-05,
+      "gain_usd": 0.063885,
+      "gas_cost_usd": 0.036476509781488316,
+      "net_after_gas_usd": 0.02740849021851168
+    },
+    {
+      "tx_hash": "0xf462b934b6773e191260b2c0163099e096444d2cdf6b0567f86f6221f20c18bc",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.054204 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.300865748e-05,
+      "gain_usd": 0.054204,
+      "gas_cost_usd": 0.03260138625154246,
+      "net_after_gas_usd": 0.021602613748457546
+    },
+    {
+      "tx_hash": "0x47c446b5116bd80da815db4dc41581b854ba8f0f58d20adc9c1260c5cdfa90e5",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059021 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.24599282e-05,
+      "gain_usd": 0.059021,
+      "gas_cost_usd": 0.031226199362940424,
+      "net_after_gas_usd": 0.027794800637059573
+    },
+    {
+      "tx_hash": "0x3a55d9c1688220908a806d7b46edfeceb7a2f1116919a81aebf17b75ab3f3ca1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.069197 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.242722967e-05,
+      "gain_usd": 0.069197,
+      "gas_cost_usd": 0.0311442525972556,
+      "net_after_gas_usd": 0.03805274740274439
+    },
+    {
+      "tx_hash": "0x8fba88491920edc2c83141eafe8f092dc6200f790161b96c37705d860f478cf4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055442 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1488242576e-05,
+      "gain_usd": 0.055442,
+      "gas_cost_usd": 0.02879102890881797,
+      "net_after_gas_usd": 0.02665097109118203
+    },
+    {
+      "tx_hash": "0x7c0ff52471c45f08e912075a94a0e2b3a1c348a4e0b551d98a76d9ac0088ee07",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.128203 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.113349567e-05,
+      "gain_usd": 0.128203,
+      "gas_cost_usd": 0.02790198705943217,
+      "net_after_gas_usd": 0.10030101294056784
+    },
+    {
+      "tx_hash": "0xa446c1586ad5a112c701dd29cbe312fbd0f9b2d6c05bdb7a79e8b6e0c9056c07",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.056750 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1631239928e-05,
+      "gain_usd": 0.05675,
+      "gas_cost_usd": 0.02914939885688272,
+      "net_after_gas_usd": 0.02760060114311728
+    },
+    {
+      "tx_hash": "0x69d1fdf70f8731f3af89f65096046e6b5f862e914f23de21639673e625067970",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053735 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1560411776e-05,
+      "gain_usd": 0.053735,
+      "gas_cost_usd": 0.028971894303135726,
+      "net_after_gas_usd": 0.02476310569686427
+    },
+    {
+      "tx_hash": "0x7dfd45983de83324ee9aa8917f6ecbf9ba5d6a1755655198c0fd36ba20d27f39",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.060393 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5342610424e-05,
+      "gain_usd": 0.060393,
+      "gas_cost_usd": 0.0384505756500067,
+      "net_after_gas_usd": 0.0219424243499933
+    },
+    {
+      "tx_hash": "0xdb0b0002ac4392c439fccfe078a80ced665005a4b6551b73e288bc220d34d8bd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055215 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3438028664e-05,
+      "gain_usd": 0.055215,
+      "gas_cost_usd": 0.03367744623977624,
+      "net_after_gas_usd": 0.02153755376022376
+    },
+    {
+      "tx_hash": "0xbde51d6a150e91f5cfbef7ade310ea713f7d50793bb309ceb923e039f285681d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.054152 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.261052065e-05,
+      "gain_usd": 0.054152,
+      "gas_cost_usd": 0.03160360361365301,
+      "net_after_gas_usd": 0.022548396386346987
+    },
+    {
+      "tx_hash": "0x8c424869ececf0a6ce7fe43846052392a39191331bea9453bf42757a7af0c2d5",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.052727 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2225175378e-05,
+      "gain_usd": 0.052727,
+      "gas_cost_usd": 0.03063787828250395,
+      "net_after_gas_usd": 0.022089121717496052
+    },
+    {
+      "tx_hash": "0x43057a25ae70d7515d2ffe02b0f549a04582cb470c691877c43378d9bf0d91c4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053491 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.251378258e-05,
+      "gain_usd": 0.053491,
+      "gas_cost_usd": 0.031361165438142005,
+      "net_after_gas_usd": 0.02212983456185799
+    },
+    {
+      "tx_hash": "0xfdd7be3b64c17f8618573ad9e5e995306ed2c425bf77e31b1705309005a56616",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.066387 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1442267214e-05,
+      "gain_usd": 0.066387,
+      "gas_cost_usd": 0.028675808676682492,
+      "net_after_gas_usd": 0.03771119132331751
+    },
+    {
+      "tx_hash": "0xc2433536d10ced1c60ab2cb99eddff66e93d532e55e13d7ee2d6d06a9fa843b4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.072898 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.203703604e-05,
+      "gain_usd": 0.072898,
+      "gas_cost_usd": 0.030166376650865363,
+      "net_after_gas_usd": 0.04273162334913464
+    },
+    {
+      "tx_hash": "0x870897165f2398785a4eef2076df1e4867f418da5367eefae32b1bfa52cef5bc",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.062369 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2359256192e-05,
+      "gain_usd": 0.062369,
+      "gas_cost_usd": 0.030973902227546375,
+      "net_after_gas_usd": 0.031395097772453626
+    },
+    {
+      "tx_hash": "0x3e2a6c5d6e99ca89527b40672138ece9d027d645ade614da1dc553ea8a4a2ef4",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053957 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.244017944e-05,
+      "gain_usd": 0.053957,
+      "gas_cost_usd": 0.03117670640382924,
+      "net_after_gas_usd": 0.02278029359617076
+    },
+    {
+      "tx_hash": "0x5184d5164297b492bfc7aef6bc59e70c7fbf241721656d803b7972836cb1a42b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.060286 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.4881560064e-05,
+      "gain_usd": 0.060286,
+      "gas_cost_usd": 0.037295123529687474,
+      "net_after_gas_usd": 0.022990876470312525
+    },
+    {
+      "tx_hash": "0x8f58e1608e7622e4a728d2274027289fe63abeb197f98d0cbac93b48d18c758b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078426 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2606763708e-05,
+      "gain_usd": 0.078426,
+      "gas_cost_usd": 0.031594188228748384,
+      "net_after_gas_usd": 0.04683181177125161
+    },
+    {
+      "tx_hash": "0x2ee0f0d397bf09dd90a7688ca17b70ded6a1140032e81a67b5a063d013a1563b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.054466 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.32607188e-05,
+      "gain_usd": 0.054466,
+      "gas_cost_usd": 0.033233084677381376,
+      "net_after_gas_usd": 0.021232915322618624
+    },
+    {
+      "tx_hash": "0x626f330debdc95a7dd164818b81defc9f0426c748ebd9dbf8c2d50c4d69cac2d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051622 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2245306724e-05,
+      "gain_usd": 0.051622,
+      "gas_cost_usd": 0.030688330051852054,
+      "net_after_gas_usd": 0.020933669948147948
+    },
+    {
+      "tx_hash": "0x453803bd8f397f5c33005698cfb609d577fb78f2b2e31a9e1d4dffd1f1b0a773",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.382724 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.232920368e-05,
+      "gain_usd": 0.382724,
+      "gas_cost_usd": 0.030898586726846367,
+      "net_after_gas_usd": 0.35182541327315364
+    },
+    {
+      "tx_hash": "0x24e12da4e0a04fe6068f1837d876a116de305a7da20a9113883c9c4ea964d24e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078230 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2673544892e-05,
+      "gain_usd": 0.07823,
+      "gas_cost_usd": 0.031761550554742946,
+      "net_after_gas_usd": 0.04646844944525705
+    },
+    {
+      "tx_hash": "0x87ce6c52e72b18d807e3e8cddee66e9577d43b354ea67191ec317c0676d2a032",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.081546 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.271699882e-05,
+      "gain_usd": 0.081546,
+      "gas_cost_usd": 0.03187045174558856,
+      "net_after_gas_usd": 0.049675548254411436
+    },
+    {
+      "tx_hash": "0xd5a441ed5cc5392f544149319f54234701f9a866ee741dceaa31ea619a0dc317",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.215839 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5137310894e-05,
+      "gain_usd": 0.215839,
+      "gas_cost_usd": 0.03793606834707554,
+      "net_after_gas_usd": 0.17790293165292448
+    },
+    {
+      "tx_hash": "0xf9eff164c25cb4b9dace7667766a26686138599628a1c793af6ca51534d5587b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.062141 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2313525068e-05,
+      "gain_usd": 0.062141,
+      "gas_cost_usd": 0.0308592940875801,
+      "net_after_gas_usd": 0.0312817059124199
+    },
+    {
+      "tx_hash": "0x069ee7467402d285c19371b4e8399827efda9add8eefc59dc5b3976e163cb70c",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.062510 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1537508944e-05,
+      "gain_usd": 0.06251,
+      "gas_cost_usd": 0.02891449682968897,
+      "net_after_gas_usd": 0.03359550317031103
+    },
+    {
+      "tx_hash": "0x83f58bfff29c30eae5d8b096d32e8f291bfa1985042878d738b7fd46e0bf8473",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.056515 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.30369092e-05,
+      "gain_usd": 0.056515,
+      "gas_cost_usd": 0.032672188733459326,
+      "net_after_gas_usd": 0.023842811266540677
+    },
+    {
+      "tx_hash": "0x586ea27cd7cee147f115559143fdcfe3bbcd44dbf49796b58afc918b9dbaabfc",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.063786 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2670350072e-05,
+      "gain_usd": 0.063786,
+      "gas_cost_usd": 0.03175354392062376,
+      "net_after_gas_usd": 0.032032456079376236
+    },
+    {
+      "tx_hash": "0x32fd2ef9be163e8b8c0ca1fd11dcdebd5072e042f27bca0519f36f8bd1ecd343",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.086327 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.298361708e-05,
+      "gain_usd": 0.086327,
+      "gas_cost_usd": 0.032538631754889115,
+      "net_after_gas_usd": 0.053788368245110886
+    },
+    {
+      "tx_hash": "0xb3082cdb43e8651338eb4ad7c6ca2978341b0569b2ba8db4936f77762baca6cd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.066919 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.10467104e-05,
+      "gain_usd": 0.066919,
+      "gas_cost_usd": 0.02768449189418823,
+      "net_after_gas_usd": 0.03923450810581178
+    },
+    {
+      "tx_hash": "0xc4751971b15b3f95dae123616837f60938b510ff43e54d081cb1b294852727fe",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.064424 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.530339111e-05,
+      "gain_usd": 0.064424,
+      "gas_cost_usd": 0.038352286952176025,
+      "net_after_gas_usd": 0.02607171304782397
+    },
+    {
+      "tx_hash": "0x03e7534bf16bb0ac41a71517e4af4d5e862e3ffbbeeef8372f5af7273ebc9e9d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051140 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1583428052e-05,
+      "gain_usd": 0.05114,
+      "gas_cost_usd": 0.02902957608198967,
+      "net_after_gas_usd": 0.022110423918010328
+    },
+    {
+      "tx_hash": "0xc6b16525206b249ef7a14e444f43db4316d19f39fdbd9d7cf6283fda99a1f3f7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.056118 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2487727238e-05,
+      "gain_usd": 0.056118,
+      "gas_cost_usd": 0.031295867364934685,
+      "net_after_gas_usd": 0.024822132635065317
+    },
+    {
+      "tx_hash": "0x8e3bf48b41082deeb91455bcbf7fcf19f7dcce856b3bab230a401e98b0e53eb1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.079182 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2598473212e-05,
+      "gain_usd": 0.079182,
+      "gas_cost_usd": 0.03157341116833854,
+      "net_after_gas_usd": 0.04760858883166146
+    },
+    {
+      "tx_hash": "0xe94c80e0f1001ceb319141d6a5885d5ae5572b0873aaa01fe60c7d29a0e5f0e1",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.203792 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3085091184e-05,
+      "gain_usd": 0.203792,
+      "gas_cost_usd": 0.03279293904709966,
+      "net_after_gas_usd": 0.17099906095290035
+    },
+    {
+      "tx_hash": "0x60b470c5b3cd09a8799900bef95f6d69d675cff73239d60cde7adb154c413e28",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.065254 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.610330683e-05,
+      "gain_usd": 0.065254,
+      "gas_cost_usd": 0.04035697970363747,
+      "net_after_gas_usd": 0.024897020296362538
+    },
+    {
+      "tx_hash": "0x5019bf0e5b634690df143e92c7d0d2f0864a004c0ed668a8d8087132d0ab2639",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.049925 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1548229336e-05,
+      "gain_usd": 0.049925,
+      "gas_cost_usd": 0.028941363525264382,
+      "net_after_gas_usd": 0.020983636474735615
+    },
+    {
+      "tx_hash": "0x3e48af3a3a42ffefd09c8430b721315e761f2b9ee239d7625cf655fd9ab5656e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.071516 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2142572218e-05,
+      "gain_usd": 0.071516,
+      "gas_cost_usd": 0.030430864028427523,
+      "net_after_gas_usd": 0.04108513597157247
+    },
+    {
+      "tx_hash": "0x9822563ff80251f91b473cd6df8a7ef729d6f9352ba16bf2bf63dc3b6d006228",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.136548 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2534778496e-05,
+      "gain_usd": 0.136548,
+      "gas_cost_usd": 0.031413783932269734,
+      "net_after_gas_usd": 0.10513421606773027
+    },
+    {
+      "tx_hash": "0xc776f38d734ae83ca0a85a97d04b054add24cb76bd8a0e297c4df6b88e700f30",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.097550 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.304297056e-05,
+      "gain_usd": 0.09755,
+      "gas_cost_usd": 0.03268737928935439,
+      "net_after_gas_usd": 0.06486262071064561
+    },
+    {
+      "tx_hash": "0xf521a9c66dffedd3be0b37fafdf52014017bb25af174668d52bee230fbb988a9",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078423 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2532170252e-05,
+      "gain_usd": 0.078423,
+      "gas_cost_usd": 0.03140724733383803,
+      "net_after_gas_usd": 0.047015752666161974
+    },
+    {
+      "tx_hash": "0x4518b282d27fba83baf5b5e3784ba945996bcf41c1b27d34adc1df14d285d994",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.209809 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.373616905e-05,
+      "gain_usd": 0.209809,
+      "gas_cost_usd": 0.03442462479345201,
+      "net_after_gas_usd": 0.17538437520654798
+    },
+    {
+      "tx_hash": "0x4e444c1d2617626a2f0bb02ab61ba90ab1fdc0783d88eae6f4d0f2571b5e6fbc",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.109783 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2541313624e-05,
+      "gain_usd": 0.109783,
+      "gas_cost_usd": 0.03143016181234374,
+      "net_after_gas_usd": 0.07835283818765626
+    },
+    {
+      "tx_hash": "0x1e78f4fc78a06a49be157c2d3b7ad206f272a70a5ba37b06069165958a0f6353",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.103722 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.19885579e-05,
+      "gain_usd": 0.103722,
+      "gas_cost_usd": 0.03004488413180056,
+      "net_after_gas_usd": 0.07367711586819943
+    },
+    {
+      "tx_hash": "0x2289fad9429ac88c256fc8938d1678e9fb33bb89d2b22ae87f7e175edd7fd3c0",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.144538 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2521205528e-05,
+      "gain_usd": 0.144538,
+      "gas_cost_usd": 0.031379768310517205,
+      "net_after_gas_usd": 0.1131582316894828
+    },
+    {
+      "tx_hash": "0x16bbf9558dd2a4a162b51c42170c2774a97e080e3de68a63d5c8dbfcc28ae652",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053493 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2597270268e-05,
+      "gain_usd": 0.053493,
+      "gas_cost_usd": 0.0315703964343398,
+      "net_after_gas_usd": 0.021922603565660198
+    },
+    {
+      "tx_hash": "0x36c24f792494b515463fde809cfa0087a26025e7d25efb766f212a1a67da87c7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.173135 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.269960146e-05,
+      "gain_usd": 0.173135,
+      "gas_cost_usd": 0.0318268517004656,
+      "net_after_gas_usd": 0.14130814829953442
+    },
+    {
+      "tx_hash": "0xdad2ff8e2584a6b5ec6f6f033a1e99059d0e22949f5a6878caf19b90b94cc4ef",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.290802 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.374870864e-05,
+      "gain_usd": 0.290802,
+      "gas_cost_usd": 0.03445605063563861,
+      "net_after_gas_usd": 0.2563459493643614
+    },
+    {
+      "tx_hash": "0xe56fdce760d3d3e4da72237eaf39512d6ac796e28f5a48a37024fac168ebee29",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.325424 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.433874219e-05,
+      "gain_usd": 0.325424,
+      "gas_cost_usd": 0.03593475139276846,
+      "net_after_gas_usd": 0.2894892486072315
+    },
+    {
+      "tx_hash": "0xeb70b2bf9219d4acf9f496561bc17b3f08c794ebbdc10112a1dc2556b86042e7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.072227 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2344602432e-05,
+      "gain_usd": 0.072227,
+      "gas_cost_usd": 0.030937178000581995,
+      "net_after_gas_usd": 0.041289821999418004
+    },
+    {
+      "tx_hash": "0x53173f04557c377d94f127438aab4a2621a12e5a134c7d89e990bb8161ac52ba",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059692 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2400094826e-05,
+      "gain_usd": 0.059692,
+      "gas_cost_usd": 0.03107624915174407,
+      "net_after_gas_usd": 0.028615750848255933
+    },
+    {
+      "tx_hash": "0x8257b3dc06323e7326a8859f08adc0411b024231405a6e89a497d7d7dd6d2be0",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.069525 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.414702016e-05,
+      "gain_usd": 0.069525,
+      "gas_cost_usd": 0.035454271069370796,
+      "net_after_gas_usd": 0.03407072893062921
+    },
+    {
+      "tx_hash": "0x289b00ea00afa26865669db989b4c9495e68ca179a87ceea937979c21a909c90",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.125290 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2682889136e-05,
+      "gain_usd": 0.12529,
+      "gas_cost_usd": 0.031784968444586,
+      "net_after_gas_usd": 0.09350503155541401
+    },
+    {
+      "tx_hash": "0x4b5a19dcf6badec76aad04e3d2ae5a73e306a5581197353a607d052f5bf781de",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.103513 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.31807168e-05,
+      "gain_usd": 0.103513,
+      "gas_cost_usd": 0.033032589268312006,
+      "net_after_gas_usd": 0.07048041073168798
+    },
+    {
+      "tx_hash": "0xb9d5ea0f3d346e27a419c350ad0c059705561fab60bc57accb93850ed59e73f5",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.081983 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2896707012e-05,
+      "gain_usd": 0.081983,
+      "gas_cost_usd": 0.03232082382963841,
+      "net_after_gas_usd": 0.04966217617036159
+    },
+    {
+      "tx_hash": "0x35e622f1e0d20f3c73d64fc987ea4699d6c3e54eadd094f732dae6b5cd8675fb",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.099890 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2123096576e-05,
+      "gain_usd": 0.09989,
+      "gas_cost_usd": 0.030382055538518787,
+      "net_after_gas_usd": 0.06950794446148122
+    },
+    {
+      "tx_hash": "0x09ec40c9e22c315fd77bbbaa2805458f6e7d2955863e7e32c6e085e5a369edbe",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059932 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3331894548e-05,
+      "gain_usd": 0.059932,
+      "gas_cost_usd": 0.03341146035187799,
+      "net_after_gas_usd": 0.02652053964812201
+    },
+    {
+      "tx_hash": "0x4eaacb4ac4dfc1127738ecff4d257c1a20a563146c00b1c6f7a85b1e23d8491a",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078573 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2499380894e-05,
+      "gain_usd": 0.078573,
+      "gas_cost_usd": 0.0313250729413812,
+      "net_after_gas_usd": 0.047247927058618806
+    },
+    {
+      "tx_hash": "0xd6afc8265a785eda770d5e7570ffb0ae651a748ffb0afa42a2b88d4a08ede97f",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.077178 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.393528448e-05,
+      "gain_usd": 0.077178,
+      "gas_cost_usd": 0.03492363393809681,
+      "net_after_gas_usd": 0.042254366061903186
+    },
+    {
+      "tx_hash": "0xe76330b0bf9fa26b23dc8d291ee8cad90c96fc2fb1ac4d65fd75ae5a44b33ba5",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.061944 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1419028324e-05,
+      "gain_usd": 0.061944,
+      "gas_cost_usd": 0.0286175689982136,
+      "net_after_gas_usd": 0.033326431001786394
+    },
+    {
+      "tx_hash": "0x4b6211a409815e7d18126ad4123fcb46b5fdf64d9572a66f9c77e0e068c38ce2",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.082173 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2091881328e-05,
+      "gain_usd": 0.082173,
+      "gas_cost_usd": 0.03030382607029347,
+      "net_after_gas_usd": 0.051869173929706525
+    },
+    {
+      "tx_hash": "0x159bfc85db3e7334197595787a3227ce433db9e943697fb87b5d1466d97a3b53",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.090707 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2385775556e-05,
+      "gain_usd": 0.090707,
+      "gas_cost_usd": 0.03104036320019005,
+      "net_after_gas_usd": 0.05966663679980995
+    },
+    {
+      "tx_hash": "0x3c9ecc5d92f9d1bde21560ffed7ab321953b306d123402235619e4a9542d9918",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.055728 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3839471936e-05,
+      "gain_usd": 0.055728,
+      "gas_cost_usd": 0.034683515251023284,
+      "net_after_gas_usd": 0.021044484748976716
+    },
+    {
+      "tx_hash": "0xc1f3d9847de7826bcb982b51cdb68246849fa242ff097836fd8a167e646fa72d",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.049363 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.161899946e-05,
+      "gain_usd": 0.049363,
+      "gas_cost_usd": 0.029118722653302054,
+      "net_after_gas_usd": 0.020244277346697943
+    },
+    {
+      "tx_hash": "0x02967102007402c473fb1762c3157658f59478c4a5a23c059cf1a1530600eaa6",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.207878 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.445668296e-05,
+      "gain_usd": 0.207878,
+      "gas_cost_usd": 0.03623032628998485,
+      "net_after_gas_usd": 0.17164767371001516
+    },
+    {
+      "tx_hash": "0xcff9a99c7d44becc56c50f9c9573e7ca22a62079bf36edcd131993c1cc8a1f22",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.089738 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.4774537634e-05,
+      "gain_usd": 0.089738,
+      "gas_cost_usd": 0.03702691141145983,
+      "net_after_gas_usd": 0.05271108858854017
+    },
+    {
+      "tx_hash": "0x16b9e3008774159374e3e113cae6d1f6b50de02143102866b4df6f801339d4b2",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.062486 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1547937536e-05,
+      "gain_usd": 0.062486,
+      "gas_cost_usd": 0.028940632236542023,
+      "net_after_gas_usd": 0.03354536776345798
+    },
+    {
+      "tx_hash": "0x07506a72c6970eddb76448df2d769a5a68d5f50048a977dd6a81f50755ae1fc7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059493 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.214395302e-05,
+      "gain_usd": 0.059493,
+      "gas_cost_usd": 0.030434324497688712,
+      "net_after_gas_usd": 0.029058675502311285
+    },
+    {
+      "tx_hash": "0x201196df49fd967a3589ab3130128113356adcd9bb9a04b8cec403354caeabef",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.132432 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.25431292e-05,
+      "gain_usd": 0.132432,
+      "gas_cost_usd": 0.03143471188175221,
+      "net_after_gas_usd": 0.10099728811824779
+    },
+    {
+      "tx_hash": "0x57f61bc49e594d8647f4c315976fd14bb85c252f7a3af2a463949119ae0822fb",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.089511 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3758818156e-05,
+      "gain_usd": 0.089511,
+      "gas_cost_usd": 0.0344813863965685,
+      "net_after_gas_usd": 0.05502961360343149
+    },
+    {
+      "tx_hash": "0xfad358bde06770004be2196ca7c3663492d424257f897cecf014cc2ebbebdd6e",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.089848 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1575129384e-05,
+      "gain_usd": 0.089848,
+      "gas_cost_usd": 0.029008778541485796,
+      "net_after_gas_usd": 0.0608392214585142
+    },
+    {
+      "tx_hash": "0xe097a9fb4a661fa98c8281228cf2a62f0b4ae804ffbe0f2b1ae645fcb35e168f",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.063075 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.387570473e-05,
+      "gain_usd": 0.063075,
+      "gas_cost_usd": 0.03477431934160547,
+      "net_after_gas_usd": 0.028300680658394535
+    },
+    {
+      "tx_hash": "0xb653d4e0b65ea53f42965f21fc587868c34ee94bdea3c7097034f747736fa6e7",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.068249 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2774362192e-05,
+      "gain_usd": 0.068249,
+      "gas_cost_usd": 0.03201421181077116,
+      "net_after_gas_usd": 0.036234788189228845
+    },
+    {
+      "tx_hash": "0x1dd527e307e0bf8aeb2aa630d94866b31c14300b0c36c99a434f27f1ba775550",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.088846 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.22467125e-05,
+      "gain_usd": 0.088846,
+      "gas_cost_usd": 0.03069185310920287,
+      "net_after_gas_usd": 0.05815414689079712
+    },
+    {
+      "tx_hash": "0xd5a34d9d3203a0c0b802dd80e704ff705bf25388c11b68fa9ca89f2bad3f5dfa",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.054534 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2133558752e-05,
+      "gain_usd": 0.054534,
+      "gas_cost_usd": 0.030408275111240415,
+      "net_after_gas_usd": 0.024125724888759584
+    },
+    {
+      "tx_hash": "0xe7e600b26eecb4c1c699fca57ccf851efa2445c01849d52aab32079ec43b9653",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.051933 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1201910436e-05,
+      "gain_usd": 0.051933,
+      "gas_cost_usd": 0.028073443354219237,
+      "net_after_gas_usd": 0.023859556645780763
+    },
+    {
+      "tx_hash": "0xd71c7da1896066bd2d0c8bc5d7e30078dbb227e8e6a3d75a06c47a1672dbba42",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.084850 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.346286167e-05,
+      "gain_usd": 0.08485,
+      "gas_cost_usd": 0.03373968098011263,
+      "net_after_gas_usd": 0.051110319019887364
+    },
+    {
+      "tx_hash": "0x0f0c74b0af4f8c0b10889c48c20c51979b2f5e450f19534bd54d2fc9e8c6a8da",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.203808 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3986375432e-05,
+      "gain_usd": 0.203808,
+      "gas_cost_usd": 0.03505167450359497,
+      "net_after_gas_usd": 0.168756325496405
+    },
+    {
+      "tx_hash": "0xa9f24cfa74db7a4596ea977b82d5c576c019f22552a960a517b733197dab63c6",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.100882 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.268038144e-05,
+      "gain_usd": 0.100882,
+      "gas_cost_usd": 0.03177868383250953,
+      "net_after_gas_usd": 0.06910331616749046
+    },
+    {
+      "tx_hash": "0x818eec607833da92c68661e112dfa45f91936d21ca6c17ee8b701ed653b06e5b",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.081099 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2454713642e-05,
+      "gain_usd": 0.081099,
+      "gas_cost_usd": 0.03121313100290785,
+      "net_after_gas_usd": 0.04988586899709216
+    },
+    {
+      "tx_hash": "0x781faf3fbfe3b3c489856f15040a9db0479e902755440fd22a5793a2fc98da41",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.053515 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2262385124e-05,
+      "gain_usd": 0.053515,
+      "gas_cost_usd": 0.030731130741762935,
+      "net_after_gas_usd": 0.022783869258237065
+    },
+    {
+      "tx_hash": "0xf0f5fdbd27dadf388fe810c4af3f08c01db47d5b4cb84df8da3569117af135dd",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.071645 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.25173736e-05,
+      "gain_usd": 0.071645,
+      "gas_cost_usd": 0.03137016500095139,
+      "net_after_gas_usd": 0.04027483499904861
+    },
+    {
+      "tx_hash": "0x40d0d838f5143e34e07bc7dc9399164d5ee824ae468d3a866ae145b582553e07",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.058915 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2472366632e-05,
+      "gain_usd": 0.058915,
+      "gas_cost_usd": 0.031257371690032516,
+      "net_after_gas_usd": 0.027657628309967486
+    },
+    {
+      "tx_hash": "0x697b2cc1cf00cb252e61842d88956976b7c14c8e2604d9d9ed2411cd13260bd0",
+      "contract": "0x18ab2e9a7c97935f026bb451d2bc7c4ab3b2050d",
+      "initiator": "0x405b2c7696ed81636d30d9fa4846aac3e541dc29",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.085411 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2546883704e-05,
+      "gain_usd": 0.085411,
+      "gas_cost_usd": 0.03144412115671199,
+      "net_after_gas_usd": 0.05396687884328801
+    },
+    {
+      "tx_hash": "0xde725c51a6f39da4f4d7f3221dbb3436293e303aee7deef7577510ca1791b2fa",
+      "contract": "0xa370cdf47ec6215ee26a6bdb2016a66fc45c30d8",
+      "initiator": "0x03d9964f4d93a24b58c0fc3a8df3474b59ba8557",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x05a3d1cd21d0c88145e82600e62e7e496e0f222b": "3964968032204165 raw (0x05a3d1cd21d0c88145e82600e62e7e496e0f222b, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 8.0401301892e-05,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0x05a3d1cd21d0c88145e82600e62e7e496e0f222b -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0x5a7c56514db42835a7d7f527ac852ee7f04d88bbc7e95d18c7bc3ade31782ccb",
+      "contract": "0x558c19a2f1d51a004d484ff05a6c3ac0bec24d11",
+      "initiator": "0x03d9964f4d93a24b58c0fc3a8df3474b59ba8557",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0xf6589f11bc40b669e584073f428b05562f568733": "206868638015457058 raw (0xf6589f11bc40b669e584073f428b05562f568733, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 8.129949126e-05,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0xf6589f11bc40b669e584073f428b05562f568733 -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0x1fdd27f11422ce938e03e09ec13cd52f5ab4c216ef8d67df43a3f758b47b8bb7",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0xab2aad0c52d3c1bae1164b29ce211419094ba266",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00007657 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.552592659e-05,
+      "gain_usd": 0.1918980803746454,
+      "gas_cost_usd": 0.06397128938697431,
+      "net_after_gas_usd": 0.12792679098767107
+    },
+    {
+      "tx_hash": "0x49e4298e1e08e1609623440247e390705ec98cd8a735bcb1e1c59395292b2f35",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x8c135415968492b0384e7183233df3c9aed63a1b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002808 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.0524320936e-05,
+      "gain_usd": 0.07038396820360618,
+      "gas_cost_usd": 0.051436615608788816,
+      "net_after_gas_usd": 0.018947352594817363
+    },
+    {
+      "tx_hash": "0x33a654bd10944a2a309fd8955251512e7d6100a4967698c3daa56381af2edadb",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0xdaafe257a9ebf88068adbf747a61f7c9a328788a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00001998 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3389129748e-05,
+      "gain_usd": 0.05006777040676672,
+      "gas_cost_usd": 0.03355489920137134,
+      "net_after_gas_usd": 0.01651287120539538
+    },
+    {
+      "tx_hash": "0xb5b86cf26caa5e546039954ef2314b2593fcd5653ad98f3567dcca67a24e9fe9",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x15bd8aaf6adea7e16be8c2f0bbcd8eaa7499b571",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003097 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.0247093056e-05,
+      "gain_usd": 0.07760357960436726,
+      "gas_cost_usd": 0.050741846512940794,
+      "net_after_gas_usd": 0.026861733091426462
+    },
+    {
+      "tx_hash": "0xca134a28296d43ed5734a1257547fcc0d8dc856d22e60b5fe3afe296d076752a",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x83417667ca9069ad66676a21d9d7c7098723656c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00011209 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.7955152498e-05,
+      "gain_usd": 0.28092440943736247,
+      "gas_cost_usd": 0.07005924521490821,
+      "net_after_gas_usd": 0.21086516422245427
+    },
+    {
+      "tx_hash": "0x2210f426f916494f38865c965422ce800e64501a94b545fc66f2a1f3b06a7b04",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0xaa3242ec58e5d0f6fe2fbb0ed8b76bd72672968d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003842 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.502876805e-05,
+      "gain_usd": 0.09627974128522525,
+      "gas_cost_usd": 0.06272534547495175,
+      "net_after_gas_usd": 0.0335543958102735
+    },
+    {
+      "tx_hash": "0x35920e8f5974ad8a91c6f8c6858a3e93d59cf130b7fb7ab966eee08d71ce3f03",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0xb5222ff9e664fb14f0df007bae77e28941a87afc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.087590 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.293137828e-05,
+      "gain_usd": 0.08759,
+      "gas_cost_usd": 0.05746901413430953,
+      "net_after_gas_usd": 0.030120985865690474
+    },
+    {
+      "tx_hash": "0xa7684c9c63d2484ff9e0e7398fb03b7d9017d71d4fea2bd6658cc354e67d7376",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x91181d5755b8c43eec3deee82ae07002e7616b66",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00006690 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.7628289794e-05,
+      "gain_usd": 0.16765289891056992,
+      "gas_cost_usd": 0.0692400847995686,
+      "net_after_gas_usd": 0.09841281411100132
+    },
+    {
+      "tx_hash": "0xecefe4c0aa01f4fe331eef77c8ceac526833a798e3a91392a5585d9d42a6c9bb",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x18844a6c2ee9c9af17562a912193a6a762050033",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002032 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9856434836e-05,
+      "gain_usd": 0.050919597023833155,
+      "gas_cost_usd": 0.049762806243632385,
+      "net_after_gas_usd": 0.0011567907802007699
+    },
+    {
+      "tx_hash": "0xa65a15c394766fe5cbce21935f6dac8783613115e24e3b70b9d4358ff0d2321d",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0xc1e2267b887e53dde9a8e5f9cb2c959b7b189937",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00013826 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.027086298e-05,
+      "gain_usd": 0.3465052667490053,
+      "gas_cost_usd": 0.05080141703162692,
+      "net_after_gas_usd": 0.29570384971737834
+    },
+    {
+      "tx_hash": "0x1ed1fb52de5c9fb82bd9a41222ce9ad78a946f03a2f13845c574a78edbdfdce2",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x6c936451e085c96301a7e3f6879e363a7c1cb135",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.078918 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.417242752e-05,
+      "gain_usd": 0.078918,
+      "gas_cost_usd": 0.08564054441783636,
+      "net_after_gas_usd": -0.00672254441783636
+    },
+    {
+      "tx_hash": "0xe8e394c2f8f6cbfece5f000a02a552e2bb10d8050dcad634607141837b2a4f84",
+      "contract": "0x72901a86a8470cb55c97b450d76ca07da2179768",
+      "initiator": "0x8a49319b2b9e6bc3427862cfb943e025a3bb61f5",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00001995 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9853792462e-05,
+      "gain_usd": 0.04999791079857628,
+      "gas_cost_usd": 0.04975618411098515,
+      "net_after_gas_usd": 0.00024172668759113447
+    },
+    {
+      "tx_hash": "0xf7af6b88563c6ac0c927317127436d85f4b5feb4f85e8b4b3dacafb5e014b465",
+      "contract": "0x34b58c2e7bee398ee656a4b1b18cf2f41f27a39f",
+      "initiator": "0x6c37d7915cf23311e6c90c21e2341047a99cf940",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.094102 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.6225036644e-05,
+      "gain_usd": 0.094102,
+      "gas_cost_usd": 0.0657233500387235,
+      "net_after_gas_usd": 0.02837864996127651
+    },
+    {
+      "tx_hash": "0x9b24c7f44afb3c838f47fc22e4b0d4e86b96bfd04a1c3ffb336551969506f7a5",
+      "contract": "0x34b58c2e7bee398ee656a4b1b18cf2f41f27a39f",
+      "initiator": "0x6c37d7915cf23311e6c90c21e2341047a99cf940",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.042501 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5779552708e-05,
+      "gain_usd": 0.042501,
+      "gas_cost_usd": 0.06460690939996257,
+      "net_after_gas_usd": -0.02210590939996257
+    },
+    {
+      "tx_hash": "0x8f7ed066b3dd72a8e1f9bd42d10342d9bc3a0ec9c4bef2b0f02fb39552733d1a",
+      "contract": "0x34b58c2e7bee398ee656a4b1b18cf2f41f27a39f",
+      "initiator": "0xef6ba29d7066393e08d3675963ad11e2c9aca484",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.043525 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.583501042e-05,
+      "gain_usd": 0.043525,
+      "gas_cost_usd": 0.06474589363352537,
+      "net_after_gas_usd": -0.02122089363352537
+    },
+    {
+      "tx_hash": "0xdf0c7d2a59305f6312ad148b07181d330e58849c98272c157b925040205c61b0",
+      "contract": "0x34b58c2e7bee398ee656a4b1b18cf2f41f27a39f",
+      "initiator": "0xef6ba29d7066393e08d3675963ad11e2c9aca484",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.042873 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5543794472e-05,
+      "gain_usd": 0.042873,
+      "gas_cost_usd": 0.06401606862137837,
+      "net_after_gas_usd": -0.021143068621378373
+    },
+    {
+      "tx_hash": "0xdbeb6b8a30691e81576ae5413adb3777f2ae6f9e562556ebb4d91a95df865f58",
+      "contract": "0x34b58c2e7bee398ee656a4b1b18cf2f41f27a39f",
+      "initiator": "0x6c37d7915cf23311e6c90c21e2341047a99cf940",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.036333 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3144452064e-05,
+      "gain_usd": 0.036333,
+      "gas_cost_usd": 0.03294170512692663,
+      "net_after_gas_usd": 0.0033912948730733666
+    },
+    {
+      "tx_hash": "0x22a3cae78404d79e2eb23fa435a9369a7d34fcc1a7c9a595203e21f2b473a127",
+      "contract": "0x8e3d7e6ae1c00006caad127b8902657f770b7a16",
+      "initiator": "0xedc90a6344e65bb3862ed4aa10a64ed5bfbf7c63",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003432 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1912298794e-05,
+      "gain_usd": 0.08601575767144203,
+      "gas_cost_usd": 0.05491506850270317,
+      "net_after_gas_usd": 0.031100689168738857
+    },
+    {
+      "tx_hash": "0xb06998a96e2f7ccbd52f8d0f5ba21a7f4ad6ab1afef79cb887e2935621ccad79",
+      "contract": "0x8e3d7e6ae1c00006caad127b8902657f770b7a16",
+      "initiator": "0x86209bd212ee68c4e1f10d0eaf1f04498abe2f15",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "3.673377 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.8694548404e-05,
+      "gain_usd": 3.673377,
+      "gas_cost_usd": 0.07191226744732349,
+      "net_after_gas_usd": 3.6014647325526763
+    },
+    {
+      "tx_hash": "0x191de62f33b5fb3eb4891e9c4a7d0e32846db595d0ee97713721f272d8cd90b2",
+      "contract": "0x8e3d7e6ae1c00006caad127b8902657f770b7a16",
+      "initiator": "0xa9bf50b749599fe6c49e4edbee2296eeaf73e7e3",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00079567 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.0558922388e-05,
+      "gain_usd": 1.994051531734893,
+      "gas_cost_usd": 0.05152333134430961,
+      "net_after_gas_usd": 1.9425282003905835
+    },
+    {
+      "tx_hash": "0xc0a23d378aa89f53e332d5f8398189e6a5ae36dd89be5729c57666cf7f899412",
+      "contract": "0x8e3d7e6ae1c00006caad127b8902657f770b7a16",
+      "initiator": "0x2da3f310c4d85f54db41831c8860454983c569a3",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00027687 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1882620304e-05,
+      "gain_usd": 0.6938776954491801,
+      "gas_cost_usd": 0.05484069034974311,
+      "net_after_gas_usd": 0.639037005099437
+    },
+    {
+      "tx_hash": "0xefe78d3af48d4d1105758e5d3874851859d4d2748c618bdc4d74d00048f59e27",
+      "contract": "0x3a00e4f1ad11ef697589af6d5e2c48f4c2f59d1e",
+      "initiator": "0xfa29167a0d85bbcd0c493bf81e6988e46af09cb8",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.209565 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.776974122e-05,
+      "gain_usd": 0.209565,
+      "gas_cost_usd": 0.0445332808549876,
+      "net_after_gas_usd": 0.1650317191450124
+    },
+    {
+      "tx_hash": "0xfc9e0874c74d2cf168e7ccb86b55649a51fa345bdfa9f0763ed8d3202b72c404",
+      "contract": "0x3a00e4f1ad11ef697589af6d5e2c48f4c2f59d1e",
+      "initiator": "0xfa29167a0d85bbcd0c493bf81e6988e46af09cb8",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00005736 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.324779014e-05,
+      "gain_usd": 0.14376249793665102,
+      "gas_cost_usd": 0.058261983376392226,
+      "net_after_gas_usd": 0.0855005145602588
+    },
+    {
+      "tx_hash": "0x0d4018852df95f0221ffd8cd3a06e4ccddfaa70094a7668b45d92668228dcb61",
+      "contract": "0x92e7b29a58d6e0dc627dcc7c6c8032c6e97b2f77",
+      "initiator": "0x7f87c41df6a6b79b0760396f2af5286b0a98ec0b",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.081151 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2404610128e-05,
+      "gain_usd": 0.081151,
+      "gas_cost_usd": 0.03108756508536525,
+      "net_after_gas_usd": 0.05006343491463475
+    },
+    {
+      "tx_hash": "0x01d8ff65d4d2883edf65ed61af96196a77462723af1a0ff906045286884eee39",
+      "contract": "0x4a99502ec3ec7125f540187370346d29c5c236b2",
+      "initiator": "0x3e7d84e312f7753f073c8cf070fb3c14847f7941",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.087061 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5050989682e-05,
+      "gain_usd": 0.087061,
+      "gas_cost_usd": 0.06278103577266966,
+      "net_after_gas_usd": 0.024279964227330336
+    },
+    {
+      "tx_hash": "0x342d4d341ed291788774b916892cdd80a1ff21fac972853b3e180909a07c525b",
+      "contract": "0x4a99502ec3ec7125f540187370346d29c5c236b2",
+      "initiator": "0x3e7d84e312f7753f073c8cf070fb3c14847f7941",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.094647 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5092451508e-05,
+      "gain_usd": 0.094647,
+      "gas_cost_usd": 0.06288494449700946,
+      "net_after_gas_usd": 0.031762055502990535
+    },
+    {
+      "tx_hash": "0x1b3481f70681d0fdbe361c580f3f1fa01f7c97a783d0c03031f1c47426200afb",
+      "contract": "0x9fc230304b5ef333e55b7b0d529dc23cde1c561b",
+      "initiator": "0xc32a1c57d76a9f9d561fdfb961a408826f666332",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003111 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8408830448e-05,
+      "gain_usd": 0.07796959441450414,
+      "gas_cost_usd": 0.04613492151646715,
+      "net_after_gas_usd": 0.03183467289803699
+    },
+    {
+      "tx_hash": "0xb24b4f0532b904534b0786a9bbceaab7f567c78cb5e1726df8ee3938abfb2676",
+      "contract": "0x9fc230304b5ef333e55b7b0d529dc23cde1c561b",
+      "initiator": "0xc32a1c57d76a9f9d561fdfb961a408826f666332",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00003886 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.652807888e-05,
+      "gain_usd": 0.09738174055624274,
+      "gas_cost_usd": 0.06648281326554428,
+      "net_after_gas_usd": 0.030898927290698458
+    },
+    {
+      "tx_hash": "0xcc70470601c84baef94091d5426c430d01ccb7bdc0751170a6848b3d9cd4f771",
+      "contract": "0x9fc230304b5ef333e55b7b0d529dc23cde1c561b",
+      "initiator": "0xc32a1c57d76a9f9d561fdfb961a408826f666332",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.082892 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8919996788e-05,
+      "gain_usd": 0.082892,
+      "gas_cost_usd": 0.04741597079574507,
+      "net_after_gas_usd": 0.035476029204254925
+    },
+    {
+      "tx_hash": "0x6220373c5afae122ac698ef4b565d1a9ce7862b0893141bd466932ba0a76b3b9",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xfc1b9b257f9bb2a54f93cc65c256a54126bbe371",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00013852 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4380811972e-05,
+      "gain_usd": 0.3471516462807164,
+      "gas_cost_usd": 0.06110148333503532,
+      "net_after_gas_usd": 0.2860501629456811
+    },
+    {
+      "tx_hash": "0x159afab5dcb31eb31355ab70defddf7d67818f5dcb4c52da371635177144b1ea",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x6815f6b6aed04cba29c0da85a0b81e34e6ab12a8",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002258 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.1093969058e-05,
+      "gain_usd": 0.05659144519151368,
+      "gas_cost_usd": 0.05286422783405803,
+      "net_after_gas_usd": 0.0037272173574556464
+    },
+    {
+      "tx_hash": "0x88b0dcdc8e112948e520177b7b49f9f2aff4a54c8dec26d7d7cea1bd759d7d70",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x7e3ba77f44d968fcb7a90f11c5164253fd7018be",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002466 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8951134664e-05,
+      "gain_usd": 0.06179569794160505,
+      "gas_cost_usd": 0.04749400635968311,
+      "net_after_gas_usd": 0.01430169158192194
+    },
+    {
+      "tx_hash": "0x06d33563eee937b1014f52a7734fc2f88f28fccd5f83626f81987a1df1692844",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x47d52a3b3f9aa88527b31da1feff7332ccc76c33",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00004502 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.415004224e-05,
+      "gain_usd": 0.11283826377191712,
+      "gas_cost_usd": 0.0605231443957817,
+      "net_after_gas_usd": 0.05231511937613542
+    },
+    {
+      "tx_hash": "0x28b03bd64e502632a972b3f3c4a285eea5b613480d2e07f823f4f11654b98b91",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xadeb64e0f57fc95f798d1c784c0e5f110daf30ec",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002828 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4000388632e-05,
+      "gain_usd": 0.07087164499309795,
+      "gas_cost_usd": 0.06014809300513312,
+      "net_after_gas_usd": 0.010723551987964826
+    },
+    {
+      "tx_hash": "0x3dfe601d3eb3c6ff3ba874e8e6a537cd5d8e930549f778e9d570ec41e35e5484",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x2a32c7833fa3ae4a058d2013a2248982ebb6de4d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00001795 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5784515508e-05,
+      "gain_usd": 0.04498320400814354,
+      "gas_cost_usd": 0.039558047220547614,
+      "net_after_gas_usd": 0.005425156787595926
+    },
+    {
+      "tx_hash": "0x57dc4ca5bf397a6184a20c51575fbc5a3e3ddcecf6c2b3a62b3f0509b71c6155",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x9311da2c4a6a6786debc9f8129070a8e9697f728",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.044985 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.55433414e-05,
+      "gain_usd": 0.044985,
+      "gas_cost_usd": 0.03895363356288405,
+      "net_after_gas_usd": 0.006031366437115944
+    },
+    {
+      "tx_hash": "0x6b4473fb152a2b29c76f5beb745c0bbfe67fcd1e55f941b13b748666e37948e7",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x15d46ffeea96999ecace82c56770449f96374f08",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.043600 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5320217792e-05,
+      "gain_usd": 0.0436,
+      "gas_cost_usd": 0.038394456804065606,
+      "net_after_gas_usd": 0.005205543195934394
+    },
+    {
+      "tx_hash": "0x48c6934f3c28e0507d04e588873dfebb22181b02b3c164ab68ac59b45ab56a40",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xc1db1f6a22a2b4a669321740a27f390cccd420aa",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.057742 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.502602568e-05,
+      "gain_usd": 0.057742,
+      "gas_cost_usd": 0.037657173138151985,
+      "net_after_gas_usd": 0.020084826861848017
+    },
+    {
+      "tx_hash": "0xb292124ca6b23ec560e8fcbb01ebcd5da92841f7c7796462d947214022275a91",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x2a887f2f653ff212885d31427096ab09c7857390",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.133995 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.427234444e-05,
+      "gain_usd": 0.133995,
+      "gas_cost_usd": 0.06082964960339005,
+      "net_after_gas_usd": 0.07316535039660996
+    },
+    {
+      "tx_hash": "0xd35d547269ea20078d6fb1abb209ac2f42932e6e49cbf22cbaa734f4342c1877",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xc99bd978ff2660060fdfb2b1115d7244849c5d21",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.058528 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.528884034e-05,
+      "gain_usd": 0.058528,
+      "gas_cost_usd": 0.038315820831536236,
+      "net_after_gas_usd": 0.02021217916846376
+    },
+    {
+      "tx_hash": "0xfbe86e4ad7d699e806df6f6772e663b40a5af4176fa4055b3ef8793e2d59b69c",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x83417667ca9069ad66676a21d9d7c7098723656c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.047633 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5554527962e-05,
+      "gain_usd": 0.047633,
+      "gas_cost_usd": 0.03898166854106297,
+      "net_after_gas_usd": 0.008651331458937032
+    },
+    {
+      "tx_hash": "0xef6faeb1fc5f4def8e4aa68313aea5703830177d2b8f1318117e7ecb97124eb5",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xb889e8eb8c5903561bc8df988a3126087583a169",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002930 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4091171456e-05,
+      "gain_usd": 0.07344209385786778,
+      "gas_cost_usd": 0.06037560656022365,
+      "net_after_gas_usd": 0.013066487297644126
+    },
+    {
+      "tx_hash": "0xf56773e8278602a00aa2c601ee6100e03036a923118a2ef1440a73d36bebd4cf",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xa4dfa12a93a52d0a1a1dd97a4c92b460c7d139c1",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00001741 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.55881999e-05,
+      "gain_usd": 0.0436302825465084,
+      "gas_cost_usd": 0.03906605479370001,
+      "net_after_gas_usd": 0.004564227752808389
+    },
+    {
+      "tx_hash": "0xbea2980cc5c4b41c3e444de0d4d522e585df880e5dbdd04c46110efe34715c5e",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x0018860811cb63c1501a459aea1b8c4287d3ebab",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.069176 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4362425204e-05,
+      "gain_usd": 0.069176,
+      "gas_cost_usd": 0.06105540370488077,
+      "net_after_gas_usd": 0.008120596295119228
+    },
+    {
+      "tx_hash": "0x83c97d53ba4f22a69328732fe67648e38ec162111219816dcb6a55b2a206663b",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xa0036453cf21740d66bc8145e78fc3c568384574",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.050810 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.548368056e-05,
+      "gain_usd": 0.05081,
+      "gas_cost_usd": 0.03880411574431424,
+      "net_after_gas_usd": 0.012005884255685759
+    },
+    {
+      "tx_hash": "0xad699da030c980781380309abd03de6d7e37b5126eea4fe9b886408278cba97e",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0xd48fcfa5edd79c40405f5a96beb728fd24652a75",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00004689 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5242433024e-05,
+      "gain_usd": 0.11751477671233912,
+      "gas_cost_usd": 0.03819951806653997,
+      "net_after_gas_usd": 0.07931525864579915
+    },
+    {
+      "tx_hash": "0xb7ad842852c055e35644a714715b83f5b0a55e7e4b9516202ad9fbe82d4e85b9",
+      "contract": "0x1e93a79be11f39a72bae9a0a6c695428cfd50e25",
+      "initiator": "0x40ebab1dcbc8f311ad73c47768a5e3e73e885259",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00002323 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.511585625e-05,
+      "gain_usd": 0.05822681445796155,
+      "gas_cost_usd": 0.03788230022096348,
+      "net_after_gas_usd": 0.020344514236998075
+    },
+    {
+      "tx_hash": "0x2109b7a56a1cfceb59283da97b3c3e899ed509e9a2adba3f4ff7c673dfacd6c0",
+      "contract": "0x524a5114848c5cba631998d89771f1f13b3265d9",
+      "initiator": "0x170c025b622060ec23d2b8120f1a082aa8726858",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.307404 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.896997832e-05,
+      "gain_usd": 0.307404,
+      "gas_cost_usd": 0.12272512981408595,
+      "net_after_gas_usd": 0.18467887018591406
+    },
+    {
+      "tx_hash": "0x78be841b073221ea073f4dd2b1544c58863bc51bf9a4ced01fa49a69c083839a",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00111003 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.1919473928e-05,
+      "gain_usd": 2.781881592854473,
+      "gas_cost_usd": 0.10505564952335048,
+      "net_after_gas_usd": 2.6768259433311226
+    },
+    {
+      "tx_hash": "0xa4d2e02cc30f0b83da916eb4cb71f81f4bd5e9bd23868f2fc19d259590a0fde2",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00049806 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.1471918624e-05,
+      "gain_usd": 1.2481910283927584,
+      "gas_cost_usd": 0.10393401776718632,
+      "net_after_gas_usd": 1.144257010625572
+    },
+    {
+      "tx_hash": "0xc20d074216a0c63a0907672b87892f1fe6cd67af79f1e407328a00568dae9af8",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0001a7a75bfe2acba8d3e52ab7cd80dfcb16d6dc",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00126917 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.8790795186e-05,
+      "gain_usd": 3.1807113704710557,
+      "gas_cost_usd": 0.09721477399243966,
+      "net_after_gas_usd": 3.083496596478616
+    },
+    {
+      "tx_hash": "0xf4f4b38113e9068f45a2a51833912d95e61fabfbdb46d32e0cb30106fff7263a",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "1.100611 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.33922024e-05,
+      "gain_usd": 1.100611,
+      "gas_cost_usd": 0.10874649847014864,
+      "net_after_gas_usd": 0.9918645015298514
+    },
+    {
+      "tx_hash": "0xd2cb48c2564e5d28c41a41e4dadfd6e6b505c71a993b8a6d52202e46942943b0",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "1.087764 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.34464516e-05,
+      "gain_usd": 1.087764,
+      "gas_cost_usd": 0.10888245401558108,
+      "net_after_gas_usd": 0.9788815459844189
+    },
+    {
+      "tx_hash": "0x4826638175057c3ceebc31924782add3d4ab11fe10af83cce7f967d01511eab7",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "1.961970 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.081645524e-05,
+      "gain_usd": 1.96197,
+      "gas_cost_usd": 0.10229134134278352,
+      "net_after_gas_usd": 1.8596786586572165
+    },
+    {
+      "tx_hash": "0x4c328ac9a84284e8c2a520b59702bfac23c2a8e59e555ecedab6d1158f07bac9",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00049551 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.6808696362e-05,
+      "gain_usd": 1.2418070211974686,
+      "gas_cost_usd": 0.09224737674569841,
+      "net_after_gas_usd": 1.1495596444517702
+    },
+    {
+      "tx_hash": "0x62fd98052746991cf24c047b28c2d15b817481a0b47c1aa97c789bb921d6b5a8",
+      "contract": "0x56d9e14e1dc231ed99dafe0e1d383702699420ca",
+      "initiator": "0x0000009efff5f06fb9b7818e610286d25144f895",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "2.049160 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.358772278e-05,
+      "gain_usd": 2.04916,
+      "gas_cost_usd": 0.10923649795228033,
+      "net_after_gas_usd": 1.9399235020477197
+    },
+    {
+      "tx_hash": "0xe96ef1bb8d820d64ec3606272863a7f2417930862386faa00d2d6d624b1dbec7",
+      "contract": "0xbcf119bf797e31f36fcea44597e93a4f847b28fa",
+      "initiator": "0x39e47b4bfe4639f258c8e9e3e30982a30cf9b031",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x2e67d292ca6a233e5c2427faa3d988ac911b10d6": "14129012402542632229844391 raw (0x2e67d292ca6a233e5c2427faa3d988ac911b10d6, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.9851673376e-05,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0x2e67d292ca6a233e5c2427faa3d988ac911b10d6 -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0xd45cff08ebd7f584e7b919b213d2e57d9cffe0e3e5f8815c6e7854ea1ea9d06e",
+      "contract": "0xbcf119bf797e31f36fcea44597e93a4f847b28fa",
+      "initiator": "0x39e47b4bfe4639f258c8e9e3e30982a30cf9b031",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b": "7526403358688339242817550 raw (0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.859146048e-05,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0x932ba08c2800049c1cda77732aa6f02a1e6cf3c351d6ac575080d725061d1cb4",
+      "contract": "0xbcf119bf797e31f36fcea44597e93a4f847b28fa",
+      "initiator": "0x39e47b4bfe4639f258c8e9e3e30982a30cf9b031",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b": "8031710160230107541126906 raw (0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b, decimals \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b)"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.8647046656e-05,
+      "gain_usd": null,
+      "gain_raw_note": "\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0432 0xd3975454a5ccb80b8e61a4e3df62a8673a6e2b3b -- decimals/\u043a\u0443\u0440\u0441 \u043d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b, $ \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u043c"
+    },
+    {
+      "tx_hash": "0x3c79e70cc900d74d06c6a6c664c6e7d599ca46906f3876d02d2b48b325169b0b",
+      "contract": "0x8f83df36480755e795d5796640254f0d9dc47c09",
+      "initiator": "0x1fc07396e78f79a5b33e37fe293843b421a9446c",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.169813 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.2676110906e-05,
+      "gain_usd": 0.169813,
+      "gas_cost_usd": 0.10695188012284951,
+      "net_after_gas_usd": 0.06286111987715048
+    },
+    {
+      "tx_hash": "0x8f6de90aec85b844a7b6cc3ecd938c318a6e2361a2075d1f8b84882e6ce782be",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.335934 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.5644559468e-05,
+      "gain_usd": 0.335934,
+      "gas_cost_usd": 0.039207299195604124,
+      "net_after_gas_usd": 0.2967267008043959
+    },
+    {
+      "tx_hash": "0x9a6689d6e164f15039210948ed7273a9c55e36023082c9ac52ba5644bbaad3bf",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.260668 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.1237008826e-05,
+      "gain_usd": 0.260668,
+      "gas_cost_usd": 0.02816140448095015,
+      "net_after_gas_usd": 0.23250659551904987
+    },
+    {
+      "tx_hash": "0x5a60a8c549b64f60cb876071c6aed182dc8dd7f9a444dd0edd94f1f7d0bd8ce1",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.265557 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.2448254756e-05,
+      "gain_usd": 0.265557,
+      "gas_cost_usd": 0.031196944195194264,
+      "net_after_gas_usd": 0.23436005580480573
+    },
+    {
+      "tx_hash": "0x04000b1427c88b38a7abe1f94955a48a716491ec324c87a8840a08be04bce8fc",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.247075 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3219099248e-05,
+      "gain_usd": 0.247075,
+      "gas_cost_usd": 0.03312878067118748,
+      "net_after_gas_usd": 0.21394621932881253
+    },
+    {
+      "tx_hash": "0xf98625a532729835b5cc6e04c031f1ce82b4e1aa7bfe699776ea2fa2ccf588db",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.180853 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9906895842e-05,
+      "gain_usd": 0.180853,
+      "gas_cost_usd": 0.04988926808258668,
+      "net_after_gas_usd": 0.13096373191741334
+    },
+    {
+      "tx_hash": "0x1813bbf6ea30973c78466f6f00a64985804d1ba7e51a3f968f9a9a0e9a7d3d7c",
+      "contract": "0x4904f1c3d68403351c203e208f7c70e95e7e48a9",
+      "initiator": "0x0a45dcd332083d412c047f7a20ce804a3fc32c25",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.178683 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8466995442e-05,
+      "gain_usd": 0.178683,
+      "gas_cost_usd": 0.046280690550560645,
+      "net_after_gas_usd": 0.13240230944943937
+    },
+    {
+      "tx_hash": "0x3d14a0930e4c57adb1ca93d4d5363f034893e85503d9df2ab44db1f2357986df",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x700ca4ba7c82d0af65c1e992abd6b0c2e5e39f8f",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.143507 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.1831314676e-05,
+      "gain_usd": 0.143507,
+      "gas_cost_usd": 0.15495731018301376,
+      "net_after_gas_usd": -0.011450310183013762
+    },
+    {
+      "tx_hash": "0x7d3ea398da6bf9c3182e1dc983c2822fdbdc29c63bf53c03f9434df7a692fdf8",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x069acec9f42bc99e681c506619242cb11ef2a5ee",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.118289 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.1992449872e-05,
+      "gain_usd": 0.118289,
+      "gas_cost_usd": 0.15536113592533884,
+      "net_after_gas_usd": -0.03707213592533884
+    },
+    {
+      "tx_hash": "0x32fd24fd77031ff1d8936d2f8a6432032c640cc5255064c8750c6da1f0653f32",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0xab6293850028560b1477158fdd71a3c790b16706",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.177978 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.296132812e-05,
+      "gain_usd": 0.177978,
+      "gas_cost_usd": 0.15778927073035837,
+      "net_after_gas_usd": 0.02018872926964163
+    },
+    {
+      "tx_hash": "0x3304b18e5faa32d25440a3e5da8a1add78a16d51f1b7ffc95683659381b6f74f",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x069acec9f42bc99e681c506619242cb11ef2a5ee",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.148394 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.2322696234e-05,
+      "gain_usd": 0.148394,
+      "gas_cost_usd": 0.15618877622736704,
+      "net_after_gas_usd": -0.007794776227367045
+    },
+    {
+      "tx_hash": "0x99bfd6661e3f8740e3e34106ba6582df936d1a2ad308227f4515e88512f50b1f",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x9114d86395817e124a1dda05288fad0650a5f0b2",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.151336 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.316791927e-05,
+      "gain_usd": 0.151336,
+      "gas_cost_usd": 0.15830701500086863,
+      "net_after_gas_usd": -0.006971015000868636
+    },
+    {
+      "tx_hash": "0xff307554ef7cb8d053977cda8984d3ffb11edc80d23aa412ae8578455e16e504",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x069acec9f42bc99e681c506619242cb11ef2a5ee",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.097795 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.2935570432e-05,
+      "gain_usd": 0.097795,
+      "gas_cost_usd": 0.15772471861675819,
+      "net_after_gas_usd": -0.05992971861675818
+    },
+    {
+      "tx_hash": "0xc1bc9056c62ee347c91f71e6ffc50416281850cca0d1487e9130f7cdf135ba40",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x069acec9f42bc99e681c506619242cb11ef2a5ee",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.109941 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.1056185372e-05,
+      "gain_usd": 0.109941,
+      "gas_cost_usd": 0.15301473541129385,
+      "net_after_gas_usd": -0.04307373541129385
+    },
+    {
+      "tx_hash": "0xb309dfbca40f968224e7db363623a0a3def4d2fb372625063334812b9d77613b",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0xac371986acc664e2e27ff6a07a3257a5b7469cc1",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.099936 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.211909764e-05,
+      "gain_usd": 0.099936,
+      "gas_cost_usd": 0.15567853169110574,
+      "net_after_gas_usd": -0.05574253169110574
+    },
+    {
+      "tx_hash": "0xf481730bc7ccfb821d120108ba10b9d8bb164e9536b745c0a8f3e0f7a8490ca7",
+      "contract": "0xace1016b6527b75fc4c4e106bc79e45a387e085f",
+      "initiator": "0xcf853bdec5c5833b95b5d88c6b98b8cd0c6ec2f0",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "2.681809 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.9441106076e-05,
+      "gain_usd": 2.681809,
+      "gas_cost_usd": 0.04872193839489768,
+      "net_after_gas_usd": 2.633087061605102
+    },
+    {
+      "tx_hash": "0x20fd51c198857142f5be46bd6f5bcfcd099c1f3f31e4937d6f75ce41d9743d44",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.086047 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8706771194e-05,
+      "gain_usd": 0.086047,
+      "gas_cost_usd": 0.046881599746357694,
+      "net_after_gas_usd": 0.039165400253642305
+    },
+    {
+      "tx_hash": "0xbdc5fa84a5a9e25079c15396ac098ccd3d6934ae6d3762673a3b6c2c3cad9363",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.049803 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.8558318086e-05,
+      "gain_usd": 0.049803,
+      "gas_cost_usd": 0.046509556964726244,
+      "net_after_gas_usd": 0.003293443035273756
+    },
+    {
+      "tx_hash": "0x97c8111fd20058c72cf9d5865e2c58d38ee19bdce7c2f766d996eedda437d62c",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.042300 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.21618288e-05,
+      "gain_usd": 0.0423,
+      "gas_cost_usd": 0.030479123525507194,
+      "net_after_gas_usd": 0.011820876474492804
+    },
+    {
+      "tx_hash": "0x981bbb50bf51912c50d4a7a12f6e8fd580a18ec04fce8d0357d53b2291dc080d",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.032546 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.206552308e-05,
+      "gain_usd": 0.032546,
+      "gas_cost_usd": 0.030237768875284447,
+      "net_after_gas_usd": 0.0023082311247155513
+    },
+    {
+      "tx_hash": "0x5cf5b25fd4a5181254cd243f74ebc8454a7043b4b1cfccfbe56d00537d75ac1d",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00004791 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.3634220592e-05,
+      "gain_usd": 0.12005707108058226,
+      "gas_cost_usd": 0.0592304283096514,
+      "net_after_gas_usd": 0.06082664277093086
+    },
+    {
+      "tx_hash": "0xa59e0e7366fef104cec29b950f4b57eac690071c9d46662e84074d85fafd7b26",
+      "contract": "0xa2ab1f4192fc74533f05bd83e46897cd82547c2e",
+      "initiator": "0xefa63c8cfec187ff0f049edbafe770885af20a93",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.059276 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 1.3656587022e-05,
+      "gain_usd": 0.059276,
+      "gas_cost_usd": 0.03422518188879426,
+      "net_after_gas_usd": 0.02505081811120574
+    },
+    {
+      "tx_hash": "0x6704fc49f7e4388db1928f394b47180718f447914a2f01079153ebbc4c018f38",
+      "contract": "0x2ade787f39339f69ea419eb4e8f90821649c3fa1",
+      "initiator": "0xa571c204b387ae21abf32a5a21f6a0491df9fec9",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.030838 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.0032470476e-05,
+      "gain_usd": 0.030838,
+      "gas_cost_usd": 0.050203974435084946,
+      "net_after_gas_usd": -0.019365974435084945
+    },
+    {
+      "tx_hash": "0x690ce1a674c4c385cda41ca5a3d22e81fbaaab3daf3e80a297aff2d53ab86c61",
+      "contract": "0x17dd4acd9ae15ad7a9ef250c7102d3f4bf7959e0",
+      "initiator": "0x17dd4acd9ae15ad7a9ef250c7102d3f4bf7959e0",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.087146 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.4758490404e-05,
+      "gain_usd": 0.087146,
+      "gas_cost_usd": 0.06204799456876095,
+      "net_after_gas_usd": 0.02509800543123905
+    },
+    {
+      "tx_hash": "0x5b9043f7446cc3e2731befaba5536abbd364b16bfd68273a3d40f9ffb2169ab8",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x75f0e301d5f3dff849143edb756adc40c06661f1",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "2.448526 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.001697984e-05,
+      "gain_usd": 2.448526,
+      "gas_cost_usd": 0.12534905169164715,
+      "net_after_gas_usd": 2.323176948308353
+    },
+    {
+      "tx_hash": "0x2f6e617319023e2e1c25cfb4afe3ca94ee7476966e9f05c55405df71d6a504ae",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x11a67c07d81f3ad8e266540b085a1753649ad595",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.913660 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.9121514192e-05,
+      "gain_usd": 0.91366,
+      "gas_cost_usd": 0.09804359880175675,
+      "net_after_gas_usd": 0.8156164011982433
+    },
+    {
+      "tx_hash": "0x87fac3353d9aee16e4810d4bfa1cd1f5ce55facb7a68dc28f0625bc0e4925896",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x9826413b0998b9f63db621e64a5c75ee1330404a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "1.207095 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.774725584e-05,
+      "gain_usd": 1.207095,
+      "gas_cost_usd": 0.14472212797522907,
+      "net_after_gas_usd": 1.062372872024771
+    },
+    {
+      "tx_hash": "0xc5ffd822fd1cdfba75b3eb1dcd6389570154985ee3f93005e6d56379c524fad2",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0xa8e0cf665208aea58a78604b6689c355e8cc48f4",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00009369 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.0583526656e-05,
+      "gain_usd": 0.23480074998107528,
+      "gas_cost_usd": 0.12676889164103425,
+      "net_after_gas_usd": 0.10803185834004103
+    },
+    {
+      "tx_hash": "0xc6ac5049cfb4feb81c62dfd239959f5851cef69e5a96ce7ab2de3a1133c0a47e",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x11a67c07d81f3ad8e266540b085a1753649ad595",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00019892 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.0627414404e-05,
+      "gain_usd": 0.4985110772965679,
+      "gas_cost_usd": 0.12687888004117917,
+      "net_after_gas_usd": 0.37163219725538876
+    },
+    {
+      "tx_hash": "0x572666e3a548a8f5007b8f1c30c74ef428cc711eee08a63e678e9599793ce543",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0xf153043ebaffc5803e7e9a208040173735b62886",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.652884 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 7.8671892336e-05,
+      "gain_usd": 0.652884,
+      "gas_cost_usd": 0.19716198640243535,
+      "net_after_gas_usd": 0.4557220135975647
+    },
+    {
+      "tx_hash": "0x3db2ae2017b4ab2759c6a8ad808ae9df64e17b0dc6578232f5dad5ae8fd91bff",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x793b1165dfc12d5eace3696d01da9024a4e333da",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.143645 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 7.3942907406e-05,
+      "gain_usd": 0.143645,
+      "gas_cost_usd": 0.18531053558841531,
+      "net_after_gas_usd": -0.04166553558841532
+    },
+    {
+      "tx_hash": "0xdcd8bfd8241b4de311b3a62c87bf9d447ca4a34116b2e8d0d245664df7cc94f2",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x069acec9f42bc99e681c506619242cb11ef2a5ee",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.208855 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 3.65989221e-05,
+      "gain_usd": 0.208855,
+      "gas_cost_usd": 0.09172165518283854,
+      "net_after_gas_usd": 0.11713334481716148
+    },
+    {
+      "tx_hash": "0x264fb1ade084ee701071c23d0839412f289c8563cf58d335399375bdf7678b12",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x9114d86395817e124a1dda05288fad0650a5f0b2",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.315462 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.240228167e-05,
+      "gain_usd": 0.315462,
+      "gas_cost_usd": 0.10626562847055365,
+      "net_after_gas_usd": 0.20919637152944637
+    },
+    {
+      "tx_hash": "0x1b181fe870e4f80eb9aa28d2261e3241e6c880230f6fecfd00643a7a17a5c989",
+      "contract": "0x7356d9f3e5491b3c3280b0bc6a96eb3009be5633",
+      "initiator": "0x7b7aa27a185d5f6c45e5f6f3b978c1f92cb38b42",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.093321 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 6.5717490222e-05,
+      "gain_usd": 0.093321,
+      "gas_cost_usd": 0.16469657114912267,
+      "net_after_gas_usd": -0.07137557114912267
+    },
+    {
+      "tx_hash": "0xb9c91fcf31abfdd6e8457c20c996ad6487d623938b2b6e05d0220d9285c06eb0",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x4dabafa70d839d311653fe47e0fb1ebeed9c0e1d",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.655371 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.5119122504e-05,
+      "gain_usd": 0.655371,
+      "gas_cost_usd": 0.1130743846815133,
+      "net_after_gas_usd": 0.5422966153184867
+    },
+    {
+      "tx_hash": "0x1db716fa56a5a5e09719b34be9d0e33a26627523c96b1e90d4395bab6072a78d",
+      "contract": "0xed4728d89bd4ef81177d8f5448f9bd1bae4e23e3",
+      "initiator": "0x9826413b0998b9f63db621e64a5c75ee1330404a",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.877560 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 5.3991345174e-05,
+      "gain_usd": 0.87756,
+      "gas_cost_usd": 0.13530932772763932,
+      "net_after_gas_usd": 0.7422506722723607
+    },
+    {
+      "tx_hash": "0x90c523f86969721f80ff91ecbd1cfeb26a4b96b6490dd433785e24d0b8f0c926",
+      "contract": "0x09e99d23bf226a6c6b4c2126239a3df3ca1b89b6",
+      "initiator": "0x6ce9efddac8e3a97d55cad8028c4693893ac8571",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.201333 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.846885843e-05,
+      "gain_usd": 0.201333,
+      "gas_cost_usd": 0.0713466590417838,
+      "net_after_gas_usd": 0.1299863409582162
+    },
+    {
+      "tx_hash": "0x1866800ba8465b4e683f8523f86160fbbb40e43b6bcf161c0729be817a421d62",
+      "contract": "0xb05500000dd07f155f00f5f1587ca33bafdfd6d5",
+      "initiator": "0x0000000013e2ae14354a12aa7dfe212233e0c3f5",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.171718 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 4.661594259e-05,
+      "gain_usd": 0.171718,
+      "gas_cost_usd": 0.11682561034394445,
+      "net_after_gas_usd": 0.05489238965605556
+    },
+    {
+      "tx_hash": "0xadfd03c1d39cc8a09ab6a931c9b436ccdb2c7782aef5987056114ad7d22fc8e4",
+      "contract": "0xec2aba306732abd857f178f7e871c93cecade3f9",
+      "initiator": "0xeec1a4ae55c278a5ec7fddebe9c57fed8acb13e2",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.076374 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.488779381e-05,
+      "gain_usd": 0.076374,
+      "gas_cost_usd": 0.062372045708482864,
+      "net_after_gas_usd": 0.014001954291517134
+    },
+    {
+      "tx_hash": "0x607ecc928823c11b8799cd2293942b65dd4200bfbd438734a73f6723302f1de5",
+      "contract": "0xec2aba306732abd857f178f7e871c93cecade3f9",
+      "initiator": "0xeec1a4ae55c278a5ec7fddebe9c57fed8acb13e2",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.084709 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.5029292414e-05,
+      "gain_usd": 0.084709,
+      "gas_cost_usd": 0.06272665959928216,
+      "net_after_gas_usd": 0.02198234040071785
+    },
+    {
+      "tx_hash": "0x666894c30ba05f7f1ab3c5b64d25281b60246ec61355eff674e7ac3b3aa7ec22",
+      "contract": "0xec2aba306732abd857f178f7e871c93cecade3f9",
+      "initiator": "0xeec1a4ae55c278a5ec7fddebe9c57fed8acb13e2",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "0.032256 USDG"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.460753366e-05,
+      "gain_usd": 0.032256,
+      "gas_cost_usd": 0.061669677349940666,
+      "net_after_gas_usd": -0.029413677349940666
+    },
+    {
+      "tx_hash": "0xc8bcb509074ee0474b3e1c378d7e6ba6cb97c61571add7f4c540ec69a3267cb3",
+      "contract": "0xd73c75a140c026fdd516f5ab50e8884914585d7f",
+      "initiator": "0x991a34cea68bf53b208cce80ed3dbb902bc9c94f",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00023152 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.464191544e-05,
+      "gain_usd": 0.5802116391122065,
+      "gas_cost_usd": 0.06175584255888086,
+      "net_after_gas_usd": 0.5184557965533256
+    },
+    {
+      "tx_hash": "0x7b9000343365d857bd581b17cc5099cc7372ad9a4ce507e96ce1ccab404c1016",
+      "contract": "0xd73c75a140c026fdd516f5ab50e8884914585d7f",
+      "initiator": "0x029baaa9e99ecb5edafc07a924a6992a14698b33",
+      "status": "success",
+      "qualifies": true,
+      "contract_net_positive": {
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73": "0.00007373 WETH"
+      },
+      "contract_net_negative": {},
+      "initiator_spent": {},
+      "tx_native_value_wei": 0,
+      "gas_cost_eth": 2.488093614e-05,
+      "gain_usd": 0.1847810186468102,
+      "gas_cost_usd": 0.06235485949623926,
+      "net_after_gas_usd": 0.12242615915057095
+    }
+  ]
+}
