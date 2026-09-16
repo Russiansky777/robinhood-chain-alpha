@@ -426,7 +426,26 @@ def main() -> None:
     if last_hour_from != OLD_DETECTOR_WINDOW["from_block"]:
         windows.append(("last_full_hour_at_run", last_hour_from, latest))
 
+    # Первый прогон показал реальный баг: подавляющее большинство
+    # multi-leg tx трогают пулы, созданные РАНЬШЕ часового окна --
+    # без сидирования старым реестром (уже есть на этом же VPS от
+    # предыдущей сессии) 9234/11157 и 11412/15527 tx пропускались как
+    # "pool не найден", 0 кандидатов -- недостоверно. Подмешиваем
+    # data/task_arc_recon_pools_result.json (6ч-скан, 24567 пулов) как
+    # стартовый реестр -- без доп. RPC-вызовов, только currency0/1
+    # (hooks/fee для этих старых записей неизвестны, помечаем явно).
     pool_map: dict = {}
+    seed_path = DATA_DIR / "task_arc_recon_pools_result.json"
+    n_seeded = 0
+    if seed_path.exists():
+        seed = json.loads(seed_path.read_text())
+        for p in seed.get("initialize_events", {}).get("pools", []):
+            pool_map[p["pool_id"]] = {"pool_id": p["pool_id"], "currency0": p["currency0"],
+                                       "currency1": p["currency1"], "fee": None, "hooks": "unknown",
+                                       "block_number": p["block_number"]}
+            n_seeded += 1
+    result["pool_map_seed"] = {"path": str(seed_path), "found": seed_path.exists(), "n_seeded": n_seeded}
+
     window_results = []
     for label, fb, tb in windows:
         wr = process_window(label, fb, tb, pool_map, receipt_budget)
