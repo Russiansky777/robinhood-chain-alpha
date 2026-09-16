@@ -1,0 +1,33 @@
+{
+  "probed_at_utc": "2026-09-16T18:47:49Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "latest_block_at_start": 21202161,
+  "range_probe_10_100_1000_10000": [
+    {"requested_blocks": 10, "http_status": 200, "ok": true, "n_results": 223},
+    {"requested_blocks": 100, "http_status": 200, "ok": true, "n_results": 1989},
+    {"requested_blocks": 1000, "http_status": 200, "ok": false, "error": {"code": -32602, "message": "request exceeded max allowed range: query exceeds max results 2000, retry with the range 21201161-21201288"}},
+    {"requested_blocks": 10000, "http_status": 200, "ok": false, "error": {"code": -32012, "message": "requested range too large"}}
+  ],
+  "max_range_conclusion": "Первая ошибка на 1000 блоках: max-results cap (~2000 логов на Swap-топике при текущей плотности) -- НЕ фиксированный блочный лимит: 100 блоков дали 1989 результатов (почти на пределе), 10 блоков -- 223. Отдельно, независимо от плотности, при 10000 блоках срабатывает ДРУГОЙ, блочный лимит (-32012 'requested range too large') -- то есть у провайдера ДВА разных ограничения: по числу результатов (~2000, плавающий порог блоков) и по абсолютному размеру диапазона (жёсткий, между 1000 и 10000 блоками, не измерен точнее в рамках этого прогона).",
+  "rate_limit_probe": {
+    "n_successful_calls_before_first_error": 200,
+    "elapsed_s_until_first_error_or_cap": 15.056000471115112,
+    "measured_calls_per_sec": 13.283740285721919,
+    "first_rate_limit_error": null,
+    "note": "Потолок пробы -- 200 вызовов; 0 ошибок за 15.06с (~13.28 вызовов/с) -- реальный лимит НЕ достигнут этим прогоном, он выше 13.28 calls/s измеренных, точное значение не определено (цена уточнения: ещё ~200-800 вызовов подряд)."
+  },
+  "block_time_probe": {
+    "block_a": 21202161, "block_a_timestamp_unix": 1789584468,
+    "block_b": 21201161, "block_b_timestamp_unix": 1789583962,
+    "delta_seconds": 506, "n_blocks": 1000, "measured_seconds_per_block": 0.506
+  },
+  "explorer_probe": [
+    {"url": "https://explorer.arc.io", "http_status": 200, "final_url": "https://explorer.arc.io/", "content_len": 91002, "mentions_block_or_explorer": true},
+    {"url": "https://arcscan.io", "exception": "ConnectionError: connection refused"},
+    {"url": "https://explorer.mainnet.arc.io", "exception": "ConnectionError: DNS NXDOMAIN"},
+    {"url": "https://arc.blockscout.com", "http_status": 404, "final_url": "https://arc.blockscout.com/", "content_len": 21, "mentions_block_or_explorer": false},
+    {"url": "https://explorer.arc.network", "exception": "ConnectionError: DNS NXDOMAIN"},
+    {"url": "https://mainnet.arcscan.io", "exception": "ConnectionError: DNS NXDOMAIN"}
+  ],
+  "explorer_conclusion": "кандидат с реальным HTTP 200 и релевантным контентом: https://explorer.arc.io -- требует дальнейшей проверки конкретной tx-страницей (сделано отдельно на реальном tx hash в основном отчёте), пока не факт по умолчанию."
+}
