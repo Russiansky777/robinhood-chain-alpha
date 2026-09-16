@@ -1,0 +1,73 @@
+{
+  "probed_at_utc": "2026-09-16T20:46:54Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "source_commit": "39589df082b7a532c3238712506fe65680aea538",
+  "note": "Второй прогон (первый дал n_tx_sampled=0/0 из-за бага без адаптивного чанка в bot_priority_sample -- исправлено в этом коммите).",
+  "txpool_status": {
+    "http_status": 200,
+    "body": {"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "Method not found"}}
+  },
+  "txpool_content": {
+    "http_status": 200,
+    "body": {"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "Method not found"}}
+  },
+  "txpool_inspect": {
+    "http_status": 200,
+    "body": {"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "Method not found"}}
+  },
+  "eth_subscribe_newPendingTransactions": {
+    "http_status": 200,
+    "body": {"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "method not supported"}}
+  },
+  "eth_subscribe_transport_caveat": "rpc.mainnet.arc.io здесь используется как HTTPS JSON-RPC (POST), не WebSocket. eth_subscribe в принципе не поддерживается транспортом HTTP (общее правило JSON-RPC, не специфика Arc) -- поэтому ошибка может отражать 'этот HTTP-эндпоинт не поддерживает подписки' наравне с 'узел отклоняет подписки по документации'. Отдельный WS-эндпоинт для Arc не найден/не проверен.",
+  "txpool_content_usable": false,
+  "question5_poll_20x_100ms": {
+    "note": "txpool_content не отдал непустой pending/queued -- опрос 20x не проводился (нет смысла опрашивать пустоту)."
+  },
+  "question6_priority_fee": {
+    "bot_a_225_per_hour": {
+      "bot": "0x608750874fdcbcc21f4f9610af48e1babacf10fe",
+      "n_calls_used": 2,
+      "n_tx_sampled": 10,
+      "n_distinct_tx_hashes": 6,
+      "note_on_duplicates": "строки повторяются парами по одному tx_hash -- в этих циклах по 2 Swap-лога (2 плеча) на одну tx, скан фильтрует по Swap-событию, поэтому receipt считан дважды на одну tx; сами значения gas корректны и идентичны в паре (один и тот же receipt).",
+      "rows": [
+        {"tx_hash": "0x90eb01e6115e1a8d97d945ce9a89484e611a56d1ddefef866808a2d4a67a9c8f", "effective_gas_price_gwei": 274.354792357, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 254.354792357},
+        {"tx_hash": "0x90eb01e6115e1a8d97d945ce9a89484e611a56d1ddefef866808a2d4a67a9c8f", "effective_gas_price_gwei": 274.354792357, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 254.354792357},
+        {"tx_hash": "0xcc9a463b72ffbc0050d53ddbe7aaa8193ca0f94fdd34b800bf143298a6c2ec1d", "effective_gas_price_gwei": 9740.938784124, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 9720.938784124},
+        {"tx_hash": "0xcc9a463b72ffbc0050d53ddbe7aaa8193ca0f94fdd34b800bf143298a6c2ec1d", "effective_gas_price_gwei": 9740.938784124, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 9720.938784124},
+        {"tx_hash": "0x4201be34b927ba8bbaa8586a1cbf4c0570f9a198d6e9eda1721cecf0a6a96faf", "effective_gas_price_gwei": 1453.774150535, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 1433.774150535},
+        {"tx_hash": "0x4201be34b927ba8bbaa8586a1cbf4c0570f9a198d6e9eda1721cecf0a6a96faf", "effective_gas_price_gwei": 1453.774150535, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 1433.774150535},
+        {"tx_hash": "0x5284446f6dbf5329dd2b520b22a87dbe5eac34d4f3c918db430cd7596a4461c9", "effective_gas_price_gwei": 925.864906485, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 905.864906485},
+        {"tx_hash": "0xb0cd2eb19e4d8ece8e3ff627b74715a05720a0b205afa8bbc2b18ffe23b2be92", "effective_gas_price_gwei": 835.967815636, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 815.967815636},
+        {"tx_hash": "0xb0cd2eb19e4d8ece8e3ff627b74715a05720a0b205afa8bbc2b18ffe23b2be92", "effective_gas_price_gwei": 835.967815636, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 815.967815636},
+        {"tx_hash": "0x0c106fc4c4eaf041039164e9f3a9d2a1381fbbe53582edc86093290dccb5e936", "effective_gas_price_gwei": 388.786664211, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 368.786664211}
+      ],
+      "avg_priority_fee_gwei": 2572.4722656000004,
+      "min_priority_fee_gwei": 254.354792357,
+      "max_priority_fee_gwei": 9720.938784124
+    },
+    "bot_b_37_total": {
+      "bot": "0xe1eee09af59990bdff17582467f5ddbef66c4bbd",
+      "n_calls_used": 2,
+      "n_tx_sampled": 10,
+      "n_distinct_tx_hashes": 10,
+      "rows": [
+        {"tx_hash": "0x427f46a32a9e601154e07b82a19ff7cde244e0d81ee972aabcd1c82293cc0fd5", "effective_gas_price_gwei": 69.551637947, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 49.551637947},
+        {"tx_hash": "0xd7e6b0bfefc1f200111bf5f09be1db83d9d4cbc049567f28ca342e8fca94a260", "effective_gas_price_gwei": 20715.702368068, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 20695.702368068},
+        {"tx_hash": "0x9d25096c181bafe3317b62b06d0e08a7e0fe7a1ffb9efd6252a2caaa967bc606", "effective_gas_price_gwei": 1584.18567962, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 1564.18567962},
+        {"tx_hash": "0x4a39a798444961477f5f27a0adcf1c1f2c7f136bce41f07cbc81ac338f0d0300", "effective_gas_price_gwei": 7503.656977067, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 7483.656977067},
+        {"tx_hash": "0x71f16efbf736e47e449d5e6b18afd2aa77174baf9b11fd6bb91d2a1fa7b4ef54", "effective_gas_price_gwei": 2090.234076859, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 2070.234076859},
+        {"tx_hash": "0xc0c9d6d46cd55550b7cc7d191f5daa873e8e426d2a2c2be5942819a5ff4c5be4", "effective_gas_price_gwei": 448.989339924, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 428.989339924},
+        {"tx_hash": "0x080f797e1aca1a55a90d0def323d8f1bf2328cb493dafa16b4d99bb78e21bfb8", "effective_gas_price_gwei": 305.669704459, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 285.669704459},
+        {"tx_hash": "0x5001f6d56494cf75bca60f53dea64870ac262e445949bb24d9f33610181cf31a", "effective_gas_price_gwei": 671.304229153, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 651.304229153},
+        {"tx_hash": "0xdf7e45deaf4c911170eb5e230c9a6a72733673448e03fc1e96e87aed7737f4ba", "effective_gas_price_gwei": 946.742886826, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 926.742886826},
+        {"tx_hash": "0xf684e0b66986ff128b093593b2d91c44ce33f5642b9fdf8bac8e318ed543b07a", "effective_gas_price_gwei": 2535.278835074, "base_fee_per_gas_gwei": 20.0, "priority_fee_gwei": 2515.278835074}
+      ],
+      "avg_priority_fee_gwei": 3667.1315734996997,
+      "min_priority_fee_gwei": 49.551637947,
+      "max_priority_fee_gwei": 20695.702368068
+    }
+  },
+  "conclusion_priority_fee": "Оба бота платят приоритетную комиссию НАМНОГО выше базовой 20 gwei в каждой из 10 засэмплированных транзакций (минимум +49.6 gwei, максимум +20695.7 gwei, среднее ~2572 и ~3667 gwei у бота A и B соответственно) -- ни разу не сидят на голом флоре 20 gwei. Подтверждает наблюдение владельца по референсной tx (32 gwei / 2.6x) и показывает, что реальные ставки в среднем НАМНОГО выше того единичного примера -- на Arc идёт настоящая gas-война за приоритет."
+}
