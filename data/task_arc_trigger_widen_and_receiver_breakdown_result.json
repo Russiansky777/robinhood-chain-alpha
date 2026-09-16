@@ -1,0 +1,47 @@
+{
+  "probed_at_utc": "2026-09-16T20:26:49Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "question1_widen_to_500": {
+    "n_resolved_of_5": 3,
+    "summary_line": "триггер найден дальше 53 блоков у 3 из 5",
+    "rows": [
+      {"bot_tx_hash": "0x984ed264a8ec2b68a55040d5187612151349e71973bedc4bf444274ad5b7095c", "bot_block": 21212654,
+       "pool_id": "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943",
+       "n_swap_found_500back": 20, "n_initialize_found_500back": 0, "n_modify_liquidity_found_500back": 0,
+       "trigger_type": "swap", "trigger_block": 21212506, "block_delta": 148,
+       "trigger_tx_hash": "0x0de9ce03c04e811c43fa787ad582f13260f811ea903dd8b784922e38bfb8de92"},
+      {"bot_tx_hash": "0x44412ed7331649b07f51cd572e8d48ec195528e7daf88d7e2145e304d19ddfdf", "bot_block": 21212574,
+       "pool_id": "0x6537c4d251a1d6084b674445c08315583763d91a9a93ecdfdd5c176c98213ac5",
+       "n_swap_found_500back": 0, "n_initialize_found_500back": 0, "n_modify_liquidity_found_500back": 0,
+       "trigger_type": "не найдено ни одного события (Swap/Initialize/ModifyLiquidity) в 500 блоках назад",
+       "trigger_block": null, "block_delta": null, "trigger_tx_hash": null},
+      {"bot_tx_hash": "0xafc79b78df08a4847b8f823617f0eceb868163920c639cf33fea0d7e7eb61c80", "bot_block": 21212490,
+       "pool_id": "0xeb0fd02fb8044d5514fb6e165ee134fd547eff0378bb33b76f4b81d8b03bd1ae",
+       "n_swap_found_500back": 4, "n_initialize_found_500back": 0, "n_modify_liquidity_found_500back": 0,
+       "trigger_type": "swap", "trigger_block": 21212422, "block_delta": 68,
+       "trigger_tx_hash": "0xb8c4a45c2688e26981b1daf8c0362d94123333f4a227444ce0ad8216dc237e34"},
+      {"bot_tx_hash": "0xe1c900996d6fb806221cc497245a77da45529339074102ce656c0e5a4e220788", "bot_block": 21212427,
+       "pool_id": "0xb6e2e17f0d9a2f49713d685cd72268b8c7d61b37bfa255dee728efa4a80725ed",
+       "n_swap_found_500back": 0, "n_initialize_found_500back": 0, "n_modify_liquidity_found_500back": 0,
+       "trigger_type": "не найдено ни одного события (Swap/Initialize/ModifyLiquidity) в 500 блоках назад",
+       "trigger_block": null, "block_delta": null, "trigger_tx_hash": null},
+      {"bot_tx_hash": "0xa0dc2d2e2a6d5d3a6000773490d6319fb61e11eefc3ead23e87c02b5bf36341c", "bot_block": 21212398,
+       "pool_id": "0x4cd60ec63898be4e2ae7922f66d4bfaca7fd9e1d131338cb7e87e248d366e82c",
+       "n_swap_found_500back": 18, "n_initialize_found_500back": 0, "n_modify_liquidity_found_500back": 0,
+       "trigger_type": "swap", "trigger_block": 21212344, "block_delta": 54,
+       "trigger_tx_hash": "0x9b4f7b0b7a34f3e984933e53ff5eb08c39666c8f49225bae9584bc85a86aa942"}
+    ],
+    "honest_conclusion": "2 из 5 -- триггера нет вообще (0 Swap/Initialize/ModifyLiquidity на этом самом pool_id за 500 блоков до tx бота) -- это НЕ реакция на локальное событие пула. Остальные 3 реагируют, но с большой задержкой (54-148 блоков, ~27-75с) -- не 'гонка блок-в-блок', скорее периодическая проверка/ребаланс."
+  },
+  "question2_receiver_breakdown": {
+    "receiver": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+    "n_analyzed": 200, "n_from_pool_manager_direct": 200, "n_from_other": 0,
+    "sum_raw_from_pool_manager_native_wrap": 959711803074684530132,
+    "sum_usd_equiv_from_pool_manager_in_200": 959.7118030746845,
+    "frac_native_wrap_value_from_pool_manager_in_200": 1.0,
+    "summary_line": "из 200 входящих: от PoolManager 200 (сумма 959.71 native-wrap), прочее 0",
+    "corrected_address_assessment": "ИНФРАСТРУКТУРА ПРОТОКОЛА, не касса одного бота: 100% из 200 последних входов идут НАПРЯМУЮ от PoolManager (0x8366a39c...), а не от разных ботов-исполнителей через их контракты. Похоже на встроенный в AMM/хук механизм фиксированного получателя доли (fee/tax), а не на кошелёк, куда один или несколько ботов сами пересылают прибыль.",
+    "arbitrage_share_of_24h_inflow": "~100% (по 200-выборке; полных 24267 не проверено, но раз 200 из 200 без исключения идут от PoolManager, экстраполяция на весь приток разумна, не строго доказана)"
+  },
+  "total_rpc_calls_used": 22
+}
