@@ -1,5 +1,6 @@
 {
   "probed_at_utc": "2026-09-16T20:53:03Z",
+  "SUPERSEDED_2026_09_16": "Владелец нашёл реальную ошибку в знаменателе ratio_to_receiver ниже (total_usdc_out_of_pool_manager верен только для продаж, для покупок вырождается в саму комиссию -- отсюда ложные ratio=1.0 у 14/20). ИСПРАВЛЕНО без новых RPC-вызовов (Transfer-логи уже были в этом файле) в data/task_arc_fee_rate_fix_denominator_result.json -- см. ИТОГОВЫЕ (не эти) числа там: 2.5% в 8/20, 1% в 10/20, 2 аномалии. Поле interpretation_2026_09_16 ниже тоже устарело (построено на ошибочном ratio_to_receiver) -- не использовать.",
   "reference_tx_verification": {
     "tx_hash": "0xc06934c034d507921ba9fe5b59d378047ab0ddb811c1a75ff200ca018b5ed6c1",
     "block_number": 21215502,
