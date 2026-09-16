@@ -1,0 +1,946 @@
+{
+  "probed_at_utc": "2026-09-16T23:32:23Z",
+  "n_pools_matched_to_registry": 16,
+  "sample_composition": {
+    "n_matched_total": 16,
+    "n_fee_positive_used_for_main_calc": 12,
+    "n_fee_zero_excluded": 4,
+    "n_dynamic_fee_flag_excluded": 0,
+    "honest_correction": "Задание говорило про 16 пулов с fee>0 -- реально из 16 registry-matched пулов 12 имеют fee>0 (не 8388608), 4 имеют fee=0 (исключены из основного расчёта, как и просилось для fee=0), 0 с флагом dynamic-fee. Число 16 в задании -- это общее число registry-matched пулов, не именно fee>0. Используем реальные 12, не выдумываем 16."
+  },
+  "latest_block": 21235876,
+  "archive_probe": {
+    "pool_id": "0x3d3f72f78bdc6e6510650ea59b508064c897d1c384cdeaf7b3e052ce38b5ba00",
+    "pair": "USDC/AROS",
+    "tested_block": 21164447,
+    "blocks_behind_latest": 71429,
+    "raw_result": {
+      "sqrt_price_x96": 79228005415226597966143322011600338113,
+      "tick": 414486,
+      "protocol_fee": 0,
+      "lp_fee": 100,
+      "fee_growth_global0_x128": 0,
+      "fee_growth_global1_x128": 0,
+      "liquidity": 0
+    },
+    "archive_reads_work": true
+  },
+  "per_pool_results": [
+    {
+      "pool_id": "0x3d3f72f78bdc6e6510650ea59b508064c897d1c384cdeaf7b3e052ce38b5ba00",
+      "pair": "USDC/AROS",
+      "fee_initialize_pips": 100,
+      "usdc_side": "currency0",
+      "other_token": "0x96150e514a726492b5b3446d9008b04c22e4d317",
+      "other_token_decimals": 18,
+      "init_block": 21164447,
+      "state_at_init": {
+        "sqrt_price_x96": 79228005415226597966143322011600338113,
+        "liquidity": 0,
+        "fee_growth_global0_x128": 0,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21171561,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 3949563850213095177679050911,
+          "fee_growth_delta1_x128": 93872520993384966277180845645401787340305370,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1000001982872557705,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 52.87643649958127,
+          "price_change_frac": -0.9182410681103562,
+          "lvr_frac_of_tvl": 0.10539583239555599,
+          "tvl_usdc_side_estimate": 12231.128057040034,
+          "lvr_usdc": 1289.1099227083737,
+          "fee_over_lvr": 0.041017787209712706
+        },
+        "3h": {
+          "target_block": 21185790,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 16829092509018849290876171313,
+          "fee_growth_delta1_x128": 135667678106565931562682033572641292724843493,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1000001982872557705,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 102.28905870561749,
+          "price_change_frac": -0.9131302948845661,
+          "lvr_frac_of_tvl": 0.10422586692949683,
+          "tvl_usdc_side_estimate": 11511.538624658913,
+          "lvr_usdc": 1199.8000928474628,
+          "fee_over_lvr": 0.08525508483905582
+        },
+        "6h": {
+          "target_block": 21207134,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 20190538663303386535182556815,
+          "fee_growth_delta1_x128": 172509475783895222760973525725689594349029398,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 0,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 0.0,
+          "price_change_frac": -0.2768665776450864,
+          "lvr_frac_of_tvl": 0.00958188772711283,
+          "tvl_usdc_side_estimate": 0.0,
+          "lvr_usdc": null,
+          "fee_over_lvr": null
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21249822
+        }
+      }
+    },
+    {
+      "pool_id": "0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846",
+      "pair": "USDC/FAZE",
+      "fee_initialize_pips": 50000,
+      "usdc_side": "currency0",
+      "other_token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+      "other_token_decimals": 18,
+      "init_block": 21171028,
+      "state_at_init": {
+        "sqrt_price_x96": 2568318208486174515649176066007760896,
+        "liquidity": 0,
+        "fee_growth_global0_x128": 0,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21178142,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 15117505604086744915336182978487,
+          "fee_growth_delta1_x128": 2017235754452629838805126359574108353346844520,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 404724970743344794,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 35115.89742815271,
+          "price_change_frac": -0.6349757589833017,
+          "lvr_frac_of_tvl": 0.05039927681205251,
+          "tvl_usdc_side_estimate": 34203.381673441865,
+          "lvr_usdc": 1723.8257008680803,
+          "fee_over_lvr": 20.3709095475657
+        },
+        "3h": {
+          "target_block": 21192371,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 19790410639582714038481601896371,
+          "fee_growth_delta1_x128": 3126277972274611741942701395490269531653085160,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 453770632631884232,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 43230.468958809404,
+          "price_change_frac": -0.5146270049568267,
+          "lvr_frac_of_tvl": 0.03310511927885421,
+          "tvl_usdc_side_estimate": 28839.752495906898,
+          "lvr_usdc": 954.7434463496313,
+          "fee_over_lvr": 45.27967081009762
+        },
+        "6h": {
+          "target_block": 21213715,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 30073939371265629804880992655893,
+          "fee_growth_delta1_x128": 4342561476278366757534406852456590726379221535,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1404197878420460132,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 200106.3814412064,
+          "price_change_frac": -0.5263263869738535,
+          "lvr_frac_of_tvl": 0.03462743320311882,
+          "tvl_usdc_side_estimate": 91449.19215850248,
+          "lvr_usdc": 3166.650792947722,
+          "fee_over_lvr": 63.19180564110592
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21256403
+        }
+      }
+    },
+    {
+      "pool_id": "0xc23143e08fcc41cdbb78c6208e004b494bc588c4139216408e5e9c6a0cd1857c",
+      "pair": "Neurofly/USDC",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency1",
+      "other_token": "0x0dcc462ff5bef5f290e5ea7a0df63819fc729416",
+      "other_token_decimals": 18,
+      "init_block": 21174967,
+      "state_at_init": {
+        "sqrt_price_x96": 129767286883430467501,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 0,
+        "fee_growth_global1_x128": 216047111889824085536655754
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21182081,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 5371261897505077678380097928474871972775993691,
+          "fee_growth_delta1_x128": 162025174085884333285045368060,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 816.4097354953375,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 816.4097354953375,
+          "price_change_frac": -0.0017943644283682013,
+          "lvr_frac_of_tvl": 4.024679627241427e-07,
+          "tvl_usdc_side_estimate": 2575.1150575323322,
+          "lvr_usdc": 0.0010364013109853013,
+          "fee_over_lvr": 787735.1435605393
+        },
+        "3h": {
+          "target_block": 21196310,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 5492190160603076201502289471933949224198869759,
+          "fee_growth_delta1_x128": 162239060726655259129726657256,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 816.2960809226985,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 816.2960809226985,
+          "price_change_frac": -0.021076100510215006,
+          "lvr_frac_of_tvl": 5.552525158958565e-05,
+          "tvl_usdc_side_estimate": 2525.373113437523,
+          "lvr_usdc": 0.1402219774811937,
+          "fee_over_lvr": 5821.456062635963
+        },
+        "6h": {
+          "target_block": 21217654,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 5492190160603076201502289471933949224198869759,
+          "fee_growth_delta1_x128": 162239060726655259129726657256,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 816.2960809226985,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 816.2960809226985,
+          "price_change_frac": -0.021076100510215006,
+          "lvr_frac_of_tvl": 5.552525158958565e-05,
+          "tvl_usdc_side_estimate": 2525.373113437523,
+          "lvr_usdc": 0.1402219774811937,
+          "fee_over_lvr": 5821.456062635963
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21260342
+        }
+      }
+    },
+    {
+      "pool_id": "0x5e794e5d3d01c045ddfb2448c4afd557ec297d1dee49b28923dc0ada3425f780",
+      "pair": "USDC/ARCUS",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0xb7c934ff18730c24e6113bb4bc5a68feef16fd29",
+      "other_token_decimals": 18,
+      "init_block": 21174922,
+      "state_at_init": {
+        "sqrt_price_x96": 47744190454726454121679830224307267580,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 290074142449089079677192091,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21182036,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 182063993307705359942492191288,
+          "fee_growth_delta1_x128": 3757499790460829605273618410609359705743409732,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 2127.0455675251073,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 2127.0455675251073,
+          "price_change_frac": -0.8068946933040664,
+          "lvr_frac_of_tvl": 0.08138488076028291,
+          "tvl_usdc_side_estimate": 13534.92398642738,
+          "lvr_usdc": 1101.5381747348854,
+          "fee_over_lvr": 1.9309776241182361
+        },
+        "3h": {
+          "target_block": 21196265,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 561760363752055542667785832378,
+          "fee_growth_delta1_x128": 7063514969769053401649023646770089561478699470,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 3424.400838156334,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 3424.400838156334,
+          "price_change_frac": -0.6694994257850241,
+          "lvr_frac_of_tvl": 0.05602868514080962,
+          "tvl_usdc_side_estimate": 7908.203045375454,
+          "lvr_usdc": 443.0862184589331,
+          "fee_over_lvr": 7.728520309357625
+        },
+        "6h": {
+          "target_block": 21217609,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 610255482641065725033156409193,
+          "fee_growth_delta1_x128": 8533195844301981674884240726339883132779875647,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 3587.0132912335107,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 3587.0132912335107,
+          "price_change_frac": -0.622291238242744,
+          "lvr_frac_of_tvl": 0.04840579814921095,
+          "tvl_usdc_side_estimate": 6919.790886886935,
+          "lvr_usdc": 334.9580009053984,
+          "fee_over_lvr": 10.708844934402938
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21260297
+        }
+      }
+    },
+    {
+      "pool_id": "0x1201d03bacbe8a9afd55d58b6ba52b21983268d6168612c091a07f9a31f05789",
+      "pair": "USDC/CINU",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0xbdbb76db770cc99dcf3fa31c42c171b9584d6a10",
+      "other_token_decimals": 18,
+      "init_block": 21140721,
+      "state_at_init": {
+        "sqrt_price_x96": 44923991494960343012120766650640732846,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 648141335669472256609967262,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21147835,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 4655019559712618821207899976,
+          "fee_growth_delta1_x128": 885890083712304148078616513422478997680154418,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 35.46363451331393,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 35.46363451331393,
+          "price_change_frac": -0.042719633586260075,
+          "lvr_frac_of_tvl": 0.00022812088671803998,
+          "tvl_usdc_side_estimate": 2901.703780796709,
+          "lvr_usdc": 0.6619392394684344,
+          "fee_over_lvr": 53.57536220664717
+        },
+        "3h": {
+          "target_block": 21162064,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 1283414170084104207369768049780,
+          "fee_growth_delta1_x128": 7113208971918174869632294641120193193914327745,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1773956533966458409,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 42588.60339959723,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 47967.31321063509,
+          "price_change_frac": -0.9471392073717836,
+          "lvr_frac_of_tvl": 0.1121340847676063,
+          "tvl_usdc_side_estimate": 59184.849946489754,
+          "lvr_usdc": 6636.638980857741,
+          "fee_over_lvr": 7.227651428530113
+        },
+        "6h": {
+          "target_block": 21183408,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 1916077898863607817311336097142,
+          "fee_growth_delta1_x128": 8353813034772022353492841767641767514949481793,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1579772252521953410,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 37926.297919004,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 38040.30179403577,
+          "price_change_frac": -0.9356660440134619,
+          "lvr_frac_of_tvl": 0.1094338682399752,
+          "tvl_usdc_side_estimate": 43306.737876343606,
+          "lvr_usdc": 4739.22384666293,
+          "fee_over_lvr": 8.026694459857897
+        },
+        "12h": {
+          "target_block": 21226096,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 2280548307038576060691419788250,
+          "fee_growth_delta1_x128": 10799010109376097477856329308047363815869392758,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 12317.551343383813,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 12317.551343383813,
+          "price_change_frac": -0.702938986829433,
+          "lvr_frac_of_tvl": 0.061765402400598725,
+          "tvl_usdc_side_estimate": 9350.752658041594,
+          "lvr_usdc": 577.5530006724072,
+          "fee_over_lvr": 21.327135914874123
+        }
+      }
+    },
+    {
+      "pool_id": "0x652526d9157fafcdea344d4d3d1bf32c079f36361ddcc577db786db846ebf4f7",
+      "pair": "USDC/ARC",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0x9de91173e7c30f430e50973c42040ceb52e4c584",
+      "other_token_decimals": 18,
+      "init_block": 21175385,
+      "state_at_init": {
+        "sqrt_price_x96": 49241240081144057608226268231361992684,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 116665440420505006189794107,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21182499,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 84110734386367691833258901513,
+          "fee_growth_delta1_x128": 2861701992577095983065434370830495788886089986,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 426.0262586457773,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 426.0262586457773,
+          "price_change_frac": -0.03350726302304674,
+          "lvr_frac_of_tvl": 0.00014034208441195443,
+          "tvl_usdc_side_estimate": 2622.0621858285504,
+          "lvr_usdc": 0.36798567261694415,
+          "fee_over_lvr": 1157.7251245030147
+        },
+        "3h": {
+          "target_block": 21196728,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 84476198168510735027584109629,
+          "fee_growth_delta1_x128": 2988188657259147788069397215971960386116703407,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 429.2803598070288,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 429.2803598070288,
+          "price_change_frac": -0.032749332929690914,
+          "lvr_frac_of_tvl": 0.0001340648509174672,
+          "tvl_usdc_side_estimate": 2620.00755831063,
+          "lvr_usdc": 0.3512509227075518,
+          "fee_over_lvr": 1222.1472800640684
+        },
+        "6h": {
+          "target_block": 21218072,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 84476198168510735027584109629,
+          "fee_growth_delta1_x128": 2996739282691117224991825005974749361301366584,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 429.07417819923984,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 429.07417819923984,
+          "price_change_frac": -0.02874671410146681,
+          "lvr_frac_of_tvl": 0.00010329669645393384,
+          "tvl_usdc_side_estimate": 2609.2102804684428,
+          "lvr_usdc": 0.2695228023260323,
+          "fee_over_lvr": 1591.9772816854427
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21260760
+        }
+      }
+    },
+    {
+      "pool_id": "0x0d751ec09f3af9db4a6ac50ca41ad1d236fcb77d8b8cfd069ae9738dc2563438",
+      "pair": "USDC/DOT",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0x6b101ed0cca19878fbe80f7b7b9e81a43e6608fa",
+      "other_token_decimals": 18,
+      "init_block": 21169135,
+      "state_at_init": {
+        "sqrt_price_x96": 49318305892272383231304653191028653549,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 108023555944912042768327877,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21176249,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 540607198683411303430284378162,
+          "fee_growth_delta1_x128": 4084709477860553390024067787470349427800334239,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 2758.978825342262,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 2758.978825342262,
+          "price_change_frac": -0.564033176601284,
+          "lvr_frac_of_tvl": 0.03976667803836691,
+          "tvl_usdc_side_estimate": 5803.753686530315,
+          "lvr_usdc": 230.79600426623603,
+          "fee_over_lvr": 11.954188003010774
+        },
+        "3h": {
+          "target_block": 21190478,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 788119766266132868095998955566,
+          "fee_growth_delta1_x128": 7128520282582440118612324717058073465096782301,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 8485.11473730781,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 8485.11473730781,
+          "price_change_frac": -0.8673218138972845,
+          "lvr_frac_of_tvl": 0.09403089110775947,
+          "tvl_usdc_side_estimate": 19070.535502696483,
+          "lvr_usdc": 1793.219447220714,
+          "fee_over_lvr": 4.731777112086739
+        },
+        "6h": {
+          "target_block": 21211822,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 1150699956156285650190872793998,
+          "fee_growth_delta1_x128": 8650943979246925593459378709872945235479382736,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 16691.88625227697,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 16691.88625227697,
+          "price_change_frac": -0.9046479092708186,
+          "lvr_frac_of_tvl": 0.10229847996850791,
+          "tvl_usdc_side_estimate": 26535.800517385596,
+          "lvr_usdc": 2714.5720576760923,
+          "fee_over_lvr": 6.148993615799119
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21254510
+        }
+      }
+    },
+    {
+      "pool_id": "0xe2e95460dc68a624cd5f05af04e789afed772d795ce20737356117aba87adef1",
+      "pair": "USDC/ARGUS",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0x7b959dd14657bf0a062270a6b277801c14a4e322",
+      "other_token_decimals": 18,
+      "init_block": 21173079,
+      "state_at_init": {
+        "sqrt_price_x96": 38129272631377084570625804543101568130,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 1728376895118592684293246032,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21180193,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 439436359540086141533753537812,
+          "fee_growth_delta1_x128": 8661796719986713695991675313600276993384745174,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 2503.423730535215,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 2503.423730535215,
+          "price_change_frac": -0.3927592856928037,
+          "lvr_frac_of_tvl": 0.019282482062240175,
+          "tvl_usdc_side_estimate": 5389.533312566332,
+          "lvr_usdc": 103.92357942340617,
+          "fee_over_lvr": 24.089083001421155
+        },
+        "3h": {
+          "target_block": 21194422,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 454691438765024815959477892311,
+          "fee_growth_delta1_x128": 10171356346897116286429664289193680916839302027,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 2545.709323998398,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 2545.709323998398,
+          "price_change_frac": -0.321171363851543,
+          "lvr_frac_of_tvl": 0.012893880619782527,
+          "tvl_usdc_side_estimate": 4821.1638169452135,
+          "lvr_usdc": 62.16351070410664,
+          "fee_over_lvr": 40.95182680585354
+        },
+        "6h": {
+          "target_block": 21215766,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 464565318069154340279975427528,
+          "fee_growth_delta1_x128": 11107103294765664449760627113333351270803730126,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 2584.2184904972855,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 2584.2184904972855,
+          "price_change_frac": -0.2847772256890726,
+          "lvr_frac_of_tvl": 0.010137258533895624,
+          "tvl_usdc_side_estimate": 4575.8387121527185,
+          "lvr_usdc": 46.386460034500104,
+          "fee_over_lvr": 55.71062091341446
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21258454
+        }
+      }
+    },
+    {
+      "pool_id": "0xfb368f54ae68bff21887c43e52d2c8f52bf0013d2585c9d76e3843d48de4791c",
+      "pair": "USDC/MAXUS",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0xcf5aeed4661d4d719c7d5f44697504b008ce2343",
+      "other_token_decimals": 18,
+      "init_block": 21174109,
+      "state_at_init": {
+        "sqrt_price_x96": 47461303584882631958802010222576137315,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 324070667834736128304983631,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21181223,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 73076777152119043696027160933,
+          "fee_growth_delta1_x128": 6449485894573610056190198227117209980741177207,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 465.87380856983543,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 465.87380856983543,
+          "price_change_frac": -0.1926659637444093,
+          "lvr_frac_of_tvl": 0.004640021698195255,
+          "tvl_usdc_side_estimate": 3256.699136208382,
+          "lvr_usdc": 15.111154656500636,
+          "fee_over_lvr": 30.829795549039805
+        },
+        "3h": {
+          "target_block": 21195452,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 78472788398730912581262031182,
+          "fee_growth_delta1_x128": 7816215653684738462606766367826784509401744953,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 488.1791167761636,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 488.1791167761636,
+          "price_change_frac": -0.10178306642257533,
+          "lvr_frac_of_tvl": 0.0012949740762977977,
+          "tvl_usdc_side_estimate": 2927.1815752052644,
+          "lvr_usdc": 3.79062425650737,
+          "fee_over_lvr": 128.78594229910968
+        },
+        "6h": {
+          "target_block": 21216796,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 132693931361953117681821061997,
+          "fee_growth_delta1_x128": 11972605281713582586385186557062272513560072479,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 866.7420889624036,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 866.7420889624036,
+          "price_change_frac": -0.21804031783685118,
+          "lvr_frac_of_tvl": 0.005942697525299386,
+          "tvl_usdc_side_estimate": 3362.378033649873,
+          "lvr_usdc": 19.981595619692115,
+          "fee_over_lvr": 43.37702080749839
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21259484
+        }
+      }
+    },
+    {
+      "pool_id": "0xb44af27f2da465ce87406e0e6eb8c2c7bc3475820e24da91ae9f52e971e1df8a",
+      "pair": "USDC/ARCEOLAS",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0x3b8dd87500d4afafd45c517d22eeddc2e302f608",
+      "other_token_decimals": 18,
+      "init_block": 21173707,
+      "state_at_init": {
+        "sqrt_price_x96": 44923991494960343012120766650640732846,
+        "liquidity": 1575037795897358225,
+        "fee_growth_global0_x128": 648141335669472256609967262,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21180821,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 69997627911477550186252609427,
+          "fee_growth_delta1_x128": 7445058156019850432925855793436086448539803796,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 482.2117543420133,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 482.2117543420133,
+          "price_change_frac": -0.17694038545314747,
+          "lvr_frac_of_tvl": 0.00391348750053855,
+          "tvl_usdc_side_estimate": 3374.900200922306,
+          "lvr_usdc": 13.207629751874485,
+          "fee_over_lvr": 36.5100902585171
+        },
+        "3h": {
+          "target_block": 21195050,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 71540352066595426796658838582,
+          "fee_growth_delta1_x128": 8303989760510799551451669766796373250910222154,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 433.7839201253015,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 433.7839201253015,
+          "price_change_frac": 0.07916841172981727,
+          "lvr_frac_of_tvl": 0.0007834546769777336,
+          "tvl_usdc_side_estimate": 2573.967166118878,
+          "lvr_usdc": 2.016586614682958,
+          "fee_over_lvr": 215.10800327983915
+        },
+        "6h": {
+          "target_block": 21216394,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 71540352066595426796658838582,
+          "fee_growth_delta1_x128": 8303989760510799551451669766796373250910222154,
+          "liquidity_at_window_start": 1575037795897358225,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": false,
+          "liquidity_changed_significantly_gt5pct": false,
+          "lp_fee_usdc_using_liquidity_at_start": 433.7839201253015,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 433.7839201253015,
+          "price_change_frac": 0.07916841172981727,
+          "lvr_frac_of_tvl": 0.0007834546769777336,
+          "tvl_usdc_side_estimate": 2573.967166118878,
+          "lvr_usdc": 2.016586614682958,
+          "fee_over_lvr": 215.10800327983915
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21259082
+        }
+      }
+    },
+    {
+      "pool_id": "0x03c82d002af61d8c215b22c42700178106a611d14361076cc0c80d089963016f",
+      "pair": "USDC/BEEF",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0xa5a9b1181eba450ee015d9283396f997a1ee0b2c",
+      "other_token_decimals": 18,
+      "init_block": 21167527,
+      "state_at_init": {
+        "sqrt_price_x96": 50302388120867331857465247907496697271,
+        "liquidity": 0,
+        "fee_growth_global0_x128": 0,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21174641,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 297507052780105790515237288446,
+          "fee_growth_delta1_x128": 6990376792240048724467304852450660774350994102,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 3034.850335589934,
+          "price_change_frac": -0.7799605498987507,
+          "lvr_frac_of_tvl": 0.0760423074247952,
+          "tvl_usdc_side_estimate": 11274.087702744735,
+          "lvr_usdc": 857.3076430262182,
+          "fee_over_lvr": 3.539978163354741
+        },
+        "3h": {
+          "target_block": 21188870,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 360929883131245360572657861191,
+          "fee_growth_delta1_x128": 8092716125369482234543893149413676486167774019,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 4308.045597381788,
+          "price_change_frac": -0.8122963374353961,
+          "lvr_frac_of_tvl": 0.08247816747636985,
+          "tvl_usdc_side_estimate": 13216.279451400605,
+          "lvr_usdc": 1090.0545100071247,
+          "fee_over_lvr": 3.9521377672696665
+        },
+        "6h": {
+          "target_block": 21210214,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 408729780562151487775994664878,
+          "fee_growth_delta1_x128": 9216031658190954190384610923380870357520300202,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 3567.3633714799785,
+          "price_change_frac": -0.7486867374380901,
+          "lvr_frac_of_tvl": 0.07006647885196146,
+          "tvl_usdc_side_estimate": 9871.122730317858,
+          "lvr_usdc": 691.6348120289323,
+          "fee_over_lvr": 5.157871335329416
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21252902
+        }
+      }
+    },
+    {
+      "pool_id": "0xd46b6f7c126c13a335e7125bafad9cbb27252e3ba527a62537809e01e38df423",
+      "pair": "USDC/CHUSD",
+      "fee_initialize_pips": 10000,
+      "usdc_side": "currency0",
+      "other_token": "0x9dc9b99d88fc77e2b833dbc77c3603324e363d03",
+      "other_token_decimals": 18,
+      "init_block": 21158935,
+      "state_at_init": {
+        "sqrt_price_x96": 50302388120867331857465247907496697271,
+        "liquidity": 0,
+        "fee_growth_global0_x128": 0,
+        "fee_growth_global1_x128": 0
+      },
+      "windows": {
+        "1h": {
+          "target_block": 21166049,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 33424764049632433439437688190,
+          "fee_growth_delta1_x128": 3595138096628635460068583614598778714716964908,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 436.97480372244513,
+          "price_change_frac": -0.6175747300786725,
+          "lvr_frac_of_tvl": 0.047674818403968144,
+          "tvl_usdc_side_estimate": 6486.872739909544,
+          "lvr_usdc": 309.2604798848388,
+          "fee_over_lvr": 1.4129668423368034
+        },
+        "3h": {
+          "target_block": 21180278,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 113837061599623381182407747899,
+          "fee_growth_delta1_x128": 7241061894454587192549681279103838156199269811,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 1104.2110778437868,
+          "price_change_frac": -0.6204961973634566,
+          "lvr_frac_of_tvl": 0.048126941367813716,
+          "tvl_usdc_side_estimate": 6536.809489840753,
+          "lvr_usdc": 314.5966470501342,
+          "fee_over_lvr": 3.5099264032137616
+        },
+        "6h": {
+          "target_block": 21201622,
+          "survived_any_trading": true,
+          "fee_growth_delta0_x128": 159370000234604780247033746258,
+          "fee_growth_delta1_x128": 9857137643773130521338800022342295614674321391,
+          "liquidity_at_window_start": 0,
+          "liquidity_at_window_end": 1575037795897358225,
+          "liquidity_at_window_start_is_degenerate_zero": true,
+          "liquidity_changed_significantly_gt5pct": true,
+          "lp_fee_usdc_using_liquidity_at_start": 0.0,
+          "lp_fee_usdc_using_liquidity_at_end_PRIMARY": 1817.2976521670962,
+          "price_change_frac": -0.6762171907179204,
+          "lvr_frac_of_tvl": 0.057158711127804546,
+          "tvl_usdc_side_estimate": 7661.753457528327,
+          "lvr_usdc": 437.93595261131935,
+          "fee_over_lvr": 4.1496881937437085
+        },
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "target_block": 21244310
+        }
+      }
+    }
+  ],
+  "window_summary": {
+    "1h": {
+      "n_pools_with_ratio": 12,
+      "median_fee_over_lvr": 22.229996274493427,
+      "pct_gt_1": 91.66666666666666,
+      "n_reached_window": 12,
+      "n_survived_any_trading": 12,
+      "pct_survived": 100.0
+    },
+    "3h": {
+      "n_pools_with_ratio": 12,
+      "median_fee_over_lvr": 24.340173557605585,
+      "pct_gt_1": 91.66666666666666,
+      "n_reached_window": 12,
+      "n_survived_any_trading": 12,
+      "pct_survived": 100.0
+    },
+    "6h": {
+      "n_pools_with_ratio": 11,
+      "median_fee_over_lvr": 43.37702080749839,
+      "pct_gt_1": 100.0,
+      "n_reached_window": 12,
+      "n_survived_any_trading": 12,
+      "pct_survived": 100.0
+    },
+    "12h": {
+      "n_pools_with_ratio": 1,
+      "median_fee_over_lvr": 21.327135914874123,
+      "pct_gt_1": 100.0,
+      "n_reached_window": 1,
+      "n_survived_any_trading": 1,
+      "pct_survived": 100.0
+    }
+  },
+  "preregistered_verdict": "ЖИВА",
+  "verdict_caveat": "Выборка -- 12 пулов fee>0 ИЗ ТОП-30 ПО ОБЪЁМУ, только 16/30 нашлись в частичном реестре -- предвзято по построению, не репрезентативно для всех 24567 пулов. fee считается на liquidity_at_window_end (тот же принцип, что NFPM.positions() -- текущая ликвидность x дельта feeGrowth с контрольной точки), НЕ на min(start,end): у свежего пула liquidity_at_init часто СТРУКТУРНО равна 0 (Initialize создаёт пул раньше первого mint) -- минимум по двум точкам в этом случае вырождается в 0 несмотря на реальное движение feeGrowthGlobal, это не консервативная граница, а артефакт метода (см. liquidity_at_window_start_is_degenerate_zero по каждому пулу/окну). Оценка на liquidity_at_end -- не точная позиционная бухгалтерия (та требует интеграла ликвидности по времени, недоступного из 2 точек), но не имеет этого вырождения; оба значения (at_start и at_end) сохранены в выводе для прозрачности.",
+  "total_rpc_calls": 63,
+  "note_on_extreme_outliers": "Два fee_over_lvr сильно выше остальных (Neurofly/USDC 1ч=787735, USDC/ARC 1ч=1157) -- проверено вручную, НЕ ошибка расчёта: liquidity константна за окно (не degenerate), fee реальный и правдоподобный ($816 и $426 на TVL ~$2.6k за 1ч), а LVR провалился в почти-ноль из-за того, что price_change_frac был крошечным (-0.18% и -3.35%) -- LVR ~ (Δцены)^2, поэтому знаменатель обвалился быстрее числителя. Тот же артефакт метрики, что и note_on_spike в исходном (event-based) результате для AROS. Медиана устойчива к этим выбросам (сортировка, середина ряда) -- вердикт не зависит от них; pct_gt_1 включает их, но не решающим образом (9-10 из 12 пулов дают >1 и без них).",
+  "cross_check_vs_event_based_single_pool": "Для AROS (единственный пул, измеренный ОБОИМИ методами) 1ч fee/LVR: extsload-метод дал 0.041, event-based (Swap-логи, прошлый раунд) дал 0.017 -- тот же порядок величины, разные ветки расчёта (feeGrowthGlobal x liquidity vs посвоповый fee_pips x amount) сходятся достаточно близко для доверия методологии, расхождение объяснимо разным базисом ликвидности и округлениями."
+}
