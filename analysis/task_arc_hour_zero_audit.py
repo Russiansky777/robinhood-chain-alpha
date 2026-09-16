@@ -35,7 +35,7 @@ HOUR_BLOCKS = int(3600 / BLOCK_TIME_S)  # 7200
 MAX_CHUNK_RETRIES = 3
 CHUNK_RETRY_PAUSE_S = 3
 TOP_N = 30
-MAX_TX_FROM_LOOKUPS = 400
+PER_POOL_TX_FROM_CAP = 40
 MAX_ARB_RECEIPT_LOOKUPS = 500
 
 
@@ -378,34 +378,43 @@ def main() -> None:
     unranked_no_usdc_leg = len(pool_agg) - len(ranked)
     top = ranked[:TOP_N]
 
-    # 6. Реальные tx.from для пулов из топа -- дедуп по tx_hash, честный
-    # потолок вызовов.
+    # 6. Реальные tx.from для пулов из топа -- дедуп по tx_hash. Первый
+    # прогон с общим бюджетом на все 30 пулов честно сломался: пул #1 один
+    # забирал весь бюджет (1500+ хешей), остальным 0 -- заменено на
+    # СПРАВЕДЛИВЫЙ потолок НА ПУЛ, чтобы каждый из топ-30 получил реальную
+    # (пусть частичную) оценку, а не только первый по объёму.
     tx_from_cache: dict[str, str | None] = {}
-    lookups_left = MAX_TX_FROM_LOOKUPS
+    total_lookups_used = 0
     for p in top:
         pid = p["pool_id"]
         tx_hashes = list({s["tx_hash"] for s in by_pool[pid]})
         resolved_from = set()
-        capped = False
+        n_sampled = 0
         for h in tx_hashes:
-            if lookups_left <= 0:
-                capped = True
+            if n_sampled >= PER_POOL_TX_FROM_CAP:
                 break
             frm = get_tx_from(h, tx_from_cache)
-            lookups_left -= 1
+            n_sampled += 1
+            total_lookups_used += 1
             if frm:
                 resolved_from.add(frm.lower())
+        capped = n_sampled < len(tx_hashes)
         p["n_unique_tx_from_resolved"] = len(resolved_from)
         p["n_unique_tx_hashes_total"] = len(tx_hashes)
+        p["n_tx_hashes_sampled_for_from"] = n_sampled
         p["tx_from_capped"] = capped
-        p["is_likely_wash"] = (not capped) and len(resolved_from) <= 3
+        # "Похоже на накрутку" -- ТОЛЬКО если реально видели весь набор
+        # tx_hash (не капнуто) ИЛИ выборка была достаточно большой (>=20),
+        # чтобы <=3 уникальных не было артефактом маленькой выборки.
+        p["is_likely_wash"] = len(resolved_from) <= 3 and (not capped or n_sampled >= 20)
 
     result["pools_hourly"] = {
         "n_pools_with_swaps": len(pool_agg),
         "n_ranked_by_usdc_volume": len(ranked),
         "n_excluded_no_confirmed_usdc_leg": unranked_no_usdc_leg,
         "top_pools": top,
-        "tx_from_lookups_used": MAX_TX_FROM_LOOKUPS - lookups_left,
+        "tx_from_lookups_used": total_lookups_used,
+        "per_pool_tx_from_cap": PER_POOL_TX_FROM_CAP,
     }
 
     # 7. День-ноль арбитраж: транзакции с ≥2 свопами в РАЗНЫХ пулах.
