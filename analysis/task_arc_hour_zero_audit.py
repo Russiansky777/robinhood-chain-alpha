@@ -36,7 +36,7 @@ MAX_CHUNK_RETRIES = 3
 CHUNK_RETRY_PAUSE_S = 3
 TOP_N = 30
 MAX_TX_FROM_LOOKUPS = 400
-MAX_ARB_RECEIPT_LOOKUPS = 150
+MAX_ARB_RECEIPT_LOOKUPS = 500
 
 
 def keccak_topic0(sig: str) -> str:
@@ -126,7 +126,15 @@ def chunked_get_logs_with_retry(address: str, topic0: str, from_block: int, to_b
                     # (уменьшенной) шириной, не возвращаясь к исходной.
                     current_chunk = hi - lo + 1
                 break
-            msg = body["error"].get("message", "")
+            err = body["error"]
+            if err.get("code") == -32005 or "rate limit" in err.get("message", "").lower():
+                # Rate-limit -- НЕ ошибка размера диапазона. Сужение чанка
+                # тут бесполезно (прошлый прогон впустую жёг вызовы именно
+                # так) -- честная пауза и повтор ТОГО ЖЕ диапазона, как
+                # прямо просил владелец.
+                time.sleep(CHUNK_RETRY_PAUSE_S)
+                continue
+            msg = err.get("message", "")
             m = _RETRY_RANGE_RE.search(msg)
             if m:
                 # Не доверяем hint_lo слепо (держим свой lo неизменным, чтобы
@@ -269,7 +277,7 @@ def main() -> None:
     # созданных именно в этот час) -- декодируем fee/tickSpacing/hooks,
     # которых не было в прошлом (более широком) прогоне.
     init_logs, init_unresolved, init_scan_stats = chunked_get_logs_with_retry(
-        POOL_MANAGER, INIT_TOPIC0, from_block, latest, chunk=5000, max_calls=15)
+        POOL_MANAGER, INIT_TOPIC0, from_block, latest, chunk=5000, max_calls=40)
     fresh_inits = {d["pool_id"]: d for d in (decode_initialize_log(l) for l in init_logs)}
     result["initialize_rescan"] = {"n_found": len(fresh_inits), "unresolved_chunks_after_retry": init_unresolved,
                                     "adaptive_chunk_stats": init_scan_stats}
@@ -388,9 +396,19 @@ def main() -> None:
         tx_swap_count[s["tx_hash"]] += 1
     multi_pool_txs = [h for h, pools in tx_pools.items() if len(pools) >= 2]
 
+    # Равномерная выборка по всему часу (по порядку появления в свопах,
+    # который примерно хронологический) -- НЕ только первые N по времени,
+    # иначе оценка смещена в начало окна.
+    if len(multi_pool_txs) > MAX_ARB_RECEIPT_LOOKUPS:
+        stride = len(multi_pool_txs) / MAX_ARB_RECEIPT_LOOKUPS
+        sample_idx = sorted({int(i * stride) for i in range(MAX_ARB_RECEIPT_LOOKUPS)})
+        sampled_txs = [multi_pool_txs[i] for i in sample_idx]
+    else:
+        sampled_txs = multi_pool_txs
+
     arb_candidates = []
     receipts_used = 0
-    for h in multi_pool_txs:
+    for h in sampled_txs:
         if receipts_used >= MAX_ARB_RECEIPT_LOOKUPS:
             break
         rec = get_tx_receipt(h)
@@ -408,8 +426,9 @@ def main() -> None:
             if t["to"].lower() == initiator:
                 net[t["token"].lower()] += t["value"]
         positive_tokens = {tok: v for tok, v in net.items() if v > 0}
-        negative_tokens = {tok: v for tok, v in net.items() if v < 0}
-        is_closed_profit_loop = len(positive_tokens) >= 1 and len(net) >= 2 and all(
+        # Владелец: "замкнутые циклы с ПЛЮСОМ В ОДНОМ токене" -- ровно один
+        # положительный токен, остальные <=0 (не любой набор с хотя бы одним).
+        is_closed_profit_loop = len(positive_tokens) == 1 and len(net) >= 2 and all(
             v <= 0 for tok, v in net.items() if tok not in positive_tokens
         )
         arb_candidates.append({
