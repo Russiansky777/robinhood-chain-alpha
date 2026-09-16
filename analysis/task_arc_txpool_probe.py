@@ -49,13 +49,18 @@ def bot_priority_sample(bot_addr: str, latest: int, n: int = 10) -> dict:
     to_block = latest
     chunk = 20000
     calls = 0
-    while len(found) < n and to_block > 0 and calls < 10:
+    while len(found) < n and to_block > 0 and calls < 20:
         from_block = max(0, to_block - chunk)
         r = rpc("eth_getLogs", [{"fromBlock": hex(from_block), "toBlock": hex(to_block),
                                   "address": POOL_MANAGER, "topics": [SWAP_TOPIC0, None, addr_topic(bot_addr)]}])
         calls += 1
         body = r.get("body") or {}
         if "error" in body:
+            err = body["error"]
+            code = err.get("code")
+            if code in (-32012, -32602) or "too large" in str(err.get("message", "")).lower() or "max results" in str(err.get("message", "")).lower():
+                chunk = max(500, chunk // 4)
+                continue  # тот же to_block, меньший диапазон -- не пропускаем блоки
             break
         logs = body.get("result", [])
         for l in logs:
