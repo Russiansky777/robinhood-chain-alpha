@@ -1,0 +1,3818 @@
+{
+  "probed_at_utc": "2026-09-16T19:10:02Z",
+  "pool_map_seed": {
+    "path": "/home/bot/robinhood-chain-alpha/data/task_arc_recon_pools_result.json",
+    "found": true,
+    "n_seeded": 24567
+  },
+  "total_rpc_calls_used": 4162,
+  "summary": {
+    "n_cycles_total": 267,
+    "n_cycles_net_positive": 262,
+    "n_cycles_net_over_1usd": 19,
+    "n_cycles_no_usd_pricing": 0,
+    "n_unique_executors": 4,
+    "cycles_per_executor": {
+      "0x608750874fdcbcc21f4f9610af48e1babacf10fe": 225,
+      "0xe1eee09af59990bdff17582467f5ddbef66c4bbd": 37,
+      "0x147cd06a76c37959c25c7d1f763aa01e7992facf": 4,
+      "0xbe3705802aa0a1b857da82cece8d7948cbd0e8f4": 1
+    },
+    "max_cycles_by_single_executor": 225,
+    "profit_usdc_net_median": 0.12987642390207055,
+    "profit_usdc_net_p90": 0.6802391419277037,
+    "profit_usdc_net_max": 8.562204926303506,
+    "frac_cycles_via_aka_fun_hook": 0.0,
+    "n_cycles_with_liquidity_zero_leg": 0
+  },
+  "preregistered_verdict": "GONKA",
+  "top_profitable_cycles_tx_hashes": [
+    "0x9373fcd1ed60118fe717f00893d05f92e092cd905a857654c8e212aaf271eed0",
+    "0x9ad4e4ee5012e5a359d899dfcc53010d76f7614868869ee301affcb37df33150",
+    "0xf1ecbcd2cbb7fdbce97a37ff5a25e4497e683aa1e204291cf47a2423ea69df0d"
+  ],
+  "windows_meta": [
+    {
+      "label": "old_detector_window",
+      "from_block": 21173786,
+      "to_block": 21180986,
+      "pool_map_scan_n_found": 5288,
+      "swap_scan_n_found": 141357,
+      "topology_filter": {
+        "n_multi_leg_txs": 11157,
+        "n_unresolved_pool_skipped": 6042,
+        "n_ambiguous_leg_skipped": 7,
+        "n_topology_candidates": 2088
+      },
+      "verification": {
+        "n_candidates": 2088,
+        "n_receipts_checked": 2088,
+        "n_receipts_capped": 0,
+        "n_verified_real_cycles": 8
+      },
+      "receipt_budget_remaining_this_window": 412,
+      "n_verified_cycles_this_window": 8
+    },
+    {
+      "label": "last_full_hour_at_run",
+      "from_block": 21197680,
+      "to_block": 21204794,
+      "pool_map_scan_n_found": 5021,
+      "swap_scan_n_found": 153164,
+      "topology_filter": {
+        "n_multi_leg_txs": 15959,
+        "n_unresolved_pool_skipped": 11647,
+        "n_ambiguous_leg_skipped": 3,
+        "n_topology_candidates": 1958
+      },
+      "verification": {
+        "n_candidates": 1958,
+        "n_receipts_checked": 1958,
+        "n_receipts_capped": 0,
+        "n_verified_real_cycles": 259
+      },
+      "receipt_budget_remaining_this_window": 542,
+      "n_verified_cycles_this_window": 259
+    }
+  ],
+  "all_verified_cycles_compact": [
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0xfd103fff598cbf7e73f20102d791f40647958e9ebcac38abb005daa0c93bd54f",
+      "block_number": 21173865,
+      "n_legs": 2,
+      "profit_usdc_net": 2.2815518964118455,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xd638214e6dcda97d7019f0bb6f8789ffa2183ef0",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 13804
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x9ad4e4ee5012e5a359d899dfcc53010d76f7614868869ee301affcb37df33150",
+      "block_number": 21174128,
+      "n_legs": 2,
+      "profit_usdc_net": 8.205997630992666,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x49dae3e4561f2d1152b16e11a7c0effdc2baf85e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1315
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x9373fcd1ed60118fe717f00893d05f92e092cd905a857654c8e212aaf271eed0",
+      "block_number": 21177184,
+      "n_legs": 2,
+      "profit_usdc_net": 8.562204926303506,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x227ee2eb6d58348f62436569053d1968d43b407d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2915
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x469f79cce642cc0321a54886e98d11d7c1d4f5b450e148bb939418f05b956c56",
+      "block_number": 21177184,
+      "n_legs": 2,
+      "profit_usdc_net": 4.834023037287938,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x227ee2eb6d58348f62436569053d1968d43b407d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2871
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0xa10c319383faa450897a0a9728f21706a2f318c7e4a4d7eebfaebd5bd9a1f9c5",
+      "block_number": 21177186,
+      "n_legs": 2,
+      "profit_usdc_net": 1.6353270175739167,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x715690b3957327333167028717977bae490f86f4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2917
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x3b9e9cd6e095ae5f9e12e87f7c234bd400e6c8ea71fa8c474cb1e95d1200a938",
+      "block_number": 21177186,
+      "n_legs": 2,
+      "profit_usdc_net": 0.4443902910913464,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x715690b3957327333167028717977bae490f86f4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1469
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x36d47847336109167386dace3e845ce1aa8379464f21eb30550b663f8d9a45f1",
+      "block_number": 21179264,
+      "n_legs": 2,
+      "profit_usdc_net": 2.0092857622205087,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x227ee2eb6d58348f62436569053d1968d43b407d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4995
+    },
+    {
+      "window": "old_detector_window",
+      "tx_hash": "0x3c274358d1c7b250e9ef0d73d080e4efadde4244d99dda50b86942c026c3cbbd",
+      "block_number": 21179264,
+      "n_legs": 2,
+      "profit_usdc_net": 1.0545138727054275,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2aaa5242b423e9e70cb5abf42057dd2b0fc8b48d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3547
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8e9f6a5bbc518c3df88a0908f31e3020344cefe1f40861b57cbf36ce15f6243c",
+      "block_number": 21198531,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04752142143787032,
+      "senders": [
+        "0xbe3705802aa0a1b857da82cece8d7948cbd0e8f4"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x31f963bc7d9b6ff78ca5b05ee14ba61b46318d516a4412642ca9ac9ffb226665",
+      "block_number": 21200063,
+      "n_legs": 2,
+      "profit_usdc_net": 0.044864365365367934,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 56
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3dc01218995b6b57b49f1fb1c5c77e85ac02d73de3dc71a63d495d55d61003c5",
+      "block_number": 21200098,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04309132594301261,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 104
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x86a6fecc894d02ebee088679422a58b5e45256d2d2553ae088088ba41f0f7c7a",
+      "block_number": 21200147,
+      "n_legs": 2,
+      "profit_usdc_net": 0.048679548810088055,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 153
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf87a7a32e67ae92ba4a8fd8190ffb034b4c0c5e753420a4f71efd4523d06852a",
+      "block_number": 21200154,
+      "n_legs": 2,
+      "profit_usdc_net": 0.056315970554231085,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 147
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6717b52eb8d06b97025073821558e7125b7d2f0287f0a27d2355680473d005e3",
+      "block_number": 21200160,
+      "n_legs": 2,
+      "profit_usdc_net": 0.11855985621186055,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 153
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x26a20ecab1265151a90c974a48e4213d6b2d3c1f09b7901e80ea1c1baf481438",
+      "block_number": 21200163,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16229385430884746,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 156
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8529517cce9b2bf75420062e745c80d4954848efe3407560c2b07315f24e87cb",
+      "block_number": 21200165,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05743386781627342,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 171
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9ca6e26e90c5f579eb82c6fc4ce843d77d2124174e4944e3f72d638003054d70",
+      "block_number": 21200174,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2265817143849356,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 286
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x816fce2524e183882e34f316aa7680e80b253a052c5a7c4116e377c8fade8529",
+      "block_number": 21200174,
+      "n_legs": 2,
+      "profit_usdc_net": 0.059041134877241525,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 278
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xde23b0bb93f7fb33f700d8412851437530165aaa22cd8509bd04d500d246e557",
+      "block_number": 21200202,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0819076767759041,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 208
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0fd4583b53044c08643d70ca9747c1541189f4df5df6a91cc146cbdc50b21ecc",
+      "block_number": 21200221,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3088150247203881,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 227
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x13f89990decec9f497f093f6ab46753dedb3f406fa9f1dbe65bb9829a6be07eb",
+      "block_number": 21200256,
+      "n_legs": 2,
+      "profit_usdc_net": 0.054571825518451356,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 249
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2432f1604f9d9f22c6fbced35c799bf0ebd4a561eeff173639d8e934a3ed92b8",
+      "block_number": 21200257,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04038544688631511,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 250
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x318ffca7693931d66b44131ba9d28789bf451e2e0e350b2a8dc2b362a512d15f",
+      "block_number": 21200301,
+      "n_legs": 2,
+      "profit_usdc_net": 0.061463958661506585,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 307
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0c33c312a4cc32616b29a606dd5b2a522abd00de19dcfb137883b4b114446813",
+      "block_number": 21200324,
+      "n_legs": 2,
+      "profit_usdc_net": 0.6770736281511859,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 330
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x97c164544b00a7432c994fb430098806af9f828d45d48d6d27a8d927ef5bbf3f",
+      "block_number": 21200327,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0650008845792095,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 333
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x872a4cc864a9ea4d592307aa07e3291451d694006a1d5d270f94c25036d53f8c",
+      "block_number": 21200328,
+      "n_legs": 2,
+      "profit_usdc_net": 0.6802391419277037,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 334
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6ba8fd830f96d88f4366b722df58125c54e0c5dae55e425bc3c66a0864b3f0c2",
+      "block_number": 21200355,
+      "n_legs": 2,
+      "profit_usdc_net": 0.11560208301227543,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 38
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x80f7e0829260fe542dc2189edc3e3e8ab2d29f06cc70a0051864c4c6750ce920",
+      "block_number": 21200364,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0497553694202625,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 194
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe654a555df30e67f6fbe1e73fea74f2be59d73f5d4ffc76aa276a7d69b1497eb",
+      "block_number": 21200369,
+      "n_legs": 2,
+      "profit_usdc_net": 0.27524028367872694,
+      "senders": [
+        "0x147cd06a76c37959c25c7d1f763aa01e7992facf"
+      ],
+      "tx_from": "0x03694d8e61e765469272a0249b22d6f7296ee301",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 36
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xac8cff8ec927a45cfe3ebc3b0822f154d9a6b53f3720f20f0c211323eb685cb4",
+      "block_number": 21200379,
+      "n_legs": 2,
+      "profit_usdc_net": 0.24282722394797512,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 209
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x5b055c56ca91288d0af19e57b5a912143bcbf8763bd80d242e7a309fdd3dcd98",
+      "block_number": 21200381,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5454075221562653,
+      "senders": [
+        "0x147cd06a76c37959c25c7d1f763aa01e7992facf"
+      ],
+      "tx_from": "0x03694d8e61e765469272a0249b22d6f7296ee301",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 48
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe4f98f89e7098e2bfe9083fed207c6ba2ecdc31c24317d98790d8c3ed8ac8109",
+      "block_number": 21200384,
+      "n_legs": 2,
+      "profit_usdc_net": 0.21728950955721998,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 67
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xde5feef5d81b0a86b9327901b3adf91e491701083a7a35817a1dde1ecfb34003",
+      "block_number": 21200406,
+      "n_legs": 2,
+      "profit_usdc_net": 0.045343553666206904,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 73
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0305f5fc43af4bffd61fee843862c06e4ed2f8a494be5b5d56495f3870aa83fd",
+      "block_number": 21200407,
+      "n_legs": 2,
+      "profit_usdc_net": 0.38377794608916016,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 12
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6babf7a0a097d4ee54c45077da7a07c651d5c00da14e2699bc8c9da6286c2b37",
+      "block_number": 21200412,
+      "n_legs": 2,
+      "profit_usdc_net": 0.049601209674065436,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 79
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8b046715abbef218631bc27d57403d4887043c67853a93848cbfa6b4618f4c71",
+      "block_number": 21200415,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0817014796192428,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 82
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdbe6e32210ca795be6786454a825a07b5385abc82d5319d3c971ad4e31dacdde",
+      "block_number": 21200431,
+      "n_legs": 2,
+      "profit_usdc_net": 0.47117837946500224,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 27
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9bc165bd3f70da5c64116bea432f723e533294d3402ca0aee2958f9881c4d1c4",
+      "block_number": 21200465,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05405508273912338,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 471
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe2be9818f8c5c09265e38fd415b3a1b1ab75302ecc0a63de70617c3032c42f60",
+      "block_number": 21200470,
+      "n_legs": 2,
+      "profit_usdc_net": 0.41106600376749713,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 66
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x62676ca4f4373db062aa553b79b252161b3052a564df9e32fb72de1bc72e63ec",
+      "block_number": 21200471,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04268050228809614,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 67
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x58af56c5edc88df8ded9cbd95db24b4d46ce98ad7e7a5ccaee662ca8b3cea9b2",
+      "block_number": 21200473,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04399989698623452,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 69
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe49353f2f7c443aa9b4776e7a1280ccbd313b596ba9daf7532a3534a3e7fcb5f",
+      "block_number": 21200474,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2111613405933956,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 70
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3489400acde28c9ef34e86e2dae0fde42659e2e16826bf692631501951edbeaf",
+      "block_number": 21200493,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1595868839757553,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 89
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xacddc4120f25fd42693aa889288157f24275569a2d3a21a84699de02c4beb4bb",
+      "block_number": 21200502,
+      "n_legs": 2,
+      "profit_usdc_net": 0.045448826129673645,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 98
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf95708797e3dae958aee0bb92b56e30979f28a278765cf51464cb0954c3f8fba",
+      "block_number": 21200505,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2634963647520702,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 188
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x25261f12f6bc30386170cba443d2cb2e15771b974a79397a29083beb63396414",
+      "block_number": 21200511,
+      "n_legs": 2,
+      "profit_usdc_net": 0.056476934150514094,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 21
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x7afa84c8cbcc554490ed039c1faaf8bdcc093d3d2dbd756233d95ebf138cf9b7",
+      "block_number": 21200520,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1064162385757478,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 157
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdcf11333cb39fe3831697885fbc697ffb73f87c4d538941a91caa238dcf8a061",
+      "block_number": 21200532,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04401888543812792,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 199
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x951970f7199ccf08af341e072b5e7b7adbb94e6b151d0717df4804e8f56de81f",
+      "block_number": 21200538,
+      "n_legs": 2,
+      "profit_usdc_net": 0.4688662811683016,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 175
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd66095dea88d2e1432d604549c17010f6e91d18ae6224bf933427633ded49d7c",
+      "block_number": 21200539,
+      "n_legs": 2,
+      "profit_usdc_net": 0.046490274757375966,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 176
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3a3bc0b39b1274429693a7c2a13a369576e99b0e9d5ddafe11e8e02f03c94bf7",
+      "block_number": 21200546,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05729337251769051,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 213
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4e47b9d8d1ee2a9c4a7055033b037a2fcf4ce3fcf31500e54de95b7262110d84",
+      "block_number": 21200549,
+      "n_legs": 2,
+      "profit_usdc_net": 0.8060565856476916,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 145
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x07d1d5f1487f095a81679687ac79edb4fbe2c95cb75fe0388178386a30c868a8",
+      "block_number": 21200562,
+      "n_legs": 2,
+      "profit_usdc_net": 0.061303559738138835,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 158
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x24a860ec9b57aaace35536cf47fe1cc4e85fe0a0d45e1745bfede7761fa1c5cc",
+      "block_number": 21200571,
+      "n_legs": 2,
+      "profit_usdc_net": 0.052644864025852514,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 208
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbe1bf57a14b0b87f1f779ca781737ab6703419833de07f289bca1ba3d1e3ad70",
+      "block_number": 21200574,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0578985591065026,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 211
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9ec44f59849f4926e7ea8bf25c7d153c5ae4368d0e57d0e46d12c6c04399508c",
+      "block_number": 21200582,
+      "n_legs": 2,
+      "profit_usdc_net": 0.41357255643343666,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 219
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa2fb8c1c5d1a5a7bf494394d1ff85a0826a3774d8dc0a637115b5b4fc62138fe",
+      "block_number": 21200597,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09707086724684053,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 234
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x69ec0d6a98b8e7ac03f0ba646a442a7237c5894fb28ec14524f81a91412d7844",
+      "block_number": 21200629,
+      "n_legs": 2,
+      "profit_usdc_net": 0.21311983401833992,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 225
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd23b99b795ce286f964382e85ff2b9e21cb52a6e3e4eef311c99eb7820accfa4",
+      "block_number": 21200642,
+      "n_legs": 2,
+      "profit_usdc_net": 0.14718343650086943,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 279
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xed15cec12a44cc6db2b301f61fc5344b7400a6dfe859c4286cc213d5027c588c",
+      "block_number": 21200658,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07419450944066645,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x09e4f31997e1e9841d725e85e424816c9e02ff3acddf55682837ebe145ab70f0",
+      "block_number": 21200680,
+      "n_legs": 2,
+      "profit_usdc_net": 0.804002611512789,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 276
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdef4187a158fb23789a2fc4eb78091a0d91afd69ea544df80b0b97724c9ecaf8",
+      "block_number": 21200733,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04353771865790121,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 243
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x43ac44a4b317f42cd6f7e46e419984ff75f10fbbbf883b58661c4a6081fa082d",
+      "block_number": 21200754,
+      "n_legs": 2,
+      "profit_usdc_net": 0.045409114420588426,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 391
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf1ecbcd2cbb7fdbce97a37ff5a25e4497e683aa1e204291cf47a2423ea69df0d",
+      "block_number": 21200767,
+      "n_legs": 2,
+      "profit_usdc_net": 4.89060312579408,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 220
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x928c6d8977ae814291ea7a48918695f9ecc0c12070d1b742f1145f5b934fa86f",
+      "block_number": 21200847,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05985224884471123,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 357
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdf450b8a7933bf18ec166e5983b239408b126fa8601016477ad152b286c280b0",
+      "block_number": 21200899,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04940124376940805,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 536
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2d555c1f01b09a3ec7290392358e37516c4e061f71828f00bb9933261fedcf3e",
+      "block_number": 21200916,
+      "n_legs": 2,
+      "profit_usdc_net": 0.10832863747596058,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 273
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbe640a4b9ec3cc2366e2b8e82c097c8505cbbb7b93eca9e1f108dfe233820a2a",
+      "block_number": 21200916,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04534637950799933,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 261
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf23fde7d014f983b295622baaac7379e35911f23abae75d5395df8f166a46d51",
+      "block_number": 21200922,
+      "n_legs": 2,
+      "profit_usdc_net": 0.207052409602483,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 75
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x7a6ecd0c139a9569346b30fd3d983748cc6c9bfdb2a36212117edb63188b13e7",
+      "block_number": 21200973,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3852556189409449,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 126
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x48882c42b3720d409557c6b3739af7f45c4f81e4bfc199da86a5efb4205d48f0",
+      "block_number": 21200975,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04958079692195139,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 571
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd950e320e595ee5200731af5a3732c3cb693d297fd1a3584710e16c00dc9e92d",
+      "block_number": 21201015,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04437881845214288,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 239
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbb4296832b0c8e256aa7fa2c4ff341993737bfd42837f5a46b6787bc1f6072ab",
+      "block_number": 21201018,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05611636219152176,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 471
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8a3fe466ad69049572e899a4d65490a626d7e4f5a469732a83f70d19ebea7729",
+      "block_number": 21201037,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05172610977292208,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 261
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4674cf5fc086a675031e9879bd298733ea185dd279030235a3bf9db26c4cbcff",
+      "block_number": 21201038,
+      "n_legs": 2,
+      "profit_usdc_net": 0.119726978236433,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8aed1a0d9cf234684d086c98808f2d9248e628092e4bee11a4c296911bfe94ac",
+      "block_number": 21201075,
+      "n_legs": 2,
+      "profit_usdc_net": 0.15170330337313104,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 228
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2e7a5877d26209a2cd840c354e62630ba476668c4724a922de5c8795b3de63a3",
+      "block_number": 21201077,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04792502223124259,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 587
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8791331b9d9b3b2994e7b638a39bfb08052223455ffb22b97670a132df71b746",
+      "block_number": 21201131,
+      "n_legs": 2,
+      "profit_usdc_net": 0.13857255031344004,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 355
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6dfd7c41748703a9ea9bb4cbac2af367c09391108e14f482a475d1e62d59c501",
+      "block_number": 21201144,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07264966875205245,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 38076
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6b5223a164f57933432d105e6525c4d942482d9deb9174a726ef6b295031e723",
+      "block_number": 21201150,
+      "n_legs": 2,
+      "profit_usdc_net": 0.416844867051369,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 303
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x83212a992b6dd46b85c4fdfcd7fc4fe0fb377b57a3a35222feb982c92319c4eb",
+      "block_number": 21201150,
+      "n_legs": 2,
+      "profit_usdc_net": 0.040138983153010524,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 660
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa28196d3fcf565c23f03fd3862da866e3429707b515dfac54dbfaf97c679e12e",
+      "block_number": 21201152,
+      "n_legs": 2,
+      "profit_usdc_net": 0.12987642390207055,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 376
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa84f66277d52f4833d8abf82f5d674aa111b61c7bd70b0cd6e1234715e1c2255",
+      "block_number": 21201156,
+      "n_legs": 2,
+      "profit_usdc_net": 0.11390304591545194,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 62722
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3cc24e5995ea48ea50bededd0afa73b72dbacedf37595c5a9d212e4339637e89",
+      "block_number": 21201156,
+      "n_legs": 2,
+      "profit_usdc_net": 0.14273210338892497,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 309
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x63af199b9c9294d4cc12e862a06576158f84330e9983325fcbe23d7073eb73aa",
+      "block_number": 21201160,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06465967449104423,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 313
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc9afdc012d3fd6441e284a7d5083da7511a25640b2b1d0cbd43dca18fa285da8",
+      "block_number": 21201203,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09362994661794255,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 799
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0c086e96c18acc5e8e9a3171355fb2f9c210d08af295157ea1b33c0c2bfcaab0",
+      "block_number": 21201205,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06676464494063658,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 429
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2380033f34b8857eeac9669c6dc13a61fb7bd4f8db2143340e09d2a37240e1cc",
+      "block_number": 21201212,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07975746763597845,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 808
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x03004ff6f2f6ed916178e7eb2a3e7c8b67ac7e0d212ee811b33c5bdb0cc215f0",
+      "block_number": 21201239,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16255365892822998,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 463
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x35c69617ff2e50a21e6021c7bf60a1032ac7242279caf668da3838db415b9626",
+      "block_number": 21201242,
+      "n_legs": 2,
+      "profit_usdc_net": 0.297285758495445,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 879
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0f1640455c470eb2407eef45aacf9d1be0fcfd5de22faf4938b79666f3c2f0cc",
+      "block_number": 21201260,
+      "n_legs": 2,
+      "profit_usdc_net": 0.20075155832475722,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 897
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8f78f9d17f8927be5236095bd173d83996a96e43b8a99368d6d585e1f7adf3ec",
+      "block_number": 21201267,
+      "n_legs": 2,
+      "profit_usdc_net": 0.29668350673299937,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 863
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc210e13feca2531989a8d7a8d63576e253da32498bbaf0dcce8aa08353297bfc",
+      "block_number": 21201268,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1481199918886002,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 905
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6d512bb1c8f07bfa9090565b5afceaa7b92782b944350ce5c85bcabe162d063e",
+      "block_number": 21201275,
+      "n_legs": 2,
+      "profit_usdc_net": 1.0504197105014863,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 871
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2881a4f2166fdfb3657a0467efca3107208b2e1cae7b61f51f49ec41a79b672d",
+      "block_number": 21201280,
+      "n_legs": 2,
+      "profit_usdc_net": 0.21136134514480454,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 790
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd083572b66d9cce64379389847b1fc3421d956964cab9ca998369c1e8e6c65c5",
+      "block_number": 21201285,
+      "n_legs": 2,
+      "profit_usdc_net": 0.6218202493313628,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 795
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3b7d47afa096d1377c8edc265e9d4a1fb6d9464b2245176142acf016674e1dba",
+      "block_number": 21201296,
+      "n_legs": 2,
+      "profit_usdc_net": 2.2030395421179425,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 204
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x78cf09db6c6cbccec7cd4059665dc84849daa7e83063b62f1f944a0bcb0a6aff",
+      "block_number": 21201307,
+      "n_legs": 2,
+      "profit_usdc_net": 0.32659939373876606,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 792
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xcdbf927c742596af09e0b6ffc5684efb97818cbbb390e8d49ba05bdea91df3da",
+      "block_number": 21201311,
+      "n_legs": 2,
+      "profit_usdc_net": 0.13153515591669057,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 535
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe45d3a5b159d8f39a2ed938cb22da7e47741442c31c516fbb70a6dde4dc8dfa5",
+      "block_number": 21201315,
+      "n_legs": 2,
+      "profit_usdc_net": 0.7865481783652984,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 539
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xda5a7f6f5fe51f342e8286f601e0549d83bd73ab74675336bb08ae70413bd0a9",
+      "block_number": 21201320,
+      "n_legs": 2,
+      "profit_usdc_net": 0.7784107817685827,
+      "senders": [
+        "0x147cd06a76c37959c25c7d1f763aa01e7992facf"
+      ],
+      "tx_from": "0x03694d8e61e765469272a0249b22d6f7296ee301",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 957
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd28c132b098fc97f56ab2b1da979daa7af0cb46e9765bba3a1e47cb88ea2f359",
+      "block_number": 21201325,
+      "n_legs": 2,
+      "profit_usdc_net": 0.25042229473451316,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 549
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdd13c81dd607ee8d8b57f07806519644f0f50ac9202b34294a43e8952bec1ac9",
+      "block_number": 21201327,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3618580350233352,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 932
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x563f45c68b44e46367777b8ea964ec91742d7b7def6ac2814af657019149733d",
+      "block_number": 21201357,
+      "n_legs": 2,
+      "profit_usdc_net": 0.19023961402126244,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 581
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2a522c1dfe34b82c11451a9b9fcf4411a8daa40790f2ae0113ff0c806ae2d6bf",
+      "block_number": 21201360,
+      "n_legs": 2,
+      "profit_usdc_net": 0.45173126195904756,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 14
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8a7d9d63746302be7d48741200d52b3ee7635ef0cbb7d774547a477ad073ae23",
+      "block_number": 21201373,
+      "n_legs": 2,
+      "profit_usdc_net": 0.26877893050628093,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 597
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf0cce745f9237443ee7aba81ca00c40836dd7d75d0095bdc16ee4772f2282d52",
+      "block_number": 21201377,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3087749588974539,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 31
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8a17aa6365c6933afbf787f0affc28c2cafedd6c4ae692aea4d7d8e95be3d558",
+      "block_number": 21201381,
+      "n_legs": 2,
+      "profit_usdc_net": 0.10871295285951832,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 345
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdd9cf3bc4096b32d228f5d54ccbd8b79fc3d1cb29499e80d07f7a0455e0b1772",
+      "block_number": 21201386,
+      "n_legs": 2,
+      "profit_usdc_net": 0.15556436391137268,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 896
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc79f1349e7fc92aeb3ad9ba4dc35ff250ed638e4f22e44894d3413878c0fb520",
+      "block_number": 21201388,
+      "n_legs": 2,
+      "profit_usdc_net": 1.1480000080009793,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 42
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf26909a2324d98ba3c1ac9c274e90dcffe8f585e2ce5c377518388e355444aef",
+      "block_number": 21201419,
+      "n_legs": 2,
+      "profit_usdc_net": 1.686499417418783,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 13
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbd30fea4e8caf961225d831472014f0ec9d1da7f04986afbcebca7d3fd1758bc",
+      "block_number": 21201419,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2520399106285225,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 63
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x85d30e5a7a11cc53fdc478044da5871337c06b356c0ccb9b095dfb2b12bf31b7",
+      "block_number": 21201421,
+      "n_legs": 2,
+      "profit_usdc_net": 1.0300112028557797,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 65
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9708d41331b78c7d7c8d8ad430ce2bb3821cfac9bbb8672d3b99c031687a09fe",
+      "block_number": 21201423,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5109521577085085,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 67
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3d6161557866a30e3a701679e03f74e6c3067665a673589a525c463582f0894c",
+      "block_number": 21201423,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09644127033059835,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 82
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8ffd0a8cf0ae7799a43a122c0a20f2c2f98642485a8fb1531654d88d635cddbe",
+      "block_number": 21201425,
+      "n_legs": 2,
+      "profit_usdc_net": 0.15626670163923845,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 79
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd6b0748bcd018ac676f6786ae2e1eb98459f83ea4a8959a1bf83d050f64d8604",
+      "block_number": 21201428,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09678633594282457,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 72
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8fe767c5fc796752f10a2c63b867399331aa233c71f2e340fee19b369e3af29d",
+      "block_number": 21201430,
+      "n_legs": 2,
+      "profit_usdc_net": 0.12258157050308838,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 74
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x94fac71051f9433da76d3f710f1992deae87f5ea982bd10d3a05718b7dd2ebee",
+      "block_number": 21201436,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06841593713723503,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 660
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x923fe8c34a55f350c1ef1d902ab4a88bb11f4ba09986759e9e85a4b7ecec0a34",
+      "block_number": 21201439,
+      "n_legs": 2,
+      "profit_usdc_net": 0.14882817701108644,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 93
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdd6472b10da1873aeb463058ea58f38c8658cc1481f82df3a5b0bc4340463fc9",
+      "block_number": 21201445,
+      "n_legs": 2,
+      "profit_usdc_net": 0.13415267593011915,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1520
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x7de0c988702cca063648dfe75d8c90c66798729945f8779e915b12054ca2561a",
+      "block_number": 21201452,
+      "n_legs": 2,
+      "profit_usdc_net": 0.6680141383122895,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 416
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xeb711b482342f2a7b27c7ec5bfa8ab78b40e9eeccbc3fd2fb6e8089ef47976e4",
+      "block_number": 21201452,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5370656988266967,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 46
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x984128c881f60293f69698cc0feee638b405f622e83aed9b2876439e10c8ed8a",
+      "block_number": 21201452,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07503901873898856,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 962
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x268633bbb287306bfd948538a18bae95a67f9fddc2afe66a8cbe8f1ecc23c125",
+      "block_number": 21201454,
+      "n_legs": 2,
+      "profit_usdc_net": 1.269287080390515,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 98
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x09719cfe7be817cc453220c8344b5bf13a714dac63dc911223622d78bde98092",
+      "block_number": 21201462,
+      "n_legs": 2,
+      "profit_usdc_net": 0.7456205467378619,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 106
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa38bc5a9f11e5c209d3c43f7ddccef6a935393979fdff1f0012970b3d980cc51",
+      "block_number": 21201462,
+      "n_legs": 2,
+      "profit_usdc_net": 0.14354756623614523,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 686
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6a04947188595a16893b0976b853c5784cde2e679681f6baa809c3ea9c8f0f0d",
+      "block_number": 21201472,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08897867807676382,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 982
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6df5c84a1deb4899c630be22473bdce0ab208d1f01db04dbaee0fb817f0e86b1",
+      "block_number": 21201475,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5134950232230786,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 129
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x52406745064ad161b4094ec46f98ba1f3199651f847b34af7e6e220c4267b43b",
+      "block_number": 21201475,
+      "n_legs": 2,
+      "profit_usdc_net": 0.21619363886914617,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1071
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2602b4e01cc315ce251901f7938d93ae53b6df7ebaac22f208709bdd096eb071",
+      "block_number": 21201475,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05925677515217566,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 119
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x493c46ce9937f7929f9f7c47d00647c737ef81589675eddf1912c2cd0302c463",
+      "block_number": 21201477,
+      "n_legs": 2,
+      "profit_usdc_net": 0.39811278350249046,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 441
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9c00b07df188f16155989d8f847a9134388e104cc34c6202246885334e65e9c3",
+      "block_number": 21201477,
+      "n_legs": 2,
+      "profit_usdc_net": 0.31637397840874665,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 131
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x7ed74599ca91df5a14a57552bdb9e61f44f21b49fc731e07a3698e3c2f2d5cab",
+      "block_number": 21201517,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5517346687776363,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 111
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc1bab954d5929e8ebf12cb36e54963dc4243f66e6ca1fbb54f53ab4b849db9ee",
+      "block_number": 21201528,
+      "n_legs": 2,
+      "profit_usdc_net": 0.18370919072313655,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1534
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd08b60c0162417b9b506bbba502431a629c84857b550f39d4a9eee83e007e3cd",
+      "block_number": 21201549,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05061254929880189,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 203
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0fd085500b579e6973b0221bd9b71f8adc861e74f1e920c80e59bbb43c57bc19",
+      "block_number": 21201564,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16175191401207636,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 208
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x30eb7ce107203747fa79cda324637c9165d8aea4549774b367028b88c98d6e8b",
+      "block_number": 21201566,
+      "n_legs": 2,
+      "profit_usdc_net": 0.13017055894891716,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 160
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x97681c69299166e8dceb517b63b9f0c791da7e1c49338409a77537dff309c59c",
+      "block_number": 21201568,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07364369421043819,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 227
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4e405044c3de5a51d15a9554d669f89c72d6106c16316f08db246a05aa429e26",
+      "block_number": 21201570,
+      "n_legs": 2,
+      "profit_usdc_net": 0.046776874365014987,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 534
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x26e1f2b5bf7c4ed1c854f5f79584296cf75f4ca6782344a880165e9f46a9c47d",
+      "block_number": 21201571,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3868805356873344,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1056
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x76284eb98862331f106547b238250e32c73b552965d616162510e0285aae1bd7",
+      "block_number": 21201576,
+      "n_legs": 2,
+      "profit_usdc_net": 0.043895123589096405,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 220
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf733f167185897eec379cd74f10d4a5fb91b6e979f95bed66d7122d4c1bedf27",
+      "block_number": 21201577,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1072982687734127,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1583
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa293351d7e6114ceddfb73e606677b10f0ab20aa0f53adf703e010c1ad11c72d",
+      "block_number": 21201578,
+      "n_legs": 2,
+      "profit_usdc_net": 0.046911530433602924,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 232
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x195aa78130371032569416ca71c9d545f28dd5ea125a00a1acdbfb69baeca0ff",
+      "block_number": 21201579,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2294467167774314,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 223
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdb9771a0fda35e00b27b057d4bada21a0d3f8218730a2c8818835b22a740e371",
+      "block_number": 21201582,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2835538742326859,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1187
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x1dc01dc3a7f0a13c5c2f3a2e2fd6685cfe1eb13bee6a0d5b3b789639c4b68c98",
+      "block_number": 21201582,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16856055635450992,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1035
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2d2ebd61d7ce24907fb92a696d07ff8db591109b6fed09e7611ff36d3538e37b",
+      "block_number": 21201583,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2154742257522977,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 237
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc17833b7276ab432b3ba6c2e24cc4817c857d56d813c082b959fc31f65b997c4",
+      "block_number": 21201583,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04934371660623385,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1250
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x783069f584103822911459b7c23cac20f5c91835961ac1a2a034473a4e3a9189",
+      "block_number": 21201596,
+      "n_legs": 2,
+      "profit_usdc_net": 0.11090292594981901,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 250
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x14f29e60023f1c1446e7e0a46b02f8196f27e4cf0ec8d3fbef4b685b292dbbdb",
+      "block_number": 21201600,
+      "n_legs": 2,
+      "profit_usdc_net": 0.059451412336957096,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 194
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x5d9401726a1844d590ed6142831302980b952b0b61c944b1c7debb228b0d4665",
+      "block_number": 21201630,
+      "n_legs": 2,
+      "profit_usdc_net": 0.460279209952119,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 274
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd2720375d5c3a3d9546157a9d440fb7aadfcda7d6324ed810a7004cc695f4516",
+      "block_number": 21201671,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06388804427688162,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 895
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9bbb672b9dcc039aea7000590e28ac1fab782fe3f9c85cce655cc2e20e228544",
+      "block_number": 21201681,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05203975891989507,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 335
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x62c2266615f23a39e239b29c8dd99b74054823e62861030c791d197553dcf699",
+      "block_number": 21201684,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04448799329079965,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1690
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xf9a525650f597ec389cfed8168a45135a3ab3227e9c49dc81b407a01c31242cd",
+      "block_number": 21201715,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06465683836015278,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 309
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x64f0bcbf66578707b90abe47822735dc7cd59df00cafdc89011a824aec38fc26",
+      "block_number": 21201715,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04527186179656015,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 369
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0d4cb499af917be837c69e427ac89313d506bf702372c1faf94695e6bb6acea1",
+      "block_number": 21201717,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16962663083284535,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 311
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xacf7578ade913958cf6d40a2c448053f52db647f2a95c01d662fbfe88c9b3d8f",
+      "block_number": 21201730,
+      "n_legs": 2,
+      "profit_usdc_net": 0.22087022628081676,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 102
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x1f91826fe9ee6b3791733f9286adbbd1cd0ee8c711420e62edba737575301cd9",
+      "block_number": 21201766,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05069395475125231,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 420
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x216cdc9efb9da2a5900dd7c05975d81ecc8e102137cdd0c175cb0048f5cb59a2",
+      "block_number": 21201769,
+      "n_legs": 2,
+      "profit_usdc_net": 0.40361187489227185,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 423
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2bc5efd60b76c293dba9750ac65cc25133c001fd2a4c73da259bd304e625b15d",
+      "block_number": 21201778,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05060800464610328,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1002
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x86ff0680549f5839f2689b98292228e6b778fe08fcbc85853e20ed5033444225",
+      "block_number": 21201831,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08472166046787225,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 475
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6957441951c4ebf0a592edc7193465cb408a4c6e4e29fc92b4258feca1c556c3",
+      "block_number": 21201854,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2439999946287706,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 63487
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdc6f3fba1e4daf57fb88b476853c3e88335a588208f3680438aaf1e4bfb2f38f",
+      "block_number": 21201901,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04861966012212167,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4a4b8755e1e04e98019d5afc2a0225ae4d9b38424a05545cbc2d9b202c6f008f",
+      "block_number": 21201919,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04125598831730647,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 563
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2f93f5f83cd13d331f67e047fd4ac0e3fb0913f1a49896783b69f4612c9dfe63",
+      "block_number": 21201935,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04778349035561087,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 529
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xac5225aa5393cc0edd9758fd3c09d15ae0fbb86552fbae866e2c5f024314b594",
+      "block_number": 21201943,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08112706011036733,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 63242
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc02769f5d3a2191c80bf159a43035e6c36c3bbb24bb9ece1881f122ac35cfaef",
+      "block_number": 21202078,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2254294986447853,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xbdb5c4964491dba3c4152495c9bf0a8b9b5c4519",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 732
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb82424f0f92b316864488ceb02b6de77932220383d9f570457918073a4b1e2be",
+      "block_number": 21202216,
+      "n_legs": 2,
+      "profit_usdc_net": 0.23692110825784374,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xbdb5c4964491dba3c4152495c9bf0a8b9b5c4519",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1180
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb69c56c9c5079926375989e4e8e7b6bd6deff92a1210ac9128f22a93547e0fbc",
+      "block_number": 21202253,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16268443658589204,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x731a4fda8c10baca89e7135974cfc19293c198f1",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 907
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb9ec99e63e97eb165511d87a7f3ef8523c3e72c172e2c4df2d8084f78776721b",
+      "block_number": 21202340,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1849229846442883,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x561457e199ff8d138b405e7cfbe235989112b3f2",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1825
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe72d3def2dced405e56889be7e9e0c98d358573bd7683899aaba575eb01181ac",
+      "block_number": 21202350,
+      "n_legs": 2,
+      "profit_usdc_net": 0.4367205230863639,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xadc7b8ce0bb4c7c095a0a73acf8976f5b4ee9879",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1004
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x167db52026afda01d12f88383c8d4eb58924c9e4f4b7216a83ab3c8d3891fa4d",
+      "block_number": 21202350,
+      "n_legs": 2,
+      "profit_usdc_net": 0.13999607916917753,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xadc7b8ce0bb4c7c095a0a73acf8976f5b4ee9879",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1574
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x693e18d70e9110b8cd9878c61bc97244fd7e5bf6e134727af22d5c1b897a23cf",
+      "block_number": 21202357,
+      "n_legs": 2,
+      "profit_usdc_net": 2.371713476202392,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 51411
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe6742428f8bfc0d440f3f3ec4f424f6b255af840ead61f2f2fec21898e322a7d",
+      "block_number": 21202357,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5582044536841919,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 63923
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x1ccaeb41e6c5ae166b402d975ce0ee8d1f2053a7adc868516f221d2eefda87db",
+      "block_number": 21202360,
+      "n_legs": 2,
+      "profit_usdc_net": 1.838590806846247,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 81
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8428e9600d0287b1252b1a8c9ae8aac1a7345e873b58a8bc6ade4276ebbf110d",
+      "block_number": 21202361,
+      "n_legs": 2,
+      "profit_usdc_net": 0.01376900825905128,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x129df18ce42875e94134c736db2d536bac499aeb",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1585
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x38efe3b89c7cb5e912669b25f979f63837e1ab92dddaf1da6f8e1999795507ac",
+      "block_number": 21202361,
+      "n_legs": 2,
+      "profit_usdc_net": 0.005917865460809024,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x731a4fda8c10baca89e7135974cfc19293c198f1",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1585
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xfa7b11fcf95a398d40bbda1b91f4801f650bfbe32d37ab5437a2b3b869208507",
+      "block_number": 21202394,
+      "n_legs": 2,
+      "profit_usdc_net": 0.126458524972361,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x731a4fda8c10baca89e7135974cfc19293c198f1",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1048
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2e1d2a2cd6bec23bef7e04f031b0054f5bed45d7ce878d474098bc8e8ae79d67",
+      "block_number": 21202514,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1601204158593505,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x129df18ce42875e94134c736db2d536bac499aeb",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1999
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x893d83d8c04725a92178be91c7302db040165cd4930533e376a7fc0116c7ec16",
+      "block_number": 21202560,
+      "n_legs": 2,
+      "profit_usdc_net": -0.049337394104069954,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xc3d65998315a12c4694db609afb40e7bd6f9f16e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1214
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x93e986633a719337906bc92c111865ace036863b12d548e3060cf85fe0ed6d05",
+      "block_number": 21202605,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2098246459321961,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x5757da4d30c96f963f3a976d8d0391c8bbb7cc80",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1259
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa8aa190371e55f2f13ebfb78b65fd4f57cdb4d890bd7e38b34902766355f0969",
+      "block_number": 21202701,
+      "n_legs": 2,
+      "profit_usdc_net": 0.0554837255611218,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1355
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2bf0c2c76e3f6b1039b6b8f56b51537ec85c674ce9091df5675772c57ec9592e",
+      "block_number": 21202707,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04934772387362425,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 809
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x18e4eca1599d9d130e6af74039c362d41ab468bc2580b9586411e316e07649c9",
+      "block_number": 21202713,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06328688674101099,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2350
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdff6a269354b6bc6be0db3a787cbd07962b3d4148d1345fe7b967f1f881c862b",
+      "block_number": 21202720,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08771783017425062,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 12
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xdf2651f4214085fe256d8d04d04238f8be941c57b23e21fdab5b65a24746e607",
+      "block_number": 21202733,
+      "n_legs": 2,
+      "profit_usdc_net": 0.14297101011877647,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xb2d2703cfde8a26545f20f0b36bd295c2a57156a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1387
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2c87fbb9ab0f6ac38b89efd123613cce05739941227f487f17f750553713087b",
+      "block_number": 21202737,
+      "n_legs": 2,
+      "profit_usdc_net": 0.015522959928638794,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2aaa5242b423e9e70cb5abf42057dd2b0fc8b48d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1391
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xcca4e4e248d3b69cff13f00e496deb3b4ad071ff7db34288c2593c3a96421ffe",
+      "block_number": 21202742,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09742602310576437,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1114
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb6640b4d8708fe539faec647a48d6cd885c48175bd3b335fefcfc290685ec6f6",
+      "block_number": 21202775,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04250155858995483,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 8
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x76677795c09f216a61c75da2c0522d3a06dae26f89223b9b61a90db3882d89f7",
+      "block_number": 21202843,
+      "n_legs": 2,
+      "profit_usdc_net": 0.19708948955433406,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 7
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd56c96d04d4f1ed8789edb1d88581495f302efcad871fd8b3b83e4dc9a775cb3",
+      "block_number": 21202894,
+      "n_legs": 2,
+      "profit_usdc_net": 0.27787429007889863,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 127
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8770443811574701607efda52f5248fe8b76c20264b161fad35a9d4dbfd498a9",
+      "block_number": 21202894,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05741797826340472,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 996
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xfbd517294799b63cfa1b08eb322fed357221d23ba1e8e9a366b103a3c9eb495a",
+      "block_number": 21202902,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05968938920321119,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1556
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x1bfe90b3591162fd8ae6a0c0aa41e768fcbf2c9bc915202c4b7955a4f9d8602f",
+      "block_number": 21202952,
+      "n_legs": 2,
+      "profit_usdc_net": 0.32585976122461263,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1054
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x55514b6bf2fe09fb821e545c3c54e2d772a6ceecc96442bfa3ed4a639319415e",
+      "block_number": 21202973,
+      "n_legs": 2,
+      "profit_usdc_net": 0.12923699384276421,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3a7d9ed487583cc21bef45407a4e4c6e0f9bf08294188b806cea6428223298bb",
+      "block_number": 21202986,
+      "n_legs": 2,
+      "profit_usdc_net": -0.0847214479609899,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xa7ce64e87b6c7d6cf57e0f2aea587b5247fae13d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1640
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xcaf2e64ed9b4442944364eaf57caf7c8f53b0741d49285c255c0e5463171f33a",
+      "block_number": 21203010,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04256277024262374,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 243
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc4732051e5e51b6167c5fd22d28c92dde3932613e8f5a9a74f936202d9337061",
+      "block_number": 21203015,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06148276286387207,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 248
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6b26b10451408744eabb6448cfab3d8259bd16bd23c5a76a0930e0ec3b41091a",
+      "block_number": 21203026,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3805249089555683,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 259
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8d6d22911fd7980c5dc3a0459a4e0d776125e6a37cc7983aedbb80dec09363b1",
+      "block_number": 21203045,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04158636413513936,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 278
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc21847db00fe84fe6cd962db8a4908f9d34251ec79eff83821666be417fc0038",
+      "block_number": 21203098,
+      "n_legs": 2,
+      "profit_usdc_net": 0.21580078977344958,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 14
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa97b037036523361d0e9f981721db94ca1cd3edb33d4a86d36709aa3ad976afc",
+      "block_number": 21203111,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2427456667705682,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2335
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc8ecde33ad011b0c6a9fe2043ebb2ac806c47dba1f3a0e87d9bfdba6e3be2076",
+      "block_number": 21203111,
+      "n_legs": 2,
+      "profit_usdc_net": 0.19500292300423472,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x494dbc646ec33128c78cc0497354d3087a7e04b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1765
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x472f6f9b09ed0f233745e2bc0f4b61c809a42de566c810d4f66d525e8961d970",
+      "block_number": 21203115,
+      "n_legs": 2,
+      "profit_usdc_net": 0.058899971201248985,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 267
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa07ad42b1eea903bb6161d5161320c3bc8ed0388d5bf7ab486229eb3a69ec859",
+      "block_number": 21203118,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08893807776549122,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1490
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x999d391370340aaf013ef51d2ed1449b805ee6bbba3b6aeea63ed872880d00a9",
+      "block_number": 21203166,
+      "n_legs": 2,
+      "profit_usdc_net": 0.9555965760424542,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x16139d59b4a82930914bf306c738aa8e115e588364f1c1644e1b2f6bffc373ac",
+      "block_number": 21203281,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06822572872618843,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 1653
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9a3e0c9c4fcc301e15f807b7a346982c2339d36ebb2078d73a1cc30139478c63",
+      "block_number": 21203289,
+      "n_legs": 2,
+      "profit_usdc_net": 0.4540072451280879,
+      "senders": [
+        "0x147cd06a76c37959c25c7d1f763aa01e7992facf"
+      ],
+      "tx_from": "0x03694d8e61e765469272a0249b22d6f7296ee301",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2799
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x14bca961b867b5f61632258cf4f532ef7ae58428a47fae685179043e7704528e",
+      "block_number": 21203393,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3345143030767937,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2047
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa7f5c051a295f05c37087de4c49ab5ba1c2e2cafbb5ac925030879481d8a6d43",
+      "block_number": 21203394,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05620884586208673,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3031
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x46ed35e6bd91d46c026a39e4bc26363b2c18da0ecee7e866341eef83f6baef28",
+      "block_number": 21203608,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09287104969155299,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 22
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x51add31dc70767804d8df6ebfc20b473121a52e0d0b09cc299f96eb7637f2ed9",
+      "block_number": 21203614,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04257550446663888,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3251
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0f3f1039071dc9007c674832401fa2467a5594d1a1d914e04385471216bedd73",
+      "block_number": 21203687,
+      "n_legs": 2,
+      "profit_usdc_net": 0.2540161534057052,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 101
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb81b0a7a2669e510c10c66bdfa307b295b8bf4e45ed947d8e7e16e34086f29d8",
+      "block_number": 21203689,
+      "n_legs": 2,
+      "profit_usdc_net": 0.16136451486444353,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3326
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x01763de983c0081c342af5aafd4b38b0f998e38c74dbb864a683d21b87db1a67",
+      "block_number": 21203723,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04621283957236144,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3233
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xed8e1955e0af325f8043e7324a2eb68adf9150fcd08cc898309f93408735ef48",
+      "block_number": 21203754,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05921830768639294,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 987
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x67f3b9c23c4ea1e6d6585471ec5e9cfc02d280f17e51968c9caf12eab4b2b19b",
+      "block_number": 21203761,
+      "n_legs": 2,
+      "profit_usdc_net": 0.43335352167879054,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 175
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa8a9f248ab357707e2b4bce6bd27dae21ae9cdc0afe7a8909d10419c339e16c0",
+      "block_number": 21203763,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07492765261601014,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 177
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x39d4520533976b716b478412acd711f9c506d7a678985d34eb848f31fc3fa009",
+      "block_number": 21203765,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09086943815295861,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 179
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8a3cf1df488125fbd0e733e1dc2eed20e3d070182fcfaafa3e1de1364871c1a5",
+      "block_number": 21203808,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09050563141309566,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2462
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x6a4f36b344f12a9bb8b88e5787dc68232a7d4e371313d5913e4ffad85d61d10e",
+      "block_number": 21203815,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08039642455103964,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 229
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2c325eb50d29d736eaab5e0e893b1b04881fccab3ab41a3d4064b8c72a867db3",
+      "block_number": 21203829,
+      "n_legs": 2,
+      "profit_usdc_net": 0.1437958882092528,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 26530
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4b007292838f91176626c0beabe436728aebcb509733084c0a4e37f6ad3c25c6",
+      "block_number": 21203979,
+      "n_legs": 2,
+      "profit_usdc_net": 2.299336222399428,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 65278
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa9a3463dcdb9bd045313c24ef334017db4e5ffebcb5ccfcee3214885db662a79",
+      "block_number": 21204014,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07638881444723933,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2116
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0d0306cd8b6f20fbcb76cc7f0d74cd1b20f70359da0d3362a7601d7b04b124c3",
+      "block_number": 21204016,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3086016346974241,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 27
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb315e322b10ab025e8ba6e8d348da826bc7a776ee23746159e9cf42d45dc65b1",
+      "block_number": 21204017,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3907259240915201,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3654
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xb29ad69552109b738d60f72b84185429c9485248ce81094f73a505a251c1bcff",
+      "block_number": 21204019,
+      "n_legs": 2,
+      "profit_usdc_net": 0.055645588872813886,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2121
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbd10944a152c9a66e3235154bc188a3f287c6cb489a343acb4d9ea54b2c6e901",
+      "block_number": 21204030,
+      "n_legs": 2,
+      "profit_usdc_net": -0.1379555847633959,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x52f2ca92b1d1aadf918fa4cb6b5595ca0ed75af2",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 65329
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xcb7b70e4db08eb49d745df2da71499564c8942fc510384dce3893975b88f1d7e",
+      "block_number": 21204048,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5695168940004538,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2702
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa0b495afd37ceebe91b7f2d79c02ff7d0a1b26a34c701d1d99f660ab30ba7ff1",
+      "block_number": 21204050,
+      "n_legs": 2,
+      "profit_usdc_net": 2.106852543625892,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2704
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x321dfc5d711a1db66cca56962a03b67745dd064480ad45230d4a0508bb7fda1e",
+      "block_number": 21204050,
+      "n_legs": 2,
+      "profit_usdc_net": 0.6878158593499126,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3655
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x686b8cdd1ad3b22f3a437cc88a414b6417b702351a86981d4db2ec3855dde3c2",
+      "block_number": 21204054,
+      "n_legs": 2,
+      "profit_usdc_net": 0.48407731807564935,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2aaa5242b423e9e70cb5abf42057dd2b0fc8b48d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3691
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4f6d75cb09047d90b9d8ed9555f86e2307a02ef20179364ff3ae924cf2ebe1d2",
+      "block_number": 21204058,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3856783709434113,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2712
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x5e167b985ea5eba3f59a29a4a79180c5ee1a7b62fa3819c6634eafaf2cf8ef84",
+      "block_number": 21204058,
+      "n_legs": 2,
+      "profit_usdc_net": 0.15167673164197684,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2160
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x512a9764839c61543aab4d7eb7a05caea95f0325231231cea04f80626fcb213e",
+      "block_number": 21204059,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3317706375678694,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x37f9b653d624eadc04d56189136dd66c6dd04de3",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3696
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4eb85443ab266d416a2df6a33f8ebcb790832598f5651d7d1a44fd2e06808873",
+      "block_number": 21204069,
+      "n_legs": 2,
+      "profit_usdc_net": 0.11613240859375334,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xbdb5c4964491dba3c4152495c9bf0a8b9b5c4519",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2723
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd51dab7c910594d96dca21c4ab0e7d6c1139fc777b931d131b3cb74d537c0a91",
+      "block_number": 21204078,
+      "n_legs": 2,
+      "profit_usdc_net": 0.053427130502549436,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3302
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x81a62dfe42fd41cd03391071ef808239454185aa0450cd7698bae9ccb0bd19bd",
+      "block_number": 21204079,
+      "n_legs": 2,
+      "profit_usdc_net": 0.3097831052928388,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2e25a469a78cc592a3d2e29b9b73561aa8dd7ee4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2733
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xc242f11fb08220c2503047a6321232824b40db244513bb94c5a48d6a662952ed",
+      "block_number": 21204084,
+      "n_legs": 2,
+      "profit_usdc_net": 3.0325765199561037,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x058086659e304541940465aacf4ec54ca0c01b7de0d03b6546e8dab806e9d5c6",
+      "block_number": 21204104,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09132242675443683,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2e25a469a78cc592a3d2e29b9b73561aa8dd7ee4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3741
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8f689249ce80b71d5bf5a457b2655a45581665f9bc77312dba9baca519df34ff",
+      "block_number": 21204110,
+      "n_legs": 2,
+      "profit_usdc_net": 0.09760400319949358,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2764
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x69a767bffb27fdc08596911647f76868721dcf85c44fe80c6628bf2b49583c29",
+      "block_number": 21204181,
+      "n_legs": 2,
+      "profit_usdc_net": 0.18546204144888045,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xa4ba5d91dbd5c35ca6a9c7fee37f213f81c0b9de",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2283
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2e8c8981f4f398722e097a0f1f4488a6deadea7a31f7cf50da5546cc6507fc8b",
+      "block_number": 21204186,
+      "n_legs": 2,
+      "profit_usdc_net": 0.4761723037953486,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2840
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x903fc00f8d1bb18949ba54e54fd3231c751a4aef319d4014e56afb08cbadbd7b",
+      "block_number": 21204225,
+      "n_legs": 2,
+      "profit_usdc_net": 0.22639353652432054,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2aaa5242b423e9e70cb5abf42057dd2b0fc8b48d",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3862
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x8178b043cc110c487d3b6e2dad7ec09d546d9c4f838ef717dbf46d728c8335f0",
+      "block_number": 21204245,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06414078913147309,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 68
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xde7c55e36779b4392464839a8f98f3b8fe813998b9a62e1e5eaedca8e6e3a888",
+      "block_number": 21204248,
+      "n_legs": 2,
+      "profit_usdc_net": 0.055102627278971694,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 71
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xef115cf15fe6ee4fe656df9e5dc47c516cd000fc6e5dd9c9f7c13ac59472a0a0",
+      "block_number": 21204252,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06100125517838417,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 23
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x700d6dccff0b88ab03a117901ed80e33ed1bac4bd580d0da901734e77034dbdd",
+      "block_number": 21204301,
+      "n_legs": 2,
+      "profit_usdc_net": 0.07183067585973892,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 86
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x16e4261672f8d28ccd2290c996d4b6fd5ec794b93f29f09aaf143af192c2a17e",
+      "block_number": 21204422,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08499641947559905,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2e25a469a78cc592a3d2e29b9b73561aa8dd7ee4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4027
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x1c761227c2f1319fe1437c55c473207afe683bc25b17a999fae3732f2d2104e9",
+      "block_number": 21204422,
+      "n_legs": 2,
+      "profit_usdc_net": 0.03802030931876245,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x2e25a469a78cc592a3d2e29b9b73561aa8dd7ee4",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3646
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x9117f8a295c28d57834d32122a6ed2053f011baef89d2b889caa2391d5492ee4",
+      "block_number": 21204441,
+      "n_legs": 2,
+      "profit_usdc_net": 0.22021799789616966,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 264
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x2edd0dc0f9ea7675b50a57c827acdf804e31b8c71f339e0323f46a4a881b1fdf",
+      "block_number": 21204507,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04278308326345641,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x0bc6db989f29ca0e10fe0aeaaedcba7b73820a9e",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4026
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x3146468fdbb7330727c39db972c6d8faf74c96c1c2c20e57887b864d4c52059d",
+      "block_number": 21204509,
+      "n_legs": 2,
+      "profit_usdc_net": -0.024469774218898396,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0xbdb5c4964491dba3c4152495c9bf0a8b9b5c4519",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4146
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x34f2fb6cb9473ac4fa99535840dca1b0e9aec3ffb251ac74069836257f74f09f",
+      "block_number": 21204529,
+      "n_legs": 2,
+      "profit_usdc_net": 0.5302082810253024,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4048
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x40734e0e759a2678a2a3e9e04416d780ab07f8010bba262a583e03476d3b2a3d",
+      "block_number": 21204546,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04051398087036532,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3200
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x995811516dc2f70931b77f862b06374fafc76c8f6954e40b9aede6dd40154ca0",
+      "block_number": 21204560,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08262235345863546,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 333
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x0650523366033430423d17006621611e8b43d4fedfbb6daeff6be533edab61a0",
+      "block_number": 21204585,
+      "n_legs": 2,
+      "profit_usdc_net": 0.048535087549077066,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4222
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xee88eeef0ee3f5aa8b606a18dc859d1573044792238f4e20b53929ba211b1537",
+      "block_number": 21204619,
+      "n_legs": 2,
+      "profit_usdc_net": 0.053214276824593856,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x495fafb15e0a262e65b3e2e728203bf31c4d0b04",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4256
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x897cad0217053952d40fea077a7208d54afbc40fdee2b6dbcd43eac5076d7669",
+      "block_number": 21204655,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04851137454475986,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 15
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x393778ecf4ab36e9877ab9164dcfe4f906d38789e3fdb19e4b4fd6a1baa69f8d",
+      "block_number": 21204716,
+      "n_legs": 2,
+      "profit_usdc_net": 0.04924257448618083,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 550
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0x4f4a5c886b82a3b7f94d75b3da337274ab6fd9e9bde55d3cd12050dfce5c8bd1",
+      "block_number": 21204722,
+      "n_legs": 2,
+      "profit_usdc_net": 0.06445681639882891,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3376
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xd5a1d6817c69f9cd475a8a1fb2044dd098452da4dfd32745f20636b3cc125672",
+      "block_number": 21204733,
+      "n_legs": 2,
+      "profit_usdc_net": 0.08206739492392037,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x8064dfdbbd6e2dc1ea6678576007ca55cd17cea6",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4370
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xa2d0f5d12763078f3530aa68cbab3af6838968ff628733a9bbea92c60acd1d77",
+      "block_number": 21204782,
+      "n_legs": 2,
+      "profit_usdc_net": 0.05864050945318626,
+      "senders": [
+        "0x608750874fdcbcc21f4f9610af48e1babacf10fe"
+      ],
+      "tx_from": "0x71935b920fa0d3d78c3298843d2702cd5325f2b7",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 2
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xe029d97f5b9c6c34bd9653b3b9412f81898b04d3ec0c1794f3e6e3f3f3fcf073",
+      "block_number": 21204788,
+      "n_legs": 2,
+      "profit_usdc_net": -0.014244191681240949,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x8dff1562972dfc7f64e2e4aa8912cf1590e65c42",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 4012
+    },
+    {
+      "window": "last_full_hour_at_run",
+      "tx_hash": "0xbc396e947d33a413fdd71df3533f575d20652df65f7940ae018b7b684564fd00",
+      "block_number": 21204789,
+      "n_legs": 2,
+      "profit_usdc_net": 0.10580664762088432,
+      "senders": [
+        "0xe1eee09af59990bdff17582467f5ddbef66c4bbd"
+      ],
+      "tx_from": "0x7b59b29f18b095cab8fbf2e6498d1d0d3614fb55",
+      "uses_aka_fun_hook": false,
+      "has_liquidity_zero_leg": false,
+      "pool_age_blocks_at_cycle": 3443
+    }
+  ]
+}
