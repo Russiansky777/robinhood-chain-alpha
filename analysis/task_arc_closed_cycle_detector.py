@@ -55,7 +55,7 @@ HOUR_BLOCKS = int(3600 / BLOCK_TIME_S)
 OLD_DETECTOR_WINDOW = {"from_block": 21173786, "to_block": 21180986}
 
 MAX_SCAN_CALLS_PER_WINDOW = 400
-MAX_RECEIPT_LOOKUPS_TOTAL = 300
+MAX_RECEIPT_LOOKUPS_PER_WINDOW = 2500
 MIN_ADAPTIVE_CHUNK = 8
 CHUNK_RETRY_PAUSE_S = 3
 
@@ -409,7 +409,11 @@ def process_window(label: str, from_block: int, to_block: int, prior_pool_map: d
 
 def main() -> None:
     result: dict = {"probed_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "rpc": RPC}
-    receipt_budget = [MAX_RECEIPT_LOOKUPS_TOTAL]
+    # Первый прогон дал 0/1710 receipts проверенных во втором окне -- общий
+    # бюджет на оба окна съедало первое окно целиком (2088 кандидатов, но
+    # потолок 300). Теперь бюджет НЕЗАВИСИМЫЙ на каждое окно, с запасом
+    # выше реально найденных кандидатов (2088/1710) -- полное покрытие
+    # обоих окон, не только первого.
 
     latest = int(rpc("eth_blockNumber", [])["result"], 16)
     windows = [("old_detector_window", OLD_DETECTOR_WINDOW["from_block"], OLD_DETECTOR_WINDOW["to_block"])]
@@ -439,13 +443,14 @@ def main() -> None:
 
     window_results = []
     for label, fb, tb in windows:
+        receipt_budget = [MAX_RECEIPT_LOOKUPS_PER_WINDOW]
         wr = process_window(label, fb, tb, pool_map, receipt_budget)
+        wr["receipt_budget_remaining_this_window"] = receipt_budget[0]
         pool_map = wr.pop("merged_pool_map_for_next_window")
         window_results.append(wr)
 
     result["windows"] = window_results
     result["total_rpc_calls_used"] = _rpc_call_count
-    result["receipt_budget_remaining"] = receipt_budget[0]
 
     all_cycles = [c for wr in window_results for c in wr["verified_cycles"]]
     net_positive = [c for c in all_cycles if c["profit_usdc_net"] is not None and c["profit_usdc_net"] > 0]
