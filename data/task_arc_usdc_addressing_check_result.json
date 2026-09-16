@@ -1,0 +1,22 @@
+{
+  "probed_at_utc": "2026-09-16T18:54:33Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "initialize_scan_window": {"from_block": 21195845, "to_block": 21202959, "n_found": 4588, "error": null},
+  "all_pools_in_window": {"n_total": 4588, "by_usdc_addressing": {"erc20_0x3600": 4386, "address(0)_native": 148, "neither": 54}},
+  "swap_count_sample_window_blocks": 300,
+  "top30_by_swap_count": {
+    "n_top30_pools_considered": 30,
+    "n_found_in_this_windows_initialize_map": 18,
+    "n_not_found_note": "пул мог быть создан раньше окна Initialize-скана -- не в этой карте, не значит 'не адресует USDC'",
+    "by_usdc_addressing": {"erc20_0x3600": 16, "address(0)_native": 2}
+  },
+  "usdc_erc20_direct_checks": {
+    "address": "0x3600000000000000000000000000000000000000",
+    "code_len_bytes": 1798, "decimals": 6, "symbol": "USDC",
+    "pool_manager_erc20_balance_raw": 6072240316199,
+    "pool_manager_native_balance_wei": 6072240316199297378691255
+  },
+  "native_value_check_on_zero_addr_pool": "не найден ни один address(0)-пул со свопом в измеренном окне -- не измерено, цена уточнения: точечный getLogs по каждому из 148 address(0)-пулов окна (до 148 доп. вызовов) в поиске хотя бы одного свопа",
+  "one_line_summary": "V4 на Arc адресует USDC как ERC20 0x3600... (148 address(0)-пулов, 4386 ERC20-0x3600-пулов, 54 ни то ни другое из 4588 за окно); PoolManager держит нативных 6072240.316199 и ERC-20 0x3600 6072240.316199.",
+  "honest_note_real_finding": "pool_manager_native_balance_wei/1e18 = 6072240.316199297... и pool_manager_erc20_balance_raw/1e6 = 6072240.316199 -- совпадают до печатаемой точности. Это говорит о том, что 'нативный' баланс PoolManager на Arc -- не независимый ETH-подобный актив, а зеркальное представление ТОЙ ЖЕ суммы USDC (нативная абстракция валюты поверх USDC), а не отдельный волатильный коллатерал. Это прямо влияет на решение по ClosedCycleExecutorV4 (писан под волатильный нативный ETH) -- на Arc 'нативное' экономически ведёт себя как стейблкоин, не как ETH."
+}
