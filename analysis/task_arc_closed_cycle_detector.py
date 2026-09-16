@@ -268,32 +268,23 @@ def process_window(label: str, from_block: int, to_block: int, prior_pool_map: d
         if not ok:
             continue
 
+        # ЧИСТО топологическая проверка -- без величин. Реальная проверка
+        # sign-convention (см. task_arc_sign_convention_check_result.json)
+        # показала: величина amount0/amount1 может РАСХОДИТЬСЯ с реально
+        # settled Transfer на хук-пулах на ~75% (0.524 заявлено vs 0.130634
+        # реально получено) -- если бы промежуточный net-flow проверялся
+        # здесь по событийным величинам, настоящие циклы через хук-пулы
+        # ложно отбрасывались бы уже на этом дешёвом шаге. Поэтому здесь
+        # только структура пути (leg[i].token_out == leg[i+1].token_in,
+        # путь замыкается на стартовый токен) -- величины и net-flow
+        # проверяются НИЖЕ на реальных Transfer-логах receipt.
+        connected = all(leg_info[i]["token_out"].lower() == leg_info[i + 1]["token_in"].lower()
+                         for i in range(len(leg_info) - 1))
+        if not connected:
+            continue
         cycle_token = leg_info[0]["token_in"]
         if cycle_token.lower() != leg_info[-1]["token_out"].lower():
             continue  # не цикл -- сквозной маршрут (обычная покупка/продажа)
-
-        # net-flow по событийным величинам (грубая проверка топологии,
-        # финальная -- на реальных Transfer ниже для короткого списка).
-        net_by_token: dict[str, int] = defaultdict(int)
-        vol_by_token: dict[str, int] = defaultdict(int)
-        for leg in leg_info:
-            net_by_token[leg["token_in"].lower()] -= leg["amount_in_event"]
-            net_by_token[leg["token_out"].lower()] += leg["amount_out_event"]
-            vol_by_token[leg["token_in"].lower()] += leg["amount_in_event"]
-            vol_by_token[leg["token_out"].lower()] += leg["amount_out_event"]
-
-        intermediate_ok = True
-        for tok, net in net_by_token.items():
-            if tok == cycle_token.lower():
-                continue
-            vol = vol_by_token.get(tok, 0)
-            if vol > 0 and abs(net) > 1e-9 * vol:
-                intermediate_ok = False
-                break
-        if not intermediate_ok:
-            continue
-        if net_by_token.get(cycle_token.lower(), 0) <= 0:
-            continue
 
         n_topology_candidates += 1
         candidates.append({"tx_hash": tx_hash, "legs": leg_info, "cycle_token_event": cycle_token,
