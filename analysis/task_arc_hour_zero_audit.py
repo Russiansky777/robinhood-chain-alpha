@@ -79,36 +79,86 @@ def topic_to_addr(topic_hex: str) -> str:
     return "0x" + topic_hex[-40:]
 
 
+import re
+
+_RETRY_RANGE_RE = re.compile(r"retry with the range (\d+)-(\d+)")
+MIN_ADAPTIVE_CHUNK = 8
+
+
 def chunked_get_logs_with_retry(address: str, topic0: str, from_block: int, to_block: int,
-                                 chunk: int, max_calls: int, extra_topics: list | None = None) -> tuple[list, list]:
-    """Как в task_arc_recon_pools.py, но с повтором ошибочных чанков через
-    паузу (по прямой инструкции владельца: ошибка чанка не равна
-    "нижняя граница окончательна" -- сначала повторить)."""
+                                 chunk: int, max_calls: int, extra_topics: list | None = None) -> tuple[list, list, dict]:
+    """Реальный первый прогон показал: ограничение провайдера на Swap-топик
+    -- это НЕ размер диапазона (как для Initialize, где 5000 работал), а
+    число результатов ("query exceeds max results 2000") -- на Arc Day 0
+    плотность свопов настолько высока, что RPC сам подсказывает безопасный
+    под-диапазон в тексте ошибки ("retry with the range X-Y"). Вместо
+    слепого повтора ТОГО ЖЕ диапазона (бесполезно для детерминированной
+    ошибки размера) -- адаптивно следуем подсказке/делим пополам, и это
+    же становится новым рабочим шагом для последующих диапазонов."""
     out: list = []
     unresolved: list = []
     block = from_block
     n_calls = 0
     topics = [topic0] + (extra_topics or [])
+    current_chunk = chunk
+    stats = {"initial_chunk": chunk, "min_chunk_seen": chunk, "n_adaptive_shrinks": 0}
+
+    def try_range(lo: int, hi: int) -> dict:
+        nonlocal n_calls
+        n_calls += 1
+        return rpc("eth_getLogs", [{"fromBlock": hex(lo), "toBlock": hex(hi),
+                                     "address": address, "topics": topics}])
+
     while block <= to_block and n_calls < max_calls:
-        end = min(block + chunk - 1, to_block)
-        ok = False
-        last_err = None
-        for attempt in range(MAX_CHUNK_RETRIES):
-            body = rpc("eth_getLogs", [{"fromBlock": hex(block), "toBlock": hex(end),
-                                         "address": address, "topics": topics}])
-            n_calls += 1
+        end = min(block + current_chunk - 1, to_block)
+        lo, hi = block, end
+        resolved = False
+        for _ in range(20):  # честный потолок адаптивных сужений на один диапазон
+            if n_calls >= max_calls:
+                break
+            body = try_range(lo, hi)
             if "error" not in body:
                 out.extend(body.get("result", []))
-                ok = True
+                resolved = True
+                block = hi + 1
+                if hi < end:
+                    # диапазон сузился -- следующий шаг продолжает с той же
+                    # (уменьшенной) шириной, не возвращаясь к исходной.
+                    current_chunk = hi - lo + 1
                 break
-            last_err = body["error"]
-            if attempt < MAX_CHUNK_RETRIES - 1:
-                time.sleep(CHUNK_RETRY_PAUSE_S)
-        if not ok:
-            unresolved.append({"from": block, "to": end, "last_error": last_err,
-                                "attempts": MAX_CHUNK_RETRIES})
-        block = end + 1
-    return out, unresolved
+            msg = body["error"].get("message", "")
+            m = _RETRY_RANGE_RE.search(msg)
+            if m:
+                # Не доверяем hint_lo слепо (держим свой lo неизменным, чтобы
+                # не пропустить блоки, если провайдер вдруг предложит
+                # диапазон, начинающийся позже нашего) -- используем только
+                # верхнюю границу подсказки, с защитой от "подсказка не
+                # уменьшила диапазон" (тогда делим пополам сами).
+                hint_hi = int(m.group(2))
+                new_hi = min(hi, hint_hi)
+                if new_hi >= hi:
+                    new_hi = lo + max(MIN_ADAPTIVE_CHUNK, (hi - lo + 1) // 2) - 1
+                hi = max(new_hi, lo)
+            else:
+                width = hi - lo + 1
+                if width <= MIN_ADAPTIVE_CHUNK:
+                    unresolved.append({"from": lo, "to": hi, "last_error": body["error"],
+                                        "reason": "min_adaptive_chunk_reached"})
+                    block = hi + 1
+                    resolved = True  # сдвигаемся дальше, честно пометив как unresolved
+                    break
+                hi = lo + max(MIN_ADAPTIVE_CHUNK, width // 2) - 1
+            stats["n_adaptive_shrinks"] += 1
+            stats["min_chunk_seen"] = min(stats["min_chunk_seen"], hi - lo + 1)
+        if not resolved:
+            unresolved.append({"from": lo, "to": hi, "reason": "n_calls budget exhausted mid-range"})
+            block = hi + 1
+    stats["final_chunk"] = current_chunk
+    stats["n_calls_used"] = n_calls
+    stats["scan_incomplete"] = block <= to_block
+    if stats["scan_incomplete"]:
+        stats["first_unscanned_block"] = block
+    return out, unresolved, stats
 
 
 def decode_initialize_log(log: dict) -> dict:
@@ -196,13 +246,17 @@ def main() -> None:
     from_block = max(0, latest - HOUR_BLOCKS)
     result["window"] = {"from_block": from_block, "to_block": latest, "window_blocks": latest - from_block}
 
-    # 1. Swap-события за последний час (чанк=5000 -- реально подтверждённый
-    # лимит провайдера из прошлого прогона).
-    swap_logs, swap_unresolved = chunked_get_logs_with_retry(
-        POOL_MANAGER, SWAP_TOPIC0, from_block, latest, chunk=5000, max_calls=30)
+    # 1. Swap-события за последний час. Прошлый прогон показал: чанк=5000
+    # (лимит для Initialize) НЕ годится для Swap -- реальная ошибка
+    # "query exceeds max results 2000" на плотности Day-0 Arc, с реальной
+    # подсказкой RPC "retry with the range X-Y" (~70 блоков). Стартуем с
+    # умеренного чанка -- дальше адаптивно подстраивается сам.
+    swap_logs, swap_unresolved, swap_scan_stats = chunked_get_logs_with_retry(
+        POOL_MANAGER, SWAP_TOPIC0, from_block, latest, chunk=200, max_calls=350)
     swaps = [decode_swap_log(l) for l in swap_logs]
     result["swap_scan"] = {"n_raw_logs": len(swap_logs), "n_decoded": len(swaps),
-                            "unresolved_chunks_after_retry": swap_unresolved}
+                            "unresolved_chunks_after_retry": swap_unresolved,
+                            "adaptive_chunk_stats": swap_scan_stats}
 
     # 2. Группировка по pool_id -- объём, число свопов, цена начало/конец.
     by_pool: dict[str, list] = defaultdict(list)
@@ -214,10 +268,11 @@ def main() -> None:
     # 3. Свежие Initialize-события за то же часовое окно (для пулов,
     # созданных именно в этот час) -- декодируем fee/tickSpacing/hooks,
     # которых не было в прошлом (более широком) прогоне.
-    init_logs, init_unresolved = chunked_get_logs_with_retry(
-        POOL_MANAGER, INIT_TOPIC0, from_block, latest, chunk=5000, max_calls=10)
+    init_logs, init_unresolved, init_scan_stats = chunked_get_logs_with_retry(
+        POOL_MANAGER, INIT_TOPIC0, from_block, latest, chunk=5000, max_calls=15)
     fresh_inits = {d["pool_id"]: d for d in (decode_initialize_log(l) for l in init_logs)}
-    result["initialize_rescan"] = {"n_found": len(fresh_inits), "unresolved_chunks_after_retry": init_unresolved}
+    result["initialize_rescan"] = {"n_found": len(fresh_inits), "unresolved_chunks_after_retry": init_unresolved,
+                                    "adaptive_chunk_stats": init_scan_stats}
 
     # 4. Карта pool_id -> block_number из прошлого 6ч-скана (для пулов
     # постарше часа, но всё ещё торгуемых) -- нужна только чтобы точечно,
