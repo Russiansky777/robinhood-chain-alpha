@@ -57,11 +57,12 @@ jobs:
           SCRIPT_PATH: ${{ inputs.script_path }}
           SCRIPT_ARGS: ${{ inputs.script_args }}
           BITQUERY_API: ${{ secrets.BITQUERY_API }}
+          BITQUERY_API2: ${{ secrets.BITQUERY_API2 }}
         run: |
           SSH_RC=0
           ssh $SSH_OPTS root@45.59.170.76 "
             set -euo pipefail
-            sudo -u bot env BITQUERY_API='$BITQUERY_API' bash -c '
+            sudo -u bot env BITQUERY_API='$BITQUERY_API' BITQUERY_API2='$BITQUERY_API2' bash -c '
               set -euo pipefail
               cd /home/bot/robinhood-chain-alpha
               git fetch origin $COMMIT_SHA
