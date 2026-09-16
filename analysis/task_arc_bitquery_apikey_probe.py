@@ -88,7 +88,10 @@ def parse_secret(raw: str) -> dict:
                 shape["mode"] = "id_secret_pair"
                 shape["detected_separator"] = repr(sep)
                 shape["part1_len"], shape["part2_len"] = len(parts[0]), len(parts[1])
-                return {**shape, "client_id": parts[0], "client_secret": parts[1]}
+                # НЕ утверждаем заранее, что это обязательно пара id+secret --
+                # сохраняем и raw целиком как отдельный кандидат на bearer,
+                # вызывающий код попробует все варианты, не выбирая один вслепую.
+                return {**shape, "client_id": parts[0], "client_secret": parts[1], "raw_whole_string": raw}
     shape["mode"] = "single_token"
     shape["looks_like_ory_at"] = raw.startswith("ory_at_")
     return {**shape, "bearer_token": raw}
@@ -121,14 +124,31 @@ def probe_bearer_works(candidate_token: str) -> dict:
     return {"ok": ok, "http_status": r.get("http_status"), "errors": (r.get("body") or {}).get("errors")}
 
 
-def gql(access_token: str, query: str, variables: dict | None = None) -> dict:
+def probe_x_api_key_header(candidate_value: str) -> dict:
+    """Ранний docs-сниппет упоминал 'X-API-KEY'/'api_key' как отдельный заголовок --
+    не Bearer вообще. Пробуем его как альтернативный транспорт, раз все
+    варианты Bearer/OAuth2 дали invalid_client/401."""
+    try:
+        resp = requests.post(GRAPHQL_ENDPOINT, json={"query": "query { __typename }"},
+                              headers={"Content-Type": "application/json", "X-API-KEY": candidate_value}, timeout=20)
+        try:
+            body = resp.json()
+        except Exception:  # noqa: BLE001
+            body = {"non_json_body": resp.text[:500]}
+        ok = resp.status_code == 200 and not body.get("errors")
+        return {"ok": ok, "http_status": resp.status_code, "errors": body.get("errors")}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "exception": f"{type(exc).__name__}: {exc}"}
+
+
+def gql(access_token: str, query: str, variables: dict | None = None, auth_header: dict | None = None) -> dict:
     try:
         payload = {"query": query}
         if variables:
             payload["variables"] = variables
-        resp = requests.post(GRAPHQL_ENDPOINT, json=payload,
-                              headers={"Content-Type": "application/json",
-                                       "Authorization": f"Bearer {access_token}"}, timeout=30)
+        headers = {"Content-Type": "application/json"}
+        headers.update(auth_header or {"Authorization": f"Bearer {access_token}"})
+        resp = requests.post(GRAPHQL_ENDPOINT, json=payload, headers=headers, timeout=30)
         try:
             body = resp.json()
         except Exception:  # noqa: BLE001
@@ -177,6 +197,7 @@ def main() -> None:
     bearer_token = parsed.pop("bearer_token", None)
     client_id = parsed.pop("client_id", None)
     client_secret = parsed.pop("client_secret", None)
+    raw_whole_string = parsed.pop("raw_whole_string", None)
     result["credential_format_detected"] = parsed
 
     # НЕ предполагаем заранее, что 2 найденные части обязаны быть client_id+
@@ -189,6 +210,8 @@ def main() -> None:
     bearer_candidates = []
     if bearer_token:
         bearer_candidates.append(("raw_whole_string", bearer_token))
+    if raw_whole_string:
+        bearer_candidates.append(("raw_whole_string_including_separator", raw_whole_string))
     if client_id and client_secret:
         bearer_candidates.append(("part1_alone_as_bearer", client_id))
         bearer_candidates.append(("part2_alone_as_bearer", client_secret))
@@ -225,11 +248,33 @@ def main() -> None:
         data_dir.joinpath("task_arc_bitquery_apikey_probe_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
         return
 
+    auth_header_override = None
     if not access_token:
-        result["STOPPED"] = "не получили access_token НИКАКИМ путём (готовый bearer x3 варианта + OAuth2 x2 порядка) -- см. bearer_direct_attempts и oauth_token_exchange*"
+        # Последняя попытка перед отказом: заголовок X-API-KEY (не Bearer/OAuth2
+        # вообще) -- упоминался в ранее прочитанной документации как отдельный
+        # способ авторизации, не пробовали ни разу до этого раунда.
+        x_api_key_attempts = []
+        for label, cand in [("raw_whole_string", raw_whole_string), ("part1", client_id), ("part2", client_secret)]:
+            if not cand:
+                continue
+            p = probe_x_api_key_header(cand)
+            x_api_key_attempts.append({"candidate": label, "len": len(cand), **p})
+            if p.get("ok"):
+                access_token = cand
+                auth_header_override = {"X-API-KEY": cand}
+                break
+        result["x_api_key_header_attempts"] = x_api_key_attempts
+        if access_token:
+            result["auth_path"] = "сработал заголовок X-API-KEY (не Bearer/OAuth2)"
+
+    if not access_token:
+        result["STOPPED"] = "не получили access_token НИКАКИМ путём (готовый bearer x3 варианта + OAuth2 x2 порядка + X-API-KEY x3 варианта) -- см. bearer_direct_attempts, oauth_token_exchange* и x_api_key_header_attempts"
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         data_dir.joinpath("task_arc_bitquery_apikey_probe_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         return
+
+    def Q(query: str) -> dict:
+        return gql(access_token, query, auth_header=auth_header_override)
 
     # === Шаг 0: интроспекция схемы (бесплатно) -- ищем реальные имена
     # полей для сырых логов/событий и допустимые значения enum network,
@@ -242,7 +287,7 @@ def main() -> None:
       networkEnum: __type(name: "evm_network") { enumValues { name } }
     }
     """
-    r0 = gql(access_token, introspect_q)
+    r0 = Q(introspect_q)
     log_ledger(ledger, "step0_introspection", "schema queryType fields + evm_network enum", r0)
     body0 = r0.get("body") or {}
     qt_fields = [f["name"] for f in (((body0.get("data") or {}).get("__schema") or {}).get("queryType") or {}).get("fields", [])]
@@ -282,7 +327,7 @@ def main() -> None:
       }
     }
     """ % network_value_to_try
-    r2 = gql(access_token, minimal_q)
+    r2 = Q(minimal_q)
     log_ledger(ledger, "step2_minimal_arc_query", f"EVM(network: {network_value_to_try}) Blocks limit:1", r2)
     result["step2_minimal_query"] = {"network_tried": network_value_to_try, **r2}
 
@@ -318,7 +363,7 @@ def main() -> None:
       }
     }
     """ % (network_value_to_try, POOL_MANAGER, SWAP_TOPIC0, AROS_POOL_ID)
-    r3 = gql(access_token, history_q)
+    r3 = Q(history_q)
     log_ledger(ledger, "step3_history_check", "Logs PoolManager+Swap+pool_id, 16.09 00:00-01:00 UTC", r3)
     result["step3_history_check"] = r3
     history_errors = (r3.get("body") or {}).get("errors")
