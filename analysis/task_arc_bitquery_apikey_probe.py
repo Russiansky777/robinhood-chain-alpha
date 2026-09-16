@@ -111,6 +111,16 @@ def get_access_token_via_oauth(client_id: str, client_secret: str) -> dict:
         return {"exception": f"{type(exc).__name__}: {exc}"}
 
 
+def probe_bearer_works(candidate_token: str) -> dict:
+    """Дешёвая/бесплатная проверка (интроспекция, не трогает блокчейн-данные) --
+    работает ли строка САМА ПО СЕБЕ как Bearer-токен, без предположений о
+    том, что 2 найденные части обязаны быть client_id+client_secret."""
+    q = "query { __typename }"
+    r = gql(candidate_token, q)
+    ok = r.get("http_status") == 200 and not (r.get("body") or {}).get("errors")
+    return {"ok": ok, "http_status": r.get("http_status"), "errors": (r.get("body") or {}).get("errors")}
+
+
 def gql(access_token: str, query: str, variables: dict | None = None) -> dict:
     try:
         payload = {"query": query}
@@ -169,15 +179,46 @@ def main() -> None:
     client_secret = parsed.pop("client_secret", None)
     result["credential_format_detected"] = parsed
 
+    # НЕ предполагаем заранее, что 2 найденные части обязаны быть client_id+
+    # client_secret -- ровно эта догадка на BITQUERY_API2 дала invalid_client.
+    # Одна из частей (особенно длинная) может САМА БЫТЬ готовым bearer-токеном,
+    # а короткая -- просто ID ключа для дашборда, не для OAuth2. Пробуем ВСЕ
+    # правдоподобные кандидаты как bearer напрямую (дёшево -- интроспекция),
+    # и только если ни один не сработал -- пробуем OAuth2-обмен парой.
     access_token = None
+    bearer_candidates = []
     if bearer_token:
-        access_token = bearer_token
-        result["auth_path"] = "ГОТОВЫЙ токен использован напрямую как Bearer (без OAuth2-обмена)"
+        bearer_candidates.append(("raw_whole_string", bearer_token))
+    if client_id and client_secret:
+        bearer_candidates.append(("part1_alone_as_bearer", client_id))
+        bearer_candidates.append(("part2_alone_as_bearer", client_secret))
+
+    bearer_attempts_log = []
+    winning_bearer_label = None
+    for label, cand in bearer_candidates:
+        probe = probe_bearer_works(cand)
+        bearer_attempts_log.append({"candidate": label, "len": len(cand), "ok": probe["ok"],
+                                     "http_status": probe["http_status"], "errors": probe["errors"]})
+        if probe["ok"]:
+            access_token = cand
+            winning_bearer_label = label
+            break
+    result["bearer_direct_attempts"] = bearer_attempts_log
+
+    if access_token:
+        result["auth_path"] = f"ГОТОВЫЙ токен использован напрямую как Bearer -- сработал кандидат: {winning_bearer_label} (без OAuth2-обмена)"
     elif client_id and client_secret:
         token_resp = get_access_token_via_oauth(client_id, client_secret)
         access_token = token_resp.pop("_raw_token", None)
         result["oauth_token_exchange"] = token_resp
-        result["auth_path"] = "пара id+secret -- прошли OAuth2 client_credentials"
+        result["auth_path"] = "ни один кандидат не сработал как готовый bearer -- пробуем OAuth2 client_credentials парой"
+        if not access_token:
+            token_resp2 = get_access_token_via_oauth(client_secret, client_id)
+            access_token2 = token_resp2.pop("_raw_token", None)
+            result["oauth_token_exchange_swapped_order"] = token_resp2
+            if access_token2:
+                access_token = access_token2
+                result["auth_path"] += " -- сработало с ОБРАТНЫМ порядком частей"
     else:
         result["STOPPED"] = "не удалось разобрать формат BITQUERY_APIKEY -- см. credential_format_detected"
         print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -185,7 +226,7 @@ def main() -> None:
         return
 
     if not access_token:
-        result["STOPPED"] = "не получили access_token (см. oauth_token_exchange, если был обмен)"
+        result["STOPPED"] = "не получили access_token НИКАКИМ путём (готовый bearer x3 варианта + OAuth2 x2 порядка) -- см. bearer_direct_attempts и oauth_token_exchange*"
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         data_dir.joinpath("task_arc_bitquery_apikey_probe_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         return
