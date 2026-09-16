@@ -19,8 +19,9 @@ import requests
 REPO_ROOT_CANDIDATES = [Path("/home/bot/robinhood-chain-alpha"), Path(__file__).parent.parent]
 URLS = [
     "https://docs.bitquery.io/docs/authorisation/how-to-generate/",
-    "https://docs.bitquery.io/docs/authorisation/authorisation-scheme/",
-    "https://docs.bitquery.io/docs/category/authorization",
+    "https://docs.bitquery.io/docs/authorisation/how-to-use/",
+    "https://docs.bitquery.io/docs/usage/track-billing-programmatically/",
+    "https://docs.bitquery.io/docs/graphql/dev-tools/graphql-tips/credits/",
 ]
 
 
@@ -47,7 +48,8 @@ def main() -> None:
             visible = re.sub(r"\s+", " ", visible).strip()
             # Ищем окрестности ключевых слов
             snippets = []
-            for kw in ("Authorization", "Bearer", "OAuth", "access_token", "oauth2", "streaming.bitquery.io", "eap.bitquery.io"):
+            for kw in ("Authorization", "Bearer", "OAuth", "access_token", "oauth2", "streaming.bitquery.io", "eap.bitquery.io",
+                       "X-API-KEY", "api_key", "credits", "points", "quota", "balance", "usage", "GetUserBalance", "arc"):
                 idx = visible.find(kw)
                 if idx != -1:
                     snippets.append({"keyword": kw, "context": visible[max(0, idx - 150):idx + 300]})
