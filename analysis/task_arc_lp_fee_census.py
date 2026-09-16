@@ -43,10 +43,29 @@ LOCAL_REGISTRY_PATHS = [
     DATA_DIR.joinpath("task_arc_recon_pools_result.json"),
 ]
 ALIVE_THRESHOLD_SWAPS = 50
-RANDOM_SAMPLE_SIZE = 300
+RANDOM_SAMPLE_SIZE = 150
 RANDOM_SEED = 20260916
 
+# Первый прогон (без этих ограничений) не уложился даже в 30-минутный
+# job timeout GH Actions -- завис в среднем шаге, ушёл в отмену без
+# единой строки результата. Причина: сотни последовательных RPC-вызовов
+# без самоограничения скорости -- вероятно периодически ловили реальный
+# rate limit, каждый такой случай стоил до 20с (5 попыток, backoff
+# 2/4/6/8с). Фикс: (1) собственный троттлинг ЗАВЕДОМО ниже измеренного
+# безопасного порога (~13.28 вызовов/с, task_arc_rpc_limits_probe_result.json)
+# -- не давать себе шанс словить лимит; (2) жёсткий дедлайн по времени
+# (не только по числу вызовов) с честной остановкой и чекпоинтом.
+MIN_CALL_INTERVAL_S = 0.12  # ~8.3 вызовов/с -- заведомо ниже измеренного порога
+DEADLINE_S = 16 * 60  # оставляем запас до 30-минутного job timeout GH Actions
+STEP2A_CALL_BUDGET = 350
+
 _rpc_calls = [0]
+_last_call_ts = [0.0]
+_start_time = time.time()
+
+
+def time_left() -> float:
+    return DEADLINE_S - (time.time() - _start_time)
 
 
 def keccak_topic0(sig: str) -> str:
@@ -60,8 +79,12 @@ SWAP_TOPIC0 = keccak_topic0("Swap(bytes32,address,int128,int128,uint160,uint128,
 
 
 def rpc(method: str, params: list, timeout: int = 30) -> dict:
+    wait = MIN_CALL_INTERVAL_S - (time.time() - _last_call_ts[0])
+    if wait > 0:
+        time.sleep(wait)
+    _last_call_ts[0] = time.time()
     _rpc_calls[0] += 1
-    for attempt in range(5):
+    for attempt in range(3):
         try:
             resp = requests.post(RPC, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                   headers={"Content-Type": "application/json"}, timeout=timeout)
@@ -234,11 +257,12 @@ def main() -> None:
 
     # === Шаг 2а: точный подсчёт свопов ТОЛЬКО для fee>0 пулов (таргетированно) ===
     fee_nonzero_alive_check = []
-    calls_budget_step2a = 800
     calls_used_step2a = 0
+    step2a_deadline_hit = False
     for p in fee_nonzero:
-        if calls_used_step2a >= calls_budget_step2a:
-            fee_nonzero_alive_check.append({"pool_id": p["pool_id"], "skipped_budget": True})
+        if calls_used_step2a >= STEP2A_CALL_BUDGET or time_left() < 240:  # держим запас на шаг 2б + запись
+            step2a_deadline_hit = True
+            fee_nonzero_alive_check.append({"pool_id": p["pool_id"], "skipped_budget_or_deadline": True})
             continue
         window_end = min(latest, p["block_number"] + int(12 * 3600 / 0.506))
         r = count_swaps_for_pool(p["pool_id"], p["block_number"], window_end)
@@ -250,11 +274,16 @@ def main() -> None:
         fee_nonzero_alive_check.append(r)
 
     n_fee_nonzero_alive = sum(1 for r in fee_nonzero_alive_check if r.get("alive"))
+    n_fee_nonzero_skipped = sum(1 for r in fee_nonzero_alive_check if r.get("skipped_budget_or_deadline"))
     result["step2a_fee_nonzero_activity_exact"] = {
-        "n_fee_nonzero_pools_checked": len(fee_nonzero_alive_check),
+        "n_fee_nonzero_pools_checked": len(fee_nonzero_alive_check) - n_fee_nonzero_skipped,
+        "n_fee_nonzero_pools_skipped_budget_or_deadline": n_fee_nonzero_skipped,
+        "deadline_hit": step2a_deadline_hit,
         "n_calls_used": calls_used_step2a,
         "n_alive_ge_50_swaps": n_fee_nonzero_alive,
         "qualifying_pools": [r for r in fee_nonzero_alive_check if r.get("alive")],
+        "caveat_if_skipped": ("часть fee>0 пулов НЕ проверена (бюджет вызовов/дедлайн) -- n_alive_ge_50_swaps "
+                               "это НИЖНЯЯ ГРАНИЦА реального числа, не полный подсчёт" if n_fee_nonzero_skipped else None),
     }
 
     # === Шаг 2б: случайная выборка ВСЕХ пулов для оценки доли "живых" (>=50) ===
@@ -263,7 +292,11 @@ def main() -> None:
     sample = random.sample(all_pool_ids_with_block, min(RANDOM_SAMPLE_SIZE, len(all_pool_ids_with_block)))
     sample_results = []
     calls_used_sample = 0
+    step2b_deadline_hit = False
     for pool_id, init_block in sample:
+        if time_left() < 60:  # запас на финальную запись результата
+            step2b_deadline_hit = True
+            break
         window_end = min(latest, init_block + int(12 * 3600 / 0.506))
         r = count_swaps_for_pool(pool_id, init_block, window_end, max_calls=8)
         calls_used_sample += r["calls"]
@@ -274,6 +307,7 @@ def main() -> None:
     alive_rate_estimate = n_alive_sample / len(sample_results) if sample_results else None
     result["step2b_random_sample_alive_rate"] = {
         "sample_size": len(sample_results), "n_calls_used": calls_used_sample,
+        "deadline_hit": step2b_deadline_hit,
         "n_alive_ge_50_swaps_in_sample": n_alive_sample,
         "alive_rate_estimate": alive_rate_estimate,
         "estimated_total_alive_pools_in_registry": (alive_rate_estimate * len(pools_full)) if alive_rate_estimate is not None else None,
@@ -282,21 +316,29 @@ def main() -> None:
     if alive_rate_estimate and n_fee_nonzero_alive is not None:
         est_total_alive = alive_rate_estimate * len(pools_full)
         result["step2_weighted_estimate"] = {
-            "n_fee_nonzero_and_alive_EXACT": n_fee_nonzero_alive,
+            "n_fee_nonzero_and_alive_EXACT_OR_LOWER_BOUND": n_fee_nonzero_alive,
             "estimated_total_alive_pools_ALL_fee_tiers": est_total_alive,
             "estimated_pct_of_alive_pools_with_fee_gt_0": (n_fee_nonzero_alive / est_total_alive * 100) if est_total_alive else None,
-            "caveat": "числитель (fee>0 И живой) -- ТОЧНЫЙ таргетированный подсчёт. Знаменатель (все живые) -- ОЦЕНКА по случайной выборке 300 пулов, не полный подсчёт (полный скан всех Swap-логов с рождения каждого из 24567 пулов стоил бы сотни вызовов и сотни МБ -- не сделан, честно не выдаётся за точный)."
+            "caveat": (f"числитель (fee>0 И живой) -- таргетированный подсчёт, ТОЧНЫЙ если step2a_deadline_hit=false, "
+                       f"иначе НИЖНЯЯ ГРАНИЦА. Знаменатель (все живые) -- ОЦЕНКА по случайной выборке "
+                       f"{len(sample_results)} пулов, не полный подсчёт (полный скан всех Swap-логов с рождения "
+                       f"каждого из 24567 пулов стоил бы сотни вызовов и сотни МБ -- не сделан, честно не выдаётся за точный).")
         }
 
     # === Решение по предрегистрации ===
     if n_fee_nonzero_alive >= 20:
         decision = "4_PRODOLZHIT -- >=20 живых пулов с fee>0 найдено, продолжаем LVR ТОЛЬКО на них"
+    elif step2a_deadline_hit:
+        decision = (f"НЕ РЕШЕНО -- дедлайн/бюджет прерван проверку fee>0 пулов на {n_fee_nonzero_alive} "
+                     f"подтверждённых из {len(fee_nonzero)} всего с fee>0 -- нужен второй прогон на непроверенном остатке "
+                     f"прежде чем говорить 'меньше 20 живых' окончательно")
     else:
-        decision = "3_NET -- меньше 20 живых пулов с fee>0, линия LP на Arc закрыта фактом, LVR не считаем"
+        decision = "3_NET -- меньше 20 живых пулов с fee>0 (проверены ВСЕ пулы с fee>0, не выборка), линия LP на Arc закрыта фактом, LVR не считаем"
     result["decision"] = decision
     result["decision_pool_count"] = n_fee_nonzero_alive
 
     result["total_rpc_calls"] = _rpc_calls[0]
+    result["total_elapsed_s"] = time.time() - _start_time
 
     print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     DATA_DIR.joinpath("task_arc_lp_fee_census_result.json").write_text(
