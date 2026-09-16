@@ -1,0 +1,18 @@
+{
+  "probed_at_utc": "2026-09-16T23:51:03Z",
+  "secret_present": true,
+  "credential_format_detected": {
+    "total_len": 151,
+    "starts_with_brace": false,
+    "mode": "id_secret_pair",
+    "detected_separator": "\n",
+    "part1_len": 109,
+    "part2_len": 41
+  },
+  "auth_path": "X-API-KEY транспорт распознан сервером (получен HTTP 402, не 401) -- ключ, вероятно, валиден, но аккаунт без активного billing period",
+  "x_api_key_result": {
+    "http_status": 402,
+    "body": "No active billing period"
+  },
+  "CONCLUSION": "Дошли до определённого ответа: транспорт X-API-KEY -- правильный (сервер вернул содержательный billing-статус, а не invalid_client/401 как для Bearer и OAuth2), но у аккаунта НЕТ активного billing period -- нужно действие владельца на account.bitquery.io (выбрать/активировать тариф, включая бесплатный). Дальше пробовать нечего -- это не проблема формата ключа или парсинга."
+}
