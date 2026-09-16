@@ -1,0 +1,30 @@
+{
+  "probed_at_utc": "2026-09-16T18:49:11Z",
+  "pool_id": "0x3d3f72f78bdc6e6510650ea59b508064c897d1c384cdeaf7b3e052ce38b5ba00",
+  "currency0": "0x3600000000000000000000000000000000000000",
+  "currency1": "0x96150e514a726492b5b3446d9008b04c22e4d317",
+  "n_recent_swaps_found_on_this_pool": 53,
+  "swap_event": {
+    "tx_hash": "0x293426518ecf1fbb8751bfdab0ddeb0ba54437ae7d6a9fa7ab3366af3e10bff8",
+    "block_number": 21201550, "log_index": 236,
+    "sender_from_swap_topic": "0x55d8b90acae198b2f141a6471ebe2ff94ac028f5",
+    "amount0_raw": -524000, "amount1_raw": 274086144901766406964281,
+    "amount0_human": -0.524, "amount1_human": 274086.1449017664
+  },
+  "tx_from": "0xf4a672f889cfc9dd6c5d69d2922ae9a667e81db0",
+  "real_transfer_logs_in_receipt": [
+    {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "token_is_currency0": false, "token_is_currency1": false,
+     "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "to": "0x55d8b90acae198b2f141a6471ebe2ff94ac028f5", "value_raw": 130634000000000000},
+    {"token": "0x3600000000000000000000000000000000000000", "token_is_currency0": true, "token_is_currency1": false,
+     "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "to": "0x55d8b90acae198b2f141a6471ebe2ff94ac028f5", "value_raw": 130634},
+    {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "token_is_currency0": false, "token_is_currency1": false,
+     "from": "0x55d8b90acae198b2f141a6471ebe2ff94ac028f5", "to": "0xf4a672f889cfc9dd6c5d69d2922ae9a667e81db0", "value_raw": 130634000000000000},
+    {"token": "0x3600000000000000000000000000000000000000", "token_is_currency0": true, "token_is_currency1": false,
+     "from": "0x55d8b90acae198b2f141a6471ebe2ff94ac028f5", "to": "0xf4a672f889cfc9dd6c5d69d2922ae9a667e81db0", "value_raw": 130634}
+  ],
+  "trader_real_net_transfer_currency0": 130634,
+  "trader_real_net_transfer_currency1": 0,
+  "interpretation": "amount0>0 означает ПРИТОК currency0 В ПУЛ (трейдер отдал currency0) -- стандартная V3/V4-конвенция, ПОДТВЕРЖДЕНО реальными Transfer-логами",
+  "applied_convention_for_mass_run": "amount0>0/amount1>0 = токен ПРИШЁЛ В ПУЛ (это входная нога трейдера, token_in); amount0<0/amount1<0 = токен УШЁЛ ИЗ ПУЛА (это выходная нога трейдера, token_out). Применяется в task_arc_closed_cycle_detector.py ТОЛЬКО если interpretation выше подтверждает стандартную конвенцию; иначе конвенция инвертируется явно.",
+  "honest_note_magnitude_mismatch": "Событие заявляет amount0=-524000 (0.524 USDC), но реально settled трейдеру пришло только 130634 (0.130634 USDC) -- ~25% от заявленного. Направление (знак) подтверждено верно, но ВЕЛИЧИНА искажена хуком (см. permission-флаги AFTER_SWAP_RETURNS_DELTA на других пулах этого проекта) -- поэтому детектор циклов использует событийные величины ТОЛЬКО для топологии (какой токен куда), а прибыль считает по реальным Transfer из receipt."
+}
