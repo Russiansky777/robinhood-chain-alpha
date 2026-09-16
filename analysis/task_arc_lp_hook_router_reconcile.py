@@ -202,6 +202,18 @@ def analyze_tx(tx_hash: str, dec_cache: dict, init_cache: dict) -> dict:
     transfers = merge_mirrored_transfers(transfers_raw)
 
     usdc_tokens = {USDC_ERC20.lower(), USDC_NATIVE_WRAP.lower()}
+    # V4 использует address(0) как sentinel "нативной" валюты пула в
+    # Initialize/Swap-событиях (currency0/1, amount0/1) -- на Arc нативная
+    # валюта = USDC (газ-токен), это НЕ то же самое поле, что
+    # 0xfff...ffe (тот адрес -- синтетический Transfer-лог нативных
+    # переводов, для ERC20-совместимых инструментов). Оба относятся к
+    # ОДНОМУ и тому же активу с одинаковым масштабом (18 знаков) --
+    # подтверждено ранее (task_arc_usdc_addressing_check_result.json:
+    # агрегатный нативный баланс PoolManager численно равен ERC20
+    # балансу/1e6). Первый прогон этого скрипта нашёл currency0=address(0)
+    # на всех 5 tx и НЕ распознал его как USDC -- реальный баг, здесь исправлен.
+    NATIVE_SENTINEL = "0x0000000000000000000000000000000000000000"
+    usdc_identity_tokens = usdc_tokens | {NATIVE_SENTINEL}
 
     # --- resolve currency0/1 for every pool touched (needed to know which
     # side of amount0/amount1 is USDC) ---
@@ -213,7 +225,7 @@ def analyze_tx(tx_hash: str, dec_cache: dict, init_cache: dict) -> dict:
         meta = init_cache[pid]
         c0 = meta["currency0"].lower() if meta else None
         c1 = meta["currency1"].lower() if meta else None
-        usdc_side = "currency0" if c0 in usdc_tokens else ("currency1" if c1 in usdc_tokens else None)
+        usdc_side = "currency0" if c0 in usdc_identity_tokens else ("currency1" if c1 in usdc_identity_tokens else None)
         other_token = (c1 if usdc_side == "currency0" else c0) if usdc_side else None
         if usdc_side == "currency0":
             amount_usdc_signed_raw = s["amount0"]
@@ -224,7 +236,11 @@ def analyze_tx(tx_hash: str, dec_cache: dict, init_cache: dict) -> dict:
         else:
             amount_usdc_signed_raw = amount_other_signed_raw = None
 
-        usdc_token_addr = (c0 if usdc_side == "currency0" else c1) if usdc_side else None
+        usdc_token_addr_raw = (c0 if usdc_side == "currency0" else c1) if usdc_side else None
+        # address(0) конвертируем ПО ШКАЛЕ native-обёртки (18 знаков) -- сам
+        # to_human() адрес address(0) не узнает, поэтому подставляем
+        # USDC_NATIVE_WRAP как эквивалент по масштабу, не как реальный адрес.
+        usdc_token_addr = (USDC_NATIVE_WRAP if usdc_token_addr_raw == NATIVE_SENTINEL else usdc_token_addr_raw)
         amount_usdc_human = (to_human(usdc_token_addr, abs(amount_usdc_signed_raw))
                               if amount_usdc_signed_raw is not None else None)
         amount_other_human = (to_human_generic(other_token, abs(amount_other_signed_raw), dec_cache)
