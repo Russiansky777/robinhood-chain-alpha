@@ -1,0 +1,75 @@
+name: "Задача 5, LIVE -- запустить read-only аналитический скрипт на NL VPS (Ohio недоступен, требует вериф)"
+
+# Ohio (3.151.160.108) сейчас требует верификацию, недоступен по SSH
+# (3 подряд реальных сбоя на ssh-keyscan) -- владелец: "может через
+# Нидерланды попробовать, у нас есть ещё один сервер". Реальный, уже
+# существующий второй сервер этого проекта -- 45.59.170.76 (root,
+# secrets.VPS_SSH_KEY), уже используется для P5/сторожков (см.
+# run_fetch_vps_position_state.yml и др.) -- репозиторий уже есть по
+# пути /home/bot/robinhood-chain-alpha, свой venv.
+#
+# ТОЧНО ТА ЖЕ схема безопасности, что run_task5_v4_analysis_script.yml
+# (Ohio): точечный `git fetch + git checkout <sha> -- analysis/`, БЕЗ
+# смены HEAD, БЕЗ reset --hard, ничего не коммитится обратно -- разовый
+# read-only прогон. НЕ трогает /etc/bot/env (может не существовать на
+# этом хосте в том же виде) -- скрипты для этого раннера должны быть
+# самодостаточны по секретам/URL (или получать их отдельным путём).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA, из которого точечно берётся весь каталог analysis/ (НЕ меняет HEAD рабочего дерева VPS, не трогает файлы вне analysis/).'
+        required: true
+        type: string
+      script_path:
+        description: 'Путь к скрипту относительно корня репозитория, напр. analysis/task_arc_recon_probe.py'
+        required: true
+        type: string
+      script_args:
+        description: 'Необязательные аргументы командной строки для скрипта (одной строкой).'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  run_script:
+    name: "Точечный checkout + запуск read-only скрипта на NL VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout script_path из commit_sha + запуск"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          SCRIPT_PATH: ${{ inputs.script_path }}
+          SCRIPT_ARGS: ${{ inputs.script_args }}
+        run: |
+          SSH_RC=0
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python \"\$(basename $SCRIPT_PATH)\" $SCRIPT_ARGS
+            '
+          " > /tmp/analysis_script_stdout.log 2> /tmp/analysis_script_stderr.log || SSH_RC=$?
+          echo "--- stdout ---"; cat /tmp/analysis_script_stdout.log
+          echo "--- stderr ---"; cat /tmp/analysis_script_stderr.log
+          echo "SSH exit code: $SSH_RC"
+          exit $SSH_RC
