@@ -1,0 +1,53 @@
+{
+  "probed_at_utc": "2026-09-16T23:14:46Z",
+  "secret_present": true,
+  "attempts": [
+    {
+      "attempt": "order=(part1,part2) transport=body",
+      "http_status": 401,
+      "body_safe": {
+        "error": "invalid_client",
+        "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).",
+        "access_token_received": false,
+        "access_token_len": null,
+        "access_token_prefix_format_ok": false
+      }
+    },
+    {
+      "attempt": "order=(part2,part1) transport=body",
+      "http_status": 401,
+      "body_safe": {
+        "error": "invalid_client",
+        "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).",
+        "access_token_received": false,
+        "access_token_len": null,
+        "access_token_prefix_format_ok": false
+      }
+    },
+    {
+      "attempt": "order=(part1,part2) transport=basic_auth_header",
+      "http_status": 401,
+      "body_safe": {
+        "error": "invalid_client",
+        "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).",
+        "access_token_received": false,
+        "access_token_len": null,
+        "access_token_prefix_format_ok": false
+      }
+    },
+    {
+      "attempt": "order=(part2,part1) transport=basic_auth_header",
+      "http_status": 401,
+      "body_safe": {
+        "error": "invalid_client",
+        "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).",
+        "access_token_received": false,
+        "access_token_len": null,
+        "access_token_prefix_format_ok": false
+      }
+    }
+  ],
+  "winning_attempt": null,
+  "STOPPED": "Все 4 комбинации (порядок id/secret x body/Basic-Auth) дали invalid_client -- проблема не в порядке частей и не в транспорте, см. attempts[].body_safe. Нужна проверка самих значений client_id/client_secret на стороне владельца (например, ключ мог быть отозван, не активирован, или формат секрета иной, чем 2 части через известные разделители).",
+  "conclusion": "Все 4 варианта (порядок частей x транспорт авторизации) дали ИДЕНТИЧНУЮ ошибку invalid_client -- это исключает и порядок id/secret, и способ передачи (form-body vs HTTP Basic Auth) как причину. Значит проблема на уровне самих значений credential или их активации на стороне Bitquery, а не в том, как мы их парсим/отправляем. Дальше гадать вслепую нельзя без риска блокировки ключа за повторные неудачные попытки аутентификации -- нужна проверка/новый ключ от владельца через дашборд account.bitquery.io."
+}

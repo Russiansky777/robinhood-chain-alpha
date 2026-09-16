@@ -79,5 +79,56 @@
   "preregistered_verdict": "НЕ РЕШЕНО",
   "verdict_reason": "Формальный расчёт скрипта на n=1 дал бы 'ЖИВА' (6ч-fee/LVR=9.45>1.5 при 100% выживаемости), но это статистически недостоверно -- один пул, один частный скачок LVR вниз из-за отката цены. Настоящая медиана по репрезентативной части выборки (16-23 пула) не получена из-за устойчивого rate limit на eth_getLogs. Честный вердикт на сегодня -- НЕ РЕШЕНО, не ЖИВА.",
   "verdict_caveat": "Выборка -- 23 пула fee>0 (+7 fee=0 для сравнения объёма) ИЗ ТОП-30 ПО ОБЪЁМУ -- выживаемость в этой выборке предвзята по построению (уже отобраны самые активные), не репрезентативна для ВСЕХ 24567 пулов реестра.",
-  "total_rpc_calls_across_both_dispatches": 13
+  "total_rpc_calls_across_both_dispatches": 13,
+  "round_2026_09_16_bitquery_and_alt_rpc": {
+    "probed_at_utc": "2026-09-16T23:15:00Z",
+    "credential_format_BITQUERY_API2": {
+      "total_len": 77, "starts_with_brace": false, "detected_separator": "\\n (literal newline)",
+      "part1_len": 41, "part2_len": 35,
+      "note": "Секрет = 2 части, разделённые символом новой строки, длины 41 и 35 символов. Значения не печатались и не сохранялись нигде."
+    },
+    "bitquery_step_by_step": {
+      "step0_arc_mainnet_on_bitquery_CONFIRMED_REGARDLESS_OF_OUTCOME": "Подтверждено с реальной документации docs.bitquery.io: баннер 'Now live -- Arc Mainnet data is available on Bitquery'. Записано в паспорт независимо от исхода OAuth2, как и требовалось.",
+      "step1_credit_balance": "НЕ ПОЛУЧЕНО -- не удалось дойти из-за провала OAuth2 на шаге получения токена (см. ниже). Прямого API-поля для остатка баллов в схеме тоже не найдено бы (по ранее прочитанным докам это делается только через дашборд account.bitquery.io) -- честно фиксируем как открытый вопрос, не выдумываем число.",
+      "step2_limit1_query_works": "НЕ ВЫПОЛНЕНО -- заблокировано на уровне получения access_token.",
+      "step3_history_check": "НЕ ВЫПОЛНЕНО -- заблокировано.",
+      "step4_full_task_cost_estimate": "НЕ ВЫПОЛНЕНО -- заблокировано.",
+      "oauth2_token_exchange_result": "401 invalid_client на ВСЕХ 4 комбинациях (порядок client_id/client_secret x транспорт form-body/HTTP Basic Auth) -- см. data/task_arc_bitquery_oauth_retry_result.json. Идентичная ошибка во всех 4 случаях исключает порядок частей и способ передачи как причину.",
+      "root_cause_status": "НЕ УСТАНОВЛЕНА -- проблема, по всей видимости, в самих значениях credential на стороне Bitquery (ключ не активирован, отозван, либо BITQUERY_API2 в реальности не является парой client_id+client_secret для этого OAuth2-приложения). Требуется проверка/новый ключ от владельца через account.bitquery.io -- дальнейшие догадки вслепую остановлены, чтобы не спровоцировать блокировку ключа за повторные неудачные попытки аутентификации.",
+      "credits_ledger_file": "data/credits_spent_bitquery.json НЕ СОЗДАН -- ни одного платного GraphQL-запроса не было выполнено (обмен токена -- это отдельный OAuth2-эндпоинт, не тратит GraphQL-баллы), поэтому тратить пока нечего фиксировать. Будет создан при первом реальном GraphQL-запросе."
+    },
+    "part_A_extsload_eth_call_RESULT": {
+      "verdict": "УСПЕХ -- полностью подтверждает гипотезу владельца",
+      "eth_call_rate_limited": false,
+      "total_rpc_calls": 35, "errors": 0,
+      "n_pools_checked": 16,
+      "static_fee_mismatches_vs_initialize": 0,
+      "conclusion": "eth_call (включая extsload) НЕ подпадает под rate limit eth_getLogs на rpc.mainnet.arc.io -- 35/35 запросов прошли без единой ошибки -32005. Живой lpFee (через extsload) у всех 16 сверенных пулов ТОЧНО совпал со статичным fee_initialize_pips -- рассинхрона нет. hooks структурно НЕ читается через eth_call ни при каком выборе слота (не хранится в Pool.State, только в PoolKey/poolId) -- это не ограничение реализации, а свойство V4. Файл: data/task_arc_lp_extsload_fee_check_result.json.",
+      "implication_for_main_task": "Это снимает лимит только для ЦЕНЫ/FEE/ЛИКВИДНОСТИ на момент вызова (point-in-time snapshot). Оборот, число свопов и выживаемость по-прежнему требуют исторических событий Swap (eth_getLogs или альтернативный источник) -- extsload сам по себе НЕ закрывает нужду в истории потоков, только в текущем состоянии."
+    },
+    "part_B_alt_rpc_research_RESULT": {
+      "source_files": "data/task_arc_alt_rpc_research_result.json (сырые сниппеты с реальных страниц, регистрация НЕ проходилась, деньги НЕ тратились)",
+      "quicknode": {
+        "arc_support": "Подтверждено -- отдельная страница '/chains/arc', баннер 'Arc mainnet is now live', полный JSON-RPC (eth_call, eth_getLogs, eth_sendRawTransaction, eth_subscribe), Mainnet + Testnet.",
+        "free_tier": "10M кредитов/мес, 15 запросов/сек, БЕЗ карты ('No card required'), community support, 1 endpoint.",
+        "CRITICAL_LIMITATION": "На бесплатном тарифе (Free trial) 'Archive data Logs' = '-' (прочерк, т.е. НЕТ доступа к архиву логов вообще). Только начиная с платного Build ($34/мес годовая оплата, $49/мес помесячно) появляется 1 час хранения логов; 1 день -- на Accelerate ($212-249/мес); 14 дней -- только Enterprise. Это значит: бесплатный QuickNode, по всей видимости, НЕ подходит для нашей задачи (нужна история от блока Initialize каждого пула, это может быть часы-сутки в прошлом, не 1 час).",
+        "verdict": "Бесплатный тариф формально поддерживает Arc и eth_getLogs синтаксически, но заявленное отсутствие архива логов на Free делает его непригодным для ретроспективного скана Swap-событий -- нужно либо платить (от $34/мес), либо проверить на практике, действительно ли 'Archive data Logs: -' означает полный запрет исторических eth_getLogs, а не что-то другое (маркетинговый текст не всегда точен, докам не смотрели)."
+      },
+      "chainstack": {
+        "arc_support": "Подтверждено -- реальный формат RPC-эндпоинта показан на странице (arc-mainnet.core.chainstack.com/...), селектор 'Arc Mainnet/Testnet' в конструкторе endpoint'а.",
+        "free_tier": "Developer-план бесплатный ('Global nodes are free on Chainstack', $0.00 usage cost в калькуляторе), карта не нужна ('No credit card required').",
+        "rps_UNCERTAIN": "Текст со страницы неоднозначен -- в одном месте фрагмент ассоциирует free-план с '1 запрос/сек, 1 Node', в другом (возможно другой виджет/раскладка той же страницы) фигурирует '250 запросов/сек, 10 Nodes, Archive data' -- со статического HTML-скрейпинга нельзя надёжно сопоставить цифру конкретному тарифу (вероятно, значения из разных вкладок/калькулятора перепутались при парсинге). Честно фиксируем неопределённость, не выдумываем число.",
+        "notable_fact": "На странице pricing калькулятора нагрузки по методам (Request Units) eth_getLogs стоит СТОЛЬКО ЖЕ RU, сколько eth_call/eth_blockNumber (1/1/20/20/26/26 по тарифам) -- то есть Chainstack НЕ штрафует eth_getLogs отдельно, в отличие от GetBlock (см. ниже).",
+        "archive_note": "Общий (не Arc-специфичный) FAQ гласит: full node отдаёт историю STATE только для последних 16-128 блоков, для произвольной глубины нужен archive node. Не нашли отдельного явного лимита по ГЛУБИНЕ eth_getLogs для Arc конкретно."
+      },
+      "getblock": {
+        "arc_support": "Подтверждено -- отдельная страница '/nodes/arc/', явные технические характеристики (Malachite consensus, ~0.5s блок, chain ID 5042, запуск 16 сентября 2026).",
+        "free_tier": "НЕ НАЙДЕН -- на странице Arc указаны только платные тарифы: Shared Node от $49/мес (от 250 RPS), Limitless Node от $150/мес, Dedicated Node дороже. Ключевые слова 'free'/'no credit card' рядом с Arc-предложением не встретились ни разу.",
+        "notable_fact": "Прямо на странице pricing: 'Compute units measure the cost of each RPC call. Heavy methods like eth_getLogs cost more than simple lookups' -- GetBlock ЯВНО берёт больше CU за eth_getLogs, чем за простые вызовы. Это худший вариант из трёх именно для нашей задачи (упор на исторический eth_getLogs).",
+        "verdict": "Не подходит для бесплатного пути -- нет free-тарифа для Arc вообще."
+      },
+      "overall_recommendation": "Ни один из трёх не даёт однозначно рабочий бесплатный путь для ИСТОРИЧЕСКОГО eth_getLogs по Arc: QuickNode Free -- явный запрет архива логов; Chainstack Developer -- Arc подтверждён и бесплатен, но точный RPS/лимит логов неясен из статического текста (нужна живая проверка, не выдуманная цифра); GetBlock -- нет free-тарифа и штраф за eth_getLogs. Если решение продолжать этой веткой -- разумный следующий шаг: попросить владельца зарегистрировать бесплатный Chainstack Developer-аккаунт (без карты) САМОСТОЯТЕЛЬНО (согласно инструкции, я сам регистрацию не прохожу) и передать эндпоинт -- тогда можно эмпирически проверить реальный лимит на живом ключе за секунды, вместо гадания по маркетинговому тексту."
+    },
+    "chosen_data_source_for_further_calculation": "НИ ОДИН новый источник не готов к использованию прямо сейчас: Bitquery заблокирован на OAuth2 (нужны новые/проверенные credential от владельца), alt-RPC free-тарифы либо не дают историю логов (QuickNode), либо неопределённы без живой проверки (Chainstack), либо платные (GetBlock). Единственный подтверждённый рабочий канал для NEW данных -- eth_call/extsload на текущем rpc.mainnet.arc.io (Part A), который закрывает point-in-time price/fee/liquidity, но НЕ закрывает историю оборота/свопов. Основной расчёт fee/LVR по-прежнему заблокирован на этой развилке: нужен либо рабочий Bitquery-ключ, либо реальный (не рекламный) лимит логов на альтернативном RPC, либо продолжение терпеливого поллинга eth_getLogs на текущем rate-limited rpc.mainnet.arc.io."
+  }
 }
