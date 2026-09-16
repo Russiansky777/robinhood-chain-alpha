@@ -1,0 +1,52 @@
+{
+  "probed_at_utc": "2026-09-16T20:16:57Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "part1_target_tx": {
+    "tx_hash": "0xcc9a463b72ffbc0050d53ddbe7aaa8193ca0f94fdd34b800bf143298a6c2ec1d",
+    "block_number": 21211352, "status": "0x1", "n_swap_legs": 2, "n_initialize_in_same_tx": 0,
+    "executor_sender": "0x608750874fdcbcc21f4f9610af48e1babacf10fe",
+    "tx_from": "0xb7e36c94aedc08e6ba1bf8aba1254d64edca028a",
+    "pools_touched": ["0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846",
+                       "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943"],
+    "profit_to_receiver_raw_by_token": {"0xfffffffffffffffffffffffffffffffffffffffe": 17202984245949997004},
+    "profit_to_receiver_usd_equiv": 17202.984245949997,
+    "n_transfers_to_receiver_in_this_tx": 1,
+    "trader_net_by_token_real_transfers": {"0xfffffffffffffffffffffffffffffffffffffffe": 0,
+                                            "0x3600000000000000000000000000000000000000": 700103133},
+    "executor_own_real_net_profit_usdc": 700.103133,
+    "classification": "ЗАМКНУТЫЙ ЦИКЛ, подтверждено реальными Transfer: ровно один токен в плюсе у трейдера (0x3600...=USDC), 1 промежуточный ~0",
+    "third_party_payment": {"to": "0xaef5844daaec497e8a65b8db42bdc91e07d867ab", "amount_usd_equiv": 11983.763162000119,
+                             "note": "исполнитель отправил это отдельным Transfer в той же tx -- не PoolManager и не profit-получатель; природа не установлена (возможно fee-share/relay-tip)"},
+    "all_transfer_logs_raw": [
+      {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "to": "0x608750874fdcbcc21f4f9610af48e1babacf10fe", "value": 700103133000000000000},
+      {"token": "0x3600000000000000000000000000000000000000", "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "to": "0x608750874fdcbcc21f4f9610af48e1babacf10fe", "value": 700103133},
+      {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "to": "0x47e7936ae9891e61c5123db720593c05de7120cc", "value": 17202984245949997004},
+      {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "from": "0x608750874fdcbcc21f4f9610af48e1babacf10fe", "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951", "value": 688119369837999880154},
+      {"token": "0xfffffffffffffffffffffffffffffffffffffffe", "from": "0x608750874fdcbcc21f4f9610af48e1babacf10fe", "to": "0xaef5844daaec497e8a65b8db42bdc91e07d867ab", "value": 11983763162000119846}
+    ]
+  },
+  "part2_last20_pattern": {
+    "executor": "0x608750874fdcbcc21f4f9610af48e1babacf10fe",
+    "n_found_total_backward_scan": 250, "n_calls_backward_scan": 3, "n_calls_trigger_lookup": 60, "n_analyzed": 20,
+    "block_delta_distribution": {"0_тот_же_блок": 0, "+1": 10, "2+": 5, "не_найден_в_53_блоках": 5},
+    "note": "0 из 20 реагируют в ТОМ ЖЕ блоке, что триггер -- бот минимум на 1 блок позади события. 5/20 триггер не найден в пределах 53 блоков назад -- либо реагирует на более старое событие, либо на что-то за пределами (pool_id, Swap|Initialize) поиска."
+  },
+  "part3_reverted_pattern": {
+    "explorer_api_tried": "https://arc-scan.org/api?module=account&action=txlist&address=0x608750874fdcbcc21f4f9610af48e1babacf10fe",
+    "http_status": 404, "api_usable": false,
+    "v2_path_tried": "https://arc-scan.org/api/v2/addresses/.../transactions -- заблокировано песочницей сессии (403 на CONNECT), не проверено",
+    "n_reverted_classified": 0,
+    "price_of_alternative": "без рабочего API обозревателя нет способа искать reverted-tx по адресу напрямую (revert не оставляет логов) -- нужен посблочный перебор неизвестного объёма, оценка -- тысячи eth_getBlockByNumber(full) в худшем случае"
+  },
+  "part4_receiver_24h_inflow": {
+    "receiver": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+    "window_blocks": 170750, "from_block": 21041971, "to_block": 21212721, "n_calls_used": 35,
+    "sum_raw_by_token": {"0xfffffffffffffffffffffffffffffffffffffffe": 94608509496516191762760,
+                          "0xfcc0422f47ea6381fbe12ac8f0c1535558c4a835": 50000000000000000000},
+    "sum_usd_equiv_native_wrap": 94608.50949651619,
+    "sum_second_token_units": 50.0,
+    "n_incoming_transfer_txs": 24267,
+    "note": "24267 входящих tx за 24ч на ОДИН адрес -- намного больше, чем может сгенерировать один исполнитель (225/час * 24 = 5400) -- получатель, вероятно, агрегирует профит с НЕСКОЛЬКИХ ботов/исполнителей, не только отслеженного. Только ERC20/wrapped-Transfer-логи; прямые нативные переводы без Transfer не видны этим методом."
+  },
+  "total_rpc_calls_used": 132
+}
