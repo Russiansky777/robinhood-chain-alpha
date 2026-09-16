@@ -1,0 +1,660 @@
+
+{
+  "probed_at_utc": "2026-09-16T21:25:52Z",
+  "rows": [
+    {
+      "tx_hash": "0xc06934c034d507921ba9fe5b59d378047ab0ddb811c1a75ff200ca018b5ed6c1",
+      "block_number": 21215502,
+      "trader_eoa": "0x8452e2233a8699717ad7e33a60306209a1893ade",
+      "swap_details": [
+        {
+          "pool_id": "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943",
+          "currency0": "0x0000000000000000000000000000000000000000",
+          "currency1": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "usdc_side": "currency0",
+          "other_token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "fee_pips": 0,
+          "amm_amount_usdc_signed_human": 88.54902812778509,
+          "amm_amount_other_signed_human": -25056.396178541723,
+          "usdc_is_input_to_pool": true,
+          "lp_fee_native_amount": 0.0,
+          "lp_fee_native_token": "USDC (входная сторона)",
+          "lp_fee_usd_equiv": 0.0,
+          "hooks": "0x47e7936ae9891e61c5123db720593c05de7120cc"
+        }
+      ],
+      "amm_usdc_leg_total_pure_swap_math": 88.54902812778509,
+      "real_usdc_leg_total_settled_transfers": 88.54902812778509,
+      "real_usdc_into_pool_manager": 0,
+      "real_usdc_out_of_pool_manager": 88.54902812778509,
+      "amm_vs_real_diff_usdc": 0.0,
+      "amm_vs_real_interpretation": "СХОДИТСЯ (|diff|\u003c0.01% объёма) -- хук берёт долю ИЗНУТРИ потока, который иначе достался бы трейдеру/роутеру, а не добавляет деньги сверх AMM-математики",
+      "hook_amount_to_receiver_usdc": 2.2137257031946276,
+      "hook_share_of_volume": 0.025,
+      "lp_fee_total_usd_equiv": 0.0,
+      "lp_fee_share_of_volume": 0.0,
+      "router_candidates": [
+        {
+          "address": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "is_contract": true,
+          "usdc_in": 86.33530242459047,
+          "usdc_out": 86.33530242459048,
+          "net_kept_usdc": -1.4210854715202004e-14
+        },
+        {
+          "address": "0x4eea475ce5ab4cdc65fb061eca0b1d009ff5d4c8",
+          "is_contract": false,
+          "usdc_in": 0.15540354436426285,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.15540354436426285
+        },
+        {
+          "address": "0x595f0cb7f5acf507e61bac0a81ff6277ff2f19f0",
+          "is_contract": false,
+          "usdc_in": 0.3108070887285257,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.3108070887285257
+        },
+        {
+          "address": "0x7f77bad9eb06373fe3aee84f85a9d701ff820eeb",
+          "is_contract": false,
+          "usdc_in": 0.3108070887285257,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.3108070887285257
+        },
+        {
+          "address": "0x7e7df6f60581f13216c5e6fcfc5643b9f4261750",
+          "is_contract": false,
+          "usdc_in": 0.08633530242459046,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.08633530242459046
+        }
+      ],
+      "trader_usdc_transfers": [
+        {
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x8452e2233a8699717ad7e33a60306209a1893ade",
+          "usdc": 85.47194940034457
+        }
+      ],
+      "trader_non_usdc_transfers": [
+        {
+          "from": "0x8452e2233a8699717ad7e33a60306209a1893ade",
+          "to": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "human": 25056.396178541723
+        }
+      ],
+      "all_transfers_deduped": [
+        {
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "from": "0x8452e2233a8699717ad7e33a60306209a1893ade",
+          "to": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "human": 25056.396178541723
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+          "human": 2.2137257031946276
+        },
+        {
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "from": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "human": 25056.396178541723
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "human": 86.33530242459047
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x4eea475ce5ab4cdc65fb061eca0b1d009ff5d4c8",
+          "human": 0.15540354436426285
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x595f0cb7f5acf507e61bac0a81ff6277ff2f19f0",
+          "human": 0.3108070887285257
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x7f77bad9eb06373fe3aee84f85a9d701ff820eeb",
+          "human": 0.3108070887285257
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x7e7df6f60581f13216c5e6fcfc5643b9f4261750",
+          "human": 0.08633530242459046
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf4c3fbb764e7dcf4505833d6f0993793a5e09100",
+          "to": "0x8452e2233a8699717ad7e33a60306209a1893ade",
+          "human": 85.47194940034457
+        }
+      ],
+      "router_cut_usdc": 0.8633530242459047,
+      "router_share_of_volume": 0.00975,
+      "conservation_check": {
+        "volume_usdc": 88.54902812778509,
+        "lp_fee_usd": 0.0,
+        "hook_usd": 2.2137257031946276,
+        "router_usd": 0.8633530242459047,
+        "sum_lp_hook_router": 3.077078727440532,
+        "note": "LP fee остаётся ВНУТРИ резервов пула (не отдельный Transfer) -- поэтому сравнение здесь не 'сумма=объём', а информативное: сколько объёма формально ушло на fee/хук/роутер по трём каналам."
+      }
+    },
+    {
+      "tx_hash": "0xdbcf64abc7c9df19dd52de490df60eac020dff3a2472eb99c5069fc31f57bf43",
+      "block_number": 21173014,
+      "trader_eoa": "0xb36ad7dcd227a2020596f1481d3e0aca2f9707e1",
+      "swap_details": [
+        {
+          "pool_id": "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943",
+          "currency0": "0x0000000000000000000000000000000000000000",
+          "currency1": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "usdc_side": "currency0",
+          "other_token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "fee_pips": 0,
+          "amm_amount_usdc_signed_human": 8.701197539695327,
+          "amm_amount_other_signed_human": -1750.5552515841844,
+          "usdc_is_input_to_pool": true,
+          "lp_fee_native_amount": 0.0,
+          "lp_fee_native_token": "USDC (входная сторона)",
+          "lp_fee_usd_equiv": 0.0,
+          "hooks": "0x47e7936ae9891e61c5123db720593c05de7120cc"
+        }
+      ],
+      "amm_usdc_leg_total_pure_swap_math": 8.701197539695327,
+      "real_usdc_leg_total_settled_transfers": 8.701197539695327,
+      "real_usdc_into_pool_manager": 0,
+      "real_usdc_out_of_pool_manager": 8.701197539695327,
+      "amm_vs_real_diff_usdc": 0.0,
+      "amm_vs_real_interpretation": "СХОДИТСЯ (|diff|\u003c0.01% объёма) -- хук берёт долю ИЗНУТРИ потока, который иначе достался бы трейдеру/роутеру, а не добавляет деньги сверх AMM-математики",
+      "hook_amount_to_receiver_usdc": 0.2175299384923832,
+      "hook_share_of_volume": 0.025,
+      "lp_fee_total_usd_equiv": 0.0,
+      "lp_fee_share_of_volume": 0.0,
+      "router_candidates": [
+        {
+          "address": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "is_contract": true,
+          "usdc_in": 8.483667601202944,
+          "usdc_out": 8.483667601202944,
+          "net_kept_usdc": 0.0
+        },
+        {
+          "address": "0xe7cdf3fa542036ad8a63ed32acd6deefbb747da4",
+          "is_contract": false,
+          "usdc_in": 0.011452951261623974,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.011452951261623974
+        },
+        {
+          "address": "0x7f77bad9eb06373fe3aee84f85a9d701ff820eeb",
+          "is_contract": false,
+          "usdc_in": 0.06490005714920252,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.06490005714920252
+        },
+        {
+          "address": "0x7e7df6f60581f13216c5e6fcfc5643b9f4261750",
+          "is_contract": false,
+          "usdc_in": 0.008483667601202944,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.008483667601202944
+        }
+      ],
+      "trader_usdc_transfers": [
+        {
+          "from": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "to": "0xb36ad7dcd227a2020596f1481d3e0aca2f9707e1",
+          "usdc": 8.398830925190914
+        }
+      ],
+      "trader_non_usdc_transfers": [
+        {
+          "from": "0xb36ad7dcd227a2020596f1481d3e0aca2f9707e1",
+          "to": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "human": 1750.5552515841844
+        }
+      ],
+      "all_transfers_deduped": [
+        {
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "from": "0xb36ad7dcd227a2020596f1481d3e0aca2f9707e1",
+          "to": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "human": 1750.5552515841844
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+          "human": 0.2175299384923832
+        },
+        {
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "from": "0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "human": 1750.5552515841844
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "human": 8.483667601202944
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "to": "0xe7cdf3fa542036ad8a63ed32acd6deefbb747da4",
+          "human": 0.011452951261623974
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "to": "0x7f77bad9eb06373fe3aee84f85a9d701ff820eeb",
+          "human": 0.06490005714920252
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "to": "0x7e7df6f60581f13216c5e6fcfc5643b9f4261750",
+          "human": 0.008483667601202944
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x0ae4297123204f451f2e66970abc502d22ace354",
+          "to": "0xb36ad7dcd227a2020596f1481d3e0aca2f9707e1",
+          "human": 8.398830925190914
+        }
+      ],
+      "router_cut_usdc": 0.08483667601202943,
+      "router_share_of_volume": 0.00975,
+      "conservation_check": {
+        "volume_usdc": 8.701197539695327,
+        "lp_fee_usd": 0.0,
+        "hook_usd": 0.2175299384923832,
+        "router_usd": 0.08483667601202943,
+        "sum_lp_hook_router": 0.3023666145044126,
+        "note": "LP fee остаётся ВНУТРИ резервов пула (не отдельный Transfer) -- поэтому сравнение здесь не 'сумма=объём', а информативное: сколько объёма формально ушло на fee/хук/роутер по трём каналам."
+      }
+    },
+    {
+      "tx_hash": "0x5b5c2a4c17fb00c93e36d08b7e139c46fe15b9da208b52b393bc912e57b0016b",
+      "block_number": 21173432,
+      "trader_eoa": "0x73fcb2d05f2e29561b58177af7f22ac19b3b484f",
+      "swap_details": [
+        {
+          "pool_id": "0x8b84c7ea2b15a9a70de5db37b2e4e43a3344567bd2bb6cae378814ed628a7722",
+          "currency0": "0x0000000000000000000000000000000000000000",
+          "currency1": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "usdc_side": "currency0",
+          "other_token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "fee_pips": 0,
+          "amm_amount_usdc_signed_human": 26.032225997081987,
+          "amm_amount_other_signed_human": -249793.32897482772,
+          "usdc_is_input_to_pool": true,
+          "lp_fee_native_amount": 0.0,
+          "lp_fee_native_token": "USDC (входная сторона)",
+          "lp_fee_usd_equiv": 0.0,
+          "hooks": "0x47e7936ae9891e61c5123db720593c05de7120cc"
+        }
+      ],
+      "amm_usdc_leg_total_pure_swap_math": 26.032225997081987,
+      "real_usdc_leg_total_settled_transfers": 26.032225997081987,
+      "real_usdc_into_pool_manager": 0,
+      "real_usdc_out_of_pool_manager": 26.032225997081987,
+      "amm_vs_real_diff_usdc": 0.0,
+      "amm_vs_real_interpretation": "СХОДИТСЯ (|diff|\u003c0.01% объёма) -- хук берёт долю ИЗНУТРИ потока, который иначе достался бы трейдеру/роутеру, а не добавляет деньги сверх AMM-математики",
+      "hook_amount_to_receiver_usdc": 0.26032225997081987,
+      "hook_share_of_volume": 0.01,
+      "lp_fee_total_usd_equiv": 0.0,
+      "lp_fee_share_of_volume": 0.0,
+      "router_candidates": [
+        {
+          "address": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "is_contract": true,
+          "usdc_in": 51.543807474222334,
+          "usdc_out": 51.543807474222334,
+          "net_kept_usdc": 0.0
+        },
+        {
+          "address": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "is_contract": true,
+          "usdc_in": 25.771903737111167,
+          "usdc_out": 25.771903737111167,
+          "net_kept_usdc": 0.0
+        },
+        {
+          "address": "0xb8159ba378904f803639d274cec79f788931c9c8",
+          "is_contract": false,
+          "usdc_in": 0.2577190373711117,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.2577190373711117
+        }
+      ],
+      "trader_usdc_transfers": [
+        {
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0x73fcb2d05f2e29561b58177af7f22ac19b3b484f",
+          "usdc": 25.514184699740056
+        }
+      ],
+      "trader_non_usdc_transfers": [
+        {
+          "from": "0x73fcb2d05f2e29561b58177af7f22ac19b3b484f",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "human": 249793.32897482772
+        }
+      ],
+      "all_transfers_deduped": [
+        {
+          "token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "from": "0x73fcb2d05f2e29561b58177af7f22ac19b3b484f",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "human": 249793.32897482772
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+          "human": 0.26032225997081987
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "human": 25.771903737111167
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "human": 25.771903737111167
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "to": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "human": 25.771903737111167
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0xb8159ba378904f803639d274cec79f788931c9c8",
+          "human": 0.2577190373711117
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0x73fcb2d05f2e29561b58177af7f22ac19b3b484f",
+          "human": 25.514184699740056
+        }
+      ],
+      "router_cut_usdc": 0.2577190373711117,
+      "router_share_of_volume": 0.0099,
+      "conservation_check": {
+        "volume_usdc": 26.032225997081987,
+        "lp_fee_usd": 0.0,
+        "hook_usd": 0.26032225997081987,
+        "router_usd": 0.2577190373711117,
+        "sum_lp_hook_router": 0.5180412973419315,
+        "note": "LP fee остаётся ВНУТРИ резервов пула (не отдельный Transfer) -- поэтому сравнение здесь не 'сумма=объём', а информативное: сколько объёма формально ушло на fee/хук/роутер по трём каналам."
+      }
+    },
+    {
+      "tx_hash": "0xfb7298fd560aa283aa42a353ec80a720e3c0b3a45738ad407421abcc5dd8190c",
+      "block_number": 21170468,
+      "trader_eoa": "0xf9ec9bd8a46d343add5ad2f9935378946d9ac1b1",
+      "swap_details": [
+        {
+          "pool_id": "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943",
+          "currency0": "0x0000000000000000000000000000000000000000",
+          "currency1": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "usdc_side": "currency0",
+          "other_token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "fee_pips": 0,
+          "amm_amount_usdc_signed_human": -24.13125,
+          "amm_amount_other_signed_human": 43850.99995039205,
+          "usdc_is_input_to_pool": false,
+          "lp_fee_native_amount": 0.0,
+          "lp_fee_native_token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e (входная сторона, НЕ USDC)",
+          "lp_fee_usd_equiv": 0.0,
+          "hooks": "0x47e7936ae9891e61c5123db720593c05de7120cc"
+        }
+      ],
+      "amm_usdc_leg_total_pure_swap_math": 24.13125,
+      "real_usdc_leg_total_settled_transfers": 24.75,
+      "real_usdc_into_pool_manager": 24.75,
+      "real_usdc_out_of_pool_manager": 0.61875,
+      "amm_vs_real_diff_usdc": 0.6187499999999986,
+      "amm_vs_real_interpretation": "РЕАЛЬНЫЙ ПОТОК БОЛЬШЕ AMM-расчёта -- есть доп. приток/расход сверх свопа (нужно смотреть не-USDC ногу трейдера)",
+      "hook_amount_to_receiver_usdc": 0.61875,
+      "hook_share_of_volume": 0.025,
+      "lp_fee_total_usd_equiv": 0.0,
+      "lp_fee_share_of_volume": 0.0,
+      "router_candidates": [
+        {
+          "address": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "is_contract": true,
+          "usdc_in": 49.75,
+          "usdc_out": 49.75,
+          "net_kept_usdc": 0.0
+        },
+        {
+          "address": "0xb8159ba378904f803639d274cec79f788931c9c8",
+          "is_contract": false,
+          "usdc_in": 0.25,
+          "usdc_out": 0.0,
+          "net_kept_usdc": 0.25
+        },
+        {
+          "address": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "is_contract": true,
+          "usdc_in": 24.75,
+          "usdc_out": 24.75,
+          "net_kept_usdc": 0.0
+        }
+      ],
+      "trader_usdc_transfers": [
+        {
+          "from": "0xf9ec9bd8a46d343add5ad2f9935378946d9ac1b1",
+          "to": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "usdc": 25.0
+        }
+      ],
+      "trader_non_usdc_transfers": [
+        {
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xf9ec9bd8a46d343add5ad2f9935378946d9ac1b1",
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "human": 43850.99995039205
+        }
+      ],
+      "all_transfers_deduped": [
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xf9ec9bd8a46d343add5ad2f9935378946d9ac1b1",
+          "to": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "human": 25.0
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0xb8159ba378904f803639d274cec79f788931c9c8",
+          "human": 0.25
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "human": 24.75
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xe6b0a06c87a1422f966e8a31b5d1f3b3fa348c5a",
+          "to": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "human": 24.75
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+          "human": 0.61875
+        },
+        {
+          "token": "0x394d38f807ee0027a182216f5e67a15ae441fa2e",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xf9ec9bd8a46d343add5ad2f9935378946d9ac1b1",
+          "human": 43850.99995039205
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x53dea4f7783c1de84cecc5c989bc37a557154827",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "human": 24.75
+        }
+      ],
+      "router_cut_usdc": 0.25,
+      "router_share_of_volume": 0.010101010101010102,
+      "conservation_check": {
+        "volume_usdc": 24.75,
+        "lp_fee_usd": 0.0,
+        "hook_usd": 0.61875,
+        "router_usd": 0.25,
+        "sum_lp_hook_router": 0.86875,
+        "note": "LP fee остаётся ВНУТРИ резервов пула (не отдельный Transfer) -- поэтому сравнение здесь не 'сумма=объём', а информативное: сколько объёма формально ушло на fee/хук/роутер по трём каналам."
+      }
+    },
+    {
+      "tx_hash": "0xe19db714cd8f209c2666d97b79964e7682a07bd1753b5f9e484307151dcf71a2",
+      "block_number": 21175193,
+      "trader_eoa": "0x56c262027e0de4aea31d2489529cb25d23e58a8b",
+      "swap_details": [
+        {
+          "pool_id": "0x8b84c7ea2b15a9a70de5db37b2e4e43a3344567bd2bb6cae378814ed628a7722",
+          "currency0": "0x0000000000000000000000000000000000000000",
+          "currency1": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "usdc_side": "currency0",
+          "other_token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "fee_pips": 0,
+          "amm_amount_usdc_signed_human": -98.81362458,
+          "amm_amount_other_signed_human": 1060348.283892718,
+          "usdc_is_input_to_pool": false,
+          "lp_fee_native_amount": 0.0,
+          "lp_fee_native_token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e (входная сторона, НЕ USDC)",
+          "lp_fee_usd_equiv": 0.0,
+          "hooks": "0x47e7936ae9891e61c5123db720593c05de7120cc"
+        }
+      ],
+      "amm_usdc_leg_total_pure_swap_math": 98.81362458,
+      "real_usdc_leg_total_settled_transfers": 99.811742,
+      "real_usdc_into_pool_manager": 99.811742,
+      "real_usdc_out_of_pool_manager": 0.99811742,
+      "amm_vs_real_diff_usdc": 0.9981174199999998,
+      "amm_vs_real_interpretation": "РЕАЛЬНЫЙ ПОТОК БОЛЬШЕ AMM-расчёта -- есть доп. приток/расход сверх свопа (нужно смотреть не-USDC ногу трейдера)",
+      "hook_amount_to_receiver_usdc": 0.99811742,
+      "hook_share_of_volume": 0.01,
+      "lp_fee_total_usd_equiv": 0.0,
+      "lp_fee_share_of_volume": 0.0,
+      "router_candidates": [
+        {
+          "address": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+          "is_contract": false,
+          "usdc_in": 0.0,
+          "usdc_out": 99.811742,
+          "net_kept_usdc": -99.811742
+        },
+        {
+          "address": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+          "is_contract": true,
+          "usdc_in": 99.811742,
+          "usdc_out": 99.811742,
+          "net_kept_usdc": 0.0
+        },
+        {
+          "address": "0xb6a575ed3bb629a44b9ad24a4b0a2147f32c5424",
+          "is_contract": true,
+          "usdc_in": 99.811742,
+          "usdc_out": 99.811742,
+          "net_kept_usdc": 0.0
+        }
+      ],
+      "trader_usdc_transfers": [],
+      "trader_non_usdc_transfers": [],
+      "all_transfers_deduped": [
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0xf70da97812cb96acdf810712aa562db8dfa3dbef",
+          "to": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+          "human": 99.811742
+        },
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+          "to": "0xb6a575ed3bb629a44b9ad24a4b0a2147f32c5424",
+          "human": 99.811742
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0x47e7936ae9891e61c5123db720593c05de7120cc",
+          "human": 0.99811742
+        },
+        {
+          "token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "from": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "to": "0xb6a575ed3bb629a44b9ad24a4b0a2147f32c5424",
+          "human": 1060348.283892718
+        },
+        {
+          "token": "0xfffffffffffffffffffffffffffffffffffffffe",
+          "from": "0xb6a575ed3bb629a44b9ad24a4b0a2147f32c5424",
+          "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "human": 99.811742
+        },
+        {
+          "token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "from": "0xb6a575ed3bb629a44b9ad24a4b0a2147f32c5424",
+          "to": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+          "human": 1060348.283892718
+        },
+        {
+          "token": "0xf653f0a29a7003aa98f9f7f879fec4cb8762fa2e",
+          "from": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+          "to": "0xda86c15acade15dfbac87433229acf1a449776b8",
+          "human": 1060348.283892718
+        }
+      ],
+      "router_cut_usdc": 0,
+      "router_share_of_volume": 0.0,
+      "conservation_check": {
+        "volume_usdc": 99.811742,
+        "lp_fee_usd": 0.0,
+        "hook_usd": 0.99811742,
+        "router_usd": 0,
+        "sum_lp_hook_router": 0.99811742,
+        "note": "LP fee остаётся ВНУТРИ резервов пула (не отдельный Transfer) -- поэтому сравнение здесь не 'сумма=объём', а информативное: сколько объёма формально ушло на fee/хук/роутер по трём каналам."
+      }
+    }
+  ],
+  "one_liners": [
+    "объём 88.5490 USDC: LP получил 0.0000 (0.000%), хук 2.2137 (2.500%), роутер 0.8634 (0.975%), хук берёт ИЗ доли трейдера/роутера (сверх AMM-математики денег НЕ появилось)",
+    "объём 8.7012 USDC: LP получил 0.0000 (0.000%), хук 0.2175 (2.500%), роутер 0.0848 (0.975%), хук берёт ИЗ доли трейдера/роутера (сверх AMM-математики денег НЕ появилось)",
+    "объём 26.0322 USDC: LP получил 0.0000 (0.000%), хук 0.2603 (1.000%), роутер 0.2577 (0.990%), хук берёт ИЗ доли трейдера/роутера (сверх AMM-математики денег НЕ появилось)",
+    "объём 24.7500 USDC: LP получил 0.0000 (0.000%), хук 0.6188 (2.500%), роутер 0.2500 (1.010%), хук берёт СВЕРХ цены (реальный поток БОЛЬШЕ AMM-расчёта)",
+    "объём 99.8117 USDC: LP получил 0.0000 (0.000%), хук 0.9981 (1.000%), роутер 0.0000 (0.000%), хук берёт СВЕРХ цены (реальный поток БОЛЬШЕ AMM-расчёта)"
+  ],
+  "total_rpc_calls": 41
+}
