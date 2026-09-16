@@ -1,0 +1,44 @@
+{
+  "source_file": "/home/bot/robinhood-chain-alpha/data/task_arc_recon_pools_result.json",
+  "probed_at_utc": "2026-09-16T15:01:51Z",
+  "rpc": "https://rpc.mainnet.arc.io",
+  "latest_block": 21175392,
+  "max_working_chunk_for_initialize": 5000,
+  "window": {
+    "from_block": 21132192,
+    "to_block": 21175392,
+    "window_blocks": 43200,
+    "chunk_size": 5000,
+    "n_chunks_needed_estimate": 9
+  },
+  "n_found_top_level": 24567,
+  "n_chunk_errors_top_level": 2,
+  "n_pools_in_list": 24567,
+  "n_distinct_currency0": 4557,
+  "currency0_counts": {
+    "0x3600000000000000000000000000000000000000": 18123,
+    "0x0000000000000000000000000000000000000000": 1416,
+    "0x171a4217b86a807a64eb94757db6849fb4bdbaa0": 82,
+    "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b": 21,
+    "0x1fc29df411ec71a48a431ebbc9f585b98af910b3": 21,
+    "0x30ac39dec8a854c5fd03aa429e3bef32a7e4c84a": 20,
+    "0x1e849f5960f02503939cbcbd44ab99b6dfcc4735": 13,
+    "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1": 11,
+    "0x0e1300985ecfe295f5e1310cf472f7c29f2acda9": 11,
+    "0x0eb0f1554bf8a057031b1649b36e51f85a3bb782": 11
+  },
+  "n_distinct_currency1": 18082,
+  "n_distinct_tx_hashes": 24562,
+  "n_txs_with_multiple_pools": 2,
+  "block_range": {
+    "min": 21137193,
+    "max": 21175391,
+    "span": 38198
+  },
+  "honest_caveats": [
+    "2 of 9 chunked eth_getLogs calls returned an RPC-level error and are missing from n_found_top_level=24567 -- this is a LOWER BOUND for the requested 43200-block (~6h) window, not a complete count. Exact failed chunk ranges were not captured by this summary pass (would need a re-read of the raw _chunk_error entries in task_arc_recon_pools_result.json on the NL VPS).",
+    "The observed min block_number in the recovered pool list (21137193) is ~5000 blocks after the requested from_block (21132192) -- consistent with the earliest chunk(s) near the window start being among the 2 that errored, i.e. the actual covered span is closer to ~38200 blocks (~5.3h) than the full 43200 (~6h) requested.",
+    "currency0=0x3600000000000000000000000000000000000000 is NOT yet identity-confirmed (no eth_call name()/symbol()/decimals() run against it in this pass) -- it dominates (18123 of 24567 pools, ~74%) and is almost certainly a fixed base-pairing token (plausibly Arc's native USDC-gas-token predeploy address, given Arc uses USDC for gas), but this is a hypothesis, not a confirmed fact.",
+    "n_distinct_tx_hashes=24562 vs n_pools_in_list=24567 with only 2 multi-pool txs implies near-1:1 tx-to-pool creation -- consistent with an automated/bot-driven or single-factory launchpad flow (e.g. aka.fun) rather than manual pool creation, but this is inferred from volume/pattern, not confirmed by decoding the creator contract."
+  ]
+}
