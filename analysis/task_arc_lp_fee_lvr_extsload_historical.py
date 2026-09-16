@@ -20,10 +20,16 @@ extsload(bytes32) -- отсюда бюджет ~80 вызовов на 16 пул
 liquidity / 2**128, по обеим сторонам -- формула владельца. ЧЕСТНАЯ
 ОГОВОРКА (не скрываем): это предполагает liquidity ПОСТОЯННОЙ весь
 период -- если за окно были mint/burn, точная позиционная бухгалтерия
-Uniswap требует интеграла ликвидности по времени, а не 2 точки. Поэтому
-считаем И на liquidity_at_window_start, И на liquidity_at_window_end,
-берём МЕНЬШУЮ (консервативную) как основную для вердикта, обе -- в
-выводе, плюс явный флаг, если они разошлись заметно.
+Uniswap требует интеграла ликвидности по времени, а не 2 точки. Считаем
+И на liquidity_at_window_start, И на liquidity_at_window_end, но
+ПЕРВИЧНАЯ оценка -- на liquidity_at_end (тот же принцип, что
+NFPM.positions(): текущая ликвидность x дельта feeGrowth с контрольной
+точки), НЕ min(start,end) -- у свежего пула liquidity РОВНО на
+Initialize-блоке часто структурно равна 0 (пул создан раньше первого
+mint), из-за чего минимум по двум точкам вырождается в 0 несмотря на
+реальное движение feeGrowthGlobal -- это артефакт метода, не
+консервативная граница. Явный флаг liquidity_at_window_start_is_
+degenerate_zero и обе оценки -- в выводе для прозрачности.
 
 Оборот НЕ считается вообще -- не нужен для fee/LVR (fee уже дан
 протоколом через feeGrowthGlobal, LVR -- только по изменению цены).
@@ -196,7 +202,17 @@ def analyze_pool(pool_meta: dict, dec_cache: dict, latest: int) -> dict:
 
         fee_usdc_start_basis = fee_usdc_for_liquidity_basis(liq_start)
         fee_usdc_end_basis = fee_usdc_for_liquidity_basis(liq_end)
-        fee_usdc_conservative = min(fee_usdc_start_basis, fee_usdc_end_basis)
+        # liquidity_at_window_start = liquidity РОВНО на init_block -- у свежего пула это
+        # СТРУКТУРНО часто 0 (Initialize создаёт пул раньше, чем первый LP успевает
+        # заминтить позицию), поэтому min(start,end) вырождается в 0 для ЛЮБОГО пула, где
+        # liq_start==0, хотя feeGrowthGlobal реально двигался -- это не консервативная
+        # граница, а артефакт метода. ПЕРВИЧНАЯ оценка -- на liquidity_at_end (тот же
+        # принцип, что использует NFPM.positions(): текущая ликвидность конкретной позиции x
+        # дельта feeGrowth с момента последней контрольной точки -- корректно ТОЧНО для LP,
+        # державшего liquidity_at_end неизменной с init, и остаётся разумной аппроксимацией
+        # иначе). liq_start==0 -- отдельный явный флаг, не тихо занижаем до 0.
+        fee_usdc_primary = fee_usdc_end_basis
+        liq_start_degenerate_zero = (liq_start == 0)
         liq_changed_significantly = (liq_start != liq_end) and (
             abs(liq_end - liq_start) / max(liq_start, 1) > 0.05
         )
@@ -218,14 +234,14 @@ def analyze_pool(pool_meta: dict, dec_cache: dict, latest: int) -> dict:
             "survived_any_trading": survived,
             "fee_growth_delta0_x128": d_fg0, "fee_growth_delta1_x128": d_fg1,
             "liquidity_at_window_start": liq_start, "liquidity_at_window_end": liq_end,
+            "liquidity_at_window_start_is_degenerate_zero": liq_start_degenerate_zero,
             "liquidity_changed_significantly_gt5pct": liq_changed_significantly,
             "lp_fee_usdc_using_liquidity_at_start": fee_usdc_start_basis,
-            "lp_fee_usdc_using_liquidity_at_end": fee_usdc_end_basis,
-            "lp_fee_usdc_CONSERVATIVE_min_of_both": fee_usdc_conservative,
+            "lp_fee_usdc_using_liquidity_at_end_PRIMARY": fee_usdc_end_basis,
             "price_change_frac": price_change_frac,
             "lvr_frac_of_tvl": lvr_frac, "tvl_usdc_side_estimate": tvl_usdc_est,
             "lvr_usdc": lvr_usdc,
-            "fee_over_lvr": (fee_usdc_conservative / lvr_usdc) if lvr_usdc else None,
+            "fee_over_lvr": (fee_usdc_primary / lvr_usdc) if lvr_usdc else None,
         }
 
     return {
@@ -359,9 +375,15 @@ def main() -> None:
     result["verdict_caveat"] = (
         f"Выборка -- {len(fee_positive_pools)} пулов fee>0 ИЗ ТОП-30 ПО ОБЪЁМУ, только 16/30 "
         "нашлись в частичном реестре -- предвзято по построению, не репрезентативно для всех "
-        "24567 пулов. fee считается консервативно (min из liquidity_at_start/liquidity_at_end) -- "
-        "честная нижняя граница, не точная позиционная бухгалтерия (та требует интеграла "
-        "ликвидности по времени, недоступного из 2 точек)."
+        "24567 пулов. fee считается на liquidity_at_window_end (тот же принцип, что "
+        "NFPM.positions() -- текущая ликвидность x дельта feeGrowth с контрольной точки), "
+        "НЕ на min(start,end): у свежего пула liquidity_at_init часто СТРУКТУРНО равна 0 "
+        "(Initialize создаёт пул раньше первого mint) -- минимум по двум точкам в этом случае "
+        "вырождается в 0 несмотря на реальное движение feeGrowthGlobal, это не консервативная "
+        "граница, а артефакт метода (см. liquidity_at_window_start_is_degenerate_zero по каждому "
+        "пулу/окну). Оценка на liquidity_at_end -- не точная позиционная бухгалтерия (та "
+        "требует интеграла ликвидности по времени, недоступного из 2 точек), но не имеет этого "
+        "вырождения; оба значения (at_start и at_end) сохранены в выводе для прозрачности."
     )
 
     result["total_rpc_calls"] = _rpc_calls[0]
