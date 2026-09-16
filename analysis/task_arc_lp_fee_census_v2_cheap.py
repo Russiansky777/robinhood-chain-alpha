@@ -113,17 +113,34 @@ def main() -> None:
         data_dir.joinpath("task_arc_lp_fee_census_v2_result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         return
 
-    # === Проба прошла -- полный скан реестра, chunk=5000 (уже проверенный рабочий размер) ===
+    # === Чекпоинт: продолжаем с того места, где остановились в прошлый раз
+    # (файл на VPS не трогается git checkout -- переживает между дисптачами) ===
+    checkpoint_path = data_dir.joinpath("_checkpoint_lp_fee_census_v2.json")
     all_logs = []
     from_block = min_init
+    if checkpoint_path.exists():
+        cp = json.loads(checkpoint_path.read_text())
+        all_logs = cp.get("logs", [])
+        from_block = cp.get("scanned_up_to_block", min_init - 1) + 1
+        result["resumed_from_checkpoint"] = {"n_logs_already_had": len(all_logs), "resuming_from_block": from_block}
+
+    # === Полный скан реестра, chunk=5000, с ТЕРПЕЛИВЫМ ретраем на rate limit
+    # (спим 25с и пробуем тот же чанк снова, до 3 раз) вместо немедленной сдачи ===
     chunk = 5000
     calls = 0
     stopped_by_rate_limit = False
-    while from_block <= max_init and calls < 20:
+    max_wall_clock_s = 12 * 60  # держим запас до 30-мин job timeout
+    t_start = time.time()
+    while from_block <= max_init and calls < 20 and (time.time() - t_start) < max_wall_clock_s:
         to_block = min(from_block + chunk - 1, max_init)
-        body = rpc("eth_getLogs", [{"fromBlock": hex(from_block), "toBlock": hex(to_block),
-                                     "address": POOL_MANAGER, "topics": [INIT_TOPIC0]}])
-        calls += 1
+        body = None
+        for retry in range(3):
+            body = rpc("eth_getLogs", [{"fromBlock": hex(from_block), "toBlock": hex(to_block),
+                                         "address": POOL_MANAGER, "topics": [INIT_TOPIC0]}])
+            calls += 1
+            if not is_rate_limited(body):
+                break
+            time.sleep(25)
         if is_rate_limited(body):
             stopped_by_rate_limit = True
             break
@@ -136,13 +153,17 @@ def main() -> None:
             break
         all_logs.extend(body.get("result", []))
         from_block = to_block + 1
+        # чекпоинт после КАЖДОГО успешного чанка -- не теряем прогресс, если упрёмся дальше
+        checkpoint_path.write_text(json.dumps({"logs": all_logs, "scanned_up_to_block": to_block}))
 
     result["full_rescan"] = {
-        "n_calls": calls, "stopped_by_rate_limit": stopped_by_rate_limit,
+        "n_calls_this_run": calls, "stopped_by_rate_limit": stopped_by_rate_limit,
         "scanned_up_to_block": from_block - 1, "target_max_block": max_init,
         "complete": from_block > max_init,
-        "n_logs_found": len(all_logs),
+        "n_logs_found_TOTAL_including_checkpoint": len(all_logs),
     }
+    if from_block > max_init and checkpoint_path.exists():
+        checkpoint_path.unlink()  # скан завершён -- чекпоинт больше не нужен
 
     pools_full = [decode_initialize_full(l) for l in all_logs]
 
