@@ -136,7 +136,7 @@ def probe_x_api_key_header(candidate_value: str) -> dict:
         except Exception:  # noqa: BLE001
             body = {"non_json_body": resp.text[:500]}
         ok = resp.status_code == 200 and not body.get("errors")
-        return {"ok": ok, "http_status": resp.status_code, "errors": body.get("errors")}
+        return {"ok": ok, "http_status": resp.status_code, "errors": body.get("errors"), "full_body": body}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "exception": f"{type(exc).__name__}: {exc}"}
 
@@ -254,10 +254,19 @@ def main() -> None:
         # вообще) -- упоминался в ранее прочитанной документации как отдельный
         # способ авторизации, не пробовали ни разу до этого раунда.
         x_api_key_attempts = []
+        secret_values_to_scrub = [v for v in (raw_whole_string, client_id, client_secret) if v]
         for label, cand in [("raw_whole_string", raw_whole_string), ("part1", client_id), ("part2", client_secret)]:
             if not cand:
                 continue
             p = probe_x_api_key_header(cand)
+            # Скраб на случай (маловероятный, но проверяем), что сервер эхом
+            # вернул часть значения секрета в теле ошибки -- требование
+            # "не печатать ни в каком виде" применяется и к ответам сервера.
+            body_str = json.dumps(p.get("full_body"), ensure_ascii=False, default=str)
+            for secret_val in secret_values_to_scrub:
+                body_str = body_str.replace(secret_val, "[REDACTED]")
+            p["full_body_scrubbed_str"] = body_str
+            p.pop("full_body", None)
             x_api_key_attempts.append({"candidate": label, "len": len(cand), **p})
             if p.get("ok"):
                 access_token = cand
