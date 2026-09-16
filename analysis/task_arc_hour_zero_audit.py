@@ -53,11 +53,31 @@ _rpc_call_count = 0
 
 
 def rpc(method: str, params: list, timeout: int = 25) -> dict:
+    """Реальный прогон (пункт 2, tx.from) показал баг: eth_getTransactionByHash
+    вызывался БЕЗ повтора на rate limit (в отличие от лог-сканера), и весь
+    бюджет в 400 вызовов ушёл в -32005, тихо трактуемый как "from не
+    найден" -- 0 разрешённых трейдеров на всех пулах топа. Централизуем
+    честный повтор с паузой на rate limit ЗДЕСЬ, для всех вызовов сразу."""
     global _rpc_call_count
-    _rpc_call_count += 1
-    resp = requests.post(RPC, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-                          headers={"Content-Type": "application/json"}, timeout=timeout)
-    return resp.json()
+    for attempt in range(5):
+        _rpc_call_count += 1
+        try:
+            resp = requests.post(RPC, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                                  headers={"Content-Type": "application/json"}, timeout=timeout)
+            body = resp.json()
+        except Exception as exc:  # noqa: BLE001
+            if attempt == 4:
+                return {"error": {"code": None, "message": f"{type(exc).__name__}: {exc}"}}
+            time.sleep(2 * (attempt + 1))
+            continue
+        err = body.get("error")
+        if err and (err.get("code") == -32005 or "rate limit" in str(err.get("message", "")).lower()):
+            if attempt == 4:
+                return body
+            time.sleep(2 * (attempt + 1))
+            continue
+        return body
+    return {"error": {"code": None, "message": "unreachable"}}
 
 
 def word(data_bytes: bytes, i: int) -> bytes:
