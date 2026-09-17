@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-09-17T17:03:59Z",
+  "generated_at_utc": "2026-09-17T17:13:39Z",
   "anchor_signature": "2NkPm8GfVw2FYBHrbLbhUrwJGmGECYh4t89oMdCnEsnAXGK8qu4BoTfpNVKEHZLWgBfGYCpZ2oUCBFLW35m8XCNS",
   "anchor_slot": 447644977,
   "anchor_time_unix": 1789600539,
-  "measured_slot_time_s": 3.1483784984451355,
+  "measured_slot_time_s": 0.31762381825878366,
   "measurement_note": "измерено из покупок 1 и 3 этапа A (реальные слот/время), не константа с другой сети",
   "before_collection": {
     "n_pages": 1,
@@ -11,16 +11,17 @@
     "n_decoded": 2,
     "n_errors": 0,
     "earliest_signature_blocktime_seen": 1789575999,
-    "coverage_seconds_before": 24540
+    "raw_lookback_seconds": 24540,
+    "coverage_seconds_before": 300
   },
   "after_collection": {
-    "n_real_slots_in_range": 146,
-    "n_blocks_scanned": 146,
+    "n_real_slots_in_range": 995,
+    "n_blocks_scanned": 294,
     "n_block_errors": 0,
-    "coverage_seconds_after": 46,
+    "coverage_seconds_after": 91,
     "target_coverage_seconds": 300,
-    "n_txs_seen_total": 195858,
-    "n_pool_trades_found": 216,
+    "n_txs_seen_total": 392809,
+    "n_pool_trades_found": 286,
     "first_block_shape_sample": {
       "slot": 447644977,
       "keys_top": [
@@ -101,8 +102,8 @@
       }
     }
   },
-  "HONEST_COVERAGE_WARNING": "Окно НЕ покрыто полностью на бюджете: до=24540с/300с, после=46с/300с -- дальнейшие числа честно ограничены этим покрытием, не выдумываем недостающее.",
-  "n_trades_total": 218,
+  "HONEST_COVERAGE_WARNING": "Окно НЕ покрыто полностью на бюджете: до=300с/300с, после=91с/300с -- дальнейшие числа честно ограничены этим покрытием, не выдумываем недостающее.",
+  "n_trades_total": 288,
   "all_trades": [
     {
       "signature": "3w3cJDRheGc5zByzQw74ceaJq2t2coD4cKQNdib71RcDmv8sDXz5fhhVPKA2jSgJKYSJRe9g9CyEntCSzqyZpzUN",
@@ -2501,9 +2502,779 @@
       "other_net_delta": -2.1721291432186263e-11,
       "price_other_per_token": 7.155244901748372e-15,
       "is_our_wallet": false
+    },
+    {
+      "signature": "3i1BRnYgSbe8nHyNhiHBgKXSVaN6Pchdvxj8tp4BRHJenSiENa74GhfAuA7eWsoFhcaWF6fUhJsX1L4uXXKCR7Xm",
+      "slot": 447645123,
+      "block_time_unix": 1789600585,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1404.951303001253,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 4.408917675391422e-12,
+      "price_other_per_token": 3.1381284646472114e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2u5FwYHdLu1ToiY7wrh7oRrFAw4uUcssLJoFqQYSN3RSLjfV2dMgWtVKJpCrx5e9pCSSqvRwB9YRgxiET6PjUWmi",
+      "slot": 447645125,
+      "block_time_unix": 1789600586,
+      "signer": "HPbHdRneUfrhm3pjzzAiWjrZJXikg2DXLmGFeLxLWwqu",
+      "token_net_delta": -756.5488649928229,
+      "other_mint": "So11111111111111111111111111111111111111112",
+      "other_net_delta": 0.10000000157725708,
+      "price_other_per_token": 0.00013217917071120812,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3vHRP9vZqYgws4MstTSqnrrmUTiMy89MS4qFrpvPARrS1YwzUAJ5Qe6NhF4geQL9GU1CaBPJA3pJKmytTKRBnG8j",
+      "slot": 447645125,
+      "block_time_unix": 1789600586,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1544.9915070004645,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.55440113505756e-12,
+      "price_other_per_token": 1.6533431565697224e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2EysUHvescaSk1eFK2XXJjNaqG39D8EH3Ws9PxvzWWi6VtH2XpXCwPA4VcPi4gyvCGLCiBwQq6jMBjz7KrHGGbfY",
+      "slot": 447645125,
+      "block_time_unix": 1789600586,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -11992.820826008217,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.2107648217352107e-11,
+      "price_other_per_token": 1.0095746774682792e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "58y3PT4n2VDzxDn6DPbXQZth1rTo3oxVPo4eFGheXEVK6yjpiwF2HfqyYvPwYPeiRAYFT2TraE2q2YwEbh7JwBs6",
+      "slot": 447645127,
+      "block_time_unix": 1789600586,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -407.27710300425133,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.821831574488897e-11,
+      "price_other_per_token": 4.4731991095258795e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2bGoZXwPSb3qNkUchsAehBRdGfjWSZzCBVV5KDnmdG8S2z4wBWgXUBhk8vCZBtwJWeue2dzYXaYF2Mh4c3UWQMuZ",
+      "slot": 447645127,
+      "block_time_unix": 1789600586,
+      "signer": "9CaQLdhZ8t4bzRVsqbA5kdB864zxYyvhp3yPBQvUHP71",
+      "token_net_delta": -390.5502579984277,
+      "other_mint": "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re",
+      "other_net_delta": -7.37365724035044e-12,
+      "price_other_per_token": 1.8880175059006427e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3xmPENtk1eea9tYcrGMJt6ozXrndkSPpgpESKnPWh9TNc2BduMxZY7cXoPacf6qJi5tDF6QQh5oW2WxhBm4aNTvc",
+      "slot": 447645128,
+      "block_time_unix": 1789600587,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -340.34216799882415,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.1580958414469933e-11,
+      "price_other_per_token": 3.40273980228919e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3ffpquDaexHuPdeUa76LHBqnDP7bQ59SfVeyxzhAKuGcuR3YmiZchqCv47qVxn4kiwdWUzvHZGUyHUhzB6Yo2Qzw",
+      "slot": 447645129,
+      "block_time_unix": 1789600587,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2828.888621000544,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -5.8761884247360285e-12,
+      "price_other_per_token": 2.0772074167620255e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "p1RX5yAr75ZPBU2ezyrgAHPRkhWuXvC7tjX863EyC737DXqpnRVjhQjtejwStscW8drPtacy9gy1LHGF2DAFRcx",
+      "slot": 447645129,
+      "block_time_unix": 1789600587,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -243.5895899961206,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.093436535233195e-12,
+      "price_other_per_token": 8.59411330043511e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3G32HbBnCkbdmiNyXDZ9oHj2LQWpf9iJEAGrkSntXkHXriAyBB7cj5BWA7Wmf4UFV2SkvHA86rFEQnHXtjL5C2Ea",
+      "slot": 447645130,
+      "block_time_unix": 1789600587,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1198.2695350012364,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.76614287031407e-11,
+      "price_other_per_token": 2.3084479656000067e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "gPE7ip8qk4qYb7fCr3C16ZaXCmdNX2WCPVqffyA4C1sEqV3oWNPFXMcwVZfypi3oV38AWP4Vq4jW9MnsvZ4ZyWn",
+      "slot": 447645130,
+      "block_time_unix": 1789600587,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1814.8910740051651,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.4434675676966435e-11,
+      "price_other_per_token": 7.953466675612375e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "rTcYAr4jrPN4XEhMhAxjturi41jQvtXPznMFhY1o4T3J7Lw7ubcRjmh77TL3stgEBEmBKWr1sa7YauFMSZnXcZX",
+      "slot": 447645131,
+      "block_time_unix": 1789600588,
+      "signer": "G5bVDZVMZJwn1B4SUNaU8EGVfaHmPF3joHvfso6nx5GW",
+      "token_net_delta": -60991.807731004665,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -7.288382074475521,
+      "price_other_per_token": 0.00011949772183536272,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "32Gy3G1Jkh1UuM87qD5j2C6NyTzDJ9cn5hUBrPEvc6pGexnBMHdHVJisoqAGLbGvaZQyPEKdAUPhZ8EaJqokJZJS",
+      "slot": 447645131,
+      "block_time_unix": 1789600588,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -7683.902756992669,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.1799451133119874e-11,
+      "price_other_per_token": 2.8370285026422897e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4hfAdaxzUSepdXq3v9xcACEne24ediXd52bZKRHBnLady3ZR7i9gmtrWAyLVcv5b6yWiXytFKZGyY6ksx8NEu4wM",
+      "slot": 447645132,
+      "block_time_unix": 1789600588,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -7068.012299008231,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.6001422409317456e-11,
+      "price_other_per_token": 2.263921132616414e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "M2d2XVzt9DmBBEwXvpU8YLddYDAHLcXZsgXQ8yw6pcCZyswzK2JVbRCDwnpVHBjTua1BQ4efiSYxXEtabCaVc4c",
+      "slot": 447645134,
+      "block_time_unix": 1789600588,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1624.7691419950424,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -8.061107337198337e-12,
+      "price_other_per_token": 4.9613862848848545e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "a6838JVn4Qh5xrpA3a7fE6tMJYBifAKtHjbEh8cF1in3hQLwFBhDDPUrULDxxQfAXM74RRopimwAPXr1T7VqSqg",
+      "slot": 447645136,
+      "block_time_unix": 1789600589,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -225.1992099897534,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.204769700142606e-11,
+      "price_other_per_token": 9.790308324096356e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3zN56eVXwJyvkaZNf2RPpS4vS2EmXrMy1iw7EQiktgdiBCSCc27S8vhUGZd8e8S1XYZMDYRUsRZEdHhNKub69MsL",
+      "slot": 447645139,
+      "block_time_unix": 1789600590,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2801.1408560018754,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.4591884084657067e-11,
+      "price_other_per_token": 8.779238656265775e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3MffQ48cMqRE9oUdWcxpEBGU3TtGySo3WqryYTkNJF5r3iKRFtSWcjdRSrTj9kNztEbT97eFZNuXPMSRsR6fkWfS",
+      "slot": 447645141,
+      "block_time_unix": 1789600591,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1628.5271159978292,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.242117602690996e-11,
+      "price_other_per_token": 1.3767763402067816e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4QxvTKALvSwnU9vQh27TnXVp6RAifFXz9gHRLZW7oB1g3pqeVSVDr8uFBcgsuZo82BKyiDkDB3nVpVjRjjQcLC7R",
+      "slot": 447645143,
+      "block_time_unix": 1789600591,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -393.62782400580545,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -9.352518759442319e-12,
+      "price_other_per_token": 2.3759800982220157e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5NxoQiZEEJ9zWDXmHL9n6LM5iGDXe5iEaDYspHRWkPy9e9Yhz3fhpLt1XBQbd68AAzmzNZJ7Asy4eNTS6DN8147m",
+      "slot": 447645144,
+      "block_time_unix": 1789600592,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2171.518147994895,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 9.688250202088966e-12,
+      "price_other_per_token": 4.461510124165788e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4RdXxEj7EKAGEaKkEVrUDHZR5CkakEjGrPqQFZ5svg7q23K9VDPeUkH9t8KpW4GYb3iH553BwaUj23SMTGQMNH3",
+      "slot": 447645145,
+      "block_time_unix": 1789600592,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -20360.47671499953,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.1880274541908875e-11,
+      "price_other_per_token": 5.834968752552191e-16,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "ZtDK2zq8pUsvHEMd9brmPjgBmTb17XcgPUysXuiRuHXrFvReV4kPpqECCoST6zZmfxus3kLS5AWNy7y4rKKSJjJ",
+      "slot": 447645145,
+      "block_time_unix": 1789600592,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -555.513040004691,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.1822542944628367e-11,
+      "price_other_per_token": 2.1282205984810965e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "37C5rKW3mMsRnBGsK2CBzHgtL7UsZ19dhXSF2joV7zbkR54ZCS74Dj5S55YQjMBqmUvwk2touMknamFNFnxRcDSV",
+      "slot": 447645146,
+      "block_time_unix": 1789600592,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -124332.49354299344,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.0463630789890885e-11,
+      "price_other_per_token": 1.6458795449811102e-16,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2pPiAPSVNsQFhbgyyANErkx1jphwgAVjJfFpzdByxSnnZirFUcJE4VCL4g7jKgwtTg33d8Y3fFzr8cASLfMem9dE",
+      "slot": 447645147,
+      "block_time_unix": 1789600593,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2569.0506389877264,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -5.7767124417296145e-12,
+      "price_other_per_token": 2.248578659393725e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4snrUxASFAKod4McoCangUNQUGpm4XxemBVSWfsoVfUfVCR134kQ8xbcsKGhocoAwHxpaB7f59HsZrSh2Hx2W3i3",
+      "slot": 447645148,
+      "block_time_unix": 1789600593,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -8889.708276998426,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.440003754600184e-11,
+      "price_other_per_token": 2.7447512095684218e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2pRwbLsQYYjUSu1FvyYGV13FUJVbPPRsex5asKkvHj2kBeJcfimD8GRvDYFEkHDTuJ2RjzTnu776tp8jVZQ99DAg",
+      "slot": 447645148,
+      "block_time_unix": 1789600593,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2974.7412150046875,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.4499513529008254e-11,
+      "price_other_per_token": 8.23584700592843e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3UmUmgbYdiKT7hi9f1agMAeHbjqTPQyReqABz8j29byjDrmGBfifxQ6zYZrPKTYKg7A5HLc93DfZHhdnzVftJ156",
+      "slot": 447645149,
+      "block_time_unix": 1789600593,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2137.6141750068346,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.5226930827338947e-11,
+      "price_other_per_token": 7.12332983443575e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "LJ3z8BUtFLDeKs8yTPJdJLua6Lvyz1NWNU2bTCvJ6F9tEtBqGXSfqaXinNHyve8V34pSdJR9JZum4w5HQwkJinw",
+      "slot": 447645150,
+      "block_time_unix": 1789600594,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -518.7924470007783,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.4171774864735198e-11,
+      "price_other_per_token": 2.731684886058863e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2pPaunHKk4cpS65NvTXea9PSw5hCcFGq2vKoFPTGvaSU4THVJ9PPXwMaqBBXD6TxW1yfkBR7JFK9hM2LTVq1aiK4",
+      "slot": 447645150,
+      "block_time_unix": 1789600594,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1555.2948239860925,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.5070611425471725e-11,
+      "price_other_per_token": 9.689874352469707e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "Y13Tx2UGkvi7B2UGuGHpNeA6AR7hGuuEJcistMT79VNB5o2ZBjRqxxzjWkgfq7q7VumFyAFX5PDahk8cbZE4zk6",
+      "slot": 447645162,
+      "block_time_unix": 1789600597,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -937.2805380034224,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.3854695996305963e-11,
+      "price_other_per_token": 2.545096695074966e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "whRKRK6MgiKpYj46gffYpm1npBixUCJuDNMhWoSLKWiLtMUknjXEJvHx9yWRQzPnMpErbquB7RzfgWnNzgsb3rF",
+      "slot": 447645163,
+      "block_time_unix": 1789600597,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -874.258777000272,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.2164491636212915e-11,
+      "price_other_per_token": 1.391406292534039e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5kJyS1FoczqgCEC8fHNhXxsCxuFknC1arzxxCUKVEF1kdDyXgrUZ7fCPr4jzTFyn7UuESkVR47owd88F491YHBfT",
+      "slot": 447645168,
+      "block_time_unix": 1789600599,
+      "signer": "Fg3pR2BFo9HxAqfjvkATntXh89ePRW1pPNWnFuekXUm5",
+      "token_net_delta": -89.0755069950228,
+      "other_mint": "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re",
+      "other_net_delta": 0.01022704005805064,
+      "price_other_per_token": 0.00011481315574911169,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5R5ch3ui2UWvgtmLYctSyGp5x2tGVAeBXw6hDJkyzSvpe2im1BwDdEkn69sbQQauBdgeTqLVXoHrfxPEtyZHQza",
+      "slot": 447645170,
+      "block_time_unix": 1789600599,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -436.6679199965838,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.900435447372729e-11,
+      "price_other_per_token": 6.642199517187844e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4PgBHwvjjDoWMLGtvFXhGNuw1VX8L7KxSMPjfZ5BcLM3ZMYMp1z1MuN6TZ4XJ8vf5KpwTJKEw2LupasDd1UPxAkt",
+      "slot": 447645172,
+      "block_time_unix": 1789600600,
+      "signer": "4VUnG8M49Ym1w1BFZuVCSsZA7DWjdPEyLAN1DNBtSGN6",
+      "token_net_delta": -2034.016245003775,
+      "other_mint": "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re",
+      "other_net_delta": 0.2338316667404392,
+      "price_other_per_token": 0.00011496056991423154,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "vCrkxeMkbXYMY1uNgfSdVDemeVuDi51fN4pC95Jd5KNixpFDG7sToQMAXdQDsu7bD7ikyMTub4r4u43cKPsY4gJ",
+      "slot": 447645175,
+      "block_time_unix": 1789600601,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2411.459032991188,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 4.419931087795703e-11,
+      "price_other_per_token": 1.832886657963745e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4oU2LKH9ebBVPnrQZKQh4TPBufafSmmcx24BbBpGPdByZcGfxnDSWSCzKCHHGtVbsj8gmVCHFH4mRAsM8mDfqNYf",
+      "slot": 447645175,
+      "block_time_unix": 1789600601,
+      "signer": "9dSdnmzURP3q2mAH9yUcuj6Qw3rFbAvTzXpRnWstdmaG",
+      "token_net_delta": -14380.728461001301,
+      "other_mint": "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re",
+      "other_net_delta": -1.5525587102612803,
+      "price_other_per_token": 0.0001079610615325657,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4cghLuAiQ3PuF2h3moeyjFXqKMc1z9Z7q5tUFfkkZP2yBsZVfYQ1jpVnCZRTb7cqMyUCmzZNHEiR9qPQ8cujXPyv",
+      "slot": 447645176,
+      "block_time_unix": 1789600601,
+      "signer": "8XgaVXKrjpiMHqzqoVF1XGyxdidEXkZ5VRKUwceuYNWk",
+      "token_net_delta": -20187.49113099859,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.1509256829891115,
+      "price_other_per_token": 0.00010654744906296408,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "485QYXiwpFpTaXJLVu1n7MUSgEDV46WTC2E4k6v2aLWAZoRtk9wpzWc9LfFr36FLyg6NZ8wdd12RK43iWxw64Rq1",
+      "slot": 447645179,
+      "block_time_unix": 1789600602,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1096.4981930095528,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -4.128253294766182e-11,
+      "price_other_per_token": 3.7649430898152116e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2LCzYGBMuFDjSXBQdjZKkvinjirZ9n3ZZGERfXAMoQYYu7vYidzYCQXmebmCWDikymZfXnaonKy7vwxce96PnFES",
+      "slot": 447645179,
+      "block_time_unix": 1789600602,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -15020.05281299539,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.8559376258053817e-11,
+      "price_other_per_token": 1.2356398801738031e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5wqiaaCDSXdqtxpKEV6QJVXzApRfofacqN8SU9qC6tjnDYrmES64zid1j7aiZwmqNaV9wQyqYifhecNHe9vcXuKf",
+      "slot": 447645179,
+      "block_time_unix": 1789600602,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2846.088441003856,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.5714541607158026e-11,
+      "price_other_per_token": 9.035046570122796e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3zVK5kf7C2Jwcb2xJGxBGMSCoMmXtm7oAz935QqgjgdcM6Ry6wPwgnp6kSdiBLRvbFfVnSHwmokXBHDEmBVfREEc",
+      "slot": 447645181,
+      "block_time_unix": 1789600603,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -733.5934999978344,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.0534685063466895e-12,
+      "price_other_per_token": 2.799191250130694e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "i9kWWCN1AwvRMp9iPHbhK6sLhFAFMPAehZW1oQJP591Mgz18b7TyLZVrE8AK7c5ELCNwD3v6wsY6fdKd2hAYKNN",
+      "slot": 447645184,
+      "block_time_unix": 1789600604,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -421.1148309952059,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.4870771281039197e-11,
+      "price_other_per_token": 3.531286524840653e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2N9XoUDCyMnVSkHQrb9gjtnL13PuySJKZvX1cax8P5h4gLw4a98ksxwC6vTJi8sNxYWJVDVbQGgr7YRhmL5iKziL",
+      "slot": 447645187,
+      "block_time_unix": 1789600605,
+      "signer": "JDjmLcFtWNpUxeu4SbJCG3HAaa8RozMTNEWgD6adMcTM",
+      "token_net_delta": -16232.055893003126,
+      "other_mint": "So11111111111111111111111111111111111111112",
+      "other_net_delta": -1.7286814725084128,
+      "price_other_per_token": 0.00010649799901524278,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3GMn8HPapWNC2D1fQQbpvQ9ehjtGY6bU9qNPYqEk5wMoUXdwahuE91ZMJhJ5x8ipnapzWx6ouEj4pLaqHMGg8X4t",
+      "slot": 447645187,
+      "block_time_unix": 1789600605,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -893.847651000764,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.6910917111090384e-11,
+      "price_other_per_token": 1.8919238745167245e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2v3JCoNSa2zpN6GtnkBddYKN61wNatkkowaWT8Y5qWWLtWmWSk8YnfocDyY1Ct4hK6CPnmHDCWNXLD9tbgsMMDuv",
+      "slot": 447645188,
+      "block_time_unix": 1789600605,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -4463.243839993869,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 6.650680006714538e-12,
+      "price_other_per_token": 1.4901000808245496e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3dc46DuZv6iHxot8arUvvNP7zx2uRqA4ribSQ46J3dmBkoZSeJpgGgmWbzn83CniyGQRH8RorkS3RhfgypAK1ssq",
+      "slot": 447645191,
+      "block_time_unix": 1789600606,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -403.37986200739033,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 9.71134284100117e-12,
+      "price_other_per_token": 2.4074932230561494e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "Z8Tg17tYEPXPurxGQhsW2EGmVwE5sLunMRNMcrQ2CZNSYVfe5AdFwWhEzLcvuMDfhZHviW674DkL6NZY3Pc6wpC",
+      "slot": 447645194,
+      "block_time_unix": 1789600607,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -13582.07816200162,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.8616219676914625e-11,
+      "price_other_per_token": 1.3706458948967727e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5dyg6gAuRUb94KLLhdFeqXUMoRj4DyjS62DDa4KbxsKjcroMYGJV2xpncGyECpVZ398SuRrz7drwx25oJiSkG8WJ",
+      "slot": 447645195,
+      "block_time_unix": 1789600607,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -733.2348730090271,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -4.874323167314287e-12,
+      "price_other_per_token": 6.647696865959454e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3sL9AuRvUnSuSwYKBqtwBmaZZxyTAskdQoJcrSkQVDVJu1msyKU9RCEsG3XogAvTk54UL1hqfZH5GjGivW7DpTN1",
+      "slot": 447645196,
+      "block_time_unix": 1789600607,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -3236.1007779887295,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.7557511000632076e-11,
+      "price_other_per_token": 5.425514285604002e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "24MsaADmpanqzevmjP23oriogisULiLYP5fWuw9kkHf32RJW9afGpbKFAeH3bUSeFfYCS4c8yZGNeQGKW1oxiHy7",
+      "slot": 447645197,
+      "block_time_unix": 1789600608,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1443.239671011659,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -7.666756118851481e-12,
+      "price_other_per_token": 5.312184991060674e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3hNSJVzy2EVSjcvj5i5idrDyLgjFdo4mkLi4tHTmnCzgZJCvTDoayrnT6uBDFL42RhHSsfTQdidqx7BBYXVvhhs1",
+      "slot": 447645198,
+      "block_time_unix": 1789600608,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -923.96059199921,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -9.245937349078304e-12,
+      "price_other_per_token": 1.0006852488234919e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "XrdNzNfrddMDb6nZVniydzPtdCRxUUoKz49cqoeyM3cRWRaCAPXyQGGjQqTSzXsDJuGTCdoqoAJcSGTKuwfHz7B",
+      "slot": 447645201,
+      "block_time_unix": 1789600609,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -1216.5105569903244,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.1961099605505296e-11,
+      "price_other_per_token": 1.805253516240547e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5vDbQjKRcKtSM5QcH7CUjniJr6E35HWvmEYyDbACq4aov9EdXTimooqy358x52Sdgc4scK6Xs1F4JniAiFirLYTR",
+      "slot": 447645206,
+      "block_time_unix": 1789600610,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -899.2833060005651,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.4015455462867976e-11,
+      "price_other_per_token": 1.5585139153977767e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "Myt6mPaRtgpGGK9Qss5QQdpBmBjEkNVkbwcxaCJS7NvmWgEoJEErTkx9PRSQaKjXnUbgrqHf9Bc9vrDe4d1vvM1",
+      "slot": 447645208,
+      "block_time_unix": 1789600611,
+      "signer": "Ecm4ZvFLG3L4Bq4Fy6WekzMXVu4dJf55QK543wdsjhH8",
+      "token_net_delta": -1606.9912529959256,
+      "other_mint": "So11111111111111111111111111111111111111112",
+      "other_net_delta": 0.1791600010184098,
+      "price_other_per_token": 0.00011148785077977275,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "32TPJZbjbQn9VGQLRtCxTwYV1GuBCc8BwNousFGtxXDwfbrK7R2Haz2mUbpguePoyyetq835wopN5vBv5Jn1modc",
+      "slot": 447645209,
+      "block_time_unix": 1789600611,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -898.2835910020913,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.1823431123048067e-11,
+      "price_other_per_token": 1.3162247692689448e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "4S8gMLR87QQ2w8xeDXCUn7VoDFogL2MGzB6MKX4Q5RVEiCopHN7JUsfRXqLkHa3PCqH7E57Cbo1mgsoryqyWZzrN",
+      "slot": 447645209,
+      "block_time_unix": 1789600611,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -613.0548260074975,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 9.35784782996052e-12,
+      "price_other_per_token": 1.5264291924595462e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "23Y12U1x8VJ1AsJqDTUu4u1S35xvm5ucxWYUA7EYa1N85RjppMp5xWzWWQjPTHX5L2981SPGXJt44TmcVzFEGe3q",
+      "slot": 447645228,
+      "block_time_unix": 1789600617,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -303.784209988562,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.3718803870688134e-11,
+      "price_other_per_token": 4.515970027278465e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "ZPApyTj6v3hyt3W53jA9DzC1akGa52v84wDDAESWmj3BjXEaW995BWtXD9bEe1vkYnXdYcdRPdXRkEg1nSkoP1m",
+      "slot": 447645235,
+      "block_time_unix": 1789600619,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2244.3199009977398,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.9736213491560193e-12,
+      "price_other_per_token": 1.3249543203863493e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2Jmn6v8U4U8Uz8ZSofzxh1Fpy1VQnXZERbkTzXuAgEFRGc2ShtVDJrveK5KJKVLunEWd7rFw8rVRFprP2t6xXzaG",
+      "slot": 447645238,
+      "block_time_unix": 1789600620,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -538.8476490095054,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.4439116569064936e-11,
+      "price_other_per_token": 2.6796287588164325e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2fQTstdi8PG641EatCnFPbNEvW1RRAdnhpW2NYLsVsHy1uBTokA1wJPjxB93KxY3xfEyZh4QohMH5oxuAEfDFZvF",
+      "slot": 447645242,
+      "block_time_unix": 1789600622,
+      "signer": "H4XXR7Pu8724t1rjWWwmjWo5nY8WS9z4gPtWwLhJLRHn",
+      "token_net_delta": -843.2027769922752,
+      "other_mint": "So11111111111111111111111111111111111111112",
+      "other_net_delta": -0.08859181999998356,
+      "price_other_per_token": 0.00010506585416617429,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5GYM2SthRDAAC8eJU3aANnGBrGwR8jaGLzTND6DddJGm93oDGX6JPDxsRyDBkFwnGmWsBRhESCTyP4zkNZd7Sf76",
+      "slot": 447645244,
+      "block_time_unix": 1789600622,
+      "signer": "DHPv75RyPDLJAJ5CSiMy6bxRRtHqyjaySXvVXhoDp9Tv",
+      "token_net_delta": -420.15858400502657,
+      "other_mint": "So11111111111111111111111111111111111111112",
+      "other_net_delta": -0.04384414301039641,
+      "price_other_per_token": 0.0001043514155832929,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "5SRkKR13ZyXD8odmuDvLb5GvPHKHsaUspHZs5MG8qPYG4kVjVpgSWWQvm1maoPLJpTXH7tPvMiw8gNmhT8fHdC6y",
+      "slot": 447645248,
+      "block_time_unix": 1789600624,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -457.997305998364,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 1.7316814648893342e-11,
+      "price_other_per_token": 3.780986137275488e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3WAK4CLJ5EF4up7tn4nAiqWb9ozNRjmPfjsddDZKiBAF14yFkK4dxSHKKSJn7pRSTYgvLLyGfC53KGjeVXiQTXvv",
+      "slot": 447645249,
+      "block_time_unix": 1789600624,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -7674.5174669937405,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -2.248157215944957e-11,
+      "price_other_per_token": 2.9293792419051e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2gttZWzYGcAA1eeZjmCE34FAh1kgHRYVatkHNGnckzMKeKXXVHCTErA9Y1pNVbZ3jAVKjrpGzpx1twsZmJq6Gy6X",
+      "slot": 447645249,
+      "block_time_unix": 1789600624,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -551.296097010345,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.9686475500056986e-11,
+      "price_other_per_token": 5.38485138223279e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2KBAMCdmJRCa6rrysNBDCvU4zj4cd8fG7gyFuWpfNEcYGNHHtXjmLFHcQbEtqsKtJ5uV9qvrYpvxFzCBGS1uru1A",
+      "slot": 447645249,
+      "block_time_unix": 1789600624,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -467.2557069957438,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 4.433786671143025e-12,
+      "price_other_per_token": 9.488994151939618e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "49PJpuFzWiiyURGYTJZoHCoFosgJeenJWjgtQ5HPV2ANmLN4sWPJEaXyJrV5zhpCHBUi16hesRqkCfQUdJ6959sM",
+      "slot": 447645251,
+      "block_time_unix": 1789600624,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -4996.405764008494,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -1.461586407458526e-11,
+      "price_other_per_token": 2.925275641115927e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "gbB3cg1MB6G9GMToBLn9CPm8ZGAzHKgzMQuBAKHDQxKywJTcvJfu4oBeNetWNVsH6pDEp9PgohAUWECyNSjyJ2i",
+      "slot": 447645254,
+      "block_time_unix": 1789600625,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -537.2118059924906,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -5.709210881832405e-12,
+      "price_other_per_token": 1.0627485878283567e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "2oPSNAAb5oU7jyqLxSB4U4BJsC5hRcRQnkF2X324pKSaVZuZMTaHbwpBHpuyRRNcBFq4qaUPuT38Y91KnbWhYCqf",
+      "slot": 447645258,
+      "block_time_unix": 1789600627,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -9011.468151001318,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.468425464030588e-11,
+      "price_other_per_token": 2.7392045587558413e-15,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "3eJSRKL7Q7WpkPJJJ9XgetruFMHQMRUuvJCCAVhTgvLUBRBVi1PpC42cfB7bZS7bLcWYuAsePdrL71myJ9r6p1dW",
+      "slot": 447645260,
+      "block_time_unix": 1789600627,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -2668.1765279954852,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": 2.8535396268125623e-11,
+      "price_other_per_token": 1.069471827246878e-14,
+      "is_our_wallet": false
+    },
+    {
+      "signature": "NzQRVuLXjfST8qGgCWt3wR8yN8BbBcKDjK3WeSNaFFxDFiGrPy6A1qKC8SBK5rYNMecC8ECyYdqEuMuWGS8dHSt",
+      "slot": 447645261,
+      "block_time_unix": 1789600628,
+      "signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "token_net_delta": -7276.4068689963315,
+      "other_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "other_net_delta": -4.1239900383516215e-11,
+      "price_other_per_token": 5.66761880224609e-15,
+      "is_our_wallet": false
     }
   ],
-  "n_unique_other_addresses": 41,
+  "n_unique_other_addresses": 48,
   "unique_other_addresses": [
     "23pV3a97bH3pKczjipwKiekzXg2Qt4vtebbYmUtBQ2vm",
     "29eV5LuZwwVaoufKr5ShBejYVP6N4JZ14U3M5rffXsjp",
@@ -2511,6 +3282,7 @@
     "2uGxhTYB8c4FQVQouMLgF2MNh192qPFTjCiJrebPaiSr",
     "34GDeKEpeL6kKmTokzTYGeQhP6mWVSv9wfhYQGmG3Aru",
     "47CAKAW81bNnMMED5Eq4vuAqsWpH8GuQS2sLRGEq9ZbE",
+    "4VUnG8M49Ym1w1BFZuVCSsZA7DWjdPEyLAN1DNBtSGN6",
     "4h7xgRjzyiCGBoZkXRr7Cf5w6oQK64QnUSW3ST1uY4c8",
     "4i2kn2hPxWjCg1RegjKvB5gWJbj7mHGTNTi6vj6jqio9",
     "4osRPXhCQK44Fxu1GkhLs4JP1uTW1EgLXjYk5anYRmEZ",
@@ -2522,8 +3294,10 @@
     "6xvtAar8EzBWeTKiRs5dKL3Pc5gpKWFrMwbQ5CWtbvrX",
     "7dGrdJRYtsNR8UYxZ3TnifXGjGc9eRYLq9sELwYpuuUu",
     "88AkHK2vdQ1XM3yhJoW5JJsH7wAJxct35vC44ftmpiVX",
+    "8XgaVXKrjpiMHqzqoVF1XGyxdidEXkZ5VRKUwceuYNWk",
     "92MDrZqegrdMmpsrBBREeEWa6Es7ZF3nhdCCtsJeSA4b",
     "98v4eo7Ngh1USvQdwX1wqQUamoMBYt84eC73zQtbJV3k",
+    "9CaQLdhZ8t4bzRVsqbA5kdB864zxYyvhp3yPBQvUHP71",
     "9dSdnmzURP3q2mAH9yUcuj6Qw3rFbAvTzXpRnWstdmaG",
     "AWWw36mNfwQQTxsEqHhqzrHa7963jCjHLrVCsUyiKPwn",
     "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
@@ -2536,13 +3310,17 @@
     "CatyeC3LgBxub7HcpW2n7cZZZ66CUKdcZ8DzHucHrSiP",
     "Cn362o4GxMmnv7sZ3tARftDCLfxfUzz62e3K31vscuH5",
     "Cz12FVeAwy1MWeYFpwUcjuHGpaNXYVkE5JE887TChmCy",
+    "DHPv75RyPDLJAJ5CSiMy6bxRRtHqyjaySXvVXhoDp9Tv",
     "Dpk5AA8HRWiWr17rX88DNTSBKpcLEKnQucvgdHHYPwR4",
     "EYvwg12vXcUN7pF1fASQZZgQ9RbVUMLjKqqCfi961ptw",
+    "Ecm4ZvFLG3L4Bq4Fy6WekzMXVu4dJf55QK543wdsjhH8",
+    "Fg3pR2BFo9HxAqfjvkATntXh89ePRW1pPNWnFuekXUm5",
     "Fv7ArKVq3ch9ubqKRB1aJEeNKDL4u3fiJh2Yt5rvx9Ay",
     "G5bVDZVMZJwn1B4SUNaU8EGVfaHmPF3joHvfso6nx5GW",
     "GJsEadecNRdFtYA75VxzDdjT5CNQUWfRQ1ZpSkTxpDoQ",
     "GmomsKPQNLXmARNsmXTcrruZaC3TdcoTc7tt89YFCHmo",
     "H4XXR7Pu8724t1rjWWwmjWo5nY8WS9z4gPtWwLhJLRHn",
+    "HPbHdRneUfrhm3pjzzAiWjrZJXikg2DXLmGFeLxLWwqu",
     "JDjmLcFtWNpUxeu4SbJCG3HAaa8RozMTNEWgD6adMcTM",
     "MriyaNN8TMp6qRWjfr723PK7xgQK7yCt7Kg2v2PQu7X",
     "shakRDxyKwaBbduqZTZt8Q4etTALbDLnAANStv9TLH3"
@@ -2554,15 +3332,15 @@
     },
     "window_60s": {
       "n_other_trades_before": 0,
-      "n_other_trades_after": 198
+      "n_other_trades_after": 231
     },
     "window_180s": {
       "n_other_trades_before": 1,
-      "n_other_trades_after": 198
+      "n_other_trades_after": 268
     },
     "window_300s": {
       "n_other_trades_before": 2,
-      "n_other_trades_after": 198
+      "n_other_trades_after": 268
     },
     "seconds_to_first_other_trade_after": 1,
     "slot_of_first_other_trade_after": 447644980,
@@ -2582,12 +3360,12 @@
     {
       "horizon_s": 60,
       "target_time_unix": 1789600599,
-      "nearest_trade_time_unix": 1789600584,
-      "gap_to_target_s": 15,
-      "slot": 447645120,
-      "price": 9.761941315529392e-16,
-      "pct_change_from_entry": 1318.200086160796,
-      "signature": "br8JqR5DcoexuW9oz2zdKkZyNzJrcUYCEnPktUjSeV4HdSHKhHs1yzC1zy4aHCju1xQphCGzuT2a5nsGbHMyXbU"
+      "nearest_trade_time_unix": 1789600599,
+      "gap_to_target_s": 0,
+      "slot": 447645168,
+      "price": 0.00011481315574911169,
+      "pct_change_from_entry": 166798818096413.94,
+      "signature": "5kJyS1FoczqgCEC8fHNhXxsCxuFknC1arzxxCUKVEF1kdDyXgrUZ7fCPr4jzTFyn7UuESkVR47owd88F491YHBfT"
     },
     {
       "horizon_s": 180,
@@ -2598,5 +3376,5 @@
       "status": "нет реальной сделки в пределах 60с от цели в собранном окне"
     }
   ],
-  "total_runtime_s": 383.0648560523987
+  "total_runtime_s": 701.0644245147705
 }
