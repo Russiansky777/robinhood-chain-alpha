@@ -77,8 +77,6 @@ from Crypto.Hash import keccak  # noqa: E402
 
 from alchemy_fallback import (  # noqa: E402
     rpc_call_trading_path,
-    fetch_v3_swap_logs,
-    fetch_v4_swap_logs,
     topic0,
     _chunked_get_logs,
     get_block_number,
@@ -165,6 +163,31 @@ MAX_CYCLES_FOR_LIFETIME_CHECK = 50
 # просто не найдёт файл и честно сделает полный bounded-скан каждый раз
 # (см. incremental_scan_one_version -- ветка "без кэша").
 POOL_MAP_CACHE_PATH = Path("/tmp/task_rh_pool_map_cache.json")
+
+# НАЙДЕНО В ЧЕТВЁРТОМ РЕАЛЬНОМ ПРОГОНЕ (run 35277775990): скрипт упал за
+# ~2с, ДО начала реального скана -- eth_getLogs на диапазоне РОВНО
+# 3,000,000 блоков (прежний chunk_size ниже) вернул
+# {'code': -32000, 'message': 'internal server errror'} (дословно, с
+# опечаткой самого провайдера). Эта строка НЕ совпадает ни с одним
+# маркером `_TRANSIENT_ERROR_MARKERS` в `alchemy_fallback.py` (там есть
+# "internal error", это ДРУГАЯ строка) и НЕ совпадает с маркерами
+# бисекции в её же `_get_range` ("exceed"/"too many"/"too large"/
+# "limit") -- поэтому общий модуль не ретраил и не бисектил, а бросал
+# RuntimeError, ничем не пойманный здесь -- весь job падал мгновенно.
+# `alchemy_fallback.py` -- общий модуль для других скриптов сессии,
+# менять её список маркеров ради одной формулировки одного провайдера
+# рискованно и не нужно (см. паспорт задачи владельца) -- вместо этого
+# ДВЕ независимые меры ЛОКАЛЬНО в этом файле: (1) chunk_size уменьшен
+# на порядок ниже (публичный RPC этой цепи реально не тянет диапазон в
+# 3 млн блоков за один запрос, но PoolCreated/Initialize -- редкие
+# события, крупный chunk всё ещё оправдан относительно плотных
+# Swap-сканов, см. SWAP_SCAN_STEP_BLOCKS=2000 выше); (2) собственная
+# бисекция на уровне ЭТОГО скрипта (см. `safe_get_logs` ниже) на
+# случай, если конкретно этот текст ошибки повторится и на
+# уменьшенном диапазоне -- тот же принцип, что уже есть в
+# `_get_range`, просто применённый к строке, под которую общий модуль
+# не подходит.
+POOL_DISCOVERY_CHUNK_SIZE = 400_000
 
 
 def word(data_bytes: bytes, i: int) -> bytes:
@@ -330,17 +353,54 @@ def is_stable_or_native(token: str) -> bool:
     return t in (USDG, WETH, NATIVE)
 
 
+SAFE_GET_LOGS_MIN_WIDTH = 20_000
+SAFE_GET_LOGS_MAX_RETRIES = 3
+
+
+def safe_get_logs(lo: int, hi: int, topics: list, chunk_size: int) -> tuple[list, list]:
+    """Обёртка над `_chunked_get_logs`, устойчивая к НЕРАСПОЗНАННЫМ (не
+    транзиентным по эвристике `alchemy_fallback._looks_transient`)
+    ошибкам провайдера. РЕАЛЬНО НАЙДЕНО (run 35277775990): публичный RPC
+    вернул `{'code': -32000, 'message': 'internal server errror'}`
+    (буквально с опечаткой у провайдера) -- НЕ матчится ни под один
+    маркер транзиентности (`_TRANSIENT_ERROR_MARKERS` ищет "internal
+    error", а тут "internal server errror") -- ни retry внутри
+    `_post_with_fallback`, ни бисекция внутри `_chunked_get_logs` не
+    сработали, весь скрипт упал. Здесь: ретрай с бэкоффом на ТОМ ЖЕ
+    диапазоне, затем бисекция пополам, затем (на минимальной ширине)
+    честный пропуск с диагностикой -- НЕ падение всего прогона на одной
+    сбойной под-выборке."""
+    for attempt in range(SAFE_GET_LOGS_MAX_RETRIES):
+        try:
+            return list(_chunked_get_logs(lo, hi, topics, chunk_size=chunk_size)), []
+        except RuntimeError as exc:
+            if attempt < SAFE_GET_LOGS_MAX_RETRIES - 1:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            last_exc = exc
+    width = hi - lo + 1
+    if width <= SAFE_GET_LOGS_MIN_WIDTH:
+        return [], [{"from": lo, "to": hi, "error": str(last_exc)}]
+    mid = (lo + hi) // 2
+    left_logs, left_unresolved = safe_get_logs(lo, mid, topics, chunk_size)
+    right_logs, right_unresolved = safe_get_logs(mid + 1, hi, topics, chunk_size)
+    return left_logs + right_logs, left_unresolved + right_unresolved
+
+
 def time_boxed_chunked_get_logs(from_block: int, to_block: int, topics: list, chunk_size: int,
-                                 deadline: float) -> tuple[list, bool, int]:
-    """Обёртка над `_chunked_get_logs` с честным потолком по времени --
-    останавливается (не бросает исключение) при исчерпании дедлайна,
-    возвращает то, что успело накопиться, флаг `hit_deadline` и
-    РЕАЛЬНО покрытый до какого блока включительно диапазон (может быть
-    < to_block, если бюджет исчерпан на середине -- честно, не выдаёт
-    частичное покрытие за полное)."""
+                                 deadline: float) -> tuple[list, bool, int, list]:
+    """Обёртка над `_chunked_get_logs` (через `safe_get_logs`, см. её
+    докстринг) с честным потолком по времени -- останавливается (не
+    бросает исключение) при исчерпании дедлайна, возвращает то, что
+    успело накопиться, флаг `hit_deadline`, РЕАЛЬНО покрытый до какого
+    блока включительно диапазон (может быть < to_block, если бюджет
+    исчерпан на середине -- честно, не выдаёт частичное покрытие за
+    полное) и список нераскрытых под-диапазонов (сбойных даже после
+    ретрая/бисекции)."""
     if from_block > to_block:
-        return [], False, from_block - 1
+        return [], False, from_block - 1, []
     out = []
+    unresolved: list = []
     block = from_block
     hit_deadline = False
     while block <= to_block:
@@ -348,10 +408,12 @@ def time_boxed_chunked_get_logs(from_block: int, to_block: int, topics: list, ch
             hit_deadline = True
             break
         end = min(block + chunk_size - 1, to_block)
-        out.extend(_chunked_get_logs(block, end, topics, chunk_size=chunk_size))
+        logs, unres = safe_get_logs(block, end, topics, chunk_size)
+        out.extend(logs)
+        unresolved.extend(unres)
         block = end + 1
     covered_to = block - 1
-    return out, hit_deadline, covered_to
+    return out, hit_deadline, covered_to, unresolved
 
 
 # --------------------------------------------------------------- phases
@@ -406,15 +468,18 @@ def sanity_check_known_txs(v3_pool_map: dict, v4_pool_map: dict) -> dict:
 
 
 def time_boxed_chunked_get_logs_backward(from_block: int, to_block: int, topics: list, chunk_size: int,
-                                          deadline: float) -> tuple[list, bool, int]:
+                                          deadline: float) -> tuple[list, bool, int, list]:
     """Как `time_boxed_chunked_get_logs`, но идёт от `to_block` НАЗАД к
     `from_block` -- если бюджет кончится на середине, честно покрыты
     САМЫЕ СВЕЖИЕ блоки (ближе к latest_block), а не самые старые. Для
     поиска пулов это важно: своп-скан (см. ниже) тоже смотрит НАЗАД от
-    latest_block -- пулы, актуальные ДЛЯ ЭТОГО ОКНА, скорее свежие."""
+    latest_block -- пулы, актуальные ДЛЯ ЭТОГО ОКНА, скорее свежие.
+    Использует `safe_get_logs` -- см. её докстринг про устойчивость к
+    нераспознанным ошибкам провайдера."""
     if from_block > to_block:
-        return [], False, to_block + 1
+        return [], False, to_block + 1, []
     out = []
+    unresolved: list = []
     block = to_block
     hit_deadline = False
     while block >= from_block:
@@ -422,10 +487,12 @@ def time_boxed_chunked_get_logs_backward(from_block: int, to_block: int, topics:
             hit_deadline = True
             break
         start = max(from_block, block - chunk_size + 1)
-        out.extend(_chunked_get_logs(start, block, topics, chunk_size=chunk_size))
+        logs, unres = safe_get_logs(start, block, topics, chunk_size)
+        out.extend(logs)
+        unresolved.extend(unres)
         block = start - 1
     covered_from = block + 1
-    return out, hit_deadline, covered_from
+    return out, hit_deadline, covered_from, unresolved
 
 
 def load_pool_map_cache() -> dict:
@@ -466,44 +533,49 @@ def incremental_scan_one_version(cache_entry: dict, topic0_val: str, latest_bloc
     covered_to = cache_entry.get("covered_to_block")
     n_new_logs = 0
     hit_any = False
+    unresolved_ranges: list = []
     remaining = budget_s
 
     if covered_from is None or covered_to is None:
-        logs, hit, reached_from = time_boxed_chunked_get_logs_backward(
-            0, latest_block, [topic0_val], chunk_size=3_000_000, deadline=time.time() + remaining)
+        logs, hit, reached_from, unres = time_boxed_chunked_get_logs_backward(
+            0, latest_block, [topic0_val], chunk_size=POOL_DISCOVERY_CHUNK_SIZE, deadline=time.time() + remaining)
         for log in logs:
             d = decode_fn(log)
             pools[d[key_field]] = d
         n_new_logs += len(logs)
         hit_any = hit
+        unresolved_ranges.extend(unres)
         covered_from, covered_to = reached_from, latest_block
     else:
         if covered_to < latest_block:
             deadline = time.time() + remaining
-            logs, hit, reached_to = time_boxed_chunked_get_logs(covered_to + 1, latest_block, [topic0_val],
-                                                                  chunk_size=3_000_000, deadline=deadline)
+            logs, hit, reached_to, unres = time_boxed_chunked_get_logs(covered_to + 1, latest_block, [topic0_val],
+                                                                         chunk_size=POOL_DISCOVERY_CHUNK_SIZE, deadline=deadline)
             for log in logs:
                 d = decode_fn(log)
                 pools[d[key_field]] = d
             n_new_logs += len(logs)
             hit_any = hit_any or hit
+            unresolved_ranges.extend(unres)
             covered_to = reached_to
             remaining = budget_s - (time.time() - t0)
         if remaining > 5.0 and covered_from > 0:
             deadline = time.time() + remaining
-            logs, hit, reached_from = time_boxed_chunked_get_logs_backward(
-                0, covered_from - 1, [topic0_val], chunk_size=3_000_000, deadline=deadline)
+            logs, hit, reached_from, unres = time_boxed_chunked_get_logs_backward(
+                0, covered_from - 1, [topic0_val], chunk_size=POOL_DISCOVERY_CHUNK_SIZE, deadline=deadline)
             for log in logs:
                 d = decode_fn(log)
                 pools[d[key_field]] = d
             n_new_logs += len(logs)
             hit_any = hit_any or hit
+            unresolved_ranges.extend(unres)
             covered_from = reached_from
 
     return {
         "pools": pools, "covered_from_block": covered_from, "covered_to_block": covered_to,
         "n_new_this_run": n_new_logs, "hit_deadline": hit_any, "runtime_s": time.time() - t0,
         "full_history_covered": covered_from == 0 and covered_to >= latest_block,
+        "n_unresolved_ranges": len(unresolved_ranges),
     }
 
 
@@ -536,6 +608,8 @@ def scan_pool_universe(latest_block: int, v3_budget_s: float, v4_budget_s: float
                  "v4_covered_range": [v4_res["covered_from_block"], v4_res["covered_to_block"]],
                  "v3_full_history_covered": v3_res["full_history_covered"],
                  "v4_full_history_covered": v4_res["full_history_covered"],
+                 "v3_n_unresolved_ranges": v3_res["n_unresolved_ranges"],
+                 "v4_n_unresolved_ranges": v4_res["n_unresolved_ranges"],
                  "cache_path": str(POOL_MAP_CACHE_PATH)},
     }
 
@@ -561,17 +635,29 @@ def probe_v2_style(latest_block: int) -> dict:
     }
 
 
+V3_SWAP_TOPIC0 = topic0("Swap(address,address,int256,int256,uint160,uint128,int24)")
+V4_SWAP_TOPIC0 = topic0("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)")
+
+
 def scan_swaps_timeboxed(latest_block: int, budget_deadline: float) -> dict:
+    """Через `safe_get_logs` (не напрямую `fetch_v3_swap_logs`/
+    `fetch_v4_swap_logs`) -- см. её докстринг про устойчивость к
+    нераспознанным ошибкам провайдера (реально уронило прогон 4,
+    run 35277775990, на скане ПУЛОВ; тот же риск есть и здесь)."""
     t0 = time.time()
     to_block = latest_block
     covered_from = latest_block + 1
     v3_logs: list = []
     v4_logs: list = []
     n_steps = 0
+    n_unresolved = 0
     while to_block >= 0 and time.time() < budget_deadline and (latest_block - to_block) < MAX_SWAP_SCAN_WINDOW_BLOCKS:
         from_block = max(0, to_block - SWAP_SCAN_STEP_BLOCKS + 1)
-        v3_logs.extend(fetch_v3_swap_logs(from_block, to_block))
-        v4_logs.extend(fetch_v4_swap_logs(from_block, to_block))
+        logs3, unres3 = safe_get_logs(from_block, to_block, [V3_SWAP_TOPIC0], chunk_size=SWAP_SCAN_STEP_BLOCKS)
+        logs4, unres4 = safe_get_logs(from_block, to_block, [V4_SWAP_TOPIC0], chunk_size=SWAP_SCAN_STEP_BLOCKS)
+        v3_logs.extend(logs3)
+        v4_logs.extend(logs4)
+        n_unresolved += len(unres3) + len(unres4)
         covered_from = from_block
         to_block = from_block - 1
         n_steps += 1
@@ -581,7 +667,8 @@ def scan_swaps_timeboxed(latest_block: int, budget_deadline: float) -> dict:
                  "window_blocks": latest_block - covered_from + 1, "n_steps": n_steps,
                  "runtime_s": time.time() - t0, "n_v3_swap_events": len(v3_logs), "n_v4_swap_events": len(v4_logs),
                  "hit_time_budget": time.time() >= budget_deadline,
-                 "hit_window_cap": (latest_block - covered_from) >= MAX_SWAP_SCAN_WINDOW_BLOCKS},
+                 "hit_window_cap": (latest_block - covered_from) >= MAX_SWAP_SCAN_WINDOW_BLOCKS,
+                 "n_unresolved_subranges": n_unresolved},
     }
 
 
