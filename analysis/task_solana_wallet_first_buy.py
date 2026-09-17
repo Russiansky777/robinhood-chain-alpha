@@ -223,15 +223,31 @@ def analyze_tx(tx: dict, wallet: str, mint: str) -> dict | None:
 
     account_keys = [k.get("pubkey") if isinstance(k, dict) else k
                     for k in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
+    lamport_diag = None
     if paid_usdc is None and paid_sol is None and wallet in account_keys:
         wallet_idx = account_keys.index(wallet)
         pre_bal = (meta.get("preBalances") or [None])[wallet_idx] if wallet_idx < len(meta.get("preBalances") or []) else None
         post_bal = (meta.get("postBalances") or [None])[wallet_idx] if wallet_idx < len(meta.get("postBalances") or []) else None
         fee = meta.get("fee", 0)
+        lamport_diag = {"wallet_idx": wallet_idx, "pre_bal": pre_bal, "post_bal": post_bal, "fee": fee}
         if pre_bal is not None and post_bal is not None:
             lamport_delta = pre_bal - post_bal - fee  # за вычетом комиссии сети
             if lamport_delta > 0:
                 paid_sol = lamport_delta / 1e9
+
+    # ЧЕСТНАЯ ДИАГНОСТИКА: если платёж всё ещё не определён -- дампим сырые
+    # балансы вместо того, чтобы гадать дальше. Реальный прогон (2 из 3
+    # покупок) показал paid_sol=null даже после проверки WSOL-дельты --
+    # нужно увидеть фактические данные транзакции, а не предполагать
+    # очередной механизм оплаты вслепую.
+    diag = None
+    if paid_usdc is None and paid_sol is None:
+        diag = {
+            "wallet_in_account_keys": wallet in account_keys,
+            "lamport_check": lamport_diag,
+            "pre_token_balances": pre_tb, "post_token_balances": post_tb,
+            "account_keys": account_keys,
+        }
 
     # Программы верхнеуровневых инструкций -- реальный on-chain факт.
     instrs = tx.get("transaction", {}).get("message", {}).get("instructions", [])
@@ -248,13 +264,16 @@ def analyze_tx(tx: dict, wallet: str, mint: str) -> dict | None:
                                "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
                                "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")]
 
-    return {
+    result = {
         "signature": tx.get("transaction", {}).get("signatures", [None])[0],
         "slot": tx.get("slot"), "block_time_unix": tx.get("blockTime"),
         "token_amount_received": token_delta,
         "paid_usdc": paid_usdc, "paid_sol": paid_sol,
         "program_ids_involved": program_ids, "dex_labels_guess": dex_labels,
     }
+    if diag is not None:
+        result["UNRESOLVED_PAYMENT_DIAGNOSTIC"] = diag
+    return result
 
 
 def main() -> None:
