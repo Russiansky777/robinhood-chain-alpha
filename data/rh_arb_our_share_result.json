@@ -1,45 +1,813 @@
 {
-  "generated_at_utc": "2026-09-17T13:37:12Z",
-  "n_pools_tvl_and_h1_active": 90,
-  "latest_block": 65408207,
+  "generated_at_utc": "2026-09-17T18:03:31Z",
+  "n_pools_tvl_and_h1_active": 87,
+  "latest_block": 65567199,
   "pair_discovery": {
-    "n_resolved_pools": 88,
-    "n_token_groups": 58,
-    "n_cross_version_pairs": 25,
-    "n_same_version_diff_fee_pairs": 13
+    "n_resolved_pools": 70,
+    "n_token_groups": 45,
+    "n_cross_version_pairs": 24,
+    "n_same_version_diff_fee_pairs": 12
   },
-  "n_pairs_total": 38,
+  "n_pairs_total": 36,
   "gas_assumption": {
-    "real_eth_gasPrice_wei": 49498000,
+    "real_eth_gasPrice_wei": 55574000,
     "real_cycle_gas_used_samples": [
       378848,
       186163,
       290261
     ],
     "median_gas_used": 290261,
-    "native_usd_price": 2434.9139433862365,
-    "gas_cost_usd_per_cycle": 0.03498323400688876,
+    "native_usd_price": 2459.0096754891906,
+    "gas_cost_usd_per_cycle": 0.03966619855260169,
     "source": "data/task5_arb_suspect_audit_3tx_result.json (реальные multi-leg-своп tx на этой цепи) + текущий eth_gasPrice"
   },
   "window": {
-    "from_block": 65402248,
-    "to_block": 65408207,
+    "from_block": 65561240,
+    "to_block": 65567199,
     "window_blocks_intended": 5959,
     "window_minutes_intended": 10.0
   },
-  "batching_supported": true,
-  "batch_failure_diagnostic": {
-    "reason": "non_200",
-    "status_code": 429,
-    "body_snippet": "",
-    "n_requests": 20
+  "sequential_rpc_supported": true,
+  "prefilter": {
+    "n_sample_blocks": 8,
+    "n_pairs_checked": 36,
+    "n_pairs_excluded_fee_dominant": 11,
+    "n_pairs_surviving": 25,
+    "n_prefilter_call_errors": 16,
+    "runtime_s": 163.0135726928711,
+    "details": [
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.0003,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00020999597480729403,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.0006,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00048430224212109746,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.000255,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00029715250867288107,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.000555,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0005005898095597349,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.00025,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00023824991633915722,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.00055,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0005396932975349959,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.0003,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00021241875556346658,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.0006,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0005138543519815834,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x7a35168956f129c032ec035cc47383a605a71df0",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.00024,
+        "n_samples_ok": 0,
+        "max_sampled_gap_frac": null,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x7a35168956f129c032ec035cc47383a605a71df0",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.00054,
+        "n_samples_ok": 0,
+        "max_sampled_gap_frac": null,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.0007,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0003465143119731243,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.001,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0007074328544632269,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xb2a6ad51b3ea3cdc8d3508cca147a43471382e53",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.0003,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00012047418741879927,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xb2a6ad51b3ea3cdc8d3508cca147a43471382e53",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.0006,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0004470560528052748,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x9b050cb1f265094b0977160a2bd7da8c9e529c3c",
+        "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "combined_fee_frac": 0.0007,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00027830633672067026,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x9b050cb1f265094b0977160a2bd7da8c9e529c3c",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.001,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.000514402712716713,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+        "pool_b": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+        "combined_fee_frac": 0.004,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0021376283370259214,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x56000f3980200d0f39a9f2eefd5233b2196b4445",
+        "pool_b": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+        "combined_fee_frac": 0.0035,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.002666354228362022,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x2f393b60ef0cfaf669af63284e5592dc3a657b73",
+        "pool_b": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+        "combined_fee_frac": 0.005072,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0019121835428982878,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x79218d7af86a312db676f9bf088db2881fc112c8",
+        "pool_b": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+        "combined_fee_frac": 0.0035,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.001094025783509952,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x79218d7af86a312db676f9bf088db2881fc112c8",
+        "pool_b": "0xa0d0bf9947aed50801f5202e714ad04463ba8b5ab409712372af3e6bd66d1fa0",
+        "combined_fee_frac": 0.00102,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0001688010825988358,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x960f79d8dfec7f2f0c1b24cdac6bb9df1371c6e2",
+        "pool_b": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+        "combined_fee_frac": 0.003555,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0010978802685977702,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x960f79d8dfec7f2f0c1b24cdac6bb9df1371c6e2",
+        "pool_b": "0xa0d0bf9947aed50801f5202e714ad04463ba8b5ab409712372af3e6bd66d1fa0",
+        "combined_fee_frac": 0.001075,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00014856560640863042,
+        "fee_dominant_excluded": true
+      },
+      {
+        "token_pair": [
+          "robinhood_0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v3_vs_v4",
+        "pool_a": "0x647bfd55cc873f3a4165064cf423d505d95289cd",
+        "pool_b": "0x7aebd80541bfaaf23dbb6e99ce13d4d31c1a84c91414f971eadbff7db5f85995",
+        "combined_fee_frac": 0.00355,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.003793806156712601,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+        "combined_fee_frac": 0.0007,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00041264492419920375,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "pool_b": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "combined_fee_frac": 0.000187,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00013457940207366162,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "pool_b": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+        "combined_fee_frac": 0.00056,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0005666905064029211,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+        "combined_fee_frac": 0.000183,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0001889404154632894,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+        "combined_fee_frac": 0.000191,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00023139316688878994,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "pool_b": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+        "combined_fee_frac": 0.000547,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0004329963961895713,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+        "combined_fee_frac": 0.00017,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.000194456539771316,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+        "combined_fee_frac": 0.000178,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00020132527936457897,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+        "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+        "combined_fee_frac": 0.000543,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.000490656516174598,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+        "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+        "combined_fee_frac": 0.000551,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0004046378074970646,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x0000000000000000000000000000000000000000",
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+        "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+        "combined_fee_frac": 0.000174,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.00011224897649920944,
+        "fee_dominant_excluded": false
+      },
+      {
+        "token_pair": [
+          "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+        ],
+        "pair_type": "v4_diff_fee",
+        "pool_a": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+        "pool_b": "0xa0d0bf9947aed50801f5202e714ad04463ba8b5ab409712372af3e6bd66d1fa0",
+        "combined_fee_frac": 0.00352,
+        "n_samples_ok": 8,
+        "max_sampled_gap_frac": 0.0012092090916455208,
+        "fee_dominant_excluded": true
+      }
+    ]
   },
-  "n_blocks_scanned": 6,
-  "partial_coverage_reason": "batching (чанками по 20) отказал на блоке 65402254 -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)",
-  "n_opportunities_found": 0,
-  "median_size_usd": null,
-  "n_lived_more_than_1_block": 0,
-  "episodes_sample_first_30": [],
-  "verdict": "ЗАКРЫТА -- 0 живущих дольше 1 блока, возможностей вообще не найдено",
-  "total_runtime_s": 81.62885189056396
+  "dense_scan_budget_s": 1160.379251241684,
+  "per_pair_coverage": [
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+      "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+      "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+      "pool_b": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xb2a6ad51b3ea3cdc8d3508cca147a43471382e53",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x9b050cb1f265094b0977160a2bd7da8c9e529c3c",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+      "pool_b": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x56000f3980200d0f39a9f2eefd5233b2196b4445",
+      "pool_b": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+      "n_blocks_covered": 79,
+      "coverage_seconds": 7.953720000000001,
+      "coverage_fraction_of_window": 0.01325725792918275
+    },
+    {
+      "token_pair": [
+        "robinhood_0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x647bfd55cc873f3a4165064cf423d505d95289cd",
+      "pool_b": "0x7aebd80541bfaaf23dbb6e99ce13d4d31c1a84c91414f971eadbff7db5f85995",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "pool_b": "0xfcfae8fa0bd6da961bcf5d990f27690932deac4f093e99bf3e871691c6586593",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "pool_b": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "pool_b": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "pool_b": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+      "pool_b": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+      "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    },
+    {
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pool_a": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+      "pool_b": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+      "n_blocks_covered": 78,
+      "coverage_seconds": 7.85304,
+      "coverage_fraction_of_window": 0.013089444537674107
+    }
+  ],
+  "n_blocks_scanned_total": 1963,
+  "partial_coverage_reason": "бюджет плотного скана (1160с) исчерпан -- честно останавливаемся",
+  "n_opportunities_found": 1,
+  "median_size_usd": 0.0426551452009449,
+  "median_lifetime_blocks": 2,
+  "n_lived_more_than_1_block": 1,
+  "max_size_usd": 0.0426551452009449,
+  "max_lifetime_blocks": 2,
+  "episodes_sample_first_30": [
+    {
+      "start_block": 65561242,
+      "size_usd_at_start": 0.0426551452009449,
+      "n_blocks": 2,
+      "peak_usd": 0.0426551452009449,
+      "end_block": 65561243,
+      "token_pair": [
+        "robinhood_0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v3_vs_v4",
+      "pool_a": "0x647bfd55cc873f3a4165064cf423d505d95289cd",
+      "pool_b": "0x7aebd80541bfaaf23dbb6e99ce13d4d31c1a84c91414f971eadbff7db5f85995"
+    }
+  ],
+  "verdict": "ЖИВЫЕ 2+ БЛОКА ЕСТЬ -- разбирать отдельно",
+  "total_runtime_s": 1400.6224911212921
 }
