@@ -122,11 +122,20 @@ DYNAMIC_FEE_FLAG = 0x800000
 # на дельту сверх кэша. v4 ещё НИ РАЗУ не проходил полный скан (первый
 # прогон получил 0 бюджета структурно, см. комментарий выше) -- отдаём
 # ему бОльшую часть.
+# ВТОРОЙ РЕАЛЬНЫЙ ПРОГОН (run 35272136404) реально нашёл 13,940 v3- и
+# 395,793 v4-пулов (обе карты честно частичные, hit_deadline=True на
+# обеих -- полный бюджет 720с растянулся на 895с реального времени из-за
+# гранулярности проверки дедлайна между чанками, не между HTTP-вызовами)
+# и упал НЕ по бюджету, а на реальном баге (см. `decode_transfer`/
+# фильтр по topics[0] -- IndexError на логах с ПУСТЫМ topics, `.get(...,
+# [None])` не подставляет дефолт, если ключ есть, но список пуст;
+# исправлено ниже). Бюджеты остальных фаз слегка урезаны с запасом,
+# чтобы компенсировать перерасход бюджета скана пулов.
 POOL_DISCOVERY_V3_BUDGET_S = 120.0
 POOL_DISCOVERY_V4_BUDGET_S = 600.0
-SWAP_SCAN_BUDGET_S = 500.0
-RECEIPT_VERIFY_BUDGET_S = 400.0
-LIFETIME_BUDGET_S = 150.0
+SWAP_SCAN_BUDGET_S = 450.0
+RECEIPT_VERIFY_BUDGET_S = 350.0
+LIFETIME_BUDGET_S = 100.0
 V2_PROBE_BLOCKS = 5000
 
 SWAP_SCAN_STEP_BLOCKS = 2000
@@ -366,8 +375,8 @@ def sanity_check_known_txs(v3_pool_map: dict, v4_pool_map: dict) -> dict:
             out["checked"].append(entry)
             continue
         logs = rec.get("logs", [])
-        v3_logs = [l for l in logs if l.get("topics", [None])[0] == v3_topic]
-        v4_logs = [l for l in logs if l.get("topics", [None])[0] == v4_topic]
+        v3_logs = [l for l in logs if (l.get("topics") or [None])[0] == v3_topic]
+        v4_logs = [l for l in logs if (l.get("topics") or [None])[0] == v4_topic]
         entry["n_v3_swap_logs"], entry["n_v4_swap_logs"] = len(v3_logs), len(v4_logs)
         topo = build_topology_candidates(v3_logs, v4_logs, v3_pool_map, v4_pool_map)
         entry["topology_filter"] = topo["topology_filter"]
@@ -647,7 +656,7 @@ def verify_candidates(candidates: list, budget_deadline: float) -> dict:
             continue
 
         transfers = [t for t in (decode_transfer(l) for l in rec.get("logs", [])
-                                  if l.get("topics", [None])[0] == TRANSFER_TOPIC0) if t]
+                                  if (l.get("topics") or [None])[0] == TRANSFER_TOPIC0) if t]
         tx_from = (rec.get("from") or "").lower()
         senders = {leg["sender"] for leg in cand["legs"]}
         trader_addrs = senders | {tx_from}
