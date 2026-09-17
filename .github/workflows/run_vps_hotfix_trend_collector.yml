@@ -48,7 +48,7 @@ jobs:
             git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
             echo "OK: $f обновлён ($(wc -l < "$REPO/$f") строк)"
           done
-          venv/bin/python -c "import sys; sys.path.insert(0,'analysis'); import trend_collector_select_pools, trend_collector_snapshot; print('OK: оба модуля импортируются')"
+          (cd "$REPO" && venv/bin/python -c "import sys; sys.path.insert(0,'analysis'); import trend_collector_select_pools, trend_collector_snapshot; print('OK: оба модуля импортируются')")
           echo "--- чистка уже накопленных битых записей (kind=v4_pool_id без pool_id) ---"
           python3 -c "$CLEAN" "$REPO/data/trend_collector/pool_universe.json" || true
           python3 -c "$CLEAN" "/home/bot/trend_collector_live_data/pool_universe.json" || true
