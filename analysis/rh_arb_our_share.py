@@ -131,9 +131,14 @@ def rpc_batch_chunked(requests_list: list[tuple[str, list]], chunk_size: int = M
     return all_results
 
 
+LAST_BATCH_FAILURE_DIAG: dict = {}
+
+
 def rpc_batch(requests_list: list[tuple[str, list]], timeout: int = 25) -> list[dict] | None:
     url = _alchemy_direct_endpoint()
     if not url:
+        LAST_BATCH_FAILURE_DIAG.clear()
+        LAST_BATCH_FAILURE_DIAG.update({"reason": "no_alchemy_url"})
         return None
     global _last_batch_call_ts
     wait = _last_batch_call_ts + BATCH_MIN_INTERVAL_S - time.monotonic()
@@ -144,16 +149,29 @@ def rpc_batch(requests_list: list[tuple[str, list]], timeout: int = 25) -> list[
     try:
         resp = requests.post(url, json=payload, timeout=timeout)
         if resp.status_code != 200:
+            LAST_BATCH_FAILURE_DIAG.clear()
+            LAST_BATCH_FAILURE_DIAG.update({"reason": "non_200", "status_code": resp.status_code,
+                                             "body_snippet": resp.text[:500], "n_requests": len(requests_list)})
             return None
         body = resp.json()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        LAST_BATCH_FAILURE_DIAG.clear()
+        LAST_BATCH_FAILURE_DIAG.update({"reason": "exception", "error": f"{type(exc).__name__}: {exc}",
+                                         "n_requests": len(requests_list)})
         return None
     if not isinstance(body, list) or len(body) != len(requests_list):
+        LAST_BATCH_FAILURE_DIAG.clear()
+        LAST_BATCH_FAILURE_DIAG.update({"reason": "shape_mismatch", "n_requests": len(requests_list),
+                                         "body_type": type(body).__name__,
+                                         "body_snippet": json.dumps(body, default=str)[:500]})
         return None
     by_id = {item.get("id"): item for item in body if isinstance(item, dict)}
     ordered = []
     for i in range(len(requests_list)):
         if i not in by_id:
+            LAST_BATCH_FAILURE_DIAG.clear()
+            LAST_BATCH_FAILURE_DIAG.update({"reason": "missing_id", "missing_id": i, "n_requests": len(requests_list),
+                                             "body_snippet": json.dumps(body, default=str)[:500]})
             return None
         ordered.append(by_id[i])
     return ordered
@@ -331,6 +349,7 @@ def main() -> None:
         batch_res = rpc_batch_chunked(reqs)
         if batch_res is None:
             stopped_reason = f"batching (чанками по {MAX_BATCH_SIZE}) отказал на блоке {block} -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)"
+            out["batch_failure_diagnostic"] = dict(LAST_BATCH_FAILURE_DIAG)
             break
         prices_by_pair: dict[int, dict] = {}
         for (pi, side), r in zip(req_index_map, batch_res):
