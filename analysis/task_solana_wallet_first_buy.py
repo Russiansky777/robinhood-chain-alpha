@@ -195,8 +195,13 @@ def analyze_tx(tx: dict, wallet: str, mint: str) -> dict | None:
     if token_delta is None:
         return None  # наш баланс этого токена не вырос в этой транзакции
 
-    # Чем заплатили: USDC delta (тот же владелец) или SOL (нативный лампорт).
-    paid_usdc, paid_sol = None, None
+    # Чем заплатили: USDC delta, ОБЁРНУТЫЙ SOL (WSOL -- частый случай для
+    # bonding-curve/launchpad-свопов, где оплата идёт через token-баланс
+    # WSOL-аккаунта, а не напрямую нативным лампортом кошелька -- ПЕРВАЯ
+    # версия скрипта эту ветку не проверяла вовсе, реальный прогон показал
+    # paid_sol=null для 2 из 3 покупок именно по этой причине), или, как
+    # последний вариант, нативный лампорт кошелька.
+    paid_usdc, paid_sol, paid_wsol = None, None, None
     for idx, post in post_by_idx.items():
         if post.get("mint") != USDC_MINT or post.get("owner") != wallet:
             continue
@@ -205,10 +210,20 @@ def analyze_tx(tx: dict, wallet: str, mint: str) -> dict | None:
         post_amt = float(post["uiTokenAmount"]["uiAmount"]) if post["uiTokenAmount"]["uiAmount"] is not None else 0.0
         if post_amt < pre_amt:
             paid_usdc = pre_amt - post_amt
+    for idx, post in post_by_idx.items():
+        if post.get("mint") != SOL_MINT or post.get("owner") != wallet:
+            continue
+        pre = pre_by_idx.get(idx)
+        pre_amt = float(pre["uiTokenAmount"]["uiAmount"]) if pre and pre["uiTokenAmount"]["uiAmount"] is not None else 0.0
+        post_amt = float(post["uiTokenAmount"]["uiAmount"]) if post["uiTokenAmount"]["uiAmount"] is not None else 0.0
+        if post_amt < pre_amt:
+            paid_wsol = pre_amt - post_amt
+    if paid_wsol:
+        paid_sol = paid_wsol
 
     account_keys = [k.get("pubkey") if isinstance(k, dict) else k
                     for k in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
-    if paid_usdc is None and wallet in account_keys:
+    if paid_usdc is None and paid_sol is None and wallet in account_keys:
         wallet_idx = account_keys.index(wallet)
         pre_bal = (meta.get("preBalances") or [None])[wallet_idx] if wallet_idx < len(meta.get("preBalances") or []) else None
         post_bal = (meta.get("postBalances") or [None])[wallet_idx] if wallet_idx < len(meta.get("postBalances") or []) else None
