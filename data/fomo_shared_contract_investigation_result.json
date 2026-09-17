@@ -1,0 +1,219 @@
+{
+  "probed_at_utc": "2026-09-17T10:26:03Z",
+  "target": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+  "bytecode_len_bytes": 4720,
+  "n_push4_candidate_selectors": 23,
+  "push4_candidate_selectors_sample": [
+    "0xbc197c81",
+    "0xf23a6e61",
+    "0x4e487b71",
+    "0x70a08231",
+    "0x150b7a02",
+    "0x5d1fe6a2",
+    "0x73b7bb2f",
+    "0x9bb43718",
+    "0xa6bd8c96",
+    "0xcd6e13f7",
+    "0x5c46a7ef",
+    "0x0a85bd01",
+    "0xf36675c3",
+    "0x3204506f",
+    "0xb12d13eb",
+    "0x0bc2c5df",
+    "0x79212195",
+    "0x095ea7b3",
+    "0x1dc00523",
+    "0x1759616b",
+    "0x200991eb",
+    "0xa9059cbb",
+    "0x90b8ec18"
+  ],
+  "selector_4byte_lookups": {
+    "0xbc197c81": {
+      "n_candidates": 1,
+      "candidates": [
+        "onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)"
+      ]
+    },
+    "0xf23a6e61": {
+      "n_candidates": 1,
+      "candidates": [
+        "onERC1155Received(address,address,uint256,uint256,bytes)"
+      ]
+    },
+    "0x4e487b71": {
+      "n_candidates": 1,
+      "candidates": [
+        "Panic(uint256)"
+      ]
+    },
+    "0x70a08231": {
+      "n_candidates": 4,
+      "candidates": [
+        "watch_tg_invmru_119a5a98(address,uint256,uint256)",
+        "passphrase_calculate_transfer(uint64,address)",
+        "branch_passphrase_public(uint256,bytes8)",
+        "balanceOf(address)"
+      ]
+    },
+    "0x150b7a02": {
+      "n_candidates": 1,
+      "candidates": [
+        "onERC721Received(address,address,uint256,bytes)"
+      ]
+    },
+    "0x5d1fe6a2": {
+      "n_candidates": 1,
+      "candidates": [
+        "cleanupNativeViaCall(uint256,address,bytes)"
+      ]
+    },
+    "0x73b7bb2f": {
+      "n_candidates": 1,
+      "candidates": [
+        "cleanupErc20sViaCall(address[],address[],bytes[],uint256[])"
+      ]
+    },
+    "0x9bb43718": {
+      "n_candidates": 1,
+      "candidates": [
+        "cleanupErc20s(address[],address[],uint256[],bytes)"
+      ]
+    },
+    "0xa6bd8c96": {
+      "n_candidates": 1,
+      "candidates": [
+        "cleanupNative(uint256,address,bytes)"
+      ]
+    },
+    "0xcd6e13f7": {
+      "n_candidates": 1,
+      "candidates": [
+        "multicall((address,bool,uint256,bytes)[],address,address,bytes)"
+      ]
+    },
+    "0x5c46a7ef": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x0a85bd01": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0xf36675c3": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x3204506f": {
+      "n_candidates": 1,
+      "candidates": [
+        "CallFailed()"
+      ]
+    },
+    "0xb12d13eb": {
+      "error": "Expecting value: line 5 column 1 (char 4)"
+    },
+    "0x0bc2c5df": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x79212195": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x095ea7b3": {
+      "n_candidates": 4,
+      "candidates": [
+        "_SIMONdotBLACK_(int8[],int224[],int256,int64,uint248[])",
+        "watch_tg_invmru_2f69f1b(address,address)",
+        "sign_szabo_bytecode(bytes16,uint128)",
+        "approve(address,uint256)"
+      ]
+    },
+    "0x1dc00523": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x1759616b": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0x200991eb": {
+      "n_candidates": 0,
+      "candidates": []
+    },
+    "0xa9059cbb": {
+      "n_candidates": 6,
+      "candidates": [
+        "workMyDirefulOwner(uint256,uint256)",
+        "join_tg_invmru_haha_fd06787(address,bool)",
+        "func_2093253501(bytes)",
+        "transfer(bytes4[9],bytes5[6],int48[11])",
+        "many_msg_babbage(bytes1)"
+      ]
+    },
+    "0x90b8ec18": {
+      "n_candidates": 1,
+      "candidates": [
+        "TransferFailed()"
+      ]
+    }
+  },
+  "deployment_block_search": {
+    "deployment_block": 5018,
+    "n_bisection_calls": 26,
+    "latest_block_at_probe": 65294029
+  },
+  "deploy_tx": {
+    "found": false,
+    "n_txs_in_block_scanned": 2,
+    "note": "ни одна receipt.contractAddress не совпала -- возможно контракт создан ВНУТРЕННЕЙ транзакцией (CREATE изнутри другого контракта), не видно через receipt верхнего уровня"
+  },
+  "interactor_count": {
+    "per_direction": {
+      "out": {
+        "n_transfers": 3000,
+        "n_pages": 30,
+        "capped": true
+      },
+      "in": {
+        "n_transfers": 3000,
+        "n_pages": 30,
+        "capped": true
+      }
+    },
+    "n_unique_counterparties_total": 411,
+    "counterparties_sample": [
+      "0x97a9b8a4a903c9cbf7ac8cd9561a7cfda5c51d77",
+      "0xc47a350a67a33bf2d95a655dfe928a237cbc8bcc",
+      "0x39fd7f0b420928df2dffd2ae3432d805dba6c812",
+      "0x96efdd2064caf593558a950bf09e9718d82c6bf0",
+      "0x174a372ac54f96bf16ead5c9371fe587ee99d5a0",
+      "0x33d18e0a1fc5f92b5417ef39d6468384bf8761f0",
+      "0x3ffc8b9721f96776bef8468f48f65e0ca573fcf2",
+      "0xf4087db5ac2787da1bcc0434f723d64f18bad404",
+      "0x7b021ceb65edaf40ed73c51e78cf44ad4edf99a4",
+      "0x6ec0c2f25d323e7779925cc20c3740101f990d9f",
+      "0x50bf95d98e6b50d6949cf528e7e6e46b02e83fcc",
+      "0xe6c8853e9f38eecdf5cc3323d34597dd49106868",
+      "0x1745359ef8ec3fb4608453b9faeaeb983371108a",
+      "0x32f99eec2eb76593255ddced7c843a4836b54c9f",
+      "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+      "0xe267ab2b5f2b4ac4f101553ba6d2936daaf73456",
+      "0x6c4e0ee2bac7485e58b4e24a4b325d3623e4c6e3",
+      "0x77850d400d2c07638efa7375f0a3ee97154cb3fc",
+      "0x018b701d24f2a7b2579dd1028d45598815876a17",
+      "0x8e871ecf331a27c762bbcff795279def31c8a25a"
+    ]
+  },
+  "native_value_payment_check": {
+    "sample_size_requested": 384,
+    "n_checked": 384,
+    "n_rpc_errors": 0,
+    "n_with_nonzero_native_value": 27,
+    "n_where_tx_from_equals_wallet": 0,
+    "n_true_native_payment_pairs": 0,
+    "examples": [],
+    "honest_note": "Если n_with_nonzero_native_value мало/ноль -- гипотеза 'платёж нативным газ-токеном в той же транзакции' НЕ подтверждается на этой выборке (не значит невозможно в принципе, значит не видно здесь). Если tx_from систематически НЕ равен кошельку -- значит кошелёк НЕ САМ инициирует эти транзакции (согласуется с ERC-4337/EIP-7702: транзакцию мог инициировать бандлер/relayer, а не сам EOA), что окончательно исключает 'платёж внутри одной адресованной кошельком транзакции' как объяснение механизма для ЭТИХ конкретных событий."
+  }
+}
