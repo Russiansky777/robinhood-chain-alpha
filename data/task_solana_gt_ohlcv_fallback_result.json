@@ -1,0 +1,90 @@
+{
+  "generated_at_utc": "2026-09-17T16:47:55Z",
+  "pool_address": "LeZ2DH1y7bqzAghYbXqKB6fNxoBKqPSPihv3EmkLBRv",
+  "T0_unix": 1789596037,
+  "honest_context": "Прямой decode через RPC не дошёл до T0 (реальный прогон, публичный RPC не потянул объём пула за разумное время) -- эта проверка ищет РЕАЛЬНУЮ альтернативу через уже готовые OHLCV-агрегаты GeckoTerminal.",
+  "minute_1": {
+    "status": 200,
+    "n_candles": 1000,
+    "earliest_unix": 1789478520,
+    "latest_unix": 1789663560
+  },
+  "minute_5": {
+    "status": 200,
+    "n_candles": 719,
+    "earliest_unix": 1789379700,
+    "latest_unix": 1789663500
+  },
+  "hour_1": {
+    "status": 200,
+    "n_candles": 72,
+    "earliest_unix": 1789376400,
+    "latest_unix": 1789660800
+  },
+  "chosen_timeframe_for_horizons": "minute_1",
+  "entry_reference_candle": {
+    "timestamp_unix": 1789598700,
+    "close": 0.0001587269714066268
+  },
+  "price_horizons_from_gt_ohlcv": [
+    {
+      "horizon_s": 60,
+      "target_time_unix": 1789596097,
+      "nearest_candle_time_unix": 1789598700,
+      "gap_to_target_s": 2603,
+      "close_price": 0.0001587269714066268,
+      "pct_change_from_entry": 0.0,
+      "candle_volume": 71.99463373193072
+    },
+    {
+      "horizon_s": 180,
+      "target_time_unix": 1789596217,
+      "nearest_candle_time_unix": 1789598700,
+      "gap_to_target_s": 2483,
+      "close_price": 0.0001587269714066268,
+      "pct_change_from_entry": 0.0,
+      "candle_volume": 71.99463373193072
+    },
+    {
+      "horizon_s": 300,
+      "target_time_unix": 1789596337,
+      "nearest_candle_time_unix": 1789598700,
+      "gap_to_target_s": 2363,
+      "close_price": 0.0001587269714066268,
+      "pct_change_from_entry": 0.0,
+      "candle_volume": 71.99463373193072
+    },
+    {
+      "horizon_s": 900,
+      "target_time_unix": 1789596937,
+      "nearest_candle_time_unix": 1789598700,
+      "gap_to_target_s": 1763,
+      "close_price": 0.0001587269714066268,
+      "pct_change_from_entry": 0.0,
+      "candle_volume": 71.99463373193072
+    },
+    {
+      "horizon_s": 3600,
+      "target_time_unix": 1789599637,
+      "nearest_candle_time_unix": 1789598700,
+      "gap_to_target_s": 937,
+      "close_price": 0.0001587269714066268,
+      "pct_change_from_entry": 0.0,
+      "candle_volume": 71.99463373193072
+    },
+    {
+      "horizon_s": 21600,
+      "target_time_unix": 1789617637,
+      "nearest_candle_time_unix": 1789620540,
+      "gap_to_target_s": 2903,
+      "close_price": 0.00032447577853763536,
+      "pct_change_from_entry": 104.42384533778647,
+      "candle_volume": 19.494112608248056
+    },
+    {
+      "horizon_s": 86400,
+      "status": "ещё не наступил к моменту прогона"
+    }
+  ],
+  "RESOLUTION_CAVEAT": "Построено из таймфрейма 'minute_1' -- honest предел разрешения: горизонты +5с/+15с/+30с/+1мин (для часовых свечей) физически неразличимы на этом таймфрейме. gap_to_target_s в каждой строке показывает, насколько реально ближайшая свеча далека от точной цели."
+}
