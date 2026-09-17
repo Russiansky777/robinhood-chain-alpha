@@ -1,0 +1,93 @@
+name: "Задача 5 -- реальное окно приёма секвенсера (только фид как часы)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Полный commit SHA, из которого точечно берётся analysis/.'
+        required: true
+        type: string
+      duration_seconds:
+        description: 'Длительность прослушивания фида, секунды.'
+        required: false
+        type: string
+        default: '240'
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SEQUENCER_WINDOW_REQUEST"
+
+jobs:
+  sequencer_window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout analysis/ на VPS + реальное окно приёма (~4-6 мин)"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+          DURATION_SECONDS: ${{ inputs.duration_seconds || '240' }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_sequencer_window.py --duration-seconds $DURATION_SECONDS
+            '
+          "
+
+      - name: Забрать data/task5_sequencer_window_result.json с VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/task5_sequencer_window_result.json' > /tmp/sequencer_window_result.json
+          [ -s /tmp/sequencer_window_result.json ]
+          cp /tmp/sequencer_window_result.json data/task5_sequencer_window_result.json
+          python3 -c "
+          import json
+          d = json.load(open('data/task5_sequencer_window_result.json'))
+          print(json.dumps({
+            'n_feed_messages': d['n_feed_messages'],
+            'achieved_feed_block_interval_ms': d['achieved_feed_block_interval_ms'],
+            'delta_blocks_diagnostic': d['delta_blocks_diagnostic'],
+            'verdict': d['verdict'],
+          }, indent=2, ensure_ascii=False))
+          "
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SEQUENCER_WINDOW_REQUEST
+          [ -e data/task5_sequencer_window_result.json ] && git add data/task5_sequencer_window_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: реальное окно приёма секвенсера, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
