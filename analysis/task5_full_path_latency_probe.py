@@ -75,8 +75,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import statistics
 import sys
+import threading
 import time
 from collections import Counter
 from pathlib import Path
@@ -107,6 +109,97 @@ from task5_bot_router_decode import (
     decode_calldata,
     decode_pool_swap_calldata,
 )
+
+
+# --- Жёсткий watchdog (владелец: неизвестно заранее, как поведёт себя декодер на
+# реальном живом объёме -- одно ОЧЕНЬ большое сообщение фида (документированный
+# реальный случай -- 3.57МБ в task5_bot_feed_client.py) может содержать тысячи
+# под-транзакций, и `decode_l2_message` делает РЕАЛЬНЫЙ ecrecover (криптография,
+# не бесплатно) для КАЖДОЙ -- если это окажется на порядки медленнее, чем блок
+# в 120мс, это САМОСТОЯТЕЛЬНАЯ находка, а не повод менять существующий декодер.
+# `asyncio.wait_for` НЕ может прервать чисто синхронный (без await внутри)
+# Python-код на середине -- если один вызов `on_message` окажется аномально
+# долгим, единственный надёжный способ не зависнуть НАВСЕГДА -- отдельный ОС-поток
+# с `threading.Timer`, который может сработать независимо от того, чем занят
+# главный поток (GIL переключается между потоками между байткод-инструкциями,
+# в отличие от кооперативных await-точек asyncio). Пишет ЧАСТИЧНЫЙ результат
+# (всё, что реально успело накопиться к этому моменту) -- честно, не молчит.
+_LIVE_STATE: dict = {
+    "n_messages_total_seen": 0,
+    "decode_diag": Counter(),
+    "all_decode_ms": [],
+    "all_calc_ms": [],
+    "all_sign_ms": [],
+    "all_processing_total_ms": [],
+    "detect_wait_ms": [],
+    "raw_samples_kept": [],
+    "slowest_message": None,
+    "test_wallet_address": None,
+}
+
+
+def _stats(samples: list[float]) -> dict | None:
+    if not samples:
+        return None
+    return {
+        "n": len(samples),
+        "median_ms": statistics.median(samples),
+        "p90_ms": (statistics.quantiles(samples, n=10)[8] if len(samples) >= 10 else max(samples)),
+        "min_ms": min(samples),
+        "max_ms": max(samples),
+        "mean_ms": statistics.mean(samples),
+    }
+
+
+def _snapshot_live_state_as_stage_stats() -> dict:
+    detect = _LIVE_STATE["detect_wait_ms"]
+    proc = _LIVE_STATE["all_processing_total_ms"]
+    full_total = [d + p for d, p in zip(detect, proc[1:])] if len(detect) == len(proc) - 1 and detect else None
+    return {
+        "detect_wait_ms": _stats(detect),
+        "decode_ms": _stats(_LIVE_STATE["all_decode_ms"]),
+        "calc_ms": _stats(_LIVE_STATE["all_calc_ms"]),
+        "sign_ms": _stats(_LIVE_STATE["all_sign_ms"]),
+        "processing_total_ms_decode_calc_sign": _stats(proc),
+        "full_total_with_detect_wait_ms": _stats(full_total) if full_total else None,
+    }
+
+
+def _watchdog_fire(started_monotonic: float) -> None:
+    elapsed_s = time.monotonic() - started_monotonic
+    print(f"\n[latency_probe][WATCHDOG] жёсткий таймаут ({elapsed_s:.1f}с реального времени) -- "
+          f"принудительное завершение процесса, печатаем ЧАСТИЧНЫЙ результат как есть, "
+          f"НЕ выдумываем недостающее.", file=sys.stderr)
+    partial = {
+        "HARD_WATCHDOG_TRIGGERED": True,
+        "watchdog_note": "Главный поток не вернул управление до жёсткого дедлайна (--duration + запас) -- "
+                          "скорее всего один или несколько сообщений фида декодировались/считались АНОМАЛЬНО "
+                          "долго (см. slowest_message ниже, если успел записаться) -- это САМОСТОЯТЕЛЬНАЯ "
+                          "находка, не сбой замера.",
+        "elapsed_wall_s": elapsed_s,
+        "n_messages_total_seen": _LIVE_STATE["n_messages_total_seen"],
+        "decode_diag": dict(_LIVE_STATE["decode_diag"]),
+        "slowest_message": _LIVE_STATE["slowest_message"],
+        "test_wallet_address": _LIVE_STATE["test_wallet_address"],
+        "stage_stats_partial": _snapshot_live_state_as_stage_stats(),
+        "raw_samples_kept_partial": _LIVE_STATE["raw_samples_kept"],
+    }
+    try:
+        text = json.dumps(partial, indent=2, ensure_ascii=False, default=str)
+    except Exception as exc:  # noqa: BLE001 -- даже это должно быть честным, не должно само по себе падать без следа
+        text = json.dumps({"HARD_WATCHDOG_TRIGGERED": True, "dump_error": str(exc)})
+    print(text)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(1)  # noqa: SLF001 -- намеренно: единственный надёжный способ гарантированно завершиться
+
+
+def install_hard_watchdog(hard_deadline_s: float) -> threading.Timer:
+    started = time.monotonic()
+    timer = threading.Timer(hard_deadline_s, _watchdog_fire, args=(started,))
+    timer.daemon = True
+    timer.start()
+    return timer
 
 
 def bootstrap_known_pools_registry() -> tuple[PoolRegistry, dict]:
@@ -163,21 +256,17 @@ def do_calc_step(registry: PoolRegistry, decoded_entries: list[dict]) -> dict:
 
 async def run_probe(duration_s: float, registry: PoolRegistry, max_raw_samples_kept: int) -> dict:
     test_account = Account.create()
-    per_message: list[dict] = []
-    decode_diag: Counter = Counter()
-    n_messages_total_seen = 0
-    prev_t_wall: float | None = None
-    detect_wait_samples: list[float] = []
-
+    _LIVE_STATE["test_wallet_address"] = test_account.address
+    prev_t_wall: list[float | None] = [None]
     dummy_tx_to = to_checksum_address(WETH_USDG_POOL)
+    decode_diag: Counter = _LIVE_STATE["decode_diag"]
 
     def on_message(msg: FeedMessage) -> None:
-        nonlocal prev_t_wall, n_messages_total_seen
-        n_messages_total_seen += 1
+        _LIVE_STATE["n_messages_total_seen"] += 1
         t0 = msg.t_wall
-        if prev_t_wall is not None:
-            detect_wait_samples.append((t0 - prev_t_wall) * 1000.0)
-        prev_t_wall = t0
+        if prev_t_wall[0] is not None:
+            _LIVE_STATE["detect_wait_ms"].append((t0 - prev_t_wall[0]) * 1000.0)
+        prev_t_wall[0] = t0
 
         if msg.raw_l2_msg_hex is None:
             decode_diag["no_l2msg_field"] += 1
@@ -209,33 +298,31 @@ async def run_probe(duration_s: float, registry: PoolRegistry, max_raw_samples_k
         Account.sign_transaction(tx, test_account.key)
         t3 = time.time()
 
-        if len(per_message) < max_raw_samples_kept:
-            per_message.append({
-                "sequence_number": msg.sequence_number,
-                "n_subentries_decoded": len(decoded),
-                "n_calc_checked": calc_stats["n_checked"],
-                "n_calc_recomputed": calc_stats["n_recomputed"],
-                "decode_ms": (t1 - t0) * 1000.0,
-                "calc_ms": (t2 - t1) * 1000.0,
-                "sign_ms": (t3 - t2) * 1000.0,
-                "processing_total_ms": (t3 - t0) * 1000.0,
-            })
-        else:
-            # Владелец: "собери статистику по десяткам-сотням сообщений" -- полный
-            # список сырых сэмплов ограничен (--max-raw-samples-kept) ради размера
-            # вывода/лога, НО статистика (median/p90) ниже считается по ВСЕМ
-            # реально обработанным сообщениям, не только по сохранённым сырым --
-            # см. all_decode_ms/all_calc_ms/all_sign_ms.
-            pass
-        _all_decode_ms.append((t1 - t0) * 1000.0)
-        _all_calc_ms.append((t2 - t1) * 1000.0)
-        _all_sign_ms.append((t3 - t2) * 1000.0)
-        _all_processing_total_ms.append((t3 - t0) * 1000.0)
-
-    _all_decode_ms: list[float] = []
-    _all_calc_ms: list[float] = []
-    _all_sign_ms: list[float] = []
-    _all_processing_total_ms: list[float] = []
+        decode_ms, calc_ms, sign_ms = (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0
+        processing_total_ms = (t3 - t0) * 1000.0
+        sample = {
+            "sequence_number": msg.sequence_number,
+            "n_subentries_decoded": len(decoded),
+            "n_calc_checked": calc_stats["n_checked"],
+            "n_calc_recomputed": calc_stats["n_recomputed"],
+            "decode_ms": decode_ms,
+            "calc_ms": calc_ms,
+            "sign_ms": sign_ms,
+            "processing_total_ms": processing_total_ms,
+        }
+        if len(_LIVE_STATE["raw_samples_kept"]) < max_raw_samples_kept:
+            _LIVE_STATE["raw_samples_kept"].append(sample)
+        # Владелец: "собери статистику по десяткам-сотням сообщений" -- полный список
+        # СЫРЫХ сэмплов ограничен (--max-raw-samples-kept) ради размера вывода/лога,
+        # НО статистика (median/p90) ниже считается по ВСЕМ реально обработанным
+        # сообщениям через all_*_ms, не только по сохранённым сырым.
+        current_slowest = _LIVE_STATE["slowest_message"]
+        if current_slowest is None or processing_total_ms > current_slowest["processing_total_ms"]:
+            _LIVE_STATE["slowest_message"] = sample
+        _LIVE_STATE["all_decode_ms"].append(decode_ms)
+        _LIVE_STATE["all_calc_ms"].append(calc_ms)
+        _LIVE_STATE["all_sign_ms"].append(sign_ms)
+        _LIVE_STATE["all_processing_total_ms"].append(processing_total_ms)
 
     client = SequencerFeedClient(SEQUENCER_FEED_URL_MAINNET)
     print(f"[latency_probe] подключение к {SEQUENCER_FEED_URL_MAINNET}, слушаем {duration_s:.0f}с "
@@ -245,39 +332,17 @@ async def run_probe(duration_s: float, registry: PoolRegistry, max_raw_samples_k
     except asyncio.TimeoutError:
         pass
 
-    def stats(samples: list[float]) -> dict | None:
-        if not samples:
-            return None
-        sorted_s = sorted(samples)
-        return {
-            "n": len(samples),
-            "median_ms": statistics.median(samples),
-            "p90_ms": (statistics.quantiles(samples, n=10)[8] if len(samples) >= 10 else max(samples)),
-            "min_ms": min(samples),
-            "max_ms": max(samples),
-            "mean_ms": statistics.mean(samples),
-        }
-
-    full_total_with_detect = [d + p for d, p in zip(detect_wait_samples, _all_processing_total_ms[1:])] \
-        if len(detect_wait_samples) == len(_all_processing_total_ms) - 1 else None
-
     return {
-        "n_messages_total_seen": n_messages_total_seen,
+        "n_messages_total_seen": _LIVE_STATE["n_messages_total_seen"],
         "feed_diag": client.diag,
         "decode_diag": dict(decode_diag),
         "test_wallet_address": test_account.address,
         "test_wallet_note": "свежесгенерированный одноразовый ключ, НЕ PRIVATE_KEY_NOX/PRIVATE_KEY_TASK5_BOT, "
                              "без фондирования, ни разу не использован для реальной отправки.",
-        "stage_stats": {
-            "detect_wait_ms": stats(detect_wait_samples),
-            "decode_ms": stats(_all_decode_ms),
-            "calc_ms": stats(_all_calc_ms),
-            "sign_ms": stats(_all_sign_ms),
-            "processing_total_ms_decode_calc_sign": stats(_all_processing_total_ms),
-            "full_total_with_detect_wait_ms": stats(full_total_with_detect) if full_total_with_detect else None,
-        },
-        "raw_samples_kept": per_message,
-        "n_raw_samples_kept": len(per_message),
+        "stage_stats": _snapshot_live_state_as_stage_stats(),
+        "slowest_message": _LIVE_STATE["slowest_message"],
+        "raw_samples_kept": _LIVE_STATE["raw_samples_kept"],
+        "n_raw_samples_kept": len(_LIVE_STATE["raw_samples_kept"]),
         "n_raw_samples_kept_cap": max_raw_samples_kept,
     }
 
@@ -333,8 +398,17 @@ def measure_invalid_nonce_submit_once() -> dict:
 
 
 def main() -> None:
+    # Владелец: печать должна доходить до лога СРАЗУ, не только при выходе
+    # процесса -- критично для watchdog-сценария (os._exit() ниже НЕ делает
+    # обычную interpreter-очистку/флаш буферов stdio).
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+    except Exception:  # noqa: BLE001 -- на некоторых окружениях reconfigure недоступен, не критично
+        pass
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--duration", type=float, default=180.0,
+    ap.add_argument("--duration", type=float, default=90.0,
                      help="Сколько секунд слушать фид ЭТИМ единственным подключением.")
     ap.add_argument("--max-raw-samples-kept", type=int, default=60,
                      help="Сколько сырых по-сообщенческих сэмплов сохранить в вывод целиком (для беглой "
@@ -343,7 +417,16 @@ def main() -> None:
     ap.add_argument("--skip-invalid-nonce-submit", action="store_true",
                      help="Пропустить п.4 (реальную отправку невалидной транзакции) -- для повторных "
                           "прогонов, где доставка до секвенсера уже измерена и не нужно слать снова.")
+    ap.add_argument("--watchdog-margin-s", type=float, default=300.0,
+                     help="Жёсткий запас СВЕРХ --duration, на случай, если ОДНО сообщение фида (реальный "
+                          "документированный случай -- батч 3.57МБ) декодируется/считается аномально долго "
+                          "(ecrecover на каждую под-транзакцию) -- см. install_hard_watchdog().")
     args = ap.parse_args()
+
+    watchdog_timer = install_hard_watchdog(args.duration + args.watchdog_margin_s + 60.0)  # +60с на bootstrap/submit
+    print(f"[latency_probe] жёсткий watchdog установлен на {args.duration + args.watchdog_margin_s + 60.0:.0f}с "
+          f"с этого момента (--duration={args.duration:.0f}с + --watchdog-margin-s={args.watchdog_margin_s:.0f}с "
+          f"+ 60с на bootstrap/submit)", file=sys.stderr)
 
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
@@ -363,6 +446,7 @@ def main() -> None:
               f"{SEQUENCER_SUBMIT_URL_MAINNET} ...", file=sys.stderr)
         result["invalid_nonce_submit"] = measure_invalid_nonce_submit_once()
 
+    watchdog_timer.cancel()
     text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
     print(text)
     if args.out:
