@@ -1,0 +1,39 @@
+{
+  "generated_at_utc": "2026-09-17T13:21:45Z",
+  "n_pools_tvl_and_h1_active": 148,
+  "latest_block": 65399051,
+  "pair_discovery": {
+    "n_resolved_pools": 143,
+    "n_token_groups": 101,
+    "n_cross_version_pairs": 33,
+    "n_same_version_diff_fee_pairs": 34
+  },
+  "n_pairs_total": 67,
+  "gas_assumption": {
+    "real_eth_gasPrice_wei": 48504000,
+    "real_cycle_gas_used_samples": [
+      378848,
+      186163,
+      290261
+    ],
+    "median_gas_used": 290261,
+    "native_usd_price": 2453.919308658928,
+    "gas_cost_usd_per_cycle": 0.03454828712214628,
+    "source": "data/task5_arb_suspect_audit_3tx_result.json (реальные multi-leg-своп tx на этой цепи) + текущий eth_gasPrice"
+  },
+  "window": {
+    "from_block": 65393092,
+    "to_block": 65399051,
+    "window_blocks_intended": 5959,
+    "window_minutes_intended": 10.0
+  },
+  "batching_supported": true,
+  "n_blocks_scanned": 10,
+  "partial_coverage_reason": "batching отказал на блоке 65393102 -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)",
+  "n_opportunities_found": 0,
+  "median_size_usd": null,
+  "n_lived_more_than_1_block": 0,
+  "episodes_sample_first_30": [],
+  "verdict": "ЗАКРЫТА -- 0 живущих дольше 1 блока, возможностей вообще не найдено",
+  "total_runtime_s": 105.82473492622375
+}
