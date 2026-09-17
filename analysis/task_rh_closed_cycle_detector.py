@@ -151,7 +151,20 @@ MAX_CANDIDATES_TO_VERIFY = 4000
 LIFETIME_FORWARD_BLOCKS = 15
 MAX_CYCLES_FOR_LIFETIME_CHECK = 50
 
-POOL_MAP_CACHE_PATH = DATA_DIR / "task_rh_pool_map_cache.json"
+# НАЙДЕНО В ТРЕТЬЕМ РЕАЛЬНОМ ПРОГОНЕ (run 35274754316): скрипт РЕАЛЬНО
+# отработал до конца (0 traceback), но git push результата упал -- полная
+# карта пулов (v3+v4, ~410k пулов) сериализовалась в 123.72 МБ, ВЫШЕ
+# жёсткого лимита GitHub 100 МБ на файл ("GH001: Large files detected").
+# Загонять эту карту в git бессмысленно и по факту: раннеры GH Actions
+# ЭФЕМЕРНЫ (новый контейнер на каждый прогон, `actions/checkout` клонит
+# репозиторий заново) -- кэш помогает МЕЖДУ прогонами ТОЛЬКО если реально
+# закоммичен, а закоммитить такой объём через обычный git физически
+# нельзя без Git LFS (не настроен, отдельная задача). Путь ПЕРЕНЕСЁН ВНЕ
+# git-репозитория (/tmp) -- код кэширования оставлен (годится для
+# локального/персистентного раннера в будущем), но в GH Actions он
+# просто не найдёт файл и честно сделает полный bounded-скан каждый раз
+# (см. incremental_scan_one_version -- ветка "без кэша").
+POOL_MAP_CACHE_PATH = Path("/tmp/task_rh_pool_map_cache.json")
 
 
 def word(data_bytes: bytes, i: int) -> bytes:

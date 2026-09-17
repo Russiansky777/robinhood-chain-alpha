@@ -35,7 +35,6 @@ jobs:
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/RH_CLOSED_CYCLE_DETECTOR_REQUEST
           [ -e data/task_rh_closed_cycles_result.json ] && git add data/task_rh_closed_cycles_result.json
-          [ -e data/task_rh_pool_map_cache.json ] && git add data/task_rh_pool_map_cache.json
           git diff --cached --quiet && exit 0
           git commit -m "Робинхуд замкнутые циклы (n_legs/треугольные): результат [automated]"
           for i in 1 2 3 4 5; do
