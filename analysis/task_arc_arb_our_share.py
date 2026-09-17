@@ -86,7 +86,7 @@ REPO_ROOT_CANDIDATES = [Path("/home/bot/robinhood-chain-alpha"), Path(__file__).
 MIN_CALL_INTERVAL_S = 0.05
 _last_call_ts = [0.0]
 _rpc_calls = [0]
-TIME_BUDGET_S = 1500.0  # общий потолок части А, оставляет запас на часть Б и job overhead в 30-минутном лимите
+TIME_BUDGET_S = 1100.0  # потолок ОСНОВНОГО блочного скана части А (без предотбора) -- оставляет запас на предотбор (до 300с), часть Б и job overhead в 30-минутном лимите
 
 
 def find_repo_root() -> Path:
@@ -159,9 +159,34 @@ def state_slot_int(pool_id_hex: str) -> int:
     return int.from_bytes(keccak256(pool_id_bytes + POOLS_SLOT.to_bytes(32, "big")), "big")
 
 
-def extsload_calldata_1slot(slot_int: int) -> str:
+# РЕАЛЬНО ПОДТВЕРЖДЕНО диагностикой (task_arc_arb_our_share_diag_result.json,
+# 2026-09-17): токен "Minara" дал абсурдный размер возможности 2.3e79, потому
+# что sqrt_price_x96 одного пула = 4295128740 (= MIN_SQRT_RATIO+1, TickMath),
+# другого = 1461446703485210103287273052203988822378723970341 (=
+# MAX_SQRT_RATIO-1) -- оба пула ПОЛНОСТЬЮ выкачаны до границы допустимого
+# диапазона тика в противоположные стороны, реальной ликвидности между ними
+# нет, "разрыв цены" -- не реальная возможность, а артефакт мёртвых пулов.
+# Границы -- точные константы TickMath (не гипотеза, подтверждены совпадением
+# до целого числа +-1 с реально прочитанными значениями).
+MIN_SQRT_RATIO = 4295128739
+MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342
+BOUNDARY_MARGIN = 10_000  # запас вокруг границы -- значение "у самой стенки" тоже отбраковываем
+
+
+def extsload_calldata_nslots(slot_int: int, n_slots: int) -> str:
     selector = keccak256(b"extsload(bytes32,uint256)")[:4].hex()
-    return "0x" + selector + slot_int.to_bytes(32, "big").hex() + (1).to_bytes(32, "big").hex()
+    return "0x" + selector + slot_int.to_bytes(32, "big").hex() + n_slots.to_bytes(32, "big").hex()
+
+
+def extsload_calldata_1slot(slot_int: int) -> str:
+    return extsload_calldata_nslots(slot_int, 1)
+
+
+def is_boundary_price(sqrt_price_x96: int) -> bool:
+    """Пул выкачан до края допустимого диапазона тика -- реальной ликвидности
+    рядом с текущей ценой нет, ЛЮБОЙ 'разрыв' с таким пулом -- не настоящая
+    возможность (см. докстринг константы выше, реальный найденный случай)."""
+    return sqrt_price_x96 <= MIN_SQRT_RATIO + BOUNDARY_MARGIN or sqrt_price_x96 >= MAX_SQRT_RATIO - BOUNDARY_MARGIN
 
 
 def decode_slot0_result(raw_hex: str | None) -> dict | None:
@@ -171,9 +196,32 @@ def decode_slot0_result(raw_hex: str | None) -> dict | None:
     if len(data) < 96:
         return None
     word0 = int.from_bytes(data[64:96], "big")
+    sqrt_price_x96 = word0 & ((1 << 160) - 1)
+    if is_boundary_price(sqrt_price_x96):
+        return None
     return {
-        "sqrt_price_x96": word0 & ((1 << 160) - 1),
+        "sqrt_price_x96": sqrt_price_x96,
         "lp_fee_pips": (word0 >> 208) & ((1 << 24) - 1),
+    }
+
+
+def decode_slot0_and_liquidity(raw_hex: str | None) -> dict | None:
+    """Полное чтение (4 слота, как extsload_batch4 в других скриптах сессии) --
+    используется ТОЛЬКО на этапе предварительного отбора пар, чтобы отбраковать
+    мёртвые/выкачанные пулы ДО того, как тратить бюджет на часовой скан."""
+    if not raw_hex or raw_hex == "0x":
+        return None
+    data = bytes.fromhex(raw_hex[2:])
+    if len(data) < 192:
+        return None
+    words = [int.from_bytes(data[64 + i * 32: 64 + (i + 1) * 32], "big") for i in range(4)]
+    slot0_raw, _fg0, _fg1, liq_raw = words
+    sqrt_price_x96 = slot0_raw & ((1 << 160) - 1)
+    return {
+        "sqrt_price_x96": sqrt_price_x96,
+        "lp_fee_pips": (slot0_raw >> 208) & ((1 << 24) - 1),
+        "liquidity": liq_raw & ((1 << 128) - 1),
+        "is_boundary_price": is_boundary_price(sqrt_price_x96),
     }
 
 
@@ -231,17 +279,61 @@ def load_registry_pairs(data_dir: Path) -> tuple[list[dict], dict]:
                     by_token.setdefault(c0, []).append({"pool_id": row["pool_id"], "usdc_is_currency0": False})
             multi = {tok: rows for tok, rows in by_token.items() if len(rows) >= 2}
             meta["n_tokens_with_multiple_usdc_pools"] = len(multi)
-            return [{"token": tok, "pools": rows[:2]} for tok, rows in list(multi.items())[:MAX_PAIRS]], meta
+            meta["n_candidate_tokens_total"] = len(multi)
+            return [{"token": tok, "pools": rows[:2]} for tok, rows in multi.items()], meta
     meta["error"] = "task_arc_recon_pools_result.json не найден ни в data/, ни на постоянном пути VPS -- live-фолбэк-скан не реализован в этой версии"
     return [], meta
 
 
+def prescreen_liquid_pairs(all_candidates: list[dict], max_pairs: int) -> tuple[list[dict], dict]:
+    """ДО того как тратить бюджет на часовой скан -- проверяем ЖИВЫМ eth_call
+    на 'latest', что ОБА пула кандидата реально имеют liquidity>0 и не сидят
+    на границе тик-диапазона (см. is_boundary_price -- реальный найденный
+    случай мёртвой пары "Minara", 2.3e79 артефакт). Кандидаты без реальной
+    ликвидности с обеих сторон -- пропускаются, следующий берётся из реестра,
+    пока не наберём max_pairs ЖИВЫХ пар или не кончится реестр."""
+    screen_meta = {"n_candidates_examined": 0, "n_rejected_dead_or_boundary": 0, "rejected_tokens": []}
+    good: list[dict] = []
+    screen_start = time.time()
+    screen_budget_s = 300.0
+    for cand in all_candidates:
+        if len(good) >= max_pairs:
+            break
+        if time.time() - screen_start > screen_budget_s:
+            screen_meta["stopped_reason"] = f"бюджет предотбора ({screen_budget_s}с) исчерпан -- берём сколько набралось, честно"
+            break
+        screen_meta["n_candidates_examined"] += 1
+        pool_a, pool_b = cand["pools"]
+        ok = True
+        for pool in (pool_a, pool_b):
+            slot_int = state_slot_int(pool["pool_id"])
+            body = rpc("eth_call", [{"to": POOL_MANAGER, "data": extsload_calldata_nslots(slot_int, 4)}, "latest"])
+            info = decode_slot0_and_liquidity(body.get("result")) if "error" not in body else None
+            if info is None or info["liquidity"] <= 0 or info["is_boundary_price"]:
+                ok = False
+                break
+        if ok:
+            good.append(cand)
+        else:
+            screen_meta["n_rejected_dead_or_boundary"] += 1
+            if len(screen_meta["rejected_tokens"]) < 30:
+                screen_meta["rejected_tokens"].append(cand["token"])
+    screen_meta["n_qualified"] = len(good)
+    return good, screen_meta
+
+
 def part_a_opportunities(data_dir: Path) -> dict:
     out: dict = {}
-    pairs, reg_meta = load_registry_pairs(data_dir)
+    all_candidates, reg_meta = load_registry_pairs(data_dir)
     out["registry_meta"] = reg_meta
-    if not pairs:
+    if not all_candidates:
         out["STOPPED"] = reg_meta.get("error", "нет доступных пар")
+        return out
+
+    pairs, screen_meta = prescreen_liquid_pairs(all_candidates, MAX_PAIRS)
+    out["prescreen_meta"] = screen_meta
+    if not pairs:
+        out["STOPPED"] = "ни одна пара не прошла предварительный отбор по живой ликвидности"
         return out
     out["n_pairs_selected"] = len(pairs)
     out["pairs"] = [{"token": p["token"], "pool_ids": [x["pool_id"] for x in p["pools"]]} for p in pairs]
