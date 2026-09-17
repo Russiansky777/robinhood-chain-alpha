@@ -1,0 +1,109 @@
+{
+  "generated_at_utc": "2026-09-17T20:05:07Z",
+  "run_meta": {
+    "commit_sha": "2dc5a72ec6943bbcc3837cf4f1446c265049bf26",
+    "script": "analysis/task5_full_path_latency_probe.py",
+    "script_args": "--duration 220 --max-raw-samples-kept 40",
+    "executed_on": "NL VPS (45.59.170.76), пользователь bot, venv /home/bot/robinhood-chain-alpha/venv",
+    "workflow": ".github/workflows/run_task5_v4_analysis_script_nl.yml",
+    "gh_actions_run_id": 35268666235,
+    "gh_actions_job_id": 105362158110,
+    "job_started_utc": "2026-09-17T20:05:04Z",
+    "job_completed_utc": "2026-09-17T20:08:49Z",
+    "note_on_run_conclusion": "GitHub Actions API показывал 'in_progress' для этого job'а вплоть до ~35 минут после старта (явно устаревший статус -- реальный SSH-скрипт завершился штатно, 'SSH exit code: 0', уже в 20:08:49, т.е. за ~3ч45м... за 3мин45с). Ручной cancel_workflow_run, вызванный из-за ложного впечатления зависания, пришёл ПОСЛЕ реального завершения и только поменял финальный conclusion на 'cancelled' -- сам stdout/JSON-результат ниже реален и получен ДО этого вызова, извлечён из логов job'а."
+  },
+  "bootstrap_stats": {
+    "n_pools": 15,
+    "n_ok": 15,
+    "n_error": 0,
+    "errors_sample": []
+  },
+  "full_path_probe": {
+    "n_messages_total_seen": 2196,
+    "feed_diag": {
+      "n_messages_total": 2208,
+      "n_with_seq": 2196,
+      "n_unparsed": 0,
+      "n_confirmation_only": 12,
+      "n_connect_attempts": 1,
+      "n_reconnects": 0,
+      "connected_at_wall": 1789675509.1291885
+    },
+    "decode_diag": {
+      "decoded_ok": 29338,
+      "unrecognized_first_byte": 36,
+      "unhandled_msg_type_0": 18,
+      "unhandled_msg_type_153": 1
+    },
+    "test_wallet_address": "0x3287397aD3F82b3A270DAA43ABBB66083DC90EE8",
+    "test_wallet_note": "свежесгенерированный одноразовый ключ, НЕ PRIVATE_KEY_NOX/PRIVATE_KEY_TASK5_BOT, без фондирования, ни разу не использован для реальной отправки.",
+    "stage_stats": {
+      "detect_wait_ms": {
+        "n": 2195,
+        "median_ms": 97.25618362426758,
+        "p90_ms": 133.73746871948242,
+        "min_ms": 2.8226375579833984,
+        "max_ms": 642.1165466308594,
+        "mean_ms": 99.8043405710972
+      },
+      "decode_ms": {
+        "n": 2196,
+        "median_ms": 52.149295806884766,
+        "p90_ms": 92.78886318206787,
+        "min_ms": 0.017881393432617188,
+        "max_ms": 638.5016441345215,
+        "mean_ms": 61.319272917693645
+      },
+      "calc_ms": {
+        "n": 2196,
+        "median_ms": 0.035762786865234375,
+        "p90_ms": 0.06444454193115234,
+        "min_ms": 0.002384185791015625,
+        "max_ms": 2.0914077758789062,
+        "mean_ms": 0.0377614424311181
+      },
+      "sign_ms": {
+        "n": 2196,
+        "median_ms": 2.997279167175293,
+        "p90_ms": 3.4913063049316406,
+        "min_ms": 2.747058868408203,
+        "max_ms": 4.949808120727539,
+        "mean_ms": 3.1035191808676243
+      },
+      "processing_total_ms_decode_calc_sign": {
+        "n": 2196,
+        "median_ms": 55.2370548248291,
+        "p90_ms": 95.87583541870117,
+        "min_ms": 2.812623977661133,
+        "max_ms": 642.0652866363525,
+        "mean_ms": 64.4605535409924
+      },
+      "full_total_with_detect_wait_ms": {
+        "n": 2195,
+        "median_ms": 151.51643753051758,
+        "p90_ms": 209.90886688232422,
+        "min_ms": 5.648136138916016,
+        "max_ms": 1092.005968093872,
+        "mean_ms": 164.27031616958237
+      }
+    },
+    "n_raw_samples_kept": 40,
+    "n_raw_samples_kept_cap": 40
+  },
+  "invalid_nonce_submit": {
+    "test_wallet_address": "0x5e0de9C809568c020f7803C1987F995b8021F466",
+    "note": "nonce=10**9 -- гарантированно невалиден, транзакция НЕ будет исполнена, 0 реальных средств потрачено (тестовый кошелёк не фондирован). Измеряет ТОЛЬКО время до ответа узла на eth_sendRawTransaction, не время реального включения в блок. n=1 (владелец: не чаще одного раза за прогон) -- это ЕДИНСТВЕННЫЙ реальный сэмпл, не медиана/p90.",
+    "endpoint_used": "sequencer_submit",
+    "endpoint_url": "https://sequencer.mainnet.chain.robinhood.com",
+    "round_trip_ms": 356.2757968902588,
+    "response": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32000,
+        "message": "insufficient funds for gas * price + value: address 0x5e0de9C809568c020f7803C1987F995b8021F466 have 0 want 21000000000000"
+      }
+    },
+    "honest_note": "Узел отклонил транзакцию по НЕДОСТАТКУ СРЕДСТВ (баланс 0), а не явно по nonce -- проверка баланса произошла раньше/вместо проверки nonce в порядке валидации ноды. Гарантия 'транзакция не исполнится, 0 реальных денег' выполнена ДВОЙНО (и нулевой баланс, и nonce=10**9), но конкретно ЭТА ошибка -- про баланс, не про nonce. Round-trip 356мс -- реальное время до ЛЮБОГО ответа узла (сама цель замера), независимо от причины отказа."
+  }
+}
