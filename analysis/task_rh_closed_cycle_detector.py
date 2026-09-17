@@ -104,17 +104,45 @@ DYNAMIC_FEE_FLAG = 0x800000
 
 # --- Бюджеты по времени (честный самоадаптирующийся скан, GH Actions
 # job timeout 35 минут -- см. run_task_rh_closed_cycle_detector.yml) ---
-POOL_DISCOVERY_BUDGET_S = 300.0
-SWAP_SCAN_BUDGET_S = 700.0
+# НАЙДЕНО В ПЕРВОМ РЕАЛЬНОМ ПРОГОНЕ (run 35269631588): v3-скан полной
+# истории (0..65,645,405) реально занял 373.98с и нашёл 40,819 v3-пулов
+# (сам по себе честно завершился) -- но т.к. v3/v4 делили ОДИН общий
+# дедлайн ПОСЛЕДОВАТЕЛЬНО, v4-скан стартовал уже ПОСЛЕ истечения общего
+# бюджета и получил n_v4_pools=0 (структурный ноль, не реальный) -- при
+# том что v4 даёт БОЛЬШИНСТВО объёма (288,761 из 456,448 событий свопа
+# в том же окне). Это увело n_unresolved_pool_skipped до 94,334 из
+# 95,958 multi-leg tx и n_topology_candidates до 4 -- НЕ реальный
+# результат "циклов нет", а артефакт нулевой v4-карты пулов. Исправлено:
+# v3 и v4 теперь получают НЕЗАВИСИМЫЕ бюджеты (не общий дедлайн), плюс
+# карта пулов КЭШИРУЕТСЯ на диск (`task_rh_pool_map_cache.json`) --
+# повторные прогоны сканируют только НОВЫЕ блоки поверх кэша, не всю
+# историю заново.
+# v3 теперь почти всегда обслуживается кэшем (см. POOL_MAP_CACHE_PATH --
+# первый прогон уже покрыл v3 0..65,645,405 полностью) -- малый бюджет
+# на дельту сверх кэша. v4 ещё НИ РАЗУ не проходил полный скан (первый
+# прогон получил 0 бюджета структурно, см. комментарий выше) -- отдаём
+# ему бОльшую часть.
+POOL_DISCOVERY_V3_BUDGET_S = 120.0
+POOL_DISCOVERY_V4_BUDGET_S = 600.0
+SWAP_SCAN_BUDGET_S = 500.0
 RECEIPT_VERIFY_BUDGET_S = 400.0
-LIFETIME_BUDGET_S = 300.0
+LIFETIME_BUDGET_S = 150.0
 V2_PROBE_BLOCKS = 5000
 
 SWAP_SCAN_STEP_BLOCKS = 2000
 MAX_SWAP_SCAN_WINDOW_BLOCKS = 400_000  # мягкий потолок -- честная ВЫБОРКА, не полное покрытие истории
 
-LIFETIME_FORWARD_BLOCKS = 20
-MAX_CYCLES_FOR_LIFETIME_CHECK = 60
+# НАЙДЕНО: multi-leg tx на этой цепи ОЧЕНЬ плотные (95,958 в одних лишь
+# 60,000 блоках) -- без потолка приёмка receipt-верификации могла бы
+# растянуться на часы. Если топологических кандидатов больше потолка --
+# честная равномерная выборка по всему окну (не "первые N"), сохраняя
+# репрезентативность распределения по блокам.
+MAX_CANDIDATES_TO_VERIFY = 4000
+
+LIFETIME_FORWARD_BLOCKS = 15
+MAX_CYCLES_FOR_LIFETIME_CHECK = 50
+
+POOL_MAP_CACHE_PATH = DATA_DIR / "task_rh_pool_map_cache.json"
 
 
 def word(data_bytes: bytes, i: int) -> bytes:
@@ -281,10 +309,15 @@ def is_stable_or_native(token: str) -> bool:
 
 
 def time_boxed_chunked_get_logs(from_block: int, to_block: int, topics: list, chunk_size: int,
-                                 deadline: float) -> tuple[list, bool]:
+                                 deadline: float) -> tuple[list, bool, int]:
     """Обёртка над `_chunked_get_logs` с честным потолком по времени --
     останавливается (не бросает исключение) при исчерпании дедлайна,
-    возвращает то, что успело накопиться, и флаг `hit_deadline`."""
+    возвращает то, что успело накопиться, флаг `hit_deadline` и
+    РЕАЛЬНО покрытый до какого блока включительно диапазон (может быть
+    < to_block, если бюджет исчерпан на середине -- честно, не выдаёт
+    частичное покрытие за полное)."""
+    if from_block > to_block:
+        return [], False, from_block - 1
     out = []
     block = from_block
     hit_deadline = False
@@ -295,7 +328,8 @@ def time_boxed_chunked_get_logs(from_block: int, to_block: int, topics: list, ch
         end = min(block + chunk_size - 1, to_block)
         out.extend(_chunked_get_logs(block, end, topics, chunk_size=chunk_size))
         block = end + 1
-    return out, hit_deadline
+    covered_to = block - 1
+    return out, hit_deadline, covered_to
 
 
 # --------------------------------------------------------------- phases
@@ -349,26 +383,138 @@ def sanity_check_known_txs(v3_pool_map: dict, v4_pool_map: dict) -> dict:
     return out
 
 
-def scan_pool_universe(latest_block: int, budget_deadline: float) -> dict:
-    """Полная история PoolCreated(v3, любой фабрики)/Initialize(v4) --
-    события редкие (см. докстринг), большой chunk делает это дёшево."""
+def time_boxed_chunked_get_logs_backward(from_block: int, to_block: int, topics: list, chunk_size: int,
+                                          deadline: float) -> tuple[list, bool, int]:
+    """Как `time_boxed_chunked_get_logs`, но идёт от `to_block` НАЗАД к
+    `from_block` -- если бюджет кончится на середине, честно покрыты
+    САМЫЕ СВЕЖИЕ блоки (ближе к latest_block), а не самые старые. Для
+    поиска пулов это важно: своп-скан (см. ниже) тоже смотрит НАЗАД от
+    latest_block -- пулы, актуальные ДЛЯ ЭТОГО ОКНА, скорее свежие."""
+    if from_block > to_block:
+        return [], False, to_block + 1
+    out = []
+    block = to_block
+    hit_deadline = False
+    while block >= from_block:
+        if time.time() > deadline:
+            hit_deadline = True
+            break
+        start = max(from_block, block - chunk_size + 1)
+        out.extend(_chunked_get_logs(start, block, topics, chunk_size=chunk_size))
+        block = start - 1
+    covered_from = block + 1
+    return out, hit_deadline, covered_from
+
+
+def load_pool_map_cache() -> dict:
+    default = {"v3": {"pools": {}, "covered_from_block": None, "covered_to_block": None},
+               "v4": {"pools": {}, "covered_from_block": None, "covered_to_block": None}}
+    if not POOL_MAP_CACHE_PATH.exists():
+        return default
+    try:
+        d = json.loads(POOL_MAP_CACHE_PATH.read_text())
+        for ver in ("v3", "v4"):
+            d.setdefault(ver, default[ver])
+            d[ver].setdefault("pools", {})
+            d[ver].setdefault("covered_from_block", None)
+            d[ver].setdefault("covered_to_block", None)
+        return d
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def save_pool_map_cache(v3_entry: dict, v4_entry: dict) -> None:
+    payload = {"v3": v3_entry, "v4": v4_entry, "saved_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    POOL_MAP_CACHE_PATH.write_text(json.dumps(payload, ensure_ascii=False, default=str))
+
+
+def incremental_scan_one_version(cache_entry: dict, topic0_val: str, latest_block: int, budget_s: float,
+                                  decode_fn, key_field: str) -> dict:
+    """Инкрементальный скан ОДНОЙ версии (v3 PoolCreated / v4 Initialize)
+    поверх кэша: (1) сначала закрывает разрыв [covered_to+1 .. latest]
+    (новые пулы с прошлого прогона -- маленький, всегда нужен), (2) если
+    бюджет остался -- расширяет покрытие НАЗАД [0 .. covered_from-1]
+    (старая история, копится через прогоны). Без кэша -- честный
+    backward-скан от latest_block вниз, бюджет-ограниченный (см.
+    time_boxed_chunked_get_logs_backward -- при нехватке бюджета
+    покрыты САМЫЕ СВЕЖИЕ блоки, не самые старые)."""
     t0 = time.time()
-    v3_logs, hit1 = time_boxed_chunked_get_logs(0, latest_block, [V3_POOL_CREATED_TOPIC0],
-                                                 chunk_size=3_000_000, deadline=budget_deadline)
-    v4_logs, hit2 = time_boxed_chunked_get_logs(0, latest_block, [V4_INITIALIZE_TOPIC0],
-                                                 chunk_size=3_000_000, deadline=budget_deadline)
-    v3_map, v4_map = {}, {}
-    for log in v3_logs:
-        d = decode_v3_pool_created(log)
-        v3_map[d["pool"]] = d
-    for log in v4_logs:
-        d = decode_v4_initialize(log)
-        v4_map[d["pool_id"]] = d
+    pools = dict(cache_entry.get("pools") or {})
+    covered_from = cache_entry.get("covered_from_block")
+    covered_to = cache_entry.get("covered_to_block")
+    n_new_logs = 0
+    hit_any = False
+    remaining = budget_s
+
+    if covered_from is None or covered_to is None:
+        logs, hit, reached_from = time_boxed_chunked_get_logs_backward(
+            0, latest_block, [topic0_val], chunk_size=3_000_000, deadline=time.time() + remaining)
+        for log in logs:
+            d = decode_fn(log)
+            pools[d[key_field]] = d
+        n_new_logs += len(logs)
+        hit_any = hit
+        covered_from, covered_to = reached_from, latest_block
+    else:
+        if covered_to < latest_block:
+            deadline = time.time() + remaining
+            logs, hit, reached_to = time_boxed_chunked_get_logs(covered_to + 1, latest_block, [topic0_val],
+                                                                  chunk_size=3_000_000, deadline=deadline)
+            for log in logs:
+                d = decode_fn(log)
+                pools[d[key_field]] = d
+            n_new_logs += len(logs)
+            hit_any = hit_any or hit
+            covered_to = reached_to
+            remaining = budget_s - (time.time() - t0)
+        if remaining > 5.0 and covered_from > 0:
+            deadline = time.time() + remaining
+            logs, hit, reached_from = time_boxed_chunked_get_logs_backward(
+                0, covered_from - 1, [topic0_val], chunk_size=3_000_000, deadline=deadline)
+            for log in logs:
+                d = decode_fn(log)
+                pools[d[key_field]] = d
+            n_new_logs += len(logs)
+            hit_any = hit_any or hit
+            covered_from = reached_from
+
     return {
-        "v3_pool_map": v3_map, "v4_pool_map": v4_map,
-        "meta": {"n_v3_pools": len(v3_map), "n_v4_pools": len(v4_map),
-                 "runtime_s": time.time() - t0, "hit_deadline": hit1 or hit2,
-                 "scan_range": [0, latest_block]},
+        "pools": pools, "covered_from_block": covered_from, "covered_to_block": covered_to,
+        "n_new_this_run": n_new_logs, "hit_deadline": hit_any, "runtime_s": time.time() - t0,
+        "full_history_covered": covered_from == 0 and covered_to >= latest_block,
+    }
+
+
+def scan_pool_universe(latest_block: int, v3_budget_s: float, v4_budget_s: float) -> dict:
+    """PoolCreated(v3, любой фабрики)/Initialize(v4) -- события редкие
+    (см. докстринг), большой chunk делает полную историю дёшевой. v3 и
+    v4 получают НЕЗАВИСИМЫЕ бюджеты (см. комментарий у констант выше --
+    в первом реальном прогоне общий дедлайн привёл к n_v4_pools=0
+    структурно, не по факту). Инкрементально поверх кэша на диске,
+    приоритет -- СВЕЖИЕ блоки (см. `incremental_scan_one_version`)."""
+    t0 = time.time()
+    cache = load_pool_map_cache()
+    v3_res = incremental_scan_one_version(cache["v3"], V3_POOL_CREATED_TOPIC0, latest_block, v3_budget_s,
+                                           decode_v3_pool_created, "pool")
+    v4_res = incremental_scan_one_version(cache["v4"], V4_INITIALIZE_TOPIC0, latest_block, v4_budget_s,
+                                           decode_v4_initialize, "pool_id")
+    save_pool_map_cache(
+        {"pools": v3_res["pools"], "covered_from_block": v3_res["covered_from_block"],
+         "covered_to_block": v3_res["covered_to_block"]},
+        {"pools": v4_res["pools"], "covered_from_block": v4_res["covered_from_block"],
+         "covered_to_block": v4_res["covered_to_block"]},
+    )
+    return {
+        "v3_pool_map": v3_res["pools"], "v4_pool_map": v4_res["pools"],
+        "meta": {"n_v3_pools": len(v3_res["pools"]), "n_v4_pools": len(v4_res["pools"]),
+                 "n_v3_pools_new_this_run": v3_res["n_new_this_run"], "n_v4_pools_new_this_run": v4_res["n_new_this_run"],
+                 "runtime_s": time.time() - t0, "v3_hit_deadline": v3_res["hit_deadline"],
+                 "v4_hit_deadline": v4_res["hit_deadline"],
+                 "v3_covered_range": [v3_res["covered_from_block"], v3_res["covered_to_block"]],
+                 "v4_covered_range": [v4_res["covered_from_block"], v4_res["covered_to_block"]],
+                 "v3_full_history_covered": v3_res["full_history_covered"],
+                 "v4_full_history_covered": v4_res["full_history_covered"],
+                 "cache_path": str(POOL_MAP_CACHE_PATH)},
     }
 
 
@@ -660,12 +806,12 @@ def main() -> None:
 
     result["v2_probe"] = probe_v2_style(latest_block)
 
-    pool_deadline = global_start + POOL_DISCOVERY_BUDGET_S
-    pools = scan_pool_universe(latest_block, pool_deadline)
+    pools = scan_pool_universe(latest_block, POOL_DISCOVERY_V3_BUDGET_S, POOL_DISCOVERY_V4_BUDGET_S)
     result["pool_discovery"] = pools["meta"]
     v3_pool_map, v4_pool_map = pools["v3_pool_map"], pools["v4_pool_map"]
     print(f"[rh_cycles] пулов: v3={len(v3_pool_map)} v4={len(v4_pool_map)}, "
-          f"{pools['meta']['runtime_s']:.0f}с, hit_deadline={pools['meta']['hit_deadline']}")
+          f"{pools['meta']['runtime_s']:.0f}с, v3_hit_deadline={pools['meta']['v3_hit_deadline']}, "
+          f"v4_hit_deadline={pools['meta']['v4_hit_deadline']}")
 
     result["sanity_check_known_txs"] = sanity_check_known_txs(v3_pool_map, v4_pool_map)
     print(f"[rh_cycles] sanity-check на 3 известных tx: "
@@ -682,8 +828,22 @@ def main() -> None:
     result["topology_filter"] = topo["topology_filter"]
     print(f"[rh_cycles] топология: {topo['topology_filter']}")
 
+    candidates = topo["candidates"]
+    n_candidates_before_cap = len(candidates)
+    if len(candidates) > MAX_CANDIDATES_TO_VERIFY:
+        # Честная РАВНОМЕРНАЯ выборка по всему окну (не "первые N" --
+        # сохраняет репрезентативность распределения по блокам), см.
+        # комментарий у MAX_CANDIDATES_TO_VERIFY.
+        step = len(candidates) / MAX_CANDIDATES_TO_VERIFY
+        candidates = [candidates[int(i * step)] for i in range(MAX_CANDIDATES_TO_VERIFY)]
+    result["candidate_sampling"] = {
+        "n_topology_candidates_total": n_candidates_before_cap, "n_sampled_for_verification": len(candidates),
+        "was_sampled": n_candidates_before_cap > MAX_CANDIDATES_TO_VERIFY,
+    }
+    print(f"[rh_cycles] кандидатов для receipt-верификации: {len(candidates)} из {n_candidates_before_cap}")
+
     verify_deadline = time.time() + RECEIPT_VERIFY_BUDGET_S
-    verify_res = verify_candidates(topo["candidates"], verify_deadline)
+    verify_res = verify_candidates(candidates, verify_deadline)
     result["verification"] = verify_res["verification_meta"]
     verified_cycles = verify_res["verified_cycles"]
     print(f"[rh_cycles] верификация: {verify_res['verification_meta']}")
