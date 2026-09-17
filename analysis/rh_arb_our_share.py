@@ -67,6 +67,15 @@ REFERENCE_NOTIONAL_USD = 200.0
 REAL_CYCLE_GAS_USED_SAMPLES = [378848, 186163, 290261]
 TIME_BUDGET_S = 800.0
 MIN_PAIRS_REQUIRED = 5
+# ЧЕСТНАЯ НАХОДКА (run 35226497462): batching отказал ровно на 11-м
+# подряд batch-вызове (134 запроса/блок, БЕЗ троттлинга) -- похоже на
+# burst-рейт-лимит Alchemy, не обязательно на размер батча (10 подряд
+# прошли). Добавлен троттлинг (тот же порядок, что _ALCHEMY_MIN_
+# REQUEST_INTERVAL_S в alchemy_fallback.py, ~10 запросов/с) -- вместе с
+# чанкованием (MAX_BATCH_SIZE) это должно устранить оба потенциальных
+# источника отказа, не гадая, какой из них был реальным.
+BATCH_MIN_INTERVAL_S = 0.12
+_last_batch_call_ts = 0.0
 
 
 def keccak256(data: bytes) -> bytes:
@@ -99,10 +108,38 @@ def decode_v4_slot0_price(raw_hex: str | None) -> int | None:
     return int.from_bytes(data[0:32], "big") & ((1 << 160) - 1)
 
 
+MAX_BATCH_SIZE = 40  # реальный найденный лимит (run 35226497462: 134 запроса/блок -- batching
+# отказал уже на 3-м реальном блоке; провайдер (Alchemy) молча режет либо размер, либо число
+# элементов батча -- не документировано явно, отступаем с запасом, не гадаем точное число)
+
+
+def rpc_batch_chunked(requests_list: list[tuple[str, list]], chunk_size: int = MAX_BATCH_SIZE) -> list[dict] | None:
+    """Разбивает requests_list на подпакеты <= chunk_size -- ОДИН
+    логический батч (все результаты для одного блока) может стать
+    НЕСКОЛЬКИМИ HTTP-вызовами, но это всё ещё на порядки дешевле
+    полностью sequential (67 пар x 2 = 134 запроса -> ~4 вызова по 40,
+    не 134 отдельных). Если ЛЮБОЙ подпакет не батчится -- честно
+    возвращает None целиком (вызывающий код останавливается, не
+    смешивает частичный успех с тихой деградацией)."""
+    all_results: list[dict] = []
+    for i in range(0, len(requests_list), chunk_size):
+        chunk = requests_list[i:i + chunk_size]
+        res = rpc_batch(chunk)
+        if res is None:
+            return None
+        all_results.extend(res)
+    return all_results
+
+
 def rpc_batch(requests_list: list[tuple[str, list]], timeout: int = 25) -> list[dict] | None:
     url = _alchemy_direct_endpoint()
     if not url:
         return None
+    global _last_batch_call_ts
+    wait = _last_batch_call_ts + BATCH_MIN_INTERVAL_S - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _last_batch_call_ts = time.monotonic()
     payload = [{"jsonrpc": "2.0", "id": i, "method": m, "params": p} for i, (m, p) in enumerate(requests_list)]
     try:
         resp = requests.post(url, json=payload, timeout=timeout)
@@ -291,9 +328,9 @@ def main() -> None:
                 params = [params[0], block_hex]
                 reqs.append((method, params))
                 req_index_map.append((pi, side))
-        batch_res = rpc_batch(reqs)
+        batch_res = rpc_batch_chunked(reqs)
         if batch_res is None:
-            stopped_reason = f"batching отказал на блоке {block} -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)"
+            stopped_reason = f"batching (чанками по {MAX_BATCH_SIZE}) отказал на блоке {block} -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)"
             break
         prices_by_pair: dict[int, dict] = {}
         for (pi, side), r in zip(req_index_map, batch_res):
