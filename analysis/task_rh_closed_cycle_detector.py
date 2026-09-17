@@ -110,7 +110,7 @@ RECEIPT_VERIFY_BUDGET_S = 400.0
 LIFETIME_BUDGET_S = 300.0
 V2_PROBE_BLOCKS = 5000
 
-SWAP_SCAN_STEP_BLOCKS = 5000
+SWAP_SCAN_STEP_BLOCKS = 2000
 MAX_SWAP_SCAN_WINDOW_BLOCKS = 400_000  # мягкий потолок -- честная ВЫБОРКА, не полное покрытие истории
 
 LIFETIME_FORWARD_BLOCKS = 20
@@ -167,7 +167,7 @@ def decode_v3_pool_created(log: dict) -> dict:
 def decode_v4_initialize(log: dict) -> dict:
     data = bytes.fromhex(log["data"][2:])
     return {
-        "pool_id": log["topics"][1], "currency0": topic_to_addr(log["topics"][2]).lower(),
+        "pool_id": log["topics"][1].lower(), "currency0": topic_to_addr(log["topics"][2]).lower(),
         "currency1": topic_to_addr(log["topics"][3]).lower(), "fee_pips": int.from_bytes(word(data, 0)[-3:], "big"),
         "hooks": to_addr(word(data, 2)).lower(), "block_number": int(log["blockNumber"], 16),
     }
@@ -187,7 +187,7 @@ def decode_v3_swap(log: dict) -> dict:
 def decode_v4_swap(log: dict) -> dict:
     data = bytes.fromhex(log["data"][2:])
     return {
-        "version": "v4", "pool_id": log["topics"][1], "sender": topic_to_addr(log["topics"][2]).lower(),
+        "version": "v4", "pool_id": log["topics"][1].lower(), "sender": topic_to_addr(log["topics"][2]).lower(),
         "amount0": to_int_signed(word(data, 0)), "amount1": to_int_signed(word(data, 1)),
         "fee_pips_real": int.from_bytes(word(data, 5)[-3:], "big"),
         "block_number": int(log["blockNumber"], 16), "log_index": int(log["logIndex"], 16),
@@ -651,14 +651,6 @@ def measure_repeat_occurrence(verified_cycles: list) -> None:
             c["nearest_repeat_gap_blocks"] = min((abs(b - c["block_number"]) for b in others), default=None)
 
 
-def pctl(values: list[float], p: float) -> float | None:
-    if not values:
-        return None
-    s = sorted(values)
-    idx = min(len(s) - 1, int(len(s) * p))
-    return s[idx]
-
-
 def main() -> None:
     result: dict = {"probed_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     global_start = time.time()
@@ -711,15 +703,12 @@ def main() -> None:
     print(f"[rh_cycles] живучесть: измеряем {len(lifetime_targets)} циклов "
           f"({len(three_plus)} 3+-плечевых из {len(three_plus)}, {len(two_leg_sample)} из {len(two_leg)} 2-плечевых)")
 
-    lifetime_results = {}
     n_lifetime_measured = n_lifetime_capped = 0
     for c in lifetime_targets:
         if time.time() > lifetime_deadline:
             n_lifetime_capped += 1
             continue
-        lr = measure_lifetime(c, lifetime_deadline)
-        c["lifetime"] = lr
-        lifetime_results[c["tx_hash"]] = lr
+        c["lifetime"] = measure_lifetime(c, lifetime_deadline)
         n_lifetime_measured += 1
     result["lifetime_measurement_meta"] = {
         "n_targets": len(lifetime_targets), "n_measured": n_lifetime_measured, "n_capped_by_budget": n_lifetime_capped,
