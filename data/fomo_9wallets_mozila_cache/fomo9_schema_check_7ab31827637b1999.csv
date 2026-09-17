@@ -1,0 +1,42 @@
+column_name,data_type,table_name,table_schema
+minute,timestamp(3) with time zone,usd,prices
+blockchain,varchar,usd,prices
+contract_address,varbinary,usd,prices
+decimals,integer,usd,prices
+symbol,varchar,usd,prices
+price,double,usd,prices
+block_time,timestamp(3),transactions,robinhood
+block_number,bigint,transactions,robinhood
+block_hash,varbinary,transactions,robinhood
+value,uint256,transactions,robinhood
+index,bigint,transactions,robinhood
+success,boolean,transactions,robinhood
+from,varbinary,transactions,robinhood
+to,varbinary,transactions,robinhood
+gas_limit,bigint,transactions,robinhood
+gas_price,uint256,transactions,robinhood
+gas_used,bigint,transactions,robinhood
+max_fee_per_gas,bigint,transactions,robinhood
+max_priority_fee_per_gas,bigint,transactions,robinhood
+priority_fee_per_gas,bigint,transactions,robinhood
+operator_fee_constant,bigint,transactions,robinhood
+operator_fee_scalar,bigint,transactions,robinhood
+l1_gas_used,bigint,transactions,robinhood
+l1_gas_price,bigint,transactions,robinhood
+l1_fee,bigint,transactions,robinhood
+l1_fee_scalar,double,transactions,robinhood
+l1_block_number,bigint,transactions,robinhood
+l1_timestamp,bigint,transactions,robinhood
+l1_tx_origin,varbinary,transactions,robinhood
+l1_batch_number,bigint,transactions,robinhood
+l1_batch_tx_index,bigint,transactions,robinhood
+chain_id,varchar,transactions,robinhood
+nonce,bigint,transactions,robinhood
+data,varbinary,transactions,robinhood
+hash,varbinary,transactions,robinhood
+type,varchar,transactions,robinhood
+access_list,"array(row(address varbinary, storagekeys array(varbinary)))",transactions,robinhood
+authorization_list,"array(row(chainid bigint, address varbinary, nonce bigint, r varchar, s varchar, yparity varchar))",transactions,robinhood
+block_date,date,transactions,robinhood
+gas_used_for_l1,bigint,transactions,robinhood
+effective_gas_price,bigint,transactions,robinhood
