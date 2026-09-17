@@ -1,0 +1,105 @@
+name: "Задача 5 -- опережает ли фид сборку блока (live, ~4 минуты)"
+
+# Владелец, 2026-09-17: снять противоречие -- медианный интервал между
+# сообщениями фида (97.3мс) похож на "одно сообщение = один готовый
+# блок", но 1452 сделки в блоке 0 означают, что попасть в уже закрытый
+# блок физически нельзя. Параллельно слушаем фид и опрашиваем
+# eth_blockNumber, сравниваем моменты появления одних и тех же событий.
+#
+# Cooldown фида (30 мин между подключениями) реально проверен ПЕРЕД
+# этим прогоном отдельно (task5_feed_cooldown_check.py,
+# seconds_until_allowed=0.0) -- сам analysis/task5_feed_vs_block_timing.py
+# (через SequencerFeedClient.listen()) тоже уважает cooldown сам по себе.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Полный commit SHA, из которого точечно берётся analysis/.'
+        required: true
+        type: string
+      duration_seconds:
+        description: 'Длительность прослушивания фида, секунды.'
+        required: false
+        type: string
+        default: '240'
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/FEED_VS_BLOCK_TIMING_REQUEST"
+
+jobs:
+  feed_vs_block:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout analysis/ на VPS + фид vs блок (~4-6 мин)"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+          DURATION_SECONDS: ${{ inputs.duration_seconds || '240' }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_feed_vs_block_timing.py --duration-seconds $DURATION_SECONDS
+            '
+          "
+
+      - name: Забрать data/task5_feed_vs_block_timing_result.json с VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/task5_feed_vs_block_timing_result.json' > /tmp/feed_vs_block_result.json
+          [ -s /tmp/feed_vs_block_result.json ]
+          cp /tmp/feed_vs_block_result.json data/task5_feed_vs_block_timing_result.json
+          python3 -c "
+          import json
+          d = json.load(open('data/task5_feed_vs_block_timing_result.json'))
+          print(json.dumps({
+            'n_feed_messages': d['n_feed_messages'],
+            'block_poller': {k: v for k, v in d['block_poller'].items() if k != 'errors_sample'},
+            'message_batch_size_distribution': d['message_batch_size_distribution'],
+            'feed_vs_block_timing': d['feed_vs_block_timing'],
+            'block_like_field_search': d['block_like_field_search'],
+          }, indent=2, ensure_ascii=False))
+          "
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FEED_VS_BLOCK_TIMING_REQUEST
+          [ -e data/task5_feed_vs_block_timing_result.json ] && git add data/task5_feed_vs_block_timing_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: фид vs блок -- опережает ли фид сборку, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

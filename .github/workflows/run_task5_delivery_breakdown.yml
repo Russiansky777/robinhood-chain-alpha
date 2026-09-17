@@ -1,0 +1,96 @@
+name: "Задача 5 -- разложить 237мс доставки (сеть/TLS/HTTP/обработка) + traceroute"
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Полный commit SHA, из которого точечно берётся analysis/.'
+        required: true
+        type: string
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/DELIVERY_BREAKDOWN_REQUEST"
+
+jobs:
+  breakdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout analysis/ на VPS + запуск разложения задержки (~1-2 мин)"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/ data/task5_delivery_latency_n50_result.json
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_delivery_breakdown.py
+            '
+          "
+
+      - name: "Traceroute/mtr/tracepath до хоста (как root -- нужен raw ICMP/UDP)"
+        run: |
+          IP=$(ssh $SSH_OPTS root@45.59.170.76 "sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python3 -c \"import json; print(json.load(open('/home/bot/robinhood-chain-alpha/data/task5_delivery_breakdown_result.json'))['resolved_ip_used'])\"")
+          echo "IP=$IP"
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -x
+            (command -v mtr >/dev/null && mtr -r -c 5 -n $IP) || \
+            (command -v traceroute >/dev/null && traceroute -n -m 20 -w 2 $IP) || \
+            (command -v tracepath >/dev/null && tracepath -n $IP) || \
+            echo 'NO_TRACEROUTE_TOOL_AVAILABLE'
+          " > /tmp/traceroute_output.txt 2>&1 || true
+          cat /tmp/traceroute_output.txt
+
+      - name: Забрать результат с VPS и вклеить traceroute
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/task5_delivery_breakdown_result.json' > /tmp/breakdown_result.json
+          [ -s /tmp/breakdown_result.json ]
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/breakdown_result.json'))
+          d['traceroute'] = open('/tmp/traceroute_output.txt').read()
+          json.dump(d, open('data/task5_delivery_breakdown_result.json', 'w'), indent=2, ensure_ascii=False)
+          "
+          python3 -c "import json; d=json.load(open('data/task5_delivery_breakdown_result.json')); print(json.dumps(d['breakdown_cold_ladder'], indent=2, ensure_ascii=False)); print(json.dumps(d['breakdown_warm_persistent_connection'], indent=2, ensure_ascii=False)); print(json.dumps(d['colocation_estimate'], indent=2, ensure_ascii=False))"
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/DELIVERY_BREAKDOWN_REQUEST
+          [ -e data/task5_delivery_breakdown_result.json ] && git add data/task5_delivery_breakdown_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: разложение 237мс доставки (сеть/TLS/HTTP/обработка) + traceroute, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
