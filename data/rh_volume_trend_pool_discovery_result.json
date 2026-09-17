@@ -1,0 +1,602 @@
+{
+  "generated_at_utc": "2026-09-17T12:58:16Z",
+  "probe_page1_status": 200,
+  "probe_sample_attributes_keys": [
+    "base_token_price_usd",
+    "base_token_price_native_currency",
+    "quote_token_price_usd",
+    "quote_token_price_native_currency",
+    "base_token_price_quote_token",
+    "quote_token_price_base_token",
+    "address",
+    "name",
+    "pool_created_at",
+    "fdv_usd",
+    "market_cap_usd",
+    "price_change_percentage",
+    "transactions",
+    "volume_usd",
+    "reserve_in_usd"
+  ],
+  "probe_sample_relationships_keys": [
+    "base_token",
+    "quote_token",
+    "dex"
+  ],
+  "probe_sample_raw": {
+    "id": "robinhood_0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+    "type": "pool",
+    "attributes": {
+      "base_token_price_usd": "0.999947479380109",
+      "base_token_price_native_currency": "0.000406841817178116",
+      "quote_token_price_usd": "2457.78",
+      "quote_token_price_native_currency": "1.0",
+      "base_token_price_quote_token": "0.0004068418172",
+      "quote_token_price_base_token": "2457.957756005",
+      "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "name": "USDG / WETH 0.01%",
+      "pool_created_at": "2026-07-02T20:51:08Z",
+      "fdv_usd": "661548203.211077",
+      "market_cap_usd": "3263959008.32628",
+      "price_change_percentage": {
+        "m5": "-0.108",
+        "m15": "-0.076",
+        "m30": "0.147",
+        "h1": "0.008",
+        "h6": "-0.077",
+        "h24": "-0.164"
+      },
+      "transactions": {
+        "m5": {
+          "buys": 423,
+          "sells": 445,
+          "buyers": 257,
+          "sellers": 297
+        },
+        "m15": {
+          "buys": 2087,
+          "sells": 2076,
+          "buyers": 1007,
+          "sellers": 1033
+        },
+        "m30": {
+          "buys": 4710,
+          "sells": 4649,
+          "buyers": 1860,
+          "sellers": 1885
+        },
+        "h1": {
+          "buys": 11008,
+          "sells": 10415,
+          "buyers": 3645,
+          "sellers": 3115
+        },
+        "h6": {
+          "buys": 40289,
+          "sells": 40320,
+          "buyers": 10427,
+          "sellers": 10333
+        },
+        "h24": {
+          "buys": 214763,
+          "sells": 225508,
+          "buyers": 29789,
+          "sellers": 31551
+        }
+      },
+      "volume_usd": {
+        "m5": "674632.640067293",
+        "m15": "4497339.59748053",
+        "m30": "15309247.2865462",
+        "h1": "36157450.8278546",
+        "h6": "85501667.6265972",
+        "h24": "527812436.586156"
+      },
+      "reserve_in_usd": "25163408.9211"
+    },
+    "relationships": {
+      "base_token": {
+        "data": {
+          "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "type": "token"
+        }
+      },
+      "quote_token": {
+        "data": {
+          "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+          "type": "token"
+        }
+      },
+      "dex": {
+        "data": {
+          "id": "uniswap-v3-robinhood",
+          "type": "dex"
+        }
+      }
+    }
+  },
+  "probe_n_pools_page1": 20,
+  "pagination_stopped_at_page": 6,
+  "pagination_stop_status": 429,
+  "n_pools_total_fetched": 100,
+  "dex_ids_seen": [
+    "alandale-cl",
+    "bankr-robinhood",
+    "giga-v3",
+    "orvex-v4",
+    "pancakeswap-infinity-clmm-robinhood",
+    "pons-v2-dex",
+    "ramses-v3-robinhood",
+    "sectorone-v2-0-robinhood",
+    "sushiswap-v3-robinhood",
+    "uniswap-v2-robinhood",
+    "uniswap-v3-robinhood",
+    "uniswap-v4-robinhood",
+    "up-v3"
+  ],
+  "n_after_tvl_filter": 93,
+  "n_ohlcv_attempted": 25,
+  "n_tvl_candidates_total": 93,
+  "ohlcv_stage_partial_coverage_reason": "бюджет проверки 3-дневной торговли (300.0с) исчерпан -- обработано 25/93 кандидатов, честно останавливаемся",
+  "n_after_3d_trading_filter": 25,
+  "latest_block_for_fee_resolution": 65387970,
+  "n_traded_candidates_fee_resolution_attempted": 25,
+  "n_traded_candidates_total": 25,
+  "n_final_candidates_fee_ne_11pct": 23,
+  "final_candidates": [
+    {
+      "gt_id": "robinhood_0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "name": "USDG / WETH 0.01%",
+      "reserve_in_usd": 25163408.9211,
+      "pool_created_at": "2026-07-02T20:51:08Z",
+      "volume_usd_h24": "527812436.586156",
+      "dex_id": "uniswap-v3-robinhood",
+      "base_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "quote_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "volume_usd_3d_real": 1313228802.3523846,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "fee_pips": 100
+      }
+    },
+    {
+      "gt_id": "robinhood_0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+      "address": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+      "name": "WETH / USDG 0.05%",
+      "reserve_in_usd": 669218.102,
+      "pool_created_at": "2026-07-21T03:25:23Z",
+      "volume_usd_h24": "19177979.1976206",
+      "dex_id": "up-v3",
+      "base_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 46309748.7145406,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+        "fee_pips": 51
+      }
+    },
+    {
+      "gt_id": "robinhood_0x15cdc3dbc951a9d4a5a39098811fa4481a6e8a19c32cefd82a1e97a1a4f171be",
+      "address": "0x15cdc3dbc951a9d4a5a39098811fa4481a6e8a19c32cefd82a1e97a1a4f171be",
+      "name": "musegram / META",
+      "reserve_in_usd": 233712.363,
+      "pool_created_at": "2026-09-16T08:57:20Z",
+      "volume_usd_h24": "4157439.24939119",
+      "dex_id": "bankr-robinhood",
+      "base_token_id": "robinhood_0x9cb595fbb3601dc0ef80e87921dc4ffd9307aba3",
+      "quote_token_id": "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35",
+      "volume_usd_3d_real": 4214084.452681323,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x15cdc3dbc951a9d4a5a39098811fa4481a6e8a19c32cefd82a1e97a1a4f171be",
+        "fee_pips": 8388608,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x9cb595fbb3601dc0ef80e87921dc4ffd9307aba3",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x40a433930370f6cdf0a78debc2c6dd599c23bd428c0d67dd8b5373e4f101557f",
+      "address": "0x40a433930370f6cdf0a78debc2c6dd599c23bd428c0d67dd8b5373e4f101557f",
+      "name": "musebook / META",
+      "reserve_in_usd": 4125510.3057,
+      "pool_created_at": "2026-09-16T05:51:12Z",
+      "volume_usd_h24": "17301999.2216385",
+      "dex_id": "bankr-robinhood",
+      "base_token_id": "robinhood_0x91a2dae9699f0b82540b5886b0d8759c22820ba3",
+      "quote_token_id": "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35",
+      "volume_usd_3d_real": 30035948.170936603,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x40a433930370f6cdf0a78debc2c6dd599c23bd428c0d67dd8b5373e4f101557f",
+        "fee_pips": 8388608,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x91a2dae9699f0b82540b5886b0d8759c22820ba3",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "address": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "name": "WETH / USDG 0.01%",
+      "reserve_in_usd": 869044.7098,
+      "pool_created_at": "2026-07-02T08:58:08Z",
+      "volume_usd_h24": "16339774.1576116",
+      "dex_id": "uniswap-v4-robinhood",
+      "base_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 38504698.78282659,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "fee_pips": 100,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "gt_id": "robinhood_0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+      "address": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+      "name": "WETH / USDG 0.005%",
+      "reserve_in_usd": 193611.8653,
+      "pool_created_at": "2026-09-10T11:03:33Z",
+      "volume_usd_h24": "6205976.35166839",
+      "dex_id": "giga-v3",
+      "base_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 8070899.817211989,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+        "fee_pips": 50
+      }
+    },
+    {
+      "gt_id": "robinhood_0x7a35168956f129c032ec035cc47383a605a71df0",
+      "address": "0x7a35168956f129c032ec035cc47383a605a71df0",
+      "name": "WETH / USDG 0.004%",
+      "reserve_in_usd": 119679.6447,
+      "pool_created_at": "2026-08-20T06:35:54Z",
+      "volume_usd_h24": "6275009.5935551",
+      "dex_id": "alandale-cl",
+      "base_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 11761975.12479447,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x7a35168956f129c032ec035cc47383a605a71df0",
+        "fee_pips": 40
+      }
+    },
+    {
+      "gt_id": "robinhood_0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+      "address": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+      "name": "WETH / USDG 0.01%",
+      "reserve_in_usd": 724982.1808,
+      "pool_created_at": "2026-08-19T16:09:34Z",
+      "volume_usd_h24": "26112828.2812812",
+      "dex_id": "ramses-v3-robinhood",
+      "base_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 59898685.990185395,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+        "fee_pips": 100
+      }
+    },
+    {
+      "gt_id": "robinhood_0x8dabf19a93da0e1fe59b655fd800151b52fbc79b4995dead08f079eff83a0576",
+      "address": "0x8dabf19a93da0e1fe59b655fd800151b52fbc79b4995dead08f079eff83a0576",
+      "name": "FOMOPAD / WETH",
+      "reserve_in_usd": 27381.8812,
+      "pool_created_at": "2026-09-16T14:47:46Z",
+      "volume_usd_h24": "4612231.5725233",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0x33e95e548646e674778195a00c995d6213ea977b",
+      "quote_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "volume_usd_3d_real": 4631602.846147389,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x8dabf19a93da0e1fe59b655fd800151b52fbc79b4995dead08f079eff83a0576",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x33e95e548646e674778195a00c995d6213ea977b"
+      }
+    },
+    {
+      "gt_id": "robinhood_0xfabeb358fe4ac3c64ac0a59f7355eb04eab3f422eb4585092e9ef79946d7410c",
+      "address": "0xfabeb358fe4ac3c64ac0a59f7355eb04eab3f422eb4585092e9ef79946d7410c",
+      "name": "SPIDERBRAIN / GOOGL",
+      "reserve_in_usd": 39454.2508,
+      "pool_created_at": "2026-09-16T22:20:31Z",
+      "volume_usd_h24": "1492334.70177472",
+      "dex_id": "bankr-robinhood",
+      "base_token_id": "robinhood_0xb11766322d5958551025597389e1e33ed4df0ba3",
+      "quote_token_id": "robinhood_0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+      "volume_usd_3d_real": 1496869.9880757893,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xfabeb358fe4ac3c64ac0a59f7355eb04eab3f422eb4585092e9ef79946d7410c",
+        "fee_pips": 8388608,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+        "currency1": "0xb11766322d5958551025597389e1e33ed4df0ba3"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+      "address": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+      "name": "META / USDG 0.3%",
+      "reserve_in_usd": 2100197.0962,
+      "pool_created_at": "2026-07-11T12:18:48Z",
+      "volume_usd_h24": "12404904.4108191",
+      "dex_id": "uniswap-v4-robinhood",
+      "base_token_id": "robinhood_0xc0d6457c16cc70d6790dd43521c899c87ce02f35",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 26369955.537521627,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+        "fee_pips": 3000,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "address": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "name": "USDG / WETH 0.05%",
+      "reserve_in_usd": 4825123.5271,
+      "pool_created_at": "2026-06-29T09:34:25Z",
+      "volume_usd_h24": "26611121.71097",
+      "dex_id": "uniswap-v3-robinhood",
+      "base_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "quote_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "volume_usd_3d_real": 60800634.80745809,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+        "fee_pips": 500
+      }
+    },
+    {
+      "gt_id": "robinhood_0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+      "address": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+      "name": "PONS / USDG 0.3%",
+      "reserve_in_usd": 1458225.8399,
+      "pool_created_at": "2026-08-11T03:34:02Z",
+      "volume_usd_h24": "24503148.1616446",
+      "dex_id": "ramses-v3-robinhood",
+      "base_token_id": "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 74597619.7509261,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+        "fee_pips": 1000
+      }
+    },
+    {
+      "gt_id": "robinhood_0xc61284332117c3fb23a2a56cceffd07f7af60029",
+      "address": "0xc61284332117c3fb23a2a56cceffd07f7af60029",
+      "name": "SPCX / USDG 0.05%",
+      "reserve_in_usd": 2462187.5369,
+      "pool_created_at": "2026-07-23T11:56:34Z",
+      "volume_usd_h24": "25260537.4883132",
+      "dex_id": "uniswap-v3-robinhood",
+      "base_token_id": "robinhood_0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 47739357.892758,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xc61284332117c3fb23a2a56cceffd07f7af60029",
+        "fee_pips": 500
+      }
+    },
+    {
+      "gt_id": "robinhood_0x97aa9ecd834cdbc35df277a9ca4ad8db2c6ee0f9ea4ce3e8b06fa5fa044a4e3f",
+      "address": "0x97aa9ecd834cdbc35df277a9ca4ad8db2c6ee0f9ea4ce3e8b06fa5fa044a4e3f",
+      "name": "LITVM / WETH",
+      "reserve_in_usd": 9207.6034,
+      "pool_created_at": "2026-09-16T15:18:34Z",
+      "volume_usd_h24": "5120975.54092901",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0x4f101f97f908a9f229c8c623d7f57d3df7099bb4",
+      "quote_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "volume_usd_3d_real": 5177395.419341228,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x97aa9ecd834cdbc35df277a9ca4ad8db2c6ee0f9ea4ce3e8b06fa5fa044a4e3f",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x4f101f97f908a9f229c8c623d7f57d3df7099bb4"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x09a7ef18fc94a56639212f6fcde66849ee4af3d1418f9655009053b860d49b6c",
+      "address": "0x09a7ef18fc94a56639212f6fcde66849ee4af3d1418f9655009053b860d49b6c",
+      "name": "FOMOPAD / WETH",
+      "reserve_in_usd": 10265.5053,
+      "pool_created_at": "2026-09-16T14:56:55Z",
+      "volume_usd_h24": "1780915.65037262",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0x2ffab1d13717c9cd72c497febd08aa5b7b8648f0",
+      "quote_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "volume_usd_3d_real": 1801194.3001627312,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x09a7ef18fc94a56639212f6fcde66849ee4af3d1418f9655009053b860d49b6c",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x2ffab1d13717c9cd72c497febd08aa5b7b8648f0"
+      }
+    },
+    {
+      "gt_id": "robinhood_0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+      "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+      "name": "NVDA / USDG 0.05%",
+      "reserve_in_usd": 7613387.9317,
+      "pool_created_at": "2026-07-21T11:02:06Z",
+      "volume_usd_h24": "21071095.7108587",
+      "dex_id": "uniswap-v3-robinhood",
+      "base_token_id": "robinhood_0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 47196785.608712986,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+        "fee_pips": 500
+      }
+    },
+    {
+      "gt_id": "robinhood_0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "address": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "name": "WETH / USDG 0.009%",
+      "reserve_in_usd": 188506.5647,
+      "pool_created_at": "2026-09-04T16:36:14Z",
+      "volume_usd_h24": "2406555.29243909",
+      "dex_id": "uniswap-v4-robinhood",
+      "base_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 6137115.75052374,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "fee_pips": 87,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x5eac4195930d5ff8b7a34a347f2bde951c42eb730d6e26075bea3dd7c66feb40",
+      "address": "0x5eac4195930d5ff8b7a34a347f2bde951c42eb730d6e26075bea3dd7c66feb40",
+      "name": "ROBIN / USDG",
+      "reserve_in_usd": 179257.2012,
+      "pool_created_at": "2026-09-05T16:54:01Z",
+      "volume_usd_h24": "1504549.56311004",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0x11b70d0243baf75e85ce03201a92b5b7c33beb59",
+      "quote_token_id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "volume_usd_3d_real": 1867577.0568487924,
+      "n_daily_candles_returned": 3,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5eac4195930d5ff8b7a34a347f2bde951c42eb730d6e26075bea3dd7c66feb40",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x11b70d0243baf75e85ce03201a92b5b7c33beb59",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "gt_id": "robinhood_0xf7a56632dc25c499e6585bf31385f58edf5c046b7baab9646619efa93d040611",
+      "address": "0xf7a56632dc25c499e6585bf31385f58edf5c046b7baab9646619efa93d040611",
+      "name": "FOMOBALL / WETH",
+      "reserve_in_usd": 56842.1619,
+      "pool_created_at": "2026-09-16T19:20:29Z",
+      "volume_usd_h24": "3460472.69351444",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0x76912652a3ba152f506157f2d1072804ccf7dcd7",
+      "quote_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "volume_usd_3d_real": 3488986.191219163,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xf7a56632dc25c499e6585bf31385f58edf5c046b7baab9646619efa93d040611",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x76912652a3ba152f506157f2d1072804ccf7dcd7"
+      }
+    },
+    {
+      "gt_id": "robinhood_0x35751a67e31548f20bb52404cef03780a38d40b8958dd3017e2cb54c16ebb6ef",
+      "address": "0x35751a67e31548f20bb52404cef03780a38d40b8958dd3017e2cb54c16ebb6ef",
+      "name": "DYNABLOCKS / RBLX",
+      "reserve_in_usd": 67737.2987,
+      "pool_created_at": "2026-09-16T15:46:02Z",
+      "volume_usd_h24": "1071329.46942776",
+      "dex_id": "bankr-robinhood",
+      "base_token_id": "robinhood_0x6d106a2797c63c76d9813a49f7e13e2b55631e18",
+      "quote_token_id": "robinhood_0xf0c4bf4c582cb3836e98394b1d4e7b7281101be8",
+      "volume_usd_3d_real": 1078432.2317097506,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x35751a67e31548f20bb52404cef03780a38d40b8958dd3017e2cb54c16ebb6ef",
+        "fee_pips": 8388608,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x6d106a2797c63c76d9813a49f7e13e2b55631e18",
+        "currency1": "0xf0c4bf4c582cb3836e98394b1d4e7b7281101be8"
+      }
+    },
+    {
+      "gt_id": "robinhood_0xe972dfc9032d148f4b1618fb914fbbd2fc41d6dc",
+      "address": "0xe972dfc9032d148f4b1618fb914fbbd2fc41d6dc",
+      "name": "musebook / WETH 1%",
+      "reserve_in_usd": 773457.5127,
+      "pool_created_at": "2026-09-16T08:27:21Z",
+      "volume_usd_h24": "4699710.71351867",
+      "dex_id": "uniswap-v3-robinhood",
+      "base_token_id": "robinhood_0x91a2dae9699f0b82540b5886b0d8759c22820ba3",
+      "quote_token_id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "volume_usd_3d_real": 5112378.814981496,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xe972dfc9032d148f4b1618fb914fbbd2fc41d6dc",
+        "fee_pips": 10000
+      }
+    },
+    {
+      "gt_id": "robinhood_0xd678fb36c5cdf487126a00d29d1e235aebbb1c4a578f2597dfa11ebe3f1c1fb5",
+      "address": "0xd678fb36c5cdf487126a00d29d1e235aebbb1c4a578f2597dfa11ebe3f1c1fb5",
+      "name": "MUSEPAD / WETH",
+      "reserve_in_usd": 48710.5499,
+      "pool_created_at": "2026-09-16T16:18:27Z",
+      "volume_usd_h24": "2584541.23439078",
+      "dex_id": "pons-v2-dex",
+      "base_token_id": "robinhood_0xdb90169c179def9111ad7ae8e23f45cc36a0da7b",
+      "quote_token_id": "robinhood_0x0000000000000000000000000000000000000000",
+      "volume_usd_3d_real": 2598484.835350198,
+      "n_daily_candles_returned": 2,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xd678fb36c5cdf487126a00d29d1e235aebbb1c4a578f2597dfa11ebe3f1c1fb5",
+        "fee_pips": 0,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xdb90169c179def9111ad7ae8e23f45cc36a0da7b"
+      }
+    }
+  ],
+  "NEXT_STEP": "23 кандидатов -- достаточно для этапа Б (почасовые ряды + детекция разгона)."
+}
