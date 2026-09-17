@@ -165,7 +165,10 @@ def get_signatures_for_address(address: str, before: str | None = None, limit: i
 
 
 def get_transaction(sig: str) -> dict | None:
-    return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+    # maxSupportedTransactionVersion=1, не 0 -- реальный прогон Stage B словил
+    # RPC error -32015 "Transaction version (1) is not supported" на реальной
+    # versioned-транзакции (address lookup tables) в высоконагруженном пуле.
+    return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
 
 
 def analyze_tx(tx: dict, wallet: str, mint: str) -> dict | None:

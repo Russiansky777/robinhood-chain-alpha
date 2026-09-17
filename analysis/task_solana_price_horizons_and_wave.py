@@ -72,7 +72,10 @@ def get_signatures_for_address(address: str, before: str | None = None, limit: i
 
 
 def get_transaction(sig: str) -> dict | None:
-    return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+    # maxSupportedTransactionVersion=1: реальный прогон упал с RPC -32015 на
+    # versioned-транзакции (address lookup table) в этом высоконагруженном
+    # пуле ($101k/24h объёма) -- версии 0 недостаточно.
+    return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
 
 
 def raydium_pool_fee(pool_id: str) -> dict:
@@ -203,7 +206,7 @@ def main() -> None:
     print(f"[stageB] {len(sigs)} подписей пула получено")
 
     trades = []
-    n_decode_attempted = 0
+    n_decode_attempted, n_decode_errors = 0, 0
     for s in sigs:
         if time.time() - t0 > TIME_BUDGET_S:
             out.setdefault("budget_warnings", []).append("бюджет исчерпан при декодировании сделок пула")
@@ -211,16 +214,26 @@ def main() -> None:
         if s.get("err") is not None:
             continue
         n_decode_attempted += 1
-        tx = get_transaction(s["signature"])
-        if tx is None:
+        try:
+            tx = get_transaction(s["signature"])
+            if tx is None:
+                continue
+            trade = extract_trade(tx, TOKEN_MINT)
+            if trade:
+                trades.append(trade)
+        except Exception as exc:  # noqa: BLE001
+            # ЧЕСТНАЯ НАХОДКА (реальный прогон упал целиком на ОДНОЙ versioned-
+            # транзакции, -32015): один плохой сигнатура не должен стоить
+            # ВСЕХ остальных decoded trades -- пропускаем и продолжаем,
+            # честно считая, сколько раз это случилось.
+            n_decode_errors += 1
+            print(f"[stageB] пропуск {s['signature']}: {type(exc).__name__}: {exc}")
             continue
-        trade = extract_trade(tx, TOKEN_MINT)
-        if trade:
-            trades.append(trade)
         if n_decode_attempted % 20 == 0:
             out["trades_checkpoint_count"] = len(trades)
             OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     out.pop("trades_checkpoint_count", None)
+    out["n_decode_errors"] = n_decode_errors
     trades.sort(key=lambda t: t["block_time_unix"] or 0)
     out["n_trades_decoded"] = len(trades)
     out["n_decode_attempted"] = n_decode_attempted
