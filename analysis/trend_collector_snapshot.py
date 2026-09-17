@@ -140,12 +140,23 @@ def run() -> int:
         row = {"snapshot_ts_utc": now, "block": latest_block, "key": key,
                "address": p.get("address"), "pool_id": p.get("pool_id"), "kind": p.get("kind"),
                "name": p.get("name"), "dex_id": p.get("dex_id"), "fee_pips": p.get("fee_pips")}
-        if p.get("kind") == "v4_pool_id":
-            state = snapshot_v4(p["pool_id"])
-        elif p.get("kind") == "v3_address":
-            state = snapshot_v3(p["address"])
-        else:
-            state = {"error": f"неизвестный kind: {p.get('kind')}"}
+        # ЧЕСТНАЯ НАХОДКА (реальный прогон на VPS): один пул с kind="v4_pool_id"
+        # но pool_id=None (уже исправлено в select_pools.py -- впредь такие не
+        # добавляются, но старые записи в реестре могли остаться) валил ВЕСЬ
+        # снимок TypeError'ом -- ни один из 23 других пулов не получал снимка,
+        # и run_log вообще не писался (тихая смерть, ровно то, чего просил
+        # избегать владелец). try/except на КАЖДЫЙ пул -- один плохой пул не
+        # должен стоить снимка всем остальным.
+        try:
+            if p.get("kind") == "v4_pool_id" and p.get("pool_id"):
+                state = snapshot_v4(p["pool_id"])
+            elif p.get("kind") == "v3_address" and p.get("address"):
+                state = snapshot_v3(p["address"])
+            else:
+                state = {"error": f"неполная запись реестра: kind={p.get('kind')}, "
+                                   f"pool_id={p.get('pool_id')}, address={p.get('address')}"}
+        except Exception as exc:  # noqa: BLE001
+            state = {"error": f"{type(exc).__name__}: {exc}"}
         row.update(state)
         if "error" in state or any(k.endswith("_error") for k in state):
             n_err += 1

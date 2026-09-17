@@ -110,9 +110,19 @@ def run() -> int:
         if latest_block is None or time.time() - fee_start > FEE_RESOLUTION_TIME_BUDGET_S:
             continue  # честно пропускаем новые до следующего дня, а не гадаем
         fee_info = resolve_real_fee(c["address"], latest_block)
+        kind = fee_info.get("kind")
+        # ЧЕСТНАЯ НАХОДКА (реальный прогон на VPS сломал снимок каждые 15 минут
+        # TypeError'ом): resolve_real_fee может вернуть kind="v4_pool_id" БЕЗ
+        # ключа "pool_id" (Initialize не найден -- info is None) -- такой пул
+        # снимку читать нечем, честно НЕ добавляем его в реестр вместо того,
+        # чтобы копить мусорную запись, которая валит снимок каждый раз.
+        if kind == "v4_pool_id" and not fee_info.get("pool_id"):
+            continue
+        if kind == "v3_address" and fee_info.get("fee_pips") is None:
+            continue
         universe["pools"][key] = {
             "address": c["address"], "name": c.get("name"), "dex_id": c.get("dex_id"),
-            "kind": fee_info.get("kind"), "fee_pips": fee_info.get("fee_pips"),
+            "kind": kind, "fee_pips": fee_info.get("fee_pips"),
             "pool_id": fee_info.get("pool_id"), "hooks": fee_info.get("hooks"),
             "currency0": fee_info.get("currency0"), "currency1": fee_info.get("currency1"),
             "first_seen_utc": now, "last_qualified_utc": now,
