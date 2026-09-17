@@ -1,25 +1,37 @@
 {
-  "probed_at_utc": "2026-09-17T20:15:18Z",
-  "latest_block": 65645405,
+  "probed_at_utc": "2026-09-17T21:43:25Z",
+  "latest_block": 65697939,
   "v2_probe": {
     "n_found": 0,
     "n_distinct_pool_addresses": 0,
     "range": [
-      65640405,
-      65645405
+      65692939,
+      65697939
     ],
-    "runtime_s": 1.393219232559204,
+    "runtime_s": 103.99685549736023,
     "note": "V2-стиль НЕ обнаружен в пробе за это окно -- согласуется с более ранним наблюдением сессии, что v3+v4 доминируют по объёму на этой цепи."
   },
   "pool_discovery": {
-    "n_v3_pools": 40819,
-    "n_v4_pools": 0,
-    "runtime_s": 373.9845321178436,
-    "hit_deadline": true,
-    "scan_range": [
-      0,
-      65645405
-    ]
+    "n_v3_pools": 4026,
+    "n_v4_pools": 97349,
+    "n_v3_pools_new_this_run": 4026,
+    "n_v4_pools_new_this_run": 97349,
+    "runtime_s": 884.8366386890411,
+    "v3_hit_deadline": true,
+    "v4_hit_deadline": true,
+    "v3_covered_range": [
+      59297940,
+      65697939
+    ],
+    "v4_covered_range": [
+      60097940,
+      65697939
+    ],
+    "v3_full_history_covered": false,
+    "v4_full_history_covered": false,
+    "v3_n_unresolved_ranges": 0,
+    "v4_n_unresolved_ranges": 0,
+    "cache_path": "/tmp/task_rh_pool_map_cache.json"
   },
   "sanity_check_known_txs": {
     "checked": [
@@ -29,7 +41,7 @@
         "n_v4_swap_logs": 3,
         "topology_filter": {
           "n_multi_leg_txs": 1,
-          "n_unresolved_pool_skipped": 1,
+          "n_unresolved_pool_skipped": 0,
           "n_ambiguous_leg_skipped": 0,
           "n_topology_candidates": 0
         },
@@ -41,11 +53,13 @@
         "n_v4_swap_logs": 2,
         "topology_filter": {
           "n_multi_leg_txs": 1,
-          "n_unresolved_pool_skipped": 1,
+          "n_unresolved_pool_skipped": 0,
           "n_ambiguous_leg_skipped": 0,
-          "n_topology_candidates": 0
+          "n_topology_candidates": 1
         },
-        "topology_candidate_found": false
+        "topology_candidate_found": true,
+        "n_legs": 2,
+        "is_verified_real_cycle": false
       },
       {
         "tx_hash": "0xa1733a2816fe30fbd3de9c8fedbcbe43f54c3dfdbe274bf838eba1f66a2c2236",
@@ -62,62 +76,468 @@
     ]
   },
   "swap_scan": {
-    "from_block": 65585406,
-    "to_block": 65645405,
-    "window_blocks": 60000,
-    "n_steps": 30,
-    "runtime_s": 702.834673166275,
-    "n_v3_swap_events": 167687,
-    "n_v4_swap_events": 288761,
+    "from_block": 65671940,
+    "to_block": 65697939,
+    "window_blocks": 26000,
+    "n_steps": 13,
+    "runtime_s": 509.5757088661194,
+    "n_v3_swap_events": 86159,
+    "n_v4_swap_events": 160010,
     "hit_time_budget": true,
-    "hit_window_cap": false
+    "hit_window_cap": false,
+    "n_unresolved_subranges": 0
   },
   "topology_filter": {
-    "n_multi_leg_txs": 95958,
-    "n_unresolved_pool_skipped": 94334,
-    "n_ambiguous_leg_skipped": 0,
-    "n_topology_candidates": 4
+    "n_multi_leg_txs": 60989,
+    "n_unresolved_pool_skipped": 59269,
+    "n_ambiguous_leg_skipped": 1,
+    "n_topology_candidates": 316
+  },
+  "candidate_sampling": {
+    "n_topology_candidates_total": 316,
+    "n_sampled_for_verification": 316,
+    "was_sampled": false
   },
   "verification": {
-    "n_candidates": 4,
-    "n_receipts_checked": 4,
+    "n_candidates": 316,
+    "n_receipts_checked": 316,
     "n_receipts_capped_by_budget": 0,
     "n_receipt_missing_or_reverted": 0,
-    "n_verified_real_cycles": 0
+    "n_verified_real_cycles": 9
   },
   "lifetime_measurement_meta": {
-    "n_targets": 0,
-    "n_measured": 0,
+    "n_targets": 9,
+    "n_measured": 9,
     "n_capped_by_budget": 0,
-    "lifetime_forward_blocks_cap": 20,
+    "lifetime_forward_blocks_cap": 15,
     "method": "маргинальная спот-цена (slot0 v3 / extsload v4), тот же принцип, что rh_arb_our_share.py, применённый к реально найденному маршруту цикла, блоки cycle_block+1..+cap"
   },
-  "verified_cycles": [],
+  "verified_cycles": [
+    {
+      "tx_hash": "0xaaef0380c4bc8799ccea3238dfc0c5bdc890e4801e2b19ff94052d09cb5c823e",
+      "block_number": 65693009,
+      "n_legs": 3,
+      "cycle_token": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "gross_profit_cycle_token_raw": 57280,
+      "gas_used": 339146,
+      "effective_gas_price_wei": 59900000,
+      "gas_cost_usd": 0.04977117923301629,
+      "profit_usd_gross": 0.05728,
+      "profit_usd_net": 0.007508820766983705,
+      "pricing_method": "cycle_token_is_usdg",
+      "senders": [
+        "0x05e66e1ca3b95fc7338f27df0755b543c5b65517"
+      ],
+      "tx_from": "0x05e66e1ca3b95fc7338f27df0755b543c5b65517",
+      "route": [
+        {
+          "pool_key": "0x5c0eaa89799f7b76606f4ff66c92a2654d178927",
+          "version": "v3",
+          "token_in": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "token_out": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+          "fee_pips": 100,
+          "token0": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+          "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        },
+        {
+          "pool_key": "0x0b0d8f28eafb9530ee368c2ec970b8ba9f3e88ab",
+          "version": "v3",
+          "token_in": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+          "token_out": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "fee_pips": 3000,
+          "token0": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "token1": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3"
+        },
+        {
+          "pool_key": "0x13698c1eaaeb29e86381ffb8a106eed016805ea6",
+          "version": "v3",
+          "token_in": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "token_out": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+          "fee_pips": 3000,
+          "token0": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "token1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 15,
+        "censored": true,
+        "combined_fee_frac": 0.0061
+      }
+    },
+    {
+      "tx_hash": "0x98c7603802dd6ed443aa0a050d26dbf78cbbf7659ed313676360c31cd8010492",
+      "block_number": 65693028,
+      "n_legs": 2,
+      "cycle_token": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+      "gross_profit_cycle_token_raw": 1454709147459591306252057,
+      "gas_used": 190255,
+      "effective_gas_price_wei": 59620000,
+      "gas_cost_usd": 0.027790296915541992,
+      "profit_usd_gross": 249.9638196171878,
+      "profit_usd_net": 249.93602932027224,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x32b6a29550",
+      "senders": [
+        "0x95fdebd63d50f6241f7adfde40feeb2de83c0e39"
+      ],
+      "tx_from": "0xcdcc009715892776d18f2bcd2beaad418395b1c0",
+      "route": [
+        {
+          "pool_key": "0x32b6a295506a4fdd9f8c623ae2a2449b1256b44d81837af06488387a0f5a2496",
+          "version": "v4",
+          "token_in": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x5ec63550f39df486588a74c729d6f19795d0b01f"
+        },
+        {
+          "pool_key": "0x32b6a295506a4fdd9f8c623ae2a2449b1256b44d81837af06488387a0f5a2496",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x5ec63550f39df486588a74c729d6f19795d0b01f"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.005
+      }
+    },
+    {
+      "tx_hash": "0x03c5aa25d93bb8c9f6856cd391f47d09ddb4f330e2d038ff9d41fbb6a4858363",
+      "block_number": 65693028,
+      "n_legs": 2,
+      "cycle_token": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+      "gross_profit_cycle_token_raw": 3955952514495409330979959,
+      "gas_used": 190303,
+      "effective_gas_price_wei": 59620000,
+      "gas_cost_usd": 0.02779730821223299,
+      "profit_usd_gross": 700.0413148187786,
+      "profit_usd_net": 700.0135175105663,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x32b6a29550",
+      "senders": [
+        "0x077a95a00ab83f73880a8df4ecc351a49c0884f8"
+      ],
+      "tx_from": "0xbfdeb7652a8b49a91d44210b9c3da34ea940f352",
+      "route": [
+        {
+          "pool_key": "0x32b6a295506a4fdd9f8c623ae2a2449b1256b44d81837af06488387a0f5a2496",
+          "version": "v4",
+          "token_in": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x5ec63550f39df486588a74c729d6f19795d0b01f"
+        },
+        {
+          "pool_key": "0x32b6a295506a4fdd9f8c623ae2a2449b1256b44d81837af06488387a0f5a2496",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x5ec63550f39df486588a74c729d6f19795d0b01f",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x5ec63550f39df486588a74c729d6f19795d0b01f"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.005
+      }
+    },
+    {
+      "tx_hash": "0x8fe33468e311b39682623c636fdb6dde3969cfec0a888d815951c328e6da1750",
+      "block_number": 65689975,
+      "n_legs": 2,
+      "cycle_token": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+      "gross_profit_cycle_token_raw": 4334239371088877952816098,
+      "gas_used": 255246,
+      "effective_gas_price_wei": 59422000,
+      "gas_cost_usd": 0.03716769849878797,
+      "profit_usd_gross": 241.26641957206215,
+      "profit_usd_net": 241.22925187356336,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x085a26f908",
+      "senders": [
+        "0x95fdebd63d50f6241f7adfde40feeb2de83c0e39"
+      ],
+      "tx_from": "0xcdcc009715892776d18f2bcd2beaad418395b1c0",
+      "route": [
+        {
+          "pool_key": "0x085a26f9082cb9171298a768abfb64e8963ed6be0e470b2f6e8bff0069fa8e7d",
+          "version": "v4",
+          "token_in": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450"
+        },
+        {
+          "pool_key": "0x085a26f9082cb9171298a768abfb64e8963ed6be0e470b2f6e8bff0069fa8e7d",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.0
+      }
+    },
+    {
+      "tx_hash": "0x052024caa312e57b00c791b81230fb31187bf6d5dc9f47ed30e977eedf1ca9bd",
+      "block_number": 65689975,
+      "n_legs": 2,
+      "cycle_token": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+      "gross_profit_cycle_token_raw": 11096295573298614032870145,
+      "gas_used": 255222,
+      "effective_gas_price_wei": 59422000,
+      "gas_cost_usd": 0.03716420373387894,
+      "profit_usd_gross": 675.4695068151684,
+      "profit_usd_net": 675.4323426114346,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x085a26f908",
+      "senders": [
+        "0x077a95a00ab83f73880a8df4ecc351a49c0884f8"
+      ],
+      "tx_from": "0xbfdeb7652a8b49a91d44210b9c3da34ea940f352",
+      "route": [
+        {
+          "pool_key": "0x085a26f9082cb9171298a768abfb64e8963ed6be0e470b2f6e8bff0069fa8e7d",
+          "version": "v4",
+          "token_in": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450"
+        },
+        {
+          "pool_key": "0x085a26f9082cb9171298a768abfb64e8963ed6be0e470b2f6e8bff0069fa8e7d",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0c4d39c533e7a7e627553e868c68a5d54e85b450"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.0
+      }
+    },
+    {
+      "tx_hash": "0xbf59d435d1f2f72eaa9e4242e28e7bf048b3889ad729b3a101b41ad37d50332d",
+      "block_number": 65681858,
+      "n_legs": 2,
+      "cycle_token": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+      "gross_profit_cycle_token_raw": 6318391917165724969826949,
+      "gas_used": 189988,
+      "effective_gas_price_wei": 58360000,
+      "gas_cost_usd": 0.02715517118400784,
+      "profit_usd_gross": 700.0148627160997,
+      "profit_usd_net": 699.9877075449157,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x02c3c9413c",
+      "senders": [
+        "0x077a95a00ab83f73880a8df4ecc351a49c0884f8"
+      ],
+      "tx_from": "0xbfdeb7652a8b49a91d44210b9c3da34ea940f352",
+      "route": [
+        {
+          "pool_key": "0x02c3c9413c7fe8ac17cc778cd49eb9e772a4082f136cd0cf6f5ce0538f257483",
+          "version": "v4",
+          "token_in": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6"
+        },
+        {
+          "pool_key": "0x02c3c9413c7fe8ac17cc778cd49eb9e772a4082f136cd0cf6f5ce0538f257483",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.005
+      }
+    },
+    {
+      "tx_hash": "0xbc81a8f985ba826515617d849abf277ad2e20aaf09f3f83617f8ff4f531617f8",
+      "block_number": 65681858,
+      "n_legs": 2,
+      "cycle_token": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+      "gross_profit_cycle_token_raw": 2181821202267217784610960,
+      "gas_used": 189812,
+      "effective_gas_price_wei": 58360000,
+      "gas_cost_usd": 0.02713001533138354,
+      "profit_usd_gross": 250.00422776719998,
+      "profit_usd_net": 249.9770977518686,
+      "pricing_method": "implied_from_same_tx_leg_pool_0x02c3c9413c",
+      "senders": [
+        "0x95fdebd63d50f6241f7adfde40feeb2de83c0e39"
+      ],
+      "tx_from": "0xcdcc009715892776d18f2bcd2beaad418395b1c0",
+      "route": [
+        {
+          "pool_key": "0x02c3c9413c7fe8ac17cc778cd49eb9e772a4082f136cd0cf6f5ce0538f257483",
+          "version": "v4",
+          "token_in": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6"
+        },
+        {
+          "pool_key": "0x02c3c9413c7fe8ac17cc778cd49eb9e772a4082f136cd0cf6f5ce0538f257483",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6",
+          "fee_pips": 2500,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x0e033f8c62a8d39fd04086b9a6256ebcc8d199f6"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.005
+      }
+    },
+    {
+      "tx_hash": "0xe2f09836241fac6ebb6a0a1247aa2e68e9285cfbc6268185966830d54c0fb9cf",
+      "block_number": 65676201,
+      "n_legs": 2,
+      "cycle_token": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+      "gross_profit_cycle_token_raw": 2776736912511268613360070,
+      "gas_used": 255174,
+      "effective_gas_price_wei": 199834000,
+      "gas_cost_usd": 0.12492534579034277,
+      "profit_usd_gross": 240.00237088293423,
+      "profit_usd_net": 239.8774455371439,
+      "pricing_method": "implied_from_same_tx_leg_pool_0xa0a6f7c780",
+      "senders": [
+        "0x95fdebd63d50f6241f7adfde40feeb2de83c0e39"
+      ],
+      "tx_from": "0xcdcc009715892776d18f2bcd2beaad418395b1c0",
+      "route": [
+        {
+          "pool_key": "0xa0a6f7c78065ca0b5eb01adfcdae6fef4263eac389e7f93775bff3b2141ec96e",
+          "version": "v4",
+          "token_in": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8"
+        },
+        {
+          "pool_key": "0xa0a6f7c78065ca0b5eb01adfcdae6fef4263eac389e7f93775bff3b2141ec96e",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.0
+      }
+    },
+    {
+      "tx_hash": "0x9e79855df5787adab3a3629701f536decd6f92c8e31b55ebacb78eb852cd5cc2",
+      "block_number": 65676201,
+      "n_legs": 2,
+      "cycle_token": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+      "gross_profit_cycle_token_raw": 7232868466176001560512106,
+      "gas_used": 254225,
+      "effective_gas_price_wei": 199834000,
+      "gas_cost_usd": 0.12446074456468877,
+      "profit_usd_gross": 672.0336303653559,
+      "profit_usd_net": 671.9091696207912,
+      "pricing_method": "implied_from_same_tx_leg_pool_0xa0a6f7c780",
+      "senders": [
+        "0x077a95a00ab83f73880a8df4ecc351a49c0884f8"
+      ],
+      "tx_from": "0xbfdeb7652a8b49a91d44210b9c3da34ea940f352",
+      "route": [
+        {
+          "pool_key": "0xa0a6f7c78065ca0b5eb01adfcdae6fef4263eac389e7f93775bff3b2141ec96e",
+          "version": "v4",
+          "token_in": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "token_out": "0x0000000000000000000000000000000000000000",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8"
+        },
+        {
+          "pool_key": "0xa0a6f7c78065ca0b5eb01adfcdae6fef4263eac389e7f93775bff3b2141ec96e",
+          "version": "v4",
+          "token_in": "0x0000000000000000000000000000000000000000",
+          "token_out": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8",
+          "fee_pips": 0,
+          "token0": "0x0000000000000000000000000000000000000000",
+          "token1": "0x1862796e0cdffc1ff1d3fe200af251aef3ce43d8"
+        }
+      ],
+      "nearest_repeat_gap_blocks": null,
+      "lifetime": {
+        "lifetime_blocks": 0,
+        "censored": false,
+        "combined_fee_frac": 0.0
+      }
+    }
+  ],
   "summary": {
     "window_scanned": {
-      "from_block": 65585406,
-      "to_block": 65645405,
-      "window_blocks": 60000,
-      "n_steps": 30,
-      "runtime_s": 702.834673166275,
-      "n_v3_swap_events": 167687,
-      "n_v4_swap_events": 288761,
+      "from_block": 65671940,
+      "to_block": 65697939,
+      "window_blocks": 26000,
+      "n_steps": 13,
+      "runtime_s": 509.5757088661194,
+      "n_v3_swap_events": 86159,
+      "n_v4_swap_events": 160010,
       "hit_time_budget": true,
-      "hit_window_cap": false
+      "hit_window_cap": false,
+      "n_unresolved_subranges": 0
     },
-    "n_cycles_total": 0,
-    "n_legs_histogram": {},
-    "n_cycles_3plus_legs": 0,
-    "frac_cycles_3plus_legs": null,
-    "profit_usd_net_median_2leg": null,
-    "profit_usd_net_median_3plus": null,
-    "n_priced_2leg": 0,
-    "n_priced_3plus": 0,
-    "lifetime_blocks_median_2leg": null,
-    "lifetime_blocks_median_3plus": null,
-    "n_lifetime_measured_2leg": 0,
-    "n_lifetime_measured_3plus": 0,
-    "total_runtime_s": 1083.0569343566895
-  },
-  "HONEST_ANSWER": "0 верифицированных реальных замкнутых циклов найдено в окне [65585406;65645405] (60000 блоков, выборка, не полная история цепи). Это честный результат за это окно, не утверждение про всю историю Robinhood Chain."
+    "n_cycles_total": 9,
+    "n_legs_histogram": {
+      "2": 8,
+      "3": 1
+    },
+    "n_cycles_3plus_legs": 1,
+    "frac_cycles_3plus_legs": 0.1111111111111111,
+    "profit_usd_net_median_2leg": 460.94313368632993,
+    "profit_usd_net_median_3plus": 0.007508820766983705,
+    "n_priced_2leg": 8,
+    "n_priced_3plus": 1,
+    "lifetime_blocks_median_2leg": 0.0,
+    "lifetime_blocks_median_3plus": 15,
+    "n_lifetime_measured_2leg": 8,
+    "n_lifetime_measured_3plus": 1,
+    "total_runtime_s": 1646.7085688114166
+  }
 }
