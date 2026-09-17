@@ -96,7 +96,8 @@ def rank_hooks_from_census(data_dir: Path) -> tuple[list[tuple[str, int]], dict]
                 if isinstance(first, (list, tuple)) and len(first) == 2:
                     items = [(x[0], x[1]) for x in d]
                 elif isinstance(first, dict):
-                    for hk, ck in (("hook", "count"), ("address", "count"), ("hook", "n"), ("address", "n"), ("hook", "n_pools")):
+                    for hk, ck in (("hook", "count"), ("address", "count"), ("hook", "n"), ("address", "n"),
+                                   ("hook", "n_pools"), ("hook", "n_pools_in_this_sample")):
                         if hk in first and ck in first:
                             items = [(x[hk], x[ck]) for x in d]
                             break
@@ -104,7 +105,11 @@ def rank_hooks_from_census(data_dir: Path) -> tuple[list[tuple[str, int]], dict]
                         meta["shape_note"] = f"поле '{key}' -- список словарей, но не распознали ключи (пример: {list(first.keys())})"
                         continue
             if items:
-                meta["shape_note"] = f"использовано готовое поле '{key}' ({len(items)} записей)"
+                # Исключаем address(0) ("нет хука") и "unknown" (нерасшифрованный placeholder) --
+                # это НЕ реальные хук-контракты, их нельзя декодировать на биты разрешений.
+                items = [(h, c) for h, c in items
+                         if str(h).lower() not in ("0x0000000000000000000000000000000000000000", "unknown", "")]
+                meta["shape_note"] = f"использовано готовое поле '{key}' ({len(items)} реальных хуков после фильтра address(0)/unknown)"
                 return sorted(items, key=lambda kv: -kv[1]), meta
         # Форма 2: список пулов с полем hooks -- считаем сами
         for key in ("pools", "all_pools", "pools_with_hooks"):
