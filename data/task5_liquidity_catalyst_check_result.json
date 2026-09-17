@@ -1,0 +1,288 @@
+{
+  "generated_at_utc": "2026-09-17T20:03:30Z",
+  "hypothesis": "Mint/Burn ликвидности v3 в предыдущих 100 блоках объясняет часть none-бакета",
+  "window_start_utc": "2026-09-10T00:00:00Z",
+  "window_end_utc": "2026-09-10T03:00:00Z",
+  "lookback_blocks": 100,
+  "max_sample_txs": 300,
+  "random_seed": 20260917,
+  "sample_source_note": "Пулы -- из data/p3_guard_cache/task5_pool_map_result.json (реальные v3 пулы с прибыльными closed-cycle захватами >= $10 за 2026-09-10 00:00-03:00 UTC). Список tx_hash none-бакета (13,400 tx, $138,589.41) НЕ существует локально построчно -- Dune вернул только агрегаты (group by bucket x category), см. task5_none_bucket_wash_overlap_result.json. Это приближение (те же пулы/день/тип активности), НЕ точное совпадение с none-бакетом.",
+  "v3_pools_used": [
+    "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+    "0x995c1ad5eb998b1bdd89f515c4bb64760c411b62",
+    "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+    "0xa4bdb396a69617eb7f70e2cc1ef526f7340b1b0d",
+    "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+    "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+    "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+    "0xe2c12a7379706a291cadaaec1d22458be2f7239d",
+    "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+    "0xbd5cd6515ca6285941fbc177381dc8ed4844e6b8",
+    "0xd78480cafef722d75519e13b9f516e5704d0d659",
+    "0xe547c18f46db55ab788343bcc503f9cf0bd7d564",
+    "0x0ebd4650c9e641e9745b5a508a2d46935dfe753e",
+    "0xc8c90d3a1c1a24967e773ac2ad0d456ba3e31f64",
+    "0x8ac92da74ab5f3b1d024dc1943ad7e15dc4179ef"
+  ],
+  "n_pools": 15,
+  "from_block": 58958196,
+  "to_block": 59065261,
+  "n_blocks_in_window": 107065,
+  "n_swap_logs_raw": 105576,
+  "n_mint_logs_raw": 490,
+  "n_burn_logs_raw": 820,
+  "n_mint_plus_burn_by_pool": {
+    "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca": 184,
+    "0x995c1ad5eb998b1bdd89f515c4bb64760c411b62": 9,
+    "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d": 558,
+    "0xa4bdb396a69617eb7f70e2cc1ef526f7340b1b0d": 2,
+    "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3": 116,
+    "0x10cc6bd38112cac182db90b6a71d8bb5939526ba": 191,
+    "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7": 16,
+    "0xe2c12a7379706a291cadaaec1d22458be2f7239d": 12,
+    "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a": 27,
+    "0xbd5cd6515ca6285941fbc177381dc8ed4844e6b8": 110,
+    "0xd78480cafef722d75519e13b9f516e5704d0d659": 10,
+    "0xe547c18f46db55ab788343bcc503f9cf0bd7d564": 8,
+    "0x0ebd4650c9e641e9745b5a508a2d46935dfe753e": 0,
+    "0xc8c90d3a1c1a24967e773ac2ad0d456ba3e31f64": 19,
+    "0x8ac92da74ab5f3b1d024dc1943ad7e15dc4179ef": 48
+  },
+  "n_unique_swap_txs_population": 104558,
+  "n_sample_txs": 300,
+  "treatment_hits": 36,
+  "treatment_hit_rate": 0.12,
+  "sample_detail_first_20": [
+    {
+      "pool": "0xe547c18f46db55ab788343bcc503f9cf0bd7d564",
+      "block": 59042720,
+      "tx_hash": "0xcd46bbff3f895989b55c172b026c1d21952af7b4a8ca7a5505d6bc0128deb30e",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58975648,
+      "tx_hash": "0x1eb25eb79f4c3f5a09cc5db22cc885c2206a54fe3b694105bf7840509be8c138",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59046401,
+      "tx_hash": "0xa5e30d153516417e1904c6e77c797a185556eddb429a1f3853a63ba56dac6945",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59056732,
+      "tx_hash": "0xd7a439631c5784e108b59e22aae67bd205c04ab216d230f6c6ba74424a8d9d5a",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xd78480cafef722d75519e13b9f516e5704d0d659",
+      "block": 59000557,
+      "tx_hash": "0xb20d98fac473e56710691c817a66738fe7ff54b8f2268b29a1cfd1372a98014e",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58994977,
+      "tx_hash": "0x39c983184504a821e65b30312836bd9dc6ebec8e5739cfa08fdd1fb0d30914bd",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59040109,
+      "tx_hash": "0x1dd8bafc3c59aaf6c5e4de17290e927673f0d8b6661c8311f4c6f6766c438a06",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58992763,
+      "tx_hash": "0xc036744521035b076360e34f50db4bd11cf92b53bfb9865305a41be405629f29",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe2c12a7379706a291cadaaec1d22458be2f7239d",
+      "block": 58959431,
+      "tx_hash": "0x628dc0f5cd621fd3e7d253e8ee6af74ebf4721e1b5b330bd2dce30c61d3b738b",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58977135,
+      "tx_hash": "0xa8e64e9ba8b20eb99afd09990fc95cacf2ca5e7d11e3b4ee9091723385565eaa",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe547c18f46db55ab788343bcc503f9cf0bd7d564",
+      "block": 59013434,
+      "tx_hash": "0xb486a25e3b89fb7936a7c87df70a60b36f8ba161343e6cad73290c80c8ad1a47",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59039896,
+      "tx_hash": "0x9898856a36adef32011b8b77e25598b2b2fd4b993c8e832bd6f506250f9c4ffb",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59004357,
+      "tx_hash": "0x5b7067db739f4582f1c675487c45ca384030183cca7fb2041aef71d65124d958",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59057297,
+      "tx_hash": "0x6b6ce40c430c1aa7f1f600aa272dd536b86ff9edfab5d23691b4bc89528fcc70",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59039514,
+      "tx_hash": "0x4cedb96cd96858b8d51fad080bd973c4e13248d33cedc8d173f6f284a062200e",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59037332,
+      "tx_hash": "0x542eb9abb54815030e40c0574dfdee5c4df5bba6ff92ac127972c5e8cfda66ce",
+      "mint_or_burn_in_prev_100": true
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58989307,
+      "tx_hash": "0x9a0faae00ab1c8c4c84da8797789a446de3f219b0ed6885dad61ab665735a24a",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59045750,
+      "tx_hash": "0xd5348628c290256b152d925b8d184fb7f3c87a8316912e8b707ef328de519cc9",
+      "mint_or_burn_in_prev_100": true
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58990525,
+      "tx_hash": "0x2953e5c9d658081972148cfffdd07826e9b714886a231f190ce120880b9e7980",
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 59029817,
+      "tx_hash": "0x3ce204abdc76f28b9db889cc3a3a1bcfe3695e6a0389a997780d5cdec820b616",
+      "mint_or_burn_in_prev_100": true
+    }
+  ],
+  "control_hits": 7,
+  "control_hit_rate": 0.023333333333333334,
+  "control_detail_first_20": [
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58968576,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x995c1ad5eb998b1bdd89f515c4bb64760c411b62",
+      "block": 59015309,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+      "block": 58997376,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x8ac92da74ab5f3b1d024dc1943ad7e15dc4179ef",
+      "block": 59009333,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe2c12a7379706a291cadaaec1d22458be2f7239d",
+      "block": 58961552,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe2c12a7379706a291cadaaec1d22458be2f7239d",
+      "block": 58999667,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+      "block": 58984126,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x0ebd4650c9e641e9745b5a508a2d46935dfe753e",
+      "block": 58993858,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe547c18f46db55ab788343bcc503f9cf0bd7d564",
+      "block": 58983036,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x10cc6bd38112cac182db90b6a71d8bb5939526ba",
+      "block": 58984580,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+      "block": 58974940,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xe547c18f46db55ab788343bcc503f9cf0bd7d564",
+      "block": 59047750,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xbd5cd6515ca6285941fbc177381dc8ed4844e6b8",
+      "block": 59053983,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xc8c90d3a1c1a24967e773ac2ad0d456ba3e31f64",
+      "block": 58962928,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "block": 58988877,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x0ebd4650c9e641e9745b5a508a2d46935dfe753e",
+      "block": 58976094,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xc8c90d3a1c1a24967e773ac2ad0d456ba3e31f64",
+      "block": 59051464,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0xc8c90d3a1c1a24967e773ac2ad0d456ba3e31f64",
+      "block": 58969025,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "block": 58960656,
+      "mint_or_burn_in_prev_100": false
+    },
+    {
+      "pool": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "block": 58983124,
+      "mint_or_burn_in_prev_100": false
+    }
+  ],
+  "bin_control_hits": 641,
+  "bin_control_total_bins": 16065,
+  "bin_control_hit_rate": 0.03990040460628696,
+  "lift_treatment_minus_random_control": 0.09666666666666666,
+  "lift_treatment_minus_bin_control": 0.08009959539371303,
+  "verdict_confirmed": false,
+  "verdict_text": "ЭФФЕКТ НЕ ОТЛИЧИМ ОТ БАЗОВОЙ ЧАСТОТЫ -- гипотеза не подтверждена"
+}
