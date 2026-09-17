@@ -81,12 +81,30 @@ def rank_hooks_from_census(data_dir: Path) -> tuple[list[tuple[str, int]], dict]
             continue
         obj = json.loads(p.read_text())
         meta["source_file"] = name
-        # Форма 1: уже готовый словарь/список счётчиков по хуку
-        for key in ("hook_counts", "hooks_by_pool_count", "top_hooks", "hook_pool_counts"):
-            if key in obj:
-                meta["shape_note"] = f"использовано готовое поле '{key}'"
-                d = obj[key]
-                items = list(d.items()) if isinstance(d, dict) else [(x["hook"], x["count"]) for x in d]
+        # Форма 1: уже готовый словарь/список счётчиков по хуку -- элементы списка
+        # МОГУТ быть [hook,count], (hook,count) или {"hook":..,"count":..}/{"address":..,"n":..}
+        # -- не гадаем на одну форму, пробуем все правдоподобные варианты по очереди.
+        for key in ("hook_counts", "hooks_by_pool_count", "top_hooks", "hook_pool_counts", "top_hooks_in_sample"):
+            if key not in obj:
+                continue
+            d = obj[key]
+            items = None
+            if isinstance(d, dict):
+                items = list(d.items())
+            elif isinstance(d, list) and d:
+                first = d[0]
+                if isinstance(first, (list, tuple)) and len(first) == 2:
+                    items = [(x[0], x[1]) for x in d]
+                elif isinstance(first, dict):
+                    for hk, ck in (("hook", "count"), ("address", "count"), ("hook", "n"), ("address", "n"), ("hook", "n_pools")):
+                        if hk in first and ck in first:
+                            items = [(x[hk], x[ck]) for x in d]
+                            break
+                    if items is None:
+                        meta["shape_note"] = f"поле '{key}' -- список словарей, но не распознали ключи (пример: {list(first.keys())})"
+                        continue
+            if items:
+                meta["shape_note"] = f"использовано готовое поле '{key}' ({len(items)} записей)"
                 return sorted(items, key=lambda kv: -kv[1]), meta
         # Форма 2: список пулов с полем hooks -- считаем сами
         for key in ("pools", "all_pools", "pools_with_hooks"):
