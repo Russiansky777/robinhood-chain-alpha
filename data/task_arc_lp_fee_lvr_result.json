@@ -4,7 +4,8 @@
   "n_pools_unmatched": 14,
   "n_pools_unmatched_note": "14 из 30 топ-пулов НЕ найдены в реестре task_arc_recon_pools_result.json (6ч Initialize-скан) -- либо созданы вне окна скана, либо попали в один из 2 сбойных чанков этого скана (см. task_arc_recon_pools_summary.json honest_caveats). Не проверялись отдельно точечным Initialize-запросом -- дополнительная стоимость не оправдана на фоне текущего rate limit.",
   "dynamic_fee_flagged_pools_excluded_from_main": {
-    "n": 0, "pool_ids": [],
+    "n": 0,
+    "pool_ids": [],
     "note": "0 найдено в топ-30 -- этот флаг встречался только в частичном скане реестра (2839/24567), не в текущей выборке"
   },
   "rate_limit_status": "eth_getLogs на rpc.mainnet.arc.io остаётся в режиме пульсирующего rate limit -- короткие окна (единицы вызовов), затем снова закрыт. Два прогона подряд: первый дал 1 полностью посчитанный пул (9 вызовов) прежде чем упёрся во второй; второй прогон (чекпоинт с пула #2) упёрся СРАЗУ на пробе (0 новых данных).",
@@ -18,11 +19,16 @@
       "usdc_side": "currency0",
       "other_token": "0x96150e514a726492b5b3446d9008b04c22e4d317",
       "init_block": 21164447,
-      "scan_meta": {"n_calls": 9, "stopped_by_rate_limit": true, "complete": false},
+      "scan_meta": {
+        "n_calls": 9,
+        "stopped_by_rate_limit": true,
+        "complete": false
+      },
       "n_swaps_total_up_to_12h": 5701,
       "windows": {
         "1h": {
-          "survived": true, "n_swaps": 1515,
+          "survived": true,
+          "n_swaps": 1515,
           "volume_usdc_swap_event_based": 220872.09931299984,
           "lp_fee_usdc_real_per_swap_fee": 22.087209931299988,
           "price_change_frac": -0.917399856287411,
@@ -32,7 +38,8 @@
           "fee_over_lvr": 0.017165126064310563
         },
         "3h": {
-          "survived": true, "n_swaps": 4627,
+          "survived": true,
+          "n_swaps": 4627,
           "volume_usdc_swap_event_based": 978521.1479789997,
           "lp_fee_usdc_real_per_swap_fee": 97.85211479790006,
           "price_change_frac": -0.9122364986801649,
@@ -42,7 +49,8 @@
           "fee_over_lvr": 0.08171691059917327
         },
         "6h": {
-          "survived": true, "n_swaps": 5701,
+          "survived": true,
+          "n_swaps": 5701,
           "volume_usdc_swap_event_based": 1186200.9907680005,
           "lp_fee_usdc_real_per_swap_fee": 118.6200990768,
           "price_change_frac": -0.2694263094029223,
@@ -52,26 +60,64 @@
           "fee_over_lvr": 9.453333453567437,
           "note_on_spike": "Скачок fee/LVR c 0.08 (3ч) до 9.45 (6ч) объясняется резким ПАДЕНИЕМ price_change_frac (цена частично откатилась к исходной) -- LVR ∝ (изменение цены)^2, поэтому знаменатель обвалился, а не выручка LP выросла. Иллюстрация шумности метрики на короткой истории одного пула, не сигнал устойчивого дохода."
         },
-        "12h": {"window_not_yet_elapsed": true, "n_swaps": 5701}
+        "12h": {
+          "window_not_yet_elapsed": true,
+          "n_swaps": 5701
+        }
       }
     }
   ],
   "all_pools_processed": false,
   "window_summary_CAVEAT": "Величины ниже посчитаны на n=1 (один пул) -- статистически НЕ ЗНАЧИМЫ, приведены как сырые числа, а не как медиана по выборке. Настоящая медиана по 16-23 пулам не получена из-за rate limit.",
   "window_summary": {
-    "1h": {"n_pools_with_ratio": 1, "median_fee_over_lvr": 0.017165126064310563, "pct_gt_1": 0.0, "n_reached_window": 1, "n_survived_ge_5_swaps": 1, "pct_survived": 100.0},
-    "3h": {"n_pools_with_ratio": 1, "median_fee_over_lvr": 0.08171691059917327, "pct_gt_1": 0.0, "n_reached_window": 1, "n_survived_ge_5_swaps": 1, "pct_survived": 100.0},
-    "6h": {"n_pools_with_ratio": 1, "median_fee_over_lvr": 9.453333453567437, "pct_gt_1": 100.0, "n_reached_window": 1, "n_survived_ge_5_swaps": 1, "pct_survived": 100.0},
-    "12h": {"n_pools_with_ratio": 0, "median_fee_over_lvr": null, "pct_gt_1": null, "n_reached_window": 0, "n_survived_ge_5_swaps": 0, "pct_survived": null}
+    "1h": {
+      "n_pools_with_ratio": 1,
+      "median_fee_over_lvr": 0.017165126064310563,
+      "pct_gt_1": 0.0,
+      "n_reached_window": 1,
+      "n_survived_ge_5_swaps": 1,
+      "pct_survived": 100.0
+    },
+    "3h": {
+      "n_pools_with_ratio": 1,
+      "median_fee_over_lvr": 0.08171691059917327,
+      "pct_gt_1": 0.0,
+      "n_reached_window": 1,
+      "n_survived_ge_5_swaps": 1,
+      "pct_survived": 100.0
+    },
+    "6h": {
+      "n_pools_with_ratio": 1,
+      "median_fee_over_lvr": 9.453333453567437,
+      "pct_gt_1": 100.0,
+      "n_reached_window": 1,
+      "n_survived_ge_5_swaps": 1,
+      "pct_survived": 100.0
+    },
+    "12h": {
+      "n_pools_with_ratio": 0,
+      "median_fee_over_lvr": null,
+      "pct_gt_1": null,
+      "n_reached_window": 0,
+      "n_survived_ge_5_swaps": 0,
+      "pct_survived": null
+    }
   },
   "volume_weighted_fee0_vs_feeN_from_rpc_scan_ONLY_1_POOL": {
     "note": "Основано ТОЛЬКО на 1 пуле (fee>0) -- 0 fee=0 пулов успели попасть в RPC-скан. НЕ использовать как ответ на 'главный вопрос' -- см. отдельное поле volume_weighted_fee0_vs_feeN_FREE_1H_SNAPSHOT ниже, посчитанное на всех 30 пулах без RPC.",
-    "1h": {"volume_fee_zero_usdc": 0, "volume_fee_nonzero_usdc": 220872.09931299984, "pct_fee_zero_of_total_volume": 0.0, "pct_fee_nonzero_of_total_volume": 100.0}
+    "1h": {
+      "volume_fee_zero_usdc": 0,
+      "volume_fee_nonzero_usdc": 220872.09931299984,
+      "pct_fee_zero_of_total_volume": 0.0,
+      "pct_fee_nonzero_of_total_volume": 100.0
+    }
   },
   "volume_weighted_fee0_vs_feeN_FREE_1H_SNAPSHOT": {
     "source": "data/task_arc_top_pools_symbols_result.json (volume_usdc_1h), БЕЗ новых RPC-вызовов, все 30 топ-пулов",
-    "n_fee_zero_pools": 7, "volume_usdc_1h_fee_zero_sum": 779548.85,
-    "n_fee_nonzero_pools": 23, "volume_usdc_1h_fee_nonzero_sum": 2409742.51,
+    "n_fee_zero_pools": 7,
+    "volume_usdc_1h_fee_zero_sum": 779548.85,
+    "n_fee_nonzero_pools": 23,
+    "volume_usdc_1h_fee_nonzero_sum": 2409742.51,
     "pct_fee_zero_of_total_volume": 24.44,
     "pct_fee_nonzero_of_total_volume": 75.56,
     "interpretation": "На этом снимке (1ч, топ-30 по объёму) fee=0 пулы НЕ доминируют по обороту -- 24.44%, меньше своей доли по числу пулов (7/30=23.3%, т.е. почти пропорционально числу, не выше). Это ПРОТИВОРЕЧИТ гипотезе 'fee=0 мало по количеству, но доминирует по обороту' -- на данной выборке (топ-30 самых активных) доля примерно соответствует числу пулов, не выше. Ограничение: только топ-30 по объёму, не все живые пулы; наш хук 0x47e79...20cc не входит даже в эту выборку -- его собственный оборот не измерен ни разу за всю сессию."
@@ -83,8 +129,11 @@
   "round_2026_09_16_bitquery_and_alt_rpc": {
     "probed_at_utc": "2026-09-16T23:15:00Z",
     "credential_format_BITQUERY_API2": {
-      "total_len": 77, "starts_with_brace": false, "detected_separator": "\\n (literal newline)",
-      "part1_len": 41, "part2_len": 35,
+      "total_len": 77,
+      "starts_with_brace": false,
+      "detected_separator": "\\n (literal newline)",
+      "part1_len": 41,
+      "part2_len": 35,
       "note": "Секрет = 2 части, разделённые символом новой строки, длины 41 и 35 символов. Значения не печатались и не сохранялись нигде."
     },
     "bitquery_step_by_step": {
@@ -100,7 +149,8 @@
     "part_A_extsload_eth_call_RESULT": {
       "verdict": "УСПЕХ -- полностью подтверждает гипотезу владельца",
       "eth_call_rate_limited": false,
-      "total_rpc_calls": 35, "errors": 0,
+      "total_rpc_calls": 35,
+      "errors": 0,
       "n_pools_checked": 16,
       "static_fee_mismatches_vs_initialize": 0,
       "conclusion": "eth_call (включая extsload) НЕ подпадает под rate limit eth_getLogs на rpc.mainnet.arc.io -- 35/35 запросов прошли без единой ошибки -32005. Живой lpFee (через extsload) у всех 16 сверенных пулов ТОЧНО совпал со статичным fee_initialize_pips -- рассинхрона нет. hooks структурно НЕ читается через eth_call ни при каком выборе слота (не хранится в Pool.State, только в PoolKey/poolId) -- это не ограничение реализации, а свойство V4. Файл: data/task_arc_lp_extsload_fee_check_result.json.",
@@ -135,10 +185,31 @@
     "note": "СЛЕДУЮЩИЙ раунд (владелец) снял блокировку выше: eth_call/extsload читает исторические блоки (проверено -- пул на 71429 блоков позади latest вернул реальные данные), значит feeGrowthGlobal0/1X128 + liquidity + sqrtPriceX96 на границах окна дают fee/LVR БЕЗ единого события Swap и БЕЗ eth_getLogs вообще. Полный результат -- data/task_arc_lp_fee_lvr_extsload_historical_result.json, скрипт analysis/task_arc_lp_fee_lvr_extsload_historical.py.",
     "sample": "12 пулов fee>0 (из 16 registry-matched -- честная поправка: в задании фигурировало 16, реально fee>0 только 12, 4 имеют fee=0)",
     "window_summary": {
-      "1h": {"median_fee_over_lvr": 22.229996274493427, "pct_gt_1": 91.67, "pct_survived": 100.0, "n_pools": 12},
-      "3h": {"median_fee_over_lvr": 24.340173557605585, "pct_gt_1": 91.67, "pct_survived": 100.0, "n_pools": 12},
-      "6h": {"median_fee_over_lvr": 43.37702080749839, "pct_gt_1": 100.0, "pct_survived": 100.0, "n_pools": 11},
-      "12h": {"median_fee_over_lvr": 21.327135914874123, "pct_gt_1": 100.0, "pct_survived": 100.0, "n_pools": 1, "caveat": "только 1 пул успел дожить до 12ч в этой выборке"}
+      "1h": {
+        "median_fee_over_lvr": 22.229996274493427,
+        "pct_gt_1": 91.67,
+        "pct_survived": 100.0,
+        "n_pools": 12
+      },
+      "3h": {
+        "median_fee_over_lvr": 24.340173557605585,
+        "pct_gt_1": 91.67,
+        "pct_survived": 100.0,
+        "n_pools": 12
+      },
+      "6h": {
+        "median_fee_over_lvr": 43.37702080749839,
+        "pct_gt_1": 100.0,
+        "pct_survived": 100.0,
+        "n_pools": 11
+      },
+      "12h": {
+        "median_fee_over_lvr": 21.327135914874123,
+        "pct_gt_1": 100.0,
+        "pct_survived": 100.0,
+        "n_pools": 1,
+        "caveat": "только 1 пул успел дожить до 12ч в этой выборке"
+      }
     },
     "verdict": "ЖИВА -- медиана fee/LVR > 1.5 ВО ВСЕХ 4 окнах (не только одном), с выживаемостью 100% -- порог предрегистрации (>1.5 хотя бы в одном окне И ≥20% доживают) пройден с большим запасом, не на грани.",
     "verdict_supersedes": "Заменяет предыдущий 'НЕ РЕШЕНО' выше (тот был на n=1, событийным методом, упирался в rate limit) -- теперь n=12 (реальная выборка, не n=1), другим независимым методом (feeGrowthGlobal, не посвоповый fee), результат согласуется по порядку величины на пересекающемся пуле (AROS: extsload 1ч=0.041, event-based 1ч=0.017 -- тот же порядок).",
@@ -147,5 +218,6 @@
       "fee считается на liquidity_at_window_end (не min(start,end) -- у свежих пулов liquidity на Initialize часто структурно 0, минимум вырождался бы в 0 несмотря на реальную торговлю), это стандартный NFPM-style прокси, не точная позиционная бухгалтерия при mint/burn внутри окна.",
       "2 из 12 пулов дали экстремальные fee/LVR (787735 и 1157 в 1ч) -- проверено вручную, не ошибка: реальная ненулевая комиссия при почти нулевом изменении цены (LVR~(Δцены)^2 провалился в почти-ноль) -- известный артефакт метрики на низковолатильных коротких окнах, медиана устойчива к нему."
     ]
-  }
+  },
+  "SUPERSEDED_2026_09_17_survivorship_bias": "Вердикт ЖИВА в FINAL_UPDATE_2026_09_16_extsload_historical выше -- ОТКЛОНЁН владельцем, ошибка выжившего: выборка (12 пулов fee>0) была взята из топ-30 ПО ОБЪЁМУ за первый час -- уже отфильтровала умершие пулы построением, выживаемость 100% была гарантирована отбором. Метод extsload остаётся верным и используется дальше. НОВЫЙ, ДЕЙСТВУЮЩИЙ результат -- data/task_arc_lp_fee_lvr_random_sample_result.json (60 СЛУЧАЙНЫХ пулов из полного реестра, seed=20260917, без фильтра по объёму/числу свопов, fee=0 не исключены, комиссия по нижней/верхней границе через промежуточные точки внутри окна). Это поле выше НЕ удалено -- оставлено как зафиксированная ошибка методологии, не как действующий вывод."
 }
