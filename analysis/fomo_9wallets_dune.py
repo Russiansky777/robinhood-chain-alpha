@@ -134,7 +134,7 @@ def run() -> int:
     print(sql_smoke)
     qid1 = client.create_query("fomo9_swaps_smoke100", sql_smoke)
     df_smoke = client.run_sql_cached("fomo9_swaps_smoke100", sql_smoke, query_id=qid1,
-                                      estimated_credits=5.0, expected_max_rows=100, expected_columns=13)
+                                      estimated_credits=5.0, expected_max_rows=100, expected_columns=14)
     n_smoke = len(df_smoke) if df_smoke is not None else 0
     cost_smoke = next((e["credits"] for e in reversed(client.credit_ledger) if e["name"] == "fomo9_swaps_smoke100"), None)
     print(f"[fomo9] смоук: {n_smoke} строк (лимит 100), реальная стоимость {cost_smoke}")
@@ -159,7 +159,7 @@ def run() -> int:
     qid2 = client.create_query("fomo9_swaps_7day_full", sql_full)
     try:
         df_full = client.run_sql_cached("fomo9_swaps_7day_full", sql_full, query_id=qid2,
-                                         estimated_credits=25.0, expected_max_rows=20000, expected_columns=13)
+                                         estimated_credits=25.0, expected_max_rows=20000, expected_columns=14)
     except BudgetGuardStop:
         # Реальный execute уже оплачен и записан в леджер ДО этого отказа
         # (execute() платится независимо от того, разрешат ли потом читать
