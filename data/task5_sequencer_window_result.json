@@ -1,0 +1,42 @@
+{
+  "generated_at_utc": "2026-09-17T23:39:37Z",
+  "run_duration_s": 240.0,
+  "rpc_endpoint_used_only_for_block_number_lookup": "https://rpc.mainnet.chain.robinhood.com",
+  "feed_diag": {
+    "n_messages_total": 2392,
+    "n_with_seq": 2381,
+    "n_unparsed": 0,
+    "n_confirmation_only": 11,
+    "n_connect_attempts": 1,
+    "n_reconnects": 0,
+    "connected_at_wall": 1789688100.9139295
+  },
+  "n_feed_messages": 2381,
+  "n_unique_tx_hashes_seen_in_feed": 27910,
+  "achieved_feed_block_interval_ms": {
+    "note": "Интервал t_wall между ПОСЛЕДОВАТЕЛЬНЫМИ (seq+1) сообщениями фида -- реальный темп блока ПО ФИДУ, RPC не используется как часы нигде в этом расчёте.",
+    "n_consecutive_pairs": 2380,
+    "n_sequence_gaps_excluded": 0,
+    "stats": {
+      "n": 2380,
+      "median_ms": 97.24307060241699,
+      "p90_ms": 119.64178085327148,
+      "min_ms": 0.010967254638671875,
+      "max_ms": 1042.6576137542725,
+      "mean_ms": 100.46741461553493
+    }
+  },
+  "delta_blocks_diagnostic": {
+    "note": "delta_blocks = receipt.blockNumber - sequenceNumber сообщения, из которого извлечена транзакция. 0 = блок уже был полностью решён в момент broadcast (атомарность подтверждена). !=0 = реальное позднее включение (окно приёма существует).",
+    "n_sampled": 300,
+    "n_receipt_resolved": 300,
+    "n_receipt_not_found_or_error": 0,
+    "n_delta_zero": 300,
+    "frac_delta_zero": 1.0,
+    "histogram": {
+      "0": 300
+    }
+  },
+  "late_insertion_cases": [],
+  "verdict": "delta_blocks == 0 ДЛЯ ВСЕХ сопоставленных транзакций -- каждое сообщение фида атомарно доставляет уже полностью решённый блок (sequenceNumber == реальный номер блока receipt, без исключений). Прямых свидетельств 'продолжающегося приёма после broadcast' НЕ найдено -- 530мс отставания RPC от фида, по всей видимости, ИЛЛЮЗИЯ чистой задержки индексации на стороне RPC-провайдера, а НЕ реальное окно приёма секвенсера. Реальный релевантный бюджет -- это ТЕМП блока ПО ФИДУ (см. achieved_feed_block_interval_ms), а не 530мс разрыв с RPC."
+}
