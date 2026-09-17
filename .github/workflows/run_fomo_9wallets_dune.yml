@@ -1,0 +1,48 @@
+name: "Fomo -- 9 адресов через Dune (tx_from, не taker), аккаунт Mozila"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/FOMO_9WALLETS_DUNE_REQUEST"
+
+jobs:
+  fomo9_dune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Схема -> смоук LIMIT 100 -> полный 7-дневный прогон -> классификация бот/человек"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/fomo_9wallets_dune.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FOMO_9WALLETS_DUNE_REQUEST
+          [ -e data/fomo_9wallets_dune_result.json ] && git add data/fomo_9wallets_dune_result.json
+          [ -e data/fomo_9wallets_dune_swaps.csv ] && git add data/fomo_9wallets_dune_swaps.csv
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Fomo (Dune, Mozila): 9 адресов по tx_from, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
