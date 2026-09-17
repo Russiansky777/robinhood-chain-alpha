@@ -1,0 +1,80 @@
+name: "Сторожок субсидий -- проверка статуса (только чтение, ничего не меняет)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_CHECK_SUBSIDY_WATCH_STATUS_REQUEST"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Только чтение: crontab, mtime скрипта, содержимое subsidy_watch.jsonl целиком"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@45.59.170.76 '
+            echo "=== дата на VPS (UTC) ==="
+            date -u +%FT%TZ
+            echo
+            echo "=== crontab bot (только чтение) ==="
+            sudo -u bot crontab -l || echo "(crontab -l вернул ошибку/пусто)"
+            echo
+            echo "=== mtime обёрточного скрипта ==="
+            stat -c "%y %n" /home/bot/bin/turnover_watch_daily.sh 2>&1 || echo "(файл не найден)"
+            echo
+            echo "=== systemd/cron лог (последние срабатывания, если пишутся в syslog) ==="
+            grep -i "turnover_watch_daily" /var/log/syslog 2>/dev/null | tail -5 || echo "(нет доступа/нет строк в syslog)"
+            echo
+            echo "=== turnover_watch.jsonl: строк, mtime, последняя строка ==="
+            wc -l /home/bot/turnover_watch_live_data/turnover_watch.jsonl 2>&1 || echo "(нет файла)"
+            stat -c "%y %n" /home/bot/turnover_watch_live_data/turnover_watch.jsonl 2>&1 || true
+            tail -1 /home/bot/turnover_watch_live_data/turnover_watch.jsonl 2>&1 || true
+            echo
+            echo "=== subsidy_watch.jsonl: строк, mtime ==="
+            wc -l /home/bot/turnover_watch_live_data/subsidy_watch.jsonl 2>&1 || echo "(нет файла)"
+            stat -c "%y %n" /home/bot/turnover_watch_live_data/subsidy_watch.jsonl 2>&1 || true
+            echo
+            echo "=== ВСЕ строки subsidy_watch.jsonl (для честного поиска попаданий) ==="
+            cat /home/bot/turnover_watch_live_data/subsidy_watch.jsonl 2>&1 || echo "(нет файла)"
+          ' | tee /tmp/subsidy_watch_status.txt
+
+      - name: Сохранить сырой вывод в репозиторий (честная запись, не пересказ)
+        if: always()
+        run: |
+          mkdir -p data/p3_guard_cache
+          cp /tmp/subsidy_watch_status.txt data/p3_guard_cache/vps_check_subsidy_watch_status_raw.txt 2>/dev/null || true
+          git rm -f --ignore-unmatch data/p3_guard_cache/VPS_CHECK_SUBSIDY_WATCH_STATUS_REQUEST
+          [ -e data/p3_guard_cache/vps_check_subsidy_watch_status_raw.txt ] && git add data/p3_guard_cache/vps_check_subsidy_watch_status_raw.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Сторожок субсидий: сырой статус (read-only) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
