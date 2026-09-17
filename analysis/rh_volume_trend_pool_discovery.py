@@ -59,6 +59,18 @@ TVL_MIN_USD = 5000.0
 EXCLUDED_FEE_PIPS = 110000
 MAX_PAGES = 10
 GT_REQUEST_INTERVAL_S = 1.2  # честная задержка -- публичный free-tier GT, без ключа
+# ЧЕСТНАЯ ОГОВОРКА (найдено на реальном прогоне 35222363249, run был убит
+# по job timeout 15 минут, ничего не записав -- скрипт ПЕРВОЙ версии не
+# имел внутреннего бюджета времени, вопреки установленному в этой сессии
+# правилу): резолв комиссии для V4-стиля кандидатов (pool_id, не адрес)
+# идёт через fetch_initialize_event -- targeted-по-pool_id eth_getLogs
+# ОДНИМ вызовом от блока 0 до latest (~70 млн блоков на этой цепи), и это
+# ОДИН реальный сетевой вызов, но при нескольких V4-кандидатах и/или
+# нестабильном ответе исторический eth_getLogs может стоить секунды-
+# десятки секунд КАЖДЫЙ -- бюджет и чекпоинты обязательны, как и везде в
+# этой сессии.
+OHLCV_STAGE_TIME_BUDGET_S = 300.0
+FEE_RESOLUTION_TIME_BUDGET_S = 300.0
 RPC = rpc_call_trading_path
 FEE_SELECTOR = "0xddca3f43"  # fee() -- стандартный getter Uniswap V3 pool
 SLOT0_SELECTOR = "0x3850c7bd"
@@ -160,13 +172,21 @@ def main() -> None:
                 "quote_token_id": (p.get("relationships", {}).get("quote_token", {}).get("data", {}) or {}).get("id"),
             })
     out["n_after_tvl_filter"] = len(tvl_candidates)
+    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))  # чекпоинт -- шаги 0-2 сохранены
 
     # --- Шаг 3: реальная торговля за 3 суток (OHLCV день, сумма объёма > 0) ---
     traded_candidates = []
+    ohlcv_stage_start = time.time()
+    ohlcv_stage_budget_exhausted = False
+    n_ohlcv_attempted = 0
     for c in tvl_candidates:
+        if time.time() - ohlcv_stage_start > OHLCV_STAGE_TIME_BUDGET_S:
+            ohlcv_stage_budget_exhausted = True
+            break
         addr = c["address"]
         if not addr:
             continue
+        n_ohlcv_attempted += 1
         time.sleep(GT_REQUEST_INTERVAL_S)
         status, body = gt_get(f"/networks/{GT_NETWORK}/pools/{addr}/ohlcv/day", params={"aggregate": 1, "limit": 3})
         if status != 200 or not body:
@@ -178,9 +198,20 @@ def main() -> None:
         c["n_daily_candles_returned"] = len(rows)
         if vol_3d and vol_3d > 0:
             traded_candidates.append(c)
+        out["traded_candidates_checkpoint"] = traded_candidates  # чекпоинт после КАЖДОГО кандидата
+        OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    del out["traded_candidates_checkpoint"]
+    out["n_ohlcv_attempted"] = n_ohlcv_attempted
+    out["n_tvl_candidates_total"] = len(tvl_candidates)
+    if ohlcv_stage_budget_exhausted:
+        out["ohlcv_stage_partial_coverage_reason"] = (
+            f"бюджет проверки 3-дневной торговли ({OHLCV_STAGE_TIME_BUDGET_S}с) исчерпан -- "
+            f"обработано {n_ohlcv_attempted}/{len(tvl_candidates)} кандидатов, честно останавливаемся"
+        )
     out["n_after_3d_trading_filter"] = len(traded_candidates)
+    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))  # чекпоинт -- шаг 3 сохранён
 
-    # --- Шаг 4+5: реальная комиссия + исключить 11% ---
+    # --- Шаг 4+5: реальная комиссия + исключить 11% (с бюджетом времени, чекпоинтами) ---
     latest_block_raw = RPC("eth_blockNumber", [])
     latest_block = int(latest_block_raw, 16) if latest_block_raw else None
     out["latest_block_for_fee_resolution"] = latest_block
@@ -191,22 +222,42 @@ def main() -> None:
         return
 
     final_candidates = []
+    fee_stage_start = time.time()
+    n_fee_resolved = 0
+    fee_stage_budget_exhausted = False
     for c in traded_candidates:
+        if time.time() - fee_stage_start > FEE_RESOLUTION_TIME_BUDGET_S:
+            fee_stage_budget_exhausted = True
+            break
         fee_info = resolve_real_fee(c["address"], latest_block)
+        n_fee_resolved += 1
         c["fee_resolution"] = fee_info
         fee_pips = fee_info.get("fee_pips")
+        out["final_candidates_checkpoint"] = final_candidates  # чекпоинт после КАЖДОГО кандидата
+        OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
         if fee_pips is None:
             continue
         if fee_pips == EXCLUDED_FEE_PIPS:
             continue
         final_candidates.append(c)
+    out["n_traded_candidates_fee_resolution_attempted"] = n_fee_resolved
+    out["n_traded_candidates_total"] = len(traded_candidates)
+    if fee_stage_budget_exhausted:
+        out["fee_resolution_partial_coverage_reason"] = (
+            f"бюджет резолва комиссии ({FEE_RESOLUTION_TIME_BUDGET_S}с) исчерпан -- "
+            f"обработано {n_fee_resolved}/{len(traded_candidates)} кандидатов, честно останавливаемся, "
+            "не выдумываем данные по необработанным"
+        )
+    del out["final_candidates_checkpoint"]
     out["n_final_candidates_fee_ne_11pct"] = len(final_candidates)
     out["final_candidates"] = final_candidates
 
     if len(final_candidates) < 5:
+        caveat = (" (ЧАСТИЧНОЕ покрытие -- см. fee_resolution_partial_coverage_reason, "
+                   "вывод не окончательный)") if fee_stage_budget_exhausted else ""
         out["HONEST_ANSWER"] = (
             f"Итоговых кандидатов после всех фильтров (TVL>=$5000, реальная торговля за 3 суток, "
-            f"fee!=11%): {len(final_candidates)} -- МЕНЬШЕ 5, это само по себе ответ по правилу владельца. "
+            f"fee!=11%): {len(final_candidates)}{caveat} -- МЕНЬШЕ 5, это само по себе ответ по правилу владельца. "
             "Полный конвейер (почасовой оборот/цена, детекция разгона, форвард-горизонты) НЕ запускается "
             "на этом прогоне -- нужно либо ослабить фильтры, либо признать выборку слишком узкой."
         )
