@@ -1,0 +1,885 @@
+{
+  "generated_at_utc": "2026-09-17T14:53:28Z",
+  "prior_run_honest_findings": {
+    "source": "data/rh_volume_trend_pool_discovery_result.json",
+    "pagination_stopped_at_page": 6,
+    "pagination_stop_reason": "HTTP 429, НЕ конец списка -- реальный total неизвестен",
+    "n_fetched_before": 100,
+    "n_after_tvl5000_before": 93,
+    "n_ohlcv_checked_before": 25,
+    "n_ohlcv_unchecked_due_to_budget_before": 68,
+    "n_final_before": 23,
+    "n_final_with_unresolved_dynamic_fee_before": 4,
+    "note": "4 из 23 предыдущих финальных пулов хранили fee_pips=8388608 (DYNAMIC_FEE_FLAG) как будто это реальная комиссия -- этот прогон хранит их честно отдельно"
+  },
+  "pagination_stop_reason": "page=11 status=401 после 1 повторных 429 на этой странице",
+  "n_pools_total_fetched": 200,
+  "n_http_429_hit_total": 40,
+  "HONEST_TOTAL_POOL_COUNT": ">=200 -- пагинация остановилась (page=11 status=401 после 1 повторных 429 на этой странице), реальный total на цепи всё ещё не подтверждён, если остановка не на пустой странице",
+  "n_pools_no_reserve_field": 1,
+  "n_after_tvl_filter_by_threshold": {
+    "5000.0": 175,
+    "1000.0": 182
+  },
+  "ohlcv_checkpoint_n_checked": 55,
+  "ohlcv_checkpoint_n_traded": 55,
+  "n_ohlcv_checked": 55,
+  "n_ohlcv_candidates_total_at_1000": 182,
+  "n_ohlcv_budget_exhausted": true,
+  "ohlcv_partial_coverage_reason": "бюджет (700.0с) исчерпан после 55/182 -- честно НЕ покрыто: 127",
+  "n_after_3d_trading_filter": 55,
+  "latest_block": 65461396,
+  "fee_checkpoint_n_checked": 55,
+  "n_fee_checked": 55,
+  "n_traded_total": 55,
+  "n_fee_budget_exhausted": false,
+  "n_dynamic_fee_pools": 8,
+  "n_excluded_11pct": 0,
+  "n_fee_unresolved": 2,
+  "n_final_tvl5000": 53,
+  "n_final_tvl1000": 53,
+  "n_over_1pct_fee_tvl5000": 1,
+  "n_over_1pct_fee_tvl1000": 1,
+  "final_candidates_tvl5000": [
+    {
+      "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+      "name": "USDG / WETH 0.01%",
+      "reserve_in_usd": 25079334.589,
+      "pool_created_at": "2026-07-02T20:51:08Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 1393828885.4713273,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "fee_pips": 100,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+      "name": "WETH / USDG 0.05%",
+      "reserve_in_usd": 678992.4893,
+      "pool_created_at": "2026-07-21T03:25:23Z",
+      "dex_id": "up-v3",
+      "volume_usd_3d_real": 50364101.108939335,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x16679e2ac1a798865ecf1c1639e67693ddb1c220",
+        "fee_pips": 75,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x15cdc3dbc951a9d4a5a39098811fa4481a6e8a19c32cefd82a1e97a1a4f171be",
+      "name": "musegram / META",
+      "reserve_in_usd": 242471.2493,
+      "pool_created_at": "2026-09-16T08:57:20Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 4326323.504582522,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x15cdc3dbc951a9d4a5a39098811fa4481a6e8a19c32cefd82a1e97a1a4f171be",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x9cb595fbb3601dc0ef80e87921dc4ffd9307aba3",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "address": "0x40a433930370f6cdf0a78debc2c6dd599c23bd428c0d67dd8b5373e4f101557f",
+      "name": "musebook / META",
+      "reserve_in_usd": 4135662.0352,
+      "pool_created_at": "2026-09-16T05:51:12Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 30523045.264018267,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x40a433930370f6cdf0a78debc2c6dd599c23bd428c0d67dd8b5373e4f101557f",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x91a2dae9699f0b82540b5886b0d8759c22820ba3",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "address": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "name": "WETH / USDG 0.01%",
+      "reserve_in_usd": 894481.7537,
+      "pool_created_at": "2026-07-02T08:58:08Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 40659041.31685864,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+        "fee_pips": 100,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+      "name": "WETH / USDG 0.005%",
+      "reserve_in_usd": 193716.7807,
+      "pool_created_at": "2026-09-10T11:03:33Z",
+      "dex_id": "giga-v3",
+      "volume_usd_3d_real": 8854134.069566065,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xf4d0171f995d576b972aa982080eaf4da456cf9e",
+        "fee_pips": 50,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+      "name": "WETH / USDG 0.01%",
+      "reserve_in_usd": 728960.4425,
+      "pool_created_at": "2026-08-19T16:09:34Z",
+      "dex_id": "ramses-v3-robinhood",
+      "volume_usd_3d_real": 63354268.21932237,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xfae65eaa11943f45e83d5b45dc7a7c801c51bfb0",
+        "fee_pips": 100,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x7a35168956f129c032ec035cc47383a605a71df0",
+      "name": "WETH / USDG 0.004%",
+      "reserve_in_usd": 23749.6053,
+      "pool_created_at": "2026-08-20T06:35:54Z",
+      "dex_id": "alandale-cl",
+      "volume_usd_3d_real": 12523792.464360388,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x7a35168956f129c032ec035cc47383a605a71df0",
+        "fee_pips": 40,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+      "name": "USDG / WETH 0.05%",
+      "reserve_in_usd": 4717652.9164,
+      "pool_created_at": "2026-06-29T09:34:25Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 64637609.4388037,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xfabeb358fe4ac3c64ac0a59f7355eb04eab3f422eb4585092e9ef79946d7410c",
+      "name": "SPIDERBRAIN / GOOGL",
+      "reserve_in_usd": 39618.9026,
+      "pool_created_at": "2026-09-16T22:20:31Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 1497264.54250595,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xfabeb358fe4ac3c64ac0a59f7355eb04eab3f422eb4585092e9ef79946d7410c",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+        "currency1": "0xb11766322d5958551025597389e1e33ed4df0ba3"
+      }
+    },
+    {
+      "address": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+      "name": "PONS / USDG 0.3%",
+      "reserve_in_usd": 1486513.6802,
+      "pool_created_at": "2026-08-11T03:34:02Z",
+      "dex_id": "ramses-v3-robinhood",
+      "volume_usd_3d_real": 80227248.70086941,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xf2a0be59ab76b96f957bd5e5b967f2b75e8db269",
+        "fee_pips": 1000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+      "name": "NVDA / USDG 0.05%",
+      "reserve_in_usd": 7614599.4852,
+      "pool_created_at": "2026-07-21T11:02:06Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 54160426.02496594,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+      "name": "META / USDG 0.3%",
+      "reserve_in_usd": 1888014.7872,
+      "pool_created_at": "2026-07-11T12:18:48Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 27059600.78543609,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5875d407a42965b0e768c8925cea290e06fa50603ef34fc99eb92a1050e6ae36",
+        "fee_pips": 3000,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "address": "0x8dabf19a93da0e1fe59b655fd800151b52fbc79b4995dead08f079eff83a0576",
+      "name": "FOMOPAD / WETH",
+      "reserve_in_usd": 24925.2834,
+      "pool_created_at": "2026-09-16T14:47:46Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 4656057.938398352,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x8dabf19a93da0e1fe59b655fd800151b52fbc79b4995dead08f079eff83a0576",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x33e95e548646e674778195a00c995d6213ea977b"
+      }
+    },
+    {
+      "address": "0xc61284332117c3fb23a2a56cceffd07f7af60029",
+      "name": "SPCX / USDG 0.05%",
+      "reserve_in_usd": 2482933.9134,
+      "pool_created_at": "2026-07-23T11:56:34Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 52505472.59833303,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xc61284332117c3fb23a2a56cceffd07f7af60029",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x97aa9ecd834cdbc35df277a9ca4ad8db2c6ee0f9ea4ce3e8b06fa5fa044a4e3f",
+      "name": "LITVM / WETH",
+      "reserve_in_usd": 8966.4399,
+      "pool_created_at": "2026-09-16T15:18:34Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 5177846.016171229,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x97aa9ecd834cdbc35df277a9ca4ad8db2c6ee0f9ea4ce3e8b06fa5fa044a4e3f",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x4f101f97f908a9f229c8c623d7f57d3df7099bb4"
+      }
+    },
+    {
+      "address": "0x09a7ef18fc94a56639212f6fcde66849ee4af3d1418f9655009053b860d49b6c",
+      "name": "FOMOPAD / WETH",
+      "reserve_in_usd": 10415.0445,
+      "pool_created_at": "2026-09-16T14:56:55Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1801320.8444700397,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x09a7ef18fc94a56639212f6fcde66849ee4af3d1418f9655009053b860d49b6c",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x2ffab1d13717c9cd72c497febd08aa5b7b8648f0"
+      }
+    },
+    {
+      "address": "0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+      "name": "SPY / WETH 0.05%",
+      "reserve_in_usd": 1746794.446,
+      "pool_created_at": "2026-08-03T13:56:47Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 23499431.42584435,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "name": "WETH / USDG 0.009%",
+      "reserve_in_usd": 188658.8313,
+      "pool_created_at": "2026-09-04T16:36:14Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 6590246.455486061,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+        "fee_pips": 87,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0xf7a56632dc25c499e6585bf31385f58edf5c046b7baab9646619efa93d040611",
+      "name": "FOMOBALL / WETH",
+      "reserve_in_usd": 51263.1406,
+      "pool_created_at": "2026-09-16T19:20:29Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 3507812.618727055,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xf7a56632dc25c499e6585bf31385f58edf5c046b7baab9646619efa93d040611",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x76912652a3ba152f506157f2d1072804ccf7dcd7"
+      }
+    },
+    {
+      "address": "0x5eac4195930d5ff8b7a34a347f2bde951c42eb730d6e26075bea3dd7c66feb40",
+      "name": "ROBIN / USDG",
+      "reserve_in_usd": 181750.0164,
+      "pool_created_at": "2026-09-05T16:54:01Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1999655.2566003636,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5eac4195930d5ff8b7a34a347f2bde951c42eb730d6e26075bea3dd7c66feb40",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x11b70d0243baf75e85ce03201a92b5b7c33beb59",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0x35751a67e31548f20bb52404cef03780a38d40b8958dd3017e2cb54c16ebb6ef",
+      "name": "DYNABLOCKS / RBLX",
+      "reserve_in_usd": 67800.6215,
+      "pool_created_at": "2026-09-16T15:46:02Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 1079139.3318322513,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x35751a67e31548f20bb52404cef03780a38d40b8958dd3017e2cb54c16ebb6ef",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x6d106a2797c63c76d9813a49f7e13e2b55631e18",
+        "currency1": "0xf0c4bf4c582cb3836e98394b1d4e7b7281101be8"
+      }
+    },
+    {
+      "address": "0xa00db6ed5b01f2c75fca3e3e8aec8500f9cf65dea9cd2a49ba01d6f2223e6ec3",
+      "name": "SPECSY / snap",
+      "reserve_in_usd": 59890.9151,
+      "pool_created_at": "2026-09-16T23:37:17Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 964522.8957119943,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xa00db6ed5b01f2c75fca3e3e8aec8500f9cf65dea9cd2a49ba01d6f2223e6ec3",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x45612ee5a5b1642ddb73f612de964c7065531e18",
+        "currency1": "0xf6589f11bc40b669e584073f428b05562f568733"
+      }
+    },
+    {
+      "address": "0xe972dfc9032d148f4b1618fb914fbbd2fc41d6dc",
+      "name": "musebook / WETH 1%",
+      "reserve_in_usd": 710106.7494,
+      "pool_created_at": "2026-09-16T08:27:21Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 5818096.637297099,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xe972dfc9032d148f4b1618fb914fbbd2fc41d6dc",
+        "fee_pips": 10000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xd678fb36c5cdf487126a00d29d1e235aebbb1c4a578f2597dfa11ebe3f1c1fb5",
+      "name": "MUSEPAD / WETH",
+      "reserve_in_usd": 37678.581,
+      "pool_created_at": "2026-09-16T16:18:27Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 2720096.2407980696,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xd678fb36c5cdf487126a00d29d1e235aebbb1c4a578f2597dfa11ebe3f1c1fb5",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xdb90169c179def9111ad7ae8e23f45cc36a0da7b"
+      }
+    },
+    {
+      "address": "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+      "name": "GOOGL / USDG 0.05%",
+      "reserve_in_usd": 2251073.9482,
+      "pool_created_at": "2026-07-10T22:04:49Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 20558318.607597433,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xed50bdeea8adc232f159486192a4157281d722ff",
+      "name": "PONS / WETH 0.3%",
+      "reserve_in_usd": 5985740.9569,
+      "pool_created_at": "2026-07-16T15:39:37Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 40485176.40943211,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xed50bdeea8adc232f159486192a4157281d722ff",
+        "fee_pips": 3000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xa0d0bf9947aed50801f5202e714ad04463ba8b5ab409712372af3e6bd66d1fa0",
+      "name": "META / USDG 0.052%",
+      "reserve_in_usd": 735841.2027,
+      "pool_created_at": "2026-09-16T10:08:30Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 10033179.551395008,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xa0d0bf9947aed50801f5202e714ad04463ba8b5ab409712372af3e6bd66d1fa0",
+        "fee_pips": 520,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "address": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+      "name": "USDG / WETH 0.02%",
+      "reserve_in_usd": 406013.3368,
+      "pool_created_at": "2026-07-16T14:37:48Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 7517622.243693495,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x84bd4e2d8be11aeb0afc1195b38f587b61e90068548f1063fdbe448fb8cad0b6",
+        "fee_pips": 200,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0xb3afa4acad527eca0332d07366222eb237b3b1aa71f2f10e0cfbd93dff6a339f",
+      "name": "AGRIPPA / META",
+      "reserve_in_usd": 87328.6914,
+      "pool_created_at": "2026-09-16T07:48:24Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 1223071.5619402993,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xb3afa4acad527eca0332d07366222eb237b3b1aa71f2f10e0cfbd93dff6a339f",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x82ef09793c78f7cb6a2b6696fcdca8e1c3581e18",
+        "currency1": "0xc0d6457c16cc70d6790dd43521c899c87ce02f35"
+      }
+    },
+    {
+      "address": "0x5bb6eff153b933480ce7a55720e66102dfb44a533da8f5c075ad29930a1073d0",
+      "name": "LuluDior / LULU",
+      "reserve_in_usd": 42923.295,
+      "pool_created_at": "2026-09-16T12:38:18Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 737677.0377007698,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5bb6eff153b933480ce7a55720e66102dfb44a533da8f5c075ad29930a1073d0",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x46f3c721d8ce66865bc7d598b3b8ba7fd6badaac",
+        "currency1": "0x4e62068525ab11fe768e29dfd00ef909b9803016"
+      }
+    },
+    {
+      "address": "0x62ab521f71431f78ac374cdbadc6cda3c8916b6c",
+      "name": "NVDA / WETH 0.05%",
+      "reserve_in_usd": 1277473.6899,
+      "pool_created_at": "2026-07-24T14:31:36Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 17219604.37293912,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x62ab521f71431f78ac374cdbadc6cda3c8916b6c",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+      "name": "WETH / USDG 0.046%",
+      "reserve_in_usd": 1535201.9619,
+      "pool_created_at": "2026-07-08T14:30:35Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 9298333.704019755,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+        "fee_pips": 460,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+      "name": "PONS / USDG 0.3%",
+      "reserve_in_usd": 8773338.0043,
+      "pool_created_at": "2026-07-18T01:42:13Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 33421901.61413072,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+        "fee_pips": 3000,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x39dbed3a2bd333467115de45665cc57f813c4571",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0x3e1afde90341f843c941ff4077d915bde3008c7e",
+      "name": "SPY / WETH 0.01%",
+      "reserve_in_usd": 186957.568,
+      "pool_created_at": "2026-08-20T11:29:04Z",
+      "dex_id": "ramses-v3-robinhood",
+      "volume_usd_3d_real": 8429083.105881423,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x3e1afde90341f843c941ff4077d915bde3008c7e",
+        "fee_pips": 100,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xc3c9f0171490ef0f4536fe493f3b0ebb5ee0cb5e",
+      "name": "SPCX / WETH 0.05%",
+      "reserve_in_usd": 901685.3726,
+      "pool_created_at": "2026-07-20T10:15:53Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 19289626.187452614,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xc3c9f0171490ef0f4536fe493f3b0ebb5ee0cb5e",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xf2a3ca11b555a5cb95f77ceb92affc6ead220f5c441230644c2cf8f435952253",
+      "name": "Depth / WETH",
+      "reserve_in_usd": 43917.7568,
+      "pool_created_at": "2026-09-17T00:24:59Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1487729.9196252474,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xf2a3ca11b555a5cb95f77ceb92affc6ead220f5c441230644c2cf8f435952253",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xc23317490b24d6e53c0137ed5d0d2ae565674bcb"
+      }
+    },
+    {
+      "address": "0xa4018e18bd9f8213e379f42434842af962d37e8a896bf67605aa0e7e5b2e9f40",
+      "name": "KONG / WETH",
+      "reserve_in_usd": 27506.2065,
+      "pool_created_at": "2026-09-16T18:36:22Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1565200.3531109898,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xa4018e18bd9f8213e379f42434842af962d37e8a896bf67605aa0e7e5b2e9f40",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x15d5c7ddfae6ef32aed53d791204c266843bf36e"
+      }
+    },
+    {
+      "address": "0x6c2c1cdbfb37da08d0ad093e9d323450fe4fa13199345923b1d5ea460096089c",
+      "name": "INUVATION / SPY",
+      "reserve_in_usd": 36461.6311,
+      "pool_created_at": "2026-09-17T13:13:30Z",
+      "dex_id": "bankr-robinhood",
+      "volume_usd_3d_real": 825638.8027264525,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x6c2c1cdbfb37da08d0ad093e9d323450fe4fa13199345923b1d5ea460096089c",
+        "fee_pips": null,
+        "fee_is_dynamic": true,
+        "hooks": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
+        "currency0": "0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+        "currency1": "0x29f09d975f768790a70468868ffd98ccd6ca1e18"
+      }
+    },
+    {
+      "address": "0x766ae13db3d7a6a32d6c7e62c266b6eee0936073fa147e65dac133b059cc0152",
+      "name": "GROKBOOK / SPCX",
+      "reserve_in_usd": 27555.2793,
+      "pool_created_at": "2026-09-17T11:59:38Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1435884.7002430663,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x766ae13db3d7a6a32d6c7e62c266b6eee0936073fa147e65dac133b059cc0152",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",
+        "currency1": "0xec497635e56cb3d1cc316c0ca6085a2f1124e4b6"
+      }
+    },
+    {
+      "address": "0x714442e9a611f8561a7df108d6d925132937cfb8",
+      "name": "CHUMP / WETH 1%",
+      "reserve_in_usd": 1009467.9913,
+      "pool_created_at": "2026-07-31T01:44:31Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 8291174.015813144,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x714442e9a611f8561a7df108d6d925132937cfb8",
+        "fee_pips": 10000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x10ea32252ee4aea2be282068a974f394684657b12d7dc976b5f4f41390455180",
+      "name": "HOOD / COOK 0.3%",
+      "reserve_in_usd": 104210.0496,
+      "pool_created_at": "2026-09-16T16:45:53Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 4667471.0337599665,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x10ea32252ee4aea2be282068a974f394684657b12d7dc976b5f4f41390455180",
+        "fee_pips": 3000,
+        "fee_is_dynamic": false,
+        "hooks": "0x4eb1976978756bd56802d8162f2271844924e0cc",
+        "currency0": "0x32ac8c1d7672667d5ebdea22935f7b06fc8d496f",
+        "currency1": "0xe10195999a422314155b1e158281dbd4f27adc46"
+      }
+    },
+    {
+      "address": "0x3ee8fa70e11a3d53ddcc6698b9d54134cb88338351194e311a80bff93c085c94",
+      "name": "FOMOBALL / USDG 4.8%",
+      "reserve_in_usd": 40641.2798,
+      "pool_created_at": "2026-09-16T19:35:10Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 1694661.5533218593,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x3ee8fa70e11a3d53ddcc6698b9d54134cb88338351194e311a80bff93c085c94",
+        "fee_pips": 48000,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+        "currency1": "0x76912652a3ba152f506157f2d1072804ccf7dcd7"
+      }
+    },
+    {
+      "address": "0xb2a6ad51b3ea3cdc8d3508cca147a43471382e53",
+      "name": "WETH / USDG 0.01%",
+      "reserve_in_usd": 24264.724,
+      "pool_created_at": "2026-08-10T02:36:32Z",
+      "dex_id": "giga-v3",
+      "volume_usd_3d_real": 6369050.258378129,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xb2a6ad51b3ea3cdc8d3508cca147a43471382e53",
+        "fee_pips": 100,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0xd42a491087a15e5afd51feb3606066cc152d2b09",
+      "name": "CASHCAT / WETH 0.3%",
+      "reserve_in_usd": 2352558.2717,
+      "pool_created_at": "2026-07-01T19:38:42Z",
+      "dex_id": "uniswap-v3-robinhood",
+      "volume_usd_3d_real": 14064209.39557263,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0xd42a491087a15e5afd51feb3606066cc152d2b09",
+        "fee_pips": 3000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x51b6ca77deae9f17c1d89edfb301ae50053c57a5",
+      "name": "PONS / WETH 1%",
+      "reserve_in_usd": 628174.0814,
+      "pool_created_at": "2026-08-06T21:01:23Z",
+      "dex_id": "ramses-v3-robinhood",
+      "volume_usd_3d_real": 8196302.665090654,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x51b6ca77deae9f17c1d89edfb301ae50053c57a5",
+        "fee_pips": 1000,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x56000f3980200d0f39a9f2eefd5233b2196b4445",
+      "name": "PONS / USDG 0.05%",
+      "reserve_in_usd": 31761.3869,
+      "pool_created_at": "2026-09-07T15:16:26Z",
+      "dex_id": "giga-v3",
+      "volume_usd_3d_real": 1527474.6360934225,
+      "fee_resolution": {
+        "kind": "v3_address",
+        "address": "0x56000f3980200d0f39a9f2eefd5233b2196b4445",
+        "fee_pips": 500,
+        "fee_is_dynamic": false
+      }
+    },
+    {
+      "address": "0x5672a58887e888d1e2de8ab83f33116ba171fd298ee7d3cc96a989d15b1b6e0d",
+      "name": "RBD / WETH",
+      "reserve_in_usd": 160819.3146,
+      "pool_created_at": "2026-09-16T02:51:49Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 363887.1707327868,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x5672a58887e888d1e2de8ab83f33116ba171fd298ee7d3cc96a989d15b1b6e0d",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xb41c7ac9d46a980f8bdf1894b392a2a07ec9992a"
+      }
+    },
+    {
+      "address": "0xe6925f7bdedf22c2714c749d0ff208ce9e4bc1540938fa2b9ab2379486322edd",
+      "name": "Fly / NVDA",
+      "reserve_in_usd": 61286.5085,
+      "pool_created_at": "2026-09-17T14:15:30Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1698815.0531813796,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xe6925f7bdedf22c2714c749d0ff208ce9e4bc1540938fa2b9ab2379486322edd",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x2fc7f9e2911f20b2c4660d2aef808aa91bddb3d3",
+        "currency1": "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec"
+      }
+    },
+    {
+      "address": "0xf4ccc569742185993492aaaa06a248da0f5d3ee97646064b26d7b63f94a0cab3",
+      "name": "TUCK / WETH 0.25%",
+      "reserve_in_usd": 13730.1192,
+      "pool_created_at": "2026-09-16T17:08:04Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 22509.92628227926,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0xf4ccc569742185993492aaaa06a248da0f5d3ee97646064b26d7b63f94a0cab3",
+        "fee_pips": 2500,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0x0fb5a113ad040b395dfa6872f9f0eed3f8de229c"
+      }
+    },
+    {
+      "address": "0x7aebd80541bfaaf23dbb6e99ce13d4d31c1a84c91414f971eadbff7db5f85995",
+      "name": "AI / USDG 0.23%",
+      "reserve_in_usd": 1536479.9228,
+      "pool_created_at": "2026-09-03T14:04:34Z",
+      "dex_id": "uniswap-v4-robinhood",
+      "volume_usd_3d_real": 20156401.905268714,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x7aebd80541bfaaf23dbb6e99ce13d4d31c1a84c91414f971eadbff7db5f85995",
+        "fee_pips": 2300,
+        "fee_is_dynamic": false,
+        "hooks": "0x0000000000000000000000000000000000000000",
+        "currency0": "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+        "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      }
+    },
+    {
+      "address": "0x59eec62fcf755c77e7491e7de14b11e401a10e01c09f6f7871148e36594a6520",
+      "name": "OZZY / WETH",
+      "reserve_in_usd": 25642.8852,
+      "pool_created_at": "2026-09-17T03:32:19Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1066393.1200239041,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x59eec62fcf755c77e7491e7de14b11e401a10e01c09f6f7871148e36594a6520",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xd93a1603807d6180929517c85c616945c23e9675"
+      }
+    },
+    {
+      "address": "0x611589ad8abd944589bd7c2256520fd06b2dc05423b3746ca7ddbdef5f8221f5",
+      "name": "Perpex / WETH",
+      "reserve_in_usd": 33814.6604,
+      "pool_created_at": "2026-09-16T18:16:29Z",
+      "dex_id": "pons-v2-dex",
+      "volume_usd_3d_real": 1071895.9593276614,
+      "fee_resolution": {
+        "kind": "v4_pool_id",
+        "pool_id": "0x611589ad8abd944589bd7c2256520fd06b2dc05423b3746ca7ddbdef5f8221f5",
+        "fee_pips": 0,
+        "fee_is_dynamic": false,
+        "hooks": "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+        "currency0": "0x0000000000000000000000000000000000000000",
+        "currency1": "0xd9510867d59b84ff815d349759a64236f996ff4b"
+      }
+    }
+  ],
+  "final_candidates_tvl1000_extra": [],
+  "HONEST_VERDICT": "При понижении TVL-порога с $5000 до $1000: выборка растёт с 53 до 53 пулов (+0). TVL никогда не была основным фильтром (на предыдущем прогоне отсеяла лишь 7%) -- главное горлышко -- бюджет проверки торговли (ohlcv), который в этом прогоне честно покрыл 55/182 кандидатов TVL>=$1000."
+}
