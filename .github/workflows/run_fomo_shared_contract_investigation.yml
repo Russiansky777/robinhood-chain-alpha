@@ -1,0 +1,47 @@
+name: "Fomo -- разобрать общий контракт 0xb92fe9... (байткод/деплой/интеракторы/нативный платёж)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/FOMO_SHARED_CONTRACT_INVESTIGATION_REQUEST"
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Байткод/PUSH4/4byte.directory/деплой-бисекция/интеракторы/нативный платёж"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          ALCHEMY_ROBINHOOD_RPC_URL: ${{ secrets.ALCHEMY_ROBINHOOD_RPC_URL }}
+        run: python -u analysis/fomo_shared_contract_investigation.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FOMO_SHARED_CONTRACT_INVESTIGATION_REQUEST
+          [ -e data/fomo_shared_contract_investigation_result.json ] && git add data/fomo_shared_contract_investigation_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Fomo: разбор общего контракта 0xb92fe9..., результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

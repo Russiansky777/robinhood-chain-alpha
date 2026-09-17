@@ -1,0 +1,55 @@
+{
+  "generated_at_utc": "2026-09-17T10:24:51Z",
+  "method": "offline, покрытие data/fomo_9wallets_alchemy_raw_transfers.csv (26372 переводов, category=erc20 only)",
+  "shared_contract_target": "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f",
+  "wallets_touching_shared_contract": {
+    "SolSwizzle": {
+      "to": 392,
+      "from": 591
+    },
+    "ether_monk": {
+      "to": 164,
+      "from": 81
+    },
+    "remusofmars": {
+      "to": 292,
+      "from": 408
+    },
+    "unipcs": {
+      "to": 293,
+      "from": 113
+    },
+    "ogle": {
+      "to": 75,
+      "from": 212
+    },
+    "avast": {
+      "to": 139,
+      "from": 48
+    },
+    "frogman": {
+      "to": 2,
+      "from": 32
+    },
+    "DumbCrayonEater": {
+      "to": 26,
+      "from": 181
+    },
+    "vee": {
+      "to": 309,
+      "from": 54
+    }
+  },
+  "n_wallets_touching_shared_contract": 9,
+  "n_wallets_total": 9,
+  "priority2_same_tx_pair_check": {
+    "canonical_payment_tokens": [
+      "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+    ],
+    "n_distinct_wallet_tx_with_canonical_out_payment": 342,
+    "n_distinct_wallet_tx_with_out_payment_AND_in_other_token_same_tx": 0,
+    "honest_note": "0 из 342 транзакций с исходящим каноническим USDG/WETH платежом содержат ВХОДЯЩИЙ другой токен В ТОЙ ЖЕ транзакции (category=erc20 только) -- каждая такая транзакция состоит РОВНО из одной ноги. Нативный газ-токен (не ERC-20) не проверялся в этой офлайн-выборке -- см. data/fomo_shared_contract_investigation_result.json, native_value_payment_check, реальная сетевая проверка гипотезы."
+  },
+  "important_caveat_fake_stablecoin_tokens": "23 РАЗНЫХ токен-контракта claim symbol=\"USDG\" и 3 claim symbol=\"USDC\" в собранной истории (классический address-poisoning/spoofing паттерн) -- канонический РЕАЛЬНЫЙ USDG (0x5fc5360d0400a0fd4f2af552add042d716f1d168) и WETH (0x0bd7d308f8e1639fab988df18a8011f41eacad73) взяты из task5_bot_config.py (установлены ранее в этой сессии для живого бота), НЕ по самозаявленному symbol из Alchemy-метаданных (тривиально подделываемому атакующим)."
+}
