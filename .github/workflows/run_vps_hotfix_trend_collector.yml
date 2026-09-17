@@ -11,7 +11,7 @@ on:
 jobs:
   hotfix:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -44,7 +44,7 @@ jobs:
           json.dump(d, open(p,"w"), ensure_ascii=False, indent=2)
           print(p, ":", before, "->", after, "записей")'
           git -C "$REPO" fetch origin "$BRANCH"
-          for f in analysis/trend_collector_select_pools.py analysis/trend_collector_snapshot.py; do
+          for f in analysis/trend_collector_select_pools.py analysis/trend_collector_snapshot.py analysis/rh_volume_trend_pool_discovery.py; do
             git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
             echo "OK: $f обновлён ($(wc -l < "$REPO/$f") строк)"
           done
@@ -52,4 +52,9 @@ jobs:
           echo "--- чистка уже накопленных битых записей (kind=v4_pool_id без pool_id) ---"
           python3 -c "$CLEAN" "$REPO/data/trend_collector/pool_universe.json" || true
           python3 -c "$CLEAN" "/home/bot/trend_collector_live_data/pool_universe.json" || true
+          echo "--- реальный тестовый прогон отбора пулов (Срочно 2 -- честные числа роста реестра) ---"
+          wc -l < /home/bot/trend_collector_live_data/pool_universe.json > /tmp/before_lines.txt || echo 0 > /tmp/before_lines.txt
+          python3 -c "import json; print('до прогона, пулов в реестре:', len(json.load(open('/home/bot/trend_collector_live_data/pool_universe.json'))['pools']))" || true
+          /home/bot/bin/trend_collector_select_pools_daily.sh
+          python3 -c "import json; print('после прогона, пулов в реестре:', len(json.load(open('/home/bot/trend_collector_live_data/pool_universe.json'))['pools']))"
           REMOTE
