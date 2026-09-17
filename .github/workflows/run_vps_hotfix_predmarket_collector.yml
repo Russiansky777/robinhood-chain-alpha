@@ -40,9 +40,9 @@ jobs:
           done
           (cd "$REPO" && venv/bin/python -c "import sys; sys.path.insert(0,'analysis'); import predmarket_collector_select_pairs, predmarket_collector_snapshot; print('OK: оба модуля импортируются')")
           echo "--- реальный тестовый прогон отбора пар (честные числа, не пересказ) ---"
-          sudo -u bot /home/bot/bin/predmarket_collector_select_pairs_daily.sh
+          /home/bot/bin/predmarket_collector_select_pairs_daily.sh
           echo "--- реальный тестовый прогон снимка ---"
-          sudo -u bot /home/bot/bin/predmarket_collector_snapshot_5min.sh
+          /home/bot/bin/predmarket_collector_snapshot_5min.sh
           echo "--- содержимое matched_pairs.json (сводка) ---"
           python3 -c "
           import json
