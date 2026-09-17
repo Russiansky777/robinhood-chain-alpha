@@ -56,7 +56,13 @@ OUT_PATH = Path("data/task_solana_price_horizons_and_wave_result.json")
 
 POOL_ADDRESS = "LeZ2DH1y7bqzAghYbXqKB6fNxoBKqPSPihv3EmkLBRv"  # реальный, из GeckoTerminal (этап A), самый ликвидный
 POOL_DEX_ID = "raydium"
-QUOTE_MINT_NAME_HINT = "GLDx"  # из имени пула GT "WOW / GLDx" -- сам mint-адрес возьмём из транзакций
+# Реальный адрес котируемого минта (GLDx), подтверждён официальным Raydium
+# API (mintA.address) -- НЕ угадан по имени. Используется как ОБЯЗАТЕЛЬНЫЙ
+# фильтр контрагентного минта в extract_trade (см. ниже, честный фикс
+# реального бага: без него разные несвязанные минты из одной сложной
+# multi-hop транзакции суммировались в одну "цену", дав абсурдный
+# результат вроде +166 триллионов% на реальном прогоне).
+QUOTE_MINT = "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
 
 HORIZONS_S = [5, 15, 30, 60, 180, 300, 900, 3600, 21600, 86400]  # +5с..+24ч
 
@@ -98,9 +104,18 @@ def raydium_pool_fee(pool_id: str) -> dict:
 
 def extract_trade(tx: dict, token_mint: str) -> dict | None:
     """DEX-агностичное извлечение реальной цены сделки из ЛЮБОЙ транзакции,
-    затронувшей пул -- сумма дельт token_mint против суммы дельт ЛЮБОГО
-    другого минта, участвовавшего в той же транзакции (это и есть
-    уплаченная/полученная котируемая валюта, кто бы ею ни владел)."""
+    затронувшей пул -- сумма дельт token_mint против суммы дельт ИМЕННО
+    QUOTE_MINT (реальный котируемый минт этого пула, GLDx, подтверждён
+    Raydium API), участвовавшего в той же транзакции.
+
+    ЧЕСТНЫЙ ФИКС РЕАЛЬНОГО БАГА (первый прогон узкого окна, реальные
+    данные): раньше суммировались дельты ЛЮБОГО минта, отличного от
+    token_mint -- в busy-блоке многие транзакции представляют собой
+    multi-hop маршруты, трогающие НЕСКОЛЬКО несвязанных токенов в одной
+    транзакции; суммирование их дельт как будто это одна валюта дало
+    абсурдную "цену" (+166 триллионов% в одном горизонте). Теперь строго
+    требуем QUOTE_MINT -- если его нет в транзакции или есть, но
+    token_net около нуля, это НЕ своп нашей пары, честно пропускаем."""
     meta = tx.get("meta") or {}
     if meta.get("err") is not None:
         return None
@@ -111,7 +126,7 @@ def extract_trade(tx: dict, token_mint: str) -> dict | None:
 
     pre_by_idx, post_by_idx = by_idx(pre_tb), by_idx(post_tb)
     all_idx = set(pre_by_idx) | set(post_by_idx)
-    token_net, other_mint, other_net = 0.0, None, 0.0
+    token_net, quote_net = 0.0, 0.0
     signer = None
     account_keys = [k.get("pubkey") if isinstance(k, dict) else k
                     for k in tx.get("transaction", {}).get("message", {}).get("accountKeys", [])]
@@ -125,11 +140,12 @@ def extract_trade(tx: dict, token_mint: str) -> dict | None:
         delta = post_amt - pre_amt
         if mint == token_mint:
             token_net += delta
-        elif abs(delta) > 1e-12:
-            other_mint = mint
-            other_net += delta
-    if abs(token_net) < 1e-9 or other_mint is None or abs(other_net) < 1e-12:
-        return None  # не своп нашего токена в этой транзакции (или чистый transfer без контрагентного минта)
+        elif mint == QUOTE_MINT:
+            quote_net += delta
+    other_mint = QUOTE_MINT
+    other_net = quote_net
+    if abs(token_net) < 1e-9 or abs(other_net) < 1e-12:
+        return None  # не своп нашей пары token/QUOTE_MINT в этой транзакции
     price = abs(other_net) / abs(token_net)
     return {
         "signature": tx.get("transaction", {}).get("signatures", [None])[0],
