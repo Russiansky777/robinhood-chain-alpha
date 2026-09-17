@@ -1,0 +1,58 @@
+name: "Хотфикс сборщика 2 на VPS -- предикшн-рынки, фолбэк без пары (только 2 файла, cron/HEAD не трогает)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_HOTFIX_PREDMARKET_COLLECTOR_REQUEST"
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10" >> "$GITHUB_ENV"
+
+      - name: "Точечно обновить 2 файла + реальный тестовый прогон (fetch-only, HEAD VPS не трогается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "sudo -u bot bash -s" <<'REMOTE'
+          set -e
+          REPO=/home/bot/robinhood-chain-alpha
+          BRANCH=claude/nifty-sagan-r0polg
+          git -C "$REPO" fetch origin "$BRANCH"
+          for f in analysis/predmarket_collector_select_pairs.py analysis/predmarket_collector_snapshot.py; do
+            git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
+            echo "OK: $f обновлён ($(wc -l < "$REPO/$f") строк)"
+          done
+          (cd "$REPO" && venv/bin/python -c "import sys; sys.path.insert(0,'analysis'); import predmarket_collector_select_pairs, predmarket_collector_snapshot; print('OK: оба модуля импортируются')")
+          echo "--- реальный тестовый прогон отбора пар (честные числа, не пересказ) ---"
+          sudo -u bot /home/bot/bin/predmarket_collector_select_pairs_daily.sh
+          echo "--- реальный тестовый прогон снимка ---"
+          sudo -u bot /home/bot/bin/predmarket_collector_snapshot_5min.sh
+          echo "--- содержимое matched_pairs.json (сводка) ---"
+          python3 -c "
+          import json
+          d = json.load(open('/home/bot/predmarket_collector_live_data/matched_pairs.json'))
+          for k in ('generated_at_utc','n_kalshi_games_scanned','n_polymarket_markets_scanned','n_pairs','n_team_matched_but_date_rejected','n_standalone_kalshi','n_standalone_polymarket'):
+              print(k, '=', d.get(k))
+          print('near_miss_samples[:3] =', json.dumps(d.get('near_miss_samples', [])[:3], ensure_ascii=False))
+          "
+          echo "--- последняя строка run_log.jsonl ---"
+          tail -1 /home/bot/predmarket_collector_live_data/run_log.jsonl
+          echo "--- размер накопленных данных за неделю (оценка) ---"
+          du -sh /home/bot/predmarket_collector_live_data/
+          REMOTE
