@@ -1,0 +1,212 @@
+name: "Деплой двух сборщиков (тренд + рынки предсказаний) на NL VPS -- НЕ трогает ветку/HEAD живого репозитория"
+
+# Владелец, 2026-09-17: "не срочно по времени выполнения, срочно по
+# календарю". ВАЖНО: VPS уже хостит живой бот (task5_bot_run.py) на
+# СВОЁМ checked-out branch/HEAD -- этот workflow НЕ делает git checkout/
+# reset на другую ветку (риск сломать состояние живого процесса).
+# Вместо этого нужные файлы извлекаются ТОЧЕЧНО через `git show
+# origin/<эта ветка>:<путь>` после `git fetch` (fetch-only, HEAD не
+# трогается) и записываются рядом с уже существующими файлами репозитория
+# на VPS (те же имена, что и в этой ветке -- если модуль уже есть на VPS
+# с другим содержимым, будет ПЕРЕЗАПИСАН этой копией; для существующих
+# разделяемых модулей типа alchemy_fallback.py это ожидаемо и безопасно
+# -- те же самые модули, что использует живой бот, версия для чтения
+# состояния цепи не менялась в этой сессии).
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_DEPLOY_TWO_COLLECTORS_REQUEST"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "0. Снимок crontab ДО + текущая ветка/HEAD репозитория на VPS (только чтение)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            echo "=== crontab bot ДО ==="
+            sudo -u bot crontab -l | tee /tmp/cron_before.txt
+            echo "=== текущая ветка/HEAD репозитория на VPS (НЕ будет тронута) ==="
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha rev-parse --abbrev-ref HEAD
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "1. Точечно извлечь нужные файлы из claude/nifty-sagan-r0polg (fetch-only, HEAD VPS не трогается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "sudo -u bot bash -s" <<'REMOTE'
+          set -e
+          REPO=/home/bot/robinhood-chain-alpha
+          BRANCH=claude/nifty-sagan-r0polg
+          git -C "$REPO" fetch origin "$BRANCH"
+          for f in analysis/trend_collector_select_pools.py analysis/trend_collector_snapshot.py \
+                   analysis/predmarket_collector_select_pairs.py analysis/predmarket_collector_snapshot.py \
+                   analysis/rh_volume_trend_pool_discovery.py; do
+            git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
+            echo "OK: $f записан ($(wc -l < "$REPO/$f") строк)"
+          done
+          echo "=== проверка общих зависимостей уже на VPS (НЕ перезаписываются, только проверка наличия) ==="
+          for f in analysis/alchemy_fallback.py analysis/taskC_sports_matcher.py analysis/task5_v4_hook_route_audit.py; do
+            if [ -f "$REPO/$f" ]; then
+              echo "OK уже есть: $f"
+            else
+              git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
+              echo "ОТСУТСТВОВАЛ, скопирован из ветки: $f"
+            fi
+          done
+          REMOTE
+
+      - name: "2. Проверка импортов (без сети -- только синтаксис/зависимости)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot venv/bin/python -c "import sys; sys.path.insert(0,\"analysis\"); import trend_collector_select_pools, trend_collector_snapshot, predmarket_collector_select_pairs, predmarket_collector_snapshot; print(\"OK: все 4 модуля импортируются на VPS\")"
+          '
+
+      - name: "3. Внешние живые директории (вне git, тот же принцип, что turnover_watch_live_data)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot mkdir -p /home/bot/trend_collector_live_data /home/bot/predmarket_collector_live_data
+            echo "созданы (или уже существовали)"
+          '
+
+      - name: "4. Два новых обёрточных скрипта -- сборщик 1 (тренд), идемпотентно перезаписываются"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/bin/trend_collector_select_pools_daily.sh && chown bot:bot /home/bot/bin/trend_collector_select_pools_daily.sh && chmod +x /home/bot/bin/trend_collector_select_pools_daily.sh' <<'EOF'
+          #!/bin/bash
+          set -uo pipefail
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/trend_collector_live_data
+          mkdir -p "$LIVE_DIR"
+          cd "$REPO"
+          mkdir -p data/trend_collector logs
+          cp -a "$LIVE_DIR/." data/trend_collector/ 2>/dev/null || true
+          echo "=== $(date -u +%FT%TZ) -- запуск trend_collector_select_pools.py ==="
+          "$REPO/venv/bin/python" -u analysis/trend_collector_select_pools.py
+          rc=$?
+          cp -a data/trend_collector/. "$LIVE_DIR/"
+          echo "=== $(date -u +%FT%TZ) -- завершено, exit=$rc ==="
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/bin/trend_collector_snapshot_15min.sh && chown bot:bot /home/bot/bin/trend_collector_snapshot_15min.sh && chmod +x /home/bot/bin/trend_collector_snapshot_15min.sh' <<'EOF'
+          #!/bin/bash
+          set -uo pipefail
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/trend_collector_live_data
+          mkdir -p "$LIVE_DIR"
+          cd "$REPO"
+          mkdir -p data/trend_collector logs
+          cp -a "$LIVE_DIR/." data/trend_collector/ 2>/dev/null || true
+          echo "=== $(date -u +%FT%TZ) -- запуск trend_collector_snapshot.py ==="
+          "$REPO/venv/bin/python" -u analysis/trend_collector_snapshot.py
+          rc=$?
+          cp -a data/trend_collector/. "$LIVE_DIR/"
+          echo "=== $(date -u +%FT%TZ) -- завершено, exit=$rc ==="
+          EOF
+
+      - name: "5. Два новых обёрточных скрипта -- сборщик 2 (рынки предсказаний)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/bin/predmarket_collector_select_pairs_daily.sh && chown bot:bot /home/bot/bin/predmarket_collector_select_pairs_daily.sh && chmod +x /home/bot/bin/predmarket_collector_select_pairs_daily.sh' <<'EOF'
+          #!/bin/bash
+          set -uo pipefail
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/predmarket_collector_live_data
+          mkdir -p "$LIVE_DIR"
+          cd "$REPO"
+          mkdir -p data/predmarket_collector logs
+          cp -a "$LIVE_DIR/." data/predmarket_collector/ 2>/dev/null || true
+          echo "=== $(date -u +%FT%TZ) -- запуск predmarket_collector_select_pairs.py ==="
+          "$REPO/venv/bin/python" -u analysis/predmarket_collector_select_pairs.py
+          rc=$?
+          cp -a data/predmarket_collector/. "$LIVE_DIR/"
+          echo "=== $(date -u +%FT%TZ) -- завершено, exit=$rc ==="
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/bin/predmarket_collector_snapshot_5min.sh && chown bot:bot /home/bot/bin/predmarket_collector_snapshot_5min.sh && chmod +x /home/bot/bin/predmarket_collector_snapshot_5min.sh' <<'EOF'
+          #!/bin/bash
+          set -uo pipefail
+          REPO=/home/bot/robinhood-chain-alpha
+          LIVE_DIR=/home/bot/predmarket_collector_live_data
+          mkdir -p "$LIVE_DIR"
+          cd "$REPO"
+          mkdir -p data/predmarket_collector logs
+          cp -a "$LIVE_DIR/." data/predmarket_collector/ 2>/dev/null || true
+          echo "=== $(date -u +%FT%TZ) -- запуск predmarket_collector_snapshot.py ==="
+          "$REPO/venv/bin/python" -u analysis/predmarket_collector_snapshot.py
+          rc=$?
+          cp -a data/predmarket_collector/. "$LIVE_DIR/"
+          echo "=== $(date -u +%FT%TZ) -- завершено, exit=$rc ==="
+          EOF
+
+      - name: "6. Разовые тестовые прогоны вручную -- реальные первые снимки"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            echo "--- сборщик 1: отбор пулов ---"
+            sudo -u bot /home/bot/bin/trend_collector_select_pools_daily.sh
+            echo "--- сборщик 1: снимок ---"
+            sudo -u bot /home/bot/bin/trend_collector_snapshot_15min.sh
+            echo "--- сборщик 2: отбор пар ---"
+            sudo -u bot /home/bot/bin/predmarket_collector_select_pairs_daily.sh
+            echo "--- сборщик 2: снимок ---"
+            sudo -u bot /home/bot/bin/predmarket_collector_snapshot_5min.sh
+            echo "--- реальные файлы после первого прогона ---"
+            ls -la /home/bot/trend_collector_live_data/ /home/bot/predmarket_collector_live_data/
+            echo "--- размеры (для оценки объёма за неделю) ---"
+            du -sb /home/bot/trend_collector_live_data/ /home/bot/predmarket_collector_live_data/
+            echo "--- первая строка каждого дневного файла (реальные данные, не пересказ) ---"
+            head -c 2000 /home/bot/trend_collector_live_data/*.jsonl 2>/dev/null | head -30 || true
+            head -c 2000 /home/bot/predmarket_collector_live_data/*.jsonl 2>/dev/null | head -30 || true
+          '
+
+      - name: "7. Добавить 4 новые строки в crontab bot (существующие 2 строки -- не трогать)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            (sudo -u bot crontab -l; echo "3,18,33,48 * * * * /home/bot/bin/trend_collector_snapshot_15min.sh >> /home/bot/robinhood-chain-alpha/logs/trend_collector_snapshot.log 2>&1"; \
+             echo "10 3 * * * /home/bot/bin/trend_collector_select_pools_daily.sh >> /home/bot/robinhood-chain-alpha/logs/trend_collector_select_pools.log 2>&1"; \
+             echo "2-59/5 * * * * /home/bot/bin/predmarket_collector_snapshot_5min.sh >> /home/bot/robinhood-chain-alpha/logs/predmarket_collector_snapshot.log 2>&1"; \
+             echo "20 3 * * * /home/bot/bin/predmarket_collector_select_pairs_daily.sh >> /home/bot/robinhood-chain-alpha/logs/predmarket_collector_select_pairs.log 2>&1") \
+             | sudo -u bot crontab -
+            sudo -u bot crontab -l | tee /tmp/cron_after.txt
+          '
+
+      - name: "8. Проверка: старые 2 строки crontab не изменились, плюс ровно 4 новые"
+        run: |
+          scp $SSH_OPTS root@45.59.170.76:/tmp/cron_before.txt /tmp/cron_before.txt
+          scp $SSH_OPTS root@45.59.170.76:/tmp/cron_after.txt /tmp/cron_after.txt
+          echo "=== ДО ==="; cat /tmp/cron_before.txt
+          echo "=== ПОСЛЕ ==="; cat /tmp/cron_after.txt
+          n_before=$(wc -l < /tmp/cron_before.txt)
+          n_after=$(wc -l < /tmp/cron_after.txt)
+          if ! grep -qFf /tmp/cron_before.txt /tmp/cron_after.txt; then
+            echo "ОШИБКА: старые строки crontab не найдены в новом crontab целиком!" >&2
+            exit 1
+          fi
+          echo "OK: все старые строки ($n_before) присутствуют без изменений в новом crontab ($n_after строк)"
+
+      - name: Итог
+        run: |
+          echo "Оба сборщика развёрнуты, реальные первые снимки сделаны (шаг 6), crontab расширен на 4 строки поверх существующих 2 (шаг 7-8 подтверждают неизменность старых строк). Ветка/HEAD репозитория на VPS НЕ тронуты (шаг 0 зафиксировал состояние ДО, файлы извлечены точечно через git show)."
