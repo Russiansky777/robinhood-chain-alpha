@@ -266,7 +266,15 @@ def run() -> int:
         purchased_token = e["purchased_token"]
         entry_price = e["entry_price_usd_per_token"]
         fee_pips = pool_info.get("fee", 0)
-        fee_frac = fee_pips / 1e6 if fee_pips else 0.0
+        # V4: если установлен DYNAMIC_FEE_FLAG (бит 0x800000), поле fee из Initialize
+        # НЕ является реальной комиссией -- комиссию определяет хук на каждый своп,
+        # и Initialize её не публикует. Считать такую комиссию по формуле fee/1e6 --
+        # значит выдумать данные (даёт абсурдные ~839% и разворачивает знак после
+        # возведения в квадрат). Поэтому для таких пулов издержки по комиссии
+        # честно помечаются "неизвестны", а не подставляется произвольное число.
+        DYNAMIC_FEE_FLAG = 0x800000
+        fee_is_dynamic = bool(fee_pips) and bool(fee_pips & DYNAMIC_FEE_FLAG)
+        fee_frac = (fee_pips / 1e6) if (fee_pips and not fee_is_dynamic) else 0.0
 
         # --- Задача 1: волна ---
         before_blocks = blocks_for_seconds(BEFORE_WINDOW_S)
@@ -344,6 +352,11 @@ def run() -> int:
                 if price_in is None or price_out is None or price_in == 0:
                     exit_table[f"{entry_label}__{exit_label}"] = {"available": False}
                     continue
+                if fee_is_dynamic:
+                    exit_table[f"{entry_label}__{exit_label}"] = {
+                        "available": False, "reason": "dynamic_fee_pool_real_fee_unknown",
+                    }
+                    continue
                 gross_pct = (price_out - price_in) / price_in
                 after_fee_multiplier = (1 - fee_frac) ** 2
                 net_price_ratio = (price_out / price_in) * after_fee_multiplier
@@ -361,7 +374,8 @@ def run() -> int:
                 }
         entry_exit_results.append({
             "wallet_name": e["wallet_name"], "purchased_symbol": e["purchased_symbol"], "tx_hash": e["tx_hash"],
-            "pool_fee_pips": fee_pips, "gas_cost_usd_per_trader_estimate": gas_cost_usd_per_trader,
+            "pool_fee_pips": fee_pips, "fee_is_dynamic": fee_is_dynamic,
+            "gas_cost_usd_per_trader_estimate": gas_cost_usd_per_trader,
             "n_distinct_recipients_in_entry_tx": n_recipients, "peak_offset_s": peak_offset_s,
             "exit_table": exit_table,
         })
