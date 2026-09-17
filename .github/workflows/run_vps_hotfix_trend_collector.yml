@@ -1,0 +1,55 @@
+name: "Хотфикс сборщика 1 на VPS -- только 2 файла, cron/HEAD не трогает"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_HOTFIX_TREND_COLLECTOR_REQUEST"
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10" >> "$GITHUB_ENV"
+      - name: "Точечно обновить 2 файла + очистить битые записи реестра (fetch-only, HEAD VPS не трогается)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "sudo -u bot bash -s" <<'REMOTE'
+          set -e
+          REPO=/home/bot/robinhood-chain-alpha
+          BRANCH=claude/nifty-sagan-r0polg
+          CLEAN='import json,sys
+          p=sys.argv[1]
+          try:
+              d=json.load(open(p))
+          except FileNotFoundError:
+              print(p, "-- не найден, пропуск"); sys.exit(0)
+          before=len(d.get("pools",{}))
+          d["pools"]={k:v for k,v in d.get("pools",{}).items() if not (v.get("kind")=="v4_pool_id" and not v.get("pool_id"))}
+          after=len(d["pools"])
+          json.dump(d, open(p,"w"), ensure_ascii=False, indent=2)
+          print(p, ":", before, "->", after, "записей")'
+          git -C "$REPO" fetch origin "$BRANCH"
+          for f in analysis/trend_collector_select_pools.py analysis/trend_collector_snapshot.py; do
+            git -C "$REPO" show "origin/$BRANCH:$f" > "$REPO/$f"
+            echo "OK: $f обновлён ($(wc -l < "$REPO/$f") строк)"
+          done
+          venv/bin/python -c "import sys; sys.path.insert(0,'analysis'); import trend_collector_select_pools, trend_collector_snapshot; print('OK: оба модуля импортируются')"
+          echo "--- чистка уже накопленных битых записей (kind=v4_pool_id без pool_id) ---"
+          python3 -c "$CLEAN" "$REPO/data/trend_collector/pool_universe.json" || true
+          python3 -c "$CLEAN" "/home/bot/trend_collector_live_data/pool_universe.json" || true
+          REMOTE
