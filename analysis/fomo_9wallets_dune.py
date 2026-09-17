@@ -71,7 +71,37 @@ SCHEMA_CHECK_SQL = """select table_schema, table_name, column_name, data_type
 from information_schema.columns
 where (table_schema = 'robinhood' and table_name = 'transactions')
    or (table_schema = 'prices' and table_name = 'usd')
+   or (table_schema = 'uniswap_v3_robinhood' and table_name in ('swaps', 'uniswapv3pool_evt_swap'))
 order by table_schema, table_name, ordinal_position"""
+
+
+def build_v3_join_sql(v3_table: str, v3_cols: set[str], limit_clause: str) -> str | None:
+    """V3 живёт в ОТДЕЛЬНОЙ схеме (uniswap_v3_robinhood). Строим SQL
+    ТОЛЬКО по реально подтверждённым в этом прогоне колонкам (v3_cols),
+    не по памяти/предположению -- всегда джойним robinhood.transactions
+    (тот же паттерн, что v4), чтобы держать унифицированную форму
+    (wallet/tx_to_contract) для совместной классификации с v4-строками."""
+    if "evt_tx_hash" not in v3_cols:
+        return None
+    sender_col = "s.sender" if "sender" in v3_cols else "NULL"
+    recipient_col = "s.recipient" if "recipient" in v3_cols else "NULL"
+    contract_col = "s.contract_address" if "contract_address" in v3_cols else "NULL"
+    return f"""select
+    s.evt_block_time as block_time,
+    s.evt_block_number as block_number,
+    'v3' as version,
+    lower(to_hex(t."from")) as wallet,
+    lower(to_hex(t."to")) as tx_to_contract,
+    lower(to_hex({sender_col})) as sender_caller,
+    lower(to_hex({recipient_col})) as recipient,
+    lower(to_hex({contract_col})) as pool_contract,
+    lower(to_hex(s.evt_tx_hash)) as tx_hash
+from {v3_table} s
+join robinhood.transactions t on t.hash = s.evt_tx_hash
+where s.evt_block_time >= now() - interval '{WINDOW_DAYS}' day
+    and lower(to_hex(t."from")) in ({addrs_in_sql()})
+order by s.evt_block_time
+{limit_clause}"""
 
 
 def build_join_sql(limit_clause: str) -> str:
@@ -98,6 +128,46 @@ order by s.block_time
 {limit_clause}"""
 
 
+def fetch_full_via_smoke(client: DuneClient, out: dict, key_prefix: str, label: str,
+                          sql_smoke: str, sql_full: str, expected_columns: int) -> pd.DataFrame | None:
+    """LIMIT 100 смоук -> полный прогон, тот же паттерн для v4 и v3 --
+    вынесено в функцию, чтобы не дублировать логику дважды."""
+    print(f"[fomo9] Шаг 1 ({label}, смоук LIMIT 100):")
+    print(sql_smoke)
+    qid1 = client.create_query(f"{key_prefix}_smoke100", sql_smoke)
+    df_smoke = client.run_sql_cached(f"{key_prefix}_smoke100", sql_smoke, query_id=qid1,
+                                      estimated_credits=5.0, expected_max_rows=100, expected_columns=expected_columns)
+    n_smoke = len(df_smoke) if df_smoke is not None else 0
+    cost_smoke = next((e["credits"] for e in reversed(client.credit_ledger) if e["name"] == f"{key_prefix}_smoke100"), None)
+    print(f"[fomo9] {label} смоук: {n_smoke} строк (лимит 100), реальная стоимость {cost_smoke}")
+    out[f"{key_prefix}_smoke"] = {"n_rows": n_smoke, "cost": cost_smoke}
+    if n_smoke == 0:
+        print(f"[fomo9] {label}: 0 строк по tx_from за {WINDOW_DAYS} дней -- дальше на этом источнике не тратим.")
+        out[f"{key_prefix}_full"] = {"n_rows": 0, "cost": 0, "skipped": "смоук дал 0 строк"}
+        return None
+
+    print(f"\n[fomo9] Шаг 2 ({label}, полный прогон, {WINDOW_DAYS} дней):")
+    print(sql_full)
+    qid2 = client.create_query(f"{key_prefix}_7day_full", sql_full)
+    try:
+        df_full = client.run_sql_cached(f"{key_prefix}_7day_full", sql_full, query_id=qid2,
+                                         estimated_credits=25.0, expected_max_rows=20000, expected_columns=expected_columns)
+    except BudgetGuardStop:
+        print(f"[fomo9] {label} СТОП обязывающего гейта чтения: реальных строк оказалось БОЛЬШЕ 20000 заявленных -- "
+              "execute уже оплачен и в леджере, /results НЕ читан (0 доп. кредитов). Само по себе это сильный "
+              "сигнал: такой объём за 7 дней на 9 адресов нетипичен для людей.")
+        out[f"{key_prefix}_full"] = {"STOPPED_BY_ROW_SAFETY_GATE": True,
+                                      "note": ">20000 строк по факту (Dune /status) -- execute оплачен, чтение отказано"}
+        return None
+    cost_full = next((e["credits"] for e in reversed(client.credit_ledger) if e["name"] == f"{key_prefix}_7day_full"), None)
+    n_full = len(df_full) if df_full is not None else 0
+    print(f"[fomo9] {label} полный прогон: {n_full} строк, реальная стоимость {cost_full}")
+    out[f"{key_prefix}_full"] = {"n_rows": n_full, "cost": cost_full}
+    if df_full is None or n_full == 0:
+        return None
+    return df_full
+
+
 def run() -> int:
     ensure_namespace("fomo_9wallets_mozila", NAMESPACE_BUDGET)
     remaining = remaining_cycle_budget(load_state())
@@ -108,8 +178,8 @@ def run() -> int:
     out: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                  "wallets": WALLETS, "window_days": WINDOW_DAYS}
 
-    # --- Шаг 0: реальная схема robinhood.transactions / prices.usd ---
-    print("[fomo9] Шаг 0: проверка реальной схемы robinhood.transactions / prices.usd")
+    # --- Шаг 0: реальная схема robinhood.transactions / prices.usd / uniswap_v3_robinhood ---
+    print("[fomo9] Шаг 0: проверка реальной схемы robinhood.transactions / prices.usd / uniswap_v3_robinhood")
     qid0 = client.create_query("fomo9_schema_check", SCHEMA_CHECK_SQL)
     df0 = client.run_sql_cached("fomo9_schema_check", SCHEMA_CHECK_SQL, query_id=qid0,
                                  estimated_credits=2.0, expected_max_rows=200, expected_columns=4)
@@ -128,69 +198,46 @@ def run() -> int:
     out["prices_usd_columns"] = sorted(prices_cols)
     print(f"[fomo9] prices.usd реальные колонки: {sorted(prices_cols)}")
 
-    # --- Шаг 1: LIMIT 100 смоук ---
-    sql_smoke = build_join_sql("limit 100")
-    print("[fomo9] Шаг 1 (смоук, LIMIT 100):")
-    print(sql_smoke)
-    qid1 = client.create_query("fomo9_swaps_smoke100", sql_smoke)
-    df_smoke = client.run_sql_cached("fomo9_swaps_smoke100", sql_smoke, query_id=qid1,
-                                      estimated_credits=5.0, expected_max_rows=100, expected_columns=14)
-    n_smoke = len(df_smoke) if df_smoke is not None else 0
-    cost_smoke = next((e["credits"] for e in reversed(client.credit_ledger) if e["name"] == "fomo9_swaps_smoke100"), None)
-    print(f"[fomo9] смоук: {n_smoke} строк (лимит 100), реальная стоимость {cost_smoke}")
-    out["step1_smoke"] = {"n_rows": n_smoke, "cost": cost_smoke, "sample_first_5": (df_smoke.head(5).to_dict("records") if df_smoke is not None else [])}
+    v3_by_table: dict[str, set] = {}
+    for r in schema_rows:
+        if r["table_schema"] == "uniswap_v3_robinhood":
+            v3_by_table.setdefault(r["table_name"], set()).add(r["column_name"])
+    v3_table = "swaps" if "swaps" in v3_by_table else ("uniswapv3pool_evt_swap" if "uniswapv3pool_evt_swap" in v3_by_table else None)
+    v3_cols = v3_by_table.get(v3_table, set()) if v3_table else set()
+    out["v3_table_used"] = v3_table
+    out["v3_columns_found"] = sorted(v3_cols)
+    print(f"[fomo9] uniswap_v3_robinhood: таблица={v3_table}, колонки={sorted(v3_cols)}")
 
-    if n_smoke == 0:
-        print("[fomo9] СТОП: 0 строк по tx_from за 7 дней на v4 -- как и предупреждал владелец про taker, "
-              "но теперь честно проверено по tx_from. Дальше не тратим на этот путь без нового решения.")
-        out["decision"] = "0 строк по tx_from -- линия закрыта на этом источнике (v4), дальше не тратим"
+    # --- V4: смоук -> полный ---
+    df_v4 = fetch_full_via_smoke(client, out, "fomo9_v4", "v4 (uniswap_v4_robinhood.swaps)",
+                                  build_join_sql("limit 100"), build_join_sql(""), expected_columns=14)
+
+    # --- V3: смоук -> полный (та же дисциплина, ТОЛЬКО если реальная схема это позволяет) ---
+    df_v3 = None
+    v3_sql_smoke = build_v3_join_sql(f"uniswap_v3_robinhood.{v3_table}", v3_cols, "limit 100") if v3_table else None
+    if v3_sql_smoke:
+        v3_sql_full = build_v3_join_sql(f"uniswap_v3_robinhood.{v3_table}", v3_cols, "")
+        df_v3 = fetch_full_via_smoke(client, out, "fomo9_v3", f"v3 ({v3_table})",
+                                      v3_sql_smoke, v3_sql_full, expected_columns=9)
+    else:
+        print("[fomo9] v3: реальная схема не дала evt_tx_hash в найденной таблице -- v3-шаг пропущен честно, не гадаем.")
+        out["fomo9_v3_smoke"] = {"skipped": f"v3_table={v3_table}, колонки не содержат evt_tx_hash"}
+
+    frames = [d for d in (df_v4, df_v3) if d is not None and len(d) > 0]
+    if not frames:
+        print("[fomo9] СТОП: 0 строк по tx_from за 7 дней И на v4, И на v3 -- линия закрыта на Dune, дальше не тратим.")
+        out["decision"] = "0 строк по tx_from на ОБЕИХ схемах (v3 и v4) -- линия закрыта"
         OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
         OUT_JSON.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
         return 0
 
-    # --- Шаг 2: полный 7-дневный прогон (без LIMIT) ---
-    sql_full = build_join_sql("")
-    print("\n[fomo9] Шаг 2 (полный прогон, 7 дней):")
-    print(sql_full)
-    # Оценка: смоук упёрся в LIMIT 100, значит реальных строк может быть
-    # заметно больше -- берём консервативную оценку с запасом, но в
-    # пределах санитарного потолка гарда (40 по умолчанию для этого
-    # пространства, не переопределяем).
-    qid2 = client.create_query("fomo9_swaps_7day_full", sql_full)
-    try:
-        df_full = client.run_sql_cached("fomo9_swaps_7day_full", sql_full, query_id=qid2,
-                                         estimated_credits=25.0, expected_max_rows=20000, expected_columns=14)
-    except BudgetGuardStop:
-        # Реальный execute уже оплачен и записан в леджер ДО этого отказа
-        # (execute() платится независимо от того, разрешат ли потом читать
-        # результат) -- сам факт "строк оказалось больше 20000 заявленных"
-        # ЭТО УЖЕ содержательный ответ ("N адресов торгуют настолько часто,
-        # что 7 дней дали >20000 строк" -- само по себе сильный сигнал
-        # бот-подобного поведения), не просто сбой скрипта.
-        print("[fomo9] СТОП обязывающего гейта чтения: реальных строк оказалось БОЛЬШЕ 20000 заявленных -- "
-              "execute уже оплачен и в леджере, /results НЕ читан (0 доп. кредитов). Само по себе это сильный "
-              "сигнал: такой объём за 7 дней на 9 адресов нетипичен для людей.")
-        out["step2_full"] = {"STOPPED_BY_ROW_SAFETY_GATE": True,
-                              "note": ">20000 строк по факту (Dune /status) -- execute оплачен, чтение отказано, "
-                                      "сам объём уже сильный признак бот-активности"}
-        out["decision"] = "объём >20000 строк за 7 дней -- вероятно боты, нужен новый лимит/агрегация, дальше не читаем без решения"
-        OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-        OUT_JSON.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
-        return 0
-    cost_full = next((e["credits"] for e in reversed(client.credit_ledger) if e["name"] == "fomo9_swaps_7day_full"), None)
-    n_full = len(df_full) if df_full is not None else 0
-    print(f"[fomo9] полный прогон: {n_full} строк, реальная стоимость {cost_full}")
-    out["step2_full"] = {"n_rows": n_full, "cost": cost_full}
-
-    if df_full is None or n_full == 0:
-        out["decision"] = "0 строк на полном 7-дневном окне -- линия закрыта"
-        OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-        OUT_JSON.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
-        return 0
-
+    df_full = pd.concat(frames, ignore_index=True, sort=False)
     df_full["wallet_name"] = df_full["wallet"].map(ADDR_TO_NAME)
     df_full["block_time"] = pd.to_datetime(df_full["block_time"])
     df_full = df_full.sort_values(["wallet", "block_time"]).reset_index(drop=True)
+    print(f"[fomo9] объединено v4+v3: {len(df_full)} строк всего ({len(df_v4) if df_v4 is not None else 0} v4 + "
+          f"{len(df_v3) if df_v3 is not None else 0} v3)")
+    out["n_rows_combined"] = len(df_full)
 
     # --- Шаг 3: локальная классификация бот/человек (0 доп. кредитов) ---
     per_wallet: dict = {}
@@ -255,17 +302,27 @@ def run() -> int:
               "ценовой джойн пропущен честно, не выдумываем структуру.")
 
     # Первые входы В ПРЕДЕЛАХ 7-дневного окна (честная оговорка: не видим историю до окна).
+    # token_bought резолвится только для v4-строк (uniswap_v4_robinhood.swaps) -- v3-строки
+    # в этой версии не резолвят token0/token1 пула (нужен отдельный join на factory PoolCreated,
+    # не сделан в этом раунде) -- честно ограничиваем первые-входы v4-подмножеством, не гадаем.
     first_entries = []
-    for (wallet_addr, token), grp in df_full.groupby(["wallet", "token_bought"]):
-        first_row = grp.sort_values("block_time").iloc[0]
-        first_entries.append({
-            "wallet": ADDR_TO_NAME.get(wallet_addr, wallet_addr),
-            "token": token,
-            "first_seen_in_window_at": str(first_row["block_time"]),
-            "n_buys_of_this_token_in_window": len(grp),
-            "is_first_buy_in_window": True,
-            "caveat": "первая покупка ВИДИМАЯ В ЭТОМ 7-дневном окне -- не исключает более раннюю покупку до окна",
-        })
+    df_v4_rows = df_full[df_full["version"] != "v3"] if "version" in df_full.columns else df_full
+    if "token_bought" in df_v4_rows.columns:
+        for (wallet_addr, token), grp in df_v4_rows.dropna(subset=["token_bought"]).groupby(["wallet", "token_bought"]):
+            first_row = grp.sort_values("block_time").iloc[0]
+            first_entries.append({
+                "wallet": ADDR_TO_NAME.get(wallet_addr, wallet_addr),
+                "token": token,
+                "first_seen_in_window_at": str(first_row["block_time"]),
+                "n_buys_of_this_token_in_window": len(grp),
+                "is_first_buy_in_window": True,
+                "caveat": "первая покупка ВИДИМАЯ В ЭТОМ 7-дневном окне -- не исключает более раннюю покупку до окна",
+            })
+    out["first_entries_caveat_v3"] = (
+        "Первые входы посчитаны ТОЛЬКО по v4-строкам (token_bought резолвится через "
+        "uniswap_v4_robinhood.swaps) -- v3-строки (uniswap_v3_robinhood) не резолвят токен пула "
+        "в этом раунде, нужен отдельный join на PoolCreated фабрики, не сделан."
+    )
     out["first_entries_within_window"] = first_entries
     out["price_join_note"] = price_join_note
 
