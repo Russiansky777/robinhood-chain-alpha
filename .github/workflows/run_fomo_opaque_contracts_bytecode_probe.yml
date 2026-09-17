@@ -1,0 +1,44 @@
+name: "Fomo -- разобрать 2 непрозрачных контрагента (байткод+строки, бесплатно)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/FOMO_OPAQUE_CONTRACTS_BYTECODE_PROBE_REQUEST"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "eth_getCode + широкий пробинг селекторов + извлечение ASCII-строк (0 кредитов Dune)"
+        run: python -u analysis/fomo_opaque_contracts_bytecode_probe.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/FOMO_OPAQUE_CONTRACTS_BYTECODE_PROBE_REQUEST
+          [ -e data/p3_guard_cache/fomo_opaque_contracts_bytecode_probe_result.json ] && git add data/p3_guard_cache/fomo_opaque_contracts_bytecode_probe_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Fomo: разбор 2 непрозрачных контрагентов (байткод+строки), результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
