@@ -61,7 +61,10 @@ WETH_USDG_POOL = "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca"
 SLOT0_SELECTOR = "0x3850c7bd"
 DECIMALS_SELECTOR = "0x313ce567"
 
-PRICE_TIME_BUDGET_S = 900.0  # 15 мин -- честный потолок на исторические slot0-вызовы
+PRICE_TIME_BUDGET_S = 720.0  # 12 мин -- честный потолок на исторические slot0-вызовы,
+# с запасом под 25-минутный таймаут job'а (см. комментарий в run() про
+# исправленный баг с decimals() -- запас теперь реально нужен только на сам
+# slot0-цикл, не сгорает заранее на ненужных вызовах).
 
 
 def load_pool_registry() -> list[dict]:
@@ -147,10 +150,16 @@ def run() -> int:
     print(f"[price_report] Реестр пулов: {len(pools)} пулов, {len(usdg_map)} прямых USDG-пар, {len(weth_map)} прямых WETH-пар")
 
     unique_tokens = sorted({r["token_address"] for r in rows if r["token_address"]})
-    dec_cache: dict = {}
-    for tok in unique_tokens:
-        get_decimals(tok, dec_cache)
 
+    # РЕАЛЬНЫЙ БАГ, найден по факту прогона 2026-09-17 (run 35205681978, job
+    # 105150758627): decimals() запрашивался для ВСЕХ 4583 уникальных токенов
+    # ДО построения token_resolution -- при том что резолвится (см. ниже) лишь
+    # маленькая доля (~38 в офлайн-проверке на реальных данных). Это сожгло
+    # весь 25-минутный таймаут job'а ДО начала полезной работы -- сам своп
+    # ни разу не оценивался, ничего не сохранилось (скрипт пишет результат
+    # только в конце run()). Исправлено: сначала строим token_resolution
+    # (0 сетевых вызовов, чистая проверка по уже загруженному в память реестру
+    # пулов), decimals() запрашивается ТОЛЬКО для реально резолвящихся токенов.
     token_resolution: dict = {}
     for tok in unique_tokens:
         if tok in usdg_map:
@@ -163,6 +172,13 @@ def run() -> int:
     print(f"[price_report] Разрешено цен для {n_resolved}/{len(unique_tokens)} уникальных токенов "
           f"({sum(1 for v in token_resolution.values() if v['path']=='direct_usdg')} напрямую USDG, "
           f"{sum(1 for v in token_resolution.values() if v['path']=='via_weth')} через WETH)")
+
+    dec_cache: dict = {}
+    for tok, res in token_resolution.items():
+        if res["path"] != "unresolved":
+            get_decimals(tok, dec_cache)
+    print(f"[price_report] decimals() запрошен для {len(dec_cache)} резолвящихся токенов "
+          f"(не для всех {len(unique_tokens)} уникальных -- см. комментарий выше про исправленный баг)")
 
     slot0_cache: dict = {}
     slot0_errors: dict = {}
