@@ -1,7 +1,7 @@
 {
-  "generated_at_utc": "2026-09-17T13:21:45Z",
+  "generated_at_utc": "2026-09-17T13:26:39Z",
   "n_pools_tvl_and_h1_active": 148,
-  "latest_block": 65399051,
+  "latest_block": 65401800,
   "pair_discovery": {
     "n_resolved_pools": 143,
     "n_token_groups": 101,
@@ -10,30 +10,105 @@
   },
   "n_pairs_total": 67,
   "gas_assumption": {
-    "real_eth_gasPrice_wei": 48504000,
+    "real_eth_gasPrice_wei": 50742000,
     "real_cycle_gas_used_samples": [
       378848,
       186163,
       290261
     ],
     "median_gas_used": 290261,
-    "native_usd_price": 2453.919308658928,
-    "gas_cost_usd_per_cycle": 0.03454828712214628,
+    "native_usd_price": 2451.185855589352,
+    "gas_cost_usd_per_cycle": 0.03610210375542192,
     "source": "data/task5_arb_suspect_audit_3tx_result.json (реальные multi-leg-своп tx на этой цепи) + текущий eth_gasPrice"
   },
   "window": {
-    "from_block": 65393092,
-    "to_block": 65399051,
+    "from_block": 65395841,
+    "to_block": 65401800,
     "window_blocks_intended": 5959,
     "window_minutes_intended": 10.0
   },
   "batching_supported": true,
-  "n_blocks_scanned": 10,
-  "partial_coverage_reason": "batching отказал на блоке 65393102 -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)",
-  "n_opportunities_found": 0,
-  "median_size_usd": null,
-  "n_lived_more_than_1_block": 0,
-  "episodes_sample_first_30": [],
-  "verdict": "ЗАКРЫТА -- 0 живущих дольше 1 блока, возможностей вообще не найдено",
-  "total_runtime_s": 105.82473492622375
+  "n_blocks_scanned": 3,
+  "partial_coverage_reason": "batching (чанками по 40) отказал на блоке 65395844 -- честно останавливаемся, не переходим на sequential (было бы на порядки медленнее)",
+  "n_opportunities_found": 5,
+  "median_size_usd": 0.009001301338224521,
+  "median_lifetime_blocks": 2,
+  "n_lived_more_than_1_block": 5,
+  "max_size_usd": 0.06856268331787774,
+  "max_lifetime_blocks": 3,
+  "episodes_sample_first_30": [
+    {
+      "start_block": 65395841,
+      "size_usd_at_start": 0.06856268331787774,
+      "n_blocks": 3,
+      "peak_usd": 0.06858240667514648,
+      "end_block": 65395843,
+      "note": "не закрылась к концу окна -- урезана окном",
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v4_diff_fee",
+      "pool_a": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+      "pool_b": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142"
+    },
+    {
+      "start_block": 65395841,
+      "size_usd_at_start": 0.06530673993529748,
+      "n_blocks": 2,
+      "peak_usd": 0.06530673993529748,
+      "end_block": 65395842,
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v4_diff_fee",
+      "pool_a": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+      "pool_b": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142"
+    },
+    {
+      "start_block": 65395841,
+      "size_usd_at_start": 0.009001301338224521,
+      "n_blocks": 2,
+      "peak_usd": 0.009001301338224521,
+      "end_block": 65395842,
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v4_diff_fee",
+      "pool_a": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+      "pool_b": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142"
+    },
+    {
+      "start_block": 65395841,
+      "size_usd_at_start": 0.0040787703708040565,
+      "n_blocks": 2,
+      "peak_usd": 0.0040787703708040565,
+      "end_block": 65395842,
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v4_diff_fee",
+      "pool_a": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+      "pool_b": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142"
+    },
+    {
+      "start_block": 65395841,
+      "size_usd_at_start": 0.0017650743497785101,
+      "n_blocks": 2,
+      "peak_usd": 0.0017650743497785101,
+      "end_block": 65395842,
+      "token_pair": [
+        "robinhood_0x0000000000000000000000000000000000000000",
+        "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168"
+      ],
+      "pair_type": "v4_diff_fee",
+      "pool_a": "0x8dae3fd4176dc44ff6d85b90b5e532a5423d632f935ac0005d29daf70adfd447",
+      "pool_b": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142"
+    }
+  ],
+  "verdict": "ЖИВЫЕ 2+ БЛОКА ЕСТЬ -- разбирать отдельно",
+  "total_runtime_s": 93.19233274459839
 }
