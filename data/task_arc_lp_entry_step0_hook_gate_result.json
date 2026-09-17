@@ -1,0 +1,43 @@
+{
+  "probed_at_utc": "2026-09-17T00:33:00Z",
+  "hook_ranking_meta": {
+    "source_file": "task_arc_lp_census_from_local_files_result.json",
+    "shape_note": "использовано готовое поле 'top_hooks_in_sample' (8 реальных хуков после фильтра address(0)/unknown)"
+  },
+  "hooks_examined": [
+    "0x20eead6db6b3d0a4491e9073119dd0ebff166acc",
+    "0xb72cddfb8db9a3840d9f451d2d088046a6eb0144",
+    "0xd5601b6a530fe8fcc7af21bf93e58197064120cc",
+    "0x158c37513a866f97a6cb7da05ca9a6e68bb46044",
+    "0x285f3cc5eaf62ae51e14ea6a54885e60518245c7",
+    "0x7bb065b180194cd1bdeb60f275d7f1ee7b5fa044",
+    "0x863233bec01b92f137677e0cdf69bce697a26044",
+    "0x110c4ae6dfd0376cab3b5367256b4c56fe2de044",
+    "0x47e7936ae9891e61c5123db720593c05de7120cc",
+    "0xb6a65950534f061618b4ae102fbcbb8541a8e0cc"
+  ],
+  "n_bit_open": 8,
+  "n_bit_set_unclear": 2,
+  "n_closed": 0,
+  "unclear_hooks_detail": {
+    "0x20eead6db6b3d0a4491e9073119dd0ebff166acc": {
+      "flags": {
+        "before_add_liquidity": true,
+        "after_add_liquidity": false
+      },
+      "revert_selector": "0x54e3ca0d",
+      "revert_selector_decoded": "ManagerLocked() -- подтверждено вычислением keccak256(\"ManagerLocked()\")[:4], точное совпадение -- это ОБЩИЙ гейт onlyWhenUnlocked, НЕ специфичная для хука ошибка"
+    },
+    "0x285f3cc5eaf62ae51e14ea6a54885e60518245c7": {
+      "flags": {
+        "before_add_liquidity": false,
+        "after_add_liquidity": true
+      },
+      "revert_selector": "0x54e3ca0d",
+      "revert_selector_decoded": "ManagerLocked() -- то же самое подтверждение"
+    }
+  },
+  "summary_line": "открыта у 8 из 10, закрыта у 0, неясно у 2",
+  "conclusion": "Ни один из 10 проверенных хуков (8 реальных из 99-пуловой выборки + 2 форсированных: хук-казна площадки 0x47e79...20cc и крупнейший по покрытию 0xb6a659...e0cc) не даёт структурно ЗАКРЫТО. Для 2 хуков с установленным битом (aka.fun и один малый) реальный eth_call дал ManagerLocked() -- подтверждено декодом селектора -- это общий гейт PoolManager, не специфичная для хука блокировка. ЛИНИЯ НЕ МЕРТВА по этому основанию -- продолжаем Шаги 1-3.",
+  "honest_caveat": "Ранжир хуков взят из 99-пуловой выборки (не полного реестра 24567) -- реальных данных о хуках с большим покрытием, кроме форсированных 2, не найдено в закоммиченных/VPS файлах на момент проверки."
+}

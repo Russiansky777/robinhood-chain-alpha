@@ -1,0 +1,128 @@
+{
+  "probed_at_utc": "2026-09-17T00:34:06Z",
+  "notional_usdc": 200.0,
+  "random_seed": 20260917,
+  "n_candidates": 500,
+  "latest_block": 21243186,
+  "n_eligible_per_T": {
+    "3": 7,
+    "6": 2,
+    "12": 1,
+    "24": 0
+  },
+  "table_T_by_H": {
+    "3": {
+      "1": {
+        "n": 7,
+        "n_no_trading_in_window": 4,
+        "median_return_pct_OPTIMISTIC": 0.0,
+        "median_return_pct_PESSIMISTIC": -50.0,
+        "pct_profitable_OPTIMISTIC": 28.57142857142857,
+        "pct_profitable_PESSIMISTIC": 0.0
+      },
+      "3": {
+        "n": 7,
+        "n_no_trading_in_window": 2,
+        "median_return_pct_OPTIMISTIC": 0.0005924594612451983,
+        "median_return_pct_PESSIMISTIC": -50.06786472975032,
+        "pct_profitable_OPTIMISTIC": 57.14285714285714,
+        "pct_profitable_PESSIMISTIC": 0.0
+      },
+      "6": {
+        "n": 7,
+        "n_no_trading_in_window": 2,
+        "median_return_pct_OPTIMISTIC": -0.0005258611326439677,
+        "median_return_pct_PESSIMISTIC": -50.82389043311735,
+        "pct_profitable_OPTIMISTIC": 14.285714285714285,
+        "pct_profitable_PESSIMISTIC": 0.0
+      }
+    },
+    "6": {
+      "1": {
+        "n": 2,
+        "n_no_trading_in_window": 1,
+        "median_return_pct_OPTIMISTIC": -0.426564979354417,
+        "median_return_pct_PESSIMISTIC": -56.61683409672347,
+        "pct_profitable_OPTIMISTIC": 0.0,
+        "pct_profitable_PESSIMISTIC": 0.0
+      },
+      "3": {
+        "n": 2,
+        "n_no_trading_in_window": 1,
+        "median_return_pct_OPTIMISTIC": 0.339206891883741,
+        "median_return_pct_PESSIMISTIC": -56.25514653954273,
+        "pct_profitable_OPTIMISTIC": 50.0,
+        "pct_profitable_PESSIMISTIC": 0.0
+      },
+      "6": {
+        "n": 1,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": 0.6784086363617803,
+        "median_return_pct_PESSIMISTIC": -62.51030063737139,
+        "pct_profitable_OPTIMISTIC": 100.0,
+        "pct_profitable_PESSIMISTIC": 0.0
+      }
+    },
+    "12": {
+      "1": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      },
+      "3": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      },
+      "6": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      }
+    },
+    "24": {
+      "1": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      },
+      "3": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      },
+      "6": {
+        "n": 0,
+        "n_no_trading_in_window": 0,
+        "median_return_pct_OPTIMISTIC": null,
+        "median_return_pct_PESSIMISTIC": null,
+        "pct_profitable_OPTIMISTIC": null,
+        "pct_profitable_PESSIMISTIC": null
+      }
+    }
+  },
+  "capacity_T24h": {
+    "n": 0,
+    "median_usdc": null,
+    "max_usdc": null
+  },
+  "best3_T24_H6": [],
+  "preregistered_verdict": "НЕТ",
+  "total_rpc_calls": 2441,
+  "honest_caveat_small_n": "n на каждый T крайне мал (7/2/1/0 из 500 случайных кандидатов) -- статистически тонкое основание для точных чисел. НО структура результата (пессимистичная медиана стабильно -50..-62% с 0% прибыльных ВО ВСЕХ 6 комбинациях T x H) -- не шум отбора, а прямое следствие механизма: у свежего пула ликвидность растёт с нуля, половина капитала (не-USDC сторона) часто оказывается в токене, который перестаёт торговаться -- при пессимистичной оценке (нельзя продать) это систематически даёт ~-50% на КАЖДОМ пуле, где не-USDC сторона умерла, независимо от конкретного T. При T=24ч ИЗ 500 СЛУЧАЙНЫХ ПУЛОВ НИ ОДИН не прошёл фильтр входа (liquidity>0 И feeGrowth рос в час перед T И TVL>=$500) -- это самостоятельная, важная находка: пулы, доживающие с реальной торговлей и TVL до суток, в случайной выборке практически не встречаются."
+}
