@@ -1,0 +1,88 @@
+name: "Задача 5 -- честный замер доставки до секвенсера, n=30-50 (не n=1)"
+
+# Владелец, 2026-09-17: вывод "блок+1 недостижим" стоял на ОДНОМ замере
+# доставки (356мс, n=1) -- недостаточно, чтобы отличить настоящую
+# медиану от разового выброса холодного соединения. Этот workflow
+# запускает analysis/task5_delivery_latency_n50.py на NL VPS
+# (keep-alive HTTP-соединение, 30-50 невалидных отправок nonce=10**9,
+# интервал 1-2с, разбивка DNS/TCP/TLS/запрос), затем ЗАБИРАЕТ реальный
+# результат обратно в git (тот же паттерн, что
+# run_fetch_vps_position_state.yml) -- точечный git checkout скрипта на
+# VPS БЕЗ смены HEAD, ничего не коммитится на самом VPS.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA, из которого точечно берётся analysis/ (НЕ меняет HEAD рабочего дерева VPS).'
+        required: true
+        type: string
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/DELIVERY_LATENCY_N50_REQUEST"
+
+jobs:
+  delivery_latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout analysis/ на VPS + запуск замера доставки (30-50 отправок, ~1-1.5 мин)"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_delivery_latency_n50.py
+            '
+          "
+
+      - name: Забрать data/task5_delivery_latency_n50_result.json с VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/task5_delivery_latency_n50_result.json' > /tmp/delivery_result.json
+          [ -s /tmp/delivery_result.json ]
+          cp /tmp/delivery_result.json data/task5_delivery_latency_n50_result.json
+          python3 -c "import json; d=json.load(open('data/task5_delivery_latency_n50_result.json')); print(json.dumps({'stats_excluding_first': d['stats_excluding_first'], 'stats_warm_reused_connection_only': d['stats_warm_reused_connection_only'], 'first_attempt_round_trip_ms': (d.get('first_attempt') or {}).get('round_trip_ms'), 'n_ok': d['n_ok']}, indent=2, ensure_ascii=False))"
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/DELIVERY_LATENCY_N50_REQUEST
+          [ -e data/task5_delivery_latency_n50_result.json ] && git add data/task5_delivery_latency_n50_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: замер доставки до секвенсера n=30-50, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
