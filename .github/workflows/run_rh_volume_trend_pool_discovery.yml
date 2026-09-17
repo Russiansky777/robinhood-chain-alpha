@@ -1,0 +1,47 @@
+name: "Тренд по цепи -- этап A: открытие реальных пулов (GeckoTerminal + on-chain fee)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/RH_VOLUME_TREND_POOL_DISCOVERY_REQUEST"
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "GeckoTerminal top pools + фильтры TVL/3д торговля + реальная комиссия с цепи"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          ALCHEMY_ROBINHOOD_RPC_URL: ${{ secrets.ALCHEMY_ROBINHOOD_RPC_URL }}
+        run: python -u analysis/rh_volume_trend_pool_discovery.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/RH_VOLUME_TREND_POOL_DISCOVERY_REQUEST
+          [ -e data/rh_volume_trend_pool_discovery_result.json ] && git add data/rh_volume_trend_pool_discovery_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Тренд по цепи: этап A -- открытие пулов, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
