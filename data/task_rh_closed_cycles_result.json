@@ -1,0 +1,123 @@
+{
+  "probed_at_utc": "2026-09-17T20:15:18Z",
+  "latest_block": 65645405,
+  "v2_probe": {
+    "n_found": 0,
+    "n_distinct_pool_addresses": 0,
+    "range": [
+      65640405,
+      65645405
+    ],
+    "runtime_s": 1.393219232559204,
+    "note": "V2-стиль НЕ обнаружен в пробе за это окно -- согласуется с более ранним наблюдением сессии, что v3+v4 доминируют по объёму на этой цепи."
+  },
+  "pool_discovery": {
+    "n_v3_pools": 40819,
+    "n_v4_pools": 0,
+    "runtime_s": 373.9845321178436,
+    "hit_deadline": true,
+    "scan_range": [
+      0,
+      65645405
+    ]
+  },
+  "sanity_check_known_txs": {
+    "checked": [
+      {
+        "tx_hash": "0x2264176a23d8ced039d386829c709ce3b3ec335427582179fb7aaedcff4de245",
+        "n_v3_swap_logs": 0,
+        "n_v4_swap_logs": 3,
+        "topology_filter": {
+          "n_multi_leg_txs": 1,
+          "n_unresolved_pool_skipped": 1,
+          "n_ambiguous_leg_skipped": 0,
+          "n_topology_candidates": 0
+        },
+        "topology_candidate_found": false
+      },
+      {
+        "tx_hash": "0xd487122244e6c89a0c7b91d48111720575294a6cfeceedfaa3cf105b1fb996d0",
+        "n_v3_swap_logs": 0,
+        "n_v4_swap_logs": 2,
+        "topology_filter": {
+          "n_multi_leg_txs": 1,
+          "n_unresolved_pool_skipped": 1,
+          "n_ambiguous_leg_skipped": 0,
+          "n_topology_candidates": 0
+        },
+        "topology_candidate_found": false
+      },
+      {
+        "tx_hash": "0xa1733a2816fe30fbd3de9c8fedbcbe43f54c3dfdbe274bf838eba1f66a2c2236",
+        "n_v3_swap_logs": 2,
+        "n_v4_swap_logs": 1,
+        "topology_filter": {
+          "n_multi_leg_txs": 1,
+          "n_unresolved_pool_skipped": 1,
+          "n_ambiguous_leg_skipped": 0,
+          "n_topology_candidates": 0
+        },
+        "topology_candidate_found": false
+      }
+    ]
+  },
+  "swap_scan": {
+    "from_block": 65585406,
+    "to_block": 65645405,
+    "window_blocks": 60000,
+    "n_steps": 30,
+    "runtime_s": 702.834673166275,
+    "n_v3_swap_events": 167687,
+    "n_v4_swap_events": 288761,
+    "hit_time_budget": true,
+    "hit_window_cap": false
+  },
+  "topology_filter": {
+    "n_multi_leg_txs": 95958,
+    "n_unresolved_pool_skipped": 94334,
+    "n_ambiguous_leg_skipped": 0,
+    "n_topology_candidates": 4
+  },
+  "verification": {
+    "n_candidates": 4,
+    "n_receipts_checked": 4,
+    "n_receipts_capped_by_budget": 0,
+    "n_receipt_missing_or_reverted": 0,
+    "n_verified_real_cycles": 0
+  },
+  "lifetime_measurement_meta": {
+    "n_targets": 0,
+    "n_measured": 0,
+    "n_capped_by_budget": 0,
+    "lifetime_forward_blocks_cap": 20,
+    "method": "маргинальная спот-цена (slot0 v3 / extsload v4), тот же принцип, что rh_arb_our_share.py, применённый к реально найденному маршруту цикла, блоки cycle_block+1..+cap"
+  },
+  "verified_cycles": [],
+  "summary": {
+    "window_scanned": {
+      "from_block": 65585406,
+      "to_block": 65645405,
+      "window_blocks": 60000,
+      "n_steps": 30,
+      "runtime_s": 702.834673166275,
+      "n_v3_swap_events": 167687,
+      "n_v4_swap_events": 288761,
+      "hit_time_budget": true,
+      "hit_window_cap": false
+    },
+    "n_cycles_total": 0,
+    "n_legs_histogram": {},
+    "n_cycles_3plus_legs": 0,
+    "frac_cycles_3plus_legs": null,
+    "profit_usd_net_median_2leg": null,
+    "profit_usd_net_median_3plus": null,
+    "n_priced_2leg": 0,
+    "n_priced_3plus": 0,
+    "lifetime_blocks_median_2leg": null,
+    "lifetime_blocks_median_3plus": null,
+    "n_lifetime_measured_2leg": 0,
+    "n_lifetime_measured_3plus": 0,
+    "total_runtime_s": 1083.0569343566895
+  },
+  "HONEST_ANSWER": "0 верифицированных реальных замкнутых циклов найдено в окне [65585406;65645405] (60000 блоков, выборка, не полная история цепи). Это честный результат за это окно, не утверждение про всю историю Robinhood Chain."
+}
