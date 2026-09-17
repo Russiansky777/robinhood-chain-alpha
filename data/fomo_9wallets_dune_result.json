@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-17T01:58:55Z",
+  "generated_at_utc": "2026-09-17T02:04:36Z",
   "wallets": {
     "SolSwizzle": "0x44fbe0006661d6d17188f1f6d42b32b5577179f7",
     "ether_monk": "0x2408ce75d217e3a70d6ca370c78c1b34d706f5a0",
@@ -258,6 +258,102 @@
       "data_type": "bigint",
       "table_name": "transactions",
       "table_schema": "robinhood"
+    },
+    {
+      "column_name": "contract_address",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_tx_hash",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_tx_from",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_tx_to",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_tx_index",
+      "data_type": "integer",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_index",
+      "data_type": "bigint",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_block_time",
+      "data_type": "timestamp(3)",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_block_number",
+      "data_type": "bigint",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "evt_block_date",
+      "data_type": "date",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "amount0",
+      "data_type": "int256",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "amount1",
+      "data_type": "int256",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "liquidity",
+      "data_type": "uint256",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "recipient",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "sender",
+      "data_type": "varbinary",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "sqrtpricex96",
+      "data_type": "uint256",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
+    },
+    {
+      "column_name": "tick",
+      "data_type": "integer",
+      "table_name": "uniswapv3pool_evt_swap",
+      "table_schema": "uniswap_v3_robinhood"
     }
   ],
   "prices_usd_columns": [
@@ -268,10 +364,42 @@
     "price",
     "symbol"
   ],
-  "step1_smoke": {
+  "v3_table_used": "uniswapv3pool_evt_swap",
+  "v3_columns_found": [
+    "amount0",
+    "amount1",
+    "contract_address",
+    "evt_block_date",
+    "evt_block_number",
+    "evt_block_time",
+    "evt_index",
+    "evt_tx_from",
+    "evt_tx_hash",
+    "evt_tx_index",
+    "evt_tx_to",
+    "liquidity",
+    "recipient",
+    "sender",
+    "sqrtpricex96",
+    "tick"
+  ],
+  "fomo9_v4_smoke": {
     "n_rows": 0,
-    "cost": 8.790192308,
-    "sample_first_5": []
+    "cost": 13.516346154
   },
-  "decision": "0 строк по tx_from -- линия закрыта на этом источнике (v4), дальше не тратим"
+  "fomo9_v4_full": {
+    "n_rows": 0,
+    "cost": 0,
+    "skipped": "смоук дал 0 строк"
+  },
+  "fomo9_v3_smoke": {
+    "n_rows": 0,
+    "cost": 10.69173077
+  },
+  "fomo9_v3_full": {
+    "n_rows": 0,
+    "cost": 0,
+    "skipped": "смоук дал 0 строк"
+  },
+  "decision": "0 строк по tx_from на ОБЕИХ схемах (v3 и v4) -- линия закрыта"
 }
