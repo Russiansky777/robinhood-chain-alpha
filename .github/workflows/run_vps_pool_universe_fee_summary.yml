@@ -2,6 +2,11 @@ name: "Срочно 2 -- честная сводка по комиссии ре�
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_POOL_UNIVERSE_FEE_SUMMARY_REQUEST"
 
 jobs:
   summary:
