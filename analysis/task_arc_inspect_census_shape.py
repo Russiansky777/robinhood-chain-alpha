@@ -35,13 +35,11 @@ def describe(obj, prefix="", depth=0, max_depth=3):
 def main() -> None:
     root = find_repo_root()
     data_dir = root.joinpath("data")
-    for name in ["task_arc_lp_census_from_local_files_result.json", "task_arc_lp_fee_census_v2_result.json",
-                 "task_arc_lp_fee_census_v2_cheap_result.json"]:
-        p = data_dir.joinpath(name)
-        print(f"=== {name} exists={p.exists()} ===")
-        if p.exists():
-            obj = json.loads(p.read_text())
-            describe(obj)
+    p = data_dir.joinpath("task_arc_lp_census_from_local_files_result.json")
+    obj = json.loads(p.read_text())
+    for key in ("top_hooks_in_sample", "n_unique_hooks_in_sample", "top3_hooks_share_of_sample", "profit_receiver_hook_in_sample"):
+        print(f"=== {key} ===")
+        print(json.dumps(obj.get(key), indent=2, ensure_ascii=False, default=str)[:3000])
         print()
 
 
