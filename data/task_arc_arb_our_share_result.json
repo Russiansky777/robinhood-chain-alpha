@@ -1,0 +1,87 @@
+{
+  "CORRECTED_VERDICT_2026_09_17": "Автоматически вычисленный вердикт скрипта ('НЕ РЕШЕНО') не соответствует предрегистрации владельца: 'Возможностей нет (все закрываются в том же блоке) -> линия закрыта'. Реально n_lived_more_than_1_block=0 при n_opportunities_found=84 -- ВСЕ 84 реальные возможности закрываются в ТОМ ЖЕ блоке, где появились (median_lifetime_blocks=1, max_lifetime_blocks=1). По предрегистрации это ЗАКРЫТА, не 'не решено' -- скрипт проверял только n_opportunities_found==0, а не честный критерий владельца (0 живущих 2+ блока). См. docs/PROJECT_STATE.md.",
+  "probed_at_utc": "2026-09-17T01:29:23Z",
+  "part_a_unclosed_opportunities": {
+    "registry_meta": {
+      "source": "/home/bot/robinhood-chain-alpha/data/task_arc_recon_pools_result.json",
+      "n_pools_in_registry": 24567,
+      "n_tokens_with_multiple_usdc_pools": 566,
+      "n_candidate_tokens_total": 566
+    },
+    "prescreen_meta": {
+      "n_candidates_examined": 33,
+      "n_rejected_dead_or_boundary": 23,
+      "rejected_tokens": [
+        "0xa163d7624da3b5d9182c50eab5b8cd247ae861bb",
+        "0xfd9c19b0c456496a6540c356fd602db15718ea55",
+        "0xc7919129b900bc707d932aa2f6c1d31b091f8957",
+        "0xc84cc66f9f458ab65c610845406f313e4a050e76",
+        "0x9dd7e2a8da22b7758dbd8e6574225c5c6f7175bb",
+        "0x2943bee4c4e9345fec8c6edf096148f5c6d7b359",
+        "0xd034b153bd7b7eabac08fb683dbaba1ca7089c93",
+        "0x1b8acd652479ff01ada5373b9b794a532dd8c0f9",
+        "0x8e98a62a995a50eca9979bfa016f91bf36a8f9d9",
+        "0xf69107f86db2b9816feea959b20afdd72950a612",
+        "0x3d7b8ecca7f752d10798270a56bf03c13129989f",
+        "0xe8c43fb35154e7d94c70200c7ee674ee1821ca27",
+        "0x980eaea6db2d3ff23b37a431d96922005763419d",
+        "0x5f1101ab8cf445342ea55855749b07e989233351",
+        "0x9867a77abd987221d1dd1cefb209b526a06ca589",
+        "0x1d382e7912dd8574e539ed5b3feef699f64fa073",
+        "0x7f9cb595fbb7fd46dc9755131ebb9a97c5c14258",
+        "0xb05625b2ef105a1cd2e07ff7fc5c9bceeb94ba96",
+        "0x3c16ad01b52bd684f63f3ab4a1fa84dfc6b8473f",
+        "0xc5996c49bccd4e8e20c6f9748ade6f50ea1d4643",
+        "0x4d370690cd4013e2fc3e452fecc6c56427e22c9e",
+        "0x7bf3fd887bac777e5452fa4de3e2de4c58705d6e",
+        "0xa6f3d187f01c0484aa1f9b82695e69539dcfe2f1"
+      ],
+      "n_qualified": 10
+    },
+    "n_pairs_selected": 10,
+    "batching_supported": true,
+    "latest_block": 21249741,
+    "gas_assumption": {
+      "real_eth_gasPrice_wei": 20002494715,
+      "real_median_gas_used_2leg_cycle": 149502,
+      "gas_cost_usdc_per_arb_tx": 0.00299041296488193,
+      "source": "eth_gasPrice текущий + медиана 5 реальных gasUsed из task_arc_arb_profit_gas_reconcile_result.json"
+    },
+    "window": {"from_block": 21242627, "to_block": 21249741, "n_blocks_requested": 7114},
+    "n_blocks_scanned": 7115,
+    "n_opportunities_found": 84,
+    "median_size_usdc": 169.96588788720243,
+    "median_lifetime_blocks": 1.0,
+    "n_lived_more_than_1_block": 0,
+    "max_size_usdc": 300.10796526257417,
+    "max_lifetime_blocks": 1,
+    "honest_caveat": "First-order оценка: относительный разрыв цены минус относительные комиссии, при референсном размере $200 -- предполагает размер пренебрежимо мал относительно ликвидности пулов (price impact исполняющего свопа НЕ учтён). Газ -- реальный текущий eth_gasPrice x медианный реальный gasUsed 5 уже измеренных 2-плечевых циклов, не гипотетическое число.",
+    "note_two_tokens_dominate_sample": "В видимых 20 из 84 эпизодов участвуют только 2 из 10 пар (0xcec9...b0517 и 0x9575...2a742), причём на ОДИНАКОВЫХ номерах блоков у обеих -- похоже на общие всплески активности на цепи (не проверено дальше, не входило в объём задания)."
+  },
+  "part_b_our_latency": {
+    "test_wallet_address": "0xbe686Dfdc19a499688c49aF946D38FD91BE3AC18",
+    "test_wallet_note": "свежесгенерированный одноразовый ключ, НЕ PRIVATE_KEY_NOX, без фондирования",
+    "block_to_ready_to_send": {
+      "n_samples": 15,
+      "median_total_ms": 499.76348876953125,
+      "p90_total_ms": 759.9717617034912,
+      "median_block_detect_ms": 452.06618309020996,
+      "median_state_read_ms": 52.12879180908203,
+      "median_local_calc_ms": 0.000476837158203125,
+      "median_sign_ms": 3.665924072265625,
+      "note_outlier": "Один из 15 сэмплов дал block_detect_ms=949 (реальный джиттер поллинга, честно включён в p90, не отброшен как выброс)."
+    },
+    "invalid_nonce_send_roundtrip": {
+      "n_samples": 10,
+      "median_ms": 55.06610870361328,
+      "p90_ms": 123.77824783325195,
+      "note": "Гарантированно НЕ исполнится (nonce ~10^9), 0 реальных средств потрачено -- измеряет только сетевую/узловую задержку ответа.",
+      "IMPORTANT_CAVEAT": "ВСЕ 10 из 10 попыток получили ошибку -32005 'rate limit exceeded', НЕ обычный revert по nonce -- значит eth_sendRawTransaction на публичном RPC Arc САМ подпадает под тот же пульсирующий рейт-лимит, что и eth_getLogs (НЕ безлимитен, как eth_call/eth_blockNumber/eth_getTransactionCount). Эти 45-128мс -- время до ОТВЕТА ОБ ОТКАЗЕ по рейт-лимиту, НЕ время до реального приёма транзакции узлом. Реальная задержка приёма настоящей (не рейт-лимитированной) транзакции этим методом НЕ измерена -- честно не измерено, не выдумано."
+    }
+  },
+  "budget_ms": 506.0,
+  "script_auto_verdict_DO_NOT_USE": "ВОПРОС ИНФРАСТРУКТУРЫ (возможности есть, путь не укладывается)",
+  "corrected_preregistered_verdict": "ЗАКРЫТА -- все 84 найденные возможности закрываются в том же блоке (n_lived_more_than_1_block=0), совпадает с предрегистрацией владельца дословно",
+  "total_rpc_calls": 7321,
+  "total_rpc_calls_note": "Счётчик считает HTTP round trips, не под-запросы внутри batch -- один batched eth_call на N пулов считается за 1, не за N, потому что это одна реальная сетевая операция."
+}

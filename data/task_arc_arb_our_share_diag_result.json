@@ -1,0 +1,14 @@
+{
+  "note": "Диагностика причины абсурдного значения 2.3e79 в первом (отклонённом) прогоне task_arc_arb_our_share.py. Токен 'Minara' (0xa163d7624da3b5d9182c50eab5b8cd247ae861bb, decimals=18, real symbol confirmed via live eth_call). Два пула против USDC:",
+  "token": "0xa163d7624da3b5d9182c50eab5b8cd247ae861bb",
+  "token_symbol_live": "Minara",
+  "token_decimals_live": 18,
+  "pool_A": "0x7f7e2f6d88eb8ce9c08a9906b6402a99d9f68003d33a2b3c909d20026e609c32",
+  "pool_B": "0xec409959e32bc7d29d969165e9eae8b6225f50c0ac2b38df3783320a419663ca",
+  "pool_A_sqrt_price_x96": 4295128740,
+  "pool_A_note": "= MIN_SQRT_RATIO + 1 (TickMath) -- пул выкачан до нижней границы диапазона тика",
+  "pool_B_sqrt_price_x96": 1461446703485210103287273052203988822378723970341,
+  "pool_B_note": "= MAX_SQRT_RATIO - 1 (TickMath) -- пул выкачан до верхней границы диапазона тика",
+  "same_at_neighbor_block": true,
+  "conclusion": "Оба пула полностью выкачаны в противоположные стороны -- реальной ликвидности между ними нет, 'разрыв цены' -- артефакт мёртвых пулов, не настоящая арбитражная возможность. Исправлено в task_arc_arb_our_share.py через prescreen_liquid_pairs (проверка liquidity>0 и не-граничной цены ДО часового скана)."
+}
