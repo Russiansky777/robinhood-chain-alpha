@@ -57,8 +57,15 @@ OUT_PATH = Path("data/rh_volume_trend_pool_discovery_result.json")
 
 TVL_MIN_USD = 5000.0
 EXCLUDED_FEE_PIPS = 110000
-MAX_PAGES = 10
-GT_REQUEST_INTERVAL_S = 1.2  # честная задержка -- публичный free-tier GT, без ключа
+DYNAMIC_FEE_FLAG = 0x800000  # линия Fomo, эта сессия -- флаг хук-управляемой комиссии, НЕ число
+# ЧЕСТНАЯ ПРАВКА ("Срочно 2", 2026-09-17): прежние MAX_PAGES=10/interval=1.2с
+# останавливали пагинацию на HTTP 429 уже на странице 6 (100 пулов) -- аудит
+# воронки (rh_pool_universe_funnel_audit.py) с interval=2.5с и терпеливым
+# бэкоффом на 429 реально дошёл до страницы 11 (200 пулов) прежде чем
+# упереться в лимит -- те же настройки перенесены сюда для обоих
+# потребителей модуля (разовый Задача-3 discovery И ежедневный сборщик).
+MAX_PAGES = 20
+GT_REQUEST_INTERVAL_S = 2.5  # честная задержка, поднята с 1.2с -- см. выше
 # ЧЕСТНАЯ ОГОВОРКА (найдено на реальном прогоне 35222363249, run был убит
 # по job timeout 15 минут, ничего не записав -- скрипт ПЕРВОЙ версии не
 # имел внутреннего бюджета времени, вопреки установленному в этой сессии
@@ -69,8 +76,8 @@ GT_REQUEST_INTERVAL_S = 1.2  # честная задержка -- публичн
 # нестабильном ответе исторический eth_getLogs может стоить секунды-
 # десятки секунд КАЖДЫЙ -- бюджет и чекпоинты обязательны, как и везде в
 # этой сессии.
-OHLCV_STAGE_TIME_BUDGET_S = 300.0
-FEE_RESOLUTION_TIME_BUDGET_S = 300.0
+OHLCV_STAGE_TIME_BUDGET_S = 700.0  # поднято с 300с ("Срочно 2") -- см. пояснение у MAX_PAGES выше
+FEE_RESOLUTION_TIME_BUDGET_S = 400.0  # поднято с 300с, тот же повод
 RPC = rpc_call_trading_path
 FEE_SELECTOR = "0xddca3f43"  # fee() -- стандартный getter Uniswap V3 pool
 SLOT0_SELECTOR = "0x3850c7bd"
@@ -105,14 +112,24 @@ def resolve_real_fee(address: str, latest_block: int) -> dict:
         info = fetch_initialize_event(address, to_block=latest_block)
         if info is None:
             return {"kind": "v4_pool_id", "error": "Initialize не найден по этому pool_id"}
-        return {"kind": "v4_pool_id", "pool_id": address, "fee_pips": info["fee"], "hooks": info["hooks"],
-                "currency0": info["currency0"], "currency1": info["currency1"]}
+        raw_fee = info["fee"]
+        # ЧЕСТНАЯ НАХОДКА ("Срочно 2", 2026-09-17, аудит воронки): DYNAMIC_FEE_FLAG
+        # (0x800000=8388608) -- это флаг "комиссия управляется хуком", а не число
+        # процентов. До этой правки он хранился в fee_pips КАК ЕСЛИ БЫ был реальной
+        # комиссией (838.86%) -- 4-8 из ~23-53 пулов в реестре были так испорчены,
+        # искажая любой честный подсчёт "сколько пулов с fee>1%".
+        is_dynamic = raw_fee == DYNAMIC_FEE_FLAG
+        return {
+            "kind": "v4_pool_id", "pool_id": address,
+            "fee_pips": None if is_dynamic else raw_fee, "fee_is_dynamic": is_dynamic,
+            "hooks": info["hooks"], "currency0": info["currency0"], "currency1": info["currency1"],
+        }
     try:
         raw = RPC("eth_call", [{"to": address, "data": FEE_SELECTOR}, "latest"])
         fee = int(raw, 16) if raw and raw != "0x" else None
     except Exception as exc:  # noqa: BLE001
         return {"kind": "v3_address", "error": f"{type(exc).__name__}: {exc}"}
-    return {"kind": "v3_address", "address": address, "fee_pips": fee}
+    return {"kind": "v3_address", "address": address, "fee_pips": fee, "fee_is_dynamic": False}
 
 
 def main() -> None:

@@ -81,9 +81,25 @@ def run() -> int:
                                         "dex_id": (p.get("relationships", {}).get("dex", {}).get("data", {}) or {}).get("id")})
     print(f"[select_pools] TVL>=${TVL_MIN_USD:.0f}: {len(tvl_candidates)} кандидатов")
 
+    # ЧЕСТНАЯ НАХОДКА ("Срочно 2", 2026-09-17, аудит воронки): реестр рос лишь
+    # до 23 пулов, хотя реальная воронка (тот же метод, более терпеливая
+    # пагинация) дала 53 -- потому что бюджет OHLCV-проверки КАЖДЫЙ день
+    # тратился на ПОВТОРНУЮ проверку уже зарегистрированных пулов (список
+    # "никогда не уменьшается", повторная проверка их торговли не нужна --
+    # решение о добавлении уже принято раз и навсегда). Уже зарегистрированные
+    # пулы обновляют last_qualified_utc СРАЗУ, без похода в OHLCV -- весь
+    # бюджет уходит на ДЕЙСТВИТЕЛЬНО новые кандидаты, и реестр сможет
+    # догнать реальную воронку за несколько дней, а не топтаться на месте.
+    already_registered = [c for c in tvl_candidates if c["address"].lower() in universe["pools"]]
+    new_candidates = [c for c in tvl_candidates if c["address"].lower() not in universe["pools"]]
+    for c in already_registered:
+        universe["pools"][c["address"].lower()]["last_qualified_utc"] = now
+    print(f"[select_pools] уже в реестре (last_qualified_utc обновлён, OHLCV не тратится): {len(already_registered)}, "
+          f"новых кандидатов на проверку: {len(new_candidates)}")
+
     ohlcv_start = time.time()
     traded = []
-    for c in tvl_candidates:
+    for c in new_candidates:
         if time.time() - ohlcv_start > OHLCV_STAGE_TIME_BUDGET_S:
             print("[select_pools] бюджет OHLCV-проверки исчерпан, честно останавливаемся")
             break
@@ -95,18 +111,15 @@ def run() -> int:
         vol_1d = sum(r[5] for r in rows if len(r) > 5 and r[5] is not None)
         if vol_1d and vol_1d > 0:
             traded.append(c)
-    print(f"[select_pools] реальная торговля за сутки: {len(traded)} кандидатов")
+    print(f"[select_pools] реальная торговля за сутки (среди НОВЫХ кандидатов): {len(traded)}")
 
     latest_raw = RPC("eth_blockNumber", [])
     latest_block = int(latest_raw, 16) if latest_raw else None
 
     n_added = 0
     fee_start = time.time()
-    for c in traded:
+    for c in traded:  # traded -- ТОЛЬКО новые кандидаты, already_registered обработаны выше
         key = c["address"].lower()
-        if key in universe["pools"]:
-            universe["pools"][key]["last_qualified_utc"] = now
-            continue  # уже в реестре, тип/комиссию не резолвим заново
         if latest_block is None or time.time() - fee_start > FEE_RESOLUTION_TIME_BUDGET_S:
             continue  # честно пропускаем новые до следующего дня, а не гадаем
         fee_info = resolve_real_fee(c["address"], latest_block)
@@ -116,13 +129,16 @@ def run() -> int:
         # ключа "pool_id" (Initialize не найден -- info is None) -- такой пул
         # снимку читать нечем, честно НЕ добавляем его в реестр вместо того,
         # чтобы копить мусорную запись, которая валит снимок каждый раз.
+        # (Динамическая комиссия -- pool_id ЕСТЬ, fee_pips=None, fee_is_dynamic=
+        # True -- это НЕ повод исключать: снимку для extsload нужен только
+        # pool_id, а не число комиссии.)
         if kind == "v4_pool_id" and not fee_info.get("pool_id"):
             continue
         if kind == "v3_address" and fee_info.get("fee_pips") is None:
             continue
         universe["pools"][key] = {
             "address": c["address"], "name": c.get("name"), "dex_id": c.get("dex_id"),
-            "kind": kind, "fee_pips": fee_info.get("fee_pips"),
+            "kind": kind, "fee_pips": fee_info.get("fee_pips"), "fee_is_dynamic": fee_info.get("fee_is_dynamic", False),
             "pool_id": fee_info.get("pool_id"), "hooks": fee_info.get("hooks"),
             "currency0": fee_info.get("currency0"), "currency1": fee_info.get("currency1"),
             "first_seen_utc": now, "last_qualified_utc": now,
