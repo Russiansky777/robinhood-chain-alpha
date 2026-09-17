@@ -1,0 +1,43 @@
+name: "Срочно 2 -- честная сводка по комиссии реального реестра пулов на VPS (read-only)"
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+      - name: "Читаем реальный реестр (read-only), считаем честные бакеты по комиссии"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "sudo -u bot bash -s" <<'REMOTE'
+          set -e
+          python3 -c "
+          import json
+          d = json.load(open('/home/bot/trend_collector_live_data/pool_universe.json'))
+          pools = d['pools']
+          n_total = len(pools)
+          n_dynamic = sum(1 for p in pools.values() if p.get('fee_is_dynamic'))
+          resolved = [p.get('fee_pips') for p in pools.values() if not p.get('fee_is_dynamic') and p.get('fee_pips') is not None]
+          n_over_1pct = sum(1 for f in resolved if f > 10000)
+          n_11pct_excluded_already = sum(1 for p in pools.values() if p.get('fee_pips') == 110000)
+          print('n_total_pools_in_registry =', n_total)
+          print('n_dynamic_fee_unresolved =', n_dynamic)
+          print('n_resolved_numeric_fee =', len(resolved))
+          print('n_over_1pct_of_resolved =', n_over_1pct)
+          print('n_still_11pct_pips_present (should be 0, excluded at collection time) =', n_11pct_excluded_already)
+          print('sample resolved fee_pips sorted =', sorted(resolved)[:40])
+          "
+          REMOTE
