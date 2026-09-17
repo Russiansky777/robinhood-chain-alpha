@@ -53,13 +53,18 @@ ANCHOR_SIGNATURE = "2NkPm8GfVw2FYBHrbLbhUrwJGmGECYh4t89oMdCnEsnAXGK8qu4BoTfpNVKE
 ANCHOR_SLOT = 447644977
 ANCHOR_TIME = 1789600539
 # Измерено из покупок 1 и 3 этапа A (реальные слот/время), не константа с Robinhood Chain/Arc.
-MEASURED_SLOT_TIME_S = (447644977 - 447630803) / (1789600539 - 1789596037)
+# ЧЕСТНЫЙ ФИКС РЕАЛЬНОГО БАГА (первый прогон): числитель/знаменатель были
+# перепутаны -- формула ниже реально считала slots/second (3.148), а
+# переменная называлась "seconds per slot", из-за чего n_slots_needed
+# вышел в ~6.5 раз МЕНЬШЕ нужного, и "после" покрыло только 46с из 300
+# запрошенных. Верно: время/слоты = секунд НА слот (0.3176с/слот).
+MEASURED_SLOT_TIME_S = (1789600539 - 1789596037) / (447644977 - 447630803)
 
 WINDOW_S = 300  # ±5 минут
 HORIZONS_S = [30, 60, 180, 300]
 
 TIME_BUDGET_BEFORE_S = 180.0
-TIME_BUDGET_AFTER_S = 480.0  # честно больше -- getBlock тяжелее по данным, чем getSignaturesForAddress
+TIME_BUDGET_AFTER_S = 700.0  # реальный прогон: ~2.6с/блок наблюдаемо -- честный, но не безграничный бюджет
 
 
 def get_signatures_for_address(address: str, before: str | None = None, until: str | None = None,
@@ -119,9 +124,15 @@ def collect_before(t0: float) -> tuple[list[dict], dict]:
         except Exception as exc:  # noqa: BLE001
             n_errors += 1
             print(f"[narrow] before: пропуск {s['signature']}: {type(exc).__name__}: {exc}")
+    # ЧЕСТНЫЙ ФИКС (первый прогон): "сколько всего успели заглянуть назад"
+    # (может законно ПРЕВЫШАТЬ WINDOW_S, если сигнатур в 300с-окне мало --
+    # страница просто ушла дальше) -- это НЕ то же самое, что "покрыто ли
+    # окно 300с". Разделяем явно, чтобы не путать превышение с недобором.
+    raw_lookback = (ANCHOR_TIME - sigs[-1]["blockTime"]) if sigs and sigs[-1].get("blockTime") else 0
     meta = {"n_pages": n_pages, "n_signatures_in_window": len(in_window), "n_decoded": n_decoded, "n_errors": n_errors,
             "earliest_signature_blocktime_seen": sigs[-1].get("blockTime") if sigs else None,
-            "coverage_seconds_before": (ANCHOR_TIME - sigs[-1]["blockTime"]) if sigs and sigs[-1].get("blockTime") else 0}
+            "raw_lookback_seconds": raw_lookback,
+            "coverage_seconds_before": min(raw_lookback, WINDOW_S)}
     return trades, meta
 
 
