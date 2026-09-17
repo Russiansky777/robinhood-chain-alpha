@@ -1,0 +1,903 @@
+{
+  "generated_at_utc": "2026-09-17T22:38:52Z",
+  "endpoint": "https://sequencer.mainnet.chain.robinhood.com",
+  "endpoint_note": "Уже НЕ Cloudflare -- см. докстринг модуля и docs/PROJECT_STATE.md ('sequencer.mainnet.chain.robinhood.com' -- AWS EC2 us-east-2, AS16509, подтверждено ранее; другой альтернативы в открытых источниках не найдено).",
+  "dns_resolution": {
+    "dns_ms": 12.111668940633535,
+    "resolved_ips": [
+      "3.136.74.196",
+      "3.141.111.43",
+      "3.142.9.34"
+    ],
+    "error": null
+  },
+  "endpoint_asn_check": {
+    "checked": [
+      {
+        "ip": "3.136.74.196",
+        "info": {
+          "ip": "3.136.74.196",
+          "hostname": "ec2-3-136-74-196.us-east-2.compute.amazonaws.com",
+          "city": "Columbus",
+          "region": "Ohio",
+          "country": "US",
+          "loc": "39.9612,-82.9988",
+          "org": "AS16509 Amazon.com, Inc.",
+          "postal": "43215",
+          "timezone": "America/New_York",
+          "readme": "https://ipinfo.io/missingauth"
+        }
+      },
+      {
+        "ip": "3.141.111.43",
+        "info": {
+          "ip": "3.141.111.43",
+          "hostname": "ec2-3-141-111-43.us-east-2.compute.amazonaws.com",
+          "city": "Columbus",
+          "region": "Ohio",
+          "country": "US",
+          "loc": "39.9612,-82.9988",
+          "org": "AS16509 Amazon.com, Inc.",
+          "postal": "43215",
+          "timezone": "America/New_York",
+          "readme": "https://ipinfo.io/missingauth"
+        }
+      }
+    ]
+  },
+  "n_sends_requested": 40,
+  "n_sends_completed": 40,
+  "n_ok": 40,
+  "n_errors": 0,
+  "n_reconnect_events_after_first": 0,
+  "first_attempt": {
+    "req_id": 1,
+    "test_wallet_address": "0x5f41408D6958602e94be8ABEb88e85F2B930F06e",
+    "round_trip_ms": 431.8419748451561,
+    "http_status": 200,
+    "response_json": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32000,
+        "message": "insufficient funds for gas * price + value: address 0x5f41408D6958602e94be8ABEb88e85F2B930F06e have 0 want 21000000000000"
+      }
+    },
+    "response_raw_head": null,
+    "was_reused_connection": false,
+    "reconnected": false,
+    "tcp_connect_ms": 102.41089505143464,
+    "tls_handshake_ms": 95.43609898537397,
+    "n_connects_so_far": 1
+  },
+  "stats_all_ok": {
+    "n": 40,
+    "median_ms": 237.33293847180903,
+    "p50_ms": 237.33293847180903,
+    "p90_ms": 242.3684650566429,
+    "min_ms": 229.4759580399841,
+    "max_ms": 431.8419748451561,
+    "mean_ms": 241.39321334077977
+  },
+  "stats_excluding_first": {
+    "n": 39,
+    "median_ms": 237.26033698767424,
+    "p50_ms": 237.26033698767424,
+    "p90_ms": 241.9903939589858,
+    "min_ms": 229.4759580399841,
+    "max_ms": 245.8031210117042,
+    "mean_ms": 236.50991176374447
+  },
+  "stats_warm_reused_connection_only": {
+    "n": 39,
+    "median_ms": 237.26033698767424,
+    "p50_ms": 237.26033698767424,
+    "p90_ms": 241.9903939589858,
+    "min_ms": 229.4759580399841,
+    "max_ms": 245.8031210117042,
+    "mean_ms": 236.50991176374447
+  },
+  "n_warm_reused_connection_only": 39,
+  "all_attempts": [
+    {
+      "req_id": 1,
+      "test_wallet_address": "0x5f41408D6958602e94be8ABEb88e85F2B930F06e",
+      "round_trip_ms": 431.8419748451561,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x5f41408D6958602e94be8ABEb88e85F2B930F06e have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": false,
+      "reconnected": false,
+      "tcp_connect_ms": 102.41089505143464,
+      "tls_handshake_ms": 95.43609898537397,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 2,
+      "test_wallet_address": "0x9707ddce0B395D879E51F7D53c95505144ac1524",
+      "round_trip_ms": 229.4759580399841,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x9707ddce0B395D879E51F7D53c95505144ac1524 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 3,
+      "test_wallet_address": "0x544b8F36528701f9DD88CEe50770cecCC579c245",
+      "round_trip_ms": 243.1439959909767,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x544b8F36528701f9DD88CEe50770cecCC579c245 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 4,
+      "test_wallet_address": "0xbD5Ec87cc3E20196d8c0d26b7EE1a7CAE234824f",
+      "round_trip_ms": 232.39613883197308,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xbD5Ec87cc3E20196d8c0d26b7EE1a7CAE234824f have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 5,
+      "test_wallet_address": "0xC76E4619D435D131dE85d3f381b79A91Ed5625F0",
+      "round_trip_ms": 230.79332406632602,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xC76E4619D435D131dE85d3f381b79A91Ed5625F0 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 6,
+      "test_wallet_address": "0xFB8F992399697f930Ab231AE086F51f0d266bb1B",
+      "round_trip_ms": 242.5769621040672,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xFB8F992399697f930Ab231AE086F51f0d266bb1B have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 7,
+      "test_wallet_address": "0xE41D41c69632604d9c2Bd8C7bb6648a39BF5F967",
+      "round_trip_ms": 242.3684650566429,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xE41D41c69632604d9c2Bd8C7bb6648a39BF5F967 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 8,
+      "test_wallet_address": "0xFC2B909f298c07d776DC5eedc5B24e71E09b935f",
+      "round_trip_ms": 237.66454681754112,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xFC2B909f298c07d776DC5eedc5B24e71E09b935f have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 9,
+      "test_wallet_address": "0x76f767F4d0cE47895fD942C1006e3F8Aa19E1CA4",
+      "round_trip_ms": 238.08000702410936,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x76f767F4d0cE47895fD942C1006e3F8Aa19E1CA4 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 10,
+      "test_wallet_address": "0xa84D978b417E966ba8314737C1DF1d635A5fd191",
+      "round_trip_ms": 239.34034002013505,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xa84D978b417E966ba8314737C1DF1d635A5fd191 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 11,
+      "test_wallet_address": "0x060b4cB028212E5A3d41548E8FB620083c883F5F",
+      "round_trip_ms": 230.802021920681,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x060b4cB028212E5A3d41548E8FB620083c883F5F have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 12,
+      "test_wallet_address": "0x0F13db313aB6a2235aC90Ce2a7B4B879F30bF00E",
+      "round_trip_ms": 232.08885407075286,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x0F13db313aB6a2235aC90Ce2a7B4B879F30bF00E have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 13,
+      "test_wallet_address": "0x67A66B53cfD21F5558a27F306B72bE7686B4E8bB",
+      "round_trip_ms": 245.8031210117042,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x67A66B53cfD21F5558a27F306B72bE7686B4E8bB have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 14,
+      "test_wallet_address": "0x93972dB7fDbb96C7De578b1E7968D18EADfBcac6",
+      "round_trip_ms": 238.4509569965303,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x93972dB7fDbb96C7De578b1E7968D18EADfBcac6 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 15,
+      "test_wallet_address": "0x485BdB883f32de64293FC09245cE772390EA94E8",
+      "round_trip_ms": 240.3769448865205,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x485BdB883f32de64293FC09245cE772390EA94E8 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 16,
+      "test_wallet_address": "0x32c6530A51D5BF985C13641e7179f391Dd00cdF7",
+      "round_trip_ms": 238.72786993160844,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 16,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x32c6530A51D5BF985C13641e7179f391Dd00cdF7 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 17,
+      "test_wallet_address": "0x965f5B3092aa793B831Fbf51E470046470b7C3a9",
+      "round_trip_ms": 232.99620393663645,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x965f5B3092aa793B831Fbf51E470046470b7C3a9 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 18,
+      "test_wallet_address": "0x99A00035efb58a5b7B7b8719611D1e574F963FB1",
+      "round_trip_ms": 236.2206110265106,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x99A00035efb58a5b7B7b8719611D1e574F963FB1 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 19,
+      "test_wallet_address": "0xF3141849e320ee578C5c88bAfC272407Ae825f3f",
+      "round_trip_ms": 237.26033698767424,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 19,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xF3141849e320ee578C5c88bAfC272407Ae825f3f have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 20,
+      "test_wallet_address": "0x8bc580AB6fcC9bd463e0d6FA0012B1fd4a2472bb",
+      "round_trip_ms": 230.2520051598549,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x8bc580AB6fcC9bd463e0d6FA0012B1fd4a2472bb have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 21,
+      "test_wallet_address": "0xA980Db99E5E60FD2456351d84Cc12aAED5FDAeF6",
+      "round_trip_ms": 232.01378504745662,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xA980Db99E5E60FD2456351d84Cc12aAED5FDAeF6 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 22,
+      "test_wallet_address": "0xFa5490D61C186A49b5679374F1605b41d7d8BabF",
+      "round_trip_ms": 233.8611208833754,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xFa5490D61C186A49b5679374F1605b41d7d8BabF have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 23,
+      "test_wallet_address": "0xb2a27bFE8c522ebD2147CD07f34385096550241f",
+      "round_trip_ms": 235.32330407761037,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 23,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xb2a27bFE8c522ebD2147CD07f34385096550241f have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 24,
+      "test_wallet_address": "0xFD4E60588dBa8213db9678CE34D2ABfBfE5053bA",
+      "round_trip_ms": 238.5698240250349,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 24,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xFD4E60588dBa8213db9678CE34D2ABfBfE5053bA have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 25,
+      "test_wallet_address": "0xB5338EAEdAF43BD2AFA9a9560e4B60F070f4A382",
+      "round_trip_ms": 239.04161085374653,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 25,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xB5338EAEdAF43BD2AFA9a9560e4B60F070f4A382 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 26,
+      "test_wallet_address": "0xE9Ffe3391044e40631575Fbd9C4Aac03918D8D0C",
+      "round_trip_ms": 231.12282087095082,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 26,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xE9Ffe3391044e40631575Fbd9C4Aac03918D8D0C have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 27,
+      "test_wallet_address": "0x62859A645c3DeF067f366E2b55F916cfc5fBA461",
+      "round_trip_ms": 233.35832310840487,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 27,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x62859A645c3DeF067f366E2b55F916cfc5fBA461 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 28,
+      "test_wallet_address": "0xa3F000157c7DBF8d18D7Ba150101d1EF902A13d7",
+      "round_trip_ms": 235.54784408770502,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 28,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xa3F000157c7DBF8d18D7Ba150101d1EF902A13d7 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 29,
+      "test_wallet_address": "0xBDcfcf116291615541E6Ed58139B7EECD879bfB1",
+      "round_trip_ms": 236.06166103854775,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 29,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xBDcfcf116291615541E6Ed58139B7EECD879bfB1 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 30,
+      "test_wallet_address": "0x294C8B5F9aC467DF9a1EEA658E400a1F9544F113",
+      "round_trip_ms": 239.51292596757412,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 30,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x294C8B5F9aC467DF9a1EEA658E400a1F9544F113 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 31,
+      "test_wallet_address": "0x950059D67DbfcedD3602c1f68A8C60c89fa1f4fE",
+      "round_trip_ms": 232.8064269386232,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 31,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x950059D67DbfcedD3602c1f68A8C60c89fa1f4fE have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 32,
+      "test_wallet_address": "0xB773637F6B2d27700483c5a32d87dFEd58dd6709",
+      "round_trip_ms": 233.873293036595,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 32,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0xB773637F6B2d27700483c5a32d87dFEd58dd6709 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 33,
+      "test_wallet_address": "0x369FF8693C32776206dBcFE243689F1449A35CA7",
+      "round_trip_ms": 234.25497394055128,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 33,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x369FF8693C32776206dBcFE243689F1449A35CA7 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 34,
+      "test_wallet_address": "0x37e16F4f1Bd13a45e9aEbe338FA3952c7993F958",
+      "round_trip_ms": 237.40553995594382,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 34,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x37e16F4f1Bd13a45e9aEbe338FA3952c7993F958 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 35,
+      "test_wallet_address": "0x5Ca7Bb9F88f022b8a743a677B6B7a2E3C315A4A5",
+      "round_trip_ms": 238.74118411913514,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 35,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x5Ca7Bb9F88f022b8a743a677B6B7a2E3C315A4A5 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 36,
+      "test_wallet_address": "0x64fD126F45A6685245e114669C52fc067A75d23C",
+      "round_trip_ms": 241.9903939589858,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 36,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x64fD126F45A6685245e114669C52fc067A75d23C have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 37,
+      "test_wallet_address": "0x8B17950C2Dbd4af7969Ed5f4CA335fB75482d7DE",
+      "round_trip_ms": 241.23472697101533,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 37,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x8B17950C2Dbd4af7969Ed5f4CA335fB75482d7DE have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 38,
+      "test_wallet_address": "0x103186644D30c3fd9952857dFDF99E16863E5CF1",
+      "round_trip_ms": 233.28223498538136,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 38,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x103186644D30c3fd9952857dFDF99E16863E5CF1 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 39,
+      "test_wallet_address": "0x55Ee14941F83470Acd65b840EB750059cbF6c801",
+      "round_trip_ms": 237.9569890908897,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 39,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x55Ee14941F83470Acd65b840EB750059cbF6c801 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    },
+    {
+      "req_id": 40,
+      "test_wallet_address": "0x9987F296fB8Bab6A8D2709dbBA02356845346084",
+      "round_trip_ms": 239.10891194827855,
+      "http_status": 200,
+      "response_json": {
+        "jsonrpc": "2.0",
+        "id": 40,
+        "error": {
+          "code": -32000,
+          "message": "insufficient funds for gas * price + value: address 0x9987F296fB8Bab6A8D2709dbBA02356845346084 have 0 want 21000000000000"
+        }
+      },
+      "response_raw_head": null,
+      "was_reused_connection": true,
+      "reconnected": false,
+      "tcp_connect_ms": null,
+      "tls_handshake_ms": null,
+      "n_connects_so_far": 1
+    }
+  ]
+}
