@@ -1,0 +1,52 @@
+name: "Solana buyer_200 -- пилот DBot: отчёт по сделкам (данные, без торговли)"
+
+# Только чтение: GET к DBot API + чтение цепи через Alchemy. Ни одного
+# вызова на покупку/продажу здесь нет -- пилотом торгует сам владелец
+# через интерфейс DBot, эта задача только собирает данные для отчёта.
+# Не трогает основной прогон 300 покупок.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DBOT_PILOT_REPORT_REQUEST"
+
+jobs:
+  solana_dbot_pilot_report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Отчёт по пилоту DBot (только чтение)"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_dbot_pilot_report.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DBOT_PILOT_REPORT_REQUEST
+          [ -e data/solana_dbot_pilot_report.json ] && git add data/solana_dbot_pilot_report.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: отчёт по пилоту DBot [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
