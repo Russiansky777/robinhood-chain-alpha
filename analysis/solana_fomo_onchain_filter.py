@@ -39,6 +39,9 @@ PER_WALLET_TIME_BUDGET_S = 45  # обрезает гиперактивные к�
 # минуту) от обычного трейдера, не тратя на выброс весь прогон
 TIME_BUDGET_S = 18 * 60  # оставляем запас под 25-минутный workflow timeout
 COMMIT_INTERVAL_S = 90
+MIN_FIRST_ENTRIES_WEEK = 20  # владелец: верхней границы нет, только минимум -- людей за ботом всё равно копируют
+GROUP_BOUNDARY = 150  # владелец: "как наш лидер" -- см. отдельную сверку реального темпа лидера в диалоге
+MAX_FIRST_ENTRY_SAMPLES = 8  # сигнатур первых входов на кошелёк, для проверки движения цены следующим шагом
 
 
 def wallet_mint_deltas(tx: dict, wallet: str) -> dict:
@@ -73,6 +76,7 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
     partial_scan=True), а не блокирует весь проход на одном выбросе."""
     before = None
     n_sigs = n_swap_events = n_first_entries = 0
+    first_entry_samples: list[dict] = []  # для последующей проверки движения цены -- см. solana_fomo_price_after_entry.py
     started_at = time.monotonic()
     partial = False
     for _ in range(MAX_PAGES_PER_WALLET):
@@ -106,6 +110,8 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
                     continue
                 if D(deltas["pre_balances"].get(m, "0")) == 0:
                     n_first_entries += 1
+                    if len(first_entry_samples) < MAX_FIRST_ENTRY_SAMPLES:
+                        first_entry_samples.append({"signature": s["signature"], "mint": m, "block_time": bt})
         if stop:
             break
         before = batch[-1]["signature"]
@@ -117,6 +123,7 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
         "trades_solana_directly": n_swap_events > 0,
         "first_entries_last_week": n_first_entries,
         "partial_scan": partial,
+        "first_entry_samples": first_entry_samples,
     }
 
 
@@ -159,11 +166,19 @@ def main() -> None:
 
     n_direct = sum(1 for r in candidates if r.get("trades_solana_directly") is True)
     n_pending = sum(1 for r in candidates if r.get("trades_solana_directly") is None)
-    filtered = [r for r in candidates if r.get("trades_solana_directly") is True]
-    filtered.sort(key=lambda r: r.get("first_entries_last_week") or 0, reverse=True)
+    # Владелец: убрал верхнюю границу по первым входам -- люди копируют топ
+    # рейтинга не разбираясь, бот это или человек. Только минимум (20/неделю),
+    # дальше -- две группы для отдельной проверки движения цены, не отсев.
+    qualified = [r for r in candidates if r.get("trades_solana_directly") is True
+                 and (r.get("first_entries_last_week") or 0) >= MIN_FIRST_ENTRIES_WEEK]
+    qualified.sort(key=lambda r: r.get("first_entries_last_week") or 0, reverse=True)
+    group_leader_like = [r for r in qualified if (r.get("first_entries_last_week") or 0) <= GROUP_BOUNDARY]
+    group_hyperactive = [r for r in qualified if (r.get("first_entries_last_week") or 0) > GROUP_BOUNDARY]
     data["n_candidates_direct_solana"] = n_direct
     data["n_candidates_still_pending_onchain_check"] = n_pending
-    data["top_30_by_first_entries"] = filtered[:30]
+    data["n_qualified_ge_20_per_week"] = len(qualified)
+    data["group_leader_like_le_150_per_week"] = group_leader_like
+    data["group_hyperactive_gt_150_per_week"] = group_hyperactive
     CANDIDATES_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str))
     print(f"[fomo_onchain] прогон: {n_done_this_run} обработано, всего готово={len(candidates) - n_pending}/{len(candidates)}, "
           f"прямых={n_direct}", flush=True)

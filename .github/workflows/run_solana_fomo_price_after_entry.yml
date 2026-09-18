@@ -1,0 +1,50 @@
+name: "Solana buyer_200 -- движение цены после входа: обычные vs гиперактивные кандидаты"
+
+# Только чтение -- Solana RPC (Alchemy/публичный). Не трогает основной
+# прогон 300 покупок.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_FOMO_PRICE_AFTER_ENTRY_REQUEST"
+
+jobs:
+  solana_fomo_price_after_entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Движение цены после входа -- две группы"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_fomo_price_after_entry.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_FOMO_PRICE_AFTER_ENTRY_REQUEST
+          [ -e data/solana_fomo_price_after_entry_result.json ] && git add data/solana_fomo_price_after_entry_result.json
+          [ -e data/solana_buyer_200/prior/current/buyer_100/route_meta.json ] && git add data/solana_buyer_200/prior/current/buyer_100/route_meta.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: движение цены после входа -- две группы кандидатов [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
