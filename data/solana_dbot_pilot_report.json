@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-18T15:46:51Z",
+  "generated_at_utc": "2026-09-18T16:37:18Z",
   "dbot_key_present": true,
   "step1_follow_orders_raw": {
     "http_status": 200,
@@ -76,7 +76,7 @@
             "mode": "only_pnl",
             "sellAmountType": "follow_ratio",
             "xTargetRatio": null,
-            "stopLossPercent": 0.4,
+            "stopLossPercent": null,
             "stopEarnPercent": 100,
             "enabled": true,
             "sellSpeedType": "fast",
@@ -99,7 +99,7 @@
             "customFeeAndTip": false,
             "pnlOrderUseMidPrice": false
           },
-          "updateAt": 1789746336385,
+          "updateAt": 1789749198356,
           "createAt": 1789745377119,
           "walletName": "TEST1",
           "walletAddress": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
@@ -118,177 +118,95 @@
         }
       ]
     },
+    "host": "https://api-bot-v1.dbotx.com",
     "auth_tried": [
       "x-api-key"
     ]
   },
-  "step1b_follow_orders_chain_solana": {
-    "http_status": 200,
-    "body": {
-      "err": false,
-      "res": [
-        {
-          "id": "mu746r8f05f9ic",
-          "accountId": "mu722i7h053a0m",
-          "enabled": true,
-          "name": "pointfarmcap",
-          "chain": "solana",
-          "dexFilter": null,
-          "targetIds": [
-            "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
-          ],
-          "targetNames": [
-            ""
-          ],
-          "walletId": "mu72pnkv0588nq",
-          "groupId": null,
-          "groupName": null,
-          "tokenBlacklist": [],
-          "tokenWhitelist": [],
-          "devBlacklist": [],
-          "devWhitelist": [],
-          "buySettings": {
-            "maxBuyAmountPerToken": null,
-            "maxBuyTimesPerToken": null,
-            "targetMaxAmountUI": null,
-            "targetMinAmountUI": null,
-            "maxTopHoldPercent": null,
-            "maxSellTax": null,
-            "maxBuyTax": null,
-            "maxTokenAgeMs": null,
-            "minLpUsd": null,
-            "maxBalanceUI": null,
-            "reservedAmountUI": null,
-            "priorityFee": 0.01,
-            "maxBuyAmountUI": 0.5,
-            "maxTokenMCUSD": null,
-            "minTokenMCUSD": null,
-            "buyAmountType": "fixed_amount",
-            "enabled": true,
-            "maxSlippage": 0.2,
-            "minLiquidity": 0,
-            "minHolders": 0,
-            "buyExist": false,
-            "skipFreezableToken": false,
-            "skipMintableToken": false,
-            "minBurnedLp": 0,
-            "retries": 2,
-            "concurrentNodes": 1,
-            "buyOncePerWallet": true,
-            "gasFeeDelta": 5,
-            "maxFeePerGas": 100,
-            "jitoEnabled": false,
-            "skipDelegatedToken": false,
-            "onlyPumpWithCashback": false,
-            "skipHoneyPot": false,
-            "skipNotOpensource": false,
-            "skipTargetIncreasePosition": true,
-            "minSocialMediaCount": 0,
-            "startHour": null,
-            "endHour": null,
-            "customFeeAndTip": false,
-            "buyRatio": 1
-          },
-          "sellSettings": {
-            "pnlOrderExpireDelta": 28800,
-            "targetMaxAmountUI": null,
-            "targetMinAmountUI": null,
-            "priorityFee": 0.005,
-            "mode": "only_pnl",
-            "sellAmountType": "follow_ratio",
-            "xTargetRatio": null,
-            "stopLossPercent": 0.4,
-            "stopEarnPercent": 100,
-            "enabled": true,
-            "sellSpeedType": "fast",
-            "maxSlippage": 0.2,
-            "retries": 3,
-            "concurrentNodes": 1,
-            "gasFeeDelta": 5,
-            "maxFeePerGas": 100,
-            "jitoEnabled": false,
-            "stopEarnGroup": null,
-            "stopLossGroup": null,
-            "migrateSellPercent": 0,
-            "transferSellPercent": 0,
-            "devSellPercent": 0,
-            "minDevSellPercent": 0,
-            "pnlOrderExpireExecute": true,
-            "pnlOrderExpireExecuteSellAll": true,
-            "startHour": null,
-            "endHour": null,
-            "customFeeAndTip": false,
-            "pnlOrderUseMidPrice": false
-          },
-          "updateAt": 1789746336385,
-          "createAt": 1789745377119,
-          "walletName": "TEST1",
-          "walletAddress": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
-          "walletType": "solana",
-          "nonceCount": 3,
-          "pnlOrderCount": 0,
-          "buyTimes": 0,
-          "sellTimes": 0,
-          "boughtUsd": 0,
-          "soldUsd": 0,
-          "pnlOrderUsd": 0,
-          "migrateOrderUsd": 0,
-          "devOrderUsd": 0,
-          "trilingStopOrderUsd": 0,
-          "_id": "mu746r8f05f9ic"
-        }
-      ]
-    },
-    "auth_tried": [
-      "x-api-key"
-    ]
+  "task_counters": {
+    "buyTimes": 0,
+    "sellTimes": 0,
+    "boughtUsd": 0,
+    "soldUsd": 0,
+    "pnlOrderCount": 0,
+    "updateAt": 1789749198356
   },
-  "step1c_wallet_endpoint_candidates": {
-    "/account/wallets": {
+  "HONEST_ANSWER": "buyTimes=0 -- сделок пилота пока нет (задача обновлена 1789749198356, leader wallet ждёт нового первого входа). Разведка эндпоинта истории сделок проведена заранее (см. step2_order_endpoint_search), чтобы не терять время, когда сделки появятся.",
+  "step2_order_endpoint_search": {
+    "/automation/swap_orders": {
       "http_status": 200,
-      "body_preview": "{\"err\": false, \"res\": [{\"id\": \"mu72pnkv0588nq\", \"name\": \"TEST1\", \"type\": \"solana\", \"address\": \"E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS\", \"sort\": 0, \"nonceCount\": 3, \"nonceInitilized\": true, \"polymarketConfigured\": false, \"_id\": \"mu72pnkv0588nq\"}]}",
+      "host": "https://api-bot-v1.dbotx.com",
+      "auth_tried": [
+        "x-api-key"
+      ],
+      "body_preview": "{\"err\": false, \"res\": []}",
       "full_body": {
         "err": false,
-        "res": [
-          {
-            "id": "mu72pnkv0588nq",
-            "name": "TEST1",
-            "type": "solana",
-            "address": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
-            "sort": 0,
-            "nonceCount": 3,
-            "nonceInitilized": true,
-            "polymarketConfigured": false,
-            "_id": "mu72pnkv0588nq"
-          }
-        ]
+        "res": []
       }
     },
-    "/wallet/list": {
+    "/automation/orders": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     },
-    "/wallet/wallets": {
+    "/automation/follow_order_logs": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     },
-    "/account/wallet_list": {
+    "/automation/follow_orders/logs": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     },
-    "/wallet/balances": {
+    "/automation/trade_history": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     },
-    "/account/wallet_holdings": {
+    "/automation/opening_sell_orders": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     },
-    "/wallet/holdings": {
+    "/wallet/transactions": {
       "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
+      "body_preview": "{\"non_json_body\": \"Not Found\"}"
+    },
+    "/dex/wallet_holdings": {
+      "http_status": 404,
+      "host": "https://servapi.dbotx.com",
+      "auth_tried": [
+        "X-Api-Key",
+        "apiKey"
+      ],
       "body_preview": "{\"non_json_body\": \"Not Found\"}"
     }
-  },
-  "step1_note": "Реальная форма ответа DBot (см. step1_follow_orders_raw) -- дальнейший код этого прогона извлекает адрес кошелька/сделки из неё по факту структуры, не по угаданной заранее схеме.",
-  "step1_n_tasks_found": 0
+  }
 }
