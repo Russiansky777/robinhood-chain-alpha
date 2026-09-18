@@ -1,0 +1,51 @@
+name: "Solana buyer_200 -- разбор двух отказов пилота DBot (Copy Buy Failed / Copy Sell Failed)"
+
+# Только чтение -- DBot GET-запросы + чтение цепи через Alchemy. Не
+# трогает основной прогон 300 покупок.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DBOT_FAILURE_POINTCHECK_REQUEST"
+
+jobs:
+  solana_dbot_failure_pointcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Разбор отказов копирования DBot"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_dbot_failure_pointcheck.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DBOT_FAILURE_POINTCHECK_REQUEST
+          [ -e data/solana_dbot_failure_pointcheck_result.json ] && git add data/solana_dbot_failure_pointcheck_result.json
+          [ -e data/solana_buyer_200/prior/current/buyer_100/route_meta.json ] && git add data/solana_buyer_200/prior/current/buyer_100/route_meta.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: результат разбора отказов DBot [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
