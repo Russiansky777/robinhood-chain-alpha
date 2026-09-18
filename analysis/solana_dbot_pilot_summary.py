@@ -36,6 +36,7 @@ import os
 import time
 from decimal import Decimal as D
 from pathlib import Path
+from statistics import median
 
 import requests
 
@@ -51,6 +52,7 @@ PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 ENTRY_SIZE_THRESHOLD_USD = D("500")
 LOOKBACK_HOURS = float(os.environ.get("PILOT_LOOKBACK_HOURS", "24"))
 GECKO_BASE = "https://api.geckoterminal.com/api/v2"
+SOL_USD_APPROX = D("100")  # то же честное приближение, что в остальном пайплайне этой сессии
 
 # Известные отказы копирования (владелец сообщает с дашборда DBot -- API
 # со списком отказов не существует, подтверждено ранее). Добавлять сюда
@@ -466,7 +468,12 @@ def main() -> None:
             task = res[0]
             out["dbot_task_counters"] = {k: task.get(k) for k in
                                           ("buyTimes", "sellTimes", "boughtUsd", "soldUsd", "pnlOrderCount", "updateAt")}
-        print(f"[pilot_summary] dbot_task_counters={out.get('dbot_task_counters')}", flush=True)
+            out["dbot_current_slippage"] = {
+                "buy_maxSlippage": (task.get("buySettings") or {}).get("maxSlippage"),
+                "sell_maxSlippage": (task.get("sellSettings") or {}).get("maxSlippage"),
+            }
+        print(f"[pilot_summary] dbot_task_counters={out.get('dbot_task_counters')} "
+              f"slippage={out.get('dbot_current_slippage')}", flush=True)
 
     cutoff = int(time.time()) - int(LOOKBACK_HOURS * 3600)
     events = scan_pilot_trades(cutoff)
@@ -482,6 +489,23 @@ def main() -> None:
             m["leader_slot_delta"] = (pair["buy"]["slot"] or 0) - (leader.get("slot") or 0)
             m["leader_seconds_delta"] = pair["buy"]["block_time"] - (leader.get("block_time") or 0)
             m["leader_entry_ge_500usd"] = (leader.get("paid_usdc") or 0) >= float(ENTRY_SIZE_THRESHOLD_USD)
+            # Реальное проскальзывание входа -- сравниваем цену исполнения
+            # пилота с ценой исполнения лидера по тому же минту (обе -- по
+            # факту дельты баланса, без декодера маршрута/квоты). Лидер
+            # торгует в USDC, пилот -- в SOL, поэтому сравнение идёт через
+            # приближённый курс SOL_USD_APPROX -- отсюда "оценочное", не
+            # точное значение (см. докстринг константы).
+            leader_paid = leader.get("paid_usdc")
+            leader_tokens = leader.get("tokens_received")
+            pilot_sol_principal = m.get("total_sol_out_buy")
+            pilot_tokens = m.get("tokens_bought")
+            if leader_paid and leader_tokens and pilot_sol_principal and pilot_tokens:
+                leader_tokens_per_usd = leader_tokens / leader_paid
+                pilot_sol_principal_ex_costs = pilot_sol_principal - (m.get("network_fee_buy_sol") or 0) - (m.get("tip_buy_sol") or 0)
+                pilot_paid_usd_equiv = pilot_sol_principal_ex_costs * float(SOL_USD_APPROX)
+                pilot_tokens_per_usd = pilot_tokens / pilot_paid_usd_equiv if pilot_paid_usd_equiv else None
+                if pilot_tokens_per_usd:
+                    m["realized_entry_slippage_pct_vs_leader"] = (pilot_tokens_per_usd / leader_tokens_per_usd - 1) * 100
         trades.append(m)
         print(f"[pilot_summary]   {pair['mint'][:8]}.. status={m['status']} "
               f"gross={m.get('gross_pct')} net={m.get('net_pct')} leader={leader.get('status')}", flush=True)
@@ -489,6 +513,22 @@ def main() -> None:
     out["trades"] = trades
     out["trades_leader_ge_500usd"] = [t for t in trades if t.get("leader_entry_ge_500usd") is True]
     out["trades_leader_lt_500usd"] = [t for t in trades if t.get("leader_entry_ge_500usd") is False]
+
+    # Проскальзывание входа vs результат -- владелец просил сравнить после
+    # 10-15 сделок; при меньшем n честно помечаем, что рано.
+    slip_rows = [t for t in trades if t.get("realized_entry_slippage_pct_vs_leader") is not None and t.get("net_pct") is not None]
+    if len(slip_rows) >= 10:
+        slip_rows_sorted = sorted(slip_rows, key=lambda t: t["realized_entry_slippage_pct_vs_leader"])
+        half = len(slip_rows_sorted) // 2
+        worse_slip = slip_rows_sorted[:half]  # более отрицательное проскальзывание -- хуже вход
+        better_slip = slip_rows_sorted[half:]
+        out["slippage_vs_result"] = {
+            "n": len(slip_rows),
+            "worse_slippage_group_median_net_pct": median(t["net_pct"] for t in worse_slip),
+            "better_slippage_group_median_net_pct": median(t["net_pct"] for t in better_slip),
+        }
+    else:
+        out["slippage_vs_result"] = {"status": f"рано -- {len(slip_rows)}/10-15 сделок с известным проскальзыванием"}
 
     out["known_failures_aftermath"] = []
     for f in KNOWN_FAILURES:
