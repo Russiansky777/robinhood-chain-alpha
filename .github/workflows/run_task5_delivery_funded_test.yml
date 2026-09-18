@@ -1,0 +1,97 @@
+name: "Задача 5 -- фондированный микро-тест доставки (8 self-transfer, серия A/B)"
+
+# Владелец, 2026-09-18: РАЗОВОЕ разрешение использовать PRIVATE_KEY_NOX/
+# 0x893f4a7e... ТОЛЬКО для этой проверки (см. docs/PROJECT_STATE.md).
+# PRIVATE_KEY_NOX читается ИСКЛЮЧИТЕЛЬНО из /etc/bot/env НА САМОМ VPS
+# (тот же протокол, что P5/asset_consolidation) -- НИКОГДА не передаётся
+# через GH Actions secrets/логи. 8 отправок жёстко ограничены в самом
+# скрипте (MAX_TOTAL_SENDS=8), серия B запускается только если серия A
+# полностью успешна.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Полный commit SHA, из которого точечно берётся analysis/.'
+        required: true
+        type: string
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/DELIVERY_FUNDED_TEST_REQUEST"
+
+jobs:
+  funded_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key_nl
+          chmod 600 ~/.ssh/vps_key_nl
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key_nl -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=20" >> "$GITHUB_ENV"
+
+      - name: "Точечный checkout analysis/ на VPS + фондированный тест (8 отправок, ~1-2 мин)"
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 "
+            set -euo pipefail
+            sudo -u bot bash -c '
+              set -euo pipefail
+              if [ -r /etc/bot/env ]; then set -a; source /etc/bot/env; set +a; fi
+              cd /home/bot/robinhood-chain-alpha
+              git fetch origin $COMMIT_SHA
+              git checkout $COMMIT_SHA -- analysis/
+              cd analysis
+              /home/bot/robinhood-chain-alpha/venv/bin/python task5_delivery_funded_test.py
+            '
+          "
+
+      - name: Забрать data/task5_delivery_funded_test_result.json с VPS
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/task5_delivery_funded_test_result.json' > /tmp/funded_result.json
+          [ -s /tmp/funded_result.json ]
+          cp /tmp/funded_result.json data/task5_delivery_funded_test_result.json
+          python3 -c "
+          import json
+          d = json.load(open('data/task5_delivery_funded_test_result.json'))
+          print('balance_before:', d.get('balance_before_native'))
+          print('balance_after:', d.get('balance_after_native'))
+          print('series_a_ok:', d.get('series_a_ok'))
+          for a in d.get('attempts', []):
+              print(a.get('label'), 'mult=', a.get('multiplier'), 'resp_ms=', a.get('response_time_ms'),
+                    'blocks_elapsed=', a.get('blocks_elapsed_from_send'), 'tx_index=', a.get('transaction_index_in_block'),
+                    'n_txs_in_block=', a.get('n_txs_in_block'))
+          "
+
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/DELIVERY_FUNDED_TEST_REQUEST
+          [ -e data/task5_delivery_funded_test_result.json ] && git add data/task5_delivery_funded_test_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Задача 5: фондированный микро-тест доставки, результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
