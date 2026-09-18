@@ -157,10 +157,15 @@ def step0_discover_keys() -> dict:
 
 
 def pick_working_key(discovery: dict) -> str | None:
-    for k, v in discovery["liveness"].items():
-        if v["alive"]:
-            return k
-    return None
+    """ТОЛЬКО DUNE_EXPLORER_API -- это ключ триала, который проверяем.
+    DUNE_API_KEY/DUNE_API_KEY_MOZILA -- секреты ДРУГОГО, не связанного
+    проекта с собственным бюджетным учётом (credit_guard.py) -- даже
+    если они живые, платные шаги 1-4 НЕ должны молча тратить их кредиты
+    вместо триала. Если живых среди них нет, а DUNE_EXPLORER_API
+    отсутствует/мёртв -- честно останавливаемся после дешёвой проверки
+    живости (step0), не подменяем ключ."""
+    v = discovery["liveness"].get("DUNE_EXPLORER_API")
+    return "DUNE_EXPLORER_API" if v and v["alive"] else None
 
 
 def step1_capability_probe(probe: DuneProbe) -> dict:
@@ -347,7 +352,18 @@ def main() -> None:
 
     key_name = pick_working_key(discovery)
     if key_name is None:
-        result["HONEST_ANSWER"] = "ни один из проверенных ключей не живой -- дальше идти некуда."
+        alive_others = [k for k, v in discovery["liveness"].items() if v["alive"] and k != "DUNE_EXPLORER_API"]
+        if "DUNE_EXPLORER_API" not in discovery["non_empty"]:
+            result["HONEST_ANSWER"] = (
+                "DUNE_EXPLORER_API не проброшен в этот workflow (секрета с таким именем нет в "
+                "репозитории вообще -- проверено). Добавь секрет DUNE_EXPLORER_API с ключом от "
+                "триал-аккаунта Plus и передай его в .github/workflows/run_solana_dune_explorer_check.yml "
+                f"(уже прописан, просто заполни secrets.DUNE_EXPLORER_API). Живые прочие ключи "
+                f"({alive_others or 'нет'}) НЕ использую вместо него -- они принадлежат другому "
+                "проекту со своим бюджетным учётом, платные шаги на них не запускаю."
+            )
+        else:
+            result["HONEST_ANSWER"] = "DUNE_EXPLORER_API проброшен, но 403/мёртв -- проверь ключ на dune.com."
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         print("[dune_check] " + result["HONEST_ANSWER"], flush=True)
         return
