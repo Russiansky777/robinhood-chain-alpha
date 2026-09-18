@@ -1,0 +1,64 @@
+name: "Solana buyer_200 -- сторож сита (застрявшие позиции, каждые 2 часа)"
+
+# Живые деньги без присмотра ночью. НИЧЕГО не продаёт и не останавливает
+# -- только смотрит on-chain балансы кошелька сита и сигналит. Упавший
+# workflow (exit 1) = будильник владельцу (email от GitHub Actions).
+# Первый запуск -- ВРУЧНУЮ (workflow_dispatch), чтобы убедиться, что
+# сторож сам не падает на пустом месте, прежде чем полагаться на
+# расписание.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 */2 * * *"
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DBOT_SIEVE_WATCHDOG_REQUEST"
+
+jobs:
+  sieve_watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Проверка застрявших позиций сита"
+        id: watchdog
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/solana_dbot_sieve_watchdog.py
+      - name: "Сохранить лог (только при успехе -- чисто)"
+        if: success()
+        run: |
+          [ -e data/dbot_sieve_watch.log ] && git add data/dbot_sieve_watch.log
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: сторож сита -- чисто [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+      - name: "Убрать маркер запроса (независимо от исхода проверки)"
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DBOT_SIEVE_WATCHDOG_REQUEST
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: сторож сита -- убрать маркер запроса [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done

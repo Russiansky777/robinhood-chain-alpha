@@ -1,0 +1,80 @@
+{
+  "generated_at_utc": "2026-09-18T23:11:28Z",
+  "source": "data/solana_dbot_pilot_summary.json (4 реальных сделки пилота, уже собраны и верифицированы ранее в этой сессии) + data/dbot_tasks_config_raw.json (sellSettings пилотной задачи)",
+  "pilot_sell_settings": {
+    "mode": "only_pnl",
+    "stopEarnPercent": 100,
+    "stopLossPercent": null,
+    "pnlOrderExpireDelta_ms": 28800,
+    "pnlOrderExpireDelta_seconds": 28.8,
+    "pnlOrderExpireExecute": true,
+    "pnlOrderExpireExecuteSellAll": true,
+    "sellSpeedType": "fast",
+    "sellAmountType": "follow_ratio"
+  },
+  "mechanism_honest_reading": "mode=only_pnl + stopEarnPercent=100 значит единственный УСЛОВНЫЙ выход -- тейк-профит на +100% брутто. stopLossPercent=null -- СТОП-ЛОССА НЕТ ВООБЩЕ, просадка ничем не ограничена сверху донизу. Единственный БЕЗУСЛОВНЫЙ выход -- таймер pnlOrderExpireDelta=28.8с: pnlOrderExpireExecute=true + pnlOrderExpireExecuteSellAll=true значит по истечении 28.8с с момента покупки DBot принудительно выставляет sell-all ПО РЫНКУ, независимо от текущего P&L (в плюсе или в минусе -- неважно).",
+  "n_trades_analyzed": 4,
+  "n_hit_take_profit": 0,
+  "n_hit_expiry_timer": 4,
+  "verdict": "4 из 4 реальных сделок пилота вышли ПО ТАЙМЕРУ ИСТЕЧЕНИЯ (28.8с), ни одна не достигла +100% тейк-профита (макс. брутто-движение среди 4х сделок -- +53.6%, меньше половины порога стоп-earn). Держим позицию РОВНО до истечения таймера, затем принудительная продажа по рынку -- в убыточной сделке (XzC5Swuo.., брутто -11.0%, нетто -13.7%) это сработало именно так: просадка НЕ была остановлена стоп-лоссом (его нет), позиция закрылась только по истечении 28.8с.",
+  "execution_lag_past_nominal_expiry": {
+    "note": "реальное время удержания (hold_seconds) ВСЕГДА больше номинальных 28.8с -- задержка между истечением таймера и подтверждённой на цепи продажей",
+    "lags_seconds": [
+      4.2,
+      4.2,
+      4.2,
+      7.2
+    ],
+    "median_lag_seconds": 4.2
+  },
+  "trades": [
+    {
+      "mint": "vAddewUHuYgRDrL6n3kXtBXMT635evJz8K93j6Wm1Ba",
+      "buy_block_time": 1789752952,
+      "sell_block_time": 1789752985,
+      "hold_seconds": 33,
+      "gross_pct": 4.399,
+      "net_pct": 1.379,
+      "cost_pct": 3.02,
+      "hit_take_profit_stopEarn_100pct": false,
+      "exit_reason": "pnlOrderExpireDelta_timer_sellAll",
+      "lag_past_expiry_seconds": 4.2
+    },
+    {
+      "mint": "XzC5SwuoRYUCXaqMNybdzbNyVL14wyzuiWHps5iqtgf",
+      "buy_block_time": 1789750696,
+      "sell_block_time": 1789750729,
+      "hold_seconds": 33,
+      "gross_pct": -11.03,
+      "net_pct": -13.732,
+      "cost_pct": 2.702,
+      "hit_take_profit_stopEarn_100pct": false,
+      "exit_reason": "pnlOrderExpireDelta_timer_sellAll",
+      "lag_past_expiry_seconds": 4.2
+    },
+    {
+      "mint": "EgP1f5J9LDn1fuTMfrrgT5ZRMiLBitYdkmDs818BS44k",
+      "buy_block_time": 1789750542,
+      "sell_block_time": 1789750575,
+      "hold_seconds": 33,
+      "gross_pct": 53.636,
+      "net_pct": 49.653,
+      "cost_pct": 3.983,
+      "hit_take_profit_stopEarn_100pct": false,
+      "exit_reason": "pnlOrderExpireDelta_timer_sellAll",
+      "lag_past_expiry_seconds": 4.2
+    },
+    {
+      "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
+      "buy_block_time": 1789749474,
+      "sell_block_time": 1789749510,
+      "hold_seconds": 36,
+      "gross_pct": 15.946,
+      "net_pct": 12.7,
+      "cost_pct": 3.246,
+      "hit_take_profit_stopEarn_100pct": false,
+      "exit_reason": "pnlOrderExpireDelta_timer_sellAll",
+      "lag_past_expiry_seconds": 7.2
+    }
+  ]
+}
