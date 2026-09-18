@@ -1,0 +1,64 @@
+name: "Solana buyer_200 -- разведка Dune как источника цен (вместо листания пулов)"
+
+# Разовая проверка (владелец, 2026-09-18): не трогает работающий
+# расширенный прогон (run_solana_buyer200_step_extended.yml). Смоук на
+# information_schema (2 дешёвых запроса) + один запрос LIMIT 100 за
+# уже известное 5-минутное окно одного пула (SOL/USDC), сверка с
+# реальными ончейн-ценами. Бюджет: namespace solana_dune_probe, 20
+# кредитов (см. data/credits_spent.json), максимум 3 платных запроса.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DUNE_PROBE_REQUEST"
+
+jobs:
+  solana_dune_probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Восстановить эфемерный кэш query_id Dune"
+        uses: actions/cache@v4
+        with:
+          path: analysis/output/cache
+          key: dune-cache-${{ github.run_id }}
+          restore-keys: |
+            dune-cache-
+          save-always: true
+      - name: Install dependencies
+        run: pip install -r analysis/requirements.txt
+      - name: "Разведка Dune: схема + сверка цен SOL/USDC"
+        env:
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          CREDIT_GUARD_NAMESPACE: solana_dune_probe
+        run: python -u analysis/solana_dune_probe.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_PROBE_REQUEST
+          [ -e data/solana_dune_probe_result.json ] && git add data/solana_dune_probe_result.json
+          [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          [ -e data/query_ids_recovered.json ] && git add data/query_ids_recovered.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: результат разведки Dune как источника цен [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
