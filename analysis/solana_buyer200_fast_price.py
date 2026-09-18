@@ -101,7 +101,14 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
             pass
     url = _endpoint()
     fallback_used = False
-    for attempt in range(8):
+    # Найдено на расширенном прогоне (300 покупок, 6000+ запросов): под
+    # устойчивой продолжительной нагрузкой публичный узел/Alchemy иногда
+    # троттлит дольше, чем 8 попыток x потолок 10с (~45с) успевают
+    # переждать -- было НЕОБРАБОТАННОЕ исключение, ронявшее весь
+    # многочасовой прогон целиком. 20 попыток и потолок 45с -- честно
+    # ждём дольше, прежде чем сдаться на этом конкретном вызове.
+    max_attempts, backoff_cap = 20, 45.0
+    for attempt in range(max_attempts):
         wait = max(_MIN_INTERVAL_S - (time.monotonic() - _last_call_at), 0.0) + _backoff_s
         if wait > 0:
             time.sleep(wait)
@@ -111,10 +118,10 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                   timeout=30)
         except Exception:  # noqa: BLE001
-            _backoff_s = min(max(_backoff_s * 2, 0.5), 10.0)
+            _backoff_s = min(max(_backoff_s * 2, 0.5), backoff_cap)
             continue
         if resp.status_code == 429 or 500 <= resp.status_code < 600:
-            _backoff_s = min(max(_backoff_s * 2, 0.5), 10.0)
+            _backoff_s = min(max(_backoff_s * 2, 0.5), backoff_cap)
             continue
         if resp.status_code in (401, 403) and not fallback_used and url != _PUBLIC_RPC:
             # Найдено при диагностике Шага 1: у выданного ALCHEMY_API_KEY
@@ -132,7 +139,7 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
             err = body["error"]
             msg = str(err.get("message", "")).lower()
             if "rate" in msg or "429" in msg:
-                _backoff_s = min(max(_backoff_s * 2, 0.5), 10.0)
+                _backoff_s = min(max(_backoff_s * 2, 0.5), backoff_cap)
                 continue
             raise RuntimeError(f"RPC error {method}: {err}")
         _backoff_s = max(_backoff_s * 0.5, 0.0)  # успех -- ослабляем бэкофф
@@ -403,13 +410,17 @@ def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: in
 
 
 def _load_existing(out_path: Path) -> dict[tuple[str, int], dict]:
+    """Возобновление: НЕ считаем сделанным то, что упало с rpc_error --
+    это транзитный сбой (см. run_comparison), должен пересчитаться на
+    следующем прогоне, а не застрять навсегда как 'уже готово'."""
     if not out_path.exists():
         return {}
     try:
         prior = json.loads(out_path.read_text())
     except (ValueError, OSError):
         return {}
-    return {(r["signature"], r["seconds"]): r for r in prior if "seconds" in r}
+    return {(r["signature"], r["seconds"]): r for r in prior
+            if "seconds" in r and r.get("mine_status") != "rpc_error"}
 
 
 COMMIT_INTERVAL_S = 12 * 60  # раз в ~10-15 минут, НЕ после каждой точки (владелец: частые коммиты тормозят больше, чем помогают)
@@ -496,42 +507,52 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
             if not route:
                 entry = dict(signature=sig, seconds=sec, status="no_route")
             else:
-                value = D(1)
-                legs_out = []
-                ok = True
-                for leg in route:
-                    lo, hi = find_window_for(windows[leg["pool"]], t)
-                    p = find_price_at(leg["pool"], t, lo, hi)
-                    legs_out.append(p)
-                    if p.get("status") != "ok":
-                        ok = False
-                        break
-                    e = p["event"]
-                    v = D(e["p1_per_0"])
-                    if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
-                        value *= v
-                    elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
-                        value /= v
-                    else:
-                        ok = False
-                        break
-                mine_price = str(value) if ok else None
-                mine_slot = legs_out[-1].get("slot") if legs_out else None
-                mine_sig = legs_out[-1].get("signature") if legs_out else None
-                ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
-                match_price = (mine_price is not None and ref.get("price_usdc") is not None
-                               and D(mine_price) == D(ref["price_usdc"]))
-                match_slot = mine_slot == ref_leg.get("slot")
-                match_sig = mine_sig == ref_leg.get("signature")
-                entry = dict(
-                    signature=sig, seconds=sec,
-                    mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
-                    mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
-                    ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
-                    ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
-                    match_price=match_price, match_slot=match_slot, match_signature=match_sig,
-                    legs=legs_out,
-                )
+                try:
+                    value = D(1)
+                    legs_out = []
+                    ok = True
+                    for leg in route:
+                        lo, hi = find_window_for(windows[leg["pool"]], t)
+                        p = find_price_at(leg["pool"], t, lo, hi)
+                        legs_out.append(p)
+                        if p.get("status") != "ok":
+                            ok = False
+                            break
+                        e = p["event"]
+                        v = D(e["p1_per_0"])
+                        if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
+                            value *= v
+                        elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
+                            value /= v
+                        else:
+                            ok = False
+                            break
+                    mine_price = str(value) if ok else None
+                    mine_slot = legs_out[-1].get("slot") if legs_out else None
+                    mine_sig = legs_out[-1].get("signature") if legs_out else None
+                    ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
+                    match_price = (mine_price is not None and ref.get("price_usdc") is not None
+                                   and D(mine_price) == D(ref["price_usdc"]))
+                    match_slot = mine_slot == ref_leg.get("slot")
+                    match_sig = mine_sig == ref_leg.get("signature")
+                    entry = dict(
+                        signature=sig, seconds=sec,
+                        mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
+                        mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
+                        ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
+                        ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
+                        match_price=match_price, match_slot=match_slot, match_signature=match_sig,
+                        legs=legs_out,
+                    )
+                except RuntimeError as exc:
+                    # Найдено на расширенном прогоне: устойчивый сбой RPC
+                    # (после увеличенных 20 попыток/45с потолка) на ОДНОЙ
+                    # точке не должен ронять весь многочасовой прогон --
+                    # честно помечаем точку и идём дальше, остальные 250+
+                    # покупок не должны из-за этого простаивать.
+                    entry = dict(signature=sig, seconds=sec, mine_status="rpc_error",
+                                  mine_error=str(exc)[:300])
+                    print(f"[{label}] {sig[:12]}.. sec={sec} RPC-ошибка, помечено rpc_error: {exc}", flush=True)
             comparison.append(entry)
             already[(sig, sec)] = entry
             points_done += 1
