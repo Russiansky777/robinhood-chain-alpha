@@ -107,6 +107,15 @@ def is_fee_payer(tx: dict, wallet: str) -> bool:
     return pk == wallet
 
 
+def is_signer(tx: dict, wallet: str) -> bool:
+    """Тот же тест, что select.py/solana_buyer200_select_extend.py::classify()
+    (signed = any(k.get("signer") and k["pubkey"]==WALLET for k in keys)) --
+    отсеивает пассивные "входы" (спам/пыль-airdrop токенов на заметный
+    кошелёк без его подписи), которые pre_balance==0 сам по себе не ловит."""
+    keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
+    return any(isinstance(k, dict) and k.get("signer") and k.get("pubkey") == wallet for k in keys)
+
+
 def rent_paid_by_wallet(tx: dict, wallet: str) -> float:
     """System Program createAccount (в т.ч. CPI внутри создания ATA), где
     source == кошелёк -- это рента за новый аккаунт, не часть суммы свопа."""
@@ -168,6 +177,11 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
                 continue
             deltas = wallet_mint_deltas(tx, address)
             touched = [m for m in deltas["increased"] + deltas["decreased"] if m not in (USDC_MINT, SOL_MINT)]
+            if touched and not is_signer(tx, address):
+                # пассивный получатель (спам/пыль-airdrop) -- не подписывал,
+                # значит это не своп кошелька; та же проверка, что в
+                # основном конвейере (classify(): wallet_not_signer)
+                continue
             if touched:
                 n_swaps += 1
             for m in deltas["increased"]:
