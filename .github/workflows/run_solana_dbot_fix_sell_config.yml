@@ -1,0 +1,51 @@
+name: "Solana buyer_200 -- ЗАПИСЬ: попытка починить sellSettings пилота DBot (stopEarn/stopLoss/expiry)"
+
+# ВНИМАНИЕ: единственный workflow в этой ветке, который пишет в живую
+# торговую конфигурацию DBot (не только читает). Владелец явно попросил
+# после того как интерфейс DBot не сохранил 3 поля sellSettings.
+# Отдельный от run_solana_dbot_pilot_report.yml (тот -- только чтение).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DBOT_FIX_SELL_CONFIG_REQUEST"
+
+jobs:
+  solana_dbot_fix_sell_config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Попытка правки sellSettings через DBot API"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/solana_dbot_fix_sell_config.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DBOT_FIX_SELL_CONFIG_REQUEST
+          [ -e data/solana_dbot_fix_sell_config_result.json ] && git add data/solana_dbot_fix_sell_config_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: результат попытки правки sellSettings DBot [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
