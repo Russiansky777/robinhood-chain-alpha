@@ -1,0 +1,180 @@
+{
+  "generated_at_utc": "2026-09-18T23:55:51Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771248}"
+      }
+    }
+  },
+  "step_a1_freshness": {
+    "dex_solana.trades": {
+      "status": "ok",
+      "max_block_time": "2026-09-18 17:59:59.000 UTC",
+      "row_count": 19424799166,
+      "cost_credits": 13.682500001
+    },
+    "pumpdotfun_solana.trades": {
+      "status": "ok",
+      "max_block_time": "2026-09-18 17:59:59.000 UTC",
+      "row_count": 2167823025,
+      "cost_credits": 13.3225
+    }
+  },
+  "step_a2_coverage_by_age": {
+    "days_actually_covered_by_our_dataset": 6.96,
+    "honest_note": "бакеты возраста дальше нашего реального окна (earliest_our_time) не проверяются -- там просто нет наших покупок для сравнения, не выдумываем цифру",
+    "dune_step": {
+      "name": "coverage_full_range_for_bucketing",
+      "sql_preview": "SELECT tx_id, block_time FROM dex_solana.trades WHERE trader_id = 'Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit' AND block_time >= from_unixtime(1789174257) AND block_time <= from_unixtime(1789672049)",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8771252,
+      "execute": {
+        "http_status": 200
+      },
+      "execution_id": "01M2VF64E6K1RWTB9JG68F2BEN",
+      "status_meta": {
+        "execution_id": "01M2VF64E6K1RWTB9JG68F2BEN",
+        "query_id": 8771252,
+        "is_execution_finished": true,
+        "state": "QUERY_STATE_COMPLETED",
+        "submitted_at": "2026-09-18T23:56:18.247001Z",
+        "expires_at": "2026-12-17T23:56:20.210894Z",
+        "execution_started_at": "2026-09-18T23:56:18.512489135Z",
+        "execution_ended_at": "2026-09-18T23:56:20.210887502Z",
+        "result_metadata": {
+          "column_names": [
+            "tx_id",
+            "block_time"
+          ],
+          "column_types": [
+            "varchar",
+            "timestamp(3) with time zone"
+          ],
+          "row_count": 35,
+          "result_set_bytes": 3356,
+          "total_row_count": 35,
+          "total_result_set_bytes": 3356,
+          "datapoint_count": 70,
+          "pending_time_millis": 265,
+          "execution_time_millis": 1698
+        },
+        "execution_cost_credits": 1.304038462
+      },
+      "results_http_status": 200,
+      "status": "ok",
+      "n_rows": 35,
+      "metadata": {
+        "column_names": [
+          "tx_id",
+          "block_time"
+        ],
+        "column_types": [
+          "varchar",
+          "timestamp(3) with time zone"
+        ],
+        "row_count": 35,
+        "result_set_bytes": 3356,
+        "total_row_count": 35,
+        "total_result_set_bytes": 3356,
+        "datapoint_count": 70,
+        "pending_time_millis": 265,
+        "execution_time_millis": 1698
+      }
+    },
+    "dune_n_rows_full_range": 35,
+    "coverage_by_age_bucket": [
+      {
+        "age_days": 1,
+        "n_our_purchases": 0,
+        "note": "нет наших покупок в этом дне -- вне реального окна датасета"
+      },
+      {
+        "age_days": 2,
+        "n_our_purchases": 32,
+        "n_found_in_dune": 1,
+        "coverage": 0.0312
+      },
+      {
+        "age_days": 3,
+        "n_our_purchases": 100,
+        "n_found_in_dune": 0,
+        "coverage": 0.0
+      },
+      {
+        "age_days": 5,
+        "n_our_purchases": 22,
+        "n_found_in_dune": 0,
+        "coverage": 0.0
+      },
+      {
+        "age_days": 7,
+        "n_our_purchases": 69,
+        "n_found_in_dune": 0,
+        "coverage": 0.0
+      },
+      {
+        "age_days": 14,
+        "n_our_purchases": 0,
+        "note": "нет наших покупок в этом дне -- вне реального окна датасета"
+      }
+    ]
+  },
+  "still_near_zero_on_old_data": true,
+  "step_a3_program_distribution": {
+    "our_dex_program_distribution_excl_infra": {
+      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 236,
+      "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH": 161,
+      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 141,
+      "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi": 98,
+      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 93,
+      "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4": 90,
+      "9H6tua7jkLhdm3w8BvgpTn5LZNU7g4ZynDmCiNN3q6Rp": 71,
+      "QuaNtZsgYRe5Z9Bk4LZ4cTD9tbkVoyCNf1R2BN9bBDv": 60,
+      "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH": 55,
+      "proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u": 49,
+      "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 37,
+      "goonuddtQRrWqqn5nFyczVKaie28f3kDkHWkHtURSLE": 23,
+      "DRVSpZ2YUYYKgZP8XtLhAGtT1zYSCKzeHfb4DgRnrgqD": 20,
+      "gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 19,
+      "ALPHAQmeA7bjrVuccPsYPiCvsi428SNwte66Srvs4pHA": 18,
+      "QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 15,
+      "FLUX6xBayGxLX9UcimVRxXFMHH6q43mAbRvDzSpCsvfK": 14,
+      "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2": 11,
+      "3TK9D8aoBFYjYZtKCjciPrVrRStsnvo7KmpcJqDavpaU": 8,
+      "ZERor4xhbUycZ6gb9ntrhqscUcZmAbQDjEAtCf4hbZY": 7,
+      "jupZ4m2GqUCJ5iueMfzQf8khFfH31d4XAQt3RzCT9Vd": 7,
+      "jupeiUmn818Jg1ekPURTpr4mFo29p46vygyykFJ3wZC": 7,
+      "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": 6,
+      "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 6,
+      "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": 6,
+      "SCoRcH8c2dpjvcJD6FiPbCSQyQgu3PcUAWj2Xxx3mqn": 5,
+      "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch": 5,
+      "DNL1tgEj3nJovHw9jtyCCQD3arssCJzkmpDizknwzey4": 4,
+      "riptK81hDxhe5pW5jSzSM9iRA8azgEgLJ4dXkPtBS7j": 4,
+      "Archer8kgiavM61GyusMzaaS2ft5sALtNsD1HxkUPMhy": 3
+    },
+    "n_distinct_dex_programs": 35,
+    "dune_project_labels_seen_in_calibration_sample": [
+      "meteora",
+      "pancakeswap",
+      "pumpswap",
+      "raydium",
+      "tessera",
+      "whirlpool"
+    ],
+    "honest_note": "Dune возвращает project-ЛЕЙБЛЫ (не program ID напрямую) -- без исходников decoder'а нельзя гарантировать точное 1:1 соответствие конкретного program ID конкретному project; сопоставление ниже -- по силе присутствия/отсутствия известных лейблов, не строгая проверка."
+  }
+}
