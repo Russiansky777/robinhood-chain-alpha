@@ -143,19 +143,40 @@ def rent_paid_by_wallet(tx: dict, wallet: str) -> float:
     return total / 1e9
 
 
-def analyze_wallet(address: str, cutoff_time: int) -> dict:
-    before = None
-    n_sigs = n_swaps = n_first_entries = 0
-    first_entry_events: list[dict] = []
+MAX_RESUME_ROUNDS = 20  # honest предохранитель от бесконечного дозаписывания -- см. docstring scan_wallet_chunk
+
+
+def scan_wallet_chunk(address: str, cutoff_time: int, resume: dict | None) -> tuple[bool, dict]:
+    """Один КУСОК разбора истории кошелька (до PER_WALLET_TIME_BUDGET_S на
+    вызов), резюмируемо ЧЕРЕЗ ПРОГОНЫ (не только между кошельками): гиперактивный
+    кошелёк (как выяснилось на лидере -- сотни подписей в сутки) не укладывается
+    в один вызов, а раньше "упёрлись в бюджет" молча становилось окончательным
+    результатом (truncated=true навсегда, часть окна так и не считана). Теперь
+    курсор (before) и накопленные счётчики сохраняются в data["_scan_progress"]
+    и следующий прогон продолжает СТРОГО с того же места, не считает заново.
+    Возвращает (done, state); done=False значит -- сохранить state и повторить
+    в следующем прогоне."""
+    if resume:
+        before = resume["before"]
+        n_sigs, n_swaps, n_first_entries = resume["n_sigs"], resume["n_swaps"], resume["n_first_entries"]
+        first_entry_events: list[dict] = resume["first_entry_events"]
+        earliest_bt_seen = resume["earliest_bt_seen"]
+        rounds = resume.get("rounds", 0) + 1
+    else:
+        before = None
+        n_sigs = n_swaps = n_first_entries = 0
+        first_entry_events = []
+        earliest_bt_seen = None
+        rounds = 1
     started_at = time.monotonic()
-    partial = False
-    earliest_bt_seen = None
-    n_pages = 0
+    done = False
+    history_shorter_than_window = False
     for _ in range(MAX_PAGES_PER_WALLET):
         batch = fp.get_signatures_for_address(address, before=before)
         if not batch:
+            done = True
+            history_shorter_than_window = earliest_bt_seen is not None and earliest_bt_seen > cutoff_time
             break
-        n_pages += 1
         stop = False
         for s in batch:
             bt = s.get("blockTime")
@@ -163,10 +184,10 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
                 continue
             earliest_bt_seen = bt if earliest_bt_seen is None else min(earliest_bt_seen, bt)
             if bt < cutoff_time:
+                done = True
                 stop = True
                 break
             if time.monotonic() - started_at > PER_WALLET_TIME_BUDGET_S:
-                partial = True
                 stop = True
                 break
             n_sigs += 1
@@ -214,22 +235,38 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
             break
         before = batch[-1]["signature"]
         if len(batch) < 1000:
+            done = True
+            history_shorter_than_window = earliest_bt_seen is not None and earliest_bt_seen > cutoff_time
             break
+    if not done and rounds >= MAX_RESUME_ROUNDS:
+        # честный предохранитель -- после стольких дозаписей (гиперактивный
+        # кошелёк) фиксируем как truncated=true, а не крутим бесконечно
+        done = True
+    state = {
+        "before": before, "n_sigs": n_sigs, "n_swaps": n_swaps, "n_first_entries": n_first_entries,
+        "first_entry_events": first_entry_events, "earliest_bt_seen": earliest_bt_seen, "rounds": rounds,
+        "history_shorter_than_window": history_shorter_than_window,
+    }
+    return done, state
 
-    # Два разных честных случая "меньше 7 дней покрыто": (а) упёрлись в НАШ
-    # предел (страницы/время) -- это truncated=true, недостаток метода; (б)
-    # у кошелька просто нет 7 дней истории (страница пришла пустой раньше
-    # cutoff) -- это факт о кошельке, не truncated.
-    days_covered = LOOKBACK_DAYS
-    history_shorter_than_window = False
-    if partial and earliest_bt_seen is not None:
+
+def finalize_wallet(state: dict, cutoff_time: int) -> dict:
+    n_sigs, n_swaps, n_first_entries = state["n_sigs"], state["n_swaps"], state["n_first_entries"]
+    first_entry_events = state["first_entry_events"]
+    earliest_bt_seen = state["earliest_bt_seen"]
+    history_shorter_than_window = state["history_shorter_than_window"]
+    reached_cutoff = earliest_bt_seen is not None and earliest_bt_seen <= cutoff_time
+    # Два разных честных случая "меньше 7 дней покрыто": (а) исчерпали
+    # MAX_RESUME_ROUNDS дозаписей, так и не дойдя до cutoff -- truncated=true,
+    # недостаток метода; (б) у кошелька просто нет 7 дней истории (страница
+    # пришла пустой раньше cutoff) -- это факт о кошельке, не truncated.
+    truncated = not reached_cutoff and not history_shorter_than_window
+    if reached_cutoff:
+        days_covered = LOOKBACK_DAYS
+    elif earliest_bt_seen is not None:
         days_covered = round((int(time.time()) - earliest_bt_seen) / 86400, 2)
-    elif n_pages >= MAX_PAGES_PER_WALLET and earliest_bt_seen is not None and earliest_bt_seen > cutoff_time:
-        partial = True
-        days_covered = round((int(time.time()) - earliest_bt_seen) / 86400, 2)
-    elif earliest_bt_seen is not None and earliest_bt_seen > cutoff_time:
-        history_shorter_than_window = True
-        days_covered = round((int(time.time()) - earliest_bt_seen) / 86400, 2)
+    else:
+        days_covered = 0
 
     sol_sizes = [e["sol_spent"] for e in first_entry_events if e.get("sol_spent") is not None]
     n_ge = sum(1 for v in sol_sizes if v >= float(SOL_THRESHOLD))
@@ -257,7 +294,7 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
         "days_covered": days_covered,
         "first_entries_per_day": round(n_first_entries / days_covered, 3) if days_covered else None,
         "first_entries_ge_4_3_per_day": round(n_ge / days_covered, 3) if days_covered else None,
-        "truncated": partial,
+        "truncated": truncated,
         "history_shorter_than_window": history_shorter_than_window,
         "first_entry_events": first_entry_events,
     }
@@ -273,31 +310,55 @@ def main() -> None:
         data = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "lookback_days": LOOKBACK_DAYS, "sol_threshold": float(SOL_THRESHOLD),
                 "wallets": {a: None for a in addresses}, "leader_control": None}
+    data.setdefault("_scan_progress", {})
 
     cutoff_time = int(time.time()) - LOOKBACK_DAYS * 86400
     started_at = time.monotonic()
     last_commit_at = started_at
 
-    def process(address: str, label: str):
+    def process(address: str, label: str) -> bool:
+        """Дожимает ОДИН кошелёк кусок за куском (не переключается на
+        следующий кандидат после первого куска) -- иначе гиперактивный
+        кошелёк никогда бы не закончился, размазывая прогресс тонким
+        слоем по всем 30. Возвращает False, если общий бюджет прогона
+        исчерпан ДО завершения (в т.ч. этого кошелька) -- тогда его
+        _scan_progress уже сохранён, следующий прогон продолжит с него же."""
         nonlocal last_commit_at
-        if time.monotonic() - started_at > TOTAL_TIME_BUDGET_S:
-            return False
-        try:
-            result = analyze_wallet(address, cutoff_time)
-        except RuntimeError as exc:
-            result = {"error": str(exc)[:300]}
-        if label == "leader":
-            data["leader_control"] = result
-        else:
-            data["wallets"][address] = result
-        print(f"[flow29] {label} {address[:12]}.. swaps={result.get('n_swaps_total')} "
-              f"first_entries={result.get('n_first_entries')} ge4.3={result.get('n_first_entries_ge_4_3_sol')} "
-              f"days={result.get('days_covered')} truncated={result.get('truncated')}", flush=True)
-        if time.monotonic() - last_commit_at > COMMIT_INTERVAL_S:
+        while True:
+            if time.monotonic() - started_at > TOTAL_TIME_BUDGET_S:
+                return False
+            try:
+                resume = data["_scan_progress"].get(address)
+                done, state = scan_wallet_chunk(address, cutoff_time, resume)
+            except RuntimeError as exc:
+                if label == "leader":
+                    data["leader_control"] = {"error": str(exc)[:300]}
+                else:
+                    data["wallets"][address] = {"error": str(exc)[:300]}
+                data["_scan_progress"].pop(address, None)
+                return True
+            if not done:
+                data["_scan_progress"][address] = state
+                print(f"[flow29] {label} {address[:12]}.. кусок #{state['rounds']} "
+                      f"(накоплено сигнатур={state['n_sigs']}, первых входов={state['n_first_entries']})", flush=True)
+                if time.monotonic() - last_commit_at > COMMIT_INTERVAL_S:
+                    OUT_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                    fp._git_commit_progress("flow29", [OUT_PATH])
+                    last_commit_at = time.monotonic()
+                continue
+            result = finalize_wallet(state, cutoff_time)
+            data["_scan_progress"].pop(address, None)
+            if label == "leader":
+                data["leader_control"] = result
+            else:
+                data["wallets"][address] = result
+            print(f"[flow29] {label} {address[:12]}.. ГОТОВО swaps={result.get('n_swaps_total')} "
+                  f"first_entries={result.get('n_first_entries')} ge4.3={result.get('n_first_entries_ge_4_3_sol')} "
+                  f"days={result.get('days_covered')} truncated={result.get('truncated')}", flush=True)
             OUT_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str))
             fp._git_commit_progress("flow29", [OUT_PATH])
             last_commit_at = time.monotonic()
-        return True
+            return True
 
     if data.get("leader_control") is None:
         process(LEADER_WALLET, "leader")
