@@ -57,11 +57,12 @@ _PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 _MIN_INTERVAL_S = 0.12  # стартовая цель ~8 req/s -- честно НЕ "долбить", но и не 0.25+1.5=1.75с на запрос
 _last_call_at = 0.0
 _backoff_s = 0.0
+_alchemy_disabled = False  # см. rpc_call: 401/403 от Alchemy -- не бить туда КАЖДЫЙ раз впустую
 
 
 def _endpoint() -> str:
     key = os.environ.get("ALCHEMY_API_KEY", "")
-    if key:
+    if key and not _alchemy_disabled:
         return f"https://solana-mainnet.g.alchemy.com/v2/{key}"
     return _PUBLIC_RPC
 
@@ -72,7 +73,7 @@ def _cache_path(method: str, params: list) -> Path:
 
 
 def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
-    global _last_call_at, _backoff_s
+    global _last_call_at, _backoff_s, _alchemy_disabled
     cache_f = _cache_path(method, params)
     if use_cache and cache_f.exists():
         try:
@@ -96,8 +97,13 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
             _backoff_s = min(max(_backoff_s * 2, 0.5), 10.0)
             continue
         if resp.status_code in (401, 403) and not fallback_used and url != _PUBLIC_RPC:
+            # Найдено при диагностике Шага 1: у выданного ALCHEMY_API_KEY
+            # сеть SOLANA_MAINNET не включена в приложении -- это ПОСТОЯННАЯ
+            # (не временная) 403 на каждый вызов. Один раз падаем на public,
+            # дальше не долбим Alchemy впустую весь оставшийся прогон.
             url = _PUBLIC_RPC
             fallback_used = True
+            _alchemy_disabled = True
             continue
         if not resp.ok:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
@@ -130,35 +136,54 @@ def get_transaction(sig: str) -> dict | None:
 
 # --- история пула: ОДНА на пул, переиспользуется для всех точек/покупок этого пула ---
 _pool_history_cache: dict[str, list[dict]] = {}
+_pool_history_reached_end: dict[str, bool] = {}
 
 
-def pool_history(pool: str, max_pages: int = 40) -> list[dict]:
-    """Полная (или до max_pages*1000) история подписей пула, newest-first,
-    как отдаёт сама getSignaturesForAddress -- кэшируется В ПАМЯТИ на весь
-    прогон процесса, так что 39 покупок одного минта = ОДИН реальный проход
-    по истории его пула, не 39 (Шаг 0.3)."""
-    if pool in _pool_history_cache:
-        return _pool_history_cache[pool]
-    disk_cache = CACHE_DIR / f"pool_history_{pool}.json"
-    if disk_cache.exists():
-        try:
-            hist = json.loads(disk_cache.read_text())
-            _pool_history_cache[pool] = hist
-            return hist
-        except (ValueError, OSError):
-            pass
-    hist: list[dict] = []
-    before = None
-    for _ in range(max_pages):
+def pool_history(pool: str, min_time: int | None = None, max_pages_per_call: int = 400) -> list[dict]:
+    """История подписей пула, newest-first, как отдаёт сама
+    getSignaturesForAddress -- кэшируется В ПАМЯТИ+на диске на весь прогон
+    процесса, так что 39 покупок одного минта = ОДИН реальный проход по
+    истории его пула, не 39 (Шаг 0.3).
+
+    ВАЖНО (найдено при сверке Шага 1 на сигнатурах 4/5 из 5: активный пул
+    'kuasv...'-подобный, 39/100 покупок делят один минт, накапливает
+    десятки тысяч подписей за считанные часы -- фиксированный потолок в
+    40 страниц не докапывался до нужного t 6+ часов назад, бинарный поиск
+    падал за конец массива и ЛОЖНО читался как no_historical_swap, хотя
+    сама транзакция реально существует и достаётся getTransaction
+    напрямую). Поэтому глубина пагинации теперь определяется НУЖНЫМ t, а
+    не произвольным потолком страниц -- догружаем ровно до тех пор, пока
+    не долистали до min_time или до реального начала истории аккаунта."""
+    hist = _pool_history_cache.get(pool)
+    if hist is None:
+        disk_cache = CACHE_DIR / f"pool_history_{pool}.json"
+        if disk_cache.exists():
+            try:
+                hist = json.loads(disk_cache.read_text())
+            except (ValueError, OSError):
+                hist = []
+        else:
+            hist = []
+        _pool_history_cache[pool] = hist
+    oldest_time = hist[-1]["blockTime"] if hist and hist[-1].get("blockTime") is not None else None
+    reached_end = _pool_history_reached_end.get(pool, False)
+    pages = 0
+    while (min_time is not None and (oldest_time is None or oldest_time > min_time)
+           and not reached_end and pages < max_pages_per_call):
+        before = hist[-1]["signature"] if hist else None
         page = get_signatures_for_address(pool, before=before, limit=1000)
+        pages += 1
         if not page:
+            reached_end = True
             break
         hist.extend(page)
-        before = page[-1]["signature"]
+        oldest_time = page[-1].get("blockTime")
         if len(page) < 1000:
+            reached_end = True
             break
     _pool_history_cache[pool] = hist
-    disk_cache.write_text(json.dumps(hist))
+    _pool_history_reached_end[pool] = reached_end
+    (CACHE_DIR / f"pool_history_{pool}.json").write_text(json.dumps(hist))
     return hist
 
 
@@ -217,9 +242,10 @@ def find_price_at(pool: str, t: int, max_scanned: int = 120) -> dict:
     """Замена их point(pool,t) -- ТА ЖЕ семантика (последняя сделка до t,
     честный статус missing_swap_event/no_historical_swap), но по
     ОТДЕЛЬНЫМ транзакциям через getTransaction, не по полным блокам."""
-    hist = pool_history(pool)
+    hist = pool_history(pool, min_time=t)
     # Первая подпись с blockTime<=t (hist -- newest-first) -- бинарный поиск,
-    # т.к. вся история пула уже загружена целиком (Шаг 0.3: один проход).
+    # история пула догружена минимум до t (Шаг 0.3: один проход вглубь на пул,
+    # переиспользуемый и расширяемый при последующих более ранних t).
     times = [-(h["blockTime"] or -(10**18)) for h in hist]  # отриц. для monotonic возрастания при newest-first
     idx = bisect.bisect_left(times, -t)
     scanned = 0
