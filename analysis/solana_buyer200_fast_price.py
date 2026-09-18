@@ -866,9 +866,32 @@ if __name__ == "__main__":
         # -- в конец, отдельно, когда остальное уже посчитано.
         DOMINANT_MINT = "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
 
-        def _priority(sig: str) -> tuple[bool, bool]:
+        # Владелец, 2026-09-18: покупка 2Va34xitgVP48XRW... зависла на
+        # листании пула 36Spkkr... (0 из 6 точек больше 30 минут ОДНОГО
+        # прогона, устойчиво повторяется при рестарте) -- ensure_pool_window
+        # не сохраняет прогресс листания между вызовами (пишет кэш только
+        # ПОСЛЕ полного завершения while-цикла пагинации), поэтому каждый
+        # рестарт джобы начинает листание этого сегмента заново с нуля и
+        # снова упирается в 90-минутный таймаут -- без вмешательства эта
+        # покупка не закроется НИКОГДА, а её место в очереди блокирует все
+        # последующие. 36Spkkr... -- это собственный пул ДОМИНИРУЮЩЕГО
+        # минта к USDC (второй его пул, помимо zxTpi4BtaWX3 к SOL) --
+        # такой же высокооборотный, просто задет здесь как промежуточная
+        # нога чужой покупки, не как её собственная. Откладываем ЛЮБУЮ
+        # покупку (не только сам доминирующий минт), чей маршрут касается
+        # хотя бы одной ногой одного из двух известных горячих пулов
+        # доминирующего минта -- в конец очереди, вместе с ним.
+        HOT_POOLS = {
+            "zxTpi4BtaWX3mgdAPoezkMD1hxx8CdeCfrqXMWvSCLX",  # доминирующий минт <-> SOL (DLMM)
+            "36SpkkrsnyUgjPC24KU993r8T3whkJaPgoEeAmbBj9uB",  # доминирующий минт <-> USDC (DLMM)
+        }
+
+        def _touches_hot_pool(sig: str) -> bool:
+            return any(leg["pool"] in HOT_POOLS for leg in (routes.get(sig) or []))
+
+        def _priority(sig: str) -> tuple[bool, bool, bool]:
             r = rows[sig]
-            return (r["mint"] == DOMINANT_MINT, not r["zero_balance"])
+            return (_touches_hot_pool(sig), r["mint"] == DOMINANT_MINT, not r["zero_balance"])
 
         target_sigs = sorted(rows.keys(), key=_priority)
         out_path = OUT_ROOT / "step_extended_result.json"
