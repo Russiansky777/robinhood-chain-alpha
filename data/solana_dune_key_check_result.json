@@ -1,0 +1,16 @@
+{
+  "key_checks": [
+    {
+      "secret_name": "DUNE_API_KEY",
+      "status": "read_only",
+      "detail": "Dune API error 403: {\"error\":\"Your account is read-only. Upgrade to create content or run queries.\"}"
+    },
+    {
+      "secret_name": "DUNE_API_KEY_MOZILA",
+      "status": "read_only",
+      "detail": "Dune API error 403: {\"error\":\"Your account is read-only. Upgrade to create content or run queries.\"}"
+    }
+  ],
+  "other_dune_secret_names_referenced_in_repo": "Только DUNE_API_KEY и DUNE_API_KEY_MOZILA где-либо читаются кодом/workflow (проверено grep, не по памяти) -- если существует ещё один секрет с другим именем, эта проверка его не видит.",
+  "HONEST_ANSWER": "Ни один известный Dune-ключ не может выполнять запросы (см. key_checks выше) -- Dune закрыт для этой задачи, остаёмся на цепи."
+}
