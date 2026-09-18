@@ -362,6 +362,33 @@ def step4_first_entry_classification(probe: DuneProbe, calib: dict) -> dict:
     return out
 
 
+def step2c_pumpfun_full_coverage(probe: DuneProbe, calib: dict, pumpfun_table: str) -> dict:
+    """Полная (не LIMIT 5) выборка из найденной таблицы pump.fun-бондинг-
+    кривой за то же окно, что и калибровка -- пересчёт покрытия ВМЕСТЕ с
+    dex_solana.trades, честно, прежде чем объявлять вердикт."""
+    sql = (f"SELECT tx_id, block_time FROM {pumpfun_table} WHERE trader_id = '{LEADER_WALLET}' "
+           f"AND block_time >= from_unixtime({calib['lo_time']}) AND block_time <= from_unixtime({calib['hi_time']})")
+    r = probe.run_sql_sync("pumpfun_full_window", sql, timeout_s=300)
+    out = {"table": pumpfun_table, "dune_step": {k: v for k, v in r.items() if k != "rows"}}
+    if r.get("status") != "ok":
+        return out
+    pumpfun_tx_ids = {row["tx_id"] for row in r["rows"]}
+    out["pumpfun_n_rows"] = len(r["rows"])
+    sel_path = REPO_ROOT / "data" / "solana_buyer_200" / "selected_300.json"
+    our_sigs = {rr["signature"] for rr in json.loads(sel_path.read_text())}
+    dex_tx_ids = {row.get("tx_id") for row in calib["dune_step"]["rows"]}
+    combined = dex_tx_ids | pumpfun_tx_ids
+    found_combined = our_sigs & combined
+    out["combined_n_found"] = len(found_combined)
+    out["combined_coverage"] = round(len(found_combined) / len(our_sigs), 4) if our_sigs else None
+    found_pumpfun_only = our_sigs & pumpfun_tx_ids
+    out["n_found_in_pumpfun_table_alone"] = len(found_pumpfun_only)
+    print(f"[dune_check] pump.fun-таблица: {out['pumpfun_n_rows']} строк в окне, "
+          f"из них наших: {out['n_found_in_pumpfun_table_alone']}, "
+          f"совместное покрытие: {out['combined_coverage']}", flush=True)
+    return out
+
+
 def main() -> None:
     discovery = step0_discover_keys()
     result["step0_key_discovery"] = discovery
@@ -397,8 +424,12 @@ def main() -> None:
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     if calib.get("coverage") is not None and calib["coverage"] < 0.95 and calib.get("missing_sample"):
-        result["step2b_pumpfun_check"] = step2b_pumpfun_check(probe, calib["missing_sample"])
+        step2b = step2b_pumpfun_check(probe, calib["missing_sample"])
+        result["step2b_pumpfun_check"] = step2b
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+        if step2b.get("found_table"):
+            result["step2c_pumpfun_full_coverage"] = step2c_pumpfun_full_coverage(probe, calib, step2b["found_table"])
+            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     result["step3_price_at_30s"] = step3_price_at_30s(probe, calib)
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
