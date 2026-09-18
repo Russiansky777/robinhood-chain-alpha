@@ -1,0 +1,50 @@
+name: "Solana buyer_200 -- нулевая точка сита DBot (10 кошельков)"
+
+# Только чтение -- DBot GET-запросы + один getBalance по RPC. Не трогает
+# ни пилотную задачу, ни основной прогон 300 покупок.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DBOT_SIEVE_BASELINE_REQUEST"
+
+jobs:
+  solana_dbot_sieve_baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Снять нулевую точку сита"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_dbot_sieve_baseline.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DBOT_SIEVE_BASELINE_REQUEST
+          [ -e data/dbot_sieve_baseline.json ] && git add data/dbot_sieve_baseline.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: нулевая точка сита DBot -- стартовое состояние [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
