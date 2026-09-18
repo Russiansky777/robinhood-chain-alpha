@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-18T23:29:20Z",
+  "generated_at_utc": "2026-09-18T23:37:26Z",
   "step0_key_discovery": {
     "env_keys_checked": [
       "DUNE_EXPLORER_API",
@@ -15,7 +15,7 @@
       "DUNE_EXPLORER_API": {
         "http_status": 200,
         "alive": true,
-        "body_preview": "{\"query_id\": 8771101}"
+        "body_preview": "{\"query_id\": 8771130}"
       },
       "DUNE_API_KEY": {
         "http_status": 403,
@@ -33,23 +33,23 @@
   "step1_capability_probe": {
     "create": {
       "http_status": 200,
-      "body_preview": "{\"query_id\": 8771102}"
+      "body_preview": "{\"query_id\": 8771131}"
     },
     "execute": {
       "http_status": 200,
-      "body_preview": "{\"execution_id\": \"01M2VDMV1QXV204RHYYP7X9HNE\", \"state\": \"QUERY_STATE_PENDING\"}"
+      "body_preview": "{\"execution_id\": \"01M2VE3NWASGQF8HN32D3MRXY8\", \"state\": \"QUERY_STATE_PENDING\"}"
     },
     "status": {
       "http_status": 200,
-      "body_preview": "{\"execution_id\": \"01M2VDMV1QXV204RHYYP7X9HNE\", \"query_id\": 8771102, \"is_execution_finished\": true, \"state\": \"QUERY_STATE_COMPLETED\", \"submitted_at\": \"2026-09-18T23:29:23.000273Z\", \"expires_at\": \"2026-12-17T23:29:23.265737Z\", \"execution_started_at\": \"2026-09-18T23:29:23.002592565Z\", \"execution_ended_"
+      "body_preview": "{\"execution_id\": \"01M2VE3NWASGQF8HN32D3MRXY8\", \"query_id\": 8771131, \"is_execution_finished\": true, \"state\": \"QUERY_STATE_COMPLETED\", \"submitted_at\": \"2026-09-18T23:37:29.227248Z\", \"expires_at\": \"2026-12-17T23:37:29.500622Z\", \"execution_started_at\": \"2026-09-18T23:37:29.229483419Z\", \"execution_ended_"
     },
     "results": {
       "http_status": 200,
-      "body_preview": "{\"execution_id\": \"01M2VDMV1QXV204RHYYP7X9HNE\", \"query_id\": 8771102, \"is_execution_finished\": true, \"state\": \"QUERY_STATE_COMPLETED\", \"submitted_at\": \"2026-09-18T23:29:23.000273Z\", \"expires_at\": \"2026-12-17T23:29:23.265737Z\", \"execution_started_at\": \"2026-09-18T23:29:23.002592Z\", \"execution_ended_at\""
+      "body_preview": "{\"execution_id\": \"01M2VE3NWASGQF8HN32D3MRXY8\", \"query_id\": 8771131, \"is_execution_finished\": true, \"state\": \"QUERY_STATE_COMPLETED\", \"submitted_at\": \"2026-09-18T23:37:29.227248Z\", \"expires_at\": \"2026-12-17T23:37:29.500622Z\", \"execution_started_at\": \"2026-09-18T23:37:29.229483Z\", \"execution_ended_at\""
     },
     "cancel_on_completed": {
       "http_status": 404,
-      "body_preview": "{\"error\": \"The requested execution ID (ID 01M2VDMV1QXV204RHYYP7X9HNE) was not found.\"}"
+      "body_preview": "{\"error\": \"The requested execution ID (ID 01M2VE3NWASGQF8HN32D3MRXY8) was not found.\"}"
     }
   },
   "step2_calibration": {
@@ -62,20 +62,20 @@
       "create": {
         "http_status": 200
       },
-      "query_id": 8771103,
+      "query_id": 8771132,
       "execute": {
         "http_status": 200
       },
-      "execution_id": "01M2VDN0PV13DGHSC7Y0QAN19C",
+      "execution_id": "01M2VE3VHF02BKCT5TMW09VC8B",
       "status_meta": {
-        "execution_id": "01M2VDN0PV13DGHSC7Y0QAN19C",
-        "query_id": 8771103,
+        "execution_id": "01M2VE3VHF02BKCT5TMW09VC8B",
+        "query_id": 8771132,
         "is_execution_finished": true,
         "state": "QUERY_STATE_COMPLETED",
-        "submitted_at": "2026-09-18T23:29:28.796493Z",
-        "expires_at": "2026-12-17T23:29:31.655444Z",
-        "execution_started_at": "2026-09-18T23:29:29.131742835Z",
-        "execution_ended_at": "2026-09-18T23:29:31.655437732Z",
+        "submitted_at": "2026-09-18T23:37:35.024565Z",
+        "expires_at": "2026-12-17T23:38:57.497818Z",
+        "execution_started_at": "2026-09-18T23:37:35.267335712Z",
+        "execution_ended_at": "2026-09-18T23:38:57.497810629Z",
         "result_metadata": {
           "column_names": [
             "tx_id",
@@ -100,24 +100,15 @@
           "total_row_count": 35,
           "total_result_set_bytes": 7233,
           "datapoint_count": 245,
-          "pending_time_millis": 335,
-          "execution_time_millis": 2523
+          "pending_time_millis": 242,
+          "execution_time_millis": 82230
         },
-        "execution_cost_credits": 1.0825
+        "execution_cost_credits": 3.683730771
       },
       "results_http_status": 200,
       "status": "ok",
       "n_rows": 35,
       "rows": [
-        {
-          "amount_usd": 9.689506591150002,
-          "block_slot": 446720020,
-          "block_time": "2026-09-13 13:58:21.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "5fWsbFwkNi4vEkcwJ8uJw7pVR6ssXoyMbDvXP2A8EUJYMKW4cbkWwHqM7Xn5KRnLZ2zuPj15HAG3SP6BrAc8gPDL"
-        },
         {
           "amount_usd": 122.48172212144,
           "block_slot": 447305679,
@@ -128,13 +119,22 @@
           "tx_id": "4G3AdyWNDhzZTttf7HUJ2jDijeeEtgZqxkgFUkhofSTtFY1DsF6R23C5SoMPwdfKwGmTyGppE5cmWnyQcWLEf1WJ"
         },
         {
-          "amount_usd": 9.70812839916,
-          "block_slot": 446741344,
-          "block_time": "2026-09-13 15:50:43.000 UTC",
+          "amount_usd": 9.689506591150002,
+          "block_slot": 446720020,
+          "block_time": "2026-09-13 13:58:21.000 UTC",
           "project": "pumpswap",
           "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "38crXcXRSv2WwuVxwBfLg2X2QwnFhbukH8pY6NPHLCjXqAE4fCWSASgKmqQV1dKcrSEAqqghNNRLsRDncA7e3Znz"
+          "tx_id": "5fWsbFwkNi4vEkcwJ8uJw7pVR6ssXoyMbDvXP2A8EUJYMKW4cbkWwHqM7Xn5KRnLZ2zuPj15HAG3SP6BrAc8gPDL"
+        },
+        {
+          "amount_usd": 4.84512267965,
+          "block_slot": 447306757,
+          "block_time": "2026-09-15 17:27:29.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "4miYBJHiGydyCNWyepKf8JdEF2HGvGoeHyZNM6XsqZDUjMwLKx2ZqZsCZGrTxEwZXtavZPkzbRpvFCtfJF8gT8mm"
         },
         {
           "amount_usd": 9.688750875719998,
@@ -155,15 +155,6 @@
           "tx_id": "5UNDJuFytQSu2RoFbYbamSNM5fYuswLQ8q2AXgiMxCiTNMU3fjMcTjWAEELSgRhUL9cshnZTZFZ9ycF5aX6KUH6n"
         },
         {
-          "amount_usd": 117.54034473612,
-          "block_slot": 447093051,
-          "block_time": "2026-09-14 22:42:35.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "46ztSzomfonEwzwHkZehAbrMb43vRPYw3ApkQcz3pump",
-          "tx_id": "4PNfSnPT5ARLevXMuewLeezcRBV4XY3gQe6y9ypZN6nnc894qn8EXC1TRvYXJu4cBtjZptUcNBeRZyT3Xp8fas6q"
-        },
-        {
           "amount_usd": 20.46255907626,
           "block_slot": 447148219,
           "block_time": "2026-09-15 03:32:58.000 UTC",
@@ -171,105 +162,6 @@
           "token_bought_mint_address": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
           "tx_id": "5UNDJuFytQSu2RoFbYbamSNM5fYuswLQ8q2AXgiMxCiTNMU3fjMcTjWAEELSgRhUL9cshnZTZFZ9ycF5aX6KUH6n"
-        },
-        {
-          "amount_usd": 246.06558832416002,
-          "block_slot": 447305650,
-          "block_time": "2026-09-15 17:21:40.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "3o5ibKT5ZdyBS7z3z94G3rSu1LSgNwH5CTTDNED2eVsW6PYg6QME68h7xQCK79cLwqQkbBz5B8Hia5GvUj8iZGJe"
-        },
-        {
-          "amount_usd": 4.8354517240699995,
-          "block_slot": 447306757,
-          "block_time": "2026-09-15 17:27:29.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "4miYBJHiGydyCNWyepKf8JdEF2HGvGoeHyZNM6XsqZDUjMwLKx2ZqZsCZGrTxEwZXtavZPkzbRpvFCtfJF8gT8mm"
-        },
-        {
-          "amount_usd": 4.767722192100001,
-          "block_slot": 447036807,
-          "block_time": "2026-09-14 17:45:25.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "5nZMRLSFnA3oWXXswKyyaW5or2FFy34tkTUhtkWPpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "4kqUE2JNDHE7h5Hkxd4kG5n6tfi3mS8CfKtQZRE5gWJNSrA217JSshPMYGzUppcJV6pcdAE5yTgEqBSxyWvffhHY"
-        },
-        {
-          "amount_usd": 119.218343475984,
-          "block_slot": 447105343,
-          "block_time": "2026-09-14 23:47:19.000 UTC",
-          "project": "raydium",
-          "token_bought_mint_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "3BdMEGeSNDiZwRDy2PBu6MwWUoPM9SxboKa4XE39fSk2ucujew1F2rU2pJFSnj1ZGaf1t4uUCoWovTszEd4it48W"
-        },
-        {
-          "amount_usd": 36.87938392208,
-          "block_slot": 447142240,
-          "block_time": "2026-09-15 03:01:28.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "3gDAjymqTF19GVw4TcB8sAKd3yLR2dfEzJ4Wztm2pump",
-          "tx_id": "o7s863S9WPCdFAq3pfVXDxGCt5ZupPkPA1h4MjgeHdNyTUTAmNQgpkKLPGbRFs6pwnuCCxZCYPhUxX3CmkKGj6m"
-        },
-        {
-          "amount_usd": 160.99997037549,
-          "block_slot": 447318937,
-          "block_time": "2026-09-15 18:31:46.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "tx_id": "2LuET9DgJsbyh8XiiEfnou1F6WiCj2zCFiTWvjDUN9LQFDanAsSiFcsK54fQkJ2KVBNyzX1nY4BAuLh7rd5n7srh"
-        },
-        {
-          "amount_usd": 4.84512267965,
-          "block_slot": 447306757,
-          "block_time": "2026-09-15 17:27:29.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "4miYBJHiGydyCNWyepKf8JdEF2HGvGoeHyZNM6XsqZDUjMwLKx2ZqZsCZGrTxEwZXtavZPkzbRpvFCtfJF8gT8mm"
-        },
-        {
-          "amount_usd": 3.52445298178,
-          "block_slot": 447110432,
-          "block_time": "2026-09-15 00:14:05.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
-          "tx_id": "4BpX7CQPS8MS7ZB3TvUexVnsCDTCrRWZMGtAsPGJsnLcYpBywQi5UURWqLLWnybYFWWLHvkJNQnwPj7LwEVR3aDb"
-        },
-        {
-          "amount_usd": 245.57443937124998,
-          "block_slot": 447305650,
-          "block_time": "2026-09-15 17:21:40.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "3o5ibKT5ZdyBS7z3z94G3rSu1LSgNwH5CTTDNED2eVsW6PYg6QME68h7xQCK79cLwqQkbBz5B8Hia5GvUj8iZGJe"
-        },
-        {
-          "amount_usd": null,
-          "block_slot": 447105392,
-          "block_time": "2026-09-14 23:47:35.000 UTC",
-          "project": "raydium",
-          "token_bought_mint_address": "suifhC9gU1VbJAPYPTBkHJyyyStKGLLYPVDTmPoqbvA",
-          "token_sold_mint_address": "9iJgiRRawY6Vvvnjvn4EJF5nuLXgrLT11zkApEXVZLaE",
-          "tx_id": "61CgD43TNdF3KSXi25EcUpYwfwhHXUZwntMbQjnGFYQuTtmYFLsyNfyZurUTR3Vc7ai2Mof7m8ShuhjiECGcwNg1"
-        },
-        {
-          "amount_usd": 142.18625729982,
-          "block_slot": 447318890,
-          "block_time": "2026-09-15 18:31:31.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "tx_id": "2hY2kfBrLjZByexH1sAsqy2idyM636QqpTbMMMmKf28i3fxTTe7bVUoedEd2RcKVq6YFHEXnp4L2G3LVFqVzwMWf"
         },
         {
           "amount_usd": 486.67747924845,
@@ -281,40 +173,13 @@
           "tx_id": "5Nj7h1cA7G9qf2vqNX5T5ye6VwZT9HaYkciXC3r13dqyty85RTstPEyA8j9iWxZQQgN2zSxNSnnJCDek3QEgo5cH"
         },
         {
-          "amount_usd": 2.45489119073,
-          "block_slot": 447110387,
-          "block_time": "2026-09-15 00:13:51.000 UTC",
+          "amount_usd": 122.49385948448,
+          "block_slot": 447305725,
+          "block_time": "2026-09-15 17:22:03.000 UTC",
           "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "Dmkj4dB3Ngva9gWKkDgj8UMF39EC7ArpGf2rxLxDpump",
-          "tx_id": "3bPJDJYZ7uxiocQsThHbPHb9GeLhrfxbXU7NPc9ziVDe5CwB9TTVQDqAkYPEfM1XQXtYfbwhxrimkiXg7t9GYNGm"
-        },
-        {
-          "amount_usd": 792.1106869584,
-          "block_slot": 447860720,
-          "block_time": "2026-09-17 18:14:30.000 UTC",
-          "project": "meteora",
-          "token_bought_mint_address": "7hGgx1VtNTj193fFXXuMEkp1MRV6JbWYgMBhHRYxaxu2",
+          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "5y38rMoQsL9fS921RhcAhGiPBEGA19iYfrzGYpKjfusb86hFh9Uazd8ypgkcf4KEoqkekWrTcRVJ9oeFLPZ2m3Se"
-        },
-        {
-          "amount_usd": 3.21302185245,
-          "block_slot": 447110421,
-          "block_time": "2026-09-15 00:14:02.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "EMKP9FV5wakvyodPh8edQW4RTSbHPrhYRDEiCiz1pump",
-          "tx_id": "YtweMZQoa3Gi38RBgMWFyQ4RGW3U82de46jJSAVo4RgS83jr88nFuX4s6Qzh6Jrzgnibkbkg6caXpnx6bSURMPt"
-        },
-        {
-          "amount_usd": 9.70888561615,
-          "block_slot": 446720020,
-          "block_time": "2026-09-13 13:58:21.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "5fWsbFwkNi4vEkcwJ8uJw7pVR6ssXoyMbDvXP2A8EUJYMKW4cbkWwHqM7Xn5KRnLZ2zuPj15HAG3SP6BrAc8gPDL"
+          "tx_id": "2WptG1Rya87GQwoBk2EhiA8gTBGTqRBujtVcivm9sbtCZNbe8JWgvaATqbDU3c9NV1XJjnUkn6KEK4637AvVv93C"
         },
         {
           "amount_usd": 15.8833837474,
@@ -324,6 +189,69 @@
           "token_bought_mint_address": "So11111111111111111111111111111111111111112",
           "token_sold_mint_address": "EHJMZdc43u4dcQ9uDcUv5VuB9podCoPhx8PDtByzpump",
           "tx_id": "HqPcPsxuZstpqARtNuZE24Cy7BN2ZNdFjs4NF5Cv43Zdos9118YJUAfBJiFW5tJZPMpt1aaTbGfMTCvc1q6x9st"
+        },
+        {
+          "amount_usd": 246.06558832416002,
+          "block_slot": 447305650,
+          "block_time": "2026-09-15 17:21:40.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "3o5ibKT5ZdyBS7z3z94G3rSu1LSgNwH5CTTDNED2eVsW6PYg6QME68h7xQCK79cLwqQkbBz5B8Hia5GvUj8iZGJe"
+        },
+        {
+          "amount_usd": 117.54034473612,
+          "block_slot": 447093051,
+          "block_time": "2026-09-14 22:42:35.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "46ztSzomfonEwzwHkZehAbrMb43vRPYw3ApkQcz3pump",
+          "tx_id": "4PNfSnPT5ARLevXMuewLeezcRBV4XY3gQe6y9ypZN6nnc894qn8EXC1TRvYXJu4cBtjZptUcNBeRZyT3Xp8fas6q"
+        },
+        {
+          "amount_usd": 245.57443937124998,
+          "block_slot": 447305650,
+          "block_time": "2026-09-15 17:21:40.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "3o5ibKT5ZdyBS7z3z94G3rSu1LSgNwH5CTTDNED2eVsW6PYg6QME68h7xQCK79cLwqQkbBz5B8Hia5GvUj8iZGJe"
+        },
+        {
+          "amount_usd": 3.52445298178,
+          "block_slot": 447110432,
+          "block_time": "2026-09-15 00:14:05.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+          "tx_id": "4BpX7CQPS8MS7ZB3TvUexVnsCDTCrRWZMGtAsPGJsnLcYpBywQi5UURWqLLWnybYFWWLHvkJNQnwPj7LwEVR3aDb"
+        },
+        {
+          "amount_usd": 122.73884729601,
+          "block_slot": 447305725,
+          "block_time": "2026-09-15 17:22:03.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "2WptG1Rya87GQwoBk2EhiA8gTBGTqRBujtVcivm9sbtCZNbe8JWgvaATqbDU3c9NV1XJjnUkn6KEK4637AvVv93C"
+        },
+        {
+          "amount_usd": 23.56254332598,
+          "block_slot": 446787764,
+          "block_time": "2026-09-13 19:55:03.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "2wzVMXhLypmP92mXNCq4fuFcd9TCC972AbMfuiH3pump",
+          "tx_id": "3W96iaqqVkqy6FnQnwXrb7zXEXGxaqZk4gGqgzKyAgnTV1TMRW3ikmvEXG6mcBCumnphrKkATZDWzUtbDYyiyMPt"
+        },
+        {
+          "amount_usd": 9.70888561615,
+          "block_slot": 446720020,
+          "block_time": "2026-09-13 13:58:21.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "5fWsbFwkNi4vEkcwJ8uJw7pVR6ssXoyMbDvXP2A8EUJYMKW4cbkWwHqM7Xn5KRnLZ2zuPj15HAG3SP6BrAc8gPDL"
         },
         {
           "amount_usd": 9.68590140624,
@@ -344,58 +272,31 @@
           "tx_id": "gkWYeTuPdqQp3voLwQzh8aKSD5vwToSoipsJ2vFL9P9MnkPWr6EDpoqUzUT9TL861ULPE3D5ehzVpPGjSSik2Wd"
         },
         {
-          "amount_usd": 669.3734114299,
-          "block_slot": 446421985,
-          "block_time": "2026-09-12 11:48:52.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "2wzVMXhLypmP92mXNCq4fuFcd9TCC972AbMfuiH3pump",
-          "tx_id": "4o9FL7fi9Wgg7zgpnQ7kX2L7886GTCGeStqEwM7SppbjAJfbWK9fNCDxkFvzgq4FoNcvjwN4RTgE7aVJ9eQo5YCG"
-        },
-        {
-          "amount_usd": 368.33625131289,
-          "block_slot": 447318856,
-          "block_time": "2026-09-15 18:31:20.000 UTC",
+          "amount_usd": 160.99997037549,
+          "block_slot": 447318937,
+          "block_time": "2026-09-15 18:31:46.000 UTC",
           "project": "pumpswap",
           "token_bought_mint_address": "So11111111111111111111111111111111111111112",
           "token_sold_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "tx_id": "3QNfiTLXBicxepxuoGnyUwQqt13a8P6ACUanMMmtZ9mC2Q6Dgk2gsFMLDk38HcVTMSQa9i7ZibDsWKgZKX48Uymo"
+          "tx_id": "2LuET9DgJsbyh8XiiEfnou1F6WiCj2zCFiTWvjDUN9LQFDanAsSiFcsK54fQkJ2KVBNyzX1nY4BAuLh7rd5n7srh"
         },
         {
-          "amount_usd": 122.72668560603,
-          "block_slot": 447305679,
-          "block_time": "2026-09-15 17:21:49.000 UTC",
+          "amount_usd": 4.8354517240699995,
+          "block_slot": 447306757,
+          "block_time": "2026-09-15 17:27:29.000 UTC",
           "project": "pumpswap",
           "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "4G3AdyWNDhzZTttf7HUJ2jDijeeEtgZqxkgFUkhofSTtFY1DsF6R23C5SoMPwdfKwGmTyGppE5cmWnyQcWLEf1WJ"
+          "tx_id": "4miYBJHiGydyCNWyepKf8JdEF2HGvGoeHyZNM6XsqZDUjMwLKx2ZqZsCZGrTxEwZXtavZPkzbRpvFCtfJF8gT8mm"
         },
         {
-          "amount_usd": 9.7052732307,
-          "block_slot": 446721941,
-          "block_time": "2026-09-13 14:08:29.000 UTC",
+          "amount_usd": 4.767722192100001,
+          "block_slot": 447036807,
+          "block_time": "2026-09-14 17:45:25.000 UTC",
           "project": "pumpswap",
-          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
+          "token_bought_mint_address": "5nZMRLSFnA3oWXXswKyyaW5or2FFy34tkTUhtkWPpump",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "47yvQER8LEvdaUc5n9Zyt55QScryDDv5XGmvTBRcekrhydJ64dKRQTYw1XCgrgw63uwsdTKkyUHqYyz7SnVHceYM"
-        },
-        {
-          "amount_usd": 122.49385948448,
-          "block_slot": 447305725,
-          "block_time": "2026-09-15 17:22:03.000 UTC",
-          "project": "pumpswap",
-          "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
-          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "2WptG1Rya87GQwoBk2EhiA8gTBGTqRBujtVcivm9sbtCZNbe8JWgvaATqbDU3c9NV1XJjnUkn6KEK4637AvVv93C"
-        },
-        {
-          "amount_usd": 792.1106869584,
-          "block_slot": 447860720,
-          "block_time": "2026-09-17 18:14:30.000 UTC",
-          "project": "whirlpool",
-          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
-          "token_sold_mint_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "tx_id": "5y38rMoQsL9fS921RhcAhGiPBEGA19iYfrzGYpKjfusb86hFh9Uazd8ypgkcf4KEoqkekWrTcRVJ9oeFLPZ2m3Se"
+          "tx_id": "4kqUE2JNDHE7h5Hkxd4kG5n6tfi3mS8CfKtQZRE5gWJNSrA217JSshPMYGzUppcJV6pcdAE5yTgEqBSxyWvffhHY"
         },
         {
           "amount_usd": 4.7667688236000005,
@@ -407,22 +308,121 @@
           "tx_id": "4kqUE2JNDHE7h5Hkxd4kG5n6tfi3mS8CfKtQZRE5gWJNSrA217JSshPMYGzUppcJV6pcdAE5yTgEqBSxyWvffhHY"
         },
         {
-          "amount_usd": 122.73884729601,
-          "block_slot": 447305725,
-          "block_time": "2026-09-15 17:22:03.000 UTC",
+          "amount_usd": 368.33625131289,
+          "block_slot": 447318856,
+          "block_time": "2026-09-15 18:31:20.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "tx_id": "3QNfiTLXBicxepxuoGnyUwQqt13a8P6ACUanMMmtZ9mC2Q6Dgk2gsFMLDk38HcVTMSQa9i7ZibDsWKgZKX48Uymo"
+        },
+        {
+          "amount_usd": 792.1106869584,
+          "block_slot": 447860720,
+          "block_time": "2026-09-17 18:14:30.000 UTC",
+          "project": "whirlpool",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "tx_id": "5y38rMoQsL9fS921RhcAhGiPBEGA19iYfrzGYpKjfusb86hFh9Uazd8ypgkcf4KEoqkekWrTcRVJ9oeFLPZ2m3Se"
+        },
+        {
+          "amount_usd": 122.72668560603,
+          "block_slot": 447305679,
+          "block_time": "2026-09-15 17:21:49.000 UTC",
           "project": "pumpswap",
           "token_bought_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
           "token_sold_mint_address": "So11111111111111111111111111111111111111112",
-          "tx_id": "2WptG1Rya87GQwoBk2EhiA8gTBGTqRBujtVcivm9sbtCZNbe8JWgvaATqbDU3c9NV1XJjnUkn6KEK4637AvVv93C"
+          "tx_id": "4G3AdyWNDhzZTttf7HUJ2jDijeeEtgZqxkgFUkhofSTtFY1DsF6R23C5SoMPwdfKwGmTyGppE5cmWnyQcWLEf1WJ"
         },
         {
-          "amount_usd": 23.56254332598,
-          "block_slot": 446787764,
-          "block_time": "2026-09-13 19:55:03.000 UTC",
+          "amount_usd": 36.87938392208,
+          "block_slot": 447142240,
+          "block_time": "2026-09-15 03:01:28.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "3gDAjymqTF19GVw4TcB8sAKd3yLR2dfEzJ4Wztm2pump",
+          "tx_id": "o7s863S9WPCdFAq3pfVXDxGCt5ZupPkPA1h4MjgeHdNyTUTAmNQgpkKLPGbRFs6pwnuCCxZCYPhUxX3CmkKGj6m"
+        },
+        {
+          "amount_usd": 792.1106869584,
+          "block_slot": 447860720,
+          "block_time": "2026-09-17 18:14:30.000 UTC",
+          "project": "meteora",
+          "token_bought_mint_address": "7hGgx1VtNTj193fFXXuMEkp1MRV6JbWYgMBhHRYxaxu2",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "5y38rMoQsL9fS921RhcAhGiPBEGA19iYfrzGYpKjfusb86hFh9Uazd8ypgkcf4KEoqkekWrTcRVJ9oeFLPZ2m3Se"
+        },
+        {
+          "amount_usd": 3.21302185245,
+          "block_slot": 447110421,
+          "block_time": "2026-09-15 00:14:02.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "EMKP9FV5wakvyodPh8edQW4RTSbHPrhYRDEiCiz1pump",
+          "tx_id": "YtweMZQoa3Gi38RBgMWFyQ4RGW3U82de46jJSAVo4RgS83jr88nFuX4s6Qzh6Jrzgnibkbkg6caXpnx6bSURMPt"
+        },
+        {
+          "amount_usd": 142.18625729982,
+          "block_slot": 447318890,
+          "block_time": "2026-09-15 18:31:31.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+          "tx_id": "2hY2kfBrLjZByexH1sAsqy2idyM636QqpTbMMMmKf28i3fxTTe7bVUoedEd2RcKVq6YFHEXnp4L2G3LVFqVzwMWf"
+        },
+        {
+          "amount_usd": 2.45489119073,
+          "block_slot": 447110387,
+          "block_time": "2026-09-15 00:13:51.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "So11111111111111111111111111111111111111112",
+          "token_sold_mint_address": "Dmkj4dB3Ngva9gWKkDgj8UMF39EC7ArpGf2rxLxDpump",
+          "tx_id": "3bPJDJYZ7uxiocQsThHbPHb9GeLhrfxbXU7NPc9ziVDe5CwB9TTVQDqAkYPEfM1XQXtYfbwhxrimkiXg7t9GYNGm"
+        },
+        {
+          "amount_usd": 9.70812839916,
+          "block_slot": 446741344,
+          "block_time": "2026-09-13 15:50:43.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "38crXcXRSv2WwuVxwBfLg2X2QwnFhbukH8pY6NPHLCjXqAE4fCWSASgKmqQV1dKcrSEAqqghNNRLsRDncA7e3Znz"
+        },
+        {
+          "amount_usd": null,
+          "block_slot": 447105392,
+          "block_time": "2026-09-14 23:47:35.000 UTC",
+          "project": "raydium",
+          "token_bought_mint_address": "suifhC9gU1VbJAPYPTBkHJyyyStKGLLYPVDTmPoqbvA",
+          "token_sold_mint_address": "9iJgiRRawY6Vvvnjvn4EJF5nuLXgrLT11zkApEXVZLaE",
+          "tx_id": "61CgD43TNdF3KSXi25EcUpYwfwhHXUZwntMbQjnGFYQuTtmYFLsyNfyZurUTR3Vc7ai2Mof7m8ShuhjiECGcwNg1"
+        },
+        {
+          "amount_usd": 669.3734114299,
+          "block_slot": 446421985,
+          "block_time": "2026-09-12 11:48:52.000 UTC",
           "project": "pumpswap",
           "token_bought_mint_address": "So11111111111111111111111111111111111111112",
           "token_sold_mint_address": "2wzVMXhLypmP92mXNCq4fuFcd9TCC972AbMfuiH3pump",
-          "tx_id": "3W96iaqqVkqy6FnQnwXrb7zXEXGxaqZk4gGqgzKyAgnTV1TMRW3ikmvEXG6mcBCumnphrKkATZDWzUtbDYyiyMPt"
+          "tx_id": "4o9FL7fi9Wgg7zgpnQ7kX2L7886GTCGeStqEwM7SppbjAJfbWK9fNCDxkFvzgq4FoNcvjwN4RTgE7aVJ9eQo5YCG"
+        },
+        {
+          "amount_usd": 119.218343475984,
+          "block_slot": 447105343,
+          "block_time": "2026-09-14 23:47:19.000 UTC",
+          "project": "raydium",
+          "token_bought_mint_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "3BdMEGeSNDiZwRDy2PBu6MwWUoPM9SxboKa4XE39fSk2ucujew1F2rU2pJFSnj1ZGaf1t4uUCoWovTszEd4it48W"
+        },
+        {
+          "amount_usd": 9.7052732307,
+          "block_slot": 446721941,
+          "block_time": "2026-09-13 14:08:29.000 UTC",
+          "project": "pumpswap",
+          "token_bought_mint_address": "9aUVtPjjvRcT7SUVcPcwSP8sPAmAGpjDEwKGaQ9bpump",
+          "token_sold_mint_address": "So11111111111111111111111111111111111111112",
+          "tx_id": "47yvQER8LEvdaUc5n9Zyt55QScryDDv5XGmvTBRcekrhydJ64dKRQTYw1XCgrgw63uwsdTKkyUHqYyz7SnVHceYM"
         }
       ],
       "metadata": {
@@ -449,8 +449,8 @@
         "total_row_count": 35,
         "total_result_set_bytes": 7233,
         "datapoint_count": 245,
-        "pending_time_millis": 335,
-        "execution_time_millis": 2523
+        "pending_time_millis": 242,
+        "execution_time_millis": 82230
       }
     },
     "dune_n_rows": 35,
@@ -459,42 +459,59 @@
     "coverage": 0.0033,
     "n_missing": 299,
     "missing_sample": [
-      "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",
+      "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",
-      "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"
+      "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"
     ],
     "projects_found": {
-      "meteora": 1,
-      "whirlpool": 1
+      "whirlpool": 1,
+      "meteora": 1
     }
   },
   "step2b_pumpfun_check": {
-    "discovery": {
-      "name": "pumpfun_table_discovery",
-      "sql_preview": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_name LIKE '%pump%' OR table_name LIKE '%bonding%' OR table_name LIKE '%launch%'",
-      "create": {
-        "http_status": 200
+    "n_missing_checked": 15,
+    "table_probes": {
+      "pump_fun_solana.trades": {
+        "status": "execution_QUERY_STATE_FAILED",
+        "n_rows": null,
+        "error_preview": "{\"execution_id\": \"01M2VE6EXY1FNQDNCSJQTPG0H6\", \"query_id\": 8771136, \"is_execution_finished\": true, \"state\": \"QUERY_STATE_FAILED\", \"submitted_at\": \"2026-09-18T23:39:00.415121Z\", \"expires_at\": \"2026-12-17T23:39:01.300441Z\", \"execution_started_at\": \"2026-09-18T23:39:00.417371232Z\", \"execution_ended_at\""
       },
-      "query_id": 8771104,
-      "execute": {
-        "http_status": 200
-      },
-      "execution_id": "01M2VDN7AJTDYS4P7RQ9XM5Q21",
-      "status": "timeout"
+      "pumpdotfun_solana.trades": {
+        "status": "ok",
+        "n_rows": 5,
+        "error_preview": "null"
+      }
     },
-    "n_missing_checked": 15
+    "found_table": "pumpdotfun_solana.trades",
+    "sample_rows": [
+      {
+        "tx_id": "2QYZvjPtdrxFsA8KctyK6jP5KivqosNTo1zxhDLf4koj5xrFQSgAQCR52JKkivq3FUhCx1EdUD28StKKbgrC1LKx"
+      },
+      {
+        "tx_id": "2ZMVAYRAgpWRKd4xoe1MHh3bsKk7j6ePHg6696uxjJEqH2RasdxB4QzxKXFnLJPhraN21aN4gCKDRsTdMK3N6HuZ"
+      },
+      {
+        "tx_id": "3LbMJP5e6GgSqyAode6A4UP7tc2SUM7xgZUxgWXMyqdbMDSe1w1CLKPNM5rfkaUxFE8BCoyMbQ4yzpjytrXnvp9A"
+      },
+      {
+        "tx_id": "5bad7nDtDQsPbm7qDWsfyzh4HxSvmU5n1Bq9QRwMqaxD1a62hbAc5EQYY2JeJXgBmxvEW1FTLyZrvsJ9c3iscKnH"
+      },
+      {
+        "tx_id": "4AKfPv8yQj5mV325fpeeFBhPg699FiPhUb4eUdYoFyzCpTDxcu1uDwfLxQNeYZQb95jY87cJ1fWiydmMNVxtqcRP"
+      }
+    ]
   },
   "step3_price_at_30s": {
     "status": "no_first_entries_found_in_dune"
@@ -506,20 +523,20 @@
       "create": {
         "http_status": 200
       },
-      "query_id": 8771113,
+      "query_id": 8771140,
       "execute": {
         "http_status": 200
       },
-      "execution_id": "01M2VDS29XZRQ44Y9JVSCMFDX0",
+      "execution_id": "01M2VE6VQ70S2DK8ZER7ZRTZQ0",
       "status_meta": {
-        "execution_id": "01M2VDS29XZRQ44Y9JVSCMFDX0",
-        "query_id": 8771113,
+        "execution_id": "01M2VE6VQ70S2DK8ZER7ZRTZQ0",
+        "query_id": 8771140,
         "is_execution_finished": true,
         "state": "QUERY_STATE_COMPLETED",
-        "submitted_at": "2026-09-18T23:31:41.501757Z",
-        "expires_at": "2026-12-17T23:31:43.129844Z",
-        "execution_started_at": "2026-09-18T23:31:41.867111124Z",
-        "execution_ended_at": "2026-09-18T23:31:43.12983782Z",
+        "submitted_at": "2026-09-18T23:39:13.512839Z",
+        "expires_at": "2026-12-17T23:39:52.883759Z",
+        "execution_started_at": "2026-09-18T23:39:13.798664962Z",
+        "execution_ended_at": "2026-09-18T23:39:52.883751932Z",
         "result_metadata": {
           "column_names": [
             "tx_id",
@@ -536,10 +553,10 @@
           "total_row_count": 8,
           "total_result_set_bytes": 1118,
           "datapoint_count": 24,
-          "pending_time_millis": 365,
-          "execution_time_millis": 1262
+          "pending_time_millis": 285,
+          "execution_time_millis": 39085
         },
-        "execution_cost_credits": 1.368653847
+        "execution_cost_credits": 1.617884616
       },
       "results_http_status": 200,
       "status": "ok",
@@ -560,8 +577,8 @@
         "total_row_count": 8,
         "total_result_set_bytes": 1118,
         "datapoint_count": 24,
-        "pending_time_millis": 365,
-        "execution_time_millis": 1262
+        "pending_time_millis": 285,
+        "execution_time_millis": 39085
       }
     },
     "n_comparable": 1,
