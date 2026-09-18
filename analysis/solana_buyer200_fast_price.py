@@ -293,7 +293,8 @@ def ensure_pool_window(pool: str, lo_time: int, hi_time: int) -> list[dict]:
 MERGE_GAP_TOLERANCE_S = 600  # см. pool_windows_needed
 
 
-def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_sec: int) -> dict[str, list[tuple[int, int]]]:
+def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_sec: int,
+                         use_gecko_sol: bool = False) -> dict[str, list[tuple[int, int]]]:
     """НЕПЕРЕСЕКАЮЩИЕСЯ сегменты [lo,hi] на пул -- объединяем только
     покупки текущего прогона, чьи диапазоны РЕАЛЬНО пересекаются,
     соприкасаются или разделены МАЛЫМ зазором (<=MERGE_GAP_TOLERANCE_S,
@@ -314,7 +315,7 @@ def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_se
         row = rows[sig]
         lo, hi = row["time"], row["time"] + max_sec
         for leg in routes.get(sig) or []:
-            if leg["pool"] == SOL_USDC_POOL:
+            if use_gecko_sol and leg["pool"] == SOL_USDC_POOL:
                 continue  # универсальная пара -- через GeckoTerminal, окно на цепи не нужно
             raw.setdefault(leg["pool"], []).append((lo, hi))
 
@@ -663,11 +664,17 @@ def migrate_sol_leg_to_gecko(already: dict, routes: dict, rows: dict, ref_by_sig
 
 def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
                     ref_by_sig_sec: dict, out_path: Path, only_ref_ok: bool = False,
-                    commit_paths: list[Path] | None = None) -> list[dict]:
+                    commit_paths: list[Path] | None = None, use_gecko_sol: bool = False) -> list[dict]:
     """Общее тело сверки для Шага 1 (17->N сигнатур), Шага 2 (19 сигнатур,
     только точки, где у эталона status=ok) и расширенного прогона на до
     300 покупок. only_ref_ok=True пропускает секунды, для которых у
     эталона нет готовой цены.
+
+    use_gecko_sol=True -- нога SOL/USDC (3ucNos4NbumP) идёт через
+    GeckoTerminal, не листанием (см. SOL_USDC_POOL). ТОЛЬКО для
+    расширенного прогона (step_extended) -- Шаг 1/2 (эталонная сверка
+    точного воспроизведения их метода на ончейн-данных) должны остаться
+    100% ончейн, иначе 30/30 точного совпадения перестанет быть точным.
 
     Возобновляемо между запусками джобы: если out_path уже содержит
     результат для (signature,seconds) -- НЕ пересчитываем и не грузим
@@ -676,7 +683,7 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
     already = _load_existing(out_path)
     print(f"[{label}] уже посчитано ранее (возобновление): {len(already)} точек", flush=True)
 
-    if label == "step_extended":
+    if use_gecko_sol:
         # GeckoTerminal (SOL/USDC) -- ОДНА жадная предзагрузка на ВЕСЬ
         # нужный диапазон СРАЗУ (по всем target_sigs, не только pending --
         # миграция ниже тоже использует этот кэш), а не по нарастающей на
@@ -714,7 +721,7 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
     # грузит каждый сегмент ЛЕНИВО, при первом реальном обращении -- то
     # есть по ходу обработки покупок, каждая из которых сразу же
     # считается и сохраняется (см. цикл ниже).
-    windows = pool_windows_needed(pending_sigs, rows, routes, max(HORIZONS_SECONDS))
+    windows = pool_windows_needed(pending_sigs, rows, routes, max(HORIZONS_SECONDS), use_gecko_sol=use_gecko_sol)
     print(f"[{label}] {len(windows)} пул(ов), {sum(len(v) for v in windows.values())} непересекающихся сегмент(ов) "
           f"-- будут догружены лениво по ходу покупок (Шаг 0.2/0.3)", flush=True)
 
@@ -745,7 +752,7 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
                     legs_out = []
                     ok = True
                     for leg in route:
-                        if leg["pool"] == SOL_USDC_POOL:
+                        if use_gecko_sol and leg["pool"] == SOL_USDC_POOL:
                             p = find_price_at_gecko(t, row["time"], t)
                         else:
                             lo, hi = find_window_for(windows[leg["pool"]], t)
@@ -851,7 +858,7 @@ if __name__ == "__main__":
         routes = {r["signature"]: r["route"] for r in json.loads((EXT_ROOT / "routes_300.json").read_text())}
         target_sigs = list(rows.keys())
         out_path = OUT_ROOT / "step_extended_result.json"
-        run_comparison("step_extended", target_sigs, rows, routes, ref_by_sig_sec, out_path)
+        run_comparison("step_extended", target_sigs, rows, routes, ref_by_sig_sec, out_path, use_gecko_sol=True)
 
     META_PATH.write_text(json.dumps(META, indent=2))
     final = json.loads(out_path.read_text())
