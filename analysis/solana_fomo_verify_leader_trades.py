@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime
 from decimal import Decimal as D
 from pathlib import Path
 
@@ -163,18 +164,28 @@ def main() -> None:
         out["our_onchain_time_range_utc"] = [time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(min(times))),
                                               time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(times)))]
 
-    def get_ts(item: dict):
+    def get_ts_epoch(item: dict) -> float | None:
+        """Метка времени сделки Fomo -- честно НЕ знаем заранее, в каком
+        поле и формате (первый реальный вызов показал: как минимум одно
+        поле пришло строкой ISO-8601, не числом -- отсюда и упавший
+        прогон). Пробуем оба варианта, а не гадаем один."""
         for k in ("timestamp", "time", "createdAt", "closedAt", "blockTime", "ts"):
-            if k in item:
-                return item[k]
+            if k not in item:
+                continue
+            v = item[k]
+            if isinstance(v, (int, float)):
+                return v / 1000 if v > 10**12 else v
+            if isinstance(v, str):
+                try:
+                    return datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
+                except ValueError:
+                    continue
         return None
 
     out["fomo_trades_sample_keys"] = list(all_trades[0].keys()) if all_trades else []
-    fomo_times = [get_ts(i) for i in all_trades if get_ts(i) is not None]
+    fomo_times = [get_ts_epoch(i) for i in all_trades if get_ts_epoch(i) is not None]
     if fomo_times:
-        fmin, fmax = min(fomo_times), max(fomo_times)
-        fmin_s = fmin / 1000 if fmin > 10**12 else fmin
-        fmax_s = fmax / 1000 if fmax > 10**12 else fmax
+        fmin_s, fmax_s = min(fomo_times), max(fomo_times)
         out["fomo_trades_time_range_utc"] = [time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(fmin_s)),
                                               time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(fmax_s))]
 
@@ -187,10 +198,9 @@ def main() -> None:
             f_mint = f.get("mint") or f.get("tokenMint") or f.get("outputMint") or f.get("token")
             if f_mint != our_mint:
                 continue
-            f_ts = get_ts(f)
-            if f_ts is None:
+            f_ts_s = get_ts_epoch(f)
+            if f_ts_s is None:
                 continue
-            f_ts_s = f_ts / 1000 if f_ts > 10**12 else f_ts
             if abs(f_ts_s - our_time) < 120:
                 best = {"our_signature": our["signature"], "our_time": our_time, "our_usdc_spent": str(our_usdc),
                         "fomo_item": f, "seconds_delta": f_ts_s - our_time}
