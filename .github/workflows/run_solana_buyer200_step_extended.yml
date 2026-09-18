@@ -30,14 +30,21 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
-      - name: "Кэш окон пулов между перезапусками джобы"
+      - name: "Восстановить кэш окон пулов из предыдущего запуска"
         # Найдено на 2-м прогоне: без этого кэша каждый рестарт (после
         # таймаута/сбоя) заново перелистывал уже собранные окна горячих
-        # пулов с нуля (десятки-сотни тысяч подписей на общий минт) --
-        # 1 покупка за 40 минут вместо ~1.3 мин/покупку. Кэш НЕ в git
-        # (слишком большой и разрастается), а в actions/cache; ключ
-        # уникален на run, restore-keys подхватывает последний доступный.
-        uses: actions/cache@v4
+        # пулов с нуля (десятки-сотни тысяч подписей на общий минт).
+        # НАЙДЕНО ПОВТОРНО на 5-м прогоне: единый actions/cache@v4 не
+        # сохраняет кэш, если джоба завершилась через cancel (таймаут) --
+        # его собственный post-шаг получает conclusion=skipped, а не
+        # success, и лог начала каждого следующего прогона честно
+        # показывает "Cache not found". Поскольку наши джобы ВСЕГДА
+        # заканчиваются таймаутом (90 мин), кэш не работал НИ РАЗУ.
+        # Раздельные restore/save (стандартный обход именно этого случая)
+        # -- save идёт отдельным шагом с if: always(), значит выполняется
+        # даже при отмене по таймауту.
+        id: pool_cache
+        uses: actions/cache/restore@v4
         with:
           path: data/solana_buyer_200/rpc_cache
           key: solana-buyer200-rpc-cache-${{ github.run_id }}
@@ -47,6 +54,12 @@ jobs:
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python -u analysis/solana_buyer200_fast_price.py --mode step_extended
+      - name: "Сохранить кэш окон пулов (даже при отмене по таймауту)"
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/solana_buyer_200/rpc_cache
+          key: solana-buyer200-rpc-cache-${{ github.run_id }}
       - name: Commit final results
         if: always()
         run: |
