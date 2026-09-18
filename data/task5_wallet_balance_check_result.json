@@ -1,6 +1,22 @@
 {
   "chain_id": 4663,
-  "private_key_env_var_checked": "PRIVATE_KEY_TASK5_BOT",
-  "note_on_address_discrepancy": "Владелец в запросе назвал 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 как адрес PRIVATE_KEY_TASK5_BOT -- по коду проекта и паспорту этот адрес документирован как кошелёк PRIVATE_KEY_NOX (другой секрет). PRIVATE_KEY_NOX в этом скрипте НЕ используется ни для чего -- см. докстринг. Реальный адрес PRIVATE_KEY_TASK5_BOT -- ниже, сверьте сами.",
-  "error": "PRIVATE_KEY_TASK5_BOT не задан в окружении этого хоста -- нечего проверять."
+  "current_gas_price_wei": 60106000,
+  "note": "PRIVATE_KEY_NOX нигде не читается и не используется в этом скрипте. eth_getBalance по адресу -- публичный вызов, ключ не требуется.",
+  "named_address_from_owner_request": {
+    "address": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+    "balance_wei": 22587306000000,
+    "balance_native": 2.2587306e-05,
+    "current_nonce": 92,
+    "estimated_cost_total_wei_for_3_sends": 3786678000000,
+    "estimated_cost_total_native_for_3_sends": 3.786678e-06,
+    "sufficient_with_3x_margin": true
+  },
+  "private_key_task5_bot": {
+    "configured": false,
+    "note": "PRIVATE_KEY_TASK5_BOT не задан в окружении этого хоста."
+  },
+  "usable_for_sending": {
+    "possible": false,
+    "reason": "Названный владельцем адрес 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75 реально профинансирован, НО PRIVATE_KEY_TASK5_BOT не задан в окружении -- неизвестно, каким приватным ключом он управляется. Если это PRIVATE_KEY_NOX -- отправка с него запрещена прямым указанием владельца ('PRIVATE_KEY_NOX не трогать'). Нужно явное подтверждение владельца, каким ключом реально подписывать, прежде чем отправлять что-либо."
+  }
 }
