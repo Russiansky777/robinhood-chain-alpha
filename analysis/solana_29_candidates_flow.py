@@ -117,7 +117,11 @@ def rent_paid_by_wallet(tx: dict, wallet: str) -> float:
     def scan(ix_list):
         nonlocal total
         for ix in ix_list:
+            if not isinstance(ix, dict):
+                continue  # неразобранная (не-parsed) инструкция приходит сырой base58-строкой, не словарём
             parsed = ix.get("parsed") or {}
+            if not isinstance(parsed, dict):
+                continue
             if parsed.get("type") == "createAccount" and ix.get("program") == "system":
                 info = parsed.get("info", {})
                 if info.get("source") == wallet:
@@ -125,7 +129,8 @@ def rent_paid_by_wallet(tx: dict, wallet: str) -> float:
 
     scan(instrs)
     for grp in inner:
-        scan(grp.get("instructions", []))
+        if isinstance(grp, dict):
+            scan(grp.get("instructions", []))
     return total / 1e9
 
 
