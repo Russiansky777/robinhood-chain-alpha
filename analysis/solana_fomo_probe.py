@@ -90,69 +90,36 @@ def main() -> None:
         print("[fomo_probe] " + out["HONEST_ANSWER"], flush=True)
 
     # ---------- fomoapi.io / getfomoapi.fun: leaderboard, с ключом (если есть) ----------
+    # Первый реальный вызов с ключом (18:10 UTC) вернул 401 "Invalid API key" на
+    # getfomoapi.fun с заголовком X-API-Key -- источники расходятся в формате
+    # заголовка (один говорит X-API-Key, другой -- Authorization: Bearer), и
+    # неясно, тот ли это вообще хост, под которым владелец завёл ключ на
+    # fomoapi.io. Проверяем варианты заголовка x хоста эмпирически, дёшево
+    # (limit=1), прежде чем тратить кредиты на полный сбор.
+    HEADER_VARIANTS = [
+        ("X-API-Key", lambda k: {"X-API-Key": k}),
+        ("Authorization_Bearer", lambda k: {"Authorization": f"Bearer {k}"}),
+        ("apiKey_param", lambda k: {}),  # ключ идёт параметром запроса, не заголовком -- см. ниже
+    ]
     out["fomoapi_probes"] = {}
     if api_key:
         for host in FOMO_HOSTS:
             key_probe = {}
-            for window in ["24h"]:  # одно окно для разведки формата и лимита, не тратим кредиты на все 4 сразу
-                for limit in [150, 25]:  # проверяем оба конкурирующих утверждения о лимите эмпирически
-                    r = http_get(f"{host}/leaderboard/{window}", headers={"X-API-Key": api_key, "Accept": "application/json"},
-                                 params={"limit": limit})
-                    n_items = None
-                    body = r.get("body")
-                    if isinstance(body, dict):
-                        for k in ("data", "results", "leaderboard", "items"):
-                            if isinstance(body.get(k), list):
-                                n_items = len(body[k])
-                                break
-                        if n_items is None and isinstance(body.get("res"), list):
-                            n_items = len(body["res"])
-                    elif isinstance(body, list):
-                        n_items = len(body)
-                    key_probe[f"{window}_limit{limit}"] = {
-                        "http_status": r.get("http_status"), "n_items_found": n_items,
-                        "body_preview": json.dumps(body, default=str)[:500] if not r.get("exception") else None,
-                        "exception": r.get("exception"),
-                    }
-                    print(f"[fomo_probe] {host} leaderboard/{window}?limit={limit} -> "
-                          f"http={r.get('http_status')} n_items={n_items}", flush=True)
-                    if r.get("http_status") == 200:
-                        key_probe[f"{window}_limit{limit}"]["full_body"] = body
+            for header_name, header_fn in HEADER_VARIANTS:
+                params = {"limit": 1}
+                headers = {"Accept": "application/json", **header_fn(api_key)}
+                if header_name == "apiKey_param":
+                    params["apiKey"] = api_key
+                r = http_get(f"{host}/leaderboard/24h", headers=headers, params=params)
+                body = r.get("body")
+                key_probe[header_name] = {
+                    "http_status": r.get("http_status"),
+                    "body_preview": _scrub_all(json.dumps(body, default=str)[:300]) if not r.get("exception") else None,
+                    "exception": r.get("exception"),
+                }
+                print(f"[fomo_probe] {host} header={header_name} -> http={r.get('http_status')}", flush=True)
             out["fomoapi_probes"][host] = key_probe
-
-        # Проверка пагинации: возвращает ли offset/page РАЗНЫЕ данные, или тот же первый лист
-        # (см. противоречие источников в докстринге) -- один window, два разных offset.
-        base_host = FOMO_HOSTS[0]
-        r_off0 = http_get(f"{base_host}/leaderboard/24h", headers={"X-API-Key": api_key, "Accept": "application/json"},
-                           params={"limit": 25, "offset": 0})
-        r_off25 = http_get(f"{base_host}/leaderboard/24h", headers={"X-API-Key": api_key, "Accept": "application/json"},
-                            params={"limit": 25, "offset": 25})
-        r_page2 = http_get(f"{base_host}/leaderboard/24h", headers={"X-API-Key": api_key, "Accept": "application/json"},
-                            params={"limit": 25, "page": 2})
-
-        def first_id(resp):
-            body = resp.get("body")
-            items = None
-            if isinstance(body, dict):
-                for k in ("data", "results", "leaderboard", "items"):
-                    if isinstance(body.get(k), list):
-                        items = body[k]
-                        break
-            elif isinstance(body, list):
-                items = body
-            if items:
-                first = items[0]
-                return first.get("id") or first.get("solana") or first.get("userHandle")
-            return None
-
-        out["pagination_test"] = {
-            "offset0_http": r_off0.get("http_status"), "offset0_first_id": first_id(r_off0),
-            "offset25_http": r_off25.get("http_status"), "offset25_first_id": first_id(r_off25),
-            "page2_http": r_page2.get("http_status"), "page2_first_id": first_id(r_page2),
-            "offset_actually_paginates": first_id(r_off0) is not None and first_id(r_off0) != first_id(r_off25),
-            "page_actually_paginates": first_id(r_off0) is not None and first_id(r_off0) != first_id(r_page2),
-        }
-        print(f"[fomo_probe] пагинация: {out['pagination_test']}", flush=True)
+        print(f"[fomo_probe] сводка перебора заголовков: {out['fomoapi_probes']}", flush=True)
 
     # ---------- FomoLens: keyless-резерв, честно пробуем без предположений ----------
     out["fomolens_probes"] = {}
