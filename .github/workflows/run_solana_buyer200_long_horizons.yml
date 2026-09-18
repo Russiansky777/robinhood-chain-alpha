@@ -1,0 +1,48 @@
+name: "Solana buyer_200 -- длинные горизонты (900с/1ч/6ч/24ч) через GeckoTerminal"
+
+# Независимо от основного ончейн-прогона (step_extended, 5-300с) -- не
+# трогает его файлы, читает только selected_300.json. Публичный API
+# GeckoTerminal, без ключа. Резюмируемо (пропускает уже готовые сигнатуры).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BUYER200_LONG_HORIZONS_REQUEST"
+
+jobs:
+  long_horizons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Длинные горизонты через GeckoTerminal"
+        run: python -u analysis/solana_buyer200_long_horizons.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BUYER200_LONG_HORIZONS_REQUEST
+          [ -e data/solana_buyer_200/long_horizons_result.json ] && git add data/solana_buyer_200/long_horizons_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: длинные горизонты (GeckoTerminal) -- прогресс [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

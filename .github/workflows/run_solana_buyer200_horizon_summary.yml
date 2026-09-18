@@ -1,0 +1,45 @@
+name: "Solana buyer_200 -- сводная таблица по всем горизонтам"
+
+# Чисто локальный расчёт (никаких сетевых запросов) поверх уже собранных
+# файлов -- быстро, без резюмируемости не нужна.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BUYER200_HORIZON_SUMMARY_REQUEST"
+
+jobs:
+  horizon_summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Сводная таблица по горизонтам"
+        run: python -u analysis/solana_buyer200_horizon_summary.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BUYER200_HORIZON_SUMMARY_REQUEST
+          [ -e data/solana_buyer_200/horizon_summary.json ] && git add data/solana_buyer_200/horizon_summary.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: сводная таблица по горизонтам [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
