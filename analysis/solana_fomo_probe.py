@@ -42,7 +42,8 @@ import requests
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "data" / "solana_fomo_probe_result.json"
 
-FOMO_HOSTS = ["https://getfomoapi.fun/api", "https://fomoapi.io/api", "https://fomoapi.io"]
+FOMO_HOSTS = ["https://getfomoapi.fun/api", "https://api.fomoapi.io", "https://api.fomoapi.io/v1", "https://api.fomoapi.io/api",
+              "https://fomoapi.io/api", "https://fomoapi.io"]
 FOMOLENS_HOSTS = ["https://fomolens.app/api", "https://fomolens.app"]
 WINDOWS = ["24h", "7d", "30d", "all"]
 
@@ -88,6 +89,18 @@ def main() -> None:
             "как keyless-резерва, честно, без предположений."
         )
         print("[fomo_probe] " + out["HONEST_ANSWER"], flush=True)
+
+    # ---------- Реальная документация с fomoapi.io (недоступна из локальной песочницы,
+    # но из GH Actions домен живой -- см. предыдущий проход, настоящая 404-страница
+    # с брендингом FOMO API) -- тащим сырой текст напрямую, авторитетнее любых сниппетов. ----------
+    out["fomoapi_docs_raw"] = {}
+    for docs_path in ["/docs", "/docs/leaderboard", "/api/docs"]:
+        r = http_get(f"https://fomoapi.io{docs_path}")
+        body = r.get("body")
+        text = body.get("non_json_body") if isinstance(body, dict) else json.dumps(body, default=str)
+        out["fomoapi_docs_raw"][docs_path] = {"http_status": r.get("http_status"), "text_len": len(text) if text else 0,
+                                               "text_sample": (text or "")[:4000]}
+        print(f"[fomo_probe] docs {docs_path} -> http={r.get('http_status')} len={len(text) if text else 0}", flush=True)
 
     # ---------- fomoapi.io / getfomoapi.fun: leaderboard, с ключом (если есть) ----------
     # Первый реальный вызов с ключом (18:10 UTC) вернул 401 "Invalid API key" на
