@@ -22,12 +22,18 @@ Alchemy (сделка лидера Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit
 про поля, которых не увидели.
 
 Известные из разведки факты (см. диалог сессии, с источниками):
-  - Base URL торгового API: https://api-bot-v1.dbotx.com
-  - Заголовок авторизации данных-WS: x-api-key (реальный пример кода) --
-    пробуем его же для REST, с фолбэком на Authorization: Bearer.
+  - Base URL торгового API: https://api-bot-v1.dbotx.com -- подтверждён
+    РЕАЛЬНЫМ рабочим вызовом (GET /automation/follow_orders, http=200,
+    заголовок x-api-key), не только поиском.
+  - Владелец, 2026-09-18: второй реальный хост -- servapi.dbotx.com,
+    заголовок авторизации "token" (не x-api-key/Bearer). Пробуем ОБА
+    хоста x ОБА заголовка для эндпоинтов, которых ещё не нашли (история
+    сделок, причины отказа копирования) -- follow_orders уже подтверждён
+    на api-bot-v1+x-api-key, его не трогаем.
   - GET /automation/follow_orders -- список копитрейдинг-задач
-    пользователя (упомянут в первом же поисковом снаппете).
-  - GET /dex/poolinfo?chain=solana&pair={pair} -- инфо по пулу.
+    пользователя (подтверждено).
+  - Задача пилота (2026-09-18 15:46 UTC): id=mu746r8f05f9ic,
+    walletId=mu72pnkv0588nq, кошелёк E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS.
 """
 from __future__ import annotations
 
@@ -42,8 +48,10 @@ import requests
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "data" / "solana_dbot_pilot_report.json"
 
-DBOT_BASE = "https://api-bot-v1.dbotx.com"
+DBOT_HOSTS = ["https://api-bot-v1.dbotx.com", "https://servapi.dbotx.com"]
 LEADER_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+PILOT_WALLET = "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS"
+TASK_ID = "mu746r8f05f9ic"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 SOL_MINT = "So11111111111111111111111111111111111111112"
 PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
@@ -60,11 +68,13 @@ def _scrub_all(text: str) -> str:
 
 # ---------- DBot REST ----------
 
-def dbot_get(path: str, api_key: str, params: dict | None = None) -> dict:
-    """Пробует несколько правдоподобных схем авторизации (см. докстринг) --
-    ни одна не подтверждена документацией впрямую, честно фиксируем,
-    какая сработала. НИКОГДА не кладём api_key в заголовок, не проверив
-    его на управляющие символы (см. докстринг, инцидент с BITQUERY_APIKEY)."""
+def dbot_get(path: str, api_key: str, params: dict | None = None, hosts: list[str] | None = None) -> dict:
+    """Пробует оба известных хоста (api-bot-v1.dbotx.com подтверждён,
+    servapi.dbotx.com -- владелец, см. докстринг) x несколько правдоподобных
+    заголовков авторизации (x-api-key подтверждён на api-bot-v1; token --
+    владелец, для servapi; Bearer/X-Api-Key -- фолбэк). НИКОГДА не кладём
+    api_key в заголовок, не проверив на управляющие символы (см. докстринг,
+    инцидент с BITQUERY_APIKEY)."""
     if any(c in api_key for c in ("\n", "\r")):
         raise RuntimeError(
             "DBOT_API_KEY содержит перевод строки -- похоже на многострочную метку "
@@ -73,23 +83,25 @@ def dbot_get(path: str, api_key: str, params: dict | None = None) -> dict:
         )
     header_variants = [
         {"x-api-key": api_key},
+        {"token": api_key},
         {"Authorization": f"Bearer {api_key}"},
         {"X-Api-Key": api_key, "apiKey": api_key},
     ]
     last: dict = {}
-    for headers in header_variants:
-        try:
-            resp = requests.get(f"{DBOT_BASE}{path}", params=params or {}, headers=headers, timeout=30)
-        except Exception as exc:  # noqa: BLE001
-            last = {"exception": _scrub_all(f"{type(exc).__name__}: {exc}")}
-            continue
-        try:
-            body = resp.json()
-        except Exception:  # noqa: BLE001
-            body = {"non_json_body": _scrub_all(resp.text[:1000])}
-        last = {"http_status": resp.status_code, "body": body, "auth_tried": list(headers.keys())}
-        if resp.status_code == 200:
-            return last
+    for host in (hosts or DBOT_HOSTS):
+        for headers in header_variants:
+            try:
+                resp = requests.get(f"{host}{path}", params=params or {}, headers=headers, timeout=30)
+            except Exception as exc:  # noqa: BLE001
+                last = {"exception": _scrub_all(f"{type(exc).__name__}: {exc}")}
+                continue
+            try:
+                body = resp.json()
+            except Exception:  # noqa: BLE001
+                body = {"non_json_body": _scrub_all(resp.text[:1000])}
+            last = {"http_status": resp.status_code, "body": body, "host": host, "auth_tried": list(headers.keys())}
+            if resp.status_code == 200:
+                return last
     return last
 
 
@@ -233,6 +245,32 @@ def _extract_buy_from_tx(tx: dict, wallet: str, mint: str) -> dict | None:
     }
 
 
+def find_order_endpoint(api_key: str) -> dict:
+    """Разведка эндпоинта истории ИСПОЛНЕННЫХ сделок (не конфига задачи) --
+    follow_orders даёт только счётчики (buyTimes/sellTimes/boughtUsd),
+    не построчную историю. Пробуем несколько правдоподобных путей на
+    ОБОИХ хостах x ОБОИХ заголовках (см. dbot_get)."""
+    candidates = {}
+    for path, params in [
+        ("/automation/swap_orders", {"chain": "solana", "walletId": PILOT_WALLET}),
+        ("/automation/orders", {"chain": "solana"}),
+        ("/automation/follow_order_logs", {"chain": "solana", "followOrderId": TASK_ID}),
+        ("/automation/follow_orders/logs", {"chain": "solana", "id": TASK_ID}),
+        ("/automation/trade_history", {"chain": "solana", "walletId": PILOT_WALLET}),
+        ("/automation/opening_sell_orders", {"chain": "solana"}),
+        ("/wallet/transactions", {"chain": "solana", "address": PILOT_WALLET}),
+        ("/dex/wallet_holdings", {"chain": "solana", "address": PILOT_WALLET}),
+    ]:
+        r = dbot_get(path, api_key, params=params)
+        candidates[path] = {"http_status": r.get("http_status"), "host": r.get("host"),
+                             "auth_tried": r.get("auth_tried"),
+                             "body_preview": json.dumps(r.get("body"), default=str)[:400]}
+        print(f"[dbot_pilot] endpoint-разведка: {path} -> http={r.get('http_status')} host={r.get('host')}", flush=True)
+        if r.get("http_status") == 200:
+            candidates[path]["full_body"] = r.get("body")
+    return candidates
+
+
 def main() -> None:
     out: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     api_key = os.environ.get("DBOT_API_KEY", "")
@@ -244,62 +282,44 @@ def main() -> None:
     if not any(c in api_key for c in ("\n", "\r")):
         _ACTIVE_SECRETS.append(api_key)  # многострочный секрет намеренно НЕ добавляем в скраб-лист как есть -- см. dbot_get()
 
-    # ---------- Шаг 1: разведка -- список копитрейдинг-задач (даёт адрес пилотного кошелька) ----------
-    r1 = dbot_get("/automation/follow_orders", api_key)
+    # ---------- Шаг 1: текущее состояние задачи (счётчики) ----------
+    r1 = dbot_get("/automation/follow_orders", api_key, params={"chain": "solana"})
     out["step1_follow_orders_raw"] = r1
-    print(f"[dbot_pilot] Шаг 1 (follow_orders): http={r1.get('http_status')} auth={r1.get('auth_tried')}", flush=True)
-
-    # Первый реальный прогон (2026-09-18 14:41 UTC): http=200, {"err":false,"res":[]} --
-    # авторизация x-api-key подтверждена рабочей, но задач 0. Явный chain=solana --
-    # вдруг дефолтная фильтрация без параметра прячет реальные задачи.
-    r1b = dbot_get("/automation/follow_orders", api_key, params={"chain": "solana"})
-    out["step1b_follow_orders_chain_solana"] = r1b
-    print(f"[dbot_pilot] Шаг 1b (follow_orders?chain=solana): http={r1b.get('http_status')} "
-          f"res_len={len((r1b.get('body') or {}).get('res', []))}", flush=True)
-
-    # ---------- Шаг 1c: адрес пилотного кошелька -- пробуем несколько
-    # правдоподобных путей (see докстринг -- ни один не подтверждён
-    # чтением документации напрямую, дампим все статусы честно). ----------
-    wallet_candidates = {}
-    for path in ["/account/wallets", "/wallet/list", "/wallet/wallets", "/account/wallet_list",
-                 "/wallet/balances", "/account/wallet_holdings", "/wallet/holdings"]:
-        r = dbot_get(path, api_key, params={"chain": "solana"})
-        wallet_candidates[path] = {"http_status": r.get("http_status"),
-                                    "body_preview": json.dumps(r.get("body"), default=str)[:300]}
-        print(f"[dbot_pilot] Шаг 1c: GET {path} -> http={r.get('http_status')}", flush=True)
-        if r.get("http_status") == 200:
-            wallet_candidates[path]["full_body"] = r.get("body")
-    out["step1c_wallet_endpoint_candidates"] = wallet_candidates
-
+    print(f"[dbot_pilot] Шаг 1 (follow_orders): http={r1.get('http_status')} host={r1.get('host')}", flush=True)
     if r1.get("http_status") != 200:
-        out["HONEST_ANSWER"] = (
-            "GET /automation/follow_orders не прошёл ни с одним из опробованных вариантов "
-            "авторизации -- см. step1_follow_orders_raw для диагностики (реальный код/тело "
-            "ответа DBot, не выдумано). Дальше не иду, пока не подтверждён рабочий способ "
-            "авторизации и реальная форма ответа."
-        )
+        out["HONEST_ANSWER"] = "GET /automation/follow_orders не прошёл -- см. step1_follow_orders_raw."
         print("[dbot_pilot] " + out["HONEST_ANSWER"], flush=True)
         _finish(out)
         return
+    res = (r1.get("body") or {}).get("res") or []
+    if not res:
+        out["HONEST_ANSWER"] = "0 задач копитрейдинга -- нечего собирать."
+        _finish(out)
+        return
+    task = res[0]
+    out["task_counters"] = {k: task.get(k) for k in
+                             ("buyTimes", "sellTimes", "boughtUsd", "soldUsd", "pnlOrderCount", "updateAt")}
+    print(f"[dbot_pilot] Счётчики задачи: {out['task_counters']}", flush=True)
 
-    body1 = r1.get("body") or {}
-    out["step1_note"] = (
-        "Реальная форма ответа DBot (см. step1_follow_orders_raw) -- дальнейший код этого "
-        "прогона извлекает адрес кошелька/сделки из неё по факту структуры, не по угаданной "
-        "заранее схеме."
-    )
+    n_trades = task.get("buyTimes", 0) or 0
+    if n_trades == 0:
+        out["HONEST_ANSWER"] = (
+            f"buyTimes=0 -- сделок пилота пока нет (задача обновлена {task.get('updateAt')}, "
+            "leader wallet ждёт нового первого входа). Разведка эндпоинта истории сделок "
+            "проведена заранее (см. step2_order_endpoint_search), чтобы не терять время, "
+            "когда сделки появятся."
+        )
+        print("[dbot_pilot] " + out["HONEST_ANSWER"], flush=True)
+        out["step2_order_endpoint_search"] = find_order_endpoint(api_key)
+        _finish(out)
+        return
 
-    # Пытаемся вытащить список задач максимально defensively -- реальная
-    # форма (список? {data:[...]}? {tasks:[...]}?) станет известна только
-    # после первого реального ответа (см. step1_follow_orders_raw).
-    tasks = body1 if isinstance(body1, list) else (
-        body1.get("data") or body1.get("tasks") or body1.get("list") or body1.get("result") or []
-    )
-    out["step1_n_tasks_found"] = len(tasks) if isinstance(tasks, list) else "не список -- см. raw"
-
+    # ---------- Шаг 2: разведка эндпоинта истории (сделки ЕСТЬ) ----------
+    out["step2_order_endpoint_search"] = find_order_endpoint(api_key)
     _finish(out)
-    print(f"[dbot_pilot] Записано {OUT_PATH} -- см. step1_follow_orders_raw для реальной схемы, "
-          "следующий проход строит таблицу сделок по ней.", flush=True)
+    print(f"[dbot_pilot] Записано {OUT_PATH} -- buyTimes={n_trades}, но построчная история сделок "
+          "ещё не подтверждена (см. step2_order_endpoint_search) -- нужен отдельный проход с "
+          "реальным эндпоинтом истории и сверкой через Alchemy, следующим шагом.", flush=True)
 
 
 def _finish(out: dict) -> None:
