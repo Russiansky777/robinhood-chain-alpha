@@ -105,6 +105,7 @@ def log_ledger(ledger: dict, step: str, query_desc: str, r: dict) -> None:
         "at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "step": step, "query": query_desc,
         "http_status": r.get("http_status"),
+        "exception": r.get("exception"),
         "has_errors": bool(body.get("errors")),
         "errors": body.get("errors"),
         "extensions": body.get("extensions"),
@@ -148,7 +149,14 @@ def main() -> None:
     out["step0_root_fields"] = root_fields
     print(f"[bitquery_probe] Корневые поля схемы: {root_fields}")
 
+    if "exception" in r0:
+        out["step0_raw_response"] = r0
+        out["HONEST_ANSWER"] = f"Сетевой запрос к {GRAPHQL_ENDPOINT} упал ДО получения HTTP-ответа: {r0['exception']} -- дальше не иду."
+        print("[bitquery_probe] " + out["HONEST_ANSWER"])
+        _finish(out)
+        return
     if r0.get("http_status") != 200 or (body0.get("errors")):
+        out["step0_raw_response"] = r0
         out["HONEST_ANSWER"] = f"Интроспекция корня не прошла (http={r0.get('http_status')}, errors={body0.get('errors')}) -- дальше не иду."
         print("[bitquery_probe] " + out["HONEST_ANSWER"])
         _finish(out)
