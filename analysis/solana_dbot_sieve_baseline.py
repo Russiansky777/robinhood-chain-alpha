@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""Владелец, 2026-09-18: запущена ВТОРАЯ copy-trade задача DBot -- сито на
-~10 кошельков, отдельный кошелёк, вход фикс 0.1 SOL, Copy Buy Range
-минимум 2 SOL, Total Buy Times 2. Снять СЕЙЧАС (до первых сделок)
-стартовое состояние -- нулевую точку для всей бухгалтерии сита:
-ID задачи, адрес её кошелька, баланс SOL, список отслеживаемых
-кошельков (с именами, если DBot их вообще отдаёт -- честно, не
-выдумывать), полный конфиг задачи, метка времени UTC.
+"""Владелец, 2026-09-18 (обновлено): ДВЕ copy-trade задачи копитрейдинга
+поверх боевого пилота -- BATCH-1 и BATCH-2, по 10 кошельков каждая,
+отдельные кошельки, по 3 SOL. Настройки одинаковые: вход фикс 0.1 SOL,
+Copy Buy Range минимум 2 SOL, Total Buy Times 2, Only Buy Once выкл,
+Skip Added Tokens вкл, slippage 35%, priority fee 0.005, TP/SL Expiry
+0.008ч=28.8с, автопродажа. Пилот (mu746r8f05f9ic) -- контроль, отдельно.
 
-Хост/заголовок/рабочий эндпоинт конфигурации задач -- те же, что уже
-подтверждены реальными вызовами в этой сессии (solana_dbot_tasks_config_diff.py):
-https://api-bot-v1.dbotx.com, x-api-key, GET /automation/follow_orders.
+Снимаем нулевую точку ПО ОБЕИМ задачам разом: id, имя (как есть в поле
+name -- BATCH-1/BATCH-2, не переименовываем), адрес кошелька, баланс
+SOL, список отслеживаемых адресов с ремарками (используем ремарки DBot
+как есть, чтобы совпадали при расширении списка), полный конфиг,
+метка времени UTC.
 
-Только чтение -- GET-запросы + один getBalance по RPC. Никаких изменений
-настроек задачи."""
+Хост/заголовок/эндпоинт -- те же, что уже подтверждены реальными
+вызовами в этой сессии: https://api-bot-v1.dbotx.com, x-api-key,
+GET /automation/follow_orders.
+
+Только чтение -- GET-запросы + по одному getBalance на кошелёк. Никаких
+изменений настроек задач."""
 from __future__ import annotations
 
 import json
@@ -31,7 +36,6 @@ OUT_PATH = REPO_ROOT / "data" / "dbot_sieve_baseline.json"
 
 DBOT_HOST = "https://api-bot-v1.dbotx.com"
 PILOT_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
-EXPECTED_TARGET_COUNT_RANGE = (5, 20)  # "сито на 10 кошельков" -- честный диапазон, не жёстко 10
 
 _ACTIVE_SECRETS: list[str] = []
 
@@ -59,14 +63,47 @@ def dbot_get(path: str, api_key: str, params: dict | None = None) -> dict:
 def find_name_fields(task: dict) -> dict:
     """Честный поиск ЛЮБОГО поля, которое может содержать имена
     отслеживаемых кошельков (remark/name/note/nick/label и т.п.) -- не
-    гадаем формат заранее, DBot ранее не документировал это в наших
-    вызовах."""
+    гадаем формат заранее."""
     hits = {}
     for k, v in task.items():
         lk = k.lower()
         if any(w in lk for w in ("remark", "name", "note", "nick", "label", "alias", "tag")):
             hits[k] = v
     return hits
+
+
+def wallet_balance_sol(addr: str | None) -> tuple[float | None, int | None, str | None]:
+    if not addr:
+        return None, None, "у задачи нет walletAddress в конфиге"
+    try:
+        bal = fp.rpc_call("getBalance", [addr], use_cache=False)
+        lamports = bal.get("value") if isinstance(bal, dict) else None
+        return (lamports / 1e9 if isinstance(lamports, (int, float)) else None), lamports, None
+    except RuntimeError as exc:
+        return None, None, str(exc)[:300]
+
+
+def snapshot_batch(task: dict) -> dict:
+    target_ids = task.get("targetIds") or []
+    target_names = task.get("targetNames") or []
+    tracked = [{"address": a, "remark": (target_names[i] if i < len(target_names) else None)}
+               for i, a in enumerate(target_ids)]
+    wallet_addr = task.get("walletAddress")
+    bal_sol, bal_lamports, bal_err = wallet_balance_sol(wallet_addr)
+    return {
+        "task_id": task.get("id"),
+        "task_name": task.get("name"),
+        "enabled": task.get("enabled"),
+        "wallet_address": wallet_addr,
+        "wallet_id": task.get("walletId"),
+        "wallet_sol_balance": bal_sol,
+        "wallet_sol_balance_raw_lamports": bal_lamports,
+        "wallet_sol_balance_error": bal_err,
+        "n_tracked_wallets": len(target_ids),
+        "tracked_wallets": tracked,
+        "name_fields_found_in_task_config": find_name_fields(task),
+        "full_config": task,
+    }
 
 
 def main() -> None:
@@ -102,77 +139,29 @@ def main() -> None:
             non_pilot_tasks.append(t)
 
     out["pilot_task_found"] = pilot_task is not None
+    out["pilot_task_full_config_for_reference"] = pilot_task
     out["n_non_pilot_tasks"] = len(non_pilot_tasks)
 
-    # Честно выбираем кандидата на "сито": среди НЕ-пилотных задач --
-    # ближайшую по числу targetIds к ожидаемому диапазону; если ровно
-    # одна не-пилотная задача есть вообще -- берём её независимо от
-    # диапазона (не гадаем лишний раз, когда выбора и так нет).
-    sieve_task = None
-    if len(non_pilot_tasks) == 1:
-        sieve_task = non_pilot_tasks[0]
-    else:
-        lo, hi = EXPECTED_TARGET_COUNT_RANGE
-        in_range = [t for t in non_pilot_tasks if lo <= len(t.get("targetIds") or []) <= hi]
-        if len(in_range) == 1:
-            sieve_task = in_range[0]
+    batches: dict[str, dict] = {}
+    unclassified: list[dict] = []
+    for t in non_pilot_tasks:
+        name = t.get("name")
+        if name:
+            batches[name] = snapshot_batch(t)
+        else:
+            unclassified.append(t)
+        print(f"[sieve_baseline] задача '{name}' (id={t.get('id')}): "
+              f"{len(t.get('targetIds') or [])} отслеживаемых, кошелёк={t.get('walletAddress')}", flush=True)
 
-    out["all_non_pilot_tasks_summary"] = [
-        {"id": t.get("id"), "name": t.get("name"), "enabled": t.get("enabled"),
-         "n_targetIds": len(t.get("targetIds") or []), "walletAddress": t.get("walletAddress")}
-        for t in non_pilot_tasks
-    ]
-
-    if sieve_task is None:
-        out["HONEST_ANSWER"] = (
-            f"не смог однозначно выбрать задачу сита среди {len(non_pilot_tasks)} не-пилотных -- "
-            f"см. all_non_pilot_tasks_summary, выбери руками по id."
-        )
-        OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
-        print("[sieve_baseline] " + out["HONEST_ANSWER"], flush=True)
-        return
-
-    target_ids = sieve_task.get("targetIds") or []
-    out["sieve_task_id"] = sieve_task.get("id")
-    out["sieve_task_wallet_address"] = sieve_task.get("walletAddress")
-    out["sieve_task_wallet_id"] = sieve_task.get("walletId")
-    out["n_tracked_wallets"] = len(target_ids)
-    out["tracked_wallets_raw"] = target_ids
-
-    name_fields = find_name_fields(sieve_task)
-    out["name_fields_found_in_task_config"] = name_fields
-    if not name_fields:
-        out["names_honest_note"] = (
-            "в конфиге задачи (follow_orders) НЕТ поля с именами отслеживаемых "
-            "кошельков (проверены remark/name/note/nick/label/alias/tag) -- "
-            "targetIds это просто список адресов, без имён. Если имена нужны, "
-            "их надо брать из другого источника (напр. таблица с сита Fomo "
-            "этой же сессии) и сопоставлять по адресу вручную."
-        )
-        print("[sieve_baseline] " + out["names_honest_note"], flush=True)
-
-    # Баланс SOL кошелька задачи -- один честный RPC-вызов, без кэша
-    # (баланс меняется).
-    wallet_addr = sieve_task.get("walletAddress")
-    if wallet_addr:
-        try:
-            bal = fp.rpc_call("getBalance", [wallet_addr], use_cache=False)
-            lamports = bal.get("value") if isinstance(bal, dict) else None
-            out["sieve_wallet_sol_balance"] = lamports / 1e9 if isinstance(lamports, (int, float)) else None
-            out["sieve_wallet_sol_balance_raw_lamports"] = lamports
-        except RuntimeError as exc:
-            out["sieve_wallet_sol_balance_error"] = str(exc)[:300]
-    else:
-        out["sieve_wallet_sol_balance_error"] = "у задачи нет walletAddress в конфиге"
-
-    out["sieve_task_full_config"] = sieve_task
-    out["pilot_task_full_config_for_reference"] = pilot_task
+    out["batches"] = batches
+    if unclassified:
+        out["unclassified_non_pilot_tasks_no_name"] = unclassified
+        print(f"[sieve_baseline] ВНИМАНИЕ: {len(unclassified)} не-пилотных задач без поля name -- "
+              "не смог классифицировать как BATCH-N, см. unclassified_non_pilot_tasks_no_name", flush=True)
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
-    print(f"[sieve_baseline] записано в {OUT_PATH}: task_id={out.get('sieve_task_id')} "
-          f"wallet={out.get('sieve_task_wallet_address')} n_tracked={out.get('n_tracked_wallets')} "
-          f"balance_sol={out.get('sieve_wallet_sol_balance')}", flush=True)
+    print(f"[sieve_baseline] записано в {OUT_PATH}: батчи={list(batches.keys())}", flush=True)
 
 
 if __name__ == "__main__":
