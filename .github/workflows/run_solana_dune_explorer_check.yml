@@ -1,0 +1,54 @@
+name: "Solana buyer_200 -- проверка Dune как замены RPC-разбора"
+
+# Проверка, не переезд. Секрет DUNE_EXPLORER_API (названный владельцем по
+# памяти) может отсутствовать -- пробрасываем его вместе с уже
+# существующими DUNE_API_KEY/DUNE_API_KEY_MOZILA, скрипт сам определяет,
+# какие непустые, и прозванивает каждый. Тратит реальные кредиты триала
+# -- умеренные, дешёвые запросы, троттлинг под лимиты Plus.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DUNE_EXPLORER_CHECK_REQUEST"
+
+jobs:
+  dune_explorer_check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Проверка Dune API"
+        env:
+          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+          DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
+          DUNE_API_KEY_MOZILA: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/solana_dune_explorer_check.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_EXPLORER_CHECK_REQUEST
+          [ -e data/solana_dune_explorer_check.json ] && git add data/solana_dune_explorer_check.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: проверка Dune -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
