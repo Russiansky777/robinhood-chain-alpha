@@ -128,6 +128,20 @@ def main() -> None:
                 working_endpoint = path
         time.sleep(0.3)
 
+    # follow_orders вернул только 1 задачу (пилот) с chain=solana -- честно
+    # проверяем, не фильтр ли это виноват, прежде чем делать вывод "второй
+    # задачи нет вообще": пробуем без chain и с другими правдоподобными
+    # параметрами (limit/page/status), не гадаем, а смотрим на факт ответа.
+    out["follow_orders_extra_param_probes"] = {}
+    for params in [{}, {"chain": "solana", "limit": 100}, {"chain": "solana", "page": 1, "limit": 100},
+                   {"status": "all"}, {"enabled": "true"}]:
+        r = dbot_get("/automation/follow_orders", api_key, params=params)
+        body = r.get("body")
+        n = len(body.get("res") or []) if isinstance(body, dict) else None
+        out["follow_orders_extra_param_probes"][json.dumps(params)] = {"http_status": r.get("http_status"), "n_tasks": n}
+        print(f"[dbot_tasks] follow_orders params={params} -> http={r.get('http_status')} n_tasks={n}", flush=True)
+        time.sleep(0.3)
+
     if tasks_body is None:
         out["HONEST_ANSWER"] = "Ни один кандидат не вернул непустой список задач -- см. endpoint_probes. Официальные доки не выкачаны (сеть на dbotx.com из песочницы этой сессии заблокирована прокси, подтверждено ранее)."
         print("[dbot_tasks] " + out["HONEST_ANSWER"], flush=True)
@@ -141,9 +155,20 @@ def main() -> None:
     print(f"[dbot_tasks] рабочий эндпоинт: {working_endpoint}, задач: {len(tasks)}", flush=True)
 
     # ---------- Шаг 2: список кошельков задачи (баланс -- отдельный эндпоинт) ----------
-    r_wallets = dbot_get("/automation/wallets", api_key)
+    # /automation/wallets работал раньше в этой сессии без параметров -- если
+    # сейчас 404, пробуем правдоподобные варианты честно, не полагаясь на
+    # память о прошлом ответе без проверки.
+    r_wallets = None
+    for path, params in [("/automation/wallets", {}), ("/automation/wallets", {"chain": "solana"}),
+                          ("/automation/wallet", {}), ("/automation/wallet", {"chain": "solana"})]:
+        r = dbot_get(path, api_key, params=params)
+        print(f"[dbot_tasks] {path}?{params} -> http={r.get('http_status')}", flush=True)
+        if r.get("http_status") == 200:
+            r_wallets = r
+            break
+        time.sleep(0.3)
+    r_wallets = r_wallets or {"http_status": None, "body": None, "HONEST_ANSWER": "все варианты пути не сработали"}
     out["wallets_raw"] = r_wallets
-    print(f"[dbot_tasks] /automation/wallets -> http={r_wallets.get('http_status')}", flush=True)
 
     RAW_OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     RAW_OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
