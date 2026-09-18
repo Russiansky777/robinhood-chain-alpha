@@ -74,18 +74,23 @@ REFERENCE = {
 }
 
 
-def _scrub(text: str, secret: str) -> str:
-    """ИНЦИДЕНТ 2026-09-18: requests/urllib3 при InvalidHeader эхом
-    печатает ПОЛНОЕ значение заголовка в тексте исключения -- если
-    api_key передан как есть (например, содержит перевод строки, как
-    в реальном BITQUERY_APIKEY: 'Access token - ...\\nID - ...'),
-    str(exc) содержит секрет целиком. Эта строка утекла в закоммиченный
-    JSON (см. git log, коммит 0b54a8f, уже отредактирован постфактум).
-    Больше НИКАКОЙ текст, производный от исключения/ответа сервера, не
-    возвращается вызывающему коду без прогона через эту функцию."""
-    if not secret:
-        return text
-    return text.replace(secret, "[REDACTED_SECRET]")
+# ИНЦИДЕНТ 2026-09-18: requests/urllib3 при InvalidHeader эхом печатает
+# ПОЛНОЕ значение заголовка в тексте исключения -- реальный
+# BITQUERY_APIKEY оказался многострочной меткой ('Access token - ...\n
+# ID - ...'), перевод строки сломал заголовок, и секрет целиком утёк в
+# закоммиченный JSON (git log, коммит 0b54a8f, отредактирован
+# постфактум). _ACTIVE_SECRETS заполняется в main() ДО первого сетевого
+# вызова -- каждая строка, уходящая в out/ledger, прогоняется через
+# _scrub_all() против ВСЕХ известных на этот момент значений (и сырого
+# env-секрета, и распарсенного токена), а не только текущего api_key.
+_ACTIVE_SECRETS: list[str] = []
+
+
+def _scrub_all(text: str) -> str:
+    for secret in _ACTIVE_SECRETS:
+        if secret:
+            text = text.replace(secret, "[REDACTED_SECRET]")
+    return text
 
 
 def gql(api_key: str, query: str, variables: dict | None = None) -> dict:
@@ -98,10 +103,10 @@ def gql(api_key: str, query: str, variables: dict | None = None) -> dict:
         try:
             body = resp.json()
         except Exception:  # noqa: BLE001
-            body = {"non_json_body": _scrub(resp.text[:2000], api_key)}
+            body = {"non_json_body": _scrub_all(resp.text[:2000])}
         return {"http_status": resp.status_code, "body": body}
     except Exception as exc:  # noqa: BLE001
-        return {"exception": _scrub(f"{type(exc).__name__}: {exc}", api_key)}
+        return {"exception": _scrub_all(f"{type(exc).__name__}: {exc}")}
 
 
 def load_ledger() -> dict:
@@ -124,7 +129,7 @@ def log_ledger(ledger: dict, step: str, query_desc: str, r: dict) -> None:
         "errors": body.get("errors"),
         "extensions": body.get("extensions"),
     })
-    LEDGER_PATH.write_text(json.dumps(ledger, indent=2, ensure_ascii=False, default=str))
+    LEDGER_PATH.write_text(_scrub_all(json.dumps(ledger, indent=2, ensure_ascii=False, default=str)))
 
 
 def introspect_type(api_key: str, type_name: str) -> dict:
@@ -147,12 +152,36 @@ def main() -> None:
     out: dict = {"generated_at_utc": None, "reference": REFERENCE}
     ledger = load_ledger()
 
-    api_key = os.environ.get("BITQUERY_APIKEY", "")
-    out["secret_present"] = bool(api_key)
-    if not api_key:
+    raw_secret = os.environ.get("BITQUERY_APIKEY", "")
+    out["secret_present"] = bool(raw_secret)
+    if not raw_secret:
         out["HONEST_ANSWER"] = "BITQUERY_APIKEY пуст в окружении -- не могу проверить."
         _finish(out)
         return
+    _ACTIVE_SECRETS.append(raw_secret)  # скрабировать ДО первого сетевого вызова, не после
+
+    # ИНЦИДЕНТ 2026-09-18: BITQUERY_APIKEY -- это двухстрочная метка
+    # дашборда ("Access token - <token>\nID - <uuid>"), не сырой токен.
+    # Раньше это отправлялось как есть в заголовок X-API-KEY, перевод
+    # строки ломал HTTP-заголовок (InvalidHeader) и эхом печатал секрет
+    # в тексте исключения. Разбираем метку и берём ТОЛЬКО сам токен.
+    api_key = raw_secret
+    for line in raw_secret.splitlines():
+        if line.lower().startswith("access token"):
+            _, _, token_part = line.partition("-")
+            api_key = token_part.strip()
+            _ACTIVE_SECRETS.append(api_key)
+            out["credential_format_detected"] = "label_format_access_token_line_parsed"
+            break
+    else:
+        if "\n" in raw_secret or "\r" in raw_secret:
+            out["HONEST_ANSWER"] = (
+                "BITQUERY_APIKEY многострочный, но строка 'Access token - ...' не найдена -- "
+                "не угадываю формат вслепую, останавливаюсь до разбора вручную."
+            )
+            _finish(out)
+            return
+        out["credential_format_detected"] = "single_line_raw_token"
 
     # ---------- Шаг 0: интроспекция (бесплатно) ----------
     root_q = "query { __schema { queryType { name fields { name } } } }"
@@ -348,7 +377,7 @@ def main() -> None:
 def _finish(out: dict) -> None:
     out["generated_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
     print(f"[bitquery_probe] Записано {OUT_PATH}")
 
 
