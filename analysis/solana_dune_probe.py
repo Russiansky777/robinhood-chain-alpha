@@ -84,8 +84,12 @@ REFERENCE_POINTS = [
 N_REMAINING_PURCHASES = 250
 
 
-def main() -> None:
-    client = DuneClient()
+def run_probe(client: DuneClient) -> dict:
+    """Шаги 1-3 разведки на уже готовом DuneClient (ключ/леджер/namespace
+    выбраны вызывающим кодом -- см. solana_dune_key_check.py, который
+    сначала проверяет ПРАВА ключа дешёвым запросом, и только на рабочем
+    ключе вызывает эту функцию). Возвращает `out` БЕЗ записи на диск --
+    запись делает вызывающий код (см. _finish)."""
     out: dict = {"generated_at_utc": None, "pool": POOL, "reference_points": REFERENCE_POINTS}
 
     # ---------- Запрос 1: какие solana-схемы/таблицы вообще есть ----------
@@ -101,8 +105,7 @@ def main() -> None:
     )
     if df1 is None:
         out["HONEST_ANSWER"] = "Запрос 1 не вернул DataFrame (materialize-only?) -- логическая ошибка вызова, чинить код."
-        _finish(out)
-        return
+        return out
     out["step1_n_tables_total"] = len(df1)
     out["step1_all_tables"] = df1.to_dict("records")
     print(f"[dune_probe] Шаг 1: {len(df1)} таблиц в *solana*-схемах.")
@@ -119,8 +122,7 @@ def main() -> None:
             "например 'swaps' или 'dex_trades'). Дальше не иду -- ручной разбор."
         )
         print("[dune_probe] " + out["HONEST_ANSWER"])
-        _finish(out)
-        return
+        return out
 
     # Приоритет: dex_solana.trades (типовое имя единой Dune-таблицы по
     # аналогии с dex.trades для EVM), иначе первый найденный кандидат.
@@ -196,8 +198,7 @@ def main() -> None:
             "Запрос 3 не выполняю -- нет смысла тратить кредиты без нужных колонок."
         )
         print("[dune_probe] " + out["HONEST_ANSWER"])
-        _finish(out)
-        return
+        return out
     if not mapping.get("pool"):
         out.setdefault("warnings", []).append(
             f"В {chosen_schema}.{chosen_table} НЕТ явного поля адреса пула/AMM среди {POOL_CANDS} -- "
@@ -246,8 +247,7 @@ def main() -> None:
             "НЕ переводим расчёт на Dune без разбора причины."
         )
         print("[dune_probe] " + out["HONEST_ANSWER"])
-        _finish(out)
-        return
+        return out
 
     # ---------- Сверка: для каждой из 6 точек -- последняя сделка Dune на/до t ----------
     import pandas as pd
@@ -327,7 +327,7 @@ def main() -> None:
         "домножения на выдуманное число пулов."
     )
 
-    _finish(out)
+    return out
 
 
 def _finish(out: dict) -> None:
@@ -336,6 +336,16 @@ def _finish(out: dict) -> None:
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     print(f"[dune_probe] Записано {OUT_PATH}")
+
+
+def main() -> None:
+    """Прежнее прямое использование (один ключ, DUNE_API_KEY из env) --
+    оставлено для совместимости и ручных перезапусков на уже известном
+    рабочем ключе. Проверка прав ключа (403 read-only и т.п.) теперь
+    делается ДО этого в solana_dune_key_check.py -- см. его docstring."""
+    client = DuneClient()
+    out = run_probe(client)
+    _finish(out)
 
 
 if __name__ == "__main__":

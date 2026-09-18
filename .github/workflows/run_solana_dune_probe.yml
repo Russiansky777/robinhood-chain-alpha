@@ -40,17 +40,19 @@ jobs:
           save-always: true
       - name: Install dependencies
         run: pip install -r analysis/requirements.txt
-      - name: "Разведка Dune: схема + сверка цен SOL/USDC"
+      - name: "Проверка прав каждого известного Dune-ключа + разведка на рабочем"
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
-          CREDIT_GUARD_NAMESPACE: solana_dune_probe
-        run: python -u analysis/solana_dune_probe.py
+          DUNE_API_KEY_MOZILA: ${{ secrets.DUNE_API_KEY_MOZILA }}
+        run: python -u analysis/solana_dune_key_check.py
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_PROBE_REQUEST
+          [ -e data/solana_dune_key_check_result.json ] && git add data/solana_dune_key_check_result.json
           [ -e data/solana_dune_probe_result.json ] && git add data/solana_dune_probe_result.json
           [ -e data/credits_spent.json ] && git add data/credits_spent.json
+          [ -e data/credits_spent_mozila.json ] && git add data/credits_spent_mozila.json
           [ -e data/query_ids_recovered.json ] && git add data/query_ids_recovered.json
           git diff --cached --quiet && exit 0
           git commit -m "Solana buyer_200: результат разведки Dune как источника цен [automated]"
