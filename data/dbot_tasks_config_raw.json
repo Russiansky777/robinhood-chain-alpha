@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-18T21:14:51Z",
+  "generated_at_utc": "2026-09-18T21:17:27Z",
   "endpoint_probes": {
     "/automation/copy_trades": {
       "http_status": 404,
@@ -24,6 +24,28 @@
     "/automation/follow_orders": {
       "http_status": 200,
       "body_preview": "{\"err\": false, \"res\": [{\"id\": \"mu746r8f05f9ic\", \"accountId\": \"mu722i7h053a0m\", \"enabled\": true, \"name\": \"pointfarmcap\", \"chain\": \"solana\", \"dexFilter\": null, \"targetIds\": [\"Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit\"], \"targetNames\": [\"\"], \"walletId\": \"mu72pnkv0588nq\", \"groupId\": null, \"groupName\": null, \"tokenBlacklist\": [], \"tokenWhitelist\": [], \"devBlacklist\": [], \"devWhitelist\": [], \"buySettings\": {\"maxBuyAmountPerToken\": null, \"maxBuyTimesPerToken\": 1, \"targetMaxAmountUI\": null, \"targetMi"
+    }
+  },
+  "follow_orders_extra_param_probes": {
+    "{}": {
+      "http_status": 200,
+      "n_tasks": 1
+    },
+    "{\"chain\": \"solana\", \"limit\": 100}": {
+      "http_status": 200,
+      "n_tasks": 1
+    },
+    "{\"chain\": \"solana\", \"page\": 1, \"limit\": 100}": {
+      "http_status": 200,
+      "n_tasks": 0
+    },
+    "{\"status\": \"all\"}": {
+      "http_status": 200,
+      "n_tasks": 1
+    },
+    "{\"enabled\": \"true\"}": {
+      "http_status": 200,
+      "n_tasks": 1
     }
   },
   "working_endpoint": "/automation/follow_orders",
@@ -143,9 +165,8 @@
     }
   ],
   "wallets_raw": {
-    "http_status": 404,
-    "body": {
-      "non_json_body": "Not Found"
-    }
+    "http_status": null,
+    "body": null,
+    "HONEST_ANSWER": "все варианты пути не сработали"
   }
 }
