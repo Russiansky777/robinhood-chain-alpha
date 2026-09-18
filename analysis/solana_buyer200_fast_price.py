@@ -598,6 +598,3 @@ if __name__ == "__main__":
     n_match = sum(1 for c in final if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
     print(json.dumps({"n_total": n_total, "n_mine_ok": n_ok, "n_full_match": n_match,
                        "rpc_calls": RPC_CALLS, "out_path": str(out_path)}, indent=2))
-    n_total = len(comparison)
-    n_match = sum(1 for c in comparison if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
-    print(json.dumps({"n_total": n_total, "n_full_match": n_match, "out_path": str(out_path)}, indent=2))
