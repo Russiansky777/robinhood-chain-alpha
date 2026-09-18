@@ -163,6 +163,30 @@ def find_wallet_tx_near(wallet: str, target_time: int, window_s: int, mint_prefi
     return out
 
 
+def wallet_sol_delta(tx: dict, wallet: str) -> dict | None:
+    """Честная дельта НАТИВНОГО SOL-баланса кошелька в транзакции, по
+    preBalances/postBalances (в лампортах, из accountKeys). Нужна, потому
+    что engine.decode_tx() не распознаёт Jupiter-агрегированный маршрут
+    этой конкретной сделки (legs=[] в первом реальном прогоне) -- без
+    декодированных нот AMM/налога проверить валовый/чистый результат
+    сделки можно только по факту изменения баланса кошелька."""
+    keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
+    idx = None
+    for i, k in enumerate(keys):
+        pk = k.get("pubkey") if isinstance(k, dict) else k
+        if pk == wallet:
+            idx = i
+            break
+    if idx is None:
+        return None
+    meta = tx.get("meta") or {}
+    pre = (meta.get("preBalances") or [None])[idx] if idx < len(meta.get("preBalances") or []) else None
+    post = (meta.get("postBalances") or [None])[idx] if idx < len(meta.get("postBalances") or []) else None
+    if pre is None or post is None:
+        return None
+    return {"pre_lamports": pre, "post_lamports": post, "delta_lamports": post - pre, "delta_sol": (post - pre) / 1e9}
+
+
 def decode_trade_fees_and_tips(tx: dict, wallet: str) -> dict:
     """Разбирает ОДНУ транзакцию (наша покупка/продажа): маршрут через
     engine.decode_tx (та же декодировка, что основной прогон), суммирует
@@ -221,6 +245,8 @@ def decode_trade_fees_and_tips(tx: dict, wallet: str) -> dict:
         "top_level_programs": program_ids, "inner_programs": inner_programs,
         "tips_found": tips_found,
         "network_fee_sol": meta.get("fee", 0) / 1e9,
+        "wallet_sol_delta": wallet_sol_delta(tx, wallet),
+        "wallet_mint_deltas": wallet_mint_deltas(tx, wallet),
     }
 
 
@@ -282,6 +308,44 @@ def main() -> None:
 
     out["part1_nub_mint"] = nub_mint
     out["part1_trades_decoded"] = trades_decoded
+
+    # Сверка валовый/чаевые/чистый -- по ФАКТИЧЕСКОЙ дельте SOL-баланса
+    # кошелька (engine.decode_tx не распознал маршрут -> legs=[], поэтому
+    # ног AMM/налога нет; баланс -- прямой и честный источник для этой
+    # проверки, не требует декодирования маршрута).
+    buy_leg = sell_leg = None
+    for d in trades_decoded:
+        wmd = d.get("wallet_mint_deltas") or {}
+        if nub_mint in (wmd.get("increased") or []):
+            buy_leg = d
+        elif nub_mint in (wmd.get("decreased") or []):
+            sell_leg = d
+    if buy_leg and sell_leg and buy_leg.get("wallet_sol_delta") and sell_leg.get("wallet_sol_delta"):
+        tip_buy = sum(t["sol"] for t in buy_leg["tips_found"])
+        tip_sell = sum(t["sol"] for t in sell_leg["tips_found"])
+        total_sol_out_buy = -buy_leg["wallet_sol_delta"]["delta_sol"]  # реально ушло из кошелька (SOL)
+        total_sol_in_sell = sell_leg["wallet_sol_delta"]["delta_sol"]  # реально пришло в кошелёк (SOL)
+        swap_principal_buy = total_sol_out_buy - buy_leg["network_fee_sol"] - tip_buy
+        swap_output_sell = total_sol_in_sell + sell_leg["network_fee_sol"] + tip_sell
+        tokens_bought = float(D(buy_leg["wallet_mint_deltas"]["deltas"][nub_mint]))
+        tokens_sold = -float(D(sell_leg["wallet_mint_deltas"]["deltas"][nub_mint]))
+        out["part1_verification"] = {
+            "buy_signature": buy_leg["signature"], "sell_signature": sell_leg["signature"],
+            "seconds_between": sell_leg["block_time"] - buy_leg["block_time"],
+            "tokens_bought": tokens_bought, "tokens_sold": tokens_sold,
+            "total_sol_out_buy": total_sol_out_buy, "total_sol_in_sell": total_sol_in_sell,
+            "swap_principal_buy_sol": swap_principal_buy, "swap_output_sell_sol": swap_output_sell,
+            "tip_buy_sol": tip_buy, "tip_sell_sol": tip_sell,
+            "network_fee_buy_sol": buy_leg["network_fee_sol"], "network_fee_sell_sol": sell_leg["network_fee_sol"],
+            "gross_pct_excl_fees_and_tips": (swap_output_sell / swap_principal_buy - 1) * 100 if swap_principal_buy else None,
+            "tips_pct_of_total_out": (tip_buy + tip_sell) / total_sol_out_buy * 100 if total_sol_out_buy else None,
+            "tips_pct_of_swap_principal": (tip_buy + tip_sell) / swap_principal_buy * 100 if swap_principal_buy else None,
+            "net_pct_realized_wallet_to_wallet": (total_sol_in_sell / total_sol_out_buy - 1) * 100 if total_sol_out_buy else None,
+        }
+        print(f"[trade1] Верификация: {out['part1_verification']}", flush=True)
+    else:
+        out["part1_verification"] = {"status": "buy_or_sell_leg_not_found_or_no_sol_delta",
+                                      "buy_found": bool(buy_leg), "sell_found": bool(sell_leg)}
 
     if nub_mint and pilot_matches:
         first_pilot_time = min(m["block_time"] for m in pilot_matches)
