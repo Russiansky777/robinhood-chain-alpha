@@ -1,0 +1,98 @@
+{
+  "generated_at_utc": "2026-09-18T16:48:04Z",
+  "event1_G44sp7_leader_matches": [
+    {
+      "row": null,
+      "check": {
+        "signature": "3kJRLgQDAd3Z2DUEpQXZBuFmwZ76TAwkSBqLNVPEFjQHBQHHuiizZiVCMyQSQoQrAReguakr25bWyKXdAv11jEDh",
+        "slot": 448139126,
+        "time": 1789749341,
+        "wallet_signed": true,
+        "usdc_spent": "100.000000",
+        "positive_mints": [
+          "G44sp7eRAPnRGSsuQqCLSDELoiJLTbgpP5WDXNngDQfe"
+        ],
+        "status": "not_selected"
+      },
+      "signature": "3kJRLgQDAd3Z2DUEpQXZBuFmwZ76TAwkSBqLNVPEFjQHBQHHuiizZiVCMyQSQoQrAReguakr25bWyKXdAv11jEDh",
+      "block_time": 1789749341,
+      "note": "минт совпал, но НЕ прошёл критерий select.py (см. check.status)"
+    }
+  ],
+  "event1_dbot_reason_endpoint_search": {
+    "/automation/follow_orders/records": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    },
+    "/automation/copy_logs": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    },
+    "/automation/task_logs": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    },
+    "/automation/error_logs": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    },
+    "/automation/follow_records": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    },
+    "/automation/notifications": {
+      "http_status": 401,
+      "host": "https://servapi.dbotx.com"
+    }
+  },
+  "event1_swap_orders_state_fail": {
+    "http_status": 200,
+    "body": {
+      "err": false,
+      "res": []
+    },
+    "host": "https://api-bot-v1.dbotx.com",
+    "auth_tried": [
+      "x-api-key"
+    ]
+  },
+  "event2_pilot_ever_held_HcRLc9": {
+    "n_total_token_accounts_pilot": 1,
+    "matching_mint_prefix": [],
+    "ever_held_this_mint": false,
+    "caveat": "Если ATA этого минта был закрыт целиком (продано всё, аккаунт закрыт) ПОСЛЕ покупки, getTokenAccountsByOwner его больше не покажет -- это НЕ доказывает отсутствие покупки, только что сейчас открытого аккаунта нет. Для окончательного ответа при пустом результате здесь нужна ещё проверка истории подписей пилотного кошелька в это же окно (см. ниже)."
+  },
+  "event2_pilot_recent_signatures_count": 6,
+  "event2_pilot_recent_signatures_sample": [
+    {
+      "signature": "4oA136iFHtBVAQULtw8LjcPUUAeebUJtJuAV42m1R2rZ4Y6Lp55qFWGnDN8AV3SmZXRVzrSBwgDsW5dkXM8xninx",
+      "block_time": 1789749510,
+      "err": null
+    },
+    {
+      "signature": "4DTLmaM3YS2rv7489vvy17CrNkr3XUJcbsALJB7mr9KCK3QcowVEEfSvaYsaSxY2JDb7jrxYEANy5Ev6D9kZVDqq",
+      "block_time": 1789749476,
+      "err": null
+    },
+    {
+      "signature": "RM7rPEEZSVuKxTZyrTX39SSvMPvMGNQPBi7jEbeTF4ueHkDTXPDY1iQtxoQydWeGY6Sqv968GiFWLg9BsYGqmGa",
+      "block_time": 1789749474,
+      "err": null
+    },
+    {
+      "signature": "2BcgJFTKZsdKpvcmsPSUQE4A4w5QeNAHm7xso6YmSWr4ZntuQ3rtS4cahWsYyGcLNXHepQJCWhe2TX64MhhxMeda",
+      "block_time": 1789744452,
+      "err": null
+    },
+    {
+      "signature": "3K2kVsq1ydYGVk4baNYvzTpEUHtMnPCe32KgEZAqkB6AANdJpDcXjAcwRMzLPTmbKe6prNNo4QNofs93HUvE7xtc",
+      "block_time": 1789744430,
+      "err": null
+    },
+    {
+      "signature": "3RgSA4ZsRZEpmmbA5FNQq4VypvJDftfF3RPQpFR5aG8x2aukJsBa9M93UZTV14zrW2bhauzBvwdvJ7mJyEsxg2De",
+      "block_time": 1789743979,
+      "err": null
+    }
+  ]
+}
