@@ -1,0 +1,28 @@
+name: "Solana buyer_200 -- проверка GeckoTerminal для ноги SOL/USDC"
+
+# Разовая проверка идеи: заменить ончейн-историю пула SOL/USDC на
+# минутные свечи GeckoTerminal. Не трогает основной расширенный прогон.
+# Результат читается из логов джобы, ничего не коммитится в основной
+# результат до подтверждения точности.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_GECKO_VERIFY_REQUEST"
+
+jobs:
+  gecko_verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Проверка GeckoTerminal для SOL/USDC"
+        run: python -u analysis/solana_gecko_solusdc_verify.py
