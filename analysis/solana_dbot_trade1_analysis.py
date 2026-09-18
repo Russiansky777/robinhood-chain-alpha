@@ -26,7 +26,7 @@ from decimal import Decimal as D
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from solana_buyer200_select_extend import classify  # noqa: E402
+from solana_buyer200_select_extend import classify, POOL_META_PATH, ROUTE_META_PATH  # noqa: E402
 import solana_buyer200_fast_price as fp  # noqa: E402
 from solana_buyer200_fast_price import PRIOR_ROOT  # noqa: E402
 
@@ -82,8 +82,46 @@ def dbot_get(path: str, api_key: str, params: dict | None = None) -> dict:
     return last
 
 
+def wallet_mint_deltas(tx: dict, wallet: str) -> dict:
+    """Дельты токен-баланса ЛЮБОГО кошелька в транзакции -- в отличие от
+    classify() (см. import выше), НЕ привязано к жёстко зашитому внутри
+    него WALLET=лидер. Нужно для анализа сделок ПИЛОТНОГО кошелька --
+    classify() на его транзакциях всегда возвращал бы пусто (искал бы
+    дельты адреса лидера, которого в этой транзакции нет)."""
+    meta = tx.get("meta") or {}
+    if meta.get("err") is not None:
+        return {"increased": [], "decreased": [], "deltas": {}, "pre_balances": {}}
+    pre_tb, post_tb = meta.get("preTokenBalances") or [], meta.get("postTokenBalances") or []
+
+    def bals(rows):
+        a: dict[str, D] = {}
+        for b in rows:
+            if b.get("owner") == wallet:
+                amt = b["uiTokenAmount"]
+                a[b["mint"]] = a.get(b["mint"], D(0)) + D(amt["amount"]) / D(10) ** amt["decimals"]
+        return a
+
+    pre, post = bals(pre_tb), bals(post_tb)
+    delta = {k: post.get(k, D(0)) - pre.get(k, D(0)) for k in set(pre) | set(post)}
+    return {
+        "increased": [k for k, v in delta.items() if v > 0],
+        "decreased": [k for k, v in delta.items() if v < 0],
+        "deltas": {k: str(v) for k, v in delta.items()},
+        "pre_balances": {k: str(v) for k, v in pre.items()},
+    }
+
+
 def find_wallet_tx_near(wallet: str, target_time: int, window_s: int, mint_prefix: str | None = None,
                          mint_suffix: str | None = None) -> list[dict]:
+    """Ищет транзакции КОШЕЛЬКА (любого -- лидер ИЛИ пилот) рядом с
+    target_time, где токен-баланс этого кошелька по данному минту
+    изменился (buy ИЛИ sell). Матчинг минта идёт через wallet_mint_deltas()
+    (см. выше) -- она честно привязана к переданному wallet, в отличие от
+    classify(), которая жёстко ищет дельты адреса ЛИДЕРА. Для вызовов с
+    wallet=LEADER_WALLET дополнительно сохраняем classify()-результат
+    (row/check) -- он несёт полезные поля (usdc_spent, zero_balance,
+    status и т.д.), которых у wallet_mint_deltas() нет и которые несколько
+    мест ниже по коду ожидают именно для лидера."""
     hi, lo = target_time + window_s, target_time - window_s
     before, out = None, []
     for _ in range(15):
@@ -103,12 +141,20 @@ def find_wallet_tx_near(wallet: str, target_time: int, window_s: int, mint_prefi
             tx = fp.get_transaction(s["signature"])
             if tx is None:
                 continue
-            row, check = classify(tx, {"transactionIndex": None})
-            mint = (row or {}).get("mint") or next(iter(check.get("positive_mints") or []), "")
-            if mint_prefix and not (mint.startswith(mint_prefix) and (not mint_suffix or mint.endswith(mint_suffix))):
-                continue
+            deltas = wallet_mint_deltas(tx, wallet)
+            touched = deltas["increased"] + deltas["decreased"]
+            if mint_prefix:
+                touched = [mt for mt in touched
+                           if mt.startswith(mint_prefix) and (not mint_suffix or mt.endswith(mint_suffix))]
+                if not touched:
+                    continue
+            if wallet == LEADER_WALLET:
+                row, check = classify(tx, {"transactionIndex": None})
+            else:
+                row, check = None, {"status": "n/a_not_leader_wallet", "positive_mints": deltas["increased"],
+                                     "negative_mints": deltas["decreased"]}
             out.append({"signature": s["signature"], "block_time": bt, "slot": tx.get("slot"),
-                        "row": row, "check": check, "tx": tx})
+                        "row": row, "check": check, "tx": tx, "mint_deltas": deltas})
         if stop:
             break
         before = batch[-1]["signature"]
@@ -185,6 +231,14 @@ def main() -> None:
         _ACTIVE_SECRETS.append(api_key)
     print(f"[trade1] alchemy_available={fp.alchemy_available()}", flush=True)
 
+    # Реальные накопленные метаданные пулов (тот же источник, что основной
+    # прогон использует для маршрутизации) -- без них plan_route_for_purchase
+    # видит только пулы ИЗ САМОЙ транзакции и часто не может достроить BFS
+    # до USDC за 3 хопа (это и есть причина route:null в прошлом проходе).
+    global_meta: dict = json.loads(POOL_META_PATH.read_text()) if POOL_META_PATH.exists() else {}
+    global_meta.update(json.loads(ROUTE_META_PATH.read_text()) if ROUTE_META_PATH.exists() else {})
+    print(f"[trade1] global_meta pools known: {len(global_meta)}", flush=True)
+
     # ---------- DBot: реальные ордера пилота (теперь должны быть непустые) ----------
     if api_key:
         r = dbot_get("/automation/swap_orders", api_key, params={"chain": "solana"})
@@ -260,8 +314,7 @@ def main() -> None:
         g = g44_leader[0]
         from solana_buyer200_select_extend import plan_route_for_purchase
         mint = (g["row"] or {}).get("mint") or next(iter(g["check"].get("positive_mints") or []), None)
-        meta_dict: dict = {}
-        route, _ = plan_route_for_purchase(mint, g["tx"], meta_dict) if mint else (None, None)
+        route, _ = plan_route_for_purchase(mint, g["tx"], global_meta) if mint else (None, None)
         part2["mint"] = mint
         part2["leader_tx_time"] = g["block_time"]
         part2["route"] = route
@@ -317,7 +370,7 @@ def main() -> None:
                 continue
             m = min(matches, key=lambda x: abs(x["block_time"] - t))
             from solana_buyer200_select_extend import plan_route_for_purchase
-            route, _ = plan_route_for_purchase(nub_mint, m["tx"], {})
+            route, _ = plan_route_for_purchase(nub_mint, m["tx"], global_meta)
             entry = {"time_str": t_str, "leader_signature": m["signature"], "leader_block_time": m["block_time"],
                      "leader_row": m["row"], "zero_balance": (m["row"] or {}).get("zero_balance")}
             if route:
