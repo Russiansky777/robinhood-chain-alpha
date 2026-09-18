@@ -1,0 +1,45 @@
+{
+  "wallet": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+  "target_count": 100,
+  "threshold_exclusive": 500,
+  "observed_quote_currency": "USDC",
+  "usd_parity_is_assumption": true,
+  "groups": [
+    "all",
+    "zero_balance_before",
+    "positive_balance_before"
+  ],
+  "horizons_seconds": [
+    5,
+    15,
+    30,
+    60,
+    180,
+    300,
+    900,
+    3600,
+    21600,
+    86400
+  ],
+  "reference_price": "actual_quote_spend/net_tokens_received",
+  "secondary_comparison": "price_at_horizon/price_at_5_seconds - 1",
+  "network_actions": "read_only",
+  "status": "blocked_network_access",
+  "last_checked_signature": "5jGmZHndpbiNh46dFG3REokLBRmi43oJcSUYf6Q5HEfjZPBM4H9oEHSmHPXQQcfGje59GymhtasydP7uw1wwoLJk",
+  "checked_successful_transactions": 768,
+  "selected_so_far": 100,
+  "zero_balance": 23,
+  "price_status_counts": {
+    "ok": 140,
+    "future": 66,
+    "data_not_cached": 727,
+    "launch_migration_requires_new_pool": 8,
+    "quote_freshness_unverified": 1,
+    "route_decoder_missing": 58
+  },
+  "updated_utc": "2026-09-17T20:38:51.258785+00:00",
+  "fully_priced_to_5min": 17,
+  "asof_utc": "2026-09-17T20:52:42.436573+00:00",
+  "error": "CONNECT tunnel failed, response 403",
+  "resume": "Run select.py only if selection changes. To resume prices: python price_batch.py --workers 4; retain selected.json unchanged. Regenerate offline/merge_prior/analysis/report only as needed; do not overwrite verified prior points with missing statuses."
+}
