@@ -230,15 +230,32 @@ def step2_calibration(probe: DuneProbe) -> dict:
     return out
 
 
+PUMPFUN_TABLE_CANDIDATES = [
+    "pump_fun_solana.trades", "pumpdotfun_solana.trades", "pumpfun_solana.trades",
+    "pump_fun_solana.pump_fun_amm_trades", "pump_fun_solana.pump_fun_trades",
+]
+
+
 def step2b_pumpfun_check(probe: DuneProbe, missing_sigs: list[str]) -> dict:
     """Ищем отдельную таблицу для сделок на бондинг-кривой pump.fun/
-    LaunchLab через information_schema (DuneSQL -- Trino, поддерживает
-    его) -- НЕ объявляем источник негодным по пропускам, пока не
-    проверили это."""
-    sql = ("SELECT table_schema, table_name FROM information_schema.tables "
-           "WHERE table_name LIKE '%pump%' OR table_name LIKE '%bonding%' OR table_name LIKE '%launch%'")
-    r = probe.run_sql_sync("pumpfun_table_discovery", sql, timeout_s=120)
-    return {"discovery": r, "n_missing_checked": len(missing_sigs)}
+    LaunchLab -- НЕ объявляем источник негодным по пропускам, пока не
+    проверили это. Прямые точечные пробы правдоподобных имён таблиц
+    (быстрые, LIMIT 1) вместо медленного полного скана
+    information_schema (тот же с timeout=120с ничего не успел --
+    честно зафиксировано отдельно, не повторяем тем же способом)."""
+    out: dict = {"n_missing_checked": len(missing_sigs), "table_probes": {}}
+    for tbl in PUMPFUN_TABLE_CANDIDATES:
+        sql = f"SELECT tx_id FROM {tbl} WHERE trader_id = '{LEADER_WALLET}' LIMIT 5"
+        r = probe.run_sql_sync(f"pumpfun_probe_{tbl.replace('.', '_')}", sql, timeout_s=60)
+        out["table_probes"][tbl] = {"status": r.get("status"),
+                                     "n_rows": r.get("n_rows"),
+                                     "error_preview": json.dumps(r.get("status_body") or r.get("execute_body") or r.get("results_body"))[:300]}
+        print(f"[dune_check] pumpfun-таблица {tbl}: {out['table_probes'][tbl]}", flush=True)
+        if r.get("status") == "ok":
+            out["found_table"] = tbl
+            out["sample_rows"] = r["rows"]
+            break
+    return out
 
 
 def step3_price_at_30s(probe: DuneProbe, calib: dict) -> dict:
