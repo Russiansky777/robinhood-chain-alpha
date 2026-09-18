@@ -253,13 +253,20 @@ def scan_pilot_trades(cutoff_time: int) -> list[dict]:
             if tx is None:
                 continue
             deltas = wallet_mint_deltas(tx, PILOT_WALLET)
+            sol_delta = wallet_sol_delta(tx, PILOT_WALLET)
+            sol_change = sol_delta["delta_sol"] if sol_delta else 0.0
+            # Реальная покупка ВСЕГДА тратит SOL, реальная продажа ВСЕГДА его
+            # приносит -- проверка направления по факту SOL-баланса отсекает
+            # пыль/побочные дельты токена в транзакции (напр. крупный take_profit
+            # по другому минту, где заодно на микроскопическую сумму дрогнул
+            # баланс третьего, не относящегося к сделке, токена).
             for mint in deltas["increased"]:
-                if mint in (USDC_MINT, SOL_MINT):
+                if mint in (USDC_MINT, SOL_MINT) or sol_change >= -0.001:
                     continue
                 events.append({"signature": s["signature"], "block_time": bt, "slot": tx.get("slot"),
                                 "mint": mint, "direction": "buy", "tx": tx})
             for mint in deltas["decreased"]:
-                if mint in (USDC_MINT, SOL_MINT):
+                if mint in (USDC_MINT, SOL_MINT) or sol_change <= 0.001:
                     continue
                 events.append({"signature": s["signature"], "block_time": bt, "slot": tx.get("slot"),
                                 "mint": mint, "direction": "sell", "tx": tx})
