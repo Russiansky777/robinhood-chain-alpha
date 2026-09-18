@@ -4,14 +4,18 @@
 и докупки, без вычета издержек (наложим отдельно). Плюс медиана
 максимальной просадки внутри каждого горизонта.
 
-База для "движения" -- РЕАЛЬНАЯ цена исполнения нашей покупки
-(entry_usdc = usdc_spent/tokens_received, уже точно посчитана в
-selected_300.json) -- ЭТО фактическая цена входа, не котировка +5с
-(тот отдельный приём "движение от +5с" в docstring
-solana_buyer200_fast_price.py относится к сверке с чужим методом на
-Шаге 1/2, не к этой экономической сводке: вопрос "что если держать
-дольше" по смыслу сравнивает С МОМЕНТОМ ВХОДА, иначе горизонт 5с был
-бы тривиальным нулём для всех сделок).
+База для "движения" -- КОТИРОВКА +5с (mine_price при seconds=5), НЕ
+фактическая цена исполнения покупки (entry_usdc). Изначально здесь было
+наоборот (база = entry_usdc) с аргументом "иначе горизонт 5с
+тривиальный ноль" -- ОШИБКА, найдена и исправлена эмпирически: по 37
+первым входам с валидной точкой на 30с медиана движения (+5с -> +30с)
+= 20.70% ТОЧНО совпадает с уже известным владельцу опорным числом
+"медиана +20.70% на n=37" (см. переписку) -- а медиана от entry_usdc
+до +30с даёт 104.66%, НЕ совпадает. Значит установленная в этом
+конвейере (docstring solana_buyer200_fast_price.py: "движение считается
+от котировки +5с") конвенция -- это база и для ЭТОЙ таблицы, не только
+для сверки Шага 1/2. Горизонт 5с оттого тривиально нулевой для всех
+сделок -- это ОЖИДАЕМО, не баг, оставлен в таблице с пояснением.
 
 Источники, оба уже реальные, ничего не досчитывается заново:
 - data/solana_buyer_200/step_extended_result.json -- ончейн, 5/15/30/60/
@@ -68,21 +72,31 @@ def load_long() -> dict[tuple[str, int], dict]:
     return out
 
 
-def gross_move_at(sig: str, sec: int, entry_usdc: float, short: dict, long_: dict) -> float | None:
+def baseline_price5(sig: str, short: dict) -> float | None:
+    """Установленная в конвейере база -- котировка +5с (см. правку в
+    docstring модуля: эмпирически подтверждена, воспроизводит опорное
+    +20.70% на n=37)."""
+    e = short.get((sig, 5))
+    if not e or e.get("mine_status") != "ok" or e.get("mine_price") is None:
+        return None
+    return float(e["mine_price"])
+
+
+def gross_move_at(sig: str, sec: int, base: float, short: dict, long_: dict) -> float | None:
     if sec in SHORT_HORIZONS:
         e = short.get((sig, sec))
         if not e or e.get("mine_status") != "ok" or e.get("mine_price") is None:
             return None
-        return float(e["mine_price"]) / entry_usdc - 1
+        return float(e["mine_price"]) / base - 1
     e = long_.get((sig, sec))
     if not e or e.get("status") != "ok" or e.get("price_usd") is None:
         return None
-    return float(e["price_usd"]) / entry_usdc - 1
+    return float(e["price_usd"]) / base - 1
 
 
-def drawdown_at(sig: str, sec: int, entry_usdc: float, short: dict, long_: dict) -> tuple[float | None, str]:
+def drawdown_at(sig: str, sec: int, base: float, short: dict, long_: dict) -> tuple[float | None, str]:
     if sec in SHORT_HORIZONS:
-        pts = [gross_move_at(sig, s, entry_usdc, short, long_) for s in SHORT_HORIZONS if s <= sec]
+        pts = [gross_move_at(sig, s, base, short, long_) for s in SHORT_HORIZONS if s <= sec]
         pts = [p for p in pts if p is not None]
         if not pts:
             return None, "discrete_points_proxy"
@@ -90,7 +104,7 @@ def drawdown_at(sig: str, sec: int, entry_usdc: float, short: dict, long_: dict)
     e = long_.get((sig, sec))
     if not e or e.get("min_low_usd_from_entry") is None:
         return None, "continuous_candle_low"
-    return float(e["min_low_usd_from_entry"]) / entry_usdc - 1, "continuous_candle_low"
+    return float(e["min_low_usd_from_entry"]) / base - 1, "continuous_candle_low"
 
 
 def pct(vals: list[float], p: float) -> float | None:
@@ -113,9 +127,16 @@ def main() -> None:
           f"с готовыми короткими горизонтами (>=1 ok)={n_short_done}, "
           f"с готовыми длинными горизонтами={n_long_done}", flush=True)
 
+    bases = {sig: baseline_price5(sig, short) for sig in selected}
+    n_with_base = sum(1 for v in bases.values() if v is not None)
+
     out = {"generated_at_utc": None, "n_purchases_total": len(selected),
            "n_short_horizons_available_for": n_short_done, "n_long_horizons_available_for": n_long_done,
-           "note_baseline": "движение считается ОТ РЕАЛЬНОЙ цены исполнения покупки (entry_usdc), не от котировки +5с",
+           "n_with_valid_5s_baseline": n_with_base,
+           "note_baseline": "движение считается ОТ КОТИРОВКИ +5с (mine_price при seconds=5) -- "
+                             "установленная в конвейере конвенция, эмпирически подтверждена: "
+                             "воспроизводит опорное +20.70% на n=37 (см. docstring). Сделки без "
+                             "валидной точки на +5с честно исключены (base=None), не обнулены.",
            "table": []}
     import time
     out["generated_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -132,11 +153,13 @@ def main() -> None:
             for sig, row in selected.items():
                 if bool(row.get("zero_balance")) != want_zero:
                     continue
-                entry_usdc = float(row["entry_usdc"])
-                mv = gross_move_at(sig, sec, entry_usdc, short, long_)
+                base = bases.get(sig)
+                if base is None:
+                    continue
+                mv = gross_move_at(sig, sec, base, short, long_)
                 if mv is not None:
                     moves.append(mv)
-                dd, dd_method = drawdown_at(sig, sec, entry_usdc, short, long_)
+                dd, dd_method = drawdown_at(sig, sec, base, short, long_)
                 if dd is not None:
                     drawdowns.append(dd)
             n = len(moves)
@@ -159,6 +182,21 @@ def main() -> None:
                   f"{('%.2f' % row_out['median_max_drawdown_pct']) if row_out['median_max_drawdown_pct'] is not None else '--':>13} "
                   f"{dd_method:>22}")
 
+    out["long_horizons_reliability_warning"] = (
+        "900с/1ч/6ч/24ч: среднее (mean_pct) для части сделок аномально огромное "
+        "(до сотен тысяч %) -- найдено при первом прогоне на реальных данных. "
+        "Проверено на худшем случае (4JfcMioEjwsfR8Q..., пул DGUzdrnp...): и "
+        "ончейн-нога маршрута, и GeckoTerminal используют РОВНО ТОТ ЖЕ адрес "
+        "пула, маршрут честно завершается в USDC (не юнит-разъезд SOL/USD) -- "
+        "но price_usd от GeckoTerminal на этом пуле даёт множитель ~218000x к "
+        "цене +5с. Причина НЕ установлена (похоже на расхождение в декодировании "
+        "конкретно pump.fun-подобных пулов между нашим ончейн-методом и "
+        "GeckoTerminal, не проверено до конца). МЕДИАНА по длинным горизонтам "
+        "выглядит разумно (10-60%), но доверять СРЕДНЕМУ и, возможно, части "
+        "медианы для 900с-24ч пока нельзя. Короткие горизонты (5-300с) этой "
+        "проблемы не имеют -- полностью ончейн, один метод, воспроизводят "
+        "опорное +20.70% на n=37 точно."
+    )
     OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     print(f"\n[horizon_summary] записано в {OUT_PATH}", flush=True)
 
