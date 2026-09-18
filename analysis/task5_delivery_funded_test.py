@@ -156,7 +156,17 @@ def verify_and_build_tx(account: Account, gas_price_wei: int) -> dict:
     return tx
 
 
-def send_one(account: Account, gas_price_wei: int, label: str, multiplier: float) -> dict:
+def send_one(account: Account, multiplier: float, label: str) -> dict:
+    """ВАЖНО, найдено в реальном прогоне 2026-09-18: base fee на этой цепи
+    реально ДИНАМИЧЕСКИЙ (EIP-1559-подобный) и меняется за секунды --
+    попытка A2 первого прогона реально упала с 'max fee per gas less than
+    block base fee' (60,454,000 vs выросший 60,774,000 всего через 4.5с).
+    Поэтому здесь -- СВЕЖИЙ eth_gasPrice ПРЯМО ПЕРЕД каждой отправкой,
+    не переиспользуем значение, вычисленное в начале скрипта. Небольшой
+    буфер (+8%) поверх текущей цены и множителя -- запас на дрейф между
+    этим вызовом и моментом реальной обработки на стороне секвенсера."""
+    fresh_gas_price_wei = int(rpc("eth_gasPrice", []), 16)
+    gas_price_wei = int(fresh_gas_price_wei * multiplier * 1.08)
     tx = verify_and_build_tx(account, gas_price_wei)
     block_at_send = int(rpc("eth_blockNumber", []), 16)
     signed = Account.sign_transaction(tx, account.key)
@@ -276,7 +286,7 @@ def main() -> None:
             break
         label = f"A{i + 1}"
         print(f"[funded_test] отправка {label} (multiplier=1.0)...", file=sys.stderr)
-        entry = send_one(account, base_gas_price_wei, label, 1.0)
+        entry = send_one(account, 1.0, label)
         n_sent += 1
         if entry.get("tx_hash"):
             time.sleep(PAUSE_BETWEEN_SENDS_S)
@@ -302,9 +312,9 @@ def main() -> None:
             if n_sent >= MAX_TOTAL_SENDS:
                 break
             label = f"B{i + 1}"
-            gas_price_b = int(base_gas_price_wei * mult)
-            print(f"[funded_test] отправка {label} (multiplier={mult}, gasPrice={gas_price_b})...", file=sys.stderr)
-            entry = send_one(account, gas_price_b, label, mult)
+            print(f"[funded_test] отправка {label} (multiplier={mult}, свежая gasPrice будет получена внутри send_one)...",
+                  file=sys.stderr)
+            entry = send_one(account, mult, label)
             n_sent += 1
             if entry.get("tx_hash"):
                 time.sleep(PAUSE_BETWEEN_SENDS_S)
