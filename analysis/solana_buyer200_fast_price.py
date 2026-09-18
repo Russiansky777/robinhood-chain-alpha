@@ -261,6 +261,8 @@ def ensure_pool_window(pool: str, lo_time: int, hi_time: int) -> list[dict]:
             break
         if len(page) < 1000:
             break
+    print(f"[pool_window] pool={pool[:12]}.. окно=[{lo_time},{hi_time}] ({hi_time - lo_time}с) -> "
+          f"{len(hist)} подписей (RPC всего: {RPC_CALLS})", flush=True)
     _pool_window_cache[key] = hist
     p.write_text(json.dumps(hist))
     return hist
@@ -460,14 +462,17 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
     print(f"[{label}] покупок всего={len(target_sigs)}, уже полностью закрыто={len(target_sigs) - len(pending_sigs)}, "
           f"осталось={len(pending_sigs)}", flush=True)
 
+    # ВАЖНО: окна считаем (для корректного объединения диапазонов между
+    # покупками одного пула), но НЕ грузим здесь заранее списком -- при
+    # 300 покупках и десятках пулов эта предзагрузка сама по себе может
+    # не уложиться в один таймаут джобы, и тогда ни одна точка не
+    # сохранится и не закоммитится. Вместо этого ensure_pool_window()
+    # грузит каждый сегмент ЛЕНИВО, при первом реальном обращении -- то
+    # есть по ходу обработки покупок, каждая из которых сразу же
+    # считается и сохраняется (см. цикл ниже).
     windows = pool_windows_needed(pending_sigs, rows, routes, max(HORIZONS_SECONDS))
     print(f"[{label}] {len(windows)} пул(ов), {sum(len(v) for v in windows.values())} непересекающихся сегмент(ов) "
-          f"-- якорем вперёд->назад (Шаг 0.2/0.3)", flush=True)
-    for pool, intervals in windows.items():
-        for lo, hi in intervals:
-            hist = ensure_pool_window(pool, lo, hi)
-            print(f"[{label}] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi - lo}с) -> {len(hist)} подписей "
-                  f"(RPC всего: {RPC_CALLS})", flush=True)
+          f"-- будут догружены лениво по ходу покупок (Шаг 0.2/0.3)", flush=True)
 
     comparison: list[dict] = list(already.values())
     started_at = time.monotonic()
