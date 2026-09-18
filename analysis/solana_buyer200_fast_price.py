@@ -331,17 +331,30 @@ def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: in
     честный статус missing_swap_event/no_historical_swap), но по
     ОТДЕЛЬНЫМ транзакциям через getTransaction, не по полным блокам.
     [lo_time,hi_time] -- окно, УЖЕ гарантированно покрывающее t (см.
-    pool_windows_needed/ensure_pool_window)."""
+    pool_windows_needed/ensure_pool_window).
+
+    ВАЖНО (найдено при сверке Шага 1 на сигнатуре 5y38rMoQ...: их
+    point() считает предел в 120 УНИКАЛЬНЫХ БЛОКОВ (dedup по slot через
+    seen_slots), а не 120 транзакций -- на активном пуле несколько сделок
+    в одном слоте означают, что per-транзакционный счётчик упирался бы в
+    120 задолго до 120 РЕАЛЬНЫХ блоков истории, ложно давая
+    no_historical_swap/120_..._without_decoded_swap там, где их метод
+    находит цену. Дедуп по slot ниже -- это не смена метода, а
+    исправление счётчика предела ПОД их же метод."""
     hist = ensure_pool_window(pool, lo_time, hi_time)
     # Первая подпись с blockTime<=t (hist -- newest-first) -- бинарный поиск
     # внутри уже загруженного окна.
     times = [-(h["blockTime"] or -(10**18)) for h in hist]  # отриц. для monotonic возрастания при newest-first
     idx = bisect.bisect_left(times, -t)
-    scanned = 0
+    seen_slots: set[int] = set()
     for h in hist[idx:]:
         if h.get("err") is not None or h.get("blockTime") is None or h["blockTime"] > t:
             continue
-        scanned += 1
+        slot = h["slot"]
+        if slot not in seen_slots:
+            if len(seen_slots) >= max_scanned:
+                return dict(pool=pool, target=t, status=f"{max_scanned}_blocks_without_decoded_swap", scanned=len(seen_slots))
+            seen_slots.add(slot)
         tx = get_transaction(h["signature"])
         if tx is None:
             continue
@@ -351,14 +364,12 @@ def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: in
         if pool_events:
             e = price_event(pool_events[-1])
             return dict(pool=pool, target=t, slot=tx["slot"], signature=h["signature"],
-                        time=tx["blockTime"], age_seconds=t - tx["blockTime"], scanned=scanned,
+                        time=tx["blockTime"], age_seconds=t - tx["blockTime"], scanned=len(seen_slots),
                         event=e, status=e.get("status", "unknown"))
         if expected > 0:
             return dict(pool=pool, target=t, slot=tx["slot"], signature=h["signature"],
-                        status="missing_swap_event", scanned=scanned)
-        if scanned >= max_scanned:
-            return dict(pool=pool, target=t, status=f"{max_scanned}_txs_without_decoded_swap", scanned=scanned)
-    return dict(pool=pool, target=t, status="no_historical_swap", scanned=scanned)
+                        status="missing_swap_event", scanned=len(seen_slots))
+    return dict(pool=pool, target=t, status="no_historical_swap", scanned=len(seen_slots))
 
 
 if __name__ == "__main__":
