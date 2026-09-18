@@ -1,0 +1,52 @@
+name: "Solana buyer_200 -- Шаг 2: сверка всех 140 готовых точек"
+
+# Прямой запуск на GH Actions runner'е (НЕ через VPS), см.
+# run_solana_buyer200_step1.yml. Таймаут выше, чем у Шага 1: 19 сигнатур
+# (не 5), окна пулов могут включать высокотрафиковые промежуточные пулы
+# (например SOL/USDC).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BUYER200_STEP2_REQUEST"
+
+jobs:
+  step2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Шаг 2: сверка всех 140 готовых точек"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_buyer200_fast_price.py --mode step2
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BUYER200_STEP2_REQUEST
+          [ -e data/solana_buyer_200/step2_comparison_result.json ] && git add data/solana_buyer_200/step2_comparison_result.json
+          [ -e data/solana_buyer_200/prior/current/buyer_100/route_meta.json ] && git add data/solana_buyer_200/prior/current/buyer_100/route_meta.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: результат Шага 2 (сверка 140 точек) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

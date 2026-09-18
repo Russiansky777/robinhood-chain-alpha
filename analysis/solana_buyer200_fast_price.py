@@ -204,42 +204,49 @@ def find_anchor_after(hi_time: int, safety_margin_s: int = 60) -> tuple[str, int
     raise RuntimeError(f"не удалось найти якорь новее t={target}")
 
 
-# --- окно истории пула: ОДНО на пул на объединённый диапазон [lo,hi] всех
-# покупок текущего прогона, идущих через него (Шаг 0.2+0.3) ---
-_pool_window_cache: dict[str, dict] = {}
+# --- окно истории пула: сегменты [lo,hi], НЕПЕРЕСЕКАЮЩИЕСЯ, каждый на
+# группу покупок текущего прогона, чьи диапазоны реально смыкаются
+# (Шаг 0.2+0.3) ---
+_pool_window_cache: dict[tuple[str, int, int], list[dict]] = {}
 
 
-def _pool_window_path(pool: str) -> Path:
-    return CACHE_DIR / f"pool_window_{pool}.json"
+def _segment_cache_path(pool: str, lo_time: int, hi_time: int) -> Path:
+    return CACHE_DIR / f"pool_window_{pool}_{lo_time}_{hi_time}.json"
 
 
 def ensure_pool_window(pool: str, lo_time: int, hi_time: int) -> list[dict]:
-    """История подписей пула, newest-first, ограниченная окном
-    [lo_time .. hi_time+запас] -- НЕ от текущего момента назад (это и было
-    найденным на Шаге 1 багом: активный пул общего минта 6GmAFSYs...
-    копит десятки тысяч подписей за часы между сбором данных и прогоном
-    скрипта). Вместо этого: находим якорь строго новее hi_time
+    """История подписей пула, newest-first, ограниченная РОВНО этим
+    сегментом [lo_time .. hi_time+запас] -- НЕ от текущего момента назад
+    (это и было найденным на Шаге 1 багом: активный пул общего минта
+    6GmAFSYs... копит десятки тысяч подписей за часы между сбором данных
+    и прогоном скрипта). Находим якорь строго новее hi_time
     (find_anchor_after) и листаем НАЗАД строго до lo_time -- окно в
-    сотни подписей вместо десятков тысяч. Кэш -- НА ПУЛ, объединяющий
-    диапазон ВСЕХ покупок текущего прогона, которые через него идут
-    (39/100 покупок делят один минт -- один проход, не 39)."""
-    state = _pool_window_cache.get(pool)
-    if state is None:
-        p = _pool_window_path(pool)
-        if p.exists():
-            try:
-                state = json.loads(p.read_text())
-            except (ValueError, OSError):
-                state = None
-        _pool_window_cache[pool] = state or {"hist": [], "lo": None, "hi": None}
-        state = _pool_window_cache[pool]
-    if state["hist"] and state["lo"] is not None and state["hi"] is not None and state["lo"] <= lo_time and state["hi"] >= hi_time:
-        return state["hist"]
+    сотни/тысячи подписей вместо десятков тысяч.
 
-    new_lo = min(lo_time, state["lo"]) if state["lo"] is not None else lo_time
-    new_hi = max(hi_time, state["hi"]) if state["hi"] is not None else hi_time
-    anchor_sig, anchor_slot = find_anchor_after(new_hi)
-    hist: list[dict] = []
+    Кэш -- НА КОНКРЕТНЫЙ СЕГМЕНТ (pool,lo,hi), не просто на пул: если бы
+    кэшировали по одному пулу, то у ОБЩЕГО для многих покупок, но при
+    этом ещё и сетевого-хайтрафик пула (например, SOL/USDC-пул как
+    промежуточное звено маршрута) окно растянулось бы на ВЕСЬ период
+    сбора данных между двумя далёкими друг от друга покупками, включая
+    часы мёртвого времени между ними -- на пуле с ~100+ tx/с это давало
+    бы сотни тысяч лишних подписей. pool_windows_needed() уже разбивает
+    диапазоны на НЕПЕРЕСЕКАЮЩИЕСЯ сегменты -- здесь просто фиксированный
+    сегмент, без попытки расширения задним числом."""
+    key = (pool, lo_time, hi_time)
+    hist = _pool_window_cache.get(key)
+    if hist is not None:
+        return hist
+    p = _segment_cache_path(pool, lo_time, hi_time)
+    if p.exists():
+        try:
+            hist = json.loads(p.read_text())
+            _pool_window_cache[key] = hist
+            return hist
+        except (ValueError, OSError):
+            pass
+
+    anchor_sig, _anchor_slot = find_anchor_after(hi_time)
+    hist = []
     before = anchor_sig
     while True:
         page = get_signatures_for_address(pool, before=before, limit=1000)
@@ -248,31 +255,50 @@ def ensure_pool_window(pool: str, lo_time: int, hi_time: int) -> list[dict]:
         hist.extend(page)
         oldest = page[-1].get("blockTime")
         before = page[-1]["signature"]
-        if oldest is not None and oldest <= new_lo:
+        if oldest is not None and oldest <= lo_time:
             break
         if len(page) < 1000:
             break
-    state.update(hist=hist, lo=new_lo, hi=new_hi, anchor_slot=anchor_slot)
-    _pool_window_path(pool).write_text(json.dumps(state))
+    _pool_window_cache[key] = hist
+    p.write_text(json.dumps(hist))
     return hist
 
 
-def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_sec: int) -> dict[str, tuple[int, int]]:
-    """Объединённый диапазон [lo,hi] на пул по всем ПОКУПКАМ текущего
-    прогона, которые через него идут -- Шаг 0.3 (общая история для
-    повторяющихся минтов), теперь ещё и общая для всех горизонтов ОДНОЙ
-    покупки (не по разу на секунду)."""
-    windows: dict[str, tuple[int, int]] = {}
+def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_sec: int) -> dict[str, list[tuple[int, int]]]:
+    """НЕПЕРЕСЕКАЮЩИЕСЯ сегменты [lo,hi] на пул -- объединяем только
+    покупки текущего прогона, чьи диапазоны РЕАЛЬНО пересекаются или
+    соприкасаются (39/100 покупок делят один минт и, как правило, идут
+    плотно во времени -- один проход, не 39), но НЕ сливаем покупки,
+    разнесённые по времени на часы через один и тот же
+    высокотрафиковый промежуточный пул (см. ensure_pool_window) -- иначе
+    получили бы одно окно на весь период сбора вместо суммы маленьких."""
+    raw: dict[str, list[tuple[int, int]]] = {}
     for sig in target_sigs:
         row = rows[sig]
         lo, hi = row["time"], row["time"] + max_sec
         for leg in routes.get(sig) or []:
-            pool = leg["pool"]
-            if pool in windows:
-                windows[pool] = (min(windows[pool][0], lo), max(windows[pool][1], hi))
+            raw.setdefault(leg["pool"], []).append((lo, hi))
+
+    merged: dict[str, list[tuple[int, int]]] = {}
+    for pool, intervals in raw.items():
+        intervals.sort()
+        out: list[list[int]] = []
+        for lo, hi in intervals:
+            if out and lo <= out[-1][1]:
+                out[-1][1] = max(out[-1][1], hi)
             else:
-                windows[pool] = (lo, hi)
-    return windows
+                out.append([lo, hi])
+        merged[pool] = [(lo, hi) for lo, hi in out]
+    return merged
+
+
+def find_window_for(intervals: list[tuple[int, int]], t: int) -> tuple[int, int]:
+    """Какой из непересекающихся сегментов пула покрывает момент t --
+    по построению pool_windows_needed ровно один должен подходить."""
+    for lo, hi in intervals:
+        if lo <= t <= hi:
+            return lo, hi
+    raise RuntimeError(f"t={t} не попадает ни в один загруженный сегмент {intervals}")
 
 
 def price_event(e: dict) -> dict:
@@ -372,81 +398,103 @@ def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: in
     return dict(pool=pool, target=t, status="no_historical_swap", scanned=len(seen_slots))
 
 
+def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
+                    ref_by_sig_sec: dict, only_ref_ok: bool = False) -> list[dict]:
+    """Общее тело сверки для Шага 1 (17->N сигнатур) и Шага 2 (все 100,
+    только точки, где у эталона status=ok -- 140/1000 уже посчитанных).
+    only_ref_ok=True пропускает секунды, для которых у эталона нет
+    готовой цены (Шаг 2 не про них -- это Шаг 3)."""
+    windows = pool_windows_needed(target_sigs, rows, routes, max(HORIZONS_SECONDS))
+    print(f"[{label}] {len(windows)} пул(ов), {sum(len(v) for v in windows.values())} непересекающихся сегмент(ов) "
+          f"-- якорем вперёд->назад (Шаг 0.2/0.3)", flush=True)
+    for pool, intervals in windows.items():
+        for lo, hi in intervals:
+            hist = ensure_pool_window(pool, lo, hi)
+            print(f"[{label}] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi - lo}с) -> {len(hist)} подписей", flush=True)
+
+    comparison = []
+    for sig in target_sigs:
+        row = rows[sig]
+        route = routes.get(sig)
+        for sec in HORIZONS_SECONDS:
+            ref = ref_by_sig_sec.get((sig, sec), {})
+            if only_ref_ok and ref.get("status") != "ok":
+                continue
+            t = row["time"] + sec
+            if not route:
+                comparison.append(dict(signature=sig, seconds=sec, status="no_route"))
+                continue
+            value = D(1)
+            legs_out = []
+            ok = True
+            for leg in route:
+                lo, hi = find_window_for(windows[leg["pool"]], t)
+                p = find_price_at(leg["pool"], t, lo, hi)
+                legs_out.append(p)
+                if p.get("status") != "ok":
+                    ok = False
+                    break
+                e = p["event"]
+                v = D(e["p1_per_0"])
+                if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
+                    value *= v
+                elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
+                    value /= v
+                else:
+                    ok = False
+                    break
+            mine_price = str(value) if ok else None
+            mine_slot = legs_out[-1].get("slot") if legs_out else None
+            mine_sig = legs_out[-1].get("signature") if legs_out else None
+            ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
+            match_price = (mine_price is not None and ref.get("price_usdc") is not None
+                           and D(mine_price) == D(ref["price_usdc"]))
+            match_slot = mine_slot == ref_leg.get("slot")
+            match_sig = mine_sig == ref_leg.get("signature")
+            comparison.append(dict(
+                signature=sig, seconds=sec,
+                mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
+                mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
+                ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
+                ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
+                match_price=match_price, match_slot=match_slot, match_signature=match_sig,
+                legs=legs_out,
+            ))
+            print(f"[{label}] {sig[:12]}.. sec={sec} mine={mine_price} ref={ref.get('price_usdc')} "
+                  f"match_price={match_price} match_slot={match_slot}", flush=True)
+    return comparison
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["step1"], default="step1")
+    ap.add_argument("--mode", choices=["step1", "step2"], default="step1")
     ap.add_argument("--n", type=int, default=5)
     args = ap.parse_args()
 
+    alchemy_ok = alchemy_available()
+    print(f"[{args.mode}] alchemy_available={alchemy_ok} (ключ не печатается)", flush=True)
+
+    rows = {r["signature"]: r for r in json.loads((PRIOR_ROOT / "selected.json").read_text())}
+    routes = {r["signature"]: r["route"] for r in json.loads((PRIOR_ROOT / "routes.json").read_text())}
+    reference = json.loads((PRIOR_ROOT / "price_points.json").read_text())
+    ref_by_sig_sec = {(r["signature"], r["seconds"]): r for r in reference}
+
     if args.mode == "step1":
-        alchemy_ok = alchemy_available()
-        print(f"[step1] alchemy_available={alchemy_ok} (ключ не печатается)", flush=True)
-
-        rows = {r["signature"]: r for r in json.loads((PRIOR_ROOT / "selected.json").read_text())}
-        routes = {r["signature"]: r["route"] for r in json.loads((PRIOR_ROOT / "routes.json").read_text())}
-        reference = json.loads((PRIOR_ROOT / "price_points.json").read_text())
-        ref_by_sig_sec = {(r["signature"], r["seconds"]): r for r in reference}
         target_sigs = json.loads((PRIOR_ROOT / "analysis.json").read_text())["meta"]["full_5min_signatures"][:args.n]
-
-        windows = pool_windows_needed(target_sigs, rows, routes, max(HORIZONS_SECONDS))
-        print(f"[step1] {len(windows)} пул(ов) в объединённых окнах, догружаем якорем вперёд->назад (Шаг 0.2/0.3)", flush=True)
-        for pool, (lo, hi) in windows.items():
-            hist = ensure_pool_window(pool, lo, hi)
-            print(f"[step1] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi-lo}с) -> {len(hist)} подписей", flush=True)
-
-        comparison = []
-        for sig in target_sigs:
-            row = rows[sig]
-            route = routes.get(sig)
-            for sec in HORIZONS_SECONDS:
-                t = row["time"] + sec
-                ref = ref_by_sig_sec.get((sig, sec), {})
-                if not route:
-                    comparison.append(dict(signature=sig, seconds=sec, status="no_route"))
-                    continue
-                value = D(1)
-                legs_out = []
-                ok = True
-                for leg in route:
-                    lo, hi = windows[leg["pool"]]
-                    p = find_price_at(leg["pool"], t, lo, hi)
-                    legs_out.append(p)
-                    if p.get("status") != "ok":
-                        ok = False
-                        break
-                    e = p["event"]
-                    v = D(e["p1_per_0"])
-                    if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
-                        value *= v
-                    elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
-                        value /= v
-                    else:
-                        ok = False
-                        break
-                mine_price = str(value) if ok else None
-                mine_slot = legs_out[-1].get("slot") if legs_out else None
-                mine_sig = legs_out[-1].get("signature") if legs_out else None
-                ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
-                match_price = (mine_price is not None and ref.get("price_usdc") is not None
-                               and D(mine_price) == D(ref["price_usdc"]))
-                match_slot = mine_slot == ref_leg.get("slot")
-                match_sig = mine_sig == ref_leg.get("signature")
-                comparison.append(dict(
-                    signature=sig, seconds=sec,
-                    mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
-                    mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
-                    ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
-                    ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
-                    match_price=match_price, match_slot=match_slot, match_signature=match_sig,
-                    legs=legs_out,
-                ))
-                print(f"[step1] {sig[:12]}.. sec={sec} mine={mine_price} ref={ref.get('price_usdc')} "
-                      f"match_price={match_price} match_slot={match_slot}", flush=True)
-
+        comparison = run_comparison("step1", target_sigs, rows, routes, ref_by_sig_sec)
         out_path = OUT_ROOT / "step1_comparison_result.json"
-        out_path.write_text(json.dumps(comparison, indent=2, default=str, ensure_ascii=False))
-        META_PATH.write_text(json.dumps(META, indent=2))
-        n_total = len(comparison)
-        n_match = sum(1 for c in comparison if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
-        print(json.dumps({"n_total": n_total, "n_full_match": n_match, "out_path": str(out_path)}, indent=2))
+    else:
+        # Шаг 2: только те покупки, где у эталона ЕСТЬ хотя бы одна точка
+        # status=ok (19 сигнатур -> 140/1000 точек, которые они реально
+        # досчитали) -- остальные 81 покупка тут ничего не дали бы
+        # сравнить, это уже Шаг 3.
+        target_sigs = sorted({sig for (sig, _sec), r in ref_by_sig_sec.items() if r.get("status") == "ok"})
+        comparison = run_comparison("step2", target_sigs, rows, routes, ref_by_sig_sec, only_ref_ok=True)
+        out_path = OUT_ROOT / "step2_comparison_result.json"
+
+    out_path.write_text(json.dumps(comparison, indent=2, default=str, ensure_ascii=False))
+    META_PATH.write_text(json.dumps(META, indent=2))
+    n_total = len(comparison)
+    n_match = sum(1 for c in comparison if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
+    print(json.dumps({"n_total": n_total, "n_full_match": n_match, "out_path": str(out_path)}, indent=2))
