@@ -1,0 +1,59 @@
+name: "Solana buyer_200 -- Шаг 1: сверка ускоренного метода на 3-5 транзакциях"
+
+# Прямой запуск на GH Actions runner'е (НЕ через VPS) -- Solana RPC
+# (Alchemy Solana / publicnode) не имеет того анти-abuse барьера, что
+# rpc.mainnet.chain.robinhood.com (это отдельная, EVM-специфичная
+# защита, см. docs/PROJECT_STATE.md) -- пробуем напрямую, честно
+# зафиксируем в логах, если ошибаемся.
+
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: 'Сколько транзакций из 17 сверить (Шаг 1: 3-5)'
+        required: false
+        type: string
+        default: '5'
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BUYER200_STEP1_REQUEST"
+
+jobs:
+  step1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Шаг 1: сверка на N транзакциях"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_buyer200_fast_price.py --mode step1 --n "${{ inputs.n || '5' }}"
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BUYER200_STEP1_REQUEST
+          [ -e data/solana_buyer_200/step1_comparison_result.json ] && git add data/solana_buyer_200/step1_comparison_result.json
+          [ -e data/solana_buyer_200/prior/current/buyer_100/route_meta.json ] && git add data/solana_buyer_200/prior/current/buyer_100/route_meta.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: результат Шага 1 (сверка) [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
