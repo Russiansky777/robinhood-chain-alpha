@@ -249,6 +249,28 @@ def main() -> None:
     out["step1_follow_orders_raw"] = r1
     print(f"[dbot_pilot] Шаг 1 (follow_orders): http={r1.get('http_status')} auth={r1.get('auth_tried')}", flush=True)
 
+    # Первый реальный прогон (2026-09-18 14:41 UTC): http=200, {"err":false,"res":[]} --
+    # авторизация x-api-key подтверждена рабочей, но задач 0. Явный chain=solana --
+    # вдруг дефолтная фильтрация без параметра прячет реальные задачи.
+    r1b = dbot_get("/automation/follow_orders", api_key, params={"chain": "solana"})
+    out["step1b_follow_orders_chain_solana"] = r1b
+    print(f"[dbot_pilot] Шаг 1b (follow_orders?chain=solana): http={r1b.get('http_status')} "
+          f"res_len={len((r1b.get('body') or {}).get('res', []))}", flush=True)
+
+    # ---------- Шаг 1c: адрес пилотного кошелька -- пробуем несколько
+    # правдоподобных путей (see докстринг -- ни один не подтверждён
+    # чтением документации напрямую, дампим все статусы честно). ----------
+    wallet_candidates = {}
+    for path in ["/account/wallets", "/wallet/list", "/wallet/wallets", "/account/wallet_list",
+                 "/wallet/balances", "/account/wallet_holdings", "/wallet/holdings"]:
+        r = dbot_get(path, api_key, params={"chain": "solana"})
+        wallet_candidates[path] = {"http_status": r.get("http_status"),
+                                    "body_preview": json.dumps(r.get("body"), default=str)[:300]}
+        print(f"[dbot_pilot] Шаг 1c: GET {path} -> http={r.get('http_status')}", flush=True)
+        if r.get("http_status") == 200:
+            wallet_candidates[path]["full_body"] = r.get("body")
+    out["step1c_wallet_endpoint_candidates"] = wallet_candidates
+
     if r1.get("http_status") != 200:
         out["HONEST_ANSWER"] = (
             "GET /automation/follow_orders не прошёл ни с одним из опробованных вариантов "
