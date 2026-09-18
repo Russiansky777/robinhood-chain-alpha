@@ -32,6 +32,7 @@ USDC_MINT = fp.USDC
 SOL_MINT = "So11111111111111111111111111111111111111112"
 LOOKBACK_DAYS = 7
 MAX_PAGES_PER_WALLET = 15  # 15*1000 подписей -- честный предел, не бесконечный
+PER_WALLET_TIME_BUDGET_S = 90  # обрезает гиперактивные кошельки (боты/маркет-мейкеры), см. analyze_wallet()
 TIME_BUDGET_S = 18 * 60  # оставляем запас под 25-минутный workflow timeout
 COMMIT_INTERVAL_S = 90
 
@@ -60,8 +61,16 @@ def wallet_mint_deltas(tx: dict, wallet: str) -> dict:
 
 
 def analyze_wallet(address: str, cutoff_time: int) -> dict:
+    """Первый реальный прогон нашёл кошелёк с 1830 подписями за 7 дней
+    (257 первых входов -- явно бот/маркет-мейкер, не дискреционный
+    "снайпер" вроде нашего лидера) -- он один съел почти весь бюджет
+    времени прохода на 56 кандидатов. PER_WALLET_TIME_BUDGET_S обрезает
+    разбор такого кошелька частичным сканированием (честно помечено
+    partial_scan=True), а не блокирует весь проход на одном выбросе."""
     before = None
     n_sigs = n_swap_events = n_first_entries = 0
+    started_at = time.monotonic()
+    partial = False
     for _ in range(MAX_PAGES_PER_WALLET):
         batch = fp.get_signatures_for_address(address, before=before)
         if not batch:
@@ -72,6 +81,10 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
             if bt is None:
                 continue
             if bt < cutoff_time:
+                stop = True
+                break
+            if time.monotonic() - started_at > PER_WALLET_TIME_BUDGET_S:
+                partial = True
                 stop = True
                 break
             n_sigs += 1
@@ -99,6 +112,7 @@ def analyze_wallet(address: str, cutoff_time: int) -> dict:
         "n_swap_events_7d": n_swap_events,
         "trades_solana_directly": n_swap_events > 0,
         "first_entries_last_week": n_first_entries,
+        "partial_scan": partial,
     }
 
 
@@ -131,7 +145,8 @@ def main() -> None:
         row.update(result)
         n_done_this_run += 1
         print(f"[fomo_onchain] {address[:12]}.. direct={result['trades_solana_directly']} "
-              f"first_entries_week={result['first_entries_last_week']} sigs={result['n_signatures_checked_7d']}", flush=True)
+              f"first_entries_week={result['first_entries_last_week']} sigs={result['n_signatures_checked_7d']} "
+              f"partial={result['partial_scan']}", flush=True)
 
         if time.monotonic() - last_commit_at > COMMIT_INTERVAL_S:
             CANDIDATES_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str))
