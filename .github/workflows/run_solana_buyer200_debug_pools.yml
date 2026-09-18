@@ -1,0 +1,29 @@
+name: "Solana buyer_200 -- диагностика: почему 2 пула дают no_historical_swap"
+
+# Разовый диагностический прогон (см. analysis/solana_buyer200_debug_pools.py).
+# Результат читается из логов джобы (mcp github get_job_logs), в репозиторий
+# ничего не коммитится.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BUYER200_DEBUG_POOLS_REQUEST"
+
+jobs:
+  debug_pools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Диагностика адресов пулов"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_buyer200_debug_pools.py
