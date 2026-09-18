@@ -58,6 +58,7 @@ _MIN_INTERVAL_S = 0.12  # стартовая цель ~8 req/s -- честно �
 _last_call_at = 0.0
 _backoff_s = 0.0
 _alchemy_disabled = False  # см. rpc_call: 401/403 от Alchemy -- не бить туда КАЖДЫЙ раз впустую
+RPC_CALLS = 0  # честный счётчик реальных HTTP-попыток (включая retry) -- для наблюдаемости
 
 
 def _endpoint() -> str:
@@ -91,7 +92,7 @@ def _cache_path(method: str, params: list) -> Path:
 
 
 def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
-    global _last_call_at, _backoff_s, _alchemy_disabled
+    global _last_call_at, _backoff_s, _alchemy_disabled, RPC_CALLS
     cache_f = _cache_path(method, params)
     if use_cache and cache_f.exists():
         try:
@@ -105,6 +106,7 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
         if wait > 0:
             time.sleep(wait)
         _last_call_at = time.monotonic()
+        RPC_CALLS += 1
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                   timeout=30)
@@ -398,103 +400,204 @@ def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: in
     return dict(pool=pool, target=t, status="no_historical_swap", scanned=len(seen_slots))
 
 
+def _load_existing(out_path: Path) -> dict[tuple[str, int], dict]:
+    if not out_path.exists():
+        return {}
+    try:
+        prior = json.loads(out_path.read_text())
+    except (ValueError, OSError):
+        return {}
+    return {(r["signature"], r["seconds"]): r for r in prior if "seconds" in r}
+
+
+COMMIT_INTERVAL_S = 12 * 60  # раз в ~10-15 минут, НЕ после каждой точки (владелец: частые коммиты тормозят больше, чем помогают)
+
+
+def _git_commit_progress(label: str, paths: list[Path]) -> None:
+    """Best-effort промежуточный коммит -- переживает обрыв джобы/таймаут
+    без потери уже посчитанного. Ошибки глотаются (это не точка отказа
+    основного расчёта), следующая попытка -- через COMMIT_INTERVAL_S."""
+    import subprocess
+    try:
+        existing = [str(p) for p in paths if p.exists()]
+        if not existing:
+            return
+        subprocess.run(["git", "add", *existing], check=True, cwd=REPO_ROOT)
+        diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
+        if diff.returncode == 0:
+            return  # нечего коммитить
+        subprocess.run(["git", "commit", "-m", f"Solana buyer_200: промежуточный прогресс {label} [automated]"],
+                        check=True, cwd=REPO_ROOT)
+        subprocess.run(["git", "pull", "--rebase", "origin", os.environ.get("GITHUB_REF_NAME", "HEAD")],
+                        check=False, cwd=REPO_ROOT)
+        subprocess.run(["git", "push"], check=True, cwd=REPO_ROOT)
+        print(f"[{label}] промежуточный коммит выполнен", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[{label}] промежуточный коммит НЕ удался (не критично, продолжаем): {exc}", flush=True)
+
+
 def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
-                    ref_by_sig_sec: dict, only_ref_ok: bool = False) -> list[dict]:
-    """Общее тело сверки для Шага 1 (17->N сигнатур) и Шага 2 (все 100,
-    только точки, где у эталона status=ok -- 140/1000 уже посчитанных).
-    only_ref_ok=True пропускает секунды, для которых у эталона нет
-    готовой цены (Шаг 2 не про них -- это Шаг 3)."""
-    windows = pool_windows_needed(target_sigs, rows, routes, max(HORIZONS_SECONDS))
+                    ref_by_sig_sec: dict, out_path: Path, only_ref_ok: bool = False,
+                    commit_paths: list[Path] | None = None) -> list[dict]:
+    """Общее тело сверки для Шага 1 (17->N сигнатур), Шага 2 (19 сигнатур,
+    только точки, где у эталона status=ok) и расширенного прогона на до
+    300 покупок. only_ref_ok=True пропускает секунды, для которых у
+    эталона нет готовой цены.
+
+    Возобновляемо между запусками джобы: если out_path уже содержит
+    результат для (signature,seconds) -- НЕ пересчитываем и не грузим
+    под это окно пула заново; переносим как есть. Пишем на диск после
+    КАЖДОЙ точки (дёшево), коммитим -- редко (см. COMMIT_INTERVAL_S)."""
+    already = _load_existing(out_path)
+    print(f"[{label}] уже посчитано ранее (возобновление): {len(already)} точек", flush=True)
+
+    def sig_fully_done(sig: str) -> bool:
+        secs_needed = [sec for sec in HORIZONS_SECONDS
+                       if not only_ref_ok or ref_by_sig_sec.get((sig, sec), {}).get("status") == "ok"]
+        return bool(secs_needed) and all((sig, sec) in already for sec in secs_needed)
+
+    pending_sigs = [s for s in target_sigs if not sig_fully_done(s)]
+    print(f"[{label}] покупок всего={len(target_sigs)}, уже полностью закрыто={len(target_sigs) - len(pending_sigs)}, "
+          f"осталось={len(pending_sigs)}", flush=True)
+
+    windows = pool_windows_needed(pending_sigs, rows, routes, max(HORIZONS_SECONDS))
     print(f"[{label}] {len(windows)} пул(ов), {sum(len(v) for v in windows.values())} непересекающихся сегмент(ов) "
           f"-- якорем вперёд->назад (Шаг 0.2/0.3)", flush=True)
     for pool, intervals in windows.items():
         for lo, hi in intervals:
             hist = ensure_pool_window(pool, lo, hi)
-            print(f"[{label}] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi - lo}с) -> {len(hist)} подписей", flush=True)
+            print(f"[{label}] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi - lo}с) -> {len(hist)} подписей "
+                  f"(RPC всего: {RPC_CALLS})", flush=True)
 
-    comparison = []
+    comparison: list[dict] = list(already.values())
+    started_at = time.monotonic()
+    last_commit_at = started_at
+    points_done = 0
+    purchases_closed = len(target_sigs) - len(pending_sigs)
+    paths_to_commit = commit_paths if commit_paths is not None else [out_path, META_PATH]
+
     for sig in target_sigs:
+        if sig not in pending_sigs:
+            continue
         row = rows[sig]
         route = routes.get(sig)
         for sec in HORIZONS_SECONDS:
+            if (sig, sec) in already:
+                continue
             ref = ref_by_sig_sec.get((sig, sec), {})
             if only_ref_ok and ref.get("status") != "ok":
                 continue
             t = row["time"] + sec
             if not route:
-                comparison.append(dict(signature=sig, seconds=sec, status="no_route"))
-                continue
-            value = D(1)
-            legs_out = []
-            ok = True
-            for leg in route:
-                lo, hi = find_window_for(windows[leg["pool"]], t)
-                p = find_price_at(leg["pool"], t, lo, hi)
-                legs_out.append(p)
-                if p.get("status") != "ok":
-                    ok = False
-                    break
-                e = p["event"]
-                v = D(e["p1_per_0"])
-                if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
-                    value *= v
-                elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
-                    value /= v
-                else:
-                    ok = False
-                    break
-            mine_price = str(value) if ok else None
-            mine_slot = legs_out[-1].get("slot") if legs_out else None
-            mine_sig = legs_out[-1].get("signature") if legs_out else None
-            ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
-            match_price = (mine_price is not None and ref.get("price_usdc") is not None
-                           and D(mine_price) == D(ref["price_usdc"]))
-            match_slot = mine_slot == ref_leg.get("slot")
-            match_sig = mine_sig == ref_leg.get("signature")
-            comparison.append(dict(
-                signature=sig, seconds=sec,
-                mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
-                mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
-                ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
-                ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
-                match_price=match_price, match_slot=match_slot, match_signature=match_sig,
-                legs=legs_out,
-            ))
-            print(f"[{label}] {sig[:12]}.. sec={sec} mine={mine_price} ref={ref.get('price_usdc')} "
-                  f"match_price={match_price} match_slot={match_slot}", flush=True)
+                entry = dict(signature=sig, seconds=sec, status="no_route")
+            else:
+                value = D(1)
+                legs_out = []
+                ok = True
+                for leg in route:
+                    lo, hi = find_window_for(windows[leg["pool"]], t)
+                    p = find_price_at(leg["pool"], t, lo, hi)
+                    legs_out.append(p)
+                    if p.get("status") != "ok":
+                        ok = False
+                        break
+                    e = p["event"]
+                    v = D(e["p1_per_0"])
+                    if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
+                        value *= v
+                    elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
+                        value /= v
+                    else:
+                        ok = False
+                        break
+                mine_price = str(value) if ok else None
+                mine_slot = legs_out[-1].get("slot") if legs_out else None
+                mine_sig = legs_out[-1].get("signature") if legs_out else None
+                ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
+                match_price = (mine_price is not None and ref.get("price_usdc") is not None
+                               and D(mine_price) == D(ref["price_usdc"]))
+                match_slot = mine_slot == ref_leg.get("slot")
+                match_sig = mine_sig == ref_leg.get("signature")
+                entry = dict(
+                    signature=sig, seconds=sec,
+                    mine_status="ok" if ok else (legs_out[-1].get("status") if legs_out else "no_legs"),
+                    mine_price=mine_price, mine_slot=mine_slot, mine_signature=mine_sig,
+                    ref_status=ref.get("status"), ref_price=ref.get("price_usdc"),
+                    ref_slot=ref_leg.get("slot"), ref_signature=ref_leg.get("signature"),
+                    match_price=match_price, match_slot=match_slot, match_signature=match_sig,
+                    legs=legs_out,
+                )
+            comparison.append(entry)
+            already[(sig, sec)] = entry
+            points_done += 1
+            out_path.write_text(json.dumps(comparison, indent=2, default=str, ensure_ascii=False))
+
+            if points_done % 20 == 0:
+                n_ok = sum(1 for e in comparison if e.get("mine_status") == "ok")
+                elapsed = time.monotonic() - started_at
+                print(f"[{label}] прогресс: {points_done} новых точек в этом прогоне "
+                      f"({len(comparison)} всего, {n_ok} mine_status=ok), покупок закрыто={purchases_closed}, "
+                      f"RPC-запросов={RPC_CALLS}, elapsed={elapsed:.0f}с", flush=True)
+
+            print(f"[{label}] {sig[:12]}.. sec={sec} mine={entry.get('mine_price')} ref={ref.get('price_usdc')} "
+                  f"match_price={entry.get('match_price')} match_slot={entry.get('match_slot')}", flush=True)
+
+        purchases_closed += 1
+        if time.monotonic() - last_commit_at >= COMMIT_INTERVAL_S:
+            META_PATH.write_text(json.dumps(META, indent=2))
+            _git_commit_progress(label, paths_to_commit)
+            last_commit_at = time.monotonic()
+
     return comparison
 
 
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["step1", "step2"], default="step1")
+    ap.add_argument("--mode", choices=["step1", "step2", "step_extended"], default="step1")
     ap.add_argument("--n", type=int, default=5)
     args = ap.parse_args()
 
     alchemy_ok = alchemy_available()
     print(f"[{args.mode}] alchemy_available={alchemy_ok} (ключ не печатается)", flush=True)
 
-    rows = {r["signature"]: r for r in json.loads((PRIOR_ROOT / "selected.json").read_text())}
-    routes = {r["signature"]: r["route"] for r in json.loads((PRIOR_ROOT / "routes.json").read_text())}
     reference = json.loads((PRIOR_ROOT / "price_points.json").read_text())
     ref_by_sig_sec = {(r["signature"], r["seconds"]): r for r in reference}
 
-    if args.mode == "step1":
-        target_sigs = json.loads((PRIOR_ROOT / "analysis.json").read_text())["meta"]["full_5min_signatures"][:args.n]
-        comparison = run_comparison("step1", target_sigs, rows, routes, ref_by_sig_sec)
-        out_path = OUT_ROOT / "step1_comparison_result.json"
+    if args.mode in ("step1", "step2"):
+        rows = {r["signature"]: r for r in json.loads((PRIOR_ROOT / "selected.json").read_text())}
+        routes = {r["signature"]: r["route"] for r in json.loads((PRIOR_ROOT / "routes.json").read_text())}
+        if args.mode == "step1":
+            target_sigs = json.loads((PRIOR_ROOT / "analysis.json").read_text())["meta"]["full_5min_signatures"][:args.n]
+            out_path = OUT_ROOT / "step1_comparison_result.json"
+            run_comparison("step1", target_sigs, rows, routes, ref_by_sig_sec, out_path)
+        else:
+            # Шаг 2: только те покупки, где у эталона ЕСТЬ хотя бы одна точка
+            # status=ok (19 сигнатур -> 140/1000 точек, которые они реально
+            # досчитали) -- остальные 81 покупка тут ничего не дали бы
+            # сравнить, это уже расширенный прогон.
+            target_sigs = sorted({sig for (sig, _sec), r in ref_by_sig_sec.items() if r.get("status") == "ok"})
+            out_path = OUT_ROOT / "step2_comparison_result.json"
+            run_comparison("step2", target_sigs, rows, routes, ref_by_sig_sec, out_path, only_ref_ok=True)
     else:
-        # Шаг 2: только те покупки, где у эталона ЕСТЬ хотя бы одна точка
-        # status=ok (19 сигнатур -> 140/1000 точек, которые они реально
-        # досчитали) -- остальные 81 покупка тут ничего не дали бы
-        # сравнить, это уже Шаг 3.
-        target_sigs = sorted({sig for (sig, _sec), r in ref_by_sig_sec.items() if r.get("status") == "ok"})
-        comparison = run_comparison("step2", target_sigs, rows, routes, ref_by_sig_sec, only_ref_ok=True)
-        out_path = OUT_ROOT / "step2_comparison_result.json"
+        # Расширенный прогон: ВСЕ отобранные покупки (до 300, включая
+        # исходные 100) -- их собственный routes.json тут не при чём,
+        # используем расширенные selected_300.json/routes_300.json
+        # (см. analysis/solana_buyer200_select_extend.py).
+        EXT_ROOT = OUT_ROOT
+        rows = {r["signature"]: r for r in json.loads((EXT_ROOT / "selected_300.json").read_text())}
+        routes = {r["signature"]: r["route"] for r in json.loads((EXT_ROOT / "routes_300.json").read_text())}
+        target_sigs = list(rows.keys())
+        out_path = OUT_ROOT / "step_extended_result.json"
+        run_comparison("step_extended", target_sigs, rows, routes, ref_by_sig_sec, out_path)
 
-    out_path.write_text(json.dumps(comparison, indent=2, default=str, ensure_ascii=False))
     META_PATH.write_text(json.dumps(META, indent=2))
+    final = json.loads(out_path.read_text())
+    n_total = len(final)
+    n_ok = sum(1 for c in final if c.get("mine_status") == "ok")
+    n_match = sum(1 for c in final if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
+    print(json.dumps({"n_total": n_total, "n_mine_ok": n_ok, "n_full_match": n_match,
+                       "rpc_calls": RPC_CALLS, "out_path": str(out_path)}, indent=2))
     n_total = len(comparison)
     n_match = sum(1 for c in comparison if c.get("match_price") and c.get("match_slot") and c.get("match_signature"))
     print(json.dumps({"n_total": n_total, "n_full_match": n_match, "out_path": str(out_path)}, indent=2))
