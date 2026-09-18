@@ -30,6 +30,19 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
+      - name: "Кэш окон пулов между перезапусками джобы"
+        # Найдено на 2-м прогоне: без этого кэша каждый рестарт (после
+        # таймаута/сбоя) заново перелистывал уже собранные окна горячих
+        # пулов с нуля (десятки-сотни тысяч подписей на общий минт) --
+        # 1 покупка за 40 минут вместо ~1.3 мин/покупку. Кэш НЕ в git
+        # (слишком большой и разрастается), а в actions/cache; ключ
+        # уникален на run, restore-keys подхватывает последний доступный.
+        uses: actions/cache@v4
+        with:
+          path: data/solana_buyer_200/rpc_cache
+          key: solana-buyer200-rpc-cache-${{ github.run_id }}
+          restore-keys: |
+            solana-buyer200-rpc-cache-
       - name: "Расширенный прогон: короткие горизонты на всех отобранных покупках"
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
