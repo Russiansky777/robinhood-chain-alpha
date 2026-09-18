@@ -74,6 +74,20 @@ REFERENCE = {
 }
 
 
+def _scrub(text: str, secret: str) -> str:
+    """ИНЦИДЕНТ 2026-09-18: requests/urllib3 при InvalidHeader эхом
+    печатает ПОЛНОЕ значение заголовка в тексте исключения -- если
+    api_key передан как есть (например, содержит перевод строки, как
+    в реальном BITQUERY_APIKEY: 'Access token - ...\\nID - ...'),
+    str(exc) содержит секрет целиком. Эта строка утекла в закоммиченный
+    JSON (см. git log, коммит 0b54a8f, уже отредактирован постфактум).
+    Больше НИКАКОЙ текст, производный от исключения/ответа сервера, не
+    возвращается вызывающему коду без прогона через эту функцию."""
+    if not secret:
+        return text
+    return text.replace(secret, "[REDACTED_SECRET]")
+
+
 def gql(api_key: str, query: str, variables: dict | None = None) -> dict:
     payload: dict = {"query": query}
     if variables:
@@ -84,10 +98,10 @@ def gql(api_key: str, query: str, variables: dict | None = None) -> dict:
         try:
             body = resp.json()
         except Exception:  # noqa: BLE001
-            body = {"non_json_body": resp.text[:2000]}
+            body = {"non_json_body": _scrub(resp.text[:2000], api_key)}
         return {"http_status": resp.status_code, "body": body}
     except Exception as exc:  # noqa: BLE001
-        return {"exception": f"{type(exc).__name__}: {exc}"}
+        return {"exception": _scrub(f"{type(exc).__name__}: {exc}", api_key)}
 
 
 def load_ledger() -> dict:
