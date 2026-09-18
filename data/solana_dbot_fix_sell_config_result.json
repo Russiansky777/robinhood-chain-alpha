@@ -1,0 +1,122 @@
+{
+  "generated_at_utc": "2026-09-18T15:59:16Z",
+  "before_sellSettings": {
+    "pnlOrderExpireDelta": 28800,
+    "targetMaxAmountUI": null,
+    "targetMinAmountUI": null,
+    "priorityFee": 0.005,
+    "mode": "only_pnl",
+    "sellAmountType": "follow_ratio",
+    "xTargetRatio": null,
+    "stopLossPercent": 0.4,
+    "stopEarnPercent": 100,
+    "enabled": true,
+    "sellSpeedType": "fast",
+    "maxSlippage": 0.2,
+    "retries": 3,
+    "concurrentNodes": 1,
+    "gasFeeDelta": 5,
+    "maxFeePerGas": 100,
+    "jitoEnabled": false,
+    "stopEarnGroup": null,
+    "stopLossGroup": null,
+    "migrateSellPercent": 0,
+    "transferSellPercent": 0,
+    "devSellPercent": 0,
+    "minDevSellPercent": 0,
+    "pnlOrderExpireExecute": true,
+    "pnlOrderExpireExecuteSellAll": true,
+    "startHour": null,
+    "endHour": null,
+    "customFeeAndTip": false,
+    "pnlOrderUseMidPrice": false
+  },
+  "n_tasks_before": 1,
+  "attempts": [
+    {
+      "method": "PUT",
+      "path": "/automation/follow_orders/mu746r8f05f9ic",
+      "body_keys": [
+        "sellSettings"
+      ],
+      "http_status": 404,
+      "response_body_preview": "{\"non_json_body\": \"Not Found\"}",
+      "exception": null
+    },
+    {
+      "method": "POST",
+      "path": "/automation/follow_orders/mu746r8f05f9ic",
+      "body_keys": [
+        "sellSettings"
+      ],
+      "http_status": 404,
+      "response_body_preview": "{\"non_json_body\": \"Not Found\"}",
+      "exception": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/automation/follow_orders/mu746r8f05f9ic",
+      "body_keys": [
+        "sellSettings"
+      ],
+      "http_status": 404,
+      "response_body_preview": "{\"non_json_body\": \"Not Found\"}",
+      "exception": null
+    },
+    {
+      "method": "POST",
+      "path": "/automation/follow_orders/update",
+      "body_keys": [
+        "id",
+        "sellSettings"
+      ],
+      "http_status": 404,
+      "response_body_preview": "{\"non_json_body\": \"Not Found\"}",
+      "exception": null
+    },
+    {
+      "method": "POST",
+      "path": "/automation/follow_orders/edit",
+      "body_keys": [
+        "id",
+        "sellSettings"
+      ],
+      "http_status": 404,
+      "response_body_preview": "{\"non_json_body\": \"Not Found\"}",
+      "exception": null
+    }
+  ],
+  "success": false,
+  "final_sellSettings_unchanged_check": {
+    "pnlOrderExpireDelta": 28800,
+    "targetMaxAmountUI": null,
+    "targetMinAmountUI": null,
+    "priorityFee": 0.005,
+    "mode": "only_pnl",
+    "sellAmountType": "follow_ratio",
+    "xTargetRatio": null,
+    "stopLossPercent": 0.4,
+    "stopEarnPercent": 100,
+    "enabled": true,
+    "sellSpeedType": "fast",
+    "maxSlippage": 0.2,
+    "retries": 3,
+    "concurrentNodes": 1,
+    "gasFeeDelta": 5,
+    "maxFeePerGas": 100,
+    "jitoEnabled": false,
+    "stopEarnGroup": null,
+    "stopLossGroup": null,
+    "migrateSellPercent": 0,
+    "transferSellPercent": 0,
+    "devSellPercent": 0,
+    "minDevSellPercent": 0,
+    "pnlOrderExpireExecute": true,
+    "pnlOrderExpireExecuteSellAll": true,
+    "startHour": null,
+    "endHour": null,
+    "customFeeAndTip": false,
+    "pnlOrderUseMidPrice": false
+  },
+  "HONEST_ANSWER": "НИ ОДНА из опробованных попыток обновления не привела к подтверждённому изменению stopEarnPercent/stopLossPercent/pnlOrderExpireDelta (см. attempts -- полные HTTP-статусы и тела ответов). Либо API этой задачи в принципе не поддерживает редактирование через опробованные пути, либо (как и в интерфейсе) поле pnlOrderExpireDelta=29 не проходит валидацию (возможен минимум, например 3600с/1ч). Конфигурация НЕ изменена. Рекомендация: возвращаемся к выходу по цене, как предложил владелец."
+}
