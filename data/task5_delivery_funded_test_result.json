@@ -1,0 +1,74 @@
+{
+  "generated_at_utc": "2026-09-18T00:09:28Z",
+  "wallet": "0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75",
+  "balance_before_wei": 22587306000000,
+  "balance_before_native": 2.2587306e-05,
+  "base_gas_price_wei": 60454000,
+  "budget_calculation": {
+    "affordable": true,
+    "unit_cost_wei": 1269534000000,
+    "budget_wei": 19199210100000,
+    "budget_units": 15.12303735071294,
+    "units_remaining_for_series_b": 10.12303735071294,
+    "series_b_multipliers": [
+      1.5,
+      2.126,
+      3.037
+    ],
+    "total_units_used_estimate": 11.663,
+    "total_cost_wei_estimate": 14806575042000,
+    "balance_remaining_after_estimate_wei": 7780730958000,
+    "balance_remaining_after_estimate_native": 7.780730958e-06,
+    "note_on_owner_example": "Владелец привёл x10/x100 как ИЛЛЮСТРАТИВНЫЙ пример -- реальный баланс не позволяет столько при честном запасе (см. budget_units выше). Использованы реально доступные множители, посчитанные здесь, а не x10/x100."
+  },
+  "attempts": [
+    {
+      "label": "A1",
+      "multiplier": 1.0,
+      "gas_price_wei": 60454000,
+      "nonce": 92,
+      "block_at_send": 65785133,
+      "t_send_wall": 1789690169.318432,
+      "response_time_ms": 436.413049697876,
+      "response_body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0xc0378aea59e869dea16bb58265c68319aafad017d67282b14265b05e472acf11"
+      },
+      "tx_hash": "0xc0378aea59e869dea16bb58265c68319aafad017d67282b14265b05e472acf11",
+      "receipt_found": true,
+      "receipt_block_number": 65785144,
+      "blocks_elapsed_from_send": 11,
+      "transaction_index_in_block": 4,
+      "n_txs_in_block": 6,
+      "receipt_status": "0x1"
+    },
+    {
+      "label": "A2",
+      "multiplier": 1.0,
+      "gas_price_wei": 60454000,
+      "nonce": 93,
+      "block_at_send": 65785178,
+      "t_send_wall": 1789690173.901836,
+      "response_time_ms": 327.95047760009766,
+      "response_body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {
+          "code": -32000,
+          "message": "max fee per gas less than block base fee: address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75, maxFeePerGas: 60454000 baseFee: 60774000"
+        }
+      },
+      "tx_hash": null,
+      "send_error": {
+        "code": -32000,
+        "message": "max fee per gas less than block base fee: address 0x893f4a7eADBa18c2f8aA1e0E23e11eCF66208e75, maxFeePerGas: 60454000 baseFee: 60774000"
+      }
+    }
+  ],
+  "series_a_ok": false,
+  "series_b_skipped": true,
+  "balance_after_wei": 21322854000000,
+  "balance_after_native": 2.1322854e-05,
+  "n_sends_total": 2
+}
