@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-18T16:37:18Z",
+  "generated_at_utc": "2026-09-18T17:27:00Z",
   "dbot_key_present": true,
   "step1_follow_orders_raw": {
     "http_status": 200,
@@ -28,9 +28,9 @@
           "devWhitelist": [],
           "buySettings": {
             "maxBuyAmountPerToken": null,
-            "maxBuyTimesPerToken": null,
+            "maxBuyTimesPerToken": 1,
             "targetMaxAmountUI": null,
-            "targetMinAmountUI": null,
+            "targetMinAmountUI": 4.3,
             "maxTopHoldPercent": null,
             "maxSellTax": null,
             "maxBuyTax": null,
@@ -99,18 +99,20 @@
             "customFeeAndTip": false,
             "pnlOrderUseMidPrice": false
           },
-          "updateAt": 1789749198356,
+          "updateAt": 1789752403427,
           "createAt": 1789745377119,
+          "boughtUsd": 167.8,
+          "buyTimes": 3,
+          "lastTradeTime": 1789750729,
+          "lastTradeType": "take_profit",
+          "sellTimes": 3,
+          "soldUsd": 0,
+          "pnlOrderUsd": 201.31768859133,
           "walletName": "TEST1",
           "walletAddress": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
           "walletType": "solana",
           "nonceCount": 3,
           "pnlOrderCount": 0,
-          "buyTimes": 0,
-          "sellTimes": 0,
-          "boughtUsd": 0,
-          "soldUsd": 0,
-          "pnlOrderUsd": 0,
           "migrateOrderUsd": 0,
           "devOrderUsd": 0,
           "trilingStopOrderUsd": 0,
@@ -124,14 +126,13 @@
     ]
   },
   "task_counters": {
-    "buyTimes": 0,
-    "sellTimes": 0,
-    "boughtUsd": 0,
+    "buyTimes": 3,
+    "sellTimes": 3,
+    "boughtUsd": 167.8,
     "soldUsd": 0,
     "pnlOrderCount": 0,
-    "updateAt": 1789749198356
+    "updateAt": 1789752403427
   },
-  "HONEST_ANSWER": "buyTimes=0 -- сделок пилота пока нет (задача обновлена 1789749198356, leader wallet ждёт нового первого входа). Разведка эндпоинта истории сделок проведена заранее (см. step2_order_endpoint_search), чтобы не терять время, когда сделки появятся.",
   "step2_order_endpoint_search": {
     "/automation/swap_orders": {
       "http_status": 200,
