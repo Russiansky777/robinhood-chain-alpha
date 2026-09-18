@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""Владелец, 2026-09-18: если Fomo API отдаёт историю сделок ПО АДРЕСУ
+"""Владелец, 2026-09-18: если Fomo API отдаёт историю сделок ПО userId
 нашего текущего лидера -- сверить с нашими данными с цепи (300 покупок,
-selected_300.json). Если совпадает -- это не только для сита, а ускорение
-для всего дальнейшего конвейера (не листать пулы вручную через Alchemy,
-а брать готовую историю сделок из Fomo).
+selected_300.json). Если совпадает -- ускорение не только для сита, а
+для всего дальнейшего конвейера.
 
-Метод (по README abstradeapi/Open-Fomo-API, единственный найденный
-источник с конкретным путём для истории сделок):
-  GET https://getfomoapi.fun/api/users/{userId}/swaps
-  header: X-API-Key
-Но userId, не адрес -- значит лидера сначала нужно найти В РЕЙТИНГЕ
-(data/fomo_leaderboard_raw.json, уже собран отдельным шагом) и достать
-его id оттуда. Если лидера в рейтинге нет -- сверка невозможна без
-эндпоинта обратного резолва по адресу (пробуем пару правдоподобных
-путей честно, без гарантий).
+Подтверждённый владельцем спек:
+  Хост: https://api.fomoapi.io, заголовок Authorization: Bearer <ключ>
+  GET /v2/users/{userId}/trades?cursor=start -- по 25 ЗАКРЫТЫХ сделок на
+  страницу, 250 кредитов/вызов. НЕ полная история -- для сита хватит,
+  для точного расчёта $ и % владелец велел идти на цепь по адресу (уже
+  умеем, см. solana_dbot_pilot_summary.py).
+  userId берём ИЗ УЖЕ СОБРАННОГО рейтинга (data/fomo_leaderboard_raw.json,
+  поле wallets.solana -> userId) -- резолв по handle (/v2/users/{handle},
+  2500 кредитов) НЕ используем, адреса и так в рейтинге.
 
-Сверка: не count-to-count (Fomo swaps включает продажи/переводы, наша
+Сверка: не count-to-count (Fomo может отдавать не всю историю, наша
 выборка -- только покупки новых токенов), а ТОЧЕЧНАЯ -- берём несколько
 наших РЕАЛЬНЫХ сделок (подпись, минт, время, usdc_spent с цепи) и ищем
 совпадение в ответе Fomo (тот же минт, близкое время, близкая сумма).
+
+Если лидера нет ни в одном из 4 собранных окон рейтинга -- честно
+останавливаемся: без userId сделок не получить, а резолв по handle
+явно исключён владельцем.
 
 БЕЗОПАСНОСТЬ: без печати ключа, вся печать/запись через _scrub_all()."""
 from __future__ import annotations
@@ -36,7 +39,7 @@ RAW_LEADERBOARD_PATH = REPO_ROOT / "data" / "fomo_leaderboard_raw.json"
 SELECTED_300_PATH = REPO_ROOT / "data" / "solana_buyer_200" / "selected_300.json"
 OUT_PATH = REPO_ROOT / "data" / "solana_fomo_verify_leader_trades_result.json"
 
-FOMO_HOSTS = ["https://getfomoapi.fun/api", "https://fomoapi.io/api"]
+FOMO_HOST = "https://api.fomoapi.io"
 LEADER_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 
 _ACTIVE_SECRETS: list[str] = []
@@ -49,11 +52,11 @@ def _scrub_all(text: str) -> str:
     return text
 
 
-def fomo_get(host: str, path: str, api_key: str, params: dict | None = None) -> dict:
+def fomo_get(path: str, api_key: str, params: dict | None = None) -> dict:
     if any(c in api_key for c in ("\n", "\r")):
         return {"exception": "ключ содержит перевод строки."}
     try:
-        resp = requests.get(f"{host}{path}", headers={"X-API-Key": api_key, "Accept": "application/json"},
+        resp = requests.get(f"{FOMO_HOST}{path}", headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
                              params=params or {}, timeout=30)
     except Exception as exc:  # noqa: BLE001
         return {"exception": _scrub_all(f"{type(exc).__name__}: {exc}")}
@@ -61,26 +64,26 @@ def fomo_get(host: str, path: str, api_key: str, params: dict | None = None) -> 
         body = resp.json()
     except Exception:  # noqa: BLE001
         body = {"non_json_body": _scrub_all(resp.text[:800])}
-    return {"http_status": resp.status_code, "body": body, "host": host}
+    return {"http_status": resp.status_code, "body": body, "x_credits_remaining": resp.headers.get("x-credits-remaining")}
 
 
-def extract_items(body) -> list:
+def extract_items(body) -> tuple[list, str | None]:
+    """Возвращает (список сделок, курсор следующей страницы если есть)."""
     if isinstance(body, list):
-        return body
+        return body, None
     if isinstance(body, dict):
-        for k in ("data", "results", "swaps", "trades", "items"):
+        cursor = body.get("nextCursor") or body.get("next_cursor") or body.get("cursor")
+        for k in ("data", "results", "trades", "items"):
             if isinstance(body.get(k), list):
-                return body[k]
-    return []
+                return body[k], cursor
+    return [], None
 
 
-def find_leader_id_in_raw() -> dict | None:
-    if not RAW_LEADERBOARD_PATH.exists():
-        return None
-    raw = json.loads(RAW_LEADERBOARD_PATH.read_text())
+def find_leader_wallet_key(raw: dict) -> dict | None:
     for window, wd in (raw.get("windows") or {}).items():
         for item in wd.get("items", []):
-            if item.get("solana") == LEADER_WALLET:
+            w = item.get("wallets") or {}
+            if w.get("solana") == LEADER_WALLET or item.get("solana") == LEADER_WALLET:
                 return {"window": window, **item}
     return None
 
@@ -96,71 +99,58 @@ def main() -> None:
     if not any(c in api_key for c in ("\n", "\r")):
         _ACTIVE_SECRETS.append(api_key)
 
-    leader_entry = find_leader_id_in_raw()
+    if not RAW_LEADERBOARD_PATH.exists():
+        out["HONEST_ANSWER"] = "data/fomo_leaderboard_raw.json ещё нет -- сначала solana_fomo_leaderboard_collect.py."
+        OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+        print("[fomo_verify] " + out["HONEST_ANSWER"], flush=True)
+        return
+
+    raw = json.loads(RAW_LEADERBOARD_PATH.read_text())
+    leader_entry = find_leader_wallet_key(raw)
     out["leader_found_in_leaderboard_raw"] = leader_entry is not None
     if leader_entry:
         out["leader_leaderboard_entry"] = leader_entry
     print(f"[fomo_verify] лидер в собранных рейтингах: {leader_entry is not None}", flush=True)
 
-    leader_id = None
-    if leader_entry:
-        leader_id = leader_entry.get("id")
-
-    if not leader_id:
-        # Пробуем правдоподобные пути обратного резолва по адресу -- честно,
-        # без предположения, что они существуют.
-        out["reverse_resolve_attempts"] = {}
-        for host in FOMO_HOSTS:
-            for path in [f"/users/wallet/{LEADER_WALLET}", f"/wallets/{LEADER_WALLET}", f"/users/{LEADER_WALLET}"]:
-                r = fomo_get(host, path, api_key)
-                out["reverse_resolve_attempts"][f"{host}{path}"] = {
-                    "http_status": r.get("http_status"),
-                    "body_preview": json.dumps(r.get("body"), default=str)[:400] if not r.get("exception") else r.get("exception"),
-                }
-                print(f"[fomo_verify] resolve {host}{path} -> http={r.get('http_status')}", flush=True)
-                body = r.get("body")
-                if r.get("http_status") == 200 and isinstance(body, dict) and body.get("id"):
-                    leader_id = body["id"]
-                    break
-            if leader_id:
-                break
-
+    leader_id = leader_entry.get("userId") if leader_entry else None
     if not leader_id:
         out["HONEST_ANSWER"] = (
-            "Лидер не найден ни в одном из 4 собранных окон рейтинга Fomo, и обратный резолв "
-            "по адресу не сработал ни на одном пробном пути (см. reverse_resolve_attempts). "
-            "История сделок через Fomo для ЭТОГО лидера недоступна -- метод годится только для "
-            "кандидатов, которые сами есть в рейтинге (это и есть будущие кандидаты для сита, "
-            "так что для них проверка возможна; для действующего лидера, который в рейтинге не "
-            "числится, -- нет)."
+            "Лидер не найден ни в одном из 4 собранных окон рейтинга Fomo (или собран старой, "
+            "неверной версией скрипта -- перепроверь дату data/fomo_leaderboard_raw.json). Резолв "
+            "по handle (/v2/users/{handle}) исключён владельцем -- 2500 кредитов, не используем. "
+            "История сделок через Fomo для ЭТОГО лидера недоступна без userId."
         )
         print("[fomo_verify] " + out["HONEST_ANSWER"], flush=True)
         OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
         return
 
-    out["leader_fomo_id"] = leader_id
+    out["leader_fomo_user_id"] = leader_id
 
-    # ---------- История сделок ----------
-    swaps_items = []
-    swaps_raw = {}
-    for host in FOMO_HOSTS:
-        for path in [f"/users/{leader_id}/swaps", f"/v2/users/{leader_id}/trades", f"/users/{leader_id}/trades"]:
-            r = fomo_get(host, path, api_key, params={"limit": 500})
-            items = extract_items(r.get("body"))
-            swaps_raw[f"{host}{path}"] = {"http_status": r.get("http_status"), "n_items": len(items)}
-            print(f"[fomo_verify] {host}{path} -> http={r.get('http_status')} n_items={len(items)}", flush=True)
-            if r.get("http_status") == 200 and items:
-                swaps_items = items
-                out["swaps_endpoint_used"] = f"{host}{path}"
-                out["swaps_raw_sample"] = items[:3]
-                break
-        if swaps_items:
+    # ---------- История сделок: постранично, cursor=start, 25/страницу ----------
+    all_trades: list = []
+    cursor = "start"
+    pages_fetched = 0
+    while cursor and pages_fetched < 8:  # 8 страниц = 200 сделок -- достаточно для точечной сверки, не выкачиваем всё без нужды
+        r = fomo_get(f"/v2/users/{leader_id}/trades", api_key, params={"cursor": cursor})
+        items, next_cursor = extract_items(r.get("body"))
+        print(f"[fomo_verify] trades page {pages_fetched}: http={r.get('http_status')} n={len(items)} "
+              f"x-credits-remaining={r.get('x_credits_remaining')}", flush=True)
+        if r.get("http_status") != 200:
+            out[f"trades_page_{pages_fetched}_error"] = r
             break
-    out["swaps_probe_attempts"] = swaps_raw
-    out["n_swaps_returned"] = len(swaps_items)
+        if pages_fetched == 0:
+            out["trades_raw_sample"] = items[:3]
+        all_trades.extend(items)
+        pages_fetched += 1
+        if not items or not next_cursor or next_cursor == cursor:
+            break
+        cursor = next_cursor
+        time.sleep(0.3)
 
-    if not swaps_items:
-        out["HONEST_ANSWER"] = "Ни один из опробованных путей истории сделок не вернул данных -- см. swaps_probe_attempts."
+    out["n_pages_fetched"] = pages_fetched
+    out["n_trades_returned"] = len(all_trades)
+    if not all_trades:
+        out["HONEST_ANSWER"] = "История сделок пуста или эндпоинт не вернул данных -- см. поля trades_page_*_error."
         print("[fomo_verify] " + out["HONEST_ANSWER"], flush=True)
         OUT_PATH.write_text(_scrub_all(json.dumps(out, ensure_ascii=False, indent=2, default=str)))
         return
@@ -173,31 +163,33 @@ def main() -> None:
         out["our_onchain_time_range_utc"] = [time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(min(times))),
                                               time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(times)))]
 
-    # Разбираем временной охват ответа Fomo -- честно, по факту полей (имя поля
-    # времени заранее не знаем -- ищем несколько правдоподобных).
     def get_ts(item: dict):
-        for k in ("timestamp", "time", "createdAt", "blockTime", "ts"):
+        for k in ("timestamp", "time", "createdAt", "closedAt", "blockTime", "ts"):
             if k in item:
                 return item[k]
         return None
 
-    fomo_times = [get_ts(i) for i in swaps_items if get_ts(i) is not None]
-    out["fomo_swaps_time_field_found"] = bool(fomo_times)
-    out["fomo_swaps_sample_keys"] = list(swaps_items[0].keys()) if swaps_items else []
+    out["fomo_trades_sample_keys"] = list(all_trades[0].keys()) if all_trades else []
+    fomo_times = [get_ts(i) for i in all_trades if get_ts(i) is not None]
+    if fomo_times:
+        fmin, fmax = min(fomo_times), max(fomo_times)
+        fmin_s = fmin / 1000 if fmin > 10**12 else fmin
+        fmax_s = fmax / 1000 if fmax > 10**12 else fmax
+        out["fomo_trades_time_range_utc"] = [time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(fmin_s)),
+                                              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(fmax_s))]
 
     matches, checked = [], 0
-    for our in sorted(our_trades, key=lambda t: t["time"], reverse=True)[:15]:  # 15 самых свежих -- больше шанс, что Fomo их видит
+    for our in sorted(our_trades, key=lambda t: t["time"], reverse=True)[:15]:  # 15 самых свежих -- больше шанс попасть в первые страницы
         checked += 1
         our_mint, our_time, our_usdc = our["mint"], our["time"], D(our["usdc_spent"])
         best = None
-        for f in swaps_items:
+        for f in all_trades:
             f_mint = f.get("mint") or f.get("tokenMint") or f.get("outputMint") or f.get("token")
             if f_mint != our_mint:
                 continue
             f_ts = get_ts(f)
             if f_ts is None:
                 continue
-            # Метка времени может быть в секундах или миллисекундах -- проверяем по порядку величины.
             f_ts_s = f_ts / 1000 if f_ts > 10**12 else f_ts
             if abs(f_ts_s - our_time) < 120:
                 best = {"our_signature": our["signature"], "our_time": our_time, "our_usdc_spent": str(our_usdc),
