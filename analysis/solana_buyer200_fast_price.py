@@ -54,7 +54,7 @@ META: dict = json.loads(META_PATH.read_text()) if META_PATH.exists() else {}
 
 # --- RPC: throttle с бэкоффом, НЕ фиксированные паузы их rpc.py ---
 _PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
-_MIN_INTERVAL_S = 0.12  # стартовая цель ~8 req/s -- честно НЕ "долбить", но и не 0.25+1.5=1.75с на запрос
+_MIN_INTERVAL_S = 0.12  # стартовая цель ~8 req/s -- честно НЕ "долбить", но и не 0.25+1.5=1.75с на запрос; уточняется alchemy_available()
 _last_call_at = 0.0
 _backoff_s = 0.0
 _alchemy_disabled = False  # см. rpc_call: 401/403 от Alchemy -- не бить туда КАЖДЫЙ раз впустую
@@ -65,6 +65,24 @@ def _endpoint() -> str:
     if key and not _alchemy_disabled:
         return f"https://solana-mainnet.g.alchemy.com/v2/{key}"
     return _PUBLIC_RPC
+
+
+def alchemy_available() -> bool:
+    """Один дешёвый вызов на старте (getHealth), НЕ печатает ключ. Найдено
+    при диагностике Шага 1: выданный ALCHEMY_API_KEY имел выключенную сеть
+    SOLANA_MAINNET (403 на каждый вызов) -- если владелец её включил,
+    Alchemy даёт заметно более высокий лимит частоты, чем публичный узел,
+    и потолок троттлинга можно honestly поднять, а не только резервный
+    fallback на 403."""
+    global _MIN_INTERVAL_S
+    if not os.environ.get("ALCHEMY_API_KEY") or _alchemy_disabled:
+        return False
+    try:
+        rpc_call("getHealth", [], use_cache=False)
+    except RuntimeError:
+        return False
+    _MIN_INTERVAL_S = 0.03
+    return not _alchemy_disabled
 
 
 def _cache_path(method: str, params: list) -> Path:
@@ -134,57 +152,127 @@ def get_transaction(sig: str) -> dict | None:
     return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
 
 
-# --- история пула: ОДНА на пул, переиспользуется для всех точек/покупок этого пула ---
-_pool_history_cache: dict[str, list[dict]] = {}
-_pool_history_reached_end: dict[str, bool] = {}
+def get_block_signatures(slot: int) -> dict | None:
+    """Минимальный getBlock -- только подписи блока (без транзакций), для
+    поиска ЯКОРЯ курсора пагинации (см. find_anchor_after)."""
+    try:
+        return rpc_call("getBlock", [slot, {"transactionDetails": "signatures", "rewards": False,
+                                             "maxSupportedTransactionVersion": 1}])
+    except RuntimeError as exc:
+        if "skipped" in str(exc).lower() or "not available" in str(exc).lower() or "-32004" in str(exc) or "-32007" in str(exc):
+            return None
+        raise
 
 
-def pool_history(pool: str, min_time: int | None = None, max_pages_per_call: int = 400) -> list[dict]:
-    """История подписей пула, newest-first, как отдаёт сама
-    getSignaturesForAddress -- кэшируется В ПАМЯТИ+на диске на весь прогон
-    процесса, так что 39 покупок одного минта = ОДИН реальный проход по
-    истории его пула, не 39 (Шаг 0.3).
+def find_anchor_after(hi_time: int, safety_margin_s: int = 60) -> tuple[str, int]:
+    """Подпись строго новее (hi_time+safety_margin_s) -- служит курсором
+    before= для getSignaturesForAddress ЛЮБОГО адреса (RPC не проверяет,
+    что курсор принадлежит опрашиваемому аккаунту -- это просто точка на
+    временной шкале). Оцениваем нужный слот линейной экстраполяцией от
+    текущей головы сети (getSlot -- один дешёвый вызов), затем ПРОВЕРЯЕМ
+    реальным blockTime блока и подправляем при недолёте -- так якорь
+    гарантированно окажется НЕ РАНЬШЕ нужного момента (Шаг 0.2, владелец:
+    "найти подпись примерно на t+300с... как anchor в их price_points.py,
+    но окно ограничивать в самом запросе")."""
+    target = hi_time + safety_margin_s
+    now = int(time.time())
+    head_slot = rpc_call("getSlot", [{"commitment": "finalized"}], use_cache=False)
+    rate = 2.5  # слотов/сек, средняя по mainnet -- стартовая оценка, уточняется по факту ниже
+    guess = max(int(head_slot - (now - target) * rate), 1)
+    prev_guess_bt: tuple[int, int] | None = None
+    for _ in range(8):
+        block = None
+        found_slot = None
+        for s in range(guess, guess + 30):
+            block = get_block_signatures(s)
+            if block and block.get("signatures") and block.get("blockTime") is not None:
+                found_slot = s
+                break
+        if block is None or found_slot is None:
+            guess += 30
+            continue
+        bt = block["blockTime"]
+        if bt >= target:
+            return block["signatures"][0], found_slot
+        if prev_guess_bt is not None:
+            d_slot = found_slot - prev_guess_bt[0]
+            d_time = bt - prev_guess_bt[1]
+            if d_slot > 0 and d_time > 0:
+                rate = d_slot / d_time
+        prev_guess_bt = (found_slot, bt)
+        guess = found_slot + max(int((target - bt) * rate) + 5, 30)
+    raise RuntimeError(f"не удалось найти якорь новее t={target}")
 
-    ВАЖНО (найдено при сверке Шага 1 на сигнатурах 4/5 из 5: активный пул
-    'kuasv...'-подобный, 39/100 покупок делят один минт, накапливает
-    десятки тысяч подписей за считанные часы -- фиксированный потолок в
-    40 страниц не докапывался до нужного t 6+ часов назад, бинарный поиск
-    падал за конец массива и ЛОЖНО читался как no_historical_swap, хотя
-    сама транзакция реально существует и достаётся getTransaction
-    напрямую). Поэтому глубина пагинации теперь определяется НУЖНЫМ t, а
-    не произвольным потолком страниц -- догружаем ровно до тех пор, пока
-    не долистали до min_time или до реального начала истории аккаунта."""
-    hist = _pool_history_cache.get(pool)
-    if hist is None:
-        disk_cache = CACHE_DIR / f"pool_history_{pool}.json"
-        if disk_cache.exists():
+
+# --- окно истории пула: ОДНО на пул на объединённый диапазон [lo,hi] всех
+# покупок текущего прогона, идущих через него (Шаг 0.2+0.3) ---
+_pool_window_cache: dict[str, dict] = {}
+
+
+def _pool_window_path(pool: str) -> Path:
+    return CACHE_DIR / f"pool_window_{pool}.json"
+
+
+def ensure_pool_window(pool: str, lo_time: int, hi_time: int) -> list[dict]:
+    """История подписей пула, newest-first, ограниченная окном
+    [lo_time .. hi_time+запас] -- НЕ от текущего момента назад (это и было
+    найденным на Шаге 1 багом: активный пул общего минта 6GmAFSYs...
+    копит десятки тысяч подписей за часы между сбором данных и прогоном
+    скрипта). Вместо этого: находим якорь строго новее hi_time
+    (find_anchor_after) и листаем НАЗАД строго до lo_time -- окно в
+    сотни подписей вместо десятков тысяч. Кэш -- НА ПУЛ, объединяющий
+    диапазон ВСЕХ покупок текущего прогона, которые через него идут
+    (39/100 покупок делят один минт -- один проход, не 39)."""
+    state = _pool_window_cache.get(pool)
+    if state is None:
+        p = _pool_window_path(pool)
+        if p.exists():
             try:
-                hist = json.loads(disk_cache.read_text())
+                state = json.loads(p.read_text())
             except (ValueError, OSError):
-                hist = []
-        else:
-            hist = []
-        _pool_history_cache[pool] = hist
-    oldest_time = hist[-1]["blockTime"] if hist and hist[-1].get("blockTime") is not None else None
-    reached_end = _pool_history_reached_end.get(pool, False)
-    pages = 0
-    while (min_time is not None and (oldest_time is None or oldest_time > min_time)
-           and not reached_end and pages < max_pages_per_call):
-        before = hist[-1]["signature"] if hist else None
+                state = None
+        _pool_window_cache[pool] = state or {"hist": [], "lo": None, "hi": None}
+        state = _pool_window_cache[pool]
+    if state["hist"] and state["lo"] is not None and state["hi"] is not None and state["lo"] <= lo_time and state["hi"] >= hi_time:
+        return state["hist"]
+
+    new_lo = min(lo_time, state["lo"]) if state["lo"] is not None else lo_time
+    new_hi = max(hi_time, state["hi"]) if state["hi"] is not None else hi_time
+    anchor_sig, anchor_slot = find_anchor_after(new_hi)
+    hist: list[dict] = []
+    before = anchor_sig
+    while True:
         page = get_signatures_for_address(pool, before=before, limit=1000)
-        pages += 1
         if not page:
-            reached_end = True
             break
         hist.extend(page)
-        oldest_time = page[-1].get("blockTime")
-        if len(page) < 1000:
-            reached_end = True
+        oldest = page[-1].get("blockTime")
+        before = page[-1]["signature"]
+        if oldest is not None and oldest <= new_lo:
             break
-    _pool_history_cache[pool] = hist
-    _pool_history_reached_end[pool] = reached_end
-    (CACHE_DIR / f"pool_history_{pool}.json").write_text(json.dumps(hist))
+        if len(page) < 1000:
+            break
+    state.update(hist=hist, lo=new_lo, hi=new_hi, anchor_slot=anchor_slot)
+    _pool_window_path(pool).write_text(json.dumps(state))
     return hist
+
+
+def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_sec: int) -> dict[str, tuple[int, int]]:
+    """Объединённый диапазон [lo,hi] на пул по всем ПОКУПКАМ текущего
+    прогона, которые через него идут -- Шаг 0.3 (общая история для
+    повторяющихся минтов), теперь ещё и общая для всех горизонтов ОДНОЙ
+    покупки (не по разу на секунду)."""
+    windows: dict[str, tuple[int, int]] = {}
+    for sig in target_sigs:
+        row = rows[sig]
+        lo, hi = row["time"], row["time"] + max_sec
+        for leg in routes.get(sig) or []:
+            pool = leg["pool"]
+            if pool in windows:
+                windows[pool] = (min(windows[pool][0], lo), max(windows[pool][1], hi))
+            else:
+                windows[pool] = (lo, hi)
+    return windows
 
 
 def price_event(e: dict) -> dict:
@@ -238,14 +326,15 @@ def price_event(e: dict) -> dict:
     return e
 
 
-def find_price_at(pool: str, t: int, max_scanned: int = 120) -> dict:
+def find_price_at(pool: str, t: int, lo_time: int, hi_time: int, max_scanned: int = 120) -> dict:
     """Замена их point(pool,t) -- ТА ЖЕ семантика (последняя сделка до t,
     честный статус missing_swap_event/no_historical_swap), но по
-    ОТДЕЛЬНЫМ транзакциям через getTransaction, не по полным блокам."""
-    hist = pool_history(pool, min_time=t)
-    # Первая подпись с blockTime<=t (hist -- newest-first) -- бинарный поиск,
-    # история пула догружена минимум до t (Шаг 0.3: один проход вглубь на пул,
-    # переиспользуемый и расширяемый при последующих более ранних t).
+    ОТДЕЛЬНЫМ транзакциям через getTransaction, не по полным блокам.
+    [lo_time,hi_time] -- окно, УЖЕ гарантированно покрывающее t (см.
+    pool_windows_needed/ensure_pool_window)."""
+    hist = ensure_pool_window(pool, lo_time, hi_time)
+    # Первая подпись с blockTime<=t (hist -- newest-first) -- бинарный поиск
+    # внутри уже загруженного окна.
     times = [-(h["blockTime"] or -(10**18)) for h in hist]  # отриц. для monotonic возрастания при newest-first
     idx = bisect.bisect_left(times, -t)
     scanned = 0
@@ -280,11 +369,20 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     if args.mode == "step1":
+        alchemy_ok = alchemy_available()
+        print(f"[step1] alchemy_available={alchemy_ok} (ключ не печатается)", flush=True)
+
         rows = {r["signature"]: r for r in json.loads((PRIOR_ROOT / "selected.json").read_text())}
         routes = {r["signature"]: r["route"] for r in json.loads((PRIOR_ROOT / "routes.json").read_text())}
         reference = json.loads((PRIOR_ROOT / "price_points.json").read_text())
         ref_by_sig_sec = {(r["signature"], r["seconds"]): r for r in reference}
         target_sigs = json.loads((PRIOR_ROOT / "analysis.json").read_text())["meta"]["full_5min_signatures"][:args.n]
+
+        windows = pool_windows_needed(target_sigs, rows, routes, max(HORIZONS_SECONDS))
+        print(f"[step1] {len(windows)} пул(ов) в объединённых окнах, догружаем якорем вперёд->назад (Шаг 0.2/0.3)", flush=True)
+        for pool, (lo, hi) in windows.items():
+            hist = ensure_pool_window(pool, lo, hi)
+            print(f"[step1] pool={pool[:12]}.. окно=[{lo},{hi}] ({hi-lo}с) -> {len(hist)} подписей", flush=True)
 
         comparison = []
         for sig in target_sigs:
@@ -300,7 +398,8 @@ if __name__ == "__main__":
                 legs_out = []
                 ok = True
                 for leg in route:
-                    p = find_price_at(leg["pool"], t)
+                    lo, hi = windows[leg["pool"]]
+                    p = find_price_at(leg["pool"], t, lo, hi)
                     legs_out.append(p)
                     if p.get("status") != "ok":
                         ok = False
