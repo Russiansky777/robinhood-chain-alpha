@@ -856,7 +856,21 @@ if __name__ == "__main__":
         EXT_ROOT = OUT_ROOT
         rows = {r["signature"]: r for r in json.loads((EXT_ROOT / "selected_300.json").read_text())}
         routes = {r["signature"]: r["route"] for r in json.loads((EXT_ROOT / "routes_300.json").read_text())}
-        target_sigs = list(rows.keys())
+        # Владелец: минт 6GmAFSYs... (106/300, ВСЕ докупки, весь результат
+        # сидит в первых входах -- медиана +31% против +1% у докупок) --
+        # его собственный высокооборотный пул (zxTpi4BtaWX3, покупки
+        # разбросаны на 109+ часов) топил весь прогон, а к выводу почти
+        # ничего не добавляет. Порядок: (1) всё, КРОМЕ этого минта --
+        # дешёвые низкооборотные пулы; внутри -- (2) сначала первые входы
+        # (zero_balance, главный результат), потом докупки; (3) сам минт
+        # -- в конец, отдельно, когда остальное уже посчитано.
+        DOMINANT_MINT = "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
+
+        def _priority(sig: str) -> tuple[bool, bool]:
+            r = rows[sig]
+            return (r["mint"] == DOMINANT_MINT, not r["zero_balance"])
+
+        target_sigs = sorted(rows.keys(), key=_priority)
         out_path = OUT_ROOT / "step_extended_result.json"
         run_comparison("step_extended", target_sigs, rows, routes, ref_by_sig_sec, out_path, use_gecko_sol=True)
 
