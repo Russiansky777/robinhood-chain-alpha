@@ -47,7 +47,22 @@ sys.path.insert(0, str(PRIOR_ROOT))
 import engine  # noqa: E402  (их decode_tx/expected_pool_counts, НЕ переписаны)
 
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+SOL = "So11111111111111111111111111111111111111112"
 HORIZONS_SECONDS = [5, 15, 30, 60, 180, 300]  # секундные точки (задание владельца, Шаг 0) -- длинные горизонты отдельно, через GeckoTerminal
+
+# Универсальная quote-пара SOL/USDC -- НЕ собственный пул мем-токена
+# (тот, zxTpi4BtaWX3..., остаётся на цепи, там нужна секундная точность).
+# Найдено на расширенном прогоне: эта конкретная пара листалась по
+# 300-470 тысяч подписей на сегмент (пул делает сотни tx/с ПОСТОЯННО,
+# не только вокруг наших покупок) -- 85 из 90 минут джобы. Владелец
+# подтвердил допуск (проверено на 8 живых точках: 0.04-0.31%, среднее
+# 0.17% -- при измеряемых движениях мем-токенов в десятки процентов это
+# шум, к тому же входит и в цену входа, и в цену выхода, почти
+# сокращаясь в отношении). GeckoTerminal-минутные свечи с линейной
+# интерполяцией между соседними закрытиями -- один диапазон запросов на
+# ВЕСЬ период сбора, без листания вообще.
+SOL_USDC_POOL = "3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv"
+GECKO_BASE = "https://api.geckoterminal.com/api/v2"
 
 META_PATH = PRIOR_ROOT / "route_meta.json"
 META: dict = json.loads(META_PATH.read_text()) if META_PATH.exists() else {}
@@ -299,6 +314,8 @@ def pool_windows_needed(target_sigs: list[str], rows: dict, routes: dict, max_se
         row = rows[sig]
         lo, hi = row["time"], row["time"] + max_sec
         for leg in routes.get(sig) or []:
+            if leg["pool"] == SOL_USDC_POOL:
+                continue  # универсальная пара -- через GeckoTerminal, окно на цепи не нужно
             raw.setdefault(leg["pool"], []).append((lo, hi))
 
     merged: dict[str, list[tuple[int, int]]] = {}
@@ -321,6 +338,121 @@ def find_window_for(intervals: list[tuple[int, int]], t: int) -> tuple[int, int]
         if lo <= t <= hi:
             return lo, hi
     raise RuntimeError(f"t={t} не попадает ни в один загруженный сегмент {intervals}")
+
+
+# --- GeckoTerminal: универсальная quote-пара SOL/USDC, минутные свечи
+# вместо ончейн-листания (см. SOL_USDC_POOL выше) ---
+_gecko_candles_state: dict = {"rows": [], "lo": None, "hi": None}
+
+
+def _gecko_cache_path() -> Path:
+    return CACHE_DIR / f"gecko_candles_{SOL_USDC_POOL}.json"
+
+
+def _gecko_get(path: str, params: dict) -> dict:
+    cache_f = CACHE_DIR / f"gecko_req_{hashlib.sha256((path + json.dumps(params, sort_keys=True)).encode()).hexdigest()[:24]}.json"
+    if cache_f.exists():
+        try:
+            return json.loads(cache_f.read_text())
+        except (ValueError, OSError):
+            pass
+    backoff = 1.0
+    for attempt in range(10):
+        try:
+            resp = requests.get(f"{GECKO_BASE}{path}", params=params, timeout=30,
+                                 headers={"Accept": "application/json"})
+        except Exception:  # noqa: BLE001
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
+        if resp.status_code == 429:
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
+        if not resp.ok:
+            raise RuntimeError(f"GeckoTerminal HTTP {resp.status_code}: {resp.text[:300]}")
+        data = resp.json()
+        cache_f.write_text(json.dumps(data))
+        return data
+    raise RuntimeError(f"GeckoTerminal {path} исчерпал попытки")
+
+
+def _gecko_fetch_range(lo_time: int, hi_time: int) -> list[list]:
+    all_rows: list[list] = []
+    cursor = hi_time + 120
+    for _ in range(60):
+        data = _gecko_get(f"/networks/solana/pools/{SOL_USDC_POOL}/ohlcv/minute",
+                           {"aggregate": 1, "before_timestamp": cursor, "limit": 1000, "currency": "usd"})
+        rows = data.get("data", {}).get("attributes", {}).get("ohlcv_list", [])
+        if not rows:
+            break
+        all_rows.extend(rows)
+        oldest_ts = min(r[0] for r in rows)
+        if oldest_ts <= lo_time or oldest_ts >= cursor:
+            break
+        cursor = oldest_ts
+        if len(rows) < 1000:
+            break
+    all_rows.sort(key=lambda r: r[0])
+    return all_rows
+
+
+def ensure_gecko_candles(lo_time: int, hi_time: int) -> list[list]:
+    """Минутные свечи SOL/USDC на объединённый диапазон ВСЕХ покупок
+    текущего прогона -- один диапазон запросов (пагинированный, но без
+    листания ончейн-истории пула вообще), догружается вглубь по мере
+    надобности, как ensure_pool_window."""
+    state = _gecko_candles_state
+    if not state["rows"]:
+        p = _gecko_cache_path()
+        if p.exists():
+            try:
+                saved = json.loads(p.read_text())
+                state.update(saved)
+            except (ValueError, OSError):
+                pass
+    if state["lo"] is not None and state["hi"] is not None and state["lo"] <= lo_time and state["hi"] >= hi_time:
+        return state["rows"]
+    new_lo = min(lo_time, state["lo"]) if state["lo"] is not None else lo_time
+    new_hi = max(hi_time, state["hi"]) if state["hi"] is not None else hi_time
+    rows = _gecko_fetch_range(new_lo, new_hi)
+    state.update(rows=rows, lo=new_lo, hi=new_hi)
+    print(f"[gecko] SOL/USDC свечи: диапазон=[{new_lo},{new_hi}] ({(new_hi-new_lo)/3600:.1f}ч) -> "
+          f"{len(rows)} минутных свечей", flush=True)
+    _gecko_cache_path().write_text(json.dumps(state))
+    return rows
+
+
+def gecko_price_interpolated(rows: list[list], t: int) -> tuple[D, dict]:
+    """Линейная интерполяция между закрытиями соседних минутных свечей
+    (закрытие свечи = цена на конец её минуты, т.е. в момент ts+60) --
+    убирает систематический сдвиг "ближайшая свеча снизу" (владелец:
+    в проверке возраст свечи был 15-52с)."""
+    if not rows:
+        raise RuntimeError("gecko_price_interpolated: пустой ряд свечей")
+    times = [r[0] + 60 for r in rows]
+    idx = bisect.bisect_right(times, t)
+    if idx == 0:
+        return D(str(rows[0][4])), dict(gecko_interp="extrapolated_before_first")
+    if idx >= len(rows):
+        return D(str(rows[-1][4])), dict(gecko_interp="extrapolated_after_last")
+    t0, c0 = times[idx - 1], D(str(rows[idx - 1][4]))
+    t1, c1 = times[idx], D(str(rows[idx][4]))
+    if t1 == t0:
+        return c0, dict(gecko_interp="degenerate_same_ts")
+    frac = D(t - t0) / D(t1 - t0)
+    price = c0 + (c1 - c0) * frac
+    return price, dict(gecko_interp="linear", candle_before_ts=rows[idx - 1][0], candle_after_ts=rows[idx][0])
+
+
+def find_price_at_gecko(t: int, lo_time: int, hi_time: int) -> dict:
+    """Замена ончейн-find_price_at ДЛЯ УНИВЕРСАЛЬНОЙ пары SOL/USDC --
+    та же форма результата (event.m0/m1/p1_per_0), что и у ончейн-ноги,
+    чтобы состав цены выше по стеку не менялся."""
+    rows = ensure_gecko_candles(lo_time, hi_time)
+    price, meta = gecko_price_interpolated(rows, t)
+    return dict(pool=SOL_USDC_POOL, target=t, status="ok", source="gecko",
+                event=dict(kind="gecko", pool=SOL_USDC_POOL, m0=SOL, m1=USDC, p1_per_0=str(price), status="ok", **meta))
 
 
 def price_event(e: dict) -> dict:
@@ -460,6 +592,75 @@ def _git_commit_progress(label: str, paths: list[Path]) -> None:
         print(f"[{label}] промежуточный коммит НЕ удался (не критично, продолжаем): {exc}", flush=True)
 
 
+def migrate_sol_leg_to_gecko(already: dict, routes: dict, rows: dict, ref_by_sig_sec: dict, label: str) -> int:
+    """Пересчитывает уже посчитанные точки, чей маршрут проходит через
+    SOL_USDC_POOL, заменяя ЭТУ ногу на GeckoTerminal -- остальные ноги
+    (уже посчитанные на цепи) переиспользуются как есть, новых ончейн-
+    запросов не требуется. Владелец: "вся выборка должна быть на одном
+    методе" + "старые значения сохранить рядом, не затирать" -- старый
+    результат остаётся под *_onchain_full, основные поля (mine_price и
+    т.д.) переходят на новый метод."""
+    n_migrated = 0
+    for (sig, sec), entry in already.items():
+        if entry.get("mine_status") != "ok" or entry.get("method") == "gecko_sol_usdc":
+            continue
+        route = routes.get(sig)
+        legs = entry.get("legs") or []
+        if not route or len(legs) != len(route) or not any(leg["pool"] == SOL_USDC_POOL for leg in route):
+            continue
+        row = rows.get(sig)
+        if row is None:
+            continue
+        value = D(1)
+        new_legs = []
+        ok = True
+        for leg, old_leg in zip(route, legs):
+            if leg["pool"] == SOL_USDC_POOL:
+                t = old_leg.get("target")
+                if t is None:
+                    ok = False
+                    break
+                p = find_price_at_gecko(t, row["time"], t)
+                new_legs.append(p)
+                e = p["event"]
+            else:
+                new_legs.append(old_leg)
+                e = (old_leg or {}).get("event")
+                if e is None:
+                    ok = False
+                    break
+            v = D(e["p1_per_0"])
+            if leg["from"] == e["m0"] and leg["to"] == e["m1"]:
+                value *= v
+            elif leg["from"] == e["m1"] and leg["to"] == e["m0"]:
+                value /= v
+            else:
+                ok = False
+                break
+        if not ok:
+            print(f"[{label}] миграция на gecko не удалась для {sig[:12]}.. sec={sec} -- оставляю как есть", flush=True)
+            continue
+        ref = ref_by_sig_sec.get((sig, sec), {})
+        ref_leg = (ref.get("legs") or [{}])[-1] if ref.get("legs") else {}
+        entry["mine_price_onchain_full"] = entry.get("mine_price")
+        entry["mine_slot_onchain_full"] = entry.get("mine_slot")
+        entry["mine_signature_onchain_full"] = entry.get("mine_signature")
+        entry["legs_onchain_full"] = legs
+        entry["mine_price"] = str(value)
+        entry["mine_slot"] = new_legs[-1].get("slot")
+        entry["mine_signature"] = new_legs[-1].get("signature")
+        entry["legs"] = new_legs
+        entry["method"] = "gecko_sol_usdc"
+        entry["match_price"] = (ref.get("price_usdc") is not None and D(str(value)) == D(ref["price_usdc"]))
+        entry["match_slot"] = entry["mine_slot"] == ref_leg.get("slot")
+        entry["match_signature"] = entry["mine_signature"] == ref_leg.get("signature")
+        n_migrated += 1
+    if n_migrated:
+        print(f"[{label}] мигрировано на GeckoTerminal (SOL/USDC-нога): {n_migrated} точек, "
+              f"старые значения сохранены в *_onchain_full", flush=True)
+    return n_migrated
+
+
 def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
                     ref_by_sig_sec: dict, out_path: Path, only_ref_ok: bool = False,
                     commit_paths: list[Path] | None = None) -> list[dict]:
@@ -474,6 +675,27 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
     КАЖДОЙ точки (дёшево), коммитим -- редко (см. COMMIT_INTERVAL_S)."""
     already = _load_existing(out_path)
     print(f"[{label}] уже посчитано ранее (возобновление): {len(already)} точек", flush=True)
+
+    if label == "step_extended":
+        # GeckoTerminal (SOL/USDC) -- ОДНА жадная предзагрузка на ВЕСЬ
+        # нужный диапазон СРАЗУ (по всем target_sigs, не только pending --
+        # миграция ниже тоже использует этот кэш), а не по нарастающей на
+        # каждый вызов: иначе каждое расширение диапазона заново
+        # перевызывало бы _gecko_fetch_range с других курсоров, теряя
+        # выгоду кэша. Дёшево (проверено: 5.76 суток за ~2.5 минуты).
+        sol_leg_sigs = [s for s in target_sigs if any(leg["pool"] == SOL_USDC_POOL for leg in (routes.get(s) or []))]
+        if sol_leg_sigs:
+            gecko_lo = min(rows[s]["time"] for s in sol_leg_sigs)
+            gecko_hi = max(rows[s]["time"] + max(HORIZONS_SECONDS) for s in sol_leg_sigs)
+            ensure_gecko_candles(gecko_lo, gecko_hi)
+
+        if already:
+            # Владелец: внедрить Gecko сразу, пересчитав уже посчитанное, а
+            # не только новое -- вся выборка на одном методе. Шаг 1/2
+            # (эталонная сверка точного воспроизведения их метода) НЕ трогаем.
+            n_migrated = migrate_sol_leg_to_gecko(already, routes, rows, ref_by_sig_sec, label)
+            if n_migrated:
+                out_path.write_text(json.dumps(list(already.values()), indent=2, default=str, ensure_ascii=False))
 
     def sig_fully_done(sig: str) -> bool:
         secs_needed = [sec for sec in HORIZONS_SECONDS
@@ -523,8 +745,11 @@ def run_comparison(label: str, target_sigs: list[str], rows: dict, routes: dict,
                     legs_out = []
                     ok = True
                     for leg in route:
-                        lo, hi = find_window_for(windows[leg["pool"]], t)
-                        p = find_price_at(leg["pool"], t, lo, hi)
+                        if leg["pool"] == SOL_USDC_POOL:
+                            p = find_price_at_gecko(t, row["time"], t)
+                        else:
+                            lo, hi = find_window_for(windows[leg["pool"]], t)
+                            p = find_price_at(leg["pool"], t, lo, hi)
                         legs_out.append(p)
                         if p.get("status") != "ok":
                             ok = False
