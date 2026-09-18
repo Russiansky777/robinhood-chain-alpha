@@ -1,8 +1,59 @@
 {
-  "generated_at_utc": "2026-09-18T18:03:21Z",
-  "fomo_api_key_present": false,
-  "HONEST_ANSWER": "FOMO_API_KEY нет в окружении -- реальный вызов leaderboard невозможен. По вторичным источникам (см. докстринг) бесплатный ключ создаётся без карты на fomoapi.io за секунды -- нужно, чтобы владелец завёл ключ и добавил его секретом FOMO_API_KEY в репозиторий. Ниже -- попытка достучаться до FomoLens как keyless-резерва, честно, без предположений.",
-  "fomoapi_probes": {},
+  "generated_at_utc": "2026-09-18T18:13:28Z",
+  "fomo_api_key_present": true,
+  "fomoapi_probes": {
+    "https://getfomoapi.fun/api": {
+      "X-API-Key": {
+        "http_status": 401,
+        "body_preview": "{\"detail\": \"Invalid API key\"}",
+        "exception": null
+      },
+      "Authorization_Bearer": {
+        "http_status": 401,
+        "body_preview": "{\"detail\": \"Invalid API key\"}",
+        "exception": null
+      },
+      "apiKey_param": {
+        "http_status": 401,
+        "body_preview": "{\"detail\": \"API key required\"}",
+        "exception": null
+      }
+    },
+    "https://fomoapi.io/api": {
+      "X-API-Key": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      },
+      "Authorization_Bearer": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      },
+      "apiKey_param": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      }
+    },
+    "https://fomoapi.io": {
+      "X-API-Key": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      },
+      "Authorization_Bearer": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      },
+      "apiKey_param": {
+        "http_status": 404,
+        "body_preview": "{\"non_json_body\": \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<title>404 - Page Not Found | FOMO API</title>\\n<meta name=\\\"description\\\" content=\\\"That page does not exist on fomoapi.io. Try the doc",
+        "exception": null
+      }
+    }
+  },
   "fomolens_probes": {
     "https://fomolens.app/api/leaderboard/24h": {
       "http_status": 404,
