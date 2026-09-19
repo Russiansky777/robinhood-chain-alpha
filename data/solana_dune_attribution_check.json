@@ -1,0 +1,241 @@
+{
+  "generated_at_utc": "2026-09-19T00:45:58Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771470}"
+      }
+    }
+  },
+  "n_our_signatures": 300,
+  "dex_solana_trades": {
+    "table": "dex_solana.trades",
+    "dune_step": {
+      "name": "attribution_dex_solana_trades",
+      "sql_preview": "SELECT tx_id, trader_id, project FROM dex_solana.trades WHERE tx_id IN ('JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm','4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pwi','2uj6KydmYxyjmhx3EN8YFrK8uXAcSEiau5nDMd4dwvGuPY",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8771471,
+      "execute": {
+        "http_status": 200
+      },
+      "execution_id": "01M2VJ13X25PXD96BENZPCWPNC",
+      "status_meta": {
+        "execution_id": "01M2VJ13X25PXD96BENZPCWPNC",
+        "query_id": 8771471,
+        "is_execution_finished": true,
+        "state": "QUERY_STATE_COMPLETED",
+        "submitted_at": "2026-09-19T00:45:59.587986Z",
+        "expires_at": "2026-12-18T00:46:54.58123Z",
+        "execution_started_at": "2026-09-19T00:46:00.326862927Z",
+        "execution_ended_at": "2026-09-19T00:46:54.581202268Z",
+        "result_metadata": {
+          "column_names": [
+            "tx_id",
+            "trader_id",
+            "project"
+          ],
+          "column_types": [
+            "varchar",
+            "varchar",
+            "varchar"
+          ],
+          "row_count": 732,
+          "result_set_bytes": 101701,
+          "total_row_count": 732,
+          "total_result_set_bytes": 101701,
+          "datapoint_count": 2196,
+          "pending_time_millis": 738,
+          "execution_time_millis": 54254
+        },
+        "execution_cost_credits": 130.710192308
+      },
+      "results_http_status": 200,
+      "status": "ok",
+      "n_rows": 732,
+      "metadata": {
+        "column_names": [
+          "tx_id",
+          "trader_id",
+          "project"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "varchar"
+        ],
+        "row_count": 732,
+        "result_set_bytes": 101701,
+        "total_row_count": 732,
+        "total_result_set_bytes": 101701,
+        "datapoint_count": 2196,
+        "pending_time_millis": 738,
+        "execution_time_millis": 54254
+      }
+    },
+    "n_found": 732,
+    "n_distinct_tx_id": 298,
+    "n_trader_id_matches_leader": 2,
+    "n_trader_id_other": 730,
+    "other_trader_ids_sample": [
+      "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn",
+      "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51"
+    ],
+    "projects_seen": {
+      "meteora": 292,
+      "goonfi": 23,
+      "bisonfi": 86,
+      "tessera": 56,
+      "raydium": 145,
+      "humidifi": 77,
+      "jupiter_lend": 7,
+      "byreal": 5,
+      "manifest": 6,
+      "alphaq": 18,
+      "scorch": 7,
+      "solfi": 2,
+      "whirlpool": 2,
+      "pumpswap": 1,
+      "pancakeswap": 3,
+      "raydium_launchlab": 2
+    },
+    "sample_rows": [
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "3t7A4mBQYHEdnU2yucJupjyJaxxwz2rC4K49xTXsRE7uRhCwD4B3xwr9mvoA8DgujK6DgUff1jM5EAT36nFfUvRH"
+      },
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "4r6vEugFsiSCuLsRyi7aohjyL6CFhzzXHBrJC6KuFnF4VRRZvxYew4wRzrUD3oLMTtTVxBUifPKeCsnVsJkRcf7x"
+      },
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "4MaZT6fLqAByqe39UZvs1PG3qZaxPWLnV9ZnN9mXAKQQAWpEYzNFAkx3XsSvD2m7YXcsw71YcSqXkMz7FFyTsHNU"
+      },
+      {
+        "project": "goonfi",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "34cJTZARWxVjWN7TXAsmZzdcMeFh6JyyzufnzzgShcJJFA2SYk8LATKGfLE27TUNBdcp91iR2WxG7VBrJ36Cfq3Q"
+      },
+      {
+        "project": "bisonfi",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "4G4QNQRjNSumrYHbbaMdr6kfJkxWpqsgTTn3T7Fh4MdF2gPgMiZE25BD2Uoqhq4ybiCrGCfGec46WwS2jGcXm9Vs"
+      },
+      {
+        "project": "bisonfi",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "2TNmYD5YMcoduYupepRjy4qf2PoaSojLSJuxgTauSUtKScDxXH7VcrCcR7sDYey8sTryCt9Ws2FsfqS4hLsDgrS"
+      },
+      {
+        "project": "tessera",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "5EuVK21qDAqebMjUd4dP2vdftNmo41VbJPnvhHXzUWiVDZv3cSmX1QbRP8uFbBEVoAJneAJupJC3kdMUP48cpKX7"
+      },
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "2b7hhbrnpjUC9LFAEjg4GzMte2b7rzFUReqLAPX93naMrqd9CsjkpqkYDq6u88DkJ7LTFZayazeRuhWhL7Ea6m4k"
+      },
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "3yDLctUyDjBGr6hY7XEfdVms4AXWxqFtfEd5xk4m6UXNbZFC9PMqHjvJz94LMqgGsYotNp2DvcdKE5caAqYkb1F1"
+      },
+      {
+        "project": "meteora",
+        "trader_id": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "tx_id": "mmM2cryP8RDxwurR3pNtqfY6smWDzhGfXPLQD3td3vbtv21jqT9XCZvg69rwJKkRnp2y4U8PwGe1z2giV6EvX5o"
+      }
+    ]
+  },
+  "pumpdotfun_solana_trades": {
+    "table": "pumpdotfun_solana.trades",
+    "dune_step": {
+      "name": "attribution_pumpdotfun_solana_trades",
+      "sql_preview": "SELECT tx_id, trader_id, project FROM pumpdotfun_solana.trades WHERE tx_id IN ('JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm','4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pwi','2uj6KydmYxyjmhx3EN8YFrK8uXAcSEiau5nDMd4",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8771475,
+      "execute": {
+        "http_status": 200
+      },
+      "execution_id": "01M2VJ2YW3P1035A6PDM7N7GAE",
+      "status_meta": {
+        "execution_id": "01M2VJ2YW3P1035A6PDM7N7GAE",
+        "query_id": 8771475,
+        "is_execution_finished": true,
+        "state": "QUERY_STATE_COMPLETED",
+        "submitted_at": "2026-09-19T00:46:59.972226Z",
+        "expires_at": "2026-12-18T00:47:31.030952Z",
+        "execution_started_at": "2026-09-19T00:47:01.298705132Z",
+        "execution_ended_at": "2026-09-19T00:47:31.030923207Z",
+        "result_metadata": {
+          "column_names": [
+            "tx_id",
+            "trader_id",
+            "project"
+          ],
+          "column_types": [
+            "varchar",
+            "varchar",
+            "varchar"
+          ],
+          "row_count": 0,
+          "result_set_bytes": 0,
+          "total_row_count": 0,
+          "total_result_set_bytes": 0,
+          "datapoint_count": 0,
+          "pending_time_millis": 1326,
+          "execution_time_millis": 29732
+        },
+        "execution_cost_credits": 94.710192308
+      },
+      "results_http_status": 200,
+      "status": "ok",
+      "n_rows": 0,
+      "metadata": {
+        "column_names": [
+          "tx_id",
+          "trader_id",
+          "project"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "varchar"
+        ],
+        "row_count": 0,
+        "result_set_bytes": 0,
+        "total_row_count": 0,
+        "total_result_set_bytes": 0,
+        "datapoint_count": 0,
+        "pending_time_millis": 1326,
+        "execution_time_millis": 29732
+      }
+    },
+    "n_found": 0,
+    "n_distinct_tx_id": 0,
+    "n_trader_id_matches_leader": 0,
+    "n_trader_id_other": 0,
+    "other_trader_ids_sample": [],
+    "projects_seen": {},
+    "sample_rows": []
+  },
+  "FINAL_VERDICT": "НАЙДЕНО БОЛЬШЕ, ЧЕМ РАНЬШЕ (732+0 по tx_id против 1 по trader_id=лидер) -- смотри trader_id найденных строк: если это не лидер, проблема в атрибуции, не в покрытии. Нужна доп. проверка связки через подписанта транзакции (solana.transactions), не объявляю вердикт автоматически."
+}
