@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- Фаза 1, Источник B: Dune-балансы на эталоне"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_SOURCE_B_DUNE_BALANCE_GATE_REQUEST"
+
+jobs:
+  source_b_dune_balance_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Источник B: Dune-балансы на эталоне"
+        env:
+          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+        run: python -u analysis/solana_source_b_dune_balance_gate.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_SOURCE_B_DUNE_BALANCE_GATE_REQUEST
+          [ -e data/solana_source_b_dune_balance_gate.json ] && git add data/solana_source_b_dune_balance_gate.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: Источник B (Dune-балансы) на эталоне -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
