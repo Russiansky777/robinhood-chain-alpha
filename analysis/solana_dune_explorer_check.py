@@ -38,7 +38,11 @@ OUT_PATH = REPO_ROOT / "data" / "solana_dune_explorer_check.json"
 API_BASE = "https://api.dune.com/api/v1"
 LEADER_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 SOL_USDC_POOL = "3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv"
-CANDIDATE_ENV_KEYS = ["DUNE_EXPLORER_API", "DUNE_API_KEY", "DUNE_API_KEY_MOZILA"]
+# Владелец, 2026-09-19: смена ключа -- DUNE_EXPLORER_API (старый триал)
+# больше не используем. Новый: DUNE_JANA_API, тариф Plus, остаток 1480
+# кредитов на момент смены. DUNE_API_KEY/DUNE_API_KEY_MOZILA -- по-прежнему
+# секреты ДРУГОГО, не относящегося к этой задаче проекта (см. pick_working_key).
+CANDIDATE_ENV_KEYS = ["DUNE_JANA_API", "DUNE_EXPLORER_API", "DUNE_API_KEY", "DUNE_API_KEY_MOZILA"]
 
 # Лимиты Plus (владелец): 70/мин тяжёлые эндпоинты, 200/мин чтение --
 # соблюдаем консервативным интервалом между вызовами.
@@ -157,15 +161,17 @@ def step0_discover_keys() -> dict:
 
 
 def pick_working_key(discovery: dict) -> str | None:
-    """ТОЛЬКО DUNE_EXPLORER_API -- это ключ триала, который проверяем.
-    DUNE_API_KEY/DUNE_API_KEY_MOZILA -- секреты ДРУГОГО, не связанного
+    """ТОЛЬКО DUNE_JANA_API (новый ключ владельца, Plus, 1480 кредитов на
+    момент смены 2026-09-19) -- старый DUNE_EXPLORER_API больше не
+    используем по прямому указанию владельца. DUNE_API_KEY/
+    DUNE_API_KEY_MOZILA -- по-прежнему секреты ДРУГОГО, не связанного
     проекта с собственным бюджетным учётом (credit_guard.py) -- даже
-    если они живые, платные шаги 1-4 НЕ должны молча тратить их кредиты
-    вместо триала. Если живых среди них нет, а DUNE_EXPLORER_API
-    отсутствует/мёртв -- честно останавливаемся после дешёвой проверки
-    живости (step0), не подменяем ключ."""
-    v = discovery["liveness"].get("DUNE_EXPLORER_API")
-    return "DUNE_EXPLORER_API" if v and v["alive"] else None
+    если они живые, платные шаги НЕ должны молча тратить их кредиты
+    вместо DUNE_JANA_API. Если DUNE_JANA_API отсутствует/мёртв --
+    честно останавливаемся после дешёвой проверки живости (step0), не
+    подменяем ключ втихую."""
+    v = discovery["liveness"].get("DUNE_JANA_API")
+    return "DUNE_JANA_API" if v and v["alive"] else None
 
 
 def step1_capability_probe(probe: DuneProbe) -> dict:

@@ -1,4 +1,4 @@
-name: "Solana buyer_200 -- пересчёт Фазы 2 v2 (многоминтовый фикс) -- ЖДЁТ снятия лимита Dune"
+name: "Solana buyer_200 -- пересчёт Фазы 2 v2 (многоминтовый фикс, целевая выгрузка)"
 
 on:
   workflow_dispatch: {}
@@ -27,13 +27,13 @@ jobs:
         run: pip install requests
       - name: "Пересчёт Фазы 2 v2 (многоминтовый фикс)"
         env:
-          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+          DUNE_JANA_API: ${{ secrets.DUNE_JANA_API }}
         run: python -u analysis/solana_phase2_reclassify_v2.py
       - name: Commit results
         if: always()
         run: |
           git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE2_RECLASSIFY_V2_REQUEST
-          [ -e data/solana_phase2_raw_rows_v2.json.gz ] && git add data/solana_phase2_raw_rows_v2.json.gz
+          [ -e data/solana_phase2_multimint_raw_v2.json.gz ] && git add data/solana_phase2_multimint_raw_v2.json.gz
           [ -e data/solana_phase2_events_v2.json ] && git add data/solana_phase2_events_v2.json
           [ -e data/solana_phase2_reclassify_v2_comparison.json ] && git add data/solana_phase2_reclassify_v2_comparison.json
           git diff --cached --quiet && exit 0

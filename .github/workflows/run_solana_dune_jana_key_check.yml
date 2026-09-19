@@ -1,4 +1,4 @@
-name: "Solana buyer_200 -- Фаза 3 v2: выборка + рост внутри SQL -- ЖДЁТ пункта 2 (Фаза 2 v2)"
+name: "Solana buyer_200 -- проверка ключа DUNE_JANA_API"
 
 on:
   workflow_dispatch: {}
@@ -6,12 +6,12 @@ on:
     branches:
       - claude/nifty-sagan-r0polg
     paths:
-      - "data/p3_guard_cache/SOLANA_PHASE3_PRICES_V2_REQUEST"
+      - "data/p3_guard_cache/SOLANA_DUNE_JANA_KEY_CHECK_REQUEST"
 
 jobs:
-  phase3_prices_v2:
+  jana_key_check:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -25,17 +25,17 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
-      - name: "Фаза 3 v2: выборка + рост внутри SQL"
+      - name: "Проверка ключа DUNE_JANA_API"
         env:
           DUNE_JANA_API: ${{ secrets.DUNE_JANA_API }}
-        run: python -u analysis/solana_phase3_prices_and_answers_v2.py
+        run: python -u analysis/solana_dune_jana_key_check.py
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE3_PRICES_V2_REQUEST
-          [ -e data/solana_phase3_result_v2.json ] && git add data/solana_phase3_result_v2.json
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_JANA_KEY_CHECK_REQUEST
+          [ -e data/solana_dune_jana_key_check.json ] && git add data/solana_dune_jana_key_check.json
           git diff --cached --quiet && exit 0
-          git commit -m "Solana buyer_200: Фаза 3 v2 (выборка + рост внутри SQL) -- результат [automated]"
+          git commit -m "Solana buyer_200: проверка ключа DUNE_JANA_API -- результат [automated]"
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
