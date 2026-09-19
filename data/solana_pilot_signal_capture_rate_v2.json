@@ -1,16 +1,25 @@
 {
-  "generated_at_utc": "2026-09-19T01:53:47Z",
+  "generated_at_utc": "2026-09-19T10:25:31Z",
   "definition": "канонический сигнал: новый минт (pre=0) + signer в любой позиции + spend>=4.3 SOL-экв, БЕЗ MIN_SPEND/без условия одного минта",
   "pilot_start_time": 1789744452,
-  "window_hours": 10.66,
-  "n_leader_tx_scanned": 234,
-  "n_canonical_signals_ge_4_3": 5,
-  "canonical_signals_per_day": 11.257,
-  "n_classify_first_entries_all_sizes": 20,
-  "n_matched": 3,
-  "n_missed": 2,
-  "capture_rate": 0.6,
+  "window_hours": 19.19,
+  "n_leader_tx_scanned": 324,
+  "n_canonical_signals_ge_4_3": 27,
+  "canonical_signals_per_day": 33.768,
+  "n_classify_first_entries_all_sizes": 21,
+  "n_matched": 7,
+  "n_missed": 20,
+  "capture_rate": 0.2593,
   "matched_with_classify_explanation": [
+    {
+      "mint": "GpuxEQPLFftuDZeo5nXm2UJWH7uAWDDaG94aa54SRQjc",
+      "sol_equivalent": 22.009206465592467,
+      "leader_signature": "S2VAQPpyQbGndfNaTMBSr8VqFeM4eBopLhggi96a4hiZcVWAQzRnw1LRTMfJLz4L6oBfhtNwEaxssu7D5YmY2JP",
+      "block_time": 1789784437,
+      "our_trade_buy_signature": "5rrvUgPWEbHF7ij8Du2eNmYxfFtBBjPF2KdSweqEJJ28JrpDdGikGNjecHJ9cqpgQpbCF8DjB5bfoNe2EWDiGnem",
+      "classify_would_count": true,
+      "classify_zero_balance": true
+    },
     {
       "mint": "7rUNV1HjfCzbtGi3ZbKQ5hYXVjzbAfyCTcgTULQxCwki",
       "sol_equivalent": 17.6558564759851,
@@ -37,6 +46,44 @@
       "our_trade_buy_signature": "3kJaUg7psEq6gtPdcwg2CiBgr9D8MpVkCfLqBrFZRqVKjhsCqt5ep3k1cubeSsCisbiDssD1QNPG5JUk4FFzmjE2",
       "classify_would_count": true,
       "classify_zero_balance": true
+    },
+    {
+      "mint": "XzC5SwuoRYUCXaqMNybdzbNyVL14wyzuiWHps5iqtgf",
+      "sol_equivalent": 4.47705663100328,
+      "leader_signature": "3kbHc3iPhZywCqhQtKFLanathj2UaEzrfuLoLm5PyrcyQreThGwYjMGtVv7r8HNsTzezrBxUmPJRKEGcjeoEJBr8",
+      "block_time": 1789750695,
+      "our_trade_buy_signature": "26zpn65TWXPr5UB9PaujJTQotKq2Me778i8WQqwmmuXwYzYX2T1APLC1dnpSevmS5bVVkXjNsNXUHo5jjEb5tGdA",
+      "classify_would_count": false,
+      "classify_reason": "not_selected",
+      "classify_check": {
+        "signature": "3kbHc3iPhZywCqhQtKFLanathj2UaEzrfuLoLm5PyrcyQreThGwYjMGtVv7r8HNsTzezrBxUmPJRKEGcjeoEJBr8",
+        "slot": 448144208,
+        "time": 1789750695,
+        "wallet_signed": true,
+        "usdc_spent": "499.963891",
+        "positive_mints": [
+          "XzC5SwuoRYUCXaqMNybdzbNyVL14wyzuiWHps5iqtgf"
+        ],
+        "status": "not_selected"
+      }
+    },
+    {
+      "mint": "EgP1f5J9LDn1fuTMfrrgT5ZRMiLBitYdkmDs818BS44k",
+      "sol_equivalent": 22.40638272832122,
+      "leader_signature": "5jpYqPa3yaTuMBaSc8JndfTPfMkEGnN7tLBGyZiwUQtCjUUUFz5iAhjUcczTCzDFbJyiYX1CzMBXhPzQfhUEK7SD",
+      "block_time": 1789750541,
+      "our_trade_buy_signature": "36VcibN7V8z5wHTJ2QxaHj3xR1KB5whMqvS2DnU1ZvVPQjCFsgov7qssSAMEFWBjVroXnMhLCAS3M2XyCi3TDc7z",
+      "classify_would_count": true,
+      "classify_zero_balance": true
+    },
+    {
+      "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
+      "sol_equivalent": 22.309521853022893,
+      "leader_signature": "4vPsRrt1cNtqxChbZFKDnDTTN85BweBn3cRSsRfVmjXvs4e1pg39S9cEaXei2XDDHi3JwF1benw4bDmfPCWGFLdn",
+      "block_time": 1789749474,
+      "our_trade_buy_signature": "RM7rPEEZSVuKxTZyrTX39SSvMPvMGNQPBi7jEbeTF4ueHkDTXPDY1iQtxoQydWeGY6Sqv968GiFWLg9BsYGqmGa",
+      "classify_would_count": true,
+      "classify_zero_balance": true
     }
   ],
   "missed_signals_full_detail": [
@@ -51,13 +98,121 @@
       "leader_signature": "3pXkd6bwMvSq1BjY6A3tsLkTzXsDEqiMr7kk7WM2bFqhMydXoYnDqdbwHAKqtP6jEeQ1gUiPTHPWkFofGBFokZmq",
       "block_time_utc": "2026-09-18T17:33:08Z",
       "sol_equivalent": 8.916155552946316
+    },
+    {
+      "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
+      "leader_signature": "3HFQaVjSQymgiiMqUH4R43S6ZKKYzv4Y2Hudrugnr28NAexAZeZxumLQD7i1LUazPK3Z5fCRF9hCgraNqfYuz2yf",
+      "block_time_utc": "2026-09-18T17:32:44Z",
+      "sol_equivalent": 8.911421904525412
+    },
+    {
+      "mint": "DgcHi71mEudJ5hqCp6tqLBJF4dNF7vPqxFUw97UEtcEL",
+      "leader_signature": "4aNziuHwR1wTFFTpS1DSQGL9dJCHBFJH73fK8z1pajQ3pdAF8qkU7cf6LKx933dqR9QdCjJ6EwRArKmMAEuh9rcy",
+      "block_time_utc": "2026-09-18T17:32:28Z",
+      "sol_equivalent": 4.453247843059985
+    },
+    {
+      "mint": "DWAi7YhCF59EfLUm9nZwdwJfAyExzqvZCvyax9KakHry",
+      "leader_signature": "4J24TLksui9n9BAM5Q1VDiREqgQPpP1Zei8JngnsTpYLNQXCw9g69UrSbC2dbKtDTU6JrrtFiuw1jDrJ9Y6JQzoA",
+      "block_time_utc": "2026-09-18T17:32:16Z",
+      "sol_equivalent": 8.902804595041069
+    },
+    {
+      "mint": "3a67JHqxYSyoc4Ndhkwz4nX9eog91tMiyzgRm86TA3y1",
+      "leader_signature": "VhBZGbdAta8ZNNxxZPf7HZ1YZ2jV3ozY4JDrUgFYZuPQ2tYuJCjS5UYV4R3hVNMKKqxC8XFkZBpjw6NDbBrHoB2",
+      "block_time_utc": "2026-09-18T17:31:41Z",
+      "sol_equivalent": 8.896063834080861
+    },
+    {
+      "mint": "6cryqwcRfbWURXxGGuhA5oTvHo2aezrs1UGw1UgyqWhs",
+      "leader_signature": "4JvJWs8pqdkfb2NDyTKQFLQ6m3WViuaEMfxTBbjFV4Zdeuh4WPjnc61gKfqfwQhBEziAPs3UAknRsTyEM7RbaqZy",
+      "block_time_utc": "2026-09-18T17:31:26Z",
+      "sol_equivalent": 44.47312156426929
+    },
+    {
+      "mint": "EcC5VERX69PB3kP2xLAws13SdhWPFgpCai6RtJn1bkQD",
+      "leader_signature": "4359Yxe5pcp8pvETPWnhaZJn9tnVWpcxT6uCe32HFjMnsmCr85bQ4HGfgY5GwBeCf3iEDcAg1UBzgZuCXD932BBQ",
+      "block_time_utc": "2026-09-18T17:31:12Z",
+      "sol_equivalent": 4.446640589983423
+    },
+    {
+      "mint": "GAMuAhwi6oYBsopfUbk5HqfM2rUx3nzY2MMB1QcvAW2G",
+      "leader_signature": "w7su8A5dcKAugxFavHbWDMWVXEF6491oxq8iHJnDwBhyfApjjSFhZHvPJMGYHXvhDrpicLDTzYmWGsrYTYwgbe2",
+      "block_time_utc": "2026-09-18T17:05:27Z",
+      "sol_equivalent": 5.370771278491972
+    },
+    {
+      "mint": "9swyN5J7fUQRYEJv46wHfZN5KHPSfQWctq31ZXHe5zqr",
+      "leader_signature": "4qQgBDxVHhUzLm2PRDQpeq6MPePG7uFVA8njdhQvbaZxeZ2HVZUgkr4D1dYJPeZ3T9hPXhPSqVmYci4TeaUoqtXC",
+      "block_time_utc": "2026-09-18T16:59:18Z",
+      "sol_equivalent": 13.444458983728824
+    },
+    {
+      "mint": "H3H7Nym8aKTgoHXvjvPXivCafnbZP22rd72XMLoST1U",
+      "leader_signature": "8fGykbWJsbAdbRKXZCWXnpEgPnzdPp8PsbF6mQtgMXETLaMpcR7JjnHa6RdTTdUtEAZwntrKsd5k59qjivwasU2",
+      "block_time_utc": "2026-09-18T16:57:18Z",
+      "sol_equivalent": 71.6415404201306
+    },
+    {
+      "mint": "CvegBNDMn69RfvXgM6rEVKbuoeWP7pGHjUD6bsGDSwPd",
+      "leader_signature": "2Kykx6Ui6oNgo5mLPFJTBQhhLYttSvANn4JkeriRbZvKRr5buasaAbt9ebmj3qwDdQjHiESxcfdoZKL6xaeBQMck",
+      "block_time_utc": "2026-09-18T16:56:50Z",
+      "sol_equivalent": 4.4788059344409925
+    },
+    {
+      "mint": "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
+      "leader_signature": "qb34NR1WhEQRojQBacGcv8seagJJUhxFLtH1uDjmbQGneDrjYaStMTBHrNBRmWBFA6rUfDmBQHC1xNwYFzUJQDY",
+      "block_time_utc": "2026-09-18T16:56:41Z",
+      "sol_equivalent": 40.31349524587995
+    },
+    {
+      "mint": "7gYKUXFqbshpydGN6EQyMHUkeigak2J9MbfKCKyTWH73",
+      "leader_signature": "5h32Lm7TMUzLH89rZ4PtjjpSja5AXC7Yy3vuqo5UsHYnTUHw9iJqhvSWSoQWK6i7gZ1iw3gquadXH4mV7gbeJoes",
+      "block_time_utc": "2026-09-18T16:56:10Z",
+      "sol_equivalent": 8.961802855542157
+    },
+    {
+      "mint": "5y4P3R4FTmx5Ni3MYLrM73z4utnzsKHURWs7xjBVSTNK",
+      "leader_signature": "5FUxatkCrZ9HWKmD7BzE94c9QRR2DTEgnyk2GYx2zV41RWxbZ43rX5HRj38VwT7CeoemWZpJpkXX8pUPbuA2i8Np",
+      "block_time_utc": "2026-09-18T16:55:56Z",
+      "sol_equivalent": 5.825812492827752
+    },
+    {
+      "mint": "6AUURRdHb9TrfPHv9AMofa8NEVoZDXcsbWKcUBpFSRXs",
+      "leader_signature": "3dqJ5XxmcGU9TGt7xqG8jQodPqsTLHjb5Bu41SZkVik7gtWWq4tyPpRx4h8jdSEbUXTFUePsPggbx9WLBjXj7iVY",
+      "block_time_utc": "2026-09-18T16:55:30Z",
+      "sol_equivalent": 5.377428301473286
+    },
+    {
+      "mint": "2x2CNPngMaKoTfDfzKzUCSVqJfwyUmN2qipV4DqRDjA4",
+      "leader_signature": "BL3GpgkmZKeErrfvTbBUhuaMFzGPmtgkxpCEPvJsmENA6EzafzFuEPpJfRrHZRJYS4q8mpchTy97c5KpGPGEFPX",
+      "block_time_utc": "2026-09-18T16:54:17Z",
+      "sol_equivalent": 4.480115720628693
+    },
+    {
+      "mint": "HdApvneP9ELet5wEu5qCG73xf4zB2Amgvf6PHVLjpV7j",
+      "leader_signature": "JAS1iJF8K4BY2LdsEVB5JmEuhNrtKnzDYSZN1L5ipdhtCoX62biz6MFPkWYs9pZUZ62aNxHzQUVPHBJb9WxcKBq",
+      "block_time_utc": "2026-09-18T16:53:51Z",
+      "sol_equivalent": 6.002792255073685
+    },
+    {
+      "mint": "HWbLXKQnEM4mngniNLpgyqEekMDk8NPUvcjpT6qZJDrM",
+      "leader_signature": "43beb6r6HFBbJAUSbacMra33GtBn6W5FV21mhQrS89gbZiQxrpCtFUuawjDsh7pADiE9vi7pwkx1nf5oB9Y44H4J",
+      "block_time_utc": "2026-09-18T15:28:50Z",
+      "sol_equivalent": 9.029846183917211
+    },
+    {
+      "mint": "6JETXVHFmWFu95A6UmzJPMa8MLNzsoA1Wd6qrWT4TcP2",
+      "leader_signature": "4foFrM5vLjMD1sjm5xt76feeTYCnvRPWS9QCooxYTDRv9oNJPMBcXiL8gt5UbNVzNzAgu91Air6TGnW34Y3GY9jX",
+      "block_time_utc": "2026-09-18T15:28:36Z",
+      "sol_equivalent": 9.028799534263444
     }
   ],
-  "n_pilot_trades_not_matched": 3,
+  "n_pilot_trades_not_matched": 0,
   "reconciliation_11_7_vs_32": {
     "old_classify_based_rate_per_day": 11.707,
-    "new_canonical_rate_per_day": 11.257,
+    "new_canonical_rate_per_day": 33.768,
     "user_recalled_rate_per_day": 32,
-    "note": "Канонический (без MIN_SPEND/без 'один минт') даёт 11.257/сутки против classify()-based 11.707/сутки на ТОМ ЖЕ окне -- определение объясняет часть расхождения, но НЕ доводит до 32/сутки -- честно: остаточная разница не объяснена определением, возможно другой порог/окно у владельца, либо реальная суточная вариативность (10.25ч -- очень короткое и нерепрезентативное окно)."
+    "note": "Канонический (без MIN_SPEND/без 'один минт') даёт 33.768/сутки против classify()-based 11.707/сутки на ТОМ ЖЕ окне -- определение почти полностью объясняет расхождение."
   }
 }
