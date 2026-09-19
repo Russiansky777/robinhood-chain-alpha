@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-09-19T02:22:58Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771836}"
+      }
+    }
+  },
+  "HONEST_LIMITATION": "Уникальные купленные минты и сумма в SOL требуют JOIN dex_solana.trades x solana.transactions -- тот же паттерн, что дважды падал по timeout. Здесь этот JOIN НЕ повторяем -- funnel посчитан ТОЛЬКО по solana.transactions (COUNT(*) как прокси числа сделок на кошелёк), без минтов/сумм. Это смета размера воронки, не паспорта.",
+  "dune_step": {
+    "name": "fomo_funnel_24h_agg",
+    "sql_preview": "SELECT date_trunc('hour', block_time) AS hour_bucket, element_at(filter(signers, x -> x != 'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51'), 1) AS trader, count(*) AS n_tx FROM solana.transactions WHERE signer = 'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51' AND block_time BETWEEN from_unixtime(17896",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771837,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VQJQTVXDFV9GY4D6GF0WV1",
+    "status_meta": {
+      "execution_id": "01M2VQJQTVXDFV9GY4D6GF0WV1",
+      "query_id": 8771837,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T02:22:59.932532Z",
+      "expires_at": "2026-12-18T02:23:11.07089Z",
+      "execution_started_at": "2026-09-19T02:23:01.258922367Z",
+      "execution_ended_at": "2026-09-19T02:23:11.070884525Z",
+      "result_metadata": {
+        "column_names": [
+          "hour_bucket",
+          "trader",
+          "n_tx"
+        ],
+        "column_types": [
+          "timestamp(3) with time zone",
+          "varchar",
+          "bigint"
+        ],
+        "row_count": 405850,
+        "result_set_bytes": 24328605,
+        "total_row_count": 405850,
+        "total_result_set_bytes": 24328605,
+        "datapoint_count": 1217550,
+        "pending_time_millis": 1326,
+        "execution_time_millis": 9811
+      },
+      "execution_cost_credits": 0.791884616
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 405850,
+    "metadata": {
+      "column_names": [
+        "hour_bucket",
+        "trader",
+        "n_tx"
+      ],
+      "column_types": [
+        "timestamp(3) with time zone",
+        "varchar",
+        "bigint"
+      ],
+      "row_count": 405850,
+      "result_set_bytes": 24328605,
+      "total_row_count": 405850,
+      "total_result_set_bytes": 24328605,
+      "datapoint_count": 1217550,
+      "pending_time_millis": 1326,
+      "execution_time_millis": 9811
+    }
+  },
+  "n_wallets_total_24h": 116012,
+  "n_wallets_ge_3_tx_24h": 74405,
+  "n_wallets_ge_5_tx_24h": 56728,
+  "n_wallets_ge_10_tx_24h": 35617,
+  "distribution_tx_per_wallet": {
+    "2": 16868,
+    "5-9": 21111,
+    "10+": 35617,
+    "3-4": 17677,
+    "1": 24739
+  },
+  "n_hours_covered": 25,
+  "total_tx_24h": 1424786,
+  "cost_credits_this_query": 0.791884616,
+  "cost_extrapolation_note": "Эта агрегированная 24ч-выборка обошлась в 0.791884616 кредитов -- заметно дешевле, чем сырые строки (та же 24ч-выборка сырыми строками ранее провалилась по объёму результата). Для регулярного мониторинга всей воронки Fomo -- ОДИН такой агрегирующий запрос в сутки, без сырых строк, в этом порядке стоимости."
+}
