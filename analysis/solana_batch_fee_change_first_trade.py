@@ -34,6 +34,10 @@ BATCH_WALLETS = {
     "BATCH-1": "GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq",
     "BATCH-2": "HMQG8xXoVBWZTkEqNye5WcfttvdZwVb522EggFD5AWZ6",
     "BATCH-3": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
+    # BATCH-4 (2026-09-19, старт ~15:35 Мадрид -- уже НА новом конфиге
+    # 0.0051/0.0051, не "смена" для неё, а точка сравнения): кошелёк из
+    # data/dbot_sieve_baseline.json.
+    "BATCH-4": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
 }
 POLL_INTERVAL_S = 20
 MAX_POLL_MINUTES = 170  # запас под лимит job (180 мин)
