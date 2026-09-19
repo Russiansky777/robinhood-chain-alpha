@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- тест классификатора BATCH-5 на известных подписях (только RPC)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BATCH5_GT_TEST_REQUEST"
+
+jobs:
+  gt_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Тест классификатора на известных подписях (RPC-only)"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_batch5_classifier_ground_truth_test.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BATCH5_GT_TEST_REQUEST
+          [ -e data/solana_batch5_classifier_ground_truth_test_result.json ] && git add data/solana_batch5_classifier_ground_truth_test_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: тест классификатора BATCH-5 на известных подписях -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
