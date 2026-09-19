@@ -1,0 +1,35 @@
+{
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8774505}"
+      }
+    }
+  },
+  "cached_execution_id": "01M2VNXS4NZCYFZ2VWT7YJBGWJ",
+  "n_suspect_tx_ids": 82,
+  "dune_step": {
+    "name": "dedup_project_check",
+    "sql_preview": "SELECT tx_id, project, token_sold_mint_address AS sold_mint, token_bought_mint_address AS bought_mint, token_sold_amount AS sold_amount FROM dex_solana.trades WHERE tx_id IN ('52RBgPrVuBCzrdH5cAJHx2LKHTHdAbByE8b84auwybHB4Qq12fdSYjHZJDUHCiLQMwgbcgiquzuoG7cxeuio4qNN','nAxCdcqFCnXpc86WkRPrWxw4ep8opnFGR",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8774506,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2WKNVY08WYQ2MHBP7NCJZ05",
+    "status": "timeout"
+  },
+  "HONEST_ANSWER": "Запрос не выполнился (timeout)"
+}
