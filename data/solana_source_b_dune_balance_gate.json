@@ -1,0 +1,402 @@
+{
+  "generated_at_utc": "2026-09-19T11:00:08Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8774610}"
+      }
+    }
+  },
+  "n_leader_signatures": 300,
+  "dune_step": {
+    "name": "source_b_leader_gate",
+    "sql_preview": "WITH target_mints(tx_id, target_mint) AS (VALUES ('JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm','BXrbjRfUH35Y9fDxmHw9GambqVHZ6McmgfRXGqkzUjQr'),('4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pwi','DDndHihssMMJnd3je9F",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8774611,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2WN5PB1J7G8XNHCHC6BSMWE",
+    "status_meta": {
+      "execution_id": "01M2WN5PB1J7G8XNHCHC6BSMWE",
+      "query_id": 8774611,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T11:00:09.699859Z",
+      "expires_at": "2026-12-18T11:00:56.335434Z",
+      "execution_started_at": "2026-09-19T11:00:11.281956891Z",
+      "execution_ended_at": "2026-09-19T11:00:56.335397494Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "block_slot",
+          "success",
+          "pre_sol",
+          "post_sol",
+          "pre_target",
+          "post_target",
+          "pre_usdc",
+          "post_usdc",
+          "pre_wsol",
+          "post_wsol",
+          "is_signer"
+        ],
+        "column_types": [
+          "varchar",
+          "bigint",
+          "boolean",
+          "bigint",
+          "bigint",
+          "double",
+          "double",
+          "double",
+          "double",
+          "double",
+          "double",
+          "boolean"
+        ],
+        "row_count": 300,
+        "result_set_bytes": 48539,
+        "total_row_count": 300,
+        "total_result_set_bytes": 48539,
+        "datapoint_count": 3600,
+        "pending_time_millis": 1582,
+        "execution_time_millis": 45053
+      },
+      "execution_cost_credits": 13.276346154
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 300,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "block_slot",
+        "success",
+        "pre_sol",
+        "post_sol",
+        "pre_target",
+        "post_target",
+        "pre_usdc",
+        "post_usdc",
+        "pre_wsol",
+        "post_wsol",
+        "is_signer"
+      ],
+      "column_types": [
+        "varchar",
+        "bigint",
+        "boolean",
+        "bigint",
+        "bigint",
+        "double",
+        "double",
+        "double",
+        "double",
+        "double",
+        "double",
+        "boolean"
+      ],
+      "row_count": 300,
+      "result_set_bytes": 48539,
+      "total_row_count": 300,
+      "total_result_set_bytes": 48539,
+      "datapoint_count": 3600,
+      "pending_time_millis": 1582,
+      "execution_time_millis": 45053
+    }
+  },
+  "n_found": 300,
+  "coverage": 1.0,
+  "n_comparable_usdc": 300,
+  "n_first_entry_comparable": 300,
+  "first_entry_agreement_rate": 1.0,
+  "ratio_usdc_summary": {
+    "n": 300,
+    "median": 1.0,
+    "p10": 0.999999999999837,
+    "p90": 1.000000000000162,
+    "n_within_0.95_1.05": 300,
+    "pct_within_0.95_1.05": 1.0
+  },
+  "per_tx_sample": [
+    {
+      "tx_id": "JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm",
+      "tokens_delta": 25591931.476034,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pwi",
+      "tokens_delta": 18241363.985734,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -599.9999999999995,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 0.9999999999999992,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "2uj6KydmYxyjmhx3EN8YFrK8uXAcSEiau5nDMd4dwvGuPYZy3gEwcixagKAqysmd8chxXHRXh7NdpcCCRzAsDiVG",
+      "tokens_delta": 5560445.628967251,
+      "sol_delta": 0.398604906,
+      "wsol_delta": -0.399155746,
+      "usdc_delta": -4000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 1.0000000000000002,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "2SGJX52MbsMk29gnk3xNhxb78nd4JkdtnNtb9dH6tddu2iQmN74UUuJu3MdHZZRrVNt71ewpv9gXz4cpNg3Z7qJ1",
+      "tokens_delta": 8600.23174533993,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.999999999999543,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "5y38rMoQsL9fS921RhcAhGiPBEGA19iYfrzGYpKjfusb86hFh9Uazd8ypgkcf4KEoqkekWrTcRVJ9oeFLPZ2m3Se",
+      "tokens_delta": 5435432.46983037,
+      "sol_delta": -0.000105529,
+      "wsol_delta": 0.0,
+      "usdc_delta": -800.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999999998,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "fxscHbqstB39REnbpxb5zGGjGcsRFefbKrNKDNZsYNAgJTjph8eZ2Ckti3dJPsmx8dAq2NiHSGRJ4SuRaTSkGAa",
+      "tokens_delta": 3363255.273228359,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "3WdZoTtAa9FyqQm9dPReLrgWPw41bufUCBDa8C6NUKqJXdQHWXfEPk451dS4r7dQv3qbjymhftxugWwoS3kxzt8F",
+      "tokens_delta": 49824.35037300002,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -1023.156621,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999999994,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "4JRePo4XGXL68BQFQuzQ45HzvqzxnsSxrZxfcwSzwteNTNb3MBxuoSquM7mg3bBF45hFb32bGf6AcZbeUTecAZz",
+      "tokens_delta": 73663.497386,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -1500.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999999998,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "5yaEaR3owd96KLtjaF7mMNHcEFeaGQd8LZVqWwFiRu26PJrS3QXijGGC3soP2r6gExPLCYCkuw6tMZGU8G6kyynd",
+      "tokens_delta": 8951.657220125198,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999996426,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "4B6YmfoUXxgbY2vt1qjJMkE7xv8qfMD6GsFBhc369BKh4W3jPDG74zf7SNKVvEwwqyCbTntGQbqi5UB6Uy7pk11a",
+      "tokens_delta": 18231423.648872,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0000000000005,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0000000000000002,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "4yh7QkEp4r1kkrpsVD81G6uHfGdQqifuM1Yz5zfAftcaeFtdyztwSASQ4gh2D9zDByp2eBbV4ZMeYfRdDXhWL8Wu",
+      "tokens_delta": 1486007.6068306714,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -835.915827,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999999984,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "5MYrKUYfzXQHTpo9caeMDVWZAJF1d5wGujWf3oFLUBf5f83AD9XKK5fZoggZTtKMiaPabSb2TcNKnb1L6eHZGLZ6",
+      "tokens_delta": 1106426.9395599999,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -1500.0000000000002,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 1.0000000000000002,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "3jAyy8kKJSU8KrvCFSYbXu5HZXdnUgDko6i995VyZskjnUFd4ZMAa9vMJyusWJkro6eyR98CJtzi1FA1qZGjvkHP",
+      "tokens_delta": 250391.39326186478,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 0.9999999999999968,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "2envX63KocGpM3HBcLHSmNbn1oB4jkzJnxr1JGRF75zVFNt3uvBFsoKFygHRcrhkRh2mLb8wbArVVdmjv9onXLMG",
+      "tokens_delta": 5063032.394842259,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -4500.0,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0000000000000002,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "B5j77uv1WB1VfET8vmEPdENVLoE713328VqntgFjJRaL2MRNxwJ9VUTejNvDfaQJ3pBuno6tWqEQutetkYWpM31",
+      "tokens_delta": 194848.82320166752,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -1406.668942,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 1.0000000000000024,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "31AoRCRKYCzKYG4TKvmsz29uBSFyG42rEe7UpEwypHTyE9rqXoeZZJQTJwcfFVfXkDtSL96LhxSW1KebS6rp1sHQ",
+      "tokens_delta": 860911.493179,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2500.0,
+      "spend_is_usdc": true,
+      "b_first_entry": false,
+      "ref_first_entry": false,
+      "ratio_vs_ours": 1.0,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "2tLjZxt5ZQKbSm9jx95LWMLDfQKig4kUqM6QoBVFFQstBhWBXzjKPLJCDZcWTpixGNPqWYRMrqmcF1GPCNiuSyjM",
+      "tokens_delta": 17795768.847837,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -999.9999999999998,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 0.9999999999999997,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "5VrzD6orY4zLLTsdT9hDKQuFVvVXLcKRPjGFo88U2cDMwDVtSVq7UP9vvSU6oPkBPz9shU9ts44NDAeaTcS72mJR",
+      "tokens_delta": 24615832.933275,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -1000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "5WaybDFctdvtUZAuhGgCp83hCvGhMuf76j5cAsnuxYeC5tdusto9tfgj5zYD9X8i6qEgxs6KqnwGAPBW7n4vmXoP",
+      "tokens_delta": 26198881.98432,
+      "sol_delta": 0.0,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2500.0000000000005,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0000000000000002,
+      "basis": "usdc"
+    },
+    {
+      "tx_id": "3gWeuYGR6ck1pbt6p6mWhSeF7obApZGAtfsxyeKuMuPY6RHndmgwqmXMJiaYESbB4VbBqCpLAo5wyAGfQCW6F7df",
+      "tokens_delta": 15207235.233259,
+      "sol_delta": -0.00055084,
+      "wsol_delta": 0.0,
+      "usdc_delta": -2000.0,
+      "spend_is_usdc": true,
+      "b_first_entry": true,
+      "ref_first_entry": true,
+      "ratio_vs_ours": 1.0,
+      "basis": "usdc"
+    }
+  ],
+  "candidates_3": [
+    {
+      "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+      "dune_step_status": "ok",
+      "n_found": 67,
+      "n_expected": 72,
+      "table_v2_per_day_ge_2": 9.571,
+      "table_v2_per_day_ge_4.3": 9.429
+    },
+    {
+      "address": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+      "dune_step_status": "ok",
+      "n_found": 54,
+      "n_expected": 54,
+      "table_v2_per_day_ge_2": 7.571,
+      "table_v2_per_day_ge_4.3": 7.143
+    },
+    {
+      "address": "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2",
+      "dune_step_status": "ok",
+      "n_found": 33,
+      "n_expected": 33,
+      "table_v2_per_day_ge_2": 4.714,
+      "table_v2_per_day_ge_4.3": 4.571
+    }
+  ]
+}
