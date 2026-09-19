@@ -1,0 +1,85 @@
+{
+  "generated_at_utc": "2026-09-19T12:25:27Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_JANA_API",
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_JANA_API"
+    ],
+    "liveness": {
+      "DUNE_JANA_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8775336}"
+      }
+    }
+  },
+  "key_name_used": "DUNE_JANA_API",
+  "roundtrip_step": {
+    "name": "jana_key_full_roundtrip_select1",
+    "sql_preview": "SELECT 1 AS x",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8775337,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2WT1XHAPRYGC9GYT80YRFPD",
+    "status_meta": {
+      "execution_id": "01M2WT1XHAPRYGC9GYT80YRFPD",
+      "query_id": 8775337,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T12:25:28.875064Z",
+      "expires_at": "2026-12-18T12:25:29.52192Z",
+      "execution_started_at": "2026-09-19T12:25:28.877626291Z",
+      "execution_ended_at": "2026-09-19T12:25:29.521916558Z",
+      "result_metadata": {
+        "column_names": [
+          "x"
+        ],
+        "column_types": [
+          "integer"
+        ],
+        "row_count": 1,
+        "result_set_bytes": 4,
+        "total_row_count": 1,
+        "total_result_set_bytes": 4,
+        "datapoint_count": 1,
+        "pending_time_millis": 2,
+        "execution_time_millis": 644
+      },
+      "execution_cost_credits": 0.05524091
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 1,
+    "rows": [
+      {
+        "x": 1
+      }
+    ],
+    "metadata": {
+      "column_names": [
+        "x"
+      ],
+      "column_types": [
+        "integer"
+      ],
+      "row_count": 1,
+      "result_set_bytes": 4,
+      "total_row_count": 1,
+      "total_result_set_bytes": 4,
+      "datapoint_count": 1,
+      "pending_time_millis": 2,
+      "execution_time_millis": 644
+    }
+  },
+  "VERDICT": "DUNE_JANA_API рабочий, create/execute/results проходят",
+  "cost_credits_this_check": 0.05524091
+}
