@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-19T13:53:40Z",
+  "generated_at_utc": "2026-09-19T14:01:18Z",
   "step0_key_discovery": {
     "env_keys_checked": [
       "DUNE_JANA_API",
@@ -14,7 +14,7 @@
       "DUNE_JANA_API": {
         "http_status": 200,
         "alive": true,
-        "body_preview": "{\"query_id\": 8775986}"
+        "body_preview": "{\"query_id\": 8776041}"
       }
     }
   },
@@ -42,10 +42,11 @@
   "days_already_done": [
     "2026-09-12",
     "2026-09-13",
-    "2026-09-14"
+    "2026-09-14",
+    "2026-09-15"
   ],
   "days_this_run": [
-    "2026-09-15"
+    "2026-09-19"
   ],
   "days_processed": [
     {
@@ -79,9 +80,172 @@
       "status": "ok",
       "n_rows": 250,
       "cost_credits": 217.664038462
+    },
+    {
+      "day": "2026-09-19",
+      "n_events": 111,
+      "n_chunks": 1,
+      "status": "ok",
+      "n_rows": 0,
+      "cost_credits": 64.248653847
     }
   ],
-  "total_cost_credits_so_far": 580.9946153870001,
+  "total_cost_credits_so_far": 645.2432692340001,
   "n_events_priced_so_far": 854,
-  "FINAL_ANSWER": "ОСТАНОВЛЕНО в этом прогоне -- потолок 150.0 кредитов на прогон превышен (потрачено в прогоне 217.66)."
+  "total_cost_credits": 645.2432692340001,
+  "global_spend_on_key_estimate": 933.759769234,
+  "ALL_DAYS_DONE": false,
+  "days_covered": [
+    "2026-09-12",
+    "2026-09-13",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-19"
+  ],
+  "days_not_covered": [
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18"
+  ],
+  "answers": {
+    "q1_rebuys": {
+      "leader": {
+        "k1": {
+          "n": 77,
+          "n_priced_plus30": 70,
+          "n_priced_plus60": 70,
+          "n_priced_plus180": 70,
+          "median_growth_plus30": 0.0,
+          "median_growth_plus60": 0.0,
+          "median_growth_plus180": 0.0
+        },
+        "k2": {
+          "n": 53,
+          "n_priced_plus30": 48,
+          "n_priced_plus60": 48,
+          "n_priced_plus180": 48,
+          "median_growth_plus30": 0.0,
+          "median_growth_plus60": 0.0,
+          "median_growth_plus180": -0.007792892516719441,
+          "take_k2_rule": false
+        },
+        "k3plus": {
+          "n": 0,
+          "n_priced_plus30": 0,
+          "n_priced_plus60": 0,
+          "n_priced_plus180": 0,
+          "median_growth_plus30": null,
+          "median_growth_plus60": null,
+          "median_growth_plus180": null
+        }
+      },
+      "others": {
+        "k1": {
+          "n": 558,
+          "n_priced_plus30": 432,
+          "n_priced_plus60": 427,
+          "n_priced_plus180": 432,
+          "median_growth_plus30": 0.0,
+          "median_growth_plus60": 1.4379787520724108e-06,
+          "median_growth_plus180": 0.0
+        },
+        "k2": {
+          "n": 109,
+          "n_priced_plus30": 82,
+          "n_priced_plus60": 83,
+          "n_priced_plus180": 82,
+          "median_growth_plus30": 0.0,
+          "median_growth_plus60": 0.0,
+          "median_growth_plus180": 0.0,
+          "take_k2_rule": false
+        },
+        "k3plus": {
+          "n": 57,
+          "n_priced_plus30": 46,
+          "n_priced_plus60": 46,
+          "n_priced_plus180": 45,
+          "median_growth_plus30": 0.0,
+          "median_growth_plus60": -2.579823021875427e-10,
+          "median_growth_plus180": 0.004468879889635735
+        }
+      }
+    },
+    "q2_threshold_and_size": {
+      "table": [
+        {
+          "bucket_sol": "2-4.3",
+          "n": 100,
+          "n_priced_30s": 70,
+          "n_priced_60s": 68,
+          "median_growth_30s": 0.00268890683122347,
+          "median_growth_60s": 0.005536504955616639
+        },
+        {
+          "bucket_sol": "4.3-8",
+          "n": 86,
+          "n_priced_30s": 71,
+          "n_priced_60s": 71,
+          "median_growth_30s": 0.0,
+          "median_growth_60s": 0.0015490050728690363
+        },
+        {
+          "bucket_sol": "8-15",
+          "n": 52,
+          "n_priced_30s": 46,
+          "n_priced_60s": 45,
+          "median_growth_30s": 0.0,
+          "median_growth_60s": 0.0
+        },
+        {
+          "bucket_sol": "15+",
+          "n": 103,
+          "n_priced_30s": 84,
+          "n_priced_60s": 86,
+          "median_growth_30s": 0.010637890520152293,
+          "median_growth_60s": 0.018249096857971714
+        }
+      ],
+      "threshold_sol_lower_bound": null
+    },
+    "q3_new_wallets": {
+      "n_wallets_evaluated": 163,
+      "top10": [
+        {
+          "address": "EURKJdQmbP2GqSBssKuhgLKz2XEwhUXnHL2oYd4eejMm",
+          "freq_ge2_per_day": 3.857,
+          "n_priced_30s": 25,
+          "median_growth_30s": 0.0,
+          "rank_score": 0.0
+        },
+        {
+          "address": "5eiXSFxmZKKo8V6qTw72SBskCZa7ok8jyqutsvtCuE1i",
+          "freq_ge2_per_day": 2.286,
+          "n_priced_30s": 25,
+          "median_growth_30s": 0.0,
+          "rank_score": 0.0
+        },
+        {
+          "address": "29omQei1ywcRzHMYXx3iEEgfZ7ccqB7TpwL3q4s3RWe3",
+          "freq_ge2_per_day": 2.429,
+          "n_priced_30s": 22,
+          "median_growth_30s": 0.0,
+          "rank_score": 0.0
+        },
+        {
+          "address": "BqLdbdWvG2N5x64uMfX17CFqRvjhWYA7qziHEjoy9Qg2",
+          "freq_ge2_per_day": 5.857,
+          "n_priced_30s": 21,
+          "median_growth_30s": -0.0027051599574728913,
+          "rank_score": -0.015844121870918725
+        },
+        {
+          "address": "DKpJ2RSH1kfA158nUx81SjjTb9WExoRxrNaanGYhwJTt",
+          "freq_ge2_per_day": 1.571,
+          "n_priced_30s": 22,
+          "median_growth_30s": -0.023993426469048007,
+          "rank_score": -0.03769367298287442
+        }
+      ]
+    }
+  }
 }
