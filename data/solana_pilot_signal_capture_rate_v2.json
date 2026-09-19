@@ -1,0 +1,63 @@
+{
+  "generated_at_utc": "2026-09-19T01:53:47Z",
+  "definition": "канонический сигнал: новый минт (pre=0) + signer в любой позиции + spend>=4.3 SOL-экв, БЕЗ MIN_SPEND/без условия одного минта",
+  "pilot_start_time": 1789744452,
+  "window_hours": 10.66,
+  "n_leader_tx_scanned": 234,
+  "n_canonical_signals_ge_4_3": 5,
+  "canonical_signals_per_day": 11.257,
+  "n_classify_first_entries_all_sizes": 20,
+  "n_matched": 3,
+  "n_missed": 2,
+  "capture_rate": 0.6,
+  "matched_with_classify_explanation": [
+    {
+      "mint": "7rUNV1HjfCzbtGi3ZbKQ5hYXVjzbAfyCTcgTULQxCwki",
+      "sol_equivalent": 17.6558564759851,
+      "leader_signature": "4Jq6se95E9D3obinTJWnvcWRXuVi9mCdQAVEh2sDDmDXxP8b6PFryBbLYYgQDhctTiqnJFoDVYxXWM73hsoB8awt",
+      "block_time": 1789774409,
+      "our_trade_buy_signature": "2DHSXrmytPa5zGG3zmS3QRdEYNKNTuoWkLUsAFpMTkkaizPzx7cEz2pjsoe8bWD8ktnNeZZy3Kmv5JKqD87n8qXH",
+      "classify_would_count": true,
+      "classify_zero_balance": true
+    },
+    {
+      "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
+      "sol_equivalent": 44.12299838934045,
+      "leader_signature": "4mX39pia4DVyih1PccHUWTmhQrF4HLLBSYJ7nVHkQwKcnPStygKRLgtz62UDDxczquvcSqQ3EKUyhLT15ScT25jJ",
+      "block_time": 1789774008,
+      "our_trade_buy_signature": "2c7yuL68DQMPo7myYCWWEvDRGqXqaYgJFeP64kHUfjFHEUmMhZdqaJruXMtMUT1Ezrn93oEau1X7UpSKEfrEZBF2",
+      "classify_would_count": true,
+      "classify_zero_balance": true
+    },
+    {
+      "mint": "vAddewUHuYgRDrL6n3kXtBXMT635evJz8K93j6Wm1Ba",
+      "sol_equivalent": 89.31993240679434,
+      "leader_signature": "5TTHHpYgyk22BwKjhPnh4qWQCq8cvpQuq8VgbT6PK8gEHtVuTffRWC6wiz2ZKNTtTGsLfkC8P8Wu4jzXN2D9TVQR",
+      "block_time": 1789752951,
+      "our_trade_buy_signature": "3kJaUg7psEq6gtPdcwg2CiBgr9D8MpVkCfLqBrFZRqVKjhsCqt5ep3k1cubeSsCisbiDssD1QNPG5JUk4FFzmjE2",
+      "classify_would_count": true,
+      "classify_zero_balance": true
+    }
+  ],
+  "missed_signals_full_detail": [
+    {
+      "mint": "26vrrfTKMn1RPqUZJu11rTsjrKGrgEr1otPURRFvrvv4",
+      "leader_signature": "5bhC1NuGL1zKv7spd5sL6sCf3xFqX3dN4jAK7BSJ71M4irCThgjr16bjAADPLaGzzdehFNwbYvMipxBdvFpgV65v",
+      "block_time_utc": "2026-09-18T17:34:22Z",
+      "sol_equivalent": 4.458272614810986
+    },
+    {
+      "mint": "7goMm2ZcfAcxQ8NiA8MbgmH1bjKA7smzWB4LCGcZvrYZ",
+      "leader_signature": "3pXkd6bwMvSq1BjY6A3tsLkTzXsDEqiMr7kk7WM2bFqhMydXoYnDqdbwHAKqtP6jEeQ1gUiPTHPWkFofGBFokZmq",
+      "block_time_utc": "2026-09-18T17:33:08Z",
+      "sol_equivalent": 8.916155552946316
+    }
+  ],
+  "n_pilot_trades_not_matched": 3,
+  "reconciliation_11_7_vs_32": {
+    "old_classify_based_rate_per_day": 11.707,
+    "new_canonical_rate_per_day": 11.257,
+    "user_recalled_rate_per_day": 32,
+    "note": "Канонический (без MIN_SPEND/без 'один минт') даёт 11.257/сутки против classify()-based 11.707/сутки на ТОМ ЖЕ окне -- определение объясняет часть расхождения, но НЕ доводит до 32/сутки -- честно: остаточная разница не объяснена определением, возможно другой порог/окно у владельца, либо реальная суточная вариативность (10.25ч -- очень короткое и нерепрезентативное окно)."
+  }
+}
