@@ -1,0 +1,154 @@
+{
+  "generated_at_utc": "2026-09-19T01:28:44Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771624}"
+      }
+    }
+  },
+  "n_our_signatures": 300,
+  "dune_step": {
+    "name": "signers_array_test",
+    "sql_preview": "SELECT id AS tx_id, signer AS scalar_signer, signers AS signers_array, contains(signers, 'Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit') AS leader_in_signers_array, cardinality(signers) AS n_signers FROM solana.transactions WHERE block_slot BETWEEN 446296620 AND 447871555 AND id IN ('JLHP1V9ediM8QET",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771625,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VMFEGB05P9G1V15HYJZZA9",
+    "status_meta": {
+      "execution_id": "01M2VMFEGB05P9G1V15HYJZZA9",
+      "query_id": 8771625,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:28:46.348219Z",
+      "expires_at": "2026-12-18T01:29:37.31817Z",
+      "execution_started_at": "2026-09-19T01:28:47.927174745Z",
+      "execution_ended_at": "2026-09-19T01:29:37.318142356Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "scalar_signer",
+          "signers_array",
+          "leader_in_signers_array",
+          "n_signers"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "array(varchar)",
+          "boolean",
+          "bigint"
+        ],
+        "row_count": 300,
+        "result_set_bytes": 70692,
+        "total_row_count": 300,
+        "total_result_set_bytes": 70692,
+        "datapoint_count": 1500,
+        "pending_time_millis": 1578,
+        "execution_time_millis": 49390
+      },
+      "execution_cost_credits": 7.940961539
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 300,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "scalar_signer",
+        "signers_array",
+        "leader_in_signers_array",
+        "n_signers"
+      ],
+      "column_types": [
+        "varchar",
+        "varchar",
+        "array(varchar)",
+        "boolean",
+        "bigint"
+      ],
+      "row_count": 300,
+      "result_set_bytes": 70692,
+      "total_row_count": 300,
+      "total_result_set_bytes": 70692,
+      "datapoint_count": 1500,
+      "pending_time_millis": 1578,
+      "execution_time_millis": 49390
+    }
+  },
+  "n_found": 300,
+  "n_scalar_signer_matches_leader": 1,
+  "n_leader_in_signers_array": 300,
+  "n_signers_distribution": {
+    "2": 299,
+    "1": 1
+  },
+  "sample_rows": [
+    {
+      "leader_in_signers_array": true,
+      "n_signers": 2,
+      "scalar_signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "signers_array": [
+        "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      ],
+      "tx_id": "2p46y7UqfVSHo7uDcmvKW2R2YhSwPEG8DEhp4xPBTrdzqqcgQ6YskK6Gs1BFbcq4bu6w4iy9zY5eR9u9C2KKjKX4"
+    },
+    {
+      "leader_in_signers_array": true,
+      "n_signers": 2,
+      "scalar_signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "signers_array": [
+        "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      ],
+      "tx_id": "ocwRMbibKjCpkeny8te9cERzuRfKeFZo9mojPHGESeASHce51VzrG2oQKb1wh2AfrUNg59s91oEjaQKsGxfRp1i"
+    },
+    {
+      "leader_in_signers_array": true,
+      "n_signers": 2,
+      "scalar_signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "signers_array": [
+        "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      ],
+      "tx_id": "ZFeGwBFW9KtS9H99W824qDyusZ3VnyvVAeXvZ6TMDZLfSBRpW3cJt88Yyy3TmS6ja8qWLc6mc3PCuWjjncukfjQ"
+    },
+    {
+      "leader_in_signers_array": true,
+      "n_signers": 2,
+      "scalar_signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "signers_array": [
+        "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      ],
+      "tx_id": "2EaYNEDfAAM7Nj6Xp4rfsL5EQbNWepDGU4ywbrwAKRPQvK1Q1ZvvryNxsBeFxsMM88cM3ExTZFeuqWEbnuWN1YMp"
+    },
+    {
+      "leader_in_signers_array": true,
+      "n_signers": 2,
+      "scalar_signer": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+      "signers_array": [
+        "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+        "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      ],
+      "tx_id": "3t7A4mBQYHEdnU2yucJupjyJaxxwz2rC4K49xTXsRE7uRhCwD4B3xwr9mvoA8DgujK6DgUff1jM5EAT36nFfUvRH"
+    }
+  ],
+  "recomputed_coverage_via_signers_array": 1.0,
+  "FINAL_VERDICT": "ПОДТВЕРЖДЕНО ЧЕРЕЗ МАССИВ SIGNERS: 300/300 (100.0%) -- лидер присутствует среди подписантов, просто не как единственный/первый (scalar signer, вероятно fee payer/спонсор, почти никогда не совпадает: 1). Нужно перезапустить калибровку (schlopping/+30с/разметка) с JOIN по contains(signers, ЛИДЕР), не по signer=ЛИДЕР."
+}
