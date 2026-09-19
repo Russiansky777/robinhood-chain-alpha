@@ -16,7 +16,24 @@
 (фандинг, не свопы), текущий баланс, стоимость открытых (непроданных)
 позиций по текущей цене, подразумеваемый P&L. Отдельно -- честный ответ,
 почему на нулевой точке было 1.747/1.769 SOL, а не 3: смотрим САМУЮ
-РАННЮЮ входящую транзакцию кошелька."""
+РАННЮЮ входящую транзакцию кошелька.
+
+Владелец, 2026-09-20: ЭТОТ файл -- ЕДИНСТВЕННАЯ актуальная версия,
+объединяющая ВСЕ исправления по цене лидера (иначе следующий прогон их
+теряет, как уже случилось один раз):
+  1. find_wallet_buy_near_time -- поиск покупки лидера/источника ПО
+     ИСТОРИИ ПОДПИСЕЙ кошелька (не через getTokenAccountsByOwner/ATA,
+     которая слепа к уже закрытым токен-аккаунтам);
+  2. WSOL-фоллбэк в той же функции -- если платёж прошёл через уже
+     открытый WSOL-токен-аккаунт (нативный lamport-баланс не двигается),
+     берём отрицательную дельту TOKEN-баланса минта So111...112;
+  3. gecko_get с ретраем/бэкоффом (10 попыток) -- единичный транзиентный
+     сбой/429 GeckoTerminal раньше тихо ронял ТОЛЬКО одну сторону цены
+     сделки (напр. нашу, при живой цене лидера в той же сделке) --
+     выглядело как "потерянное исправление №1/2", хотя было именно это.
+Если правишь цену лидера/нашу цену -- проверяй, что все три пункта
+остаются в файле ПОСЛЕ правки (напр. пересчётом markup_at_entry_pct
+для всех 7 контрольных сделок пилота+BATCH-1, должно быть 7/7 без null)."""
 from __future__ import annotations
 
 import json
@@ -298,11 +315,30 @@ _sol_candles_cache: dict[int, list[list]] = {}
 
 
 def gecko_get(path: str, params: dict) -> dict:
-    try:
-        resp = requests.get(f"{GECKO_BASE}{path}", params=params, timeout=30, headers={"Accept": "application/json"})
+    """Владелец, 2026-09-20: ретрай с бэкоффом -- без него единичный
+    транзиентный сбой/429 от GeckoTerminal тихо возвращает None и роняет
+    ТОЛЬКО одну сторону цены (напр. нашу, при живой цене лидера в той же
+    сделке), выглядит как "потерянное исправление", хотя это не баг
+    логики, а просто непереживший сбой одиночный HTTP-запрос. Тот же
+    паттерн (10 попыток, экспоненциальный бэкофф до 30с), что уже
+    используется в solana_29_candidates_usdc_to_sol.py."""
+    backoff = 1.0
+    last: dict = {"http_status": None}
+    for _ in range(10):
+        try:
+            resp = requests.get(f"{GECKO_BASE}{path}", params=params, timeout=30, headers={"Accept": "application/json"})
+        except Exception as exc:  # noqa: BLE001
+            last = {"http_status": None, "exception": str(exc)[:200]}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
+        if resp.status_code == 429:
+            last = {"http_status": 429}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
         return {"http_status": resp.status_code, "body": resp.json() if resp.ok else None}
-    except Exception as exc:  # noqa: BLE001
-        return {"http_status": None, "exception": str(exc)[:200]}
+    return last
 
 
 def sol_usd_price_at(t: int) -> float | None:
@@ -564,7 +600,12 @@ def wallet_balance_reconciliation(wallet: str, all_meta: list[dict], trade_pairs
 
 
 def main() -> None:
-    result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "trades": []}
+    prev = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
+    prev_generated_at = prev.get("generated_at_utc")
+    prev_buy_sigs = {t["buy_signature"] for t in prev.get("trades", []) if t.get("buy_signature")}
+
+    result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     "previous_run_generated_at_utc": prev_generated_at, "trades": []}
     baseline = json.loads(BASELINE_PATH.read_text()) if BASELINE_PATH.exists() else {}
 
     wallets_to_scan = [("pilot", PILOT_WALLET, PILOT_TASK_ID, None)]
@@ -584,6 +625,7 @@ def main() -> None:
             if label != "pilot" and tracked_wallets:
                 source_info = find_source_wallet(tracked_wallets, pair["mint"], pair["buy"]["block_time"])
             row = build_trade_row(label, wallet, task_id, source_info, pair)
+            row["is_new_since_previous_run"] = row.get("buy_signature") not in prev_buy_sigs
             result["trades"].append(row)
             OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
             print(f"[ledger] {label} {row['mint'][:10]}.. status={row.get('status')} "
@@ -613,16 +655,60 @@ def main() -> None:
     markups = [t["markup_at_entry_pct"] for t in closed if "markup_at_entry_pct" in t]
     grosses = [t["gross_pct"] for t in closed if "gross_pct" in t]
     nets = [t["net_pct"] for t in closed if "net_pct" in t]
+    n_new = sum(1 for t in result["trades"] if t.get("is_new_since_previous_run"))
     result["summary"] = {
         "n_closed_trades": len(closed),
+        "n_new_trades_since_previous_run": n_new,
         "median_markup_pct": median(markups) if markups else None,
         "markup_values": markups,
         "median_gross_pct": median(grosses) if grosses else None,
         "median_net_pct": median(nets) if nets else None,
         "n_gross": len(grosses), "n_net": len(nets),
     }
+
+    by_wallet_summary = {}
+    for label, wallet, _task_id, _ in wallets_to_scan:
+        w_closed = [t for t in closed if t.get("label") == label]
+        w_gross = [t["gross_pct"] for t in w_closed if "gross_pct" in t]
+        w_net = [t["net_pct"] for t in w_closed if "net_pct" in t]
+        w_net_sol = [(t["total_sol_in_sell"] - t["total_sol_out_buy"]) for t in w_closed
+                     if t.get("total_sol_in_sell") is not None and t.get("total_sol_out_buy") is not None]
+        recon = reconciliation.get(label, {})
+        w_fees = [t["dbot_fee_sol"] for t in w_closed if t.get("dbot_fee_sol") is not None]
+        by_source: dict[str, dict] = {}
+        if label != "pilot":
+            for t in w_closed:
+                src = t.get("source_wallet_remark") or t.get("source_wallet_address") or "не определён"
+                by_source.setdefault(src, {"n_trades": 0, "gross_values": []})
+                by_source[src]["n_trades"] += 1
+                if "gross_pct" in t:
+                    by_source[src]["gross_values"].append(t["gross_pct"])
+            for src, v in by_source.items():
+                v["median_gross_pct"] = median(v["gross_values"]) if v["gross_values"] else None
+        by_wallet_summary[label] = {
+            "wallet_address": wallet,
+            "n_trades_closed": len(w_closed),
+            "n_trades_open": sum(1 for t in result["trades"] if t.get("label") == label and t.get("status") == "открыта -- ещё не продано"),
+            "median_gross_pct": median(w_gross) if w_gross else None,
+            "median_net_pct": median(w_net) if w_net else None,
+            "sum_net_sol": round(sum(w_net_sol), 6) if w_net_sol else None,
+            "current_balance_sol": recon.get("current_balance_sol"),
+            "total_funded_sol": recon.get("total_funded_sol"),
+            "balance_minus_funding_sol": round(recon["current_balance_sol"] - recon["total_funded_sol"], 6)
+                                         if recon.get("current_balance_sol") is not None and recon.get("total_funded_sol") is not None else None,
+            "open_positions": recon.get("open_positions"),
+            "dbot_fee_sol_total": round(sum(w_fees), 8) if w_fees else None,
+            "dbot_fee_n_trades_matched": len(w_fees),
+            "by_source_wallet": by_source if by_source else None,
+        }
+    result["summary_by_wallet"] = by_wallet_summary
+
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     print(f"[ledger] завершено: {result['summary']}", flush=True)
+    for label, s in by_wallet_summary.items():
+        print(f"[ledger]   {label}: закрыто={s['n_trades_closed']} мед.брутто={s['median_gross_pct']} "
+              f"мед.нетто={s['median_net_pct']} сумма_нетто_SOL={s['sum_net_sol']} "
+              f"баланс-фандинг={s['balance_minus_funding_sol']}", flush=True)
 
 
 if __name__ == "__main__":
