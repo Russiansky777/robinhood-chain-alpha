@@ -8,6 +8,15 @@ balances из getTransaction вместо solana.transactions, spend_sol_equiv
 не трогаем; сделки, профинансированные ТОЛЬКО в стейблах, честно
 считаются отдельно, не входят в median/пороги SOL).
 
+ИСПРАВЛЕНО (контроль на LEADER_WALLET/Brez): без проверки на реальную
+DEX/AMM-программу в транзакции метод засчитывал в "первые входы" любые
+непокупные транзакции (переводы, дасты) с крошечным spend_sol_equiv
+(~сетевая комиссия) -- лидер и Brez показывали 0 входов >=2 SOL при
+известной активной торговле. См. tx_program_ids/DEX_PROGRAMS ниже.
+Валидация фикса на эталонах ЕЩЁ НЕ прогнана -- лидер имеет ~1600 подписей/72ч,
+повторный скан конкурировал бы за RPC-бюджет с основным сканом
+кандидатов (приоритет владельца), отложено до паузы/отдельного разрешения.
+
 "Первый вход" -- буквально как просил владелец: баланс МИНТА у кошелька
 ДО этой конкретной транзакции == 0 (или запись отсутствует), после > 0,
 кошелёк -- подписант. Многоминтовые tx (вырос больше одного немонетного
@@ -39,6 +48,28 @@ WSOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 STABLE_MINTS = {USDC, USDT}
+
+# Владелец, контроль метода: лидер и Brez давали 0 входов >=2 SOL при
+# известной активной торговле -- баланс-only классификация без проверки
+# на реальный DEX/AMM ловила массу непокупных транзакций (переводы,
+# дасты) с крошечным spend_sol_equiv (~сетевая комиссия), топя реальные
+# свопы в шуме. Фикс: "первый вход" засчитывается ТОЛЬКО если tx также
+# содержит известную DEX/AMM программу -- список из уже собранного в
+# репозитории dex_labels.json (не выдумано здесь, использовался и
+# раньше этой сессией).
+DEX_LABELS_PATH = REPO_ROOT / "data" / "solana_buyer_200" / "prior" / "current" / "buyer_100" / "dex_labels.json"
+DEX_PROGRAMS = set(json.loads(DEX_LABELS_PATH.read_text()).keys()) if DEX_LABELS_PATH.exists() else set()
+
+
+def tx_program_ids(tx: dict) -> set[str]:
+    instrs = tx.get("transaction", {}).get("message", {}).get("instructions", [])
+    inner = (tx.get("meta") or {}).get("innerInstructions") or []
+    ids = {ix.get("programId") for ix in instrs if isinstance(ix, dict)}
+    for g in inner:
+        for ix in g.get("instructions", []):
+            if isinstance(ix, dict):
+                ids.add(ix.get("programId"))
+    return {i for i in ids if i}
 
 LOOKBACK_HOURS = 72
 LOOKBACK_S = LOOKBACK_HOURS * 3600
@@ -99,6 +130,8 @@ def classify_tx(tx: dict, wallet: str) -> dict | None:
         return None
     if wallet not in tx_signers(tx):
         return None
+    if not (tx_program_ids(tx) & DEX_PROGRAMS):
+        return {"kind": "no_first_entry"}  # не своп -- перевод/даст/другое, честно не считаем покупкой
     keys = [k["pubkey"] if isinstance(k, dict) else k for k in tx["transaction"]["message"]["accountKeys"]]
     if wallet not in keys:
         return None
