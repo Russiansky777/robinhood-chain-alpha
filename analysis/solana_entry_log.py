@@ -188,11 +188,20 @@ def build_log(req: dict) -> dict:
           f"окно=[{lo_slot},{hi_slot}]", flush=True)
 
     sigs = fetch_mint_signatures_in_slot_window(mint, leader_time, lo_slot, hi_slot)
-    # добираем нашу покупку/продажу, если их слот вдруг вне окна (честно расширяем, не молчим)
+    # добираем нашу покупку/продажу, если их слот вдруг вне окна (честно
+    # расширяем, не молчим -- продажа часто происходит на десятки слотов
+    # позже, вне узкого окна входа; это ОЖИДАЕМО и не повод её терять,
+    # т.к. без неё не посчитать "от покупки до продажи"). Такие "внешние"
+    # подписи помечаем force_include=True -- НЕ отфильтровываются по
+    # границам окна ниже, попадают в rows и сводку в любом случае.
+    force_include_sigs: set[str] = set()
     extra_sigs_info = []
-    for extra_key in ("our_buy_signature", "our_sell_signature"):
+    for extra_key in ("leader_signature", "our_buy_signature", "our_sell_signature"):
         sig = req.get(extra_key)
-        if sig and not any(s["signature"] == sig for s in sigs):
+        if not sig:
+            continue
+        force_include_sigs.add(sig)
+        if not any(s["signature"] == sig for s in sigs):
             tx = fp.get_transaction(sig)
             if tx:
                 extra_sigs_info.append({"signature": sig, "slot": tx["slot"], "blockTime": tx["blockTime"], "err": tx.get("meta", {}).get("err")})
@@ -213,13 +222,33 @@ def build_log(req: dict) -> dict:
         if tx is None:
             continue
         slot = tx["slot"]
-        if not (lo_slot <= slot <= hi_slot):
+        if not (lo_slot <= slot <= hi_slot) and sig not in force_include_sigs:
             continue
         ev = mint_event_for_tx(tx, mint)
         if ev is None:
+            if sig in force_include_sigs:
+                # Честно показываем, что decode_tx не нашёл своп-событие
+                # по этому минту в ЗАПРОШЕННОЙ (лидер/наша) транзакции --
+                # не молчим, чтобы не терять строку без объяснения.
+                other_events = [{"pool": e.get("pool"), "kind": e.get("kind"), "m0": e.get("m0"), "m1": e.get("m1")}
+                                 for e in engine.decode_tx(tx)]
+                signers = tx_signers(tx)
+                wallet = next((w for w in (LEADER_WALLET, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
+                idx = block_index(slot, sig)
+                rows.append({"signature": sig, "slot": slot, "index_in_block": idx,
+                             "block_time_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(tx["blockTime"])),
+                             "wallet": wallet, "wallet_label": label_map.get(wallet, "прочие"),
+                             "has_fomo_cosigner": FOMO_COSIGNER in signers,
+                             "HONEST_NOTE": "decode_tx НЕ нашёл своп-событие по этому минту в этой транзакции",
+                             "other_decoded_events_in_tx": other_events})
             continue
         signers = tx_signers(tx)
-        wallet = signers[0] if signers else None
+        # Владелец, найдено на JUPCAT: у транзакции лидера ПЕРВЫЙ подписант --
+        # Fomo Co-signer, а не сам кошелёк лидера (мульти-подпись) -- если
+        # опираться только на signers[0], лидерская сделка ошибочно
+        # получает метку "прочие". Явно ищем ЛИДЕРА/НАС среди ВСЕХ
+        # подписантов, иначе -- первый подписант.
+        wallet = next((w for w in (LEADER_WALLET, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
         price, quote_mint = price_of_mint(ev, mint)
         p_usd, usd_note = price_usd(price, quote_mint)
         amounts = trade_amounts(ev, mint)
@@ -246,16 +275,16 @@ def build_log(req: dict) -> dict:
 
     leader_rows = [r for r in rows if r["signature"] == leader_sig]
     leader_seq = leader_rows[0]["global_seq"] if leader_rows else None
-    leader_price_usd = leader_rows[0]["price_usd"] if leader_rows else None
-    leader_price_quote = leader_rows[0]["price_in_quote"] if leader_rows else None
-    leader_quote_mint = leader_rows[0]["quote_mint"] if leader_rows else None
+    leader_price_usd = leader_rows[0].get("price_usd") if leader_rows else None
+    leader_price_quote = leader_rows[0].get("price_in_quote") if leader_rows else None
+    leader_quote_mint = leader_rows[0].get("quote_mint") if leader_rows else None
 
     for r in rows:
         r["slots_from_leader"] = r["slot"] - leader_slot
         r["positions_from_leader"] = (r["global_seq"] - leader_seq) if leader_seq is not None else None
-        if leader_price_usd is not None and r["price_usd"] is not None:
+        if leader_price_usd is not None and r.get("price_usd") is not None:
             r["price_vs_leader_pct"] = round((r["price_usd"] / leader_price_usd - 1.0) * 100, 4)
-        elif leader_price_quote is not None and r["price_in_quote"] is not None and r["quote_mint"] == leader_quote_mint:
+        elif leader_price_quote is not None and r.get("price_in_quote") is not None and r.get("quote_mint") == leader_quote_mint:
             r["price_vs_leader_pct_same_quote_asset_only"] = round((r["price_in_quote"] / leader_price_quote - 1.0) * 100, 4)
 
     result = {"label": req.get("label"), "mint": mint, "leader_signature": leader_sig,
@@ -284,7 +313,7 @@ def build_log(req: dict) -> dict:
     if our_buy_row and our_sell_row:
         if our_buy_row.get("price_usd") and our_sell_row.get("price_usd"):
             summary["our_buy_to_sell_growth_pct"] = round((our_sell_row["price_usd"] / our_buy_row["price_usd"] - 1.0) * 100, 4)
-        elif (our_buy_row["quote_mint"] == our_sell_row["quote_mint"] and our_buy_row.get("price_in_quote") and our_sell_row.get("price_in_quote")):
+        elif (our_buy_row.get("quote_mint") == our_sell_row.get("quote_mint") and our_buy_row.get("price_in_quote") and our_sell_row.get("price_in_quote")):
             summary["our_buy_to_sell_growth_pct_same_quote_asset_only"] = round(
                 (our_sell_row["price_in_quote"] / our_buy_row["price_in_quote"] - 1.0) * 100, 4)
     result["summary"] = summary
