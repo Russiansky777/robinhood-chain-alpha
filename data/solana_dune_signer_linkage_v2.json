@@ -1,0 +1,102 @@
+{
+  "generated_at_utc": "2026-09-19T01:23:03Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771609}"
+      }
+    }
+  },
+  "n_our_signatures": 300,
+  "slot_bound": [
+    446296620,
+    447871555
+  ],
+  "mystery_address_identity": {
+    "address": "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+    "status": "ok",
+    "executable": false,
+    "owner_program": "11111111111111111111111111111111",
+    "lamports": 3124487838836,
+    "space": 0,
+    "parsed_type": null,
+    "parsed_info_preview": null,
+    "conclusion": "НЕ программа -- обычный аккаунт, владелец (owner) = 11111111111111111111111111111111"
+  },
+  "step1_signer_linkage": {
+    "name": "signer_linkage_bounded",
+    "sql_preview": "SELECT id AS tx_id, signer AS signer FROM solana.transactions WHERE block_slot BETWEEN 446296620 AND 447871555 AND id IN ('JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm','4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pw",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771610,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VM51E2Y3VJ2DQKV348ZWQ3",
+    "status_meta": {
+      "execution_id": "01M2VM51E2Y3VJ2DQKV348ZWQ3",
+      "query_id": 8771610,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:23:05.283026Z",
+      "expires_at": "2026-12-18T01:23:35.170652Z",
+      "execution_started_at": "2026-09-19T01:23:06.744394114Z",
+      "execution_ended_at": "2026-09-19T01:23:35.170626679Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "signer"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar"
+        ],
+        "row_count": 300,
+        "result_set_bytes": 39539,
+        "total_row_count": 300,
+        "total_result_set_bytes": 39539,
+        "datapoint_count": 600,
+        "pending_time_millis": 1461,
+        "execution_time_millis": 28426
+      },
+      "execution_cost_credits": 7.405576924
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 300,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "signer"
+      ],
+      "column_types": [
+        "varchar",
+        "varchar"
+      ],
+      "row_count": 300,
+      "result_set_bytes": 39539,
+      "total_row_count": 300,
+      "total_result_set_bytes": 39539,
+      "datapoint_count": 600,
+      "pending_time_millis": 1461,
+      "execution_time_millis": 28426
+    }
+  },
+  "n_tx_found_in_tx_table": 300,
+  "n_signer_matches_leader": 1,
+  "signer_coverage_by_tx_id": 1.0,
+  "recomputed_coverage_via_signer_linkage": 0.0033,
+  "attribution_confirmed": false,
+  "FINAL_VERDICT": "Связка через подписанта НЕ подтвердилась уверенно (1/300 совпадений) -- дальнейшую калибровку (схлопывание, +30с, разметка) не запускаю, чтобы не тратить кредиты впустую."
+}
