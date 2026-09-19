@@ -1,0 +1,48 @@
+name: "Solana buyer_200 -- выгрузка pre_amt по дням (переразметка first_entry/k)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_PHASE2_PREAMT_FETCH_REQUEST"
+
+jobs:
+  preamt_fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Выгрузка pre_amt по дням"
+        env:
+          DUNE_JANA_API: ${{ secrets.DUNE_JANA_API }}
+        run: python -u analysis/solana_phase2_preamt_fetch.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE2_PREAMT_FETCH_REQUEST
+          [ -d data/solana_phase2_preamt_raw ] && git add data/solana_phase2_preamt_raw
+          [ -e data/solana_phase2_preamt_fetch_result.json ] && git add data/solana_phase2_preamt_fetch_result.json
+          [ -e data/solana_phase2_events_v3.json ] && git add data/solana_phase2_events_v3.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: выгрузка pre_amt по дням -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
