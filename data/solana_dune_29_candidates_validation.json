@@ -1,0 +1,326 @@
+{
+  "generated_at_utc": "2026-09-19T01:53:48Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771723}"
+      }
+    }
+  },
+  "n_known_events": 246,
+  "step1_signers": {
+    "name": "candidates29_signers",
+    "sql_preview": "SELECT id AS tx_id, signer, signers FROM solana.transactions WHERE block_time BETWEEN from_unixtime(1789166482) AND from_unixtime(1789771150) AND id IN ('5okBJqs9iM1ixWGoe5HyiChEsicPgAtAtGC672S8D6TxtZiCzUuQqyzDLznVfK1hmSEQSGg4k9JnUbWwniQD8tSx','UVCSTToAgxp9ETWB7bey44n8Crpw4gXua3STCV2Kthj8ZJNeRv72Lh7",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771724,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VNXAFNT9PR392B2MQHESDP",
+    "status_meta": {
+      "execution_id": "01M2VNXAFNT9PR392B2MQHESDP",
+      "query_id": 8771724,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:53:49.558194Z",
+      "expires_at": "2026-12-18T01:54:00.274622Z",
+      "execution_started_at": "2026-09-19T01:53:50.946579636Z",
+      "execution_ended_at": "2026-09-19T01:54:00.274586568Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "signer",
+          "signers"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "array(varchar)"
+        ],
+        "row_count": 239,
+        "result_set_bytes": 54207,
+        "total_row_count": 239,
+        "total_result_set_bytes": 54207,
+        "datapoint_count": 717,
+        "pending_time_millis": 1388,
+        "execution_time_millis": 9328
+      },
+      "execution_cost_credits": 8.568653847
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 239,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "signer",
+        "signers"
+      ],
+      "column_types": [
+        "varchar",
+        "varchar",
+        "array(varchar)"
+      ],
+      "row_count": 239,
+      "result_set_bytes": 54207,
+      "total_row_count": 239,
+      "total_result_set_bytes": 54207,
+      "datapoint_count": 717,
+      "pending_time_millis": 1388,
+      "execution_time_millis": 9328
+    }
+  },
+  "step1_coverage": 0.9715,
+  "step1_attribution_rate": 1.0,
+  "step2_dex_trades": {
+    "name": "candidates29_dex_trades",
+    "sql_preview": "SELECT tx_id, token_bought_mint_address AS bought_mint, token_sold_mint_address AS sold_mint, token_bought_amount AS bought_amount, token_sold_amount AS sold_amount FROM dex_solana.trades WHERE tx_id IN ('5okBJqs9iM1ixWGoe5HyiChEsicPgAtAtGC672S8D6TxtZiCzUuQqyzDLznVfK1hmSEQSGg4k9JnUbWwniQD8tSx','UVCS",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771725,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VNXS4NZCYFZ2VWT7YJBGWJ",
+    "status_meta": {
+      "execution_id": "01M2VNXS4NZCYFZ2VWT7YJBGWJ",
+      "query_id": 8771725,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:54:04.566522Z",
+      "expires_at": "2026-12-18T01:55:10.678716Z",
+      "execution_started_at": "2026-09-19T01:54:05.754762768Z",
+      "execution_ended_at": "2026-09-19T01:55:10.678691795Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "bought_mint",
+          "sold_mint",
+          "bought_amount",
+          "sold_amount"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "varchar",
+          "double",
+          "double"
+        ],
+        "row_count": 625,
+        "result_set_bytes": 118737,
+        "total_row_count": 625,
+        "total_result_set_bytes": 118737,
+        "datapoint_count": 3125,
+        "pending_time_millis": 1188,
+        "execution_time_millis": 64923
+      },
+      "execution_cost_credits": 121.848653847
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 625,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "bought_mint",
+        "sold_mint",
+        "bought_amount",
+        "sold_amount"
+      ],
+      "column_types": [
+        "varchar",
+        "varchar",
+        "varchar",
+        "double",
+        "double"
+      ],
+      "row_count": 625,
+      "result_set_bytes": 118737,
+      "total_row_count": 625,
+      "total_result_set_bytes": 118737,
+      "datapoint_count": 3125,
+      "pending_time_millis": 1188,
+      "execution_time_millis": 64923
+    }
+  },
+  "step2_size_ratio_summary": {
+    "n": 121,
+    "median": 0.7557579293569741,
+    "mean": 0.6505023765232487
+  },
+  "step3_per_wallet_compare": [
+    {
+      "address": "5FGoPPj1nL8LCnfVnpTmreqQtqLuMXXAwuS1uahMrp8V",
+      "n_events": 1,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.143,
+      "table_v2_per_day_ge_2": 0.143,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 0.143
+    },
+    {
+      "address": "J9WiAZKf8JnCkHFL8fLCCXdEgdoLjLRqU2EGsDjdqYga",
+      "n_events": 4,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.286,
+      "table_v2_per_day_ge_2": 0.571,
+      "dune_per_day_ge_4.3": 0.286,
+      "table_v2_per_day_ge_4.3": 0.571
+    },
+    {
+      "address": "2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8",
+      "n_events": 2,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.143,
+      "table_v2_per_day_ge_2": 0.286,
+      "dune_per_day_ge_4.3": 0.0,
+      "table_v2_per_day_ge_4.3": 0.286
+    },
+    {
+      "address": "8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq",
+      "n_events": 7,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.429,
+      "table_v2_per_day_ge_2": 1.0,
+      "dune_per_day_ge_4.3": 0.429,
+      "table_v2_per_day_ge_4.3": 1.0
+    },
+    {
+      "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+      "n_events": 72,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 4.429,
+      "table_v2_per_day_ge_2": 9.571,
+      "dune_per_day_ge_4.3": 4.0,
+      "table_v2_per_day_ge_4.3": 9.429
+    },
+    {
+      "address": "4ugDhHJ8XDXAeABmrNmGffFaLbJb9BkPyiFGVSV9ocwo",
+      "n_events": 8,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.429,
+      "table_v2_per_day_ge_2": 0.857,
+      "dune_per_day_ge_4.3": 0.429,
+      "table_v2_per_day_ge_4.3": 0.857
+    },
+    {
+      "address": "F5hkYsi8JxjyA2JHN5CA7MbnnhWubkXB2ZQB7Gkaxqs6",
+      "n_events": 3,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.143,
+      "table_v2_per_day_ge_2": 0.429,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 0.429
+    },
+    {
+      "address": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+      "n_events": 6,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.571,
+      "table_v2_per_day_ge_2": 0.857,
+      "dune_per_day_ge_4.3": 0.571,
+      "table_v2_per_day_ge_4.3": 0.857
+    },
+    {
+      "address": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
+      "n_events": 28,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 2.571,
+      "table_v2_per_day_ge_2": 4.0,
+      "dune_per_day_ge_4.3": 2.429,
+      "table_v2_per_day_ge_4.3": 3.857
+    },
+    {
+      "address": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+      "n_events": 8,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.429,
+      "table_v2_per_day_ge_2": 1.143,
+      "dune_per_day_ge_4.3": 0.429,
+      "table_v2_per_day_ge_4.3": 1.0
+    },
+    {
+      "address": "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18",
+      "n_events": 3,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.143,
+      "table_v2_per_day_ge_2": 0.429,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 0.429
+    },
+    {
+      "address": "5dB6rj9CoXMLQCAymoC5UXCb1LtFjbM5rbut3MNuj9Q",
+      "n_events": 3,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.286,
+      "table_v2_per_day_ge_2": 0.429,
+      "dune_per_day_ge_4.3": 0.286,
+      "table_v2_per_day_ge_4.3": 0.429
+    },
+    {
+      "address": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+      "n_events": 54,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 1.857,
+      "table_v2_per_day_ge_2": 7.571,
+      "dune_per_day_ge_4.3": 1.429,
+      "table_v2_per_day_ge_4.3": 7.143
+    },
+    {
+      "address": "7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H",
+      "n_events": 2,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.143,
+      "table_v2_per_day_ge_2": 0.286,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 0.286
+    },
+    {
+      "address": "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2",
+      "n_events": 33,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 3.286,
+      "table_v2_per_day_ge_2": 4.714,
+      "dune_per_day_ge_4.3": 3.143,
+      "table_v2_per_day_ge_4.3": 4.571
+    },
+    {
+      "address": "7iPPqPyrqcmfenRs4xZ72ab4pyuUofXB5YaQB83WJmT9",
+      "n_events": 3,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.286,
+      "table_v2_per_day_ge_2": 0.429,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 0.429
+    },
+    {
+      "address": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
+      "n_events": 9,
+      "days_covered": 7,
+      "dune_per_day_ge_2": 0.429,
+      "table_v2_per_day_ge_2": 1.143,
+      "dune_per_day_ge_4.3": 0.143,
+      "table_v2_per_day_ge_4.3": 1.0
+    }
+  ],
+  "step3_summary": {
+    "n_wallets": 17,
+    "mean_abs_diff_per_day_ge_4.3": 1.0839411764705882,
+    "max_abs_diff_per_day_ge_4.3": 5.7139999999999995
+  },
+  "REPRODUCES_TABLE_V2": false,
+  "FINAL_VERDICT": "НЕ ВОСПРОИЗВОДИТ table_v2 в пределах разумного допуска -- Dune для массового прогона НЕ используем, вердикт финальный. См. step1/2/3 для того, что именно разошлось (покрытие/размер/день-рейт)."
+}
