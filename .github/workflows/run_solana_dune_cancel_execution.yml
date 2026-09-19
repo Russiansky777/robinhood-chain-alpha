@@ -1,4 +1,4 @@
-name: "Solana buyer_200 -- Фаза 3 v3: цены по дням (после pre_amt фикса)"
+name: "Solana buyer_200 -- отмена активного исполнения Dune (правило отмены)"
 
 on:
   workflow_dispatch: {}
@@ -6,12 +6,12 @@ on:
     branches:
       - claude/nifty-sagan-r0polg
     paths:
-      - "data/p3_guard_cache/SOLANA_PHASE3_PRICES_V3_REQUEST"
+      - "data/p3_guard_cache/SOLANA_DUNE_CANCEL_EXECUTION_REQUEST"
 
 jobs:
-  phase3_prices_v3:
+  cancel_execution:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
@@ -25,19 +25,17 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
-      - name: "Фаза 3 v3: цены по дням"
+      - name: "Отмена активного исполнения Dune по последнему execution_id"
         env:
           DUNE_JANA_API: ${{ secrets.DUNE_JANA_API }}
-        run: python -u analysis/solana_phase3_prices_and_answers_v3.py
+        run: python -u analysis/solana_dune_cancel_execution.py
       - name: Commit results
         if: always()
         run: |
-          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE3_PRICES_V3_REQUEST
-          [ -d data/solana_phase3_raw_v3 ] && git add data/solana_phase3_raw_v3
-          [ -e data/solana_phase3_result_v3.json ] && git add data/solana_phase3_result_v3.json
-          [ -e data/p3_guard_cache/DUNE_LAST_EXECUTION.json ] && git add data/p3_guard_cache/DUNE_LAST_EXECUTION.json
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_CANCEL_EXECUTION_REQUEST
+          [ -e data/solana_dune_cancel_execution_result.json ] && git add data/solana_dune_cancel_execution_result.json
           git diff --cached --quiet && exit 0
-          git commit -m "Solana buyer_200: Фаза 3 v3 (цены по дням) -- результат [automated]"
+          git commit -m "Solana buyer_200: отмена активного исполнения Dune -- результат [automated]"
           for i in 1 2 3 4 5; do
             git push && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"

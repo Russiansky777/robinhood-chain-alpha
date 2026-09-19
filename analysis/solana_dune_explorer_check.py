@@ -49,6 +49,18 @@ CANDIDATE_ENV_KEYS = ["DUNE_JANA_API", "DUNE_EXPLORER_API", "DUNE_API_KEY", "DUN
 HEAVY_MIN_INTERVAL_S = 60.0 / 70.0 * 1.5
 READ_MIN_INTERVAL_S = 60.0 / 200.0 * 1.5
 
+# Владелец, 2026-09-19: правило отмены -- при остановке платного прогона
+# (напр. cancel_workflow_run в GitHub Actions) СНАЧАЛА отменять исполнение
+# на стороне Dune через API (POST /execution/{id}/cancel), а не только
+# останавливать раннер: раннер не успевает получить query_id/execution_id
+# конкретной попытки (см. инцидент с днём 09-18 -- execute() почти
+# наверняка уже ушёл к моменту отмены раннера, а execution_id нигде не
+# сохранился, отменить было нечем). run_sql_sync теперь пишет
+# query_id/execution_id СРАЗУ после успешного execute(), ДО начала опроса
+# статуса -- эта запись переживает "Commit results" (if: always()) даже
+# если раннер убит посреди опроса.
+LAST_EXECUTION_MARKER_PATH = REPO_ROOT / "data" / "p3_guard_cache" / "DUNE_LAST_EXECUTION.json"
+
 result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
@@ -111,6 +123,13 @@ class DuneProbe:
             return step
         exec_id = ex["body"]["execution_id"]
         step["execution_id"] = exec_id
+        try:
+            LAST_EXECUTION_MARKER_PATH.parent.mkdir(parents=True, exist_ok=True)
+            LAST_EXECUTION_MARKER_PATH.write_text(json.dumps(
+                {"name": name, "query_id": qid, "execution_id": exec_id,
+                 "submitted_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=2))
+        except OSError:
+            pass  # честная попытка -- если диск/права подвели, не роняем сам запрос из-за этого
         waited = 0
         while waited < timeout_s:
             st = self.status(exec_id)
