@@ -1,0 +1,38 @@
+{
+  "days_covered": [
+    "2026-09-12",
+    "2026-09-13",
+    "2026-09-14",
+    "2026-09-17",
+    "2026-09-18"
+  ],
+  "leader": {
+    "n_total": 250,
+    "pump_amm": {
+      "n": 0,
+      "n_no_trade_in_30s": 0,
+      "share_no_trade_in_30s": null
+    },
+    "non_pump_amm": {
+      "n": 250,
+      "n_no_trade_in_30s": 160,
+      "share_no_trade_in_30s": 0.64
+    },
+    "unresolved_tx_fetch_failed": 0
+  },
+  "candidates_29": {
+    "n_total": 156,
+    "pump_amm": {
+      "n": 69,
+      "n_no_trade_in_30s": 6,
+      "share_no_trade_in_30s": 0.087
+    },
+    "non_pump_amm": {
+      "n": 87,
+      "n_no_trade_in_30s": 36,
+      "share_no_trade_in_30s": 0.4138
+    },
+    "unresolved_tx_fetch_failed": 0
+  },
+  "note": "pump_amm/non_pump_amm определены прямым RPC getTransaction по каждому tx_id события (наличие pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA среди top-level+inner программ). no_trade_in_30s -- тот же прокси, что в solana_phase3_v4_size_cuts.py (price_before==price_plus30 или обе стороны отсутствуют), НЕ прямой подсчёт сделок."
+}
