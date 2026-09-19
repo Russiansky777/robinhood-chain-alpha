@@ -70,12 +70,12 @@ def extract_items(body):
     if isinstance(body, list):
         return body
     if isinstance(body, dict):
-        for k in ("data", "results", "trades", "items", "list"):
+        for k in ("res", "data", "results", "trades", "items", "list"):
             v = body.get(k)
             if isinstance(v, list):
                 return v
             if isinstance(v, dict):
-                for kk in ("data", "results", "trades", "items", "list"):
+                for kk in ("res", "data", "results", "trades", "items", "list"):
                     if isinstance(v.get(kk), list):
                         return v[kk]
     return []
@@ -88,9 +88,10 @@ def find_cursor(body):
         v = body.get(k)
         if v:
             return v
-        data = body.get("data")
-        if isinstance(data, dict) and data.get(k):
-            return data[k]
+        for container_key in ("res", "data"):
+            container = body.get(container_key)
+            if isinstance(container, dict) and container.get(k):
+                return container[k]
     return None
 
 
@@ -112,6 +113,7 @@ def main() -> None:
     out["page1_credit_related_headers"] = r1.get("credit_related_headers")
     body1 = r1.get("body")
     out["page1_body_sample"] = _scrub_all(json.dumps(body1, default=str)[:3000])
+    out["page1_body_full_item_count_raw"] = len(body1.get("res", [])) if isinstance(body1, dict) else None
     items1 = extract_items(body1)
     out["page1_n_items"] = len(items1)
     out["page1_item_keys_sample"] = list(items1[0].keys()) if items1 and isinstance(items1[0], dict) else None
@@ -133,6 +135,7 @@ def main() -> None:
         print(f"[dbot_probe] page2 (cursor): http={r2.get('http_status')} n_items={len(items2)}", flush=True)
     out["n_pages_fetched"] = n_pages
     out["n_items_total"] = len(all_items)
+    out["all_items_sample_first_20"] = all_items[:20]
 
     # ---------- Сверка с 8 известными покупками по txHash ----------
     by_hash = {}
