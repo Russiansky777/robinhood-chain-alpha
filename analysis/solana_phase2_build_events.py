@@ -65,6 +65,9 @@ LOOKBACK_DAYS = 7
 TOP200_LOOKBACK_DAYS = 3
 N_TOP_NEW_WALLETS = 200
 TOP200_QUERY_LIMIT = 260  # запас поверх 200 на пересечение с лидером/29 и на явный мусор
+MAX_TX_3D_CUTOFF = 100  # ~33 tx/день -- см. докстринг main(): предыдущий прогон без отсечки
+# дал 499 637 строк/410МБ, fetch упал по лимиту чтения; отсечка -- явная, разумная оговорка,
+# не найденная эмпирически (полное распределение нельзя посмотреть без нового платного запроса)
 
 
 def sql_lit_list(addrs: list[str]) -> str:
@@ -77,11 +80,15 @@ def load_29_candidates() -> list[str]:
 
 
 def build_top200_sql(lo: int, hi: int) -> str:
+    # HAVING count(*)<=MAX_TX_3D_CUTOFF -- отсечка ботов ВНУТРИ запроса, а не
+    # постфактум: LIMIT здесь сортирует по убыванию, и если отсекать уже
+    # ПОСЛЕ выборки топ-260 по сырому счётчику, весь топ-260 может целиком
+    # оказаться ботами -- значит фильтр обязан идти до ORDER BY/LIMIT.
     return (
         f"SELECT element_at(filter(signers, x -> x != '{FOMO_SPONSOR}'), 1) AS trader, "
         f"count(*) AS n_tx FROM {TX_TABLE} "
         f"WHERE signer = '{FOMO_SPONSOR}' AND block_time BETWEEN from_unixtime({lo}) AND from_unixtime({hi}) "
-        f"GROUP BY 1 ORDER BY n_tx DESC LIMIT {TOP200_QUERY_LIMIT}"
+        f"GROUP BY 1 HAVING count(*) <= {MAX_TX_3D_CUTOFF} ORDER BY n_tx DESC LIMIT {TOP200_QUERY_LIMIT}"
     )
 
 
@@ -260,16 +267,18 @@ def main() -> None:
     exclude = set(candidates_29) | {LEADER_WALLET, FOMO_SPONSOR}
 
     # --- шаг 1: топ-200 новых кошельков по числу tx за 3 суток ---
-    # Переиспользуем уже ОПЛАЧЕННЫЙ прошлый прогон (probe.results на его
-    # execution_id -- честно бесплатная повторная выдача кэша), а не
-    # платим по новой -- прошлый шаг1 уже завершился успешно (2.62
-    # кредита потрачено), упал только шаг2 (событийный запрос).
+    # Переиспользуем уже ОПЛАЧЕННЫЙ прошлый прогон, только если запрос
+    # НЕ менялся (query_variant совпадает) -- этот прогон добавил
+    # HAVING count(*)<=MAX_TX_3D_CUTOFF внутрь SQL (см. build_top200_sql),
+    # поэтому старый кэш (без HAVING, топ-260 по сырому счётчику --
+    # вероятно почти сплошь боты) непригоден и был бы тихой подменой.
+    QUERY_VARIANT = f"having_cutoff_{MAX_TX_3D_CUTOFF}"
     prior_exec_id = None
     if OUT_PATH.exists():
         try:
             prior = json.loads(OUT_PATH.read_text())
             prior_top = prior.get("top200_step") or {}
-            if prior_top.get("status") == "ok":
+            if prior_top.get("status") == "ok" and prior_top.get("query_variant") == QUERY_VARIANT:
                 prior_exec_id = prior_top.get("execution_id")
         except Exception:  # noqa: BLE001
             prior_exec_id = None
@@ -277,11 +286,12 @@ def main() -> None:
         rr = probe.results(prior_exec_id)
         rows_reused = (((rr.get("body") or {}).get("result") or {}).get("rows") or []) if rr["http_status"] == 200 else []
         r_top = {"status": "ok" if rr["http_status"] == 200 and rows_reused else "results_refetch_failed",
-                 "execution_id": prior_exec_id, "reused_from_prior_run": True,
+                 "execution_id": prior_exec_id, "reused_from_prior_run": True, "query_variant": QUERY_VARIANT,
                  "rows": rows_reused, "n_rows": len(rows_reused)}
     else:
         sql_top = build_top200_sql(top200_lo, window_hi)
         r_top = probe.run_sql_sync("phase2_top200_by_tx_count", sql_top, timeout_s=600)
+        r_top["query_variant"] = QUERY_VARIANT
     result["top200_step"] = {k: v for k, v in r_top.items() if k != "rows"}
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     print(f"[phase2] топ-200 запрос: status={r_top.get('status')} n_rows={r_top.get('n_rows')}", flush=True)
@@ -293,9 +303,28 @@ def main() -> None:
 
     top_rows = [row for row in r_top["rows"] if row.get("trader") and row["trader"] not in exclude]
     top_rows.sort(key=lambda r: -r["n_tx"])
-    new_200 = [row["trader"] for row in top_rows[:N_TOP_NEW_WALLETS]]
+    all_counts = sorted(r["n_tx"] for r in top_rows)
+    dist = {"n": len(all_counts),
+            "min": all_counts[0] if all_counts else None,
+            "p50": all_counts[len(all_counts) // 2] if all_counts else None,
+            "p90": all_counts[int(len(all_counts) * 0.9)] if all_counts else None,
+            "max": all_counts[-1] if all_counts else None}
+    result["top200_n_tx_3d_distribution_before_cutoff"] = dist
+    print(f"[phase2] распределение n_tx/3д (до отсечки ботов): {dist}", flush=True)
+
+    # ОГОВОРКА: предыдущий прогон дал 499 637 строк / 410МБ -> execute
+    # 155.6 кредита, fetch упал (превышен лимит на чтение). Это значит,
+    # что часть "топ по числу tx" -- явно не люди-покупатели (боты/маркет-
+    # мейкеры), а не 230 равномерно активных кошельков. Отсекаем верхний
+    # хвост: самый частый ИЗВЕСТНЫЙ реальный кандидат (frank,
+    # table_v2: 9.571 первых входов/день) даёт ориентир -- берём кошельки
+    # из разумного диапазона активности, не абсолютный максимум.
+    new_200 = [row["trader"] for row in top_rows if row["n_tx"] <= MAX_TX_3D_CUTOFF][:N_TOP_NEW_WALLETS]
+    result["max_tx_3d_cutoff_applied"] = MAX_TX_3D_CUTOFF
+    result["n_excluded_as_likely_bot"] = sum(1 for r in top_rows if r["n_tx"] > MAX_TX_3D_CUTOFF)
     result["n_new_wallets_selected"] = len(new_200)
-    print(f"[phase2] новых кошельков отобрано: {len(new_200)} (из {len(top_rows)} после исключения известных)", flush=True)
+    print(f"[phase2] новых кошельков отобрано: {len(new_200)} (из {len(top_rows)} после исключения известных, "
+          f"отсечка >{MAX_TX_3D_CUTOFF} tx/3д исключила {result['n_excluded_as_likely_bot']} вероятных ботов)", flush=True)
 
     full_wallets = [LEADER_WALLET] + candidates_29 + new_200
     result["n_wallets_total"] = len(full_wallets)
