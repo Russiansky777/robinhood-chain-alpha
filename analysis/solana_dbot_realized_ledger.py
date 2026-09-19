@@ -60,6 +60,13 @@ PILOT_WALLET = "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS"
 PILOT_TASK_ID = "mu746r8f05f9ic"
 GECKO_BASE = "https://api.geckoterminal.com/api/v2"
 TIP_LAMPORTS_MARKERS = (4_950_000, 9_950_000)
+# Владелец, 19.09 ~13:15 Европа/Мадрид (CEST=UTC+2) = 11:15 UTC: размеры
+# входа изменены -- пилот 0.5->0.75 SOL, батчи 0.1->0.3 SOL. Это ДРУГОЕ,
+# более раннее событие, чем смена Priority/Bribery Fee в тот же день
+# (14:05 Мадрид/12:05 UTC, см. solana_batch_fee_change_first_trade.py) --
+# не путать константы. Помечаем сделки по времени ПОКУПКИ, чтобы сравнить
+# наценку на входе и брутто до/после смены размера.
+SIZE_CHANGE_CUTOFF_UTC = 1789816500  # 2026-09-19T11:15:00Z
 
 
 def wallet_mint_deltas(tx: dict, wallet: str) -> dict:
@@ -396,6 +403,7 @@ def build_trade_row(label: str, wallet: str, task_id: str, source_info: dict | N
                                       if source_info and source_info.get("block_time") is not None else None,
         "buy_signature": b["signature"], "buy_block_time": b["block_time"], "tokens_bought": tokens_bought,
         "total_sol_out_buy": -b_delta if b_delta else None,
+        "size_change_group": "after" if b["block_time"] >= SIZE_CHANGE_CUTOFF_UTC else "before",
     }
     if label != "pilot" and source_info is None:
         row["source_wallet_attribution"] = "не найдено ни у одного из 10 отслеживаемых кошельков в окне 300с -- честно не гадаем"
@@ -703,12 +711,43 @@ def main() -> None:
         }
     result["summary_by_wallet"] = by_wallet_summary
 
+    # Владелец, дополнение (низкий приоритет, не прерывая другие задачи):
+    # с 19.09 ~13:15 Мадрид размеры входа изменены (пилот 0.5->0.75,
+    # батчи 0.1->0.3 SOL) -- разделяем закрытые сделки по времени покупки
+    # на группы before/after этой смены и сравниваем наценку на входе
+    # (markup_at_entry_pct) и брутто (gross_pct) отдельно для пилота и
+    # для батчей (все вместе -- у них одна и та же смена размера в одно
+    # и то же время; BATCH-4 стартовал уже ПОСЛЕ смены, поэтому у него
+    # только группа "after", это не искажает сравнение, а просто честно
+    # не даёт группы "before" для этого батча).
+    def group_stats(rows: list[dict]) -> dict:
+        gm = [t["markup_at_entry_pct"] for t in rows if "markup_at_entry_pct" in t]
+        gg = [t["gross_pct"] for t in rows if "gross_pct" in t]
+        return {"n_closed": len(rows), "n_markup": len(gm), "median_markup_pct": median(gm) if gm else None,
+                "n_gross": len(gg), "median_gross_pct": median(gg) if gg else None}
+
+    size_change_comparison = {"cutoff_utc": SIZE_CHANGE_CUTOFF_UTC,
+                               "cutoff_human": "2026-09-19T11:15:00Z = 13:15 Europe/Madrid (CEST)"}
+    pilot_closed = [t for t in closed if t.get("label") == "pilot"]
+    batch_closed = [t for t in closed if t.get("label", "").startswith("BATCH")]
+    for scope_name, scope_rows in (("pilot", pilot_closed), ("batches_all", batch_closed)):
+        before = [t for t in scope_rows if t.get("size_change_group") == "before"]
+        after = [t for t in scope_rows if t.get("size_change_group") == "after"]
+        size_change_comparison[scope_name] = {"before": group_stats(before), "after": group_stats(after)}
+    result["size_change_comparison"] = size_change_comparison
+
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     print(f"[ledger] завершено: {result['summary']}", flush=True)
     for label, s in by_wallet_summary.items():
         print(f"[ledger]   {label}: закрыто={s['n_trades_closed']} мед.брутто={s['median_gross_pct']} "
               f"мед.нетто={s['median_net_pct']} сумма_нетто_SOL={s['sum_net_sol']} "
               f"баланс-фандинг={s['balance_minus_funding_sol']}", flush=True)
+    for scope_name in ("pilot", "batches_all"):
+        sc = size_change_comparison[scope_name]
+        print(f"[ledger]   size_change/{scope_name}: before(n={sc['before']['n_closed']}, "
+              f"мед.наценка={sc['before']['median_markup_pct']}, мед.брутто={sc['before']['median_gross_pct']}) "
+              f"after(n={sc['after']['n_closed']}, мед.наценка={sc['after']['median_markup_pct']}, "
+              f"мед.брутто={sc['after']['median_gross_pct']})", flush=True)
 
 
 if __name__ == "__main__":
