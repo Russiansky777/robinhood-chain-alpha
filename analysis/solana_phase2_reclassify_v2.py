@@ -209,7 +209,15 @@ def main() -> None:
     print(f"[reclassify_v2] сырьё сохранено: {RAW_MULTIMINT_PATH} "
           f"({RAW_MULTIMINT_PATH.stat().st_size} байт, {len(rows)} строк)", flush=True)
 
-    # --- системное определение наградных минтов на многоминтовом датасете ---
+    # --- системное определение наградных/маршрутных минтов на многоминтовом датасете ---
+    # Два независимых сигнала (или): (a) >=MIN_WALLETS_COMPANION разных
+    # кошельков видят минт СОПУТСТВУЮЩЕ в многоминтовой tx; (b) минт НИ РАЗУ
+    # не встречается как САМОСТОЯТЕЛЬНАЯ (одноминтовая) покупка во всём
+    # датасете (data/solana_phase2_events.json, 18526 событий) -- находка
+    # при разборе: помимо явных наградных токенов (STONK/$UBI), то же самое
+    # делают токенизированные акции (Xs-префикс, xStocks/Backed Finance,
+    # подтверждено WebSearch -- напр. Tesla xStock) как побочный
+    # маршрутный хоп в некоторых свопах, не будучи целью покупки НИ РАЗУ.
     mint_wallets: dict[str, set] = defaultdict(set)
     row_candidates = []
     for row in rows:
@@ -217,13 +225,21 @@ def main() -> None:
         row_candidates.append(cands)
         for mint, _, _ in cands:
             mint_wallets[mint].add(row["trader"])
-    reward_mints = {m for m, wset in mint_wallets.items() if len(wset) >= MIN_WALLETS_COMPANION}
+    solo_mint_counts = Counter()
+    for wallet, evs in old["events_by_wallet"].items():
+        for e in evs:
+            solo_mint_counts[e["mint"]] += 1
+    reward_mints_companion = {m for m, wset in mint_wallets.items() if len(wset) >= MIN_WALLETS_COMPANION}
+    reward_mints_never_solo = {m for m in mint_wallets if solo_mint_counts.get(m, 0) == 0}
+    reward_mints = reward_mints_companion | reward_mints_never_solo
+    result["n_reward_mints_companion_signal"] = len(reward_mints_companion)
+    result["n_reward_mints_never_solo_signal"] = len(reward_mints_never_solo)
     result["n_reward_mints_detected"] = len(reward_mints)
     result["reward_mints_sample"] = sorted(
-        [{"mint": m, "n_distinct_wallets": len(mint_wallets[m])} for m in reward_mints],
-        key=lambda x: -x["n_distinct_wallets"])[:30]
-    print(f"[reclassify_v2] наградных минтов обнаружено (>= {MIN_WALLETS_COMPANION} разных кошельков "
-          f"в многоминтовых tx): {len(reward_mints)}", flush=True)
+        [{"mint": m, "n_distinct_wallets": len(mint_wallets[m]), "n_solo_elsewhere": solo_mint_counts.get(m, 0)}
+         for m in reward_mints], key=lambda x: -x["n_distinct_wallets"])[:40]
+    print(f"[reclassify_v2] наградных/маршрутных минтов: companion-сигнал={len(reward_mints_companion)}, "
+          f"никогда-не-соло-сигнал={len(reward_mints_never_solo)}, объединение={len(reward_mints)}", flush=True)
 
     # --- спасаем настоящие покупки из многоминтовых tx ---
     rescued_by_wallet: dict[str, list] = defaultdict(list)
