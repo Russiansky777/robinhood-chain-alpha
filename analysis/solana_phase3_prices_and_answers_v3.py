@@ -53,6 +53,13 @@ CHUNK_SIZE = 700  # под-батч ВНУТРИ дня, чтобы не упе�
 MAX_TOTAL_COST_CREDITS = 150.0
 MAX_DAYS_PER_RUN = 1  # владелец: сначала ОДИН день (проверить, что цена не подскочила от объёма
 # соединения на полной выборке), потом остальные дни по 2 за прогон -- поднять до 2 после проверки дня 1
+# Владелец: общий бюджет 1200 на ключе DUNE_JANA_API, резерв 280 не трогаем.
+# GLOBAL_PRIOR_SPEND_OTHER_STEPS -- всё, что потрачено НЕ в этом скрипте
+# (проверка ключа 0.055 + целевая выгрузка многоминтовых tx 97.479 +
+# pre_amt 14.79+28.311 + отброшенный тест Фазы 3 v2 фикс.батчами 83.079 +
+# отброшенный тест Фазы 3 v3 на сокращённой выборке 64.8025).
+GLOBAL_PRIOR_SPEND_OTHER_STEPS = 0.055 + 97.479 + 14.79 + 28.311 + 83.079 + 64.8025
+GLOBAL_BUDGET_CAP = 1200.0
 FATAL_ERROR_MARKERS = ("RESOURCES_CAP_REACHED", "exceed your configured", "datapoint limit")
 ROUND_TRIP_COST_FRAC = 0.06
 SIZE_BUCKETS = [("2-4.3", 2, 4.3), ("4.3-8", 4.3, 8), ("8-15", 8, 15), ("15+", 15, float("inf"))]
@@ -283,9 +290,23 @@ def main() -> None:
     for m in (prev_result.get("days_processed") or []):
         if m.get("status") == "ok":
             prior_cost_total += m.get("cost_credits", 0) or 0
-    days_todo = [day for day in days if day not in already_ok_days][:MAX_DAYS_PER_RUN]
+    remaining_days = [day for day in days if day not in already_ok_days]
+    # Владелец: от дешёвых к дорогим -- 09-19 (неполный день, ожидаемо
+    # дешевле всех) первым, 09-18 (самый крупный день) последним.
+    day_priority = {"2026-09-19": 0, "2026-09-16": 1, "2026-09-17": 2, "2026-09-18": 3}
+    remaining_days.sort(key=lambda dday: day_priority.get(dday, 99))
+    days_todo = remaining_days[:MAX_DAYS_PER_RUN]
     print(f"[phase3v3] дней всего={len(days)}, уже готово={len(already_ok_days)}, "
-          f"в этом прогоне обработаю: {days_todo}", flush=True)
+          f"порядок оставшихся: {remaining_days}, в этом прогоне обработаю: {days_todo}", flush=True)
+
+    if GLOBAL_PRIOR_SPEND_OTHER_STEPS + prior_cost_total >= GLOBAL_BUDGET_CAP:
+        result_stop = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "FINAL_ANSWER": (f"ОСТАНОВЛЕНО -- общий бюджет ключа исчерпан "
+                                          f"({GLOBAL_PRIOR_SPEND_OTHER_STEPS + prior_cost_total:.2f}/{GLOBAL_BUDGET_CAP})."),
+                        "days_already_done": sorted(already_ok_days)}
+        OUT_PATH.write_text(json.dumps(result_stop, ensure_ascii=False, indent=2, default=str))
+        print("[phase3v3] " + result_stop["FINAL_ANSWER"], flush=True)
+        return
 
     discovery = step0_discover_keys()
     key_name = pick_working_key(discovery)
@@ -327,8 +348,7 @@ def main() -> None:
         result["days_processed"] = day_meta
         result["total_cost_credits_so_far"] = running_cost
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-        print(f"[phase3v3] день {day} итог: {day_cost:.2f} кредита (ожидалось ~65-80 по замеру дня 09-12)",
-              flush=True)
+        print(f"[phase3v3] день {day} итог: {day_cost:.2f} кредита", flush=True)
 
         if day_status != "ok":
             err_text = json.dumps(day_meta[-1], default=str)
@@ -349,24 +369,31 @@ def main() -> None:
         if running_cost - prior_cost_total > MAX_TOTAL_COST_CREDITS:
             result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО в этом прогоне -- потолок {MAX_TOTAL_COST_CREDITS} кредитов "
                                        f"на прогон превышен (потрачено в прогоне {running_cost - prior_cost_total:.2f}).")
-            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-            print("[phase3v3] " + result["FINAL_ANSWER"], flush=True)
-            return
+            break
+        if GLOBAL_PRIOR_SPEND_OTHER_STEPS + running_cost >= GLOBAL_BUDGET_CAP:
+            result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО -- общий бюджет ключа исчерпан "
+                                       f"({GLOBAL_PRIOR_SPEND_OTHER_STEPS + running_cost:.2f}/{GLOBAL_BUDGET_CAP}, "
+                                       f"резерв 280 не трогаем).")
+            break
 
     result["total_cost_credits"] = running_cost
+    result["global_spend_on_key_estimate"] = GLOBAL_PRIOR_SPEND_OTHER_STEPS + running_cost
     done_days = {m["day"] for m in day_meta if m["status"] == "ok"}
-    if done_days >= set(days):
-        result["answers"] = build_answer_tables(sample, prices_by_event, d["wallet_roles"])
-        result["ALL_DAYS_DONE"] = True
+    remaining = [day for day in days if day not in done_days]
+    result["ALL_DAYS_DONE"] = not remaining
+    result["days_covered"] = sorted(done_days)
+    result["days_not_covered"] = remaining
+    # Три таблицы -- ВСЕГДА на том, что уже проценено (частично или полностью),
+    # с честной пометкой покрытия по дням (владелец: "непокрытые дни честно пометь").
+    result["answers"] = build_answer_tables(sample, prices_by_event, d["wallet_roles"])
+    if not remaining:
         print(f"[phase3v3] ВСЕ ДНИ ЗАВЕРШЕНЫ: {len(prices_by_event)}/{len(sample)} событий получили цены, "
               f"стоимость всего={running_cost:.2f} кредитов", flush=True)
     else:
-        remaining = [day for day in days if day not in done_days]
-        result["ALL_DAYS_DONE"] = False
-        result["days_remaining"] = remaining
-        print(f"[phase3v3] прогон завершён, но остались дни: {remaining} -- "
-              f"перезапустите скрипт (продолжит с них), стоимость этого прогона={running_cost - prior_cost_total:.2f}, "
-              f"всего накоплено={running_cost:.2f}", flush=True)
+        print(f"[phase3v3] прогон завершён, ЧАСТИЧНОЕ покрытие -- дни в таблицах: {sorted(done_days)}, "
+              f"не покрыты: {remaining}, стоимость этого прогона={running_cost - prior_cost_total:.2f}, "
+              f"всего накоплено={running_cost:.2f} (+{GLOBAL_PRIOR_SPEND_OTHER_STEPS:.2f} на др. шагах = "
+              f"{GLOBAL_PRIOR_SPEND_OTHER_STEPS + running_cost:.2f}/{GLOBAL_BUDGET_CAP})", flush=True)
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
 
