@@ -1,0 +1,321 @@
+{
+  "generated_at_utc": "2026-09-19T01:53:46Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771721}"
+      }
+    }
+  },
+  "fixes": "см. docstring -- шаг3 пер-событийное окно, шаг4 фильтр по signers вместо partition by signer",
+  "step3_price_at_30s": {
+    "name": "price_at_30s_v5_fixed",
+    "sql_preview": "WITH events(mint, lo, hi) AS (VALUES ('BXrbjRfUH35Y9fDxmHw9GambqVHZ6McmgfRXGqkzUjQr', 1789671987, 1789672021),('DDndHihssMMJnd3je9Fxukq4M9PdxwQ2XqF8cZgkZu1s', 1789671942, 1789671976),('7hGgx1VtNTj193fFXXuMEkp1MRV6JbWYgMBhHRYxaxu2', 1789668710, 1789668744),('8jZTEysTtA2f57evMwWyrWXQAnSksGRtCYp6vQUw7L",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771722,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VNX98CTG3FVHTRFYY56MRG",
+    "status_meta": {
+      "execution_id": "01M2VNX98CTG3FVHTRFYY56MRG",
+      "query_id": 8771722,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:53:48.301405Z",
+      "expires_at": "2026-12-18T01:54:00.897796Z",
+      "execution_started_at": "2026-09-19T01:53:48.591113891Z",
+      "execution_ended_at": "2026-09-19T01:54:00.897788872Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "block_time",
+          "bought_mint",
+          "sold_mint",
+          "bought_amount",
+          "sold_amount",
+          "event_mint",
+          "lo",
+          "hi"
+        ],
+        "column_types": [
+          "varchar",
+          "timestamp(3) with time zone",
+          "varchar",
+          "varchar",
+          "double",
+          "double",
+          "varchar(44)",
+          "integer",
+          "integer"
+        ],
+        "row_count": 17671,
+        "result_set_bytes": 4434455,
+        "total_row_count": 17671,
+        "total_result_set_bytes": 4434455,
+        "datapoint_count": 159039,
+        "pending_time_millis": 289,
+        "execution_time_millis": 12306
+      },
+      "execution_cost_credits": 13.69173077
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 17671,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "block_time",
+        "bought_mint",
+        "sold_mint",
+        "bought_amount",
+        "sold_amount",
+        "event_mint",
+        "lo",
+        "hi"
+      ],
+      "column_types": [
+        "varchar",
+        "timestamp(3) with time zone",
+        "varchar",
+        "varchar",
+        "double",
+        "double",
+        "varchar(44)",
+        "integer",
+        "integer"
+      ],
+      "row_count": 17671,
+      "result_set_bytes": 4434455,
+      "total_row_count": 17671,
+      "total_result_set_bytes": 4434455,
+      "datapoint_count": 159039,
+      "pending_time_millis": 289,
+      "execution_time_millis": 12306
+    }
+  },
+  "step3_per_trade": [
+    {
+      "signature": "JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZahtGxCmpqakSvbBqJ1SnSf8oWm",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "4DpW5GZo5nAH89x1NQRZrXA2YnbYC4h2zeKixaAJEor75sTczmv1RQbAFgfS9GDQRsqiZ2QwBznx1Emh5ENJ8Pwi",
+      "status": "ok",
+      "our_price_sol_per_token_at_30s": 9.946365899449968e-07,
+      "dune_price_sol_per_token_at_30s": 1.146985590939825e-06,
+      "ratio_dune_over_ours": 1.1531705172873774
+    },
+    {
+      "signature": "fxscHbqstB39REnbpxb5zGGjGcsRFefbKrNKDNZsYNAgJTjph8eZ2Ckti3dJPsmx8dAq2NiHSGRJ4SuRaTSkGAa",
+      "status": "ok",
+      "our_price_sol_per_token_at_30s": 7.637544129527455e-06,
+      "dune_price_sol_per_token_at_30s": 7.848445109240181e-06,
+      "ratio_dune_over_ours": 1.0276137166785544
+    },
+    {
+      "signature": "4B6YmfoUXxgbY2vt1qjJMkE7xv8qfMD6GsFBhc369BKh4W3jPDG74zf7SNKVvEwwqyCbTntGQbqi5UB6Uy7pk11a",
+      "status": "ok",
+      "our_price_sol_per_token_at_30s": 2.2071346670900215e-06,
+      "dune_price_sol_per_token_at_30s": 2.2820503049542905e-06,
+      "ratio_dune_over_ours": 1.0339424861479072
+    },
+    {
+      "signature": "2envX63KocGpM3HBcLHSmNbn1oB4jkzJnxr1JGRF75zVFNt3uvBFsoKFygHRcrhkRh2mLb8wbArVVdmjv9onXLMG",
+      "status": "ok",
+      "our_price_sol_per_token_at_30s": 9.3126761534851e-06,
+      "dune_price_sol_per_token_at_30s": 9.552800121899342e-06,
+      "ratio_dune_over_ours": 1.025784636387724
+    },
+    {
+      "signature": "2tLjZxt5ZQKbSm9jx95LWMLDfQKig4kUqM6QoBVFFQstBhWBXzjKPLJCDZcWTpixGNPqWYRMrqmcF1GPCNiuSyjM",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "5VrzD6orY4zLLTsdT9hDKQuFVvVXLcKRPjGFo88U2cDMwDVtSVq7UP9vvSU6oPkBPz9shU9ts44NDAeaTcS72mJR",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "5WaybDFctdvtUZAuhGgCp83hCvGhMuf76j5cAsnuxYeC5tdusto9tfgj5zYD9X8i6qEgxs6KqnwGAPBW7n4vmXoP",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3gWeuYGR6ck1pbt6p6mWhSeF7obApZGAtfsxyeKuMuPY6RHndmgwqmXMJiaYESbB4VbBqCpLAo5wyAGfQCW6F7df",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2hrnu91GH42UkGyoZqdqh3E6QUq2zQbDkxbGuh22zcg93862cL24cbST4HB15igFNxNtBv3dNrw4SdE4BwNauW1f",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "HKmLbXVMFwkDbi6haKq3wpw6t43dqE6NqGpMYDCi2KjiAAzZpCFe8NWkVJeMkJ3ZXxDdZEZbdFL68voCoftCEGe",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "4JfcMioEjwsfR8QfAdTPXSt1crn89h8fJb2effrXEB29UhVSz7oT1iefGW3DNmgjoZLvPobDDtHtMk7y4Ge1L2eo",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2HbuUkqvfVvswTYckU6HyMi1cGvyjkEjwQkUzmpXvZFT2rpJY49zpihd3rkH7hQX4cYW1vShWkRRF89GqyZRYJL5",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2vF5jifs7HpmnpaUs5ZVCtm6SnBpaJAtyHw9uLp9ioZpNz3RvMcmqfnrPdFP3sfL9qLfAuB7n2kzaopFqdPaMSet",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "s23mozQmGQB6tvAkQahhEWTPzxRjjNQFiovSp5Qa7ezs5U2aSgNPS7MZ4ewpzRsQDqF5DNGio3NFZ9nxg8f5qWV",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "645BBDd3o6oo595fGaReFNzcodjAu6Bg4b1BhvJcX3qATEV2ouvsmvr5RXUpAqTSTpoWkWHfC1RZtxM2b9h9GY97",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "64RR43RRSzPXLQmPbjMNP9h8HhXkeEcPRvV5SYy9VxMUacpDzbeFzi83tYi1MS7iQURHSB7F54QPjaxJWn7MPcT7",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "5YnjbbAc9d4it12dBcM7MhXyWf7qyYsMVLcekEFpxhSw2WRjitLq5fgHpQEqj2apV2mJtucfMGYwLJUx6Uq3MaSz",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2c7gu5qx1WXcccZumRtNTxeLgCVa7Hoa2o7x5gDWw9b4srYfzJib4HAvdkcAGz97b3KuUFargqSHMRtYXfhZCPWk",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "4vDJHzjiv5d4f5LbSvxoX3ZedCtvWfv3AacsisdZn9cjHyGRyQXCkhkKvUSXjK3KdRZiX73wtw7nXV7X3Y2zHyMq",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "4igVKnxJruDTaCz46AAYAGWYMpDPduJxHWtzNT4NCxK7GJrMoEfyvFHeSq8pvz4rZBAd2MMXnK3A8ZpCMkSZbMRN",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2gdgnsNpGDPbAfpvcBPK4x76s148Ahc4wXrubtRor2BwpAv6ngebFnVaEQ2AUCqYkAkbuSiUeLpg9Ujey3snLAre",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "5pt5f2hoP9WmXxGSg44xEzRAReMq1gw5B46DVgkKsV5VKCELCtgm8UiqaqyKzjVB4WFvVm2uhSND6tFLhRjvkDvE",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3D1x3beSDgty9XXzoUrVsDtwdZYksZsxt57cDtm5asP5VXs7ZhySWHaowwd9FJAC1Bg6ikhXi4Hzp9qJ897YexiG",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "jgBQTAy6HGnRTYZcXBDWF1w1y4EGczs6F45eFqCuThMCpzdQAwbvUGDfoXVH48fSxWPWVWp3dExQr9YaRjhuUNL",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "48kUZiPq1PsmgRuGK32HAJzrGSECDDubQ3TbEX9WYioTg15XSAoo3vt6isAhjsX343oy5MuRmoFZniczrcJ4SSef",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "pE3wyEm1KdJrgmS8mAxYR28E1ezuuo6y3opTQDLXYEcsh3u66AzVAyNyw4MgfNKU4Y4jrthNMQ2cYSTw5VqoGw1",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "ZWf3Y54Fquf23DiSepTzfqddu2aRSunULUWevVCdUbTA1G5NekMF8K8DbAaRYk6ycztZpKf2NZ3dJwzmeqT238i",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3auDjW3agmChKoJ42SmCY2KGQ3c8L9zfFwWmkySrTs2vmzdP4hqqy4JoKPi1bSiEZmSM482RtAgJEqmXezWerFn2",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "28a1gr1KDZxaJPQLfi3Q65jH5TJShkX2XpCikRNbSc3wMKU32nUdjhs4ag6ujJbAwA9uoypEamGANLhRrdK67GT4",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3JpPuhbY36rqE2imj1pxpoezQRrYkDcptPDzjTdEGRr7ZjQ8QRquKjmGGTpbg8iDp27NpBMaJkbEYAWteshtUoAR",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2btqjyA94FEHfUpwqnve3WKfZJphTmCsP2gStLQg4kdEiGxBgJaq4RZ44fuj6xm7cmMJa97CyQp8HiuffiuhY52X",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "4wMgwcUWLM8BeuCD5NtF1fTx58f7F5gNPdPaje7N39nwMEGM8RB3G3hV8DezinJGXqx31V8jb4z2bhPQ1jmYrsLQ",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3x54nP9my3HdJPz1t5KZbDvA1c7wK88hw86Ae6KQWiB65dX8qzgaEg6Uf5qSra4i6ykkCqiQKP8EgRkZfdypmJNN",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "5JG2mdVCedir7okQ3szvv2wNfWBbjn3pTjgwhc9NphVdMJzNy25tFDy213Xo3jV1p8GQ3VKU8jEBLxjqieckFQhy",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "4HAuup7pRYdAehUrh4RuJ3ZXtfihxUiyrNjp2RASGX26diDgTLGFnjKq9HGgLsDZ6LNeFRS3JLRtBhZUqpdjccyQ",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3VenqqQk2vbezhoQEybCsoLCsWboXgXn85HPdj9Rj2eRape2ak1PrMiPkZ25BZzxJ5bxRJ1izda9YRughgKGuost",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "5cumAgXdsqRLqck63mZ2aRKn57smjfg38azygwn4myK1BK7Z6iVBXrKY1BwRA6ynBv3UebcWvUJhSYA5UUYj1Yii",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "2Va34xitgVP48XRWRGKu8S7SyipdpA4X65rWBvPkjUtAd2ycBrfMEr9jaLxTggh5EGgEP3qSqDYzPwgzGHhdLEGN",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "45RrU6o1wuAGJ8QpnETjQB2bST5agkz6KtfyC8yuNjQpQaZbbt6HpfzuWmVpvhxQVFwvjfHv3AoKKVHZpBTY5pMJ",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "3FEA8YSeY5pDMRAtG1LQaSDLYUZ7nik6ZfQHjs3oyAYfV5j9QPuTx7zZvyZaWj281ccTFEJapWqDRNc18CKsYGsa",
+      "status": "no_our_price"
+    },
+    {
+      "signature": "4cqvzxDfPtoYMMBySK8CkJLPvZa4SswbqNFd17KHDQ7fnPUD5KfysJqqu3SGP1Y5ZJMtk76yGvFGaBdQ6MC2ykHk",
+      "status": "no_comparable_dune_row_or_our_price"
+    },
+    {
+      "signature": "61HnZs9Qdcgr5San5MYXcBe26bPDG8xdnKVkuLajeZuNP8Eacgyk2ctGqmJ8vojthK59ea1bHwpevp4zjsoQbU6U",
+      "status": "no_comparable_dune_row_or_our_price"
+    }
+  ],
+  "step3_summary": {
+    "n": 4,
+    "median_ratio_dune_over_ours": 1.030778101413231
+  },
+  "step4_first_entry_classification": {
+    "name": "dune_first_entry_v5_fixed",
+    "sql_preview": "WITH ranked AS (SELECT dt.tx_id, dt.token_bought_mint_address AS mint, dt.block_time, row_number() OVER (PARTITION BY dt.token_bought_mint_address ORDER BY dt.block_time) AS rn FROM dex_solana.trades dt JOIN solana.transactions tt ON dt.tx_id = tt.id WHERE tt.block_slot BETWEEN 446296620 AND 4478715",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771726,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VNXXHZSQT993NWAB3TW2E3",
+    "status": "timeout"
+  },
+  "cost_this_run": {
+    "credits_by_step": [
+      {
+        "step": "step3_price_at_30s",
+        "credits": 13.69173077
+      }
+    ],
+    "total": 13.69173077
+  }
+}
