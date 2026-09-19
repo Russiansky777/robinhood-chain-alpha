@@ -107,6 +107,21 @@ def drawdown_at(sig: str, sec: int, base: float, short: dict, long_: dict) -> tu
     return float(e["min_low_usd_from_entry"]) / base - 1, "continuous_candle_low"
 
 
+def trimmed_mean(vals: list[float], trim_frac: float = 0.05) -> float | None:
+    """Среднее с отсечением trim_frac с КАЖДОЙ стороны -- владелец,
+    2026-09-19: рядом со средним, чтобы медиана и усечённое среднее
+    вместе честно показывали, не тащат ли результат единичные иксы
+    (аномальные средние на длинных горизонтах, см.
+    long_horizons_reliability_warning)."""
+    if not vals:
+        return None
+    s = sorted(vals)
+    n = len(s)
+    k = int(n * trim_frac)
+    core = s[k: n - k] if n - 2 * k > 0 else s
+    return sum(core) / len(core)
+
+
 def pct(vals: list[float], p: float) -> float | None:
     if not vals:
         return None
@@ -141,7 +156,7 @@ def main() -> None:
     import time
     out["generated_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    print(f"{'горизонт':>8} {'группа':>12} {'n':>5} {'медиана%':>10} {'среднее%':>10} "
+    print(f"{'горизонт':>8} {'группа':>12} {'n':>5} {'медиана%':>10} {'среднее%':>10} {'усеч.среднее%':>13} "
           f"{'доля<0':>8} {'мед.просадка%':>14} {'метод просадки':>22}")
     print("-" * 95)
 
@@ -168,6 +183,7 @@ def main() -> None:
                 "n": n,
                 "median_pct": round(median(moves) * 100, 3) if moves else None,
                 "mean_pct": round(mean(moves) * 100, 3) if moves else None,
+                "trimmed_mean_pct_5pct_each_side": round(trimmed_mean(moves) * 100, 3) if moves else None,
                 "share_negative": round(sum(1 for m in moves if m < 0) / n, 3) if n else None,
                 "median_max_drawdown_pct": round(median(drawdowns) * 100, 3) if drawdowns else None,
                 "drawdown_method": dd_method,
@@ -178,6 +194,7 @@ def main() -> None:
             print(f"{LABELS[sec]:>8} {group_name:>12} {n:>5} "
                   f"{('%.2f' % row_out['median_pct']) if row_out['median_pct'] is not None else '--':>10} "
                   f"{('%.2f' % row_out['mean_pct']) if row_out['mean_pct'] is not None else '--':>10} "
+                  f"{('%.2f' % row_out['trimmed_mean_pct_5pct_each_side']) if row_out['trimmed_mean_pct_5pct_each_side'] is not None else '--':>12} "
                   f"{('%.2f' % (row_out['share_negative']*100)) if row_out['share_negative'] is not None else '--':>7}% "
                   f"{('%.2f' % row_out['median_max_drawdown_pct']) if row_out['median_max_drawdown_pct'] is not None else '--':>13} "
                   f"{dd_method:>22}")
