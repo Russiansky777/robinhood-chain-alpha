@@ -416,17 +416,30 @@ def main() -> None:
 
     day_meta = [m for m in (prev_result.get("days_processed") or []) if m["day"] in already_ok_days]
     running_cost = prior_cost_total
+    running_datapoints = sum(m.get("datapoints", 0) or 0 for m in day_meta)
     for day in days_todo:
         day_events = by_day[day]
         chunks = [day_events[j:j + CHUNK_SIZE] for j in range(0, len(day_events), CHUNK_SIZE)]
-        day_cost, day_rows_all, failed_chunks, hit_fatal_block = 0.0, [], [], False
+        day_cost, day_datapoints, day_rows_all, failed_chunks, hit_fatal_block = 0.0, 0, [], [], False
         for ci, chunk in enumerate(chunks):
             sql = build_price_sql(chunk)
             r = probe.run_sql_sync(f"phase3v4_{day}_c{ci}", sql, timeout_s=600)
             meta = {k: v for k, v in r.items() if k != "rows"}
-            cost = (meta.get("status_meta") or {}).get("execution_cost_credits", 0) or 0
+            status_meta = meta.get("status_meta") or {}
+            cost = status_meta.get("execution_cost_credits", 0) or 0
+            # Владелец: два СЕПАРАТНЫХ счётчика Dune -- кредиты исполнения
+            # (execution_cost_credits) и датапоинты выгрузки результата
+            # (result_metadata.datapoint_count, есть только при успешном
+            # выполнении -- при падении результат не скачивается, датапоинтов
+            # 0 за эту попытку; сам предел datapoint limit нашёл нас именно
+            # на execute(), ДО скачивания -- см. FATAL_ERROR_MARKERS ниже).
+            # Оба сверяются с кабинетом владельца, не считаются авторитетными
+            # сами по себе (см. отчёт про завышение execution_cost_credits ~3.3x).
+            datapoints = (status_meta.get("result_metadata") or {}).get("datapoint_count", 0) or 0
             day_cost += cost
             running_cost += cost
+            day_datapoints += datapoints
+            running_datapoints += datapoints
             if r.get("status") != "ok":
                 # Владелец, найдено на дне 09-15: одна чанка может упасть
                 # (напр. FAILED_TYPE_RESOURCES_CAP_REACHED из-за одного
@@ -439,10 +452,11 @@ def main() -> None:
                 err_text = json.dumps({k: meta.get(k) for k in ("status_meta", "execute_body", "create_body")}, default=str)
                 is_fatal = any(m in err_text for m in FATAL_ERROR_MARKERS)
                 failed_chunks.append({"chunk_index": ci, "n_events": len(chunk), "status": r.get("status"),
-                                       "cost_credits": cost, "is_fatal_external_block": is_fatal,
+                                       "cost_credits": cost, "datapoints": datapoints, "is_fatal_external_block": is_fatal,
                                        "meta": meta})
                 print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status={r.get('status')} "
-                      f"is_fatal={is_fatal} -- тело: {json.dumps(meta, default=str)[:800]}", flush=True)
+                      f"is_fatal={is_fatal} cost={cost} datapoints={datapoints} (упавшие запросы тоже считаем!) -- "
+                      f"тело: {json.dumps(meta, default=str)[:800]}", flush=True)
                 if is_fatal:
                     # Внешний жёсткий блок аккаунта Dune (напр. datapoint
                     # limit per billing cycle) -- следующие чанки/дни
@@ -452,14 +466,21 @@ def main() -> None:
                 continue  # нефатальная ошибка конкретной чанки -- пробуем остальные чанки этого дня
             day_rows_all.extend(r["rows"])
             print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status=ok n_rows={r.get('n_rows')} "
-                  f"cost={cost} running_total={running_cost:.2f}", flush=True)
+                  f"cost={cost} datapoints={datapoints} running_cost={running_cost:.2f} "
+                  f"running_datapoints={running_datapoints}", flush=True)
 
         day_status = "ok" if not failed_chunks else "partial_chunks_failed"
         day_meta.append({"day": day, "n_events": len(day_events), "n_chunks": len(chunks),
                           "n_chunks_failed": len(failed_chunks), "failed_chunks": failed_chunks,
-                          "status": day_status, "n_rows": len(day_rows_all), "cost_credits": day_cost})
+                          "status": day_status, "n_rows": len(day_rows_all),
+                          "cost_credits": day_cost, "datapoints": day_datapoints})
         result["days_processed"] = day_meta
         result["total_cost_credits_so_far"] = running_cost
+        result["total_datapoints_so_far"] = running_datapoints
+        result["HONEST_NOTE_ACCOUNTING"] = ("Два раздельных счётчика Dune (кредиты исполнения и датапоинты выгрузки) -- "
+                                             "оба сверяй с кабинетом на dune.com, ни один не авторитетен сам по себе "
+                                             "(execution_cost_credits завышал ~3.3x в прошлых прогонах, причина не установлена). "
+                                             "Упавшие запросы тоже включены в суммы, где Dune их фактически посчитал.")
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         print(f"[phase3v4] день {day} итог: {day_cost:.2f} кредита, "
               f"чанков упало={len(failed_chunks)}/{len(chunks)}", flush=True)
