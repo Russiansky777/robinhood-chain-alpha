@@ -419,7 +419,7 @@ def main() -> None:
     for day in days_todo:
         day_events = by_day[day]
         chunks = [day_events[j:j + CHUNK_SIZE] for j in range(0, len(day_events), CHUNK_SIZE)]
-        day_cost, day_rows_all, failed_chunks = 0.0, [], []
+        day_cost, day_rows_all, failed_chunks, hit_fatal_block = 0.0, [], [], False
         for ci, chunk in enumerate(chunks):
             sql = build_price_sql(chunk)
             r = probe.run_sql_sync(f"phase3v4_{day}_c{ci}", sql, timeout_s=600)
@@ -432,20 +432,24 @@ def main() -> None:
                 # (напр. FAILED_TYPE_RESOURCES_CAP_REACHED из-за одного
                 # тяжёлого минта в этой чанке), не бросаем весь день --
                 # остальные чанки могут пройти нормально, их данные не
-                # выбрасываем. Событий из упавшей чанки честно нет в
-                # результате -- см. failed_chunks.
-                err = (meta.get("status_meta") or {}).get("error")
+                # выбрасываем. Текст ошибки может быть в status_meta.error
+                # (упало исполнение) ИЛИ в execute_body/create_body (упало
+                # ДО исполнения, напр. execute_failed по datapoint limit --
+                # именно так провалился повтор 09-15) -- проверяем все три.
+                err_text = json.dumps({k: meta.get(k) for k in ("status_meta", "execute_body", "create_body")}, default=str)
+                is_fatal = any(m in err_text for m in FATAL_ERROR_MARKERS)
                 failed_chunks.append({"chunk_index": ci, "n_events": len(chunk), "status": r.get("status"),
-                                       "cost_credits": cost, "error": err})
-                print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status={r.get('status')} -- "
-                      f"ПРОПУЩЕН (данные остальных чанков сохраняются). тело: {json.dumps(meta, default=str)[:800]}", flush=True)
-                is_fatal = any(m in json.dumps(err, default=str) for m in FATAL_ERROR_MARKERS)
-                if not is_fatal:
-                    result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО на дне {day}, чанк {ci} (нефатальная ошибка, не похоже на внешний предел Dune): {r.get('status')}"
-                    OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-                    print("[phase3v4] " + result["FINAL_ANSWER"], flush=True)
-                    return
-                continue
+                                       "cost_credits": cost, "is_fatal_external_block": is_fatal,
+                                       "meta": meta})
+                print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status={r.get('status')} "
+                      f"is_fatal={is_fatal} -- тело: {json.dumps(meta, default=str)[:800]}", flush=True)
+                if is_fatal:
+                    # Внешний жёсткий блок аккаунта Dune (напр. datapoint
+                    # limit per billing cycle) -- следующие чанки/дни
+                    # упрутся в то же самое, не тратим время/вызовы впустую.
+                    hit_fatal_block = True
+                    break
+                continue  # нефатальная ошибка конкретной чанки -- пробуем остальные чанки этого дня
             day_rows_all.extend(r["rows"])
             print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status=ok n_rows={r.get('n_rows')} "
                   f"cost={cost} running_total={running_cost:.2f}", flush=True)
@@ -459,6 +463,14 @@ def main() -> None:
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         print(f"[phase3v4] день {day} итог: {day_cost:.2f} кредита, "
               f"чанков упало={len(failed_chunks)}/{len(chunks)}", flush=True)
+
+        if hit_fatal_block:
+            result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО на дне {day} -- внешний жёсткий блок аккаунта Dune "
+                                       f"(см. failed_chunks[-1] для точного сообщения). Дальше запускать бессмысленно "
+                                       f"до решения владельца (изменить лимит на dune.com или дождаться нового billing cycle).")
+            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+            print("[phase3v4] " + result["FINAL_ANSWER"], flush=True)
+            return
 
         raw_path = RAW_DIR / f"{day}.json.gz"
         with gzip.open(raw_path, "wt", encoding="utf-8") as fh:
