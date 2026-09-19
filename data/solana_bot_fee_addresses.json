@@ -1,0 +1,351 @@
+{
+  "source": "https://github.com/duneanalytics/spellbook (main, dbt_subprojects/solana/models/_sector/dex/bot_trades)",
+  "method": "regex-извлечение Jinja {% set *fee_receiver*/*wallet*/*sniper* = '<адрес>' %} из каждой *_bot_trades.sql модели платформы -- без запуска dbt, без Dune API.",
+  "note": "Адреса -- КОШЕЛЬКИ-ПОЛУЧАТЕЛИ КОМИССИИ бота (per spellbook: trader_id != fee_receiver AND signer != fee_receiver), НЕ program_id инструкции и не адрес трейдера. Unibot/ChainSwap/Nova/Bloom -- отдельные модели spellbook, не включены в объединённую dex_solana_bot_trades (возможно новее/экспериментальные), но включены здесь как есть.",
+  "HONEST_NOTE_addresses_shared_by_multiple_bots": {
+    "6qgwjhV2RQxcPffRdtQBTTEezRykQKXqhcDyv1z3r9tq": [
+      "Alpha Dex",
+      "Consortium Key"
+    ]
+  },
+  "n_bots": 30,
+  "n_addresses": 48,
+  "rows": [
+    {
+      "bot_name": "Alpha Dex",
+      "address": "6qgwjhV2RQxcPffRdtQBTTEezRykQKXqhcDyv1z3r9tq",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/alpha_dex_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Autosnipe",
+      "address": "CWEfC6fLi552zE2KFxhPiBAZUWdT78gMd8NGENik2zfE",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/autosnipe_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_6",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "4BBNEVRgrxVKv9f7pMNE788XM1tt379X9vNjpDH2KCL7",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_5",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "7tQiiBdKoScWQkB1RmVuML7DBGnR31cuKPEtMM7Vy5SA",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_4",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "8r2hZoDfk5hDWJ1sDujAi2Qr45ZyZw5EQxAXiMZWLKh2",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "Cj297UauzMX64FU9dKJZRUBWszJ7tEWpVheasq4CfATV",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "EMbqD9Y9jLXEa3RbCR8AsEW1kVa3EiJgDLVgvKh4qNFP",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_7",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "HKMh8nV3ysSofRi23LsfVGLGQKB415QAEfZT96kCcVj4",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_3",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Banana Gun",
+      "address": "Lk693UiTzQC4vobasRS1QGcYA9D6RGYLjHp1bWreQtM",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_8",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/banana_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Bitfoot",
+      "address": "BzmpLvrhZHKoXV7CW9F1AVPnie3hNh2JK3BRdHL4Zcya",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/bitfoot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Bloom",
+      "address": "7HeD6sLLqAnKVRuSfc1Ko3BSPMNKWgGTiWLKXJF31vKM",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/bloom_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "BonkBot",
+      "address": "ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/bonkbot/bonkbot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "ChainSwap",
+      "address": "CSWAP5SpPcVjvpsA1H2n2HjNjMsRaPnZuX8H8bVJN5wy",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/cswap_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Consortium Key",
+      "address": "6qgwjhV2RQxcPffRdtQBTTEezRykQKXqhcDyv1z3r9tq",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/consortium_key_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Falcon",
+      "address": "DfkYw6zrr5cqzQHBTaXBsny54p5ip25CELUZ71hkS5LH",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/falcon_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Jupbot",
+      "address": "H2mM9cXi42efgwkSzTRKMVaWHrqJJx1nzNdV1NxWaHjC",
+      "role": "fee_receiver",
+      "var_name": "buy_fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/jupbot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Looter",
+      "address": "3Pu1V4duyLyVpAJue1kLAfr74nGjQ3JDzj3aJjnoEXuL",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/looter_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Maestro",
+      "address": "FRMxAnZgkW58zbYcE7Bxqsg99VWpJh6sMP5xLzAWNabN",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/maestro_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Maestro",
+      "address": "MaestroUL88UBnZr3wfoN7hqmNWFi3ZYCGqZoJJHE36",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/maestro_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Magnum",
+      "address": "8dEe5BM7irAnHtJ6SSWwCRf7njgnyczS3jPrvJJs88U5",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/magnum_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Magnum",
+      "address": "CPixcsP8LEMeUoavaHG3bdkywR8s4mZXNN3mYUgbXFev",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/magnum_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "MevX Bot",
+      "address": "3kxSQybWEeQZsMuNWMRJH4TxrhwoDwfv41TNMLRzFP5A",
+      "role": "fee_receiver",
+      "var_name": "buy_fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/mev_x_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "MevX Bot",
+      "address": "4Lpvp1q69SHentfYcMBUrkgvppeEx6ovHCSYjg4UYXiq",
+      "role": "fee_receiver",
+      "var_name": "sell_fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/mev_x_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "MevX Bot",
+      "address": "BS3CyJ9rRC4Tp8G7f86r6hGvuu3XdrVGNVpbNM9U5WRZ",
+      "role": "fee_receiver",
+      "var_name": "sell_fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/mev_x_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Nova",
+      "address": "noVaE91mUL5jTb8e9Vf6dqJdNPzJpEQ3uAdnQ8h4nVz",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/nova_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Padre",
+      "address": "J5XGHmzrRmnYWbmw45DbYkdZAU2bwERFZ11qCDXPvFB5",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/padre_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Pepe Boost",
+      "address": "G9PhF9C9H83mAjjkdJz4MDqkufiTPMJkx7TnKE1kFyCp",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/pepe_boost_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Pinkpunk",
+      "address": "38e4GH49TwjXn2yARvnHueAKvU2xREtuchQahMiz3w9G",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/pinkpunk_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Pinkpunk",
+      "address": "DShXwLqk6ZHZFtdzE8HMDsGJLhEvrxgRdB5K16V28arK",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/pinkpunk_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "ProphetBots",
+      "address": "55vkTc7nZoUQM92AfQG7T8bkNKD4TbWeBPRg8KjyUZre",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/prophetbots_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "ProphetBots",
+      "address": "Hgckz7Sv8Q5grhLXxDFXGaJD6StPE7Yu8gz611nn1wKS",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/prophetbots_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "ReadySwap",
+      "address": "FNKVZeufZY2me2netdgj44tnxqPK1p5GTJkFWukWFRsN",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/readyswap_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Sanji",
+      "address": "4E64WX4EARRMfHsvL4ZXbrbpiPcBUyrC62uawGofhdNN",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sanji_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Shuriken",
+      "address": "9cSuF94JWPb1HQzWMcifJzkoggwAtfjsojcUqny5XuJy",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/shuriken_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Sol Trading Bot",
+      "address": "96aFQc9qyqpjMfqdUeurZVYRrrwPJG2uPV6pceu4B1yb",
+      "role": "fee_receiver",
+      "var_name": "sell_fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sol_trading_bot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Sol Trading Bot",
+      "address": "F34kcgMgCF7mYWkwLN3WN7KrFprr2NbwxuLvXx4fbztj",
+      "role": "fee_receiver",
+      "var_name": "buy_fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sol_trading_bot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Sol Trading Bot",
+      "address": "HEPL5rTb6n1Ax6jt9z2XMPFJcDe9bSWvWQpsK7AMcbZg",
+      "role": "fee_receiver",
+      "var_name": "buy_fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sol_trading_bot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Sol Trading Bot",
+      "address": "K1LRSA1DSoKBtC5DkcvnermRQ62YxogWSCZZPWQrdG5",
+      "role": "fee_receiver",
+      "var_name": "sell_fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sol_trading_bot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Solgun",
+      "address": "J3W8Bv948phnEYFCHaSF9CPxbsdRn2LFjBCUwC7Vo5AN",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/sol_gun_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Soul Sniper",
+      "address": "6MgcmcZJXfyux7rRSsvjWaG8iegQ29KLxMtWHKoCZ7fn",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/soul_sniper_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Tirador",
+      "address": "3CicL2SZhjeZrMkQ4trT2di2RKaffovBADqHvRrYKsaJ",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/tirador_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Tradewiz",
+      "address": "97VmzkjX9w8gMFS2RnHTSjtMEDbifGXBq9pgosFdFnM",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/tradewiz_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Trojan",
+      "address": "9yMwSPk9mrXSN7yDHUuZurAh1sjbJsfpUqjZ7SvVtdco",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/trojan_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Trojan",
+      "address": "BBYXdwhqbCxVRVtnuMTTxh8biNisz3ZxsnHfr44jXytR",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/trojan_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Unibot",
+      "address": "7Yr577ubghnmUTvFgB23iPw3FWReMt18WehCz2b2c9mV",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_2",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/unibot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Unibot",
+      "address": "8FEE2ghpWPoxsypBLW87yyqmChjUbcZz41V7bzfiJqGF",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver_1",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/unibot_solana_bot_trades.sql"
+    },
+    {
+      "bot_name": "Wifbot",
+      "address": "W1FCMFH3D7QeQcsNSTCMTpJ9BxQdk6VzeQMLJp2dNro",
+      "role": "fee_receiver",
+      "var_name": "fee_receiver",
+      "spellbook_path": "dbt_subprojects/solana/models/_sector/dex/bot_trades/solana/platforms/wifbot_solana_bot_trades.sql"
+    }
+  ]
+}
