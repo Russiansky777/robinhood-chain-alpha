@@ -149,12 +149,16 @@ def price_usd(price: float | None, quote_mint: str | None) -> tuple[float | None
     return None, f"неизвестный quote-актив {quote_mint[:10] if quote_mint else '?'}.."
 
 
-def get_block_full(slot: int) -> dict | None:
-    """Полный getBlock (все транзакции, jsonParsed) -- для честного скана
-    окна по слотам без опоры на getSignaturesForAddress (см. docstring
-    fetch_mint_signatures_via_block_scan)."""
+def get_block_accounts_level(slot: int) -> dict | None:
+    """getBlock с transactionDetails='accounts' -- ЛЕГЧЕ, чем 'full'
+    (без инструкций/логов), но meta (preTokenBalances/postTokenBalances/
+    loadedAddresses) и accountKeys транзакции сохраняются -- этого
+    достаточно для проверки в fetch_mint_signatures_via_block_scan.
+    Первый прогон с 'full' на 11 слотах не укладывался в разумное время
+    (полный набор инструкций/логов по КАЖДОЙ транзакции блока -- лишний
+    вес, не нужный для самой проверки на присутствие минта)."""
     try:
-        return fp.rpc_call("getBlock", [slot, {"transactionDetails": "full", "encoding": "jsonParsed",
+        return fp.rpc_call("getBlock", [slot, {"transactionDetails": "accounts",
                                                 "rewards": False, "maxSupportedTransactionVersion": 1}])
     except RuntimeError as exc:
         if "skipped" in str(exc).lower() or "not available" in str(exc).lower() or "-32004" in str(exc) or "-32007" in str(exc):
@@ -173,7 +177,7 @@ def fetch_mint_signatures_via_block_scan(mint: str, lo_slot: int, hi_slot: int) 
     того, как именно адрес попал в транзакцию."""
     out = []
     for slot in range(lo_slot, hi_slot + 1):
-        block = get_block_full(slot)
+        block = get_block_accounts_level(slot)
         if block is None:
             continue
         for tx in block.get("transactions") or []:
