@@ -1,0 +1,42 @@
+{
+  "generated_at_utc": "2026-09-19T01:29:20Z",
+  "pilot_start_time": 1789744452,
+  "pilot_start_note": "время крупнейшего реального пополнения боевого кошелька пилота (все funding_events см. ниже)",
+  "all_funding_events": [
+    {
+      "signature": "3RgSA4ZsRZEpmmbA5FNQq4VypvJDftfF3RPQpFR5aG8x2aukJsBa9M93UZTV14zrW2bhauzBvwdvJ7mJyEsxg2De",
+      "block_time": 1789743979,
+      "sol_change": 0.01
+    },
+    {
+      "signature": "2BcgJFTKZsdKpvcmsPSUQE4A4w5QeNAHm7xso6YmSWr4ZntuQ3rtS4cahWsYyGcLNXHepQJCWhe2TX64MhhxMeda",
+      "block_time": 1789744452,
+      "sol_change": 2.26
+    }
+  ],
+  "window_hours": 10.25,
+  "n_leader_tx_scanned": 234,
+  "n_leader_first_entries_all_sizes": 20,
+  "n_leader_first_entries_ge_4_3_sol": 5,
+  "leader_first_entries_ge_4_3_sol_per_day": 11.707,
+  "n_pilot_trades_executed": 6,
+  "n_matched": 3,
+  "n_missed": 2,
+  "capture_rate": 0.6,
+  "missed_signals": [
+    {
+      "mint": "7goMm2ZcfAcxQ8NiA8MbgmH1bjKA7smzWB4LCGcZvrYZ",
+      "block_time": 1789752788,
+      "leader_signature": "3pXkd6bwMvSq1BjY6A3tsLkTzXsDEqiMr7kk7WM2bFqhMydXoYnDqdbwHAKqtP6jEeQ1gUiPTHPWkFofGBFokZmq",
+      "sol_equivalent": 8.916155552946316
+    },
+    {
+      "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
+      "block_time": 1789752764,
+      "leader_signature": "3HFQaVjSQymgiiMqUH4R43S6ZKKYzv4Y2Hudrugnr28NAexAZeZxumLQD7i1LUazPK3Z5fCRF9hCgraNqfYuz2yf",
+      "sol_equivalent": 8.911421904525412
+    }
+  ],
+  "n_pilot_trades_not_matched_to_any_ge_4_3_leader_entry": 3,
+  "HONEST_NOTE_on_miss_reasons": "DBot API не отдаёт нам причину отказа по конкретному сигналу -- ПРОВЕРЕНО ранее в этой сессии (data/solana_dbot_failure_pointcheck_result.json): /automation/follow_orders/records, copy_logs, task_logs, error_logs, follow_records, notifications -- все 401; swap_orders?state=fail -- 200, но 0 строк. Единственный источник причины (already holds / slippage / tx error / вообще не было записи) -- дашборд DBot, доступный только владельцу. Список missed_signals (минт+время+подпись лидера) выше -- для проверки каждого случая на дашборде вручную, причины не выдумываем."
+}
