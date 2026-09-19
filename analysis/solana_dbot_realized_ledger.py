@@ -253,8 +253,17 @@ def find_wallet_buy_near_time(wallet: str, mint: str, before_time: int, window_b
             continue
         usdc_delta = deltas["deltas"].get(USDC_MINT)
         sol_delta = wallet_sol_delta(tx, wallet)
+        wsol_delta = deltas["deltas"].get(SOL_MINT)
         paid_usdc = float(-D(usdc_delta)) if usdc_delta and D(usdc_delta) < 0 else None
-        paid_sol = -sol_delta if sol_delta is not None and sol_delta < 0 else None
+        if sol_delta is not None and sol_delta < -0.0005:
+            paid_sol = -sol_delta
+        elif wsol_delta and D(wsol_delta) < 0:
+            # Своп через уже открытый WSOL-токен-аккаунт -- нативный
+            # lamport-баланс не двигается, платёж виден только как
+            # отрицательная дельта TOKEN-баланса минта So111...112.
+            paid_sol = float(-D(wsol_delta))
+        else:
+            paid_sol = None
         tokens_received = float(D(deltas["deltas"][mint]))
         return {"signature": s["signature"], "block_time": tx.get("blockTime"),
                 "paid_usdc": paid_usdc, "paid_sol": paid_sol, "tokens_received": tokens_received}
