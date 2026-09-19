@@ -101,11 +101,16 @@ def build_events_sql(wallets: list[str], lo: int, hi: int) -> str:
         "element_at(post_balances, array_position(account_keys, trader)) AS post_sol, "
         "filter(pre_token_balances, x -> x[3] = trader) AS pre_tb, "
         "filter(post_token_balances, x -> x[3] = trader) AS post_tb "
-        "FROM base) "
+        "FROM base), "
+        "prices_min AS ("
+        "SELECT minute, avg(price) AS price FROM prices.usd "
+        f"WHERE blockchain = 'solana' AND symbol = 'SOL' "
+        f"AND minute BETWEEN from_unixtime({lo}) AND from_unixtime({hi}) "
+        "GROUP BY minute"
+        ") "
         "SELECT e.*, p.price AS sol_usd_price "
-        "FROM enriched e LEFT JOIN prices.usd p "
-        f"ON p.blockchain = 'solana' AND p.contract_address = '{WSOL_MINT}' "
-        "AND p.minute = date_trunc('minute', e.block_time)"
+        "FROM enriched e LEFT JOIN prices_min p "
+        "ON p.minute = date_trunc('minute', e.block_time)"
     )
 
 
@@ -255,8 +260,28 @@ def main() -> None:
     exclude = set(candidates_29) | {LEADER_WALLET, FOMO_SPONSOR}
 
     # --- шаг 1: топ-200 новых кошельков по числу tx за 3 суток ---
-    sql_top = build_top200_sql(top200_lo, window_hi)
-    r_top = probe.run_sql_sync("phase2_top200_by_tx_count", sql_top, timeout_s=600)
+    # Переиспользуем уже ОПЛАЧЕННЫЙ прошлый прогон (probe.results на его
+    # execution_id -- честно бесплатная повторная выдача кэша), а не
+    # платим по новой -- прошлый шаг1 уже завершился успешно (2.62
+    # кредита потрачено), упал только шаг2 (событийный запрос).
+    prior_exec_id = None
+    if OUT_PATH.exists():
+        try:
+            prior = json.loads(OUT_PATH.read_text())
+            prior_top = prior.get("top200_step") or {}
+            if prior_top.get("status") == "ok":
+                prior_exec_id = prior_top.get("execution_id")
+        except Exception:  # noqa: BLE001
+            prior_exec_id = None
+    if prior_exec_id:
+        rr = probe.results(prior_exec_id)
+        rows_reused = (((rr.get("body") or {}).get("result") or {}).get("rows") or []) if rr["http_status"] == 200 else []
+        r_top = {"status": "ok" if rr["http_status"] == 200 and rows_reused else "results_refetch_failed",
+                 "execution_id": prior_exec_id, "reused_from_prior_run": True,
+                 "rows": rows_reused, "n_rows": len(rows_reused)}
+    else:
+        sql_top = build_top200_sql(top200_lo, window_hi)
+        r_top = probe.run_sql_sync("phase2_top200_by_tx_count", sql_top, timeout_s=600)
     result["top200_step"] = {k: v for k, v in r_top.items() if k != "rows"}
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     print(f"[phase2] топ-200 запрос: status={r_top.get('status')} n_rows={r_top.get('n_rows')}", flush=True)
