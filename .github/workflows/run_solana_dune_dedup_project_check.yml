@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- Dune: проверка агрегатор/дублирование (Section A)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DUNE_DEDUP_PROJECT_CHECK_REQUEST"
+
+jobs:
+  dune_dedup_project_check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Проверка агрегатор/дублирование"
+        env:
+          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+        run: python -u analysis/solana_dune_dedup_project_check.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_DEDUP_PROJECT_CHECK_REQUEST
+          [ -e data/solana_dune_dedup_project_check.json ] && git add data/solana_dune_dedup_project_check.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: проверка агрегатор/дублирование Dune -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

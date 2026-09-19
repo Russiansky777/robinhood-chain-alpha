@@ -37,12 +37,28 @@ TX_TABLE, SIG_COL = "solana.transactions", "id"
 
 
 def gecko_get(path: str, params: dict) -> dict:
-    try:
-        resp = requests.get(f"https://api.geckoterminal.com/api/v2{path}", params=params, timeout=30,
-                            headers={"Accept": "application/json"})
+    """Владелец, 2026-09-20: ретрай с бэкоффом -- этот модуль ИМПОРТИРУЕТСЯ
+    из v5 и далее, единичный транзиентный сбой/429 не должен тихо ронять
+    цену (тот же класс бага, что уже нашли и чинили в ведомости и в
+    скрипте захвата пилота)."""
+    backoff = 1.0
+    last: dict = {"http_status": None}
+    for _ in range(10):
+        try:
+            resp = requests.get(f"https://api.geckoterminal.com/api/v2{path}", params=params, timeout=30,
+                                headers={"Accept": "application/json"})
+        except Exception as exc:  # noqa: BLE001
+            last = {"http_status": None, "exception": str(exc)[:200]}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
+        if resp.status_code == 429:
+            last = {"http_status": 429}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
         return {"http_status": resp.status_code, "body": resp.json() if resp.ok else None}
-    except Exception as exc:  # noqa: BLE001
-        return {"http_status": None, "exception": str(exc)[:200]}
+    return last
 
 
 def sol_usd_price_at(t: int) -> float | None:
