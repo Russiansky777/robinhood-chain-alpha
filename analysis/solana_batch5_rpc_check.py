@@ -132,7 +132,11 @@ def classify_tx(tx: dict, wallet: str) -> dict | None:
         return None
     if not (tx_program_ids(tx) & DEX_PROGRAMS):
         return {"kind": "no_first_entry"}  # не своп -- перевод/даст/другое, честно не считаем покупкой
-    keys = [k["pubkey"] if isinstance(k, dict) else k for k in tx["transaction"]["message"]["accountKeys"]]
+    # Владелец: ключи = static accountKeys + loadedAddresses (versioned tx с ALT) --
+    # preBalances/postBalances индексируются по этому полному списку.
+    loaded = meta.get("loadedAddresses") or {}
+    keys = ([k["pubkey"] if isinstance(k, dict) else k for k in tx["transaction"]["message"]["accountKeys"]]
+            + list(loaded.get("writable") or []) + list(loaded.get("readonly") or []))
     if wallet not in keys:
         return None
     idx = keys.index(wallet)
@@ -160,24 +164,57 @@ def classify_tx(tx: dict, wallet: str) -> dict | None:
     wsol_decrease = max(D(0), pre_tb.get(WSOL, D(0)) - post_tb.get(WSOL, D(0)))
     usdc_decrease = max(D(0), pre_tb.get(USDC, D(0)) - post_tb.get(USDC, D(0)))
     usdt_decrease = max(D(0), pre_tb.get(USDT, D(0)) - post_tb.get(USDT, D(0)))
-    spend_sol_equiv = sol_decrease + wsol_decrease
-    stable_only = spend_sol_equiv <= 0 and (usdc_decrease + usdt_decrease) > 0
-    if spend_sol_equiv <= 0 and not stable_only:
-        return {"kind": "no_first_entry"}  # ни SOL, ни стейбл не потрачен -- не покупка (или airdrop/transfer)
+    stable_usd = usdc_decrease + usdt_decrease
+
+    # Владелец: "как в Dune-шлюзе" -- USDC/USDT тоже переводятся в SOL по
+    # курсу, не оставляются отдельно. Диагностика на известной покупке
+    # лидера (egp1f5j9ld) подтвердила: это НЕ редкий случай -- Fomo-сделки
+    # реально идут через USDC без WSOL-ноги вообще. Курс -- через уже
+    # используемый в репозитории Gecko SOL/USDC (та же пара, что и везде
+    # в проекте для этой конвертации, не Dune) -- ОДИН диапазон минутных
+    # свечей на кэш, не по вызову на транзакцию.
+    stable_sol_equiv = D(0)
+    price_missing = False
+    if stable_usd > 0:
+        block_time = tx.get("blockTime")
+        if block_time is None:
+            price_missing = True
+        else:
+            try:
+                price_row = fp.find_price_at_gecko(block_time, block_time - 3600, block_time + 3600)
+                sol_usd = D(price_row["event"]["p1_per_0"])
+                if sol_usd > 0:
+                    stable_sol_equiv = stable_usd / sol_usd
+                else:
+                    price_missing = True
+            except Exception:  # noqa: BLE001 -- честно: не удалось получить курс, не выдумываем
+                price_missing = True
+
+    spend_sol_equiv = sol_decrease + wsol_decrease + stable_sol_equiv
+    if spend_sol_equiv <= 0:
+        return {"kind": "no_first_entry"}  # ни SOL, ни WSOL, ни стейбл (с курсом) не потрачен -- не покупка
 
     return {
         "kind": "first_entry", "mint": mint, "tokens_received": str(tokens_received),
-        "spend_sol_equiv": float(spend_sol_equiv) if not stable_only else None,
-        "funded_in_stablecoin_only": stable_only,
-        "stable_usd_spent": float(usdc_decrease + usdt_decrease) if stable_only else None,
+        "spend_sol_equiv": float(spend_sol_equiv),
+        "sol_decrease": float(sol_decrease), "wsol_decrease": float(wsol_decrease),
+        "stable_usd_spent": float(stable_usd) if stable_usd > 0 else None,
+        "stable_sol_equiv": float(stable_sol_equiv) if stable_usd > 0 else None,
+        "price_missing": price_missing,
         "slot": tx["slot"], "signature": tx["transaction"]["signatures"][0],
     }
 
 
+MAX_TX_PER_WALLET = 300  # владелец: цена скана ограничена, честный статус "частично" при превышении
+
+
 def scan_wallet(address: str) -> dict:
-    sigs = fetch_signatures_last_n_hours(address, LOOKBACK_S)
-    ok_sigs = [s["signature"] for s in sigs if s.get("err") is None]
-    entries, n_multi_mint_skipped, n_tx_fetch_failed = [], 0, 0
+    sigs = fetch_signatures_last_n_hours(address, LOOKBACK_S)  # уже newest-first, отфильтровано по 72ч
+    ok_sigs_full = [s for s in sigs if s.get("err") is None]
+    capped = len(ok_sigs_full) > MAX_TX_PER_WALLET
+    ok_sigs = [s["signature"] for s in ok_sigs_full[:MAX_TX_PER_WALLET]]
+
+    entries, n_multi_mint_skipped, n_tx_fetch_failed, n_price_missing = [], 0, 0, 0
     for sig in ok_sigs:
         tx = fp.get_transaction(sig)
         if tx is None:
@@ -189,15 +226,22 @@ def scan_wallet(address: str) -> dict:
         if ev["kind"] == "multi_mint_skipped":
             n_multi_mint_skipped += 1
             continue
+        if ev.get("price_missing"):
+            n_price_missing += 1
         entries.append(ev)
 
-    sol_sizes = [e["spend_sol_equiv"] for e in entries if e["spend_sol_equiv"] is not None]
-    n_stable_only = sum(1 for e in entries if e["funded_in_stablecoin_only"])
+    sol_sizes = [e["spend_sol_equiv"] for e in entries]
+    now = int(time.time())
+    oldest_covered_bt = ok_sigs_full[len(ok_sigs) - 1].get("blockTime") if ok_sigs else None
+    coverage_hours_actual = round((now - oldest_covered_bt) / 3600, 2) if oldest_covered_bt else LOOKBACK_HOURS
+    coverage_status = ("partial_capped_at_300_tx" if capped else
+                        ("full_72h" if coverage_hours_actual >= LOOKBACK_HOURS * 0.95 else "wallet_history_shorter_than_72h"))
     return {
-        "n_tx_scanned": len(ok_sigs), "n_tx_fetch_failed": n_tx_fetch_failed,
-        "n_multi_mint_skipped": n_multi_mint_skipped,
+        "n_tx_scanned": len(ok_sigs), "n_tx_in_window_before_cap": len(ok_sigs_full),
+        "n_tx_fetch_failed": n_tx_fetch_failed, "n_multi_mint_skipped": n_multi_mint_skipped,
+        "n_price_missing": n_price_missing,
+        "coverage_status": coverage_status, "coverage_hours_actual": coverage_hours_actual,
         "n_first_entries_72h": len(entries),
-        "n_first_entries_funded_stablecoin_only": n_stable_only,
         "n_first_entries_ge_2sol": sum(1 for s in sol_sizes if s >= 2),
         "n_first_entries_ge_4_3sol": sum(1 for s in sol_sizes if s >= 4.3),
         "median_spend_sol_equiv": round(median(sol_sizes), 4) if sol_sizes else None,
