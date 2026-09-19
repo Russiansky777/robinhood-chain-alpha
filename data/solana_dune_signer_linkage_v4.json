@@ -1,0 +1,677 @@
+{
+  "generated_at_utc": "2026-09-19T01:33:52Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8771642}"
+      }
+    }
+  },
+  "n_our_signatures": 300,
+  "attribution_basis": "v3 подтвердил 300/300 через contains(signers, ЛИДЕР) -- см. solana_dune_signer_linkage_v3.json",
+  "step1_schema_probe": {
+    "name": "schema_probe_v4",
+    "sql_preview": "SELECT * FROM dex_solana.trades LIMIT 1",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771643,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VMRTVTX4RZS5FKG0MRGEJN",
+    "status_meta": {
+      "execution_id": "01M2VMRTVTX4RZS5FKG0MRGEJN",
+      "query_id": 8771643,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:33:53.914976Z",
+      "expires_at": "2026-12-18T01:33:55.333976Z",
+      "execution_started_at": "2026-09-19T01:33:54.31696289Z",
+      "execution_ended_at": "2026-09-19T01:33:55.333970882Z",
+      "result_metadata": {
+        "column_names": [
+          "blockchain",
+          "project",
+          "version",
+          "version_name",
+          "block_month",
+          "block_date",
+          "block_time",
+          "block_slot",
+          "trade_source",
+          "token_bought_symbol",
+          "token_sold_symbol",
+          "token_pair",
+          "token_bought_amount",
+          "token_sold_amount",
+          "token_bought_amount_raw",
+          "token_sold_amount_raw",
+          "amount_usd",
+          "fee_tier",
+          "fee_usd",
+          "token_bought_mint_address",
+          "token_sold_mint_address",
+          "token_bought_vault",
+          "token_sold_vault",
+          "project_program_id",
+          "project_main_id",
+          "trader_id",
+          "tx_id",
+          "outer_instruction_index",
+          "inner_instruction_index",
+          "tx_index",
+          "_updated_at"
+        ],
+        "column_types": [
+          "varchar",
+          "varchar",
+          "integer",
+          "varchar",
+          "date",
+          "date",
+          "timestamp(3) with time zone",
+          "bigint",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "double",
+          "double",
+          "uint256",
+          "uint256",
+          "double",
+          "double",
+          "double",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "integer",
+          "integer",
+          "integer",
+          "timestamp(3) with time zone"
+        ],
+        "row_count": 1,
+        "result_set_bytes": 607,
+        "total_row_count": 1,
+        "total_result_set_bytes": 607,
+        "datapoint_count": 31,
+        "pending_time_millis": 401,
+        "execution_time_millis": 1017
+      },
+      "execution_cost_credits": 0.220961539
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 1,
+    "metadata": {
+      "column_names": [
+        "blockchain",
+        "project",
+        "version",
+        "version_name",
+        "block_month",
+        "block_date",
+        "block_time",
+        "block_slot",
+        "trade_source",
+        "token_bought_symbol",
+        "token_sold_symbol",
+        "token_pair",
+        "token_bought_amount",
+        "token_sold_amount",
+        "token_bought_amount_raw",
+        "token_sold_amount_raw",
+        "amount_usd",
+        "fee_tier",
+        "fee_usd",
+        "token_bought_mint_address",
+        "token_sold_mint_address",
+        "token_bought_vault",
+        "token_sold_vault",
+        "project_program_id",
+        "project_main_id",
+        "trader_id",
+        "tx_id",
+        "outer_instruction_index",
+        "inner_instruction_index",
+        "tx_index",
+        "_updated_at"
+      ],
+      "column_types": [
+        "varchar",
+        "varchar",
+        "integer",
+        "varchar",
+        "date",
+        "date",
+        "timestamp(3) with time zone",
+        "bigint",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "double",
+        "double",
+        "uint256",
+        "uint256",
+        "double",
+        "double",
+        "double",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "integer",
+        "integer",
+        "integer",
+        "timestamp(3) with time zone"
+      ],
+      "row_count": 1,
+      "result_set_bytes": 607,
+      "total_row_count": 1,
+      "total_result_set_bytes": 607,
+      "datapoint_count": 31,
+      "pending_time_millis": 401,
+      "execution_time_millis": 1017
+    }
+  },
+  "step1_columns": [
+    "blockchain",
+    "project",
+    "version",
+    "version_name",
+    "block_month",
+    "block_date",
+    "block_time",
+    "block_slot",
+    "trade_source",
+    "token_bought_symbol",
+    "token_sold_symbol",
+    "token_pair",
+    "token_bought_amount",
+    "token_sold_amount",
+    "token_bought_amount_raw",
+    "token_sold_amount_raw",
+    "amount_usd",
+    "fee_tier",
+    "fee_usd",
+    "token_bought_mint_address",
+    "token_sold_mint_address",
+    "token_bought_vault",
+    "token_sold_vault",
+    "project_program_id",
+    "project_main_id",
+    "trader_id",
+    "tx_id",
+    "outer_instruction_index",
+    "inner_instruction_index",
+    "tx_index",
+    "_updated_at"
+  ],
+  "step1_resolved_columns": {
+    "bought_mint": "token_bought_mint_address",
+    "sold_mint": "token_sold_mint_address",
+    "bought_amount": "token_bought_amount",
+    "sold_amount": "token_sold_amount"
+  },
+  "step2_full_rows": {
+    "name": "collapse_legs_v4",
+    "sql_preview": "SELECT tx_id, block_time, trader_id, project, token_bought_mint_address AS bought_mint, token_sold_mint_address AS sold_mint, token_bought_amount AS bought_amount, token_sold_amount AS sold_amount FROM dex_solana.trades WHERE tx_id IN ('JLHP1V9ediM8QETprKpTAC7MbKxWrc8J6MFkraKR1BqCea8t54HQQ58pCnPuZah",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771644,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VMS1EJ3M10AMN5RSHNS45A",
+    "status_meta": {
+      "execution_id": "01M2VMS1EJ3M10AMN5RSHNS45A",
+      "query_id": 8771644,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:34:00.659601Z",
+      "expires_at": "2026-12-18T01:36:22.868223Z",
+      "execution_started_at": "2026-09-19T01:34:00.914462293Z",
+      "execution_ended_at": "2026-09-19T01:36:22.868198829Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "block_time",
+          "trader_id",
+          "project",
+          "bought_mint",
+          "sold_mint",
+          "bought_amount",
+          "sold_amount"
+        ],
+        "column_types": [
+          "varchar",
+          "timestamp(3) with time zone",
+          "varchar",
+          "varchar",
+          "varchar",
+          "varchar",
+          "double",
+          "double"
+        ],
+        "row_count": 732,
+        "result_set_bytes": 183030,
+        "total_row_count": 732,
+        "total_result_set_bytes": 183030,
+        "datapoint_count": 5856,
+        "pending_time_millis": 254,
+        "execution_time_millis": 141953
+      },
+      "execution_cost_credits": 125.17173077
+    },
+    "results_http_status": 200,
+    "status": "ok",
+    "n_rows": 732,
+    "metadata": {
+      "column_names": [
+        "tx_id",
+        "block_time",
+        "trader_id",
+        "project",
+        "bought_mint",
+        "sold_mint",
+        "bought_amount",
+        "sold_amount"
+      ],
+      "column_types": [
+        "varchar",
+        "timestamp(3) with time zone",
+        "varchar",
+        "varchar",
+        "varchar",
+        "varchar",
+        "double",
+        "double"
+      ],
+      "row_count": 732,
+      "result_set_bytes": 183030,
+      "total_row_count": 732,
+      "total_result_set_bytes": 183030,
+      "datapoint_count": 5856,
+      "pending_time_millis": 254,
+      "execution_time_millis": 141953
+    }
+  },
+  "step2_n_tx_with_rows": 298,
+  "step2_avg_legs_per_tx": 2.456,
+  "step2_collapsed_net_swaps_sample": [
+    {
+      "tx_id": "4G4QNQRjNSumrYHbbaMdr6kfJkxWpqsgTTn3T7Fh4MdF2gPgMiZE25BD2Uoqhq4ybiCrGCfGec46WwS2jGcXm9Vs",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 9.761229047,
+      "dune_net_swap_tokens_out": 106412.748107423,
+      "dune_price_sol_per_token": 9.17298840656394e-05,
+      "our_price_sol_per_token": 9.493473271798048e-05,
+      "ratio_dune_over_ours": 0.9662415581675294
+    },
+    {
+      "tx_id": "nRzG2iKQNXG3HuA6THqV1E94Dt9rzRCUDFko5PdSUa7LcuxoriqQCpjPuq6wUGk6pEdFaVff3snnHPwzjSvew8V",
+      "n_legs": 3,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "2TNmYD5YMcoduYupepRjy4qf2PoaSojLSJuxgTauSUtKScDxXH7VcrCcR7sDYey8sTryCt9Ws2FsfqS4hLsDgrS",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 22.457362647,
+      "dune_net_swap_tokens_out": 12904.329795323,
+      "dune_price_sol_per_token": 0.0017402967068572107,
+      "our_price_sol_per_token": 0.0017447930188717949,
+      "ratio_dune_over_ours": 0.9974230112305862
+    },
+    {
+      "tx_id": "5EuVK21qDAqebMjUd4dP2vdftNmo41VbJPnvhHXzUWiVDZv3cSmX1QbRP8uFbBEVoAJneAJupJC3kdMUP48cpKX7",
+      "n_legs": 2,
+      "status": "ok",
+      "dune_net_swap_sol_in": 37.461238592,
+      "dune_net_swap_tokens_out": 12777.492051158,
+      "dune_price_sol_per_token": 0.002931814666134342,
+      "our_price_sol_per_token": 0.0029335391355089437,
+      "ratio_dune_over_ours": 0.999412153956384
+    },
+    {
+      "tx_id": "4MaZT6fLqAByqe39UZvs1PG3qZaxPWLnV9ZnN9mXAKQQAWpEYzNFAkx3XsSvD2m7YXcsw71YcSqXkMz7FFyTsHNU",
+      "n_legs": 2,
+      "status": "ok",
+      "dune_net_swap_sol_in": 14.64203622,
+      "dune_net_swap_tokens_out": 1922999.346805581,
+      "dune_price_sol_per_token": 7.61416598727547e-06,
+      "our_price_sol_per_token": 7.699985970826617e-06,
+      "ratio_dune_over_ours": 0.9888545272840368
+    },
+    {
+      "tx_id": "34cJTZARWxVjWN7TXAsmZzdcMeFh6JyyzufnzzgShcJJFA2SYk8LATKGfLE27TUNBdcp91iR2WxG7VBrJ36Cfq3Q",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 42.072262002,
+      "dune_net_swap_tokens_out": 427743.400963,
+      "dune_price_sol_per_token": 9.835864657942268e-05,
+      "our_price_sol_per_token": 0.0001241987806655095,
+      "ratio_dune_over_ours": 0.7919453480330122
+    },
+    {
+      "tx_id": "2b7hhbrnpjUC9LFAEjg4GzMte2b7rzFUReqLAPX93naMrqd9CsjkpqkYDq6u88DkJ7LTFZayazeRuhWhL7Ea6m4k",
+      "n_legs": 2,
+      "status": "ok",
+      "dune_net_swap_sol_in": 11.351493748,
+      "dune_net_swap_tokens_out": 5361.416831942,
+      "dune_price_sol_per_token": 0.0021172563342530277,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "3t6NjEHdj8HdwxjmzoDmCNJsFN3tdCcV7CCHJReUj7vzmBzYjRdt7QPw5n5rEFXVCEJKqj24xCewVrrVF9m8z63C",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 3.800362551,
+      "dune_net_swap_tokens_out": 155812.948570355,
+      "dune_price_sol_per_token": 2.439054382751767e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "2p46y7UqfVSHo7uDcmvKW2R2YhSwPEG8DEhp4xPBTrdzqqcgQ6YskK6Gs1BFbcq4bu6w4iy9zY5eR9u9C2KKjKX4",
+      "n_legs": 3,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "3yDLctUyDjBGr6hY7XEfdVms4AXWxqFtfEd5xk4m6UXNbZFC9PMqHjvJz94LMqgGsYotNp2DvcdKE5caAqYkb1F1",
+      "n_legs": 2,
+      "status": "ok",
+      "dune_net_swap_sol_in": 8.536849054,
+      "dune_net_swap_tokens_out": 91354.849291097,
+      "dune_price_sol_per_token": 9.344713630688414e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "pE3wyEm1KdJrgmS8mAxYR28E1ezuuo6y3opTQDLXYEcsh3u66AzVAyNyw4MgfNKU4Y4jrthNMQ2cYSTw5VqoGw1",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 4.589307679,
+      "dune_net_swap_tokens_out": 3995619.633689,
+      "dune_price_sol_per_token": 1.1485847252089087e-06,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "3x54nP9my3HdJPz1t5KZbDvA1c7wK88hw86Ae6KQWiB65dX8qzgaEg6Uf5qSra4i6ykkCqiQKP8EgRkZfdypmJNN",
+      "n_legs": 3,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "mmM2cryP8RDxwurR3pNtqfY6smWDzhGfXPLQD3td3vbtv21jqT9XCZvg69rwJKkRnp2y4U8PwGe1z2giV6EvX5o",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 1.910983774,
+      "dune_net_swap_tokens_out": 108215.178577,
+      "dune_price_sol_per_token": 1.7659110294220403e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "5GZq89uMs4wgc171ayC7s1cC3DEzTCXjRpNsD4fbQnkgkc3kbNNPBJYCEtRjxAjsAXmiEewhPs6n44RwRvm9Sxva",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 6.123121838,
+      "dune_net_swap_tokens_out": 81168.614696431,
+      "dune_price_sol_per_token": 7.543706223027649e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "jgBQTAy6HGnRTYZcXBDWF1w1y4EGczs6F45eFqCuThMCpzdQAwbvUGDfoXVH48fSxWPWVWp3dExQr9YaRjhuUNL",
+      "n_legs": 4,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "3t7A4mBQYHEdnU2yucJupjyJaxxwz2rC4K49xTXsRE7uRhCwD4B3xwr9mvoA8DgujK6DgUff1jM5EAT36nFfUvRH",
+      "n_legs": 1,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "4r6vEugFsiSCuLsRyi7aohjyL6CFhzzXHBrJC6KuFnF4VRRZvxYew4wRzrUD3oLMTtTVxBUifPKeCsnVsJkRcf7x",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 11.547891781,
+      "dune_net_swap_tokens_out": 1656117.237274,
+      "dune_price_sol_per_token": 6.972870954479073e-06,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "3m4MZPJxWjEeynQWFD8h3w7whjfCHvfLEyQSAwqqDDfrijNXe8oAXNrNNHs7USmLRXgEBCUFnETt8aFzsdUDqxF8",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 19.738515097,
+      "dune_net_swap_tokens_out": 11985.299371915,
+      "dune_price_sol_per_token": 0.0016468937891741789,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "2dmGUAYrwLFHk5T8TYBQT4tCM8uKAxd22e1axCRcxz9dZ8sSXd1CyiYbcoSwRQ5ZEt1sqpV7NiWSDbXphAEzvaPu",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 18.444492547,
+      "dune_net_swap_tokens_out": 245664.590937062,
+      "dune_price_sol_per_token": 7.507997988902431e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "4zGrvpcPFYUdfg3CDAG3foE51L7iMFVg5pfkcUg9ZTBCkhLmKkwE1WzUvWjqckAWpNPSEhewcftX2iYRkriSJ1ig",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 32.737151941,
+      "dune_net_swap_tokens_out": 190948.893838,
+      "dune_price_sol_per_token": 0.00017144457494880293,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "5bW9mE9FGiGvbT3ofeUQY8YYxiwmo39Y1hZZEXgkz9vvPYXJhihzQq2SP9v7UE32LD7hU83bjGahJ8T2hBLKr9tw",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 17.913150323,
+      "dune_net_swap_tokens_out": 10542.348290576,
+      "dune_price_sol_per_token": 0.0016991613091566038,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "YstMmr4uZunhpddMijCc6uwa24VrC5sron6nqvJVYZ8ZLvzg26z87xJTh5Kff7gUqZA9Z28DAY6NjHoS4SnXq4y",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 3.973021913,
+      "dune_net_swap_tokens_out": 225652.793354,
+      "dune_price_sol_per_token": 1.7606792514937743e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "3eXwM25MeZH6jmgN6u2HwgbwP9Yf9sfcGpcoEowuoz3xNQEzstTFzU6GkAjydsMt6f2r3mBBA9u6cUnQdbSnUwQC",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 24.590152625,
+      "dune_net_swap_tokens_out": 10793.187657479,
+      "dune_price_sol_per_token": 0.002278303074621386,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "2zLpLygJTXuySGWsVqnEif5xaBM6pwcLw2BuPwSTapZ1uzib9Q3rM8vGFwBXbpGTQ7JGWpdBdzQphjnPJLSeM32q",
+      "n_legs": 2,
+      "status": "ok",
+      "dune_net_swap_sol_in": 21.360249176,
+      "dune_net_swap_tokens_out": 13508.47112764,
+      "dune_price_sol_per_token": 0.0015812484606266281,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "58HZo1gmDPxDnShA1N4WM7864Li6UQEpnGiyfC3htML53q53poU1qhBrnmQ1Tox33iBh6Un1AoHzaN1cLXhZc3i4",
+      "n_legs": 1,
+      "status": "no_sol_or_target_leg_found"
+    },
+    {
+      "tx_id": "QPP6eZq46KUEjTr5s85nYg3Du4VAty2We6XXEBgmhYtvAdsi9VgxZdxi83UzhN2kv3BFXJ7DTGNMrAUhF2D9MJz",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 4.848333439,
+      "dune_net_swap_tokens_out": 294823.711824,
+      "dune_price_sol_per_token": 1.6444855839459395e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "4eFR39tjCgPTSuBhNw5X1LPSPpi6r4QzbEZ2wxQ5LTsk1LkbpmXByeGudEwC8sp3iDvcvXBha8YKTf1jzk4HGN83",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 9.388870184,
+      "dune_net_swap_tokens_out": 108013.249305916,
+      "dune_price_sol_per_token": 8.692331954026089e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "4Dq2icDj1HaenPoVEfGhMYfMNj8jcEW8vcnzg6Qcazan8k9kurRqyAbg28B6kGKunvxXUBxGsvsdt4NLFQoRCjLS",
+      "n_legs": 4,
+      "status": "ok",
+      "dune_net_swap_sol_in": 24.274717906,
+      "dune_net_swap_tokens_out": 1735866.96087,
+      "dune_price_sol_per_token": 1.3984204120017205e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "3rVQx6VebHsvtaHJEngn72rnWBPBdNq1iLndgGdmWRLzPV9KHLX9UDgGboBWigTcTtKGwuf6sHmLYfENftbKK9zF",
+      "n_legs": 3,
+      "status": "ok",
+      "dune_net_swap_sol_in": 4.069635309,
+      "dune_net_swap_tokens_out": 276178.415268,
+      "dune_price_sol_per_token": 1.4735529947374338e-05,
+      "our_price_sol_per_token": null,
+      "ratio_dune_over_ours": null
+    },
+    {
+      "tx_id": "4FGg9jyV3MP4ToWszB3DFNoVYZE47qB1aQY2A1JuJTnNgBpmcBx6vog8qEJ1nugMyQ1knSA6eSYbZRAPGAiJARpp",
+      "n_legs": 3,
+      "status": "no_sol_or_target_leg_found"
+    }
+  ],
+  "step2_n_collapsed_total": 298,
+  "step2_summary": {
+    "n": 5,
+    "median_ratio_dune_over_ours": 0.9888545272840368,
+    "mean_ratio_dune_over_ours": 0.9487753197343097
+  },
+  "step3_price_at_30s": {
+    "name": "price_at_30s_v4",
+    "sql_preview": "SELECT tx_id, block_time, token_bought_mint_address AS bought_mint, token_sold_mint_address AS sold_mint, token_bought_amount AS bought_amount, token_sold_amount AS sold_amount FROM dex_solana.trades WHERE (token_bought_mint_address IN ('2pWXsELtCwtcKUyvNC6igngswUSQjVpJdY4hA4cTdjaL','3C6sZzwq2ietUdj",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771660,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VMY4MM4D4GJVZDD33QM9RW",
+    "status_meta": {
+      "execution_id": "01M2VMY4MM4D4GJVZDD33QM9RW",
+      "query_id": 8771660,
+      "is_execution_finished": true,
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T01:36:47.764958Z",
+      "expires_at": "2026-12-18T01:37:03.136753Z",
+      "execution_started_at": "2026-09-19T01:36:48.052251202Z",
+      "execution_ended_at": "2026-09-19T01:37:03.13674219Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "block_time",
+          "bought_mint",
+          "sold_mint",
+          "bought_amount",
+          "sold_amount"
+        ],
+        "column_types": [
+          "varchar",
+          "timestamp(3) with time zone",
+          "varchar",
+          "varchar",
+          "double",
+          "double"
+        ],
+        "row_count": 775272,
+        "result_set_bytes": 154011368,
+        "total_row_count": 775272,
+        "total_result_set_bytes": 154011368,
+        "datapoint_count": 4651632,
+        "pending_time_millis": 287,
+        "execution_time_millis": 15084
+      },
+      "execution_cost_credits": 4.507115385
+    },
+    "results_http_status": 402,
+    "status": "results_failed",
+    "results_body": {
+      "error": "This api request would exceed your configured credits limit for read requests. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+    }
+  },
+  "step4_first_entry_classification": {
+    "name": "dune_first_entry_v4",
+    "sql_preview": "WITH ranked AS (SELECT dt.tx_id, dt.token_bought_mint_address AS mint, dt.block_time, row_number() OVER (PARTITION BY tt.signer, dt.token_bought_mint_address ORDER BY dt.block_time) AS rn FROM dex_solana.trades dt JOIN solana.transactions tt ON dt.tx_id = tt.id WHERE tt.block_slot BETWEEN 446296620 ",
+    "create": {
+      "http_status": 200
+    },
+    "query_id": 8771663,
+    "execute": {
+      "http_status": 200
+    },
+    "execution_id": "01M2VMYQ9KF0M827FV8TMPSVFP",
+    "status": "timeout"
+  },
+  "step5_cost_estimate": {
+    "credits_by_step": [
+      {
+        "step": "step2_full_rows",
+        "credits": 125.17173077
+      },
+      {
+        "step": "step3_price_at_30s",
+        "credits": 4.507115385
+      }
+    ],
+    "total_credits_this_run": 129.678846155,
+    "note": "Стоимость определяется в основном ШИРИНОЙ временного окна (партиционирование по block_time/date), а не количеством tx_id/кошельков в фильтре -- поэтому для 100 кошельков ОДИН запрос с объединённым списком tx_id и одной общей границей по времени стоит примерно СТОЛЬКО ЖЕ, сколько этот прогон на 300 подписях (130 кредитов за прогон), а 100 отдельных запросов (по кошельку) -- примерно в 100 раз дороже. Перед массовым прогоном -- считать одним объединённым запросом."
+  },
+  "FINAL_VERDICT": "АТРИБУЦИЯ ПОДТВЕРЖДЕНА ОКОНЧАТЕЛЬНО (100%, через signers-массив, не через trader_id/signer-скаляр). Прежний вердикт 'негоден по покрытию' ОТМЕНЯЕТСЯ. dex_solana.trades пригоден для восстановления сделок лидера ЧЕРЕЗ ПРАВИЛЬНЫЙ join (contains(signers, лидер) в solana.transactions), но НЕ напрямую по trader_id -- см. шаги 2-4 для точности цены/разметки на этом join."
+}
