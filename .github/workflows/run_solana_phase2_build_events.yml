@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- Фаза 2: события ~230 кошельков (Источник B)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_PHASE2_BUILD_EVENTS_REQUEST"
+
+jobs:
+  phase2_build_events:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Фаза 2: события ~230 кошельков"
+        env:
+          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+        run: python -u analysis/solana_phase2_build_events.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE2_BUILD_EVENTS_REQUEST
+          [ -e data/solana_phase2_events.json ] && git add data/solana_phase2_events.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: Фаза 2 -- события ~230 кошельков -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
