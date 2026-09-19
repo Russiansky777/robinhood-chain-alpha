@@ -43,34 +43,73 @@ POLL_INTERVAL_S = 20
 MAX_POLL_MINUTES = 170  # запас под лимит job (180 мин)
 
 
+_B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def b58decode(s: str) -> bytes:
+    num = 0
+    for ch in s:
+        num = num * 58 + _B58_ALPHABET.index(ch)
+    combined = num.to_bytes((num.bit_length() + 7) // 8, "big") if num else b""
+    n_leading_zeros = len(s) - len(s.lstrip("1"))
+    return b"\x00" * n_leading_zeros + combined
+
+
+def is_real_trade(tx: dict, wallet: str) -> bool:
+    """Настоящая сделка -- есть изменение ТОКЕН-баланса кошелька
+    (покупка/продажа), а не инфраструктурная tx DBot (напр. создание
+    durable-nonce аккаунтов dbot-nonce-seed-N -- реально встретилось
+    как первая находка после смены, НЕ сделка)."""
+    meta = tx.get("meta") or {}
+    pre_tb = meta.get("preTokenBalances") or []
+    post_tb = meta.get("postTokenBalances") or []
+    return any(b.get("owner") == wallet for b in pre_tb) or any(b.get("owner") == wallet for b in post_tb)
+
+
 def find_new_sig_after(wallet: str, cutoff: int) -> dict | None:
-    """Последние подписи кошелька (свежие, без кэша) -- если самая
-    свежая уже >= cutoff, это кандидат. Берём caмую РАННЮЮ среди тех,
-    что >= cutoff (первая сделка ПОСЛЕ смены, не последняя)."""
-    sigs = fp.get_signatures_for_address(wallet, limit=20)
+    """Последние подписи кошелька (свежие, без кэша), отфильтрованные
+    по времени; берём caмую РАННЮЮ >= cutoff, ЧТО ЯВЛЯЕТСЯ НАСТОЯЩЕЙ
+    СДЕЛКОЙ (is_real_trade) -- инфраструктурные tx DBot (нонсы и т.п.)
+    пропускаем, не выдаём их за ответ."""
+    sigs = fp.get_signatures_for_address(wallet, limit=50)
     candidates = [s for s in sigs if s.get("blockTime") and s["blockTime"] >= cutoff and s.get("err") is None]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda s: s["blockTime"])
+    candidates.sort(key=lambda s: s["blockTime"])
+    for cand in candidates:
+        tx = fp.get_transaction(cand["signature"])
+        if tx is None:
+            continue
+        if is_real_trade(tx, wallet):
+            return cand
+    return None
 
 
 def extract_compute_budget(tx: dict) -> dict:
     instrs = tx.get("transaction", {}).get("message", {}).get("instructions", [])
     out = {"compute_unit_limit": None, "compute_unit_price_microlamports": None}
     for ix in instrs:
-        if not isinstance(ix, dict):
-            continue
-        if ix.get("program") != "compute-budget":
+        if not isinstance(ix, dict) or ix.get("programId") != "ComputeBudget111111111111111111111111111111":
             continue
         parsed = ix.get("parsed") or {}
-        if not isinstance(parsed, dict):
+        if isinstance(parsed, dict) and parsed.get("type"):
+            t, info = parsed.get("type"), parsed.get("info", {})
+            if t == "setComputeUnitLimit":
+                out["compute_unit_limit"] = info.get("units")
+            elif t == "setComputeUnitPrice":
+                out["compute_unit_price_microlamports"] = info.get("microLamports")
             continue
-        t = parsed.get("type")
-        info = parsed.get("info", {})
-        if t == "setComputeUnitLimit":
-            out["compute_unit_limit"] = info.get("units")
-        elif t == "setComputeUnitPrice":
-            out["compute_unit_price_microlamports"] = info.get("microLamports")
+        # jsonParsed не расшифровал (реально встретилось) -- декодируем сами:
+        # байт 0 = дискриминант (2=SetComputeUnitLimit u32 LE, 3=SetComputeUnitPrice u64 LE)
+        raw_b58 = ix.get("data") if isinstance(ix.get("data"), str) else None
+        if not raw_b58:
+            continue
+        try:
+            raw = b58decode(raw_b58)
+        except Exception:  # noqa: BLE001
+            continue
+        if len(raw) >= 5 and raw[0] == 2:
+            out["compute_unit_limit"] = int.from_bytes(raw[1:5], "little")
+        elif len(raw) >= 9 and raw[0] == 3:
+            out["compute_unit_price_microlamports"] = int.from_bytes(raw[1:9], "little")
     return out
 
 
