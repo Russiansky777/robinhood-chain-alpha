@@ -102,40 +102,57 @@ def main() -> None:
         return
     probe = DuneProbe(os.environ[key_name])
 
+    CHUNK_SIZE = 1500  # день 09-17 (2866 событий) упал на create_failed -- похоже на лимит длины SQL,
+    # чиним разбиением большого дня на под-батчи, стоимость от этого практически не растёт (~0.0015/событие)
+
     running_cost = 0.0
     day_meta = []
     preamt_by_tx: dict[str, float] = {}
+    first_day_done = False
     for i, day in enumerate(days):
         lo, hi = day_bounds(day)
         day_events = by_day[day]
-        sql = build_preamt_sql(day_events, lo, hi)
-        r = probe.run_sql_sync(f"phase2_preamt_{day}", sql, timeout_s=600)
-        meta = {k: v for k, v in r.items() if k != "rows"}
-        cost = (meta.get("status_meta") or {}).get("execution_cost_credits", 0) or 0
-        running_cost += cost
-        day_meta.append({"day": day, "n_events": len(day_events), "status": r.get("status"),
-                          "n_rows": r.get("n_rows"), "cost_credits": cost})
+        chunks = [day_events[j:j + CHUNK_SIZE] for j in range(0, len(day_events), CHUNK_SIZE)]
+        day_cost, day_rows_all, day_status = 0.0, [], "ok"
+        for ci, chunk in enumerate(chunks):
+            sql = build_preamt_sql(chunk, lo, hi)
+            r = probe.run_sql_sync(f"phase2_preamt_{day}_c{ci}", sql, timeout_s=600)
+            meta = {k: v for k, v in r.items() if k != "rows"}
+            cost = (meta.get("status_meta") or {}).get("execution_cost_credits", 0) or 0
+            day_cost += cost
+            running_cost += cost
+            if r.get("status") != "ok":
+                day_status = r.get("status")
+                print(f"[preamt] день {day} чанк {ci+1}/{len(chunks)}: status={day_status} -- "
+                      f"тело ошибки: {json.dumps(meta, default=str)[:800]}", flush=True)
+                break
+            day_rows_all.extend(r["rows"])
+            print(f"[preamt] день {day} чанк {ci+1}/{len(chunks)}: status=ok n_rows={r.get('n_rows')} "
+                  f"cost={cost} running_total={running_cost:.2f}", flush=True)
+
+        day_meta.append({"day": day, "n_events": len(day_events), "n_chunks": len(chunks),
+                          "status": day_status, "n_rows": len(day_rows_all), "cost_credits": day_cost})
         result["days_processed"] = day_meta
         result["total_cost_credits_so_far"] = running_cost
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-        print(f"[preamt] день {day} ({i+1}/{len(days)}): status={r.get('status')} n_rows={r.get('n_rows')} "
-              f"cost={cost} running_total={running_cost:.2f}", flush=True)
 
-        if r.get("status") != "ok":
-            err_text = json.dumps(meta, default=str)
+        if day_status != "ok":
+            err_text = json.dumps(day_meta[-1], default=str)
             is_fatal = any(m in err_text for m in FATAL_ERROR_MARKERS)
-            result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО на дне {day} ({'внешний блокер' if is_fatal else r.get('status')})."
+            result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО на дне {day} ({'внешний блокер' if is_fatal else day_status})."
             OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
             print("[preamt] " + result["FINAL_ANSWER"], flush=True)
             return
 
         raw_path = RAW_DIR / f"{day}.json.gz"
         with gzip.open(raw_path, "wt", encoding="utf-8") as fh:
-            json.dump({"day": day, "sql": sql, "rows": r["rows"]}, fh, default=str)
-        for row in r["rows"]:
+            json.dump({"day": day, "n_chunks": len(chunks), "rows": day_rows_all}, fh, default=str)
+        for row in day_rows_all:
             preamt_by_tx[row["tx_id"]] = row["pre_amt"]
 
-        if i == 0:
+        cost = day_cost
+        if not first_day_done:
+            first_day_done = True
             per_event = cost / len(day_events) if day_events else 0
             projected_total = per_event * len(flat)
             result["cost_per_event_from_first_day"] = per_event
