@@ -2,13 +2,10 @@
 """Владелец: контроль метода RPC-скана BATCH-5 ДО продолжения и до любых
 выводов. Тот же код (fetch_signatures_last_n_hours/classify_tx из
 solana_batch5_rpc_check.py), 72ч, на двух эталонах:
-  - "лидер", АДРЕС РОВНО КАК ДАЛ ВЛАДЕЛЕЦ: Beqv6dzDEe86iKJ5XUx1MHXf2GeGwjh2wkHjzKqbmsnU
-    -- ЭТО НЕ LEADER_WALLET константа проекта (Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,
-    используется во всех предыдущих скриптах сессии) -- общий префикс
-    "Beqv6dz", дальше разные строки. Честно берём БУКВАЛЬНО то, что дал
-    владелец (полный адрес, не обрезанный префикс -- правило "не
-    выдумывать" здесь не про запрос уточнения, а про использование ровно
-    того, что есть), но флагаем расхождение явно, не молчим.
+  - лидер -- LEADER_WALLET константа проекта, Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit
+    (владелец подтвердил: адрес из прошлого запроса был ошибкой по
+    памяти, правильный -- эта константа; прошлый контрольный прогон на
+    неверном адресе выброшен).
   - Brez (Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB), уже известный
     кошелёк BATCH-3.
 
@@ -37,7 +34,7 @@ FOMO_SPONSOR = "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51"
 PROJECT_LEADER_WALLET_CONST = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 
 CONTROL_WALLETS = [
-    ("Beqv6dzDEe86iKJ5XUx1MHXf2GeGwjh2wkHjzKqbmsnU", "лидер (адрес владельца в этом запросе)"),
+    (PROJECT_LEADER_WALLET_CONST, "лидер (LEADER_WALLET)"),
     ("Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB", "Brez (BATCH-3)"),
 ]
 
@@ -81,10 +78,9 @@ def main() -> None:
     out: dict = {
         "lookback_hours": LOOKBACK_HOURS,
         "HONEST_NOTE_leader_address": (
-            f"Адрес лидера в этом запросе (Beqv6dzDEe86iKJ5XUx1MHXf2GeGwjh2wkHjzKqbmsnU) "
-            f"НЕ совпадает с константой LEADER_WALLET, использованной во всех предыдущих "
-            f"скриптах этой сессии ({PROJECT_LEADER_WALLET_CONST}) -- общий префикс, разные "
-            f"адреса. Использован буквально тот, что дан в этом запросе, без подмены."
+            f"Исправлено: предыдущий контрольный прогон использовал ошибочный адрес "
+            f"(владелец подтвердил опечатку по памяти) и выброшен. Этот прогон -- "
+            f"на LEADER_WALLET константе проекта ({PROJECT_LEADER_WALLET_CONST})."
         ),
         "control": {},
         "priority_10_diagnostics": {},
