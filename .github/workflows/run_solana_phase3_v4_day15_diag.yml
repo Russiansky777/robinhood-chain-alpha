@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- диагностика упавшего дня 09-15 Фазы 3 v4"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_PHASE3_V4_DAY15_DIAG_REQUEST"
+
+jobs:
+  day15_diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Полный текст ошибки дня 09-15 (повторное чтение статуса, без нового исполнения)"
+        env:
+          DUNE_JANA_API: ${{ secrets.DUNE_JANA_API }}
+        run: python -u analysis/solana_phase3_v4_day15_diag.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PHASE3_V4_DAY15_DIAG_REQUEST
+          [ -e data/solana_phase3_v4_day15_diag_result.json ] && git add data/solana_phase3_v4_day15_diag_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: диагностика упавшего дня 09-15 Фазы 3 v4 -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
