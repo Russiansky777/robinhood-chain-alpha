@@ -1,0 +1,46 @@
+name: "Solana buyer_200 -- захват сигналов пилота v2 (каноническое определение)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_PILOT_SIGNAL_CAPTURE_RATE_V2_REQUEST"
+
+jobs:
+  pilot_signal_capture_rate_v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Захват сигналов пилота (каноническое определение)"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_pilot_signal_capture_rate_v2.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_PILOT_SIGNAL_CAPTURE_RATE_V2_REQUEST
+          [ -e data/solana_pilot_signal_capture_rate_v2.json ] && git add data/solana_pilot_signal_capture_rate_v2.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: захват сигналов пилота v2 (каноническое определение) -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

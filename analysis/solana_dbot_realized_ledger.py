@@ -443,6 +443,60 @@ def extract_outgoing_transfers(tx: dict, wallet: str) -> list[dict]:
     return out
 
 
+def find_balance_delta_destinations(tx: dict, wallet: str) -> list[dict]:
+    """Фоллбэк, когда extract_outgoing_transfers ничего не находит (напр.
+    комиссия ушла через CPI, не декодированную как parsed 'transfer') --
+    напрямую по pre/postBalances ВСЕХ аккаунтов транзакции: любой рост
+    lamports у не-wallet-аккаунта. Работает независимо от того, как
+    именно программа перевела SOL -- нативный баланс всегда виден."""
+    keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
+    meta = tx.get("meta") or {}
+    pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
+    out = []
+    for i, k in enumerate(keys):
+        if i >= len(pre) or i >= len(post):
+            continue
+        pk = k.get("pubkey") if isinstance(k, dict) else k
+        if pk == wallet:
+            continue
+        delta = post[i] - pre[i]
+        if delta > 0:
+            out.append({"destination": pk, "lamports": delta})
+    out.sort(key=lambda d: d["lamports"], reverse=True)
+    return out
+
+
+DBOT_FEE_WALLET = "F7F8QYPCc3zDYNeAh4UUE2wJ7Mq1huid5MeMo7PPzsqB"
+DBOT_FEE_PCT_PER_SIDE = 0.006  # Free-план DBot, по гайду -- 0.6% с каждой стороны
+
+
+def match_fees_to_trades(other_debits: list[dict], trade_pairs: list[dict]) -> dict:
+    """Каждый небиржевой отток на DBOT_FEE_WALLET привязываем к БЛИЖАЙШЕЙ
+    ПРЕДШЕСТВУЮЩЕЙ завершённой сделке (по времени продажи) -- если
+    несколько сборов попадают в один интервал между сделками, суммируем
+    на последнюю из них (честно, без домысливания, какая часть куда).
+    Долг ДО первой сделки (напр. активационный сбор) -- НЕ привязывается
+    ни к одной сделке, отдельная категория."""
+    closed = [p for p in trade_pairs if p["sell"] is not None]
+    closed.sort(key=lambda p: p["sell"]["block_time"])
+    fee_debits = [d for d in other_debits if DBOT_FEE_WALLET in
+                  {t.get("destination") for t in (d.get("outgoing_transfers") or [])}]
+    by_buy_sig: dict[str, float] = {}
+    unmatched_before_first_trade = []
+    for d in other_debits:
+        dests = {t.get("destination") for t in (d.get("outgoing_transfers") or [])}
+        if DBOT_FEE_WALLET not in dests:
+            continue
+        candidates = [p for p in closed if p["sell"]["block_time"] <= d["block_time"]]
+        if not candidates:
+            unmatched_before_first_trade.append(d)
+            continue
+        target = candidates[-1]
+        by_buy_sig[target["buy"]["signature"]] = by_buy_sig.get(target["buy"]["signature"], 0.0) + abs(d["sol_change"])
+    return {"fee_by_buy_signature": by_buy_sig, "n_fee_debits_matched": len(fee_debits) - len(unmatched_before_first_trade),
+            "unmatched_fee_debits_before_first_trade": unmatched_before_first_trade}
+
+
 def wallet_balance_reconciliation(wallet: str, all_meta: list[dict], trade_pairs: list[dict]) -> dict:
     swap_sigs = {e["buy"]["signature"] for e in trade_pairs} | {e["sell"]["signature"] for e in trade_pairs if e["sell"]}
     funding_events = []
@@ -467,9 +521,14 @@ def wallet_balance_reconciliation(wallet: str, all_meta: list[dict], trade_pairs
             # считается ТОЛЬКО по buy/sell-транзакциям), но входит в
             # реальный баланс -- отсюда разница "сумма net по сделкам"
             # vs "баланс минус пополнения".
+            transfers = extract_outgoing_transfers(m["tx"], wallet)
+            fallback_used = False
+            if not transfers:
+                transfers = find_balance_delta_destinations(m["tx"], wallet)
+                fallback_used = bool(transfers)
             other_debits.append({"signature": m["signature"], "block_time": m["block_time"],
-                                  "sol_change": m["sol_change"],
-                                  "outgoing_transfers": extract_outgoing_transfers(m["tx"], wallet)})
+                                  "sol_change": m["sol_change"], "outgoing_transfers": transfers,
+                                  "destination_found_via_balance_delta_fallback": fallback_used})
     total_funded = sum(e["sol_change"] for e in funding_events)
     total_other_debits = sum(e["sol_change"] for e in other_debits)
     bal = fp.rpc_call("getBalance", [wallet], use_cache=False)
@@ -532,6 +591,22 @@ def main() -> None:
 
         reconciliation[label] = wallet_balance_reconciliation(wallet, all_meta, pairs)
         result["balance_reconciliation"] = reconciliation
+
+        fee_match = match_fees_to_trades(reconciliation[label]["other_debits_non_swap_transfers_out"], pairs)
+        reconciliation[label]["dbot_fee_matching"] = fee_match
+        for row in result["trades"]:
+            if row.get("label") != label:
+                continue
+            fee_sol = fee_match["fee_by_buy_signature"].get(row.get("buy_signature"))
+            if fee_sol is None:
+                continue
+            row["dbot_fee_sol"] = round(fee_sol, 8)
+            principal = row.get("total_sol_out_buy")
+            if principal:
+                row["dbot_fee_pct_of_round_trip_principal"] = round(fee_sol / principal * 100, 4)
+                row["dbot_fee_theoretical_pct_0.6_each_side"] = round(2 * DBOT_FEE_PCT_PER_SIDE * 100, 4)
+            if row.get("net_pct") is not None and principal:
+                row["net_pct_after_dbot_fee"] = round(row["net_pct"] - (fee_sol / principal * 100), 4)
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     closed = [t for t in result["trades"] if t.get("status") == "ok"]
