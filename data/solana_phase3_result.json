@@ -1,0 +1,327 @@
+{
+  "generated_at_utc": "2026-09-19T11:49:47Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_EXPLORER_API"
+    ],
+    "liveness": {
+      "DUNE_EXPLORER_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8775012}"
+      }
+    }
+  },
+  "n_events_total": 5811,
+  "batches": [
+    {
+      "name": "phase3_prices_batch_0",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (0, 'AvVELuh2WZzxnAdUyfT7GcrUbhxfNBVSKt3Mdphjpump', 1789301343, 1789301828),(1, '8p7uhDVpe5Pw4fg2tfHXskHmCicfr7gTrnbRtzAopump', 1789309916, 1789310401),(2, '8p7uhDVpe5Pw4fg2tfHXskHmCicfr7gTrnbRtzAopump', 1789311649, 1789312134),(3, '8p7uhDVpe5Pw4fg2tfHXskHm",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775013,
+      "execute": {
+        "http_status": 200
+      },
+      "execution_id": "01M2WR0KATAWBHXPAFS9HP3W8X",
+      "status": "execution_QUERY_STATE_FAILED",
+      "status_body": {
+        "execution_id": "01M2WR0KATAWBHXPAFS9HP3W8X",
+        "query_id": 8775013,
+        "is_execution_finished": true,
+        "state": "QUERY_STATE_FAILED",
+        "submitted_at": "2026-09-19T11:49:48.507324Z",
+        "expires_at": "2026-12-18T11:50:38.939081Z",
+        "execution_started_at": "2026-09-19T11:49:48.897882026Z",
+        "execution_ended_at": "2026-09-19T11:50:38.939050225Z",
+        "execution_cost_credits": 339.354483976,
+        "error": {
+          "type": "FAILED_TYPE_RESOURCES_CAP_REACHED",
+          "message": "Query execution has exceeded the user defined maximum amount of resources [Execution ID: 01M2WR0KATAWBHXPAFS9HP3W8X]"
+        }
+      }
+    },
+    {
+      "name": "phase3_prices_batch_1",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (500, '5rE6xNX2su82uXYHAUgsJDqnRJU3cwsKS79PWUqapump', 1789279926, 1789280411),(501, 'FGxLjBATQFk2LZu6TJZpXRzejp8A5Xp8oavcsmMvpump', 1789280336, 1789280821),(502, 'FGxLjBATQFk2LZu6TJZpXRzejp8A5Xp8oavcsmMvpump', 1789280528, 1789281013),(503, '8tg831A2D87956TD",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775028,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_2",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (1000, 'G4hgryWhpNchZsjXZeiwNtGnAL6NjgLDLQx7KHCpump', 1789664318, 1789664803),(1001, '5dDeBvYERiX7Vks5TU6aaSxQeYJk5jHncHwBaVqTpump', 1789665175, 1789665660),(1002, '5dDeBvYERiX7Vks5TU6aaSxQeYJk5jHncHwBaVqTpump', 1789665245, 1789665730),(1003, '2ubhzKPouTyA3",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775029,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_3",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (1500, '7guAAEFPKxPH3VsffZWh1upJzxqHxqUSCbQxL55Gpump', 1789750711, 1789751196),(1501, 'GnU8BRtkFAik9E3yuzaxoHqRJXqLJwc7cmjbRgispump', 1789751866, 1789752351),(1502, '8s33EDndLnvZrFZ8CaaofaeU2PoGzQP8yFzw6Xtm8g7u', 1789752977, 1789753462),(1503, '8s33EDndLnvZ",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775030,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_4",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (2000, '3mCs98j1Hjr6KoNMQTmBf6RoQcUVBCnARvHyrk2Lpump', 1789807780, 1789808265),(2001, '6orppG13FHK2rMPzqk7UUMKeGoBNbt338fj3A1sSpaid', 1789506944, 1789507429),(2002, 'Khy8512E4qL2GhNSjiZQJu1ELbo1myNnyRkkkiypump', 1789586198, 1789586683),(2003, 'AhQhyh4jq8QnN",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775031,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_5",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (2500, '2TqMkSTqMpxACay3j8Cjt7uqUAWTG8HYqwWJ3xmbpump', 1789803674, 1789804159),(2501, '2TqMkSTqMpxACay3j8Cjt7uqUAWTG8HYqwWJ3xmbpump', 1789803986, 1789804471),(2502, '2TqMkSTqMpxACay3j8Cjt7uqUAWTG8HYqwWJ3xmbpump', 1789805060, 1789805545),(2503, '2TqMkSTqMpxA",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775033,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_6",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (3000, '5hmWwRNw66m1YtQKbnFvfSerhkgD3pdmuQ4JZywepump', 1789694257, 1789694742),(3001, 'DJmh9qciViBBXQD86JB92PLRSXWi76azLJLGsQ6wpump', 1789695599, 1789696084),(3002, '3u3TGoHd2djQtZKgc4dTY9FuY2F8GEFDd51SF8sEN3yZ', 1789701926, 1789702411),(3003, '83LzJNgASvxL",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775035,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_7",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (3500, '9nrUsqcEPptS3gXQ1RJdHza1wQtAjuP6wqKWW2gdMBkh', 1789587524, 1789588009),(3501, '9nrUsqcEPptS3gXQ1RJdHza1wQtAjuP6wqKWW2gdMBkh', 1789587987, 1789588472),(3502, '9nrUsqcEPptS3gXQ1RJdHza1wQtAjuP6wqKWW2gdMBkh', 1789588429, 1789588914),(3503, '6LDU8HoZ3oAJ",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775036,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_8",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (4000, 'HAeZinSES8XQc4L67GYQ1ReG5nLT8Sj9YY2gffB5pump', 1789265229, 1789265714),(4001, 'FQMzYh9Gh2355N6LmxffiU9bZGJHoBJYEyP7bJwppump', 1789267336, 1789267821),(4002, '8ZSayX4jHiUHRFXmypVG4MCVGHtcc24B3V3bvCoZpump', 1789281092, 1789281577),(4003, '8ZSayX4jHiUH",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775037,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_9",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (4500, 'HpYdUftXwEaG7jekkjFvFLWeJ5dfqaFvtDHoRC6jd99s', 1789544856, 1789545341),(4501, '3SLZNtvGNjPMtpkaPExbghDFSSGL9kXmxdCrddAUpump', 1789546564, 1789547049),(4502, '3SLZNtvGNjPMtpkaPExbghDFSSGL9kXmxdCrddAUpump', 1789546767, 1789547252),(4503, 'F1QHMMzfn7Yu",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775038,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_10",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (5000, 'EXNRQBvA4FH4AMC3dQ2zAnxN8UcbShzmdBcA4hiBpump', 1789323405, 1789323890),(5001, '43FkyPxVW3FqGjyYka5m9XtLFthDm8p9SPQGejirpump', 1789325017, 1789325502),(5002, '43FkyPxVW3FqGjyYka5m9XtLFthDm8p9SPQGejirpump', 1789325055, 1789325540),(5003, '3KsTy7PHRnfj",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775039,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    },
+    {
+      "name": "phase3_prices_batch_11",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi) AS (VALUES (5500, 'Aw4i79Ju3zmPCMTxnqThykTZUXxPhjjUQJQzrWk3pump', 1789694703, 1789695188),(5501, '6LWQfDJgHDpxgjf2d2e7DfKKm8PkGG6SWtqHzUM5vmx7', 1789695083, 1789695568),(5502, '4Aomb3zEUNQUesNR2aEDCMxNiEPuAznXg3h2SkaFpump', 1789695344, 1789695829),(5503, '4Aomb3zEUNQU",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775041,
+      "execute": {
+        "http_status": 402
+      },
+      "status": "execute_failed",
+      "execute_body": {
+        "error": "This api request would exceed your configured datapoint limit per billing cycle. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
+      }
+    }
+  ],
+  "FINAL_ANSWER": "Батч 11 не выполнился (execute_failed) -- Фаза 3 неполная, см. batches.",
+  "n_events_with_any_missing_horizon": 5811,
+  "n_events_no_trade_data_at_all": 5811,
+  "answers": {
+    "q1_rebuys": {
+      "leader": {
+        "k1": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null
+        },
+        "k2": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null,
+          "take_k2_rule": false
+        },
+        "k3plus": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null
+        }
+      },
+      "others": {
+        "k1": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null
+        },
+        "k2": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null,
+          "take_k2_rule": false
+        },
+        "k3plus": {
+          "n": 0,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "n_priced_180s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null,
+          "median_growth_180s": null
+        }
+      }
+    },
+    "q2_threshold_and_size": {
+      "table": [
+        {
+          "bucket_sol": "2-4.3",
+          "n": 152,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null
+        },
+        {
+          "bucket_sol": "4.3-8",
+          "n": 83,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null
+        },
+        {
+          "bucket_sol": "8-15",
+          "n": 57,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null
+        },
+        {
+          "bucket_sol": "15+",
+          "n": 66,
+          "n_priced_30s": 0,
+          "n_priced_60s": 0,
+          "median_growth_30s": null,
+          "median_growth_60s": null
+        }
+      ],
+      "threshold_sol_lower_bound": null,
+      "our_size_estimate": null
+    },
+    "q3_new_wallets": {
+      "n_wallets_evaluated": 194,
+      "n_eligible_n_ge_20": 0,
+      "top10": []
+    }
+  },
+  "total_cost_credits": 0
+}
