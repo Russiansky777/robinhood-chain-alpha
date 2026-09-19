@@ -91,6 +91,9 @@ def helius_get(path: str, api_key: str, params: dict) -> dict:
             body = resp.json()
         except Exception:  # noqa: BLE001
             body = None
+        if resp.status_code != 200 or not isinstance(body, list):
+            print(f"[source_a] НЕОЖИДАННЫЙ ответ {path}: http={resp.status_code} "
+                  f"body_preview={_scrub(json.dumps(body, default=str)[:500] if body is not None else resp.text[:500])}", flush=True)
         return {"http_status": resp.status_code, "body": body, "elapsed_s": dt}
     return last
 
