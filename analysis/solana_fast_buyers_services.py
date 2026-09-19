@@ -44,6 +44,15 @@ INFRA_PROGRAMS = {
 # program_id -> имя, реально встречающихся на цепи (не выдумано здесь).
 DEX_LABELS_PATH = REPO_ROOT / "data" / "solana_buyer_200" / "prior" / "current" / "buyer_100" / "dex_labels.json"
 DEX_PROGRAMS = json.loads(DEX_LABELS_PATH.read_text()) if DEX_LABELS_PATH.exists() else {}
+# dex_labels.json не содержит главный роутер-агрегатор Jupiter v6 --
+# подтверждён на цепи этой же сессией (лог "Instruction: SharedAccountsRouteV2"
+# у programId JUP6Lkb... в решённых ранее транзакциях), добавляем явно,
+# иначе он лишним шумом лезет в "прочие программы".
+DEX_PROGRAMS.setdefault("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4", "Jupiter Aggregator v6")
+# Аналогично: собственный вспомогательный fee-калькулятор Pump.fun AMM
+# (наблюдался в этой сессии -- "Program log: Instruction: GetFeesWithQuoteMint",
+# CPI внутри самого AMM-инструкции) -- часть протокола DEX, не сервис.
+DEX_PROGRAMS.setdefault("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ", "Pump.fun AMM fee calculator")
 
 # Известные заранее (даны владельцем).
 KNOWN_SERVICES = {
