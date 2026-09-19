@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-19T11:29:59Z",
+  "generated_at_utc": "2026-09-19T11:33:02Z",
   "step0_key_discovery": {
     "env_keys_checked": [
       "DUNE_EXPLORER_API",
@@ -13,73 +13,19 @@
       "DUNE_EXPLORER_API": {
         "http_status": 200,
         "alive": true,
-        "body_preview": "{\"query_id\": 8774843}"
+        "body_preview": "{\"query_id\": 8774863}"
       }
     }
   },
-  "window_lo_epoch": 1789212598,
-  "window_hi_epoch": 1789817398,
-  "scan_lo_epoch": 1788607798,
+  "window_lo_epoch": 1789212782,
+  "window_hi_epoch": 1789817582,
+  "scan_lo_epoch": 1788607982,
   "top200_selection_method": "tx_count_3d (оговорка -- см. докстринг файла, не first-entry-агрегат)",
   "top200_step": {
-    "name": "phase2_top200_by_tx_count",
-    "sql_preview": "SELECT element_at(filter(signers, x -> x != 'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51'), 1) AS trader, count(*) AS n_tx FROM solana.transactions WHERE signer = 'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51' AND block_time BETWEEN from_unixtime(1789558198) AND from_unixtime(1789817398) GROUP BY 1",
-    "create": {
-      "http_status": 200
-    },
-    "query_id": 8774844,
-    "execute": {
-      "http_status": 200
-    },
-    "execution_id": "01M2WPWB3H1EMGEGBSSHSXXWXC",
-    "status_meta": {
-      "execution_id": "01M2WPWB3H1EMGEGBSSHSXXWXC",
-      "query_id": 8774844,
-      "is_execution_finished": true,
-      "state": "QUERY_STATE_COMPLETED",
-      "submitted_at": "2026-09-19T11:30:00.434373Z",
-      "expires_at": "2026-12-18T11:30:12.750461Z",
-      "execution_started_at": "2026-09-19T11:30:01.919425945Z",
-      "execution_ended_at": "2026-09-19T11:30:12.750456177Z",
-      "result_metadata": {
-        "column_names": [
-          "trader",
-          "n_tx"
-        ],
-        "column_types": [
-          "varchar",
-          "bigint"
-        ],
-        "row_count": 260,
-        "result_set_bytes": 13503,
-        "total_row_count": 260,
-        "total_result_set_bytes": 13503,
-        "datapoint_count": 520,
-        "pending_time_millis": 1485,
-        "execution_time_millis": 10831
-      },
-      "execution_cost_credits": 2.624038462
-    },
-    "results_http_status": 200,
     "status": "ok",
-    "n_rows": 260,
-    "metadata": {
-      "column_names": [
-        "trader",
-        "n_tx"
-      ],
-      "column_types": [
-        "varchar",
-        "bigint"
-      ],
-      "row_count": 260,
-      "result_set_bytes": 13503,
-      "total_row_count": 260,
-      "total_result_set_bytes": 13503,
-      "datapoint_count": 520,
-      "pending_time_millis": 1485,
-      "execution_time_millis": 10831
-    }
+    "execution_id": "01M2WPWB3H1EMGEGBSSHSXXWXC",
+    "reused_from_prior_run": true,
+    "n_rows": 260
   },
   "n_new_wallets_selected": 200,
   "n_wallets_total": 230,
@@ -327,29 +273,58 @@
     "create": {
       "http_status": 200
     },
-    "query_id": 8774846,
+    "query_id": 8774864,
     "execute": {
       "http_status": 200
     },
-    "execution_id": "01M2WPWSM3TYYG5ZW2MNHA01AK",
-    "status": "execution_QUERY_STATE_FAILED",
-    "status_body": {
-      "execution_id": "01M2WPWSM3TYYG5ZW2MNHA01AK",
-      "query_id": 8774846,
+    "execution_id": "01M2WQ1Z0BRWHGV0ZE6HF8BN6D",
+    "status_meta": {
+      "execution_id": "01M2WQ1Z0BRWHGV0ZE6HF8BN6D",
+      "query_id": 8774864,
       "is_execution_finished": true,
-      "state": "QUERY_STATE_FAILED",
-      "submitted_at": "2026-09-19T11:30:15.299678Z",
-      "expires_at": "2026-12-18T11:30:16.049291Z",
-      "execution_cost_credits": 0,
-      "error": {
-        "type": "FAILED_TYPE_EXECUTION_FAILED",
-        "message": "line 1:11777: Cannot apply operator: varbinary = varchar(43) at line 1, position 11777. Did you mean to write a bytearray literal? Use the syntax 0x1234 instead of '0x1234'. Learn more about the varbinary type here: https://docs.dune.com/query-engine/datatypes#varbinary. Learn more about the varbinary utility functions here: https://docs.dune.com/query-engine/Functions-and-operators/varbinary#varbinary-to-text. [Execution ID: 01M2WPWSM3TYYG5ZW2MNHA01AK]",
-        "metadata": {
-          "line": 1,
-          "column": 11777
-        }
-      }
+      "state": "QUERY_STATE_COMPLETED",
+      "submitted_at": "2026-09-19T11:33:04.651986Z",
+      "expires_at": "2026-12-18T11:34:24.875062Z",
+      "execution_started_at": "2026-09-19T11:33:06.244253845Z",
+      "execution_ended_at": "2026-09-19T11:34:24.875048249Z",
+      "result_metadata": {
+        "column_names": [
+          "tx_id",
+          "block_time",
+          "block_slot",
+          "trader",
+          "pre_sol",
+          "post_sol",
+          "pre_tb",
+          "post_tb",
+          "sol_usd_price"
+        ],
+        "column_types": [
+          "varchar",
+          "timestamp(3) with time zone",
+          "bigint",
+          "varchar",
+          "bigint",
+          "bigint",
+          "array(row(account varchar, mint varchar, owner varchar, amount decimal(38, 18)))",
+          "array(row(account varchar, mint varchar, owner varchar, amount decimal(38, 18)))",
+          "double"
+        ],
+        "row_count": 499637,
+        "result_set_bytes": 410422449,
+        "total_row_count": 499637,
+        "total_result_set_bytes": 410422449,
+        "datapoint_count": 4496733,
+        "pending_time_millis": 1592,
+        "execution_time_millis": 78630
+      },
+      "execution_cost_credits": 155.633269231
+    },
+    "results_http_status": 402,
+    "status": "results_failed",
+    "results_body": {
+      "error": "This api request would exceed your configured credits limit for read requests. Please visit your subscription settings on dune.com and adjust your limits to perform this request."
     }
   },
-  "FINAL_ANSWER": "Событийный запрос не выполнился (execution_QUERY_STATE_FAILED) -- Фаза 2 не завершена."
+  "FINAL_ANSWER": "Событийный запрос не выполнился (results_failed) -- Фаза 2 не завершена."
 }
