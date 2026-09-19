@@ -237,7 +237,7 @@ def main() -> None:
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                      "step0_key_discovery": discovery, "n_events_sampled": len(sample)}
     if key_name is None:
-        result["HONEST_ANSWER"] = "DUNE_EXPLORER_API не живой."
+        result["HONEST_ANSWER"] = "DUNE_JANA_API не живой."
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         return
     probe = DuneProbe(os.environ[key_name])
