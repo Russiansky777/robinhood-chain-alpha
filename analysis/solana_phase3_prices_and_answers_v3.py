@@ -68,7 +68,18 @@ def size_bucket(spend: float) -> str | None:
     return None
 
 
-def build_sample(events_by_wallet: dict, wallet_roles: dict) -> list[dict]:
+LEADER_CAP_REDUCED = 100
+TOP30_PER_WALLET_CAP_REDUCED = 10
+
+
+def build_sample(events_by_wallet: dict, wallet_roles: dict, reduced: bool = True) -> list[dict]:
+    """reduced=True -- фолбэк владельца после реального замера (день 1
+    = 66.46 кредита на 210 событий, открытый скан dex_solana.trades не
+    получает того же фикс.-по-партиции эффекта, что bounded pre_amt):
+    "если дорого -- лидер выборочно, топ-30 по 10 событий". Общий
+    стратифицированный пул (800 k1/300 k2/150 k3+) вырезается целиком
+    как самый низкий приоритет ("сначала лидер и топ-30, потом
+    остальное")."""
     rng = random.Random(SEED)
     leader = wallet_roles["leader"][0]
     candidates_29 = set(wallet_roles["candidates_29"])
@@ -80,27 +91,33 @@ def build_sample(events_by_wallet: dict, wallet_roles: dict) -> list[dict]:
             flat.append({**e, "wallet": wallet, "event_id": eid})
             eid += 1
 
-    leader_evs = [e for e in flat if e["wallet"] == leader and e["k"] in (1, 2)]
+    leader_pool = [e for e in flat if e["wallet"] == leader and e["k"] in (1, 2)]
+    if reduced:
+        leader_evs = rng.sample(leader_pool, min(LEADER_CAP_REDUCED, len(leader_pool)))
+    else:
+        leader_evs = leader_pool
 
     other_evs = [e for e in flat if e["wallet"] != leader]
     k1 = [e for e in other_evs if e["k"] == 1]
     k2 = [e for e in other_evs if e["k"] == 2]
     k3p = [e for e in other_evs if e["k"] >= 3]
 
-    by_bucket: dict[str, list] = defaultdict(list)
-    for e in k1:
-        b = size_bucket(e["spend_sol_equiv"])
-        if b:
-            by_bucket[b].append(e)
-    target_per_bucket = 800 // len(SIZE_BUCKETS)
-    k1_sample = []
-    for name, _, _ in SIZE_BUCKETS:
-        pool = by_bucket.get(name, [])
-        n_take = max(60, target_per_bucket) if len(pool) >= max(60, target_per_bucket) else len(pool)
-        k1_sample.extend(rng.sample(pool, n_take) if len(pool) >= n_take else pool)
-
-    k2_sample = rng.sample(k2, min(300, len(k2)))
-    k3p_sample = rng.sample(k3p, min(150, len(k3p)))
+    if reduced:
+        k1_sample, k2_sample, k3p_sample = [], [], []
+    else:
+        by_bucket: dict[str, list] = defaultdict(list)
+        for e in k1:
+            b = size_bucket(e["spend_sol_equiv"])
+            if b:
+                by_bucket[b].append(e)
+        target_per_bucket = 800 // len(SIZE_BUCKETS)
+        k1_sample = []
+        for name, _, _ in SIZE_BUCKETS:
+            pool = by_bucket.get(name, [])
+            n_take = max(60, target_per_bucket) if len(pool) >= max(60, target_per_bucket) else len(pool)
+            k1_sample.extend(rng.sample(pool, n_take) if len(pool) >= n_take else pool)
+        k2_sample = rng.sample(k2, min(300, len(k2)))
+        k3p_sample = rng.sample(k3p, min(150, len(k3p)))
 
     # топ-30 новых кошельков по частоте (freq_ge2/day, k=1, исключая лидера и 29 кандидатов)
     by_wallet_new: dict[str, list] = defaultdict(list)
@@ -114,10 +131,11 @@ def build_sample(events_by_wallet: dict, wallet_roles: dict) -> list[dict]:
         freqs.append((w, n_ge2 / 7.0))
     freqs.sort(key=lambda x: -x[1])
     top30_wallets = {w for w, _ in freqs[:30]}
+    per_wallet_cap = TOP30_PER_WALLET_CAP_REDUCED if reduced else 30
     top30_extra = []
     for w in top30_wallets:
         wk1 = [e for e in by_wallet_new[w] if e["k"] == 1]
-        top30_extra.extend(wk1[:30])
+        top30_extra.extend(wk1[:per_wallet_cap])
 
     seen_ids = set()
     sample = []
