@@ -37,8 +37,12 @@ LOOKBACK_S = 300
 HORIZONS = [("plus5", 5), ("plus30", 30), ("plus60", 60), ("plus180", 180)]
 MAX_HORIZON_S = 180
 FETCH_HI_BUFFER_S = 5
-BATCH_SIZE = 500
+BATCH_SIZE = 20  # см. докстринг build_price_sql -- батч 0 (500 событий, OR-джойн)
+# сжёг 339 кредитов и всё равно упал по лимиту ресурсов; после починки на UNION ALL
+# начинаем с МАЛОГО батча, чтобы честно проверить реальную стоимость до масштабирования
 ROUND_TRIP_COST_FRAC = 0.06  # ~6% на 0.3 SOL размере, по заданию владельца
+MAX_TOTAL_COST_CREDITS = 150.0  # аварийный потолок -- см. FATAL_ERROR_MARKERS ниже
+FATAL_ERROR_MARKERS = ("RESOURCES_CAP_REACHED", "exceed your configured", "datapoint limit")
 
 
 def flatten_events(events_by_wallet: dict) -> list[dict]:
@@ -52,21 +56,32 @@ def flatten_events(events_by_wallet: dict) -> list[dict]:
 
 
 def build_price_sql(batch: list[dict]) -> str:
+    # НАХОДКА (после реального сбоя -- батч 0 из 500 событий сжёг 339
+    # кредитов и всё равно упал по лимиту ресурсов на выполнение,
+    # FAILED_TYPE_RESOURCES_CAP_REACHED; следующие батчи упали по
+    # лимиту датапоинтов на биллинг-цикл): (A OR B) в условии JOIN не
+    # даёт Trino сделать простой hash-join по одному ключу -- вместо
+    # этого похоже на почти полное сканирование dex_solana.trades на
+    # каждый VALUES-ряд. Чиним: два отдельных равенственных JOIN (по
+    # bought_mint и по sold_mint отдельно), UNION ALL -- каждая половина
+    # получает нормальный hash-join по mint.
     values = ",".join(
         f"({e['event_id']}, '{e['mint']}', {e['block_time_epoch'] - LOOKBACK_S}, "
         f"{e['block_time_epoch'] + MAX_HORIZON_S + FETCH_HI_BUFFER_S})"
         for e in batch
     )
+    select_cols = ("dt.block_time, dt.token_bought_mint_address AS bought_mint, "
+                   "dt.token_sold_mint_address AS sold_mint, dt.token_bought_amount AS bought_amount, "
+                   "dt.token_sold_amount AS sold_amount, e.event_id")
     return (
         f"WITH ev(event_id, mint, lo, hi) AS (VALUES {values}) "
-        "SELECT dt.block_time, dt.token_bought_mint_address AS bought_mint, "
-        "dt.token_sold_mint_address AS sold_mint, dt.token_bought_amount AS bought_amount, "
-        "dt.token_sold_amount AS sold_amount, e.event_id "
-        "FROM dex_solana.trades dt JOIN ev e "
-        "ON (dt.token_bought_mint_address = e.mint OR dt.token_sold_mint_address = e.mint) "
+        f"SELECT {select_cols} FROM dex_solana.trades dt JOIN ev e "
+        f"ON dt.token_bought_mint_address = e.mint AND dt.token_sold_mint_address = '{WSOL_MINT}' "
         "AND dt.block_time BETWEEN from_unixtime(e.lo) AND from_unixtime(e.hi) "
-        f"WHERE (dt.token_bought_mint_address = e.mint AND dt.token_sold_mint_address = '{WSOL_MINT}') "
-        f"OR (dt.token_sold_mint_address = e.mint AND dt.token_bought_mint_address = '{WSOL_MINT}')"
+        "UNION ALL "
+        f"SELECT {select_cols} FROM dex_solana.trades dt JOIN ev e "
+        f"ON dt.token_sold_mint_address = e.mint AND dt.token_bought_mint_address = '{WSOL_MINT}' "
+        "AND dt.block_time BETWEEN from_unixtime(e.lo) AND from_unixtime(e.hi)"
     )
 
 
@@ -245,6 +260,7 @@ def main() -> None:
     events_by_id = {e["event_id"]: e for e in flat_events}
     prices_by_event: dict[int, dict] = {}
     batch_meta = []
+    running_cost = 0.0
     n_batches = (len(flat_events) + BATCH_SIZE - 1) // BATCH_SIZE
     for bi in range(n_batches):
         batch = flat_events[bi * BATCH_SIZE:(bi + 1) * BATCH_SIZE]
@@ -252,13 +268,38 @@ def main() -> None:
         r = probe.run_sql_sync(f"phase3_prices_batch_{bi}", sql, timeout_s=600)
         meta = {k: v for k, v in r.items() if k != "rows"}
         batch_meta.append(meta)
+        batch_cost = (meta.get("status_meta") or {}).get("execution_cost_credits", 0) or 0
+        running_cost += batch_cost
         print(f"[phase3] батч {bi+1}/{n_batches}: status={r.get('status')} n_rows={r.get('n_rows')} "
-              f"credits={meta.get('status_meta', {}).get('execution_cost_credits')}", flush=True)
+              f"credits={batch_cost} running_total={running_cost:.2f}", flush=True)
+
+        err_text = json.dumps(meta, default=str)
+        is_fatal = any(marker in err_text for marker in FATAL_ERROR_MARKERS)
         if r.get("status") != "ok":
             result["batches"] = batch_meta
+            result["total_cost_credits_so_far"] = running_cost
+            if is_fatal:
+                result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО на батче {bi} -- реальный внешний блокер Dune "
+                                           f"(ресурсный лимит запроса или лимит датапоинтов биллинг-цикла), "
+                                           f"не код-баг. Дальше не итерирую -- нужно решение владельца "
+                                           f"(поднять лимиты в Dune или дождаться сброса цикла). "
+                                           f"Потрачено в этом прогоне: {running_cost:.2f} кредитов.")
+                OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+                print("[phase3] " + result["FINAL_ANSWER"], flush=True)
+                break
             result["FINAL_ANSWER"] = f"Батч {bi} не выполнился ({r.get('status')}) -- Фаза 3 неполная, см. batches."
             OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
             continue
+
+        if running_cost > MAX_TOTAL_COST_CREDITS:
+            result["batches"] = batch_meta
+            result["total_cost_credits_so_far"] = running_cost
+            result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО после батча {bi} -- аварийный потолок стоимости "
+                                       f"{MAX_TOTAL_COST_CREDITS} кредитов превышен ({running_cost:.2f}). "
+                                       f"Дальше не трачу без явного решения владельца.")
+            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+            print("[phase3] " + result["FINAL_ANSWER"], flush=True)
+            break
 
         rows_by_event: dict[int, list] = {}
         for row in r["rows"]:
