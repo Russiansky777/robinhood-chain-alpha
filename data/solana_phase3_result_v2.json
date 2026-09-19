@@ -1,0 +1,103 @@
+{
+  "generated_at_utc": "2026-09-19T12:34:51Z",
+  "step0_key_discovery": {
+    "env_keys_checked": [
+      "DUNE_JANA_API",
+      "DUNE_EXPLORER_API",
+      "DUNE_API_KEY",
+      "DUNE_API_KEY_MOZILA"
+    ],
+    "non_empty": [
+      "DUNE_JANA_API"
+    ],
+    "liveness": {
+      "DUNE_JANA_API": {
+        "http_status": 200,
+        "alive": true,
+        "body_preview": "{\"query_id\": 8775405}"
+      }
+    }
+  },
+  "n_events_sampled": 1871,
+  "cost_per_event_from_first_batch": 4.15397115385,
+  "projected_total_cost_credits": 7772.080028853349,
+  "batches": [
+    {
+      "name": "phase3v2_batch_0",
+      "sql_preview": "WITH ev(event_id, mint, lo, hi, t0) AS (VALUES (5272, '6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx', 1789212957, 1789213442, 1789213257),(5273, '6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx', 1789212999, 1789213484, 1789213299),(5297, '6rCTxdMkyhUPdL4MF3YXBGnJ3s9hH1fvAbsXFFHwDyVB', 1789213454, 1789",
+      "create": {
+        "http_status": 200
+      },
+      "query_id": 8775406,
+      "execute": {
+        "http_status": 200
+      },
+      "execution_id": "01M2WTK45DWKZXYK8QGK2E56D8",
+      "status_meta": {
+        "execution_id": "01M2WTK45DWKZXYK8QGK2E56D8",
+        "query_id": 8775406,
+        "is_execution_finished": true,
+        "state": "QUERY_STATE_COMPLETED",
+        "submitted_at": "2026-09-19T12:34:52.718507Z",
+        "expires_at": "2026-12-18T12:36:21.340819Z",
+        "execution_started_at": "2026-09-19T12:34:53.354075604Z",
+        "execution_ended_at": "2026-09-19T12:36:21.340811647Z",
+        "result_metadata": {
+          "column_names": [
+            "event_id",
+            "price_before",
+            "price_plus5",
+            "price_plus30",
+            "price_plus60",
+            "price_plus180"
+          ],
+          "column_types": [
+            "integer",
+            "double",
+            "double",
+            "double",
+            "double",
+            "double"
+          ],
+          "row_count": 19,
+          "result_set_bytes": 773,
+          "total_row_count": 19,
+          "total_result_set_bytes": 773,
+          "datapoint_count": 114,
+          "pending_time_millis": 635,
+          "execution_time_millis": 87986
+        },
+        "execution_cost_credits": 83.079423077
+      },
+      "results_http_status": 200,
+      "status": "ok",
+      "n_rows": 19,
+      "metadata": {
+        "column_names": [
+          "event_id",
+          "price_before",
+          "price_plus5",
+          "price_plus30",
+          "price_plus60",
+          "price_plus180"
+        ],
+        "column_types": [
+          "integer",
+          "double",
+          "double",
+          "double",
+          "double",
+          "double"
+        ],
+        "row_count": 19,
+        "result_set_bytes": 773,
+        "total_row_count": 19,
+        "total_result_set_bytes": 773,
+        "datapoint_count": 114,
+        "pending_time_millis": 635,
+        "execution_time_millis": 87986
+      }
+    }
+  ],
+  "FINAL_ANSWER": "ОСТАНОВЛЕНО после батча 0 -- прогноз стоимости (7772.08) превышает потолок 150.0. Нужно решение владельца (поднять потолок или уменьшить выборку)."
+}
