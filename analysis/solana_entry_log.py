@@ -93,8 +93,25 @@ def mint_event_for_tx(tx: dict, mint: str) -> dict | None:
 
 def trade_amounts(e: dict, mint: str) -> dict | None:
     """Для kind='cp' -- реальные суммы обеих ног из SwapEvent-лога.
-    Для остальных видов пулов (cl/dl/launch) суммы здесь не извлекаются
-    -- честно возвращаем None, не выдумываем."""
+    Для kind='pamm' (Pump.fun AMM) -- только направление 'buy', сверено с
+    эталоном (20 WSOL -> 14 263 324.112826 CC); 'sell' там расклад полей
+    не проверен, суммы не извлекаются (см. engine.py). Для остальных видов
+    пулов (cl/dl/launch) суммы здесь не извлекаются -- честно возвращаем
+    None, не выдумываем."""
+    if e.get("kind") == "pamm":
+        if e.get("direction") != "buy" or e.get("m0") is None or e.get("m1") is None:
+            return None
+        d0, d1 = e.get("d0"), e.get("d1")
+        if d0 is None or d1 is None:
+            return None
+        in_mint, out_mint = e["m0"], e["m1"]
+        input_amount = float(D(e["quote_amount_raw"]) / D(10) ** d0)
+        output_amount = float(D(e["base_amount_raw"]) / D(10) ** d1)
+        return {"input_mint": in_mint, "input_amount": input_amount,
+                "output_mint": out_mint, "output_amount": output_amount,
+                "quote_mint": out_mint if in_mint == mint else in_mint,
+                "quote_amount": output_amount if in_mint == mint else input_amount,
+                "direction": "продажа минта" if in_mint == mint else "покупка минта"}
     if e.get("kind") != "cp":
         return None
     ev = e.get("event") or {}
