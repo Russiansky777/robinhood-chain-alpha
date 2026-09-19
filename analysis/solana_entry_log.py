@@ -178,7 +178,8 @@ def build_log(req: dict) -> dict:
     leader_slot = leader_tx["slot"]
     leader_time = leader_tx["blockTime"]
 
-    mint = req.get("mint") or detect_mint(leader_tx, LEADER_WALLET)
+    leader_wallet = req.get("leader_wallet") or LEADER_WALLET
+    mint = req.get("mint") or detect_mint(leader_tx, leader_wallet)
     if not mint:
         return {"label": req.get("label"), "HONEST_ANSWER": "не удалось определить минт по балансу лидера -- укажите mint явно"}
 
@@ -209,7 +210,7 @@ def build_log(req: dict) -> dict:
     print(f"[entry_log] {req.get('label')}: найдено подписей минта в окне (+доп. наши) = {len(sigs)}", flush=True)
 
     our_wallet = req.get("our_wallet")
-    label_map = {LEADER_WALLET: "ЛИДЕР"}
+    label_map = {leader_wallet: "ЛИДЕР"}
     if our_wallet:
         label_map[our_wallet] = "МЫ"
 
@@ -233,7 +234,7 @@ def build_log(req: dict) -> dict:
                 other_events = [{"pool": e.get("pool"), "kind": e.get("kind"), "m0": e.get("m0"), "m1": e.get("m1")}
                                  for e in engine.decode_tx(tx)]
                 signers = tx_signers(tx)
-                wallet = next((w for w in (LEADER_WALLET, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
+                wallet = next((w for w in (leader_wallet, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
                 idx = block_index(slot, sig)
                 rows.append({"signature": sig, "slot": slot, "index_in_block": idx,
                              "block_time_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(tx["blockTime"])),
@@ -248,7 +249,7 @@ def build_log(req: dict) -> dict:
         # опираться только на signers[0], лидерская сделка ошибочно
         # получает метку "прочие". Явно ищем ЛИДЕРА/НАС среди ВСЕХ
         # подписантов, иначе -- первый подписант.
-        wallet = next((w for w in (LEADER_WALLET, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
+        wallet = next((w for w in (leader_wallet, our_wallet) if w and w in signers), None) or (signers[0] if signers else None)
         price, quote_mint = price_of_mint(ev, mint)
         p_usd, usd_note = price_usd(price, quote_mint)
         amounts = trade_amounts(ev, mint)
