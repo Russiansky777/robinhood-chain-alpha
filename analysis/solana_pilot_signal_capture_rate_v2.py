@@ -37,11 +37,31 @@ MATCH_WINDOW_S = 120
 
 
 def gecko_get(path: str, params: dict) -> dict:
-    try:
-        resp = requests.get(f"{GECKO_BASE}{path}", params=params, timeout=30, headers={"Accept": "application/json"})
+    """Владелец, 2026-09-20: ретрай с бэкоффом -- найдено как реальная
+    причина потери 2 реальных сигналов лидера (GtDZKAqvMZ.../EgP1f5J9LD...)
+    в этом же скрипте: одиночный транзиентный сбой/429 GeckoTerminal при
+    busy-прогоне (много вызовов подряд на разные timestamp) тихо ронял
+    None, который НАВСЕГДА кэшировался в _sol_cache[t] -- сигнал
+    пропадал без возможности повтора в рамках того же прогона. Тот же
+    паттерн (10 попыток, бэкофф до 30с), что уже в
+    solana_29_candidates_usdc_to_sol.py и solana_dbot_realized_ledger.py."""
+    backoff = 1.0
+    last: dict = {"http_status": None}
+    for _ in range(10):
+        try:
+            resp = requests.get(f"{GECKO_BASE}{path}", params=params, timeout=30, headers={"Accept": "application/json"})
+        except Exception as exc:  # noqa: BLE001
+            last = {"http_status": None, "exception": str(exc)[:200]}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
+        if resp.status_code == 429:
+            last = {"http_status": 429}
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+            continue
         return {"http_status": resp.status_code, "body": resp.json() if resp.ok else None}
-    except Exception as exc:  # noqa: BLE001
-        return {"http_status": None, "exception": str(exc)[:200]}
+    return last
 
 
 _sol_cache: dict[int, float | None] = {}
@@ -54,7 +74,9 @@ def sol_usd_price_at(t: int) -> float | None:
                   {"aggregate": 1, "before_timestamp": t + 3600, "limit": 200, "currency": "usd"})
     rows = (((r.get("body") or {}).get("data") or {}).get("attributes") or {}).get("ohlcv_list") or []
     if not rows:
-        _sol_cache[t] = None
+        # НЕ кэшируем None навсегда -- честная неудача на этот раз, но
+        # следующий вызов для того же t ДОЛЖЕН иметь шанс на повтор,
+        # не быть замурован первым же сбоем.
         return None
     rows = sorted(rows, key=lambda c: c[0])
     import bisect
