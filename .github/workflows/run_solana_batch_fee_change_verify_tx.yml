@@ -1,0 +1,46 @@
+name: "Solana batch: проверка найденной 'первой сделки' после смены комиссии"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BATCH_FEE_CHANGE_VERIFY_TX_REQUEST"
+
+jobs:
+  verify_tx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Проверка найденной транзакции"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_batch_fee_change_verify_tx.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_BATCH_FEE_CHANGE_VERIFY_TX_REQUEST
+          [ -e data/solana_batch_fee_change_verify_tx.json ] && git add data/solana_batch_fee_change_verify_tx.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana batch: проверка найденной транзакции после смены комиссии -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

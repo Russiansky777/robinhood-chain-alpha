@@ -51,6 +51,8 @@ MAX_HORIZON_S = 180
 FETCH_HI_BUFFER_S = 5
 CHUNK_SIZE = 700  # под-батч ВНУТРИ дня, чтобы не упереться в лимит длины SQL (см. preamt/09-17)
 MAX_TOTAL_COST_CREDITS = 150.0
+MAX_DAYS_PER_RUN = 1  # владелец: сначала ОДИН день (проверить, что цена не подскочила от объёма
+# соединения на полной выборке), потом остальные дни по 2 за прогон -- поднять до 2 после проверки дня 1
 FATAL_ERROR_MARKERS = ("RESOURCES_CAP_REACHED", "exceed your configured", "datapoint limit")
 ROUND_TRIP_COST_FRAC = 0.06
 SIZE_BUCKETS = [("2-4.3", 2, 4.3), ("4.3-8", 4.3, 8), ("8-15", 8, 15), ("15+", 15, float("inf"))]
@@ -252,7 +254,10 @@ def build_answer_tables(sample: list[dict], prices_by_event: dict, wallet_roles:
 def main() -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     d = json.loads(EVENTS_PATH.read_text())
-    sample = build_sample(d["events_by_wallet"], d["wallet_roles"])
+    # Владелец, после замера: стоимость фиксирована ЗА ДЕНЬ (партиция),
+    # не за событие -- сокращать выборку бессмысленно, а для ранга
+    # кошельков нужно n>=20/кошелёк. Полная выборка (reduced=False).
+    sample = build_sample(d["events_by_wallet"], d["wallet_roles"], reduced=False)
     events_by_id = {e["event_id"]: e for e in sample}
 
     by_day: dict[str, list[dict]] = defaultdict(list)
@@ -260,21 +265,44 @@ def main() -> None:
         by_day[day_str(e["block_time_epoch"])].append(e)
     days = sorted(by_day.keys())
 
+    # Резюме с прошлого прогона -- пропускаем уже успешно обработанные
+    # дни (их сырьё уже в data/solana_phase3_raw_v3/<день>.json.gz),
+    # берём цены оттуда без повторной оплаты.
+    prev_result = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
+    already_ok_days = {m["day"] for m in (prev_result.get("days_processed") or []) if m.get("status") == "ok"}
+    prices_by_event: dict[int, dict] = {}
+    prior_cost_total = 0.0
+    for day in already_ok_days:
+        raw_path = RAW_DIR / f"{day}.json.gz"
+        if not raw_path.exists():
+            continue
+        with gzip.open(raw_path, "rt", encoding="utf-8") as fh:
+            cached = json.load(fh)
+        for row in cached["rows"]:
+            prices_by_event[row["event_id"]] = row
+    for m in (prev_result.get("days_processed") or []):
+        if m.get("status") == "ok":
+            prior_cost_total += m.get("cost_credits", 0) or 0
+    days_todo = [day for day in days if day not in already_ok_days][:MAX_DAYS_PER_RUN]
+    print(f"[phase3v3] дней всего={len(days)}, уже готово={len(already_ok_days)}, "
+          f"в этом прогоне обработаю: {days_todo}", flush=True)
+
     discovery = step0_discover_keys()
     key_name = pick_working_key(discovery)
     result: dict = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                      "step0_key_discovery": discovery, "n_events_sampled": len(sample),
-                     "n_events_per_day": {k: len(v) for k, v in by_day.items()}}
+                     "n_events_per_day": {k: len(v) for k, v in by_day.items()},
+                     "days_all": days, "days_already_done": sorted(already_ok_days),
+                     "days_this_run": days_todo}
     if key_name is None:
         result["HONEST_ANSWER"] = "DUNE_JANA_API не живой."
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         return
     probe = DuneProbe(os.environ[key_name])
 
-    prices_by_event: dict[int, dict] = {}
-    day_meta, running_cost = [], 0.0
-    first_day_done = False
-    for di, day in enumerate(days):
+    day_meta = [m for m in (prev_result.get("days_processed") or []) if m["day"] in already_ok_days]
+    running_cost = prior_cost_total
+    for di, day in enumerate(days_todo):
         day_events = by_day[day]
         chunks = [day_events[j:j + CHUNK_SIZE] for j in range(0, len(day_events), CHUNK_SIZE)]
         day_cost, day_rows_all, day_status = 0.0, [], "ok"
@@ -299,21 +327,8 @@ def main() -> None:
         result["days_processed"] = day_meta
         result["total_cost_credits_so_far"] = running_cost
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-
-        if not first_day_done:
-            first_day_done = True
-            projected_total = day_cost * len(days)  # прогноз по стоимости ДНЯ, не события (см. докстринг)
-            result["cost_per_day_first_day"] = day_cost
-            result["projected_total_cost_credits"] = projected_total
-            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-            print(f"[phase3v3] прогноз после дня 1: {day_cost:.2f} кредита/день x {len(days)} дней "
-                  f"≈ {projected_total:.2f} кредитов (потолок {MAX_TOTAL_COST_CREDITS})", flush=True)
-            if projected_total > MAX_TOTAL_COST_CREDITS:
-                result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО после дня 1 -- прогноз ({projected_total:.2f}) "
-                                           f"превышает потолок {MAX_TOTAL_COST_CREDITS}. Нужно решение владельца.")
-                OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-                print("[phase3v3] " + result["FINAL_ANSWER"], flush=True)
-                return
+        print(f"[phase3v3] день {day} итог: {day_cost:.2f} кредита (ожидалось ~65-80 по замеру дня 09-12)",
+              flush=True)
 
         if day_status != "ok":
             err_text = json.dumps(day_meta[-1], default=str)
@@ -331,17 +346,28 @@ def main() -> None:
         result["n_events_priced_so_far"] = len(prices_by_event)
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
-        if running_cost > MAX_TOTAL_COST_CREDITS:
-            result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО -- потолок {MAX_TOTAL_COST_CREDITS} кредитов превышен ({running_cost:.2f})."
+        if running_cost - prior_cost_total > MAX_TOTAL_COST_CREDITS:
+            result["FINAL_ANSWER"] = (f"ОСТАНОВЛЕНО в этом прогоне -- потолок {MAX_TOTAL_COST_CREDITS} кредитов "
+                                       f"на прогон превышен (потрачено в прогоне {running_cost - prior_cost_total:.2f}).")
             OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
             print("[phase3v3] " + result["FINAL_ANSWER"], flush=True)
             return
 
     result["total_cost_credits"] = running_cost
-    result["answers"] = build_answer_tables(sample, prices_by_event, d["wallet_roles"])
+    done_days = {m["day"] for m in day_meta if m["status"] == "ok"}
+    if done_days >= set(days):
+        result["answers"] = build_answer_tables(sample, prices_by_event, d["wallet_roles"])
+        result["ALL_DAYS_DONE"] = True
+        print(f"[phase3v3] ВСЕ ДНИ ЗАВЕРШЕНЫ: {len(prices_by_event)}/{len(sample)} событий получили цены, "
+              f"стоимость всего={running_cost:.2f} кредитов", flush=True)
+    else:
+        remaining = [day for day in days if day not in done_days]
+        result["ALL_DAYS_DONE"] = False
+        result["days_remaining"] = remaining
+        print(f"[phase3v3] прогон завершён, но остались дни: {remaining} -- "
+              f"перезапустите скрипт (продолжит с них), стоимость этого прогона={running_cost - prior_cost_total:.2f}, "
+              f"всего накоплено={running_cost:.2f}", flush=True)
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-    print(f"[phase3v3] завершено: {len(prices_by_event)}/{len(sample)} событий получили цены, "
-          f"стоимость={running_cost:.2f} кредитов", flush=True)
 
 
 if __name__ == "__main__":
