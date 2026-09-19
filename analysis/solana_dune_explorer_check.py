@@ -138,6 +138,12 @@ class DuneProbe:
                 step["status_meta"] = st["body"]
                 break
             if state in ("QUERY_STATE_FAILED", "QUERY_STATE_CANCELLED"):
+                # Владелец, найдено на дне 09-15: упавшее исполнение (напр.
+                # FAILED_TYPE_RESOURCES_CAP_REACHED) ВСЁ РАВНО списывает
+                # кредиты (101.59 на этом падении) -- status_meta нужно
+                # сохранять и здесь, иначе вызывающий код (cost = ...
+                # status_meta.execution_cost_credits) молча посчитает 0.
+                step["status_meta"] = st["body"]
                 step["status"] = f"execution_{state}"
                 step["status_body"] = st["body"]
                 return step

@@ -64,7 +64,9 @@ LOOKBACK_S = 300
 HORIZONS = [("plus5", 5), ("plus30", 30), ("plus60", 60), ("plus180", 180)]
 MAX_HORIZON_S = 180
 FETCH_HI_BUFFER_S = 5
-CHUNK_SIZE = 700
+CHUNK_SIZE = 100  # владелец: день 09-15 (340 событий, 1 чанк по старому 700) упал с
+# FAILED_TYPE_RESOURCES_CAP_REACHED, реально списав 101.59 кредита -- уменьшаем размер
+# запроса, чтобы держаться под лимитом ресурсов на исполнение, не по длине SQL-текста
 MAX_TOTAL_COST_CREDITS = 1000.0  # предохранитель за один прогон -- только от катастрофического сбоя,
 # НЕ реальный бюджетный лимит (владелец: решения об остановке -- только по кабинету Dune, собственный
 # счётчик execution_cost_credits завышал ~3.3x в прошлых прогонах и не сверен с кабинетом)
@@ -355,7 +357,7 @@ def main() -> None:
     days = sorted(by_day.keys())
 
     prev_result = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
-    already_ok_days = {m["day"] for m in (prev_result.get("days_processed") or []) if m.get("status") == "ok"}
+    already_ok_days = {m["day"] for m in (prev_result.get("days_processed") or []) if m.get("status") in ("ok", "partial_chunks_failed")}
     prices_by_event: dict[int, dict] = {}
     prior_cost_total = 0.0
     for day in already_ok_days:
@@ -367,7 +369,7 @@ def main() -> None:
         for row in cached["rows"]:
             prices_by_event[row["event_id"]] = row
     for m in (prev_result.get("days_processed") or []):
-        if m.get("status") == "ok":
+        if m.get("status") in ("ok", "partial_chunks_failed"):
             prior_cost_total += m.get("cost_credits", 0) or 0
     remaining_days = [day for day in days if day not in already_ok_days]
     # Владелец: темп трат на новом (исправленном) джойне заметно выше
@@ -417,7 +419,7 @@ def main() -> None:
     for day in days_todo:
         day_events = by_day[day]
         chunks = [day_events[j:j + CHUNK_SIZE] for j in range(0, len(day_events), CHUNK_SIZE)]
-        day_cost, day_rows_all, day_status = 0.0, [], "ok"
+        day_cost, day_rows_all, failed_chunks = 0.0, [], []
         for ci, chunk in enumerate(chunks):
             sql = build_price_sql(chunk)
             r = probe.run_sql_sync(f"phase3v4_{day}_c{ci}", sql, timeout_s=600)
@@ -426,28 +428,37 @@ def main() -> None:
             day_cost += cost
             running_cost += cost
             if r.get("status") != "ok":
-                day_status = r.get("status")
-                print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status={day_status} -- "
-                      f"тело: {json.dumps(meta, default=str)[:800]}", flush=True)
-                break
+                # Владелец, найдено на дне 09-15: одна чанка может упасть
+                # (напр. FAILED_TYPE_RESOURCES_CAP_REACHED из-за одного
+                # тяжёлого минта в этой чанке), не бросаем весь день --
+                # остальные чанки могут пройти нормально, их данные не
+                # выбрасываем. Событий из упавшей чанки честно нет в
+                # результате -- см. failed_chunks.
+                err = (meta.get("status_meta") or {}).get("error")
+                failed_chunks.append({"chunk_index": ci, "n_events": len(chunk), "status": r.get("status"),
+                                       "cost_credits": cost, "error": err})
+                print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status={r.get('status')} -- "
+                      f"ПРОПУЩЕН (данные остальных чанков сохраняются). тело: {json.dumps(meta, default=str)[:800]}", flush=True)
+                is_fatal = any(m in json.dumps(err, default=str) for m in FATAL_ERROR_MARKERS)
+                if not is_fatal:
+                    result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО на дне {day}, чанк {ci} (нефатальная ошибка, не похоже на внешний предел Dune): {r.get('status')}"
+                    OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+                    print("[phase3v4] " + result["FINAL_ANSWER"], flush=True)
+                    return
+                continue
             day_rows_all.extend(r["rows"])
             print(f"[phase3v4] день {day} чанк {ci+1}/{len(chunks)}: status=ok n_rows={r.get('n_rows')} "
                   f"cost={cost} running_total={running_cost:.2f}", flush=True)
 
+        day_status = "ok" if not failed_chunks else "partial_chunks_failed"
         day_meta.append({"day": day, "n_events": len(day_events), "n_chunks": len(chunks),
+                          "n_chunks_failed": len(failed_chunks), "failed_chunks": failed_chunks,
                           "status": day_status, "n_rows": len(day_rows_all), "cost_credits": day_cost})
         result["days_processed"] = day_meta
         result["total_cost_credits_so_far"] = running_cost
         OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-        print(f"[phase3v4] день {day} итог: {day_cost:.2f} кредита", flush=True)
-
-        if day_status != "ok":
-            err_text = json.dumps(day_meta[-1], default=str)
-            is_fatal = any(m in err_text for m in FATAL_ERROR_MARKERS)
-            result["FINAL_ANSWER"] = f"ОСТАНОВЛЕНО на дне {day} ({'внешний блокер Dune' if is_fatal else day_status})."
-            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-            print("[phase3v4] " + result["FINAL_ANSWER"], flush=True)
-            return
+        print(f"[phase3v4] день {day} итог: {day_cost:.2f} кредита, "
+              f"чанков упало={len(failed_chunks)}/{len(chunks)}", flush=True)
 
         raw_path = RAW_DIR / f"{day}.json.gz"
         with gzip.open(raw_path, "wt", encoding="utf-8") as fh:
@@ -469,7 +480,7 @@ def main() -> None:
             break
 
     result["total_cost_credits"] = running_cost
-    done_days = {m["day"] for m in day_meta if m["status"] == "ok"}
+    done_days = {m["day"] for m in day_meta if m["status"] in ("ok", "partial_chunks_failed")}
     remaining = [day for day in days if day not in done_days]
     result["ALL_DAYS_DONE"] = not remaining
     result["days_covered"] = sorted(done_days)
