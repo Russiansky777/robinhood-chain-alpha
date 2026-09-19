@@ -149,6 +149,49 @@ def price_usd(price: float | None, quote_mint: str | None) -> tuple[float | None
     return None, f"неизвестный quote-актив {quote_mint[:10] if quote_mint else '?'}.."
 
 
+def get_block_full(slot: int) -> dict | None:
+    """Полный getBlock (все транзакции, jsonParsed) -- для честного скана
+    окна по слотам без опоры на getSignaturesForAddress (см. docstring
+    fetch_mint_signatures_via_block_scan)."""
+    try:
+        return fp.rpc_call("getBlock", [slot, {"transactionDetails": "full", "encoding": "jsonParsed",
+                                                "rewards": False, "maxSupportedTransactionVersion": 1}])
+    except RuntimeError as exc:
+        if "skipped" in str(exc).lower() or "not available" in str(exc).lower() or "-32004" in str(exc) or "-32007" in str(exc):
+            return None
+        raise
+
+
+def fetch_mint_signatures_via_block_scan(mint: str, lo_slot: int, hi_slot: int) -> list[dict]:
+    """Владелец, п.2: getSignaturesForAddress(минт) как выяснилось на
+    сделке AKBot -- НЕ находит транзакцию, где минт присутствует только
+    через loadedAddresses версионной транзакции (Address Lookup Table) --
+    подозрение, что этот RPC-метод индексирует только статические ключи.
+    Честная альтернатива для узкого окна: getBlock по каждому слоту,
+    прямая проверка на минт в preTokenBalances/postTokenBalances ИЛИ в
+    loadedAddresses ИЛИ в статических accountKeys -- ничего не зависит от
+    того, как именно адрес попал в транзакцию."""
+    out = []
+    for slot in range(lo_slot, hi_slot + 1):
+        block = get_block_full(slot)
+        if block is None:
+            continue
+        for tx in block.get("transactions") or []:
+            meta = tx.get("meta") or {}
+            if meta.get("err") is not None:
+                continue
+            mints_in_tx = {b.get("mint") for b in (meta.get("preTokenBalances") or []) + (meta.get("postTokenBalances") or [])}
+            loaded = meta.get("loadedAddresses") or {}
+            loaded_keys = set(loaded.get("writable") or []) | set(loaded.get("readonly") or [])
+            keys = tx["transaction"]["message"].get("accountKeys") or []
+            static_keys = {k["pubkey"] if isinstance(k, dict) else k for k in keys}
+            if mint in mints_in_tx or mint in loaded_keys or mint in static_keys:
+                sig = tx["transaction"]["signatures"][0]
+                out.append({"signature": sig, "slot": slot, "blockTime": block.get("blockTime"), "err": None,
+                            "found_via": "block_scan"})
+    return out
+
+
 def fetch_mint_signatures_in_slot_window(mint: str, ref_time: int, lo_slot: int, hi_slot: int,
                                           time_buffer_s: int = 30) -> list[dict]:
     """Все подписи, где встречается адрес МИНТА (значит -- любая его
@@ -206,6 +249,29 @@ def build_log(req: dict) -> dict:
           f"окно=[{lo_slot},{hi_slot}]", flush=True)
 
     sigs = fetch_mint_signatures_in_slot_window(mint, leader_time, lo_slot, hi_slot)
+    n_via_mint_sigs = len(sigs)
+    pool_addr = req.get("pool")
+    if pool_addr:
+        pool_sigs = fetch_mint_signatures_in_slot_window(pool_addr, leader_time, lo_slot, hi_slot)
+        known = {s["signature"] for s in sigs}
+        sigs += [s for s in pool_sigs if s["signature"] not in known]
+    n_via_address_search = len(sigs)
+    # Владелец, п.2: getSignaturesForAddress по минту (и опционально пулу)
+    # честно может пропускать транзакции, где адрес присутствует только
+    # через loadedAddresses версионной transaction (ALT) -- см.
+    # fetch_mint_signatures_via_block_scan. Для узкого окна прогоняем
+    # getBlock по каждому слоту как независимую проверку полноты.
+    block_scan_sigs = fetch_mint_signatures_via_block_scan(mint, lo_slot, hi_slot)
+    known = {s["signature"] for s in sigs}
+    n_found_only_via_block_scan = 0
+    for s in block_scan_sigs:
+        if s["signature"] not in known:
+            sigs.append(s)
+            known.add(s["signature"])
+            n_found_only_via_block_scan += 1
+    print(f"[entry_log] {req.get('label')}: подписей по минту={n_via_mint_sigs}, "
+          f"+по пулу={n_via_address_search - n_via_mint_sigs}, "
+          f"+только через block_scan={n_found_only_via_block_scan}", flush=True)
     # добираем нашу покупку/продажу, если их слот вдруг вне окна (честно
     # расширяем, не молчим -- продажа часто происходит на десятки слотов
     # позже, вне узкого окна входа; это ОЖИДАЕМО и не повод её терять,
@@ -307,6 +373,9 @@ def build_log(req: dict) -> dict:
 
     result = {"label": req.get("label"), "mint": mint, "leader_signature": leader_sig,
               "leader_slot": leader_slot, "window": [lo_slot, hi_slot],
+              "discovery": {"n_via_mint_getSignaturesForAddress": n_via_mint_sigs,
+                            "n_via_pool_getSignaturesForAddress": n_via_address_search - n_via_mint_sigs,
+                            "n_found_only_via_block_scan": n_found_only_via_block_scan},
               "n_rows": len(rows), "rows": rows}
 
     our_buy_sig, our_sell_sig = req.get("our_buy_signature"), req.get("our_sell_signature")
