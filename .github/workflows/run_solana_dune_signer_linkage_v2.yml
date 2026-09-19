@@ -1,0 +1,47 @@
+name: "Solana buyer_200 -- Dune: связка через подписанта v2 (границы по слоту + калибровка)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_DUNE_SIGNER_LINKAGE_V2_REQUEST"
+
+jobs:
+  dune_signer_linkage_v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Связка через подписанта v2 + калибровка"
+        env:
+          DUNE_EXPLORER_API: ${{ secrets.DUNE_EXPLORER_API }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: python -u analysis/solana_dune_signer_linkage_v2.py
+      - name: Commit results
+        if: always()
+        run: |
+          git rm -f --ignore-unmatch data/p3_guard_cache/SOLANA_DUNE_SIGNER_LINKAGE_V2_REQUEST
+          [ -e data/solana_dune_signer_linkage_v2.json ] && git add data/solana_dune_signer_linkage_v2.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: связка Dune v2 через подписанта + калибровка -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
