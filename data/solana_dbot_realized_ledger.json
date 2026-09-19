@@ -1,6 +1,6 @@
 {
-  "generated_at_utc": "2026-09-19T10:02:59Z",
-  "previous_run_generated_at_utc": "2026-09-19T01:53:47Z",
+  "generated_at_utc": "2026-09-19T13:39:45Z",
+  "previous_run_generated_at_utc": "2026-09-19T10:02:59Z",
   "trades": [
     {
       "label": "pilot",
@@ -254,7 +254,7 @@
       "cost_pct": 3.1469041591457136,
       "status": "ok",
       "close_account_refund_detected_same_tx": true,
-      "is_new_since_previous_run": true,
+      "is_new_since_previous_run": false,
       "dbot_fee_sol": 0.01132075,
       "dbot_fee_pct_of_round_trip_principal": 2.2129,
       "dbot_fee_theoretical_pct_0.6_each_side": 1.2,
@@ -292,7 +292,7 @@
       "cost_pct": 13.79287685003362,
       "status": "ok",
       "close_account_refund_detected_same_tx": true,
-      "is_new_since_previous_run": true
+      "is_new_since_previous_run": false
     },
     {
       "label": "BATCH-3",
@@ -326,7 +326,7 @@
       "cost_pct": 15.162026922176388,
       "status": "ok",
       "close_account_refund_detected_same_tx": true,
-      "is_new_since_previous_run": true
+      "is_new_since_previous_run": false
     },
     {
       "label": "BATCH-3",
@@ -360,7 +360,7 @@
       "cost_pct": 12.829145644561502,
       "status": "ok",
       "close_account_refund_detected_same_tx": true,
-      "is_new_since_previous_run": true
+      "is_new_since_previous_run": false
     },
     {
       "label": "BATCH-2",
@@ -394,7 +394,7 @@
       "cost_pct": 13.623728641536125,
       "status": "ok",
       "close_account_refund_detected_same_tx": true,
-      "is_new_since_previous_run": true
+      "is_new_since_previous_run": false
     },
     {
       "label": "BATCH-1",
@@ -595,6 +595,78 @@
         "unmatched_fee_debits_before_first_trade": []
       }
     },
+    "BATCH-4": {
+      "funding_events": [
+        {
+          "signature": "2ZA65FsscJVfb1x2mTWvpY8GBq21qUfHm3w8vcPkM8eS2JVJKWqznqg56Hs1KpKnm5zQgUj4uwgWPoFZJ35ohm6R",
+          "block_time": 1789824691,
+          "sol_change": 1.78
+        }
+      ],
+      "n_funding_events": 1,
+      "total_funded_sol": 1.78,
+      "other_credits_standalone_rent_refunds": [],
+      "other_debits_non_swap_transfers_out": [
+        {
+          "signature": "BiYPEs2YRofL42nrEurG9w6b7A1sP39HwzDG6ETprKAaYZQmpegYdqbctWfyeDoX6hsG236JGxKbvJBQ6m9hYaj",
+          "block_time": 1789824723,
+          "sol_change": -0.00318492,
+          "outgoing_transfers": [
+            {
+              "destination": "G1NvNw9XLMNXvmQXygfWxHCpDyHu2DyTyavknXCvsMW",
+              "lamports": 1056640
+            },
+            {
+              "destination": "qNmKpTSkLNi8waFCuYxD2LkeLsPFaixRZSnhnzwfK4s",
+              "lamports": 1056640
+            },
+            {
+              "destination": "EgnLLL31bg11qeJ8Re4Z9avBLi7ZcLC4KGFWEBNhETjL",
+              "lamports": 1056640
+            }
+          ],
+          "destination_found_via_balance_delta_fallback": true
+        },
+        {
+          "signature": "6qkhXfrHupewcqedD7vuVhN2RX1AYMwzgMoP47M9ySeMnE2epn2diGWEw9eERu83L162ZPPZgKNThbDJdpdoRQT",
+          "block_time": 1789825246,
+          "sol_change": -0.0052982,
+          "outgoing_transfers": [
+            {
+              "destination": "HC3Jifoznwg9jU3LBmRK3VZtXhtLZeWbAjWY7EgD4aAQ",
+              "lamports": 1056640
+            },
+            {
+              "destination": "4Zz5zm5FSTwU7VY26zQcwCSpzQQxYn1ubAxUkkxpNcJY",
+              "lamports": 1056640
+            },
+            {
+              "destination": "8VgmHu7314WFojL1XXLr1K1aBkB4WXhk6XVS6K7n4aNi",
+              "lamports": 1056640
+            },
+            {
+              "destination": "75YC789u9nLKBxhZ3DTLt6TBh6Q4gX5cG9PKCosQnGTF",
+              "lamports": 1056640
+            },
+            {
+              "destination": "6VhYHproFvoPKUq48WvPPEcp7p2PPPrd8GHiG3RbpAFX",
+              "lamports": 1056640
+            }
+          ],
+          "destination_found_via_balance_delta_fallback": true
+        }
+      ],
+      "total_other_debits_sol": -0.008483,
+      "current_balance_sol": 1.77151688,
+      "open_positions": [],
+      "total_open_value_sol_approx": 0.0,
+      "implied_pnl_sol": -0.008483,
+      "dbot_fee_matching": {
+        "fee_by_buy_signature": {},
+        "n_fee_debits_matched": 0,
+        "unmatched_fee_debits_before_first_trade": []
+      }
+    },
     "BATCH-3": {
       "funding_events": [
         {
@@ -626,13 +698,33 @@
             }
           ],
           "destination_found_via_balance_delta_fallback": true
+        },
+        {
+          "signature": "19g2RXZpDHfe281ci71ULkGqtn6nq2DTvvhSWYSuPjj6CLtEVS4hKGjke5x6RRcd5fCxsbxWZsUww5D3hvMq11d",
+          "block_time": 1789825255,
+          "sol_change": -0.00318492,
+          "outgoing_transfers": [
+            {
+              "destination": "445BK7N1jPRiTA3xQBEXtTZp3NF2MgdYCafJijpTQEKV",
+              "lamports": 1056640
+            },
+            {
+              "destination": "DEffudHHuEYbacjFK8rGtAX3q44QUxWPArc84MXb38xc",
+              "lamports": 1056640
+            },
+            {
+              "destination": "GWeThv8KqtgopuRge24L2cr1EjVxEa7tCGoPMEaNREp3",
+              "lamports": 1056640
+            }
+          ],
+          "destination_found_via_balance_delta_fallback": true
         }
       ],
-      "total_other_debits_sol": -0.003185,
-      "current_balance_sol": 1.727685234,
+      "total_other_debits_sol": -0.00637,
+      "current_balance_sol": 1.724500314,
       "open_positions": [],
       "total_open_value_sol_approx": 0.0,
-      "implied_pnl_sol": -0.032315,
+      "implied_pnl_sol": -0.0355,
       "dbot_fee_matching": {
         "fee_by_buy_signature": {},
         "n_fee_debits_matched": 0,
@@ -670,13 +762,33 @@
             }
           ],
           "destination_found_via_balance_delta_fallback": true
+        },
+        {
+          "signature": "3TCMLvtNuFe3PBAS4TBhLF8zYeGzjKPCcmSKBEbshpJGj5DAy6ix4Jo9a9QAWGf2rZNKVfzjUGNEG3NTFgByrMPE",
+          "block_time": 1789825258,
+          "sol_change": -0.00318492,
+          "outgoing_transfers": [
+            {
+              "destination": "D2S5nohmR3Xe7pCmF8GgvcPUqCe9S6zeTW1JvvU2Y3uK",
+              "lamports": 1056640
+            },
+            {
+              "destination": "Cky1TZBV6qxjq9s2MR3jG9T5bdfVorqTN46Jb4AqpGGg",
+              "lamports": 1056640
+            },
+            {
+              "destination": "BY2fsc5uvW3Ry7SGKbCesyJwBMjjikEZTH62NQnD9pu3",
+              "lamports": 1056640
+            }
+          ],
+          "destination_found_via_balance_delta_fallback": true
         }
       ],
-      "total_other_debits_sol": -0.003185,
-      "current_balance_sol": 1.733747531,
+      "total_other_debits_sol": -0.00637,
+      "current_balance_sol": 1.730562611,
       "open_positions": [],
       "total_open_value_sol_approx": 0.0,
-      "implied_pnl_sol": -0.016252,
+      "implied_pnl_sol": -0.019437,
       "dbot_fee_matching": {
         "fee_by_buy_signature": {},
         "n_fee_debits_matched": 0,
@@ -714,13 +826,33 @@
             }
           ],
           "destination_found_via_balance_delta_fallback": true
+        },
+        {
+          "signature": "4ffvGHSdm8JYhanu5hUwYfwhc52tkkZPS5gVQFwk1A65RDw9VYjVp3XLqQ3cndoQiWasrRKi7UpkxpAemoY1hW94",
+          "block_time": 1789825260,
+          "sol_change": -0.00318492,
+          "outgoing_transfers": [
+            {
+              "destination": "AvZo5Wz2sg7N9ddmAU2epDrBYMfMybi5rGvsZSSPqeVK",
+              "lamports": 1056640
+            },
+            {
+              "destination": "AfcutZqbyt2JWgtuLaWjPtKfftz4tufqTccJRkzn3Nxs",
+              "lamports": 1056640
+            },
+            {
+              "destination": "ALsHJ5Kjs1nGaXJYoSpRhQjXrLJPDczTjJbXuToMLsFB",
+              "lamports": 1056640
+            }
+          ],
+          "destination_found_via_balance_delta_fallback": true
         }
       ],
-      "total_other_debits_sol": -0.003185,
-      "current_balance_sol": 1.768659583,
+      "total_other_debits_sol": -0.00637,
+      "current_balance_sol": 1.765474663,
       "open_positions": [],
       "total_open_value_sol_approx": 0.0,
-      "implied_pnl_sol": 0.01866,
+      "implied_pnl_sol": 0.015475,
       "dbot_fee_matching": {
         "fee_by_buy_signature": {},
         "n_fee_debits_matched": 0,
@@ -730,7 +862,7 @@
   },
   "summary": {
     "n_closed_trades": 12,
-    "n_new_trades_since_previous_run": 5,
+    "n_new_trades_since_previous_run": 0,
     "median_markup_pct": 29.17846859594337,
     "markup_values": [
       6.138532825005649,
@@ -767,6 +899,21 @@
       "dbot_fee_n_trades_matched": 5,
       "by_source_wallet": null
     },
+    "BATCH-4": {
+      "wallet_address": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
+      "n_trades_closed": 0,
+      "n_trades_open": 0,
+      "median_gross_pct": null,
+      "median_net_pct": null,
+      "sum_net_sol": null,
+      "current_balance_sol": 1.77151688,
+      "total_funded_sol": 1.78,
+      "balance_minus_funding_sol": -0.008483,
+      "open_positions": [],
+      "dbot_fee_sol_total": null,
+      "dbot_fee_n_trades_matched": 0,
+      "by_source_wallet": null
+    },
     "BATCH-3": {
       "wallet_address": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
       "n_trades_closed": 3,
@@ -774,9 +921,9 @@
       "median_gross_pct": 3.714705305207655,
       "median_net_pct": -10.078171544825965,
       "sum_net_sol": -0.02913,
-      "current_balance_sol": 1.727685234,
+      "current_balance_sol": 1.724500314,
       "total_funded_sol": 1.76,
-      "balance_minus_funding_sol": -0.032315,
+      "balance_minus_funding_sol": -0.0355,
       "open_positions": [],
       "dbot_fee_sol_total": null,
       "dbot_fee_n_trades_matched": 0,
@@ -811,9 +958,9 @@
       "median_gross_pct": 1.9123355399173647,
       "median_net_pct": -11.71139310161876,
       "sum_net_sol": -0.013068,
-      "current_balance_sol": 1.733747531,
+      "current_balance_sol": 1.730562611,
       "total_funded_sol": 1.75,
-      "balance_minus_funding_sol": -0.016252,
+      "balance_minus_funding_sol": -0.019437,
       "open_positions": [],
       "dbot_fee_sol_total": null,
       "dbot_fee_n_trades_matched": 0,
@@ -834,9 +981,9 @@
       "median_gross_pct": 36.28311648164701,
       "median_net_pct": 19.577471011778115,
       "sum_net_sol": 0.021845,
-      "current_balance_sol": 1.768659583,
+      "current_balance_sol": 1.765474663,
       "total_funded_sol": 1.75,
-      "balance_minus_funding_sol": 0.01866,
+      "balance_minus_funding_sol": 0.015475,
       "open_positions": [],
       "dbot_fee_sol_total": null,
       "dbot_fee_n_trades_matched": 0,
