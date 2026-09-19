@@ -77,15 +77,20 @@ def decode_tx(r):
   d=base64.b64decode(l[14:])
   if d[:8]==PUMP_AMM_BUY and len(d)>=184:
    WSOL='So11111111111111111111111111111111111111112'
+   USDT='Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
    base_out,quote_in=struct.unpack_from('<QQ',d,16);pool=b58(d[120:152]);user=b58(d[152:184])
    e=dict(kind='pamm',pool=pool,user=user,direction='buy',base_amount_raw=base_out,quote_amount_raw=quote_in,status='ok_verified_vs_20wsol_14263324cc_ground_truth')
-   # минт -- ненулевой не-WSOL/USDC баланс ИМЕННО кошелька user (offset152 события),
-   # не первый попавшийся в транзакции -- иначе в мультихоп-маршруте можно
-   # ошибочно взять токен промежуточного хопа.
-   mint=next((b.get('mint') for b in bal.values() if b.get('owner')==user and b.get('mint') not in (WSOL,USDC)),None)
+   # минт -- ненулевой не-WSOL/USDC/USDT баланс ИМЕННО кошелька user (offset152
+   # события), и только если он ОДНОЗНАЧЕН -- если у user в этой tx несколько
+   # разных таких минтов (мультихоп через промежуточный не-стейбл токен),
+   # честно не угадываем, оставляем m0/m1 не заполненными.
+   cand_mints={b.get('mint') for b in bal.values() if b.get('owner')==user and b.get('mint') not in (WSOL,USDC,USDT)}
+   mint=next(iter(cand_mints)) if len(cand_mints)==1 else None
    d0=decimals.get(mint) if mint else None;d1=decimals.get(WSOL)
    if d0 is not None and d1 is not None and quote_in:
     e.update(m0=WSOL,m1=mint,d0=d1,d1=d0,p1_per_0=str(D(base_out)/D(quote_in)*D(10)**(d1-d0)))
+   elif len(cand_mints)>1:
+    e['status']='ambiguous_mint_multiple_nonstable_candidates_not_decoded'
    out.append(e)
   elif d[:8]==PUMP_AMM_SELL:
    pool=b58(d[120:152]) if len(d)>=152 else None
