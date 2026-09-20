@@ -547,7 +547,18 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
             results = rpc_batch(reqs)
             for h, tx in zip(ok_chunk, results):
                 if tx is None:
-                    continue
+                    # Найдено при проверке выдачи: пакетный (batch) вызов
+                    # getTransaction иногда молча теряет ОДНУ конкретную
+                    # запись (null вместо результата) при том, что прямой
+                    # одиночный вызов той же подписи проходит с первого
+                    # раза -- и без повтора это НАВСЕГДА остаётся дырой в
+                    # кэше (подпись не кэшируется ни как успех, ни как
+                    # ошибка, но и не помечается для гарантированного
+                    # повтора). Один прямой одиночный вызов перед тем, как
+                    # сдаться, закрывает именно этот случай.
+                    tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+                    if tx is None:
+                        continue
                 parsed = parse_tx_for_wallet(h["signature"], tx, wallet)
                 parsed["_wallet"] = wallet
                 cache[h["signature"]] = parsed
