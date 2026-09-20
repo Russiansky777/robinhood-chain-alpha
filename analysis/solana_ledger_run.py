@@ -418,22 +418,59 @@ def parse_tx_for_wallet(sig: str, tx: dict, wallet: str) -> dict:
     }
 
 
+def _genesis_key(wallet: str) -> str:
+    return f"__genesis_synced__:{wallet}"
+
+
+def _oldest_cached_signature(cache: dict, wallet: str) -> str | None:
+    rows = [v for v in cache.values() if isinstance(v, dict) and v.get("_wallet") == wallet and v.get("slot") is not None]
+    if not rows:
+        return None
+    return min(rows, key=lambda v: v["slot"])["signature"]
+
+
 def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
-    before = None
+    """Найдено при проверке выдачи: у нескольких кошельков (BATCH-1..4)
+    первая закэшированная транзакция -- уже покупка, без транзакции
+    пополнения перед ней -- значит первоначальный обход истории не дошёл
+    до реального начала (бюджет времени кончился раньше), а старая логика
+    ('встретили уже известную подпись -- считаем, что дальше в глубину всё
+    известно') после этого НАВСЕГДА замораживала разрыв между этим местом
+    и настоящим началом истории кошелька, потому что каждый следующий
+    запуск снова упирался в тот же самый кэш на первой же странице.
+    Теперь: проход 1 -- свежая активность с конца; проход 2, если геном
+    ещё не подтверждён явным маркером -- докапываем назад от самой старой
+    уже известной подписи, а не останавливаемся на первом совпадении."""
     todo = []
+
+    before = None
     while time.monotonic() < deadline:
         page = get_signatures_for_address(wallet, before=before, limit=1000)
         if not page:
+            cache[_genesis_key(wallet)] = {"_genesis_marker": True}
             break
-        hit_known = False
-        for h in page:
-            if h["signature"] in cache:
-                hit_known = True
-                break
-            todo.append(h)
+        new_in_page = [h for h in page if h["signature"] not in cache]
+        todo.extend(new_in_page)
         before = page[-1]["signature"]
-        if hit_known or len(page) < 1000:
+        if len(new_in_page) < len(page):
+            break  # дальше в глубину -- уже известная область (с прошлого раза)
+        if len(page) < 1000:
+            cache[_genesis_key(wallet)] = {"_genesis_marker": True}
             break
+
+    if not cache.get(_genesis_key(wallet)):
+        before = _oldest_cached_signature(cache, wallet)
+        while before and time.monotonic() < deadline:
+            page = get_signatures_for_address(wallet, before=before, limit=1000)
+            if not page:
+                cache[_genesis_key(wallet)] = {"_genesis_marker": True}
+                break
+            todo.extend(h for h in page if h["signature"] not in cache)
+            before = page[-1]["signature"]
+            if len(page) < 1000:
+                cache[_genesis_key(wallet)] = {"_genesis_marker": True}
+                break
+
     todo.reverse()
     n_new = 0
     chunk_size = 20
