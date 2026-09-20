@@ -6,10 +6,13 @@ data/night_status.json и продолжает с места остановки,
 дольше TIME_BUDGET_S, затем сохраняет статус и выходит -- следующий
 тик cron продолжит.
 
-Стадии: control -> scan -> done|stopped. control -- не более
-MAX_ATTEMPTS попыток всего (счётчик в файле); прошёл -> scan; не прошёл
-после MAX_ATTEMPTS -> stopped с сырыми данными по одной покупке.
-scan -- кошельки из data/solana_fomo_passed.json по одному, результаты
+Стадии: control -> scan -> done|stopped. control -- ОДНА попытка на
+одних и тех же 15 реальных исторических покупках лидера из фазы 3
+(data/solana_crowd_control_set.json), не на свежих живых -- владелец
+явно просил не тратить вторую попытку в старом виде. Прошёл -> сразу
+scan (без остановки); не прошёл -> stopped с полной таблицей сравнения
+(подпись/Dune/новый метод/разница) в night_status.json. scan --
+кошельки из data/solana_fomo_passed.json по одному, результаты
 дописываются в data/solana_fomo_crowd.json по ходу (один процесс,
 конкурентного доступа нет -- concurrency-группа гарантирует это)."""
 from __future__ import annotations
@@ -23,22 +26,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solana_buyer200_fast_price as fp  # noqa: E402
 from solana_crowd_common import (  # noqa: E402
-    analyze_wallet, MAX_PURCHASES_PER_WALLET_CONTROL, MAX_PURCHASES_PER_WALLET_SCAN,
+    analyze_purchase, analyze_wallet, median, purchase_age_minutes, wallet_purchases,
+    MAX_PURCHASES_PER_WALLET_SCAN,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATUS_PATH = REPO_ROOT / "data" / "night_status.json"
 CROWD_PATH = REPO_ROOT / "data" / "solana_fomo_crowd.json"
 PASSED_PATH = REPO_ROOT / "data" / "solana_fomo_passed.json"
+CONTROL_SET_PATH = REPO_ROOT / "data" / "solana_crowd_control_set.json"
 
 LEADER_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 BREZ = "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB"
-CONTROL_SPEC = {
-    LEADER_WALLET: {"name": "LEADER", "min_sol": 15.0, "expected_pct": 17.0},
-    BREZ: {"name": "Brez", "min_sol": 2.0, "expected_pct": 11.0},
-}
+BREZ_MIN_SOL = 2.0
+BREZ_MAX_PURCHASES = 8
 TIME_BUDGET_S = 20 * 60
-MAX_ATTEMPTS = 2
+MIN_PRICED_EVENTS = 10
+MIN_SIGN_AGREEMENT = 0.8
+MAX_MEDIAN_ABS_DIFF_PP = 10.0
 
 
 def now_utc() -> str:
@@ -66,11 +71,8 @@ def save_status(status: dict) -> None:
     STATUS_PATH.write_text(json.dumps(status, ensure_ascii=False, indent=2, default=str))
 
 
-def same_sign_same_order(got: float, expected: float) -> bool:
-    if got == 0 or expected == 0 or (got > 0) != (expected > 0):
-        return False
-    ratio = abs(got) / abs(expected)
-    return 0.3 <= ratio <= 3.0
+def sign(x: float) -> int:
+    return (x > 0) - (x < 0)
 
 
 FOLLOW_ORDERS_PATH = REPO_ROOT / "data" / "dbot_follow_orders_raw.json"
@@ -115,51 +117,120 @@ def load_ranked_wallets() -> list[dict]:
     return rows
 
 
+def load_control_set() -> list[dict]:
+    return json.loads(CONTROL_SET_PATH.read_text())["events"]
+
+
+def run_brez_diagnostic(ctrl: dict, deadline: float) -> None:
+    """Владелец, п.3: сырые 8 покупок Brez -- токен, возраст токена на
+    момент покупки, цена входа, цена через 30с, число чужих покупок в
+    окне. Диагностика, НЕ участвует в принятии/отклонении контроля."""
+    diag = ctrl.setdefault("brez_raw", {"rows": [], "partial": False, "done": False})
+    if diag.get("done"):
+        return
+    purchases = wallet_purchases(BREZ, BREZ_MIN_SOL, BREZ_MAX_PURCHASES)
+    seen = {r["signature"] for r in diag["rows"]}
+    for e in purchases:
+        if e["signature"] in seen:
+            continue
+        if time.monotonic() > deadline:
+            diag["partial"] = True
+            print("[crowd_night] Brez-диагностика: бюджет исчерпан, таблица будет неполной", flush=True)
+            return
+        r = analyze_purchase(e, BREZ)
+        age_min = purchase_age_minutes(e)
+        price_plus30s = None
+        if not r.get("empty") and not r.get("unresolved") and r.get("growth_pct_30s") is not None and r.get("price_source"):
+            price_plus30s = round(r["price_source"] * (1 + r["growth_pct_30s"] / 100.0), 12)
+        row = {
+            "signature": e["signature"], "mint": e.get("mint"),
+            "token_age_min_at_purchase": age_min,
+            "price_source": r.get("price_source"),
+            "price_plus30s": price_plus30s,
+            "n_other_buys": r.get("n_other_buys"),
+            "empty": r.get("empty"), "unresolved": r.get("unresolved", False),
+            "quote_not_wsol_excluded": r.get("quote_not_wsol_excluded", False),
+            "HONEST_NOTE": r.get("HONEST_NOTE"),
+        }
+        diag["rows"].append(row)
+        print(f"[crowd_night] Brez: {e['signature'][:12]}.. возраст={age_min}мин "
+              f"цена_входа={row['price_source']} цена+30с={row['price_plus30s']} "
+              f"n_чужих_покупок={row['n_other_buys']}", flush=True)
+    diag["done"] = True
+
+
 def run_control(status: dict, deadline: float) -> None:
+    """Владелец: контроль на ОДНИХ И ТЕХ ЖЕ 15 реальных исторических
+    покупках лидера (data/solana_crowd_control_set.json -- подпись и
+    рост к +30с по Dune, фаза 3), не на свежих живых покупках. Новый
+    метод (analyze_purchase) прогоняется на тех же подписях. Принято при
+    n_приценённых>=MIN_PRICED_EVENTS, доле совпадения знака
+    >=MIN_SIGN_AGREEMENT и медиане |разницы| <=MAX_MEDIAN_ABS_DIFF_PP
+    п.п. Одна попытка -- владелец явно просил не тратить вторую в старом
+    виде: не прошла -> сразу stage=stopped с таблицей целиком."""
     ctrl = status.setdefault("control", {})
-    ctrl.setdefault("results", {})
-    for addr, spec in CONTROL_SPEC.items():
-        if addr in ctrl["results"]:
+    rows = ctrl.setdefault("rows", {})
+    events = load_control_set()
+    for ev in events:
+        sig = ev["signature"]
+        if sig in rows:
             continue
         if time.monotonic() > deadline:
             print("[crowd_night] контроль: бюджет исчерпан, продолжу со следующего тика", flush=True)
             return
-        print(f"[crowd_night] контроль: считаю {spec['name']} ({addr[:10]}..)...", flush=True)
-        r = analyze_wallet(addr, spec["name"], min_sol=spec["min_sol"],
-                            max_purchases=MAX_PURCHASES_PER_WALLET_CONTROL, deadline=deadline)
-        if r.get("wallet_budget_cut"):
-            # Бюджет кончился НА этом кошельке -- неполный прогон не
-            # считается попыткой (MAX_ATTEMPTS), продолжаем с него же
-            # на следующем тике.
-            print(f"[crowd_night] {spec['name']}: бюджет кончился на этом кошельке "
-                  f"(n={r['n_purchases_analyzed']}/{MAX_PURCHASES_PER_WALLET_CONTROL}) -- "
-                  f"не считается попыткой, продолжу со следующего тика", flush=True)
-            return
-        got = r.get("median_growth_pct_30s")
-        ok = got is not None and same_sign_same_order(got, spec["expected_pct"])
-        ctrl["results"][addr] = {**r, "expected_pct": spec["expected_pct"], "match_sign_and_order": ok}
-        print(f"[crowd_night] {spec['name']}: n={r['n_purchases_analyzed']} "
-              f"медиана={got} (ожидание~{spec['expected_pct']}%) match={ok}", flush=True)
+        print(f"[crowd_night] контроль: {sig[:12]}.. ({ev['day']}, Dune={ev['dune_growth_pct_30s']}%)...", flush=True)
+        entry = {"signature": sig, "mint": ev["mint"], "slot": ev["slot"],
+                 "spend_sol_equiv": ev.get("spend_sol_equiv")}
+        r = analyze_purchase(entry, LEADER_WALLET)
+        new_growth = r.get("growth_pct_30s")
+        rows[sig] = {
+            "signature": sig, "day": ev["day"], "mint": ev["mint"],
+            "dune_growth_pct_30s": ev["dune_growth_pct_30s"],
+            "new_method_growth_pct_30s": new_growth,
+            "diff_pp": round(new_growth - ev["dune_growth_pct_30s"], 4) if new_growth is not None else None,
+            "unresolved": r.get("unresolved", False),
+            "quote_not_wsol_excluded": r.get("quote_not_wsol_excluded", False),
+            "empty": r.get("empty"),
+            "HONEST_NOTE": r.get("HONEST_NOTE"),
+        }
+        print(f"[crowd_night]   Dune={rows[sig]['dune_growth_pct_30s']}% новый={rows[sig]['new_method_growth_pct_30s']} "
+              f"diff={rows[sig]['diff_pp']}", flush=True)
 
-    if len(ctrl["results"]) < len(CONTROL_SPEC):
+    if len(rows) < len(events):
         return
 
-    all_ok = all(v["match_sign_and_order"] for v in ctrl["results"].values())
+    priced = [r for r in rows.values() if r["new_method_growth_pct_30s"] is not None]
+    n_priced = len(priced)
+    matches = sum(1 for r in priced if sign(r["new_method_growth_pct_30s"]) == sign(r["dune_growth_pct_30s"]))
+    sign_agreement = (matches / n_priced) if n_priced else 0.0
+    diffs = [abs(r["diff_pp"]) for r in priced]
+    median_abs_diff = median(diffs)
+
+    ok = (n_priced >= MIN_PRICED_EVENTS and sign_agreement >= MIN_SIGN_AGREEMENT
+          and median_abs_diff is not None and median_abs_diff <= MAX_MEDIAN_ABS_DIFF_PP)
+
+    ctrl["n_priced"] = n_priced
+    ctrl["n_total_events"] = len(events)
+    ctrl["sign_agreement"] = round(sign_agreement, 4)
+    ctrl["median_abs_diff_pp"] = round(median_abs_diff, 4) if median_abs_diff is not None else None
+    ctrl["table"] = sorted(rows.values(), key=lambda r: (r["day"], r["signature"]))
     status["attempts"] = status.get("attempts", 0) + 1
-    if all_ok:
+
+    print(f"[crowd_night] КОНТРОЛЬ: n_приценённых={n_priced}/{len(events)} "
+          f"совпадение_знака={sign_agreement:.2%} медиана|разницы|={ctrl['median_abs_diff_pp']}п.п.", flush=True)
+
+    run_brez_diagnostic(ctrl, deadline)
+
+    if ok:
         status["stage"] = "scan"
         status["last_error"] = None
-        print(f"[crowd_night] КОНТРОЛЬ ПРОЙДЕН (попытка {status['attempts']}/{MAX_ATTEMPTS}) -> stage=scan", flush=True)
-    elif status["attempts"] < MAX_ATTEMPTS:
-        print(f"[crowd_night] контроль не прошёл (попытка {status['attempts']}/{MAX_ATTEMPTS}) -- повтор на следующем тике", flush=True)
-        ctrl["results"] = {}
+        print("[crowd_night] КОНТРОЛЬ ПРОЙДЕН (новая методика, одна попытка) -> stage=scan", flush=True)
     else:
-        bad = next((v for v in ctrl["results"].values() if not v["match_sign_and_order"]), None)
-        raw_purchase = (bad.get("purchases") or [None])[0] if bad else None
-        medians = {v["name"]: v["median_growth_pct_30s"] for v in ctrl["results"].values()}
         status["stage"] = "stopped"
-        status["last_error"] = f"контроль не сошёлся за {MAX_ATTEMPTS} попытки -- медианы: {medians}"
-        status["control_raw_one_purchase"] = raw_purchase
+        status["last_error"] = (
+            f"контроль не прошёл: n_приценённых={n_priced} (нужно >={MIN_PRICED_EVENTS}), "
+            f"совпадение_знака={sign_agreement:.2%} (нужно >={MIN_SIGN_AGREEMENT:.0%}), "
+            f"медиана|разницы|={ctrl['median_abs_diff_pp']}п.п. (нужно <={MAX_MEDIAN_ABS_DIFF_PP}п.п.)")
         print(f"[crowd_night] СТОП: {status['last_error']}", flush=True)
 
 

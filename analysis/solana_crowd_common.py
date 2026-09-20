@@ -9,9 +9,10 @@
 эквивалент). Цена через +30с (75 слотов) = цена последней сделки в окне
 С ТЕМ ЖЕ quote-активом, что источник -- разные quote-активы честно не
 сравниваются. Ноль чужих сделок в окне -- «пусто», рост не считается
-(не 0%, а None). Источники, котируемые не в SOL/WSOL, исключены из
-сравнения с эталоном Dune (тот считался по обычным SOL-котируемым
-запускам) -- см. quote_not_wsol_excluded.
+(не 0%, а None). Источники, котируемые не в SOL/WSOL/USDC/USDT
+(пары токен/токен), исключены -- рост % внутри одного пула не зависит
+от котируемой валюты, поэтому SOL и стейблы равноправны -- см.
+quote_not_wsol_excluded.
 
 Окно капится на MAX_WINDOW_TX_DECODE сделок (первые по времени после
 покупки) -- владелец: не более 40, partial=True при превышении, честно
@@ -34,6 +35,7 @@ from solana_entry_log import (  # noqa: E402
     price_of_mint, tx_signers, block_index, WSOL, STABLE_QUOTES,
 )
 
+ALLOWED_QUOTES = {WSOL} | STABLE_QUOTES
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
 MAX_PURCHASES_PER_WALLET_SCAN = 10
 MAX_PURCHASES_PER_WALLET_CONTROL = 8
@@ -104,6 +106,46 @@ def get_transactions_batch(sigs: list[str]) -> dict[str, dict | None]:
     return out
 
 
+MINT_AGE_MAX_PAGES = 20  # владелец, диагностика Brez: не более 20000 подписей на минт --
+# честный предел, не бесконечная пагинация; если генезис не найден в пределах, возраст = None
+
+
+def mint_creation_time(mint: str) -> tuple[int | None, bool]:
+    """Возраст токена = время его первой транзакции (getSignaturesForAddress,
+    страница за страницей назад до последней/неполной страницы = генезис
+    аккаунта минта). Возвращает (earliest_block_time, reached_genesis) --
+    честно None, если генезис не найден в пределах MINT_AGE_MAX_PAGES."""
+    earliest_time = None
+    earliest_sig = None
+    before = None
+    for _ in range(MINT_AGE_MAX_PAGES):
+        page = fp.get_signatures_for_address(mint, before=before, limit=1000)
+        if not page:
+            return earliest_time, True
+        for row in page:
+            bt = row.get("blockTime")
+            if bt is not None and (earliest_time is None or bt < earliest_time):
+                earliest_time = bt
+        earliest_sig = page[-1].get("signature")
+        if len(page) < 1000:
+            return earliest_time, True
+        before = earliest_sig
+    return earliest_time, False
+
+
+def purchase_age_minutes(entry: dict) -> float | None:
+    """Возраст токена на момент покупки (мин от первой транзакции минта
+    до покупки) -- честно None, если генезис минта не найден в пределах
+    MINT_AGE_MAX_PAGES или если время покупки не удалось получить."""
+    tx = fp.get_transaction(entry["signature"])
+    if tx is None or tx.get("blockTime") is None:
+        return None
+    creation_time, reached_genesis = mint_creation_time(entry["mint"])
+    if creation_time is None or not reached_genesis:
+        return None
+    return round((tx["blockTime"] - creation_time) / 60.0, 2)
+
+
 def wallet_purchases(address: str, min_sol: float, max_purchases: int) -> list[dict]:
     """До max_purchases последних первых покупок >=min_sol SOL за 72ч --
     переиспользует уже провалидированный scan_wallet (тот же метод, что
@@ -138,14 +180,14 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
     out["quote_mint"] = quote_mint
     out["pool"] = ev.get("pool")
 
-    # Эталон Dune (+17%/+11%) считался по обычным SOL-котируемым запускам
-    # (pump.fun/raydium) -- сравнение "то же на то же" требует того же
-    # quote-актива. Источники не в SOL/WSOL честно исключаются, не
-    # смешиваются с несравнимой волатильностью ток/ток-пар.
-    if quote_mint != WSOL:
+    # Владелец: рост в % внутри ОДНОГО пула не зависит от котируемой
+    # валюты -- разрешаем SOL/WSOL и стейблы (USDC/USDT), исключаем
+    # только пары токен/токен без стейбла и без SOL (там волатильность
+    # обеих ног мешает сравнению).
+    if quote_mint not in ALLOWED_QUOTES:
         out["quote_not_wsol_excluded"] = True
-        out["HONEST_NOTE"] = (f"источник котируется не в SOL (quote="
-                               f"{quote_mint[:10] if quote_mint else '?'}..) -- несравнимо с эталоном Dune, исключено")
+        out["HONEST_NOTE"] = (f"источник котируется не в SOL/WSOL/стейбле (quote="
+                               f"{quote_mint[:10] if quote_mint else '?'}..) -- пара токен/токен, исключено")
         return out
 
     slot = source_tx["slot"]
