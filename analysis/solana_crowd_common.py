@@ -27,6 +27,10 @@ from solana_entry_log import (  # noqa: E402
 
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
 MAX_PURCHASES_PER_WALLET = 10
+MAX_WINDOW_TX_DECODE = 60  # владелец, попытка 2: без кэпа окно на горячем
+# пуле даёт 60-300 последовательных getTransaction на ОДНУ покупку --
+# это и убило попытку 1 таймаутом (30 мин, не дошли даже до Brez).
+# Капим decode, честно помечаем capped=True -- не выдумываем недостающие.
 
 
 def wallet_purchases(address: str, min_sol: float) -> list[dict]:
@@ -63,6 +67,18 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
     out["quote_mint"] = quote_mint
     out["pool"] = ev.get("pool")
 
+    # Владелец, попытка 2: эталон Dune (+17%/+11%) почти наверняка считался
+    # по обычным SOL-котируемым запускам (pump.fun/raydium) -- попытка 1
+    # честно показала, что >=15 SOL входы лидера в последние часы шли
+    # через биржевые пары ток/ток (котировка -- другой синтетический
+    # актив, не SOL), где размах цены на тонкой ликвидности несравним с
+    # эталоном. Сравнение "то же на то же" требует того же quote-актива --
+    # ограничиваем ИМЕННО сравнение с Dune источниками, котируемыми в SOL.
+    if quote_mint != WSOL:
+        out["quote_not_wsol_excluded"] = True
+        out["HONEST_NOTE"] = f"источник котируется не в SOL (quote={quote_mint[:10] if quote_mint else '?'}..) -- несравнимо с эталоном Dune, исключено из медианы"
+        return out
+
     slot = source_tx["slot"]
     lo, hi = slot, slot + WINDOW_SLOTS_AFTER
     ref_time = source_tx["blockTime"]
@@ -74,6 +90,18 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
         sigs += [s for s in pool_sigs if s["signature"] not in known]
     if not any(s["signature"] == sig for s in sigs):
         sigs.append({"signature": sig, "slot": slot})
+
+    sigs.sort(key=lambda h: h.get("slot") or 0)
+    n_found_total = len(sigs)
+    capped = n_found_total > MAX_WINDOW_TX_DECODE
+    if capped:
+        source_h = next((h for h in sigs if h["signature"] == sig), None)
+        sigs = sigs[:MAX_WINDOW_TX_DECODE]
+        if source_h and not any(h["signature"] == sig for h in sigs):
+            sigs.append(source_h)
+    out["n_window_tx_found_total"] = n_found_total
+    out["n_window_tx_decoded"] = len(sigs)
+    out["window_capped"] = capped
 
     rows = []
     for h in sigs:
@@ -128,7 +156,8 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
 def analyze_wallet(address: str, name: str, min_sol: float = 2.0) -> dict:
     purchases = wallet_purchases(address, min_sol)
     results = [analyze_purchase(e, address) for e in purchases]
-    resolved = [r for r in results if not r.get("unresolved")]
+    n_quote_excluded = sum(1 for r in results if r.get("quote_not_wsol_excluded"))
+    resolved = [r for r in results if not r.get("unresolved") and not r.get("quote_not_wsol_excluded")]
     non_empty = [r for r in resolved if not r.get("empty")]
     growths = sorted(r["growth_pct_30s"] for r in non_empty)
     others_counts = sorted(r["n_other_buys"] for r in resolved)
@@ -142,7 +171,9 @@ def analyze_wallet(address: str, name: str, min_sol: float = 2.0) -> dict:
 
     return {
         "address": address, "name": name,
-        "n_purchases_analyzed": len(results), "n_unresolved": len(results) - len(resolved),
+        "n_purchases_analyzed": len(results),
+        "n_unresolved": sum(1 for r in results if r.get("unresolved")),
+        "n_quote_not_wsol_excluded": n_quote_excluded,
         "n_empty": sum(1 for r in resolved if r.get("empty")),
         "empty_share": round(sum(1 for r in resolved if r.get("empty")) / len(resolved), 3) if resolved else None,
         "median_growth_pct_30s": round(median(growths), 4) if growths else None,
