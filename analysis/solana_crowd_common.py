@@ -234,9 +234,16 @@ def median(xs: list[float]) -> float | None:
     return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2
 
 
-def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int) -> dict:
+def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int,
+                    deadline: float | None = None) -> dict:
     purchases = wallet_purchases(address, min_sol, max_purchases)
-    results = [analyze_purchase(e, address) for e in purchases]
+    results = []
+    wallet_budget_cut = False
+    for e in purchases:
+        if deadline is not None and time.monotonic() > deadline:
+            wallet_budget_cut = True
+            break
+        results.append(analyze_purchase(e, address))
     n_quote_excluded = sum(1 for r in results if r.get("quote_not_wsol_excluded"))
     resolved = [r for r in results if not r.get("unresolved") and not r.get("quote_not_wsol_excluded")]
     non_empty = [r for r in resolved if not r.get("empty")]
@@ -245,6 +252,7 @@ def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int) 
 
     return {
         "address": address, "name": name,
+        "wallet_budget_cut": wallet_budget_cut,
         "n_purchases_analyzed": len(results),
         "n_unresolved": sum(1 for r in results if r.get("unresolved")),
         "n_quote_not_wsol_excluded": n_quote_excluded,

@@ -73,10 +73,21 @@ _MIN_INTERVAL_S = 0.12  # стартовая цель ~8 req/s -- честно �
 _last_call_at = 0.0
 _backoff_s = 0.0
 _alchemy_disabled = False  # см. rpc_call: 401/403 от Alchemy -- не бить туда КАЖДЫЙ раз впустую
-RPC_CALLS = 0  # честный счётчик реальных HTTP-попыток (включая retry) -- для наблюдаемости
+# Найдено при разборе зависаний crowd_night: выданный ALCHEMY_API_KEY имеет
+# отключённую сеть SOLANA_MAINNET (403 на каждый вызов) -- при таком объёме
+# вызовов (сотни на одну покупку: getBlock якоря, вся история минта в окне,
+# батч getTransaction) публичный узел троттлит настолько, что один прогон
+# не укладывался ни в 20 минут внутреннего бюджета, ни в 25 минут таймаута
+# job'а. HELIUS_API уже подтверждён рабочим и быстрым в этом же репозитории
+# (единый конвейер учёта сделок) -- пробуем его первым, Alchemy и публичный
+# узел остаются запасными вариантами.
+_helius_disabled = False
 
 
 def _endpoint() -> str:
+    helius_key = os.environ.get("HELIUS_API", "")
+    if helius_key and not _helius_disabled:
+        return f"https://mainnet.helius-rpc.com/?api-key={helius_key}"
     key = os.environ.get("ALCHEMY_API_KEY", "")
     if key and not _alchemy_disabled:
         return f"https://solana-mainnet.g.alchemy.com/v2/{key}"
@@ -84,21 +95,25 @@ def _endpoint() -> str:
 
 
 def alchemy_available() -> bool:
-    """Один дешёвый вызов на старте (getHealth), НЕ печатает ключ. Найдено
-    при диагностике Шага 1: выданный ALCHEMY_API_KEY имел выключенную сеть
-    SOLANA_MAINNET (403 на каждый вызов) -- если владелец её включил,
-    Alchemy даёт заметно более высокий лимит частоты, чем публичный узел,
-    и потолок троттлинга можно honestly поднять, а не только резервный
-    fallback на 403."""
+    """Один дешёвый вызов на старте (getHealth), НЕ печатает ключ. Проверяет
+    ТЕКУЩИЙ активный по каскаду провайдер (Helius -> Alchemy -> публичный
+    узел, см. _endpoint()) -- название сохранено для существующих вызовов
+    (только диагностический print), но означает "есть привилегированный
+    RPC, не публичный узел". Найдено при диагностике crowd_night: выданный
+    ALCHEMY_API_KEY имел выключенную сеть SOLANA_MAINNET (403 на каждый
+    вызов) -- если активен HELIUS_API или Alchemy реально работает, лимит
+    частоты честно поднимается, а не только резервный fallback на 403."""
     global _MIN_INTERVAL_S
-    if not os.environ.get("ALCHEMY_API_KEY") or _alchemy_disabled:
+    if _endpoint() == _PUBLIC_RPC:
         return False
     try:
         rpc_call("getHealth", [], use_cache=False)
     except RuntimeError:
         return False
+    if _endpoint() == _PUBLIC_RPC:
+        return False  # health-запрос сам вызвал каскадное отключение до public
     _MIN_INTERVAL_S = 0.03
-    return not _alchemy_disabled
+    return True
 
 
 def _cache_path(method: str, params: list) -> Path:
@@ -107,7 +122,7 @@ def _cache_path(method: str, params: list) -> Path:
 
 
 def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
-    global _last_call_at, _backoff_s, _alchemy_disabled, RPC_CALLS
+    global _last_call_at, _backoff_s, _alchemy_disabled, _helius_disabled, RPC_CALLS
     cache_f = _cache_path(method, params)
     if use_cache and cache_f.exists():
         try:
@@ -115,7 +130,6 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
         except (ValueError, OSError):
             pass
     url = _endpoint()
-    fallback_used = False
     # Найдено на расширенном прогоне (300 покупок, 6000+ запросов): под
     # устойчивой продолжительной нагрузкой публичный узел/Alchemy иногда
     # троттлит дольше, чем 8 попыток x потолок 10с (~45с) успевают
@@ -138,14 +152,15 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
         if resp.status_code == 429 or 500 <= resp.status_code < 600:
             _backoff_s = min(max(_backoff_s * 2, 0.5), backoff_cap)
             continue
-        if resp.status_code in (401, 403) and not fallback_used and url != _PUBLIC_RPC:
-            # Найдено при диагностике Шага 1: у выданного ALCHEMY_API_KEY
-            # сеть SOLANA_MAINNET не включена в приложении -- это ПОСТОЯННАЯ
-            # (не временная) 403 на каждый вызов. Один раз падаем на public,
-            # дальше не долбим Alchemy впустую весь оставшийся прогон.
-            url = _PUBLIC_RPC
-            fallback_used = True
-            _alchemy_disabled = True
+        if resp.status_code in (401, 403) and url != _PUBLIC_RPC:
+            # Постоянная (не временная) 401/403 конкретного провайдера --
+            # отключаем именно его и переходим на следующий по каскаду
+            # (Helius -> Alchemy -> публичный узел), не долбим впустую.
+            if "helius-rpc.com" in url:
+                _helius_disabled = True
+            else:
+                _alchemy_disabled = True
+            url = _endpoint()
             continue
         if not resp.ok:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")

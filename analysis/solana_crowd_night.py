@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import solana_buyer200_fast_price as fp  # noqa: E402
 from solana_crowd_common import (  # noqa: E402
     analyze_wallet, MAX_PURCHASES_PER_WALLET_CONTROL, MAX_PURCHASES_PER_WALLET_SCAN,
 )
@@ -72,13 +73,45 @@ def same_sign_same_order(got: float, expected: float) -> bool:
     return 0.3 <= ratio <= 3.0
 
 
+FOLLOW_ORDERS_PATH = REPO_ROOT / "data" / "dbot_follow_orders_raw.json"
+LIVE_TASK_NAMES = ("BATCH-3", "BATCH-5", "BATCH-6", "BATCH-7")
+
+
+def load_live_task_sources() -> dict[str, str]:
+    """Адрес источника -> имя задачи, только для живых задач BATCH-3/5/6/7
+    (владелец, п.3: эти сканируются первыми). Файл обновляется отдельным
+    почасовым конвейером учёта (ledger_hourly) в этой же рабочей ветке --
+    здесь просто читается, без обращения к DBot API."""
+    if not FOLLOW_ORDERS_PATH.exists():
+        return {}
+    try:
+        data = json.loads(FOLLOW_ORDERS_PATH.read_text())
+    except (ValueError, OSError):
+        return {}
+    out: dict[str, str] = {}
+    for t in data.get("tasks", []):
+        if t.get("name") not in LIVE_TASK_NAMES:
+            continue
+        for s in t.get("sources") or []:
+            addr = s.get("address")
+            if addr:
+                out.setdefault(addr, t["name"])
+    return out
+
+
 def load_ranked_wallets() -> list[dict]:
     rows = []
     for line in PASSED_PATH.read_text().splitlines():
         line = line.strip()
         if line:
             rows.append(json.loads(line))
-    rows.sort(key=lambda r: r.get("fomo_rank", 10**9))
+    live_sources = load_live_task_sources()
+    for r in rows:
+        r["stands_in"] = live_sources.get(r["address"], "очередь")
+    # Владелец, п.3: сначала кошельки, стоящие в живых задачах BATCH-3/5/6/7
+    # (в порядке ранга Fomo внутри этой группы), затем остальные -- тоже
+    # по рангу Fomo.
+    rows.sort(key=lambda r: (0 if r["stands_in"] != "очередь" else 1, r.get("fomo_rank", 10**9)))
     return rows
 
 
@@ -93,7 +126,15 @@ def run_control(status: dict, deadline: float) -> None:
             return
         print(f"[crowd_night] контроль: считаю {spec['name']} ({addr[:10]}..)...", flush=True)
         r = analyze_wallet(addr, spec["name"], min_sol=spec["min_sol"],
-                            max_purchases=MAX_PURCHASES_PER_WALLET_CONTROL)
+                            max_purchases=MAX_PURCHASES_PER_WALLET_CONTROL, deadline=deadline)
+        if r.get("wallet_budget_cut"):
+            # Бюджет кончился НА этом кошельке -- неполный прогон не
+            # считается попыткой (MAX_ATTEMPTS), продолжаем с него же
+            # на следующем тике.
+            print(f"[crowd_night] {spec['name']}: бюджет кончился на этом кошельке "
+                  f"(n={r['n_purchases_analyzed']}/{MAX_PURCHASES_PER_WALLET_CONTROL}) -- "
+                  f"не считается попыткой, продолжу со следующего тика", flush=True)
+            return
         got = r.get("median_growth_pct_30s")
         ok = got is not None and same_sign_same_order(got, spec["expected_pct"])
         ctrl["results"][addr] = {**r, "expected_pct": spec["expected_pct"], "match_sign_and_order": ok}
@@ -133,13 +174,20 @@ def run_scan(status: dict, deadline: float) -> None:
         if time.monotonic() > deadline:
             print("[crowd_night] scan: бюджет исчерпан, продолжу со следующего тика", flush=True)
             break
-        r = analyze_wallet(addr, row.get("name"), min_sol=2.0, max_purchases=MAX_PURCHASES_PER_WALLET_SCAN)
+        r = analyze_wallet(addr, row.get("name"), min_sol=2.0, max_purchases=MAX_PURCHASES_PER_WALLET_SCAN,
+                            deadline=deadline)
+        if r.get("wallet_budget_cut"):
+            print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): бюджет кончился на этом кошельке "
+                  f"(n={r['n_purchases_analyzed']}/{MAX_PURCHASES_PER_WALLET_SCAN}) -- не сохраняю, "
+                  f"продолжу со следующего тика", flush=True)
+            break
         r["fomo_rank"] = row.get("fomo_rank")
+        r["stands_in"] = row.get("stands_in")
         crowd[addr] = r
         CROWD_PATH.write_text(json.dumps(crowd, ensure_ascii=False, indent=2, default=str))
-        print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): n={r['n_purchases_analyzed']} "
-              f"медиана_роста={r['median_growth_pct_30s']} empty_share={r['empty_share']} "
-              f"({len(crowd)}/{len(ranked)})", flush=True)
+        print(f"[crowd_night] {row.get('name')} ({addr[:10]}.., {row.get('stands_in')}): "
+              f"n={r['n_purchases_analyzed']} медиана_роста={r['median_growth_pct_30s']} "
+              f"empty_share={r['empty_share']} ({len(crowd)}/{len(ranked)})", flush=True)
     status["done_wallets"] = len(crowd)
     if len(crowd) >= len(ranked):
         status["stage"] = "done"
@@ -152,6 +200,15 @@ def main() -> None:
         print(f"[crowd_night] stage={status['stage']} -- работа не требуется, выхожу без изменений", flush=True)
         save_status(status)
         return
+
+    # Найдено при разборе зависаний: без привилегированного RPC (публичный
+    # узел, ~8 запросов/с целевой темп + троттлинг) один прогон не
+    # укладывался ни в TIME_BUDGET_S, ни в 25-минутный таймаут job'а --
+    # HELIUS_API уже подтверждён рабочим и быстрым в этом репозитории.
+    privileged_rpc = fp.alchemy_available()
+    print(f"[crowd_night] привилегированный RPC активен: {privileged_rpc} "
+          f"(HELIUS_API={'есть' if os.environ.get('HELIUS_API') else 'нет'}, "
+          f"ALCHEMY_API_KEY={'есть' if os.environ.get('ALCHEMY_API_KEY') else 'нет'})", flush=True)
 
     deadline = time.monotonic() + TIME_BUDGET_S
     try:
