@@ -3,12 +3,10 @@ name: "Solana crowd_night -- самоходный процесс п.2 (толп�
 # Владелец: п.2 не должен зависеть от внешних пробуждений. Cron-триггеры
 # GitHub Actions запускаются ТОЛЬКО с версии workflow-файла на РЕАЛЬНОЙ
 # default-ветке репозитория (проверено через API: здесь это
-# claude/robinhood-copytrading-hypothesis-awjj0g, НЕ main -- первая
-# попытка положить файл на main была ошибкой, workflow не
-# регистрировался вообще). Поэтому этот файл лежит именно тут, а
-# checkout явно указывает на claude/nifty-sagan-r0polg -- вся работа и
-# все коммиты идут именно в неё, эта ветка используется только как
-# носитель расписания.
+# claude/robinhood-copytrading-hypothesis-awjj0g, НЕ main). Поэтому этот
+# файл лежит именно там, а checkout здесь явно указывает на
+# claude/nifty-sagan-r0polg -- вся работа и все коммиты идут именно в
+# неё, default-ветка используется только как носитель расписания.
 
 on:
   schedule:
@@ -41,6 +39,7 @@ jobs:
         run: pip install requests
       - name: "Шаг п.2 (control/scan, бюджет 20 мин из отведённых 25)"
         env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: python -u analysis/solana_crowd_night.py
       - name: Commit results
