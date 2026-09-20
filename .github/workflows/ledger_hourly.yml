@@ -1,0 +1,63 @@
+name: "Solana ledger -- единый конвейер учёта сделок (почасовой)"
+
+# Владелец просил положить файл в main, но у этого репозитория main НЕ
+# является default-веткой (проверено через API в этой же сессии:
+# default_branch = claude/robinhood-copytrading-hypothesis-awjj0g) --
+# GitHub cron регистрируется только с реальной default-ветки, поэтому
+# файл лежит здесь, а не на main (иначе расписание молча не сработает,
+# как уже было с crowd_night.yml). Вся работа и все коммиты -- в
+# claude/nifty-sagan-r0polg, эта ветка используется только как носитель
+# расписания.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ledger_hourly
+  cancel-in-progress: false
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - name: Git identity + нормализация ветки
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B claude/nifty-sagan-r0polg origin/claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Единый конвейер учёта (A-E)"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/solana_ledger_run.py
+      - name: Commit results
+        if: always()
+        run: |
+          for f in data/dbot_follow_orders_raw.json data/dbot_follow_trades_raw.json \
+                   data/chain_tx_cache.json data/solana_trades_all.json \
+                   data/solana_source_stats.json data/solana_task_stats.json data/ledger_status.json; do
+            [ -e "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana ledger: шаг конвейера учёта [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
