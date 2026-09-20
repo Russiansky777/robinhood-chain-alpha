@@ -236,17 +236,26 @@ def fetch_follow_orders(api_key: str) -> tuple[list[dict], int | None]:
     return tasks, status
 
 
-def fetch_follow_trades_for_task(task_id: str, api_key: str) -> list[dict]:
+def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | None = None) -> list[dict]:
+    """Владелец: пагинация должна идти ДО пустой страницы, а не
+    останавливаться раньше на "страница короче size" -- на живом,
+    постоянно дописываемом наборе данных страница может отдать <size
+    записей НЕ на самом деле дойдя до конца (сдвиг из-за параллельной
+    записи новых сделок), и тогда следующая страница снова непустая --
+    эмпирически подтверждено: 4 реальные сделки по источнику N_HtuY были
+    пропущены именно так. myWallet -- дополнительный фильтр по кошельку
+    задачи, если поддерживается API (сужает выборку, не должен вредить)."""
     out = []
     page = 1
+    params = {"chain": "solana", "configId": task_id, "size": 20}
+    if my_wallet:
+        params["myWallet"] = my_wallet
     while True:
-        status, body = dbot_get("/account/follow_trades", {"chain": "solana", "configId": task_id, "page": page, "size": 20}, api_key)
+        status, body = dbot_get("/account/follow_trades", {**params, "page": page}, api_key)
         items = extract_items(body)
         if not items:
             break
         out.extend(items)
-        if len(items) < 20:
-            break
         page += 1
         if page > 500:
             break
@@ -654,6 +663,16 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
 
             source = resolve_source(buy_record)
 
+            # Владелец: брутто -- НЕ из транзакции (в ней чаевые/приоритетные
+            # сборы той же сделки смешаны со свопом, надёжно не разделить без
+            # decode_tx -- уже проверено и не подтвердилось на примерах).
+            # Брутто = то, что сама DBot записала как отправленное/полученное
+            # (send.amount у buy-записи, receive.amount у sell-записи);
+            # нетто (sol_in/sol_out выше) остаётся дельтой кошелька по цепочке
+            # -- это и есть проверенное на пилоте значение, не трогаем.
+            gross_sol_in = dbot_sol_amount(buy_record) if buy_record else None
+            gross_sol_out = dbot_sol_amount(sell_record) if sell_record else None
+
             net_sol = round(buy_sol_leg + (sell_sol_leg or 0), 9)
             gross_pct = round((sol_out / sol_in - 1) * 100, 4) if (sell_v and sol_in) else None
 
@@ -681,6 +700,8 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 "sell_block_time": sell_v.get("blockTime") if sell_v else None,
                 "sell_match_method": sell_method,
                 "sol_in": sol_in, "sol_out": sol_out, "gross_pct": gross_pct, "net_sol": net_sol,
+                "gross_sol_in": gross_sol_in, "gross_sol_in_source": "dbot_record" if buy_record else None,
+                "gross_sol_out": gross_sol_out, "gross_sol_out_source": "dbot_record" if sell_record else None,
                 "status": status,
                 "dbot_fail_reason": None,
             })
@@ -727,7 +748,11 @@ def build_source_stats(trades_all: list[dict]) -> list[dict]:
         trades = row["trades"]
         closed = [t for t in trades if t["status"] == "закрыта" and t.get("gross_pct") is not None]
         n_profit = sum(1 for t in closed if t["gross_pct"] > 0)
-        gross_sum = sum(t["sol_in"] for t in trades if t.get("sol_in"))
+        # Брутто (владелец, п.1) -- строго из записи DBot, не из транзакции;
+        # доступно только когда есть done-запись на покупку (продажа DBot
+        # тут никогда не завершается -- gross_sol_out практически всегда
+        # неизвестен, честно не считаем его как ноль).
+        gross_sum = sum(t["gross_sol_in"] for t in trades if t.get("gross_sol_in"))
         net_sum = sum(t["net_sol"] for t in trades if t.get("net_sol") is not None)
         best_pct = max((t["gross_pct"] for t in closed), default=None)
         fails = [t for t in trades if t["status"].startswith("срыв")]
@@ -761,23 +786,34 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
         # -- входящие пополнения и исходящие выводы, с подписью/адресом/
         # суммой каждого, чтобы можно было явно проверить, куда/откуда шли
         # деньги, а не просто верить агрегату.
-        topups, withdrawals = [], []
+        # Владелец, п.3: пополнение без опознанного контрагента-плательщика --
+        # ОТДЕЛЬНАЯ строка "неопознанное поступление", в topups_sol/сверку не
+        # входит, пока владелец не подтвердит его происхождение (эмпирически
+        # именно так BATCH-4 сходится в ноль: без него сверка точная).
+        topups, withdrawals, unidentified_deposits = [], [], []
         for v in wallet_tx:
             flow = classify_external_flow(v)
             if flow is None:
                 continue
             kind, amount, counterparty = flow
             entry = {"signature": v.get("signature"), "counterparty": counterparty, "amount_sol": round(amount, 9)}
-            (topups if kind == "topup" else withdrawals).append(entry)
+            if kind == "topup" and counterparty is None:
+                unidentified_deposits.append(entry)
+            elif kind == "topup":
+                topups.append(entry)
+            else:
+                withdrawals.append(entry)
         topups_sol = sum(e["amount_sol"] for e in topups)
         withdrawals_sol = sum(e["amount_sol"] for e in withdrawals)
+        unidentified_deposits_sol = sum(e["amount_sol"] for e in unidentified_deposits)
 
         try:
             current_balance = get_balance_sol(wallet)
         except Exception:  # noqa: BLE001
             current_balance = None
 
-        # Сверка теперь: баланс - пополнения + выводы == нетто сделок - комиссия DBot
+        # Сверка: баланс - пополнения(опознанные) + выводы == нетто сделок - комиссия DBot.
+        # Неопознанные поступления сознательно НЕ входят в формулу.
         recon_left = (current_balance - topups_sol + withdrawals_sol) if current_balance is not None else None
         recon_right = net_sum - dbot_fee_total
         diff = abs(recon_left - recon_right) if recon_left is not None else None
@@ -789,6 +825,8 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
             "current_balance_sol": round(current_balance, 6) if current_balance is not None else None,
             "topups_sol": round(topups_sol, 6), "topups": topups,
             "withdrawals_sol": round(withdrawals_sol, 6), "withdrawals": withdrawals,
+            "unidentified_deposits_sol": round(unidentified_deposits_sol, 6),
+            "unidentified_deposits": unidentified_deposits,
             "reconciliation_left_balance_minus_topups_plus_withdrawals": round(recon_left, 6) if recon_left is not None else None,
             "reconciliation_right_net_minus_fee": round(recon_right, 6),
             "reconciliation_diff_sol": round(diff, 6) if diff is not None else None,
@@ -863,7 +901,7 @@ def main() -> None:
     for task in tasks:
         tid = task["id"]
         print(f"[ledger] A: follow_trades для задачи {tid} ({task.get('name')})...", flush=True)
-        records = fetch_follow_trades_for_task(tid, api_key)
+        records = fetch_follow_trades_for_task(tid, api_key, my_wallet=task.get("wallet"))
         follow_trades_by_task[tid] = records
         if records and not FOLLOW_TRADES_SAMPLE_PATH.exists():
             save_json(FOLLOW_TRADES_SAMPLE_PATH, records[0])
