@@ -1,16 +1,18 @@
 {
-  "stage": "scan",
-  "done_wallets": 5,
+  "stage": "closed_by_owner",
+  "reason": "Закрыто владельцем 2026-09-20: несколько часов работы, узкое место -- баг workflow ([ -e файл ] && git add файл без || true под bash -e обрывал шаг Commit shard results ДО commit/push при отсутствующем файле, результаты шардов терялись молча) поверх медленного метода (find_price_at_gecko пересобирал весь диапазон свечей заново на каждом расширении окна). Расписание в crowd_night.yml отключено, замер не возобновляется.",
+  "final_done_wallets": 5,
   "total_wallets": 90,
-  "shards": [
+  "HONEST_NOTE": "Фактический итог на момент закрытия: 5 из 90 (владелец ранее сообщал 1/90 по более раннему наблюдению -- после фиксов реально накопилось 5, честно указываю расхождение).",
+  "shards_at_closure": [
     {
       "shard_id": 0,
       "stage": "scan",
       "done_wallets": 2,
       "total_wallets": 23,
       "last_error": null,
-      "updated_utc": "2026-09-20T17:23:58Z",
-      "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35524651198"
+      "updated_utc": "2026-09-20T18:04:47Z",
+      "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35526682761"
     },
     {
       "shard_id": 1,
@@ -18,8 +20,8 @@
       "done_wallets": 0,
       "total_wallets": 23,
       "last_error": null,
-      "updated_utc": "2026-09-20T17:44:15Z",
-      "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35525223892"
+      "updated_utc": "2026-09-20T18:04:35Z",
+      "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35526682761"
     },
     {
       "shard_id": 2,
@@ -40,6 +42,5 @@
       "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35524651198"
     }
   ],
-  "updated_utc": "2026-09-20T17:56:53Z",
-  "run_url": "https://github.com/Russiansky777/robinhood-chain-alpha/actions/runs/35527417925"
+  "closed_at_utc": "2026-09-20T18:20:35Z"
 }
