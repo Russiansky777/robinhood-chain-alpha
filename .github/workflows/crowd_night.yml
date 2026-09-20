@@ -1,4 +1,4 @@
-name: "Solana crowd_night -- самоходный процесс п.2 (толпа за 90 кошельками)"
+name: "Solana crowd_night -- самоходный процесс п.2 (толпа за 90 кошельками, 4 шарда)"
 
 # Владелец: п.2 не должен зависеть от внешних пробуждений. Cron-триггеры
 # GitHub Actions запускаются ТОЛЬКО с версии workflow-файла на РЕАЛЬНОЙ
@@ -7,22 +7,33 @@ name: "Solana crowd_night -- самоходный процесс п.2 (толп�
 # файл лежит именно там, а checkout здесь явно указывает на
 # claude/nifty-sagan-r0polg -- вся работа и все коммиты идут именно в
 # неё, default-ветка используется только как носитель расписания.
+#
+# Владелец, ускорение (1 кошелёк/тик было неприемлемо): 4 параллельных
+# шарда (strategy.matrix), каждый обрабатывает каждый 4-й кошелёк из
+# общего списка, пишет только СВОИ два файла (без гонки записи между
+# job'ами), затем отдельный шаг агрегации после ВСЕХ 4 шардов собирает
+# общий data/night_status.json и объединённый data/solana_fomo_crowd.json.
+# concurrency -- ПО ШАРДУ (не общий), иначе матрица бы просто
+# сериализовалась и параллелизм пропал.
 
 on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
-concurrency:
-  group: crowd_night
-  cancel-in-progress: false
-
 jobs:
-  night:
+  shard_scan:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: write
+    concurrency:
+      group: crowd_night-shard-${{ matrix.shard_id }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_id: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,19 +48,60 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
-      - name: "Шаг п.2 (control/scan, бюджет 20 мин из отведённых 25)"
+      - name: "Шард ${{ matrix.shard_id }} (скан, бюджет 20 мин из отведённых 25)"
         env:
           HELIUS_API: ${{ secrets.HELIUS_API }}
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          SHARD_ID: ${{ matrix.shard_id }}
         run: python -u analysis/solana_crowd_night.py
-      - name: Commit results
+      - name: Commit shard results
+        if: always()
+        run: |
+          [ -e "data/night_status_shard_${{ matrix.shard_id }}.json" ] && git add "data/night_status_shard_${{ matrix.shard_id }}.json"
+          [ -e "data/solana_fomo_crowd_shard_${{ matrix.shard_id }}.json" ] && git add "data/solana_fomo_crowd_shard_${{ matrix.shard_id }}.json"
+          [ -e data/solana_crowd_decode_fail_programs.json ] && git add data/solana_crowd_decode_fail_programs.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana crowd_night: шард ${{ matrix.shard_id }} [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
+
+  aggregate:
+    needs: shard_scan
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: crowd_night-aggregate
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - name: Git identity + нормализация ветки
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B claude/nifty-sagan-r0polg origin/claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Собрать общий night_status.json + solana_fomo_crowd.json из 4 шардов"
+        run: python -u analysis/solana_crowd_night_aggregate.py
+      - name: Commit aggregate
         if: always()
         run: |
           [ -e data/night_status.json ] && git add data/night_status.json
           [ -e data/solana_fomo_crowd.json ] && git add data/solana_fomo_crowd.json
-          [ -e data/solana_crowd_decode_fail_programs.json ] && git add data/solana_crowd_decode_fail_programs.json
           git diff --cached --quiet && exit 0
-          git commit -m "Solana crowd_night: шаг [automated]"
+          git commit -m "Solana crowd_night: агрегированный статус [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"

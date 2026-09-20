@@ -217,8 +217,13 @@ def scan_wallet(address: str) -> dict:
     ok_sigs = [s["signature"] for s in ok_sigs_full[:MAX_TX_PER_WALLET]]
 
     entries, n_multi_mint_skipped, n_tx_fetch_failed, n_price_missing = [], 0, 0, 0
+    # Владелец: было по одной getTransaction на подпись (до 300 за
+    # кошелёк) -- главный тормоз скана. Пачками по 20, как в скане 217
+    # (fp.get_transactions_batch, честный одиночный повтор только на
+    # null внутри батча).
+    tx_by_sig = fp.get_transactions_batch(ok_sigs)
     for sig in ok_sigs:
-        tx = fp.get_transaction(sig)
+        tx = tx_by_sig.get(sig)
         if tx is None:
             n_tx_fetch_failed += 1
             continue

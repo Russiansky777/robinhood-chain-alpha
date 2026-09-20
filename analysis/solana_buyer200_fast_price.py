@@ -216,6 +216,84 @@ def get_transaction(sig: str) -> dict | None:
     return rpc_call("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
 
 
+_TX_PARAMS = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}
+
+
+def get_transactions_batch(sigs: list[str], batch_size: int = 20) -> dict[str, dict | None]:
+    """Владелец, скан 217 -- пачки по batch_size (один HTTP POST на
+    пачку), не по одной. Один прямой одиночный повтор ТОЛЬКО для
+    сигнатур, вернувшихся null внутри иначе успешного батча (найдено на
+    практике: batch getTransaction иногда молча теряет ОДНУ запись, хотя
+    прямой одиночный вызов той же подписи проходит с первого раза) --
+    честно, не выдумываем данные, просто не сдаёмся после одного null."""
+    out: dict[str, dict | None] = {}
+    todo = []
+    for s in sigs:
+        cache_f = _cache_path("getTransaction", [s, _TX_PARAMS])
+        if cache_f.exists():
+            try:
+                out[s] = json.loads(cache_f.read_text())
+                continue
+            except (ValueError, OSError):
+                pass
+        todo.append(s)
+    if not todo:
+        return out
+
+    for start in range(0, len(todo), batch_size):
+        if soft_deadline_exceeded():
+            for s in todo[start:]:
+                out[s] = None
+            break
+        chunk = todo[start:start + batch_size]
+        url = _endpoint()
+        body = [{"jsonrpc": "2.0", "id": i, "method": "getTransaction", "params": [s, _TX_PARAMS]}
+                for i, s in enumerate(chunk)]
+        backoff = 0.0
+        ok = False
+        for _attempt in range(8):
+            if soft_deadline_exceeded():
+                break
+            try:
+                resp = requests.post(url, json=body, timeout=45)
+            except Exception:  # noqa: BLE001
+                backoff = min(max(backoff * 2, 0.5), 20.0)
+                time.sleep(backoff)
+                continue
+            if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                backoff = min(max(backoff * 2, 0.5), 20.0)
+                time.sleep(backoff)
+                continue
+            if not resp.ok:
+                break
+            try:
+                results = resp.json()
+            except ValueError:
+                break
+            if not isinstance(results, list):
+                break
+            by_id = {r.get("id"): r for r in results if isinstance(r, dict)}
+            for i, s in enumerate(chunk):
+                r = by_id.get(i)
+                tx = r.get("result") if r and "error" not in r else None
+                if tx is None:
+                    try:
+                        tx = rpc_call("getTransaction", [s, _TX_PARAMS])
+                    except RuntimeError:
+                        tx = None
+                out[s] = tx
+                _cache_path("getTransaction", [s, _TX_PARAMS]).write_text(json.dumps(tx))
+            ok = True
+            break
+        if not ok:
+            for s in chunk:
+                try:
+                    out[s] = rpc_call("getTransaction", [s, _TX_PARAMS])
+                except RuntimeError:
+                    out[s] = None
+    return out
+
+
 def get_block_signatures(slot: int) -> dict | None:
     """Минимальный getBlock -- только подписи блока (без транзакций), для
     поиска ЯКОРЯ курсора пагинации (см. find_anchor_after)."""

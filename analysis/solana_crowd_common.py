@@ -21,17 +21,16 @@ decode_fail (getTransaction вернул null / decode_tx не нашёл соб
 record_decode_fail_programs) для последующего разбора топ-5 по частоте.
 
 Окно капится на MAX_WINDOW_TX_DECODE сделок (первые по времени после
-покупки) -- владелец: не более 40, partial=True при превышении, честно
+покупки) -- владелец: не более 30, partial=True при превышении, честно
 не выдумываем недостающие. getTransaction внутри окна -- JSON-RPC batch
-(один HTTP POST на пачку), не по одной."""
+по 20 (fp.get_transactions_batch, тот же метод, что скан 217), не по
+одной."""
 from __future__ import annotations
 
 import json
 import sys
 import time
 from pathlib import Path
-
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solana_buyer200_fast_price as fp  # noqa: E402
@@ -46,73 +45,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DECODE_FAIL_PROGRAMS_PATH = REPO_ROOT / "data" / "solana_crowd_decode_fail_programs.json"
 ALLOWED_QUOTES = {WSOL} | STABLE_QUOTES
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
-MAX_PURCHASES_PER_WALLET_SCAN = 10
+MAX_PURCHASES_PER_WALLET_SCAN = 5  # владелец: было 10 -- достаточно для медианы/доли пустых
 MAX_PURCHASES_PER_WALLET_CONTROL = 8
-MAX_WINDOW_TX_DECODE = 40  # владелец: не больше 40 сделок токена после покупки
-BATCH_SIZE = 30
-_TX_PARAMS = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}
-
-
-def get_transactions_batch(sigs: list[str]) -> dict[str, dict | None]:
-    """JSON-RPC batch (один HTTP POST на пачку подписей) -- владелец:
-    'запросы getTransaction пачками, как в скане'. Кэш -- тот же файл-
-    кэш, что fp.get_transaction (та же ключевая функция _cache_path),
-    чтобы дальнейшие одиночные вызовы тоже брали из кэша. Откат на
-    одиночные вызовы для чанка, если пачка не удалась -- не роняем весь
-    прогон из-за одного отказавшегося провайдера/чанка."""
-    out: dict[str, dict | None] = {}
-    todo = []
-    for s in sigs:
-        cache_f = fp._cache_path("getTransaction", [s, _TX_PARAMS])
-        if cache_f.exists():
-            try:
-                out[s] = json.loads(cache_f.read_text())
-                continue
-            except (ValueError, OSError):
-                pass
-        todo.append(s)
-    if not todo:
-        return out
-
-    url = fp._endpoint()
-    for start in range(0, len(todo), BATCH_SIZE):
-        chunk = todo[start:start + BATCH_SIZE]
-        body = [{"jsonrpc": "2.0", "id": i, "method": "getTransaction", "params": [s, _TX_PARAMS]}
-                for i, s in enumerate(chunk)]
-        backoff = 0.0
-        ok = False
-        for _attempt in range(8):
-            try:
-                resp = requests.post(url, json=body, timeout=45)
-            except Exception:  # noqa: BLE001
-                backoff = min(max(backoff * 2, 0.5), 20.0)
-                time.sleep(backoff)
-                continue
-            if resp.status_code == 429 or 500 <= resp.status_code < 600:
-                backoff = min(max(backoff * 2, 0.5), 20.0)
-                time.sleep(backoff)
-                continue
-            if not resp.ok:
-                break
-            try:
-                results = resp.json()
-            except ValueError:
-                break
-            if not isinstance(results, list):
-                break
-            by_id = {r.get("id"): r for r in results if isinstance(r, dict)}
-            for i, s in enumerate(chunk):
-                r = by_id.get(i)
-                tx = r.get("result") if r and "error" not in r else None
-                out[s] = tx
-                fp._cache_path("getTransaction", [s, _TX_PARAMS]).write_text(json.dumps(tx))
-            ok = True
-            break
-        if not ok:
-            # честно -- пачка не удалась, откатываемся на одиночные вызовы
-            for s in chunk:
-                out[s] = fp.get_transaction(s)
-    return out
+MAX_WINDOW_TX_DECODE = 30  # владелец: было 40 -- достаточно для медианы/доли пустых
+get_transactions_batch = fp.get_transactions_batch  # владелец: батчи по 20, как в скане 217 (см. fp)
 
 
 MINT_AGE_MAX_PAGES = 20  # владелец, диагностика Brez: не более 20000 подписей на минт --
