@@ -47,6 +47,7 @@ jobs:
         run: |
           [ -e data/night_status.json ] && git add data/night_status.json
           [ -e data/solana_fomo_crowd.json ] && git add data/solana_fomo_crowd.json
+          [ -e data/solana_crowd_decode_fail_programs.json ] && git add data/solana_crowd_decode_fail_programs.json
           git diff --cached --quiet && exit 0
           git commit -m "Solana crowd_night: шаг [automated]"
           for i in 1 2 3 4 5; do
