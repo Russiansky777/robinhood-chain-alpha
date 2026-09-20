@@ -477,7 +477,13 @@ def fetch_missing_tx(sig: str, wallet: str, cache: dict) -> None:
 
 def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) -> list[dict]:
     wallet = task["wallet"]
-    wallet_tx = [v for v in chain_cache.values() if v.get("_wallet") == wallet and not v.get("err")]
+    # is_signer=True обязательно: иначе в "сделки" попадают транзакции, которые
+    # кошелёк вообще не инициировал (пассивная пыль/чужая транзакция,
+    # затрагивающая его токен-аккаунт -- эмпирически найдено: несколько таких
+    # tx с token_deltas>0 и sol_delta_native==0 давали фантомные "незакрытые
+    # позиции" и путали сопоставление buy/sell для реальных сделок).
+    wallet_tx = [v for v in chain_cache.values()
+                 if v.get("_wallet") == wallet and not v.get("err") and v.get("is_signer")]
     by_mint: dict[str, list] = {}
     for v in wallet_tx:
         deltas = v.get("token_deltas") or {}
