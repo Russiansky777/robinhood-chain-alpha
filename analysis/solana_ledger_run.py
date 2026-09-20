@@ -486,6 +486,28 @@ def _oldest_cached_signature(cache: dict, wallet: str) -> str | None:
     return min(rows, key=lambda v: v["slot"])["signature"]
 
 
+def _cache_key(sig: str, wallet: str) -> str:
+    return f"{sig}:{wallet}"
+
+
+def _has_own_view(cache: dict, sig: str, wallet: str) -> bool:
+    """Найдено при проверке выдачи: одна и та же подпись бывает актуальна
+    сразу для ДВУХ отслеживаемых кошельков -- перевод SOL напрямую между
+    двумя своими же кошельками задач (BATCH-4 -> BATCH-5, 0.500015 SOL,
+    подпись 3bhVXPkghX...). Кэш был ключом ПО ПОДПИСИ -- чей кошелёк
+    первым синхронизировался, тот и "застолбил" запись; второй кошелёк
+    навсегда видел "уже в кэше" и никогда не получал СВОЙ собственный
+    разбор той же транзакции (свою сторону перевода, свой is_signer).
+    Теперь новые записи пишутся под составным ключом (подпись, кошелёк);
+    старые ключи-подписи по-прежнему признаются "своими", если уже
+    принадлежат этому же кошельку -- чтобы не терять то, что и так верно
+    закэшировано, и не устраивать полный переразбор истории заново."""
+    if _cache_key(sig, wallet) in cache:
+        return True
+    legacy = cache.get(sig)
+    return isinstance(legacy, dict) and legacy.get("_wallet") == wallet
+
+
 def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
     """Найдено при проверке выдачи: у нескольких кошельков (BATCH-1..4)
     первая закэшированная транзакция -- уже покупка, без транзакции
@@ -506,7 +528,7 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
         if not page:
             cache[_genesis_key(wallet)] = {"_genesis_marker": True}
             break
-        new_in_page = [h for h in page if h["signature"] not in cache]
+        new_in_page = [h for h in page if not _has_own_view(cache, h["signature"], wallet)]
         todo.extend(new_in_page)
         before = page[-1]["signature"]
         if len(new_in_page) < len(page):
@@ -522,7 +544,7 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
             if not page:
                 cache[_genesis_key(wallet)] = {"_genesis_marker": True}
                 break
-            todo.extend(h for h in page if h["signature"] not in cache)
+            todo.extend(h for h in page if not _has_own_view(cache, h["signature"], wallet))
             before = page[-1]["signature"]
             if len(page) < 1000:
                 cache[_genesis_key(wallet)] = {"_genesis_marker": True}
@@ -534,14 +556,14 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
     for start in range(0, len(todo), chunk_size):
         if time.monotonic() > deadline:
             break
-        chunk = [h for h in todo[start:start + chunk_size] if h["signature"] not in cache]
+        chunk = [h for h in todo[start:start + chunk_size] if not _has_own_view(cache, h["signature"], wallet)]
         if not chunk:
             continue
         ok_chunk = [h for h in chunk if h.get("err") is None]
         for h in chunk:
             if h.get("err") is not None:
-                cache[h["signature"]] = {"signature": h["signature"], "slot": h.get("slot"),
-                                          "blockTime": h.get("blockTime"), "err": h.get("err"), "_wallet": wallet}
+                cache[_cache_key(h["signature"], wallet)] = {"signature": h["signature"], "slot": h.get("slot"),
+                                                              "blockTime": h.get("blockTime"), "err": h.get("err"), "_wallet": wallet}
         if ok_chunk:
             reqs = [("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}]) for h in ok_chunk]
             results = rpc_batch(reqs)
@@ -561,21 +583,21 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
                         continue
                 parsed = parse_tx_for_wallet(h["signature"], tx, wallet)
                 parsed["_wallet"] = wallet
-                cache[h["signature"]] = parsed
+                cache[_cache_key(h["signature"], wallet)] = parsed
                 n_new += 1
     return n_new
 
 
 def fetch_missing_tx(sig: str, wallet: str, cache: dict) -> None:
-    if sig in cache:
+    if _has_own_view(cache, sig, wallet):
         return
     tx = rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}])
     if tx is None:
-        cache[sig] = {"signature": sig, "err": "getTransaction_null", "_wallet": wallet}
+        cache[_cache_key(sig, wallet)] = {"signature": sig, "err": "getTransaction_null", "_wallet": wallet}
         return
     parsed = parse_tx_for_wallet(sig, tx, wallet)
     parsed["_wallet"] = wallet
-    cache[sig] = parsed
+    cache[_cache_key(sig, wallet)] = parsed
 
 
 # ---------- Section C+D: сшивка, сделки, статистика ----------
@@ -1065,7 +1087,7 @@ def main() -> None:
         for r in follow_trades_by_task.get(task["id"], []):
             state = str(r.get("state") or "").lower()
             h = dbot_signature_from_record(r)
-            if state == "done" and h and h not in chain_cache:
+            if state == "done" and h and not _has_own_view(chain_cache, h, task["wallet"]):
                 fetch_missing_tx(h, task["wallet"], chain_cache)
     save_json(CHAIN_CACHE_PATH, chain_cache)
     status["n_tx_chain"] = len(chain_cache)
