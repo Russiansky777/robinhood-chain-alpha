@@ -35,6 +35,7 @@ STATUS_PATH = REPO_ROOT / "data" / "night_status.json"
 CROWD_PATH = REPO_ROOT / "data" / "solana_fomo_crowd.json"
 PASSED_PATH = REPO_ROOT / "data" / "solana_fomo_passed.json"
 CONTROL_SET_PATH = REPO_ROOT / "data" / "solana_crowd_control_set.json"
+BREZ_CONTROL_SET_PATH = REPO_ROOT / "data" / "solana_crowd_brez_control_set.json"
 
 LEADER_WALLET = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 BREZ = "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB"
@@ -44,6 +45,8 @@ TIME_BUDGET_S = 20 * 60
 MIN_PRICED_EVENTS = 10
 MIN_SIGN_AGREEMENT = 0.8
 MAX_MEDIAN_ABS_DIFF_PP = 10.0
+BREZ_CONTROL_V2_TIME_SLICE_S = 5 * 60  # владелец, п.5: параллельно, не блокирует скан --
+# небольшой срез бюджета за тик, не более, пока все 17 подписей не будут обработаны
 
 
 def now_utc() -> str:
@@ -140,7 +143,7 @@ def run_brez_diagnostic(ctrl: dict, deadline: float) -> None:
         r = analyze_purchase(e, BREZ)
         age_min = purchase_age_minutes(e)
         price_plus30s = None
-        if not r.get("empty") and not r.get("unresolved") and r.get("growth_pct_30s") is not None and r.get("price_source"):
+        if not r.get("empty") and not r.get("decode_fail") and r.get("growth_pct_30s") is not None and r.get("price_source"):
             price_plus30s = round(r["price_source"] * (1 + r["growth_pct_30s"] / 100.0), 12)
         row = {
             "signature": e["signature"], "mint": e.get("mint"),
@@ -148,8 +151,8 @@ def run_brez_diagnostic(ctrl: dict, deadline: float) -> None:
             "price_source": r.get("price_source"),
             "price_plus30s": price_plus30s,
             "n_other_buys": r.get("n_other_buys"),
-            "empty": r.get("empty"), "unresolved": r.get("unresolved", False),
-            "quote_not_wsol_excluded": r.get("quote_not_wsol_excluded", False),
+            "empty": r.get("empty"), "decode_fail": r.get("decode_fail", False),
+            "not_a_purchase": r.get("not_a_purchase", False),
             "HONEST_NOTE": r.get("HONEST_NOTE"),
         }
         diag["rows"].append(row)
@@ -188,8 +191,8 @@ def run_control(status: dict, deadline: float) -> None:
             "dune_growth_pct_30s": ev["dune_growth_pct_30s"],
             "new_method_growth_pct_30s": new_growth,
             "diff_pp": round(new_growth - ev["dune_growth_pct_30s"], 4) if new_growth is not None else None,
-            "unresolved": r.get("unresolved", False),
-            "quote_not_wsol_excluded": r.get("quote_not_wsol_excluded", False),
+            "decode_fail": r.get("decode_fail", False),
+            "not_a_purchase": r.get("not_a_purchase", False),
             "empty": r.get("empty"),
             "HONEST_NOTE": r.get("HONEST_NOTE"),
         }
@@ -234,6 +237,59 @@ def run_control(status: dict, deadline: float) -> None:
         print(f"[crowd_night] СТОП: {status['last_error']}", flush=True)
 
 
+def load_brez_control_set() -> list[dict]:
+    return json.loads(BREZ_CONTROL_SET_PATH.read_text())["events"]
+
+
+def run_brez_control_v2(status: dict, deadline: float) -> None:
+    """Владелец, п.5: дополнительный контроль ПАРАЛЛЕЛЬНО скану, не
+    блокирующий -- те же 17 подписей Brez из фазы 3 (first_entry=true,
+    приценённые Dune, data/solana_crowd_brez_control_set.json), новым
+    методом. НЕ влияет на прошёл/не прошёл (контроль уже засчитан
+    владельцем) -- только таблица подпись/Dune/новый метод/разница,
+    прикладывается к итогу. Небольшой срез бюджета за тик
+    (BREZ_CONTROL_V2_TIME_SLICE_S), чтобы не задерживать скан 90
+    кошельков -- честная имитация "параллельно": один процесс, но скан
+    получает основную часть бюджета каждый тик."""
+    bc = status.setdefault("brez_control_v2", {"rows": {}, "done": False})
+    if bc.get("done"):
+        return
+    rows = bc.setdefault("rows", {})
+    events = load_brez_control_set()
+    slice_deadline = min(deadline, time.monotonic() + BREZ_CONTROL_V2_TIME_SLICE_S)
+    for ev in events:
+        sig = ev["signature"]
+        if sig in rows:
+            continue
+        if time.monotonic() > slice_deadline:
+            print("[crowd_night] Brez-контроль (п.5): срез бюджета на этот тик исчерпан, продолжу позже", flush=True)
+            return
+        entry = {"signature": sig, "mint": ev["mint"], "slot": ev["slot"],
+                 "spend_sol_equiv": ev.get("spend_sol_equiv")}
+        r = analyze_purchase(entry, BREZ)
+        new_growth = r.get("growth_pct_30s")
+        rows[sig] = {
+            "signature": sig, "day": ev["day"], "mint": ev["mint"],
+            "dune_growth_pct_30s": ev["dune_growth_pct_30s"],
+            "new_method_growth_pct_30s": new_growth,
+            "diff_pp": round(new_growth - ev["dune_growth_pct_30s"], 4) if new_growth is not None else None,
+            "decode_fail": r.get("decode_fail", False),
+            "not_a_purchase": r.get("not_a_purchase", False),
+            "empty": r.get("empty"),
+            "HONEST_NOTE": r.get("HONEST_NOTE"),
+        }
+        print(f"[crowd_night] Brez-контроль (п.5): {sig[:12]}.. Dune={rows[sig]['dune_growth_pct_30s']}% "
+              f"новый={rows[sig]['new_method_growth_pct_30s']} diff={rows[sig]['diff_pp']}", flush=True)
+
+    if len(rows) >= len(events):
+        priced = [r for r in rows.values() if r["new_method_growth_pct_30s"] is not None]
+        bc["n_priced"] = len(priced)
+        bc["n_total_events"] = len(events)
+        bc["table"] = sorted(rows.values(), key=lambda r: (r["day"], r["signature"]))
+        bc["done"] = True
+        print(f"[crowd_night] Brez-контроль (п.5) завершён: n_приценённых={len(priced)}/{len(events)}", flush=True)
+
+
 def run_scan(status: dict, deadline: float) -> None:
     ranked = load_ranked_wallets()
     status["total_wallets"] = len(ranked)
@@ -249,7 +305,7 @@ def run_scan(status: dict, deadline: float) -> None:
                             deadline=deadline)
         if r.get("wallet_budget_cut"):
             print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): бюджет кончился на этом кошельке "
-                  f"(n={r['n_purchases_analyzed']}/{MAX_PURCHASES_PER_WALLET_SCAN}) -- не сохраняю, "
+                  f"(n_приценено={r['n_priced']}, n_decode_fail={r['n_decode_fail']}) -- не сохраняю, "
                   f"продолжу со следующего тика", flush=True)
             break
         r["fomo_rank"] = row.get("fomo_rank")
@@ -257,8 +313,9 @@ def run_scan(status: dict, deadline: float) -> None:
         crowd[addr] = r
         CROWD_PATH.write_text(json.dumps(crowd, ensure_ascii=False, indent=2, default=str))
         print(f"[crowd_night] {row.get('name')} ({addr[:10]}.., {row.get('stands_in')}): "
-              f"n={r['n_purchases_analyzed']} медиана_роста={r['median_growth_pct_30s']} "
-              f"empty_share={r['empty_share']} ({len(crowd)}/{len(ranked)})", flush=True)
+              f"n_всего={r['n_purchases_total']} n_приценено={r['n_priced']} n_decode_fail={r['n_decode_fail']} "
+              f"медиана_роста={r['median_growth_pct_30s']} empty_share={r['empty_share']} "
+              f"({len(crowd)}/{len(ranked)})", flush=True)
     status["done_wallets"] = len(crowd)
     if len(crowd) >= len(ranked):
         status["stage"] = "done"
@@ -285,6 +342,8 @@ def main() -> None:
     try:
         if status["stage"] == "control":
             run_control(status, deadline)
+        if status["stage"] == "scan" and time.monotonic() < deadline:
+            run_brez_control_v2(status, deadline)  # владелец, п.5: не блокирует scan -- маленький срез, потом scan
         if status["stage"] == "scan" and time.monotonic() < deadline:
             run_scan(status, deadline)
     except Exception as exc:  # noqa: BLE001

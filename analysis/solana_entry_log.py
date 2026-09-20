@@ -52,6 +52,60 @@ USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 STABLE_QUOTES = {USDC, USDT}
 
+# Владелец, диагностика decode_fail в крауд-скане (п.2): реальные адреса
+# инфраструктурных программ (System/Token/Token-2022/ATA/ComputeBudget/
+# Memo), подтверждённые из уже закэшированных ответов RPC в data/ --
+# исключаются из кандидатов "программа свопа", т.к. они есть почти в
+# каждой транзакции и не являются DEX-программой.
+INFRA_PROGRAM_IDS = {
+    "11111111111111111111111111111111",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "ComputeBudget111111111111111111111111111111",
+    "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+}
+
+DEX_LABELS_PATH = PRIOR_ROOT / "dex_labels.json"
+try:
+    DEX_LABELS: dict[str, str] = json.loads(DEX_LABELS_PATH.read_text())
+except (FileNotFoundError, ValueError):
+    DEX_LABELS = {}
+
+# Владелец: когда decode_tx НАШЁЛ событие (ev.kind известен), но не
+# извлёк цену (p1_per_0 отсутствует) -- программа свопа известна
+# статически по kind (см. engine.py: CP/PUMP_AMM/DL -- константы,
+# LanMV9... -- Raydium Launchlab по data/solana_buyer_200/prior/.../
+# dex_labels.json). kind='cl' детектится только по логам события, БЕЗ
+# programId инструкции -- честно пусто, не угадываем.
+KIND_PROGRAM_IDS: dict[str, list[str]] = {
+    "cp": ["CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"],
+    "pamm": ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"],
+    "dl": ["LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"],
+    "launch": ["LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"],
+    "cl": [],
+}
+
+
+def candidate_program_ids_for_mint(tx: dict, mint: str) -> list[str]:
+    """Владелец, диагностика decode_fail (п.2 крауд-скана): когда
+    decode_tx вообще не нашёл событие по минту, честно НЕ угадываем
+    какая именно программа виновата -- собираем programId всех
+    инструкций (верхнего уровня + inner), где минт встречается среди
+    accounts, за вычетом инфраструктурных программ. Это сырой список
+    кандидатов для последующего разбора, не идентификация DEX."""
+    engine.normalize(tx)
+    ix = (tx["transaction"]["message"]["instructions"]
+          + [i for g in (tx.get("meta") or {}).get("innerInstructions") or [] for i in g["instructions"]])
+    out = []
+    for i in ix:
+        pid = i.get("programId")
+        if not pid or pid in INFRA_PROGRAM_IDS:
+            continue
+        if mint in (i.get("accounts") or []) and pid not in out:
+            out.append(pid)
+    return out
+
 
 def tx_signers(tx: dict) -> list[str]:
     keys = tx["transaction"]["message"]["accountKeys"]

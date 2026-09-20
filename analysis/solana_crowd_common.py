@@ -9,10 +9,16 @@
 эквивалент). Цена через +30с (75 слотов) = цена последней сделки в окне
 С ТЕМ ЖЕ quote-активом, что источник -- разные quote-активы честно не
 сравниваются. Ноль чужих сделок в окне -- «пусто», рост не считается
-(не 0%, а None). Источники, котируемые не в SOL/WSOL/USDC/USDT
-(пары токен/токен), исключены -- рост % внутри одного пула не зависит
-от котируемой валюты, поэтому SOL и стейблы равноправны -- см.
-quote_not_wsol_excluded.
+(не 0%, а None). Источники, котируемые не в SOL/WSOL/USDC/USDT (пары
+токен/токен) -- владелец: это НЕ покупка в смысле этого замера, честно
+пропускаются без пометки ошибки (см. not_a_purchase), не входят ни в
+n_приценено, ни в n_decode_fail.
+
+decode_fail (getTransaction вернул null / decode_tx не нашёл событие /
+цена не извлеклась) -- честная неудача метода, не чинится сейчас, но
+кандидаты программы свопа собираются в общий файл
+(data/solana_crowd_decode_fail_programs.json, см.
+record_decode_fail_programs) для последующего разбора топ-5 по частоте.
 
 Окно капится на MAX_WINDOW_TX_DECODE сделок (первые по времени после
 покупки) -- владелец: не более 40, partial=True при превышении, честно
@@ -33,8 +39,11 @@ from solana_batch5_rpc_check import scan_wallet  # noqa: E402
 from solana_entry_log import (  # noqa: E402
     fetch_mint_signatures_in_slot_window, mint_event_for_tx, trade_amounts,
     price_of_mint, tx_signers, block_index, WSOL, STABLE_QUOTES,
+    candidate_program_ids_for_mint, KIND_PROGRAM_IDS, DEX_LABELS,
 )
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DECODE_FAIL_PROGRAMS_PATH = REPO_ROOT / "data" / "solana_crowd_decode_fail_programs.json"
 ALLOWED_QUOTES = {WSOL} | STABLE_QUOTES
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
 MAX_PURCHASES_PER_WALLET_SCAN = 10
@@ -146,6 +155,27 @@ def purchase_age_minutes(entry: dict) -> float | None:
     return round((tx["blockTime"] - creation_time) / 60.0, 2)
 
 
+def record_decode_fail_programs(program_ids: list[str]) -> None:
+    """Владелец, п.2 крауд-скана: не чинить decode_fail сейчас, только
+    собрать program IDs свопа в общий файл (для последующего разбора
+    топ-5 по частоте). Один вызов на одну неудачную покупку -- program_ids
+    уже дедуплицированы вызывающей стороной внутри одного события."""
+    if not program_ids:
+        return
+    try:
+        data = json.loads(DECODE_FAIL_PROGRAMS_PATH.read_text()) if DECODE_FAIL_PROGRAMS_PATH.exists() else {}
+    except (ValueError, OSError):
+        data = {}
+    counts = data.setdefault("counts", {})
+    labels = data.setdefault("labels", {})
+    for pid in program_ids:
+        counts[pid] = counts.get(pid, 0) + 1
+        if pid not in labels:
+            labels[pid] = DEX_LABELS.get(pid)
+    data["updated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    DECODE_FAIL_PROGRAMS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+
 def wallet_purchases(address: str, min_sol: float, max_purchases: int) -> list[dict]:
     """До max_purchases последних первых покупок >=min_sol SOL за 72ч --
     переиспользует уже провалидированный scan_wallet (тот же метод, что
@@ -163,31 +193,35 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
 
     source_tx = fp.get_transaction(sig)
     if source_tx is None:
+        out["decode_fail"] = True
         out["HONEST_NOTE"] = "getTransaction источника вернул null"
-        out["unresolved"] = True
         return out
     ev = mint_event_for_tx(source_tx, mint)
     if ev is None:
+        out["decode_fail"] = True
         out["HONEST_NOTE"] = "decode_tx не нашёл своп-событие по минту в исходной транзакции"
-        out["unresolved"] = True
+        out["program_id_candidates"] = candidate_program_ids_for_mint(source_tx, mint)
         return out
     price_source, quote_mint = price_of_mint(ev, mint)
     if price_source is None:
+        out["decode_fail"] = True
         out["HONEST_NOTE"] = "цена источника не извлечена (см. trade_amounts/price_of_mint)"
-        out["unresolved"] = True
+        out["kind"] = ev.get("kind")
+        out["program_id_candidates"] = KIND_PROGRAM_IDS.get(ev.get("kind"), [])
         return out
     out["price_source"] = price_source
     out["quote_mint"] = quote_mint
     out["pool"] = ev.get("pool")
 
-    # Владелец: рост в % внутри ОДНОГО пула не зависит от котируемой
-    # валюты -- разрешаем SOL/WSOL и стейблы (USDC/USDT), исключаем
-    # только пары токен/токен без стейбла и без SOL (там волатильность
-    # обеих ног мешает сравнению).
+    # Владелец: токен/токен (котировка не в SOL/WSOL/USDC/USDT) -- НЕ
+    # покупка в смысле этого замера (рост % внутри пула не зависит от
+    # котируемой валюты, но пул третьего SPL-токена не сравним с эталоном
+    # Dune и не интересен для копирования толпой) -- пропускаем без
+    # пометки ошибки, не decode_fail.
     if quote_mint not in ALLOWED_QUOTES:
-        out["quote_not_wsol_excluded"] = True
-        out["HONEST_NOTE"] = (f"источник котируется не в SOL/WSOL/стейбле (quote="
-                               f"{quote_mint[:10] if quote_mint else '?'}..) -- пара токен/токен, исключено")
+        out["not_a_purchase"] = True
+        out["HONEST_NOTE"] = (f"котировка не в SOL/WSOL/USDC/USDT (quote="
+                               f"{quote_mint[:10] if quote_mint else '?'}..) -- не покупка, пропущено")
         return out
 
     slot = source_tx["slot"]
@@ -285,22 +319,30 @@ def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int,
         if deadline is not None and time.monotonic() > deadline:
             wallet_budget_cut = True
             break
-        results.append(analyze_purchase(e, address))
-    n_quote_excluded = sum(1 for r in results if r.get("quote_not_wsol_excluded"))
-    resolved = [r for r in results if not r.get("unresolved") and not r.get("quote_not_wsol_excluded")]
-    non_empty = [r for r in resolved if not r.get("empty")]
+        r = analyze_purchase(e, address)
+        results.append(r)
+        if r.get("decode_fail"):
+            record_decode_fail_programs(r.get("program_id_candidates") or [])
+
+    not_purchase = [r for r in results if r.get("not_a_purchase")]
+    decode_fail = [r for r in results if r.get("decode_fail")]
+    priced = [r for r in results if not r.get("decode_fail") and not r.get("not_a_purchase")]
+    non_empty = [r for r in priced if not r.get("empty")]
     growths = [r["growth_pct_30s"] for r in non_empty]
-    others_counts = [r["n_other_buys"] for r in resolved]
+    others_counts = [r["n_other_buys"] for r in priced]
+    sizes = [r["spend_sol_equiv"] for r in priced if r.get("spend_sol_equiv") is not None]
 
     return {
         "address": address, "name": name,
         "wallet_budget_cut": wallet_budget_cut,
-        "n_purchases_analyzed": len(results),
-        "n_unresolved": sum(1 for r in results if r.get("unresolved")),
-        "n_quote_not_wsol_excluded": n_quote_excluded,
-        "n_empty": sum(1 for r in resolved if r.get("empty")),
-        "empty_share": round(sum(1 for r in resolved if r.get("empty")) / len(resolved), 3) if resolved else None,
+        "n_purchases_total": len(priced) + len(decode_fail),
+        "n_priced": len(priced),
+        "n_decode_fail": len(decode_fail),
+        "n_not_a_purchase_token_token": len(not_purchase),
+        "n_empty": sum(1 for r in priced if r.get("empty")),
+        "empty_share": round(sum(1 for r in priced if r.get("empty")) / len(priced), 3) if priced else None,
         "median_growth_pct_30s": round(median(growths), 4) if growths else None,
         "median_n_other_buys": median(others_counts),
+        "median_purchase_size_sol_equiv": median(sizes),
         "purchases": results,
     }
