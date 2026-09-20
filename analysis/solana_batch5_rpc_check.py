@@ -99,6 +99,8 @@ def fetch_signatures_last_n_hours(address: str, lookback_s: int) -> list[dict]:
     hist: list[dict] = []
     before = None
     while True:
+        if fp.soft_deadline_exceeded():
+            raise RuntimeError("fetch_signatures_last_n_hours: мягкий дедлайн тика истёк во время пагинации")
         page = fp.get_signatures_for_address(address, before=before, limit=1000)
         if not page:
             break

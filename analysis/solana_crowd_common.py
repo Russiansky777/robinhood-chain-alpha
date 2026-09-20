@@ -186,6 +186,23 @@ def wallet_purchases(address: str, min_sol: float, max_purchases: int) -> list[d
 
 
 def analyze_purchase(entry: dict, wallet: str) -> dict:
+    """Владелец, найдено на реальном прогоне 2026-09-20: один зависший
+    RPC-вызов внутри _analyze_purchase_inner (retry-цикл rpc_call или
+    пагинация fetch_mint_signatures_in_slot_window) может сам по себе
+    съесть весь бюджет тика и убить job -- см. fp.set_soft_deadline.
+    Здесь -- последний рубеж: RuntimeError от честно истёкшего мягкого
+    дедлайна (или любой другой RPC-сбой) НЕ должен прерывать весь цикл
+    по кошельку/скану, а честно засчитывается decode_fail на ЭТОЙ ОДНОЙ
+    покупке, следующая обрабатывается как обычно."""
+    try:
+        return _analyze_purchase_inner(entry, wallet)
+    except RuntimeError as exc:
+        return {"signature": entry["signature"], "slot": entry.get("slot"), "mint": entry.get("mint"),
+                "spend_sol_equiv": entry.get("spend_sol_equiv"),
+                "decode_fail": True, "rpc_error": True, "HONEST_NOTE": f"RPC-сбой: {exc}"}
+
+
+def _analyze_purchase_inner(entry: dict, wallet: str) -> dict:
     sig = entry["signature"]
     mint = entry["mint"]
     out = {"signature": sig, "slot": entry["slot"], "mint": mint,
@@ -312,7 +329,18 @@ def median(xs: list[float]) -> float | None:
 
 def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int,
                     deadline: float | None = None) -> dict:
-    purchases = wallet_purchases(address, min_sol, max_purchases)
+    try:
+        purchases = wallet_purchases(address, min_sol, max_purchases)
+    except RuntimeError as exc:
+        # Мягкий дедлайн тика (или иной RPC-сбой) истёк ещё во время
+        # получения списка покупок этого кошелька (scan_wallet) -- честно
+        # не считаем этот кошелёк сделанным, следующий тик начнёт заново.
+        print(f"[crowd_common] {name} ({address[:10]}..): сбой при получении покупок -- {exc}", flush=True)
+        return {"address": address, "name": name, "wallet_budget_cut": True,
+                "n_purchases_total": 0, "n_priced": 0, "n_decode_fail": 0,
+                "n_not_a_purchase_token_token": 0, "n_empty": 0, "empty_share": None,
+                "median_growth_pct_30s": None, "median_n_other_buys": None,
+                "median_purchase_size_sol_equiv": None, "purchases": []}
     results = []
     wallet_budget_cut = False
     for e in purchases:

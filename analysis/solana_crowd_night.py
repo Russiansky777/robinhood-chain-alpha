@@ -257,29 +257,40 @@ def run_brez_control_v2(status: dict, deadline: float) -> None:
     rows = bc.setdefault("rows", {})
     events = load_brez_control_set()
     slice_deadline = min(deadline, time.monotonic() + BREZ_CONTROL_V2_TIME_SLICE_S)
-    for ev in events:
-        sig = ev["signature"]
-        if sig in rows:
-            continue
-        if time.monotonic() > slice_deadline:
-            print("[crowd_night] Brez-контроль (п.5): срез бюджета на этот тик исчерпан, продолжу позже", flush=True)
-            return
-        entry = {"signature": sig, "mint": ev["mint"], "slot": ev["slot"],
-                 "spend_sol_equiv": ev.get("spend_sol_equiv")}
-        r = analyze_purchase(entry, BREZ)
-        new_growth = r.get("growth_pct_30s")
-        rows[sig] = {
-            "signature": sig, "day": ev["day"], "mint": ev["mint"],
-            "dune_growth_pct_30s": ev["dune_growth_pct_30s"],
-            "new_method_growth_pct_30s": new_growth,
-            "diff_pp": round(new_growth - ev["dune_growth_pct_30s"], 4) if new_growth is not None else None,
-            "decode_fail": r.get("decode_fail", False),
-            "not_a_purchase": r.get("not_a_purchase", False),
-            "empty": r.get("empty"),
-            "HONEST_NOTE": r.get("HONEST_NOTE"),
-        }
-        print(f"[crowd_night] Brez-контроль (п.5): {sig[:12]}.. Dune={rows[sig]['dune_growth_pct_30s']}% "
-              f"новый={rows[sig]['new_method_growth_pct_30s']} diff={rows[sig]['diff_pp']}", flush=True)
+    # Владелец, найдено на реальном прогоне: один зависший RPC-вызов внутри
+    # analyze_purchase раньше мог утянуть за собой ВЕСЬ 20-минутный бюджет
+    # тика (мягкий дедлайн rpc_call был привязан к общему deadline). Здесь
+    # -- собственный, более тесный дедлайн на срез Brez-контроля, чтобы
+    # зависшая подпись стоила не больше BREZ_CONTROL_V2_TIME_SLICE_S, а не
+    # всего тика; после среза дедлайн RPC возвращается к общему -- скану
+    # достаётся вся оставшаяся часть бюджета.
+    fp.set_soft_deadline(slice_deadline)
+    try:
+        for ev in events:
+            sig = ev["signature"]
+            if sig in rows:
+                continue
+            if time.monotonic() > slice_deadline:
+                print("[crowd_night] Brez-контроль (п.5): срез бюджета на этот тик исчерпан, продолжу позже", flush=True)
+                return
+            entry = {"signature": sig, "mint": ev["mint"], "slot": ev["slot"],
+                     "spend_sol_equiv": ev.get("spend_sol_equiv")}
+            r = analyze_purchase(entry, BREZ)
+            new_growth = r.get("growth_pct_30s")
+            rows[sig] = {
+                "signature": sig, "day": ev["day"], "mint": ev["mint"],
+                "dune_growth_pct_30s": ev["dune_growth_pct_30s"],
+                "new_method_growth_pct_30s": new_growth,
+                "diff_pp": round(new_growth - ev["dune_growth_pct_30s"], 4) if new_growth is not None else None,
+                "decode_fail": r.get("decode_fail", False),
+                "not_a_purchase": r.get("not_a_purchase", False),
+                "empty": r.get("empty"),
+                "HONEST_NOTE": r.get("HONEST_NOTE"),
+            }
+            print(f"[crowd_night] Brez-контроль (п.5): {sig[:12]}.. Dune={rows[sig]['dune_growth_pct_30s']}% "
+                  f"новый={rows[sig]['new_method_growth_pct_30s']} diff={rows[sig]['diff_pp']}", flush=True)
+    finally:
+        fp.set_soft_deadline(deadline)
 
     if len(rows) >= len(events):
         priced = [r for r in rows.values() if r["new_method_growth_pct_30s"] is not None]
@@ -304,10 +315,17 @@ def run_scan(status: dict, deadline: float) -> None:
         r = analyze_wallet(addr, row.get("name"), min_sol=2.0, max_purchases=MAX_PURCHASES_PER_WALLET_SCAN,
                             deadline=deadline)
         if r.get("wallet_budget_cut"):
-            print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): бюджет кончился на этом кошельке "
-                  f"(n_приценено={r['n_priced']}, n_decode_fail={r['n_decode_fail']}) -- не сохраняю, "
-                  f"продолжу со следующего тика", flush=True)
-            break
+            if time.monotonic() > deadline:
+                print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): бюджет кончился на этом кошельке "
+                      f"(n_приценено={r['n_priced']}, n_decode_fail={r['n_decode_fail']}) -- не сохраняю, "
+                      f"продолжу со следующего тика", flush=True)
+                break
+            # Владелец: RPC-сбой на ЭТОМ кошельке (не исчерпание бюджета
+            # тика, время ещё есть) -- не бросаем весь тик, пропускаем
+            # кошелёк и идём дальше, next тик подхватит его снова.
+            print(f"[crowd_night] {row.get('name')} ({addr[:10]}..): RPC-сбой при получении покупок "
+                  f"(бюджет ещё есть) -- пропускаю, перехожу к следующему кошельку", flush=True)
+            continue
         r["fomo_rank"] = row.get("fomo_rank")
         r["stands_in"] = row.get("stands_in")
         crowd[addr] = r
@@ -339,6 +357,12 @@ def main() -> None:
           f"ALCHEMY_API_KEY={'есть' if os.environ.get('ALCHEMY_API_KEY') else 'нет'})", flush=True)
 
     deadline = time.monotonic() + TIME_BUDGET_S
+    # Владелец, найдено на реальном прогоне 2026-09-20: без этого один
+    # зависший RPC-вызов (rpc_call: до 20 попыток x потолок 45с = до 25
+    # минут) убивал ВЕСЬ job таймаутом раньше, чем внутренний 20-минутный
+    # цикл успевал заметить дедлайн -- ни одна покупка/кошелёк даже не
+    # сохранялись. Теперь rpc_call сам обрывается по этому дедлайну.
+    fp.set_soft_deadline(deadline)
     try:
         if status["stage"] == "control":
             run_control(status, deadline)

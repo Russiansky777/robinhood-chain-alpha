@@ -213,6 +213,8 @@ def fetch_mint_signatures_in_slot_window(mint: str, ref_time: int, lo_slot: int,
     hist: list[dict] = []
     before = anchor_sig
     while True:
+        if fp.soft_deadline_exceeded():
+            raise RuntimeError("fetch_mint_signatures_in_slot_window: мягкий дедлайн тика истёк во время пагинации")
         page = fp.get_signatures_for_address(mint, before=before, limit=1000)
         if not page:
             break

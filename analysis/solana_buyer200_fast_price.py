@@ -84,6 +84,27 @@ RPC_CALLS = 0  # честный счётчик реальных HTTP-попыт�
 # узел остаются запасными вариантами.
 _helius_disabled = False
 
+# Найдено на реальном прогоне crowd_night 2026-09-20: rpc_call может
+# уйти в 20 попыток x потолок backoff 45с = до 25 минут на ОДИН вызов
+# (тюнинг под многочасовой некритичный по времени buyer_200 -- см.
+# комментарий у max_attempts ниже), что при 20-минутном бюджете тика и
+# 25-минутном таймауте job'а crowd_night убивает ВЕСЬ прогон целиком
+# из-за одного зависшего вызова (было: 1 из 17 подписей Brez-контроля
+# съело всю job). _soft_deadline -- опциональный, по умолчанию None
+# (остальные вызывающие, buyer_200 и т.п., поведение не меняют) --
+# crowd_night выставляет его в начале каждого тика; rpc_call бросает
+# RuntimeError сразу по истечении, не дожидаясь исчерпания всех попыток.
+_soft_deadline: float | None = None
+
+
+def set_soft_deadline(deadline: float | None) -> None:
+    global _soft_deadline
+    _soft_deadline = deadline
+
+
+def soft_deadline_exceeded() -> bool:
+    return _soft_deadline is not None and time.monotonic() > _soft_deadline
+
 
 def _endpoint() -> str:
     helius_key = os.environ.get("HELIUS_API", "")
@@ -139,6 +160,9 @@ def rpc_call(method: str, params: list, use_cache: bool = True) -> dict:
     # ждём дольше, прежде чем сдаться на этом конкретном вызове.
     max_attempts, backoff_cap = 20, 45.0
     for attempt in range(max_attempts):
+        if soft_deadline_exceeded():
+            raise RuntimeError(f"RPC {method}: мягкий дедлайн тика истёк во время retry "
+                                f"(попытка {attempt}/{max_attempts}) -- не дожидаюсь оставшихся попыток")
         wait = max(_MIN_INTERVAL_S - (time.monotonic() - _last_call_at), 0.0) + _backoff_s
         if wait > 0:
             time.sleep(wait)
