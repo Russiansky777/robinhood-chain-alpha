@@ -8,12 +8,24 @@ A. DBot follow_orders (реальная форма ответа подтверж
    ранее -- {"err":false,"res":[{...}]}, поля id/name/walletAddress/
    walletName/targetIds/targetNames -- см. data/dbot_tasks_config_raw.json)
    -- 0 кредитов, "источник намерений".
-   follow_trades -- эндпоинт НИКОГДА не вызывался раньше в этой сессии,
-   его реальная форма ответа НЕ подтверждена. Извлечение полей (txHash/
-   state/reason) -- ЛУЧШАЯ ПОПЫТКА по нескольким вероятным именам, сырые
-   записи сохраняются целиком в кэш -- если имена полей другие, это
-   будет видно в data/dbot_follow_trades_raw.json и честно не заявляется
-   как проверенное.
+   follow_trades -- реальная форма ответа теперь подтверждена (первый
+   полный прогон): подписи транзакции как отдельного поля НЕТ (как и
+   предупреждала документация владельца, docs.dbotx.com/reference/
+   copy-records), но она есть в links.etherscan -- Solscan-ссылка вида
+   "https://solscan.io/tx/<подпись>" (имя поля общее/EVM-style, но URL
+   реально ведёт на Solscan для сети solana). Источник (кого копировали)
+   -- follow.wallet, прямо в записи, отдельный запрос с targetWallet не
+   понадобился. Реальные поля: id, configId, configName, wallet,
+   createAt (мс), timestamp (с, только у state=="done"), type (buy/sell),
+   state (done/fail/...), errorCode/errorMessage/skipReason,
+   send.info.contract + send.amount (raw), receive.info.contract +
+   receive.amount (raw), dbotFeeRate/dbotFee, follow.wallet,
+   follow.remark, links.etherscan. Первая сырая запись сохраняется
+   отдельно в data/dbot_follow_trades_sample.json. Если подпись из
+   links.etherscan не извлеклась -- запасная сшивка по (кошелёк, минт,
+   тип buy/sell, |время цепочки - timestamp записи| <= 20с, ближайший по
+   времени и по сумме) -- см. buy_match_method/sell_match_method
+   ("signature"/"time_match") в каждой сделке.
 
 B. Цепочка -- источник денег, баланс-метод (тот же принцип, что уже
    провалидирован в этой сессии multiple раз: preBalances/postBalances,
@@ -59,6 +71,7 @@ RELAY_PREFIXES = ("astra", "AsTra", "ste11", "LandX")
 
 FOLLOW_ORDERS_PATH = REPO_ROOT / "data" / "dbot_follow_orders_raw.json"
 FOLLOW_TRADES_PATH = REPO_ROOT / "data" / "dbot_follow_trades_raw.json"
+FOLLOW_TRADES_SAMPLE_PATH = REPO_ROOT / "data" / "dbot_follow_trades_sample.json"
 CHAIN_CACHE_PATH = REPO_ROOT / "data" / "chain_tx_cache.json"
 TRADES_ALL_PATH = REPO_ROOT / "data" / "solana_trades_all.json"
 SOURCE_STATS_PATH = REPO_ROOT / "data" / "solana_source_stats.json"
@@ -240,11 +253,102 @@ def fetch_follow_trades_for_task(task_id: str, api_key: str) -> list[dict]:
     return out
 
 
-def dbot_record_field(r: dict, *candidates):
-    for c in candidates:
-        if c in r and r[c] not in (None, ""):
-            return r[c]
+def dbot_signature_from_record(r: dict) -> str | None:
+    """Подписи как отдельного поля в follow_trades нет (подтверждено
+    документацией и эмпирически). Она зашита в links.* как URL explorer'а --
+    у links.etherscan это на деле Solscan-ссылка для solana."""
+    links = r.get("links") or {}
+    for key in ("etherscan", "dexscreener", "uniswap"):
+        url = links.get(key)
+        if url and "/tx/" in url:
+            sig = url.rsplit("/tx/", 1)[-1].strip()
+            if sig:
+                return sig
     return None
+
+
+def dbot_token_contract(r: dict) -> str | None:
+    """Адрес НЕ-SOL токена сделки: buy -- получаемый токен, sell -- отдаваемый."""
+    rtype = str(r.get("type") or "").lower()
+    send_c = ((r.get("send") or {}).get("info") or {}).get("contract")
+    recv_c = ((r.get("receive") or {}).get("info") or {}).get("contract")
+    if rtype == "buy":
+        return recv_c if recv_c and recv_c != WSOL else send_c
+    if rtype == "sell":
+        return send_c if send_c and send_c != WSOL else recv_c
+    for c in (send_c, recv_c):
+        if c and c != WSOL:
+            return c
+    return send_c or recv_c
+
+
+def dbot_sol_amount(r: dict) -> float | None:
+    """Сумма SOL-ноги сделки (send для buy, receive для sell) в SOL -- для
+    сравнения по сумме при сшивке по времени (кандидатов несколько)."""
+    rtype = str(r.get("type") or "").lower()
+    try:
+        if rtype == "buy":
+            return float(((r.get("send") or {}).get("amount"))) / 1e9
+        if rtype == "sell":
+            return float(((r.get("receive") or {}).get("amount"))) / 1e9
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def dbot_time_candidates(records: list[dict]) -> list[dict]:
+    """Записи state=='done' без извлекаемой подписи -- кандидаты для запасной
+    сшивки по времени (owner: если подписи нет -- сшивать по кошельку/минту/
+    типу/времени +-20с)."""
+    out = []
+    for r in records:
+        if str(r.get("state") or "").lower() != "done":
+            continue
+        if dbot_signature_from_record(r):
+            continue
+        if r.get("timestamp") is None or dbot_token_contract(r) is None:
+            continue
+        out.append(r)
+    return out
+
+
+def find_dbot_record(sig: str, block_time, mint: str, is_buy: bool, sol_amount,
+                      dbot_by_sig: dict, time_candidates: list[dict], consumed_ids: set):
+    """Сначала точная подпись; если её нет в DBot-записях -- запасная сшивка
+    по (тот же минт, тот же тип buy/sell, |время цепочки - timestamp| <= 20с),
+    при нескольких кандидатах -- ближайший по времени, затем по сумме SOL."""
+    rec = dbot_by_sig.get(sig)
+    if rec is not None:
+        return rec, "signature"
+    if block_time is None:
+        return None, None
+    want_type = "buy" if is_buy else "sell"
+    candidates = []
+    for r in time_candidates:
+        rid = r.get("id") or r.get("_id")
+        if rid is not None and rid in consumed_ids:
+            continue
+        if str(r.get("type") or "").lower() != want_type:
+            continue
+        if dbot_token_contract(r) != mint:
+            continue
+        dt = abs((r.get("timestamp") or 0) - block_time)
+        if dt <= 20:
+            candidates.append((dt, r))
+    if not candidates:
+        return None, None
+    if sol_amount is not None:
+        def amount_diff(item):
+            ra = dbot_sol_amount(item[1])
+            return abs((ra if ra is not None else 1e9) - sol_amount)
+        candidates.sort(key=lambda item: (item[0], amount_diff(item)))
+    else:
+        candidates.sort(key=lambda item: item[0])
+    best = candidates[0][1]
+    rid = best.get("id") or best.get("_id")
+    if rid is not None:
+        consumed_ids.add(rid)
+    return best, "time_match"
 
 
 # ---------- Section B: цепочка (баланс-метод) ----------
@@ -376,19 +480,41 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
     wallet_tx = [v for v in chain_cache.values() if v.get("_wallet") == wallet and not v.get("err")]
     by_mint: dict[str, list] = {}
     for v in wallet_tx:
-        for mint, delta in (v.get("token_deltas") or {}).items():
-            by_mint.setdefault(mint, []).append((v, delta))
+        deltas = v.get("token_deltas") or {}
+        if not deltas:
+            continue
+        # Одна подпись = одна сделка (одна нога свопа). Иногда в той же
+        # транзакции есть побочная пыль другого минта (реферальный кэшбэк,
+        # округление) -- это НЕ вторая сделка. Настоящая нога свопа -- та,
+        # у которой модуль дельты токена больше на порядки; берём только её,
+        # иначе побочная пыль с той же подписью создаёт фантомную сделку,
+        # которая при сшивке по подписи затирает настоящую.
+        mint, delta = max(deltas.items(), key=lambda kv: abs(kv[1]))
+        by_mint.setdefault(mint, []).append((v, delta))
     for mint in by_mint:
         by_mint[mint].sort(key=lambda t: (t[0].get("slot") or 0))
 
-    dbot_by_sig = {}
+    dbot_by_sig: dict[str, dict] = {}
     for r in records:
-        h = dbot_record_field(r, "txHash", "hash", "signature", "txId", "sig")
-        if h:
-            dbot_by_sig[h] = r
+        sig = dbot_signature_from_record(r)
+        if sig:
+            dbot_by_sig[sig] = r
+    time_candidates = dbot_time_candidates(records)
+    consumed_ids: set = set()
+
+    def resolve_source(record: dict | None):
+        if not record:
+            return None
+        follow = record.get("follow") or {}
+        src_addr = follow.get("wallet")
+        if not src_addr:
+            return None
+        known = next((s for s in task["sources"] if s["address"] == src_addr), None)
+        return known or {"address": src_addr, "remark": follow.get("remark")}
 
     trades = []
-    matched_sigs = set()
+    matched_sigs: set = set()
+    matched_record_ids: set = set()
     for mint, txs in by_mint.items():
         buys = [t for t in txs if t[1] > 0]
         sells = [t for t in txs if t[1] < 0]
@@ -396,23 +522,36 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
         for buy_v, buy_amt in buys:
             matched_sigs.add(buy_v["signature"])
             sell_v = None
-            for sv, sd in sells_remaining:
+            for i, (sv, sd) in enumerate(sells_remaining):
                 if (sv.get("slot") or 0) > (buy_v.get("slot") or 0):
                     sell_v = sv
-                    sells_remaining.remove((sv, sd))
+                    del sells_remaining[i]
                     break
-            buy_record = dbot_by_sig.get(buy_v["signature"])
-            sell_record = dbot_by_sig.get(sell_v["signature"]) if sell_v else None
-            if sell_v:
-                matched_sigs.add(sell_v["signature"])
-
-            source = None
-            if buy_record:
-                src_addr = dbot_record_field(buy_record, "targetId", "sourceAddress", "targetAddress", "sourceId")
-                source = next((s for s in task["sources"] if s["address"] == src_addr), None)
 
             sol_in = round(-float(buy_v.get("sol_delta_native") or 0), 9)
-            sol_out = round(float(sell_v.get("sol_delta_native") or 0), 9) if sell_v else None
+            buy_record, buy_method = find_dbot_record(
+                buy_v["signature"], buy_v.get("blockTime"), mint, True, sol_in,
+                dbot_by_sig, time_candidates, consumed_ids)
+            if buy_record is not None:
+                rid = buy_record.get("id") or buy_record.get("_id")
+                if rid is not None:
+                    matched_record_ids.add(rid)
+
+            sell_record, sell_method = None, None
+            sol_out = None
+            if sell_v:
+                matched_sigs.add(sell_v["signature"])
+                sol_out = round(float(sell_v.get("sol_delta_native") or 0), 9)
+                sell_record, sell_method = find_dbot_record(
+                    sell_v["signature"], sell_v.get("blockTime"), mint, False, sol_out,
+                    dbot_by_sig, time_candidates, consumed_ids)
+                if sell_record is not None:
+                    rid = sell_record.get("id") or sell_record.get("_id")
+                    if rid is not None:
+                        matched_record_ids.add(rid)
+
+            source = resolve_source(buy_record) or resolve_source(sell_record)
+
             net_sol = round((buy_v.get("sol_delta_native") or 0) + (sell_v.get("sol_delta_native") if sell_v else 0), 9)
             gross_pct = round((sol_out / sol_in - 1) * 100, 4) if (sell_v and sol_in) else None
 
@@ -431,26 +570,31 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 "source_remark": source["remark"] if source else None,
                 "mint": mint,
                 "buy_signature": buy_v["signature"], "buy_block_time": buy_v.get("blockTime"),
+                "buy_match_method": buy_method,
                 "sell_signature": sell_v["signature"] if sell_v else None,
                 "sell_block_time": sell_v.get("blockTime") if sell_v else None,
+                "sell_match_method": sell_method,
                 "sol_in": sol_in, "sol_out": sol_out, "gross_pct": gross_pct, "net_sol": net_sol,
                 "status": status,
                 "dbot_fail_reason": None,
             })
 
     for r in records:
-        h = dbot_record_field(r, "txHash", "hash", "signature", "txId", "sig")
-        state = str(dbot_record_field(r, "state", "status") or "").lower()
-        if h and h in matched_sigs:
+        rid = r.get("id") or r.get("_id")
+        sig = dbot_signature_from_record(r)
+        state = str(r.get("state") or "").lower()
+        if sig and sig in matched_sigs:
             continue
-        if state in ("done", "success", "ok"):
-            continue  # реально прошла и учтена выше -- либо не была найдена в chain-кэше (честно проигнорировать в этом проходе)
+        if rid is not None and rid in matched_record_ids:
+            continue
+        if state == "done":
+            continue  # реально прошла, но не нашлась в chain-кэше в этом проходе -- честно не учитываем
         trades.append({
             "task_id": task["id"], "task_name": task.get("name"), "wallet": wallet,
             "wallet_name": task.get("wallet_name"),
-            "mint": dbot_record_field(r, "mint", "tokenAddress", "token"),
-            "buy_signature": h, "status": "срыв",
-            "dbot_fail_reason": dbot_record_field(r, "failReason", "reason", "state", "status"),
+            "mint": dbot_token_contract(r),
+            "buy_signature": sig, "status": "срыв",
+            "dbot_fail_reason": r.get("errorMessage") or r.get("skipReason") or r.get("errorCode"),
         })
     return trades
 
@@ -579,6 +723,9 @@ def main() -> None:
         print(f"[ledger] A: follow_trades для задачи {tid} ({task.get('name')})...", flush=True)
         records = fetch_follow_trades_for_task(tid, api_key)
         follow_trades_by_task[tid] = records
+        if records and not FOLLOW_TRADES_SAMPLE_PATH.exists():
+            save_json(FOLLOW_TRADES_SAMPLE_PATH, records[0])
+            print(f"[ledger] первая сырая запись follow_trades сохранена в {FOLLOW_TRADES_SAMPLE_PATH.name}", flush=True)
         for r in records:
             rid = r.get("id") or r.get("_id") or f"{tid}:{len(follow_trades_cache)}"
             follow_trades_cache[str(rid)] = {"task_id": tid, "record": r}
@@ -602,9 +749,9 @@ def main() -> None:
     print("[ledger] C: дотягиваю done-записи DBot без транзакции в кэше...", flush=True)
     for task in tasks:
         for r in follow_trades_by_task.get(task["id"], []):
-            state = str(dbot_record_field(r, "state", "status") or "").lower()
-            h = dbot_record_field(r, "txHash", "hash", "signature", "txId", "sig")
-            if state in ("done", "success", "ok") and h and h not in chain_cache:
+            state = str(r.get("state") or "").lower()
+            h = dbot_signature_from_record(r)
+            if state == "done" and h and h not in chain_cache:
                 fetch_missing_tx(h, task["wallet"], chain_cache)
     save_json(CHAIN_CACHE_PATH, chain_cache)
     status["n_tx_chain"] = len(chain_cache)
