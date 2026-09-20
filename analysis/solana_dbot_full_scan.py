@@ -1,39 +1,50 @@
 #!/usr/bin/env python3
-"""Владелец: отмена решения "остаёмся на RPC" -- цель быстрый метод через
-DBot, скан RPC по 217 не запускать.
+"""Владелец: DBot не отбрасывать. Пересчёт размера покупки на уже
+собранных (в прошлом прогоне) сырых данных DBot -- MAX(usdAmount) по
+txHash (не сумма по легам маршрута, как раньше -- это и было причиной
+провала первой попытки: DBot логирует каждый лег мульти-хопа отдельной
+строкой и solAmount для USDC-котируемых лег на самом деле равен
+usdAmount, т.е. это USD, а не SOL), делённое на курс SOL (usdRate из
+строки этого же txHash с baseMint=WSOL; если такой строки нет в самом
+txHash -- ближайший по времени usdRate из ДРУГИХ строк того же
+уже полученного набора).
 
-Документация docs.dbotx.com заблокирована прокси и из этой песочницы
-(подтверждено повторно -- WebFetch/requests на *.dbotx.com возвращают
-EGRESS_BLOCKED/404 из прошлых попыток в этой сессии), поэтому курсор
-пагинации НЕ берём из документации по памяти (нельзя выдумывать) --
-ищем эмпирически: пробуем несколько вероятных имён параметра
-(cursor/before/beforeId/endTime -- по blockTime и по _id последнего
-элемента страницы 1) и оставляем только тот, что реально даёт более
-старые новые записи.
+ВАЖНО: прошлый прогон (data/solana_dbot_full_scan.json, шаг step1_2) не
+сохранил сырые строки DBot (только сумму solAmount по txHash) -- этого
+пересчёта из уже сохранённых данных буквально не существует. Честно
+дозапрашиваем ТОЛЬКО тот же самый уже покрытый скан лидера (те же ~5
+курсорных страниц, то же окно) -- НЕ 217 кандидатов, НЕ новый более
+широкий скан -- ровно чтобы сохранить сырые строки (txHash, mint,
+baseMint, blockTime, solAmount, usdAmount, usdRate) и dex_program_ids
+для сверки, раз их не было в кэше. Дальше пересчёт V2 делается только
+на этих (и старых RPC-side, тоже пересохранённых) данных.
 
-Порядок (ровно как просил владелец):
-  1. Пагинация: 2-3 доп. страницы лидера (type=buy) эмпирически найденным
-     способом. Отчёт -- сколько часов назад реально дошли.
-  2. Сверка БЕЗ старых эталонов: за окно, которое реально перекрыто
-     ответом DBot, берём покупки лидера через уже провалидированный RPC-
-     конвейер (classify_tx_total_spend ниже -- тот же баланс-метод, что
-     в solana_batch5_rpc_check.classify_tx, но БЕЗ ограничения
-     "первый вход по минту", т.к. DBot type=buy отдаёт ВСЕ покупки, не
-     только первые). Сравнение по txHash, solAmount (у DBot уже в SOL)
-     против spend_sol_equiv, допуск ±2%.
-  3. Сошлось -> сразу считаем все 217 (сначала 10 BATCH-5) через DBot:
-     на кошелёк -- страницы type=buy, пока не наберём 3 первых покупки
-     (первая по минту в пределах уже полученного окна) >=2 SOL, либо не
-     кончится окно 72ч, либо не кончится лимит в 5 страниц. Покрытие
-     часов пишем всегда, даже когда фильтр не набрался.
-  4. Не сошлось -> стоп, 3 примера расхождений, RPC-скан 217 НЕ
-     запускаем без прямого разрешения владельца."""
+Критерий (владелец): сравнить пересчитанный V2 размер с RPC на общих
+txHash, порог >=80% в пределах ±5%. Плюс отдельно полнота: сколько из
+RPC-покупок лидера DBot вообще не нашёл (по txHash), 3 примера с типом
+пула/маршрута (dex_program_ids -> имя из dex_labels.json).
+
+Решение автоматически, без промпта:
+  A) сошлось -> скан 217 (сначала 10 BATCH-5) через DBot с пересчётом V2:
+     type=buy, cursor=_id (см. discover_pagination -- уже подтверждено,
+     что это рабочая пагинация), до 5 страниц на кошелёк, ранняя
+     остановка при 3 первых покупках (первая по минту в окне) >=2 SOL.
+     В итог -- пометка о заниженной полноте DBot (см. completeness_pct
+     на лидере).
+  B) не сошлось -> сразу скан 217 через RPC (тот же метод, что уже
+     провалидирован на LEADER_WALLET и Brez -- solana_batch5_rpc_check.
+     scan_wallet), лимит 300 tx/кошелёк, честный coverage_status.
+
+В обоих случаях -- батчи по 10 в порядке лучшего ранга Fomo (windows_present),
+фильтр >=3 покупки >=2 SOL за 72ч (как в предыдущей явной спецификации
+владельца, ничем не отменена), address/name/n_ge_2sol/медиана."""
 from __future__ import annotations
 
 import json
 import os
 import sys
 import time
+from collections import defaultdict
 from decimal import Decimal as D
 from pathlib import Path
 from statistics import median
@@ -45,13 +56,15 @@ import solana_buyer200_fast_price as fp  # noqa: E402
 from solana_entry_log import tx_signers  # noqa: E402
 from solana_batch5_rpc_check import (  # noqa: E402
     tx_program_ids, mint_balance_map, DEX_PROGRAMS, STABLE_MINTS, WSOL, USDC, USDT,
-    PRIORITY_10, fetch_signatures_last_n_hours,
+    PRIORITY_10, fetch_signatures_last_n_hours, scan_wallet as rpc_scan_wallet,
 )
 from solana_dbot_pilot_report import _ACTIVE_SECRETS, _scrub_all  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "data" / "solana_dbot_full_scan.json"
 CANDIDATES_PATH = REPO_ROOT / "data" / "fomo_leaderboard_candidates.json"
+DEX_LABELS_PATH = REPO_ROOT / "data" / "solana_buyer_200" / "prior" / "current" / "buyer_100" / "dex_labels.json"
+DEX_LABELS = json.loads(DEX_LABELS_PATH.read_text()) if DEX_LABELS_PATH.exists() else {}
 
 HOST = "https://api-data-v1.dbotx.com"
 PATH_TRADES = "/kline/wallet/trades"
@@ -62,7 +75,7 @@ LOOKBACK_S = LOOKBACK_HOURS * 3600
 MAX_PAGES_LEADER_PROBE = 5
 MAX_PAGES_PER_WALLET = 5
 TARGET_GE2SOL_PER_WALLET = 3
-MATCH_TOLERANCE = 0.02
+MATCH_TOLERANCE_V2 = 0.05
 TIME_BUDGET_S = 35 * 60
 COMMIT_INTERVAL_S = 60
 
@@ -102,7 +115,7 @@ def item_hash(item: dict) -> str | None:
     return item.get("txHash") or item.get("tx_hash") or item.get("signature")
 
 
-# ---------- эмпирическое обнаружение пагинации ----------
+# ---------- пагинация: cursor=_id последней записи (подтверждено рабочим прошлым прогоном) ----------
 
 PAGINATION_CANDIDATES = [
     ("cursor_id", "cursor", "_id"),
@@ -114,7 +127,6 @@ PAGINATION_CANDIDATES = [
 
 
 def discover_pagination(account: str, api_key: str, page1_items: list) -> tuple[str | None, dict]:
-    """Пробует кандидатов на page1's oldest item -- возвращает (имя_стратегии, доп.лог)."""
     if not page1_items:
         return None, {"reason": "page1 пуста"}
     oldest = min(page1_items, key=lambda i: i.get("blockTime") or 0)
@@ -141,8 +153,6 @@ def discover_pagination(account: str, api_key: str, page1_items: list) -> tuple[
 
 def fetch_dbot_buys(account: str, api_key: str, strategy: str | None, max_pages: int,
                      stop_when=None) -> tuple[list, dict]:
-    """Тянет до max_pages страниц type=buy для account, используя strategy
-    (если None -- только страница 1). stop_when(all_items)->bool -- ранняя остановка."""
     params_base = {"account": account, "chain": "solana", "type": "buy"}
     r1 = dbot_get(params_base, api_key)
     items1 = extract_items(r1.get("body"))
@@ -174,19 +184,101 @@ def fetch_dbot_buys(account: str, api_key: str, strategy: str | None, max_pages:
     return all_items, {"pages": pages_log}
 
 
+# ---------- пересчёт V2: MAX(usdAmount) по txHash / курс SOL ----------
+
+def sol_rate_series(items: list) -> list[tuple[int, float]]:
+    pts = [(i.get("blockTime"), i.get("usdRate")) for i in items
+           if i.get("baseMint") == WSOL and i.get("blockTime") is not None and i.get("usdRate")]
+    pts.sort(key=lambda p: p[0])
+    return pts
+
+
+def nearest_rate(pts: list[tuple[int, float]], bt) -> float | None:
+    if not pts or bt is None:
+        return None
+    return min(pts, key=lambda p: abs(p[0] - bt))[1]
+
+
+def dbot_buy_size_sol_v2(rows_for_hash: list[dict], rate_pts: list[tuple[int, float]]) -> float | None:
+    usd_amounts = [r.get("usdAmount") for r in rows_for_hash if r.get("usdAmount") is not None]
+    if not usd_amounts:
+        return None
+    amt_usd = max(usd_amounts)
+    own_wsol_rows = [r for r in rows_for_hash if r.get("baseMint") == WSOL and r.get("usdRate")]
+    if own_wsol_rows:
+        rate = own_wsol_rows[0]["usdRate"]
+    else:
+        bt = next((r.get("blockTime") for r in rows_for_hash if r.get("blockTime") is not None), None)
+        rate = nearest_rate(rate_pts, bt)
+    if not rate:
+        return None
+    return amt_usd / rate
+
+
+def dex_names(program_ids: list[str] | None) -> list[str]:
+    if not program_ids:
+        return []
+    return [DEX_LABELS.get(p, p) for p in program_ids]
+
+
+def recompute_v2(all_items: list, rpc_events: list) -> dict:
+    by_hash: dict[str, list] = defaultdict(list)
+    for i in all_items:
+        h = item_hash(i)
+        if h:
+            by_hash[h].append(i)
+    rate_pts = sol_rate_series(all_items)
+    size_by_hash = {h: dbot_buy_size_sol_v2(rows, rate_pts) for h, rows in by_hash.items()}
+
+    comparison = []
+    for ev in rpc_events:
+        sig = ev["signature"]
+        dbot_sol = size_by_hash.get(sig)
+        row = {"signature": sig, "rpc_spend_sol_equiv": ev["spend_sol_equiv"],
+               "found_in_dbot": sig in by_hash, "dbot_size_sol_v2": dbot_sol}
+        if dbot_sol is not None and ev["spend_sol_equiv"] > 0:
+            row["match_within_5pct"] = abs(dbot_sol - ev["spend_sol_equiv"]) / ev["spend_sol_equiv"] < MATCH_TOLERANCE_V2
+        else:
+            row["match_within_5pct"] = None
+        comparison.append(row)
+
+    n_common = sum(1 for r in comparison if r["found_in_dbot"])
+    n_matched = sum(1 for r in comparison if r.get("match_within_5pct"))
+    frac_matched = (n_matched / n_common) if n_common else 0.0
+    decision = "сошлось" if (n_common >= 3 and frac_matched >= 0.8) else "не сошлось"
+
+    n_total = len(rpc_events)
+    completeness_pct = round(100 * n_common / n_total, 1) if n_total else None
+    not_found = [ev for ev in rpc_events if ev["signature"] not in by_hash]
+    not_found_examples = [
+        {"signature": ev["signature"], "blockTime": ev["blockTime"],
+         "spend_sol_equiv": ev["spend_sol_equiv"], "bought_mints": ev.get("bought_mints"),
+         "dex_program_ids": ev.get("dex_program_ids"), "dex_names": dex_names(ev.get("dex_program_ids"))}
+        for ev in not_found[:3]
+    ]
+
+    return {
+        "comparison_table_v2": comparison, "n_common_txhash": n_common,
+        "n_matched_within_5pct": n_matched, "fraction_matched_5pct": round(frac_matched, 3),
+        "n_rpc_events_total": n_total, "completeness_pct": completeness_pct,
+        "n_not_found_in_dbot": len(not_found), "not_found_examples": not_found_examples,
+        "MATCH_DECISION_V2": decision,
+    }
+
+
 # ---------- RPC-сторона сверки (без старых эталонов -- любые покупки лидера в окне) ----------
 
 def classify_tx_total_spend(tx: dict, wallet: str) -> dict | None:
     """Как classify_tx в solana_batch5_rpc_check, но БЕЗ требования
     "первый вход по минту" -- просто общий SOL-эквивалент потраченного в
-    этой транзакции на DEX/AMM, для сверки с DBot type=buy (который
-    отдаёт ВСЕ покупки, не только первые)."""
+    этой транзакции на DEX/AMM, для сверки с DBot type=buy."""
     meta = tx.get("meta") or {}
     if meta.get("err") is not None:
         return None
     if wallet not in tx_signers(tx):
         return None
-    if not (tx_program_ids(tx) & DEX_PROGRAMS):
+    dex_ids = tx_program_ids(tx) & DEX_PROGRAMS
+    if not dex_ids:
         return None
     loaded = meta.get("loadedAddresses") or {}
     keys = ([k["pubkey"] if isinstance(k, dict) else k for k in tx["transaction"]["message"]["accountKeys"]]
@@ -224,7 +316,8 @@ def classify_tx_total_spend(tx: dict, wallet: str) -> dict | None:
     bought_mints = [m for m, post_amt in post_tb.items()
                     if m not in STABLE_MINTS and m != WSOL and post_amt > pre_tb.get(m, D(0))]
     return {"signature": tx["transaction"]["signatures"][0], "blockTime": tx.get("blockTime"),
-            "spend_sol_equiv": float(spend_sol_equiv), "bought_mints": bought_mints}
+            "spend_sol_equiv": float(spend_sol_equiv), "bought_mints": bought_mints,
+            "dex_program_ids": sorted(dex_ids)}
 
 
 def rpc_ground_truth_window(wallet: str, window_start: int, window_end: int) -> list[dict]:
@@ -243,7 +336,7 @@ def rpc_ground_truth_window(wallet: str, window_start: int, window_end: int) -> 
     return out
 
 
-# ---------- шаг 1+2: пагинация лидера + сверка ----------
+# ---------- шаг 1+2: пагинация лидера + сверка (с сохранением сырых данных для V2) ----------
 
 def step1_2(api_key: str) -> dict:
     out: dict = {}
@@ -262,6 +355,7 @@ def step1_2(api_key: str) -> dict:
     all_items, fetch_log = fetch_dbot_buys(LEADER_WALLET, api_key, strategy, MAX_PAGES_LEADER_PROBE)
     out["fetch_log"] = fetch_log
     out["n_items_total"] = len(all_items)
+    out["all_dbot_items"] = all_items  # сырые строки -- нужны для пересчёта V2 без новых запросов в будущем
 
     now = int(time.time())
     blocktimes = [i.get("blockTime") for i in all_items if i.get("blockTime") is not None]
@@ -274,90 +368,59 @@ def step1_2(api_key: str) -> dict:
 
     if window_start is None:
         out["HONEST_ANSWER"] = "нет ни одной записи с blockTime -- сверку строить не на чем"
-        out["MATCH_DECISION"] = "не сошлось (нет данных)"
+        out["rpc_events"] = []
         return out
 
     print("[dbot_full] тяну RPC ground truth за то же окно...", flush=True)
     rpc_events = rpc_ground_truth_window(LEADER_WALLET, window_start, window_end)
+    out["rpc_events"] = rpc_events  # сырые RPC-события -- тоже нужны для пересчёта без новых запросов
     out["n_rpc_ground_truth_events"] = len(rpc_events)
-
-    dbot_by_hash: dict[str, float] = {}
-    for i in all_items:
-        h = item_hash(i)
-        if h is None:
-            continue
-        sa = i.get("solAmount")
-        if sa is None:
-            continue
-        dbot_by_hash[h] = dbot_by_hash.get(h, 0.0) + float(sa)
-
-    comparison = []
-    for ev in rpc_events:
-        sig = ev["signature"]
-        dbot_sol = dbot_by_hash.get(sig)
-        row = {"signature": sig, "rpc_spend_sol_equiv": ev["spend_sol_equiv"],
-               "found_in_dbot": dbot_sol is not None, "dbot_sol_amount_sum": dbot_sol}
-        if dbot_sol is not None and ev["spend_sol_equiv"] > 0:
-            row["match_within_2pct"] = abs(dbot_sol - ev["spend_sol_equiv"]) / ev["spend_sol_equiv"] < MATCH_TOLERANCE
-        else:
-            row["match_within_2pct"] = None
-        comparison.append(row)
-
-    out["comparison_table"] = comparison
-    n_comparable = sum(1 for r in comparison if r["found_in_dbot"])
-    n_matched = sum(1 for r in comparison if r.get("match_within_2pct"))
-    out["n_rpc_events_in_window"] = len(comparison)
-    out["n_found_in_dbot"] = n_comparable
-    out["n_matched_within_2pct"] = n_matched
-    frac_matched = (n_matched / n_comparable) if n_comparable else 0.0
-    out["fraction_matched"] = round(frac_matched, 3)
-
-    decision = "не сошлось (недостаточно пересечения)"
-    if n_comparable >= 3 and frac_matched >= 0.8:
-        decision = "сошлось"
-    elif n_comparable >= 3:
-        decision = "не сошлось (расхождение сумм)"
-    out["MATCH_DECISION"] = decision
-    out["discrepancy_examples"] = [r for r in comparison if r.get("match_within_2pct") is False][:3] or \
-        [r for r in comparison if not r["found_in_dbot"]][:3]
-    print(f"[dbot_full] сверка: rpc_events_in_window={len(comparison)} found_in_dbot={n_comparable} "
-          f"matched_2pct={n_matched} decision={decision}", flush=True)
+    print(f"[dbot_full] RPC ground truth: {len(rpc_events)} событий", flush=True)
     return out
 
 
-# ---------- шаг 3: скан кошелька через DBot (после "сошлось") ----------
+# ---------- шаг 3: скан кошелька через DBot V2 (после "сошлось") ----------
 
-def dbot_scan_wallet(address: str, api_key: str, strategy: str | None) -> dict:
-    now = int(time.time())
-    cutoff = now - LOOKBACK_S
-
-    def enough(items):
-        by_mint = {}
-        for i in items:
-            if (i.get("blockTime") or 0) < cutoff:
-                continue
-            m = i.get("mint")
-            if m is None:
-                continue
-            if m not in by_mint or (i.get("blockTime") or 0) < (by_mint[m].get("blockTime") or 0):
-                by_mint[m] = i
-        n_ge2 = sum(1 for p in by_mint.values() if (p.get("solAmount") or 0) >= 2)
-        oldest = min((i.get("blockTime") or now for i in items), default=now)
-        return n_ge2 >= TARGET_GE2SOL_PER_WALLET or oldest <= cutoff
-
-    all_items, fetch_log = fetch_dbot_buys(address, api_key, strategy, MAX_PAGES_PER_WALLET, stop_when=enough)
-
-    by_mint = {}
-    for i in all_items:
-        if (i.get("blockTime") or 0) < cutoff:
+def first_purchase_sizes_v2(items: list, cutoff: int) -> tuple[list[float], int, dict]:
+    by_hash: dict[str, list] = defaultdict(list)
+    for i in items:
+        h = item_hash(i)
+        if h:
+            by_hash[h].append(i)
+    rate_pts = sol_rate_series(items)
+    by_mint_first: dict[str, dict] = {}
+    for i in items:
+        bt = i.get("blockTime")
+        if bt is None or bt < cutoff:
             continue
         m = i.get("mint")
         if m is None:
             continue
-        if m not in by_mint or (i.get("blockTime") or 0) < (by_mint[m].get("blockTime") or 0):
-            by_mint[m] = i
-    first_purchases = list(by_mint.values())
-    sizes = [p.get("solAmount") for p in first_purchases if p.get("solAmount") is not None]
+        if m not in by_mint_first or bt < by_mint_first[m]["blockTime"]:
+            by_mint_first[m] = i
+    sizes, n_price_missing = [], 0
+    for item in by_mint_first.values():
+        h = item_hash(item)
+        sz = dbot_buy_size_sol_v2(by_hash.get(h, [item]), rate_pts)
+        if sz is None:
+            n_price_missing += 1
+        else:
+            sizes.append(sz)
+    return sizes, n_price_missing, by_mint_first
+
+
+def dbot_scan_wallet_v2(address: str, api_key: str, strategy: str | None) -> dict:
+    now = int(time.time())
+    cutoff = now - LOOKBACK_S
+
+    def enough(items):
+        sizes, _, _ = first_purchase_sizes_v2(items, cutoff)
+        n_ge2 = sum(1 for s in sizes if s >= 2)
+        oldest = min((i.get("blockTime") or now for i in items), default=now)
+        return n_ge2 >= TARGET_GE2SOL_PER_WALLET or oldest <= cutoff
+
+    all_items, fetch_log = fetch_dbot_buys(address, api_key, strategy, MAX_PAGES_PER_WALLET, stop_when=enough)
+    sizes, n_price_missing, by_mint_first = first_purchase_sizes_v2(all_items, cutoff)
 
     blocktimes_in_window = [i.get("blockTime") for i in all_items if i.get("blockTime") and i["blockTime"] >= cutoff]
     oldest_bt = min(blocktimes_in_window) if blocktimes_in_window else None
@@ -373,48 +436,79 @@ def dbot_scan_wallet(address: str, api_key: str, strategy: str | None) -> dict:
     return {
         "n_pages_fetched": n_pages, "n_items_total": len(all_items),
         "coverage_status": coverage_status, "coverage_hours_actual": coverage_hours_actual,
-        "n_first_purchases_in_window": len(first_purchases),
+        "n_first_purchases_in_window": len(by_mint_first), "n_price_missing": n_price_missing,
         "n_ge_2sol": sum(1 for s in sizes if s >= 2),
         "n_ge_4_3sol": sum(1 for s in sizes if s >= 4.3),
         "median_spend_sol": round(median(sizes), 4) if sizes else None,
     }
 
 
+def scan_wallet_adapter(method: str, address: str, api_key: str, strategy: str | None) -> dict:
+    if method == "dbot_v2":
+        return dbot_scan_wallet_v2(address, api_key, strategy)
+    r = rpc_scan_wallet(address)
+    return {
+        "n_tx_scanned": r["n_tx_scanned"], "coverage_status": r["coverage_status"],
+        "coverage_hours_actual": r["coverage_hours_actual"],
+        "n_ge_2sol": r["n_first_entries_ge_2sol"], "n_ge_4_3sol": r["n_first_entries_ge_4_3sol"],
+        "median_spend_sol": r["median_spend_sol_equiv"],
+    }
+
+
 def main() -> None:
     api_key = os.environ.get("DBOT_API_KEY", "")
     result: dict = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
-    if not api_key:
-        result["HONEST_ANSWER"] = "DBOT_API_KEY пуст в окружении."
-        OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-        print("[dbot_full] " + result["HONEST_ANSWER"], flush=True)
-        return
-    if not any(c in api_key for c in ("\n", "\r")):
-        _ACTIVE_SECRETS.append(api_key)
 
-    if "step1_2" not in result:
+    need_raw = ("step1_2" not in result or "all_dbot_items" not in result["step1_2"]
+                or "rpc_events" not in result["step1_2"])
+    if need_raw:
+        if not api_key:
+            result["HONEST_ANSWER"] = "DBOT_API_KEY пуст в окружении."
+            OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+            print("[dbot_full] " + result["HONEST_ANSWER"], flush=True)
+            return
+        if not any(c in api_key for c in ("\n", "\r")):
+            _ACTIVE_SECRETS.append(api_key)
+        print("[dbot_full] в кэше нет сырых строк DBot/RPC для V2-пересчёта -- "
+              "дозапрашиваю ТОЛЬКО уже покрытое окно лидера (не 217, не шире)", flush=True)
+        result.pop("STOP", None)
+        result.pop("reason", None)
         result["step1_2"] = step1_2(api_key)
         OUT_PATH.write_text(_scrub_all(json.dumps(result, ensure_ascii=False, indent=2, default=str)))
-        fp._git_commit_progress("dbot_full_scan_step1_2", [OUT_PATH])
+        fp._git_commit_progress("dbot_full_scan_raw_refetch", [OUT_PATH])
+    elif not any(c in api_key for c in ("\n", "\r")) and api_key:
+        _ACTIVE_SECRETS.append(api_key)
 
-    decision = result["step1_2"].get("MATCH_DECISION")
-    if decision != "сошлось":
-        result["STOP"] = True
-        result["reason"] = decision
+    s = result["step1_2"]
+    if "MATCH_DECISION_V2" not in s:
+        v2 = recompute_v2(s["all_dbot_items"], s["rpc_events"])
+        s.update(v2)
+        result["step1_2"] = s
         OUT_PATH.write_text(_scrub_all(json.dumps(result, ensure_ascii=False, indent=2, default=str)))
-        fp._git_commit_progress("dbot_full_scan_stop", [OUT_PATH])
-        print(f"[dbot_full] СТОП: {decision}. RPC-скан 217 не запускаю без прямого разрешения.", flush=True)
-        return
+        fp._git_commit_progress("dbot_full_scan_recompute_v2", [OUT_PATH])
+        print(f"[dbot_full] V2: common_txhash={v2['n_common_txhash']} matched_5pct={v2['n_matched_within_5pct']} "
+              f"frac={v2['fraction_matched_5pct']} completeness={v2['completeness_pct']}% "
+              f"decision={v2['MATCH_DECISION_V2']}", flush=True)
 
-    strategy = result["step1_2"].get("pagination_strategy_found")
+    decision = s["MATCH_DECISION_V2"]
+    method = "dbot_v2" if decision == "сошлось" else "rpc"
+    result["scan_method"] = method
+    strategy = s.get("pagination_strategy_found")
+    if method == "dbot_v2":
+        result["dbot_completeness_note"] = (
+            f"частота по DBot занижена (полнота ~{s.get('completeness_pct')}% на лидере)")
+    print(f"[dbot_full] решение V2={decision} -> метод скана 217 = {method}", flush=True)
+
     result.setdefault("priority_10", {})
     result.setdefault("remaining_scan", {})
 
-    print(f"[dbot_full] сошлось -- считаю приоритетные 10 через DBot (strategy={strategy})", flush=True)
+    print(f"[dbot_full] считаю приоритетные 10 (метод={method})", flush=True)
     for addr, name in PRIORITY_10:
-        if addr in result["priority_10"]:
+        if addr in result["priority_10"] and result["priority_10"][addr].get("_method") == method:
             continue
-        row = dbot_scan_wallet(addr, api_key, strategy)
+        row = scan_wallet_adapter(method, addr, api_key, strategy)
         row["name"] = name
+        row["_method"] = method
         result["priority_10"][addr] = row
         print(f"[dbot_full] {name} ({addr[:10]}..): >=2SOL={row['n_ge_2sol']} >=4.3SOL={row['n_ge_4_3sol']} "
               f"медиана={row['median_spend_sol']} coverage={row['coverage_status']} ({row['coverage_hours_actual']}ч)", flush=True)
@@ -445,13 +539,14 @@ def main() -> None:
     n_done = 0
     for row in remaining:
         addr = row["solana_address"]
-        if addr in scanned:
+        if addr in scanned and scanned[addr].get("_method") == method:
             continue
         if time.monotonic() - started_at > TIME_BUDGET_S:
             print("[dbot_full] бюджет времени исчерпан -- остальное на следующий прогон", flush=True)
             break
-        r = dbot_scan_wallet(addr, api_key, strategy)
+        r = scan_wallet_adapter(method, addr, api_key, strategy)
         r["name"] = row.get("nickname")
+        r["_method"] = method
         scanned[addr] = r
         n_done += 1
         print(f"[dbot_full] {row.get('nickname')} ({addr[:10]}..): >=2SOL={r['n_ge_2sol']} "
@@ -479,7 +574,7 @@ def main() -> None:
         for batch in batches
     ]
     OUT_PATH.write_text(_scrub_all(json.dumps(result, ensure_ascii=False, indent=2, default=str)))
-    print(f"[dbot_full] квалифицировано (>=3 покупки >=2SOL/72ч): {len(qualified)}, "
+    print(f"[dbot_full] метод={method} квалифицировано (>=3 покупки >=2SOL/72ч): {len(qualified)}, "
           f"батчей по 10: {len(batches)}", flush=True)
 
 
