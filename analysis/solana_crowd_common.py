@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""Владелец, ночное задание п.2: общая логика "идёт ли толпа за
-первой покупкой" -- переиспользует ровно тот же метод, что
-analysis/solana_entry_log.py (только RPC, decode_tx, поиск по минту и
-по пулу), применённый не к одной сделке лидера, а к каждой первой
-покупке >=2 SOL кошелька за 72ч.
+"""Владелец, п.2 "толпа за первой покупкой": переиспользует ровно тот
+же метод, что analysis/solana_entry_log.py (только RPC, decode_tx,
+поиск по минту и по пулу), применённый не к одной сделке лидера, а к
+каждой первой покупке кошелька за 72ч.
 
 Цена источника = его трата/полученные токены (через decode_tx -- то же
 самое отношение, native precision пула, БЕЗ кросс-конвертации в SOL-
 эквивалент). Цена через +30с (75 слотов) = цена последней сделки в окне
 С ТЕМ ЖЕ quote-активом, что источник -- разные quote-активы честно не
-сравниваются (см. entry_log.py: 'same_quote_asset_only'). Ноль чужих
-сделок в окне -- «пусто», рост не считается (не 0%, а None)."""
+сравниваются. Ноль чужих сделок в окне -- «пусто», рост не считается
+(не 0%, а None). Источники, котируемые не в SOL/WSOL, исключены из
+сравнения с эталоном Dune (тот считался по обычным SOL-котируемым
+запускам) -- см. quote_not_wsol_excluded.
+
+Окно капится на MAX_WINDOW_TX_DECODE сделок (первые по времени после
+покупки) -- владелец: не более 40, partial=True при превышении, честно
+не выдумываем недостающие. getTransaction внутри окна -- JSON-RPC batch
+(один HTTP POST на пачку), не по одной."""
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
+
+import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solana_buyer200_fast_price as fp  # noqa: E402
@@ -26,20 +35,82 @@ from solana_entry_log import (  # noqa: E402
 )
 
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
-MAX_PURCHASES_PER_WALLET = 10
-MAX_WINDOW_TX_DECODE = 60  # владелец, попытка 2: без кэпа окно на горячем
-# пуле даёт 60-300 последовательных getTransaction на ОДНУ покупку --
-# это и убило попытку 1 таймаутом (30 мин, не дошли даже до Brez).
-# Капим decode, честно помечаем capped=True -- не выдумываем недостающие.
+MAX_PURCHASES_PER_WALLET_SCAN = 10
+MAX_PURCHASES_PER_WALLET_CONTROL = 8
+MAX_WINDOW_TX_DECODE = 40  # владелец: не больше 40 сделок токена после покупки
+BATCH_SIZE = 30
+_TX_PARAMS = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}
 
 
-def wallet_purchases(address: str, min_sol: float) -> list[dict]:
-    """До MAX_PURCHASES_PER_WALLET последних первых покупок >=min_sol SOL
-    за 72ч -- переиспользует уже провалидированный scan_wallet (тот же
-    метод, что скан 217/BATCH-5), entries уже newest-first."""
+def get_transactions_batch(sigs: list[str]) -> dict[str, dict | None]:
+    """JSON-RPC batch (один HTTP POST на пачку подписей) -- владелец:
+    'запросы getTransaction пачками, как в скане'. Кэш -- тот же файл-
+    кэш, что fp.get_transaction (та же ключевая функция _cache_path),
+    чтобы дальнейшие одиночные вызовы тоже брали из кэша. Откат на
+    одиночные вызовы для чанка, если пачка не удалась -- не роняем весь
+    прогон из-за одного отказавшегося провайдера/чанка."""
+    out: dict[str, dict | None] = {}
+    todo = []
+    for s in sigs:
+        cache_f = fp._cache_path("getTransaction", [s, _TX_PARAMS])
+        if cache_f.exists():
+            try:
+                out[s] = json.loads(cache_f.read_text())
+                continue
+            except (ValueError, OSError):
+                pass
+        todo.append(s)
+    if not todo:
+        return out
+
+    url = fp._endpoint()
+    for start in range(0, len(todo), BATCH_SIZE):
+        chunk = todo[start:start + BATCH_SIZE]
+        body = [{"jsonrpc": "2.0", "id": i, "method": "getTransaction", "params": [s, _TX_PARAMS]}
+                for i, s in enumerate(chunk)]
+        backoff = 0.0
+        ok = False
+        for _attempt in range(8):
+            try:
+                resp = requests.post(url, json=body, timeout=45)
+            except Exception:  # noqa: BLE001
+                backoff = min(max(backoff * 2, 0.5), 20.0)
+                time.sleep(backoff)
+                continue
+            if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                backoff = min(max(backoff * 2, 0.5), 20.0)
+                time.sleep(backoff)
+                continue
+            if not resp.ok:
+                break
+            try:
+                results = resp.json()
+            except ValueError:
+                break
+            if not isinstance(results, list):
+                break
+            by_id = {r.get("id"): r for r in results if isinstance(r, dict)}
+            for i, s in enumerate(chunk):
+                r = by_id.get(i)
+                tx = r.get("result") if r and "error" not in r else None
+                out[s] = tx
+                fp._cache_path("getTransaction", [s, _TX_PARAMS]).write_text(json.dumps(tx))
+            ok = True
+            break
+        if not ok:
+            # честно -- пачка не удалась, откатываемся на одиночные вызовы
+            for s in chunk:
+                out[s] = fp.get_transaction(s)
+    return out
+
+
+def wallet_purchases(address: str, min_sol: float, max_purchases: int) -> list[dict]:
+    """До max_purchases последних первых покупок >=min_sol SOL за 72ч --
+    переиспользует уже провалидированный scan_wallet (тот же метод, что
+    скан 217/BATCH-5), entries уже newest-first."""
     scan = scan_wallet(address)
     entries = [e for e in scan.get("entries", []) if e.get("spend_sol_equiv", 0) >= min_sol]
-    return entries[:MAX_PURCHASES_PER_WALLET]
+    return entries[:max_purchases]
 
 
 def analyze_purchase(entry: dict, wallet: str) -> dict:
@@ -67,16 +138,14 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
     out["quote_mint"] = quote_mint
     out["pool"] = ev.get("pool")
 
-    # Владелец, попытка 2: эталон Dune (+17%/+11%) почти наверняка считался
-    # по обычным SOL-котируемым запускам (pump.fun/raydium) -- попытка 1
-    # честно показала, что >=15 SOL входы лидера в последние часы шли
-    # через биржевые пары ток/ток (котировка -- другой синтетический
-    # актив, не SOL), где размах цены на тонкой ликвидности несравним с
-    # эталоном. Сравнение "то же на то же" требует того же quote-актива --
-    # ограничиваем ИМЕННО сравнение с Dune источниками, котируемыми в SOL.
+    # Эталон Dune (+17%/+11%) считался по обычным SOL-котируемым запускам
+    # (pump.fun/raydium) -- сравнение "то же на то же" требует того же
+    # quote-актива. Источники не в SOL/WSOL честно исключаются, не
+    # смешиваются с несравнимой волатильностью ток/ток-пар.
     if quote_mint != WSOL:
         out["quote_not_wsol_excluded"] = True
-        out["HONEST_NOTE"] = f"источник котируется не в SOL (quote={quote_mint[:10] if quote_mint else '?'}..) -- несравнимо с эталоном Dune, исключено из медианы"
+        out["HONEST_NOTE"] = (f"источник котируется не в SOL (quote="
+                               f"{quote_mint[:10] if quote_mint else '?'}..) -- несравнимо с эталоном Dune, исключено")
         return out
 
     slot = source_tx["slot"]
@@ -91,24 +160,27 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
     if not any(s["signature"] == sig for s in sigs):
         sigs.append({"signature": sig, "slot": slot})
 
-    sigs.sort(key=lambda h: h.get("slot") or 0)
+    sigs.sort(key=lambda h: h.get("slot") or 0)  # "первые по времени после покупки"
     n_found_total = len(sigs)
-    capped = n_found_total > MAX_WINDOW_TX_DECODE
-    if capped:
+    partial = n_found_total > MAX_WINDOW_TX_DECODE
+    if partial:
         source_h = next((h for h in sigs if h["signature"] == sig), None)
         sigs = sigs[:MAX_WINDOW_TX_DECODE]
         if source_h and not any(h["signature"] == sig for h in sigs):
             sigs.append(source_h)
     out["n_window_tx_found_total"] = n_found_total
     out["n_window_tx_decoded"] = len(sigs)
-    out["window_capped"] = capped
+    out["partial"] = partial
+
+    ok_sigs = [h["signature"] for h in sigs if h.get("err") is None]
+    tx_by_sig = get_transactions_batch(ok_sigs)
 
     rows = []
     for h in sigs:
         s = h["signature"]
         if h.get("err") is not None:
             continue
-        tx = fp.get_transaction(s)
+        tx = tx_by_sig.get(s)
         if tx is None:
             continue
         tslot = tx["slot"]
@@ -153,21 +225,23 @@ def analyze_purchase(entry: dict, wallet: str) -> dict:
     return out
 
 
-def analyze_wallet(address: str, name: str, min_sol: float = 2.0) -> dict:
-    purchases = wallet_purchases(address, min_sol)
+def median(xs: list[float]) -> float | None:
+    if not xs:
+        return None
+    xs = sorted(xs)
+    n = len(xs)
+    mid = n // 2
+    return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2
+
+
+def analyze_wallet(address: str, name: str, min_sol: float, max_purchases: int) -> dict:
+    purchases = wallet_purchases(address, min_sol, max_purchases)
     results = [analyze_purchase(e, address) for e in purchases]
     n_quote_excluded = sum(1 for r in results if r.get("quote_not_wsol_excluded"))
     resolved = [r for r in results if not r.get("unresolved") and not r.get("quote_not_wsol_excluded")]
     non_empty = [r for r in resolved if not r.get("empty")]
-    growths = sorted(r["growth_pct_30s"] for r in non_empty)
-    others_counts = sorted(r["n_other_buys"] for r in resolved)
-
-    def median(xs):
-        if not xs:
-            return None
-        n = len(xs)
-        mid = n // 2
-        return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2
+    growths = [r["growth_pct_30s"] for r in non_empty]
+    others_counts = [r["n_other_buys"] for r in resolved]
 
     return {
         "address": address, "name": name,
