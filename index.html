@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HEDGE Кошельки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f2f4f1;
+  --bg-glow:radial-gradient(1100px 560px at 8% -12%, #dbe7f8 0%, rgba(219,231,248,0) 62%), radial-gradient(900px 520px at 100% -6%, #e3f1e8 0%, rgba(227,241,232,0) 58%);
+  --surface:#ffffff; --surface-2:#eef0ec; --surface-3:#e4e7e2;
+  --ink:#131619; --ink-2:#596068; --ink-3:#8a9199;
+  --line:#e2e5e0; --line-2:#cdd2cb;
+  --shadow:0 1px 2px rgba(19,22,25,.05), 0 10px 28px -14px rgba(19,22,25,.16);
+  --good:#0f8f2e; --good-bg:rgba(15,143,46,.11);
+  --bad:#c93a3a; --bad-bg:rgba(201,58,58,.11);
+  --warn:#9a6a00; --warn-bg:rgba(250,178,25,.2);
+  --accent:#2a78d6;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#008300; --c7:#4a3aa7; --c8:#e34948;
+  --tip-bg:#131619; --tip-ink:#f4f6f3;
+  --sans:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0e1110;
+    --bg-glow:radial-gradient(1100px 560px at 8% -12%, #17243a 0%, rgba(23,36,58,0) 62%), radial-gradient(900px 520px at 100% -6%, #11261c 0%, rgba(17,38,28,0) 58%);
+    --surface:#171a19; --surface-2:#1f2321; --surface-3:#292e2b;
+    --ink:#f1f3ef; --ink-2:#a3aaa3; --ink-3:#6f766f;
+    --line:#262b29; --line-2:#363c39;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 14px 34px -16px rgba(0,0,0,.6);
+    --good:#3ccb5a; --good-bg:rgba(60,203,90,.13);
+    --bad:#ef6363; --bad-bg:rgba(239,99,99,.14);
+    --warn:#fab219; --warn-bg:rgba(250,178,25,.15);
+    --accent:#3987e5;
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#2aa02a; --c7:#9085e9; --c8:#e66767;
+    --tip-bg:#f1f3ef; --tip-ink:#131619;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0e1110;
+  --bg-glow:radial-gradient(1100px 560px at 8% -12%, #17243a 0%, rgba(23,36,58,0) 62%), radial-gradient(900px 520px at 100% -6%, #11261c 0%, rgba(17,38,28,0) 58%);
+  --surface:#171a19; --surface-2:#1f2321; --surface-3:#292e2b;
+  --ink:#f1f3ef; --ink-2:#a3aaa3; --ink-3:#6f766f;
+  --line:#262b29; --line-2:#363c39;
+  --shadow:0 1px 2px rgba(0,0,0,.35), 0 14px 34px -16px rgba(0,0,0,.6);
+  --good:#3ccb5a; --good-bg:rgba(60,203,90,.13);
+  --bad:#ef6363; --bad-bg:rgba(239,99,99,.14);
+  --warn:#fab219; --warn-bg:rgba(250,178,25,.15);
+  --accent:#3987e5;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#2aa02a; --c7:#9085e9; --c8:#e66767;
+  --tip-bg:#f1f3ef; --tip-ink:#131619;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg-glow),var(--bg);background-attachment:fixed;color:var(--ink);font:14px/1.45 var(--sans);font-weight:500;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--c1),var(--c3));display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;letter-spacing:-.02em;box-shadow:var(--shadow)}
+.brand h1{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.brand .sub{font-size:12px;color:var(--ink-2);font-weight:500}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.status{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3);flex:none}
+.dot.ok{background:var(--good);box-shadow:0 0 0 3px var(--good-bg)} .dot.bad{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)} .dot.busy{background:var(--warn);box-shadow:0 0 0 3px var(--warn-bg)}
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:700;line-height:1;box-shadow:0 1px 0 rgba(0,0,0,.03);transition:background .15s,transform .05s}
+.btn:hover{background:var(--surface-2)} .btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+.btn.primary:hover{filter:brightness(1.07);background:var(--accent)}
+.btn[disabled]{opacity:.55;cursor:default}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer;user-select:none;font-weight:600}
+.toggle input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+
+main{max-width:1240px;margin:0 auto;padding:18px 16px 40px}
+
+/* summary tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile .lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+.tile .v{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tile.hero .v{font-size:34px}
+.tile .v small{font-size:13px;color:var(--ink-2);font-weight:500;margin-left:5px}
+.tile .s{font-family:var(--mono);font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tile .v.up,.tile .s.up{color:var(--good)} .tile .v.down,.tile .s.down{color:var(--bad)}
+.tile.alert{border-color:var(--bad)} .tile.alert .v{color:var(--bad)}
+.tile.calm .v{color:var(--good)}
+
+/* wallet cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+@media (max-width:400px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:10px;min-width:0;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--wc)}
+.card.alert{border-color:var(--bad)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.task{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;letter-spacing:-.005em}
+.task .sw{width:10px;height:10px;border-radius:3px;background:var(--wc);flex:none}
+.addr{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);font-size:12px}
+.addr a{color:var(--ink-2);text-decoration:none;border-bottom:1px dotted var(--line-2)}
+.icon-btn{border:0;background:transparent;padding:3px 6px;border-radius:7px;color:var(--ink-2);line-height:1;font-size:13px}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+.bal-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.bal{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.bal small{font-size:13px;color:var(--ink-2);font-weight:500;margin-left:4px}
+.bal.pending{color:var(--ink-3)}
+.usd{font-family:var(--mono);font-size:17px;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.delta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--surface-2);color:var(--ink-2)}
+.chip .m{font-family:var(--mono);font-weight:600}
+.chip.up{background:var(--good-bg);color:var(--good)}
+.chip.down{background:var(--bad-bg);color:var(--bad)}
+.chip.crit{background:var(--bad-bg);color:var(--bad)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-3);font-weight:600}
+.chart-wrap{position:relative;margin-top:2px}
+.chart{display:block;width:100%;height:auto;overflow:visible}
+.chart .grid-l{stroke:var(--line);stroke-width:1}
+.chart .axis-t{fill:var(--ink-3);font-family:var(--mono);font-size:19px;font-weight:500}
+.chart .line{fill:none;stroke:var(--wc);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.chart .end{fill:var(--wc);stroke:var(--surface);stroke-width:3}
+.chart .cross{stroke:var(--ink-3);stroke-width:1.5}
+.chart .hit{fill:transparent}
+.tip{position:absolute;top:0;left:0;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);font-family:var(--mono);font-size:11px;padding:5px 8px;border-radius:7px;white-space:nowrap;transform:translate(-50%,-115%);display:none;box-shadow:var(--shadow)}
+.chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;pointer-events:none}
+.tokens{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:6px}
+.tokens-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.tok{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:5px 8px;border-radius:8px;background:var(--bad-bg)}
+.tok a{text-decoration:none;color:var(--ink);border-bottom:1px dotted var(--line-2)}
+.tok .amt{color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* settings */
+.settings{margin-top:24px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+.settings summary{cursor:pointer;padding:13px 16px;font-weight:800;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.settings summary::-webkit-details-marker{display:none}
+.settings summary::after{content:"+";color:var(--ink-2);font-size:20px;font-weight:500}
+.settings[open] summary::after{content:"–"}
+.settings-body{padding:0 16px 16px;display:grid;gap:14px}
+.field{display:grid;gap:6px}
+.field label{font-size:12px;color:var(--ink-2);font-weight:700}
+.field input,.field textarea{width:100%;border:1px solid var(--line-2);background:var(--bg);border-radius:10px;padding:10px 11px;font-family:var(--mono);font-size:12px;font-weight:500}
+.field textarea{min-height:140px;resize:vertical}
+.hint{font-size:12px;color:var(--ink-2);line-height:1.55}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.log{margin-top:12px;color:var(--ink-3);font-size:12px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word}
+.log .err{color:var(--bad)}
+@media (prefers-reduced-motion:no-preference){.dot.busy{animation:pulse 1s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.35}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">H</div>
+      <div><h1>HEDGE · кошельки</h1><div class="sub">DBot · Solana · живые балансы</div></div>
+    </div>
+    <div class="controls">
+      <span class="status"><span class="dot" id="dot"></span><span id="statusText">ещё не обновлялось</span></span>
+      <label class="toggle"><input type="checkbox" id="auto" checked> авто, 15 с</label>
+      <button class="btn primary" id="refresh">Обновить</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="tiles" aria-label="Сводка">
+    <div class="tile hero"><span class="lbl">Всего</span><span class="v mono" id="tTotal">—<small>SOL</small></span><span class="s" id="tTotalUsd">—</span></div>
+    <div class="tile"><span class="lbl">За 24 часа</span><span class="v mono" id="tDelta">—</span><span class="s" id="tDeltaUsd">—</span></div>
+    <div class="tile"><span class="lbl">Курс SOL</span><span class="v mono" id="tPrice">—</span><span class="s" id="tPriceSrc">—</span></div>
+    <div class="tile" id="tStuckTile"><span class="lbl">Зависшие токены</span><span class="v mono" id="tStuck">—</span><span class="s" id="tStuckSub">проверяю…</span></div>
+  </section>
+
+  <section class="grid" id="grid" aria-live="polite"></section>
+
+  <details class="settings" id="settings">
+    <summary>Настройки</summary>
+    <div class="settings-body">
+      <div class="field">
+        <label for="rpc">RPC-узел (JSON-RPC URL)</label>
+        <input id="rpc" type="url" spellcheck="false" autocomplete="off">
+        <div class="hint">По умолчанию — узел Helius с твоим ключом. Если он не отвечает, страница сама переключается на публичные: publicnode → drpc → mainnet-beta. Публичные могут отвечать «429», тогда страница ждёт и повторяет.</div>
+      </div>
+      <div class="field">
+        <label for="wallets">Кошельки — по одному в строке: <span class="mono">адрес,название</span></label>
+        <textarea id="wallets" spellcheck="false"></textarea>
+        <div class="hint">Названия задач — как в DBot. Порядок строк = порядок карточек, цвет закреплён за позицией.</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="save">Сохранить</button>
+        <button class="btn" id="clearHist">Сбросить кэш истории</button>
+        <button class="btn" id="resetAll">Вернуть список по умолчанию</button>
+      </div>
+      <div class="hint">Как это работает: балансы страница спрашивает у узла напрямую с этого устройства каждые 15 секунд, пока вкладка открыта. График за 24 часа строится по транзакциям кошелька в блокчейне (баланс после каждой), поэтому истории не нужно накапливаться. Доллары — по текущему курсу SOL (CoinGecko, запасные Binance и Kraken); изменение за сутки в долларах считается по текущему курсу.</div>
+    </div>
+  </details>
+
+  <div class="log" id="log"></div>
+</main>
+
+<script>
+(() => {
+'use strict';
+const LS_SET = 'hedge.v2.settings', LS_HIST = 'hedge.v1.hist', LS_PRICE = 'hedge.v1.price';
+const H24 = 24*3600*1000, KEEP = 48*3600*1000;
+const DEFAULT_RPC = 'https://mainnet.helius-rpc.com/?api-key=bd05dcb3-8875-4c71-b757-771da753315f';
+const FALLBACK_RPCS = ['https://solana-rpc.publicnode.com','https://solana.drpc.org','https://api.mainnet-beta.solana.com'];
+const DEFAULT_WALLETS = [
+  ['E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS','Пилот · TEST1'],
+  ['GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq','BATCH-1'],
+  ['HMQG8xXoVBWZTkEqNye5WcfttvdZwVb522EggFD5AWZ6','BATCH-2'],
+  ['BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu','BATCH-3'],
+  ['EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N','BATCH-4'],
+  ['5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv','BATCH-5'],
+];
+const TOKEN_PROGRAMS = ['TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA','TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'];
+const WSOL = 'So11111111111111111111111111111111111111112';
+const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const PRICE_SOURCES = [
+  {u:'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd', f:j=>Number(j.solana.usd), n:'CoinGecko'},
+  {u:'https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT', f:j=>Number(j.price), n:'Binance'},
+  {u:'https://api.kraken.com/0/public/Ticker?pair=SOLUSD', f:j=>Number(Object.values(j.result)[0].c[0]), n:'Kraken'},
+];
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fmtSol = l => (l/1e9).toLocaleString('ru-RU',{minimumFractionDigits:3,maximumFractionDigits:3});
+const fmtSigned = l => (l>=0?'+':'−') + fmtSol(Math.abs(l));
+const fmtUsd = v => { const a=Math.abs(v); const d = a>=1000?0:a>=100?1:2; return '$'+a.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
+const fmtUsdSigned = v => (v>=0?'+':'−') + fmtUsd(v);
+const short = a => a.slice(0,4)+'…'+a.slice(-4);
+const hhmm = t => new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+const hhmmss = t => new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+// ---------- storage ----------
+function lsGet(k, d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+const S = Object.assign({rpc:DEFAULT_RPC, wallets:DEFAULT_WALLETS, auto:true}, lsGet(LS_SET, {}));
+if(!Array.isArray(S.wallets) || !S.wallets.length) S.wallets = DEFAULT_WALLETS;
+let HIST = lsGet(LS_HIST, {});
+const cachedPrice = lsGet(LS_PRICE, null);
+
+const state = {
+  lamports:{}, tokens:{}, tokensAt:{}, histAt:{}, histBusy:false, liveBusy:false,
+  lastLive:0, ticks:0, timer:null, err:'', progress:'',
+  price: cachedPrice ? cachedPrice.p : null, priceAt: cachedPrice ? cachedPrice.t : 0, priceSrc: cachedPrice ? cachedPrice.src : ''
+};
+
+// ---------- RPC ----------
+let rpcId = 0, rpcList = [], rpcIdx = 0, batchOK = true;
+function buildRpcList(){ rpcList = [S.rpc, ...FALLBACK_RPCS].filter((u,i,a)=>u && a.indexOf(u)===i); rpcIdx = 0; batchOK = true; }
+const activeRpc = () => rpcList[rpcIdx];
+const hostOf = u => { try{ return new URL(u).host.replace(/^www\./,''); }catch(e){ return u; } };
+function rotateRpc(){ if(rpcList.length<2) return false; rpcIdx = (rpcIdx+1) % rpcList.length; batchOK = true; log('узел не отвечает из браузера — переключаюсь на '+hostOf(activeRpc()), true); return true; }
+const call = (method, params) => ({jsonrpc:'2.0', id:++rpcId, method, params});
+async function post(body){
+  let r;
+  try{ r = await fetch(activeRpc(), {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)}); }
+  catch(e){ const err=new Error('нет связи с узлом '+hostOf(activeRpc())+' (CORS или сеть)'); err.network=true; throw err; }
+  if(r.status===429){ const e=new Error('429: узел '+hostOf(activeRpc())+' просит подождать'); e.retry=true; throw e; }
+  if(r.status===401 || r.status===403){ const e=new Error('узел '+hostOf(activeRpc())+' отверг запрос: HTTP '+r.status); e.network=true; throw e; }
+  if(!r.ok) throw new Error('HTTP '+r.status+' от '+hostOf(activeRpc()));
+  return r.json();
+}
+async function withRetry(fn, tries=6){
+  let d=1200;
+  for(let i=0;;i++){
+    try{ return await fn(); }
+    catch(e){
+      if(i>=tries-1 || !(e.retry || e.network)) throw e;
+      if(e.network && rotateRpc()){ setStatus('busy', e.message); await sleep(300); continue; }
+      setStatus('busy', e.message+' — жду '+(d/1000)+' с'); await sleep(d); d=Math.min(d*2, 15000);
+    }
+  }
+}
+async function batch(reqs){
+  if(!reqs.length) return [];
+  if(batchOK){
+    try{
+      const res = await withRetry(()=>post(reqs));
+      if(Array.isArray(res)){ const m=new Map(res.map(r=>[r.id,r])); return reqs.map(q=>m.get(q.id)||{error:{message:'нет ответа'}}); }
+      batchOK = false;
+    }catch(e){ if(!/batch/i.test(String(e.message))) throw e; batchOK=false; }
+  }
+  const out=[]; for(const q of reqs){ out.push(await withRetry(()=>post(q))); } return out;
+}
+async function one(method, params){ const [r] = await batch([call(method, params)]); if(r.error) throw new Error(r.error.message||'RPC error'); return r.result; }
+
+// ---------- price ----------
+async function refreshPrice(force){
+  if(!force && state.price && Date.now()-state.priceAt < 60000) return;
+  for(const s of PRICE_SOURCES){
+    try{
+      const r = await fetch(s.u, {cache:'no-store'}); if(!r.ok) continue;
+      const p = s.f(await r.json());
+      if(p>0){ state.price=p; state.priceAt=Date.now(); state.priceSrc=s.n; lsSet(LS_PRICE,{p, t:state.priceAt, src:s.n}); render(); return; }
+    }catch(e){}
+  }
+  if(!state.price) log('курс SOL: ни один источник не ответил', true);
+}
+
+// ---------- live balances ----------
+async function refreshLive(){
+  if(state.liveBusy) return; state.liveBusy = true;
+  try{
+    const addrs = S.wallets.map(w=>w[0]);
+    const res = await one('getMultipleAccounts', [addrs, {encoding:'base64', dataSlice:{offset:0,length:0}, commitment:'confirmed'}]);
+    (res.value||[]).forEach((acc,i)=>{ state.lamports[addrs[i]] = acc ? acc.lamports : 0; });
+    state.lastLive = Date.now(); state.err='';
+    setStatus('ok', 'обновлено '+hhmmss(state.lastLive)+' · '+hostOf(activeRpc()));
+  }catch(e){ state.err = 'балансы: '+e.message; setStatus('bad', state.err); log(state.err, true); }
+  finally{ state.liveBusy=false; render(); }
+}
+
+// ---------- token holdings ----------
+async function refreshTokens(force){
+  const now = Date.now();
+  const todo = S.wallets.map(w=>w[0]).filter(a => force || !state.tokensAt[a] || now-state.tokensAt[a] > 60000);
+  if(!todo.length) return;
+  const reqs = [], meta = [];
+  for(const a of todo) for(const p of TOKEN_PROGRAMS){ reqs.push(call('getTokenAccountsByOwner',[a,{programId:p},{encoding:'jsonParsed',commitment:'confirmed'}])); meta.push([a,p]); }
+  try{
+    const res = await batch(reqs);
+    const acc = {}; todo.forEach(a=>acc[a]=[]);
+    res.forEach((r,i)=>{
+      const [a,p] = meta[i]; if(!r || r.error || !r.result) return;
+      for(const it of r.result.value||[]){
+        const info = it.account?.data?.parsed?.info; const ta = info?.tokenAmount; if(!info||!ta) continue;
+        const ui = Number(ta.uiAmountString ?? ta.uiAmount ?? 0); if(!(ui>0)) continue;
+        acc[a].push({mint:info.mint, ui, program:p});
+      }
+    });
+    for(const a of todo){ state.tokens[a]=acc[a].sort((x,y)=>y.ui-x.ui); state.tokensAt[a]=Date.now(); }
+  }catch(e){ log('токены: '+e.message, true); }
+  render();
+}
+
+// ---------- 24h history from chain ----------
+async function refreshHistory(force){
+  if(state.histBusy) return; state.histBusy = true;
+  const now = Date.now();
+  try{
+    for(const [a] of S.wallets){
+      if(!force && state.histAt[a] && now-state.histAt[a] < 5*60000) continue;
+      await loadWalletHistory(a);
+      state.histAt[a] = Date.now();
+      pruneHist(a); lsSet(LS_HIST, HIST); render();
+    }
+    state.progress='';
+  }catch(e){ log('история: '+e.message, true); }
+  finally{ state.histBusy=false; setStatus(state.err?'bad':'ok', state.err || (state.lastLive?'обновлено '+hhmmss(state.lastLive)+' · '+hostOf(activeRpc()):'')); render(); }
+}
+async function loadWalletHistory(a){
+  HIST[a] = HIST[a] || {};
+  const cutoff = Date.now() - H24 - 10*60000;
+  let sigs=[], before;
+  for(let page=0; page<4; page++){
+    const arr = await one('getSignaturesForAddress', [a, Object.assign({limit:200, commitment:'confirmed'}, before?{before}:{})]);
+    if(!arr || !arr.length) break;
+    sigs.push(...arr);
+    const last = arr[arr.length-1];
+    if(arr.length<200 || !last.blockTime || last.blockTime*1000 < cutoff) break;
+    before = last.signature;
+  }
+  const need = sigs.filter(s => s.blockTime && s.blockTime*1000 >= cutoff && !HIST[a][s.signature]);
+  let done = 0;
+  for(let i=0;i<need.length;i+=10){
+    const chunk = need.slice(i,i+10);
+    state.progress = `история ${labelOf(a)}: ${done}/${need.length}`; setStatus('busy', state.progress);
+    const res = await batch(chunk.map(s=>call('getTransaction',[s.signature,{encoding:'json',maxSupportedTransactionVersion:0,commitment:'confirmed'}])));
+    res.forEach((r,j)=>{
+      const tx = r && r.result; const sig = chunk[j].signature;
+      if(!tx || !tx.meta){ HIST[a][sig] = {t:chunk[j].blockTime*1000, skip:1}; return; }
+      const la = tx.meta.loadedAddresses || {};
+      const keys = (tx.transaction.message.accountKeys||[]).map(k=>typeof k==='string'?k:k.pubkey).concat(la.writable||[], la.readonly||[]);
+      const idx = keys.indexOf(a);
+      if(idx<0){ HIST[a][sig] = {t:tx.blockTime*1000, skip:1}; return; }
+      HIST[a][sig] = {t:(tx.blockTime||chunk[j].blockTime)*1000, pre:tx.meta.preBalances[idx], post:tx.meta.postBalances[idx]};
+    });
+    done += chunk.length;
+    if(i+10<need.length) await sleep(200);
+  }
+}
+function pruneHist(a){ const h=HIST[a]||{}; const lim=Date.now()-KEEP; for(const k in h) if(!h[k].t || h[k].t<lim) delete h[k]; }
+function seriesFor(a){
+  const now = Date.now(), from = now-H24;
+  const pts = Object.values(HIST[a]||{}).filter(p=>!p.skip && p.t>=from).sort((x,y)=>x.t-y.t);
+  const cur = state.lamports[a];
+  if(cur==null && !pts.length) return null;
+  const start = pts.length ? pts[0].pre : cur;
+  const s = [{t:from, v:start}];
+  for(const p of pts) s.push({t:p.t, v:p.post});
+  s.push({t:now, v: cur!=null ? cur : s[s.length-1].v});
+  return {s, start, cur: s[s.length-1].v, n: pts.length};
+}
+
+// ---------- render ----------
+const labelOf = a => (S.wallets.find(w=>w[0]===a)||[a,short(a)])[1];
+const colorOf = i => `var(--c${(i%8)+1})`;
+function setStatus(kind, text){ $('dot').className='dot '+kind; if(text!=null) $('statusText').textContent=text; }
+function log(msg, isErr){ const el=$('log'); const line=document.createElement('div'); if(isErr) line.className='err'; line.textContent=hhmmss(Date.now())+'  '+msg; el.prepend(line); while(el.children.length>6) el.lastChild.remove(); }
+const usdOf = l => state.price ? (l/1e9)*state.price : null;
+
+function render(){
+  const grid = $('grid');
+  let total=0, totalStart=0, any=false, stuckTotal=0, stuckWallets=0, tokensKnown=0;
+  const cards = S.wallets.map(([a,name],i)=>{
+    const l = state.lamports[a];
+    const ser = seriesFor(a);
+    if(l!=null){ total+=l; any=true; totalStart += ser ? ser.start : l; }
+    const toks = state.tokens[a];
+    const stuck = (toks||[]).filter(t=>t.mint!==WSOL);
+    const wsol = (toks||[]).find(t=>t.mint===WSOL);
+    if(toks){ tokensKnown++; if(stuck.length){ stuckTotal+=stuck.length; stuckWallets++; } }
+    let card = grid.querySelector(`[data-a="${a}"]`);
+    if(!card){ card = document.createElement('article'); card.className='card'; card.dataset.a=a; card.innerHTML = cardSkeleton(a); grid.appendChild(card); bindCard(card,a); }
+    card.style.setProperty('--wc', colorOf(i));
+    card.classList.toggle('alert', stuck.length>0);
+    card.querySelector('.task-name').textContent = name;
+    const balEl = card.querySelector('.bal');
+    balEl.classList.toggle('pending', l==null);
+    balEl.innerHTML = (l==null?'—':fmtSol(l)) + '<small>SOL</small>';
+    const u = usdOf(l==null?0:l);
+    card.querySelector('.usd').textContent = (l!=null && u!=null) ? fmtUsd(u) : '';
+    const d = card.querySelector('.delta');
+    if(ser && l!=null){
+      const diff = l-ser.start; const du = usdOf(diff);
+      d.className='chip delta '+(diff>0?'up':diff<0?'down':'');
+      d.innerHTML = (diff>0?'▲ ':diff<0?'▼ ':'') + '<span class="m">'+fmtSigned(diff)+' SOL</span>' + (du!=null?' · <span class="m">'+fmtUsdSigned(du)+'</span>':'') + ' за 24ч';
+      card.querySelector('.txn').textContent = ser.n ? `${ser.n} tx` : 'без сделок';
+    } else { d.className='chip delta'; d.textContent='Δ 24ч —'; card.querySelector('.txn').textContent=''; }
+    drawChart(card, ser);
+    const th = card.querySelector('.tokens-head'), tl = card.querySelector('.tok-list');
+    const wsolChip = wsol ? `<span class="chip warn">WSOL <span class="m">${wsol.ui.toLocaleString('ru-RU',{maximumFractionDigits:4})}</span></span>` : '';
+    if(!toks){ th.innerHTML='<span class="chip ghost">токены: проверяю…</span>'; tl.innerHTML=''; }
+    else if(!stuck.length){ th.innerHTML='<span class="chip">✓ зависших токенов нет</span>'+wsolChip; tl.innerHTML=''; }
+    else {
+      th.innerHTML=`<span class="chip crit">⚠ зависло токенов: ${stuck.length}</span>`+wsolChip;
+      tl.innerHTML = stuck.slice(0,8).map(t=>`<div class="tok"><a class="mono" href="https://solscan.io/token/${t.mint}" target="_blank" rel="noopener">${short(t.mint)}</a><span class="amt mono">${t.ui.toLocaleString('ru-RU',{maximumFractionDigits:2})}</span></div>`).join('') + (stuck.length>8?`<div class="hint">и ещё ${stuck.length-8}</div>`:'');
+    }
+    return card;
+  });
+  cards.forEach(c=>grid.appendChild(c));
+  [...grid.children].forEach(c=>{ if(!S.wallets.some(w=>w[0]===c.dataset.a)) c.remove(); });
+
+  // tiles
+  $('tTotal').innerHTML = (any ? fmtSol(total) : '—') + '<small>SOL</small>';
+  const tu = usdOf(total);
+  $('tTotalUsd').textContent = any && tu!=null ? fmtUsd(tu) : (any ? 'курс ещё не получен' : '—');
+  const tD = $('tDelta'), tDu = $('tDeltaUsd');
+  if(any){ const diff=total-totalStart; const cls = diff>0?'up':diff<0?'down':''; tD.className='v mono '+cls; tD.innerHTML=(diff>0?'▲ ':diff<0?'▼ ':'')+fmtSigned(diff)+'<small>SOL</small>'; const du=usdOf(diff); tDu.className='s '+cls; tDu.textContent = du!=null ? fmtUsdSigned(du) : ''; }
+  else { tD.className='v mono'; tD.textContent='—'; tDu.textContent=''; }
+  $('tPrice').textContent = state.price ? fmtUsd(state.price) : '—';
+  $('tPriceSrc').textContent = state.price ? `${state.priceSrc} · ${hhmm(state.priceAt)}` : 'получаю…';
+  const st = $('tStuckTile');
+  if(tokensKnown){ $('tStuck').textContent = stuckTotal ? String(stuckTotal) : '0'; $('tStuckSub').textContent = stuckTotal ? `в ${stuckWallets} ${stuckWallets===1?'кошельке':'кошельках'} — продать вручную` : 'все позиции закрыты'; st.classList.toggle('alert', stuckTotal>0); st.classList.toggle('calm', stuckTotal===0); }
+}
+function cardSkeleton(a){
+  return `<div class="card-head"><span class="task"><span class="sw"></span><span class="task-name"></span></span>
+    <span class="addr"><a class="mono" href="https://solscan.io/account/${a}" target="_blank" rel="noopener" title="${a}">${short(a)}</a><button class="icon-btn copy" type="button" aria-label="Скопировать адрес" title="Скопировать адрес">⧉</button></span></div>
+    <div class="bal-row"><span class="bal mono pending">—<small>SOL</small></span><span class="usd"></span></div>
+    <div class="delta-row"><span class="chip delta">Δ 24ч —</span><span class="chip ghost txn"></span></div>
+    <div class="chart-wrap"><svg class="chart" viewBox="0 0 600 190" role="img" aria-label="Баланс за 24 часа"></svg><div class="tip"></div><div class="chart-empty" hidden></div></div>
+    <div class="tokens"><div class="tokens-head"></div><div class="tok-list"></div></div>`;
+}
+function bindCard(card,a){
+  card.querySelector('.copy').addEventListener('click', async (ev)=>{
+    const b=ev.currentTarget; try{ await navigator.clipboard.writeText(a); b.textContent='✓'; }catch(e){ window.prompt('Адрес', a); } setTimeout(()=>b.textContent='⧉',1200);
+  });
+  const svg = card.querySelector('.chart'), tip = card.querySelector('.tip');
+  const move = (ev)=>{
+    const ser = svg._ser; if(!ser) return;
+    const r = svg.getBoundingClientRect(); const x = (ev.clientX - r.left) / r.width * 600;
+    const {x0,x1,y,s} = svg._geo; if(x<x0||x>x1){ hide(); return; }
+    const t = ser.s[0].t + (x-x0)/(x1-x0) * (ser.s[ser.s.length-1].t - ser.s[0].t);
+    let v = s[0].v; for(const p of s){ if(p.t<=t) v=p.v; else break; }
+    let cross = svg.querySelector('.cross'); if(!cross){ cross=document.createElementNS('http://www.w3.org/2000/svg','line'); cross.setAttribute('class','cross'); svg.appendChild(cross); }
+    cross.setAttribute('x1',x); cross.setAttribute('x2',x); cross.setAttribute('y1',svg._geo.top); cross.setAttribute('y2',svg._geo.bottom);
+    const u = usdOf(v);
+    tip.style.display='block'; tip.style.left=(x/600*r.width)+'px'; tip.style.top=(y(v)/190*r.height)+'px';
+    tip.textContent = hhmm(t)+' · '+fmtSol(v)+' SOL'+(u!=null?' · '+fmtUsd(u):'');
+  };
+  const hide = ()=>{ tip.style.display='none'; const c=svg.querySelector('.cross'); if(c) c.remove(); };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', hide); svg.addEventListener('pointerdown', move);
+}
+let gradSeq = 0;
+function drawChart(card, ser){
+  const svg = card.querySelector('.chart'), empty = card.querySelector('.chart-empty');
+  svg._ser = ser;
+  if(!ser){ svg.innerHTML=''; empty.hidden=false; empty.textContent='нет данных'; return; }
+  empty.hidden = true;
+  const W=600,H=190, L=8, R=76, T=14, B=30;
+  const x0=L, x1=W-R, top=T, bottom=H-B;
+  const s = ser.s; const t0=s[0].t, t1=s[s.length-1].t;
+  let mn=Math.min(...s.map(p=>p.v)), mx=Math.max(...s.map(p=>p.v));
+  if(mx===mn){ mn=mn*0.995-1e6; mx=mx*1.005+1e6; } else { const pad=(mx-mn)*0.08; mn-=pad; mx+=pad; }
+  if(mn<0) mn=0;
+  const x = t => x0 + (t-t0)/(t1-t0||1)*(x1-x0);
+  const y = v => bottom - (v-mn)/(mx-mn||1)*(bottom-top);
+  svg._geo = {x0,x1,top,bottom,y,s};
+  let d = `M${x(s[0].t).toFixed(1)},${y(s[0].v).toFixed(1)}`;
+  for(let i=1;i<s.length;i++){ d += ` H${x(s[i].t).toFixed(1)} V${y(s[i].v).toFixed(1)}`; }
+  const area = d + ` V${bottom} H${x0} Z`;
+  const ticks = [t0, t0+H24/2, t1];
+  const mid = (mn+mx)/2;
+  const yl = v => `<text class="axis-t" x="${x1+6}" y="${(y(v)+6.5).toFixed(1)}">${fmtSol(v)}</text>`;
+  if(!svg._gid) svg._gid = 'g'+(++gradSeq);
+  svg.innerHTML =
+    `<defs><linearGradient id="${svg._gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--wc)" stop-opacity=".30"/><stop offset="1" stop-color="var(--wc)" stop-opacity="0"/></linearGradient></defs>`+
+    `<line class="grid-l" x1="${x0}" x2="${x1}" y1="${top}" y2="${top}"/>`+
+    `<line class="grid-l" x1="${x0}" x2="${x1}" y1="${y(mid).toFixed(1)}" y2="${y(mid).toFixed(1)}"/>`+
+    `<line class="grid-l" x1="${x0}" x2="${x1}" y1="${bottom}" y2="${bottom}"/>`+
+    yl(mx)+yl(mid)+yl(mn)+
+    ticks.map((t,i)=>`<text class="axis-t" x="${x(t).toFixed(1)}" y="${H-8}" text-anchor="${i===0?'start':i===ticks.length-1?'end':'middle'}">${i===ticks.length-1?'сейчас':hhmm(t)}</text>`).join('')+
+    `<path d="${area}" fill="url(#${svg._gid})"/><path class="line" d="${d}"/>`+
+    `<circle class="end" cx="${x(t1).toFixed(1)}" cy="${y(s[s.length-1].v).toFixed(1)}" r="6"/>`+
+    `<rect class="hit" x="${x0}" y="${top}" width="${x1-x0}" height="${bottom-top}"/>`;
+}
+
+// ---------- settings UI ----------
+function fillSettings(){ $('rpc').value = S.rpc; $('wallets').value = S.wallets.map(w=>w.join(',')).join('\n'); $('auto').checked = !!S.auto; }
+$('save').addEventListener('click', ()=>{
+  const rpc = $('rpc').value.trim() || DEFAULT_RPC;
+  const lines = $('wallets').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const ws=[], bad=[];
+  for(const l of lines){ const [a,...rest]=l.split(','); const addr=(a||'').trim(); const nm=rest.join(',').trim()||short(addr); if(B58.test(addr)) ws.push([addr,nm]); else bad.push(l); }
+  if(bad.length){ log('не похоже на адрес: '+bad.join(' | '), true); }
+  if(!ws.length){ log('список пуст — оставил прежний', true); return; }
+  S.rpc=rpc; S.wallets=ws; lsSet(LS_SET, S); buildRpcList();
+  state.tokensAt={}; state.histAt={};
+  log('сохранено: '+ws.length+' кошельков'); render(); kick(true);
+});
+$('clearHist').addEventListener('click', ()=>{ HIST={}; lsSet(LS_HIST, HIST); state.histAt={}; log('кэш истории очищен'); render(); kick(true); });
+$('resetAll').addEventListener('click', ()=>{ S.wallets=DEFAULT_WALLETS; S.rpc=DEFAULT_RPC; lsSet(LS_SET,S); fillSettings(); buildRpcList(); state.tokensAt={}; state.histAt={}; render(); kick(true); });
+$('auto').addEventListener('change', e=>{ S.auto=e.target.checked; lsSet(LS_SET,S); schedule(); });
+$('refresh').addEventListener('click', ()=>kick(true));
+
+// ---------- loop ----------
+async function kick(force){
+  $('refresh').disabled = true;
+  try{
+    refreshPrice(force);
+    await refreshLive();
+    refreshTokens(force);
+    await refreshHistory(force);
+  } finally { $('refresh').disabled=false; }
+}
+async function tick(){
+  state.ticks++;
+  await refreshLive();
+  if(state.ticks%4===0){ refreshTokens(false); refreshPrice(false); }
+  if(state.ticks%20===0) refreshHistory(false);
+}
+function schedule(){ if(state.timer) clearInterval(state.timer); state.timer=null; if(S.auto) state.timer=setInterval(()=>{ if(!document.hidden) tick(); }, 15000); }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && S.auto && Date.now()-state.lastLive>15000) tick(); });
+
+buildRpcList(); fillSettings(); render(); schedule(); kick(true);
+})();
+</script>
+</body>
+</html>
