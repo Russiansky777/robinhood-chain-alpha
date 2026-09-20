@@ -360,6 +360,38 @@ def find_dbot_record(sig: str, block_time, mint: str, is_buy: bool, sol_amount,
     return best, "time_match"
 
 
+def find_source_by_onchain_time(source_addr: str, mint: str, buy_time: int,
+                                 window_s: int = 10, max_pages: int = 8) -> str | None:
+    """Владелец, п.3: сделка без записи DBot -- источник ищем по цепочке
+    самого источника: его собственная покупка того же минта в пределах
+    window_s секунд ДО нашей покупки (копирующий бот срабатывает следом
+    за источником, не раньше). Идём назад по подписям источника, пока не
+    пройдём мимо окна по времени, или не кончится max_pages (страховка от
+    расходов на очень активный источник без результата)."""
+    before = None
+    for _ in range(max_pages):
+        page = get_signatures_for_address(source_addr, before=before, limit=1000)
+        if not page:
+            return None
+        candidates = [h for h in page if h.get("blockTime") is not None
+                      and buy_time - window_s <= h["blockTime"] <= buy_time]
+        for h in candidates:
+            tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+            if tx is None:
+                continue
+            parsed = parse_tx_for_wallet(h["signature"], tx, source_addr)
+            if parsed.get("err") is not None or not parsed.get("is_signer"):
+                continue
+            leg = classify_swap_leg(parsed)
+            if leg and leg[0] == mint and leg[1] > 0:
+                return h["signature"]
+        oldest_bt = page[-1].get("blockTime")
+        if oldest_bt is not None and oldest_bt < buy_time - window_s:
+            return None
+        before = page[-1]["signature"]
+    return None
+
+
 # ---------- Section B: цепочка (баланс-метод) ----------
 
 def account_keys_and_signers(tx: dict) -> tuple[list[str], set[str]]:
@@ -662,6 +694,18 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                         matched_record_ids.add(rid)
 
             source = resolve_source(buy_record)
+            source_method = "dbot_record" if source else None
+            # Владелец, п.3: нет записи DBot -- пробуем сшить источник по
+            # цепочке (его собственная покупка того же минта в пределах 10с
+            # до нашей), перебирая объявленные источники задачи; закрытую
+            # сделку без источника не теряем -- либо найдём, либо явно
+            # покажем "источник неизвестен" (не молчим и не отбрасываем).
+            if source is None and sell_v and buy_v.get("blockTime"):
+                for cand in task["sources"]:
+                    if find_source_by_onchain_time(cand["address"], mint, buy_v["blockTime"]):
+                        source = cand
+                        source_method = "onchain_time"
+                        break
 
             # Владелец: брутто -- НЕ из транзакции (в ней чаевые/приоритетные
             # сборы той же сделки смешаны со свопом, надёжно не разделить без
@@ -693,6 +737,7 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 "wallet_name": task.get("wallet_name"),
                 "source_address": source["address"] if source else None,
                 "source_remark": source["remark"] if source else None,
+                "source_match_method": source_method,
                 "mint": mint,
                 "buy_signature": buy_v["signature"], "buy_block_time": buy_v.get("blockTime"),
                 "buy_match_method": buy_method,
@@ -734,32 +779,39 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
 
 
 def build_source_stats(trades_all: list[dict]) -> list[dict]:
+    # Владелец, п.3: сделки без источника не терять -- группируем и
+    # неопознанные (source_address=None) под отдельной строкой на задачу,
+    # а не отбрасываем.
     by_key: dict = {}
     for t in trades_all:
-        if not t.get("source_address"):
-            continue
-        key = (t["task_id"], t["source_address"])
+        key = (t["task_id"], t.get("source_address"))
         by_key.setdefault(key, {"task_id": t["task_id"], "task_name": t.get("task_name"),
-                                 "source_address": t["source_address"], "source_remark": t.get("source_remark"),
+                                 "source_address": t.get("source_address"),
+                                 "source_remark": t.get("source_remark") if t.get("source_address")
+                                 else "источник неизвестен",
                                  "trades": []})
         by_key[key]["trades"].append(t)
     out = []
     for (task_id, addr), row in by_key.items():
         trades = row["trades"]
-        closed = [t for t in trades if t["status"] == "закрыта" and t.get("gross_pct") is not None]
-        n_profit = sum(1 for t in closed if t["gross_pct"] > 0)
+        # Владелец, п.1: "сделок" = только закрытые (покупка+продажа в
+        # цепочке); fail/skip/expired -- отдельным столбцом "срывов".
+        closed = [t for t in trades if t["status"] == "закрыта"]
+        # Владелец, п.2: "в+" = нетто > 0 (было: доля по проценту, что
+        # давало неверные числа вроде "11 из 351").
+        n_profit = sum(1 for t in closed if (t.get("net_sol") or 0) > 0)
         # Брутто (владелец, п.1) -- строго из записи DBot, не из транзакции;
         # доступно только когда есть done-запись на покупку (продажа DBot
         # тут никогда не завершается -- gross_sol_out практически всегда
         # неизвестен, честно не считаем его как ноль).
         gross_sum = sum(t["gross_sol_in"] for t in trades if t.get("gross_sol_in"))
         net_sum = sum(t["net_sol"] for t in trades if t.get("net_sol") is not None)
-        best_pct = max((t["gross_pct"] for t in closed), default=None)
-        fails = [t for t in trades if t["status"].startswith("срыв")]
+        best_pct = max((t["gross_pct"] for t in closed if t.get("gross_pct") is not None), default=None)
+        fails = [t for t in trades if t["status"] == "срыв"]
         last_bt = max((t.get("buy_block_time") or 0 for t in trades), default=0)
         out.append({
             "task_id": task_id, "task_name": row["task_name"], "source_address": addr,
-            "source_remark": row["source_remark"], "n_trades": len(trades), "n_profit": n_profit,
+            "source_remark": row["source_remark"], "n_trades": len(closed), "n_profit": n_profit,
             "gross_sol_sum": round(gross_sum, 6), "net_sol_sum": round(net_sum, 6),
             "best_trade_pct": best_pct, "n_fails": len(fails),
             "fail_reasons": [f.get("dbot_fail_reason") for f in fails][:10],
@@ -769,68 +821,128 @@ def build_source_stats(trades_all: list[dict]) -> list[dict]:
     return out
 
 
-def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dict) -> list[dict]:
+def build_wallet_reconciliation(wallet: str, chain_cache: dict) -> dict:
+    """Владелец, п.4: полная сверка по категориям -- закрытые / покупка без
+    продажи / продажа без покупки / пополнения / выводы / комиссия DBot /
+    прочее. Комиссия DBot вынесена отдельной строкой (добавляется обратно
+    в сумму своей сделки, чтобы не задваивалась и не пропадала) -- сумма
+    всех категорий обязана дать текущий баланс, если история кошелька
+    подтверждённо докопана до генезиса (genesis_synced=true); если нет --
+    это и есть явный, названный источник невязки, а не "что-то произошло
+    во время прогона" накидываемое на несколько кошельков сразу."""
+    wallet_tx = [v for v in chain_cache.values() if isinstance(v, dict) and v.get("_wallet") == wallet and not v.get("err")]
+
+    def dbot_fee_of(v: dict) -> float:
+        return sum(tr["amount_sol"] for tr in (v.get("sol_transfers") or []) if tr["tag"] == "комиссия DBot")
+
+    signer_tx = [v for v in wallet_tx if v.get("is_signer")]
+    by_mint: dict[str, list] = {}
+    for v in signer_tx:
+        leg = classify_swap_leg(v)
+        if leg is None:
+            continue
+        mint, delta, sol_leg = leg
+        by_mint.setdefault(mint, []).append((v, delta, sol_leg))
+    for mint in by_mint:
+        by_mint[mint].sort(key=lambda t: (t[0].get("slot") or 0))
+
+    closed_sol = buy_without_sell_sol = sell_without_buy_sol = dbot_fee_sol = 0.0
+    swap_sigs: set = set()
+    for mint, txs in by_mint.items():
+        buys = [t for t in txs if t[1] > 0]
+        sells = [t for t in txs if t[1] < 0]
+        sells_remaining = list(sells)
+        for buy_v, buy_amt, buy_sol_leg in buys:
+            swap_sigs.add(buy_v["signature"])
+            buy_fee = dbot_fee_of(buy_v)
+            dbot_fee_sol += buy_fee
+            sell_v, sell_sol_leg = None, None
+            for i, (sv, sd, sl) in enumerate(sells_remaining):
+                if (sv.get("slot") or 0) > (buy_v.get("slot") or 0):
+                    sell_v, sell_sol_leg = sv, sl
+                    del sells_remaining[i]
+                    break
+            if sell_v:
+                swap_sigs.add(sell_v["signature"])
+                sell_fee = dbot_fee_of(sell_v)
+                dbot_fee_sol += sell_fee
+                closed_sol += (buy_sol_leg + buy_fee) + (sell_sol_leg + sell_fee)
+            else:
+                buy_without_sell_sol += buy_sol_leg + buy_fee
+        for sv, sd, sl in sells_remaining:
+            swap_sigs.add(sv["signature"])
+            sell_fee = dbot_fee_of(sv)
+            dbot_fee_sol += sell_fee
+            sell_without_buy_sol += sl + sell_fee
+
+    topups, withdrawals, other_entries = [], [], []
+    other_sol = 0.0
+    for v in wallet_tx:
+        if v.get("signature") in swap_sigs:
+            continue
+        flow = classify_external_flow(v)
+        if flow is not None:
+            kind, amount, counterparty = flow
+            entry = {"signature": v.get("signature"), "counterparty": counterparty, "amount_sol": round(amount, 9)}
+            (topups if kind == "topup" else withdrawals).append(entry)
+        else:
+            leftover = (v.get("sol_delta_native") or 0) + (v.get("wsol_delta") or 0)
+            if leftover != 0:
+                other_sol += leftover
+                other_entries.append({"signature": v.get("signature"), "amount_sol": round(leftover, 9)})
+
+    topups_sol = sum(e["amount_sol"] for e in topups)
+    withdrawals_sol = sum(e["amount_sol"] for e in withdrawals)
+
+    return {
+        "closed_sol": round(closed_sol, 6),
+        "buy_without_sell_sol": round(buy_without_sell_sol, 6),
+        "sell_without_buy_sol": round(sell_without_buy_sol, 6),
+        "topups_sol": round(topups_sol, 6), "topups": topups,
+        "withdrawals_sol": round(withdrawals_sol, 6), "withdrawals": withdrawals,
+        "dbot_fee_sol": round(dbot_fee_sol, 6),
+        "other_sol": round(other_sol, 6), "other": other_entries,
+        "sum_of_categories": round(closed_sol + buy_without_sell_sol + sell_without_buy_sol
+                                    + topups_sol - withdrawals_sol - dbot_fee_sol + other_sol, 6),
+        "genesis_synced": bool(chain_cache.get(_genesis_key(wallet))),
+    }
+
+
+def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dict,
+                      wallet_balances: dict[str, float | None] | None = None) -> list[dict]:
+    wallet_balances = wallet_balances or {}
     out = []
     for task in tasks:
         wallet = task["wallet"]
         task_trades = [t for t in trades_all if t["task_id"] == task["id"]]
-        n_trades = len(task_trades)
+        n_trades = sum(1 for t in task_trades if t["status"] == "закрыта")
         net_sum = sum(t["net_sol"] for t in task_trades if t.get("net_sol") is not None)
         n_open = sum(1 for t in task_trades if t["status"] == "незакрыта")
 
-        wallet_tx = [v for v in chain_cache.values() if isinstance(v, dict) and v.get("_wallet") == wallet and not v.get("err")]
-        dbot_fee_total = sum(tr["amount_sol"] for v in wallet_tx for tr in (v.get("sol_transfers") or [])
-                              if tr["tag"] == "комиссия DBot")
+        recon = build_wallet_reconciliation(wallet, chain_cache)
 
-        # Владелец, доп. к п.5: "внешние потоки" (не своп, не комиссия DBot)
-        # -- входящие пополнения и исходящие выводы, с подписью/адресом/
-        # суммой каждого, чтобы можно было явно проверить, куда/откуда шли
-        # деньги, а не просто верить агрегату.
-        # Владелец, п.3: пополнение без опознанного контрагента-плательщика --
-        # ОТДЕЛЬНАЯ строка "неопознанное поступление", в topups_sol/сверку не
-        # входит, пока владелец не подтвердит его происхождение (эмпирически
-        # именно так BATCH-4 сходится в ноль: без него сверка точная).
-        topups, withdrawals, unidentified_deposits = [], [], []
-        for v in wallet_tx:
-            flow = classify_external_flow(v)
-            if flow is None:
-                continue
-            kind, amount, counterparty = flow
-            entry = {"signature": v.get("signature"), "counterparty": counterparty, "amount_sol": round(amount, 9)}
-            if kind == "topup" and counterparty is None:
-                unidentified_deposits.append(entry)
-            elif kind == "topup":
-                topups.append(entry)
-            else:
-                withdrawals.append(entry)
-        topups_sol = sum(e["amount_sol"] for e in topups)
-        withdrawals_sol = sum(e["amount_sol"] for e in withdrawals)
-        unidentified_deposits_sol = sum(e["amount_sol"] for e in unidentified_deposits)
+        # Баланс -- снятый в Section B сразу после синхронизации ИМЕННО этого
+        # кошелька (см. комментарий там); если по какой-то причине его нет
+        # (кошелёк не успел обработаться до конца бюджета), снимаем сейчас
+        # как запасной вариант, честно понимая, что зазор будет больше.
+        current_balance = wallet_balances.get(wallet)
+        if current_balance is None:
+            try:
+                current_balance = get_balance_sol(wallet)
+            except Exception:  # noqa: BLE001
+                current_balance = None
 
-        try:
-            current_balance = get_balance_sol(wallet)
-        except Exception:  # noqa: BLE001
-            current_balance = None
-
-        # Сверка: баланс - пополнения(опознанные) + выводы == нетто сделок - комиссия DBot.
-        # Неопознанные поступления сознательно НЕ входят в формулу.
-        recon_left = (current_balance - topups_sol + withdrawals_sol) if current_balance is not None else None
-        recon_right = net_sum - dbot_fee_total
-        diff = abs(recon_left - recon_right) if recon_left is not None else None
+        diff = (round(current_balance - recon["sum_of_categories"], 6)
+                if current_balance is not None else None)
 
         out.append({
             "task_id": task["id"], "task_name": task.get("name"), "wallet": wallet,
             "wallet_name": task.get("wallet_name"), "n_trades": n_trades, "net_sol_sum": round(net_sum, 6),
-            "dbot_fee_total_sol": round(dbot_fee_total, 6), "n_open": n_open,
+            "dbot_fee_total_sol": recon["dbot_fee_sol"], "n_open": n_open,
             "current_balance_sol": round(current_balance, 6) if current_balance is not None else None,
-            "topups_sol": round(topups_sol, 6), "topups": topups,
-            "withdrawals_sol": round(withdrawals_sol, 6), "withdrawals": withdrawals,
-            "unidentified_deposits_sol": round(unidentified_deposits_sol, 6),
-            "unidentified_deposits": unidentified_deposits,
-            "reconciliation_left_balance_minus_topups_plus_withdrawals": round(recon_left, 6) if recon_left is not None else None,
-            "reconciliation_right_net_minus_fee": round(recon_right, 6),
-            "reconciliation_diff_sol": round(diff, 6) if diff is not None else None,
-            "reconciliation_flag": bool(diff is not None and diff > 0.01),
+            "reconciliation": recon,
+            "reconciliation_diff_sol": diff,
+            "reconciliation_flag": bool(diff is not None and abs(diff) > 0.01),
         })
 
     # Владелец: если адрес пополнения/вывода повторяется у нескольких РАЗНЫХ
@@ -838,12 +950,12 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
     # случайный сторонний адрес; помечаем каждую такую запись явно.
     addr_wallets: dict[str, set] = {}
     for row in out:
-        for e in row["topups"] + row["withdrawals"]:
+        for e in row["reconciliation"]["topups"] + row["reconciliation"]["withdrawals"]:
             if e["counterparty"]:
                 addr_wallets.setdefault(e["counterparty"], set()).add(row["wallet"])
     owner_addrs = {a for a, ws in addr_wallets.items() if len(ws) >= 2}
     for row in out:
-        for e in row["topups"] + row["withdrawals"]:
+        for e in row["reconciliation"]["topups"] + row["reconciliation"]["withdrawals"]:
             e["note"] = "кошелёк владельца" if e["counterparty"] in owner_addrs else None
     return out
 
@@ -916,6 +1028,13 @@ def main() -> None:
 
     print("[ledger] B: синхронизация цепочки по кошелькам задач...", flush=True)
     chain_cache = load_json(CHAIN_CACHE_PATH, {})
+    # Баланс снимается СРАЗУ после синхронизации именно ЭТОГО кошелька (не
+    # общим проходом в конце для всех восьми) -- иначе на живой, постоянно
+    # торгующей системе между "историю досинхронизировали" и "сняли баланс"
+    # проходит время обработки ОСТАЛЬНЫХ кошельков (DBot-выгрузка, сборка
+    # сделок), и туда успевает влезть ещё одна сделка -- именно это и было
+    # источником невязки 0.3-0.5 SOL у активных кошельков.
+    wallet_balances: dict[str, float | None] = {}
     for task in tasks:
         if time.monotonic() > deadline:
             print("[ledger] B: бюджет времени исчерпан, продолжим со следующего запуска", flush=True)
@@ -924,6 +1043,10 @@ def main() -> None:
         print(f"[ledger] {task.get('name')} ({task['wallet'][:10]}..): +{n_new} новых транзакций, "
               f"всего в кэше {sum(1 for v in chain_cache.values() if v.get('_wallet') == task['wallet'])}", flush=True)
         save_json(CHAIN_CACHE_PATH, chain_cache)
+        try:
+            wallet_balances[task["wallet"]] = get_balance_sol(task["wallet"])
+        except Exception:  # noqa: BLE001
+            wallet_balances[task["wallet"]] = None
     status["n_tx_chain"] = len(chain_cache)
 
     print("[ledger] C: дотягиваю done-записи DBot без транзакции в кэше...", flush=True)
@@ -956,7 +1079,7 @@ def main() -> None:
     print("[ledger] D: статистика по источникам и задачам...", flush=True)
     source_stats = build_source_stats(trades_all)
     save_json(SOURCE_STATS_PATH, source_stats)
-    task_stats = build_task_stats(tasks, trades_all, chain_cache)
+    task_stats = build_task_stats(tasks, trades_all, chain_cache, wallet_balances)
     save_json(TASK_STATS_PATH, task_stats)
 
     status["validation"] = validation
