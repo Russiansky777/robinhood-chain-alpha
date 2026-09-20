@@ -53,19 +53,27 @@ jobs:
           HELIUS_API: ${{ secrets.HELIUS_API }}
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           SHARD_ID: ${{ matrix.shard_id }}
+          GITHUB_REF_NAME: claude/nifty-sagan-r0polg
         run: python -u analysis/solana_crowd_night.py
-      - name: Commit shard results
+      - name: "Финальный коммит-подстраховка (скрипт уже коммитит после каждого кошелька)"
         if: always()
         run: |
-          [ -e "data/night_status_shard_${{ matrix.shard_id }}.json" ] && git add "data/night_status_shard_${{ matrix.shard_id }}.json"
-          [ -e "data/solana_fomo_crowd_shard_${{ matrix.shard_id }}.json" ] && git add "data/solana_fomo_crowd_shard_${{ matrix.shard_id }}.json"
-          [ -e data/solana_crowd_decode_fail_programs.json ] && git add data/solana_crowd_decode_fail_programs.json
+          FILES="data/night_status_shard_${{ matrix.shard_id }}.json data/solana_fomo_crowd_shard_${{ matrix.shard_id }}.json data/solana_crowd_decode_fail_shard_${{ matrix.shard_id }}.json"
+          for f in $FILES; do [ -e "$f" ] && git add "$f" || true; done
           git diff --cached --quiet && exit 0
-          git commit -m "Solana crowd_night: шард ${{ matrix.shard_id }} [automated]"
+          mkdir -p /tmp/crowd_night_own
+          for f in $FILES; do [ -e "$f" ] && cp "$f" "/tmp/crowd_night_own/$(basename "$f")"; done
           for i in 1 2 3 4 5; do
+            for f in $FILES; do
+              b="$(basename "$f")"
+              [ -e "/tmp/crowd_night_own/$b" ] && cp "/tmp/crowd_night_own/$b" "$f" && git add "$f"
+            done
+            git diff --cached --quiet && exit 0
+            git commit -m "Solana crowd_night: шард ${{ matrix.shard_id }} -- финальная подстраховка [automated]"
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
-            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
-            git pull --rebase origin claude/nifty-sagan-r0polg
+            echo "push rejected, попытка $i/5 -- fetch+reset (не rebase -- свои файлы) и повтор"
+            git fetch origin claude/nifty-sagan-r0polg
+            git reset --hard origin/claude/nifty-sagan-r0polg
             sleep 3
           done
           echo "не удалось запушить после 5 попыток" >&2
@@ -93,19 +101,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
       - name: "Собрать общий night_status.json + solana_fomo_crowd.json из 4 шардов"
         run: python -u analysis/solana_crowd_night_aggregate.py
       - name: Commit aggregate
         if: always()
         run: |
-          [ -e data/night_status.json ] && git add data/night_status.json
-          [ -e data/solana_fomo_crowd.json ] && git add data/solana_fomo_crowd.json
+          FILES="data/night_status.json data/solana_fomo_crowd.json"
+          for f in $FILES; do [ -e "$f" ] && git add "$f" || true; done
           git diff --cached --quiet && exit 0
-          git commit -m "Solana crowd_night: агрегированный статус [automated]"
+          mkdir -p /tmp/crowd_night_agg
+          for f in $FILES; do [ -e "$f" ] && cp "$f" "/tmp/crowd_night_agg/$(basename "$f")"; done
           for i in 1 2 3 4 5; do
+            for f in $FILES; do
+              b="$(basename "$f")"
+              [ -e "/tmp/crowd_night_agg/$b" ] && cp "/tmp/crowd_night_agg/$b" "$f" && git add "$f"
+            done
+            git diff --cached --quiet && exit 0
+            git commit -m "Solana crowd_night: агрегированный статус [automated]"
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
-            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
-            git pull --rebase origin claude/nifty-sagan-r0polg
+            echo "push rejected, попытка $i/5 -- fetch+reset (не rebase) и повтор"
+            git fetch origin claude/nifty-sagan-r0polg
+            git reset --hard origin/claude/nifty-sagan-r0polg
             sleep 3
           done
           echo "не удалось запушить после 5 попыток" >&2

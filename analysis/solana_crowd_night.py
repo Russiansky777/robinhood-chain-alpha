@@ -23,13 +23,16 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solana_buyer200_fast_price as fp  # noqa: E402
-from solana_crowd_common import analyze_wallet, MAX_PURCHASES_PER_WALLET_SCAN  # noqa: E402
+from solana_crowd_common import (  # noqa: E402
+    analyze_wallet, DECODE_FAIL_PROGRAMS_PATH, MAX_PURCHASES_PER_WALLET_SCAN,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PASSED_PATH = REPO_ROOT / "data" / "solana_fomo_passed.json"
@@ -38,6 +41,7 @@ LIVE_TASK_NAMES = ("BATCH-3", "BATCH-5", "BATCH-6", "BATCH-7")
 
 TOTAL_SHARDS = 4
 SHARD_ID = int(os.environ.get("SHARD_ID", "-1"))  # -1 = без шардирования (весь список -- ручной прогон)
+GIT_REF = os.environ.get("GITHUB_REF_NAME") or "claude/nifty-sagan-r0polg"
 
 if SHARD_ID >= 0:
     STATUS_PATH = REPO_ROOT / "data" / f"night_status_shard_{SHARD_ID}.json"
@@ -51,6 +55,37 @@ TIME_BUDGET_S = 20 * 60
 
 def shard_tag() -> str:
     return f" шард {SHARD_ID}" if SHARD_ID >= 0 else ""
+
+
+def own_files() -> list[Path]:
+    """Владелец, п.4/5: этот процесс -- ЕДИНСТВЕННЫЙ писатель этих файлов
+    (свой шард), поэтому вместо git pull --rebase (ломал прогоны на общем
+    файле decode_fail_programs -- теперь он тоже пошардовый) можно честно
+    fetch+reset --hard на origin и просто вернуть СВОИ файлы поверх."""
+    return [p for p in (STATUS_PATH, CROWD_PATH, DECODE_FAIL_PROGRAMS_PATH) if p.exists()]
+
+
+def git_commit_push(message: str) -> bool:
+    files = own_files()
+    if not files:
+        return True
+    saved = {p: p.read_bytes() for p in files}
+    for attempt in range(5):
+        subprocess.run(["git", "fetch", "origin", GIT_REF], cwd=REPO_ROOT, check=False)
+        subprocess.run(["git", "reset", "--hard", f"origin/{GIT_REF}"], cwd=REPO_ROOT, check=False)
+        for p, content in saved.items():
+            p.write_bytes(content)
+        subprocess.run(["git", "add", *[str(p) for p in saved]], cwd=REPO_ROOT, check=True)
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT).returncode == 0:
+            return True  # ничего не изменилось относительно свежего origin
+        subprocess.run(["git", "commit", "-m", message], cwd=REPO_ROOT, check=True)
+        if subprocess.run(["git", "push", "origin", f"HEAD:{GIT_REF}"], cwd=REPO_ROOT).returncode == 0:
+            return True
+        print(f"[crowd_night{shard_tag()}] push отклонён, попытка {attempt + 1}/5 -- "
+              f"fetch+reset и повтор (не rebase -- свои файлы, конфликтов быть не должно)", flush=True)
+        time.sleep(2 * (attempt + 1))
+    print(f"[crowd_night{shard_tag()}] ПРЕДУПРЕЖДЕНИЕ: не удалось запушить после 5 попыток", flush=True)
+    return False
 
 
 def now_utc() -> str:
@@ -120,6 +155,9 @@ def load_ranked_wallets() -> list[dict]:
 
 
 def run_scan(status: dict, deadline: float) -> None:
+    """Владелец, п.5: коммит+push своих файлов после КАЖДОГО обработанного
+    кошелька -- иначе 20-минутный job невидим снаружи и при таймауте/сбое
+    теряет всё, что насчитал."""
     ranked = load_ranked_wallets()
     status["total_wallets"] = len(ranked)
     crowd = json.loads(CROWD_PATH.read_text()) if CROWD_PATH.exists() else {}
@@ -145,14 +183,25 @@ def run_scan(status: dict, deadline: float) -> None:
         r["stands_in"] = row.get("stands_in")
         crowd[addr] = r
         CROWD_PATH.write_text(json.dumps(crowd, ensure_ascii=False, indent=2, default=str))
+        status["done_wallets"] = len(crowd)
         print(f"[crowd_night{shard_tag()}] {row.get('name')} ({addr[:10]}.., {row.get('stands_in')}): "
               f"n_всего={r['n_purchases_total']} n_приценено={r['n_priced']} n_decode_fail={r['n_decode_fail']} "
               f"медиана_роста={r['median_growth_pct_30s']} empty_share={r['empty_share']} "
               f"({len(crowd)}/{len(ranked)})", flush=True)
+        save_status(status)
+        git_commit_push(f"Solana crowd_night: шард {SHARD_ID} -- {row.get('name')} [automated]"
+                         if SHARD_ID >= 0 else "Solana crowd_night: шаг [automated]")
     status["done_wallets"] = len(crowd)
     if len(crowd) >= len(ranked):
         status["stage"] = "done"
         print(f"[crowd_night{shard_tag()}] ВСЕ {len(ranked)} (мой шард) ГОТОВЫ -- stage=done", flush=True)
+    # Финальное сохранение -- покрывает и случай "ни один кошелёк не успел
+    # завершиться за тик" (застряли на первом же), и переход в stage=done.
+    # Если содержимое не изменилось с последнего коммита внутри цикла,
+    # git_commit_push честно не создаёт пустой коммит (diff --cached --quiet).
+    save_status(status)
+    git_commit_push(f"Solana crowd_night: шард {SHARD_ID} -- статус [automated]"
+                     if SHARD_ID >= 0 else "Solana crowd_night: шаг [automated]")
 
 
 def main() -> None:
@@ -180,7 +229,9 @@ def main() -> None:
         status["last_error"] = f"{type(exc).__name__}: {exc}"
         print(f"[crowd_night{shard_tag()}] ОШИБКА в этом тике (не критично, следующий тик продолжит): "
               f"{status['last_error']}", flush=True)
-    save_status(status)
+        save_status(status)
+        git_commit_push(f"Solana crowd_night: шард {SHARD_ID} -- ошибка тика [automated]"
+                         if SHARD_ID >= 0 else "Solana crowd_night: шаг [automated]")
 
 
 if __name__ == "__main__":

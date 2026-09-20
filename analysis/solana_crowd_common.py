@@ -28,6 +28,7 @@ record_decode_fail_programs) для последующего разбора то
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -42,7 +43,12 @@ from solana_entry_log import (  # noqa: E402
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DECODE_FAIL_PROGRAMS_PATH = REPO_ROOT / "data" / "solana_crowd_decode_fail_programs.json"
+# Владелец, п.3: 4 параллельных шарда писали в ОДИН общий файл -> конфликт
+# при синхронизации git между job'ами. Пошардовый файл, объединяется в
+# aggregate (см. solana_crowd_night_aggregate.py).
+_SHARD_ID = int(os.environ.get("SHARD_ID", "-1"))
+DECODE_FAIL_PROGRAMS_PATH = (REPO_ROOT / "data" / f"solana_crowd_decode_fail_shard_{_SHARD_ID}.json"
+                              if _SHARD_ID >= 0 else REPO_ROOT / "data" / "solana_crowd_decode_fail_programs.json")
 ALLOWED_QUOTES = {WSOL} | STABLE_QUOTES
 WINDOW_SLOTS_AFTER = 75  # ~30с при ~400мс/слот
 MAX_PURCHASES_PER_WALLET_SCAN = 5  # владелец: было 10 -- достаточно для медианы/доли пустых
