@@ -98,9 +98,64 @@ def check_targetwallet_pagination() -> None:
     print(f"из них с недостающими минтами: {len(found_plain)}", flush=True)
 
 
+def check_full_signature_history() -> None:
+    """Реконсиляция BATCH-4 не сходится на одну и ту же величину (0.500015
+    SOL) в НЕСКОЛЬКИХ отдельных прогонах при НЕИЗМЕННОМ балансе -- значит,
+    это не "сделка прошла во время прогона", а реальный пробел в
+    закэшированной истории (скорее всего, оставшийся от старых, уже
+    исправленных в этой сессии багов синхронизации: forward-проход и
+    backward genesis-fill проверяют только края уже известного диапазона
+    подписей, не середину). Здесь -- независимый, полный обход ВСЕХ
+    подписей кошелька с нуля (без использования кэша вообще), сверка с
+    тем, что реально есть в data/chain_tx_cache.json."""
+    print("=" * 20, "3) Полный независимый обход подписей BATCH-4 (без кэша)", "=" * 20, flush=True)
+    all_sigs = []
+    before = None
+    page_n = 0
+    while True:
+        page_n += 1
+        page = lr.get_signatures_for_address(BATCH4_WALLET, before=before, limit=1000)
+        if not page:
+            print(f"  страница {page_n}: пусто -- дошли до генезиса", flush=True)
+            break
+        all_sigs.extend(page)
+        print(f"  страница {page_n}: {len(page)} подписей, самая старая blockTime={page[-1].get('blockTime')}", flush=True)
+        before = page[-1]["signature"]
+        if len(page) < 1000:
+            break
+        if page_n > 50:
+            print("  ! остановка по защитному лимиту 50 страниц", flush=True)
+            break
+    print(f"итого подписей на цепочке (полный обход): {len(all_sigs)}", flush=True)
+
+    cache = json.loads(lr.CHAIN_CACHE_PATH.read_text())
+    cached_sigs = {v["signature"] for v in cache.values() if isinstance(v, dict) and v.get("_wallet") == BATCH4_WALLET}
+    print(f"итого подписей в кэше: {len(cached_sigs)}", flush=True)
+
+    missing = [h for h in all_sigs if h["signature"] not in cached_sigs]
+    print(f"ПРОПУЩЕНО (есть на цепочке, нет в кэше): {len(missing)}", flush=True)
+    total_missing_delta = 0.0
+    for h in missing:
+        sig = h["signature"]
+        if h.get("err") is not None:
+            print(f"  {sig[:20]}.. err={h.get('err')} (не влияет на баланс)")
+            continue
+        tx = lr.rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+        if tx is None:
+            print(f"  {sig[:20]}.. getTransaction -> null")
+            continue
+        parsed = lr.parse_tx_for_wallet(sig, tx, BATCH4_WALLET)
+        d = (parsed.get("sol_delta_native") or 0) + (parsed.get("wsol_delta") or 0)
+        total_missing_delta += d
+        print(f"  {sig[:20]}.. blockTime={h.get('blockTime')} delta={d} SOL is_signer={parsed.get('is_signer')} "
+              f"token_deltas={parsed.get('token_deltas')}")
+    print(f"сумма дельт пропущенных транзакций: {total_missing_delta} SOL", flush=True)
+
+
 def main() -> None:
     dump_tx()
     check_targetwallet_pagination()
+    check_full_signature_history()
 
 
 if __name__ == "__main__":
