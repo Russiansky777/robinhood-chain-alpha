@@ -1,0 +1,23 @@
+name: "Solana ledger -- разовая диагностика (п.2/п.3: пагинация + разбор 1.0 SOL)"
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Разбор транзакции + проверка targetWallet-пагинации"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/solana_diag_probe.py
