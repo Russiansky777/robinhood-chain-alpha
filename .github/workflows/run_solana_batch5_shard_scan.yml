@@ -1,0 +1,53 @@
+name: "Solana buyer_200 -- BATCH-5, скан 217 в 4 параллельных шардах (RPC)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_BATCH5_SHARD_SCAN_REQUEST"
+
+jobs:
+  shard_scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard_id: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config pull.rebase true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "Шард ${{ matrix.shard_id }} -- скан кандидатов (RPC-only)"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          SHARD_ID: ${{ matrix.shard_id }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python -u analysis/solana_batch5_shard_scan.py
+      - name: Commit final shard results
+        if: always()
+        run: |
+          [ -e "data/solana_batch5_shard_${{ matrix.shard_id }}.json" ] && git add "data/solana_batch5_shard_${{ matrix.shard_id }}.json"
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: шард ${{ matrix.shard_id }} -- итог скана [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
