@@ -1,0 +1,48 @@
+name: "Helius -- проверка ключа ровно так, как указал владелец (ШАГ 0)"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/HELIUS_KEY_PROBE_REQUEST"
+
+jobs:
+  helius_probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "POST getBalance, ключ в query, не в заголовке"
+        run: |
+          set +e
+          BODY_FILE=$(mktemp)
+          HEADERS_FILE=$(mktemp)
+          HTTP_CODE=$(curl -sS -D "$HEADERS_FILE" -o "$BODY_FILE" -w "%{http_code}" -X POST \
+            "https://mainnet.helius-rpc.com/?api-key=bd05dcb3-8875-4c71-b757-771da753315f" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS"]}')
+          echo "=== HTTP_CODE: $HTTP_CODE ==="
+          echo "=== ЗАГОЛОВКИ ОТВЕТА ==="
+          cat "$HEADERS_FILE"
+          echo "=== ТЕЛО ОТВЕТА ==="
+          cat "$BODY_FILE"
+          echo ""
+      - name: "Сравнение секрета HELIUS_API с указанным ключом (без печати значения секрета)"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set +e
+          if [ -z "$HELIUS_API" ]; then
+            echo "=== HELIUS_API: секрет пуст/не задан в этом репозитории ==="
+          else
+            GOT_HASH=$(printf '%s' "$HELIUS_API" | sha256sum | cut -d' ' -f1)
+            EXPECTED_HASH=$(printf '%s' "bd05dcb3-8875-4c71-b757-771da753315f" | sha256sum | cut -d' ' -f1)
+            echo "=== sha256(HELIUS_API secret)  = $GOT_HASH ==="
+            echo "=== sha256(указанный ключ)     = $EXPECTED_HASH ==="
+            if [ "$GOT_HASH" = "$EXPECTED_HASH" ]; then
+              echo "=== СОВПАДАЕТ: секрет HELIUS_API == указанному ключу ==="
+            else
+              echo "=== НЕ СОВПАДАЕТ: секрет HELIUS_API отличается от указанного ключа ==="
+            fi
+          fi
