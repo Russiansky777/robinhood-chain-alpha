@@ -83,28 +83,57 @@ def load_already_passed() -> set[str]:
     return out
 
 
+def _abort_any_stuck_rebase(shard_id: int) -> None:
+    """Владелец, найденный этой сессией баг: git pull --rebase на общем
+    файле с малым числом строк конфликтует (контекст диффа перекрывает
+    весь файл) -- rebase зависает (.git/rebase-merge), HEAD остаётся
+    detached, и ВСЕ дальнейшие коммиты этого job'а уходят в никуда
+    (detached HEAD умирает вместе с runner'ом) -- именно так шарды 1-3
+    молча потеряли по 59/59 уже отсканированных кошельков. Если застрявший
+    rebase есть -- сначала выйти из него, вернуться на ветку."""
+    if (REPO_ROOT / ".git" / "rebase-merge").exists() or (REPO_ROOT / ".git" / "rebase-apply").exists():
+        print(f"[shard {shard_id}] обнаружен зависший rebase -- git rebase --abort", flush=True)
+        subprocess.run(["git", "rebase", "--abort"], cwd=REPO_ROOT)
+
+
 def append_passed_with_retry(row: dict, shard_id: int) -> bool:
-    """Дозапись ОДНОЙ строки в общий файл + коммит/push с ретраем на
-    конфликт (несколько шардов пишут в один файл параллельно) -- своя
-    ретрай-логика, т.к. общий _git_commit_progress не сигнализирует
-    успех/неудачу вызывающему коду."""
+    """Дозапись ОДНОЙ строки в общий файл -- вместо git rebase (см.
+    _abort_any_stuck_rebase) используем fetch+reset --hard на актуальный
+    origin ПЕРЕД каждой попыткой (оптимистичная конкуренция: рабочее
+    дерево = точный слепок origin, дописываем свою строку поверх свежей
+    версии, коммитим, пушим; конфликт -- просто повтор с нуля, без
+    построчного merge вообще)."""
     line = json.dumps(row, ensure_ascii=False, default=str)
     ref = os.environ.get("GITHUB_REF_NAME", "HEAD")
-    for attempt in range(6):
-        with PASSED_PATH.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
+    for attempt in range(8):
+        _abort_any_stuck_rebase(shard_id)
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=REPO_ROOT,
+                                 capture_output=True, text=True).stdout
+        dirty_other_files = [l for l in status.splitlines() if PASSED_PATH.name not in l]
+        if dirty_other_files:
+            print(f"[shard {shard_id}] есть незакоммиченные изменения в других файлах -- "
+                  f"не трогаю их сбросом: {dirty_other_files}", flush=True)
+        else:
+            subprocess.run(["git", "fetch", "origin", ref], cwd=REPO_ROOT, check=False)
+            subprocess.run(["git", "checkout", ref], cwd=REPO_ROOT, check=False)
+            subprocess.run(["git", "reset", "--hard", f"origin/{ref}"], cwd=REPO_ROOT, check=False)
+
+        current = PASSED_PATH.read_text() if PASSED_PATH.exists() else ""
+        if line in current.splitlines():
+            return True  # уже есть ровно эта строка (идемпотентно)
+        sep = "" if (not current or current.endswith("\n")) else "\n"
+        PASSED_PATH.write_text(current + sep + line + "\n")
         try:
             subprocess.run(["git", "add", str(PASSED_PATH)], check=True, cwd=REPO_ROOT)
             subprocess.run(["git", "commit", "-m",
                              f"Solana buyer_200: FOMO прошёл фильтр {row['address'][:10]} (шард {shard_id}) [automated]"],
                             check=True, cwd=REPO_ROOT)
-            push = subprocess.run(["git", "push"], cwd=REPO_ROOT)
+            push = subprocess.run(["git", "push", "origin", ref], cwd=REPO_ROOT)
             if push.returncode == 0:
                 return True
         except subprocess.CalledProcessError as exc:
             print(f"[shard {shard_id}] git ошибка при записи passed-строки: {exc}", flush=True)
-        print(f"[shard {shard_id}] push passed-файла отклонён, попытка {attempt + 1}/6 -- pull --rebase и повтор", flush=True)
-        subprocess.run(["git", "pull", "--rebase", "origin", ref], cwd=REPO_ROOT)
+        print(f"[shard {shard_id}] push passed-файла отклонён, попытка {attempt + 1}/8 -- fetch+reset и повтор", flush=True)
         time.sleep(2 * (attempt + 1))
     print(f"[shard {shard_id}] ПРЕДУПРЕЖДЕНИЕ: не удалось закоммитить passed-строку для {row['address']} после ретраев", flush=True)
     return False
@@ -161,6 +190,7 @@ def main() -> None:
                       f">=2SOL={n_ge2} медиана={median_val}", flush=True)
 
         if time.monotonic() - last_commit_at > COMMIT_INTERVAL_S:
+            _abort_any_stuck_rebase(shard_id)  # защита: не дать detached HEAD молча съесть прогресс
             out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
             fp._git_commit_progress(f"batch5_shard_{shard_id}", [out_path])
             last_commit_at = time.monotonic()
@@ -168,6 +198,7 @@ def main() -> None:
     result["n_shard_total"] = len(shard_wallets)
     result["n_shard_scanned"] = len(scanned)
     result["shard_complete"] = len(scanned) >= len(shard_wallets)
+    _abort_any_stuck_rebase(shard_id)
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     fp._git_commit_progress(f"batch5_shard_{shard_id}_final", [out_path])
     print(f"[shard {shard_id}] итог: {n_done} сейчас, всего {len(scanned)}/{len(shard_wallets)}, "
