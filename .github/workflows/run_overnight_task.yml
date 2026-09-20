@@ -1,0 +1,125 @@
+name: "Solana buyer_200 -- ночное задание: п.2 толпа за 90 + п.3 цена скорости"
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/SOLANA_OVERNIGHT_TASK_REQUEST"
+
+jobs:
+  point3_speed_cost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "П.3 -- цена скорости конкурента (без сканов)"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python -u analysis/solana_point3_speed_cost.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/solana_point3_speed_cost.json ] && git add data/solana_point3_speed_cost.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: п.3 -- цена скорости конкурента -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
+
+  crowd_control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "П.2 контроль -- лидер + Brez"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python -u analysis/solana_crowd_control.py
+      - name: Commit results
+        if: always()
+        run: |
+          [ -e data/solana_crowd_control_result.json ] && git add data/solana_crowd_control_result.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: п.2 контроль толпы (лидер+Brez) -- результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
+
+  crowd_shards:
+    needs: crowd_control
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard_id: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: "П.2 -- шард ${{ matrix.shard_id }} толпы за 90"
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          SHARD_ID: ${{ matrix.shard_id }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python -u analysis/solana_crowd_shard_scan.py
+      - name: Commit final shard results
+        if: always()
+        run: |
+          [ -e "data/solana_crowd_shard_${{ matrix.shard_id }}.json" ] && git add "data/solana_crowd_shard_${{ matrix.shard_id }}.json"
+          git diff --cached --quiet && exit 0
+          git commit -m "Solana buyer_200: п.2 шард ${{ matrix.shard_id }} толпы -- итог [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
