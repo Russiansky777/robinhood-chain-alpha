@@ -1,0 +1,60 @@
+name: "Телеграм-бот сторожа -- найти chat_id и отправить тестовое сообщение"
+
+# Владелец: bot token кладём ТОЛЬКО в секреты (TELEGRAM_BOT_TOKEN, уже
+# должен быть добавлен владельцем в Settings -> Secrets and variables ->
+# Actions -- этот workflow не может создать секрет сам, только читает
+# его). После того как владелец нажал Start в @Dbot7788_bot, этот
+# workflow вызывает getUpdates, берёт chat.id из последнего сообщения,
+# печатает его в лог job'а (chat_id сам по себе не даёт доступа к боту
+# без токена, поэтому печатать его безопасно) и сразу шлёт пробное
+# сообщение «Сторож на связи» в найденный чат. Сам chat_id владелец
+# добавляет как секрет TELEGRAM_CHAT_ID вручную (у этого workflow нет
+# инструмента писать секреты репозитория) -- дальше он подхватывается
+# деплой-workflow'ом (run_vps_deploy_sold_position_guard_nl.yml) при
+# следующем прогоне.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  find_chat_id:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: getUpdates -> найти chat_id -> отправить тестовое сообщение
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "СТОП: секрет TELEGRAM_BOT_TOKEN не задан в репозитории (Settings -> Secrets and variables -> Actions)." >&2
+            exit 1
+          fi
+          RESP=$(curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates")
+          echo "$RESP" | python3 -c "
+          import json, sys
+          body = json.load(sys.stdin)
+          if not body.get('ok'):
+              print('getUpdates вернул ошибку:', body, file=sys.stderr)
+              sys.exit(1)
+          updates = body.get('result') or []
+          if not updates:
+              print('СТОП: обновлений нет -- владелец ещё не нажал Start в боте (или Telegram отдаёт их только один раз, если их уже кто-то читал). Нажмите Start и повторите запуск.', file=sys.stderr)
+              sys.exit(1)
+          last = updates[-1]
+          chat = (last.get('message') or last.get('my_chat_member') or {}).get('chat') or {}
+          chat_id = chat.get('id')
+          if chat_id is None:
+              print('СТОП: не нашёл chat.id в последнем обновлении:', last, file=sys.stderr)
+              sys.exit(1)
+          print(f'::notice::TELEGRAM_CHAT_ID={chat_id} -- добавьте это значение как секрет репозитория TELEGRAM_CHAT_ID')
+          print(f'НАЙДЕН chat_id={chat_id} (имя/название чата: {chat.get(\"first_name\") or chat.get(\"title\") or \"?\"})')
+          with open('chat_id.txt', 'w') as f:
+              f.write(str(chat_id))
+          "
+          CHAT_ID=$(cat chat_id.txt)
+          echo "=== Отправляю пробное сообщение ==="
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" -d text="Сторож на связи"
+          echo ""
+          echo "=== ГОТОВО: chat_id=${CHAT_ID} напечатан выше (::notice::) -- добавьте его как секрет TELEGRAM_CHAT_ID, затем перезапустите деплой-workflow сторожа, чтобы он подхватил оба значения. ==="

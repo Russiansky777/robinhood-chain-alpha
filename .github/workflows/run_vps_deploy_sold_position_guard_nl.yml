@@ -1,0 +1,189 @@
+name: "Сторож проваленных продаж -- деплой на VPS Нидерланды (45.59.170.76)"
+
+# Владелец: постоянная служба (systemd, Restart=always), проверяет
+# DBot expired-задачи (TP/SL, брошенные после 10 неудачных попыток
+# продажи), для наших 9 кошельков (пилот + BATCH-1..8) сверяет реальный
+# баланс токена через Helius и, если он не нулевой, пробует продать
+# через DBot. Тот же аудируемый канал, что все остальные VPS-сервисы
+# этого проекта (run_vps_bootstrap_nl.yml, run_vps_setup_*_cron_nl.yml)
+# -- SSH ТОЛЬКО из GH Actions (secrets.VPS_SSH_KEY), не из интерактивной
+# сессии (см. docs/PROJECT_STATE.md, §4 бага #8 -- прямой ad hoc SSH из
+# агентской сессии к хосту с боевыми ключами явно отклонён владельцем
+# как демонтаж аудируемого барьера).
+#
+# Секреты -- отдельный файл /etc/dbot-guard/env (НЕ существующий
+# /etc/bot/env с PRIVATE_KEY_NOX/Lighter-ключами -- этой службе они не
+# нужны, принцип наименьшей привилегии). DBOT_API_KEY/HELIUS_API уже
+# существуют как секреты репозитория (используются ledger_hourly.yml).
+# TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID -- опциональны: если ещё не
+# заведены как секреты репозитория, служба просто пишет алерты в лог
+# (см. send_telegram() в самом скрипте) -- этот workflow идемпотентен,
+# безопасно перезапустить позже после того, как владелец добавит их.
+#
+# Идемпотентно: обновляет код (git reset --hard), секреты, юнит,
+# logrotate и делает restart при каждом прогоне -- безопасно гонять
+# повторно (например, после правки скрипта).
+on:
+  workflow_dispatch:
+    inputs:
+      enable_service:
+        description: "systemctl enable --now (боевой запуск) -- 'yes' или оставить пустым для установки без включения"
+        required: false
+        default: ""
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/p3_guard_cache/VPS_DEPLOY_SOLD_POSITION_GUARD_NL_REQUEST"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "1. Обновить код репозитория у bot (та же ветка, что учёт/крауд-скан)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha fetch origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha checkout claude/nifty-sagan-r0polg
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
+            sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "2. Секреты -> /etc/dbot-guard/env (отдельный файл, НЕ /etc/bot/env -- этой службе Lighter/EVM-ключи не нужны)"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /etc/dbot-guard && cat > /etc/dbot-guard/env && chmod 640 /etc/dbot-guard/env && chown root:bot /etc/dbot-guard/env && wc -l /etc/dbot-guard/env' <<EOF
+          DBOT_API_KEY=$DBOT_API_KEY
+          HELIUS_API=$HELIUS_API
+          TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
+          TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
+          GUARD_LIVE_SELL=1
+          GUARD_INTERVAL_S=45
+          GUARD_STUCK_THRESHOLD=10
+          GUARD_API_DOWN_ALERT_S=600
+          GUARD_STATE_DIR=/home/bot/dbot_sold_position_guard_live_data
+          EOF
+          echo "GUARD_LIVE_SELL=1 -- живая продажа включена по прямой инструкции владельца (боевое включение после чистого read-пути)."
+
+      - name: "3. systemd-юнит"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /etc/systemd/system/dbot-sold-guard.service' <<'EOF'
+          [Unit]
+          Description=DBot sold-position guard (expired TP/SL cleanup)
+          After=network-online.target
+          Wants=network-online.target
+          StartLimitIntervalSec=600
+          StartLimitBurst=5
+
+          [Service]
+          Type=simple
+          User=bot
+          Group=bot
+          WorkingDirectory=/home/bot/robinhood-chain-alpha
+          EnvironmentFile=/etc/dbot-guard/env
+          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/robinhood-chain-alpha/analysis/dbot_sold_position_guard.py
+          Restart=always
+          RestartSec=10
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 '
+            mkdir -p /home/bot/dbot_sold_position_guard_live_data
+            chown bot:bot /home/bot/dbot_sold_position_guard_live_data
+            systemctl daemon-reload
+          '
+
+      - name: "4. logrotate по размеру (journalctl -u ротируется системно отдельно)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /home/bot/robinhood-chain-alpha/logs && cat > /etc/logrotate.d/dbot-sold-guard' <<'EOF'
+          /home/bot/dbot_sold_position_guard_live_data/*.jsonl {
+              size 100M
+              rotate 5
+              compress
+              delaycompress
+              missingok
+              notifempty
+              copytruncate
+              su bot bot
+          }
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 'logrotate -d /etc/logrotate.d/dbot-sold-guard 2>&1 | tail -10'
+
+      - name: "5. Проверка ДО боевого включения: --check-only (чистое чтение, ничего не продаёт)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/robinhood-chain-alpha
+            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env; set +a; ./venv/bin/python -u analysis/dbot_sold_position_guard.py --check-only"
+          '
+
+      - name: "6. Включить и запустить службу (только если inputs.enable_service=yes)"
+        if: github.event.inputs.enable_service == 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            systemctl enable --now dbot-sold-guard
+            sleep 3
+            systemctl status dbot-sold-guard --no-pager | head -15
+          '
+
+      - name: "6a. Первый живой цикл -- реальный вывод в лог (что бы он ни сделал -- ничего/продажа/алерт)"
+        if: github.event.inputs.enable_service == 'yes'
+        run: |
+          echo "Жду ~60с, чтобы первый живой цикл гарантированно завершился, затем читаю journalctl с самого старта службы."
+          sleep 60
+          ssh $SSH_OPTS root@45.59.170.76 'journalctl -u dbot-sold-guard --no-pager -n 200'
+
+      - name: "6б. Юнит установлен, НЕ включён (обычный прогон без enable_service=yes)"
+        if: github.event.inputs.enable_service != 'yes'
+        run: |
+          echo "systemd-юнит dbot-sold-guard установлен и daemon-reload сделан, но НЕ включён (enable_service!=yes)."
+          echo "Включить: workflow_dispatch этого workflow с enable_service=yes, или вручную: systemctl enable --now dbot-sold-guard"
+
+      - name: "7. Забрать сырой sample expired-записи (если появился) для коммита -- диагностика формы ответа"
+        if: always()
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/dbot_sold_position_guard_sample.json 2>/dev/null' > /tmp/guard_sample.json || true
+          if [ -s /tmp/guard_sample.json ]; then
+            mkdir -p data
+            cp /tmp/guard_sample.json data/dbot_sold_position_guard_sample.json
+          fi
+
+      - name: Commit sample (если появился)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/dbot_sold_position_guard_sample.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Сторож проваленных продаж: сырая форма expired-записи с реального прогона [automated]"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
