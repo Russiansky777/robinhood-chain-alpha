@@ -1,0 +1,125 @@
+name: "Часть A: отставание в слотах от источника (entry_log offsets)"
+
+# Владелец, задача «измерение, не торговля»: для каждой нашей сделки
+# найти покупку ИСТОЧНИКА на цепочке, посчитать offset_slots и кто успел
+# купить между ними. Выход -- data/solana_entry_log.json.
+#
+# НИ ОДНОГО вызова покупки/продажи: скрипт умеет только читать RPC
+# (getSignaturesForAddress / getTransaction / getBlock) -- см. сам файл
+# analysis/solana_entry_log_offsets.py.
+#
+# КЛЮЧ: владелец просит env HELIUS_API_KEY. В секретах репозитория
+# реально заведён HELIUS_API (проверено на прогоне, см.
+# data/solana_source_a_helius_gate.json). Отдаём ОБА имени из одного
+# секрета -- скрипт прочитает HELIUS_API_KEY (как просил владелец), а
+# каскад RPC внутри solana_buyer200_fast_price читает HELIUS_API.
+# В репозиторий ключ не кладётся.
+#
+# GitHub-механика (тот же урок, что у сторожа): workflow_dispatch
+# регистрируется ТОЛЬКО с копии файла на РЕАЛЬНОЙ default-ветке
+# (claude/robinhood-copytrading-hypothesis-awjj0g). Поэтому файл лежит и
+# там, и здесь, а checkout/push всегда указывают на claude/nifty-sagan-r0polg.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "обработать только N сделок (0 = все 223); маленькое N -- дешёвая разведка стоимости"
+        required: false
+        default: "0"
+      max_slot_scan:
+        description: "потолок сканирования блоков на сделку (слотов)"
+        required: false
+        default: "150"
+      time_budget_s:
+        description: "мягкий бюджет времени скрипта, секунд"
+        required: false
+        default: "3300"
+      max_history_pages:
+        description: "потолок страниц getSignaturesForAddress на источник за один прогон"
+        required: false
+        default: "12"
+
+concurrency:
+  group: solana-entry-log-offsets
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Замер (только чтение цепочки)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then
+            echo "СТОП: секрет HELIUS_API пуст -- без привилегированного RPC прогон не уложится в бюджет." >&2
+            exit 1
+          fi
+          python -u analysis/solana_entry_log_offsets.py \
+            --limit "${{ github.event.inputs.limit || 0 }}" \
+            --max-slot-scan "${{ github.event.inputs.max_slot_scan || 150 }}" \
+            --time-budget-s "${{ github.event.inputs.time_budget_s || 3300 }}" \
+            --max-history-pages "${{ github.event.inputs.max_history_pages || 12 }}" \
+            2>&1 | tail -400
+
+      - name: "Сводка в лог job'а"
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("data/solana_entry_log.json")
+          if not p.exists():
+              print("файла нет -- скрипт не дошёл до записи")
+              raise SystemExit(0)
+          d = json.loads(p.read_text())
+          print("сгенерирован:", d["generated_at_utc"])
+          print("run_stats:", json.dumps(d["run_stats"], ensure_ascii=False)[:1500])
+          s = d["summary"]
+          for k in ("n_rows", "n_with_offset", "n_with_buyers_between", "offset_slots_distribution",
+                    "offset_slots_median", "buyers_between_median", "buyers_between_distribution",
+                    "buyers_same_block_after_us_median", "is_rfq_share", "is_rfq_n",
+                    "dex_distribution", "via_jupiter_n", "via_dflow_n",
+                    "signal_median_by_offset_bucket", "corr_offset_vs_signal",
+                    "corr_buyers_between_vs_signal", "source_lookup_methods"):
+              print(f"{k}: {json.dumps(s.get(k), ensure_ascii=False)}")
+          print("--- по задачам ---")
+          for task, v in s["offset_slots_by_task"].items():
+              print(f"  {task}: n={v['n']} {json.dumps(v['offset_buckets'], ensure_ascii=False)}")
+          print("--- по источникам (топ-15 по числу сделок) ---")
+          for src, v in sorted(s["offset_slots_by_source"].items(), key=lambda kv: -kv[1]["n"])[:15]:
+              print(f"  {src} ({v.get('remark')}): n={v['n']} {json.dumps(v['offset_buckets'], ensure_ascii=False)}")
+          PY
+
+      - name: "Коммит результата и кэша"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/solana_entry_log.json data/solana_entry_log_offsets_cache.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Часть A: отставание в слотах от источника -- прогон [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5 -- fetch+rebase и повтор"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
