@@ -191,6 +191,11 @@ def get_token_holding(wallet: str, mint: str) -> float:
     return total
 
 
+FOLLOW_TRADES_FRESHNESS_WINDOW_H = 6
+SECTION_A_BUDGET_S = 25 * 60
+HUNG_THRESHOLD_S = 300
+
+
 # ---------- DBot REST (0 кредитов) ----------
 
 def dbot_get(path: str, params: dict, api_key: str):
@@ -236,7 +241,7 @@ def fetch_follow_orders(api_key: str) -> tuple[list[dict], int | None]:
     return tasks, status
 
 
-def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | None = None) -> list[dict]:
+def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | None = None) -> tuple[list[dict], bool]:
     """Владелец: пагинация должна идти ДО пустой страницы, а не
     останавливаться раньше на "страница короче size" -- на живом,
     постоянно дописываемом наборе данных страница может отдать <size
@@ -244,22 +249,38 @@ def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | No
     записи новых сделок), и тогда следующая страница снова непустая --
     эмпирически подтверждено: 4 реальные сделки по источнику N_HtuY были
     пропущены именно так. myWallet -- дополнительный фильтр по кошельку
-    задачи, если поддерживается API (сужает выборку, не должен вредить)."""
+    задачи, если поддерживается API (сужает выборку, не должен вредить).
+
+    Найдено при диагнозе "13 сделок после 10:43, источник только у 1":
+    dbot_get после 6 неудачных попыток возвращает (None, {}) -- и
+    extract_items({}) тоже даёт [], НЕОТЛИЧИМО от настоящего конца
+    пагинации. Разовый сетевой сбой посреди прохода молча обрубал
+    выгрузку прямо перед самыми свежими страницами. Теперь неудачная
+    страница -- отдельный повтор (до 5 раз), и если так и не вышло --
+    возвращаем то, что успели, и complete=False, а не тихо "конец".
+    Возвращает (записи, complete) -- complete=False значит выгрузка этой
+    задачи в этом прогоне не гарантированно полная."""
     out = []
     page = 1
     params = {"chain": "solana", "configId": task_id, "size": 20}
     if my_wallet:
         params["myWallet"] = my_wallet
     while True:
-        status, body = dbot_get("/account/follow_trades", {**params, "page": page}, api_key)
+        status, body = None, {}
+        for page_attempt in range(5):
+            status, body = dbot_get("/account/follow_trades", {**params, "page": page}, api_key)
+            if status is not None:
+                break
+            time.sleep(3 * (page_attempt + 1))
+        if status is None:
+            return out, False
         items = extract_items(body)
         if not items:
-            break
+            return out, True
         out.extend(items)
         page += 1
         if page > 500:
-            break
-    return out
+            return out, False  # честно: упёрлись в защитный потолок, не в реальный конец данных
 
 
 def dbot_signature_from_record(r: dict) -> str | None:
@@ -765,6 +786,19 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 holding = get_token_holding(wallet, mint)
                 status = "незакрыта" if holding > 0 else "ручная продажа"
 
+            # Владелец: отдельной колонкой -- зависшие сделки (держали
+            # дольше HUNG_THRESHOLD_S). Для закрытых -- реальное время
+            # покупка->продажа по цепочке; для ещё открытых -- сколько уже
+            # держим к моменту прогона (тоже "зависла", и даже актуальнее).
+            # "Ручная продажа" -- время продажи нам не известно (её не
+            # нашли в истории кошелька), не выдумываем held_seconds для неё.
+            held_seconds = None
+            if sell_v and sell_v.get("blockTime") is not None and buy_v.get("blockTime") is not None:
+                held_seconds = sell_v["blockTime"] - buy_v["blockTime"]
+            elif status == "незакрыта" and buy_v.get("blockTime") is not None:
+                held_seconds = int(time.time()) - buy_v["blockTime"]
+            is_hung = bool(held_seconds is not None and held_seconds > HUNG_THRESHOLD_S)
+
             trades.append({
                 "task_id": task["id"], "task_name": task.get("name"), "wallet": wallet,
                 "wallet_name": task.get("wallet_name"),
@@ -781,6 +815,7 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 "gross_sol_in": gross_sol_in, "gross_sol_in_source": "dbot_record" if buy_record else None,
                 "gross_sol_out": gross_sol_out, "gross_sol_out_source": "dbot_record" if sell_record else None,
                 "status": status,
+                "held_seconds": held_seconds, "is_hung": is_hung,
                 "dbot_fail_reason": None,
             })
 
@@ -806,6 +841,7 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
             "source_remark": source["remark"] if source else None,
             "mint": dbot_token_contract(r),
             "buy_signature": sig, "status": "срыв",
+            "held_seconds": None, "is_hung": False,  # не исполнилась в цепочке -- держать нечего
             "dbot_fail_reason": r.get("errorMessage") or r.get("skipReason") or r.get("errorCode"),
         })
     return trades
@@ -841,12 +877,13 @@ def build_source_stats(trades_all: list[dict]) -> list[dict]:
         net_sum = sum(t["net_sol"] for t in trades if t.get("net_sol") is not None)
         best_pct = max((t["gross_pct"] for t in closed if t.get("gross_pct") is not None), default=None)
         fails = [t for t in trades if t["status"] == "срыв"]
+        n_hung = sum(1 for t in trades if t.get("is_hung"))
         last_bt = max((t.get("buy_block_time") or 0 for t in trades), default=0)
         out.append({
             "task_id": task_id, "task_name": row["task_name"], "source_address": addr,
             "source_remark": row["source_remark"], "n_trades": len(closed), "n_profit": n_profit,
             "gross_sol_sum": round(gross_sum, 6), "net_sol_sum": round(net_sum, 6),
-            "best_trade_pct": best_pct, "n_fails": len(fails),
+            "best_trade_pct": best_pct, "n_fails": len(fails), "n_hung": n_hung,
             "fail_reasons": [f.get("dbot_fail_reason") for f in fails][:10],
             "last_trade_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_bt)) if last_bt else None,
         })
@@ -951,6 +988,8 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
         n_trades = sum(1 for t in task_trades if t["status"] == "закрыта")
         net_sum = sum(t["net_sol"] for t in task_trades if t.get("net_sol") is not None)
         n_open = sum(1 for t in task_trades if t["status"] == "незакрыта")
+        n_hung = sum(1 for t in task_trades if t.get("is_hung"))
+        n_no_source = sum(1 for t in task_trades if t["status"] in ("закрыта", "незакрыта") and not t.get("source_address"))
 
         recon = build_wallet_reconciliation(wallet, chain_cache)
 
@@ -972,6 +1011,7 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
             "task_id": task["id"], "task_name": task.get("name"), "wallet": wallet,
             "wallet_name": task.get("wallet_name"), "n_trades": n_trades, "net_sol_sum": round(net_sum, 6),
             "dbot_fee_total_sol": recon["dbot_fee_sol"], "n_open": n_open,
+            "n_hung": n_hung, "n_no_source": n_no_source,
             "current_balance_sol": round(current_balance, 6) if current_balance is not None else None,
             "reconciliation": recon,
             "reconciliation_diff_sol": diff,
@@ -1041,13 +1081,24 @@ def main() -> None:
     print(f"[ledger] задач найдено: {len(tasks)}", flush=True)
 
     follow_trades_cache = load_json(FOLLOW_TRADES_PATH, {})
-    follow_trades_by_task: dict[str, list] = {}
     n_records_total = 0
+    incomplete_fetch_tasks: list[str] = []
+    section_a_deadline = started + SECTION_A_BUDGET_S
     for task in tasks:
         tid = task["id"]
+        if time.monotonic() > section_a_deadline:
+            print(f"[ledger] A: бюджет раздела A исчерпан -- {task.get('name')} и далее пропускаю "
+                  f"в этом прогоне (сшивка ниже всё равно опирается на полный накопленный кэш, "
+                  f"не только на этот проход)", flush=True)
+            incomplete_fetch_tasks.append(tid)
+            continue
         print(f"[ledger] A: follow_trades для задачи {tid} ({task.get('name')})...", flush=True)
-        records = fetch_follow_trades_for_task(tid, api_key, my_wallet=task.get("wallet"))
-        follow_trades_by_task[tid] = records
+        records, fetch_complete = fetch_follow_trades_for_task(tid, api_key, my_wallet=task.get("wallet"))
+        if not fetch_complete:
+            incomplete_fetch_tasks.append(tid)
+            print(f"[ledger] ВНИМАНИЕ: выгрузка follow_trades для {tid} ({task.get('name')}) НЕПОЛНАЯ "
+                  f"(сбой сети/API посреди пагинации, получено {len(records)} записей за этот проход) -- "
+                  f"дотянем в следующий часовой прогон", flush=True)
         if records and not FOLLOW_TRADES_SAMPLE_PATH.exists():
             save_json(FOLLOW_TRADES_SAMPLE_PATH, records[0])
             print(f"[ledger] первая сырая запись follow_trades сохранена в {FOLLOW_TRADES_SAMPLE_PATH.name}", flush=True)
@@ -1055,9 +1106,46 @@ def main() -> None:
             rid = r.get("id") or r.get("_id") or f"{tid}:{len(follow_trades_cache)}"
             follow_trades_cache[str(rid)] = {"task_id": tid, "record": r}
         n_records_total += len(records)
-    save_json(FOLLOW_TRADES_PATH, follow_trades_cache)
+        # Владелец: сохранять не только в самом конце -- инкрементально
+        # после каждой задачи, чтобы обрыв job'а посреди раздела A не
+        # терял уже полученные записи остальных задач (тот же урок, что и
+        # в crowd_night: коммит по ходу, а не одной подстраховкой в конце).
+        save_json(FOLLOW_TRADES_PATH, follow_trades_cache)
     status["n_records_dbot"] = n_records_total
-    print(f"[ledger] всего DBot-записей: {n_records_total}", flush=True)
+    status["follow_trades_incomplete_tasks"] = incomplete_fetch_tasks
+    print(f"[ledger] всего DBot-записей за этот проход: {n_records_total}"
+          + (f", НЕПОЛНО (задачи {incomplete_fetch_tasks})" if incomplete_fetch_tasks else ""), flush=True)
+
+    # Владелец: "перепривязывать все сделки без source_address" -- сшивка
+    # источника ниже должна видеть ВЕСЬ когда-либо накопленный кэш DBot
+    # (follow_trades_cache только растёт и переживает сбой отдельного
+    # часового прогона), а не только то, что удалось получить именно в
+    # ЭТОМ проходе -- иначе разовый сбой раздела A "забывает" уже
+    # когда-то подтверждённые записи и откатывает уже сделанные привязки.
+    follow_trades_by_task: dict[str, list] = {}
+    for entry in follow_trades_cache.values():
+        follow_trades_by_task.setdefault(entry["task_id"], []).append(entry["record"])
+
+    # Честная видимость свежести (владелец: "выгружать ПОЛНОСТЬЮ за
+    # последние 6 часов") -- не просто заявляем это сделанным, а показываем
+    # реальный возраст самой свежей DBot-записи на задачу, чтобы отставание
+    # (в т.ч. на стороне самого DBot, не только в нашей выгрузке) было
+    # видно явно, а не молчаливо считалось исправленным.
+    now_ms = time.time() * 1000
+    freshness = []
+    for task in tasks:
+        tid = task["id"]
+        create_ats = [r.get("createAt") for r in follow_trades_by_task.get(tid, []) if r.get("createAt")]
+        latest_ms = max(create_ats) if create_ats else None
+        age_h = round((now_ms - latest_ms) / 3600000, 2) if latest_ms else None
+        freshness.append({
+            "task_id": tid, "task_name": task.get("name"),
+            "latest_record_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest_ms / 1000)) if latest_ms else None,
+            "hours_since_latest_record": age_h,
+            "stale_gt_6h": bool(age_h is not None and age_h > FOLLOW_TRADES_FRESHNESS_WINDOW_H),
+            "fetch_incomplete_this_run": tid in incomplete_fetch_tasks,
+        })
+    status["follow_trades_freshness"] = freshness
 
     print("[ledger] B: синхронизация цепочки по кошелькам задач...", flush=True)
     chain_cache = load_json(CHAIN_CACHE_PATH, {})
