@@ -35,7 +35,7 @@ on:
   workflow_dispatch:
     inputs:
       enable_service:
-        description: "systemctl enable --now (боевой запуск) -- 'yes' или оставить пустым для установки без включения"
+        description: "systemctl enable + restart (боевой запуск/перезапуск с новым окружением) -- 'yes' или оставить пустым для установки без запуска"
         required: false
         default: ""
   push:
@@ -150,11 +150,12 @@ jobs:
             sudo -u bot bash -c "set -a; source /etc/dbot-guard/env; set +a; ./venv/bin/python -u analysis/dbot_sold_position_guard.py --check-only"
           '
 
-      - name: "6. Включить и запустить службу (только если inputs.enable_service=yes)"
+      - name: "6. Включить и (пере)запустить службу (только если inputs.enable_service=yes)"
         if: github.event.inputs.enable_service == 'yes'
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
-            systemctl enable --now dbot-sold-guard
+            systemctl enable dbot-sold-guard
+            systemctl restart dbot-sold-guard
             sleep 3
             systemctl status dbot-sold-guard --no-pager | head -15
           '
@@ -170,7 +171,7 @@ jobs:
         if: github.event.inputs.enable_service != 'yes'
         run: |
           echo "systemd-юнит dbot-sold-guard установлен и daemon-reload сделан, но НЕ включён (enable_service!=yes)."
-          echo "Включить: workflow_dispatch этого workflow с enable_service=yes, или вручную: systemctl enable --now dbot-sold-guard"
+          echo "Включить: workflow_dispatch этого workflow с enable_service=yes, или вручную: systemctl enable --now dbot-sold-guard (или restart, если уже запущена)"
 
       - name: "7. Забрать сырой sample expired-записи (если появился) для коммита -- диагностика формы ответа"
         if: always()
