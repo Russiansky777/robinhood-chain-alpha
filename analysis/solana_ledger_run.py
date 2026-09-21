@@ -226,6 +226,19 @@ def extract_items(body) -> list:
     return []
 
 
+def has_recognized_list_shape(body) -> bool:
+    """Владелец (найдено в сторожe проваленных продаж, тот же класс
+    риска здесь): True -- extract_items нашёл ожидаемый ключ (пусть
+    даже пустой список -- честный ноль). False -- тело не похоже на
+    ожидаемую форму вообще -- расхождение формы, не должно молча
+    считаться концом пагинации."""
+    if isinstance(body, list):
+        return True
+    if isinstance(body, dict):
+        return any(isinstance(body.get(k), list) for k in ("res", "data", "results", "list", "items"))
+    return False
+
+
 def fetch_follow_orders(api_key: str) -> tuple[list[dict], int | None]:
     status, body = dbot_get("/automation/follow_orders", {}, api_key)
     items = extract_items(body)
@@ -259,9 +272,16 @@ def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | No
     страница -- отдельный повтор (до 5 раз), и если так и не вышло --
     возвращаем то, что успели, и complete=False, а не тихо "конец".
     Возвращает (записи, complete) -- complete=False значит выгрузка этой
-    задачи в этом прогоне не гарантированно полная."""
+    задачи в этом прогоне не гарантированно полная.
+
+    Владелец, найденный реальный баг (сторож проваленных продаж):
+    страницы DBot нумеруются с 0 (docs.dbotx.com/reference/copy-tpsl-
+    tasks -- "page, defaults to 0"), а не с 1 -- начиная с page=1 эта
+    функция ВСЕГДА пропускала настоящую первую страницу. follow_orders
+    (fetch_follow_orders выше) не затронут -- он не постраничный вообще
+    (один GET, без параметра page)."""
     out = []
-    page = 1
+    page = 0
     params = {"chain": "solana", "configId": task_id, "size": 20}
     if my_wallet:
         params["myWallet"] = my_wallet
@@ -274,6 +294,10 @@ def fetch_follow_trades_for_task(task_id: str, api_key: str, my_wallet: str | No
             time.sleep(3 * (page_attempt + 1))
         if status is None:
             return out, False
+        if status == 200 and body and not has_recognized_list_shape(body):
+            print(f"[ledger] ВНИМАНИЕ: follow_trades страница {page} -- HTTP 200, тело непустое, но форма "
+                  f"НЕ распознана (нет res/data/results/list/items) -- расхождение формы, не честный ноль: "
+                  f"{json.dumps(body, ensure_ascii=False, default=str)[:2000]}", flush=True)
         items = extract_items(body)
         if not items:
             return out, True

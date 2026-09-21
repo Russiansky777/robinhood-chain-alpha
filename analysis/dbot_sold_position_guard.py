@@ -149,6 +149,21 @@ def extract_items(body) -> list:
     return []
 
 
+def has_recognized_list_shape(body) -> bool:
+    """Владелец, п.2 (баг нумерации страниц дал реальные 11 записей vs
+    наш честный "0" -- расхождение формы не должно выглядеть так же,
+    как настоящий пустой список). True -- extract_items нашёл ожидаемый
+    ключ (пусть даже пустой список внутри -- это честный ноль). False --
+    тело вообще не похоже на ожидаемую форму (ни один из res/data/
+    results/list/items не нашёлся как список) -- это и есть случай,
+    который нельзя молча принимать за ноль."""
+    if isinstance(body, list):
+        return True
+    if isinstance(body, dict):
+        return any(isinstance(body.get(k), list) for k in ("res", "data", "results", "list", "items"))
+    return False
+
+
 def fetch_our_wallets(api_key: str) -> dict[str, str]:
     """Владелец: "наши 9 кошельков (пилот + BATCH-1..8)" -- живьём из
     /automation/follow_orders (тот же подтверждённый вызов, что
@@ -175,9 +190,15 @@ def fetch_expired_orders(api_key: str) -> tuple[list[dict], bool]:
     конец списка. dbot_get после 6 неудач возвращает (None, {}) --
     extract_items({})==[] неотличимо от честного конца, поэтому статус
     проверяется отдельно и по неудаче возвращаем complete=False, а не
-    тихо считаем, что список кончился."""
+    тихо считаем, что список кончился.
+
+    Владелец, найденный реальный баг: страницы нумеруются с 0 (docs.
+    dbotx.com/reference/copy-tpsl-tasks -- "page, defaults to 0"), а не
+    с 1 -- начиная с page=1 мы ВСЕГДА пропускали настоящую первую
+    страницу (владелец видел 11 записей в Expired, сторож честно писал
+    0 -- это и был весь баг, не сбой API)."""
     out = []
-    page = 1
+    page = 0
     while True:
         status, body = dbot_get(
             "/automation/pnl_orders_from_follow_order",
@@ -186,6 +207,13 @@ def fetch_expired_orders(api_key: str) -> tuple[list[dict], bool]:
         )
         if status is None:
             return out, False
+        if status == 200 and body and not has_recognized_list_shape(body):
+            log.warning(
+                "expired-страница %d: HTTP 200, тело непустое, но форма НЕ распознана "
+                "(нет ни одного из ключей res/data/results/list/items) -- это РАСХОЖДЕНИЕ "
+                "ФОРМЫ, не честный ноль. Сырое тело (первые 2000 симв.): %s",
+                page, _scrub_all(json.dumps(body, ensure_ascii=False, default=str)[:2000]),
+            )
         items = extract_items(body)
         if items and not SAMPLE_PATH.exists():
             SAMPLE_PATH.write_text(_scrub_all(json.dumps(items[0], ensure_ascii=False, indent=2, default=str)))
@@ -209,6 +237,34 @@ def sell_100_percent(mint: str, wallet_id: str, api_key: str) -> tuple[int | Non
         "retries": DEFAULT_SELL_RETRIES,
     }
     return dbot_post("/automation/swap_orders_with_multi_wallets", body, api_key)
+
+
+def parse_sell_response(status: int | None, body: dict) -> tuple[bool, str]:
+    """Владелец, п.3: разобрать ответ DBot, не просто залогировать сырое
+    тело. Поле err -- тот же подтверждённый паттерн, что у follow_orders/
+    follow_trades ({"err": false, "res": [...]}); сообщение -- из
+    первого найденного среди msg/message/errorMessage/error/description.
+    Реальная форма ЭТОГО конкретного эндпоинта не подтверждена (см.
+    докстринг модуля) -- если err вообще отсутствует, не выдумываем
+    успех: честно считаем неопределённым/неудачным и печатаем сырое
+    тело целиком в audit_log (это делает вызывающий код), не только это
+    резюме."""
+    if status != 200:
+        return False, f"http={status}"
+    if not isinstance(body, dict):
+        return False, f"неожиданная форма ответа (не объект): {str(body)[:300]}"
+    err = body.get("err")
+    msg = None
+    for k in ("msg", "message", "errorMessage", "error", "description"):
+        v = body.get(k)
+        if v:
+            msg = str(v)
+            break
+    if err is True:
+        return False, msg or "err=true без текста сообщения"
+    if err is False:
+        return True, msg or "ok"
+    return False, msg or f"поле err отсутствует в ответе, успех не подтверждён: {str(body)[:300]}"
 
 
 # ---------- Telegram (владелец: только 3 типа событий, ничего больше) ----------
@@ -250,9 +306,26 @@ def open_db(path: Path) -> sqlite3.Connection:
             last_sell_attempt_utc TEXT,
             last_sell_response TEXT,
             closed_utc TEXT,
-            stuck_alerted_at_attempts INTEGER NOT NULL DEFAULT 0
+            stuck_alerted_at_attempts INTEGER NOT NULL DEFAULT 0,
+            zero_streak INTEGER NOT NULL DEFAULT 0,
+            last_sell_ok INTEGER,
+            last_sell_error TEXT,
+            sell_fail_alerted INTEGER NOT NULL DEFAULT 0
         )"""
     )
+    # Владелец, правки: на VPS уже есть живая база со старой схемой --
+    # CREATE TABLE IF NOT EXISTS новые колонки в неё не добавит. Миграция
+    # безопасно повторяема (дубликат колонки -- OperationalError, игнор).
+    for ddl in (
+        "ALTER TABLE positions ADD COLUMN zero_streak INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE positions ADD COLUMN last_sell_ok INTEGER",
+        "ALTER TABLE positions ADD COLUMN last_sell_error TEXT",
+        "ALTER TABLE positions ADD COLUMN sell_fail_alerted INTEGER NOT NULL DEFAULT 0",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     return conn
 
@@ -280,24 +353,40 @@ def db_mark_closed(conn: sqlite3.Connection, key: str, wallet: str, wallet_id: s
 
 def db_upsert_watching(conn: sqlite3.Connection, key: str, wallet: str, wallet_id: str, mint: str,
                         task_name: str, balance: float) -> int:
+    # zero_streak=0 -- владелец, п.5: ненулевой баланс всегда сбрасывает
+    # счётчик подряд-нулевых чтений (закрываем только после ДВУХ подряд).
     conn.execute(
         """INSERT INTO positions (key, wallet_address, wallet_id, mint, task_name, state, first_seen_utc,
-                                   last_checked_utc, attempts, last_balance)
-           VALUES (?, ?, ?, ?, ?, 'watching', ?, ?, 1, ?)
+                                   last_checked_utc, attempts, last_balance, zero_streak)
+           VALUES (?, ?, ?, ?, ?, 'watching', ?, ?, 1, ?, 0)
            ON CONFLICT(key) DO UPDATE SET state='watching', wallet_id=excluded.wallet_id,
                                            last_checked_utc=excluded.last_checked_utc,
-                                           attempts=positions.attempts + 1, last_balance=excluded.last_balance""",
+                                           attempts=positions.attempts + 1, last_balance=excluded.last_balance,
+                                           zero_streak=0""",
         (key, wallet, wallet_id, mint, task_name, now_utc(), now_utc(), balance),
     )
     conn.commit()
     return conn.execute("SELECT attempts FROM positions WHERE key=?", (key,)).fetchone()["attempts"]
 
 
-def db_record_sell(conn: sqlite3.Connection, key: str, response_summary: str) -> None:
+def db_bump_zero_streak(conn: sqlite3.Connection, key: str, streak: int) -> None:
+    """Владелец, п.5: первое нулевое чтение после watching -- не закрывать
+    сразу, запомнить счётчик и ждать ещё одно подряд нулевое чтение."""
+    conn.execute("UPDATE positions SET zero_streak=?, last_checked_utc=? WHERE key=?", (streak, now_utc(), key))
+    conn.commit()
+
+
+def db_record_sell(conn: sqlite3.Connection, key: str, response_summary: str, ok: bool, error_text: str) -> None:
     conn.execute(
-        "UPDATE positions SET last_sell_attempt_utc=?, last_sell_response=? WHERE key=?",
-        (now_utc(), response_summary, key),
+        "UPDATE positions SET last_sell_attempt_utc=?, last_sell_response=?, last_sell_ok=?, last_sell_error=? "
+        "WHERE key=?",
+        (now_utc(), response_summary, 1 if ok else 0, error_text, key),
     )
+    conn.commit()
+
+
+def db_mark_sell_fail_alerted(conn: sqlite3.Connection, key: str) -> None:
+    conn.execute("UPDATE positions SET sell_fail_alerted=1 WHERE key=?", (key,))
     conn.commit()
 
 
@@ -358,9 +447,25 @@ def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wall
             continue
 
         if balance <= 0:
-            was_watching = row is not None and row["state"] == "watching"
-            prior_balance = row["last_balance"] if row is not None else None
-            first_seen = row["first_seen_utc"] if row is not None else now_utc()
+            # Владелец, п.5: закрывать (state=closed + "продал") только
+            # после ДВУХ подряд нулевых чтений -- одно нулевое чтение
+            # после реально watching-позиции может быть ложным (гонка с
+            # Helius/индексацией), а не подтверждённой продажей.
+            if row is None:
+                # никогда не видели с ненулевым балансом -- честный ноль
+                # сразу, закрывать/уведомлять нечего (не "продал", просто
+                # нечего держать).
+                db_mark_closed(conn, key, wallet, wallet_id, mint, task_name)
+                continue
+            zero_streak = (row["zero_streak"] or 0) + 1
+            if zero_streak < 2:
+                db_bump_zero_streak(conn, key, zero_streak)
+                log.info("баланс 0 (%d/2 подряд, ещё не закрываю): %s кошелёк=%s токен=%s",
+                          zero_streak, task_name, wallet[:10], mint[:10])
+                continue
+            was_watching = row["state"] == "watching"
+            prior_balance = row["last_balance"]
+            first_seen = row["first_seen_utc"]
             db_mark_closed(conn, key, wallet, wallet_id, mint, task_name)
             if was_watching:
                 msg = (f"Сторож продал зависшую позицию: кошелёк {wallet} ({task_name}), "
@@ -378,19 +483,34 @@ def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wall
         if attempts > 0 and attempts % stuck_threshold == 0:
             row2 = db_get(conn, key)
             if row2 is None or row2["stuck_alerted_at_attempts"] != attempts:
+                # Владелец, п.3: текст последнего ответа DBot -- в тот же алерт.
+                last_err = (row2["last_sell_error"] if row2 else None) or "(ещё ни разу не пробовали продать)"
                 msg = (f"По токену {mint} на кошельке {wallet} ({task_name}) {attempts} кругов подряд "
-                       f"без продажи (баланс {balance}) -- нужна ручная помощь.")
+                       f"без продажи (баланс {balance}). Последний ответ DBot: {last_err}")
                 log.error(msg)
                 send_telegram(telegram_token, telegram_chat_id, msg)
                 db_mark_stuck_alerted(conn, key, attempts)
 
         if live_sell:
             status, resp = sell_100_percent(mint, wallet_id, dbot_key)
+            ok, err_text = parse_sell_response(status, resp)
             summary = _scrub_all(json.dumps({"http_status": status, "body": resp}, ensure_ascii=False, default=str)[:500])
-            db_record_sell(conn, key, summary)
+            db_record_sell(conn, key, summary, ok, err_text)
             audit_log(audit_path, {"event": "sell_attempt", "task": task_name, "wallet": wallet, "mint": mint,
-                                    "balance_before": balance, "http_status": status, "response": resp})
-            log.info("продажа отправлена: %s", summary)
+                                    "balance_before": balance, "http_status": status, "response": resp,
+                                    "ok": ok, "error_text": err_text})
+            if ok:
+                log.info("продажа подтверждена DBot: %s", summary)
+            else:
+                log.warning("продажа ОТКАЗАНА/не подтверждена DBot: %s", _scrub_all(err_text))
+                # Владелец, п.3: сообщение в Телеграм сразу при отказе,
+                # один раз на позицию (флаг sell_fail_alerted в SQLite).
+                row3 = db_get(conn, key)
+                if row3 is None or not row3["sell_fail_alerted"]:
+                    fail_msg = (f"Сторож не смог продать {mint} на {wallet} ({task_name}): "
+                                f"{_scrub_all(err_text)}")
+                    send_telegram(telegram_token, telegram_chat_id, fail_msg)
+                    db_mark_sell_fail_alerted(conn, key)
         else:
             log.info("DRY-RUN (GUARD_LIVE_SELL не включён): продал бы 100%% %s на %s", mint[:10], wallet[:10])
 
@@ -419,7 +539,6 @@ def load_env_config() -> dict:
         "stuck_threshold": int(os.environ.get("GUARD_STUCK_THRESHOLD", DEFAULT_STUCK_THRESHOLD)),
         "api_down_alert_s": int(os.environ.get("GUARD_API_DOWN_ALERT_S", DEFAULT_API_DOWN_ALERT_S)),
         "state_dir": Path(os.environ.get("GUARD_STATE_DIR", str(REPO_ROOT / "state"))),
-        "wallets_refresh_every": int(os.environ.get("GUARD_WALLETS_REFRESH_CYCLES", 20)),
         "telegram_token": telegram_token,
         "telegram_chat_id": os.environ.get("TELEGRAM_CHAT_ID") or None,
     }
@@ -470,9 +589,10 @@ def main() -> None:
         cycle_start = time.monotonic()
         cycle_n += 1
         try:
-            if cycle_n > 1 and cycle_n % cfg["wallets_refresh_every"] == 0:
-                our_wallets = fetch_our_wallets(cfg["dbot_key"])
-                log.info("список наших кошельков обновлён: %d", len(our_wallets))
+            # Владелец, п.4: список наших кошельков -- каждый цикл (один
+            # GET follow_orders), не раз в N кругов -- любое изменение
+            # состава задач подхватывается сразу.
+            our_wallets = fetch_our_wallets(cfg["dbot_key"])
 
             _, fetch_ok = run_cycle(conn, audit_path, our_wallets, cfg["dbot_key"], cfg["live_sell"],
                                      cfg["stuck_threshold"], cfg["telegram_token"], cfg["telegram_chat_id"],
