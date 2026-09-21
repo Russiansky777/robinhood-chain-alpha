@@ -23,6 +23,14 @@ name: "Сторож проваленных продаж -- деплой на VPS
 # Идемпотентно: обновляет код (git reset --hard), секреты, юнит,
 # logrotate и делает restart при каждом прогоне -- безопасно гонять
 # повторно (например, после правки скрипта).
+#
+# Владелец, GitHub-механика (тот же урок, что crowd_night.yml):
+# workflow_dispatch регистрируется ТОЛЬКО с версии файла на РЕАЛЬНОЙ
+# default-ветке репозитория -- здесь это claude/robinhood-copytrading-
+# hypothesis-awjj0g, НЕ nifty-sagan. Поэтому этот файл лежит и здесь, и
+# на default-ветке -- вся логика/чекаут на VPS всё равно указывает на
+# claude/nifty-sagan-r0polg, default-ветка используется только как
+# носитель регистрации диспетчера.
 on:
   workflow_dispatch:
     inputs:
@@ -44,6 +52,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
 
       - name: SSH key + known_hosts
         env:
@@ -180,9 +190,9 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Сторож проваленных продаж: сырая форма expired-записи с реального прогона [automated]"
           for i in 1 2 3 4 5; do
-            git push && exit 0
-            echo "push rejected, попытка $i/5 -- git pull --rebase и повтор"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push rejected, попытка $i/5 -- fetch+rebase и повтор"
+            git pull --rebase origin claude/nifty-sagan-r0polg
             sleep 3
           done
           echo "не удалось запушить после 5 попыток" >&2
