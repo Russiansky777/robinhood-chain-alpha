@@ -100,7 +100,7 @@ jobs:
           '
           # Сторож импортирует solana_ledger_run (rpc_call/get_token_holding),
           # поэтому рядом кладётся и он -- иначе служба вне дерева не стартует.
-          for f in dbot_sold_position_guard.py solana_ledger_run.py; do
+          for f in dbot_sold_position_guard.py solana_ledger_run.py dbot_rescue.py; do
             ssh $SSH_OPTS root@45.59.170.76 "cat > /home/bot/dbot_sold_guard/$f && chown bot:bot /home/bot/dbot_sold_guard/$f && chmod 644 /home/bot/dbot_sold_guard/$f" < "analysis/$f"
             echo "sha256 в репозитории ($f):"; sha256sum "analysis/$f"
             echo "sha256 на хосте ($f):"; ssh $SSH_OPTS root@45.59.170.76 "sha256sum /home/bot/dbot_sold_guard/$f"
@@ -110,6 +110,7 @@ jobs:
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --self-test
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_rescue.py
           '
 
       - name: "2. Секреты -> /etc/dbot-guard/env (отдельный файл, НЕ /etc/bot/env -- этой службе Lighter/EVM-ключи не нужны)"
@@ -118,8 +119,10 @@ jobs:
           HELIUS_API: ${{ secrets.HELIUS_API }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RESCUE_WALLET_KEY: ${{ secrets.RESCUE_WALLET_KEY }}
+          RESCUE_WALLET_ADDRESS: ${{ vars.RESCUE_WALLET_ADDRESS }}
         run: |
-          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /etc/dbot-guard && cat > /etc/dbot-guard/env && chmod 640 /etc/dbot-guard/env && chown root:bot /etc/dbot-guard/env && wc -l /etc/dbot-guard/env' <<EOF
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /etc/dbot-guard && cat > /etc/dbot-guard/env && chmod 600 /etc/dbot-guard/env && chown root:root /etc/dbot-guard/env && wc -l /etc/dbot-guard/env' <<EOF
           DBOT_API_KEY=$DBOT_API_KEY
           HELIUS_API=$HELIUS_API
           TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
@@ -131,7 +134,21 @@ jobs:
           GUARD_STATE_DIR=/home/bot/dbot_sold_position_guard_live_data
           GUARD_SAMPLE_PATH=/home/bot/dbot_sold_position_guard_live_data/dbot_sold_position_guard_sample.json
           GUARD_TRADES_PATH=/home/bot/robinhood-chain-alpha/data/solana_trades_all.json
+          RESCUE_LIVE=0
+          RESCUE_MAX_QUOTE_SOL=3.0
+          RESCUE_MIN_SHARE=0.30
+          RESCUE_RETURN_RESERVE_SOL=0.002
+          RESCUE_SLIPPAGE_BPS=3000
+          RESCUE_WALLET_KEY=$RESCUE_WALLET_KEY
+          RESCUE_WALLET_ADDRESS=$RESCUE_WALLET_ADDRESS
           EOF
+          ssh $SSH_OPTS root@45.59.170.76 'chmod 600 /etc/dbot-guard/env && chown root:root /etc/dbot-guard/env && ls -l /etc/dbot-guard/env'
+          echo "RESCUE_LIVE=0 -- спасение считает план и НИЧЕГО не отправляет. Включение только по явному распоряжению владельца."
+          if [ -z "$RESCUE_WALLET_KEY" ]; then
+            echo "Секрета RESCUE_WALLET_KEY нет -- строка пустая, спасение не сможет подписывать (и не будет: RESCUE_LIVE=0)."
+          else
+            echo "Секрет RESCUE_WALLET_KEY передан в окружение службы (права 600). В лог не выводится."
+          fi
           echo "GUARD_LIVE_SELL=1 -- живая продажа включена по прямой инструкции владельца (боевое включение после чистого read-пути)."
 
       - name: "3. systemd-юнит"
@@ -184,7 +201,13 @@ jobs:
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
             cd /home/bot/dbot_sold_guard
-            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only"
+            # Файл окружения теперь 600 root:root (в нём приватный ключ
+            # утилизатора), поэтому прочитать его может только root.
+            # Секреты НЕ идут в argv (их было бы видно в ps): root
+            # подгружает их в своё окружение, а sudo -E передаёт
+            # окружение процессу, который всё равно работает от bot.
+            set -a; . /etc/dbot-guard/env; set +a
+            sudo -E -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only
           '
 
       - name: "6. Включить и (пере)запустить службу (только если inputs.enable_service=yes)"

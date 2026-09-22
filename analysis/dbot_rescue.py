@@ -281,6 +281,207 @@ def build_close_account(keypair, token_account: str, program_id: str, blockhash_
     return base64.b64encode(bytes(tx)).decode()
 
 
+# ---------- цепь: отправка своих транзакций ----------
+
+def send_raw_b64(rpc: Callable, tx_b64: str) -> str:
+    """Отправить подписанную транзакцию. Подпись возвращается сразу, но
+    это ещё не исполнение -- подтверждение проверяется по балансу."""
+    return rpc("sendTransaction", [tx_b64, {"encoding": "base64",
+                                              "skipPreflight": False,
+                                              "maxRetries": 3}])
+
+
+def latest_blockhash(rpc: Callable) -> str:
+    res = rpc("getLatestBlockhash", [{"commitment": "confirmed"}])
+    bh = ((res or {}).get("value") or {}).get("blockhash")
+    if not bh:
+        raise RuntimeError("getLatestBlockhash не вернул blockhash")
+    return bh
+
+
+def token_accounts(rpc: Callable, owner: str, mint: str) -> list[dict]:
+    res = rpc("getTokenAccountsByOwner", [owner, {"mint": mint}, {"encoding": "jsonParsed"}])
+    out = []
+    for acc in (res or {}).get("value") or []:
+        try:
+            info = acc["account"]["data"]["parsed"]["info"]
+            ta = info["tokenAmount"]
+            out.append({"pubkey": acc["pubkey"], "raw": int(ta["amount"]),
+                         "ui": float(ta.get("uiAmount") or 0.0),
+                         "decimals": ta.get("decimals"),
+                         "program": acc["account"].get("owner")})
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+def raw_balance(rpc: Callable, owner: str, mint: str) -> tuple[int, int | None]:
+    accs = token_accounts(rpc, owner, mint)
+    return sum(a["raw"] for a in accs), (accs[0]["decimals"] if accs else None)
+
+
+def distribute_ok(status: int | None, body) -> tuple[bool, str]:
+    """Разбор ответа /coin_tools/distribute. Форма подтверждена живыми
+    вызовами этапа B: {"err": false, "res": [{"err": .., "msg": ..,
+    "txid": ..}]}. ВНЕШНИЙ err относится к приёму запроса, ВНУТРЕННИЙ --
+    к самой отправке, и они расходятся: Token-2022 дал внешний err=false
+    при внутреннем err=true и отказе цепи 0x1f. Читать только внешний err
+    значит принять отказ за успех."""
+    if status != 200:
+        return False, f"http={status}"
+    if not isinstance(body, dict):
+        return False, f"неожиданная форма ответа: {str(body)[:300]}"
+    if body.get("err"):
+        return False, str(body.get("msg") or body.get("message") or body)[:400]
+    res = body.get("res")
+    if not isinstance(res, list) or not res:
+        return False, f"в ответе нет списка res -- успех не подтверждён: {str(body)[:300]}"
+    first = res[0] if isinstance(res[0], dict) else {}
+    if first.get("err"):
+        return False, str(first.get("msg") or "внутренний err=true без текста")[:400]
+    if not first.get("txid"):
+        return False, f"нет txid -- отправка не подтверждена: {str(first)[:300]}"
+    return True, str(first.get("txid"))
+
+
+# ---------- оркестратор спасения (этап D) ----------
+
+@dataclass
+class RescueContext:
+    wallet: str                 # кошелёк задачи, откуда спасаем
+    wallet_id: str              # walletId в DBot (для distribute)
+    mint: str
+    task_name: str
+    sol_in: float | None        # вход из учёта; None -- значит неизвестен
+    whitelist: set[str]         # адреса кошельков задач, живьём из follow_orders
+    cfg: RescueConfig
+    rpc: Callable               # (method, params) -> result, Helius
+    dbot_post: Callable         # (path, body) -> (status, body)
+    notify: Callable = lambda text: None
+    log: Callable = lambda text: None
+    scrub: Callable = lambda s: s
+    steps: list = field(default_factory=list)
+
+
+def _step(ctx: RescueContext, name: str, **data) -> None:
+    rec = {"шаг": name, "когда_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **data}
+    ctx.steps.append(rec)
+    ctx.log(ctx.scrub(f"спасение/{name}: {json.dumps(data, ensure_ascii=False, default=str)[:600]}"))
+
+
+def rescue_position(ctx: RescueContext, keypair=None) -> dict:
+    """Полная последовательность спасения. Ничего не отправляет, пока
+    cfg.live не равен True: до этого считается и печатается план."""
+    c = ctx.cfg
+    ctx.steps = []
+
+    # 1. остаток и котировка
+    raw, dec = raw_balance(ctx.rpc, ctx.wallet, ctx.mint)
+    _step(ctx, "остаток", raw=raw, decimals=dec)
+    q = quote_sol_for(ctx.mint, raw, c.slippage_bps, ctx.scrub)
+    _step(ctx, "котировка", **q)
+
+    # 2. решение по порогу и потолку
+    verdict, why = decide(q.get("SOL"), ctx.sol_in, c)
+    _step(ctx, "решение", вердикт=verdict, причина=why)
+    if verdict != "идём":
+        ctx.notify(f"Спасение {ctx.mint} на {ctx.wallet} ({ctx.task_name}) НЕ начато: {why}")
+        return {"итог": "стоп", "причина": why, "шаги": ctx.steps}
+
+    if not c.live:
+        plan = (f"ПЛАН (RESCUE_LIVE выключен, ничего не отправлено): перевести {raw} сырых единиц "
+                f"{ctx.mint} с {ctx.wallet} на утилизатор, продать через Jupiter (~{q.get('SOL')} SOL), "
+                f"вернуть SOL на {ctx.wallet}")
+        _step(ctx, "план", текст=plan)
+        ctx.notify(plan)
+        return {"итог": "план", "причина": "RESCUE_LIVE не включён", "шаги": ctx.steps}
+
+    if keypair is None:
+        raise RuntimeError("боевой режим включён, но ключ утилизатора не передан")
+    rescue_addr = str(keypair.pubkey())
+
+    # 3. перевод токена на утилизатор
+    amount_ui = raw / (10 ** (dec or 0))
+    st, resp = ctx.dbot_post("/coin_tools/distribute", {
+        "chain": "solana", "fromWalletId": ctx.wallet_id,
+        "toList": [{"address": rescue_addr, "amountUI": amount_ui}], "token": ctx.mint})
+    _step(ctx, "distribute", http=st, ответ=json.loads(ctx.scrub(json.dumps(resp, default=str))))
+    ok_sent, why_not = distribute_ok(st, resp)
+    if not ok_sent:
+        msg = ctx.scrub(why_not[:500])
+        _step(ctx, "distribute_отказ", сообщение=msg)
+        ctx.notify(f"Спасение {ctx.mint}: перевод на утилизатор отклонён -- {msg}")
+        return {"итог": "стоп", "причина": f"distribute отклонён: {msg}", "шаги": ctx.steps}
+
+    # 4. ждём ПРИХОДА ПО ЦЕПИ, а не верим ответу API
+    deadline = time.time() + c.arrive_timeout_s
+    arrived = 0
+    while time.time() < deadline:
+        time.sleep(5)
+        arrived, _ = raw_balance(ctx.rpc, rescue_addr, ctx.mint)
+        if arrived > 0:
+            break
+    _step(ctx, "пришло_на_утилизатор", raw=arrived, отправлено_raw=raw,
+          удержано_raw=raw - arrived)
+    if arrived <= 0:
+        ctx.notify(f"Спасение {ctx.mint}: за {c.arrive_timeout_s}с токен на утилизатор не пришёл")
+        return {"итог": "стоп", "причина": "токен не пришёл на утилизатор", "шаги": ctx.steps}
+
+    # 5. продажа через Jupiter Ultra -- по ФАКТИЧЕСКИ пришедшему количеству
+    sold = None
+    for attempt in range(c.retries + 1):
+        order = ultra_order(ctx.mint, arrived, rescue_addr, ctx.scrub)
+        if order.get("ошибка"):
+            _step(ctx, "ultra_order_ошибка", попытка=attempt + 1, ошибка=order["ошибка"])
+            continue
+        signed = sign_versioned_b64(order["transaction"], keypair)
+        ex = ultra_execute(signed, order["requestId"], ctx.scrub)
+        _step(ctx, "ultra_execute", попытка=attempt + 1, status=ex.get("status"),
+              signature=ex.get("signature"), http=ex.get("http"))
+        left, _ = raw_balance(ctx.rpc, rescue_addr, ctx.mint)
+        if left < arrived:
+            sold = ex.get("signature")
+            break
+        _step(ctx, "продажа_не_подтверждена", остаток_raw=left)
+    if sold is None:
+        ctx.notify(f"Спасение {ctx.mint}: Jupiter не продал за {c.retries + 1} попыток; "
+                   f"токен лежит на утилизаторе {rescue_addr}")
+        return {"итог": "частично", "причина": "токен на утилизаторе, продажа не прошла",
+                "шаги": ctx.steps}
+
+    # 6. возврат SOL на кошелёк задачи -- только через белый список
+    assert_whitelisted(ctx.wallet, ctx.whitelist)
+    bal_lamports = ((ctx.rpc("getBalance", [rescue_addr]) or {}).get("value") or 0)
+    reserve = int(c.return_reserve_sol * 1e9)
+    send_lamports = bal_lamports - reserve
+    _step(ctx, "возврат_расчёт", баланс_lamports=bal_lamports, резерв_lamports=reserve,
+          к_отправке_lamports=send_lamports, получатель=ctx.wallet)
+    ret_sig = None
+    if send_lamports > 0:
+        ret_sig = send_raw_b64(ctx.rpc, build_sol_transfer(
+            keypair, ctx.wallet, send_lamports, latest_blockhash(ctx.rpc)))
+        _step(ctx, "возврат_отправлен", signature=ret_sig)
+    else:
+        _step(ctx, "возврат_пропущен", причина="после резерва отправлять нечего")
+
+    # 7. закрыть пустой токен-аккаунт -- вернуть ренту
+    for a in token_accounts(ctx.rpc, rescue_addr, ctx.mint):
+        if a["raw"] == 0:
+            try:
+                sig = send_raw_b64(ctx.rpc, build_close_account(
+                    keypair, a["pubkey"], a["program"], latest_blockhash(ctx.rpc)))
+                _step(ctx, "токен_аккаунт_закрыт", pubkey=a["pubkey"], signature=sig)
+            except Exception as exc:  # noqa: BLE001
+                _step(ctx, "закрытие_не_удалось", pubkey=a["pubkey"],
+                      ошибка=ctx.scrub(f"{type(exc).__name__}: {exc}"))
+
+    ctx.notify(f"Спасение {ctx.mint} на {ctx.wallet} ({ctx.task_name}) завершено. "
+               f"Продажа {sold}, возврат {ret_sig}, вернулось "
+               f"{send_lamports / 1e9:.9f} SOL при входе {ctx.sol_in} SOL.")
+    return {"итог": "спасено", "продажа": sold, "возврат": ret_sig,
+            "вернулось_SOL": send_lamports / 1e9, "шаги": ctx.steps}
+
+
 # ---------- самопроверка границ (без сети, без ключей) ----------
 
 def self_test() -> None:
@@ -325,6 +526,19 @@ def self_test() -> None:
         chk("пустой белый список отклоняется", False, "исключения не было")
     except RuntimeError:
         chk("пустой белый список отклоняется", True)
+
+    ok, why = distribute_ok(200, {"err": False, "res": [{"err": False, "msg": "OK", "txid": "T"}]})
+    chk("distribute: успех с txid", ok and why == "T", why)
+    ok, why = distribute_ok(200, {"err": False, "res": [{"err": True, "msg": "0x1f"}]})
+    chk("distribute: внешний err=false, внутренний true -> отказ", not ok and "0x1f" in why, why)
+    ok, why = distribute_ok(200, {"err": False, "res": [{"err": False, "msg": "OK"}]})
+    chk("distribute: нет txid -> не успех", not ok, why)
+    ok, why = distribute_ok(200, {"err": True, "msg": "нет прав"})
+    chk("distribute: внешний err=true -> отказ", not ok, why)
+    ok, why = distribute_ok(500, {})
+    chk("distribute: http!=200 -> отказ", not ok, why)
+    ok, why = distribute_ok(200, {"err": False})
+    chk("distribute: без res -> не успех", not ok, why)
 
     os.environ.pop("RESCUE_LIVE", None)
     chk("из окружения без RESCUE_LIVE -- не боевой", RescueConfig.from_env().live is False)

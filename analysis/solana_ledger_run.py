@@ -69,6 +69,16 @@ KNOWN_RELAYS = {
 }
 RELAY_PREFIXES = ("astra", "AsTra", "ste11", "LandX")
 
+# ЭТАП E (учёт спасений). Кошелёк-утилизатор -- наш же, поэтому переводы
+# "кошелёк задачи <-> утилизатор" это ВНУТРЕННЕЕ перемещение, а не
+# пополнение и не вывод. Без этого спасённая позиция выглядела бы как
+# вывод средств на неизвестный адрес, а вернувшийся SOL -- как
+# пополнение извне, и обе цифры испортили бы сверку.
+# Адрес берётся из окружения (RESCUE_WALLET_ADDRESS); приватный ключ
+# учёту не нужен и здесь не читается. Адреса нет -- поведение ровно то
+# же, что раньше.
+RESCUE_WALLET_ADDRESS = (os.environ.get("RESCUE_WALLET_ADDRESS") or "").strip() or None
+
 FOLLOW_ORDERS_PATH = REPO_ROOT / "data" / "dbot_follow_orders_raw.json"
 FOLLOW_TRADES_PATH = REPO_ROOT / "data" / "dbot_follow_trades_raw.json"
 FOLLOW_TRADES_SAMPLE_PATH = REPO_ROOT / "data" / "dbot_follow_trades_sample.json"
@@ -462,6 +472,8 @@ def token_balance_map(tb_list, owner: str) -> dict:
 def classify_transfer_address(addr: str) -> str:
     if addr == DBOT_FEE_ADDRESS:
         return "комиссия DBot"
+    if RESCUE_WALLET_ADDRESS and addr == RESCUE_WALLET_ADDRESS:
+        return "утилизатор (спасение)"
     if addr in KNOWN_RELAYS or any(addr.startswith(p) for p in RELAY_PREFIXES):
         return "чаевые"
     return "прочее"
@@ -686,9 +698,15 @@ def classify_external_flow(v: dict):
     if any(tr["recipient"] == DBOT_FEE_ADDRESS for tr in transfers):
         return None
     if sol_leg > 0:
-        return "topup", sol_leg, v.get("counterparty_in")
+        kind = "rescue_in" if v.get("counterparty_in") == RESCUE_WALLET_ADDRESS \
+            and RESCUE_WALLET_ADDRESS else "topup"
+        return kind, sol_leg, v.get("counterparty_in")
     top = max(transfers, key=lambda tr: tr["amount_sol"]) if transfers else None
-    return "withdrawal", -sol_leg, (top["recipient"] if top else None)
+    recipient = top["recipient"] if top else None
+    # ЭТАП E: отправка НА утилизатор -- внутреннее перемещение, не вывод.
+    if RESCUE_WALLET_ADDRESS and recipient == RESCUE_WALLET_ADDRESS:
+        return "rescue_out", -sol_leg, recipient
+    return "withdrawal", -sol_leg, recipient
 
 
 def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) -> list[dict]:
@@ -970,6 +988,7 @@ def build_wallet_reconciliation(wallet: str, chain_cache: dict) -> dict:
             sell_without_buy_sol += sl + sell_fee
 
     topups, withdrawals, other_entries = [], [], []
+    rescue_out, rescue_in = [], []
     other_sol = 0.0
     for v in wallet_tx:
         if v.get("signature") in swap_sigs:
@@ -978,7 +997,11 @@ def build_wallet_reconciliation(wallet: str, chain_cache: dict) -> dict:
         if flow is not None:
             kind, amount, counterparty = flow
             entry = {"signature": v.get("signature"), "counterparty": counterparty, "amount_sol": round(amount, 9)}
-            (topups if kind == "topup" else withdrawals).append(entry)
+            # ЭТАП E: спасение -- своё перемещение между нашими же
+            # кошельками. В пополнения/выводы оно не идёт, иначе сверка
+            # показала бы вывод на неизвестный адрес и пополнение извне.
+            {"topup": topups, "withdrawal": withdrawals,
+             "rescue_out": rescue_out, "rescue_in": rescue_in}[kind].append(entry)
         else:
             leftover = (v.get("sol_delta_native") or 0) + (v.get("wsol_delta") or 0)
             if leftover != 0:
@@ -987,6 +1010,8 @@ def build_wallet_reconciliation(wallet: str, chain_cache: dict) -> dict:
 
     topups_sol = sum(e["amount_sol"] for e in topups)
     withdrawals_sol = sum(e["amount_sol"] for e in withdrawals)
+    rescue_out_sol = sum(e["amount_sol"] for e in rescue_out)
+    rescue_in_sol = sum(e["amount_sol"] for e in rescue_in)
 
     return {
         "closed_sol": round(closed_sol, 6),
@@ -994,10 +1019,19 @@ def build_wallet_reconciliation(wallet: str, chain_cache: dict) -> dict:
         "sell_without_buy_sol": round(sell_without_buy_sol, 6),
         "topups_sol": round(topups_sol, 6), "topups": topups,
         "withdrawals_sol": round(withdrawals_sol, 6), "withdrawals": withdrawals,
+        # ЭТАП E: спасения -- отдельными строками. Результат спасения =
+        # rescue_in_sol - rescue_out_sol (вернувшийся SOL минус то, что
+        # ушло на утилизатор); для токена вход это sol_in его покупки, и
+        # он уже учтён в buy_without_sell_sol, поэтому здесь не
+        # задваивается.
+        "rescue_out_sol": round(rescue_out_sol, 6), "rescue_out": rescue_out,
+        "rescue_in_sol": round(rescue_in_sol, 6), "rescue_in": rescue_in,
+        "rescue_net_sol": round(rescue_in_sol - rescue_out_sol, 6),
         "dbot_fee_sol": round(dbot_fee_sol, 6),
         "other_sol": round(other_sol, 6), "other": other_entries,
         "sum_of_categories": round(closed_sol + buy_without_sell_sol + sell_without_buy_sol
-                                    + topups_sol - withdrawals_sol - dbot_fee_sol + other_sol, 6),
+                                    + topups_sol - withdrawals_sol - dbot_fee_sol + other_sol
+                                    + rescue_in_sol - rescue_out_sol, 6),
         "genesis_synced": bool(chain_cache.get(_genesis_key(wallet))),
     }
 
@@ -1055,6 +1089,44 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
         for e in row["reconciliation"]["topups"] + row["reconciliation"]["withdrawals"]:
             e["note"] = "кошелёк владельца" if e["counterparty"] in owner_addrs else None
     return out
+
+
+def build_rescue_wallet_row() -> dict:
+    """ЭТАП E: утилизатор отдельной строкой. История цепочки для него НЕ
+    синхронизируется (он не кошелёк задачи и в follow_orders его нет),
+    поэтому строка честно ограничена текущим состоянием: SOL и остатки
+    токенов прямо сейчас. Ненулевой остаток токена здесь -- признак
+    незавершённого спасения: токен доехал, а продажа не прошла."""
+    if not RESCUE_WALLET_ADDRESS:
+        return {"настроен": False,
+                "почему": "RESCUE_WALLET_ADDRESS не задан в окружении -- спасения не включены"}
+    row: dict = {"настроен": True, "адрес": RESCUE_WALLET_ADDRESS,
+                 "охват": "только текущее состояние: история цепочки для утилизатора не синхронизируется"}
+    try:
+        row["sol"] = get_balance_sol(RESCUE_WALLET_ADDRESS)
+    except Exception as exc:  # noqa: BLE001
+        row["sol"] = None
+        row["sol_ошибка"] = f"{type(exc).__name__}"
+    held = []
+    for prog in ("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"):
+        try:
+            res = rpc_call("getTokenAccountsByOwner",
+                            [RESCUE_WALLET_ADDRESS, {"programId": prog}, {"encoding": "jsonParsed"}])
+        except Exception as exc:  # noqa: BLE001
+            held.append({"программа": prog, "ошибка": f"{type(exc).__name__}"})
+            continue
+        for acc in (res or {}).get("value") or []:
+            try:
+                info = acc["account"]["data"]["parsed"]["info"]
+                ui = float((info.get("tokenAmount") or {}).get("uiAmount") or 0.0)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if ui:
+                held.append({"mint": info.get("mint"), "ui": ui, "программа": prog})
+    row["незавершённые_остатки"] = held
+    row["флаг_незавершённого_спасения"] = bool([h for h in held if h.get("mint")])
+    return row
 
 
 # ---------- E: контроль перед выдачей ----------
@@ -1228,6 +1300,7 @@ def main() -> None:
     save_json(TASK_STATS_PATH, task_stats)
 
     status["validation"] = validation
+    status["rescue_wallet"] = build_rescue_wallet_row()
     save_json(STATUS_PATH, status)
     print(f"[ledger] ГОТОВО: сделок={status['n_trades']} открыто={status['n_open']} "
           f"срывов={status['n_unmatched']} контроль_ок={validation.get('all_ok')}", flush=True)

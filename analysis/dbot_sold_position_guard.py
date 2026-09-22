@@ -68,6 +68,13 @@ import requests
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import solana_ledger_run as ledger  # noqa: E402  -- reuse rpc_call/get_token_holding (Helius)
+try:
+    import dbot_rescue as rescue  # noqa: E402 -- этапы C/D, боевой режим по умолчанию выключен
+except Exception as _rescue_exc:  # noqa: BLE001 -- модуль не должен ронять сторож
+    rescue = None
+    _RESCUE_IMPORT_ERROR = f"{type(_rescue_exc).__name__}: {_rescue_exc}"
+else:
+    _RESCUE_IMPORT_ERROR = None
 
 DBOT_HOST = "https://api-bot-v1.dbotx.com"
 SOLANA_CHAIN = "solana"
@@ -650,6 +657,54 @@ def audit_log(path: Path, event: dict) -> None:
         f.write(_scrub_all(json.dumps(event, ensure_ascii=False, default=str)) + "\n")
 
 
+# ---------- спасение зависшей позиции (этапы C/D) ----------
+
+def try_rescue(wallet: str, wallet_id: str, mint: str, task_name: str,
+                whitelist: dict[str, str], dbot_key: str, audit_path: Path | None,
+                telegram_token: str | None, telegram_chat_id: str | None) -> dict | None:
+    """Запускается на том же пороге, что и алерт о зависании. Ничего не
+    двигает, пока RESCUE_LIVE не равен 1: считает план и пишет его в
+    аудит. Любая ошибка внутри НЕ должна валить сторож -- продажи важнее
+    спасения."""
+    if rescue is None:
+        log.warning("модуль спасения не импортировался: %s", _RESCUE_IMPORT_ERROR)
+        return None
+    cfg = rescue.RescueConfig.from_env()
+    key_raw = os.environ.get("RESCUE_WALLET_KEY", "").strip()
+    if cfg.live and not key_raw:
+        log.error("RESCUE_LIVE=1, но RESCUE_WALLET_KEY пуст -- спасение не запускаю")
+        return None
+    keypair = None
+    if key_raw:
+        _ACTIVE_SECRETS.append(key_raw)
+        try:
+            keypair = rescue.load_rescue_keypair(key_raw)
+        except Exception as exc:  # noqa: BLE001
+            log.error("ключ утилизатора не разобрался: %s", _scrub_all(type(exc).__name__))
+            return None
+    v = sol_in_from_ledger(wallet, mint)
+    ctx = rescue.RescueContext(
+        wallet=wallet, wallet_id=wallet_id, mint=mint, task_name=task_name,
+        sol_in=(v.get("sol_in") if v.get("известно") else None),
+        whitelist=set(whitelist.keys()), cfg=cfg,
+        rpc=lambda m, pr: ledger.rpc_call(m, pr),
+        dbot_post=lambda path, body: dbot_post(path, body, dbot_key),
+        notify=lambda text: send_telegram(telegram_token, telegram_chat_id, _scrub_all(text)),
+        log=lambda text: log.info("%s", _scrub_all(text)),
+        scrub=_scrub_all,
+    )
+    try:
+        res = rescue.rescue_position(ctx, keypair)
+    except Exception as exc:  # noqa: BLE001
+        log.error("спасение упало: %s", _scrub_all(f"{type(exc).__name__}: {exc}"))
+        audit_log(audit_path, {"event": "rescue_failed", "wallet": wallet, "mint": mint,
+                                "ошибка": _scrub_all(f"{type(exc).__name__}: {exc}")[:300]})
+        return None
+    audit_log(audit_path, {"event": "rescue", "task": task_name, "wallet": wallet,
+                            "mint": mint, "боевой": cfg.live, **res})
+    return res
+
+
 # ---------- один цикл (используется и --check-only, и боевым циклом) ----------
 
 def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wallets: dict[str, str],
@@ -744,6 +799,12 @@ def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wall
                 log.error(msg)
                 send_telegram(telegram_token, telegram_chat_id, msg)
                 db_mark_stuck_alerted(conn, key, attempts)
+                # Этап D: на том же пороге пробуем спасти. При
+                # RESCUE_LIVE=0 это только расчёт плана -- ни одной
+                # отправки, и в аудит попадает, что именно было бы
+                # сделано.
+                try_rescue(wallet, wallet_id, mint, task_name, our_wallets, dbot_key,
+                            audit_path, telegram_token, telegram_chat_id)
 
         if live_sell:
             status, resp, slip_used = sell_100_percent(mint, wallet_id, dbot_key)
@@ -824,6 +885,13 @@ def load_env_config() -> dict:
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN") or None
     if telegram_token:
         _ACTIVE_SECRETS.append(telegram_token)
+    # Ключ утилизатора -- в скрабер СРАЗУ при старте, до первой строки
+    # лога, а не в момент использования: иначе он может утечь в трассу
+    # исключения, случившегося раньше.
+    rescue_key = os.environ.get("RESCUE_WALLET_KEY", "").strip()
+    if rescue_key:
+        check_key_for_injection(rescue_key, "RESCUE_WALLET_KEY")
+        _ACTIVE_SECRETS.append(rescue_key)
     return {
         "dbot_key": dbot_key,
         "interval_s": int(os.environ.get("GUARD_INTERVAL_S", DEFAULT_INTERVAL_S)),
@@ -922,6 +990,13 @@ def main() -> None:
     conn = open_db(db_path)
     log.info("состояние: %s (SQLite), аудит-лог: %s", db_path, audit_path)
     log.info("GUARD_LIVE_SELL=%s интервал=%dс порог-завис=%d", cfg["live_sell"], cfg["interval_s"], cfg["stuck_threshold"])
+    if rescue is None:
+        log.warning("СПАСЕНИЕ НЕДОСТУПНО: модуль не импортировался (%s)", _RESCUE_IMPORT_ERROR)
+    else:
+        rc = rescue.RescueConfig.from_env()
+        log.info("СПАСЕНИЕ: боевой=%s потолок=%s SOL порог=%s от входа ключ=%s",
+                  rc.live, rc.max_quote_sol, rc.min_share_of_sol_in,
+                  "есть" if os.environ.get("RESCUE_WALLET_KEY") else "нет")
 
     last_dbot_ok_ts = time.monotonic()
     api_down_alerted = False
