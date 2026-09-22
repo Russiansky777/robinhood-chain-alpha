@@ -1,0 +1,209 @@
+name: "Зонд обнаружения (Часть B) -- деплой на VPS Нидерланды (45.59.170.76)"
+
+# Владелец, Часть B: постоянная служба слушает вебсокет Helius по
+# кошелькам-источникам и записывает, В КАКОЙ МОМЕНТ мы узнали о сделке
+# лидера; раз в 5 минут добирает, в каком слоте села НАША покупка от
+# DBot. Измерение, не торговля -- ни одного вызова покупки/продажи.
+#
+# СТОРОЖ ПРОВАЛЕННЫХ ПРОДАЖ НЕ ТРОГАЕТСЯ. Всё своё и не пересекается:
+#   служба        dbot-detect-probe     (у сторожа dbot-sold-guard)
+#   окружение     /etc/dbot-detect-probe/env   (у сторожа /etc/dbot-guard/env)
+#   состояние     /home/bot/dbot_detect_probe  (у сторожа /home/bot/dbot_sold_position_guard_live_data)
+#   logrotate     /etc/logrotate.d/dbot-detect-probe
+#   concurrency   отдельная группа -- деплои не наступают друг на друга
+# Ни одна команда здесь не обращается к dbot-sold-guard.
+#
+# ПОЧЕМУ СКРИПТ КЛАДЁТСЯ ВНЕ РАБОЧЕГО ДЕРЕВА РЕПОЗИТОРИЯ. На этом хосте
+# другие почасовые workflow (run_vps_setup_hourly_cron_nl.yml и соседи)
+# делают git reset --hard в /home/bot/robinhood-chain-alpha на ДРУГУЮ
+# ветку (claude/sc1-pons-v2-launcher-efdbyt). Служба, чей ExecStart
+# указывает внутрь дерева, после такого переключения уходит в
+# перезапуск по кругу. Поэтому файл службы копируется по ssh в
+# /home/bot/dbot_detect_probe/ -- стабильный путь вне git. venv
+# (/home/bot/robinhood-chain-alpha/venv) переживает reset --hard, потому
+# что не отслеживается git'ом, и используется как есть.
+#
+# Регистрация workflow_dispatch -- только с копии на реальной
+# default-ветке; логика всегда смотрит на claude/nifty-sagan-r0polg.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_service:
+        description: "systemctl enable + restart (боевой запуск) -- 'yes' или пусто для установки без запуска"
+        required: false
+        default: ""
+      report_only:
+        description: "'yes' -- ничего не деплоить, только снять отчёт с уже работающей службы"
+        required: false
+        default: ""
+
+concurrency:
+  group: vps-deploy-detect-probe
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "1. Каталоги службы + сам скрипт ВНЕ дерева репозитория"
+        if: github.event.inputs.report_only != 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            mkdir -p /home/bot/dbot_detect_probe
+            chown bot:bot /home/bot/dbot_detect_probe
+          '
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /home/bot/dbot_detect_probe/solana_detect_probe.py && chown bot:bot /home/bot/dbot_detect_probe/solana_detect_probe.py && chmod 644 /home/bot/dbot_detect_probe/solana_detect_probe.py' < analysis/solana_detect_probe.py
+          echo "sha256 у нас в репозитории:"; sha256sum analysis/solana_detect_probe.py
+          echo "sha256 на хосте:"; ssh $SSH_OPTS root@45.59.170.76 'sha256sum /home/bot/dbot_detect_probe/solana_detect_probe.py'
+
+      - name: "2. Зависимость websockets в общий venv (идемпотентно, сторожа не касается)"
+        if: github.event.inputs.report_only != 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q "websockets>=12.0" "requests>=2.31"
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -c "import websockets, requests; print(\"websockets\", websockets.__version__, \"requests\", requests.__version__)"
+          '
+
+      - name: "3. Секреты -> /etc/dbot-detect-probe/env (свой файл, не /etc/dbot-guard/env и не /etc/bot/env)"
+        if: github.event.inputs.report_only != 'yes'
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'mkdir -p /etc/dbot-detect-probe && cat > /etc/dbot-detect-probe/env && chmod 640 /etc/dbot-detect-probe/env && chown root:bot /etc/dbot-detect-probe/env && wc -l /etc/dbot-detect-probe/env' <<EOF
+          DBOT_API_KEY=$DBOT_API_KEY
+          HELIUS_API_KEY=$HELIUS_API
+          HELIUS_API=$HELIUS_API
+          PROBE_STATE_DIR=/home/bot/dbot_detect_probe
+          PROBE_SOURCES_REFRESH_S=600
+          PROBE_ENRICH_EVERY_S=300
+          PROBE_ENRICH_MIN_AGE_S=60
+          PROBE_CLOCK_CHECK_EVERY_S=3600
+          EOF
+          echo "Владелец просил ключ Helius из HELIUS_API_KEY -- кладём его под ОБОИМИ именами из одного секрета HELIUS_API (второго секрета в репозитории нет)."
+
+      - name: "4. systemd-юнит dbot-detect-probe"
+        if: github.event.inputs.report_only != 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /etc/systemd/system/dbot-detect-probe.service' <<'EOF'
+          [Unit]
+          Description=DBot detect probe (Helius websocket, измерение задержки обнаружения)
+          After=network-online.target
+          Wants=network-online.target
+          StartLimitIntervalSec=600
+          StartLimitBurst=5
+
+          [Service]
+          Type=simple
+          User=bot
+          Group=bot
+          WorkingDirectory=/home/bot/dbot_detect_probe
+          EnvironmentFile=/etc/dbot-detect-probe/env
+          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_detect_probe/solana_detect_probe.py
+          Restart=always
+          RestartSec=10
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 'systemctl daemon-reload && echo "daemon-reload сделан"'
+
+      - name: "5. logrotate (свой файл, не трогает ротацию сторожа)"
+        if: github.event.inputs.report_only != 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 'cat > /etc/logrotate.d/dbot-detect-probe' <<'EOF'
+          /home/bot/dbot_detect_probe/*.jsonl {
+              size 200M
+              rotate 5
+              compress
+              delaycompress
+              missingok
+              notifempty
+              copytruncate
+              su bot bot
+          }
+          EOF
+          ssh $SSH_OPTS root@45.59.170.76 'logrotate -d /etc/logrotate.d/dbot-detect-probe 2>&1 | tail -8'
+
+      - name: "6. Проверка ДО запуска: --check-only (чистое чтение: источники, слот, часы)"
+        if: github.event.inputs.report_only != 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_detect_probe
+            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --check-only"
+          '
+
+      - name: "7. Включить и (пере)запустить (только при enable_service=yes)"
+        if: github.event.inputs.enable_service == 'yes' && github.event.inputs.report_only != 'yes'
+        run: |
+          # enable + restart, а НЕ enable --now: для уже активного юнита
+          # --now ничего не перезапускает и новый EnvironmentFile не
+          # перечитывается (реальный случай этой сессии со сторожем).
+          ssh $SSH_OPTS root@45.59.170.76 '
+            systemctl enable dbot-detect-probe
+            systemctl restart dbot-detect-probe
+            sleep 3
+            systemctl status dbot-detect-probe --no-pager | head -12
+          '
+
+      - name: "8. Первые 90 секунд живого лога -- виден ли РЕАЛЬНО работающий способ подписки"
+        if: github.event.inputs.enable_service == 'yes' && github.event.inputs.report_only != 'yes'
+        run: |
+          sleep 90
+          ssh $SSH_OPTS root@45.59.170.76 'journalctl -u dbot-detect-probe --no-pager -n 120'
+          echo "=== status.json ==="
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/status.json 2>/dev/null || echo "status.json ещё нет"'
+          echo "=== первые события ==="
+          ssh $SSH_OPTS root@45.59.170.76 'head -5 /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null; wc -l /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null || echo "events.jsonl ещё нет"'
+
+      - name: "9. Отчёт со службы (включая самопроверку по Solscan)"
+        if: always()
+        run: |
+          mkdir -p data
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_detect_probe
+            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --report"
+          ' 2>&1 | tee data/dbot_detect_probe_report.txt || true
+          ssh $SSH_OPTS root@45.59.170.76 'tail -50 /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null' > data/dbot_detect_probe_sample.jsonl || true
+          ssh $SSH_OPTS root@45.59.170.76 'tail -20 /home/bot/dbot_detect_probe/enriched.jsonl 2>/dev/null' > data/dbot_detect_probe_enriched_sample.jsonl || true
+          wc -l data/dbot_detect_probe_*.jsonl data/dbot_detect_probe_report.txt 2>/dev/null || true
+
+      - name: "10. Коммит отчёта и образца"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/dbot_detect_probe_report.txt data/dbot_detect_probe_sample.jsonl data/dbot_detect_probe_enriched_sample.jsonl; do
+            [ -s "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Зонд обнаружения: отчёт и образец событий с реального прогона [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
