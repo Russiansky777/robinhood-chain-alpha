@@ -90,8 +90,15 @@ def out_path_for(mode: str) -> Path:
 SIM_CACHE_PATH = REPO_ROOT / "data" / "solana_retro_signal_cache.json"
 
 EXIT_FROM_S = 33
-EXIT_TO_S = 40
-EXIT_MAX_BLOCKS = 12
+# ОКНО ВЫХОДА РАСШИРЕНО до T+120с (распоряжение владельца). Прежнее
+# T+33..40с СТРУКТУРНО не добиралось до конца: 12 блоков при слоте
+# 250-300 мс покрывают лишь ~3.2с, и фактический максимум задержки в
+# прошлом прогоне был 37с при заявленных 40. 62 симуляции из 506 ушли в
+# no_exit не потому, что сделок не было, а потому что скан не дошёл.
+EXIT_TO_S = 120
+EXIT_MAX_BLOCKS = 12          # первый, дешёвый проход
+EXIT_DEEP_MAX_BLOCKS = 420    # добор до T+120с; 87с / ~0.28с на слот ~ 310
+EXIT_SLOW_S = 45              # выше -- строка помечается и в основную медиану не идёт
 SCEN_LOOKAHEAD = 2          # не больше 2 слотов от стартового
 COST_THRESHOLD_PCT = 2.5    # порог издержек владельца на 0.5 SOL
 MIN_LEG_SOL = 0.05          # см. dust_ok(): ниже этого цена сделки -- не цена
@@ -464,6 +471,11 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
         return {**row, "status": "no_leader_tx",
                 "note": "транзакции лидера нет среди сделок этого минта в его же слоте"}
     row["leader_index"] = leader_index
+    # Сделка самого лидера -- источник цены для отката, когда чужих сделок
+    # в окне нет. Берётся из того же разбора блока, тем же способом.
+    leader_trade = next((t for t in node["trades"] if t["signature"] == leader_sig), None)
+    row["leader_price"] = (leader_trade or {}).get("price_sol_per_token")
+    row["leader_sol_size"] = (leader_trade or {}).get("sol_size")
 
     # ГОРИЗОНТ E0 -- РОВНО 0 слотов: только слот S. Распоряжение владельца:
     # "E0 = только чужие покупки в слоте S после транзакции лидера; если их
@@ -483,10 +495,28 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
         if r.get("found"):
             scen[name] = {"entry_price": r["price_sol_per_token"], "entry_slot": r["slot"],
                            "entry_index": r["index"], "entry_signature": r["signature"],
-                           "entry_sol_size": r["sol_size"], "incomplete": r["incomplete"]}
+                           "entry_sol_size": r["sol_size"], "incomplete": r["incomplete"],
+                           "entry_src": "market"}
+        elif leader_trade and leader_trade.get("price_sol_per_token") is not None:
+            # ОТКАТ НА ЦЕНУ ЛИДЕРА (распоряжение владельца). Отсутствие
+            # ЧУЖИХ сделок в окне означает, что цена НЕ СДВИНУЛАСЬ, а не
+            # что цены нет. Раньше такая строка уходила в no_entry, и
+            # sim_E2 не считался вовсе -- метод молча выбрасывал именно
+            # спокойные минты и оставлял людные, то есть был смещён.
+            # Цена лидера берётся тем же способом (дельты его балансов).
+            scen[name] = {"entry_price": leader_trade["price_sol_per_token"],
+                           "entry_slot": slot, "entry_index": leader_index,
+                           "entry_signature": leader_sig,
+                           "entry_sol_size": leader_trade.get("sol_size"),
+                           "incomplete": r["incomplete"], "entry_src": "leader_price",
+                           "no_market_entry": True}
         else:
-            scen[name] = {"entry_price": None, "no_entry": True, "incomplete": r["incomplete"]}
+            scen[name] = {"entry_price": None, "no_entry": True, "incomplete": r["incomplete"],
+                           "entry_src": None,
+                           "почему": ("чужих сделок в окне нет, и цена самой сделки лидера "
+                                       "не посчиталась -- подставлять нечего")}
     row["scenarios"] = scen
+    row["entry_src_E2"] = (scen.get("E2") or {}).get("entry_src")
 
     # Отдельный вопрос владельца: доля случаев, когда в слоте ЛИДЕРА после
     # него вообще был покупатель. Считаем прямо по блоку, НЕ через E0:
@@ -510,34 +540,58 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
         row["status"] = "no_exit"
         row["exit_note"] = "не удалось привязать время T+33с к слоту"
         return row
+    # ДВА ПРОХОДА. Первый -- дешёвый (EXIT_MAX_BLOCKS блоков): на прошлом
+    # прогоне 444 симуляции из 506 находили выход за 12 блоков с задержкой
+    # 33-37с. Глубокий добор до T+120с делается ТОЛЬКО для тех, кому
+    # первого прохода не хватило, иначе стоимость прогона выросла бы на
+    # порядок на ровном месте.
     exit_row = None
     exit_incomplete = False
-    for step in range(EXIT_MAX_BLOCKS):
-        node_e = st.get(s_exit + step, mint)
-        if node_e is None:
-            exit_incomplete = True
-            continue
-        ebt = node_e.get("block_time")
-        if ebt is None:
-            continue
-        if ebt < bt + EXIT_FROM_S:
-            continue
-        if ebt > bt + EXIT_TO_S:
+    scanned = 0
+    hit_cap = False
+    window_done = False   # дошли до конца окна по ВРЕМЕНИ -- глубокий проход не нужен
+    for limit in (EXIT_MAX_BLOCKS, EXIT_DEEP_MAX_BLOCKS):
+        if exit_row is not None or window_done:
             break
-        cand = next((t for t in node_e["trades"] if t["price_sol_per_token"] is not None), None)
-        if cand:
-            exit_row = {"exit_price": cand["price_sol_per_token"], "exit_slot": s_exit + step,
-                         "exit_signature": cand["signature"], "exit_is_buy": cand["is_buy"],
-                         "exit_sol_size": cand["sol_size"], "exit_block_time": ebt,
-                         "exit_delay_s": ebt - bt}
-            break
+        for step in range(scanned, limit):
+            node_e = st.get(s_exit + step, mint)
+            scanned = step + 1
+            if node_e is None:
+                exit_incomplete = True
+                continue
+            ebt = node_e.get("block_time")
+            if ebt is None:
+                continue
+            if ebt < bt + EXIT_FROM_S:
+                continue
+            if ebt > bt + EXIT_TO_S:
+                window_done = True
+                break
+            cand = next((t for t in node_e["trades"] if t["price_sol_per_token"] is not None), None)
+            if cand:
+                exit_row = {"exit_price": cand["price_sol_per_token"], "exit_slot": s_exit + step,
+                             "exit_signature": cand["signature"], "exit_is_buy": cand["is_buy"],
+                             "exit_sol_size": cand["sol_size"], "exit_block_time": ebt,
+                             "exit_delay_s": ebt - bt}
+                break
+        else:
+            hit_cap = (limit == EXIT_DEEP_MAX_BLOCKS)
     row["exit_incomplete"] = exit_incomplete
-    row["exit_scan_blocks"] = EXIT_MAX_BLOCKS
+    row["exit_scan_blocks"] = scanned
+    row["exit_scan_hit_cap"] = hit_cap
     if not exit_row:
         row["status"] = "no_exit"
-        row["exit_note"] = f"в окне T+{EXIT_FROM_S}..{EXIT_TO_S}с за {EXIT_MAX_BLOCKS} блоков сделок с минтом нет"
+        row["exit_note"] = (
+            f"в окне T+{EXIT_FROM_S}..{EXIT_TO_S}с за {scanned} блоков сделок с минтом нет"
+            + (f"; УПЁРЛИСЬ В ПОТОЛОК {EXIT_DEEP_MAX_BLOCKS} блоков, до T+{EXIT_TO_S}с скан "
+               f"мог не дойти" if hit_cap else ""))
         return row
     row.update(exit_row)
+    # Медленный выход: нашёлся, но позже, чем мы реально держим позицию
+    # (медиана held_seconds 35с, p75 36с). Такие строки НЕ выбрасываются
+    # -- они считаются и показываются отдельно, но в основную медиану не
+    # идут: это уже не "выход через ~35с", а другой горизонт.
+    row["exit_slow"] = exit_row["exit_delay_s"] > EXIT_SLOW_S
     for name in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
         ep = scen[name].get("entry_price")
         row[f"sim_{name}"] = round((exit_row["exit_price"] / ep - 1) * 100, 4) if ep else None
@@ -560,19 +614,43 @@ def live_trades() -> list[dict]:
     return out
 
 
-def crowd_buys() -> tuple[list[dict], dict[str, dict]]:
-    d = json.loads(CROWD_PATH.read_text())
+def crowd_buys(min_buys: int = 3, extra_paths: list[Path] | None = None) -> tuple[list[dict], dict[str, dict]]:
+    """Покупки кошельков из скана толпы.
+
+    min_buys -- порог числа покупок для КАНДИДАТА (у кошельков в задаче
+    порога нет). Владелец: добить дыру по кандидатам порогом от 1.
+
+    extra_paths -- дополнительные сканы (например, семидневное окно по
+    кошелькам, у которых за 72ч покупок не набралось). Запись из
+    дополнительного скана ЗАМЕЩАЕТ основную по тому же адресу, а не
+    добавляется к ней: иначе одна и та же покупка попала бы в выборку
+    дважды и вес такого кошелька удвоился бы."""
+    wallets: dict[str, dict] = {}
+    sources: dict[str, str] = {}
+    for path, tag in ([(CROWD_PATH, "72ч")] + [(x, "расширенный") for x in (extra_paths or [])]):
+        if not path.exists():
+            log(f"скана нет, пропускаю: {path}")
+            continue
+        d = json.loads(path.read_text())
+        for w in d.get("wallets") or []:
+            if not w.get("address"):
+                continue
+            wallets[w["address"]] = w
+            sources[w["address"]] = tag
+        log(f"скан {path.name} ({tag}): кошельков {len(d.get('wallets') or [])}")
+
     meta: dict[str, dict] = {}
     sims: list[dict] = []
-    for w in d.get("wallets") or []:
+    for w in wallets.values():
         if w.get("status_scan") != "ok":
             continue
         is_cand = w.get("status") == "кандидат"
-        if is_cand and w.get("n_buys", 0) < 3:
+        if is_cand and w.get("n_buys", 0) < min_buys:
             continue
         meta[w["address"]] = {"name": w.get("name"), "status": w.get("status"),
                                "crowd_2": w.get("crowd_2_median"), "level": w.get("level"),
-                               "n_buys": w.get("n_buys")}
+                               "n_buys": w.get("n_buys"),
+                               "окно_скана": sources.get(w["address"])}
         for b in w.get("buys") or []:
             if b.get("crowd_2") is None:
                 continue
@@ -600,6 +678,20 @@ def dust_ok(r: dict, min_leg_sol: float) -> bool:
     entry = sc.get("entry_sol_size")
     exit_ = r.get("exit_sol_size")
     return (entry or 0) >= min_leg_sol and (exit_ or 0) >= min_leg_sol
+
+
+def exit_ok(r: dict) -> bool:
+    """Строка годится в ОСНОВНУЮ медиану, если выход нашёлся не позже
+    EXIT_SLOW_S. Медленные не выбрасываются -- они считаются отдельно:
+    это другой горизонт удержания, а не тот, которым мы торгуем."""
+    return not r.get("exit_slow")
+
+
+def row_usable(r: dict, min_leg_sol: float) -> bool:
+    """Единый фильтр для всех сводок: не пыль И не медленный выход.
+    Раньше фильтр был только по пыли и применялся в трёх местах
+    по-разному -- теперь одно правило в одном месте."""
+    return dust_ok(r, min_leg_sol) and exit_ok(r)
 
 
 def pct(vals: list[float], p: float) -> float | None:
@@ -672,17 +764,25 @@ def calibration(rows: list[dict]) -> dict:
 def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN_LEG_SOL) -> list[dict]:
     by: dict[str, list[dict]] = {}
     dropped: dict[str, int] = {}
+    slow: dict[str, list[dict]] = {}
     for r in rows:
         if r.get("sim_E2") is not None and not dust_ok(r, min_leg_sol):
             dropped[r["leader"]] = dropped.get(r["leader"], 0) + 1
             continue
+        if r.get("sim_E2") is not None and not exit_ok(r):
+            slow.setdefault(r["leader"], []).append(r)
+            continue
         by.setdefault(r["leader"], []).append(r)
+    for addr in slow:
+        by.setdefault(addr, [])
     out = []
     for addr, rs in by.items():
         m = meta.get(addr, {})
         row = {"address": addr, "name": m.get("name"), "status": m.get("status"),
                 "crowd_2": m.get("crowd_2"), "level": m.get("level"),
+                "окно_скана": m.get("окно_скана"), "n_buys_скана": m.get("n_buys"),
                 "n_sim_total": len(rs), "n_отброшено_пыль": dropped.get(addr, 0),
+                "n_медленных_исключено": len(slow.get(addr) or []),
                 "n_no_entry": sum(1 for r in rs if (r.get("scenarios") or {}).get("E2", {}).get("no_entry")),
                 "n_no_exit": sum(1 for r in rs if r.get("status") == "no_exit"),
                 "n_incomplete": sum(1 for r in rs if r.get("exit_incomplete")
@@ -714,6 +814,25 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
         row["n_sim"] = len(e2)
         row["best_E2"] = round(max(e2), 4) if e2 else None
         row["worst_E2"] = round(min(e2), 4) if e2 else None
+        # Доля симуляций В ПЛЮС -- нужна для фильтра кандидатов владельца
+        # ("больше половины симуляций в плюс"). Считается по тем же
+        # строкам, что и median_E2.
+        row["доля_в_плюс_E2"] = round(sum(1 for x in e2 if x > 0) / len(e2), 4) if e2 else None
+        # Откуда взялась цена входа: рынок или цена самой сделки лидера.
+        srcs = [(r.get("scenarios") or {}).get("E2", {}).get("entry_src")
+                for r in rs if r.get("sim_E2") is not None]
+        srcs = [x for x in srcs if x]
+        row["n_entry_market"] = sum(1 for x in srcs if x == "market")
+        row["n_entry_leader_price"] = sum(1 for x in srcs if x == "leader_price")
+        row["доля_leader_price"] = round(row["n_entry_leader_price"] / len(srcs), 4) if srcs else None
+        # Фактическая задержка выхода -- после расширения окна это уже не
+        # константа 33-37с, и её надо видеть по кошельку.
+        dl = [r["exit_delay_s"] for r in rs if r.get("exit_delay_s") is not None]
+        row["медиана_задержки_выхода_с"] = round(statistics.median(dl), 2) if dl else None
+        sl = slow.get(addr) or []
+        row["n_медленный_выход"] = len(sl)
+        sl_v = [r["sim_E2"] for r in sl if r.get("sim_E2") is not None]
+        row["median_E2_медленных"] = round(statistics.median(sl_v), 4) if sl_v else None
         out.append(row)
     out.sort(key=lambda r: (r["median_E2"] is None, -(r["median_E2"] or 0)))
     return out
@@ -721,9 +840,23 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
 
 def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> dict:
     n_all = sum(1 for r in rows if r.get("sim_E2") is not None)
-    rows = [r for r in rows if r.get("sim_E2") is None or dust_ok(r, min_leg_sol)]
+    dusty = [r for r in rows if r.get("sim_E2") is not None and not dust_ok(r, min_leg_sol)]
+    slow = [r for r in rows if r.get("sim_E2") is not None and dust_ok(r, min_leg_sol)
+            and not exit_ok(r)]
+    rows = [r for r in rows if r.get("sim_E2") is None or row_usable(r, min_leg_sol)]
     o = {"label": label, "мин_нога_SOL": min_leg_sol,
-         "отброшено_пылевых": n_all - sum(1 for r in rows if r.get("sim_E2") is not None)}
+         "отброшено_пылевых": len(dusty),
+         "медленный_выход": {
+             "порог_с": EXIT_SLOW_S,
+             "n_исключено": len(slow),
+             "медиана_E2_у_медленных": round(statistics.median(
+                 [r["sim_E2"] for r in slow]), 4) if slow else None,
+             "медиана_задержки_у_медленных_с": round(statistics.median(
+                 [r["exit_delay_s"] for r in slow]), 2) if slow else None,
+             "пояснение": ("выход нашёлся, но позже, чем мы реально держим позицию "
+                            "(медиана held_seconds 35с). Это другой горизонт, поэтому в основную "
+                            "медиану такие строки не идут, но и не выбрасываются")},
+         "всего_с_sim_E2_до_фильтров": n_all}
     for k in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
         v = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None]
         o[f"n_{k}"] = len(v)
@@ -731,13 +864,6 @@ def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> d
         o[f"p25_{k}"] = round(pct(v, 0.25), 4) if v else None
         o[f"p75_{k}"] = round(pct(v, 0.75), 4) if v else None
         o[f"share_above_{COST_THRESHOLD_PCT}_{k}"] = share_above(v, COST_THRESHOLD_PCT)
-    dl = [r["exit_delay_s"] for r in rows if r.get("exit_delay_s") is not None]
-    if dl:
-        o["задержка_выхода_с"] = {"мин": min(dl), "медиана": statistics.median(dl), "макс": max(dl)}
-        o["УСЕЧЕНИЕ_ОКНА"] = (
-            f"окно задано T+{EXIT_FROM_S}..{EXIT_TO_S}с, но {EXIT_MAX_BLOCKS} блоков при слоте "
-            f"250-300 мс покрывают лишь ~{EXIT_MAX_BLOCKS*0.27:.1f}с: фактический максимум "
-            f"задержки {max(dl)}с, до T+{EXIT_TO_S}с скан структурно не доходит")
     # Доля случаев, когда в слоте лидера ПОСЛЕ него вообще был покупатель.
     # Знаменатель -- только те симуляции, где блок лидера отдался и его
     # транзакция в нём нашлась (иначе вопрос не определён).
@@ -762,7 +888,172 @@ def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> d
         o["медиана_E0_минус_E2"] = round(statistics.median([a - c for a, _, c in both]), 4)
         o["медиана_E1_минус_E2"] = round(statistics.median([b - c for _, b, c in both]), 4)
         o["медиана_E0_минус_E1"] = round(statistics.median([a - b for a, b, _ in both]), 4)
+
+    # РАЗБИВКА ПО ИСТОЧНИКУ ЦЕНЫ ВХОДА. Ровно то, ради чего вводился
+    # entry_src: увидеть, насколько метод был смещён, когда молча
+    # выбрасывал строки без чужих сделок в окне. Медианы приводятся
+    # порознь и вместе -- если они сильно расходятся, прежние цифры
+    # были посчитаны по неслучайной подвыборке.
+    def _med(v):
+        return round(statistics.median(v), 4) if v else None
+
+    by_src: dict = {}
+    for k in ("E0", "E1", "E2"):
+        vm = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None
+              and ((r.get("scenarios") or {}).get(k, {}) or {}).get("entry_src") == "market"]
+        vl = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None
+              and ((r.get("scenarios") or {}).get(k, {}) or {}).get("entry_src") == "leader_price"]
+        by_src[k] = {"n_market": len(vm), "медиана_market": _med(vm),
+                     "n_leader_price": len(vl), "медиана_leader_price": _med(vl),
+                     "n_вместе": len(vm) + len(vl), "медиана_вместе": _med(vm + vl),
+                     "доля_leader_price": round(len(vl) / (len(vm) + len(vl)), 4)
+                     if (vm or vl) else None}
+    o["по_источнику_входа"] = by_src
+
+    dl = [r["exit_delay_s"] for r in rows if r.get("exit_delay_s") is not None]
+    if dl:
+        o["задержка_выхода_распределение"] = {
+            "n": len(dl), "мин": min(dl), "p25": pct(dl, 0.25), "медиана": statistics.median(dl),
+            "p75": pct(dl, 0.75), "p95": pct(dl, 0.95), "макс": max(dl)}
+    o["n_упёрлись_в_потолок_скана"] = sum(1 for r in rows if r.get("exit_scan_hit_cap"))
     return o
+
+
+def passing_candidates(wallets: list[dict], min_e2: float = 5.0, min_n: int = 4,
+                        min_crowd: float = 3.0, min_share_pos: float = 0.5) -> dict:
+    """Фильтр владельца: ретро E2 >= +5%, n >= 4, толпа >= 3, больше
+    половины симуляций в плюс. Строго "больше половины" -- ровно 0.5 не
+    проходит, иначе это "не меньше половины".
+
+    Отдельно возвращается, сколько кошельков отсеял КАЖДЫЙ критерий по
+    отдельности: иначе нельзя понять, узок ли фильтр или данных мало."""
+    cand = [w for w in wallets if w.get("status") == "кандидат"]
+    def ok_e2(w):
+        return w.get("median_E2") is not None and w["median_E2"] >= min_e2
+    def ok_n(w):
+        return (w.get("n_sim") or 0) >= min_n
+    def ok_crowd(w):
+        return w.get("crowd_2") is not None and w["crowd_2"] >= min_crowd
+    def ok_pos(w):
+        return w.get("доля_в_плюс_E2") is not None and w["доля_в_плюс_E2"] > min_share_pos
+    passed = [w for w in cand if ok_e2(w) and ok_n(w) and ok_crowd(w) and ok_pos(w)]
+    passed.sort(key=lambda w: -(w.get("median_E2") or 0))
+    return {
+        "порог": {"median_E2_не_меньше": min_e2, "n_sim_не_меньше": min_n,
+                   "crowd_2_не_меньше": min_crowd, "доля_в_плюс_строго_больше": min_share_pos},
+        "кандидатов_всего": len(cand),
+        "отсев_по_каждому_критерию_поодиночке": {
+            "не_прошли_E2": sum(1 for w in cand if not ok_e2(w)),
+            "не_прошли_n": sum(1 for w in cand if not ok_n(w)),
+            "не_прошли_толпу": sum(1 for w in cand if not ok_crowd(w)),
+            "не_прошли_долю_в_плюс": sum(1 for w in cand if not ok_pos(w))},
+        "прошли": [{"address": w["address"], "name": w.get("name"), "crowd_2": w.get("crowd_2"),
+                     "n_sim": w.get("n_sim"), "median_E2": w.get("median_E2"),
+                     "доля_в_плюс_E2": w.get("доля_в_плюс_E2"),
+                     "доля_leader_price": w.get("доля_leader_price"),
+                     "медиана_задержки_выхода_с": w.get("медиана_задержки_выхода_с"),
+                     "окно_скана": w.get("окно_скана")} for w in passed],
+    }
+
+
+def self_test_method() -> None:
+    """Границы правки метода -- без сети и без ключей. Проверяется ровно
+    то, что меняет цифры: откат на цену лидера, честный отказ, когда
+    подставлять нечего, и глубокий добор выхода до T+120с."""
+    def T(owner, idx, price, buy=True, sig=None, size=1.0):
+        return {"owner": owner, "is_buy": buy, "index": idx,
+                "signature": sig or f"s{owner}{idx}",
+                "price_sol_per_token": price, "sol_size": size}
+
+    class FakeST:
+        def __init__(self, blocks):
+            self.blocks = blocks
+
+        def get(self, slot, mint):
+            return self.blocks.get(slot)
+
+    class FakeClock:
+        def slot_at(self, s0, t0, target, max_probe=6):
+            return s0 + (target - t0) * 4      # 0.25с на слот
+
+    checks: list[tuple[str, bool, str]] = []
+
+    def chk(name, cond, got=""):
+        checks.append((name, bool(cond), got))
+
+    LEAD, MINT, SLOT, SIG = "L", "M", 1000, "sigL"
+    base = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]},
+            1132: {"block_time": 133, "trades": [T("X", 1, 3.0)]}}
+
+    r = simulate(None, FakeST(dict(base)), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    sc = r["scenarios"]
+    chk("чужих сделок нет -> вход по цене лидера", sc["E2"]["entry_src"] == "leader_price")
+    chk("цена входа равна цене лидера", sc["E2"]["entry_price"] == 2.0)
+    chk("sim_E2 считается (раньше был no_entry)", abs((r.get("sim_E2") or 0) - 50.0) < 1e-6,
+        str(r.get("sim_E2")))
+    chk("выход 33с не помечен медленным", r.get("exit_slow") is False)
+
+    b2 = dict(base)
+    b2[SLOT + 2] = {"block_time": 100, "trades": [T("Y", 1, 2.5)]}
+    r2 = simulate(None, FakeST(b2), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    chk("чужая сделка есть -> источник рынок", r2["scenarios"]["E2"]["entry_src"] == "market")
+    chk("вход берётся рыночный, не лидерский", r2["scenarios"]["E2"]["entry_price"] == 2.5)
+    chk("E0 остаётся на цене лидера (в слоте S чужих нет)",
+        r2["scenarios"]["E0"]["entry_src"] == "leader_price")
+
+    b3 = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, None, sig=SIG)]},
+          1132: {"block_time": 133, "trades": [T("X", 1, 3.0)]}}
+    r3 = simulate(None, FakeST(b3), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    chk("цены лидера нет -> честный no_entry", r3["scenarios"]["E2"].get("no_entry") is True)
+    chk("и sim_E2 не выдумывается", r3.get("sim_E2") is None)
+
+    b4 = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]}}
+    for i in range(300):
+        b4[1132 + i] = {"block_time": 133 + i // 4, "trades": []}
+    b4[1132 + 120] = {"block_time": 163, "trades": [T("X", 1, 4.0)]}
+    r4 = simulate(None, FakeST(b4), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    chk("выход за пределами 12 блоков найден", r4.get("exit_delay_s") == 63, str(r4.get("exit_delay_s")))
+    chk("он помечен медленным", r4.get("exit_slow") is True)
+    chk("глубокий проход реально был", (r4.get("exit_scan_blocks") or 0) > EXIT_MAX_BLOCKS,
+        str(r4.get("exit_scan_blocks")))
+    chk("в потолок скана не упёрлись", r4.get("exit_scan_hit_cap") is False)
+
+    b5 = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]}}
+    for i in range(500):
+        b5[1132 + i] = {"block_time": 133 + i // 4, "trades": []}
+    r5 = simulate(None, FakeST(b5), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    chk("сделок нет вовсе -> no_exit", r5["status"] == "no_exit")
+    chk("скан остановлен временем окна, а не потолком", r5.get("exit_scan_hit_cap") is False)
+    chk("скан не вышел за окно T+120с",
+        (r5.get("exit_scan_blocks") or 0) <= 4 * (EXIT_TO_S - EXIT_FROM_S) + 8,
+        str(r5.get("exit_scan_blocks")))
+
+    slow_row = {"scenarios": {"E2": {"entry_sol_size": 1.0}}, "exit_sol_size": 1.0,
+                "exit_slow": True, "sim_E2": 10.0}
+    fast_row = {**slow_row, "exit_slow": False}
+    chk("медленный выход не идёт в основную сводку", not row_usable(slow_row, 0.05))
+    chk("быстрый идёт", row_usable(fast_row, 0.05))
+
+    pc = passing_candidates([
+        {"status": "кандидат", "address": "A", "median_E2": 6.0, "n_sim": 5,
+         "crowd_2": 4, "доля_в_плюс_E2": 0.6},
+        {"status": "кандидат", "address": "B", "median_E2": 6.0, "n_sim": 5,
+         "crowd_2": 4, "доля_в_плюс_E2": 0.5},
+        {"status": "в задаче", "address": "C", "median_E2": 99.0, "n_sim": 9,
+         "crowd_2": 9, "доля_в_плюс_E2": 1.0},
+    ])
+    chk("фильтр пропускает подходящего кандидата",
+        [x["address"] for x in pc["прошли"]] == ["A"], str(pc["прошли"]))
+    chk("ровно половина в плюс НЕ проходит", all(x["address"] != "B" for x in pc["прошли"]))
+    chk("кошельки в задаче в список кандидатов не попадают", pc["кандидатов_всего"] == 2)
+
+    bad = 0
+    for name, good, got in checks:
+        print(f"  [{'ok  ' if good else 'СБОЙ'}] {name}" + (f"  -> {got}" if got and not good else ""))
+        bad += (not good)
+    print(f"самопроверка метода: {len(checks) - bad}/{len(checks)} пройдено")
+    if bad:
+        raise SystemExit(f"самопроверка не пройдена: {bad} из {len(checks)}")
 
 
 # ---------- самопроверка ----------
@@ -919,7 +1210,8 @@ def reaggregate(min_leg_sol: float, mode: str) -> None:
     if out.get("mode") == "full":
         out["wallets"] = per_wallet(rows, meta, min_leg_sol)
     if out.get("calibration"):
-        out["calibration"] = calibration([r for r in rows if dust_ok(r, min_leg_sol) or r.get("sim_E2") is None])
+        out["calibration"] = calibration([r for r in rows if row_usable(r, min_leg_sol)
+                                           or r.get("sim_E2") is None])
     out["ЧЕСТНЫЕ_ОГОВОРКИ"].append(
         f"Симуляции, где вход или выход мельче {min_leg_sol} SOL, ОТБРОШЕНЫ: при пылевых сделках "
         "цена вырождается и отношение выход/вход взрывается (в сыром прогоне до +554989%). "
@@ -937,10 +1229,20 @@ def main() -> None:
     ap.add_argument("--min-interval-s", type=float, default=0.12)
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--min-leg-sol", type=float, default=MIN_LEG_SOL)
+    ap.add_argument("--min-buys", type=int, default=3,
+                     help="порог числа покупок для КАНДИДАТА (в задаче порога нет)")
+    ap.add_argument("--extra-crowd", default="",
+                     help="через запятую: дополнительные файлы скана толпы (например, 7-дневное "
+                          "окно); запись замещает основную по тому же адресу")
+    ap.add_argument("--self-test", action="store_true",
+                     help="проверить правку метода без сети и без ключей и выйти")
     ap.add_argument("--reaggregate", action="store_true",
                     help="пересчитать сводку из готового файла, без вызовов сети")
     args = ap.parse_args()
 
+    if args.self_test:
+        self_test_method()
+        return
     if args.reaggregate:
         reaggregate(args.min_leg_sol, args.mode)
         return
@@ -968,14 +1270,20 @@ def main() -> None:
         meta: dict[str, dict] = {}
         label = "калибровка"
     else:
-        items, meta = crowd_buys()
+        extra = [Path(x.strip()) if Path(x.strip()).is_absolute() else REPO_ROOT / x.strip()
+                 for x in args.extra_crowd.split(",") if x.strip()]
+        items, meta = crowd_buys(args.min_buys, extra)
         if args.limit:
             items = items[:args.limit]
         label = "основной"
     log(f"{label}: симуляций к расчёту {len(items)}")
 
     rows = run(rpc, st, clock, items, args.workers, label, cache)
-    calib = calibration(rows) if args.mode == "calibrate" else None
+    # Калибровка -- на тех же строках, что и сводки: без пыли и без
+    # медленных выходов. Раньше она считалась по ВСЕМ строкам, а сводки
+    # по отфильтрованным -- и гейт проверял не то, что потом печаталось.
+    calib = calibration([r for r in rows if row_usable(r, args.min_leg_sol)]) \
+        if args.mode == "calibrate" else None
     wallets = per_wallet(rows, meta, args.min_leg_sol) if args.mode == "full" else []
     check = self_check(rpc, rows)
 
@@ -1013,10 +1321,16 @@ def main() -> None:
                        "budget_exhausted": rpc.expired(),
                        "statuses": {k: sum(1 for r in rows if r.get("status") == k)
                                      for k in sorted({r.get("status") for r in rows})}},
+        "параметры_отбора": {"min_buys_кандидата": args.min_buys,
+                              "дополнительные_сканы": args.extra_crowd or None,
+                              "окно_выхода_с": [EXIT_FROM_S, EXIT_TO_S],
+                              "потолок_блоков_скана_выхода": EXIT_DEEP_MAX_BLOCKS,
+                              "порог_медленного_выхода_с": EXIT_SLOW_S},
         "calibration": calib,
         "overall": overall(rows, "все кошельки", args.min_leg_sol),
         "overall_pilot": overall([r for r in rows if r["leader"] == PILOT], "пилот", args.min_leg_sol),
         "wallets": wallets,
+        "кандидаты_прошедшие_фильтр": passing_candidates(wallets) if wallets else None,
         "self_check": check,
         "sims": rows,
     }
@@ -1047,9 +1361,21 @@ def report(out: dict) -> None:
         for k in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
             print(f"  {k:<9}: n={o[f'n_{k}']:<5} медиана={o[f'median_{k}']}%  p25={o[f'p25_{k}']}  "
                   f"p75={o[f'p75_{k}']}  доля>+2.5%={o[f'share_above_2.5_{k}']}")
-        if o.get("УСЕЧЕНИЕ_ОКНА"):
-            print(f"  задержка выхода: {json.dumps(o['задержка_выхода_с'], ensure_ascii=False)}")
-            print(f"  ВНИМАНИЕ: {o['УСЕЧЕНИЕ_ОКНА']}")
+        if o.get("задержка_выхода_распределение"):
+            print(f"  задержка выхода: {json.dumps(o['задержка_выхода_распределение'], ensure_ascii=False)}")
+        if o.get("медленный_выход"):
+            m = o["медленный_выход"]
+            print(f"  медленный выход (> {m['порог_с']}с): исключено {m['n_исключено']}, "
+                  f"их медиана E2 {m['медиана_E2_у_медленных']}, "
+                  f"медиана задержки {m['медиана_задержки_у_медленных_с']}с")
+        if o.get("n_упёрлись_в_потолок_скана"):
+            print(f"  ВНИМАНИЕ: {o['n_упёрлись_в_потолок_скана']} симуляций упёрлись в потолок "
+                  f"скана {EXIT_DEEP_MAX_BLOCKS} блоков -- до T+{EXIT_TO_S}с могли не дойти")
+        for k, v in (o.get("по_источнику_входа") or {}).items():
+            print(f"  {k} по источнику входа: рынок n={v['n_market']} медиана={v['медиана_market']} | "
+                  f"цена лидера n={v['n_leader_price']} медиана={v['медиана_leader_price']} | "
+                  f"вместе n={v['n_вместе']} медиана={v['медиана_вместе']} "
+                  f"(доля leader_price {v['доля_leader_price']})")
         if o.get("n_все_три"):
             print(f"  на общих {o['n_все_три']} симуляциях: E0-E2={o['медиана_E0_минус_E2']} п.п., "
                   f"E1-E2={o['медиана_E1_минус_E2']} п.п., E0-E1={o['медиана_E0_минус_E1']} п.п.")

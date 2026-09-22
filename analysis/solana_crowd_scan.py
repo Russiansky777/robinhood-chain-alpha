@@ -406,12 +406,25 @@ def crowd_for_buy(cache: BlockCache, slot: int, mint: str, wallet: str,
 
 # ---------- покупки кошелька ----------
 
+# Окно скана по умолчанию 72ч (LOOKBACK_S из solana_batch5_rpc_check), но
+# владелец просит добивать дыру по кандидатам семидневным окном. Значение
+# переопределяется ключом --lookback-hours и хранится здесь, чтобы обе
+# функции (страницы подписей и оговорки в выгрузке) видели одно и то же.
+ACTIVE_LOOKBACK_S = LOOKBACK_S
+
+
 def wallet_signatures_72h(rpc: Rpc, address: str) -> tuple[list[dict], bool]:
-    cutoff = int(time.time()) - LOOKBACK_S
+    """Подписи кошелька за ACTIVE_LOOKBACK_S. Имя оставлено прежним,
+    чтобы не разъехаться с вызывающим кодом; окно берётся из переменной."""
+    cutoff = int(time.time()) - ACTIVE_LOOKBACK_S
     hist: list[dict] = []
     before = None
     complete = False
-    for _ in range(12):
+    # Страниц пропорционально окну: 12 страниц по 1000 подписей хватало на
+    # 72ч, на 7 днях активному кошельку могло не хватить -- и тогда
+    # "покупок нет" означало бы "не долистали", а это разные вещи.
+    max_pages = max(12, int(12 * ACTIVE_LOOKBACK_S / LOOKBACK_S))
+    for _ in range(max_pages):
         page = rpc.signatures(address, before)
         if not page:
             complete = True
@@ -504,7 +517,7 @@ def scan_one(rpc: Rpc, cache: BlockCache, address: str, meta: dict) -> dict:
     buys = found["buys"]
     if not buys:
         row.update({"status_scan": "no_buys", "n_buys": 0,
-                     "note": f"нет первых покупок >={MIN_SPEND_SOL} SOL-экв за 72ч "
+                     "note": f"нет первых покупок >={MIN_SPEND_SOL} SOL-экв за {ACTIVE_LOOKBACK_S // 3600}ч "
                              f"(просмотрено транзакций: {found['n_tx_examined']})"})
         return row
 
@@ -855,7 +868,19 @@ def main() -> None:
     ap.add_argument("--cache-max-age-s", type=int, default=6 * 3600,
                     help="возраст записи кэша кошелька, после которого он пересчитывается")
     ap.add_argument("--no-cache", action="store_true", help="считать всё заново")
+    ap.add_argument("--lookback-hours", type=int, default=LOOKBACK_S // 3600,
+                    help="окно поиска покупок в часах (по умолчанию 72)")
+    ap.add_argument("--only", default="",
+                    help="через запятую: сканировать ТОЛЬКО эти адреса (добор дыры по кандидатам)")
+    ap.add_argument("--out", default="",
+                    help="путь выгрузки; пусто -- data/solana_crowd_scan.json. Для добора "
+                         "обязательно задать свой файл, иначе основной скан будет затёрт")
     args = ap.parse_args()
+
+    global ACTIVE_LOOKBACK_S, OUT_PATH
+    ACTIVE_LOOKBACK_S = args.lookback_hours * 3600
+    if args.out:
+        OUT_PATH = Path(args.out) if Path(args.out).is_absolute() else REPO_ROOT / args.out
 
     started = time.monotonic()
     key, key_name = helius_key()
@@ -881,6 +906,16 @@ def main() -> None:
         log(f"КАЛИБРОВКА: пилот + источники с >=4 живыми сделками = {len(target)} кошельков")
     else:
         target = dict(wallets)
+    only = {a.strip() for a in args.only.split(",") if a.strip()}
+    if only:
+        missing = only - set(target.keys())
+        target = {a: m for a, m in target.items() if a in only}
+        log(f"ДОБОР: сканирую только {len(target)} адресов из списка")
+        if missing:
+            # Честно: адрес из списка, которого нет в наборе кошельков, --
+            # это не "просканирован и пусто", а "не сканировался вовсе".
+            log(f"ВНИМАНИЕ: {len(missing)} адресов из --only нет в наборе кошельков: "
+                f"{', '.join(sorted(missing))}")
     if args.limit:
         target = dict(list(target.items())[:args.limit])
 
@@ -908,7 +943,8 @@ def main() -> None:
         ],
         "config": {
             "min_spend_sol": MIN_SPEND_SOL, "max_buys_per_wallet": MAX_BUYS_PER_WALLET,
-            "lookback_hours": LOOKBACK_S // 3600, "slots_ahead": CROWD_SLOTS_AHEAD,
+            "lookback_hours": ACTIVE_LOOKBACK_S // 3600, "slots_ahead": CROWD_SLOTS_AHEAD,
+            "только_адреса": sorted(only) or None,
             "workers": args.workers, "helius_key_env_name": key_name,
             "levels": {"сильный": ">=8", "средний": "3-7", "пустой": "<=2"},
         },
