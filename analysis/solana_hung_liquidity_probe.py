@@ -111,7 +111,28 @@ def main():
         print(f"[probe] {m[:12]}… t2022={mi['token2022']} fee={mi['transfer_fee_bps']} "
               f"пар={len(pr.get('пары') or [])} годных={len(good)} лучший={best_any.get('quote')}"
               f"/{best_any.get('liq_usd')}", flush=True)
-    out = {"generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    # БАЗОВАЯ ДОЛЯ. "9 из 11 зависших -- Token-2022 с комиссией" само по
+    # себе не значит ничего: если Token-2022 и так почти все наши сделки,
+    # это не объяснение, а фон. Меряем долю среди СЛУЧАЙНЫХ независших.
+    import random
+    non_hung = [t for t in trades if t.get("mint") and t["mint"] not in seen
+                and not t.get("is_hung")
+                and not (isinstance(t.get("held_seconds"), (int, float)) and t["held_seconds"] > 300)]
+    uniq = sorted({t["mint"] for t in non_hung})
+    random.seed(20260922)
+    sample = random.sample(uniq, min(60, len(uniq)))
+    base = {"выборка": len(sample), "token2022": 0, "с_комиссией": 0, "не_опрошено": 0}
+    for m in sample:
+        mi = mint_info(m, key)
+        if mi.get("decimals") is None and not mi["token2022"]:
+            base["не_опрошено"] += 1
+            continue
+        base["token2022"] += 1 if mi["token2022"] else 0
+        base["с_комиссией"] += 1 if mi["transfer_fee_bps"] else 0
+    print(f"[probe] базовая доля на {base['выборка']} случайных НЕзависших минтах: "
+          f"Token-2022 {base['token2022']}, с комиссией {base['с_комиссией']}", flush=True)
+
+    out = {"базовая_доля_независшие": base, "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "sol_usd": px, "порог_usd": thr_usd, "строк": len(rows), "токены": rows}
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2))
     n_only_foreign = sum(1 for r in rows if r["ликвидность_только_в_чужой_паре"])
@@ -123,6 +144,13 @@ def main():
     print(f"Token-2022: {n_t22}; из них с комиссией за перевод: "
           f"{sum(1 for r in rows if r['transfer_fee_bps'])}")
     print(f"есть пул SOL/USDC глубже 1 SOL: {sum(1 for r in rows if r['пулов_с_SOL_USDC_свыше_1SOL'])}")
+    b = out["базовая_доля_независшие"]
+    if b["выборка"]:
+        print(f"БАЗОВАЯ ДОЛЯ (независшие, n={b['выборка']}): Token-2022 "
+              f"{b['token2022']} ({100*b['token2022']/b['выборка']:.0f}%), "
+              f"с комиссией {b['с_комиссией']} ({100*b['с_комиссией']/b['выборка']:.0f}%)")
+        print(f"  против зависших: Token-2022 {n_t22}/{len(rows)} "
+              f"({100*n_t22/len(rows):.0f}%)")
 
 
 if __name__ == "__main__":
