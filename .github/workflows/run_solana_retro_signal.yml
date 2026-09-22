@@ -1,0 +1,119 @@
+name: "Ретро-сигнал: симуляция входа в трёх скоростях и выхода через ~35с"
+
+# Владелец: только чтение цепочки, ни одной сделки. Guard
+# (dbot-sold-guard) и зонд (dbot-detect-probe) не трогаются -- этот
+# workflow вообще не ходит на VPS.
+#
+# КАЛИБРОВКА -- ГЕЙТ. Сначала mode=calibrate по нашим живым сделкам из
+# data/solana_entry_log.json: sim_E2 против настоящего signal_pct.
+# Порог: Спирмен >= 0.6 И совпадение знака >= 70%. Не прошло -- job
+# падает, основной прогон не делается.
+#
+# Ключ: владелец просит HELIUS_API_KEY, в секретах заведён HELIUS_API --
+# отдаём оба имени из одного секрета.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "calibrate (живые сделки, гейт) или full (кандидаты + источники)"
+        required: false
+        default: "calibrate"
+      workers:
+        description: "параллельных воркеров (владелец просил 3-4)"
+        required: false
+        default: "4"
+      time_budget_s:
+        description: "мягкий бюджет времени, секунд"
+        required: false
+        default: "18000"
+      min_interval_s:
+        description: "минимальный интервал между RPC-вызовами, секунд (темп подобран замером)"
+        required: false
+        default: "0.12"
+      limit:
+        description: "только N симуляций (отладка, 0 = все)"
+        required: false
+        default: "0"
+      no_cache:
+        description: "'yes' -- пересчитать всё заново"
+        required: false
+        default: ""
+
+concurrency:
+  group: solana-retro-signal
+  cancel-in-progress: false
+
+jobs:
+  retro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Ретро-сигнал (только чтение цепочки)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then
+            echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1
+          fi
+          python -u analysis/solana_retro_signal.py \
+            --mode "${{ github.event.inputs.mode || 'calibrate' }}" \
+            --workers "${{ github.event.inputs.workers || 4 }}" \
+            --time-budget-s "${{ github.event.inputs.time_budget_s || 18000 }}" \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.12' }}" \
+            --limit "${{ github.event.inputs.limit || 0 }}" \
+            ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
+            2>&1 | tail -600
+
+      - name: "Гейт калибровки"
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path("data/solana_retro_signal.json")
+          if not p.exists():
+              print("файла нет -- скрипт не дошёл до записи"); sys.exit(0)
+          d = json.loads(p.read_text())
+          print("режим:", d["mode"])
+          print("проба accounts:", json.dumps(d.get("проба_accounts"), ensure_ascii=False))
+          print("самопроверка у двух провайдеров:", (d.get("self_check") or {}).get("ok"))
+          c = d.get("calibration")
+          if c:
+              print("калибровка: n=%s Спирмен=%s Пирсон=%s знак=%s смещение=%s медиана|ошибки|=%s" % (
+                  c.get("n"), c.get("spearman"), c.get("pearson"), c.get("sign_agreement"),
+                  c.get("median_bias_pct"), c.get("median_abs_error_pct")))
+              if d["mode"] == "calibrate" and not c.get("verdict_ok"):
+                  print("::error::Калибровка не прошла -- основной прогон (mode=full) запускать НЕЛЬЗЯ.")
+                  sys.exit(2)
+          PY
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/solana_retro_signal.json data/solana_retro_signal_cache.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Ретро-сигнал: прогон [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1

@@ -110,10 +110,19 @@ def helius_key() -> tuple[str, str]:
 # которые тот же модуль используют. Здесь свой слой с локом.
 
 class Rpc:
-    def __init__(self, key: str, min_interval_s: float = 0.02, workers: int = 4) -> None:
+    """Потокобезопасный RPC. Темп подобран по ЗАМЕРУ, а не на глаз: при
+    min_interval=0.02 и удвоении бэкоффа до 20с скан толпы дал 1783
+    ретрая на 3912 вызовов (45%) и пропускную способность 0.49 вызова/с
+    -- ХУЖЕ, чем однопоточная Часть A (0.94/с). Мы сами загоняли себя в
+    спираль бэкоффа. Темп 0.12с, множитель 1.5 и потолок 8с держат
+    нагрузку под лимитом провайдера."""
+    def __init__(self, key: str, min_interval_s: float = 0.12, workers: int = 4,
+                  backoff_mult: float = 1.5, backoff_cap: float = 8.0) -> None:
         self.key = key
         self.url = f"https://mainnet.helius-rpc.com/?api-key={key}"
         self.min_interval_s = min_interval_s
+        self.backoff_mult = backoff_mult
+        self.backoff_cap = backoff_cap
         self._lock = threading.Lock()
         self._last_at = 0.0
         self._backoff = 0.0
@@ -144,12 +153,12 @@ class Rpc:
 
     def _slow_down(self) -> None:
         with self._lock:
-            self._backoff = min(max(self._backoff * 2, 0.25), 20.0)
+            self._backoff = min(max(self._backoff * self.backoff_mult, 0.25), self.backoff_cap)
             self.retries += 1
 
     def _speed_up(self) -> None:
         with self._lock:
-            self._backoff = max(self._backoff * 0.5, 0.0)
+            self._backoff = self._backoff * 0.35 if self._backoff > 0.05 else 0.0
 
     def call(self, method: str, params: list, url: str | None = None, attempts: int = 8):
         """Возвращает result. Бросает RuntimeError на неустранимой ошибке."""
