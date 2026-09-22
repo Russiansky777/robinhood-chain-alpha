@@ -26,9 +26,13 @@ on:
         required: false
         default: "4"
       time_budget_s:
-        description: "мягкий бюджет времени, секунд"
+        description: "мягкий бюджет времени, секунд (полный прогон ~150 кошельков идёт часами)"
         required: false
         default: "4500"
+      no_cache:
+        description: "'yes' -- пересчитать всё заново, не брать кошельки из кэша"
+        required: false
+        default: ""
       limit:
         description: "только N кошельков (отладка, 0 = без ограничения)"
         required: false
@@ -41,7 +45,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 95
+    timeout-minutes: 350
     permissions:
       contents: write
     steps:
@@ -75,6 +79,7 @@ jobs:
             --workers "${{ github.event.inputs.workers || 4 }}" \
             --time-budget-s "${{ github.event.inputs.time_budget_s || 4500 }}" \
             --limit "${{ github.event.inputs.limit || 0 }}" \
+            ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -500
 
       - name: "Гейт калибровки: без связи основной прогон не делаем"
@@ -107,7 +112,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/solana_crowd_scan.json 2>/dev/null || true
+          git add data/solana_crowd_scan.json data/solana_crowd_scan_cache.json 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Скан толпы: прогон [automated]"
           for i in 1 2 3 4 5; do
