@@ -72,6 +72,7 @@ EXIT_TO_S = 40
 EXIT_MAX_BLOCKS = 12
 SCEN_LOOKAHEAD = 2          # не больше 2 слотов от стартового
 COST_THRESHOLD_PCT = 2.5    # порог издержек владельца на 0.5 SOL
+MIN_LEG_SOL = 0.05          # см. dust_ok(): ниже этого цена сделки -- не цена
 SLOT_EST_S = 0.30           # стартовая оценка длительности слота, уточняется по факту
 
 _PRINT_LOCK = threading.Lock()
@@ -503,6 +504,23 @@ def crowd_buys() -> tuple[list[dict], dict[str, dict]]:
 
 # ---------- агрегация ----------
 
+def dust_ok(r: dict, min_leg_sol: float) -> bool:
+    """Обе ноги симуляции должны быть осмысленного размера.
+
+    Найдено на реальном прогоне: при пылевых сделках цена вырождается и
+    отношение выход/вход взрывается -- в выборке оказались значения до
+    +554 989%, и все рекордсмены имеют ногу в 0.0015 SOL. Это не сигнал,
+    а деление на почти ноль. Отсечка по размеру ноги, а не по величине
+    самого sim_*: обрезать выбросы по результату значит подгонять ответ,
+    обрезать по размеру сделки -- отбрасывать заведомо негодные цены.
+    Ровно та же болезнь, что стоила нам 94% на продаже STONKY: в тонком
+    пуле «цена» ничего не значит."""
+    sc = (r.get("scenarios") or {}).get("E2") or {}
+    entry = sc.get("entry_sol_size")
+    exit_ = r.get("exit_sol_size")
+    return (entry or 0) >= min_leg_sol and (exit_ or 0) >= min_leg_sol
+
+
 def pct(vals: list[float], p: float) -> float | None:
     if not vals:
         return None
@@ -570,16 +588,20 @@ def calibration(rows: list[dict]) -> dict:
     }
 
 
-def per_wallet(rows: list[dict], meta: dict[str, dict]) -> list[dict]:
+def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN_LEG_SOL) -> list[dict]:
     by: dict[str, list[dict]] = {}
+    dropped: dict[str, int] = {}
     for r in rows:
+        if r.get("sim_E2") is not None and not dust_ok(r, min_leg_sol):
+            dropped[r["leader"]] = dropped.get(r["leader"], 0) + 1
+            continue
         by.setdefault(r["leader"], []).append(r)
     out = []
     for addr, rs in by.items():
         m = meta.get(addr, {})
         row = {"address": addr, "name": m.get("name"), "status": m.get("status"),
                 "crowd_2": m.get("crowd_2"), "level": m.get("level"),
-                "n_sim_total": len(rs),
+                "n_sim_total": len(rs), "n_отброшено_пыль": dropped.get(addr, 0),
                 "n_no_entry": sum(1 for r in rs if (r.get("scenarios") or {}).get("E2", {}).get("no_entry")),
                 "n_no_exit": sum(1 for r in rs if r.get("status") == "no_exit"),
                 "n_incomplete": sum(1 for r in rs if r.get("exit_incomplete")
@@ -599,8 +621,11 @@ def per_wallet(rows: list[dict], meta: dict[str, dict]) -> list[dict]:
     return out
 
 
-def overall(rows: list[dict], label: str) -> dict:
-    o = {"label": label}
+def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> dict:
+    n_all = sum(1 for r in rows if r.get("sim_E2") is not None)
+    rows = [r for r in rows if r.get("sim_E2") is None or dust_ok(r, min_leg_sol)]
+    o = {"label": label, "мин_нога_SOL": min_leg_sol,
+         "отброшено_пылевых": n_all - sum(1 for r in rows if r.get("sim_E2") is not None)}
     for k in ("E0", "E0_loose", "E1", "E2"):
         v = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None]
         o[f"n_{k}"] = len(v)
@@ -759,6 +784,31 @@ def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: 
     return rows
 
 
+def reaggregate(min_leg_sol: float) -> None:
+    """Пересчитать сводку из уже посчитанного файла, не трогая сеть."""
+    out = json.loads(OUT_PATH.read_text())
+    rows = out["sims"]
+    meta: dict[str, dict] = {}
+    if CROWD_PATH.exists():
+        for w in json.loads(CROWD_PATH.read_text()).get("wallets") or []:
+            meta[w["address"]] = {"name": w.get("name"), "status": w.get("status"),
+                                   "crowd_2": w.get("crowd_2_median"), "level": w.get("level"),
+                                   "n_buys": w.get("n_buys")}
+    out["config"]["min_leg_sol"] = min_leg_sol
+    out["overall"] = overall(rows, "все кошельки", min_leg_sol)
+    out["overall_pilot"] = overall([r for r in rows if r["leader"] == PILOT], "пилот", min_leg_sol)
+    if out.get("mode") == "full":
+        out["wallets"] = per_wallet(rows, meta, min_leg_sol)
+    if out.get("calibration"):
+        out["calibration"] = calibration([r for r in rows if dust_ok(r, min_leg_sol) or r.get("sim_E2") is None])
+    out["ЧЕСТНЫЕ_ОГОВОРКИ"].append(
+        f"Симуляции, где вход или выход мельче {min_leg_sol} SOL, ОТБРОШЕНЫ: при пылевых сделках "
+        "цена вырождается и отношение выход/вход взрывается (в сыром прогоне до +554989%). "
+        "Отсекается размер сделки, а не величина результата -- иначе это была бы подгонка.")
+    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    report(out)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--mode", choices=("calibrate", "full"), default="calibrate")
@@ -767,7 +817,14 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--min-interval-s", type=float, default=0.12)
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--min-leg-sol", type=float, default=MIN_LEG_SOL)
+    ap.add_argument("--reaggregate", action="store_true",
+                    help="пересчитать сводку из готового файла, без вызовов сети")
     args = ap.parse_args()
+
+    if args.reaggregate:
+        reaggregate(args.min_leg_sol)
+        return
 
     started = time.monotonic()
     key, key_name = helius_key()
@@ -800,7 +857,7 @@ def main() -> None:
 
     rows = run(rpc, st, clock, items, args.workers, label, cache)
     calib = calibration(rows) if args.mode == "calibrate" else None
-    wallets = per_wallet(rows, meta) if args.mode == "full" else []
+    wallets = per_wallet(rows, meta, args.min_leg_sol) if args.mode == "full" else []
     check = self_check(rpc, rows)
 
     out = {
@@ -837,8 +894,8 @@ def main() -> None:
                        "statuses": {k: sum(1 for r in rows if r.get("status") == k)
                                      for k in sorted({r.get("status") for r in rows})}},
         "calibration": calib,
-        "overall": overall(rows, "все кошельки"),
-        "overall_pilot": overall([r for r in rows if r["leader"] == PILOT], "пилот"),
+        "overall": overall(rows, "все кошельки", args.min_leg_sol),
+        "overall_pilot": overall([r for r in rows if r["leader"] == PILOT], "пилот", args.min_leg_sol),
         "wallets": wallets,
         "self_check": check,
         "sims": rows,
