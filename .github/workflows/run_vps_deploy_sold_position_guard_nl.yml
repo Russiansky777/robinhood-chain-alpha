@@ -20,9 +20,23 @@ name: "Сторож проваленных продаж -- деплой на VPS
 # (см. send_telegram() в самом скрипте) -- этот workflow идемпотентен,
 # безопасно перезапустить позже после того, как владелец добавит их.
 #
-# Идемпотентно: обновляет код (git reset --hard), секреты, юнит,
-# logrotate и делает restart при каждом прогоне -- безопасно гонять
-# повторно (например, после правки скрипта).
+# ПОЧЕМУ СЛУЖБА ЖИВЁТ ВНЕ РАБОЧЕГО ДЕРЕВА (согласовано с владельцем).
+# На этом хосте другие почасовые workflow (run_vps_setup_hourly_cron_nl
+# и соседи) делают git reset --hard в /home/bot/robinhood-chain-alpha на
+# ДРУГУЮ ветку. Служба, чей ExecStart указывает внутрь дерева, после
+# такого переключения уходит в перезапуск по кругу -- это уже случалось
+# с зондом. Для процесса, который на этапе C получит приватный ключ,
+# это тем более недопустимо. Поэтому код копируется по ssh в
+# /home/bot/dbot_sold_guard/ -- стабильный путь вне git, как у зонда.
+# venv (/home/bot/robinhood-chain-alpha/venv) переживает reset --hard,
+# потому что не отслеживается git, и используется как есть.
+# Рабочее дерево остаётся источником ТОЛЬКО для выгрузки учёта
+# (data/solana_trades_all.json) -- она читается по пути из
+# GUARD_TRADES_PATH и только на чтение.
+#
+# Идемпотентно: обновляет код, секреты, юнит, logrotate и делает restart
+# при каждом прогоне -- безопасно гонять повторно (например, после
+# правки скрипта).
 #
 # Владелец, GitHub-механика (тот же урок, что crowd_night.yml):
 # workflow_dispatch регистрируется ТОЛЬКО с версии файла на РЕАЛЬНОЙ
@@ -66,7 +80,7 @@ jobs:
           ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: "1. Обновить код репозитория у bot (та же ветка, что учёт/крауд-скан)"
+      - name: "1. Обновить рабочее дерево (нужно только как источник выгрузки учёта)"
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
             set -e
@@ -75,6 +89,27 @@ jobs:
             sudo -u bot git -C /home/bot/robinhood-chain-alpha reset --hard origin/claude/nifty-sagan-r0polg
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q -r /home/bot/robinhood-chain-alpha/analysis/requirements.txt
             sudo -u bot git -C /home/bot/robinhood-chain-alpha log -1 --oneline
+          '
+
+      - name: "1a. Сам код службы -- ВНЕ дерева, в /home/bot/dbot_sold_guard"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            set -e
+            mkdir -p /home/bot/dbot_sold_guard
+            chown bot:bot /home/bot/dbot_sold_guard
+          '
+          # Сторож импортирует solana_ledger_run (rpc_call/get_token_holding),
+          # поэтому рядом кладётся и он -- иначе служба вне дерева не стартует.
+          for f in dbot_sold_position_guard.py solana_ledger_run.py; do
+            ssh $SSH_OPTS root@45.59.170.76 "cat > /home/bot/dbot_sold_guard/$f && chown bot:bot /home/bot/dbot_sold_guard/$f && chmod 644 /home/bot/dbot_sold_guard/$f" < "analysis/$f"
+            echo "sha256 в репозитории ($f):"; sha256sum "analysis/$f"
+            echo "sha256 на хосте ($f):"; ssh $SSH_OPTS root@45.59.170.76 "sha256sum /home/bot/dbot_sold_guard/$f"
+          done
+
+      - name: "1b. Границы этапа A доказываются на самом хосте (без сети и без ключей)"
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --self-test
           '
 
       - name: "2. Секреты -> /etc/dbot-guard/env (отдельный файл, НЕ /etc/bot/env -- этой службе Lighter/EVM-ключи не нужны)"
@@ -94,6 +129,8 @@ jobs:
           GUARD_STUCK_THRESHOLD=10
           GUARD_API_DOWN_ALERT_S=600
           GUARD_STATE_DIR=/home/bot/dbot_sold_position_guard_live_data
+          GUARD_SAMPLE_PATH=/home/bot/dbot_sold_position_guard_live_data/dbot_sold_position_guard_sample.json
+          GUARD_TRADES_PATH=/home/bot/robinhood-chain-alpha/data/solana_trades_all.json
           EOF
           echo "GUARD_LIVE_SELL=1 -- живая продажа включена по прямой инструкции владельца (боевое включение после чистого read-пути)."
 
@@ -111,9 +148,9 @@ jobs:
           Type=simple
           User=bot
           Group=bot
-          WorkingDirectory=/home/bot/robinhood-chain-alpha
+          WorkingDirectory=/home/bot/dbot_sold_guard
           EnvironmentFile=/etc/dbot-guard/env
-          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/robinhood-chain-alpha/analysis/dbot_sold_position_guard.py
+          ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py
           Restart=always
           RestartSec=10
           NoNewPrivileges=true
@@ -146,8 +183,8 @@ jobs:
       - name: "5. Проверка ДО боевого включения: --check-only (чистое чтение, ничего не продаёт)"
         run: |
           ssh $SSH_OPTS root@45.59.170.76 '
-            cd /home/bot/robinhood-chain-alpha
-            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env; set +a; ./venv/bin/python -u analysis/dbot_sold_position_guard.py --check-only"
+            cd /home/bot/dbot_sold_guard
+            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only"
           '
 
       - name: "6. Включить и (пере)запустить службу (только если inputs.enable_service=yes)"
@@ -176,7 +213,7 @@ jobs:
       - name: "7. Забрать сырой sample expired-записи (если появился) для коммита -- диагностика формы ответа"
         if: always()
         run: |
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/robinhood-chain-alpha/data/dbot_sold_position_guard_sample.json 2>/dev/null' > /tmp/guard_sample.json || true
+          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_sold_position_guard_live_data/dbot_sold_position_guard_sample.json 2>/dev/null || cat /home/bot/robinhood-chain-alpha/data/dbot_sold_position_guard_sample.json 2>/dev/null' > /tmp/guard_sample.json || true
           if [ -s /tmp/guard_sample.json ]; then
             mkdir -p data
             cp /tmp/guard_sample.json data/dbot_sold_position_guard_sample.json

@@ -72,7 +72,13 @@ import solana_ledger_run as ledger  # noqa: E402  -- reuse rpc_call/get_token_ho
 DBOT_HOST = "https://api-bot-v1.dbotx.com"
 SOLANA_CHAIN = "solana"
 
-SAMPLE_PATH = REPO_ROOT / "data" / "dbot_sold_position_guard_sample.json"
+# Служба живёт ВНЕ git-дерева (иначе почасовые workflow, делающие
+# git reset --hard на чужую ветку, выбивают ExecStart из-под неё --
+# ровно это уже случалось с зондом). Поэтому оба пути к файлам
+# переопределяются окружением, а REPO_ROOT остаётся лишь значением по
+# умолчанию для запуска из репозитория.
+SAMPLE_PATH = Path(os.environ.get("GUARD_SAMPLE_PATH",
+                                   str(REPO_ROOT / "data" / "dbot_sold_position_guard_sample.json")))
 
 DEFAULT_INTERVAL_S = 45
 DEFAULT_STUCK_THRESHOLD = 10
@@ -250,6 +256,7 @@ def fetch_expired_orders(api_key: str) -> tuple[list[dict], bool]:
             )
         items = extract_items(body)
         if items and not SAMPLE_PATH.exists():
+            SAMPLE_PATH.parent.mkdir(parents=True, exist_ok=True)
             SAMPLE_PATH.write_text(_scrub_all(json.dumps(items[0], ensure_ascii=False, indent=2, default=str)))
             log.info("сырая первая expired-запись сохранена в %s", SAMPLE_PATH.name)
         if not items:

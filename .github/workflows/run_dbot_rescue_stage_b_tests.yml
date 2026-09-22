@@ -81,7 +81,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/dbot_rescue_stage_b_tests.json data/dbot_distribute_raw_sample.json 2>/dev/null || true
+          # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
+          # добавляет НИЧЕГО, включая существующие соседние пути. На
+          # сухом прогоне это и случилось -- файла сырой формы ещё не
+          # было, и выгрузка не закоммитилась.
+          for f in data/dbot_rescue_stage_b_tests.json data/dbot_distribute_raw_sample.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Спасение, этап B: результат проверок distribute [automated]"
           for i in 1 2 3 4 5; do
