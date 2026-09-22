@@ -1,42 +1,42 @@
-=== ЗОНД ОБНАРУЖЕНИЯ: отчёт на 2026-09-22T00:13:02Z ===
+=== ЗОНД ОБНАРУЖЕНИЯ: отчёт на 2026-09-22T00:17:47Z ===
 --- состояние службы ---
 {
-  "updated_utc": "2026-09-22T00:12:23Z",
+  "updated_utc": "2026-09-22T00:17:06Z",
   "uptime_s": 60.1,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
-      "utc": "2026-09-22T00:11:24Z",
+      "utc": "2026-09-22T00:16:07Z",
       "method": "logsSubscribe",
       "acked": 63,
       "of": 63
     }
   ],
   "источников": 63,
-  "событий_записано": 4,
+  "событий_записано": 8,
   "дублей_пропущено": 0,
-  "неудачных_пропущено": 2,
+  "неудачных_пропущено": 0,
   "переподключений_tx": 1,
   "переподключений_slot": 0,
-  "slot_уведомлений": 226,
-  "текущий_слот": 449213223,
-  "последнее_событие_utc": "2026-09-22T00:12:18Z",
+  "slot_уведомлений": 223,
+  "текущий_слот": 449214282,
+  "последнее_событие_utc": "2026-09-22T00:16:59Z",
   "часы": {
-    "checked_at_utc": "2026-09-22T00:11:23Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Tue 2026-09-22 02:11:23 CEST\nRTCTimeUSec=Tue 2026-09-22 02:11:23 CEST",
+    "checked_at_utc": "2026-09-22T00:16:06Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Tue 2026-09-22 02:16:06 CEST\nRTCTimeUSec=Tue 2026-09-22 02:16:06 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-событий всего: 7; обогащено: 0
+событий всего: 29; обогащено: 0
 
 --- как быстро мы узнаём о сделке источника ---
-lag_slots (текущий слот минус слот транзакции) n=7: {0: 7}
+lag_slots (текущий слот минус слот транзакции) n=29: {-1: 1, 0: 27, 1: 1}
   медиана=0
-ms_since_slot_seen n=7: медиана=182.9 мин=4.7 макс=340.8
-по способу: {'logsSubscribe': 7}
-по источникам (топ-10): {'4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD': 4, '2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8': 1, 'BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN': 1, 'DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc': 1}
+ms_since_slot_seen n=29: медиана=168.6 мин=0.3 макс=372.8
+по способу: {'logsSubscribe': 29}
+по источникам (топ-10): {'4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD': 6, 'DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc': 6, 'Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo': 4, 'F5hkYsi8JxjyA2JHN5CA7MbnnhWubkXB2ZQB7Gkaxqs6': 4, 'Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn': 2, '2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8': 1, '7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H': 1, 'BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN': 1, 'CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7': 1, 'DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y': 1}
 
 === ГЛАВНЫЙ ВОПРОС ВЛАДЕЛЬЦА ===
 Сколько слотов проходит между тем, как МЫ увидели транзакцию источника,
