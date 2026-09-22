@@ -15,3 +15,4 @@ rlp>=4.0                # Задача 5, живой бот: декодиров�
 web3>=6.0               # Задача 5, живой бот: task5_bot_sender.py (владелец, 2026-09-13) -- Web3 HTTPProvider для RPC/sequencer, подпись/отправка/рецепт
 py-solc-x>=2.0           # Задача 5, стадия 2: компиляция ClosedCycleExecutorV4.sol на Ohio (сеть есть) -- ТОЛЬКО компиляция/локальная проверка, без деплоя, см. task5_v4_executor_compile_check.py
 eth-utils>=5.0           # Задача 5, живой пилот: селекторы функций/ошибок executeCycle (eth_utils.function_signature_to_4byte_selector) -- явная зависимость, а не расчёт на транзитивную протяжку через eth-account/web3
+solders>=0.23            # Спасение зависших позиций (этапы C/D, dbot_rescue.py): подпись транзакций кошелька-утилизатора -- Jupiter Ultra, возврат SOL на кошелёк задачи, закрытие токен-аккаунта. Отправка только при RESCUE_LIVE=1, ключ только из окружения RESCUE_WALLET_KEY.
