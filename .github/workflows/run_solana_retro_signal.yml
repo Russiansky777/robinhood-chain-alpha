@@ -54,6 +54,18 @@ on:
         description: "'no' -- не выгружать чекпойнты в git (по умолчанию выгружаются: иначе при гибели раннера возобновлять не из чего)"
         required: false
         default: ""
+      only_leaders:
+        description: "через запятую: считать ТОЛЬКО этих лидеров -- так прогон делится на части"
+        required: false
+        default: ""
+      seed_cache_from:
+        description: "взять готовые симуляции из выгрузки прошлого прогона, напр. data/solana_retro_signal.json"
+        required: false
+        default: ""
+      exit_deep_max_blocks:
+        description: "потолок блоков глубокого добора выхода (420 по умолчанию)"
+        required: false
+        default: "420"
 
 concurrency:
   group: solana-retro-signal
@@ -100,6 +112,9 @@ jobs:
             --min-buys "${{ github.event.inputs.min_buys || 3 }}" \
             --extra-crowd "${{ github.event.inputs.extra_crowd }}" \
             --checkpoint-s "${{ github.event.inputs.checkpoint_s || 900 }}" \
+            --only-leaders "${{ github.event.inputs.only_leaders }}" \
+            --seed-cache-from "${{ github.event.inputs.seed_cache_from }}" \
+            --exit-deep-max-blocks "${{ github.event.inputs.exit_deep_max_blocks || 420 }}" \
             ${{ github.event.inputs.checkpoint_push != 'no' && '--checkpoint-push' || '' }} \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -600

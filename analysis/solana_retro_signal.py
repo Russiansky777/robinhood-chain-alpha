@@ -1373,6 +1373,9 @@ def reaggregate(min_leg_sol: float, mode: str) -> None:
 
 
 def main() -> None:
+    # Потолок глубокого добора выхода задаётся ключом: если добор съедает
+    # весь бюджет времени, его можно понизить, не трогая код.
+    global EXIT_DEEP_MAX_BLOCKS
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--mode", choices=("calibrate", "full"), default="calibrate")
     ap.add_argument("--workers", type=int, default=4)
@@ -1384,6 +1387,15 @@ def main() -> None:
                           "чтобы прогон оставался возобновляемым)")
     ap.add_argument("--checkpoint-s", type=float, default=CHECKPOINT_S,
                      help="как часто сохранять кэш на диск, секунд")
+    ap.add_argument("--only-leaders", default="",
+                     help="через запятую: считать ТОЛЬКО эти кошельки-лидеры. Так прогон делится "
+                          "на части, если целиком не укладывается в лимит задания")
+    ap.add_argument("--seed-cache-from", default="",
+                     help="взять готовые симуляции из выгрузки прошлого прогона (её sims) в кэш. "
+                          "Спасает работу прогона, который писать кэш ещё не умел")
+    ap.add_argument("--exit-deep-max-blocks", type=int, default=EXIT_DEEP_MAX_BLOCKS,
+                     help="потолок блоков глубокого добора выхода; понизить, если добор съедает "
+                          "весь бюджет времени")
     ap.add_argument("--checkpoint-push", action="store_true",
                      help="выгружать чекпойнт в git прямо из прогона -- иначе он погибнет "
                           "вместе с раннером и возобновлять будет не из чего")
@@ -1402,6 +1414,7 @@ def main() -> None:
     if args.self_test:
         self_test_method()
         return
+    EXIT_DEEP_MAX_BLOCKS = args.exit_deep_max_blocks
     if args.reaggregate:
         reaggregate(args.min_leg_sol, args.mode)
         return
@@ -1426,7 +1439,42 @@ def main() -> None:
     # --no-cache теперь значит "не брать готовое", а НЕ "не сохранять".
     # Прежнее поведение выключало запись целиком, и обрыв прогона стоил
     # всей работы -- ровно то, что просил починить владелец.
+    only_leaders = {a.strip() for a in args.only_leaders.split(",") if a.strip()}
+    if only_leaders:
+        before = len(items)
+        missing = only_leaders - {it["leader"] for it in items}
+        items = [it for it in items if it["leader"] in only_leaders]
+        log(f"ЧАСТЬ ПРОГОНА: только {len(only_leaders)} лидеров -- {len(items)} симуляций из {before}")
+        if missing:
+            # Честно: адрес, которого нет среди источников, НЕ просчитан,
+            # а не "просчитан и пусто".
+            log(f"ВНИМАНИЕ: {len(missing)} адресов из --only-leaders нет среди источников: "
+                f"{', '.join(sorted(missing))}")
+
     cache = SimCache(SIM_CACHE_PATH, METHOD_VERSION, ignore_existing=args.no_cache)
+    if args.seed_cache_from:
+        seed = Path(args.seed_cache_from)
+        seed = seed if seed.is_absolute() else REPO_ROOT / seed
+        n_seed = 0
+        if seed.exists():
+            try:
+                prev = json.loads(seed.read_text())
+            except (ValueError, OSError) as exc:
+                log(f"засев кэша: {seed.name} не читается ({type(exc).__name__}) -- пропускаю")
+                prev = {}
+            # Берём ТОЛЬКО доведённые до конца строки. Симуляции,
+            # оборвавшиеся по исчерпанию бюджета, выглядят как no_exit --
+            # если засеять и их, обрыв прошлого прогона навсегда
+            # закрепится в данных как "сделок не было".
+            for r in (prev.get("sims") or []):
+                sig = r.get("leader_signature")
+                if sig and r.get("status") in ("ok", "частично") and not r.get("exit_scan_hit_cap"):
+                    cache.put(sig, r)
+                    n_seed += 1
+            log(f"засев кэша из {seed.name}: взято {n_seed} завершённых симуляций "
+                f"(строки с исчерпанным бюджетом и упёршиеся в потолок скана НЕ берутся)")
+        else:
+            log(f"засев кэша: файла {seed} нет")
     if cache.dropped_other_version:
         log(f"кэш: отброшено {cache.dropped_other_version} записей ЧУЖОЙ версии метода "
             f"(нужна {METHOD_VERSION}) -- смешивать старые и новые строки нельзя")
@@ -1497,6 +1545,8 @@ def main() -> None:
                               "дополнительные_сканы": args.extra_crowd or None,
                               "окно_выхода_с": [EXIT_FROM_S, EXIT_TO_S],
                               "потолок_блоков_скана_выхода": EXIT_DEEP_MAX_BLOCKS,
+                              "только_лидеры": sorted(only_leaders) or None,
+                              "засеяно_из": args.seed_cache_from or None,
                               "порог_медленного_выхода_с": EXIT_SLOW_S},
         "calibration": calib,
         "overall": overall(rows, "все кошельки", args.min_leg_sol),
