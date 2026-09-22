@@ -88,6 +88,19 @@ def out_path_for(mode: str) -> Path:
 
 
 SIM_CACHE_PATH = REPO_ROOT / "data" / "solana_retro_signal_cache.json"
+PROGRESS_PATH = REPO_ROOT / "data" / "solana_retro_signal_progress.json"
+
+# ВЕРСИЯ МЕТОДА. Кэш симуляций хранится вместе с ней, и записи ЧУЖОЙ
+# версии при загрузке отбрасываются. Без этого возобновление после
+# правки метода тихо смешало бы строки, посчитанные по старому и новому
+# правилу, -- а именно из-за этого риска прогон после правки приходилось
+# гонять с --no-cache, то есть вообще без возможности возобновиться.
+# Поднимать при ЛЮБОМ изменении, влияющем на цифры в строке симуляции.
+#   1 -- исходный метод;
+#   2 -- E0 без перекрытия (только слот S);
+#   3 -- откат входа на цену лидера + окно выхода до T+120с.
+METHOD_VERSION = 3
+CHECKPOINT_S = 900   # ~15 минут между сохранениями на диск
 
 EXIT_FROM_S = 33
 # ОКНО ВЫХОДА РАСШИРЕНО до T+120с (распоряжение владельца). Прежнее
@@ -1047,6 +1060,31 @@ def self_test_method() -> None:
     chk("ровно половина в плюс НЕ проходит", all(x["address"] != "B" for x in pc["прошли"]))
     chk("кошельки в задаче в список кандидатов не попадают", pc["кандидатов_всего"] == 2)
 
+    # --- возобновление после обрыва ---
+    import tempfile  # noqa: PLC0415
+    tmp = Path(tempfile.mkdtemp())
+    cp = tmp / "cache.json"
+    c = SimCache(cp, 3)
+    c.put("sigA", {"status": "ok", "sim_E2": 1.0})
+    chk("чекпойнт сохраняет записи", c.save() == 1)
+    chk("в файле записана версия метода",
+        json.loads(cp.read_text()).get("версия_метода") == 3)
+    chk("возобновление подхватывает готовое", SimCache(cp, 3).loaded == 1)
+    chk("ЧУЖАЯ версия метода отбрасывается, а не смешивается", SimCache(cp, 4).loaded == 0)
+    chk("и отброшенное посчитано", SimCache(cp, 4).dropped_other_version == 1)
+    c2 = SimCache(cp, 3, ignore_existing=True)
+    chk("--no-cache не берёт готовое", c2.loaded == 0)
+    c2.put("sigB", {"status": "ok"})
+    c2.save()
+    chk("--no-cache при этом ПИШЕТ (обрыв больше не стоит всего прогона)",
+        SimCache(cp, 3).loaded == 1)
+    chk("чекпойнт по времени: сразу не нужен", not SimCache(cp, 3).due(900))
+    chk("чекпойнт по времени: при нулевом пороге нужен", SimCache(cp, 3).due(0))
+    bad_file = tmp / "bad.json"
+    bad_file.write_text("{не json")
+    chk("битый кэш не валит запуск", SimCache(bad_file, 3).loaded == 0)
+    chk("временный файл после записи убран", not cp.with_suffix(".tmp").exists())
+
     bad = 0
     for name, good, got in checks:
         print(f"  [{'ok  ' if good else 'СБОЙ'}] {name}" + (f"  -> {got}" if got and not good else ""))
@@ -1120,16 +1158,45 @@ def recompute_price(rpc: Rpc, slot: int, mint: str, signature: str, url: str | N
 # ---------- прогон ----------
 
 class SimCache:
-    def __init__(self, path: Path) -> None:
+    """Кэш посчитанных симуляций -- он же точка возобновления.
+
+    Формат файла: {"версия_метода": N, "сохранено_utc": ..., "rows": {...}}.
+    Записи другой версии метода при загрузке ОТБРАСЫВАЮТСЯ: иначе после
+    правки метода возобновление тихо смешало бы старые и новые строки.
+    Старый плоский формат (без версии) считается версией 1.
+
+    ignore_existing -- пересчитать всё заново, НО ПРОДОЛЖАЯ ПИСАТЬ: это и
+    есть разница с прежним --no-cache, который не писал ничего, и обрыв
+    означал потерю всего прогона."""
+
+    def __init__(self, path: Path, method_version: int = METHOD_VERSION,
+                  ignore_existing: bool = False) -> None:
         self.path = path
+        self.version = method_version
         self._lock = threading.Lock()
         self._d: dict = {}
-        if path.exists():
+        self.loaded = 0
+        self.dropped_other_version = 0
+        if path.exists() and not ignore_existing:
             try:
-                self._d = json.loads(path.read_text())
+                raw = json.loads(path.read_text())
             except (ValueError, OSError):
-                self._d = {}
+                raw = {}
+            if isinstance(raw, dict) and "rows" in raw:
+                if raw.get("версия_метода") == method_version:
+                    self._d = raw["rows"] or {}
+                else:
+                    self.dropped_other_version = len(raw.get("rows") or {})
+            elif isinstance(raw, dict):
+                # плоский формат = версия 1
+                if method_version == 1:
+                    self._d = raw
+                else:
+                    self.dropped_other_version = len(raw)
+            self.loaded = len(self._d)
         self.hits = 0
+        self.saves = 0
+        self._last_save = time.monotonic()
 
     def get(self, sig: str) -> dict | None:
         v = self._d.get(sig)
@@ -1142,13 +1209,84 @@ class SimCache:
         with self._lock:
             self._d[sig] = row
 
-    def save(self) -> None:
+    def due(self, every_s: float = CHECKPOINT_S) -> bool:
+        return (time.monotonic() - self._last_save) >= every_s
+
+    def save(self) -> int:
+        """Атомарно: сначала во временный файл, потом подмена. Обрыв
+        посреди записи не оставит битый кэш, из которого потом нечего
+        возобновлять."""
         with self._lock:
-            self.path.write_text(json.dumps(self._d, ensure_ascii=False, default=str))
+            payload = {"версия_метода": self.version, "сохранено_utc": now_utc(),
+                        "n": len(self._d), "rows": self._d}
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, default=str))
+            os.replace(tmp, self.path)
+            self.saves += 1
+            self._last_save = time.monotonic()
+            return len(self._d)
+
+
+def push_checkpoint(paths: list[Path], note: str) -> str:
+    """Отправить чекпойнт на удалённую ветку ПРЯМО ИЗ ПРОГОНА.
+
+    Зачем так. Кэш, сохранённый только на диск раннера, при гибели
+    раннера исчезает вместе с ним -- возобновлять будет не из чего:
+    шаг коммита в workflow выполняется лишь после завершения расчёта,
+    которого в этом случае не будет. Поэтому чекпойнт уходит в git
+    сразу.
+
+    Любая неудача здесь НЕ должна ронять прогон: расчёт важнее
+    сохранения, и следующая попытка будет через четверть часа."""
+    import subprocess  # noqa: PLC0415 -- нужен только здесь
+
+    def sh(*args: str, check: bool = False) -> subprocess.CompletedProcess:
+        return subprocess.run(args, cwd=str(REPO_ROOT), capture_output=True,
+                               text=True, timeout=180, check=check)
+
+    try:
+        sh("git", "config", "user.name", "github-actions[bot]")
+        sh("git", "config", "user.email", "github-actions[bot]@users.noreply.github.com")
+        existing = [str(x.relative_to(REPO_ROOT)) for x in paths if x.exists()]
+        if not existing:
+            return "нечего сохранять"
+        for f in existing:
+            sh("git", "add", f)
+        if sh("git", "diff", "--cached", "--quiet").returncode == 0:
+            return "изменений нет"
+        sh("git", "commit", "-m", f"Ретро-сигнал: промежуточное сохранение -- {note} [automated]")
+        for attempt in range(3):
+            r = sh("git", "push", "origin", "HEAD:claude/nifty-sagan-r0polg")
+            if r.returncode == 0:
+                return f"выгружено ({', '.join(existing)})"
+            sh("git", "pull", "--rebase", "origin", "claude/nifty-sagan-r0polg")
+        return "push отклонён 3 раза -- чекпойнт остался только на диске раннера"
+    except Exception as exc:  # noqa: BLE001
+        return f"ошибка выгрузки ({type(exc).__name__}) -- чекпойнт остался на диске"
+
+
+def write_progress(path: Path, label: str, done: int, total: int, from_cache: int,
+                    rpc: Rpc, st: SlotTrades, started: float) -> None:
+    """Небольшой файл состояния: по нему видно, где прогон, пока логи
+    задания ещё недоступны (GitHub отдаёт их только по завершении)."""
+    try:
+        path.write_text(json.dumps({
+            "обновлено_utc": now_utc(), "этап": label,
+            "готово": done, "всего_считать": total, "взято_из_кэша": from_cache,
+            "доля": round(done / total, 4) if total else None,
+            "версия_метода": METHOD_VERSION,
+            "минут_идёт": round((time.monotonic() - started) / 60, 1),
+            "блоков": st.fetched, "блоков_из_кэша": st.hits,
+            "rpc_вызовов": rpc.calls, "ретраев": rpc.retries,
+            "бюджет_исчерпан": rpc.expired(),
+        }, ensure_ascii=False, indent=1))
+    except OSError:
+        pass
 
 
 def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: int,
-        label: str, cache: SimCache | None) -> list[dict]:
+        label: str, cache: SimCache | None, checkpoint_s: float = CHECKPOINT_S,
+        push: bool = False, started: float | None = None) -> list[dict]:
     rows: list[dict] = []
     todo = []
     for it in items:
@@ -1160,6 +1298,8 @@ def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: 
             todo.append(it)
     if cache and rows:
         log(f"{label}: из кэша {len(rows)}, считать {len(todo)}")
+    n_from_cache = len(rows)
+    started = started if started is not None else time.monotonic()
     done = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(simulate, rpc, st, clock, it["leader"], it["mint"], it["slot"],
@@ -1183,10 +1323,22 @@ def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: 
                 log(f"{label}: {done}/{len(todo)} | блоков={st.fetched} из кэша={st.hits} "
                     f"пропущено={st.skipped} | getBlockTime={clock.calls} | RPC={rpc.calls} "
                     f"ретраев={rpc.retries}")
-                if cache:
-                    cache.save()
+                write_progress(PROGRESS_PATH, label, done, len(todo), n_from_cache,
+                                rpc, st, started)
+            # ЧЕКПОЙНТ ПО ВРЕМЕНИ, а не только по числу симуляций: на
+            # глубоком доборе выхода одна симуляция может идти минутами,
+            # и "каждые 20 штук" превращалось бы в час без сохранения.
+            if cache and (cache.due(checkpoint_s) or done == len(todo)):
+                n = cache.save()
+                msg = f"{label}: чекпойнт -- в кэше {n} симуляций"
+                if push:
+                    msg += "; " + push_checkpoint([cache.path, PROGRESS_PATH],
+                                                   f"{label} {done}/{len(todo)}")
+                log(msg)
     if cache:
         cache.save()
+        if push:
+            log(f"{label}: финальный чекпойнт -- {push_checkpoint([cache.path, PROGRESS_PATH], 'финал')}")
     return rows
 
 
@@ -1227,7 +1379,14 @@ def main() -> None:
     ap.add_argument("--time-budget-s", type=int, default=75 * 60)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--min-interval-s", type=float, default=0.12)
-    ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--no-cache", action="store_true",
+                     help="не брать готовые строки из кэша (запись при этом продолжается, "
+                          "чтобы прогон оставался возобновляемым)")
+    ap.add_argument("--checkpoint-s", type=float, default=CHECKPOINT_S,
+                     help="как часто сохранять кэш на диск, секунд")
+    ap.add_argument("--checkpoint-push", action="store_true",
+                     help="выгружать чекпойнт в git прямо из прогона -- иначе он погибнет "
+                          "вместе с раннером и возобновлять будет не из чего")
     ap.add_argument("--min-leg-sol", type=float, default=MIN_LEG_SOL)
     ap.add_argument("--min-buys", type=int, default=3,
                      help="порог числа покупок для КАНДИДАТА (в задаче порога нет)")
@@ -1264,7 +1423,15 @@ def main() -> None:
         st.detail = "full"
         log("переключаюсь на transactionDetails=full -- accounts не отдаёт нужные поля")
 
-    cache = None if args.no_cache else SimCache(SIM_CACHE_PATH)
+    # --no-cache теперь значит "не брать готовое", а НЕ "не сохранять".
+    # Прежнее поведение выключало запись целиком, и обрыв прогона стоил
+    # всей работы -- ровно то, что просил починить владелец.
+    cache = SimCache(SIM_CACHE_PATH, METHOD_VERSION, ignore_existing=args.no_cache)
+    if cache.dropped_other_version:
+        log(f"кэш: отброшено {cache.dropped_other_version} записей ЧУЖОЙ версии метода "
+            f"(нужна {METHOD_VERSION}) -- смешивать старые и новые строки нельзя")
+    log(f"кэш: взято готовых {cache.loaded}, версия метода {METHOD_VERSION}, "
+        f"чекпойнт каждые {args.checkpoint_s}с, выгрузка в git: {'да' if args.checkpoint_push else 'нет'}")
     if args.mode == "calibrate":
         items = live[:args.limit] if args.limit else live
         meta: dict[str, dict] = {}
@@ -1278,7 +1445,8 @@ def main() -> None:
         label = "основной"
     log(f"{label}: симуляций к расчёту {len(items)}")
 
-    rows = run(rpc, st, clock, items, args.workers, label, cache)
+    rows = run(rpc, st, clock, items, args.workers, label, cache,
+                checkpoint_s=args.checkpoint_s, push=args.checkpoint_push, started=started)
     # Калибровка -- на тех же строках, что и сводки: без пыли и без
     # медленных выходов. Раньше она считалась по ВСЕМ строкам, а сводки
     # по отфильтрованным -- и гейт проверял не то, что потом печаталось.
@@ -1317,6 +1485,10 @@ def main() -> None:
                        "rpc_retries": rpc.retries, "rpc_errors": rpc.errors,
                        "batch_splits": getattr(rpc, "splits", 0),
                        "sims_from_cache": (cache.hits if cache else 0),
+                       "кэш_взято_готовых": (cache.loaded if cache else 0),
+                       "кэш_отброшено_чужой_версии": (cache.dropped_other_version if cache else 0),
+                       "кэш_сохранений": (cache.saves if cache else 0),
+                       "версия_метода": METHOD_VERSION,
                        "elapsed_s": round(time.monotonic() - started, 1),
                        "budget_exhausted": rpc.expired(),
                        "statuses": {k: sum(1 for r in rows if r.get("status") == k)

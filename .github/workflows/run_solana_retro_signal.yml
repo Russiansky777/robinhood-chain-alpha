@@ -46,6 +46,14 @@ on:
         description: "через запятую: дополнительные сканы толпы, напр. data/solana_crowd_scan_7d.json"
         required: false
         default: ""
+      checkpoint_s:
+        description: "как часто сохранять промежуточный результат, секунд (900 = ~15 минут)"
+        required: false
+        default: "900"
+      checkpoint_push:
+        description: "'no' -- не выгружать чекпойнты в git (по умолчанию выгружаются: иначе при гибели раннера возобновлять не из чего)"
+        required: false
+        default: ""
 
 concurrency:
   group: solana-retro-signal
@@ -69,6 +77,11 @@ jobs:
       - name: Зависимости
         run: pip install -q requests
 
+      # Шаг расчёта сам выгружает чекпойнты в git (см. push_checkpoint):
+      # шаг коммита ниже выполняется только после успешного завершения, а
+      # смысл чекпойнта ровно в том, чтобы пережить НЕзавершение.
+      # persist-credentials у checkout@v4 включён по умолчанию, поэтому
+      # push из шага работает тем же токеном.
       - name: "Ретро-сигнал (только чтение цепочки)"
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
@@ -86,6 +99,8 @@ jobs:
             --limit "${{ github.event.inputs.limit || 0 }}" \
             --min-buys "${{ github.event.inputs.min_buys || 3 }}" \
             --extra-crowd "${{ github.event.inputs.extra_crowd }}" \
+            --checkpoint-s "${{ github.event.inputs.checkpoint_s || 900 }}" \
+            ${{ github.event.inputs.checkpoint_push != 'no' && '--checkpoint-push' || '' }} \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -600
 
@@ -123,10 +138,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
           # добавляет НИЧЕГО, включая существующие соседние пути.
-          for f in data/solana_retro_signal.json data/solana_retro_signal_calibration.json data/solana_retro_signal_cache.json; do
+          for f in data/solana_retro_signal.json data/solana_retro_signal_calibration.json data/solana_retro_signal_cache.json data/solana_retro_signal_progress.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          # Свои же чекпойнты уже в ветке -- подтягиваем, иначе итоговый
+          # push будет отклонён как несинхронный.
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
           git commit -m "Ретро-сигнал: прогон [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
