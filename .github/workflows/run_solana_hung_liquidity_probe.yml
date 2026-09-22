@@ -1,0 +1,29 @@
+name: "Причина зависших продаж: ликвидность и Token-2022 (только чтение)"
+on:
+  workflow_dispatch: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -q requests
+      - env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: python -u analysis/solana_hung_liquidity_probe.py 2>&1 | tail -80
+      - if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/solana_hung_liquidity.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Причина зависших продаж: ликвидность и Token-2022 [automated]"
+          for i in 1 2 3; do git push origin HEAD:claude/nifty-sagan-r0polg && exit 0; git pull --rebase origin claude/nifty-sagan-r0polg; done
