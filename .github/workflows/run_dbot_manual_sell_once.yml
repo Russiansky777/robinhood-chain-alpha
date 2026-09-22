@@ -47,6 +47,10 @@ on:
         description: "напечатать ПРОДАЮ для реальной отправки; пусто = сухой прогон"
         required: false
         default: ""
+      since_ts:
+        description: "unix-время: показать сделки по минту с этого момента (проверка постфактум, 0 = не искать)"
+        required: false
+        default: "0"
 
 concurrency:
   group: dbot-manual-sell-once
@@ -94,4 +98,5 @@ jobs:
             --max-slippage "${{ github.event.inputs.max_slippage }}" \
             --retries "${{ github.event.inputs.retries }}" \
             --wait-s "${{ github.event.inputs.wait_s }}" \
+            --since-ts "${{ github.event.inputs.since_ts || 0 }}" \
             $CONFIRM 2>&1 | tail -300

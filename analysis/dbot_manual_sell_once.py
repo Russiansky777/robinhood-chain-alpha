@@ -127,12 +127,15 @@ def find_wallet_id(wallet: str, key: str) -> tuple[str | None, dict]:
     return None, {}
 
 
-def expired_has(wallet: str, mint: str, key: str) -> dict:
+def expired_has(wallet: str, mint: str, key: str, max_pages: int = 5) -> dict:
     """Есть ли эта позиция в expired-списке (её может продать сторож)."""
     found, pages, ok = [], 0, True
     page = 0
-    while page < 30:
-        st, body = dbot_get("/automation/copy_tpsl_tasks",
+    while page < max_pages:
+        # Путь ровно тот же, что в сторожe. На первом прогоне я взял
+        # /automation/copy_tpsl_tasks -- он отдал не 200, и проверка
+        # молча вернула "0 страниц прочитано, список неполный".
+        st, body = dbot_get("/automation/pnl_orders_from_follow_order",
                              {"chain": SOLANA_CHAIN, "state": "expired", "size": 20, "page": page}, key)
         if st != 200:
             ok = False
@@ -301,6 +304,8 @@ def main() -> None:
     ap.add_argument("--retries", type=int, default=3)
     ap.add_argument("--wait-s", type=int, default=25)
     ap.add_argument("--confirm-live-sell", action="store_true")
+    ap.add_argument("--since-ts", type=int, default=0,
+                    help="искать сделки по минту начиная с этой метки времени (для проверки постфактум)")
     args = ap.parse_args()
 
     dbot_key, dbot_name = env("DBOT_API_KEY")
@@ -318,14 +323,10 @@ def main() -> None:
     log(f"walletId найден живьём из follow_orders; задача: {json.dumps(task, ensure_ascii=False)}")
     report["задача"] = task
 
-    prog = mint_program(args.mint, hel_key)
-    log(f"программа минта: {json.dumps(prog, ensure_ascii=False)}")
-    report["программа_минта"] = prog
-
-    exp_before = expired_has(args.wallet, args.mint, dbot_key)
-    log(f"позиция в expired ДО (её может продать сторож): {json.dumps(exp_before, ensure_ascii=False)}")
-    report["expired_до"] = exp_before
-
+    # ПОРЯДОК ВАЖЕН: между решением продать и самим вызовом не должно
+    # быть медленной диагностики -- на первом реальном прогоне обход
+    # expired-списка задержал отправку. Сначала баланс (без него продавать
+    # нельзя) и продажа, вся остальная диагностика -- после.
     bal0 = balance_three_ways(args.wallet, args.mint, hel_key)
     log(f"БАЛАНС ДО: {json.dumps(bal0, ensure_ascii=False)}")
     report["баланс_до"] = bal0
@@ -336,12 +337,20 @@ def main() -> None:
         print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2))
         return
 
+    if args.since_ts:
+        report["сделки_с_момента"] = find_sell_tx(args.wallet, args.mint, args.since_ts, hel_key)
+        report["expired_сейчас"] = expired_has(args.wallet, args.mint, dbot_key)
+        log(f"сделки по минту с {args.since_ts}: {json.dumps(report['сделки_с_момента'], ensure_ascii=False)}")
+        log(f"expired сейчас: {json.dumps(report['expired_сейчас'], ensure_ascii=False)}")
+
     if not args.confirm_live_sell:
-        report["итог"] = "СУХОЙ ПРОГОН: --confirm-live-sell не передан, продажа НЕ отправлена"
+        report["итог"] = "НАБЛЮДЕНИЕ: --confirm-live-sell не передан, продажа НЕ отправлена"
         log(report["итог"])
         print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2))
         return
 
+    prog = None
+    exp_before = None
     prev = bal0["итог"]
     for percent in [float(x) for x in args.percents.split(",") if x.strip()]:
         t0 = int(time.time())
@@ -350,7 +359,14 @@ def main() -> None:
         time.sleep(args.wait_s)
         bal = balance_three_ways(args.wallet, args.mint, hel_key)
         tx = find_sell_tx(args.wallet, args.mint, t0, hel_key)
+        if prog is None:
+            prog = mint_program(args.mint, hel_key)
+            report["программа_минта"] = prog
+            log(f"программа минта: {json.dumps(prog, ensure_ascii=False)}")
         exp_now = expired_has(args.wallet, args.mint, dbot_key)
+        if exp_before is None:
+            exp_before = exp_now
+            report["expired_после_первой_попытки"] = exp_now
         step = {"sellPercent": percent, "http": st, "принято_DBot": ok, "сообщение": msg,
                  "сырой_ответ": json.loads(scrub(json.dumps(resp, ensure_ascii=False, default=str)))
                  if isinstance(resp, dict) else str(resp),
