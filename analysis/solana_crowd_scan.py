@@ -121,6 +121,7 @@ class Rpc:
         self.calls = 0
         self.retries = 0
         self.errors = 0
+        self.splits = 0
         self.deadline: float | None = None
 
     def session(self) -> requests.Session:
@@ -191,19 +192,26 @@ class Rpc:
             opts["before"] = before
         return self.call("getSignaturesForAddress", [address, opts]) or []
 
-    def transactions(self, sigs: list[str]) -> dict[str, dict | None]:
-        """Пачка getTransaction одним POST (как в скане 217)."""
+    def transactions(self, sigs: list[str], _depth: int = 0) -> dict[str, dict | None]:
+        """Пачка getTransaction одним POST (как в скане 217).
+
+        Найдено на реальном прогоне калибровки: у самых активных
+        кошельков (пилот, MaxHuh) пачка из 20 стабильно исчерпывала
+        попытки -- ответ слишком большой -- и кошелёк падал целиком со
+        статусом "ошибка", то есть терялся из калибровки. Теперь при
+        неудаче пачка ДРОБИТСЯ пополам вплоть до одиночных запросов, и
+        сдаётся только та подпись, которая действительно не отдаётся."""
         if not sigs:
             return {}
         payload = [{"jsonrpc": "2.0", "id": i, "method": "getTransaction",
                     "params": [s, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}]}
                    for i, s in enumerate(sigs)]
-        for _ in range(8):
+        for _ in range(5):
             if self.expired():
                 raise RuntimeError("getTransaction batch: бюджет времени истёк")
             self._pace()
             try:
-                resp = self.session().post(self.url, json=payload, timeout=90)
+                resp = self.session().post(self.url, json=payload, timeout=120)
             except Exception:  # noqa: BLE001
                 self._slow_down()
                 continue
@@ -211,8 +219,13 @@ class Rpc:
                 self._slow_down()
                 continue
             if not resp.ok:
-                raise RuntimeError(f"getTransaction batch: HTTP {resp.status_code}")
-            body = resp.json()
+                self._slow_down()
+                continue
+            try:
+                body = resp.json()
+            except ValueError:
+                self._slow_down()
+                continue
             if not isinstance(body, list):
                 self._slow_down()
                 continue
@@ -225,7 +238,15 @@ class Rpc:
             for s in sigs:
                 out.setdefault(s, None)
             return out
-        raise RuntimeError("getTransaction batch: исчерпаны попытки")
+        if len(sigs) == 1:
+            self.errors += 1
+            return {sigs[0]: None}      # честно: эта подпись не отдалась, остальные не страдают
+        mid = len(sigs) // 2
+        with self._lock:
+            self.splits += 1
+        left = self.transactions(sigs[:mid], _depth + 1)
+        right = self.transactions(sigs[mid:], _depth + 1)
+        return {**left, **right}
 
 
 # ---------- блоки: общий кэш на все кошельки ----------
@@ -422,12 +443,19 @@ def wallet_buys(rpc: Rpc, address: str) -> dict:
     sigs, complete = wallet_signatures_72h(rpc, address)
     ok = [s["signature"] for s in sigs if s.get("err") is None][:MAX_TX_PER_WALLET]
     buys: list[dict] = []
-    n_tx_seen = n_fetch_failed = n_multi_mint = 0
+    n_tx_seen = n_fetch_failed = n_multi_mint = n_chunk_failed = 0
     for i in range(0, len(ok), 20):
         if len(buys) >= MAX_BUYS_PER_WALLET or rpc.expired():
             break
         chunk = ok[i:i + 20]
-        txs = rpc.transactions(chunk)
+        try:
+            txs = rpc.transactions(chunk)
+        except RuntimeError as exc:
+            # Бюджет времени истёк посреди кошелька -- отдаём, что успели,
+            # и честно помечаем, а не теряем кошелёк целиком.
+            n_chunk_failed += 1
+            log(f"{address[:10]}..: пачка транзакций не отдалась ({str(exc)[:80]}) -- дальше с тем, что есть")
+            break
         for sig in chunk:
             tx = txs.get(sig)
             n_tx_seen += 1
@@ -453,7 +481,7 @@ def wallet_buys(rpc: Rpc, address: str) -> dict:
                 break
     return {"buys": buys, "n_sigs_72h": len(sigs), "n_tx_examined": n_tx_seen,
             "n_tx_fetch_failed": n_fetch_failed, "n_multi_mint_skipped": n_multi_mint,
-            "signatures_complete": complete}
+            "n_chunk_failed": n_chunk_failed, "signatures_complete": complete}
 
 
 def scan_one(rpc: Rpc, cache: BlockCache, address: str, meta: dict) -> dict:
@@ -730,12 +758,63 @@ def recount_crowd_tx(rpc: Rpc, slot: int, mint: str, wallet: str, signature: str
 
 # ---------- main ----------
 
+class WalletCache:
+    """Результат по кошельку живёт в файле, чтобы повторный прогон и
+    продолжение после исчерпанного бюджета не пересчитывали то, что уже
+    посчитано. Возраст записи пишется в вывод -- ничего не выдаётся за
+    свежее молча."""
+
+    def __init__(self, path: Path, max_age_s: int) -> None:
+        self.path = path
+        self.max_age_s = max_age_s
+        self._lock = threading.Lock()
+        self._data: dict = {}
+        if path.exists():
+            try:
+                self._data = json.loads(path.read_text())
+            except (ValueError, OSError):
+                self._data = {}
+        self.hits = 0
+
+    def get(self, address: str) -> dict | None:
+        node = self._data.get(address)
+        if not node:
+            return None
+        age = time.time() - float(node.get("cached_at") or 0)
+        if age > self.max_age_s:
+            return None
+        row = dict(node["row"])
+        row["из_кэша_секунд_назад"] = int(age)
+        with self._lock:
+            self.hits += 1
+        return row
+
+    def put(self, address: str, row: dict) -> None:
+        if row.get("status_scan") not in ("ok", "no_buys"):
+            return                      # ошибки не кэшируем -- пусть перепробует
+        with self._lock:
+            self._data[address] = {"cached_at": time.time(), "row": row}
+
+    def save(self) -> None:
+        with self._lock:
+            self.path.write_text(json.dumps(self._data, ensure_ascii=False, default=str))
+
+
 def run_scan(rpc: Rpc, cache: BlockCache, wallets: dict[str, dict], workers: int,
-              label: str) -> list[dict]:
+              label: str, wcache: "WalletCache | None" = None) -> list[dict]:
     rows: list[dict] = []
     done = 0
+    todo = dict(wallets)
+    if wcache is not None:
+        for a in list(todo):
+            hit = wcache.get(a)
+            if hit is not None:
+                rows.append(hit)
+                del todo[a]
+        if rows:
+            log(f"{label}: из кэша взято {len(rows)} кошельков, считать надо {len(todo)}")
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(scan_one, rpc, cache, a, m): a for a, m in wallets.items()}
+        futs = {ex.submit(scan_one, rpc, cache, a, m): a for a, m in todo.items()}
         for fut in as_completed(futs):
             addr = futs[fut]
             try:
@@ -745,9 +824,13 @@ def run_scan(rpc: Rpc, cache: BlockCache, wallets: dict[str, dict], workers: int
                         "status": wallets[addr].get("status"),
                         "status_scan": "ошибка", "note": scrub(f"{type(exc).__name__}: {exc}")[:200]}
             rows.append(row)
+            if wcache is not None:
+                wcache.put(addr, row)
+                if done % 10 == 0:
+                    wcache.save()
             done += 1
-            if done % 5 == 0 or done == len(wallets):
-                log(f"{label}: {done}/{len(wallets)} | блоков из сети={cache.fetched} "
+            if done % 5 == 0 or done == len(todo):
+                log(f"{label}: {done}/{len(todo)} | блоков из сети={cache.fetched} "
                     f"из кэша={cache.hits} пропущено={cache.skipped} | RPC={rpc.calls} ретраев={rpc.retries}")
     rows.sort(key=lambda r: (-(r.get("crowd_2_median") if r.get("crowd_2_median") is not None else -1),
                               r["address"]))
@@ -760,6 +843,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--time-budget-s", type=int, default=75 * 60)
     ap.add_argument("--limit", type=int, default=0, help="только N кошельков (отладка)")
+    ap.add_argument("--cache-max-age-s", type=int, default=6 * 3600,
+                    help="возраст записи кэша кошелька, после которого он пересчитывается")
+    ap.add_argument("--no-cache", action="store_true", help="считать всё заново")
     args = ap.parse_args()
 
     started = time.monotonic()
@@ -789,7 +875,10 @@ def main() -> None:
     if args.limit:
         target = dict(list(target.items())[:args.limit])
 
-    rows = run_scan(rpc, cache, target, args.workers, args.mode)
+    wcache = None if args.no_cache else WalletCache(CACHE_PATH, args.cache_max_age_s)
+    rows = run_scan(rpc, cache, target, args.workers, args.mode, wcache)
+    if wcache is not None:
+        wcache.save()
     calib = calibration_report(rows, live)
     check = self_check(rpc, rows)
 
@@ -819,6 +908,8 @@ def main() -> None:
             "blocks_fetched": cache.fetched, "blocks_from_cache": cache.hits,
             "blocks_skipped": cache.skipped, "blocks_failed": cache.failed,
             "rpc_calls": rpc.calls, "rpc_retries": rpc.retries, "rpc_errors": rpc.errors,
+            "batch_splits": rpc.splits,
+            "wallets_from_cache": (wcache.hits if wcache else 0),
             "elapsed_s": round(time.monotonic() - started, 1),
             "budget_exhausted": rpc.expired(),
         },
