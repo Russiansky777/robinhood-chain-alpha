@@ -1,0 +1,1359 @@
+{
+  "generated_at_utc": "2026-09-22T14:34:17Z",
+  "mode": "calibrate",
+  "ЧЕСТНЫЕ_ОГОВОРКИ": [
+    "Только чтение цепочки: ни одного вызова покупки/продажи.",
+    "Окно выхода T+33..T+40с выбрано не на глаз: held_seconds наших 265 живых сделок дают медиану 35с, p25=33, p75=36, и 95.5% попадают в 30-45с.",
+    "Секунды в названиях сценариев даны для слота 250 мс (так с 18.09). Для более ранних сделок слот был ~300 мс, то есть E1/E2 соответствуют ~0.30с/~0.60с, а не 0.25/0.50. Сами сценарии заданы В СЛОТАХ и от этого не зависят -- меняется только подпись в секундах.",
+    "Цена берётся по дельтам балансов ТРЕЙДЕРА (подписанта), а не по состоянию пула: в неё входят проскальзывание и чаевые валидатору этого трейдера. У входа и выхода это разные люди, так что смещение частично гасится, но не исчезает -- это ограничение метода.",
+    "Издержки не вычитаются: sim_* -- это уровень «сигнал», как в правиле владельца. Порог сравнения +2.5% -- издержки на 0.5 SOL.",
+    "no_entry/no_exit и incomplete считаются и печатаются отдельно: недоступный блок нигде не превращается в тихий ноль."
+  ],
+  "config": {
+    "exit_window_s": [
+      33,
+      40
+    ],
+    "exit_max_blocks": 12,
+    "scenario_lookahead_slots": 2,
+    "cost_threshold_pct": 2.5,
+    "helius_key_env_name": "HELIUS_API_KEY",
+    "workers": 4,
+    "min_interval_s": 0.12
+  },
+  "проба_accounts": {
+    "slot": 448922487,
+    "n_tx": 1259,
+    "есть_preBalances": true,
+    "есть_postBalances": true,
+    "есть_preTokenBalances": true,
+    "есть_fee": true,
+    "есть_accountKeys": true,
+    "есть_флаг_signer": true,
+    "есть_blockTime": true,
+    "вывод": "accounts отдаёт всё нужное -- full не требуется"
+  },
+  "run_stats": {
+    "n_sims": 25,
+    "blocks_fetched": 240,
+    "blocks_from_cache": 62,
+    "blocks_skipped": 0,
+    "blocks_failed": 0,
+    "getBlockTime_calls": 49,
+    "rpc_calls": 323,
+    "rpc_retries": 8,
+    "rpc_errors": 1,
+    "batch_splits": 0,
+    "sims_from_cache": 0,
+    "elapsed_s": 175.0,
+    "budget_exhausted": false,
+    "statuses": {
+      "no_exit": 4,
+      "ok": 17,
+      "частично": 4
+    }
+  },
+  "calibration": {
+    "n": 17,
+    "spearman": 0.5025,
+    "pearson": 0.1937,
+    "median_abs_error_pct": 3.0982,
+    "median_bias_pct": 0.196,
+    "sign_agreement": 0.8235,
+    "median_sim_E2": -4.6099,
+    "median_live_signal": -5.5722,
+    "verdict_ok": false,
+    "порог": "Спирмен >= 0.6 И совпадение знака >= 70%"
+  },
+  "overall": {
+    "label": "все кошельки",
+    "n_E0": 20,
+    "median_E0": -4.3293,
+    "p25_E0": -9.2136,
+    "p75_E0": 1.592,
+    "share_above_2.5_E0": 0.1,
+    "n_E1": 20,
+    "median_E1": -4.9161,
+    "p25_E1": -9.2772,
+    "p75_E1": 1.7481,
+    "share_above_2.5_E1": 0.1,
+    "n_E2": 17,
+    "median_E2": -4.6099,
+    "p25_E2": -9.2772,
+    "p75_E2": 0.0241,
+    "share_above_2.5_E2": 0.1765,
+    "n_все_три": 16,
+    "медиана_E0_минус_E2": 0.0,
+    "медиана_E1_минус_E2": 0.0,
+    "медиана_E0_минус_E1": 0.0
+  },
+  "overall_pilot": {
+    "label": "пилот",
+    "n_E0": 0,
+    "median_E0": null,
+    "p25_E0": null,
+    "p75_E0": null,
+    "share_above_2.5_E0": null,
+    "n_E1": 0,
+    "median_E1": null,
+    "p25_E1": null,
+    "p75_E1": null,
+    "share_above_2.5_E1": null,
+    "n_E2": 0,
+    "median_E2": null,
+    "p25_E2": null,
+    "p75_E2": null,
+    "share_above_2.5_E2": null,
+    "n_все_три": 0
+  },
+  "wallets": [],
+  "self_check": {
+    "ok": true,
+    "checks": [
+      {
+        "leader": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+        "mint": "He5XcCaLrygisurxfDYH7vumKW5yopVZcA9DKPvpH4Lz",
+        "source_slot": 448863124,
+        "solscan_лидер": "https://solscan.io/tx/chLHCW582r8o5ZoaNt2HapNHTaj4oPPHZWnQRcJFhmSQSehqpieAEAvfj9nXwVXSXWEd4yxs6d18Y465eKMFKaR",
+        "helius": {
+          "E0": 1.9557992870795298e-07,
+          "E1": 1.9557992870795298e-07,
+          "E2": 1.9557992870795298e-07,
+          "exit": 2.5126731954254987e-07
+        },
+        "публичный_узел": {
+          "E0": 1.9557992870795298e-07,
+          "E1": 1.9557992870795298e-07,
+          "E2": 1.9557992870795298e-07,
+          "exit": 2.5126731954254987e-07
+        },
+        "записано": {
+          "E0": 1.9557992870795298e-07,
+          "E1": 1.9557992870795298e-07,
+          "E2": 1.9557992870795298e-07,
+          "exit": 2.5126731954254987e-07
+        },
+        "совпало": true
+      },
+      {
+        "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+        "mint": "EcC5VERX69PB3kP2xLAws13SdhWPFgpCai6RtJn1bkQD",
+        "source_slot": 448943101,
+        "solscan_лидер": "https://solscan.io/tx/5vjLbVxPWkYPh2WyoDcgxm695C6kYcdbkrNofxXckqE2yMht2oECDEjjSCHb6NKracR24DTMECEYhGsL7vBi87zd",
+        "helius": {
+          "E0": 5.711721692917682e-07,
+          "E1": 5.711721692917682e-07,
+          "E2": 5.711721692917682e-07,
+          "exit": 5.181682329856207e-07
+        },
+        "публичный_узел_ошибка": "getBlock: исчерпаны попытки, последняя причина: HTTP 429",
+        "публичный_узел": {
+          "E0": 5.711721692917682e-07,
+          "E1": 5.711721692917682e-07
+        },
+        "записано": {
+          "E0": 5.711721692917682e-07,
+          "E1": 5.711721692917682e-07,
+          "E2": 5.711721692917682e-07,
+          "exit": 5.181682329856207e-07
+        },
+        "совпало": true
+      },
+      {
+        "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+        "mint": "GzjzjsShvhB25xifTtFS9u2xnFKfvYSQcjJmgVdapump",
+        "source_slot": 448866680,
+        "solscan_лидер": "https://solscan.io/tx/3se1iB4DD2mWdEh3MkdVhpkQm7WXTwbJwaMbLvRS4v1AAKbMUABxifeNT8bLBvi4jkbteH5QcZZfPr8S6jYXteey",
+        "helius": {
+          "E0": 1.3324085152725617e-06,
+          "E1": 1.3324085152725617e-06,
+          "E2": 1.3873890825727396e-06,
+          "exit": 1.3304003372241311e-06
+        },
+        "публичный_узел": {
+          "E0": 1.3324085152725617e-06,
+          "E1": 1.3324085152725617e-06,
+          "E2": 1.3873890825727396e-06,
+          "exit": 1.3304003372241311e-06
+        },
+        "записано": {
+          "E0": 1.3324085152725617e-06,
+          "E1": 1.3324085152725617e-06,
+          "E2": 1.3873890825727396e-06,
+          "exit": 1.3304003372241311e-06
+        },
+        "совпало": true
+      }
+    ]
+  },
+  "sims": [
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "G15FnXjWwNxWvHgbKoWrwGmQ1DrHxiCJuoKNJFRYyF25",
+      "source_slot": 448930951,
+      "leader_signature": "3U3Ku61AFwDVBEup9bt8WG8CZMpj19EGXDbRiG7985cEoxhZtiv6hXsfuDTBeq1gLySfvFAcDJNNRkdu7TST9jYY",
+      "block_time": 1789960559,
+      "leader_index": 822,
+      "scenarios": {
+        "E0": {
+          "entry_price": 2.935853562836705e-07,
+          "entry_slot": 448930953,
+          "entry_index": 624,
+          "entry_signature": "3ee7srP6gdU41PsyCLVGVZDZ4SDNREsfLwg1vZZXP7Fp5akCoDsaZQfTcH7tGowiNgGu2LxLbBYXJBrB4hhEHia1",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 2.935853562836705e-07,
+          "entry_slot": 448930953,
+          "entry_index": 624,
+          "entry_signature": "3ee7srP6gdU41PsyCLVGVZDZ4SDNREsfLwg1vZZXP7Fp5akCoDsaZQfTcH7tGowiNgGu2LxLbBYXJBrB4hhEHia1",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 2.935853562836705e-07,
+          "entry_slot": 448930953,
+          "entry_index": 624,
+          "entry_signature": "3ee7srP6gdU41PsyCLVGVZDZ4SDNREsfLwg1vZZXP7Fp5akCoDsaZQfTcH7tGowiNgGu2LxLbBYXJBrB4hhEHia1",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 3.000135634411547e-07,
+      "exit_slot": 448931077,
+      "exit_signature": "2ez8355w2osDwqgDz5j6o7sk7ZshHskcU8vE5cnFoawNtqEorNpT3iyvJcUo7wPg9fAALYBLkuDaEw3n1M8kAQi5",
+      "exit_is_buy": true,
+      "exit_sol_size": 0.358778012,
+      "exit_block_time": 1789960593,
+      "exit_delay_s": 34,
+      "sim_E0": 2.1896,
+      "sim_E1": 2.1896,
+      "sim_E2": 2.1896,
+      "status": "ok",
+      "signal_pct": -10.0067,
+      "task_name": "BATCH-8",
+      "buyers_between": 3
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "AAvKyZBgu855grAwPKnugPusH7WazeryoWCBXmbEMQxG",
+      "source_slot": 448922487,
+      "leader_signature": "2z7E3debTnzNMnu13L14LfzDuW19SaqnTFCVVpmZaCTFnvLDPQhm7UiNxMvKhTQb1czuZvaVuUkBVSgAxMaUw6EY",
+      "block_time": 1789958302,
+      "leader_index": 1111,
+      "scenarios": {
+        "E0": {
+          "entry_price": 7.690097657136555e-08,
+          "entry_slot": 448922489,
+          "entry_index": 498,
+          "entry_signature": "2TK5xDxMzDxMSu6jKzuGu38E4DZCwmqp4Nc3dZo2h1aEFfpuocasTsLgiiiYr8s335M3JgnqLSNrq7HyAMRnB8d5",
+          "entry_sol_size": 0.2097228,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 7.690097657136555e-08,
+          "entry_slot": 448922489,
+          "entry_index": 498,
+          "entry_signature": "2TK5xDxMzDxMSu6jKzuGu38E4DZCwmqp4Nc3dZo2h1aEFfpuocasTsLgiiiYr8s335M3JgnqLSNrq7HyAMRnB8d5",
+          "entry_sol_size": 0.2097228,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 7.690097657136555e-08,
+          "entry_slot": 448922489,
+          "entry_index": 498,
+          "entry_signature": "2TK5xDxMzDxMSu6jKzuGu38E4DZCwmqp4Nc3dZo2h1aEFfpuocasTsLgiiiYr8s335M3JgnqLSNrq7HyAMRnB8d5",
+          "entry_sol_size": 0.2097228,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "status": "no_exit",
+      "exit_note": "в окне T+33..40с за 12 блоков сделок с минтом нет",
+      "signal_pct": 6.9436,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "CY6xRXqZ6nuRzL5ZNp15zUMn8kue42C8NASJrPpiCzSu",
+      "source_slot": 448939364,
+      "leader_signature": "2AgdvF9YbkBWTY6sBpoMZGJ5mHkVaQwXPoeqDUdMQcVAndPgPtEJP1AQG2v2nRZcBL5rdawfEvuoYjGN7dCShJJN",
+      "block_time": 1789962804,
+      "leader_index": 530,
+      "scenarios": {
+        "E0": {
+          "entry_price": 9.720255408004513e-07,
+          "entry_slot": 448939366,
+          "entry_index": 722,
+          "entry_signature": "2U2vghpdj2p4RhZtCqf3pgZwYc9CJqwb1wfnN3tBoV2WwX2vgmnjmqoHiLi3qX1cy9Ae7DLvN47CHDpKswWZYfrQ",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 9.720255408004513e-07,
+          "entry_slot": 448939366,
+          "entry_index": 722,
+          "entry_signature": "2U2vghpdj2p4RhZtCqf3pgZwYc9CJqwb1wfnN3tBoV2WwX2vgmnjmqoHiLi3qX1cy9Ae7DLvN47CHDpKswWZYfrQ",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 9.720255408004513e-07,
+          "entry_slot": 448939366,
+          "entry_index": 722,
+          "entry_signature": "2U2vghpdj2p4RhZtCqf3pgZwYc9CJqwb1wfnN3tBoV2WwX2vgmnjmqoHiLi3qX1cy9Ae7DLvN47CHDpKswWZYfrQ",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 8.818484733299077e-07,
+      "exit_slot": 448939490,
+      "exit_signature": "5ZgRmTpop7VY6Hm2dJ58VuHYw7MxQvnDvSNp6m2JxTZuxYubauMgux65Z77dcYxbv9qjhVtC14pBm5Kpkg3ad1yi",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.83659259,
+      "exit_block_time": 1789962837,
+      "exit_delay_s": 33,
+      "sim_E0": -9.2772,
+      "sim_E1": -9.2772,
+      "sim_E2": -9.2772,
+      "status": "ok",
+      "signal_pct": -7.6194,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "3p9aWrPiuxrwqWFT8gXjXh235mPfzBFbwqTkSAQfNjDF",
+      "source_slot": 449064207,
+      "leader_signature": "5xHvSEfxmm9dSMQVoukZLjfyDBVaxAYL1WZv8tS7bKq7YVm2Gfqs3uBmYqZ678L1awSWeaugimBXCRmNitxnvWKc",
+      "block_time": 1789996045,
+      "leader_index": 4,
+      "scenarios": {
+        "E0": {
+          "entry_price": 4.3325197412101174e-07,
+          "entry_slot": 449064207,
+          "entry_index": 309,
+          "entry_signature": "4N4ARJpu1xZCBuLARtEY5JD7gHUXEWrwBWBZvbK7mvdPoqRyfzN1aHu1BftigkbhKEt3U7inziiGDZarEWjPg6bc",
+          "entry_sol_size": 0.20755168,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 4.303254154218536e-07,
+          "entry_slot": 449064208,
+          "entry_index": 1001,
+          "entry_signature": "3AxkZ2vdcbp18swQ8iF8M82a729sFEdQacS9TTYWw4UnvTVeSNZsbp5w3Z9zBFwWrPMHx13Kg1Y3rTQ6uLrD7RMM",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 6.779538977734463e-11,
+          "entry_slot": 449064211,
+          "entry_index": 1074,
+          "entry_signature": "61JiJV1sQgenWXpGeoSjsSa7fN6uVbd4n9j8Ca7eJVHyKrT49UjXvxrGJE9JJqtXkZjBz6qXiSdrRdUGcmq1BepX",
+          "entry_sol_size": 0.00030142,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 4.385308000171206e-07,
+      "exit_slot": 449064336,
+      "exit_signature": "btTy2uhkfF7mcYa11aKEF6Kr8qsChWTrLE5sRWc6FnKnh1KzhSDQQouGG8DV7VtuZ7JYF4f5wegkvsRiLdsjkVw",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.209010818,
+      "exit_block_time": 1789996079,
+      "exit_delay_s": 34,
+      "sim_E0": 1.2184,
+      "sim_E1": 1.9068,
+      "sim_E2": 646744.5737,
+      "status": "ok",
+      "signal_pct": 4.4779,
+      "task_name": "BATCH-8",
+      "buyers_between": 1
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "CY6xRXqZ6nuRzL5ZNp15zUMn8kue42C8NASJrPpiCzSu",
+      "source_slot": 449068139,
+      "leader_signature": "47zNn5Tsc8YEfXpvQRg7jhwHbk9dJ6J89zhhEkCYtAdkqpWaYpWArrwWkFmRCWi1DieWWpuaBZyJtwc2tqqjg2H9",
+      "block_time": 1789997099,
+      "leader_index": 52,
+      "scenarios": {
+        "E0": {
+          "entry_price": 8.582318054903474e-07,
+          "entry_slot": 449068140,
+          "entry_index": 1895,
+          "entry_signature": "5iLEn7aiUH3377hbauCBp436HnzsnN9rzDxpmSpS8Z3pocHJJ227rX1UyzaU77wA9bJ3zubH9FJah38WMNyHF7pa",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 8.582318054903474e-07,
+          "entry_slot": 449068140,
+          "entry_index": 1895,
+          "entry_signature": "5iLEn7aiUH3377hbauCBp436HnzsnN9rzDxpmSpS8Z3pocHJJ227rX1UyzaU77wA9bJ3zubH9FJah38WMNyHF7pa",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 8.73041996208004e-07,
+      "exit_slot": 449068264,
+      "exit_signature": "2G6p9qwXPW7U8BHLaeJ2pc2vcz4nJetY7GgpbbU5dqzuH4bNKMc5uwwXKqUL9XDq6qprHzhVtYECkhfpAJkRqbGx",
+      "exit_is_buy": true,
+      "exit_sol_size": 0.235393549,
+      "exit_block_time": 1789997133,
+      "exit_delay_s": 34,
+      "sim_E0": 1.7257,
+      "sim_E1": 1.7257,
+      "sim_E2": null,
+      "status": "частично",
+      "signal_pct": -8.5279,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "EcC5VERX69PB3kP2xLAws13SdhWPFgpCai6RtJn1bkQD",
+      "source_slot": 448943101,
+      "leader_signature": "5vjLbVxPWkYPh2WyoDcgxm695C6kYcdbkrNofxXckqE2yMht2oECDEjjSCHb6NKracR24DTMECEYhGsL7vBi87zd",
+      "block_time": 1789963800,
+      "leader_index": 644,
+      "scenarios": {
+        "E0": {
+          "entry_price": 5.711721692917682e-07,
+          "entry_slot": 448943103,
+          "entry_index": 793,
+          "entry_signature": "4yzaPZ6oPAjSsse8oqvU2BXPnFbuH1TYsNsMSbNksRr6FLXFoaaiGG5P7TJFfVuG4cjSikutGEZEaT8CVVKGhndU",
+          "entry_sol_size": 0.20823436,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 5.711721692917682e-07,
+          "entry_slot": 448943103,
+          "entry_index": 793,
+          "entry_signature": "4yzaPZ6oPAjSsse8oqvU2BXPnFbuH1TYsNsMSbNksRr6FLXFoaaiGG5P7TJFfVuG4cjSikutGEZEaT8CVVKGhndU",
+          "entry_sol_size": 0.20823436,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 5.711721692917682e-07,
+          "entry_slot": 448943103,
+          "entry_index": 793,
+          "entry_signature": "4yzaPZ6oPAjSsse8oqvU2BXPnFbuH1TYsNsMSbNksRr6FLXFoaaiGG5P7TJFfVuG4cjSikutGEZEaT8CVVKGhndU",
+          "entry_sol_size": 0.20823436,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 5.181682329856207e-07,
+      "exit_slot": 448943228,
+      "exit_signature": "5otnuycdu2a4JsHpEu34BmP5yTWPoRGMM8pu2NnqmG6CPkHYy26vkwduXLMswjcTtapM3D369BvAdwcrdmWD3fir",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.188910518,
+      "exit_block_time": 1789963834,
+      "exit_delay_s": 34,
+      "sim_E0": -9.2799,
+      "sim_E1": -9.2799,
+      "sim_E2": -9.2799,
+      "status": "ok",
+      "signal_pct": -5.5722,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "EcC5VERX69PB3kP2xLAws13SdhWPFgpCai6RtJn1bkQD",
+      "source_slot": 449090157,
+      "leader_signature": "uJNaoafXL4PAjnaUhJ6hggBYNDXKtkDph268Zv45xHpMjWA3AJ2NttwvcsDwV9mJf44Wu2qDEMcjDWMwCAMaAE7",
+      "block_time": 1790003017,
+      "leader_index": 891,
+      "scenarios": {
+        "E0": {
+          "entry_price": 4.4281676352869907e-07,
+          "entry_slot": 449090159,
+          "entry_index": 867,
+          "entry_signature": "5cxLcJHPneqbQTRA9Wf7TrYGZLdBCTgVikVbVLAFfabmH173J1KZrumB2KiRNHr6CT1AyBLmzi6ctc2X4jaoAa7",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 4.4281676352869907e-07,
+          "entry_slot": 449090159,
+          "entry_index": 867,
+          "entry_signature": "5cxLcJHPneqbQTRA9Wf7TrYGZLdBCTgVikVbVLAFfabmH173J1KZrumB2KiRNHr6CT1AyBLmzi6ctc2X4jaoAa7",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 4.4281676352869907e-07,
+          "entry_slot": 449090159,
+          "entry_index": 867,
+          "entry_signature": "5cxLcJHPneqbQTRA9Wf7TrYGZLdBCTgVikVbVLAFfabmH173J1KZrumB2KiRNHr6CT1AyBLmzi6ctc2X4jaoAa7",
+          "entry_sol_size": 0.2051,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 4.2088117124601395e-07,
+      "exit_slot": 449090279,
+      "exit_signature": "61cYuXsGESaHemwYJTwQgB3RXi8etBVXoTbsiJdPpEoa99qCr3p41QnYcexhMJ9WmKh7RbPHvKDYEtQrvgM4xuF1",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.194940064,
+      "exit_block_time": 1790003050,
+      "exit_delay_s": 33,
+      "sim_E0": -4.9536,
+      "sim_E1": -4.9536,
+      "sim_E2": -4.9536,
+      "status": "ok",
+      "signal_pct": -2.5575,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "72pbt41uetb5hhcPnfeYVQ86K73xAZ8J3651ptw4wiBn",
+      "source_slot": 449079253,
+      "leader_signature": "5QuiWK4buhdQ9yEfyc3Co7ZLmeNPzzeR3moC3sXL9QVen99bN3WMn9am8SQ9Rx7QBocUb2r4NFv5VEuq24ZAq611",
+      "block_time": 1790000086,
+      "leader_index": 191,
+      "scenarios": {
+        "E0": {
+          "entry_price": 4.688679636739137e-07,
+          "entry_slot": 449079254,
+          "entry_index": 1002,
+          "entry_signature": "5eaJ3grfpCLM58TiXWE1RXhUxFYZbK6M2jDS2MwUduPPjdYPKDt2cN7yJsZLQfdTZNp3CRPUcV7ujyGdRp7AFz4L",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 4.688679636739137e-07,
+          "entry_slot": 449079254,
+          "entry_index": 1002,
+          "entry_signature": "5eaJ3grfpCLM58TiXWE1RXhUxFYZbK6M2jDS2MwUduPPjdYPKDt2cN7yJsZLQfdTZNp3CRPUcV7ujyGdRp7AFz4L",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 4.819853947361327e-07,
+          "entry_slot": 449079255,
+          "entry_index": 538,
+          "entry_signature": "CagoekDF3dHBrwmYqU4oP5f8LgjPS2rtMh4yxRhGQ8ybeoW29NNP7iUPxLGB1VHBFmhz9dYY5AixoBsiqM1bFpY",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 4.232241459012442e-07,
+      "exit_slot": 449079376,
+      "exit_signature": "3JTSnyqjX5XNSnZ9m2wd8W94rFkBQ989F5z5zx67V5twVYc5W9wjes55GcTvDj71hMqufTFfSXxZkQrVhnFv5yF6",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.181478042,
+      "exit_block_time": 1790000120,
+      "exit_delay_s": 34,
+      "sim_E0": -9.7349,
+      "sim_E1": -9.7349,
+      "sim_E2": -12.1915,
+      "status": "ok",
+      "signal_pct": -9.2885,
+      "task_name": "BATCH-8",
+      "buyers_between": 1
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "FAZFZHPnUx5p9LCL76zbZ8HuchrsnCBbK7Xjaxx68AxW",
+      "source_slot": 449095822,
+      "leader_signature": "P2aPxQvogUstuo9se3BJknj4M8bLksJ7SyDQzJcUjvyLVmSCmcivWZRGNBgSHAPMqiacuvATDgsTmFyhBCxDP6c",
+      "block_time": 1790004537,
+      "leader_index": 507,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.9411341211194506e-07,
+          "entry_slot": 449095823,
+          "entry_index": 540,
+          "entry_signature": "3Pi4YfiTx8VymG2WicuygJvNS6CwGjYWJ9VZ2bwA3hPe8jeFv7fpLEQsV5SeYovJuNHjSR2hUNqHaKXBujERryLL",
+          "entry_sol_size": 0.2045748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.9411341211194506e-07,
+          "entry_slot": 449095823,
+          "entry_index": 540,
+          "entry_signature": "3Pi4YfiTx8VymG2WicuygJvNS6CwGjYWJ9VZ2bwA3hPe8jeFv7fpLEQsV5SeYovJuNHjSR2hUNqHaKXBujERryLL",
+          "entry_sol_size": 0.2045748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.971537208077704e-07,
+          "entry_slot": 449095824,
+          "entry_index": 104,
+          "entry_signature": "2t52uFukgGVShtMR1D7TTDeUCMkXv3BSbfbNhqhhQkZC7Kyy2bbMYnKnDzJvHJsvreFWvPsFtgRZmkegyo5CHXGu",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.8464360373856123e-07,
+      "exit_slot": 449095940,
+      "exit_signature": "5kzywCiMetmybafyrEXiKux3zgX2xS7v4ajrzM8CjwmYNsguWNpS6DwzEVPE5jfNmDofmNSEoMBX4UQAmS3ivw5h",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.193560536,
+      "exit_block_time": 1790004570,
+      "exit_delay_s": 33,
+      "sim_E0": -4.8785,
+      "sim_E1": -4.8785,
+      "sim_E2": -6.3454,
+      "status": "ok",
+      "signal_pct": -3.2472,
+      "task_name": "BATCH-8",
+      "buyers_between": 1
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH",
+      "source_slot": 449081272,
+      "leader_signature": "yonfwdaZnZHZhr8843vZQaH3uYg8YXh6d2cHrsD3ynzjd8EPhbKPM2vGqTa4mG4VLwyDyrCoQkvYtYUjKC9qyHg",
+      "block_time": 1790000629,
+      "leader_index": 1265,
+      "scenarios": {
+        "E0": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 0.9375930375697225,
+          "entry_slot": 449081276,
+          "entry_index": 1009,
+          "entry_signature": "3X6ppYXAnRWc7iPkqsqnmccYdajAACTG9Nbn3pZSdpb7hWN78QX1rLQYKV8oZuU2kWCd7wuAoWDxQ8PkuLCfBM3m",
+          "entry_sol_size": 0.20665956,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 0.9084901695590624,
+      "exit_slot": 449081403,
+      "exit_signature": "394vk4oxpcE6eKcfdjHH9EKFwJ8oWQpF9nyf16io8pPoVpx5tJPcXjc7jc1DaMWfrDgsWF7nQ6yT66Yns2NE4DfK",
+      "exit_is_buy": true,
+      "exit_sol_size": 1.347857538,
+      "exit_block_time": 1790000663,
+      "exit_delay_s": 34,
+      "sim_E0": null,
+      "sim_E1": null,
+      "sim_E2": -3.104,
+      "status": "ok",
+      "signal_pct": -3.3,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "3p9aWrPiuxrwqWFT8gXjXh235mPfzBFbwqTkSAQfNjDF",
+      "source_slot": 448927285,
+      "leader_signature": "47Jhn3aNS6zjD8Qc4SNnLwyW9qd6ZeTQDHEgZWLwfxPRB49pLMShiC6hYuxewRGXv2ifYZnAqp231ixUSSvncgZc",
+      "block_time": 1789959583,
+      "leader_index": 56,
+      "scenarios": {
+        "E0": {
+          "entry_price": 4.482422551351861e-07,
+          "entry_slot": 448927286,
+          "entry_index": 992,
+          "entry_signature": "dxJbrLpgCfea9udSWaz4M2nFuvsm5qMXuKvakC3LQwRRfv5t1NVnaoVPcwQNVNAFty5WdamZTxHtaVC5Ub8NokS",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 4.482422551351861e-07,
+          "entry_slot": 448927286,
+          "entry_index": 992,
+          "entry_signature": "dxJbrLpgCfea9udSWaz4M2nFuvsm5qMXuKvakC3LQwRRfv5t1NVnaoVPcwQNVNAFty5WdamZTxHtaVC5Ub8NokS",
+          "entry_sol_size": 0.2066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 4.52966290436223e-07,
+          "entry_slot": 448927289,
+          "entry_index": 10,
+          "entry_signature": "2mQsJLgv8FQFyH9JsY3CztGQKSzqi3wxNmikYFKNaNse1wAq5Ppnfv7xoQseBfnj1E2bwJD9HE2oqGcfegL3ri76",
+          "entry_sol_size": 0.0315748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "status": "no_exit",
+      "exit_note": "в окне T+33..40с за 12 блоков сделок с минтом нет",
+      "signal_pct": -7.1957,
+      "task_name": "BATCH-8",
+      "buyers_between": 0
+    },
+    {
+      "leader": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+      "mint": "GGfExBjKZKoDvkCDdzgLTibR64ZcaFVuMK5DgQeR6nSf",
+      "source_slot": 449123777,
+      "leader_signature": "2MVY7tKKjSyMFN6evXvytzP9oZZ3ESQV9CRpjh4sGYksuD4kgfP7Evs99wM5tD1ywEDjy93SAFJWkqA5HHF3ELZz",
+      "block_time": 1790012048,
+      "leader_index": 156,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.031823698645403e-07,
+          "entry_slot": 449123777,
+          "entry_index": 688,
+          "entry_signature": "m1qmbhL7MZ5rdNGB2AqPpEYEYYamyCnv9Xvubt5W13YM8fU1oxeVof8T6qoJ3bsNANRVfFKTC1WNVNbpp95EFob",
+          "entry_sol_size": 0.2076228,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.0408001572088903e-07,
+          "entry_slot": 449123779,
+          "entry_index": 583,
+          "entry_signature": "4nXqciEsPs8yRw9Pnv7d5fkcSH3nCk7rAanN5FZtRydaaQHeSPbmYHXjRjJ1rzA1j7KGeoAubku85LMKqrpSpNMC",
+          "entry_sol_size": 0.20823436,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.0408001572088903e-07,
+          "entry_slot": 449123779,
+          "entry_index": 583,
+          "entry_signature": "4nXqciEsPs8yRw9Pnv7d5fkcSH3nCk7rAanN5FZtRydaaQHeSPbmYHXjRjJ1rzA1j7KGeoAubku85LMKqrpSpNMC",
+          "entry_sol_size": 0.20823436,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 9.928201962143552e-08,
+      "exit_slot": 449123908,
+      "exit_signature": "LCffuKx1FvEJNzuYuMBx1PgfuK91ygfL71SDZZ4cL1pm5fbvHnGrNRb6XvVPvDiG8EVogBoXJnztWnRCQg8owEz",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.774993961,
+      "exit_block_time": 1790012082,
+      "exit_delay_s": 34,
+      "sim_E0": -3.7801,
+      "sim_E1": -4.6099,
+      "sim_E2": -4.6099,
+      "status": "ok",
+      "signal_pct": -1.3698,
+      "task_name": "BATCH-8",
+      "buyers_between": 1
+    },
+    {
+      "leader": "DPAghrNgkW4m5HMBL3kVsiCm9ywhrBtCutc6tSSvicx8",
+      "mint": "DUe1qheefigxhjboRqKkGWjSTeYivjLo6yq763redsRC",
+      "source_slot": 448786308,
+      "leader_signature": "2Ks8SymZciDGAFYsyggi3jdA1bTigQhRg46gmJFWp3EQNs8HkPhspEw33CysdTGYnZhGF5ZmNXp8vBvYeHRWqLj2",
+      "block_time": 1789921879,
+      "leader_index": 285,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.398823557252242e-05,
+          "entry_slot": 448786309,
+          "entry_index": 386,
+          "entry_signature": "66YVf1xv2c6AQs2e3woxvkPx1g7MqLzCo6Hbk9WrC9f813w4EcUHAVsxjgKyrhDAA8ciBz22owwJMgeN4JHstEno",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.398823557252242e-05,
+          "entry_slot": 448786309,
+          "entry_index": 386,
+          "entry_signature": "66YVf1xv2c6AQs2e3woxvkPx1g7MqLzCo6Hbk9WrC9f813w4EcUHAVsxjgKyrhDAA8ciBz22owwJMgeN4JHstEno",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.3067784747257265e-05,
+      "exit_slot": 448786439,
+      "exit_signature": "38YRkfBJTHchSDiFvpk4k13HHGgiqPn84kZKxn67YxVSQYx9DFXqVaMuzJsV1vjoHEQ3Y9216whdLaZUhCqr7Uo9",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.47186352,
+      "exit_block_time": 1789921914,
+      "exit_delay_s": 35,
+      "sim_E0": -6.5802,
+      "sim_E1": -6.5802,
+      "sim_E2": null,
+      "status": "частично",
+      "signal_pct": -5.6383,
+      "task_name": "BATCH-7",
+      "buyers_between": 0
+    },
+    {
+      "leader": "57aiHCweKvWmAspN26FVV6kKLY8opJGYgw5iN3nPESk9",
+      "mint": "DUe1qheefigxhjboRqKkGWjSTeYivjLo6yq763redsRC",
+      "source_slot": 448629794,
+      "leader_signature": "2z25Nz2hQzZyvwotYCbS7ah46XKHZSkAGSXMZLcQhNeefLbzmSUcer6nQ1KwR9HjQsQqv5XwkXxM6CaJTMKh6JYF",
+      "block_time": 1789880201,
+      "leader_index": 235,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.2751328057016448e-05,
+          "entry_slot": 448629795,
+          "entry_index": 439,
+          "entry_signature": "5ccGnv11ZQdDXnE9wJuNUNvh2PgtjMtNFCJKFEcP8f5edWQ9LdFcfdncTthSNJTD2xuoqseu6qVLAcxo2aS8vQCx",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.2751328057016448e-05,
+          "entry_slot": 448629795,
+          "entry_index": 439,
+          "entry_signature": "5ccGnv11ZQdDXnE9wJuNUNvh2PgtjMtNFCJKFEcP8f5edWQ9LdFcfdncTthSNJTD2xuoqseu6qVLAcxo2aS8vQCx",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "status": "no_exit",
+      "exit_note": "в окне T+33..40с за 12 блоков сделок с минтом нет",
+      "signal_pct": 12.7435,
+      "task_name": "BATCH-7",
+      "buyers_between": 3
+    },
+    {
+      "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+      "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
+      "source_slot": 448796223,
+      "leader_signature": "2priy5zeMXe38qEZcCR7Lx1ym8AffP1D6eu1fyzWUSv2TArZMLFtje5SW5ocVM7hsoxMDyka94ACb1XtJrcqs9eU",
+      "block_time": 1789924528,
+      "leader_index": 672,
+      "scenarios": {
+        "E0": {
+          "entry_price": 5.618359565267087e-05,
+          "entry_slot": 448796225,
+          "entry_index": 38,
+          "entry_signature": "TAvkYkwFi2TAMqRcBNYxCdUNz364cCxa32uU96vf41jJ7E4WeM6Pg5TCYFM3veBY5RcbZZ34jteWPoni4Ffoe6Z",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 5.618359565267087e-05,
+          "entry_slot": 448796225,
+          "entry_index": 38,
+          "entry_signature": "TAvkYkwFi2TAMqRcBNYxCdUNz364cCxa32uU96vf41jJ7E4WeM6Pg5TCYFM3veBY5RcbZZ34jteWPoni4Ffoe6Z",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 5.618359565267087e-05,
+          "entry_slot": 448796225,
+          "entry_index": 38,
+          "entry_signature": "TAvkYkwFi2TAMqRcBNYxCdUNz364cCxa32uU96vf41jJ7E4WeM6Pg5TCYFM3veBY5RcbZZ34jteWPoni4Ffoe6Z",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 5.078986984306704e-05,
+      "exit_slot": 448796354,
+      "exit_signature": "4PtSuquLopjFt2Tn8XdQZavfGgeF7Jhy4xpNxrwPp397uTKJVdH7QiZQZ3cR8WMB2mNHYrzqfLH2dr2XYAKNEea2",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.02682619,
+      "exit_block_time": 1789924563,
+      "exit_delay_s": 35,
+      "sim_E0": -9.6002,
+      "sim_E1": -9.6002,
+      "sim_E2": -9.6002,
+      "status": "ok",
+      "signal_pct": -8.9683,
+      "task_name": "BATCH-7",
+      "buyers_between": 0
+    },
+    {
+      "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+      "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
+      "source_slot": 448633691,
+      "leader_signature": "2KVZnJS934oa6NZD1dDUuTMJF9tjWjY2CrFVki1goofRj6FfWS3DCqJraPQJvqu1yDypSgwxWQAnhaKjVuLhTMHi",
+      "block_time": 1789881239,
+      "leader_index": 78,
+      "scenarios": {
+        "E0": {
+          "entry_price": 0.0001272546757053825,
+          "entry_slot": 448633691,
+          "entry_index": 163,
+          "entry_signature": "27ipQVBNoNbRmRcUWMsh5cJ78hL1KgUFPpUj1tnSf6hJv3j2Tpp8RGn4WizmTAuoS6HwaMfng5Yn4JiGUsF7NsM9",
+          "entry_sol_size": 0.10148844,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 0.00012705946856850927,
+          "entry_slot": 448633692,
+          "entry_index": 898,
+          "entry_signature": "26VsdGfUc7RVBZN9E8NziNGJa6c3t75yBf6qzkaTAW4rd1Tey1eqHnbEzYxHbVC49LpHy9sE6jWu5RxLVzf24cM7",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 0.00017469090195318014,
+          "entry_slot": 448633693,
+          "entry_index": 227,
+          "entry_signature": "2XhVmSj5Kh9juedFFtPMjSEriyNvHA26t1GQQCze2HD4nDbbe6SfMyEtG8TsHYKPy4cQVbTRMWCA65wTwAD8PYmL",
+          "entry_sol_size": 0.0055748,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 0.00012928056548017536,
+      "exit_slot": 448633816,
+      "exit_signature": "5RZUY5QoqpQ2jbgWeRsADqoEdLwENoLiNySF9C3nZWHTAd39aNuZb7rKZ81E1vL7MpsDCh4uQ7pHqs3pYsmLaaM9",
+      "exit_is_buy": true,
+      "exit_sol_size": 0.018356715,
+      "exit_block_time": 1789881272,
+      "exit_delay_s": 33,
+      "sim_E0": 1.592,
+      "sim_E1": 1.7481,
+      "sim_E2": -25.9947,
+      "status": "ok",
+      "signal_pct": -48.8945,
+      "task_name": "BATCH-7",
+      "buyers_between": 2
+    },
+    {
+      "leader": "DPAghrNgkW4m5HMBL3kVsiCm9ywhrBtCutc6tSSvicx8",
+      "mint": "DrqFweS6UGCTtSnZEx5M96ShhoTpMVLuLTv3EkvpEgDo",
+      "source_slot": 448659279,
+      "leader_signature": "5KvdRQyJsv5NcERTKK245FjnWu6ztjVjvktTQwarPFC1u3zUr7Vhfw4BAsUPJUgBFH2x1hzZgQ7mzWp8pYqERbLh",
+      "block_time": 1789888045,
+      "leader_index": 721,
+      "scenarios": {
+        "E0": {
+          "entry_price": 7.525525675308922e-07,
+          "entry_slot": 448659281,
+          "entry_index": 215,
+          "entry_signature": "92LzHg8vNgR42uPVMQV9rEcVuheYmK5Z2WmcxjMiFbx6dXCeE53da3X873fTcgMrBGe9Mpb6Uhq25yLmevLwCZv",
+          "entry_sol_size": 0.50973804,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 7.525525675308922e-07,
+          "entry_slot": 448659281,
+          "entry_index": 215,
+          "entry_signature": "92LzHg8vNgR42uPVMQV9rEcVuheYmK5Z2WmcxjMiFbx6dXCeE53da3X873fTcgMrBGe9Mpb6Uhq25yLmevLwCZv",
+          "entry_sol_size": 0.50973804,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 7.525525675308922e-07,
+          "entry_slot": 448659281,
+          "entry_index": 215,
+          "entry_signature": "92LzHg8vNgR42uPVMQV9rEcVuheYmK5Z2WmcxjMiFbx6dXCeE53da3X873fTcgMrBGe9Mpb6Uhq25yLmevLwCZv",
+          "entry_sol_size": 0.50973804,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "status": "no_exit",
+      "exit_note": "в окне T+33..40с за 12 блоков сделок с минтом нет",
+      "signal_pct": 6.1972,
+      "task_name": "BATCH-7",
+      "buyers_between": 0
+    },
+    {
+      "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+      "mint": "6oeiky8G8ZnuvadARQPRMkV6FRz8ALKd579ZuXhKSTNK",
+      "source_slot": 448767045,
+      "leader_signature": "2uocehmYrtVrACFiSNwFmVVCooxn3tKMNHk15x7giYeQosbqrmUAbyxqHaVeT9Yee7aoWDfihmw6ZJraRydexW3W",
+      "block_time": 1789916726,
+      "leader_index": 35,
+      "scenarios": {
+        "E0": {
+          "entry_price": 7.699480170090692e-06,
+          "entry_slot": 448767045,
+          "entry_index": 312,
+          "entry_signature": "2niv5rKM4357P9eYMKn9yk9sAK1xvhV7wvmrtWiB2QaaW2y3t5vALmqUjkQhrPVdA7HXTMDyBHtN9VZPXxzcNDBu",
+          "entry_sol_size": 0.1015748,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 7.688988956889903e-06,
+          "entry_slot": 448767046,
+          "entry_index": 377,
+          "entry_signature": "2NitLtb63xWBBkCGPHB5raGB2eVNi3MUhja3Eb8kMfEucrXNPPhVNUezkF8XtCeZFsK1srU15MpdkisqdivdARH8",
+          "entry_sol_size": 0.5066748,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 6.990081930585424e-06,
+      "exit_slot": 448767170,
+      "exit_signature": "3y3LiJts487YGu6t5e6ZDvtnUpiW7M7xSWjRGMGXTLhuzrWscH2u5cZLC5xHvFodk9eDfdwNnGyiLBYyifYrK65g",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.460619515,
+      "exit_block_time": 1789916760,
+      "exit_delay_s": 34,
+      "sim_E0": -9.2136,
+      "sim_E1": -9.0897,
+      "sim_E2": null,
+      "status": "частично",
+      "signal_pct": -7.8871,
+      "task_name": "BATCH-7",
+      "buyers_between": 1
+    },
+    {
+      "leader": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+      "mint": "He5XcCaLrygisurxfDYH7vumKW5yopVZcA9DKPvpH4Lz",
+      "source_slot": 448863124,
+      "leader_signature": "chLHCW582r8o5ZoaNt2HapNHTaj4oPPHZWnQRcJFhmSQSehqpieAEAvfj9nXwVXSXWEd4yxs6d18Y465eKMFKaR",
+      "block_time": 1789942427,
+      "leader_index": 910,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.9557992870795298e-07,
+          "entry_slot": 448863126,
+          "entry_index": 538,
+          "entry_signature": "28hyq2XVMfKyyu8LV7ehYg4xcfJBv9wCQoEbyfH9YPQfuHSwmNq92aLpF6FhBPj7siXwNHpYFFeAMf5byxQEFNE1",
+          "entry_sol_size": 0.382517292,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.9557992870795298e-07,
+          "entry_slot": 448863126,
+          "entry_index": 538,
+          "entry_signature": "28hyq2XVMfKyyu8LV7ehYg4xcfJBv9wCQoEbyfH9YPQfuHSwmNq92aLpF6FhBPj7siXwNHpYFFeAMf5byxQEFNE1",
+          "entry_sol_size": 0.382517292,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.9557992870795298e-07,
+          "entry_slot": 448863126,
+          "entry_index": 538,
+          "entry_signature": "28hyq2XVMfKyyu8LV7ehYg4xcfJBv9wCQoEbyfH9YPQfuHSwmNq92aLpF6FhBPj7siXwNHpYFFeAMf5byxQEFNE1",
+          "entry_sol_size": 0.382517292,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 2.5126731954254987e-07,
+      "exit_slot": 448863252,
+      "exit_signature": "4k33k6PfsG48XNZqwFHWvTAQZ5dtVerhsXitNmWKym4ZCkLGYx3Vxn3B7TVXhZh4W2aN8aYfjjKiAvHCnPRxX6hj",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.63732708,
+      "exit_block_time": 1789942461,
+      "exit_delay_s": 34,
+      "sim_E0": 28.473,
+      "sim_E1": 28.473,
+      "sim_E2": 28.473,
+      "status": "ok",
+      "signal_pct": 27.4544,
+      "task_name": "BATCH-7",
+      "buyers_between": 1
+    },
+    {
+      "leader": "AMcHYqUj4HPUdkDkEatguugNSmKaQTdvxzexzqsXDU4r",
+      "mint": "CHQeLyR3kiywgkq6CQuTruNq64bi8RFUyLb3WCCX4iv7",
+      "source_slot": 448865700,
+      "leader_signature": "yNtC6VDGa9dGMnE9aonb4UgBBmKtB5rx7s94MtfNoafohuee5TbRo1DvpPdb4jq1tqVopPuDDK4W859bPUQGPHg",
+      "block_time": 1789943118,
+      "leader_index": 1192,
+      "scenarios": {
+        "E0": {
+          "entry_price": 8.711987285453198e-07,
+          "entry_slot": 448865700,
+          "entry_index": 1236,
+          "entry_signature": "2tHoKT6tsBhdjNw6KsHraTHB1Gd71VA5aAbnm8iwFcPT1snHmQZtRMxqy2bT5hY26WQPa51mLghneCPVKKB6zo86",
+          "entry_sol_size": 1.011,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 8.163523047405254e-07,
+          "entry_slot": 448865701,
+          "entry_index": 524,
+          "entry_signature": "2EynoYuftubXxud85qocJB4Do8VYzAF1FBvTRNPVbs1j2ak8ND8TwVtW9yw8hQX2XyEX9hKAjxqNzuuim4m465w5",
+          "entry_sol_size": 1.011,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 7.081789032349684e-07,
+          "entry_slot": 448865702,
+          "entry_index": 174,
+          "entry_signature": "2XVVrsvwBWtzYdwziLtpCS5BTAzcDSPaV1v2vuXAyEdXzdbmff9CYhiS3XeGhwPS1UwrRK236HgWMRTce2hnaJgJ",
+          "entry_sol_size": 1.307225133,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 6.795539422724581e-07,
+      "exit_slot": 448865826,
+      "exit_signature": "5wubSoDNuGVfrt9LvsTDnVrkNambRU6PUYHhkM8mufsXqYf3fLPFdQL15T9ffcZkpQLAn23NsKMSNU3n2b7N3Myp",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.447734897,
+      "exit_block_time": 1789943152,
+      "exit_delay_s": 34,
+      "sim_E0": -21.9978,
+      "sim_E1": -16.7573,
+      "sim_E2": -4.0421,
+      "status": "ok",
+      "signal_pct": -2.8314,
+      "task_name": "BATCH-7",
+      "buyers_between": 15
+    },
+    {
+      "leader": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+      "mint": "8k4sBtEeK4pf26noKqApv8NBTnuSJcbdwpKYknk5PbAA",
+      "source_slot": 448779839,
+      "leader_signature": "2LFyY3zUrFvVJke1LBdoSh6VZtWcYWtY9JTN9C21vnT8zM5W1FSm3qr5Tivvgie6AYs5vTA4eJdC2XYLoSdToXUf",
+      "block_time": 1789920142,
+      "leader_index": 91,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.1965914672685088e-05,
+          "entry_slot": 448779839,
+          "entry_index": 181,
+          "entry_signature": "3sRLdvrGtp9UD8zXJ8iafvQp9frCGne2eHSJq7Lu1439MsXa1HQLdaDUe8edxnXBSVTaaJMZfxeB9bhEwwYWr5rC",
+          "entry_sol_size": 0.221908305,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.2277294603529405e-05,
+          "entry_slot": 448779840,
+          "entry_index": 858,
+          "entry_signature": "5B9XyRNepGw628MUQcRTdQhseLNd9kWdoVBF3PfjBHCrjnj1EgpdmMHT2sjuFYtfiamz6nYuQ5trf52mBsd6AMoL",
+          "entry_sol_size": 0.50661384,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": null,
+          "no_entry": true,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.1580207379357475e-05,
+      "exit_slot": 448779971,
+      "exit_signature": "1kdsyBfKUuNs3CR25VQKNwTe7R7AwaZMkUMuw2MDAissgkhsYkPTpuHa8iECoSTdEqvnmTGsYuhZJMEwiAnerMa",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.089781162,
+      "exit_block_time": 1789920177,
+      "exit_delay_s": 35,
+      "sim_E0": -3.2234,
+      "sim_E1": -5.6779,
+      "sim_E2": null,
+      "status": "частично",
+      "signal_pct": -3.4433,
+      "task_name": "BATCH-7",
+      "buyers_between": 2
+    },
+    {
+      "leader": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+      "mint": "GzjzjsShvhB25xifTtFS9u2xnFKfvYSQcjJmgVdapump",
+      "source_slot": 448866427,
+      "leader_signature": "278zAye2Gg19VWA2m6EzaCqo4LrBmTAKstGQhxUoU5QiUqV89B7ZeSDDPUm8AsbWAGAYmeg68zpSK6prsd95RE6Q",
+      "block_time": 1789943314,
+      "leader_index": 193,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.1310735892493952e-06,
+          "entry_slot": 448866427,
+          "entry_index": 458,
+          "entry_signature": "SDKdmUJADtLKZwpV2k8KBZXtDoMWeAek4LnLTwx6sBqvhrTiZ2Ynd2JZGTEYXkqjct75vsyuFQrt8Q6oep9AM8T",
+          "entry_sol_size": 0.303039482,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.1436733349171116e-06,
+          "entry_slot": 448866428,
+          "entry_index": 936,
+          "entry_signature": "6msFkVFbtBdxj8Sv1E1P4iXs9JDaucQzWa1Rak7pSacRB44pCTP58um17GpfUZ4QPkG3NNixAV55XyXX5CMBCu3",
+          "entry_sol_size": 0.50661384,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.1550456874076276e-06,
+          "entry_slot": 448866429,
+          "entry_index": 594,
+          "entry_signature": "3MdqRJjfmStq2oeyZmE2e4NiJ5VWP382Ti4pJAzTHCHHVCigfwDbCgpq1VxeMp8AwxhUkAKTDBJnTMq2fXcx3wwD",
+          "entry_sol_size": 0.253639472,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.211922073582977e-06,
+      "exit_slot": 448866556,
+      "exit_signature": "3G5XCHMKyj4XTXVzokpbuw6RVZKibEy8nuVmTu32Vp7Wv6ua32zGcDbJKgCAMejse1dfN89zmDY11q8o21YA85gZ",
+      "exit_is_buy": true,
+      "exit_sol_size": 0.012795264,
+      "exit_block_time": 1789943348,
+      "exit_delay_s": 34,
+      "sim_E0": 7.1479,
+      "sim_E1": 5.9675,
+      "sim_E2": 4.9242,
+      "status": "ok",
+      "signal_pct": -8.9782,
+      "task_name": "BATCH-7",
+      "buyers_between": 2
+    },
+    {
+      "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+      "mint": "GzjzjsShvhB25xifTtFS9u2xnFKfvYSQcjJmgVdapump",
+      "source_slot": 448866680,
+      "leader_signature": "3se1iB4DD2mWdEh3MkdVhpkQm7WXTwbJwaMbLvRS4v1AAKbMUABxifeNT8bLBvi4jkbteH5QcZZfPr8S6jYXteey",
+      "block_time": 1789943381,
+      "leader_index": 345,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.3324085152725617e-06,
+          "entry_slot": 448866681,
+          "entry_index": 61,
+          "entry_signature": "2ryUCq9GTkTnnJamK2oZ7C43WpoK4RGz49pp6ja3hRtrHkKJeLnibAvJP6cHuRMjoZNfLrkDfhKeGYhvCSaAwQeE",
+          "entry_sol_size": 2.00601384,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.3324085152725617e-06,
+          "entry_slot": 448866681,
+          "entry_index": 61,
+          "entry_signature": "2ryUCq9GTkTnnJamK2oZ7C43WpoK4RGz49pp6ja3hRtrHkKJeLnibAvJP6cHuRMjoZNfLrkDfhKeGYhvCSaAwQeE",
+          "entry_sol_size": 2.00601384,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.3873890825727396e-06,
+          "entry_slot": 448866682,
+          "entry_index": 368,
+          "entry_signature": "HRufTisAZHF4rMVfef3J7g4Hkx1ctseU3xGSsmyvi5FmsueDeuuurrXJHKQDoCebpUSurwxkyZmoUX2mWy2UJmf",
+          "entry_sol_size": 0.5051,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.3304003372241311e-06,
+      "exit_slot": 448866801,
+      "exit_signature": "3w1o6kjuwHsDi6LkXBugwV2peCUupCsensQpKyP1pZP8A9cXoso1tMieGaZ6UhoPPBqTz19cYgMt55m9UpuNaJBf",
+      "exit_is_buy": true,
+      "exit_sol_size": 0.01011,
+      "exit_block_time": 1789943414,
+      "exit_delay_s": 33,
+      "sim_E0": -0.1507,
+      "sim_E1": -0.1507,
+      "sim_E2": -4.1076,
+      "status": "ok",
+      "signal_pct": -8.917,
+      "task_name": "BATCH-7",
+      "buyers_between": 2
+    },
+    {
+      "leader": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+      "mint": "He5XcCaLrygisurxfDYH7vumKW5yopVZcA9DKPvpH4Lz",
+      "source_slot": 448865693,
+      "leader_signature": "5JbjGATq38TeXW48R98KXjLZVoPPrxMW3ZTEciTgqo59fYwweBd9jUzPe3VbYDwmZkJHifxn7QgtY2KAwiFLrgS9",
+      "block_time": 1789943116,
+      "leader_index": 51,
+      "scenarios": {
+        "E0": {
+          "entry_price": 1.182577054050759e-06,
+          "entry_slot": 448865693,
+          "entry_index": 161,
+          "entry_signature": "2QiWyyYe7SCmHeogiuy8tMQhB5zmoHwkh2wX1ybk3XsoFHzcEjTXLCP8GnTTyRPeYpKmdgYstCxjdJhANWrPr1os",
+          "entry_sol_size": 1.262721074,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 1.2820156937300942e-06,
+          "entry_slot": 448865694,
+          "entry_index": 135,
+          "entry_signature": "5fURqvdUoyTqM469QiANhXfcnzbE4ytpYxAhpmBsN8yQxyXCkcjCZ2ihdurLUTEuCK8N1BZRbC8XdhK82h7zR1GS",
+          "entry_sol_size": 0.01262,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 1.187857566137071e-06,
+          "entry_slot": 448865697,
+          "entry_index": 293,
+          "entry_signature": "33rYJ29nqdxfpjBC3FSzvPaHTUTsoj2jX4xBtU3VGxtNAoQ9MWirLVTma38KACVxGTSbdSq2PVCpAwViWeTyQ1gX",
+          "entry_sol_size": 0.263115138,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 1.095060172343412e-06,
+      "exit_slot": 448865818,
+      "exit_signature": "3tV8fb4CrRWUZM3HgipZefXNaZuPBJ5wVCAsLQ5XkgKYBzn7AjmxSo52FN1GQzJBvQyq8azFgT2kKmx8mnM6qcRc",
+      "exit_is_buy": false,
+      "exit_sol_size": 0.447295523,
+      "exit_block_time": 1789943150,
+      "exit_delay_s": 34,
+      "sim_E0": -7.4005,
+      "sim_E1": -14.5829,
+      "sim_E2": -7.8122,
+      "status": "ok",
+      "signal_pct": -10.5519,
+      "task_name": "BATCH-7",
+      "buyers_between": 4
+    },
+    {
+      "leader": "BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN",
+      "mint": "8rq59Z7rjezyuJpEYBCCWG7iEdEuL6EevpUfMoqbcBQ5",
+      "source_slot": 448833817,
+      "leader_signature": "2F7EcK8X9hwgKum63AwnpbmMfi78r7JufqbeSWVPpVvXHtoZQmZAqj71fM1QSL4vsZjk2KzgzGg2KXPh8BjxdzHD",
+      "block_time": 1789934591,
+      "leader_index": 696,
+      "scenarios": {
+        "E0": {
+          "entry_price": 4.797373482829481e-06,
+          "entry_slot": 448833818,
+          "entry_index": 85,
+          "entry_signature": "4DFk8TRPGs47NPmyYgbM4Ebjrbb5NLAkZKLXvHzEeyR8WaHvnqZD9VU3E12VLb5mgyue8t5hqaFnTNLgFSFQxXbP",
+          "entry_sol_size": 0.090456831,
+          "incomplete": false
+        },
+        "E1": {
+          "entry_price": 4.797373482829481e-06,
+          "entry_slot": 448833818,
+          "entry_index": 85,
+          "entry_signature": "4DFk8TRPGs47NPmyYgbM4Ebjrbb5NLAkZKLXvHzEeyR8WaHvnqZD9VU3E12VLb5mgyue8t5hqaFnTNLgFSFQxXbP",
+          "entry_sol_size": 0.090456831,
+          "incomplete": false
+        },
+        "E2": {
+          "entry_price": 4.784105703435391e-06,
+          "entry_slot": 448833819,
+          "entry_index": 13,
+          "entry_signature": "5fbgY81DPgz8XnzT6pwsx39DXnEPSJz6yMPZfJEWcinMbKrJGDsyon97w9SMkN9JmSE7Xx2vkSvAXxtw3UQU3FzA",
+          "entry_sol_size": 0.50816324,
+          "incomplete": false
+        }
+      },
+      "exit_incomplete": false,
+      "exit_price": 4.7852600183977685e-06,
+      "exit_slot": 448833928,
+      "exit_signature": "3a69o61aymyfThi37Vkg8cN9sSYrLdTkZwvUtasoJ3VKtdtKCrHJE4rveSTdMtaywjPyGms7tzUdvKB262vtCzUc",
+      "exit_is_buy": true,
+      "exit_sol_size": 10.019872379,
+      "exit_block_time": 1789934624,
+      "exit_delay_s": 33,
+      "sim_E0": -0.2525,
+      "sim_E1": -0.2525,
+      "sim_E2": 0.0241,
+      "status": "ok",
+      "signal_pct": -4.5486,
+      "task_name": "BATCH-7",
+      "buyers_between": 3
+    }
+  ]
+}
