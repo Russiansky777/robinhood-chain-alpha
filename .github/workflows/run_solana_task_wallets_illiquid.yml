@@ -1,0 +1,67 @@
+name: "Кошельки задач: позиции в токенах без прямой SOL/USDC-ликвидности"
+
+# Владелец: ТОЛЬКО ЧТЕНИЕ. Ни одной покупки/продажи, ни одного POST в
+# DBot -- единственное обращение к DBot -- GET /automation/follow_orders
+# за списком кошельков (живьём, не хардкодом). Guard (dbot-sold-guard) и
+# зонд (dbot-detect-probe) не трогаются: этот workflow не ходит на VPS.
+#
+# Ключ Helius: владелец просит HELIUS_API_KEY, в секретах заведён
+# HELIUS_API -- отдаём оба имени из одного секрета.
+on:
+  workflow_dispatch:
+    inputs:
+      min_usd:
+        description: "не показывать позиции дешевле, USD (0 = все)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: solana-task-wallets-illiquid
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Скан остатков (только чтение)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1; fi
+          if [ -z "$DBOT_API_KEY" ]; then echo "СТОП: секрет DBOT_API_KEY пуст." >&2; exit 1; fi
+          python -u analysis/solana_task_wallets_illiquid_positions.py \
+            --min-usd "${{ github.event.inputs.min_usd || 0 }}" 2>&1 | tail -400
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/solana_task_wallets_illiquid_positions.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Кошельки задач: позиции без прямой SOL/USDC-ликвидности [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
