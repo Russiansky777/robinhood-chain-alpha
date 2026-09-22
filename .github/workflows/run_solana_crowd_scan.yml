@@ -37,6 +37,18 @@ on:
         description: "только N кошельков (отладка, 0 = без ограничения)"
         required: false
         default: "0"
+      lookback_hours:
+        description: "окно поиска покупок в часах (72 обычно; 168 -- семидневный добор)"
+        required: false
+        default: "72"
+      only:
+        description: "через запятую: сканировать ТОЛЬКО эти адреса (добор дыры по кандидатам)"
+        required: false
+        default: ""
+      out:
+        description: "путь выгрузки; пусто -- основной файл. ДЛЯ ДОБОРА ЗАДАТЬ СВОЙ, иначе затрёт основной"
+        required: false
+        default: ""
 
 concurrency:
   group: solana-crowd-scan
@@ -79,6 +91,9 @@ jobs:
             --workers "${{ github.event.inputs.workers || 4 }}" \
             --time-budget-s "${{ github.event.inputs.time_budget_s || 4500 }}" \
             --limit "${{ github.event.inputs.limit || 0 }}" \
+            --lookback-hours "${{ github.event.inputs.lookback_hours || 72 }}" \
+            --only "${{ github.event.inputs.only }}" \
+            --out "${{ github.event.inputs.out }}" \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -500
 
@@ -87,9 +102,10 @@ jobs:
         run: |
           python - <<'PY'
           import json, pathlib, sys
-          p = pathlib.Path("data/solana_crowd_scan.json")
+          out = "${{ github.event.inputs.out }}".strip()
+          p = pathlib.Path(out or "data/solana_crowd_scan.json")
           if not p.exists():
-              print("файла нет -- скрипт не дошёл до записи"); sys.exit(0)
+              print(f"файла {p} нет -- скрипт не дошёл до записи"); sys.exit(0)
           d = json.loads(p.read_text())
           c = d["calibration"]
           print("режим:", d["mode"])
@@ -112,7 +128,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/solana_crowd_scan.json data/solana_crowd_scan_cache.json 2>/dev/null || true
+          # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
+          # добавляет НИЧЕГО, включая существующие соседние пути.
+          for f in data/solana_crowd_scan.json data/solana_crowd_scan_cache.json "${{ github.event.inputs.out }}"; do
+            [ -n "$f" ] && [ -f "$f" ] && git add "$f"
+          done
+          true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Скан толпы: прогон [automated]"
           for i in 1 2 3 4 5; do
