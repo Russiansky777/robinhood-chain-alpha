@@ -46,7 +46,12 @@ USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 QUOTE_MINTS = {WSOL, USDC, USDT}
 QUOTE_SYMS = {"SOL", "WSOL", "USDC", "USDT"}
-DS_BATCH = 30  # DexScreener /latest/dex/tokens принимает до 30 адресов
+# ПОЧЕМУ НЕ ПАЧКАМИ. /latest/dex/tokens принимает до 30 адресов, но ответ
+# ограничен по числу пулов, и хвост минтов возвращается ПУСТЫМ -- то есть
+# "пулов нет" неотличимо от "не влезло". В первом прогоне это дало 11
+# ложных НЕТ_ПАР, среди них PEPEqnuu..., у которого пул с ликвидностью
+# $51k уже был измерен в пункте 6. Спрашиваем по одному минту.
+DS_ONE_BY_ONE = True
 
 
 def scrub(s: str) -> str:
@@ -273,15 +278,13 @@ def main() -> int:
 
     ds: dict[str, list[dict]] = {}
     ds_err: dict[str, str] = {}
-    for i in range(0, len(mints), DS_BATCH):
-        chunk = mints[i:i + DS_BATCH]
-        by, err = ds_tokens(chunk)
+    for m in mints:
+        by, err = ds_tokens([m])
         if err:
-            for m in chunk:
-                ds_err[m] = err
+            ds_err[m] = err
         else:
-            ds.update(by)
-        time.sleep(0.4)
+            ds[m] = by.get(m, [])
+        time.sleep(0.35)
 
     info: dict[str, dict] = {}
     for m in mints:
@@ -289,6 +292,40 @@ def main() -> int:
             info[m] = mint_info(m, hel)
         except RuntimeError as exc:
             info[m] = {"ошибка": scrub(str(exc))[:120]}
+
+    # Отдельная проверка: 11 минтов из зависших продаж (пункт 6) не попали
+    # в перечень остатков. Это либо "уже продано", либо дыра в переборе
+    # токен-счетов -- разница существенная, поэтому спрашиваем баланс
+    # каждого такого минта у каждого кошелька НАПРЯМУЮ, с фильтром по
+    # минту, а не делаем вывод из отсутствия в списке.
+    hung_check = []
+    hung_path = REPO / "data" / "solana_hung_liquidity.json"
+    if hung_path.exists():
+        try:
+            hung = [t["mint"] for t in (json.loads(hung_path.read_text()).get("токены") or [])]
+        except (ValueError, KeyError, TypeError):
+            hung = []
+        for m in hung:
+            tot, per = 0.0, {}
+            err = None
+            for addr, name in wallets.items():
+                try:
+                    res = rpc("getTokenAccountsByOwner", [addr, {"mint": m},
+                                                          {"encoding": "jsonParsed"}], hel)
+                except RuntimeError as exc:
+                    err = scrub(str(exc))[:120]
+                    continue
+                for acc in (res or {}).get("value") or []:
+                    info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info") or {}
+                    ui = float((info.get("tokenAmount") or {}).get("uiAmount") or 0.0)
+                    if ui:
+                        per[name] = per.get(name, 0.0) + ui
+                        tot += ui
+            hung_check.append({"mint": m, "остаток_всего": tot, "по_кошелькам": per,
+                                "ошибка": err})
+        z = sum(1 for h in hung_check if not h["остаток_всего"] and not h["ошибка"])
+        print(f"зависшие минты: у {z} из {len(hung_check)} остаток сейчас НОЛЬ "
+              f"(прямой запрос по минту, не вывод из отсутствия в списке)")
 
     rows = []
     for p in positions:
@@ -332,6 +369,7 @@ def main() -> int:
         "summary": summary,
         "wallets": wallets,
         "errors": errors,
+        "зависшие_минты_остаток_сейчас": hung_check,
         "positions": rows,
     }
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2))
@@ -349,6 +387,13 @@ def main() -> int:
               f"{(r['ликвидность'].get('лучшая_любая_liq_usd', -1)):>11.0f}")
     print()
     print("ИТОГО:", json.dumps(summary, ensure_ascii=False))
+    if hung_check:
+        print()
+        print("ЗАВИСШИЕ МИНТЫ (пункт 6) -- остаток на кошельках задач СЕЙЧАС:")
+        for h in hung_check:
+            print(f"  {h['mint']:<46}{h['остаток_всего']:>20.6f}  "
+                  f"{json.dumps(h['по_кошелькам'], ensure_ascii=False)}"
+                  f"{'  ОШИБКА: ' + h['ошибка'] if h['ошибка'] else ''}")
     if errors:
         print("ОШИБКИ ЧТЕНИЯ:", json.dumps(errors, ensure_ascii=False))
     print(f"файл: {OUT.relative_to(REPO)}")
