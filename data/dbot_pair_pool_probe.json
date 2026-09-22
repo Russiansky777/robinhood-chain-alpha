@@ -1,6 +1,6 @@
 {
-  "начато_utc": "2026-09-22T18:49:14Z",
-  "режим": "сухой прогон",
+  "начато_utc": "2026-09-22T18:50:31Z",
+  "режим": "боевой",
   "минт": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
   "кошелёк": {
     "имя": "BATCH-3",
@@ -12,81 +12,83 @@
   "продаём_raw": 254327573,
   "maxSlippage": 0.4,
   "маршрут_на_весь_остаток": {
-    "SOL": 0.007122338,
-    "outAmount": "7122338",
+    "SOL": 0.007098599,
+    "outAmount": "7098599",
     "priceImpactPct": "0",
-    "шагов": 3,
+    "шагов": 2,
     "маршрут": [
       {
-        "label": "Quantum",
-        "ammKey": "AgEZLwFKa3nHtu9Xhz9MQhBBHHseDtVrUmfzsNSowbrW",
+        "label": "Whirlpool",
+        "ammKey": "GupqDENX2H7xFSUtGwWkvXYNg3eFriX2K3KeHniWTARf",
         "inputMint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
         "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "inAmount": "2543275733",
-        "outAmount": "841756",
-        "percent": 100
-      },
-      {
-        "label": "JupLend AMM",
-        "ammKey": "FfEJYz4hLLFe4KyNyKYCjvfhMfbtpLH3CXpcPe8nhmfy",
-        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        "outputMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-        "inAmount": "841756",
-        "outAmount": "841741",
+        "outAmount": "838682",
         "percent": 100
       },
       {
         "label": "Whirlpool",
-        "ammKey": "AhhoxZDmsg2snm85vPjqzYzEYESoKfb4KmTj4HrBBNwY",
-        "inputMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "ammKey": "Esvfxt3jMDdtTZqLF1fqRhDjzM8Bpr7fZxJMrK69PB7e",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "outputMint": "So11111111111111111111111111111111111111112",
-        "inAmount": "841741",
-        "outAmount": "7122338",
+        "inAmount": "838682",
+        "outAmount": "7098599",
         "percent": 100
       }
     ],
     "хост": "https://lite-api.jup.ag/swap/v1/quote"
   },
   "маршрут_на_продаваемую_долю": {
-    "SOL": 0.000712146,
-    "outAmount": "712146",
+    "SOL": 0.000709883,
+    "outAmount": "709883",
     "priceImpactPct": "0",
-    "шагов": 2,
+    "шагов": 1,
     "маршрут": [
       {
-        "label": "Meteora DLMM",
-        "ammKey": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
+        "label": "Whirlpool",
+        "ammKey": "7Fo2mVzvrYxmUiLkkLij1KQzyKBjcJTHJkgV4Jkwjbnn",
         "inputMint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
-        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        "inAmount": "254327573",
-        "outAmount": "84165",
-        "percent": 100
-      },
-      {
-        "label": "1DEX",
-        "ammKey": "DbuvwPuLvH8uy2B1sKuu18aCd2QpCvfZdfDtdRZztBd2",
-        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "outputMint": "So11111111111111111111111111111111111111112",
-        "inAmount": "84165",
-        "outAmount": "712146",
+        "inAmount": "254327573",
+        "outAmount": "709883",
         "percent": 100
       }
     ],
     "хост": "https://lite-api.jup.ag/swap/v1/quote"
   },
-  "адрес_пула_первого_шага": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
-  "outputMint_первого_шага": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  "первый_шаг_сразу_в_SOL": false,
-  "итог": "СУХОЙ ПРОГОН: продажа НЕ отправлена",
-  "тело_которое_ушло_бы": {
-    "chain": "solana",
-    "pair": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
-    "walletIdList": [
-      "<walletId>"
-    ],
-    "type": "sell",
-    "sellPercent": 0.1,
-    "maxSlippage": 0.4,
-    "retries": 3
-  }
+  "адрес_пула_первого_шага": "7Fo2mVzvrYxmUiLkkLij1KQzyKBjcJTHJkgV4Jkwjbnn",
+  "outputMint_первого_шага": "So11111111111111111111111111111111111111112",
+  "первый_шаг_сразу_в_SOL": true,
+  "http": 200,
+  "ответ": {
+    "err": false,
+    "res": {
+      "ids": [
+        "mud14jnb16qkw8"
+      ]
+    }
+  },
+  "состояние_ордера": [
+    {
+      "id": "mud14jnb16qkw8",
+      "state": "done",
+      "swapHash": "3iHeMpjqBFoDU4k1mzRirPntP6HptTdnd7yc8CSUzrh71cALfM6s46Y25SZPzK8LfGdUeYzHD5z3CENSy15JC334",
+      "errorCode": "",
+      "errorMessage": ""
+    }
+  ],
+  "баланс_токена": {
+    "до_raw": 2543275733,
+    "после_raw": 2288948160,
+    "продано_raw": 254327573
+  },
+  "баланс_SOL": {
+    "до": 4.949008511,
+    "после": 4.946492988,
+    "дельта": -0.002515523
+  },
+  "баланс_упал": true,
+  "доля_от_котировки": -354.36,
+  "пояснение_доли": "дельта SOL кошелька уже ЗА ВЫЧЕТОМ комиссии сети и чаевых DBot, поэтому доля занижена относительно чистой цены исполнения",
+  "итог": "DBot ПРИНЯЛ адрес пула в pair и продал"
 }
