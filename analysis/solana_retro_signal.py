@@ -103,15 +103,26 @@ METHOD_VERSION = 3
 CHECKPOINT_S = 900   # ~15 минут между сохранениями на диск
 
 EXIT_FROM_S = 33
-# ОКНО ВЫХОДА РАСШИРЕНО до T+120с (распоряжение владельца). Прежнее
-# T+33..40с СТРУКТУРНО не добиралось до конца: 12 блоков при слоте
-# 250-300 мс покрывают лишь ~3.2с, и фактический максимум задержки в
-# прошлом прогоне был 37с при заявленных 40. 62 симуляции из 506 ушли в
-# no_exit не потому, что сделок не было, а потому что скан не дошёл.
-EXIT_TO_S = 120
+# ОКНО ВЫХОДА = ТО, КОТОРЫМ МЫ РЕАЛЬНО ТОРГУЕМ, T+33..45с.
+#
+# История этого числа, чтобы не наступить дважды. Прежнее T+33..40с
+# структурно не добиралось до конца: 12 блоков при слоте 250-300 мс
+# покрывают ~3.2с, и 62 симуляции из 506 уходили в no_exit не потому,
+# что сделок не было, а потому что скан не дошёл. Я расширил окно до
+# T+120с -- и это оказалось дорого и бесполезно одновременно: строки с
+# выходом позже 45с всё равно не идут в медиану по правилу exit_slow,
+# то есть добор с 45с до 120с НЕ МЕНЯЕТ НИ ОДНОЙ ИТОГОВОЙ ЦИФРЫ, но
+# съедает почти всё время прогона (420 блоков на симуляцию; при 12%
+# симуляций без выхода это 155 минут, при 25% -- 316 минут).
+# Правильная граница -- горизонт удержания: медиана held_seconds 35с,
+# p75 36с, 95.5% в 30-45с.
+EXIT_TO_S = 45
 EXIT_MAX_BLOCKS = 12          # первый, дешёвый проход
-EXIT_DEEP_MAX_BLOCKS = 420    # добор до T+120с; 87с / ~0.28с на слот ~ 310
-EXIT_SLOW_S = 45              # выше -- строка помечается и в основную медиану не идёт
+EXIT_DEEP_MAX_BLOCKS = 60     # добор до T+45с: 12с / ~0.28с на слот ~ 43, с запасом 60
+EXIT_SLOW_S = 45              # выше -- строка не идёт в основную медиану
+# При EXIT_TO_S == EXIT_SLOW_S медленных строк не бывает по построению:
+# скан останавливается ровно на границе. Механика exit_slow оставлена --
+# она снова заработает, если окно когда-нибудь расширят.
 SCEN_LOOKAHEAD = 2          # не больше 2 слотов от стартового
 COST_THRESHOLD_PCT = 2.5    # порог издержек владельца на 0.5 SOL
 MIN_LEG_SOL = 0.05          # см. dust_ok(): ниже этого цена сделки -- не цена
@@ -932,6 +943,36 @@ def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> d
     return o
 
 
+def truncation_report(rows: list[dict], budget_exhausted: bool) -> dict:
+    """Сколько строк ушло в no_exit и сколько из них может быть обрывом
+    по бюджету. Для прогонов, где пометки budget_truncated ещё не было,
+    даётся ОЦЕНКА по косвенным признакам, и она названа оценкой.
+
+    Признак обрыва в старых данных: строка одновременно упёрлась в
+    потолок скана И часть блоков не отдалась. Настоящий глубокий скан,
+    ничего не нашедший, доходит до потолка с полными блоками; после
+    исчерпания бюджета блоки перестают отдаваться все разом."""
+    n = len(rows)
+    no_exit = [r for r in rows if r.get("status") == "no_exit"]
+    marked = [r for r in rows if r.get("budget_truncated")]
+    marked_status = [r for r in rows if r.get("status") == "оборвано_бюджетом"]
+    suspect = [r for r in no_exit if r.get("exit_scan_hit_cap") and r.get("exit_incomplete")]
+    return {
+        "симуляций_всего": n,
+        "no_exit": len(no_exit),
+        "оборвано_бюджетом_помечено": len(marked_status),
+        "помечено_как_затронутые_обрывом_всего": len(marked),
+        "бюджет_исчерпан": budget_exhausted,
+        "оценка_обрыва_в_no_exit": len(suspect) if not marked_status else None,
+        "как_считана_оценка": (
+            "строка упёрлась в потолок скана И часть блоков не отдалась -- признак того, что "
+            "блоки перестали приходить, а не того, что сделок не было. Применяется только к "
+            "прогонам без явной пометки budget_truncated"),
+        "честно": ("нижняя оценка: строку, оборвавшуюся до потолка, этот признак не поймает. "
+                    "Прогоны с явной пометкой сомнений не оставляют"),
+    }
+
+
 def passing_candidates(wallets: list[dict], min_e2: float = 5.0, min_n: int = 4,
                         min_crowd: float = 3.0, min_share_pos: float = 0.5) -> dict:
     """Фильтр владельца: ретро E2 >= +5%, n >= 4, толпа >= 3, больше
@@ -1020,16 +1061,31 @@ def self_test_method() -> None:
     chk("цены лидера нет -> честный no_entry", r3["scenarios"]["E2"].get("no_entry") is True)
     chk("и sim_E2 не выдумывается", r3.get("sim_E2") is None)
 
+    # Выход ВНУТРИ окна, но дальше дешёвого прохода: глубокий добор обязан
+    # его найти. 28 блоков по 0.25с = T+40с.
     b4 = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]}}
-    for i in range(300):
+    for i in range(200):
         b4[1132 + i] = {"block_time": 133 + i // 4, "trades": []}
-    b4[1132 + 120] = {"block_time": 163, "trades": [T("X", 1, 4.0)]}
+    b4[1132 + 28] = {"block_time": 140, "trades": [T("X", 1, 4.0)]}
     r4 = simulate(None, FakeST(b4), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
-    chk("выход за пределами 12 блоков найден", r4.get("exit_delay_s") == 63, str(r4.get("exit_delay_s")))
-    chk("он помечен медленным", r4.get("exit_slow") is True)
+    chk("выход за пределами дешёвого прохода найден", r4.get("exit_delay_s") == 40,
+        str(r4.get("exit_delay_s")))
     chk("глубокий проход реально был", (r4.get("exit_scan_blocks") or 0) > EXIT_MAX_BLOCKS,
         str(r4.get("exit_scan_blocks")))
     chk("в потолок скана не упёрлись", r4.get("exit_scan_hit_cap") is False)
+    chk("выход внутри окна не помечен медленным", r4.get("exit_slow") is False)
+
+    # Выход ПОЗЖЕ окна, которым мы торгуем: теперь честный no_exit, а не
+    # строка, которую всё равно выбросил бы фильтр exit_slow. Ровно на
+    # этом и экономится время прогона.
+    b4b = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]}}
+    for i in range(300):
+        b4b[1132 + i] = {"block_time": 133 + i // 4, "trades": []}
+    b4b[1132 + 120] = {"block_time": 163, "trades": [T("X", 1, 4.0)]}
+    r4b = simulate(None, FakeST(b4b), FakeClock(), LEAD, MINT, SLOT, SIG, None, 100)
+    chk("выход позже T+45с не берётся", r4b["status"] == "no_exit", r4b["status"])
+    chk("и скан на него не тратится", (r4b.get("exit_scan_blocks") or 0) <= EXIT_DEEP_MAX_BLOCKS,
+        str(r4b.get("exit_scan_blocks")))
 
     b5 = {SLOT: {"block_time": 100, "trades": [T(LEAD, 5, 2.0, sig=SIG)]}}
     for i in range(500):
@@ -1084,6 +1140,27 @@ def self_test_method() -> None:
     bad_file.write_text("{не json")
     chk("битый кэш не валит запуск", SimCache(bad_file, 3).loaded == 0)
     chk("временный файл после записи убран", not cp.with_suffix(".tmp").exists())
+
+    # --- пометка обрыва по бюджету ---
+    tr = truncation_report([
+        {"status": "ok", "sim_E2": 1.0},
+        {"status": "no_exit", "exit_scan_hit_cap": True, "exit_incomplete": True},
+        {"status": "no_exit", "exit_scan_hit_cap": True, "exit_incomplete": False},
+        {"status": "no_exit"},
+    ], budget_exhausted=True)
+    chk("no_exit посчитаны", tr["no_exit"] == 3, str(tr["no_exit"]))
+    chk("оценка обрыва ловит потолок+неполные блоки", tr["оценка_обрыва_в_no_exit"] == 1,
+        str(tr["оценка_обрыва_в_no_exit"]))
+    tr2 = truncation_report([{"status": "оборвано_бюджетом", "budget_truncated": True},
+                              {"status": "ok", "sim_E2": 1.0, "budget_truncated": True}],
+                             budget_exhausted=True)
+    chk("при явной пометке оценка не подменяет факт", tr2["оценка_обрыва_в_no_exit"] is None)
+    chk("помечено оборванными ровно незавершённое", tr2["оборвано_бюджетом_помечено"] == 1)
+    chk("затронутых обрывом считаем шире", tr2["помечено_как_затронутые_обрывом_всего"] == 2)
+    chk("окно выхода равно горизонту удержания", EXIT_TO_S == EXIT_SLOW_S == 45,
+        f"{EXIT_TO_S}/{EXIT_SLOW_S}")
+    chk("потолок добора соответствует окну", EXIT_DEEP_MAX_BLOCKS == 60,
+        str(EXIT_DEEP_MAX_BLOCKS))
 
     bad = 0
     for name, good, got in checks:
@@ -1313,7 +1390,30 @@ def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: 
                 row = {"leader": it["leader"], "mint": it["mint"], "source_slot": it["slot"],
                         "leader_signature": it["signature"], "status": "ошибка",
                         "note": scrub(f"{type(exc).__name__}: {exc}")[:200]}
-            if cache and row.get("status") in ("ok", "частично", "no_exit", "no_leader_tx"):
+            # ОБРЫВ ПО БЮДЖЕТУ ПОМЕЧАЕТСЯ ЯВНО. После исчерпания бюджета
+            # Rpc.call бросает исключение сразу, блоки возвращаются как
+            # "не отдались", и симуляция выглядит как no_exit -- то есть
+            # обрыв неотличим от честного "сделок не было". Различить
+            # построчно нечем, поэтому помечается ВСЁ, обработанное после
+            # момента исчерпания: лучше пометить лишнее, чем выдать обрыв
+            # за факт.
+            if rpc.expired():
+                row["budget_truncated"] = True
+                if row.get("sim_E2") is None:
+                    # Незавершённая строка: её no_exit/ошибка могут быть
+                    # следствием обрыва, поэтому статус меняется.
+                    row["статус_до_обрыва"] = row.get("status")
+                    row["status"] = "оборвано_бюджетом"
+                    row["note"] = ("обработана после исчерпания бюджета времени -- "
+                                    "отсутствие входа/выхода может быть следствием обрыва, "
+                                    "а не отсутствием сделок")
+                # Строка С посчитанным sim_E2 завершена корректно: вход и
+                # выход найдены до обрыва. Её не выбрасываем -- только
+                # помечаем, иначе потеряли бы годные данные.
+            # В кэш кладём только доведённые до конца строки: иначе обрыв
+            # закрепился бы в кэше и повторный прогон его унаследовал.
+            if (cache and not row.get("budget_truncated")
+                    and row.get("status") in ("ok", "частично", "no_exit", "no_leader_tx")):
                 cache.put(it["signature"], row)
             row.update({k: v for k, v in it.items()
                         if k in ("signal_pct", "task_name", "buyers_between", "spend_sol_equiv")})
@@ -1549,6 +1649,7 @@ def main() -> None:
                               "засеяно_из": args.seed_cache_from or None,
                               "порог_медленного_выхода_с": EXIT_SLOW_S},
         "calibration": calib,
+        "обрыв_по_бюджету": truncation_report(rows, rpc.expired()),
         "overall": overall(rows, "все кошельки", args.min_leg_sol),
         "overall_pilot": overall([r for r in rows if r["leader"] == PILOT], "пилот", args.min_leg_sol),
         "wallets": wallets,
@@ -1568,6 +1669,19 @@ def report(out: dict) -> None:
     print(f"РЕТРО-СИГНАЛ, режим={out['mode']}, {out['generated_at_utc']}")
     print("проба accounts:", json.dumps(out["проба_accounts"], ensure_ascii=False))
     print("статистика:", json.dumps(out["run_stats"], ensure_ascii=False))
+    t = out.get("обрыв_по_бюджету")
+    if t:
+        print()
+        print("--- ОБРЫВ ПО БЮДЖЕТУ ---")
+        print(f"  симуляций {t['симуляций_всего']}, no_exit {t['no_exit']}, "
+              f"бюджет исчерпан: {t['бюджет_исчерпан']}")
+        if t["оборвано_бюджетом_помечено"]:
+            print(f"  ПОМЕЧЕНО оборванными: {t['оборвано_бюджетом_помечено']} "
+                  f"(затронуто обрывом всего {t['помечено_как_затронутые_обрывом_всего']})")
+        elif t["оценка_обрыва_в_no_exit"]:
+            print(f"  ОЦЕНКА обрыва внутри no_exit: {t['оценка_обрыва_в_no_exit']} "
+                  f"-- {t['как_считана_оценка']}")
+            print(f"  {t['честно']}")
     c = out.get("calibration")
     if c:
         print()

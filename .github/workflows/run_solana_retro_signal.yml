@@ -63,9 +63,9 @@ on:
         required: false
         default: ""
       exit_deep_max_blocks:
-        description: "потолок блоков глубокого добора выхода (420 по умолчанию)"
+        description: "потолок блоков глубокого добора выхода (60 = окно T+33..45с, которым мы торгуем)"
         required: false
-        default: "420"
+        default: "60"
 
 concurrency:
   group: solana-retro-signal
@@ -114,7 +114,7 @@ jobs:
             --checkpoint-s "${{ github.event.inputs.checkpoint_s || 900 }}" \
             --only-leaders "${{ github.event.inputs.only_leaders }}" \
             --seed-cache-from "${{ github.event.inputs.seed_cache_from }}" \
-            --exit-deep-max-blocks "${{ github.event.inputs.exit_deep_max_blocks || 420 }}" \
+            --exit-deep-max-blocks "${{ github.event.inputs.exit_deep_max_blocks || 60 }}" \
             ${{ github.event.inputs.checkpoint_push != 'no' && '--checkpoint-push' || '' }} \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -600
