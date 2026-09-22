@@ -306,12 +306,20 @@ def source_history(source: str, window: dict, cache: dict,
     return node["entries"]
 
 
-def enhanced_swaps(source: str, key: str, stats: dict) -> list[dict] | None:
-    """Helius Enhanced REST, как просил владелец. Реальный прогон
-    2026-09-19 (data/solana_source_a_helius_gate.json) зафиксировал HTTP
-    401 на всех запросах Enhanced API с этим ключом -- поэтому это
-    ПРОБНЫЙ путь: при любой неудаче возвращаем None и идём по JSON-RPC.
-    Что реально сработало -- попадёт в отчёт."""
+def enhanced_swaps(source: str, key: str, stats: dict, cache: dict) -> list[dict] | None:
+    """Helius Enhanced REST, как просил владелец (/v0/addresses/{source}/
+    transactions?type=SWAP).
+
+    ЧТО ПОКАЗАЛ РЕАЛЬНЫЙ ПРОГОН (job 35670100424): HTTP 200, ответ
+    приходит -- но это ТОЛЬКО последняя страница транзакций адреса
+    (самые свежие). Наши сделки старше, поэтому ни одна из них в эту
+    страницу не попадает, и путь не даёт ни одного совпадения. Поэтому
+    зонд делается ОДИН РАЗ НА ИСТОЧНИК (а не на каждую сделку), его
+    охват (сколько записей и до какого времени достаёт) пишется в отчёт
+    как измеренный факт, а рабочим путём остаётся JSON-RPC."""
+    node = cache.setdefault("enhanced", {})
+    if source in node:
+        return node[source]
     try:
         resp = requests.get(
             f"{HELIUS_ENHANCED_BASE}/v0/addresses/{source}/transactions",
@@ -320,17 +328,30 @@ def enhanced_swaps(source: str, key: str, stats: dict) -> list[dict] | None:
         )
     except Exception as exc:  # noqa: BLE001
         stats["enhanced_error"] = scrub(f"{type(exc).__name__}: {exc}")
+        node[source] = None
         return None
     stats["enhanced_last_status"] = resp.status_code
     if resp.status_code != 200:
         stats["enhanced_error"] = scrub(resp.text[:200])
+        node[source] = None
         return None
     try:
         body = resp.json()
     except ValueError:
         stats["enhanced_error"] = "non-json body"
+        node[source] = None
         return None
-    return body if isinstance(body, list) else None
+    if not isinstance(body, list):
+        node[source] = None
+        return None
+    ts = [b.get("timestamp") for b in body if b.get("timestamp")]
+    stats.setdefault("enhanced_coverage", {})[source] = {
+        "n": len(body),
+        "oldest_ts": min(ts) if ts else None,
+        "newest_ts": max(ts) if ts else None,
+    }
+    node[source] = body
+    return body
 
 
 # ---------- разбор транзакции ----------
@@ -422,11 +443,19 @@ def block_buyers(slot: int, mint: str, cache: dict, stats: dict) -> list[dict] |
     """Покупатели mint в блоке slot, по (post-pre)TokenBalances > 0.
     Возвращает список {index, signature, owner, delta} в порядке блока.
 
-    transactionDetails="accounts" (а не "full") -- осознанное отличие от
-    буквы задания: этот уровень детализации отдаёт ровно то, что нужно
-    (подписи + pre/postTokenBalances), но в разы меньше трафика, чем
-    полные транзакции. Если у блока не окажется токен-балансов, честно
-    падаем на "full" и помечаем это в статистике."""
+    ДВА ОСОЗНАННЫХ ОТЛИЧИЯ ОТ БУКВЫ ЗАДАНИЯ, оба по реальному прогону:
+
+    1. maxSupportedTransactionVersion=1, а НЕ 0 (как в задании). С нулём
+       РЕАЛЬНО падали все 12 из 12 вызовов первого прогона (job
+       35670100424): "code: -32015, Transaction version (1) is not
+       supported by the requesting client". В блоках сейчас есть
+       транзакции версии 1, и с потолком 0 узел отказывается отдавать
+       блок целиком. С единицей блок отдаётся -- иначе buyers_between не
+       посчитать вообще ни по одной сделке.
+    2. transactionDetails="accounts" (а не "full"): этот уровень отдаёт
+       ровно то, что нужно (подписи + pre/postTokenBalances), но в разы
+       меньше трафика. Если у блока не окажется токен-балансов -- честный
+       фоллбэк на "full" со счётчиком fallback_to_full."""
     ck = f"{slot}:{mint}"
     node = cache.setdefault("block_buyers", {})
     if ck in node:
@@ -438,7 +467,7 @@ def block_buyers(slot: int, mint: str, cache: dict, stats: dict) -> list[dict] |
             blk = fp.rpc_call("getBlock", [slot, {
                 "encoding": "jsonParsed",
                 "transactionDetails": detail,
-                "maxSupportedTransactionVersion": 0,
+                "maxSupportedTransactionVersion": 1,
                 "rewards": False,
             }], use_cache=False)
         except Exception as exc:  # noqa: BLE001
@@ -513,7 +542,7 @@ def find_source_tx(trade: dict, fingerprint: dict | None, cache: dict, stats: di
 
     # (2) Helius Enhanced REST -- пробный путь, см. докстринг
     if use_enhanced:
-        swaps = enhanced_swaps(source, key, stats)
+        swaps = enhanced_swaps(source, key, stats, cache)
         if swaps:
             stats["enhanced_worked"] = True
             best = None
