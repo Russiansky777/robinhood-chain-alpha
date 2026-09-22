@@ -1,0 +1,96 @@
+name: "Проба: принимает ли DBot адрес пула в поле pair"
+
+# Владелец: путь дешевле утилизатора. distribute не переносит
+# Token-2022, но свопы DBot с ним работают -- значит, если DBot примет в
+# pair адрес конкретного пула (док-ция: "address of the token or pair"),
+# зависшую позицию можно продать через пул, найденный Jupiter, не
+# перевозя ключи никуда.
+#
+# ГРАНИЦЫ: maxSlippage жёстко <= 0.5; без confirm=ПРОДАЮ ничего не
+# отправляется; доля продажи задаётся явно (проверка на пыли -- пара
+# центов). Ни одной покупки. Guard и зонд не затрагиваются: на VPS этот
+# workflow не ходит.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "минт для пробы (по умолчанию STONK -- обычный SPL, пыль на BATCH-3/5/7)"
+        required: false
+        default: "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
+      wallet:
+        description: "кошелёк задачи; пусто -- взять с наибольшим остатком"
+        required: false
+        default: ""
+      sell_percent:
+        description: "доля остатка на продажу"
+        required: false
+        default: "0.1"
+      max_slippage:
+        description: "проскальзывание (жёсткий потолок 0.5)"
+        required: false
+        default: "0.4"
+      confirm:
+        description: "напиши ПРОДАЮ, чтобы реально отправить; иначе сухой прогон"
+        required: false
+        default: ""
+
+concurrency:
+  group: dbot-pair-pool-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Проба pair=адрес пула"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1; fi
+          if [ -z "$DBOT_API_KEY" ]; then echo "СТОП: секрет DBOT_API_KEY пуст." >&2; exit 1; fi
+          CONFIRM=""
+          if [ "${{ github.event.inputs.confirm }}" = "ПРОДАЮ" ]; then
+            CONFIRM="--confirm"; echo "БОЕВОЙ ПРОГОН: продажа будет отправлена."
+          else
+            echo "СУХОЙ ПРОГОН: продажа НЕ будет отправлена."
+          fi
+          python -u analysis/dbot_pair_pool_probe.py \
+            --mint "${{ github.event.inputs.mint }}" \
+            ${{ github.event.inputs.wallet && format('--wallet {0}', github.event.inputs.wallet) || '' }} \
+            --sell-percent "${{ github.event.inputs.sell_percent || '0.1' }}" \
+            --max-slippage "${{ github.event.inputs.max_slippage || '0.4' }}" \
+            $CONFIRM 2>&1 | tail -300
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/dbot_pair_pool_probe.json ] && git add data/dbot_pair_pool_probe.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Проба pair=адрес пула: результат [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
