@@ -188,7 +188,12 @@ def classify(pairs: list[dict], thin_usd: float | None) -> tuple[str, dict]:
     direct = [p for p in pairs if p["other_addr"] in QUOTE_MINTS or p["other_sym"] in QUOTE_SYMS]
     best_direct = max((p["liq_usd"] for p in direct), default=0.0)
     best_any = max((p["liq_usd"] for p in pairs), default=0.0)
+    # DexScreener отдаёт не более 30 пулов на минт. Ровно 30 -- признак,
+    # что список мог быть обрезан; на вердикт ПРЯМАЯ_ОК это не влияет
+    # (прямая пара уже найдена), но "прямой пары нет" при 30 пулах надо
+    # читать как "нет среди 30 показанных", и это помечается явно.
     det = {"n_пар": len(pairs), "n_прямых": len(direct),
+           "список_пулов_мог_быть_обрезан": len(pairs) >= 30,
            "лучшая_прямая_liq_usd": round(best_direct, 2),
            "лучшая_любая_liq_usd": round(best_any, 2),
            "лучшая_пара": (pairs[0]["dex"] + "/" + pairs[0]["other_sym"]) if pairs else None}
@@ -316,8 +321,14 @@ def main() -> int:
                     err = scrub(str(exc))[:120]
                     continue
                 for acc in (res or {}).get("value") or []:
-                    info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info") or {}
-                    ui = float((info.get("tokenAmount") or {}).get("uiAmount") or 0.0)
+                    # НЕ называть это info: в первом прогоне здесь была
+                    # переменная info, и она затирала словарь сведений о
+                    # минтах -- token2022/transfer_fee_bps вышли пустыми у
+                    # всех 24 позиций. Счёт при этом честный: пустые
+                    # токен-счета (uiAmount=0) существуют, поэтому тело
+                    # цикла выполняется и без остатка.
+                    acc_info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info") or {}
+                    ui = float((acc_info.get("tokenAmount") or {}).get("uiAmount") or 0.0)
                     if ui:
                         per[name] = per.get(name, 0.0) + ui
                         tot += ui
