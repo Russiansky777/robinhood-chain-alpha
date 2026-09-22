@@ -1,0 +1,120 @@
+name: "Скан толпы за кандидатами (crowd_2)"
+
+# Владелец: только чтение цепочки, ни одной сделки. Для кошельков,
+# которых мы ещё не копировали, считаем ту же метрику толпы, что в
+# Части A показала связь с прибыльностью (при buyers_between=0 в плюс
+# 17.6% сделок, при 6+ -- 60.0%, проверено на реальном файле).
+#
+# КАЛИБРОВКА -- ГЕЙТ. Сначала mode=calibrate: пилот + источники с >=4
+# живыми сделками. Если связи скана с живым buyers_between нет --
+# основной прогон НЕ делается, job падает с этим диагнозом.
+#
+# Guard (dbot-sold-guard) и зонд (dbot-detect-probe) не трогаются: этот
+# workflow вообще не ходит на VPS, всё считается на раннере.
+#
+# Ключ: владелец просит HELIUS_API_KEY, в секретах заведён HELIUS_API --
+# отдаём оба имени из одного секрета, в репозиторий ключ не кладётся.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "calibrate (пилот + источники с живыми сделками) или full (все кошельки)"
+        required: false
+        default: "calibrate"
+      workers:
+        description: "параллельных воркеров (владелец просил 3-4)"
+        required: false
+        default: "4"
+      time_budget_s:
+        description: "мягкий бюджет времени, секунд"
+        required: false
+        default: "4500"
+      limit:
+        description: "только N кошельков (отладка, 0 = без ограничения)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: solana-crowd-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Скан (только чтение цепочки)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then
+            echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1
+          fi
+          if [ -z "$DBOT_API_KEY" ]; then
+            echo "СТОП: секрет DBOT_API_KEY пуст -- список источников активных задач взять неоткуда," >&2
+            echo "а выдумывать его нельзя." >&2; exit 1
+          fi
+          python -u analysis/solana_crowd_scan.py \
+            --mode "${{ github.event.inputs.mode || 'calibrate' }}" \
+            --workers "${{ github.event.inputs.workers || 4 }}" \
+            --time-budget-s "${{ github.event.inputs.time_budget_s || 4500 }}" \
+            --limit "${{ github.event.inputs.limit || 0 }}" \
+            2>&1 | tail -500
+
+      - name: "Гейт калибровки: без связи основной прогон не делаем"
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path("data/solana_crowd_scan.json")
+          if not p.exists():
+              print("файла нет -- скрипт не дошёл до записи"); sys.exit(0)
+          d = json.loads(p.read_text())
+          c = d["calibration"]
+          print("режим:", d["mode"])
+          print("вердикт калибровки:", "СВЯЗЬ ЕСТЬ" if c["verdict_ok"] else "СВЯЗИ НЕТ")
+          print("  пилот: живой med =", c["pilot"]["live_buyers_between_median"],
+                "| скан crowd_2_tx med =", c["pilot"]["scan_crowd_2_tx_median"],
+                "| один порядок:", c["pilot_same_order"])
+          print("  пар источников:", c["n_pairs"],
+                "| Спирмен crowd_2 =", c["spearman_crowd2_vs_live"],
+                "| Спирмен crowd_2_tx =", c["spearman_crowd2tx_vs_live"])
+          sc = d.get("self_check") or {}
+          print("самопроверка у двух провайдеров:", sc.get("ok"))
+          if d["mode"] == "calibrate" and not c["verdict_ok"]:
+              print("::error::Калибровка не прошла -- основной прогон (mode=full) запускать НЕЛЬЗЯ.")
+              sys.exit(2)
+          PY
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/solana_crowd_scan.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Скан толпы: прогон [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
