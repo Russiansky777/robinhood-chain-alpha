@@ -38,6 +38,14 @@ on:
         description: "'yes' -- пересчитать всё заново"
         required: false
         default: ""
+      min_buys:
+        description: "порог числа покупок для КАНДИДАТА (3 обычно; 1 -- добор дыры)"
+        required: false
+        default: "3"
+      extra_crowd:
+        description: "через запятую: дополнительные сканы толпы, напр. data/solana_crowd_scan_7d.json"
+        required: false
+        default: ""
 
 concurrency:
   group: solana-retro-signal
@@ -76,6 +84,8 @@ jobs:
             --time-budget-s "${{ github.event.inputs.time_budget_s || 18000 }}" \
             --min-interval-s "${{ github.event.inputs.min_interval_s || '0.12' }}" \
             --limit "${{ github.event.inputs.limit || 0 }}" \
+            --min-buys "${{ github.event.inputs.min_buys || 3 }}" \
+            --extra-crowd "${{ github.event.inputs.extra_crowd }}" \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             2>&1 | tail -600
 
