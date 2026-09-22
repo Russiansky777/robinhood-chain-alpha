@@ -84,9 +84,14 @@ jobs:
         run: |
           python - <<'PY'
           import json, pathlib, sys
-          p = pathlib.Path("data/solana_retro_signal.json")
+          # Режимы пишут в РАЗНЫЕ файлы (калибровочный прогон раньше
+          # затирал выгрузку полного), поэтому и читаем тот, что
+          # соответствует режиму этого прогона.
+          mode = "${{ github.event.inputs.mode || 'calibrate' }}"
+          p = pathlib.Path("data/solana_retro_signal_calibration.json" if mode == "calibrate"
+                            else "data/solana_retro_signal.json")
           if not p.exists():
-              print("файла нет -- скрипт не дошёл до записи"); sys.exit(0)
+              print(f"файла {p} нет -- скрипт не дошёл до записи"); sys.exit(0)
           d = json.loads(p.read_text())
           print("режим:", d["mode"])
           print("проба accounts:", json.dumps(d.get("проба_accounts"), ensure_ascii=False))
@@ -106,7 +111,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/solana_retro_signal.json data/solana_retro_signal_cache.json 2>/dev/null || true
+          # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
+          # добавляет НИЧЕГО, включая существующие соседние пути.
+          for f in data/solana_retro_signal.json data/solana_retro_signal_calibration.json data/solana_retro_signal_cache.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Ретро-сигнал: прогон [automated]"
           for i in 1 2 3 4 5; do
