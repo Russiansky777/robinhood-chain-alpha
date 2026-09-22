@@ -269,6 +269,41 @@ def find_sell_tx(wallet: str, mint: str, since_ts: int, key: str) -> dict | None
     return None
 
 
+def order_status(ids: list[str], key: str) -> list[dict]:
+    """GET /automation/swap_orders?ids=... -- состояние ордера и ПРИЧИНА
+    отказа. Эндпоинт из документации DBot (docs.dbotx.com/reference/
+    get-swap-order-info): state = init/processing/done/fail/expired,
+    плюс swapHash, errorCode, errorMessage. Без него мы гадали, почему
+    принятый ордер не доходит до цепочки."""
+    if not ids:
+        return []
+    st, body = dbot_get("/automation/swap_orders", {"ids": ",".join(ids)}, key)
+    if st != 200:
+        return [{"id": i, "ошибка_запроса": f"http={st}", "сырое": scrub(str(body)[:300])} for i in ids]
+    out = []
+    for r in extract_items(body):
+        out.append({"id": r.get("id"), "state": r.get("state"),
+                     "swapHash": r.get("swapHash"), "errorCode": r.get("errorCode"),
+                     "errorMessage": r.get("errorMessage"),
+                     "tradeType": r.get("tradeType"), "txPriceUsd": r.get("txPriceUsd")})
+    if not out:
+        out = [{"id": i, "ошибка_запроса": "ответ без распознанного списка",
+                 "сырое": scrub(json.dumps(body, ensure_ascii=False, default=str)[:400])} for i in ids]
+    return out
+
+
+def wait_order(ids: list[str], key: str, timeout_s: int = 45) -> list[dict]:
+    """Ждём терминального состояния ордера, а не фиксированную паузу."""
+    deadline = time.time() + timeout_s
+    last: list[dict] = []
+    while True:
+        last = order_status(ids, key)
+        states = {r.get("state") for r in last}
+        if not (states & {"init", "processing"}) or time.time() > deadline:
+            return last
+        time.sleep(3)
+
+
 def parse_sell_response(status: int | None, body: dict) -> tuple[bool, str]:
     if status != 200:
         return False, f"http={status}"
@@ -299,7 +334,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--wallet", required=True)
     ap.add_argument("--mint", required=True)
-    ap.add_argument("--percents", default="0.95,0.90")
+    ap.add_argument("--percents", default="0.95,0.90",
+                    help="доли продажи; можно пары доля:проскальзывание, напр. 1.0:0.5,0.25:0.9")
+    ap.add_argument("--probe-ids", default="",
+                    help="через запятую: прочитать состояние этих ордеров и выйти")
     ap.add_argument("--max-slippage", type=float, default=0.4)
     ap.add_argument("--retries", type=int, default=3)
     ap.add_argument("--wait-s", type=int, default=25)
@@ -337,6 +375,14 @@ def main() -> None:
         print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2))
         return
 
+    if args.probe_ids:
+        ids = [x.strip() for x in args.probe_ids.split(",") if x.strip()]
+        st_rows = order_status(ids, dbot_key)
+        report["состояние_ордеров"] = st_rows
+        for r in st_rows:
+            log(f"ордер {r.get('id')}: state={r.get('state')} errorCode={r.get('errorCode')} "
+                f"errorMessage={r.get('errorMessage')} swapHash={r.get('swapHash')}")
+
     if args.since_ts:
         report["сделки_с_момента"] = find_sell_tx(args.wallet, args.mint, args.since_ts, hel_key)
         report["expired_сейчас"] = expired_has(args.wallet, args.mint, dbot_key)
@@ -352,11 +398,25 @@ def main() -> None:
     prog = None
     exp_before = None
     prev = bal0["итог"]
-    for percent in [float(x) for x in args.percents.split(",") if x.strip()]:
+    ladder = []
+    for item in args.percents.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if ":" in item:
+            a, b = item.split(":", 1)
+            ladder.append((float(a), float(b)))
+        else:
+            ladder.append((float(item), args.max_slippage))
+    for percent, slip in ladder:
         t0 = int(time.time())
-        st, resp, ok, msg = sell(args.mint, wallet_id, percent, args.max_slippage, args.retries, dbot_key)
-        log(f"жду {args.wait_s}с до проверки баланса")
-        time.sleep(args.wait_s)
+        st, resp, ok, msg = sell(args.mint, wallet_id, percent, slip, args.retries, dbot_key)
+        ids = ((resp.get("res") or {}).get("ids") or []) if isinstance(resp, dict) else []
+        order_rows = wait_order(ids, dbot_key, timeout_s=max(args.wait_s, 45)) if ids else []
+        for r in order_rows:
+            log(f"ордер {r.get('id')}: state={r.get('state')} errorCode={r.get('errorCode')} "
+                f"errorMessage={r.get('errorMessage')} swapHash={r.get('swapHash')}")
+        time.sleep(5)
         bal = balance_three_ways(args.wallet, args.mint, hel_key)
         tx = find_sell_tx(args.wallet, args.mint, t0, hel_key)
         if prog is None:
@@ -367,7 +427,8 @@ def main() -> None:
         if exp_before is None:
             exp_before = exp_now
             report["expired_после_первой_попытки"] = exp_now
-        step = {"sellPercent": percent, "http": st, "принято_DBot": ok, "сообщение": msg,
+        step = {"sellPercent": percent, "maxSlippage": slip, "http": st,
+                 "принято_DBot": ok, "сообщение": msg, "состояние_ордера": order_rows,
                  "сырой_ответ": json.loads(scrub(json.dumps(resp, ensure_ascii=False, default=str)))
                  if isinstance(resp, dict) else str(resp),
                  "баланс_после": bal, "баланс_упал": bal["итог"] < prev - 1e-12,
@@ -378,10 +439,10 @@ def main() -> None:
         if step["баланс_упал"]:
             report["итог"] = f"продано на sellPercent={percent}"
             break
-        log(f"баланс НЕ уменьшился ({prev} -> {bal['итог']}) -- иду к следующему sellPercent")
+        log(f"баланс НЕ уменьшился ({prev} -> {bal['итог']}) -- иду к следующей ступени лестницы")
         prev = bal["итог"]
     else:
-        report["итог"] = "ни один sellPercent не уменьшил баланс"
+        report["итог"] = "ни одна ступень лестницы не уменьшила баланс"
 
     report["закончено_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2, default=str))
