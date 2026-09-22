@@ -1,5 +1,5 @@
 {
-  "начато_utc": "2026-09-22T17:23:23Z",
+  "начато_utc": "2026-09-22T17:24:30Z",
   "режим": "боевой",
   "белый_список": [
     {
@@ -42,12 +42,12 @@
   "тесты": [
     {
       "тест": "token2022",
-      "минт": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+      "минт": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
       "доля_остатка": 0.25,
       "сведения_о_минте": {
-        "token2022": false,
+        "token2022": true,
         "transfer_fee_bps": null,
-        "decimals": 9
+        "decimals": 6
       },
       "остатки": [
         {
@@ -59,8 +59,8 @@
         {
           "имя": "BATCH-7",
           "адрес": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
-          "ui": 1.440076961,
-          "raw": 1440076961
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-6",
@@ -71,8 +71,8 @@
         {
           "имя": "BATCH-5",
           "адрес": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
-          "ui": 0.906310088,
-          "raw": 906310088
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-4",
@@ -83,8 +83,8 @@
         {
           "имя": "BATCH-3",
           "адрес": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
-          "ui": 3.391034311,
-          "raw": 3391034311
+          "ui": 479.788637,
+          "raw": 479788637
         },
         {
           "имя": "BATCH-2",
@@ -108,15 +108,15 @@
       "отправитель": {
         "имя": "BATCH-3",
         "адрес": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
-        "ui": 3.391034311,
-        "raw": 3391034311
+        "ui": 479.788637,
+        "raw": 479788637
       },
       "получатель": {
         "имя": "BATCH-8",
         "адрес": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
       },
       "получатель_в_белом_списке": true,
-      "сумма_ui": 0.847758578,
+      "сумма_ui": 119.947159,
       "получатель_до": {
         "ui": 0.0,
         "raw": 0
@@ -126,27 +126,21 @@
         "err": false,
         "res": [
           {
-            "err": false,
-            "msg": "OK",
+            "err": true,
+            "msg": "Simulation failed. \nMessage: Transaction simulation failed: Error processing Instruction 1: custom program error: 0x1f. \nLogs: \n[\n  \"Program log: Instruction: InitializeAccount3\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2802 of 385229 compute units\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success\",\n  \"Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 17877 of 400000 compute units\",\n  \"Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]\",\n  \"Program log: Instruction: Transfer\",\n  \"Program log: Mint required for this account to transfer tokens, use `transfer_checked` or `transfer_checked_with_fee`\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1504 of 382123 compute units\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x1f\"\n]. \nCatch the `SendTransactionError` and call `getLogs()` on it for full details.",
             "toList": [
               {
                 "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-                "amountUI": 0.847758578
+                "amountUI": 119.947159
               }
-            ],
-            "txid": "3FTbLqxnGuYsM7tjpre74YaofKHpQLqRbLVNb9hr2LseT9kCeS5cHw3bPdNpB3g5ufMmmKHZpZXRCxiHX5r5qwY9",
-            "decimals": 9
+            ]
           }
         ]
       },
       "кредитов_списано_по_документации": 5,
-      "получатель_после_raw": 847758578,
-      "отправлено_raw": 847758578,
-      "пришло_raw": 847758578,
-      "удержано_raw": 0,
-      "удержано_доля_%": 0.0,
-      "итог": "ПЕРЕВОД Token-2022 ПОДТВЕРЖДЁН ЦЕПЬЮ"
+      "получатель_после_raw": 0,
+      "итог": "баланс получателя не изменился за отведённое время -- перевод НЕ подтверждён"
     }
   ],
-  "закончено_utc": "2026-09-22T17:23:43Z"
+  "закончено_utc": "2026-09-22T17:26:04Z"
 }
