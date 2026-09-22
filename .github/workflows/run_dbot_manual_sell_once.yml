@@ -47,6 +47,10 @@ on:
         description: "напечатать ПРОДАЮ для реальной отправки; пусто = сухой прогон"
         required: false
         default: ""
+      jupiter_quote:
+        description: "через запятую slippageBps: спросить котировку Jupiter (только чтение), напр. 300,1000,5000"
+        required: false
+        default: ""
       probe_ids:
         description: "через запятую: прочитать состояние этих ордеров DBot (причина отказа) и выйти"
         required: false
@@ -104,4 +108,5 @@ jobs:
             --wait-s "${{ github.event.inputs.wait_s }}" \
             --since-ts "${{ github.event.inputs.since_ts || 0 }}" \
             --probe-ids "${{ github.event.inputs.probe_ids }}" \
+            --jupiter-quote "${{ github.event.inputs.jupiter_quote }}" \
             $CONFIRM 2>&1 | tail -300

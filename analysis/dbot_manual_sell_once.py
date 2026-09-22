@@ -246,6 +246,61 @@ def mint_program(mint: str, key: str) -> dict:
              "supply": info.get("supply")}
 
 
+def raw_balance(wallet: str, mint: str, key: str) -> tuple[int, int | None]:
+    """Сырой (целочисленный) баланс и decimals -- для котировки Jupiter,
+    где сумма задаётся в минимальных единицах."""
+    res = rpc("getTokenAccountsByOwner", [wallet, {"mint": mint}, {"encoding": "jsonParsed"}], key)
+    total, dec = 0, None
+    for acc in (res or {}).get("value") or []:
+        try:
+            ta = acc["account"]["data"]["parsed"]["info"]["tokenAmount"]
+            total += int(ta["amount"])
+            dec = ta.get("decimals", dec)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return total, dec
+
+
+def jupiter_quote(mint: str, amount_raw: int, slippage_bps: int) -> dict:
+    """Котировка Jupiter НА ЧТЕНИЕ: есть ли вообще маршрут для этого
+    Token-2022 с комиссией за перевод и какой ценой.
+
+    Ключ кошелька для котировки не нужен -- подпись требуется только для
+    самой отправки, а её сделать нечем: приватный ключ у DBot.
+    Пробуем оба известных хоста Jupiter и честно пишем, который ответил."""
+    out: dict = {"amount_raw": amount_raw, "slippage_bps": slippage_bps}
+    hosts = [("lite-api", "https://lite-api.jup.ag/swap/v1/quote"),
+             ("quote-api-v6", "https://quote-api.jup.ag/v6/quote")]
+    for name, url in hosts:
+        params = {"inputMint": mint, "outputMint": WSOL, "amount": str(amount_raw),
+                  "slippageBps": str(slippage_bps), "restrictIntermediateTokens": "false"}
+        try:
+            r = requests.get(url, params=params, timeout=30)
+        except Exception as exc:  # noqa: BLE001
+            out[name] = f"сеть: {type(exc).__name__}: {exc}"
+            continue
+        if r.status_code != 200:
+            out[name] = f"http={r.status_code}: {scrub(r.text[:300])}"
+            continue
+        try:
+            b = r.json()
+        except ValueError:
+            out[name] = "не JSON"
+            continue
+        routes = []
+        for rp in (b.get("routePlan") or []):
+            si = rp.get("swapInfo") or {}
+            routes.append({"label": si.get("label"), "amm": si.get("ammKey"),
+                            "in": si.get("inAmount"), "out": si.get("outAmount"),
+                            "percent": rp.get("percent")})
+        out[name] = {"outAmount": b.get("outAmount"),
+                      "outAmount_SOL": (int(b["outAmount"]) / 1e9) if b.get("outAmount") else None,
+                      "priceImpactPct": b.get("priceImpactPct"),
+                      "маршрут": routes,
+                      "ошибка": b.get("error") or b.get("errorCode")}
+    return out
+
+
 def find_sell_tx(wallet: str, mint: str, since_ts: int, key: str) -> dict | None:
     """Ищем НАШУ продажу: свежая транзакция кошелька, где баланс минта
     уменьшился. Подпись не выдумываем -- если не нашли, вернём None."""
@@ -360,6 +415,8 @@ def main() -> None:
     ap.add_argument("--mint", required=True)
     ap.add_argument("--percents", default="0.95,0.90",
                     help="доли продажи; можно пары доля:проскальзывание, напр. 1.0:0.5,0.25:0.9")
+    ap.add_argument("--jupiter-quote", default="",
+                    help="через запятую slippageBps: спросить котировку Jupiter и выйти, напр. 300,1000,5000")
     ap.add_argument("--probe-ids", default="",
                     help="через запятую: прочитать состояние этих ордеров и выйти")
     ap.add_argument("--max-slippage", type=float, default=0.4)
@@ -402,6 +459,17 @@ def main() -> None:
         log(report["итог"])
         print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2))
         return
+
+    if args.jupiter_quote:
+        amt, dec = raw_balance(args.wallet, args.mint, hel_key)
+        report["сырой_баланс"] = {"amount": amt, "decimals": dec}
+        log(f"сырой баланс для котировки: {amt} (decimals={dec})")
+        qs = []
+        for bps in [int(x) for x in args.jupiter_quote.split(",") if x.strip()]:
+            q = jupiter_quote(args.mint, amt, bps)
+            qs.append(q)
+            log(f"Jupiter slippageBps={bps}: {json.dumps(q, ensure_ascii=False)[:900]}")
+        report["котировки_jupiter"] = qs
 
     if args.probe_ids:
         ids = [x.strip() for x in args.probe_ids.split(",") if x.strip()]
