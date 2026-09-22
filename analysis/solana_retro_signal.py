@@ -7,12 +7,18 @@
 (dbot-detect-probe) не затрагиваются -- всё считается на раннере.
 
 ТРИ СЦЕНАРИЯ ВХОДА (для покупки лидера в слоте S, минт M):
-  E0 -- сразу за лидером: первая ЧУЖАЯ покупка M в том же слоте S после
-        его транзакции по индексу; если в S такой нет -- первая в S+1.
-        Это потолок достижимого.
+  E0 -- сразу за лидером: первая ЧУЖАЯ покупка M В ТОМ ЖЕ СЛОТЕ S после
+        его транзакции по индексу. Если в слоте S такой покупки нет --
+        no_entry для E0, отката в S+1 НЕТ. Это потолок достижимого.
   E1 -- через ~0.25с: первая чужая покупка M начиная со слота S+1.
   E2 -- через ~0.5с (так работает DBot сейчас): начиная со слота S+2.
-Поиск вперёд не более 2 слотов от стартового, иначе no_entry.
+E1/E2 ищут вперёд не более 2 слотов от стартового, иначе no_entry; E0 --
+только слот S, без поиска вперёд, поэтому сценарии НЕ ПЕРЕКРЫВАЮТСЯ:
+E0 живёт в S, E1 -- в S+1..S+3, E2 -- в S+2..S+4.
+
+Рядом считаются два прежних варианта E0, чтобы разница определений была
+видна, а не спрятана: E0_s1 (S и S+1 -- определение до этой правки) и
+E0_loose (S..S+2, свободный вариант, перекрывается с E2).
 
 ВЫХОД (общий для трёх сценариев): цена первой сделки с M (покупки ИЛИ
 продажи) в окне T+33..T+40 с, где T -- время покупки лидера. Не нашлось
@@ -447,18 +453,17 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
                 "note": "транзакции лидера нет среди сделок этого минта в его же слоте"}
     row["leader_index"] = leader_index
 
-    # ГОРИЗОНТ E0 -- 1 слот, а не 2. В задании два места про E0 расходятся:
-    # определение говорит "первая чужая в S после лидера; ЕСЛИ В S ЕЁ НЕТ --
-    # первая в S+1", то есть S и S+1; общая фраза "не больше 2 слотов от
-    # стартового" дала бы ещё и S+2 -- ровно тот слот, где начинается E2.
-    # На реальном прогоне (247 симуляций) свободный вариант ставил вход E0
-    # в S+2 в 33 случаях, и в 33 из 220 симуляций цена E0 СОВПАДАЛА с ценой
-    # E2 -- то есть цена опоздания на этих строках обнулялась по построению,
-    # а E0 переставал быть потолком. Берём определение: S и S+1. Свободный
-    # вариант считается рядом как sim_E0_loose, чтобы разница была видна, а
-    # не спрятана.
+    # ГОРИЗОНТ E0 -- РОВНО 0 слотов: только слот S. Распоряжение владельца:
+    # "E0 = только чужие покупки в слоте S после транзакции лидера; если их
+    # нет -- no_entry для E0 (никакого отката в S+1)". Так сценарии перестают
+    # перекрываться: E0 -- S, E1 -- S+1.., E2 -- S+2..; раньше E0 с откатом в
+    # S+1 совпадал с E1 по входу, и разница E0-E1 выходила ровно 0.0.
+    # Прежние определения считаются рядом, чтобы сравнение было видно:
+    #   E0_s1    -- S и S+1 (определение до этой правки),
+    #   E0_loose -- S..S+2 (свободный вариант, перекрывается с E2).
     scen = {}
-    for name, start, after, look in (("E0", slot, leader_index, 1),
+    for name, start, after, look in (("E0", slot, leader_index, 0),
+                                      ("E0_s1", slot, leader_index, 1),
                                       ("E0_loose", slot, leader_index, SCEN_LOOKAHEAD),
                                       ("E1", slot + 1, None, SCEN_LOOKAHEAD),
                                       ("E2", slot + 2, None, SCEN_LOOKAHEAD)):
@@ -470,6 +475,18 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
         else:
             scen[name] = {"entry_price": None, "no_entry": True, "incomplete": r["incomplete"]}
     row["scenarios"] = scen
+
+    # Отдельный вопрос владельца: доля случаев, когда в слоте ЛИДЕРА после
+    # него вообще был покупатель. Считаем прямо по блоку, НЕ через E0:
+    # first_foreign_buy пропускает сделки без пригодной цены, а здесь важен
+    # сам факт покупки. Поэтому два счётчика: любой покупатель и покупатель
+    # с посчитанной ценой (второй и есть вход E0).
+    in_slot = [t for t in node["trades"]
+               if t["is_buy"] and t["owner"] != leader and t["index"] > leader_index]
+    row["buyers_in_leader_slot"] = len(in_slot)
+    row["buyer_in_leader_slot"] = bool(in_slot)
+    row["buyer_in_leader_slot_priced"] = any(
+        t["price_sol_per_token"] is not None for t in in_slot)
 
     if bt is None:
         row["status"] = "no_exit"
@@ -509,7 +526,7 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
         row["exit_note"] = f"в окне T+{EXIT_FROM_S}..{EXIT_TO_S}с за {EXIT_MAX_BLOCKS} блоков сделок с минтом нет"
         return row
     row.update(exit_row)
-    for name in ("E0", "E0_loose", "E1", "E2"):
+    for name in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
         ep = scen[name].get("entry_price")
         row[f"sim_{name}"] = round((exit_row["exit_price"] / ep - 1) * 100, 4) if ep else None
     row["status"] = "ok" if row.get("sim_E2") is not None else "частично"
@@ -659,7 +676,7 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
                 "n_incomplete": sum(1 for r in rs if r.get("exit_incomplete")
                                      or any((r.get("scenarios") or {}).get(k, {}).get("incomplete")
                                             for k in ("E0", "E1", "E2")))}
-        for k in ("E0", "E0_loose", "E1", "E2"):
+        for k in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
             v = [r[f"sim_{k}"] for r in rs if r.get(f"sim_{k}") is not None]
             row[f"n_{k}"] = len(v)
             row[f"median_{k}"] = round(statistics.median(v), 4) if v else None
@@ -671,6 +688,11 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
         # их между собой в одной строке нельзя -- в прогоне это давало
         # переворот знака до 15 п.п. Отдельно считаем медианы по ОБЩЕЙ
         # подвыборке, где есть все три: только их и сопоставляют.
+        den_w = [r for r in rs if r.get("buyer_in_leader_slot") is not None]
+        row["n_слот_лидера_знам"] = len(den_w)
+        row["n_покупатель_в_слоте_лидера"] = sum(1 for r in den_w if r["buyer_in_leader_slot"])
+        row["доля_покупатель_в_слоте_лидера"] = round(
+            row["n_покупатель_в_слоте_лидера"] / len(den_w) * 100, 2) if den_w else None
         common = [r for r in rs if all(r.get(f"sim_{k}") is not None for k in ("E0", "E1", "E2"))]
         row["n_общих"] = len(common)
         for k in ("E0", "E1", "E2"):
@@ -690,7 +712,7 @@ def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> d
     rows = [r for r in rows if r.get("sim_E2") is None or dust_ok(r, min_leg_sol)]
     o = {"label": label, "мин_нога_SOL": min_leg_sol,
          "отброшено_пылевых": n_all - sum(1 for r in rows if r.get("sim_E2") is not None)}
-    for k in ("E0", "E0_loose", "E1", "E2"):
+    for k in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
         v = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None]
         o[f"n_{k}"] = len(v)
         o[f"median_{k}"] = round(statistics.median(v), 4) if v else None
@@ -704,6 +726,23 @@ def overall(rows: list[dict], label: str, min_leg_sol: float = MIN_LEG_SOL) -> d
             f"окно задано T+{EXIT_FROM_S}..{EXIT_TO_S}с, но {EXIT_MAX_BLOCKS} блоков при слоте "
             f"250-300 мс покрывают лишь ~{EXIT_MAX_BLOCKS*0.27:.1f}с: фактический максимум "
             f"задержки {max(dl)}с, до T+{EXIT_TO_S}с скан структурно не доходит")
+    # Доля случаев, когда в слоте лидера ПОСЛЕ него вообще был покупатель.
+    # Знаменатель -- только те симуляции, где блок лидера отдался и его
+    # транзакция в нём нашлась (иначе вопрос не определён).
+    den = [r for r in rows if r.get("buyer_in_leader_slot") is not None]
+    o["покупатель_в_слоте_лидера"] = {
+        "знаменатель_симуляций": len(den),
+        "n_был_покупатель": sum(1 for r in den if r["buyer_in_leader_slot"]),
+        "доля_был_покупатель": round(
+            sum(1 for r in den if r["buyer_in_leader_slot"]) / len(den) * 100, 2) if den else None,
+        "n_с_посчитанной_ценой": sum(1 for r in den if r.get("buyer_in_leader_slot_priced")),
+        "доля_с_посчитанной_ценой": round(
+            sum(1 for r in den if r.get("buyer_in_leader_slot_priced")) / len(den) * 100, 2) if den else None,
+        "медиана_покупателей_в_слоте": statistics.median(
+            [r.get("buyers_in_leader_slot") or 0 for r in den]) if den else None,
+        "пояснение": ("вторая доля -- это и есть доля симуляций, где у E0 "
+                       "есть вход: цена считается не по всякой покупке"),
+    }
     both = [(r["sim_E0"], r["sim_E1"], r["sim_E2"]) for r in rows
             if None not in (r.get("sim_E0"), r.get("sim_E1"), r.get("sim_E2"))]
     o["n_все_три"] = len(both)
@@ -987,7 +1026,7 @@ def report(out: dict) -> None:
         o = out[key]
         print()
         print(f"--- ЦЕНА ОПОЗДАНИЯ: {o['label']} ---")
-        for k in ("E0", "E0_loose", "E1", "E2"):
+        for k in ("E0", "E0_s1", "E0_loose", "E1", "E2"):
             print(f"  {k:<9}: n={o[f'n_{k}']:<5} медиана={o[f'median_{k}']}%  p25={o[f'p25_{k}']}  "
                   f"p75={o[f'p75_{k}']}  доля>+2.5%={o[f'share_above_2.5_{k}']}")
         if o.get("УСЕЧЕНИЕ_ОКНА"):
@@ -996,6 +1035,13 @@ def report(out: dict) -> None:
         if o.get("n_все_три"):
             print(f"  на общих {o['n_все_три']} симуляциях: E0-E2={o['медиана_E0_минус_E2']} п.п., "
                   f"E1-E2={o['медиана_E1_минус_E2']} п.п., E0-E1={o['медиана_E0_минус_E1']} п.п.")
+        b = o.get("покупатель_в_слоте_лидера") or {}
+        if b.get("знаменатель_симуляций"):
+            print(f"  покупатель в слоте лидера после него: {b['n_был_покупатель']}/"
+                  f"{b['знаменатель_симуляций']} = {b['доля_был_покупатель']}%; "
+                  f"из них с посчитанной ценой (вход E0 есть): "
+                  f"{b['n_с_посчитанной_ценой']} = {b['доля_с_посчитанной_ценой']}%; "
+                  f"медиана числа таких покупателей в слоте: {b['медиана_покупателей_в_слоте']}")
     if out["wallets"]:
         print()
         print(f"--- КОШЕЛЬКИ (по медиане sim_E2), всего {len(out['wallets'])} ---")
