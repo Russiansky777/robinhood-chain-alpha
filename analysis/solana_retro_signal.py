@@ -74,7 +74,19 @@ STABLES = {USDC, USDT}
 
 ENTRY_LOG_PATH = REPO_ROOT / "data" / "solana_entry_log.json"
 CROWD_PATH = REPO_ROOT / "data" / "solana_crowd_scan.json"
-OUT_PATH = REPO_ROOT / "data" / "solana_retro_signal.json"
+# ДВА РАЗНЫХ ФАЙЛА -- по распоряжению владельца. Раньше оба режима писали
+# в один solana_retro_signal.json, и калибровочный прогон затирал выгрузку
+# полного: таблица по кошелькам (90 строк) исчезала, оставалась только
+# калибровка с пустым списком wallets. Теперь каждый режим пишет в свой
+# файл и затирать нечего.
+OUT_PATH_FULL = REPO_ROOT / "data" / "solana_retro_signal.json"
+OUT_PATH_CALIBRATE = REPO_ROOT / "data" / "solana_retro_signal_calibration.json"
+
+
+def out_path_for(mode: str) -> Path:
+    return OUT_PATH_CALIBRATE if mode == "calibrate" else OUT_PATH_FULL
+
+
 SIM_CACHE_PATH = REPO_ROOT / "data" / "solana_retro_signal_cache.json"
 
 EXIT_FROM_S = 33
@@ -887,9 +899,13 @@ def run(rpc: Rpc, st: SlotTrades, clock: SlotClock, items: list[dict], workers: 
     return rows
 
 
-def reaggregate(min_leg_sol: float) -> None:
-    """Пересчитать сводку из уже посчитанного файла, не трогая сеть."""
-    out = json.loads(OUT_PATH.read_text())
+def reaggregate(min_leg_sol: float, mode: str) -> None:
+    """Пересчитать сводку из уже посчитанного файла, не трогая сеть.
+    Файл выбирается по режиму -- тому же, в который прогон и писал."""
+    path = out_path_for(mode)
+    if not path.exists():
+        raise SystemExit(f"файла {path} нет -- пересчитывать нечего (режим {mode})")
+    out = json.loads(path.read_text())
     rows = out["sims"]
     meta: dict[str, dict] = {}
     if CROWD_PATH.exists():
@@ -908,7 +924,7 @@ def reaggregate(min_leg_sol: float) -> None:
         f"Симуляции, где вход или выход мельче {min_leg_sol} SOL, ОТБРОШЕНЫ: при пылевых сделках "
         "цена вырождается и отношение выход/вход взрывается (в сыром прогоне до +554989%). "
         "Отсекается размер сделки, а не величина результата -- иначе это была бы подгонка.")
-    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     report(out)
 
 
@@ -926,7 +942,7 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.reaggregate:
-        reaggregate(args.min_leg_sol)
+        reaggregate(args.min_leg_sol, args.mode)
         return
 
     started = time.monotonic()
@@ -1004,7 +1020,9 @@ def main() -> None:
         "self_check": check,
         "sims": rows,
     }
-    OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    path = out_path_for(args.mode)
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    print(f"выгрузка: {path.relative_to(REPO_ROOT)} (режим {args.mode})")
     report(out)
 
 
