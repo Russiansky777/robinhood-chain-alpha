@@ -455,6 +455,33 @@ def _sig_and_slot(res: dict) -> tuple[str | None, int | None]:
             slot if isinstance(slot, int) else None)
 
 
+def _handle_notification(msg: dict, sub_of: dict[int, str]) -> None:
+    """Разбор одного уведомления. Вынесено отдельно, чтобы события,
+    прилетевшие ПОКА ещё подтверждаются остальные подписки, не
+    терялись: на 45 адресах подтверждения идут вперемешку с первыми
+    уведомлениями, и «пропустим всё, у чего нет id» выбрасывало бы
+    ровно те события, ради которых служба и запущена."""
+    m = msg.get("method")
+    if m not in ("transactionNotification", "logsNotification"):
+        return
+    params = msg.get("params") or {}
+    res = params.get("result") or {}
+    source = sub_of.get(params.get("subscription"))
+    if m == "logsNotification":
+        val = res.get("value") or {}
+        if val.get("err") is not None:
+            ST.failed_skipped += 1          # владелец: failed:false
+            return
+        sig = val.get("signature")
+        slot = (res.get("context") or {}).get("slot")
+        if isinstance(sig, str) and SIG_RE.match(sig):
+            record_event(sig, slot if isinstance(slot, int) else None, source, "logsSubscribe")
+        return
+    sig, slot = _sig_and_slot(res)
+    if sig:
+        record_event(sig, slot, source, "transactionSubscribe")
+
+
 async def tx_watcher(key: str) -> None:
     """Сначала transactionSubscribe (Helius Enhanced Websockets, хост
     atlas-*), как просил владелец. Если он не подтверждается -- честный
@@ -479,67 +506,54 @@ async def tx_watcher(key: str) -> None:
                 else:
                     await _subscribe_logs(ws, sources)
 
-                acked, rejected = 0, []
-                deadline = time.time() + 45
-                while acked + len(rejected) < len(sources) and time.time() < deadline:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=30)
-                    msg = json.loads(raw)
-                    if "id" not in msg:
-                        continue
-                    if "error" in msg:
-                        rejected.append(msg["error"])
-                    else:
-                        acked += 1
-                if acked == 0:
-                    raise RuntimeError(f"{method}: ни одна подписка не подтверждена, "
-                                        f"отказы: {str(rejected[:2])[:300]}")
-                if rejected:
-                    log.warning("%s: подтверждено %d из %d, отказов %d (первый: %s)",
-                                method, acked, len(sources), len(rejected), str(rejected[0])[:200])
-
-                ST.tx_method = method
-                ST.tx_method_history.append({"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                                              "method": method, "acked": acked, "of": len(sources)})
-                log.info("РАБОТАЕТ %s: подтверждено %d подписок из %d (хост %s)",
-                         method, acked, len(sources), "atlas" if atlas else "mainnet")
-                write_status()
-                backoff = 1.0
-
-                # по одной подписке на адрес -- id подписки -> адрес
-                sub_of: dict[int, str] = {}
                 # id запроса == порядковый номер адреса (см. _subscribe_*)
                 id_to_addr = {i: a for i, a in enumerate(sources, 1)}
+                sub_of: dict[int, str] = {}     # id подписки -> адрес источника
+                acked, rejected = 0, []
+                confirmed = False
+                deadline = time.time() + 45
 
                 async for raw in ws:
                     if ST.sources_generation != generation:
                         log.info("список источников изменился -- переподписываюсь")
                         break
                     msg = json.loads(raw)
-                    if "id" in msg and "result" in msg and isinstance(msg["result"], int):
-                        addr = id_to_addr.get(msg["id"])
-                        if addr:
-                            sub_of[msg["result"]] = addr
-                        continue
-                    m = msg.get("method")
-                    if m not in ("transactionNotification", "logsNotification"):
-                        continue
-                    params = msg.get("params") or {}
-                    res = params.get("result") or {}
-                    sub_id = params.get("subscription")
-                    source = sub_of.get(sub_id)
-                    if m == "logsNotification":
-                        val = res.get("value") or {}
-                        if val.get("err") is not None:
-                            ST.failed_skipped += 1     # владелец: failed:false
-                            continue
-                        sig = val.get("signature")
-                        slot = (res.get("context") or {}).get("slot")
-                        if isinstance(sig, str) and SIG_RE.match(sig):
-                            record_event(sig, slot if isinstance(slot, int) else None, source, "logsSubscribe")
-                        continue
-                    sig, slot = _sig_and_slot(res)
-                    if sig:
-                        record_event(sig, slot, source, "transactionSubscribe")
+
+                    if "id" in msg and ("result" in msg or "error" in msg):
+                        if "error" in msg:
+                            rejected.append(msg["error"])
+                        else:
+                            acked += 1
+                            if isinstance(msg.get("result"), int):
+                                addr = id_to_addr.get(msg["id"])
+                                if addr:
+                                    sub_of[msg["result"]] = addr
+                    else:
+                        _handle_notification(msg, sub_of)
+
+                    if not confirmed:
+                        if acked + len(rejected) >= len(sources) or time.time() > deadline:
+                            if acked == 0:
+                                raise RuntimeError(f"{method}: ни одна подписка не подтверждена, "
+                                                    f"отказы: {str(rejected[:2])[:300]}")
+                            confirmed = True
+                            if rejected:
+                                log.warning("%s: подтверждено %d из %d, отказов %d (первый: %s)",
+                                            method, acked, len(sources), len(rejected), str(rejected[0])[:200])
+                            ST.tx_method = method
+                            ST.tx_method_history.append(
+                                {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                 "method": method, "acked": acked, "of": len(sources)})
+                            log.info("РАБОТАЕТ %s: подтверждено %d подписок из %d (хост %s)",
+                                     method, acked, len(sources), "atlas" if atlas else "mainnet")
+                            write_status()
+                            backoff = 1.0
+                else:
+                    # поток закончился без break -- сервер закрыл соединение
+                    raise RuntimeError(f"{method}: сервер закрыл соединение")
+
+                if not confirmed and acked == 0:
+                    raise RuntimeError(f"{method}: соединение закрылось до подтверждения подписок")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
