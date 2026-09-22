@@ -209,17 +209,41 @@ def balance_three_ways(wallet: str, mint: str, key: str) -> dict:
 
 
 def mint_program(mint: str, key: str) -> dict:
+    """Программа минта и, главное, СТАВКА комиссии за перевод.
+
+    Реальная причина отказа свопа (errorMessage ордера DBot) --
+    ExceededSlippage в Meteora cp-amm: комиссия за перевод съедает часть
+    токена при заходе в пул, выход выходит меньше расчётного, защита
+    пула отбивает сделку. Без ставки комиссии нельзя сказать, хватит ли
+    поднять проскальзывание или через этот пул продать вообще нельзя."""
     res = rpc("getAccountInfo", [mint, {"encoding": "jsonParsed"}], key)
     owner = ((res or {}).get("value") or {}).get("owner")
     parsed = (((res or {}).get("value") or {}).get("data") or {})
-    ext = []
-    try:
-        ext = [e.get("extension") for e in (parsed.get("parsed") or {}).get("info", {}).get("extensions", [])]
-    except (AttributeError, TypeError):
-        ext = []
+    info = (parsed.get("parsed") or {}).get("info", {}) if isinstance(parsed, dict) else {}
+    exts = info.get("extensions") or []
+    names, fee = [], None
+    for e in exts:
+        if not isinstance(e, dict):
+            continue
+        names.append(e.get("extension"))
+        if e.get("extension") == "transferFeeConfig":
+            st = e.get("state") or {}
+            newer = st.get("newerTransferFee") or {}
+            older = st.get("olderTransferFee") or {}
+            fee = {"newer_bps": newer.get("transferFeeBasisPoints"),
+                    "newer_max": newer.get("maximumFee"),
+                    "older_bps": older.get("transferFeeBasisPoints"),
+                    "older_max": older.get("maximumFee"),
+                    "withheld": st.get("withheldAmount")}
+            bps = newer.get("transferFeeBasisPoints")
+            if isinstance(bps, int):
+                fee["в_процентах"] = round(bps / 100, 4)
     return {"owner_program": owner,
              "это_Token2022": owner == TOKEN_2022_PROGRAM,
-             "расширения": [e for e in ext if e]}
+             "расширения": [n for n in names if n],
+             "комиссия_за_перевод": fee,
+             "decimals": info.get("decimals"),
+             "supply": info.get("supply")}
 
 
 def find_sell_tx(wallet: str, mint: str, since_ts: int, key: str) -> dict | None:
@@ -365,6 +389,10 @@ def main() -> None:
     # быть медленной диагностики -- на первом реальном прогоне обход
     # expired-списка задержал отправку. Сначала баланс (без него продавать
     # нельзя) и продажа, вся остальная диагностика -- после.
+    prog0 = mint_program(args.mint, hel_key)
+    report["программа_минта"] = prog0
+    log(f"программа минта: {json.dumps(prog0, ensure_ascii=False)}")
+
     bal0 = balance_three_ways(args.wallet, args.mint, hel_key)
     log(f"БАЛАНС ДО: {json.dumps(bal0, ensure_ascii=False)}")
     report["баланс_до"] = bal0
@@ -395,7 +423,7 @@ def main() -> None:
         print("\n=== РЕЗУЛЬТАТ ===\n" + json.dumps(report, ensure_ascii=False, indent=2))
         return
 
-    prog = None
+    prog = prog0
     exp_before = None
     prev = bal0["итог"]
     ladder = []
