@@ -1,0 +1,97 @@
+name: "РАЗОВАЯ РУЧНАЯ ПРОДАЖА одной позиции (реальные деньги)"
+
+# Владелец, прямое указание: продать позицию по конкретному кошельку и
+# токену. Вызов тот же, что у сторожа (POST
+# /automation/swap_orders_with_multi_wallets, type=sell), отличается
+# только sellPercent (0.95, при неудаче 0.90).
+#
+# ЭТО РЕАЛЬНЫЕ ДЕНЬГИ. Предохранители:
+#   - продажа уходит только при confirm=ПРОДАЮ (иначе сухой прогон:
+#     покажет walletId, программу минта и баланс, ничего не отправит);
+#   - кошелёк и минт задаются входами, ничего не захардкожено;
+#   - walletId берётся живьём из follow_orders, не выдумывается.
+#
+# СТОРОЖ НЕ ОСТАНАВЛИВАЕТСЯ (указание владельца). Скрипт до и после
+# смотрит, есть ли позиция в expired-списке: если её продаст сторож,
+# падение баланса будет не от нашего вызова, и выдавать это за свой
+# результат нельзя.
+#
+# Тот же аудируемый канал, что у всех боевых действий проекта: ключи
+# только из секретов репозитория, в файлы не попадают.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "адрес кошелька"
+        required: true
+      mint:
+        description: "адрес токена"
+        required: true
+      percents:
+        description: "доли продажи через запятую, по порядку попыток"
+        required: false
+        default: "0.95,0.90"
+      max_slippage:
+        description: "maxSlippage"
+        required: false
+        default: "0.4"
+      retries:
+        description: "retries"
+        required: false
+        default: "3"
+      wait_s:
+        description: "сколько секунд ждать до проверки баланса"
+        required: false
+        default: "25"
+      confirm:
+        description: "напечатать ПРОДАЮ для реальной отправки; пусто = сухой прогон"
+        required: false
+        default: ""
+
+concurrency:
+  group: dbot-manual-sell-once
+  cancel-in-progress: false
+
+jobs:
+  sell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Продажа"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          if [ -z "$DBOT_API_KEY" ] || [ -z "$HELIUS_API_KEY" ]; then
+            echo "СТОП: нет секрета DBOT_API_KEY или HELIUS_API." >&2; exit 1
+          fi
+          CONFIRM=""
+          if [ "${{ github.event.inputs.confirm }}" = "ПРОДАЮ" ]; then
+            CONFIRM="--confirm-live-sell"
+            echo "РЕАЛЬНАЯ ПРОДАЖА ПОДТВЕРЖДЕНА"
+          else
+            echo "СУХОЙ ПРОГОН: confirm != ПРОДАЮ, вызов продажи отправлен НЕ будет"
+          fi
+          python -u analysis/dbot_manual_sell_once.py \
+            --wallet "${{ github.event.inputs.wallet }}" \
+            --mint "${{ github.event.inputs.mint }}" \
+            --percents "${{ github.event.inputs.percents }}" \
+            --max-slippage "${{ github.event.inputs.max_slippage }}" \
+            --retries "${{ github.event.inputs.retries }}" \
+            --wait-s "${{ github.event.inputs.wait_s }}" \
+            $CONFIRM 2>&1 | tail -300
