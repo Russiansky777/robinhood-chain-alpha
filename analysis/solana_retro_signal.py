@@ -57,6 +57,10 @@ from solana_crowd_scan import (  # noqa: E402
     PILOT, PUBLIC_RPC, Rpc, helius_key, scrub, now_utc,
 )
 
+DEX_LABELS_PATH = (REPO_ROOT / "data" / "solana_buyer_200" / "prior" / "current"
+                    / "buyer_100" / "dex_labels.json")
+DEX_PROGRAMS = set(json.loads(DEX_LABELS_PATH.read_text()).keys()) if DEX_LABELS_PATH.exists() else set()
+
 WSOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
@@ -113,21 +117,45 @@ def _tb_map(entries, want_mints=None) -> dict:
     return out
 
 
-def tx_trades_for_mint(t: dict, mint: str, index: int, block_time: int | None) -> dict | None:
-    """Разбор ОДНОЙ транзакции из блока: кто торговал mint и по какой цене.
+# Порог привязан к РЕАЛЬНОМУ числу, а не выбран на глаз: рента ATA в
+# Solana -- 0.00203928 SOL, и именно такой ногой (0.0021576 SOL = рента
+# плюс комиссия) в прошлом выпуске оказались оценены три независимые
+# строки с ценой на 4 порядка мимо рынка. Порог 0.01 SOL лежит выше
+# ренты с запасом и в 50 раз ниже медианной настоящей сделки (0.5 SOL),
+# то есть режет вырожденное, а не рынок.
+ATA_RENT_SOL = 0.00203928
+MIN_SOL_LEG = 0.01
 
-    Возвращает None, если в транзакции нет ненулевой дельты mint у
-    подписанта, либо цену посчитать не из чего (тогда причина -- в поле
-    price_note, а не тихий пропуск)."""
+
+def tx_trades_for_mint(t: dict, mint: str, index: int, block_time: int | None) -> dict | None:
+    """Разбор ОДНОЙ транзакции: кто торговал mint и по какой цене.
+
+    БРАКОВКА ЯВНАЯ, А НЕ ТИХАЯ. Состязательный разбор кода (44 агента,
+    10 подтверждённых находок) показал, что прежняя версия оценивала
+    ЛЮБУЮ транзакцию, где у подписанта ненулевая дельта минта и
+    SOL-нога противоположного знака -- включая обычные переводы, у
+    которых единственный расход SOL это рента ATA. В выпуске уже лежали
+    три строки с входной ногой ровно 0.0021576 SOL (рентного размера) у
+    трёх независимых кошельков и ценой на 4 порядка мимо рынка.
+
+    Четыре проверки, каждая со своей причиной в price_note:
+      1. в транзакции есть известная DEX/AMM-программа -- ровно та
+         проверка, что стоит в каноническом классификаторе репозитория
+         (solana_batch5_rpc_check), где её необходимость уже задокумен-
+         тирована: без неё метод засчитывал переводы и дасты;
+      2. владелец не двигает больше одного НЕ-котировочного минта --
+         маршрут tokenA->SOL->M нетит SOL-ногу почти в ноль и даёт цену
+         на порядки ниже настоящей (канонический классификатор такие
+         транзакции тоже пропускает как multi_mint);
+      3. SOL-нога не меньше MIN_SOL_LEG -- отсекает рентные остатки и
+         нетто-плоский арбитраж, где нормальная сумма делится на пыль;
+      4. знаки дельт противоположны (обмен, а не раздача).
+    """
     meta = t.get("meta") or {}
     if meta.get("err") is not None:
         return None
     txn = t.get("transaction") or {}
     sigs = txn.get("signatures") or []
-    # Под transactionDetails="accounts" ключи лежат прямо в transaction,
-    # под "full" -- в transaction.message. Раньше читался только первый
-    # путь: откат на full молча остался бы БЕЗ подписантов и без
-    # нативной SOL-ноги, то есть страховка не страховала.
     keys_raw = txn.get("accountKeys") or ((txn.get("message") or {}).get("accountKeys")) or []
     keys = [k.get("pubkey") if isinstance(k, dict) else k for k in keys_raw]
     signers = {k.get("pubkey") for k in keys_raw if isinstance(k, dict) and k.get("signer")}
@@ -144,14 +172,27 @@ def tx_trades_for_mint(t: dict, mint: str, index: int, block_time: int | None) -
     if not deltas:
         return None
 
-    # Главный -- подписант. Пул/PDA подписантом не бывает, а его дельта
-    # равна дельте трейдера с обратным знаком: без этого правила ценой
-    # оказалась бы сделка пула.
     cands = [o for o in deltas if o in signers] or list(deltas)
     owner = max(cands, key=lambda o: abs(deltas[o]))
     token_delta = deltas[owner]
 
-    # SOL-нога того же владельца
+    def bad(note: str) -> dict:
+        return {"index": index, "signature": sigs[0] if sigs else None, "owner": owner,
+                "token_delta": token_delta, "sol_delta": None,
+                "price_sol_per_token": None, "price_note": note,
+                "is_buy": token_delta > 0, "sol_size": 0.0}
+
+    # (1) реальная DEX/AMM-программа в транзакции
+    if DEX_PROGRAMS and not (set(keys) & DEX_PROGRAMS):
+        return bad("нет известной DEX/AMM-программы -- перевод/даст, не сделка")
+
+    # (2) владелец двигает больше одного не-котировочного минта -> маршрут
+    other_mints = {m for (o, m) in set(pre_all) | set(post_all)
+                   if o == owner and m not in (WSOL, USDC, USDT) and m != mint
+                   and (post_all.get((o, m), 0.0) - pre_all.get((o, m), 0.0)) != 0}
+    if other_mints:
+        return bad(f"многоминтовый маршрут ({len(other_mints)} других минтов) -- SOL-нога нетится")
+
     wsol = (post_all.get((owner, WSOL), 0.0) - pre_all.get((owner, WSOL), 0.0))
     stable_usd = 0.0
     for st in STABLES:
@@ -162,34 +203,31 @@ def tx_trades_for_mint(t: dict, mint: str, index: int, block_time: int | None) -
         pre_b, post_b = meta.get("preBalances") or [], meta.get("postBalances") or []
         if idx < len(pre_b) and idx < len(post_b):
             native = (post_b[idx] - pre_b[idx]) / 1e9
-            if idx == 0:      # плательщик комиссии -- комиссия не часть цены
+            if idx == 0:
                 native += (meta.get("fee") or 0) / 1e9
 
-    price_note = None
     stable_sol = 0.0
     if stable_usd:
         if block_time is None:
-            price_note = "нет blockTime -- курс SOL/USD не взять"
-        else:
-            px = sol_usd_at(block_time)
-            if px is None:
-                price_note = "курс SOL/USD на момент сделки не получен"
-            else:
-                stable_sol = stable_usd / px
+            return bad("нет blockTime -- курс SOL/USD не взять")
+        px = sol_usd_at(block_time)
+        if px is None:
+            return bad("курс SOL/USD на момент сделки не получен")
+        stable_sol = stable_usd / px
 
     sol_delta = wsol + stable_sol + native
-    if price_note is None and sol_delta == 0:
-        price_note = "нулевая SOL-нога (ни WSOL, ни стейбл, ни нативный SOL)"
-    # Покупка токена -> SOL уходит (sol_delta<0); продажа -> приходит.
-    if price_note is None and (token_delta > 0) == (sol_delta > 0):
-        price_note = "знаки дельт токена и SOL совпали -- не похоже на обмен"
-    price = abs(sol_delta) / abs(token_delta) if price_note is None else None
+    # (3) SOL-нога должна быть настоящей оплатой, а не рентой/остатком
+    if abs(sol_delta) < MIN_SOL_LEG:
+        return bad(f"SOL-нога {abs(sol_delta):.9f} < {MIN_SOL_LEG} -- рента или остаток маршрута")
+    # (4) обмен, а не раздача
+    if (token_delta > 0) == (sol_delta > 0):
+        return bad("знаки дельт токена и SOL совпали -- не обмен")
+
     return {
         "index": index, "signature": sigs[0] if sigs else None, "owner": owner,
         "token_delta": token_delta, "sol_delta": round(sol_delta, 9),
-        "price_sol_per_token": price, "price_note": price_note,
-        "is_buy": token_delta > 0,
-        "sol_size": abs(round(sol_delta, 9)),
+        "price_sol_per_token": abs(sol_delta) / abs(token_delta), "price_note": None,
+        "is_buy": token_delta > 0, "sol_size": abs(round(sol_delta, 9)),
     }
 
 
@@ -210,7 +248,7 @@ class SlotTrades:
         self._d: OrderedDict[str, dict | None] = OrderedDict()
         self._lock = threading.Lock()
         self._klock: dict[str, threading.Lock] = {}
-        self.hits = self.fetched = self.skipped = self.failed = 0
+        self.hits = self.fetched = self.skipped = self.failed = self.outliers = 0
         self.detail = "accounts"
         self.fallback_full = 0
 
@@ -267,6 +305,20 @@ class SlotTrades:
                 r = tx_trades_for_mint(t, mint, i, bt)
                 if r:
                     trades.append(r)
+            # Цена, улетевшая на два порядка от соседей по тому же минту в
+            # том же слоте, -- это вырожденная сделка, а не рынок: за один
+            # слот рынок столько не проходит. Бракуем с причиной.
+            priced = [t["price_sol_per_token"] for t in trades if t["price_sol_per_token"]]
+            if len(priced) >= 3:
+                med = statistics.median(priced)
+                if med > 0:
+                    for t in trades:
+                        pr = t["price_sol_per_token"]
+                        if pr and (pr > med * 100 or pr < med / 100):
+                            t["price_sol_per_token"] = None
+                            t["price_note"] = (f"цена {pr:.3e} отличается от медианы слота "
+                                                f"{med:.3e} более чем в 100 раз -- вырожденная сделка")
+                            self.outliers += 1
             self.fetched += 1
             return {"trades": trades, "block_time": bt}
         return None
@@ -612,6 +664,18 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
             row[f"n_{k}"] = len(v)
             row[f"median_{k}"] = round(statistics.median(v), 4) if v else None
             row[f"share_above_{COST_THRESHOLD_PCT}_{k}"] = share_above(v, COST_THRESHOLD_PCT)
+            row[f"n_no_entry_{k}"] = sum(
+                1 for r in rs if ((r.get("scenarios") or {}).get(k, {}) or {}).get("no_entry"))
+        # Медианы по сценариям считаются по РАЗНЫМ подвыборкам (у E0
+        # горизонт короче, поэтому у него больше no_entry), и сравнивать
+        # их между собой в одной строке нельзя -- в прогоне это давало
+        # переворот знака до 15 п.п. Отдельно считаем медианы по ОБЩЕЙ
+        # подвыборке, где есть все три: только их и сопоставляют.
+        common = [r for r in rs if all(r.get(f"sim_{k}") is not None for k in ("E0", "E1", "E2"))]
+        row["n_общих"] = len(common)
+        for k in ("E0", "E1", "E2"):
+            v = [r[f"sim_{k}"] for r in common]
+            row[f"median_{k}_общих"] = round(statistics.median(v), 4) if v else None
         e2 = [r["sim_E2"] for r in rs if r.get("sim_E2") is not None]
         row["n_sim"] = len(e2)
         row["best_E2"] = round(max(e2), 4) if e2 else None
@@ -885,6 +949,7 @@ def main() -> None:
         "проба_accounts": probe,
         "run_stats": {"n_sims": len(rows), "blocks_fetched": st.fetched, "blocks_from_cache": st.hits,
                        "blocks_skipped": st.skipped, "blocks_failed": st.failed,
+                       "цен_забраковано_выбросом": st.outliers,
                        "getBlockTime_calls": clock.calls, "rpc_calls": rpc.calls,
                        "rpc_retries": rpc.retries, "rpc_errors": rpc.errors,
                        "batch_splits": getattr(rpc, "splits", 0),
@@ -934,13 +999,15 @@ def report(out: dict) -> None:
     if out["wallets"]:
         print()
         print(f"--- КОШЕЛЬКИ (по медиане sim_E2), всего {len(out['wallets'])} ---")
-        print(f"  {'адрес':<46}{'имя':<16}{'статус':<10}{'n':>4}{'crowd2':>7}"
-              f"{'medE0':>8}{'medE1':>8}{'medE2':>8}{'>2.5%E2':>9}{'лучш':>9}{'худш':>9}{'no_en':>6}{'no_ex':>6}")
+        print("  медианы E0/E1/E2 -- по ОБЩЕЙ подвыборке (n_общих), иначе они несравнимы между собой")
+        print(f"  {'адрес':<46}{'имя':<15}{'статус':<10}{'n':>3}{'общ':>4}{'crd2':>6}"
+              f"{'medE0':>8}{'medE1':>8}{'medE2':>8}{'>2.5E2':>8}{'noE0':>5}{'noE2':>5}{'no_ex':>6}")
         for w in out["wallets"]:
-            print(f"  {w['address']:<46}{str(w.get('name') or '')[:15]:<16}{str(w.get('status') or '')[:9]:<10}"
-                  f"{w['n_sim']:>4}{str(w.get('crowd_2')):>7}{str(w['median_E0']):>8}{str(w['median_E1']):>8}"
-                  f"{str(w['median_E2']):>8}{str(w['share_above_2.5_E2']):>9}{str(w['best_E2']):>9}"
-                  f"{str(w['worst_E2']):>9}{w['n_no_entry']:>6}{w['n_no_exit']:>6}")
+            print(f"  {w['address']:<46}{str(w.get('name') or '')[:14]:<15}{str(w.get('status') or '')[:9]:<10}"
+                  f"{w['n_sim']:>3}{w.get('n_общих', 0):>4}{str(w.get('crowd_2')):>6}"
+                  f"{str(w.get('median_E0_общих')):>8}{str(w.get('median_E1_общих')):>8}"
+                  f"{str(w.get('median_E2_общих')):>8}{str(w['share_above_2.5_E2']):>8}"
+                  f"{w.get('n_no_entry_E0', 0):>5}{w.get('n_no_entry_E2', 0):>5}{w['n_no_exit']:>6}")
         sel = [w for w in out["wallets"] if w.get("status") == "кандидат"
                and (w.get("crowd_2") or 0) >= 4 and (w.get("median_E2") or -1e9) > COST_THRESHOLD_PCT]
         print()
