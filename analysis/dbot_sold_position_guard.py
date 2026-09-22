@@ -29,6 +29,24 @@ BITQUERY_APIKEY) -- секрет никогда не подставляется 
 проверки на переводы строк, и любой текст, который может его содержать,
 прогоняется через _scrub_all() перед печатью/записью.
 
+ЭТАП A (границы, по распоряжению владельца):
+  1. Потолок проскальзывания ЖЁСТКИЙ -- MAX_SLIPPAGE_CEILING = 0.5. Всё
+     выше срезается до потолка (clamp_slippage). Лестниц долей и
+     проскальзываний в стороже нет. Повод -- реальный инцидент этой
+     сессии: ручная продажа STONKY с maxSlippage 0.99 через пул
+     глубиной 0.1418 SOL дала $4.31 вместо $69.15 по другому маршруту.
+  2. Успех = БАЛАНС МИНТА В ЦЕПИ УМЕНЬШИЛСЯ. Ответ DBot err:false
+     понижен до "принят" и успехом не считается. Если баланс не
+     прочитался -- это "неизвестно", а не успех и не отказ.
+  3. При неудаче -- GET /automation/swap_orders?ids=... (0 кредитов),
+     и в Telegram уходит НАСТОЯЩИЙ errorMessage (на реальных ордерах
+     этой сессии он давал ExceededSlippage / E_TOKEN_BALANCE_NOT_ENOUGH).
+  4. В алерт о зависании добавлены: котировка Jupiter на весь остаток,
+     маршрут, sol_in из выгрузки учёта и ссылка jup.ag для ручной
+     продажи. Ничего из этого не выдумывается: не получилось -- в
+     тексте написано, почему.
+Границы 1-3 проверяются без сети: `--self-test`.
+
 ПРОДАЖА ПО УМОЛЧАНИЮ ВЫКЛЮЧЕНА В КОДЕ (GUARD_LIVE_SELL, по умолчанию
 "0") -- тот же принцип, что sc1_launcher.py --confirm-mainnet: реальная
 отправка только по явному значению переменной окружения, не по
@@ -60,7 +78,23 @@ DEFAULT_INTERVAL_S = 45
 DEFAULT_STUCK_THRESHOLD = 10
 DEFAULT_API_DOWN_ALERT_S = 600
 DEFAULT_MAX_SLIPPAGE = 0.4
+# ЭТАП A, п.1 владельца: потолок проскальзывания ЖЁСТКИЙ. Функция продажи
+# принимает slippage, но всё выше потолка срезается до него -- лестниц
+# вроде 1.0:0.99 в стороже нет и быть не может. Повод -- реальный
+# инцидент этой сессии: ручная продажа STONKY ушла с maxSlippage 0.99
+# через пул глубиной 0.1418 SOL и дала $4.31 вместо $69.15 по другому
+# маршруту. Потолок -- это защита от повторения, а не настройка.
+MAX_SLIPPAGE_CEILING = 0.5
 DEFAULT_SELL_RETRIES = 3
+
+WSOL_MINT = "So11111111111111111111111111111111111111112"
+# Сколько ждём терминального состояния ордера DBot, прежде чем читать
+# баланс: ответ err:false -- это "принят", а не "исполнен".
+ORDER_WAIT_S = 45
+# Путь к выгрузке учёта: из неё берётся sol_in по (кошелёк, минт) для
+# алерта. Файл пишет solana_ledger_run.py. Переопределяется переменной
+# окружения, потому что служба живёт вне git-дерева.
+TRADES_ALL_PATH = Path(os.environ.get("GUARD_TRADES_PATH", str(REPO_ROOT / "data" / "solana_trades_all.json")))
 
 _ACTIVE_SECRETS: list[str] = []
 
@@ -226,17 +260,104 @@ def fetch_expired_orders(api_key: str) -> tuple[list[dict], bool]:
             return out, False  # честно: упёрлись в защитный потолок, не в реальный конец
 
 
-def sell_100_percent(mint: str, wallet_id: str, api_key: str) -> tuple[int | None, dict]:
+def clamp_slippage(value: float) -> float:
+    """Этап A, п.1: всё выше MAX_SLIPPAGE_CEILING срезается до потолка.
+    Отдельной функцией -- чтобы правило было в одном месте и его было
+    видно в тесте, а не растворялось в теле вызова."""
+    if value != value or value <= 0:  # NaN или бессмыслица
+        return DEFAULT_MAX_SLIPPAGE
+    return min(float(value), MAX_SLIPPAGE_CEILING)
+
+
+def sell_100_percent(mint: str, wallet_id: str, api_key: str,
+                      slippage: float = DEFAULT_MAX_SLIPPAGE) -> tuple[int | None, dict, float]:
+    slip = clamp_slippage(slippage)
+    if slip != slippage:
+        log.warning("проскальзывание %s срезано до потолка %s", slippage, slip)
     body = {
         "chain": SOLANA_CHAIN,
         "pair": mint,
         "walletIdList": [wallet_id],
         "type": "sell",
         "sellPercent": 1.0,
-        "maxSlippage": DEFAULT_MAX_SLIPPAGE,
+        "maxSlippage": slip,
         "retries": DEFAULT_SELL_RETRIES,
     }
-    return dbot_post("/automation/swap_orders_with_multi_wallets", body, api_key)
+    status, resp = dbot_post("/automation/swap_orders_with_multi_wallets", body, api_key)
+    return status, resp, slip
+
+
+def order_ids_from_response(body) -> list[str]:
+    """Идентификаторы ордеров из ответа на продажу. Форма подтверждена
+    реальным вызовом в dbot_manual_sell_once.py: {"res": {"ids": [...]}}.
+    Если формы нет -- возвращаем пусто и НЕ выдумываем идентификаторы:
+    без них мы просто не сможем спросить причину, и это будет видно."""
+    if not isinstance(body, dict):
+        return []
+    res = body.get("res")
+    if isinstance(res, dict):
+        ids = res.get("ids")
+        if isinstance(ids, list):
+            return [str(i) for i in ids if i]
+    if isinstance(res, list):
+        return [str(i) for i in res if isinstance(i, str)]
+    return []
+
+
+def order_status(ids: list[str], api_key: str) -> list[dict]:
+    """GET /automation/swap_orders?ids=... -- состояние ордера и ПРИЧИНА
+    отказа (docs.dbotx.com/reference/get-swap-order-info): state =
+    init/processing/done/fail/expired, плюс swapHash, errorCode,
+    errorMessage. 0 кредитов. Без него мы гадали, почему принятый ордер
+    не доходит до цепочки. Тот же код, что уже отработал в
+    dbot_manual_sell_once.py на реальных ордерах."""
+    if not ids:
+        return []
+    st, body = dbot_get("/automation/swap_orders", {"ids": ",".join(ids)}, api_key)
+    if st != 200:
+        return [{"id": i, "ошибка_запроса": f"http={st}",
+                  "сырое": _scrub_all(str(body)[:300])} for i in ids]
+    out = []
+    for r in extract_items(body):
+        out.append({"id": r.get("id"), "state": r.get("state"), "swapHash": r.get("swapHash"),
+                     "errorCode": r.get("errorCode"), "errorMessage": r.get("errorMessage")})
+    if not out:
+        out = [{"id": i, "ошибка_запроса": "ответ без распознанного списка",
+                 "сырое": _scrub_all(json.dumps(body, ensure_ascii=False, default=str)[:400])} for i in ids]
+    return out
+
+
+def wait_order(ids: list[str], api_key: str, timeout_s: int = ORDER_WAIT_S) -> list[dict]:
+    """Ждём терминального состояния ордера, а не фиксированную паузу."""
+    deadline = time.time() + timeout_s
+    last: list[dict] = []
+    while True:
+        last = order_status(ids, api_key)
+        states = {r.get("state") for r in last}
+        if not (states & {"init", "processing"}) or time.time() > deadline:
+            return last
+        time.sleep(3)
+
+
+def order_reason(rows: list[dict]) -> str:
+    """Человеческая причина из состояний ордеров -- именно она идёт в
+    Telegram вместо бессодержательного "err=false"."""
+    if not rows:
+        return "идентификаторов ордера в ответе не было -- причину спросить не у чего"
+    parts = []
+    for r in rows:
+        if r.get("ошибка_запроса"):
+            parts.append(f"{r.get('id')}: не смог прочитать состояние ({r['ошибка_запроса']})")
+            continue
+        bits = [f"state={r.get('state')}"]
+        if r.get("errorCode"):
+            bits.append(f"errorCode={r['errorCode']}")
+        if r.get("errorMessage"):
+            bits.append(f"errorMessage={r['errorMessage']}")
+        if r.get("swapHash"):
+            bits.append(f"tx={r['swapHash']}")
+        parts.append(f"{r.get('id')}: " + " ".join(bits))
+    return "; ".join(parts)
 
 
 def parse_sell_response(status: int | None, body: dict) -> tuple[bool, str]:
@@ -263,8 +384,126 @@ def parse_sell_response(status: int | None, body: dict) -> tuple[bool, str]:
     if err is True:
         return False, msg or "err=true без текста сообщения"
     if err is False:
-        return True, msg or "ok"
+        # ЭТАП A, п.2 владельца: err:false означает ТОЛЬКО "запрос
+        # принят". Реальная продажа подтверждается падением баланса в
+        # цепи, и ничем иным. Первый возвращаемый элемент -- "принят",
+        # а не "продан"; вызывающий код обязан это различать.
+        return True, msg or "принят DBot (не подтверждение продажи)"
     return False, msg or f"поле err отсутствует в ответе, успех не подтверждён: {str(body)[:300]}"
+
+
+# ---------- диагностика для алерта (этап A, п.4) ----------
+
+def raw_token_balance(wallet: str, mint: str) -> tuple[int, int | None]:
+    """Сырой остаток и decimals -- котировка Jupiter считается в сырых
+    единицах, а get_token_holding отдаёт uiAmount."""
+    res = ledger.rpc_call("getTokenAccountsByOwner",
+                           [wallet, {"mint": mint}, {"encoding": "jsonParsed"}])
+    total, dec = 0, None
+    for acc in (res or {}).get("value") or []:
+        try:
+            ta = acc["account"]["data"]["parsed"]["info"]["tokenAmount"]
+            total += int(ta["amount"])
+            dec = ta.get("decimals", dec)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return total, dec
+
+
+def jupiter_quote(mint: str, amount_raw: int, slippage_bps: int = 3000) -> dict:
+    """Котировка Jupiter НА ЧТЕНИЕ: есть ли вообще маршрут и по какой
+    цене. Подпись не нужна -- она требуется только для отправки.
+    Бесплатный тариф Jupiter отклоняет restrictIntermediateTokens=false
+    (проверено: NOT_SUPPORTED), поэтому параметр не передаётся."""
+    if amount_raw <= 0:
+        return {"ошибка": "нулевой остаток -- котировать нечего"}
+    hosts = [("lite-api", "https://lite-api.jup.ag/swap/v1/quote"),
+             ("quote-api-v6", "https://quote-api.jup.ag/v6/quote")]
+    errors = {}
+    for name, url in hosts:
+        params = {"inputMint": mint, "outputMint": WSOL_MINT, "amount": str(amount_raw),
+                   "slippageBps": str(slippage_bps)}
+        try:
+            r = requests.get(url, params=params, timeout=25)
+        except Exception as exc:  # noqa: BLE001
+            errors[name] = f"сеть: {type(exc).__name__}"
+            continue
+        if r.status_code != 200:
+            errors[name] = f"http={r.status_code}: {_scrub_all(r.text[:200])}"
+            continue
+        try:
+            b = r.json()
+        except ValueError:
+            errors[name] = "не JSON"
+            continue
+        if b.get("error") or b.get("errorCode"):
+            errors[name] = str(b.get("error") or b.get("errorCode"))
+            continue
+        route = " -> ".join(
+            f"{(rp.get('swapInfo') or {}).get('label')}"
+            for rp in (b.get("routePlan") or [])) or "(маршрут не разобран)"
+        out_raw = b.get("outAmount")
+        return {"хост": name, "outAmount": out_raw,
+                 "SOL": round(int(out_raw) / 1e9, 9) if out_raw else None,
+                 "priceImpactPct": b.get("priceImpactPct"),
+                 "маршрут": route, "slippageBps": slippage_bps}
+    return {"ошибка": "ни один хост Jupiter не дал котировку", "подробности": errors}
+
+
+def sol_in_from_ledger(wallet: str, mint: str) -> dict:
+    """sol_in по (кошелёк, минт) из выгрузки учёта. Файла нет или записи
+    нет -- так и пишем, а не подставляем ноль: ноль здесь означал бы
+    "вход был бесплатным", и порог спасения посчитался бы неверно."""
+    try:
+        trades = json.loads(TRADES_ALL_PATH.read_text())
+    except FileNotFoundError:
+        return {"известно": False, "почему": f"файла учёта нет: {TRADES_ALL_PATH}"}
+    except (ValueError, OSError) as exc:
+        return {"известно": False, "почему": f"файл учёта не читается: {type(exc).__name__}"}
+    best = None
+    for t in trades if isinstance(trades, list) else []:
+        if t.get("wallet") == wallet and t.get("mint") == mint and t.get("sol_in") is not None:
+            if best is None or (t.get("buy_block_time") or 0) > (best.get("buy_block_time") or 0):
+                best = t
+    if best is None:
+        return {"известно": False, "почему": "в выгрузке учёта нет сделки с этим кошельком и минтом"}
+    return {"известно": True, "sol_in": best.get("sol_in"),
+             "buy_block_time": best.get("buy_block_time"),
+             "task_name": best.get("task_name")}
+
+
+def hang_diagnostics(wallet: str, mint: str) -> dict:
+    """Всё, что нужно владельцу в алерте о зависании: котировка Jupiter
+    на ВЕСЬ остаток, sol_in из учёта, маршрут и ссылка на ручную
+    продажу. Любой сбой здесь не должен ронять сторож -- поэтому каждый
+    источник обёрнут и его отказ виден в тексте."""
+    d: dict = {"ссылка": f"https://jup.ag/swap/{mint}-SOL"}
+    try:
+        raw, dec = raw_token_balance(wallet, mint)
+        d["сырой_остаток"] = raw
+        d["decimals"] = dec
+    except Exception as exc:  # noqa: BLE001
+        d["сырой_остаток_ошибка"] = _scrub_all(f"{type(exc).__name__}: {exc}")[:200]
+        raw = 0
+    d["котировка_jupiter"] = jupiter_quote(mint, raw) if raw > 0 else {"ошибка": "остаток не прочитан"}
+    d["вход"] = sol_in_from_ledger(wallet, mint)
+    return d
+
+
+def hang_alert_text(mint: str, wallet: str, task_name: str, attempts: int,
+                     balance: float, last_err: str, diag: dict) -> str:
+    q = diag.get("котировка_jupiter") or {}
+    if q.get("SOL") is not None:
+        q_line = (f"Jupiter сейчас даёт {q['SOL']} SOL (маршрут: {q.get('маршрут')}, "
+                  f"влияние на цену {q.get('priceImpactPct')}, slippageBps {q.get('slippageBps')})")
+    else:
+        q_line = f"Котировки Jupiter нет: {q.get('ошибка')} {q.get('подробности') or ''}".strip()
+    v = diag.get("вход") or {}
+    v_line = (f"вход был {v['sol_in']} SOL" if v.get("известно")
+              else f"вход неизвестен ({v.get('почему')})")
+    return (f"По токену {mint} на кошельке {wallet} ({task_name}) {attempts} кругов подряд "
+            f"без продажи (баланс {balance}). Последний ответ DBot: {last_err}\n"
+            f"{q_line}\n{v_line}\nПродать вручную: {diag.get('ссылка')}")
 
 
 # ---------- Telegram (владелец: только 3 типа событий, ничего больше) ----------
@@ -485,30 +724,76 @@ def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wall
             if row2 is None or row2["stuck_alerted_at_attempts"] != attempts:
                 # Владелец, п.3: текст последнего ответа DBot -- в тот же алерт.
                 last_err = (row2["last_sell_error"] if row2 else None) or "(ещё ни разу не пробовали продать)"
-                msg = (f"По токену {mint} на кошельке {wallet} ({task_name}) {attempts} кругов подряд "
-                       f"без продажи (баланс {balance}). Последний ответ DBot: {last_err}")
+                # ЭТАП A, п.4: в алерт идёт не только текст DBot, но и
+                # ответ на вопрос "а можно ли это вообще продать и за
+                # сколько": котировка Jupiter на весь остаток, маршрут,
+                # sol_in из учёта и ссылка на ручную продажу.
+                diag = hang_diagnostics(wallet, mint)
+                msg = hang_alert_text(mint, wallet, task_name, attempts, balance,
+                                       _scrub_all(last_err), diag)
+                audit_log(audit_path, {"event": "stuck_alert", "task": task_name, "wallet": wallet,
+                                        "mint": mint, "attempts": attempts, "balance": balance,
+                                        "диагностика": diag})
                 log.error(msg)
                 send_telegram(telegram_token, telegram_chat_id, msg)
                 db_mark_stuck_alerted(conn, key, attempts)
 
         if live_sell:
-            status, resp = sell_100_percent(mint, wallet_id, dbot_key)
-            ok, err_text = parse_sell_response(status, resp)
-            summary = _scrub_all(json.dumps({"http_status": status, "body": resp}, ensure_ascii=False, default=str)[:500])
-            db_record_sell(conn, key, summary, ok, err_text)
-            audit_log(audit_path, {"event": "sell_attempt", "task": task_name, "wallet": wallet, "mint": mint,
-                                    "balance_before": balance, "http_status": status, "response": resp,
-                                    "ok": ok, "error_text": err_text})
-            if ok:
-                log.info("продажа подтверждена DBot: %s", summary)
+            status, resp, slip_used = sell_100_percent(mint, wallet_id, dbot_key)
+            accepted, accept_text = parse_sell_response(status, resp)
+
+            # ЭТАП A, п.2: "принят" -- это НЕ "продан". Ждём терминального
+            # состояния ордера, затем читаем баланс в цепи. Успехом
+            # считается только уменьшение баланса.
+            ids = order_ids_from_response(resp)
+            order_rows = wait_order(ids, dbot_key) if ids else []
+            reason = order_reason(order_rows)
+            try:
+                balance_after = ledger.get_token_holding(wallet, mint)
+            except Exception as exc:  # noqa: BLE001
+                balance_after = None
+                log.warning("баланс после продажи не прочитался: %s",
+                            _scrub_all(f"{type(exc).__name__}: {exc}"))
+            # ЭТАП A, п.2: успех = баланс уменьшился. None (не
+            # прочитался) -- это НЕ успех и НЕ отказ: неизвестность, её и
+            # пишем, чтобы следующий круг перепроверил.
+            if balance_after is None:
+                sold = None
+                verdict = "НЕИЗВЕСТНО: баланс после попытки не прочитался"
+            elif balance_after < balance - 1e-12:
+                sold = True
+                verdict = f"ПРОДАНО: баланс {balance} -> {balance_after}"
             else:
-                log.warning("продажа ОТКАЗАНА/не подтверждена DBot: %s", _scrub_all(err_text))
+                sold = False
+                verdict = f"НЕ ПРОДАНО: баланс не изменился ({balance})"
+
+            err_text = verdict if sold else f"{verdict}; принято={accepted} ({accept_text}); ордер: {reason}"
+            summary = _scrub_all(json.dumps(
+                {"http_status": status, "maxSlippage": slip_used, "принят": accepted,
+                 "ордера": order_rows, "баланс_до": balance, "баланс_после": balance_after},
+                ensure_ascii=False, default=str)[:800])
+            db_record_sell(conn, key, summary, bool(sold), _scrub_all(err_text))
+            audit_log(audit_path, {"event": "sell_attempt", "task": task_name, "wallet": wallet,
+                                    "mint": mint, "balance_before": balance,
+                                    "balance_after": balance_after, "http_status": status,
+                                    "max_slippage": slip_used, "accepted": accepted,
+                                    "accept_text": accept_text, "orders": order_rows,
+                                    "sold_onchain": sold, "verdict": verdict})
+            if sold:
+                log.info("продажа ПОДТВЕРЖДЕНА ЦЕПЬЮ: %s", verdict)
+            else:
+                log.warning("продажа не подтверждена цепью: %s | ордер: %s",
+                            verdict, _scrub_all(reason))
                 # Владелец, п.3: сообщение в Телеграм сразу при отказе,
                 # один раз на позицию (флаг sell_fail_alerted в SQLite).
+                # В тексте -- НАСТОЯЩИЙ errorMessage из swap_orders, а не
+                # наше "err=false".
                 row3 = db_get(conn, key)
                 if row3 is None or not row3["sell_fail_alerted"]:
-                    fail_msg = (f"Сторож не смог продать {mint} на {wallet} ({task_name}): "
-                                f"{_scrub_all(err_text)}")
+                    fail_msg = (f"Сторож не смог продать {mint} на {wallet} ({task_name}).\n"
+                                f"{verdict}\nОтвет DBot на запрос: принят={accepted} ({accept_text})\n"
+                                f"Состояние ордера: {_scrub_all(reason)}\n"
+                                f"maxSlippage {slip_used} (потолок {MAX_SLIPPAGE_CEILING})")
                     send_telegram(telegram_token, telegram_chat_id, fail_msg)
                     db_mark_sell_fail_alerted(conn, key)
         else:
@@ -553,13 +838,63 @@ def print_check_table(rows: list[dict]) -> None:
         print(f"{r['task']:<12} {r['wallet'][:12]+'..':<16} {r['mint'][:12]+'..':<16} {r['balance']:>16}")
 
 
+def self_test() -> None:
+    """Границы этапа A -- проверяются без сети и без ключей, чтобы
+    правило "выше 0.5 не уходит" было доказано, а не заявлено."""
+    checks: list[tuple[str, bool, str]] = []
+
+    def chk(name: str, cond: bool, got: str = "") -> None:
+        checks.append((name, bool(cond), got))
+
+    chk("0.4 остаётся 0.4", clamp_slippage(0.4) == 0.4, str(clamp_slippage(0.4)))
+    chk("0.5 остаётся 0.5", clamp_slippage(0.5) == 0.5, str(clamp_slippage(0.5)))
+    chk("0.99 срезается до 0.5", clamp_slippage(0.99) == MAX_SLIPPAGE_CEILING, str(clamp_slippage(0.99)))
+    chk("1.0 срезается до 0.5", clamp_slippage(1.0) == MAX_SLIPPAGE_CEILING, str(clamp_slippage(1.0)))
+    chk("0 и мусор -> значение по умолчанию",
+        clamp_slippage(0) == DEFAULT_MAX_SLIPPAGE and clamp_slippage(-1) == DEFAULT_MAX_SLIPPAGE,
+        f"{clamp_slippage(0)}/{clamp_slippage(-1)}")
+    chk("потолок не выше 0.5", MAX_SLIPPAGE_CEILING <= 0.5, str(MAX_SLIPPAGE_CEILING))
+
+    ok, txt = parse_sell_response(200, {"err": False})
+    chk("err:false -> принят, а не продан", ok and "не подтверждение продажи" in txt, txt)
+    ok2, txt2 = parse_sell_response(200, {"res": {"ids": ["x"]}})
+    chk("нет поля err -> не успех", not ok2, txt2)
+    chk("http!=200 -> не успех", not parse_sell_response(500, {})[0], "")
+
+    chk("ids из {'res':{'ids':[...]}}",
+        order_ids_from_response({"res": {"ids": ["a", "b"]}}) == ["a", "b"], "")
+    chk("ids из мусора -> пусто", order_ids_from_response({"res": 1}) == [], "")
+    chk("ids из None -> пусто", order_ids_from_response(None) == [], "")
+
+    r = order_reason([{"id": "1", "state": "fail", "errorCode": "E1", "errorMessage": "ExceededSlippage"}])
+    chk("причина отказа попадает в текст", "ExceededSlippage" in r and "fail" in r, r)
+    chk("без ордеров -- честно сказано", "спросить не у чего" in order_reason([]), "")
+
+    bad = 0
+    for name, good, got in checks:
+        mark = "ok  " if good else "СБОЙ"
+        print(f"  [{mark}] {name}" + (f"  -> {got}" if got and not good else ""))
+        if not good:
+            bad += 1
+    print(f"самопроверка границ: {len(checks) - bad}/{len(checks)} пройдено")
+    if bad:
+        raise SystemExit(f"самопроверка не пройдена: {bad} проверок из {len(checks)}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-only", action="store_true",
                          help="Только прочитать expired-список и показать таблицу баланса -- ничего не продаёт, "
                               "не пишет в SQLite.")
     parser.add_argument("--once", action="store_true", help="Один цикл и выход (для теста), не бесконечный цикл.")
+    parser.add_argument("--self-test", action="store_true",
+                         help="Проверить границы без сети и без ключей (потолок проскальзывания, разбор ответа, "
+                              "разбор состояния ордера) и выйти.")
     args = parser.parse_args()
+
+    if args.self_test:
+        self_test()
+        return
 
     setup_logging()
     cfg = load_env_config()
