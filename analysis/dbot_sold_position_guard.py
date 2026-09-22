@@ -657,6 +657,47 @@ def audit_log(path: Path, event: dict) -> None:
         f.write(_scrub_all(json.dumps(event, ensure_ascii=False, default=str)) + "\n")
 
 
+# ---------- продажа через конкретный пул (перед спасением) ----------
+
+def try_pool_route(wallet: str, wallet_id: str, mint: str, task_name: str,
+                    dbot_key: str, audit_path: Path | None,
+                    telegram_token: str | None, telegram_chat_id: str | None) -> dict | None:
+    """Распоряжение владельца: ПЕРЕД спасением через утилизатор пробуем
+    продать позицию через тот пул, который нашёл Jupiter -- DBot
+    принимает адрес пула в поле pair (проверено живой продажей: ордер
+    ушёл в done, баланс токена упал). Это обычная продажа через DBot, а
+    не перенос средств, поэтому шаг разрешён и при RESCUE_LIVE=0.
+
+    Ошибка внутри не валит сторож."""
+    if rescue is None:
+        log.warning("модуль спасения не импортировался, продажа через пул недоступна: %s",
+                     _RESCUE_IMPORT_ERROR)
+        return None
+    ctx = rescue.PoolSellContext(
+        wallet=wallet, wallet_id=wallet_id, mint=mint, task_name=task_name,
+        cfg=rescue.RescueConfig.from_env(),
+        rpc=lambda m, pr: ledger.rpc_call(m, pr),
+        dbot_post=lambda path, body: dbot_post(path, body, dbot_key),
+        dbot_sell=lambda pair, wid, slip: sell_100_percent(pair, wid, dbot_key, slip),
+        order_wait=lambda ids: wait_order(ids, dbot_key),
+        order_ids=order_ids_from_response,
+        max_slippage=DEFAULT_MAX_SLIPPAGE,
+        notify=lambda text: send_telegram(telegram_token, telegram_chat_id, _scrub_all(text)),
+        log=lambda text: log.info("%s", _scrub_all(text)),
+        scrub=_scrub_all,
+    )
+    try:
+        res = rescue.sell_via_pool(ctx)
+    except Exception as exc:  # noqa: BLE001
+        log.error("продажа через пул упала: %s", _scrub_all(f"{type(exc).__name__}: {exc}"))
+        audit_log(audit_path, {"event": "pool_route_failed", "wallet": wallet, "mint": mint,
+                                "ошибка": _scrub_all(f"{type(exc).__name__}: {exc}")[:300]})
+        return None
+    audit_log(audit_path, {"event": "pool_route", "task": task_name, "wallet": wallet,
+                            "mint": mint, **res})
+    return res
+
+
 # ---------- спасение зависшей позиции (этапы C/D) ----------
 
 def try_rescue(wallet: str, wallet_id: str, mint: str, task_name: str,
@@ -799,12 +840,18 @@ def run_cycle(conn: sqlite3.Connection | None, audit_path: Path | None, our_wall
                 log.error(msg)
                 send_telegram(telegram_token, telegram_chat_id, msg)
                 db_mark_stuck_alerted(conn, key, attempts)
-                # Этап D: на том же пороге пробуем спасти. При
-                # RESCUE_LIVE=0 это только расчёт плана -- ни одной
-                # отправки, и в аудит попадает, что именно было бы
-                # сделано.
-                try_rescue(wallet, wallet_id, mint, task_name, our_wallets, dbot_key,
-                            audit_path, telegram_token, telegram_chat_id)
+                # ПОРЯДОК ВАЖЕН. Сначала дешёвый путь -- продажа через
+                # конкретный пул (обычная продажа через DBot, ключи
+                # никуда не переезжают), и только если он не сработал --
+                # спасение через утилизатор. Продажа через пул разрешена
+                # и при RESCUE_LIVE=0, спасение -- нет.
+                pr = try_pool_route(wallet, wallet_id, mint, task_name, dbot_key,
+                                     audit_path, telegram_token, telegram_chat_id)
+                if (pr or {}).get("итог") == "продано":
+                    log.info("позиция закрыта продажей через пул, спасение не нужно")
+                else:
+                    try_rescue(wallet, wallet_id, mint, task_name, our_wallets, dbot_key,
+                                audit_path, telegram_token, telegram_chat_id)
 
         if live_sell:
             status, resp, slip_used = sell_100_percent(mint, wallet_id, dbot_key)

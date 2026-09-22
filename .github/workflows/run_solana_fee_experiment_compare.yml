@@ -1,0 +1,76 @@
+name: "Тест низких комиссий BATCH-5: сравнение до и после"
+
+# Владелец: BATCH-5 переключается с priority 0.0051 + tip 0.0051 на
+# 0.0005 + 0.0005. Сравниваются опоздание в слотах, доля непопаданий в
+# блок и срывы по проскальзыванию -- до и после границы, которую задаёт
+# владелец. ТОЛЬКО ЧТЕНИЕ: ни одной покупки/продажи, ни одного POST в
+# DBot. На VPS не ходит -- guard и зонд не затрагиваются.
+on:
+  workflow_dispatch:
+    inputs:
+      switch_ts:
+        description: "момент переключения, unix-секунды UTC (обязательно)"
+        required: true
+      window_h:
+        description: "длина каждого окна в часах (окна симметричны)"
+        required: false
+        default: "24"
+      task:
+        description: "задача эксперимента"
+        required: false
+        default: "BATCH-5"
+      min_n:
+        description: "минимум наблюдений в окне, иначе вывод помечается недостаточным"
+        required: false
+        default: "20"
+
+concurrency:
+  group: solana-fee-experiment
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Сравнение до/после"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$DBOT_API_KEY" ]; then echo "СТОП: секрет DBOT_API_KEY пуст." >&2; exit 1; fi
+          python -u analysis/solana_fee_experiment_compare.py \
+            --switch-ts "${{ github.event.inputs.switch_ts }}" \
+            --window-h "${{ github.event.inputs.window_h || '24' }}" \
+            --task "${{ github.event.inputs.task || 'BATCH-5' }}" \
+            --min-n "${{ github.event.inputs.min_n || '20' }}" 2>&1 | tail -300
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/solana_fee_experiment_compare.json ] && git add data/solana_fee_experiment_compare.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Тест низких комиссий: сравнение до/после [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
