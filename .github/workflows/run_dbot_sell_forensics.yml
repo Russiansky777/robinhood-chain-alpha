@@ -1,0 +1,59 @@
+name: "Разбор продажи по цепочке (только чтение)"
+
+# Владелец: интерфейс показывает сумму в разы больше, чем мы получили.
+# Считаем ответ из данных транзакции и соседних блоков: цена исполнения,
+# цена до сделки, глубина пула, цена влияния, и что сейчас даёт Jupiter
+# на разные объёмы. Ничего не продаёт и не отправляет.
+on:
+  workflow_dispatch:
+    inputs:
+      signature:
+        description: "подпись транзакции продажи"
+        required: true
+      wallet:
+        description: "адрес кошелька"
+        required: true
+      mint:
+        description: "адрес токена"
+        required: true
+      decimals:
+        description: "decimals токена"
+        required: false
+        default: "6"
+      prior_blocks:
+        description: "сколько блоков ДО нашей сделки просмотреть на рыночную цену"
+        required: false
+        default: "8"
+      quote_tokens:
+        description: "объёмы в токенах для котировки Jupiter, через запятую"
+        required: false
+        default: "1000,10000,100000,1029680"
+
+jobs:
+  forensics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: Разбор
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          python -u analysis/dbot_sell_forensics.py \
+            --signature "${{ github.event.inputs.signature }}" \
+            --wallet "${{ github.event.inputs.wallet }}" \
+            --mint "${{ github.event.inputs.mint }}" \
+            --decimals "${{ github.event.inputs.decimals }}" \
+            --prior-blocks "${{ github.event.inputs.prior_blocks }}" \
+            --quote-tokens "${{ github.event.inputs.quote_tokens }}" 2>&1 | tail -250
