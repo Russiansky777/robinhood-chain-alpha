@@ -1,0 +1,65 @@
+=== ЗОНД ОБНАРУЖЕНИЯ: отчёт на 2026-09-22T00:13:02Z ===
+--- состояние службы ---
+{
+  "updated_utc": "2026-09-22T00:12:23Z",
+  "uptime_s": 60.1,
+  "tx_method_работает": "logsSubscribe",
+  "tx_method_история": [
+    {
+      "utc": "2026-09-22T00:11:24Z",
+      "method": "logsSubscribe",
+      "acked": 63,
+      "of": 63
+    }
+  ],
+  "источников": 63,
+  "событий_записано": 4,
+  "дублей_пропущено": 0,
+  "неудачных_пропущено": 2,
+  "переподключений_tx": 1,
+  "переподключений_slot": 0,
+  "slot_уведомлений": 226,
+  "текущий_слот": 449213223,
+  "последнее_событие_utc": "2026-09-22T00:12:18Z",
+  "часы": {
+    "checked_at_utc": "2026-09-22T00:11:23Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Tue 2026-09-22 02:11:23 CEST\nRTCTimeUSec=Tue 2026-09-22 02:11:23 CEST",
+    "chronyc": "нет на хосте",
+    "ntpq": "нет на хосте",
+    "ntp_synchronized": "yes"
+  }
+}
+событий всего: 7; обогащено: 0
+
+--- как быстро мы узнаём о сделке источника ---
+lag_slots (текущий слот минус слот транзакции) n=7: {0: 7}
+  медиана=0
+ms_since_slot_seen n=7: медиана=182.9 мин=4.7 макс=340.8
+по способу: {'logsSubscribe': 7}
+по источникам (топ-10): {'4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD': 4, '2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8': 1, 'BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN': 1, 'DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc': 1}
+
+=== ГЛАВНЫЙ ВОПРОС ВЛАДЕЛЬЦА ===
+Сколько слотов проходит между тем, как МЫ увидели транзакцию источника,
+и тем, как покупка DBot села на цепочку:
+  ПОКА НЕТ ДАННЫХ: ни одно событие не сшито с нашей покупкой (источники могли не торговать, или DBot не скопировал сделку)
+  сшивок с DBot: {}
+
+=== САМОПРОВЕРКА: сверить вручную на Solscan ===
+
+  событие 2026-09-22T00:11:27Z источник=BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN
+    транзакция источника: https://solscan.io/tx/3JThu1GejA9UMbgFdyZYd7nKpLxqkgWw22S1RRx27fQMCXkhyv8kUSdyu1ES2pU9xgmtAko5zNtGhy6uX8DW3qkj
+      ожидаем slot=449213012 (из вебсокета), source_slot=None (из getTransaction)
+    наша покупка: не сшита -- сверять нечего
+
+  событие 2026-09-22T00:11:36Z источник=DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc
+    транзакция источника: https://solscan.io/tx/49XfkbCd7gunLsM4hSed1LFV5cVwAhH6E7uEXy3Yq38j518FqYWifV7NW2f1MDj2GPo3yru6d7okqouphYuF25Ab
+      ожидаем slot=449213045 (из вебсокета), source_slot=None (из getTransaction)
+    наша покупка: не сшита -- сверять нечего
+
+  событие 2026-09-22T00:12:03Z источник=2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8
+    транзакция источника: https://solscan.io/tx/4oFSrmbcwHA3n7FPsK9CrXQZnVJ4WSmiCWyLGEPqh45LeswiB6eXWRyZFZhEtoJupNgjg7PzZtdRDmhaGtY2yAiB
+      ожидаем slot=449213149 (из вебсокета), source_slot=None (из getTransaction)
+    наша покупка: не сшита -- сверять нечего
+
+  Как сверять: открыть ссылку, найти на странице Solscan поле Slot (Block) и
+  сравнить с ожидаемым числом выше. dbot_offset_slots должен быть ровно разностью.
