@@ -1,0 +1,92 @@
+{
+  "начато_utc": "2026-09-22T18:49:14Z",
+  "режим": "сухой прогон",
+  "минт": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+  "кошелёк": {
+    "имя": "BATCH-3",
+    "адрес": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu"
+  },
+  "остаток_raw": 2543275733,
+  "decimals": 9,
+  "доля_продажи": 0.1,
+  "продаём_raw": 254327573,
+  "maxSlippage": 0.4,
+  "маршрут_на_весь_остаток": {
+    "SOL": 0.007122338,
+    "outAmount": "7122338",
+    "priceImpactPct": "0",
+    "шагов": 3,
+    "маршрут": [
+      {
+        "label": "Quantum",
+        "ammKey": "AgEZLwFKa3nHtu9Xhz9MQhBBHHseDtVrUmfzsNSowbrW",
+        "inputMint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "inAmount": "2543275733",
+        "outAmount": "841756",
+        "percent": 100
+      },
+      {
+        "label": "JupLend AMM",
+        "ammKey": "FfEJYz4hLLFe4KyNyKYCjvfhMfbtpLH3CXpcPe8nhmfy",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "outputMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "inAmount": "841756",
+        "outAmount": "841741",
+        "percent": 100
+      },
+      {
+        "label": "Whirlpool",
+        "ammKey": "AhhoxZDmsg2snm85vPjqzYzEYESoKfb4KmTj4HrBBNwY",
+        "inputMint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "outputMint": "So11111111111111111111111111111111111111112",
+        "inAmount": "841741",
+        "outAmount": "7122338",
+        "percent": 100
+      }
+    ],
+    "хост": "https://lite-api.jup.ag/swap/v1/quote"
+  },
+  "маршрут_на_продаваемую_долю": {
+    "SOL": 0.000712146,
+    "outAmount": "712146",
+    "priceImpactPct": "0",
+    "шагов": 2,
+    "маршрут": [
+      {
+        "label": "Meteora DLMM",
+        "ammKey": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
+        "inputMint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "inAmount": "254327573",
+        "outAmount": "84165",
+        "percent": 100
+      },
+      {
+        "label": "1DEX",
+        "ammKey": "DbuvwPuLvH8uy2B1sKuu18aCd2QpCvfZdfDtdRZztBd2",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "outputMint": "So11111111111111111111111111111111111111112",
+        "inAmount": "84165",
+        "outAmount": "712146",
+        "percent": 100
+      }
+    ],
+    "хост": "https://lite-api.jup.ag/swap/v1/quote"
+  },
+  "адрес_пула_первого_шага": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
+  "outputMint_первого_шага": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "первый_шаг_сразу_в_SOL": false,
+  "итог": "СУХОЙ ПРОГОН: продажа НЕ отправлена",
+  "тело_которое_ушло_бы": {
+    "chain": "solana",
+    "pair": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
+    "walletIdList": [
+      "<walletId>"
+    ],
+    "type": "sell",
+    "sellPercent": 0.1,
+    "maxSlippage": 0.4,
+    "retries": 3
+  }
+}
