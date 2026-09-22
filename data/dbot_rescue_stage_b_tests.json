@@ -1,5 +1,5 @@
 {
-  "начато_utc": "2026-09-22T17:19:38Z",
+  "начато_utc": "2026-09-22T17:20:41Z",
   "режим": "боевой",
   "белый_список": [
     {
@@ -41,91 +41,106 @@
   ],
   "тесты": [
     {
-      "тест": "sol",
-      "сумма_SOL": 0.001,
-      "балансы_до": [
+      "тест": "token2022",
+      "минт": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+      "доля_остатка": 0.25,
+      "сведения_о_минте": {
+        "token2022": true,
+        "transfer_fee_bps": 100,
+        "decimals": 9
+      },
+      "остатки": [
         {
           "имя": "BATCH-8",
           "адрес": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "sol": 2.115522138
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-7",
           "адрес": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
-          "sol": 0.994080431
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-6",
           "адрес": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
-          "sol": 1.075630134
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-5",
           "адрес": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
-          "sol": 6.239048659
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-4",
           "адрес": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
-          "sol": 1.442784643
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-3",
           "адрес": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
-          "sol": 4.980146913
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-2",
           "адрес": "HMQG8xXoVBWZTkEqNye5WcfttvdZwVb522EggFD5AWZ6",
-          "sol": 2.392437986
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "BATCH-1",
           "адрес": "GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq",
-          "sol": 2.243126431
+          "ui": 0.0,
+          "raw": 0
         },
         {
           "имя": "pointfarmcap",
           "адрес": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
-          "sol": 8.731931173
+          "ui": 0.000787677,
+          "raw": 787677
         }
       ],
       "отправитель": {
         "имя": "pointfarmcap",
         "адрес": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
-        "sol": 8.731931173
+        "ui": 0.000787677,
+        "raw": 787677
       },
       "получатель": {
-        "имя": "BATCH-7",
-        "адрес": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
-        "sol": 0.994080431
+        "имя": "BATCH-8",
+        "адрес": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
       },
       "получатель_в_белом_списке": true,
+      "сумма_ui": 0.000196919,
+      "получатель_до": {
+        "ui": 0.0,
+        "raw": 0
+      },
       "http": 200,
       "ответ": {
         "err": false,
         "res": [
           {
-            "err": false,
-            "msg": "OK",
+            "err": true,
+            "msg": "Simulation failed. \nMessage: Transaction simulation failed: Error processing Instruction 1: custom program error: 0x1f. \nLogs: \n[\n  \"Program log: Warning: Mint has a permanent delegate, so tokens in this account may be seized at any time\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 4212 of 382862 compute units\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success\",\n  \"Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 21654 of 400000 compute units\",\n  \"Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]\",\n  \"Program log: Instruction: Transfer\",\n  \"Program log: Mint required for this account to transfer tokens, use `transfer_checked` or `transfer_checked_with_fee`\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1666 of 378346 compute units\",\n  \"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: custom program error: 0x1f\"\n]. \nCatch the `SendTransactionError` and call `getLogs()` on it for full details.",
             "toList": [
               {
-                "address": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
-                "amountUI": 0.001
+                "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+                "amountUI": 0.000196919
               }
-            ],
-            "txid": "95knwrxb5jYdLcqiGqpjkUJQqMRNR4Ny1TosepAhuof58Bc85JgoCfZynextzTDJTLkKDPC9RNJ8zrMc4P8JoZs",
-            "decimals": 9
+            ]
           }
         ]
       },
       "кредитов_списано_по_документации": 5,
-      "баланс_получателя_после": 0.995080431,
-      "пришло_SOL": 0.001,
-      "баланс_отправителя_после": 8.730926173,
-      "ушло_с_отправителя_SOL": 0.001005,
-      "итог": "ПЕРЕВОД ПОДТВЕРЖДЁН ЦЕПЬЮ"
+      "получатель_после_raw": 0,
+      "итог": "баланс получателя не изменился за отведённое время -- перевод НЕ подтверждён"
     }
   ],
-  "закончено_utc": "2026-09-22T17:19:52Z"
+  "закончено_utc": "2026-09-22T17:22:15Z"
 }
