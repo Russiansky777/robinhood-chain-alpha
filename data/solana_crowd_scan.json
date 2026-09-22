@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-22T01:10:39Z",
+  "generated_at_utc": "2026-09-22T01:38:32Z",
   "mode": "calibrate",
   "ЧЕСТНЫЕ_ОГОВОРКИ": [
     "Только чтение цепочки: ни одного вызова покупки/продажи, из DBot только GET follow_orders.",
@@ -23,14 +23,16 @@
   },
   "run_stats": {
     "wallets_scanned": 19,
-    "blocks_fetched": 378,
+    "blocks_fetched": 405,
     "blocks_from_cache": 0,
     "blocks_skipped": 0,
     "blocks_failed": 0,
-    "rpc_calls": 913,
-    "rpc_retries": 356,
+    "rpc_calls": 1048,
+    "rpc_retries": 431,
     "rpc_errors": 0,
-    "elapsed_s": 1366.4,
+    "batch_splits": 27,
+    "wallets_from_cache": 0,
+    "elapsed_s": 1469.2,
     "budget_exhausted": false
   },
   "calibration": {
@@ -38,12 +40,12 @@
       "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
       "live_buyers_between_median": 19.0,
       "live_n": 20,
-      "scan_crowd_2_median": null,
-      "scan_crowd_2_tx_median": null,
-      "scan_n_buys": null,
-      "scan_status": "ошибка"
+      "scan_crowd_2_median": 12,
+      "scan_crowd_2_tx_median": 16,
+      "scan_n_buys": 3,
+      "scan_status": "ok"
     },
-    "n_pairs": 17,
+    "n_pairs": 19,
     "pairs": [
       {
         "address": "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2",
@@ -53,6 +55,15 @@
         "n_scan_buys": 8,
         "scan_crowd_2_median": 12.0,
         "scan_crowd_2_tx_median": 25.5
+      },
+      {
+        "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "name": "ПИЛОТ",
+        "n_live": 20,
+        "live_buyers_between_median": 19.0,
+        "n_scan_buys": 3,
+        "scan_crowd_2_median": 12,
+        "scan_crowd_2_tx_median": 16
       },
       {
         "address": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
@@ -89,6 +100,15 @@
         "n_scan_buys": 7,
         "scan_crowd_2_median": 11,
         "scan_crowd_2_tx_median": 11
+      },
+      {
+        "address": "H3en1XWQHfbNWjEDRnRFi6HKVkZG1P7twdAHTvnCnYE3",
+        "name": "MaxHuh",
+        "n_live": 6,
+        "live_buyers_between_median": 7.0,
+        "n_scan_buys": 6,
+        "scan_crowd_2_median": 6.5,
+        "scan_crowd_2_tx_median": 11.0
       },
       {
         "address": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
@@ -199,62 +219,62 @@
         "scan_crowd_2_tx_median": 1.0
       }
     ],
-    "pearson_crowd2_vs_live": 0.9129,
-    "spearman_crowd2_vs_live": 0.9526,
-    "pearson_crowd2tx_vs_live": 0.9637,
-    "spearman_crowd2tx_vs_live": 0.931,
-    "pilot_same_order": null,
-    "best_spearman": 0.9526,
-    "verdict_ok": false
+    "pearson_crowd2_vs_live": 0.9263,
+    "spearman_crowd2_vs_live": 0.9652,
+    "pearson_crowd2tx_vs_live": 0.9425,
+    "spearman_crowd2tx_vs_live": 0.9379,
+    "pilot_same_order": true,
+    "best_spearman": 0.9652,
+    "verdict_ok": true
   },
   "self_check": {
     "ok": true,
     "checks": [
       {
-        "address": "7PFdKg9HgcjXh9fodFp6BCSGxqXcDSHAizotW6umE7aN",
-        "name": "L͓̽A͓̽D͓̽Y͓̽ ʟɛʍօռ 🍋",
-        "signature": "3VZGLsgisXR1auuyx4ZeVemHUtjPJqNhQGG5gUmoaUxwrHUDwRLN7aE4SpRWBE1j3jwi6MATWC5MxCYqFKCLsYnK",
-        "mint": "EBsK6LyH8ZCF6aq2uD4fTkFHuPzA1DLUE7fLjMyJpump",
-        "solscan": "https://solscan.io/tx/3VZGLsgisXR1auuyx4ZeVemHUtjPJqNhQGG5gUmoaUxwrHUDwRLN7aE4SpRWBE1j3jwi6MATWC5MxCYqFKCLsYnK",
-        "slot_записан": 448599109,
-        "crowd_2_записан": 3,
-        "crowd_2_tx_записан": 3,
-        "slot_helius": 448599109,
-        "slot_публичный_узел": 448599109,
-        "crowd_2_tx_helius": 3,
-        "crowd_2_tx_публичный_узел": 3,
+        "address": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "name": "Omakase",
+        "signature": "3FSVrRvY5eNpmJUepUxspSZCPL2UVQgw41nfbSdztgZp622YA2wWMvNXvWp4A2hXN7hGPjXsjFrbBReKV1i69dfr",
+        "mint": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP",
+        "solscan": "https://solscan.io/tx/3FSVrRvY5eNpmJUepUxspSZCPL2UVQgw41nfbSdztgZp622YA2wWMvNXvWp4A2hXN7hGPjXsjFrbBReKV1i69dfr",
+        "slot_записан": 449100810,
+        "crowd_2_записан": 8,
+        "crowd_2_tx_записан": 21,
+        "slot_helius": 449100810,
+        "slot_публичный_узел": 449100810,
+        "crowd_2_tx_helius": 21,
+        "crowd_2_tx_публичный_узел": 21,
         "слот_совпал": true,
         "толпа_совпала": true
       },
       {
-        "address": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
-        "name": "zakum",
-        "signature": "46H6XvamDCo9Ds78b9Q6LgLyveYcHfzfATSKykAL7UhPGNY9AADkci6QJMxs57tMwDU7bChSfxMSZrBwsX6o4YMp",
-        "mint": "DkjoTNGY6nFGEPRPGCo79siM1w3ZL3RDyfBDPGNSnGn3",
-        "solscan": "https://solscan.io/tx/46H6XvamDCo9Ds78b9Q6LgLyveYcHfzfATSKykAL7UhPGNY9AADkci6QJMxs57tMwDU7bChSfxMSZrBwsX6o4YMp",
-        "slot_записан": 449222165,
+        "address": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
+        "name": "Brez",
+        "signature": "4iRPpNvawbYNJM7HWXhCgqSgBVRQ9J68kbYMW9Sffo3bShz1da2Tvhv3C3AuFwUWKmAEtXvGjiBTsgrLTjeeY9mk",
+        "mint": "8TSUhXRhpEFtUVfDFAQdYCwgp2mEbs2jQk7tAYc1pump",
+        "solscan": "https://solscan.io/tx/4iRPpNvawbYNJM7HWXhCgqSgBVRQ9J68kbYMW9Sffo3bShz1da2Tvhv3C3AuFwUWKmAEtXvGjiBTsgrLTjeeY9mk",
+        "slot_записан": 449197022,
+        "crowd_2_записан": 10,
+        "crowd_2_tx_записан": 32,
+        "slot_helius": 449197022,
+        "slot_публичный_узел": 449197022,
+        "crowd_2_tx_helius": 32,
+        "crowd_2_tx_публичный_узел": 32,
+        "слот_совпал": true,
+        "толпа_совпала": true
+      },
+      {
+        "address": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+        "name": "Jarl Balgruuf",
+        "signature": "5tUvJBYUzeFobXWF4yF9avYuwFVtwrbgAVaNAYR8nAvq9e7xUa8t1kVTaXvEdzSDpaunDN9k4j4LwzQ8VM3AVJLm",
+        "mint": "AAHvR3SK2KKa6nGyJZnkbbauLfEWnxqZGgbHHQWG8Aqz",
+        "solscan": "https://solscan.io/tx/5tUvJBYUzeFobXWF4yF9avYuwFVtwrbgAVaNAYR8nAvq9e7xUa8t1kVTaXvEdzSDpaunDN9k4j4LwzQ8VM3AVJLm",
+        "slot_записан": 449192984,
         "crowd_2_записан": 2,
-        "crowd_2_tx_записан": 2,
-        "slot_helius": 449222165,
-        "slot_публичный_узел": 449222165,
-        "crowd_2_tx_helius": 2,
-        "crowd_2_tx_публичный_узел": 2,
-        "слот_совпал": true,
-        "толпа_совпала": true
-      },
-      {
-        "address": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
-        "name": "N_Xk9o",
-        "signature": "4CMtjAZAMrWRNdRfNHGZTaZxTyD5pzK5fxeKkN1oVbCV2nEGKqaYBD9nB87dPbpoaTsvpHQQ8dJ1zVmkTdqQfUgA",
-        "mint": "FcYSxP7zD3jJL8jrLyUd7KGDfjyx1apbjxD5gZhT3LWU",
-        "solscan": "https://solscan.io/tx/4CMtjAZAMrWRNdRfNHGZTaZxTyD5pzK5fxeKkN1oVbCV2nEGKqaYBD9nB87dPbpoaTsvpHQQ8dJ1zVmkTdqQfUgA",
-        "slot_записан": 449037475,
-        "crowd_2_записан": 5,
-        "crowd_2_tx_записан": 5,
-        "slot_helius": 449037475,
-        "slot_публичный_узел": 449037475,
-        "crowd_2_tx_helius": 5,
-        "crowd_2_tx_публичный_узел": 5,
+        "crowd_2_tx_записан": 6,
+        "slot_helius": 449192984,
+        "slot_публичный_узел": 449192984,
+        "crowd_2_tx_helius": 6,
+        "crowd_2_tx_публичный_узел": 6,
         "слот_совпал": true,
         "толпа_совпала": true
       }
@@ -265,10 +285,11 @@
       "address": "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2",
       "name": "rasmr",
       "status": "в задаче",
-      "n_sigs_72h": 203,
-      "n_tx_examined": 61,
+      "n_sigs_72h": 208,
+      "n_tx_examined": 66,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -414,6 +435,79 @@
       "level": "сильный"
     },
     {
+      "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+      "name": "ПИЛОТ",
+      "status": "в задаче",
+      "n_sigs_72h": 2633,
+      "n_tx_examined": 300,
+      "n_tx_fetch_failed": 0,
+      "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
+      "signatures_complete": true,
+      "buys": [
+        {
+          "signature": "2vkwoBafYYZyLb6dTxfMZcj66BzXSXSLf62BBxd4fFZmohtRoKniH3182gGKSMR3nQKSp9qfHS5uGjXw7Gm6m6bw",
+          "slot": 449163151,
+          "mint": "HhcfXbZ2rukoKx8oAH8rfkmzXbwvfdh6MMLZjneg4rWk",
+          "spend_sol_equiv": 21.021581,
+          "block_time": 1790022586,
+          "stable_usd_spent": 2500.0,
+          "price_missing": false,
+          "own_index_in_block": 368,
+          "crowd_0": 4,
+          "crowd_1": 10,
+          "crowd_2_only": 0,
+          "crowd_2": 14,
+          "crowd_2_tx": 16,
+          "incomplete": false
+        },
+        {
+          "signature": "3CwHXm8SQ4EqyXecon5jtiUTG4taaTLRbjZsZbZdy71M4Hb57AYgV8uMPqZKi8mTqPq2Q3H6PAyrvTEmWayA3A6A",
+          "slot": 449158636,
+          "mint": "4tJ1g3BnQDXiMGaPE8Ab4U8Vq8YnFxHDe75WQDrPfURy",
+          "spend_sol_equiv": 8.996385,
+          "block_time": 1790021379,
+          "stable_usd_spent": 1065.18908,
+          "price_missing": false,
+          "own_index_in_block": 106,
+          "crowd_0": 6,
+          "crowd_1": 1,
+          "crowd_2_only": 0,
+          "crowd_2": 7,
+          "crowd_2_tx": 7,
+          "incomplete": false
+        },
+        {
+          "signature": "3R4S2gTLDxzyPZthQ1xj2qEVninDDNyh3M6v8PJe9jf9NDPsGdvA4pPQ4PK5AbZp6ZXab6tADitAiit83WzKeP1f",
+          "slot": 449135502,
+          "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
+          "spend_sol_equiv": 84.81511,
+          "block_time": 1790015178,
+          "stable_usd_spent": 10000.0,
+          "price_missing": false,
+          "own_index_in_block": 276,
+          "crowd_0": 2,
+          "crowd_1": 7,
+          "crowd_2_only": 7,
+          "crowd_2": 12,
+          "crowd_2_tx": 47,
+          "incomplete": false
+        }
+      ],
+      "n_buys": 3,
+      "status_scan": "ok",
+      "crowd_2_median": 12,
+      "crowd_2_p75": 14,
+      "crowd_2_tx_median": 16,
+      "crowd_0_median": 4,
+      "crowd_1_median": 7,
+      "crowd_2_only_median": 0,
+      "zero_share": 0.0,
+      "spend_median_sol": 21.0216,
+      "n_incomplete": 0,
+      "level": "сильный"
+    },
+    {
       "address": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
       "name": "jg",
       "status": "в задаче",
@@ -421,6 +515,7 @@
       "n_tx_examined": 133,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -573,6 +668,7 @@
       "n_tx_examined": 141,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -705,10 +801,11 @@
       "address": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
       "name": "Brez",
       "status": "в задаче",
-      "n_sigs_72h": 351,
-      "n_tx_examined": 214,
+      "n_sigs_72h": 353,
+      "n_tx_examined": 215,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -811,7 +908,7 @@
           "signature": "54JR5Re1SuCHA7H9s7uPQHCNBALtSbeBEiYGwmFzy5vsdBTWUd3Cq3UfTbtkigwNipT3Mw9owppsBKKeUGB5AqU5",
           "slot": 448327584,
           "mint": "SPqTn8KkooByR41x3SsaNxGxXDqPFFRXR2Kkt8TJhSK",
-          "spend_sol_equiv": 17.932987,
+          "spend_sol_equiv": 17.920454,
           "block_time": 1789799624,
           "stable_usd_spent": 2000.0,
           "price_missing": false,
@@ -845,6 +942,7 @@
       "n_tx_examined": 40,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -990,13 +1088,135 @@
       "level": "сильный"
     },
     {
+      "address": "H3en1XWQHfbNWjEDRnRFi6HKVkZG1P7twdAHTvnCnYE3",
+      "name": "MaxHuh",
+      "status": "в задаче",
+      "n_sigs_72h": 69,
+      "n_tx_examined": 69,
+      "n_tx_fetch_failed": 0,
+      "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
+      "signatures_complete": true,
+      "buys": [
+        {
+          "signature": "2aiRx4WJVK4HA1w8JtzrbrFoZ8bnTZ2da4A9duq1hYway9TdECMxer9yc6acTuNbbdq8zVJomPNLg84Pq16inFFi",
+          "slot": 449196502,
+          "mint": "8TSUhXRhpEFtUVfDFAQdYCwgp2mEbs2jQk7tAYc1pump",
+          "spend_sol_equiv": 3.775798,
+          "block_time": 1790031490,
+          "stable_usd_spent": 450.0,
+          "price_missing": false,
+          "own_index_in_block": 737,
+          "crowd_0": 5,
+          "crowd_1": 4,
+          "crowd_2_only": 2,
+          "crowd_2": 11,
+          "crowd_2_tx": 11,
+          "incomplete": false
+        },
+        {
+          "signature": "2VRw9VAucn76czax9nT5ZfsU1D8665f37nVJqMfK3sSJoFLB1QEBLE36Uuujj3Bb3ck1hLMC9UJBcvG4tDm3H2dV",
+          "slot": 449093479,
+          "mint": "95pCcNPexz8rg1Sazi2GscfAGSFy3NXSPDL9TdEMZE2V",
+          "spend_sol_equiv": 16.278913,
+          "block_time": 1790003909,
+          "stable_usd_spent": 1927.838846,
+          "price_missing": false,
+          "own_index_in_block": 121,
+          "crowd_0": 2,
+          "crowd_1": 1,
+          "crowd_2_only": 5,
+          "crowd_2": 6,
+          "crowd_2_tx": 11,
+          "incomplete": false
+        },
+        {
+          "signature": "2pWStMGp7EQQP9Ro8gzs3eCaFZN1Bbe8g47NVbgyQUaNMGjXHxfo2MCwAhc1ZJQFHnZY1Fb3NaZag6cpMWv5m5Nt",
+          "slot": 448853031,
+          "mint": "BJ9mPPkCqnMisMiv7JQW7MJ2fgDyjm9udmwHZuJ2YcTf",
+          "spend_sol_equiv": 8.315283,
+          "block_time": 1789939729,
+          "stable_usd_spent": 914.056219,
+          "price_missing": false,
+          "own_index_in_block": 51,
+          "crowd_0": 4,
+          "crowd_1": 4,
+          "crowd_2_only": 2,
+          "crowd_2": 7,
+          "crowd_2_tx": 16,
+          "incomplete": false
+        },
+        {
+          "signature": "5qTYvzunbUxqbBvcx3z9ZV8aEixQ57hN3w3ADHh54psUGR5rxCpD5hQ1igYcsXN2o3b4q4DneBpZ1tHf97cuU1mx",
+          "slot": 448840452,
+          "mint": "FSJfPYF6VjuDuUxMFdUrCEkVr96bhC5oXKhv4o6JJxiK",
+          "spend_sol_equiv": 3.628872,
+          "block_time": 1789936371,
+          "stable_usd_spent": 400.0,
+          "price_missing": false,
+          "own_index_in_block": 768,
+          "crowd_0": 0,
+          "crowd_1": 2,
+          "crowd_2_only": 2,
+          "crowd_2": 4,
+          "crowd_2_tx": 4,
+          "incomplete": false
+        },
+        {
+          "signature": "2J1k2DStySKF65agVGSp7gDW2EBN6aK2dfSqGTNHa4JuW4VJv9W2EQfGqYnhkMdgbuwvwMQVbVQdzKU4vfd9g8TA",
+          "slot": 448820392,
+          "mint": "EKtmPPLaCbEEKiwoHHtV7TsRsmPXs5CMGtQtZFSiinsc",
+          "spend_sol_equiv": 91.193741,
+          "block_time": 1789930991,
+          "stable_usd_spent": 10000.0,
+          "price_missing": false,
+          "own_index_in_block": 641,
+          "crowd_0": 7,
+          "crowd_1": 4,
+          "crowd_2_only": 10,
+          "crowd_2": 17,
+          "crowd_2_tx": 31,
+          "incomplete": false
+        },
+        {
+          "signature": "5fRw7QNeaZJcjF1vB1GHECCwJGMq9wYKhBA6kn2BQ3UwVHM9mtnBSHEaR9LznKcjqc6L9iTDx1EwHtrJmJTrd5Ku",
+          "slot": 448803353,
+          "mint": "95pCcNPexz8rg1Sazi2GscfAGSFy3NXSPDL9TdEMZE2V",
+          "spend_sol_equiv": 10.004543,
+          "block_time": 1789926433,
+          "stable_usd_spent": null,
+          "price_missing": false,
+          "own_index_in_block": 582,
+          "crowd_0": 1,
+          "crowd_1": 2,
+          "crowd_2_only": 2,
+          "crowd_2": 5,
+          "crowd_2_tx": 6,
+          "incomplete": false
+        }
+      ],
+      "n_buys": 6,
+      "status_scan": "ok",
+      "crowd_2_median": 6.5,
+      "crowd_2_p75": 11,
+      "crowd_2_tx_median": 11.0,
+      "crowd_0_median": 3.0,
+      "crowd_1_median": 3.0,
+      "crowd_2_only_median": 2.0,
+      "zero_share": 0.0,
+      "spend_median_sol": 9.1599,
+      "n_incomplete": 0,
+      "level": "средний"
+    },
+    {
       "address": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
       "name": "User",
       "status": "кандидат",
-      "n_sigs_72h": 665,
-      "n_tx_examined": 76,
+      "n_sigs_72h": 657,
+      "n_tx_examined": 79,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1145,10 +1365,11 @@
       "address": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
       "name": "dreamloader",
       "status": "в задаче",
-      "n_sigs_72h": 989,
-      "n_tx_examined": 199,
+      "n_sigs_72h": 997,
+      "n_tx_examined": 208,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1297,10 +1518,11 @@
       "address": "5VRgqb2qbVqaWVGsM2k1b2bnPJk7up2xYbn4ziEjFgNt",
       "name": "figaro",
       "status": "в задаче",
-      "n_sigs_72h": 422,
+      "n_sigs_72h": 421,
       "n_tx_examined": 300,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1433,10 +1655,11 @@
       "address": "6MwHc79vgWXeMVyZwgQ13bqqudRNCYkvjmgQzc294g8M",
       "name": "Unmade",
       "status": "в задаче",
-      "n_sigs_72h": 232,
-      "n_tx_examined": 231,
+      "n_sigs_72h": 227,
+      "n_tx_examined": 226,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1569,10 +1792,11 @@
       "address": "DmopudSGaQQenK4cW5NgmHUsexMB3sEJNn6n1EfLKs28",
       "name": "Werey",
       "status": "в задаче",
-      "n_sigs_72h": 275,
-      "n_tx_examined": 206,
+      "n_sigs_72h": 279,
+      "n_tx_examined": 210,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1721,10 +1945,11 @@
       "address": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
       "name": "Omakase",
       "status": "в задаче",
-      "n_sigs_72h": 139,
-      "n_tx_examined": 60,
+      "n_sigs_72h": 140,
+      "n_tx_examined": 61,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -1873,10 +2098,11 @@
       "address": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
       "name": "N_Xk9o",
       "status": "в задаче",
-      "n_sigs_72h": 202,
+      "n_sigs_72h": 201,
       "n_tx_examined": 67,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -2029,6 +2255,7 @@
       "n_tx_examined": 69,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -2177,12 +2404,29 @@
       "address": "57aiHCweKvWmAspN26FVV6kKLY8opJGYgw5iN3nPESk9",
       "name": "badtrader69",
       "status": "в задаче",
-      "n_sigs_72h": 82,
+      "n_sigs_72h": 84,
       "n_tx_examined": 75,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
+        {
+          "signature": "3hFS8mCf4tTe3cQTNbK11gqufkEhMUBE14BqFebGsLDudZW8zBvfUGzbSfJrRpmeyHEV8SdofyJsP71w1nPrj7xQ",
+          "slot": 449226723,
+          "mint": "CFrQFyoA3grHbZmjz3f7w7jLcf7xcRH1hRH44xbcPRtn",
+          "spend_sol_equiv": 8.476846,
+          "block_time": 1790039550,
+          "stable_usd_spent": 1000.0,
+          "price_missing": false,
+          "own_index_in_block": 573,
+          "crowd_0": 0,
+          "crowd_1": 1,
+          "crowd_2_only": 1,
+          "crowd_2": 2,
+          "crowd_2_tx": 2,
+          "incomplete": false
+        },
         {
           "signature": "WHaJahzL3fWTpAkRXURvtCFwnBHoVmiTbg6jgtwUcdfbgYUac6m9BYwim7AGiAoP1XmZY4kvQduHgQWxQX9vvpk",
           "slot": 449204908,
@@ -2294,22 +2538,6 @@
           "crowd_2": 1,
           "crowd_2_tx": 1,
           "incomplete": false
-        },
-        {
-          "signature": "36ggMLcNEgHmZ73f9JgKJkGX2mNSMhct3Xr6XAf3d4SUo5PKnU4EDS39veGJ8wdgMJN6GDsGUyk6sT8W9JcrFr3",
-          "slot": 448503278,
-          "mint": "kkfhrRkYhft8fJArWZ2Q3Gm9DE435DpLH9CRxjuRXtv",
-          "spend_sol_equiv": 8.988064,
-          "block_time": 1789846432,
-          "stable_usd_spent": 1000.0,
-          "price_missing": false,
-          "own_index_in_block": 413,
-          "crowd_0": 0,
-          "crowd_1": 0,
-          "crowd_2_only": 1,
-          "crowd_2": 1,
-          "crowd_2_tx": 1,
-          "incomplete": false
         }
       ],
       "n_buys": 8,
@@ -2333,6 +2561,7 @@
       "n_tx_examined": 81,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -2481,10 +2710,11 @@
       "address": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
       "name": "ryan",
       "status": "в задаче",
-      "n_sigs_72h": 185,
-      "n_tx_examined": 185,
+      "n_sigs_72h": 186,
+      "n_tx_examined": 186,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -2537,10 +2767,11 @@
       "address": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
       "name": "Jarl Balgruuf",
       "status": "в задаче",
-      "n_sigs_72h": 393,
-      "n_tx_examined": 82,
+      "n_sigs_72h": 395,
+      "n_tx_examined": 84,
       "n_tx_fetch_failed": 0,
       "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
       "signatures_complete": true,
       "buys": [
         {
@@ -2684,20 +2915,6 @@
       "spend_median_sol": 19.4942,
       "n_incomplete": 0,
       "level": "пустой"
-    },
-    {
-      "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
-      "name": "ПИЛОТ",
-      "status": "в задаче",
-      "status_scan": "ошибка",
-      "note": "getTransaction batch: исчерпаны попытки"
-    },
-    {
-      "address": "H3en1XWQHfbNWjEDRnRFi6HKVkZG1P7twdAHTvnCnYE3",
-      "name": "MaxHuh",
-      "status": "в задаче",
-      "status_scan": "ошибка",
-      "note": "getTransaction batch: исчерпаны попытки"
     }
   ]
 }
