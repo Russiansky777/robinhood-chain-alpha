@@ -123,7 +123,11 @@ def tx_trades_for_mint(t: dict, mint: str, index: int, block_time: int | None) -
         return None
     txn = t.get("transaction") or {}
     sigs = txn.get("signatures") or []
-    keys_raw = txn.get("accountKeys") or []
+    # Под transactionDetails="accounts" ключи лежат прямо в transaction,
+    # под "full" -- в transaction.message. Раньше читался только первый
+    # путь: откат на full молча остался бы БЕЗ подписантов и без
+    # нативной SOL-ноги, то есть страховка не страховала.
+    keys_raw = txn.get("accountKeys") or ((txn.get("message") or {}).get("accountKeys")) or []
     keys = [k.get("pubkey") if isinstance(k, dict) else k for k in keys_raw]
     signers = {k.get("pubkey") for k in keys_raw if isinstance(k, dict) and k.get("signer")}
 
@@ -352,11 +356,11 @@ class SlotClock:
 # ---------- одна симуляция ----------
 
 def first_foreign_buy(st: SlotTrades, mint: str, leader: str, start_slot: int,
-                       after_index: int | None) -> dict:
+                       after_index: int | None, lookahead: int = SCEN_LOOKAHEAD) -> dict:
     """Первая чужая покупка mint начиная со start_slot, не дальше
-    SCEN_LOOKAHEAD слотов вперёд."""
+    lookahead слотов вперёд."""
     incomplete = False
-    for step in range(SCEN_LOOKAHEAD + 1):
+    for step in range(lookahead + 1):
         s = start_slot + step
         node = st.get(s, mint)
         if node is None:
@@ -390,9 +394,22 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
                 "note": "транзакции лидера нет среди сделок этого минта в его же слоте"}
     row["leader_index"] = leader_index
 
+    # ГОРИЗОНТ E0 -- 1 слот, а не 2. В задании два места про E0 расходятся:
+    # определение говорит "первая чужая в S после лидера; ЕСЛИ В S ЕЁ НЕТ --
+    # первая в S+1", то есть S и S+1; общая фраза "не больше 2 слотов от
+    # стартового" дала бы ещё и S+2 -- ровно тот слот, где начинается E2.
+    # На реальном прогоне (247 симуляций) свободный вариант ставил вход E0
+    # в S+2 в 33 случаях, и в 33 из 220 симуляций цена E0 СОВПАДАЛА с ценой
+    # E2 -- то есть цена опоздания на этих строках обнулялась по построению,
+    # а E0 переставал быть потолком. Берём определение: S и S+1. Свободный
+    # вариант считается рядом как sim_E0_loose, чтобы разница была видна, а
+    # не спрятана.
     scen = {}
-    for name, start, after in (("E0", slot, leader_index), ("E1", slot + 1, None), ("E2", slot + 2, None)):
-        r = first_foreign_buy(st, mint, leader, start, after)
+    for name, start, after, look in (("E0", slot, leader_index, 1),
+                                      ("E0_loose", slot, leader_index, SCEN_LOOKAHEAD),
+                                      ("E1", slot + 1, None, SCEN_LOOKAHEAD),
+                                      ("E2", slot + 2, None, SCEN_LOOKAHEAD)):
+        r = first_foreign_buy(st, mint, leader, start, after, look)
         if r.get("found"):
             scen[name] = {"entry_price": r["price_sol_per_token"], "entry_slot": r["slot"],
                            "entry_index": r["index"], "entry_signature": r["signature"],
@@ -433,12 +450,13 @@ def simulate(rpc: Rpc, st: SlotTrades, clock: SlotClock, leader: str, mint: str,
                          "exit_delay_s": ebt - bt}
             break
     row["exit_incomplete"] = exit_incomplete
+    row["exit_scan_blocks"] = EXIT_MAX_BLOCKS
     if not exit_row:
         row["status"] = "no_exit"
         row["exit_note"] = f"в окне T+{EXIT_FROM_S}..{EXIT_TO_S}с за {EXIT_MAX_BLOCKS} блоков сделок с минтом нет"
         return row
     row.update(exit_row)
-    for name in ("E0", "E1", "E2"):
+    for name in ("E0", "E0_loose", "E1", "E2"):
         ep = scen[name].get("entry_price")
         row[f"sim_{name}"] = round((exit_row["exit_price"] / ep - 1) * 100, 4) if ep else None
     row["status"] = "ok" if row.get("sim_E2") is not None else "частично"
@@ -567,7 +585,7 @@ def per_wallet(rows: list[dict], meta: dict[str, dict]) -> list[dict]:
                 "n_incomplete": sum(1 for r in rs if r.get("exit_incomplete")
                                      or any((r.get("scenarios") or {}).get(k, {}).get("incomplete")
                                             for k in ("E0", "E1", "E2")))}
-        for k in ("E0", "E1", "E2"):
+        for k in ("E0", "E0_loose", "E1", "E2"):
             v = [r[f"sim_{k}"] for r in rs if r.get(f"sim_{k}") is not None]
             row[f"n_{k}"] = len(v)
             row[f"median_{k}"] = round(statistics.median(v), 4) if v else None
@@ -583,13 +601,20 @@ def per_wallet(rows: list[dict], meta: dict[str, dict]) -> list[dict]:
 
 def overall(rows: list[dict], label: str) -> dict:
     o = {"label": label}
-    for k in ("E0", "E1", "E2"):
+    for k in ("E0", "E0_loose", "E1", "E2"):
         v = [r[f"sim_{k}"] for r in rows if r.get(f"sim_{k}") is not None]
         o[f"n_{k}"] = len(v)
         o[f"median_{k}"] = round(statistics.median(v), 4) if v else None
         o[f"p25_{k}"] = round(pct(v, 0.25), 4) if v else None
         o[f"p75_{k}"] = round(pct(v, 0.75), 4) if v else None
         o[f"share_above_{COST_THRESHOLD_PCT}_{k}"] = share_above(v, COST_THRESHOLD_PCT)
+    dl = [r["exit_delay_s"] for r in rows if r.get("exit_delay_s") is not None]
+    if dl:
+        o["задержка_выхода_с"] = {"мин": min(dl), "медиана": statistics.median(dl), "макс": max(dl)}
+        o["УСЕЧЕНИЕ_ОКНА"] = (
+            f"окно задано T+{EXIT_FROM_S}..{EXIT_TO_S}с, но {EXIT_MAX_BLOCKS} блоков при слоте "
+            f"250-300 мс покрывают лишь ~{EXIT_MAX_BLOCKS*0.27:.1f}с: фактический максимум "
+            f"задержки {max(dl)}с, до T+{EXIT_TO_S}с скан структурно не доходит")
     both = [(r["sim_E0"], r["sim_E1"], r["sim_E2"]) for r in rows
             if None not in (r.get("sim_E0"), r.get("sim_E1"), r.get("sim_E2"))]
     o["n_все_три"] = len(both)
@@ -840,9 +865,12 @@ def report(out: dict) -> None:
         o = out[key]
         print()
         print(f"--- ЦЕНА ОПОЗДАНИЯ: {o['label']} ---")
-        for k in ("E0", "E1", "E2"):
-            print(f"  {k}: n={o[f'n_{k}']:<5} медиана={o[f'median_{k}']}%  p25={o[f'p25_{k}']}  "
+        for k in ("E0", "E0_loose", "E1", "E2"):
+            print(f"  {k:<9}: n={o[f'n_{k}']:<5} медиана={o[f'median_{k}']}%  p25={o[f'p25_{k}']}  "
                   f"p75={o[f'p75_{k}']}  доля>+2.5%={o[f'share_above_2.5_{k}']}")
+        if o.get("УСЕЧЕНИЕ_ОКНА"):
+            print(f"  задержка выхода: {json.dumps(o['задержка_выхода_с'], ensure_ascii=False)}")
+            print(f"  ВНИМАНИЕ: {o['УСЕЧЕНИЕ_ОКНА']}")
         if o.get("n_все_три"):
             print(f"  на общих {o['n_все_три']} симуляциях: E0-E2={o['медиана_E0_минус_E2']} п.п., "
                   f"E1-E2={o['медиана_E1_минус_E2']} п.п., E0-E1={o['медиана_E0_минус_E1']} п.п.")
