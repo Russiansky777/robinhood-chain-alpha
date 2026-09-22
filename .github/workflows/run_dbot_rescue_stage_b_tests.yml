@@ -1,0 +1,94 @@
+name: "Спасение, этап B: проверки distribute ДО появления ключа"
+
+# Владелец: distribute -- несущая деталь всей схемы спасения. Без него
+# токен с кошелька задачи не сдвинуть (приватный ключ у DBot). Поэтому
+# он проверяется ДО того, как на VPS появится приватный ключ
+# утилизатора.
+#
+# ГРАНИЦЫ. Получатель -- только адрес из /automation/follow_orders,
+# взятый живьём (белый список). Без confirm=ПЕРЕВОЖУ ничего не
+# отправляется: печатается ровно то тело, которое ушло бы. Потолок суммы
+# зашит в самом скрипте. Guard (dbot-sold-guard) и зонд
+# (dbot-detect-probe) не затрагиваются -- этот workflow не ходит на VPS.
+#
+# Каждый вызов distribute стоит 5 кредитов DBot.
+on:
+  workflow_dispatch:
+    inputs:
+      tests:
+        description: "через запятую: sol, token2022, ultra"
+        required: false
+        default: "sol"
+      confirm:
+        description: "напиши ПЕРЕВОЖУ, чтобы реально отправить distribute; иначе сухой прогон"
+        required: false
+        default: ""
+      t22_mint:
+        description: "минт Token-2022 с комиссией для теста token2022"
+        required: false
+        default: "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S"
+      t22_share:
+        description: "какую долю остатка переслать в тесте token2022"
+        required: false
+        default: "0.25"
+
+concurrency:
+  group: dbot-rescue-stage-b
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Этап B"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY" ]; then echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1; fi
+          if [ -z "$DBOT_API_KEY" ]; then echo "СТОП: секрет DBOT_API_KEY пуст." >&2; exit 1; fi
+          CONFIRM=""
+          if [ "${{ github.event.inputs.confirm }}" = "ПЕРЕВОЖУ" ]; then
+            CONFIRM="--confirm"
+            echo "БОЕВОЙ ПРОГОН: distribute будет отправлен."
+          else
+            echo "СУХОЙ ПРОГОН: distribute НЕ будет отправлен (confirm != ПЕРЕВОЖУ)."
+          fi
+          python -u analysis/dbot_rescue_stage_b_tests.py \
+            --tests "${{ github.event.inputs.tests || 'sol' }}" \
+            --t22-mint "${{ github.event.inputs.t22_mint }}" \
+            --t22-share "${{ github.event.inputs.t22_share || '0.25' }}" \
+            $CONFIRM 2>&1 | tail -400
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/dbot_rescue_stage_b_tests.json data/dbot_distribute_raw_sample.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Спасение, этап B: результат проверок distribute [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
