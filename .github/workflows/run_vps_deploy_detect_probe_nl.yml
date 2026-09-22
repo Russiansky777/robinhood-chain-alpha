@@ -177,7 +177,21 @@ jobs:
           echo "=== первые события ==="
           ssh $SSH_OPTS root@45.59.170.76 'head -5 /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null; wc -l /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null || echo "events.jsonl ещё нет"'
 
-      - name: "9. Отчёт со службы (включая самопроверку по Solscan)"
+      - name: "9a. САМОПРОВЕРКА: 3 события сверяются с цепочкой у двух провайдеров"
+        if: always()
+        run: |
+          # Владелец: "перед отчётом прогони самопроверку". Сверка идёт не
+          # сама с собой: slot из вебсокета перепроверяется повторным
+          # getTransaction у Helius И у независимого публичного узла
+          # api.mainnet-beta.solana.com. Ссылки на Solscan печатаются
+          # рядом, чтобы открыть те же транзакции глазами.
+          mkdir -p data
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_detect_probe
+            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --selfcheck"
+          ' 2>&1 | tee data/dbot_detect_probe_selfcheck.txt || echo "САМОПРОВЕРКА НАШЛА РАСХОЖДЕНИЯ ИЛИ НЕ СМОГЛА ОТРАБОТАТЬ -- см. вывод выше"
+
+      - name: "9. Отчёт со службы"
         if: always()
         run: |
           mkdir -p data
@@ -194,7 +208,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/dbot_detect_probe_report.txt data/dbot_detect_probe_sample.jsonl data/dbot_detect_probe_enriched_sample.jsonl; do
+          for f in data/dbot_detect_probe_report.txt data/dbot_detect_probe_selfcheck.txt data/dbot_detect_probe_sample.jsonl data/dbot_detect_probe_enriched_sample.jsonl; do
             [ -s "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }

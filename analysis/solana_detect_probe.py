@@ -241,8 +241,11 @@ def dbot_signature(rec: dict) -> str | None:
 
 # ---------- Solana JSON-RPC (только чтение) ----------
 
-def rpc(method: str, params: list, key: str) -> dict | None:
-    url = f"https://mainnet.helius-rpc.com/?api-key={key}"
+PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
+
+
+def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | None:
+    url = url or f"https://mainnet.helius-rpc.com/?api-key={key}"
     for attempt in range(4):
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
@@ -265,12 +268,12 @@ def rpc(method: str, params: list, key: str) -> dict | None:
     return None
 
 
-def get_tx(sig: str, key: str) -> dict | None:
+def get_tx(sig: str, key: str, url: str | None = None) -> dict | None:
     # maxSupportedTransactionVersion=1: на реальном прогоне Части A узел
     # отвечал -32015 "Transaction version (1) is not supported" на
     # потолке 0 -- в блоках сейчас есть транзакции версии 1.
     return rpc("getTransaction", [sig, {"encoding": "jsonParsed",
-                                         "maxSupportedTransactionVersion": 1}], key)
+                                         "maxSupportedTransactionVersion": 1}], key, url)
 
 
 def owner_token_deltas(tx: dict, owner: str) -> dict[str, float]:
@@ -837,6 +840,69 @@ def print_report(n_selfcheck: int = 3) -> None:
     print("  сравнить с ожидаемым числом выше. dbot_offset_slots должен быть ровно разностью.")
 
 
+def self_check(helius_key: str, n: int = 3) -> bool:
+    """Владелец: «перед отчётом прогони самопроверку: возьми 3 события из
+    events.jsonl и вручную сверь slot, our_slot и dbot_offset_slots».
+
+    Сверяем НЕ сами с собой: slot из вебсокета проверяется повторным
+    getTransaction у Helius И независимым публичным узлом Solana
+    (api.mainnet-beta.solana.com) -- другой провайдер, другой ответ, то
+    же самое число или расхождение. Ссылки на Solscan печатаются рядом,
+    чтобы владелец мог открыть глазами ту же транзакцию.
+    """
+    enriched = {e["signature"]: e for e in read_jsonl(ENRICHED_PATH) if e.get("signature")}
+    events = read_jsonl(EVENTS_PATH)
+    preferred = [e for e in events if enriched.get(e.get("signature"), {}).get("dbot_offset_slots") is not None]
+    pool = (preferred or [e for e in events if e.get("signature") in enriched] or events)[-n:]
+    if not pool:
+        print("САМОПРОВЕРКА: событий нет -- проверять нечего (честный ноль, не сбой)")
+        return True
+
+    print(f"=== САМОПРОВЕРКА {len(pool)} СОБЫТИЙ: сверка с цепочкой у ДВУХ провайдеров ===")
+    all_ok = True
+    for ev in pool:
+        sig = ev["signature"]
+        enr = enriched.get(sig, {})
+        print(f"\n-- событие {ev.get('t_recv_utc')} источник={ev.get('source')} ({ev.get('source_remark')})")
+        print(f"   транзакция источника: https://solscan.io/tx/{sig}")
+        h = get_tx(sig, helius_key)
+        pub = get_tx(sig, helius_key, PUBLIC_RPC)
+        h_slot = h.get("slot") if h else None
+        p_slot = pub.get("slot") if pub else None
+        ws_slot = ev.get("slot")
+        ok = (h_slot == ws_slot) and (p_slot is None or p_slot == ws_slot)
+        all_ok = all_ok and ok
+        print(f"   slot из вебсокета={ws_slot} | Helius getTransaction={h_slot} | "
+              f"публичный узел={p_slot if p_slot is not None else 'не ответил'} -> "
+              f"{'СОВПАДАЕТ' if ok else 'РАСХОЖДЕНИЕ'}")
+        our_sig = enr.get("our_signature")
+        if not our_sig:
+            print("   наша покупка не сшита с этим событием -- our_slot/dbot_offset_slots сверять нечего")
+            continue
+        print(f"   наша покупка: https://solscan.io/tx/{our_sig}")
+        oh = get_tx(our_sig, helius_key)
+        op = get_tx(our_sig, helius_key, PUBLIC_RPC)
+        oh_slot = oh.get("slot") if oh else None
+        op_slot = op.get("slot") if op else None
+        rec_our = enr.get("our_slot")
+        ok2 = (oh_slot == rec_our) and (op_slot is None or op_slot == rec_our)
+        all_ok = all_ok and ok2
+        print(f"   our_slot записан={rec_our} | Helius={oh_slot} | "
+              f"публичный узел={op_slot if op_slot is not None else 'не ответил'} -> "
+              f"{'СОВПАДАЕТ' if ok2 else 'РАСХОЖДЕНИЕ'}")
+        rec_off = enr.get("dbot_offset_slots")
+        src_slot = enr.get("source_slot")
+        recomputed = (oh_slot - h_slot) if (isinstance(oh_slot, int) and isinstance(h_slot, int)) else None
+        ok3 = rec_off == recomputed
+        all_ok = all_ok and ok3
+        print(f"   dbot_offset_slots записан={rec_off} | пересчитан по свежим ответам "
+              f"({oh_slot} - {h_slot})={recomputed} -> {'СОВПАДАЕТ' if ok3 else 'РАСХОЖДЕНИЕ'}")
+        if src_slot is not None and src_slot != h_slot:
+            print(f"   ВНИМАНИЕ: source_slot в записи={src_slot}, а сейчас getTransaction даёт {h_slot}")
+    print(f"\nИТОГ САМОПРОВЕРКИ: {'все сверенные числа совпали' if all_ok else 'ЕСТЬ РАСХОЖДЕНИЯ -- смотри выше'}")
+    return all_ok
+
+
 # ---------- main ----------
 
 def check_only(helius_key: str, dbot_key: str) -> None:
@@ -884,10 +950,12 @@ def main() -> None:
     ap.add_argument("--check-only", action="store_true", help="показать источники/слот/часы и выйти")
     ap.add_argument("--report", action="store_true", help="отчёт по накопленным событиям и выйти")
     ap.add_argument("--enrich-now", action="store_true", help="один прогон обогащения и выйти")
+    ap.add_argument("--selfcheck", action="store_true",
+                    help="сверить 3 события с цепочкой у двух провайдеров и выйти")
     args = ap.parse_args()
     setup_logging()
 
-    if args.report:
+    if args.report and not args.selfcheck:
         print_report()
         return
 
@@ -898,6 +966,12 @@ def main() -> None:
     if args.check_only:
         check_only(helius_key, dbot_key)
         return
+    if args.selfcheck:
+        ok = self_check(helius_key)
+        if args.report:
+            print()
+            print_report()
+        sys.exit(0 if ok else 1)
     if args.enrich_now:
         ST.sources = fetch_sources(dbot_key)
         print("обогащено:", enrich_once(helius_key, dbot_key))
