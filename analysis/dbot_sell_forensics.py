@@ -164,6 +164,10 @@ def recent_prices(mint: str, slot_from: int, slot_to: int, wallet: str, key: str
 
 
 def jupiter_quote(mint: str, amount_raw: int, bps: int) -> dict:
+    """Причина отказа ЛОГИРУЕТСЯ. В первом прогоне я её проглотил, и
+    получилось бесполезное "оба хоста не ответили" -- нельзя было понять,
+    нет маршрута или просто не достучались."""
+    why: dict = {}
     for name, url in (("lite-api", "https://lite-api.jup.ag/swap/v1/quote"),
                       ("quote-api-v6", "https://quote-api.jup.ag/v6/quote")):
         try:
@@ -171,12 +175,15 @@ def jupiter_quote(mint: str, amount_raw: int, bps: int) -> dict:
                                            "amount": str(amount_raw), "slippageBps": str(bps),
                                            "restrictIntermediateTokens": "false"}, timeout=30)
         except Exception as exc:  # noqa: BLE001
+            why[name] = f"сеть: {type(exc).__name__}: {exc}"
             continue
         if r.status_code != 200:
+            why[name] = f"http={r.status_code}: {scrub(r.text[:400])}"
             continue
         try:
             b = r.json()
         except ValueError:
+            why[name] = "не JSON: " + scrub(r.text[:200])
             continue
         routes = [{"label": (rp.get("swapInfo") or {}).get("label"),
                    "in": (rp.get("swapInfo") or {}).get("inAmount"),
@@ -185,7 +192,34 @@ def jupiter_quote(mint: str, amount_raw: int, bps: int) -> dict:
         return {"хост": name, "outAmount": b.get("outAmount"),
                 "outAmount_SOL": (int(b["outAmount"]) / 1e9) if b.get("outAmount") else None,
                 "priceImpactPct": b.get("priceImpactPct"), "маршрут": routes}
-    return {"ответа_нет": "оба хоста Jupiter не ответили"}
+    return {"ответа_нет": why}
+
+
+def dexscreener_pairs(mint: str) -> dict:
+    """Все пары токена с ликвидностью. Отвечает на главный вопрос: был ли
+    пул глубже того, через который мы продали."""
+    url = f"https://api.dexscreener.com/latest/dex/tokens/{mint}"
+    try:
+        r = requests.get(url, timeout=30)
+    except Exception as exc:  # noqa: BLE001
+        return {"ошибка": f"сеть: {type(exc).__name__}: {exc}"}
+    if r.status_code != 200:
+        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}"}
+    try:
+        b = r.json()
+    except ValueError:
+        return {"ошибка": "не JSON"}
+    out = []
+    for pr in (b.get("pairs") or []):
+        out.append({"dex": pr.get("dexId"), "pair": pr.get("pairAddress"),
+                     "база": (pr.get("baseToken") or {}).get("symbol"),
+                     "котировка": (pr.get("quoteToken") or {}).get("symbol"),
+                     "ликвидность_usd": (pr.get("liquidity") or {}).get("usd"),
+                     "цена_usd": pr.get("priceUsd"),
+                     "объём_24ч_usd": (pr.get("volume") or {}).get("h24"),
+                     "создан": pr.get("pairCreatedAt")})
+    out.sort(key=lambda x: -(x.get("ликвидность_usd") or 0))
+    return {"пар": len(out), "пары": out}
 
 
 def main() -> None:
@@ -210,6 +244,10 @@ def main() -> None:
         log(f"сделок этого минта в {args.prior_blocks} блоках до нашей: {len(prior)}")
         for p in prior[-10:]:
             log("  " + json.dumps(p, ensure_ascii=False))
+
+    pairs = dexscreener_pairs(args.mint)
+    rep["все_пулы_dexscreener"] = pairs
+    log("ВСЕ ПУЛЫ ТОКЕНА: " + json.dumps(pairs, ensure_ascii=False)[:2000])
 
     quotes = []
     for t in [float(x) for x in args.quote_tokens.split(",") if x.strip()]:
