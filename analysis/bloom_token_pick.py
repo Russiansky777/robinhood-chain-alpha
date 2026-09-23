@@ -32,7 +32,14 @@ WSOL = "So11111111111111111111111111111111111111112"
 LAMPORT = 1_000_000_000
 РАЗМЕРЫ_SOL = (0.01, 0.05, 0.2)
 ПРЕДЕЛ_ВЛИЯНИЯ = 0.01          # 1% на 0.05 SOL -- уже неглубоко
-QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
+# Адреса котировщика перебираются по порядку: v6 на quote-api в прогоне
+# 23.09 не ответил вообще, и все кандидаты прошли проверку МИМО котировки.
+# Какой адрес сработал -- пишется в ответ, чтобы это не выяснялось снова
+# по отсутствию данных.
+QUOTE_URLS = ("https://lite-api.jup.ag/swap/v1/quote",
+              "https://quote-api.jup.ag/v6/quote",
+              "https://api.jup.ag/swap/v1/quote")
+QUOTE_URL = QUOTE_URLS[0]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "data" / "bloom_token_pick.json"
@@ -44,16 +51,25 @@ def котировка(минт: str, размер_sol: float, *, таймаут
     параметры = {"inputMint": WSOL, "outputMint": минт,
                  "amount": str(int(размер_sol * LAMPORT)),
                  "slippageBps": "100"}
-    try:
-        r = requests.get(QUOTE_URL, params=параметры, timeout=таймаут)
-    except Exception as exc:  # noqa: BLE001
-        return {"known": False, "why": f"{type(exc).__name__}: {str(exc)[:120]}"}
-    if not r.ok:
-        return {"known": False, "why": f"http {r.status_code}: {r.text[:160]}"}
-    try:
-        j = r.json() or {}
-    except ValueError:
-        return {"known": False, "why": "ответ не JSON"}
+    j, откуда, причины = None, None, []
+    for url in QUOTE_URLS:
+        try:
+            r = requests.get(url, params=параметры, timeout=таймаут)
+        except Exception as exc:  # noqa: BLE001
+            причины.append(f"{url}: {type(exc).__name__}: {str(exc)[:80]}")
+            continue
+        if not r.ok:
+            причины.append(f"{url}: http {r.status_code}: {r.text[:80]}")
+            continue
+        try:
+            j = r.json() or {}
+        except ValueError:
+            причины.append(f"{url}: ответ не JSON")
+            continue
+        откуда = url
+        break
+    if j is None:
+        return {"known": False, "why": "; ".join(причины)[:400]}
     план = j.get("routePlan") or []
     рынки = []
     for шаг in план:
@@ -66,7 +82,8 @@ def котировка(минт: str, размер_sol: float, *, таймаут
     except (TypeError, ValueError):
         влияние = None
     return {"known": True, "hops": len(план), "markets": рынки,
-            "price_impact": влияние, "out_amount": j.get("outAmount")}
+            "price_impact": влияние, "out_amount": j.get("outAmount"),
+            "quote_url": откуда}
 
 
 ПУЛЫ_URL = "https://api.geckoterminal.com/api/v2/networks/solana/pools"
@@ -156,8 +173,13 @@ def пулы_по_стороне(*, страниц: int = 4, запрос_fn=Non
                     return float(x or 0)
                 except (TypeError, ValueError):
                     return 0.0
+            # dex у GeckoTerminal лежит в relationships.dex.data.id, а не
+            # только в attributes: прогон 23.09 дал dex=None у всех пулов,
+            # и пункт 5 не нашёл кандидатов по этой причине, а не по сути.
+            dex = (атр.get("dex_id")
+                   or (((св.get("dex") or {}).get("data")) or {}).get("id"))
             запись = {"mint": минт, "pool_name": атр.get("name"),
-                      "dex": атр.get("dex_id"),
+                      "dex": dex,
                       "reserve_usd": число(атр.get("reserve_in_usd")),
                       "volume_24h_usd": число((атр.get("volume_usd") or {}).get("h24")),
                       "quote": котир_минт}
@@ -188,7 +210,8 @@ def классы(*, страниц: int = 4, на_класс: int = 3, helius=No
     итог = {"pools": {"to_sol": len(пулы["to_sol"]), "to_usdc": len(пулы["to_usdc"]),
                       "failures": пулы["failures"], "source": пулы["source"]},
             "item3_taxed_direct_sol": [], "item5_raydium_meteora_direct": [],
-            "item6_usdc_only": [], "checked": 0, "notes": []}
+            "item6_usdc_only": [], "checked": 0, "notes": [],
+            "quote_failed": [], "seen": []}
 
     # --- п. 3 и п. 5: кандидаты с прямым пулом к SOL, по резерву вниз
     к_sol = sorted(пулы["to_sol"].values(), key=lambda x: -x["reserve_usd"])
@@ -204,6 +227,9 @@ def классы(*, страниц: int = 4, на_класс: int = 3, helius=No
         if пауза_с:
             time.sleep(пауза_с)
         итог["checked"] += 1
+        if not к.get("known"):
+            итог["quote_failed"].append({"mint": п["mint"], "why": к.get("why")})
+            continue
         прямой = к.get("hops") == 1
         запись = dict(п)
         запись.update({"hops": к.get("hops"), "price_impact": к.get("price_impact"),
@@ -213,6 +239,10 @@ def классы(*, страниц: int = 4, на_класс: int = 3, helius=No
                        "token_program": (налог_минта_итог or {}).get("token_program"),
                        "fee_bps": (налог_минта_итог or {}).get("fee_bps"),
                        "taxed": (налог_минта_итог or {}).get("taxed")})
+        итог["seen"].append({k: запись.get(k) for k in
+                             ("mint", "dex", "hops", "price_impact",
+                              "token_program", "fee_bps", "reserve_usd",
+                              "volume_24h_usd")})
         if (прямой and запись.get("token_program") == TOKEN_2022
                 and (запись.get("fee_bps") or 0) > 0
                 and len(итог["item3_taxed_direct_sol"]) < на_класс):
@@ -235,6 +265,13 @@ def классы(*, страниц: int = 4, на_класс: int = 3, helius=No
         if пауза_с:
             time.sleep(пауза_с)
         итог["checked"] += 1
+        # Отсутствие котировки -- НЕ признак многохопового маршрута.
+        # В прогоне 23.09 котировщик не ответил ни разу, hops вышли None,
+        # и кандидаты прошли проверку МИМО неё: "нет данных" сработало как
+        # "всё хорошо". Теперь без котировки кандидат не классифицируется.
+        if not к.get("known"):
+            итог["quote_failed"].append({"mint": п["mint"], "why": к.get("why")})
+            continue
         # Маршрут в один хоп означал бы, что прямой пул к SOL всё-таки
         # есть -- просто его не было на просмотренных страницах. Такой
         # кандидат пункту 6 не годится, и молча брать его нельзя.
@@ -244,6 +281,11 @@ def классы(*, страниц: int = 4, на_класс: int = 3, helius=No
                                         "price_impact": к.get("price_impact"),
                                         "quote_known": к.get("known"),
                                         "markets": (к.get("markets") or [])[:3]})
+    if итог["quote_failed"] and len(итог["quote_failed"]) >= итог["checked"]:
+        итог["notes"].append(
+            "котировщик не ответил НИ РАЗУ: ни один кандидат не проверен "
+            f"маршрутом. Причина первого отказа: "
+            f"{(итог['quote_failed'][0] or {}).get('why')}")
     for имя, ключ in (("п. 3 (Token-2022 с налогом, прямой пул к SOL)",
                        "item3_taxed_direct_sol"),
                       ("п. 5 (Raydium/Meteora, прямой пул к SOL)",
@@ -480,6 +522,47 @@ def self_test() -> int:
     chk("п. 6: токен, у которого есть и пул к SOL, отброшен",
         "USDC_НО_ЕСТЬ_SOL" not in п6, п6)
     chk("п. 6: мелкий USDC-пул отброшен", "МЕЛКИЙ_USDC" not in п6, п6)
+    # Отказ котировщика НЕ должен пропускать кандидата в класс: именно так
+    # прогон 23.09 набрал три кандидата пункта 6, не проверив ни одного.
+    def котировка_молчит(минт, размер):
+        return {"known": False, "why": "http 410"}
+
+    кл_молч = классы(страниц=1, на_класс=3, helius=НалогиКлассов(),
+                     котировка_fn=котировка_молчит, запрос_fn=страница_классов,
+                     пауза_с=0)
+    chk("без котировки ни один класс не заполняется",
+        not кл_молч["item3_taxed_direct_sol"]
+        and not кл_молч["item5_raydium_meteora_direct"]
+        and not кл_молч["item6_usdc_only"],
+        (кл_молч["item3_taxed_direct_sol"], кл_молч["item6_usdc_only"]))
+    chk("отказы котировщика перечислены",
+        len(кл_молч["quote_failed"]) > 0, кл_молч["quote_failed"])
+    chk("и сказано, что котировщик не ответил ни разу",
+        any("НИ РАЗУ" in n for n in кл_молч["notes"]), кл_молч["notes"])
+
+    # dex из relationships тоже читается
+    def страница_dex(n):
+        if n != 1:
+            return {"known": True, "data": []}
+        return {"known": True, "data": [{
+            "attributes": {"name": "R / SOL", "reserve_in_usd": "500000",
+                            "volume_usd": {"h24": "90000"}},
+            "relationships": {
+                "base_token": {"data": {"id": f"solana_DEX_ИЗ_СВЯЗЕЙ"}},
+                "quote_token": {"data": {"id": f"solana_{WSOL}"}},
+                "dex": {"data": {"id": "raydium"}}}}]}
+
+    def котировка_прямая(минт, размер):
+        return {"known": True, "hops": 1, "price_impact": 0.001,
+                "markets": [{"label": "Raydium"}], "out_amount": "1"}
+
+    кл_dex = классы(страниц=1, на_класс=1, helius=НалогиКлассов(),
+                    котировка_fn=котировка_прямая, запрос_fn=страница_dex,
+                    пауза_с=0)
+    chk("dex читается из relationships, когда в attributes его нет",
+        [x["mint"] for x in кл_dex["item5_raydium_meteora_direct"]] == ["DEX_ИЗ_СВЯЗЕЙ"],
+        кл_dex["item5_raydium_meteora_direct"])
+
     chk("отказ страницы пулов назван, а не проглочен",
         классы(страниц=1, на_класс=1,
                котировка_fn=котировка_классов,
