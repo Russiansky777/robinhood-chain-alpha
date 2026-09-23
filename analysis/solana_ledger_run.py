@@ -1418,14 +1418,27 @@ def main() -> None:
         create_ats = [r.get("createAt") for r in follow_trades_by_task.get(tid, []) if r.get("createAt")]
         latest_ms = max(create_ats) if create_ats else None
         age_h = round((now_ms - latest_ms) / 3600000, 2) if latest_ms else None
+        # Задача на ПАУЗЕ обязана устаревать: новых записей у неё и не
+        # должно быть. Без этой развилки пауза части задач превратилась бы
+        # в постоянную ложную тревогу о протухшем учёте.
+        enabled = bool(task.get("enabled"))
         freshness.append({
             "task_id": tid, "task_name": task.get("name"),
+            "enabled": enabled,
             "latest_record_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest_ms / 1000)) if latest_ms else None,
             "hours_since_latest_record": age_h,
-            "stale_gt_6h": bool(age_h is not None and age_h > FOLLOW_TRADES_FRESHNESS_WINDOW_H),
+            "stale_gt_6h": bool(enabled and age_h is not None
+                                 and age_h > FOLLOW_TRADES_FRESHNESS_WINDOW_H),
+            "устарела_но_на_паузе": bool(not enabled and age_h is not None
+                                          and age_h > FOLLOW_TRADES_FRESHNESS_WINDOW_H),
             "fetch_incomplete_this_run": tid in incomplete_fetch_tasks,
         })
     status["follow_trades_freshness"] = freshness
+    status["задач_всего"] = len(freshness)
+    status["задач_включено"] = sum(1 for f in freshness if f["enabled"])
+    status["устаревших_среди_включённых"] = sum(1 for f in freshness if f["stale_gt_6h"])
+    status["на_паузе_и_потому_устарели"] = sum(1 for f in freshness
+                                                if f["устарела_но_на_паузе"])
 
     print("[ledger] B: синхронизация цепочки по кошелькам задач...", flush=True)
     chain_cache = load_json(CHAIN_CACHE_PATH, {})
@@ -1552,6 +1565,19 @@ def self_test() -> None:
     for name, ok, got in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}" + (f"  -> {got}" if got and not ok else ""))
         bad += (not ok)
+    # Пауза задач не должна выглядеть протухшим учётом.
+    def свежесть(enabled, age_h, окно=FOLLOW_TRADES_FRESHNESS_WINDOW_H):
+        return {"stale_gt_6h": bool(enabled and age_h is not None and age_h > окно),
+                "устарела_но_на_паузе": bool(not enabled and age_h is not None and age_h > окно)}
+    chk("включённая и протухшая -- тревога",
+        свежесть(True, 9)["stale_gt_6h"] is True)
+    chk("выключенная и протухшая -- не тревога, а пауза",
+        свежесть(False, 9)["stale_gt_6h"] is False
+        and свежесть(False, 9)["устарела_но_на_паузе"] is True)
+    chk("свежая включённая -- ни то, ни другое",
+        свежесть(True, 1)["stale_gt_6h"] is False
+        and свежесть(True, 1)["устарела_но_на_паузе"] is False)
+
     print(f"самопроверка учёта: {len(checks) - bad}/{len(checks)} пройдено")
     if bad:
         raise SystemExit(f"самопроверка не пройдена: {bad} из {len(checks)}")
