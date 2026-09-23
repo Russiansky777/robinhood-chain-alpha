@@ -43,6 +43,7 @@ E. Контроль перед выдачей -- 3 пилотных сделки
    data/solana_dbot_realized_ledger.json (SOL вход/выход), допуск 0.001."""
 from __future__ import annotations
 
+import calendar
 import concurrent.futures as cf
 import json
 import os
@@ -90,6 +91,33 @@ RESCUE_WALLET_ADDRESS = (os.environ.get("RESCUE_WALLET_ADDRESS") or "").strip() 
 TRADEWIZ_WALLET = "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
 TRADEWIZ_FROM_TS = 1790123400  # 2026-09-23T00:30:00Z
 TRADEWIZ_LABEL = "tradewiz"
+# Метки чужих исполнителей: их сделки не наши, в итоги задач DBot и в
+# статистику источников они не идут, но выносятся отдельной строкой --
+# иначе сверка баланса кошелька развалилась бы на ровном месте.
+ЧУЖИЕ_БОТЫ = ("tradewiz", "bloom")
+# С 23.09 15:42Z TradeWiz выключен, и с ТОГО ЖЕ кошелька BATCH-8 работает
+# исполнитель Bloom. Без этой границы каждая сделка Bloom получала бы метку
+# tradewiz и вылетала бы из итогов задач и статистики источников -- то есть
+# результат Bloom молча приписывался бы выключенному боту.
+# Точное время старта Bloom уточняется владельцем; по умолчанию берётся
+# начало эксперимента с комиссиями. Переопределяется BLOOM_FROM_UTC.
+BLOOM_WALLET = TRADEWIZ_WALLET
+BLOOM_LABEL = "bloom"
+
+
+def _ts_from_env(name: str, default_ts: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default_ts
+    try:
+        return calendar.timegm(time.strptime(raw, "%Y-%m-%dT%H:%M:%SZ"))
+    except ValueError:
+        print(f"[ledger] ВНИМАНИЕ: {name}={raw!r} не разобрано как UTC-метка "
+              f"вида 2026-09-23T15:42:00Z -- беру значение по умолчанию")
+        return default_ts
+
+
+BLOOM_FROM_TS = _ts_from_env("BLOOM_FROM_UTC", 1790178120)  # 2026-09-23T15:42:00Z
 DBOT_LABEL = "dbot"
 UNKNOWN_BOT_LABEL = "неизвестен"
 
@@ -852,16 +880,21 @@ def classify_external_flow(v: dict):
 
 
 def classify_bot(wallet: str, buy_block_time, has_dbot_record: bool) -> str:
-    """Чей это бот: DBot, TradeWiz или неизвестно.
+    """Чей это бот: DBot, Bloom, TradeWiz или неизвестно.
 
     Запись DBot -- решающее доказательство: она есть только у наших сделок.
-    TradeWiz ставим лишь там, где владелец его и запускал (кошелёк BATCH-8
-    начиная с 23.09 00:30Z) И записи DBot нет. Всё остальное без записи --
-    честно "неизвестен", а не догадка в пользу удобного ответа.
+    Кошелёк BATCH-8 один, а ботов на нём было два подряд: TradeWiz с
+    23.09 00:30Z до 15:42Z и Bloom с 15:42Z. Поэтому окно TradeWiz
+    ЗАКРЫТО сверху: без этого сделки Bloom получали бы чужую метку и
+    вылетали из итогов. Всё остальное без записи DBot -- честно
+    "неизвестен", а не догадка в пользу удобного ответа.
     """
     if has_dbot_record:
         return DBOT_LABEL
-    if wallet == TRADEWIZ_WALLET and buy_block_time is not None and buy_block_time >= TRADEWIZ_FROM_TS:
+    if wallet == BLOOM_WALLET and buy_block_time is not None and buy_block_time >= BLOOM_FROM_TS:
+        return BLOOM_LABEL
+    if (wallet == TRADEWIZ_WALLET and buy_block_time is not None
+            and TRADEWIZ_FROM_TS <= buy_block_time < BLOOM_FROM_TS):
         return TRADEWIZ_LABEL
     return UNKNOWN_BOT_LABEL
 
@@ -1055,9 +1088,10 @@ def build_source_stats(trades_all: list[dict]) -> list[dict]:
     # а не отбрасываем.
     by_key: dict = {}
     for t in trades_all:
-        # Сделки чужого бота (TradeWiz) в статистику ИСТОЧНИКОВ DBot не идут:
-        # источник ему назначали не мы, и приписывать их нашим сигналам нельзя.
-        if t.get("bot") == TRADEWIZ_LABEL:
+        # Сделки чужого бота (TradeWiz, Bloom) в статистику ИСТОЧНИКОВ DBot
+        # не идут: источник им назначали не мы, и приписывать их нашим
+        # сигналам нельзя.
+        if t.get("bot") in ЧУЖИЕ_БОТЫ:
             continue
         key = (t["task_id"], t.get("source_address"))
         by_key.setdefault(key, {"task_id": t["task_id"], "task_name": t.get("task_name"),
@@ -1211,23 +1245,31 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
         # выбрасываются -- выносятся отдельным блоком, чтобы было видно и
         # сколько их, и на сколько SOL они двигают баланс кошелька (иначе
         # сверка баланса развалилась бы на ровном месте).
-        foreign = [t for t in all_task_trades if t.get("bot") == TRADEWIZ_LABEL]
-        task_trades = [t for t in all_task_trades if t.get("bot") != TRADEWIZ_LABEL]
+        foreign = [t for t in all_task_trades if t.get("bot") in ЧУЖИЕ_БОТЫ]
+        task_trades = [t for t in all_task_trades if t.get("bot") not in ЧУЖИЕ_БОТЫ]
         n_trades = sum(1 for t in task_trades if t["status"] == "закрыта")
         net_sum = sum(t["net_sol"] for t in task_trades if t.get("net_sol") is not None)
         n_open = sum(1 for t in task_trades if t["status"] == "незакрыта")
         n_hung = sum(1 for t in task_trades if t.get("is_hung"))
         n_no_source = sum(1 for t in task_trades if t["status"] in ("закрыта", "незакрыта") and not t.get("source_address"))
         foreign_net = sum(t["net_sol"] for t in foreign if t.get("net_sol") is not None)
+        боты = sorted({t.get("bot") for t in foreign})
         foreign_row = {
-            "бот": TRADEWIZ_LABEL,
+            "бот": боты[0] if len(боты) == 1 else боты,
             "учтено_в_итогах_задачи": False,
-            "с_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(TRADEWIZ_FROM_TS)),
+            "окна_utc": {
+                TRADEWIZ_LABEL: (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(TRADEWIZ_FROM_TS))
+                                  + " -- " + time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                            time.gmtime(BLOOM_FROM_TS))),
+                BLOOM_LABEL: "с " + time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                   time.gmtime(BLOOM_FROM_TS)),
+            },
             "n_сделок": len(foreign),
+            "по_ботам": {b: sum(1 for t in foreign if t.get("bot") == b) for b in боты},
             "n_закрытых": sum(1 for t in foreign if t["status"] == "закрыта"),
             "n_незакрытых": sum(1 for t in foreign if t["status"] == "незакрыта"),
             "net_sol_sum": round(foreign_net, 6),
-            "признак": "сделка на кошельке BATCH-8 после отсечки без подтверждающей записи DBot",
+            "признак": "сделка на кошельке BATCH-8 в окне чужого бота без подтверждающей записи DBot",
         } if foreign else None
 
         recon = build_wallet_reconciliation(wallet, chain_cache)
@@ -1577,6 +1619,23 @@ def self_test() -> None:
     chk("свежая включённая -- ни то, ни другое",
         свежесть(True, 1)["stale_gt_6h"] is False
         and свежесть(True, 1)["устарела_но_на_паузе"] is False)
+    # Кошелёк BATCH-8 один, ботов на нём два подряд: метка не должна врать.
+    chk("сделка Bloom не получает метку TradeWiz",
+        classify_bot(BLOOM_WALLET, BLOOM_FROM_TS + 60, False) == BLOOM_LABEL)
+    chk("сделка TradeWiz до старта Bloom остаётся TradeWiz",
+        classify_bot(TRADEWIZ_WALLET, BLOOM_FROM_TS - 60, False) == TRADEWIZ_LABEL)
+    chk("ровно в момент старта Bloom метка уже Bloom",
+        classify_bot(BLOOM_WALLET, BLOOM_FROM_TS, False) == BLOOM_LABEL)
+    chk("до окна TradeWiz -- неизвестен, а не догадка",
+        classify_bot(TRADEWIZ_WALLET, TRADEWIZ_FROM_TS - 1, False) == UNKNOWN_BOT_LABEL)
+    chk("запись DBot перевешивает любую границу по времени",
+        classify_bot(BLOOM_WALLET, BLOOM_FROM_TS + 60, True) == DBOT_LABEL)
+    chk("чужой кошелёк меток по времени не получает",
+        classify_bot("ДРУГОЙ", BLOOM_FROM_TS + 60, False) == UNKNOWN_BOT_LABEL)
+    chk("Bloom тоже считается чужим и в итоги задачи не идёт",
+        BLOOM_LABEL in ЧУЖИЕ_БОТЫ and TRADEWIZ_LABEL in ЧУЖИЕ_БОТЫ)
+
+
 
     print(f"самопроверка учёта: {len(checks) - bad}/{len(checks)} пройдено")
     if bad:
