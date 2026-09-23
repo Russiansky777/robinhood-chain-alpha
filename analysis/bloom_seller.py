@@ -164,7 +164,7 @@ def rpc_call(method: str, params: list, *, timeout: int = 20) -> dict:
             последняя = scrub_all(f"RPC error: {str(body['error'])[:200]}")
             continue
         return {"ok": True, "result": body.get("result")}
-    return {"ok": False, "почему": последняя}
+    return {"ok": False, "why_not": последняя}
 
 
 def token_balance_raw(wallet: str, mint: str) -> dict:
@@ -182,7 +182,7 @@ def token_balance_raw(wallet: str, mint: str) -> dict:
                       [wallet, {"mint": mint, "programId": prog},
                        {"encoding": "jsonParsed"}])
         if not r.get("ok"):
-            сбои.append({"программа": prog, "почему": r.get("почему")})
+            сбои.append({"program": prog, "why_not": r.get("why_not")})
             continue
         for it in ((r.get("result") or {}).get("value") or []):
             info = ((((it.get("account") or {}).get("data") or {}).get("parsed") or {})
@@ -195,9 +195,9 @@ def token_balance_raw(wallet: str, mint: str) -> dict:
             ui += float(amt.get("uiAmount") or 0.0)
             счетов += 1
     if сбои and счетов == 0:
-        return {"ok": False, "сбои": сбои,
-                 "почему": "остаток не прочитан ни по одной программе токена"}
-    return {"ok": True, "raw": сумма, "ui": ui, "счетов": счетов, "сбои": сбои}
+        return {"ok": False, "failures": сбои,
+                 "why_not": "остаток не прочитан ни по одной программе токена"}
+    return {"ok": True, "raw": сумма, "ui": ui, "accounts": счетов, "failures": сбои}
 
 
 def kill_sell_active() -> tuple[bool, str]:
@@ -221,14 +221,14 @@ def telegram(text: str) -> dict:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not token or not chat:
-        return {"ok": False, "почему": "телеграм не настроен -- только журнал"}
+        return {"ok": False, "why_not": "телеграм не настроен -- только журнал"}
     try:
         r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
                            json={"chat_id": chat, "text": text[:3500],
                                  "disable_web_page_preview": True}, timeout=15)
-        return {"ok": r.status_code == 200, "код": r.status_code}
+        return {"ok": r.status_code == 200, "code": r.status_code}
     except requests.RequestException as exc:
-        return {"ok": False, "почему": scrub_all(f"{type(exc).__name__}: {exc}")}
+        return {"ok": False, "why_not": scrub_all(f"{type(exc).__name__}: {exc}")}
 
 
 def due_for_watch(pos: dict, *, grace_s: float, now: float | None = None) -> bool:
@@ -286,20 +286,20 @@ class Seller:
         now = now if now is not None else time.time()
         cid = pos.get("client_order_id")
         mint = pos.get("mint")
-        итог = {"client_order_id": cid, "mint": mint, "state_было": pos.get("state")}
+        итог = {"client_order_id": cid, "mint": mint, "state_before": pos.get("state")}
 
         if not due_for_watch(pos, grace_s=self.grace_s, now=now):
-            итог["действие"] = "ждём срок таймерного ордера"
+            итог["action"] = "ждём срок таймерного ордера"
             return итог
 
         # Баланс по цепи ПЕРЕД любым действием.
         bal = balance_reader(EXECUTOR_WALLET, mint)
         if not bal.get("ok"):
-            итог.update(действие="остаток не прочитан -- ничего не делаем",
-                         почему=bal.get("почему"))
+            итог.update(action="остаток не прочитан -- ничего не делаем",
+                         why_not=bal.get("why_not"))
             return итог
-        итог["остаток_raw"] = bal.get("raw")
-        итог["остаток_ui"] = bal.get("ui")
+        итог["balance_raw"] = bal.get("raw")
+        итог["balance_ui"] = bal.get("ui")
 
         if int(bal.get("raw") or 0) <= 0:
             # Два нуля подряд перед закрытием: одиночный ноль бывает гонкой
@@ -309,10 +309,10 @@ class Seller:
                 self.state.update_position(cid, state=STATE_CLOSED, zero_streak=серия,
                                             closed_reason="остаток ноль дважды подряд")
                 self.state.note_sell_outcome(sold=True)
-                итог.update(действие="позиция закрыта", zero_streak=серия)
+                итог.update(action="позиция закрыта", zero_streak=серия)
             else:
                 self.state.update_position(cid, zero_streak=серия)
-                итог.update(действие="ноль первый раз -- ещё не закрываю",
+                итог.update(action="ноль первый раз -- ещё не закрываю",
                              zero_streak=серия)
             return итог
 
@@ -323,12 +323,12 @@ class Seller:
                 cid, state=STATE_CLOSED,
                 closed_reason=(f"крошка: остаток {bal.get('raw')} сырых единиц меньше "
                                 f"порога {self.dust_raw}, продавать нечего"))
-            итог.update(действие="закрыта как крошка")
+            итог.update(action="закрыта как крошка")
             return итог
 
         убит, почему = kill_sell_active()
         if убит:
-            итог.update(действие="продажа запрещена рубильником продаж", почему=почему)
+            итог.update(action="продажа запрещена рубильником продаж", why_not=почему)
             self.log(итог)
             return итог
 
@@ -344,14 +344,14 @@ class Seller:
                           f"остаток {bal.get('ui')} ({bal.get('raw')} сырых)\n"
                           f"попыток {pos.get('sell_attempts', 0)}\n"
                           f"продать руками через Phantom/Jupiter")
-                self.log({**итог, "действие": "UNSOLD, доклад владельцу",
-                           "телеграм": telegram(текст)})
-            итог["действие"] = "UNSOLD -- ждём владельца"
+                self.log({**итог, "action": "UNSOLD, доклад владельцу",
+                           "telegram": telegram(текст)})
+            итог["action"] = "UNSOLD -- ждём владельца"
             return итог
 
         последняя = pos.get("ts_last_sell_attempt")
         if последняя and (now - float(последняя)) < self.retry_every_s:
-            итог["действие"] = (f"пауза между попытками: прошло "
+            итог["action"] = (f"пауза между попытками: прошло "
                                  f"{now - float(последняя):.0f} с из "
                                  f"{self.retry_every_s:.0f}")
             return итог
@@ -372,11 +372,11 @@ class Seller:
         if res.get("signatures"):
             поля["last_sell_signatures"] = res["signatures"]
         if not res.get("ok"):
-            поля["last_sell_error"] = res.get("код_ошибки") or res.get("почему")
+            поля["last_sell_error"] = res.get("error_code") or res.get("why_not")
         self.state.update_position(cid, **поля)
-        итог.update(действие=("продажа отправлена" if res.get("ok")
+        итог.update(action=("продажа отправлена" if res.get("ok")
                                else "продажа не принята"),
-                     попытка=попытка, режим="dry-run" if self.api.dry_run else "live",
+                     attempt=попытка, mode="dry-run" if self.api.dry_run else "live",
                      ответ={k: res.get(k) for k in
                              ("ok", "код", "код_ошибки", "order_id", "signatures",
                               "rate_limited", "retry_after_s", "dry_run")})
@@ -400,22 +400,25 @@ class Seller:
         куп_включён, _ = self.state.kill_active()
         прод_доступен, прод_поч = self.state.kill_readable(kill_sell_file())
         прод_включён, _ = kill_sell_active()
+        from bloom_exec_state import (  # noqa: PLC0415
+            SCHEMA_VERSION, SCHEMA_VERSION_KEY)
         atomic_write_json(self.state.base / "seller_heartbeat.json", {
-            "обновлено_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "обновлено_ts": time.time(),
-            "режим": "live" if self.live else "dry-run",
-            "позиций_в_круге": итог.get("позиций"),
-            "проскальзывание_pct": self.slippage,
-            "запас_после_срока_с": self.grace_s,
-            "потолок_ожидания_с": self.give_up_after_s,
-            "рубильник_покупок": {"путь": str(self.state.kill_path),
-                                   "доступен": куп_доступен, "включён": куп_включён,
-                                   "пояснение": куп_поч},
-            "учёт_кредитов_пишется": _УЧЁТ_ПИШЕТСЯ,
-            "учёт_кредитов_почему": _УЧЁТ_ПОЧЕМУ,
-            "рубильник_продаж": {"путь": str(kill_sell_file()),
-                                  "доступен": прод_доступен, "включён": прод_включён,
-                                  "пояснение": прод_поч},
+            SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+            "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "updated_ts": time.time(),
+            "mode": "live" if self.live else "dry-run",
+            "positions_in_cycle": итог.get("positions"),
+            "slippage_pct": self.slippage,
+            "grace_s": self.grace_s,
+            "give_up_after_s": self.give_up_after_s,
+            "kill_buy": {"path": str(self.state.kill_path),
+                                   "readable": куп_доступен, "active": куп_включён,
+                                   "note": куп_поч},
+            "credits_logged": _УЧЁТ_ПИШЕТСЯ,
+            "credits_log_error": _УЧЁТ_ПОЧЕМУ,
+            "kill_sell": {"path": str(kill_sell_file()),
+                                  "readable": прод_доступен, "active": прод_включён,
+                                  "note": прод_поч},
         })
 
     def cycle(self, *, now: float | None = None, balance_reader=token_balance_raw) -> dict:
@@ -423,8 +426,8 @@ class Seller:
         открытые = self.state.open_positions()
         строки = [self.handle(p, now=now, balance_reader=balance_reader)
                   for p in открытые]
-        итог = {"позиций": len(открытые), "режим": "live" if self.live else "dry-run",
-                 "строки": строки}
+        итог = {"positions": len(открытые), "mode": "live" if self.live else "dry-run",
+                 "rows": строки}
         self.heartbeat(итог)
         return итог
 
@@ -436,17 +439,17 @@ class Seller:
             план.append({
                 "client_order_id": p.get("client_order_id"), "mint": p.get("mint"),
                 "state": p.get("state"),
-                "остаток_raw": bal.get("raw") if bal.get("ok") else None,
-                "остаток_прочитан": bool(bal.get("ok")),
-                "пора_смотреть": due_for_watch(p, grace_s=self.grace_s),
-                "продал_бы": bool(bal.get("ok") and int(bal.get("raw") or 0) >= self.dust_raw
+                "balance_raw": bal.get("raw") if bal.get("ok") else None,
+                "balance_read": bool(bal.get("ok")),
+                "due": due_for_watch(p, grace_s=self.grace_s),
+                "would_sell": bool(bal.get("ok") and int(bal.get("raw") or 0) >= self.dust_raw
                                    and due_for_watch(p, grace_s=self.grace_s)),
-                "чем": f"/swap Sell 100 % slippage {self.slippage} auto_orders []",
+                "with_what": f"/swap Sell 100 % slippage {self.slippage} auto_orders []",
             })
-        return {"режим": "live" if self.live else "dry-run",
-                 "рубильник_покупок": self.state.kill_active(),
-                 "рубильник_продаж": kill_sell_active(),
-                 "план": план}
+        return {"mode": "live" if self.live else "dry-run",
+                 "kill_buy": self.state.kill_active(),
+                 "kill_sell": kill_sell_active(),
+                 "plan": план}
 
 
 def self_test() -> None:
@@ -518,13 +521,13 @@ def self_test() -> None:
 
     def читатель(raw):
         def f(wallet, mint):
-            return {"ok": True, "raw": raw, "ui": raw / 1e6, "счетов": 1, "сбои": []}
+            return {"ok": True, "raw": raw, "ui": raw / 1e6, "accounts": 1, "failures": []}
         return f
 
     r = s.handle(st.positions()["p1"], balance_reader=читатель(0))
-    chk("первый ноль -- позиция не закрывается", r["действие"].startswith("ноль первый"))
+    chk("первый ноль -- позиция не закрывается", r["action"].startswith("ноль первый"))
     r = s.handle(st.positions()["p1"], balance_reader=читатель(0))
-    chk("второй ноль подряд -- закрывается", r["действие"] == "позиция закрыта")
+    chk("второй ноль подряд -- закрывается", r["action"] == "позиция закрыта")
     chk("и в журнале она уже не открыта", st.open_positions() == [])
     chk("удачная продажа снимает серию непроданных",
         int(st.counters().get("unsold_streak", 0)) == 0)
@@ -534,34 +537,34 @@ def self_test() -> None:
                      mode="dry-run", sell_after_s=28.8)
     st.update_position("p2", state="bought", ts_accepted=time.time() - 100)
     r = s.handle(st.positions()["p2"], balance_reader=читатель(500))
-    chk("крошка не продаётся, а закрывается", r["действие"] == "закрыта как крошка")
+    chk("крошка не продаётся, а закрывается", r["action"] == "закрыта как крошка")
 
     st.write_intent(client_order_id="p3", mint="MINT3", source_sig="S3", source_slot=3,
                      sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
                      mode="dry-run", sell_after_s=28.8)
     st.update_position("p3", state="bought", ts_accepted=time.time() - 100)
     r = s.handle(st.positions()["p3"], balance_reader=читатель(5_000_000))
-    chk("настоящий остаток -- продажа отправлена", r["действие"] == "продажа отправлена")
-    chk("и это dry-run, без сети", r["режим"] == "dry-run")
+    chk("настоящий остаток -- продажа отправлена", r["action"] == "продажа отправлена")
+    chk("и это dry-run, без сети", r["mode"] == "dry-run")
     chk("попытка посчитана", st.positions()["p3"]["sell_attempts"] == 1)
     r = s.handle(st.positions()["p3"], balance_reader=читатель(5_000_000))
     chk("сразу вторая попытка не делается -- держим паузу 45 с",
-        r["действие"].startswith("пауза между попытками"), r["действие"])
+        r["action"].startswith("пауза между попытками"), r["action"])
 
     # --- не читается остаток -- ничего не делаем
     def нечитаемый(wallet, mint):
-        return {"ok": False, "почему": "узел молчит"}
+        return {"ok": False, "why_not": "узел молчит"}
 
     r = s.handle(st.positions()["p3"], balance_reader=нечитаемый)
     chk("остаток не прочитан -- продажи нет",
-        r["действие"].startswith("остаток не прочитан"))
+        r["action"].startswith("остаток не прочитан"))
 
     # --- сдача и доклад
     st.update_position("p3", ts_first_sell_attempt=time.time() - 601,
                         ts_last_sell_attempt=time.time() - 601)
     r = s.handle(st.positions()["p3"], balance_reader=читатель(5_000_000))
     chk("через 10 минут позиция помечена UNSOLD",
-        st.positions()["p3"]["state"] == "unsold", r["действие"])
+        st.positions()["p3"]["state"] == "unsold", r["action"])
     chk("и серия непроданных выросла",
         int(st.counters().get("unsold_streak", 0)) == 1)
 
@@ -581,35 +584,39 @@ def self_test() -> None:
     chk("круг пишет признак жизни", hb.exists() and not было or hb.exists())
     hb_data = json.loads(hb.read_text())
     chk("в признаке жизни есть время и режим",
-        "обновлено_ts" in hb_data and hb_data["режим"] == "dry-run", str(hb_data)[:120])
+        "updated_ts" in hb_data and hb_data["mode"] == "dry-run", str(hb_data)[:120])
+    chk("в признаке жизни есть версия формата", hb_data.get("schema_version") == 2,
+        hb_data.get("schema_version"))
+    chk("все ключи признака жизни латинские",
+        all(k.isascii() for k in hb_data), [k for k in hb_data if not k.isascii()])
 
     # --- check-only ничего не меняет
     до = st.positions_path.stat().st_size
     план = s.check_only(balance_reader=читатель(5_000_000))
-    chk("check-only даёт план", isinstance(план.get("план"), list))
+    chk("check-only даёт план", isinstance(план.get("plan"), list))
     chk("и ничего не пишет в журнал позиций",
         st.positions_path.stat().st_size == до)
 
     chk("в признаке жизни есть оба рубильника",
-        "рубильник_покупок" in hb_data and "рубильник_продаж" in hb_data, list(hb_data))
+        "kill_buy" in hb_data and "kill_sell" in hb_data, list(hb_data))
     chk("и отдельно сказано, читаются ли они",
-        hb_data["рубильник_покупок"].get("доступен") is True
-        and hb_data["рубильник_продаж"].get("доступен") is True, hb_data)
+        hb_data["kill_buy"].get("readable") is True
+        and hb_data["kill_sell"].get("readable") is True, hb_data)
     chk("и что оба выключены",
-        not hb_data["рубильник_покупок"]["включён"]
-        and not hb_data["рубильник_продаж"]["включён"], hb_data)
+        not hb_data["kill_buy"]["active"]
+        and not hb_data["kill_sell"]["active"], hb_data)
 
     # нечитаемый рубильник продаж не должен выглядеть как тишина
     было_ks = os.environ.get("BLOOM_KILL_SELL_FILE")
     os.environ["BLOOM_KILL_SELL_FILE"] = str(st.base / "нет_каталога" / "KILL_SELL")
     try:
-        s.heartbeat({"позиций": 0})
+        s.heartbeat({"positions": 0})
         hb3 = json.loads(hb.read_text())
         chk("нечитаемый рубильник продаж помечен недоступным",
-            hb3["рубильник_продаж"]["доступен"] is False, hb3["рубильник_продаж"])
+            hb3["kill_sell"]["readable"] is False, hb3["kill_sell"])
         chk("и причина названа словами",
-            "не существует" in hb3["рубильник_продаж"]["пояснение"],
-            hb3["рубильник_продаж"]["пояснение"])
+            "не существует" in hb3["kill_sell"]["note"],
+            hb3["kill_sell"]["note"])
     finally:
         if было_ks is None:
             os.environ.pop("BLOOM_KILL_SELL_FILE", None)
@@ -650,7 +657,7 @@ def main() -> None:
         начало = time.monotonic()
         try:
             итог = s.cycle()
-            if итог["позиций"]:
+            if итог["positions"]:
                 print(json.dumps(итог, ensure_ascii=False)[:2000], flush=True)
         except Exception as exc:  # noqa: BLE001 -- круг не должен валить процесс
             print(scrub_all(f"[сторож] круг упал: {type(exc).__name__}: {exc}"), flush=True)

@@ -265,13 +265,13 @@ class BloomApi:
             r = self.session.get(self.host + path, headers=self._headers(),
                                   timeout=self.timeout)
         except requests.RequestException as exc:
-            return {"ok": False, "код": None, "сеть": True,
-                     "почему": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300]}
-        out = {"код": r.status_code, "заголовки_лимита": self._note_headers(r.headers)}
+            return {"ok": False, "code": None, "network": True,
+                     "why_not": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300]}
+        out = {"code": r.status_code, "rate_headers": self._note_headers(r.headers)}
         try:
-            out["тело"] = r.json()
+            out["body"] = r.json()
         except ValueError:
-            out["тело_не_json"] = scrub(r.text[:300], self.key)
+            out["body_not_json"] = scrub(r.text[:300], self.key)
         out["ok"] = r.status_code == 200
         return out
 
@@ -286,33 +286,33 @@ class BloomApi:
         """
         validate_swap_body(body)
         # Тело можно печатать целиком: ключа в нём нет, он только в заголовке.
-        запись = {"этап": "запрос", "path": SWAP_PATH, "client_order_id": client_order_id,
-                   "зачем": why, "режим": "dry-run" if self.dry_run else "live",
-                   "тело": body}
+        запись = {"stage": "запрос", "path": SWAP_PATH, "client_order_id": client_order_id,
+                   "why": why, "mode": "dry-run" if self.dry_run else "live",
+                   "body": body}
         if self.dry_run:
-            запись["итог"] = "dry-run: запрос НЕ отправлен"
+            запись["result"] = "dry-run: запрос НЕ отправлен"
             self._log_call(запись)
-            return {"ok": True, "dry_run": True, "код": None,
+            return {"ok": True, "dry_run": True, "code": None,
                      "order_id": None, "signatures": [],
-                     "почему": "dry-run: запрос не отправлялся"}
+                     "why_not": "dry-run: запрос не отправлялся"}
         self._log_call(запись)
         try:
             r = self.session.post(self.host + SWAP_PATH, headers=self._headers(),
                                    json=body, timeout=self.timeout)
         except requests.RequestException as exc:
-            out = {"ok": False, "код": None, "сеть": True, "order_id": None,
+            out = {"ok": False, "code": None, "network": True, "order_id": None,
                     "signatures": [],
-                    "почему": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300],
-                    "повтор_только_после_проверки_цепи": True}
+                    "why_not": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300],
+                    "retry_only_after_chain_check": True}
             if self.state is not None:
                 self.state.note_api_result(ok=False, code="СЕТЬ")
-            self._log_call({"этап": "ответ", "client_order_id": client_order_id, **out})
+            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
             return out
         return self._parse_swap(r, client_order_id)
 
     def _parse_swap(self, r, client_order_id: str) -> dict:
         заг = self._note_headers(r.headers)
-        out = {"код": r.status_code, "заголовки_лимита": заг, "order_id": None,
+        out = {"code": r.status_code, "rate_headers": заг, "order_id": None,
                 "signatures": []}
         try:
             body = r.json()
@@ -321,18 +321,18 @@ class BloomApi:
                         код_ошибки="ОТВЕТ_НЕ_JSON")
             if self.state is not None:
                 self.state.note_api_result(ok=False, code="ОТВЕТ_НЕ_JSON")
-            self._log_call({"этап": "ответ", "client_order_id": client_order_id, **out})
+            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
             return out
         if r.status_code == 200 and body.get("success"):
             data = body.get("data") or {}
             out.update(ok=True, order_id=data.get("order_id"),
                         signatures=list(data.get("signatures") or []))
             # 200 -- это принято, а не исполнено. Подписи отправленные.
-            out["оговорка"] = ("200 не означает сделку: подписи отправленные, "
+            out["caveat"] = ("200 не означает сделку: подписи отправленные, "
                                "не подтверждённые, и массив может быть пустым")
             if self.state is not None:
                 self.state.note_api_result(ok=True)
-            self._log_call({"этап": "ответ", "client_order_id": client_order_id, **out})
+            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
             return out
         err = (body.get("error") or {}) if isinstance(body, dict) else {}
         код = err.get("code") or f"HTTP_{r.status_code}"
@@ -343,17 +343,17 @@ class BloomApi:
         out["rate_limited"] = rl
         if rl:
             out["retry_after_s"] = self._retry_after(r, err)
-            out["оговорка"] = "отклонённый по лимиту запрос в бюджет не идёт"
-        out["пропуск_а_не_ошибка"] = код in ERR_SKIP_NOT_FAILURE
-        out["безопасно_повторить_по_докам"] = код in ERR_RETRYABLE
-        out["повтор_только_после_проверки_цепи"] = True
+            out["caveat"] = "отклонённый по лимиту запрос в бюджет не идёт"
+        out["skip_not_failure"] = код in ERR_SKIP_NOT_FAILURE
+        out["retry_safe_per_docs"] = код in ERR_RETRYABLE
+        out["retry_only_after_chain_check"] = True
         if self.state is not None:
             # Пропуск маршрута -- не отказ сервиса: серию ошибок не растит.
-            if out["пропуск_а_не_ошибка"]:
+            if out["skip_not_failure"]:
                 self.state.note_api_result(ok=True)
             else:
                 self.state.note_api_result(ok=False, rate_limited=rl, code=код)
-        self._log_call({"этап": "ответ", "client_order_id": client_order_id, **out})
+        self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
         return out
 
     @staticmethod
@@ -493,7 +493,7 @@ def self_test() -> None:
     chk("dry-run возвращает ok без сети", res["ok"] is True and res["dry_run"] is True)
     chk("и пишет тело запроса в журнал вызовов", st.api_path.exists())
     журнал = [json.loads(x) for x in st.api_path.read_text().splitlines() if x.strip()]
-    chk("в журнале есть полное тело", журнал[0]["тело"]["side"] == "Buy")
+    chk("в журнале есть полное тело", журнал[0]["body"]["side"] == "Buy")
     chk("и ключа в журнале нет", "КЛЮЧ" not in st.api_path.read_text())
 
     # --- разбор ответов
@@ -515,7 +515,7 @@ def self_test() -> None:
         {"X-RateLimit-Remaining-Week": "9000"}), "cid2")
     chk("200 разобран", ok200["ok"] is True and ok200["order_id"] == "oid")
     chk("подписи вынуты", ok200["signatures"] == ["SIG1"])
-    chk("и сказано, что 200 не равно сделке", "не означает сделку" in ok200["оговорка"])
+    chk("и сказано, что 200 не равно сделке", "не означает сделку" in ok200["caveat"])
     chk("остаток недельного лимита сохранён из заголовка",
         st.week_budget_state()["remaining_week"] == 9000)
 
@@ -525,11 +525,11 @@ def self_test() -> None:
     chk("429 опознан как rate_limited", e429["rate_limited"] is True)
     chk("Retry-After прочитан", e429["retry_after_s"] == 5.0, str(e429.get("retry_after_s")))
     chk("и сказано, что отклонённый запрос в бюджет не идёт",
-        "в бюджет не идёт" in e429["оговорка"])
+        "в бюджет не идёт" in e429["caveat"])
 
     noroute = api2._parse_swap(Ответ(400, {"success": False, "error": {
         "code": "NO_ROUTE", "message": "no route"}}), "cid4")
-    chk("NO_ROUTE -- пропуск, а не ошибка", noroute["пропуск_а_не_ошибка"] is True)
+    chk("NO_ROUTE -- пропуск, а не ошибка", noroute["skip_not_failure"] is True)
     до = st.counters().get("api_error_streak", 0)
     api2._parse_swap(Ответ(400, {"success": False, "error": {"code": "NO_ROUTE"}}), "cid5")
     chk("и серию ошибок API он не растит",
@@ -538,16 +538,16 @@ def self_test() -> None:
     fatal = api2._parse_swap(Ответ(400, {"success": False, "error": {
         "code": "INVALID_REQUEST", "message": "bad field",
         "details": {"field": "slippage"}}}), "cid6")
-    chk("INVALID_REQUEST -- не пропуск", fatal["пропуск_а_не_ошибка"] is False)
+    chk("INVALID_REQUEST -- не пропуск", fatal["skip_not_failure"] is False)
     chk("details сохранены, чтобы видеть поле", fatal["details"] == {"field": "slippage"})
     chk("и серия ошибок выросла", st.counters().get("api_error_streak", 0) >= 1)
 
     внутр = api2._parse_swap(Ответ(500, {"success": False, "error": {
         "code": "INTERNAL_ERROR"}}), "cid7")
     chk("INTERNAL_ERROR помечен как безопасный к повтору по докам",
-        внутр["безопасно_повторить_по_докам"] is True)
+        внутр["retry_safe_per_docs"] is True)
     chk("но повтор всё равно только после проверки цепи",
-        внутр["повтор_только_после_проверки_цепи"] is True)
+        внутр["retry_only_after_chain_check"] is True)
 
     нежсон = api2._parse_swap(Ответ(200, None, {}, "<html>ошибка</html>"), "cid8")
     chk("ответ не-json не считается успехом", нежсон["ok"] is False)

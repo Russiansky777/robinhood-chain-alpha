@@ -66,6 +66,13 @@ WEEK_STOP_AT = 0.80
 
 STATES_OPEN = ("intent", "bought", "selling", "unsold")
 
+# Версия формата журналов и состояния. Ключи переведены на ASCII 23.09 по
+# слову владельца; версия нужна, чтобы потребитель не гадал, кириллица
+# перед ним или латиница, а СПРОСИЛ. Записи версии 1 (кириллические
+# ключи) больше не пишутся; прочитать их можно только зная, что это v1.
+SCHEMA_VERSION = 2
+SCHEMA_VERSION_KEY = "schema_version"
+
 # Машиночитаемые коды отказов can_open_detailed. Текст причины пишется
 # людям, код -- в журнал и в сверку: по тексту сверка ломается от любой
 # правки формулировки, а SKIPPED_DUP_MINT владелец просил считать
@@ -310,7 +317,8 @@ class ExecState:
         Если запрос уйдёт и служба упадёт до записи ответа, позиция всё
         равно будет известна: сторож найдёт токен по цепи и продаст.
         """
-        row = {"client_order_id": client_order_id, "state": "intent",
+        row = {SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+                "client_order_id": client_order_id, "state": "intent",
                 "mint": mint, "source_sig": source_sig, "source_slot": source_slot,
                 "sol_in": sol_in, "pool": pool, "program": program,
                 "taxed": taxed, "tax_bps": tax_bps, "mode": mode,
@@ -322,7 +330,8 @@ class ExecState:
         return row
 
     def update_position(self, client_order_id: str, **поля) -> dict:
-        row = {"client_order_id": client_order_id,
+        row = {SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+                "client_order_id": client_order_id,
                 "ts_update": time.time(),
                 "ts_update_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 **поля}
@@ -331,7 +340,8 @@ class ExecState:
 
     def log_decision(self, row: dict) -> None:
         append_jsonl_fsync(self.decisions_path,
-                            {"ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                            {SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+                             "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                              **row})
 
     # -------------------------------------------------------------- счётчики
@@ -343,7 +353,7 @@ class ExecState:
             return json.loads(self.counters_path.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             # Битые счётчики -- это не повод торговать без счётчиков.
-            return {"повреждены": True, "api_error_streak": 10 ** 6}
+            return {"corrupt": True, "api_error_streak": 10 ** 6}
 
     def save_counters(self, c: dict) -> None:
         atomic_write_json(self.counters_path, c)
@@ -384,13 +394,13 @@ class ExecState:
     def pnl(self, ts: float | None = None) -> dict:
         path, беда = self.pnl_path(ts)
         out = {"realized_sol": 0.0, "spent_sol": 0.0, "buys": 0, "sells": 0,
-                "часовой_пояс_недоступен": беда}
+                "tz_unavailable": беда}
         if path.exists():
             try:
                 out.update(json.loads(path.read_text(encoding="utf-8")))
             except (ValueError, OSError):
-                out["повреждён"] = True
-        out["часовой_пояс_недоступен"] = беда
+                out["corrupt"] = True
+        out["tz_unavailable"] = беда
         return out
 
     def add_pnl(self, *, realized_sol: float = 0.0, spent_sol: float = 0.0,
@@ -442,15 +452,15 @@ class ExecState:
         limit = int(b.get("limit_week") or WEEK_BUDGET)
         remaining = b.get("remaining_week")
         out = {"limit_week": limit, "remaining_week": remaining,
-                "порог_остановки": WEEK_STOP_AT}
+                "stop_at": WEEK_STOP_AT}
         if remaining is None:
-            out["израсходовано_доля"] = None
-            out["стоп"] = False
-            out["почему"] = "остаток недельного лимита ещё не известен из заголовков"
+            out["spent_share"] = None
+            out["stop"] = False
+            out["why_not"] = "остаток недельного лимита ещё не известен из заголовков"
             return out
         израсходовано = 1.0 - (int(remaining) / limit if limit else 1.0)
-        out["израсходовано_доля"] = round(израсходовано, 4)
-        out["стоп"] = израсходовано >= WEEK_STOP_AT
+        out["spent_share"] = round(израсходовано, 4)
+        out["stop"] = израсходовано >= WEEK_STOP_AT
         return out
 
     # ------------------------------------------------------------- главный гейт
@@ -476,7 +486,7 @@ class ExecState:
             return False, почему, КОД_РУБИЛЬНИК
 
         c = self.counters()
-        if c.get("повреждены"):
+        if c.get("corrupt"):
             return False, ("счётчики повреждены -- торговля запрещена, пока их не "
                             "починят: иначе автопауза не сработает"), КОД_СЧЁТЧИКИ_БИТЫ
         if int(c.get("api_error_streak", 0)) >= self.api_error_streak_max:
@@ -491,9 +501,9 @@ class ExecState:
                             f"{self.rate_limited_pause_s:.0f} с"), КОД_ПАУЗА_429
 
         wb = self.week_budget_state()
-        if wb.get("стоп"):
+        if wb.get("stop"):
             return False, (f"недельный бюджет запросов Bloom израсходован на "
-                            f"{wb['израсходовано_доля'] * 100:.0f}% при пороге "
+                            f"{wb['spent_share'] * 100:.0f}% при пороге "
                             f"{WEEK_STOP_AT * 100:.0f}%"), КОД_БЮДЖЕТ_НЕДЕЛИ
 
         открытые = self.open_positions()
@@ -541,22 +551,23 @@ class ExecState:
         открытые = self.open_positions()
         p = self.pnl()
         return {
-            "каталог_состояния": str(self.base),
-            "рубильник": {"путь": str(self.kill_path), "включён": убит, "почему": почему},
-            "лимиты": {"макс_открытых": self.max_open,
-                        "дневной_лимит_потерь_sol": self.daily_loss_sol,
-                        "вход_sol": self.buy_sol,
-                        "резерв_на_комиссии_sol": self.fee_reserve_sol,
-                        "порог_ошибок_api": self.api_error_streak_max,
-                        "порог_непроданных": self.unsold_streak_max,
-                        "пауза_при_429_с": self.rate_limited_pause_s,
-                        "кулдаун_минта_с": self.mint_cooldown_s,
-                        "покупок_на_минт": self.max_buys_per_mint},
-            "открытых_позиций": len(открытые),
-            "минты_открытых": sorted({p_.get("mint") for p_ in открытые if p_.get("mint")}),
-            "счётчики": self.counters(),
-            "дневной_итог": p,
-            "бюджет_запросов_bloom": self.week_budget_state(),
+            SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+            "state_dir": str(self.base),
+            "kill_switch": {"path": str(self.kill_path), "active": убит, "why_not": почему},
+            "limits": {"max_open": self.max_open,
+                        "daily_loss_sol": self.daily_loss_sol,
+                        "buy_sol": self.buy_sol,
+                        "fee_reserve_sol": self.fee_reserve_sol,
+                        "api_error_streak_max": self.api_error_streak_max,
+                        "unsold_streak_max": self.unsold_streak_max,
+                        "rate_limited_pause_s": self.rate_limited_pause_s,
+                        "mint_cooldown_s": self.mint_cooldown_s,
+                        "max_buys_per_mint": self.max_buys_per_mint},
+            "open_positions": len(открытые),
+            "open_mints": sorted({p_.get("mint") for p_ in открытые if p_.get("mint")}),
+            "counters": self.counters(),
+            "day_pnl": p,
+            "bloom_request_budget": self.week_budget_state(),
         }
 
 
@@ -736,16 +747,16 @@ def self_test() -> None:
     # --- бюджет запросов
     st14 = ExecState(base=base / "state14", kill=kill)
     chk("пока заголовков не было -- стопа нет, но и доли нет",
-        st14.week_budget_state()["стоп"] is False
-        and st14.week_budget_state()["израсходовано_доля"] is None)
+        st14.week_budget_state()["stop"] is False
+        and st14.week_budget_state()["spent_share"] is None)
     st14.note_rate_headers({"X-RateLimit-Limit-Week": "10000",
                              "X-RateLimit-Remaining-Week": "2500",
                              "x-ratelimit-remaining-minute": "59"})
     wb = st14.week_budget_state()
     chk("остаток недели прочитан из заголовка", wb["remaining_week"] == 2500, str(wb))
-    chk("израсходовано 75% -- стоп при пороге 80% ещё нет", wb["стоп"] is False)
+    chk("израсходовано 75% -- стоп при пороге 80% ещё нет", wb["stop"] is False)
     st14.note_rate_headers({"X-RateLimit-Remaining-Week": "1500"})
-    chk("израсходовано 85% -- стоп", st14.week_budget_state()["стоп"] is True)
+    chk("израсходовано 85% -- стоп", st14.week_budget_state()["stop"] is True)
     ok, почему16 = st14.can_open(mint="M", source_sig="S", balance_sol=1.0)
     chk("и открывать нельзя", ok is False and "недельный бюджет" in почему16, почему16)
 
@@ -802,7 +813,30 @@ def self_test() -> None:
         FOREIGN_WALLET_W1 != EXECUTOR_WALLET)
 
     отчёт = st.report()
-    chk("отчёт собирается", "лимиты" in отчёт and "рубильник" in отчёт)
+    chk("отчёт собирается", "limits" in отчёт and "kill_switch" in отчёт)
+
+    # --- версия формата: читатель не должен гадать, какие перед ним ключи
+    chk("версия формата -- 2", SCHEMA_VERSION == 2, SCHEMA_VERSION)
+    chk("в отчёте есть версия формата",
+        отчёт.get(SCHEMA_VERSION_KEY) == SCHEMA_VERSION, отчёт.get(SCHEMA_VERSION_KEY))
+    with tempfile.TemporaryDirectory() as d:
+        st = ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+        st.write_intent(client_order_id="c", mint="M", source_sig="s", source_slot=1,
+                        sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
+                        mode="dry", sell_after_s=28.8)
+        st.update_position("c", state="bought")
+        st.log_decision({"code": "BUY"})
+        строки = [json.loads(x) for x in
+                  st.positions_path.read_text(encoding="utf-8").strip().split("\n")]
+        chk("версия в каждой записи позиций",
+            all(r.get(SCHEMA_VERSION_KEY) == SCHEMA_VERSION for r in строки), строки)
+        реш = [json.loads(x) for x in
+               st.decisions_path.read_text(encoding="utf-8").strip().split("\n")]
+        chk("версия в записи решения",
+            реш[0].get(SCHEMA_VERSION_KEY) == SCHEMA_VERSION, реш[0])
+        chk("кириллических ключей в записях нет",
+            all(k.isascii() for r in строки + реш for k in r),
+            [k for r in строки + реш for k in r if not k.isascii()])
 
     bad = 0
     for n, ok_, got in checks:

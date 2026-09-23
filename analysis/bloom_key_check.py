@@ -56,7 +56,7 @@ def scrub(text: str, key: str) -> str:
 def safe_fields(obj, глубина: int = 0) -> dict:
     """Имена полей всегда, значения -- только у непохожих на секрет."""
     if глубина > 2 or not isinstance(obj, dict):
-        return {"тип": type(obj).__name__}
+        return {"kind": type(obj).__name__}
     out = {}
     for k, v in obj.items():
         if SECRET_LIKE.search(str(k)):
@@ -76,16 +76,16 @@ def get(path: str, key: str, timeout: int = 30) -> dict:
     try:
         r = requests.get(url, headers={"Authorization": f"Bearer {key}"}, timeout=timeout)
     except requests.RequestException as exc:
-        return {"путь": path, "код": None,
-                "почему": scrub(f"{type(exc).__name__}: {exc}", key)[:300]}
+        return {"path": path, "code": None,
+                "why_not": scrub(f"{type(exc).__name__}: {exc}", key)[:300]}
     заголовки = {k: v for k, v in r.headers.items() if RATE_HEADERS.search(k)}
-    out = {"путь": path, "код": r.status_code, "заголовки_про_лимит": заголовки}
+    out = {"path": path, "code": r.status_code, "заголовки_про_лимит": заголовки}
     try:
         body = r.json()
     except ValueError:
-        out["тело_не_json"] = scrub(r.text[:400], key)
+        out["body_not_json"] = scrub(r.text[:400], key)
         return out
-    out["тело"] = body
+    out["body"] = body
     return out
 
 
@@ -129,7 +129,7 @@ def main() -> None:
               "ГРАНИЦЫ": ["только GET", "ключ не печатается нигде",
                            "тела ответов целиком не печатаются"]}
     if not key:
-        отчёт["итог"] = "СТОП: BLOOM_API_KEY пуст в окружении"
+        отчёт["result"] = "СТОП: BLOOM_API_KEY пуст в окружении"
         OUT_PATH.write_text(json.dumps(отчёт, ensure_ascii=False, indent=2))
         print(json.dumps(отчёт, ensure_ascii=False, indent=2))
         raise SystemExit(2)
@@ -137,33 +137,33 @@ def main() -> None:
 
     ping = get(PING_PATH, key)
     отчёт["ping"] = {**{k: v for k, v in ping.items() if k != "тело"},
-                      "поля_тела": safe_fields(ping.get("тело"))}
-    print(f"[bloom] ping: HTTP {ping.get('код')}", flush=True)
+                      "поля_тела": safe_fields(ping.get("body"))}
+    print(f"[bloom] ping: HTTP {ping.get('code')}", flush=True)
 
     wl = get(WALLETS_PATH, key)
-    адреса = wallets_from(wl.get("тело"))
+    адреса = wallets_from(wl.get("body"))
     есть = EXECUTOR_WALLET in адреса
     отчёт["wallets"] = {**{k: v for k, v in wl.items() if k != "тело"},
-                         "поля_тела": safe_fields(wl.get("тело")),
+                         "поля_тела": safe_fields(wl.get("body")),
                          "кошельков_в_ответе": len(адреса),
-                         "адреса": адреса,
+                         "addresses": адреса,
                          "кошелёк_исполнителя_в_списке": есть}
-    print(f"[bloom] wallets: HTTP {wl.get('код')}, кошельков {len(адреса)}, "
+    print(f"[bloom] wallets: HTTP {wl.get('code')}, кошельков {len(адреса)}, "
           f"наш в списке: {есть}", flush=True)
 
-    ключ_работает = ping.get("код") == 200
+    ключ_работает = ping.get("code") == 200
     отчёт["ключ_работает"] = ключ_работает
     if not ключ_работает:
-        отчёт["итог"] = (f"СТОП: ping ответил {ping.get('код')} -- ключ не подтверждён. "
+        отчёт["result"] = (f"СТОП: ping ответил {ping.get('code')} -- ключ не подтверждён. "
                           "Дальше без владельца нельзя.")
     elif not есть:
-        отчёт["итог"] = ("СТОП: ключ работает, но кошелька исполнителя в списке НЕТ. "
+        отчёт["result"] = ("СТОП: ключ работает, но кошелька исполнителя в списке НЕТ. "
                           "Дальше без владельца нельзя.")
     else:
-        отчёт["итог"] = "ок: ключ работает, кошелёк исполнителя в списке"
+        отчёт["result"] = "ок: ключ работает, кошелёк исполнителя в списке"
     OUT_PATH.write_text(json.dumps(отчёт, ensure_ascii=False, indent=2))
     print(json.dumps(отчёт, ensure_ascii=False, indent=2))
-    if отчёт["итог"].startswith("СТОП"):
+    if отчёт["result"].startswith("СТОП"):
         raise SystemExit(3)
 
 

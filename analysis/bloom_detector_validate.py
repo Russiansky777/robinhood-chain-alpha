@@ -85,7 +85,7 @@ def gecko_get(path: str, params: dict) -> dict:
         except (ValueError, OSError):
             pass
     if requests is None:
-        return {"http_status": None, "почему": "нет requests"}
+        return {"http_status": None, "why_not": "нет requests"}
     backoff = 1.0
     for _ in range(8):
         try:
@@ -105,7 +105,7 @@ def gecko_get(path: str, params: dict) -> dict:
         body = r.json()
         f.write_text(json.dumps(body))
         return {"http_status": 200, "body": body}
-    return {"http_status": None, "почему": locals().get("последняя")}
+    return {"http_status": None, "why_not": locals().get("последняя")}
 
 
 def свечи(lo: int, hi: int) -> list:
@@ -228,7 +228,7 @@ def граница(записи: list, свечи_: list, порог: float) -> 
             без_курса += 1
             continue
         строка = {"sol_экв": round(v, 6), "id": r.get("id"),
-                   "минт_траты": s["трата_минт"], "трата_ui": s["трата_ui"]}
+                   "минт_траты": s["spend_mint"], "spend_ui": s["spend_ui"]}
         (мало if r.get("skipReason") == "TARGET_AMOUNT_OUT_OF_RANGE" else хватает).append(строка)
     мало.sort(key=lambda x: -x["sol_экв"])
     хватает.sort(key=lambda x: x["sol_экв"])
@@ -248,7 +248,7 @@ def граница(записи: list, свечи_: list, порог: float) -> 
         "зазор_между_классами": (round(низ_хватает - верх_мало, 6)
                                   if (верх_мало is not None and низ_хватает is not None) else None),
         "порог_лежит_между_классами": разделяет,
-        "пояснение": ("порог подтверждён данными: класс «мало» кончается ниже порога, "
+        "note": ("порог подтверждён данными: класс «мало» кончается ниже порога, "
                        "класс «хватает» начинается не ниже него"
                        if разделяет else
                        "классы НЕ разделены нашим порогом -- совпадение по размеру "
@@ -279,14 +279,14 @@ def сигнал_из_записи(r: dict) -> dict:
     ui = (сырое / 10 ** dec) if (сырое is not None and isinstance(dec, int)) else None
     контракт = si.get("contract")
     докупка = r.get("skipReason") == "SKIP_TARGET_INCREASE_POSITION"
-    s = {"подпись": r.get("id"), "источник": f.get("wallet"),
-          "минт": ri.get("contract"), "тип": "buy",
-          "трата_минт": контракт, "трата_ui": ui,
-          "трата": ui if контракт == BD.WSOL else None,
-          "первый_вход": (not докупка),
+    s = {"signature": r.get("id"), "source": f.get("wallet"),
+          "mint": ri.get("contract"), "kind": "buy",
+          "spend_mint": контракт, "spend_ui": ui,
+          "spend": ui if контракт == BD.WSOL else None,
+          "first_entry": (not докупка),
           "первый_вход_откуда": "вердикт DBot (офлайн иначе не установить)",
-          "программы_dex": [], "программа_токена": ri.get("tokenProgram"),
-          "слот": None, "createAt": r.get("createAt")}
+          "dex_programs": [], "token_program": ri.get("tokenProgram"),
+          "slot": None, "createAt": r.get("createAt")}
     return s
 
 
@@ -324,7 +324,7 @@ def сверить(записи: list, свечи_: list, *, порог: float,
         if вердикт_размера == "нет_курса":
             итог["размер"]["нет_курса"] += 1
             итог["нет_курса"].append({"id": r.get("id"), "createAt": r.get("createAt"),
-                                       "трата_ui": s["трата_ui"], "минт_траты": s["трата_минт"]})
+                                       "spend_ui": s["spend_ui"], "минт_траты": s["spend_mint"]})
         else:
             # Сравнивать можно только там, где DBot до размера дошёл:
             # если он отказал раньше по другому признаку, его молчание о
@@ -340,36 +340,36 @@ def сверить(записи: list, свечи_: list, *, порог: float,
                     итог["размер"]["разошлось"] += 1
                     итог["размер"]["расхождения"].append(
                         {"id": r.get("id"), "задача": r.get("configName"),
-                         "источник": s["источник"], "минт": s["минт"],
+                         "source": s["source"], "mint": s["mint"],
                          "createAt": r.get("createAt"),
-                         "трата_ui": s["трата_ui"], "минт_траты": s["трата_минт"],
-                         "курс_usd_sol": курс, "наш_sol_экв": трата,
+                         "spend_ui": s["spend_ui"], "минт_траты": s["spend_mint"],
+                         "rate_usd_sol": курс, "наш_sol_экв": трата,
                          "наш_вердикт": вердикт_размера, "dbot": dbot})
 
         # --- сквозное действие
-        if порядок == "докупка_раньше_размера" and s["первый_вход"] is False:
-            наш_код, наше_действие = BD.КОД_ДОКУПКА, "пропуск"
+        if порядок == "докупка_раньше_размера" and s["first_entry"] is False:
+            наш_код, наше_действие = BD.КОД_ДОКУПКА, "skip"
             наша_причина = "докупка"
         else:
             ок, наш_код, наша_причина = BD.фильтры_dbot(s, трата, порог_sol=порог)
-            наше_действие = "покупка" if ок else "пропуск"
-        if наше_действие == "покупка":
+            наше_действие = "buy" if ок else "skip"
+        if наше_действие == "buy":
             можно, почему, код2 = сим.can_open_detailed(
-                mint=s["минт"], source_sig=s["подпись"], balance_sol=None)
+                mint=s["mint"], source_sig=s["signature"], balance_sol=None)
             if можно:
-                сим.открыли(s["минт"], s["подпись"], t_s)
+                сим.открыли(s["mint"], s["signature"], t_s)
             else:
-                наше_действие, наш_код, наша_причина = "пропуск", код2, почему
+                наше_действие, наш_код, наша_причина = "skip", код2, почему
 
         итог["всего"] += 1
         итог["по_кодам_наш"][наш_код] = итог["по_кодам_наш"].get(наш_код, 0) + 1
 
         dbot_купил = dbot == "ПРОШЛО"
-        мы_купили = наше_действие == "покупка"
+        мы_купили = наше_действие == "buy"
         карточка = {"id": r.get("id"), "задача": r.get("configName"),
-                     "источник": s["источник"], "минт": s["минт"],
-                     "createAt": r.get("createAt"), "трата_ui": s["трата_ui"],
-                     "минт_траты": s["трата_минт"], "курс_usd_sol": курс,
+                     "source": s["source"], "mint": s["mint"],
+                     "createAt": r.get("createAt"), "spend_ui": s["spend_ui"],
+                     "минт_траты": s["spend_mint"], "rate_usd_sol": курс,
                      "наш_sol_экв": трата, "наш_код": наш_код,
                      "наша_причина": наша_причина, "dbot": dbot,
                      "состояние_dbot": r.get("state"),
@@ -439,10 +439,10 @@ def прогнать(путь: Path = СНИМОК, *, порог: float = 2.0) 
         порядок_вывод = max(оба, key=lambda k: (оба[k]["доля_совпадений"] or 0))
     return {
         "источник_эталона": str(путь.relative_to(REPO_ROOT)),
-        "задачи": по_задачам,
+        "tasks": по_задачам,
         "покупочных_сигналов_всего": len(записи),
         "порог_входа_sol": порог,
-        "курс": {"пул": SOL_USDC_POOL, "источник": "GeckoTerminal, минутные свечи",
+        "курс": {"пул": SOL_USDC_POOL, "source": "GeckoTerminal, минутные свечи",
                   "свечей": len(св),
                   "покрытие_utc": ([time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime(св[0][0])),
                                      time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime(св[-1][0]))]
@@ -490,12 +490,12 @@ def self_test() -> int:
                         "receive": {"info": {"contract": "M", "tokenProgram": BD.TOKEN_2022},
                                      "amount": "1"}}}
     s = сигнал_из_записи(зап)
-    chk("трата 500 USDC разобрана", abs(s["трата_ui"] - 500) < 1e-9, s["трата_ui"])
-    chk("стейбл не считается SOL", s["трата"] is None, s["трата"])
-    chk("первый вход по умолчанию True", s["первый_вход"] is True)
+    chk("трата 500 USDC разобрана", abs(s["spend_ui"] - 500) < 1e-9, s["spend_ui"])
+    chk("стейбл не считается SOL", s["spend"] is None, s["spend"])
+    chk("первый вход по умолчанию True", s["first_entry"] is True)
     chk("источник признака честно помечен", "DBot" in s["первый_вход_откуда"])
     зап2 = dict(зап, skipReason="SKIP_TARGET_INCREASE_POSITION")
-    chk("докупка из вердикта DBot", сигнал_из_записи(зап2)["первый_вход"] is False)
+    chk("докупка из вердикта DBot", сигнал_из_записи(зап2)["first_entry"] is False)
 
     зап3 = {"id": "Y", "createAt": 1000_000, "configName": "BATCH-5",
              "skipReason": None, "state": "done",
@@ -504,7 +504,7 @@ def self_test() -> int:
                                    "amount": "3000000000"},
                          "receive": {"info": {"contract": "M2"}, "amount": "1"}}}
     s3 = сигнал_из_записи(зап3)
-    chk("трата в SOL не требует курса", abs(s3["трата"] - 3.0) < 1e-9, s3["трата"])
+    chk("трата в SOL не требует курса", abs(s3["spend"] - 3.0) < 1e-9, s3["spend"])
     chk("вердикт размера без курса работает для SOL",
         наш_вердикт_размера(s3, None, 2.0)[0] == "хватает")
     chk("вердикт размера для стейбла без курса -- нет_курса",
@@ -594,7 +594,7 @@ def self_test() -> int:
                    зп("b", 402_000000, None)], свечи_t, 2.0)
     chk("перепутанные классы не объявляются подтверждением порога",
         г2["порог_лежит_между_классами"] is False, г2["порог_лежит_между_классами"])
-    chk("в таком случае это прямо сказано", "НЕ разделены" in г2["пояснение"], г2["пояснение"])
+    chk("в таком случае это прямо сказано", "НЕ разделены" in г2["note"], г2["note"])
 
     прошло = sum(1 for _, ок, _ in проверки if ок)
     for имя, ок, факт in проверки:

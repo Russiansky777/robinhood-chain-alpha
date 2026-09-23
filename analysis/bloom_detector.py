@@ -155,7 +155,7 @@ def балансы_кошелька(tx: dict, кошелёк: str) -> dict:
     """
     meta = (tx or {}).get("meta") or {}
     ключи = _баланс_ключи(tx)
-    out = {"нативный_delta_sol": 0.0, "по_минтам": {}, "плательщик": False}
+    out = {"native_delta_sol": 0.0, "by_mint": {}, "is_fee_payer": False}
 
     pre_n = meta.get("preBalances") or []
     post_n = meta.get("postBalances") or []
@@ -164,9 +164,9 @@ def балансы_кошелька(tx: dict, кошелёк: str) -> dict:
         if i < len(pre_n) and i < len(post_n):
             d = int(post_n[i]) - int(pre_n[i])
             if i == 0:
-                out["плательщик"] = True
+                out["is_fee_payer"] = True
                 d += int(meta.get("fee") or 0)
-            out["нативный_delta_sol"] = d / LAMPORT
+            out["native_delta_sol"] = d / LAMPORT
 
     def свод(записи, куда):
         for b in записи or []:
@@ -180,21 +180,21 @@ def балансы_кошелька(tx: dict, кошелёк: str) -> dict:
                 raw = int(ui.get("amount"))
             except (TypeError, ValueError):
                 continue
-            з = out["по_минтам"].setdefault(
+            з = out["by_mint"].setdefault(
                 m, {"pre_raw": 0, "post_raw": 0, "decimals": ui.get("decimals"),
-                    "программа": b.get("programId"), "было_в_pre": False})
+                    "program": b.get("programId"), "in_pre": False})
             з[куда] = з[куда] + raw
             if куда == "pre_raw":
-                з["было_в_pre"] = True
+                з["in_pre"] = True
             if з.get("decimals") is None:
                 з["decimals"] = ui.get("decimals")
-            if not з.get("программа"):
-                з["программа"] = b.get("programId")
+            if not з.get("program"):
+                з["program"] = b.get("programId")
 
     свод(meta.get("preTokenBalances"), "pre_raw")
     свод(meta.get("postTokenBalances"), "post_raw")
 
-    for m, з in out["по_минтам"].items():
+    for m, з in out["by_mint"].items():
         d = з["decimals"]
         з["delta_raw"] = з["post_raw"] - з["pre_raw"]
         з["delta_ui"] = (з["delta_raw"] / (10 ** d)) if isinstance(d, int) else None
@@ -260,89 +260,89 @@ def маршрут_из_транзакции(tx: dict, *, минт_покупк�
                 вызовов += 1
 
     в_маршруте = len(промежуточные) + 1 + (1 if трата_минт else 0)
-    return {"программы": программы_dex(tx),
-             "промежуточные_минты": промежуточные,
-             "минтов_в_маршруте": в_маршруте,
-             "хопов_оценка_по_минтам": max(1, в_маршруте - 1),
-             "вызовов_dex": вызовов,
-             "через_промежуточный_токен": bool(промежуточные),
-             "все_минты_транзакции": sorted(минты)}
+    return {"programs": программы_dex(tx),
+             "intermediate_mints": промежуточные,
+             "mints_in_route": в_маршруте,
+             "hops_by_mints": max(1, в_маршруте - 1),
+             "dex_calls": вызовов,
+             "via_intermediate": bool(промежуточные),
+             "all_tx_mints": sorted(минты)}
 
 
 def сигнал_из_транзакции(tx: dict, источник: str, *, подпись: str,
                           слот: int | None = None) -> dict:
     """Чистый разбор: что именно сделал источник. Без сети и состояния."""
     meta = (tx or {}).get("meta") or {}
-    сиг = {"подпись": подпись, "источник": источник,
-            "слот": слот if slot_ok(слот) else (tx or {}).get("slot"),
-            "тип": None, "минт": None, "трата": None, "трата_минт": None,
-            "трата_ui": None, "первый_вход": None, "программы_dex": программы_dex(tx),
-            "программа_токена": None, "решение_причина": None}
+    сиг = {"signature": подпись, "source": источник,
+            "slot": слот if slot_ok(слот) else (tx or {}).get("slot"),
+            "kind": None, "mint": None, "spend": None, "spend_mint": None,
+            "spend_ui": None, "first_entry": None, "dex_programs": программы_dex(tx),
+            "token_program": None, "decide_reason": None}
 
     if meta.get("err") is not None:
-        сиг["тип"] = "fail"
-        сиг["решение_причина"] = "транзакция источника с ошибкой"
+        сиг["kind"] = "fail"
+        сиг["decide_reason"] = "транзакция источника с ошибкой"
         return сиг
 
     б = балансы_кошелька(tx, источник)
-    сиг["нативный_delta_sol"] = б["нативный_delta_sol"]
+    сиг["native_delta_sol"] = б["native_delta_sol"]
 
-    вошли = [(m, з) for m, з in б["по_минтам"].items()
+    вошли = [(m, з) for m, з in б["by_mint"].items()
               if m not in КОТИРОВОЧНЫЕ and (з["delta_raw"] or 0) > 0]
-    вышли = [(m, з) for m, з in б["по_минтам"].items()
+    вышли = [(m, з) for m, з in б["by_mint"].items()
               if m not in КОТИРОВОЧНЫЕ and (з["delta_raw"] or 0) < 0]
 
     # трата в котировочных: WSOL и нативный SOL считаются вместе
-    sol_ушло = -min(0.0, б["нативный_delta_sol"])
-    wsol = б["по_минтам"].get(WSOL)
+    sol_ушло = -min(0.0, б["native_delta_sol"])
+    wsol = б["by_mint"].get(WSOL)
     if wsol and (wsol.get("delta_ui") or 0) < 0:
         sol_ушло += -wsol["delta_ui"]
     стабиль_ушло = {}
     for m in СТАБИЛЬНЫЕ:
-        з = б["по_минтам"].get(m)
+        з = б["by_mint"].get(m)
         if з and (з.get("delta_ui") or 0) < 0:
             стабиль_ушло[m] = -з["delta_ui"]
 
     if len(вошли) > 1:
-        сиг["тип"] = "ambiguous"
-        сиг["решение_причина"] = (f"в транзакции выросло {len(вошли)} некотировочных "
+        сиг["kind"] = "ambiguous"
+        сиг["decide_reason"] = (f"в транзакции выросло {len(вошли)} некотировочных "
                                    f"минтов -- какой из них покупка, из балансов не видно")
         return сиг
 
     if вошли:
         m, з = вошли[0]
-        сиг["тип"] = "buy"
-        сиг["минт"] = m
-        сиг["первый_вход"] = not з["было_в_pre"] or з["pre_raw"] == 0
-        сиг["программа_токена"] = з.get("программа")
-        сиг["получено_ui"] = з.get("delta_ui")
+        сиг["kind"] = "buy"
+        сиг["mint"] = m
+        сиг["first_entry"] = not з["in_pre"] or з["pre_raw"] == 0
+        сиг["token_program"] = з.get("program")
+        сиг["received_ui"] = з.get("delta_ui")
         if sol_ушло > 0:
-            сиг["трата_минт"] = WSOL
-            сиг["трата_ui"] = sol_ушло
-            сиг["трата"] = sol_ушло          # уже в SOL
+            сиг["spend_mint"] = WSOL
+            сиг["spend_ui"] = sol_ушло
+            сиг["spend"] = sol_ушло          # уже в SOL
         elif стабиль_ушло:
             m2 = max(стабиль_ушло, key=lambda k: стабиль_ушло[k])
-            сиг["трата_минт"] = m2
-            сиг["трата_ui"] = стабиль_ушло[m2]
-            сиг["трата"] = None              # нужен курс
+            сиг["spend_mint"] = m2
+            сиг["spend_ui"] = стабиль_ушло[m2]
+            сиг["spend"] = None              # нужен курс
         else:
-            сиг["тип"] = "received"
-            сиг["решение_причина"] = (
+            сиг["kind"] = "received"
+            сиг["decide_reason"] = (
                 "минт вырос, но источник не отдал ни SOL, ни стейблов "
-                f"(нативная дельта {б['нативный_delta_sol']:+.9f} SOL): это "
+                f"(нативная дельта {б['native_delta_sol']:+.9f} SOL): это "
                 "получение токена, а не покупка -- копировать нечего")
-        сиг["маршрут"] = маршрут_из_транзакции(
-            tx, минт_покупки=сиг["минт"], трата_минт=сиг.get("трата_минт"))
+        сиг["route"] = маршрут_из_транзакции(
+            tx, минт_покупки=сиг["mint"], трата_минт=сиг.get("spend_mint"))
         return сиг
 
     if вышли:
-        сиг["тип"] = "sell"
-        сиг["минт"] = вышли[0][0]
-        сиг["решение_причина"] = "продажа источника"
+        сиг["kind"] = "sell"
+        сиг["mint"] = вышли[0][0]
+        сиг["decide_reason"] = "продажа источника"
         return сиг
 
-    сиг["тип"] = "other"
-    сиг["решение_причина"] = "ни один некотировочный минт не изменился"
+    сиг["kind"] = "other"
+    сиг["decide_reason"] = "ни один некотировочный минт не изменился"
     return сиг
 
 
@@ -398,13 +398,13 @@ class КурсSOL:
         if self.свежий(now):
             return self.значение
         if requests is None:
-            self.отказы = [{"источник": "нет requests"}]
+            self.отказы = [{"source": "нет requests"}]
             return None
         for имя, fn in (("geckoterminal", self._gecko), ("jupiter", self._jup)):
             try:
                 v = fn()
             except Exception as exc:  # noqa: BLE001
-                self.отказы.append({"источник": имя, "ошибка": f"{type(exc).__name__}: {str(exc)[:120]}"})
+                self.отказы.append({"source": имя, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
                 continue
             if v and v > 0:
                 self.значение, self.когда, self.источник = float(v), now, имя
@@ -419,12 +419,12 @@ class КурсSOL:
 
 def в_sol(сигнал: dict, курс_usd: float | None) -> tuple[float | None, str]:
     """Трата источника в SOL-эквиваленте. Возвращает (сумма, пояснение)."""
-    if сигнал.get("трата") is not None:
-        return float(сигнал["трата"]), "трата в SOL/WSOL, курс не нужен"
-    if сигнал.get("трата_минт") in СТАБИЛЬНЫЕ and сигнал.get("трата_ui"):
+    if сигнал.get("spend") is not None:
+        return float(сигнал["spend"]), "трата в SOL/WSOL, курс не нужен"
+    if сигнал.get("spend_mint") in СТАБИЛЬНЫЕ and сигнал.get("spend_ui"):
         if not курс_usd or курс_usd <= 0:
             return None, "курс SOL/USD недоступен"
-        return float(сигнал["трата_ui"]) / float(курс_usd), f"по курсу {курс_usd:.2f} USD/SOL"
+        return float(сигнал["spend_ui"]) / float(курс_usd), f"по курсу {курс_usd:.2f} USD/SOL"
     return None, "трата не определена"
 
 
@@ -437,7 +437,7 @@ def фильтры_dbot(сигнал: dict, трата_sol: float | None, *,
     Порядок сознательно совпадает с тем, что видно в follow_trades:
     сначала «не покупка», потом размер, потом докупка.
     """
-    т = сигнал.get("тип")
+    т = сигнал.get("kind")
     if т == "sell":
         return False, КОД_НЕ_ПОКУПКА, ("продажа источника: sellSettings.mode=only_pnl, "
                                         "DBot копирует только покупки")
@@ -445,16 +445,16 @@ def фильтры_dbot(сигнал: dict, трата_sol: float | None, *,
         return False, (КОД_НЕЯСНО if т == "ambiguous" else
                         КОД_ПОЛУЧЕН_НЕ_КУПЛЕН if т == "received" else
                         КОД_ОШИБКА_ЦЕПИ if т == "fail" else КОД_НЕ_ПОКУПКА), \
-            сигнал.get("решение_причина") or f"тип сигнала {т}"
+            сигнал.get("decide_reason") or f"тип сигнала {т}"
     if трата_sol is None:
         return False, КОД_НЕТ_КУРСА, ("трата источника в стейблах, а курса SOL нет -- "
                                         "порог в SOL-эквиваленте не проверить")
     if трата_sol < порог_sol:
         return False, КОД_МАЛО, (f"вход источника {трата_sol:.3f} SOL-эквивалента "
                                    f"меньше targetMinAmountUI={порог_sol}")
-    if сигнал.get("первый_вход") is False:
+    if сигнал.get("first_entry") is False:
         return False, КОД_ДОКУПКА, "источник докупает уже имеющийся токен (skipTargetIncreasePosition=true)"
-    if сигнал.get("первый_вход") is None:
+    if сигнал.get("first_entry") is None:
         return False, КОД_НЕЯСНО, "первый ли это вход источника -- из транзакции не видно"
     return True, КОД_КУПИТЬ, "фильтры задачи пройдены"
 
@@ -468,53 +468,53 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
     Устаревший сигнал отсекается ДО тормозов: иначе он занял бы подпись
     в «уже видели» и исказил сверку.
     """
-    строка = {"подпись": сигнал.get("подпись"), "источник": сигнал.get("источник"),
-               "минт": сигнал.get("минт"), "слот": сигнал.get("слот"),
-               "тип": сигнал.get("тип"), "трата_sol_экв": трата_sol,
-               "трата_минт": сигнал.get("трата_минт"), "трата_ui": сигнал.get("трата_ui"),
-               "первый_вход": сигнал.get("первый_вход"),
-               "программы_dex": сигнал.get("программы_dex"),
-               "программа_токена": сигнал.get("программа_токена"),
-               "маршрут": сигнал.get("маршрут")}
+    строка = {"signature": сигнал.get("signature"), "source": сигнал.get("source"),
+               "mint": сигнал.get("mint"), "slot": сигнал.get("slot"),
+               "kind": сигнал.get("kind"), "spend_sol_eq": трата_sol,
+               "spend_mint": сигнал.get("spend_mint"), "spend_ui": сигнал.get("spend_ui"),
+               "first_entry": сигнал.get("first_entry"),
+               "dex_programs": сигнал.get("dex_programs"),
+               "token_program": сигнал.get("token_program"),
+               "route": сигнал.get("route")}
 
     отставание = None
-    if slot_ok(текущий_слот) and slot_ok(сигнал.get("слот")):
-        отставание = текущий_слот - сигнал["слот"]
-    строка["отставание_слотов"] = отставание
+    if slot_ok(текущий_слот) and slot_ok(сигнал.get("slot")):
+        отставание = текущий_слот - сигнал["slot"]
+    строка["slot_lag"] = отставание
     if отставание is not None and отставание > макс_отставание:
-        строка.update({"действие": "пропуск", "код": КОД_УСТАРЕЛ,
-                        "причина": (f"сигнал отстал на {отставание} слотов при пороге "
+        строка.update({"action": "skip", "code": КОД_УСТАРЕЛ,
+                        "reason": (f"сигнал отстал на {отставание} слотов при пороге "
                                     f"{макс_отставание} -- цена уже не та")})
         return строка
 
     ок, код, причина = фильтры_dbot(сигнал, трата_sol, порог_sol=порог_sol)
     if not ок:
-        строка.update({"действие": "пропуск", "код": код, "причина": причина,
-                        "фильтр": "задача DBot"})
+        строка.update({"action": "skip", "code": код, "reason": причина,
+                        "filter": "задача DBot"})
         return строка
 
     # Маршрут через промежуточный токен -- НАШ отказ, не отказ DBot: у
     # задач dexFilter=null и такого фильтра нет. Поэтому помечается как
     # наш лимит с dbot_бы_купил, чтобы сверка не считала это расхождением.
-    м = сигнал.get("маршрут") or {}
-    if м.get("через_промежуточный_токен"):
-        строка.update({"действие": "пропуск", "код": КОД_ПРОМЕЖУТОЧНЫЙ,
-                        "причина": (f"источник купил через промежуточный токен "
-                                    f"{', '.join(x[:10] for x in м['промежуточные_минты'])}: "
+    м = сигнал.get("route") or {}
+    if м.get("via_intermediate"):
+        строка.update({"action": "skip", "code": КОД_ПРОМЕЖУТОЧНЫЙ,
+                        "reason": (f"источник купил через промежуточный токен "
+                                    f"{', '.join(x[:10] for x in м['intermediate_mints'])}: "
                                     f"комиссия на перевод берётся на каждой ноге"),
-                        "фильтр": "наш лимит", "dbot_бы_купил": True})
+                        "filter": "наш лимит", "dbot_бы_купил": True})
         return строка
 
     можно, почему, код2 = состояние.can_open_detailed(
-        mint=сигнал["минт"], source_sig=сигнал["подпись"], balance_sol=баланс_sol)
+        mint=сигнал["mint"], source_sig=сигнал["signature"], balance_sol=баланс_sol)
     if not можно:
-        строка.update({"действие": "пропуск", "код": код2, "причина": почему,
-                        "фильтр": "наш лимит",
+        строка.update({"action": "skip", "code": код2, "reason": почему,
+                        "filter": "наш лимит",
                         "dbot_бы_купил": True})
         return строка
 
-    строка.update({"действие": "покупка", "код": КОД_КУПИТЬ,
-                    "причина": "фильтры задачи и наши лимиты пройдены"})
+    строка.update({"action": "buy", "code": КОД_КУПИТЬ,
+                    "reason": "фильтры задачи и наши лимиты пройдены"})
     return строка
 
 
@@ -645,22 +645,22 @@ class Helius:
         расширение у минта меняется эпохами, а не секундами."""
         if минт in self._кеш_минтов:
             return self._кеш_минтов[минт]
-        out = {"минт": минт, "программа_токена": None, "ставка_bps": None,
-                "таксируемый": None}
+        out = {"mint": минт, "token_program": None, "fee_bps": None,
+                "taxed": None}
         try:
             r = self.call("getAccountInfo", [минт, {"encoding": "jsonParsed"}])
         except RuntimeError as exc:
-            out["почему"] = str(exc)[:120]
+            out["why_not"] = str(exc)[:120]
             return out                      # НЕ кешируем неудачу
         val = (r or {}).get("value") or {}
-        out["программа_токена"] = val.get("owner")
+        out["token_program"] = val.get("owner")
         info = (((val.get("data") or {}).get("parsed") or {}).get("info") or {})
-        out["десятичных"] = info.get("decimals")
+        out["decimals"] = info.get("decimals")
         for e in info.get("extensions") or []:
             if isinstance(e, dict) and e.get("extension") == "transferFeeConfig":
                 st = (e.get("state") or {})
-                out["ставка_bps"] = (st.get("newerTransferFee") or {}).get("transferFeeBasisPoints")
-        out["таксируемый"] = bool(out.get("ставка_bps"))
+                out["fee_bps"] = (st.get("newerTransferFee") or {}).get("transferFeeBasisPoints")
+        out["taxed"] = bool(out.get("fee_bps"))
         self._кеш_минтов[минт] = out
         return out
 
@@ -675,7 +675,7 @@ def источники_из_конфига(конфиг: dict, задачи: tup
     девять base58-адресов, а targetNames -- их прозвища).
     """
     out = {}
-    res = ((конфиг or {}).get("тело") or конфиг or {}).get("res") or []
+    res = ((конфиг or {}).get("body") or конфиг or {}).get("res") or []
     for t in res:
         if not isinstance(t, dict):
             continue
@@ -793,47 +793,48 @@ class Детектор:
         return self.состояние.base / "detector_status.json"
 
     def признак_жизни(self) -> dict:
-        st = {"обновлено_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-               "обновлено_ts": time.time(),
-               "живёт_с_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.старт)),
-               "режим": self.режим,
-               "источников": len(self.источники),
-               "источники_откуда": self.откуда_источники,
-               "поколение_источников": self.поколение,
-               "способ_подписки": self.способ,
-               "обрывов_подписки": self.обрывов,
-               "обработано_сигналов": self.обработано,
-               "к_покупке": self.к_покупке,
-               "по_кодам": dict(self.по_кодам),
-               "курс_источник": self.курс.источник,
-               "курс_usd_sol": self.курс.значение,
-               "курс_свежий": self.курс.свежий(),
-               "курс_отказы": self.курс.отказы[-3:]}
+        st = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
+               "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+               "updated_ts": time.time(),
+               "alive_since_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.старт)),
+               "mode": self.режим,
+               "sources": len(self.источники),
+               "sources_from": self.откуда_источники,
+               "sources_generation": self.поколение,
+               "subscribe_method": self.способ,
+               "subscribe_drops": self.обрывов,
+               "signals_seen": self.обработано,
+               "to_buy": self.к_покупке,
+               "by_code": dict(self.по_кодам),
+               "rate_source": self.курс.источник,
+               "rate_usd_sol": self.курс.значение,
+               "rate_fresh": self.курс.свежий(),
+               "rate_failures": self.курс.отказы[-3:]}
         # Рубильник, который не читается, выглядит как включённый: служба
         # молча не торгует. Поэтому доступность пути пишется ОТДЕЛЬНО от
         # состояния -- чтобы почасовая проверка видела поломку, а не тишину.
         доступен, почему = self.состояние.kill_readable()
         убит, причина = self.состояние.kill_active()
-        st["рубильник_путь"] = str(self.состояние.kill_path)
-        st["рубильник_доступен"] = доступен
-        st["рубильник_включён"] = убит
-        st["рубильник_пояснение"] = (почему if доступен else почему) or причина
-        st["слот_сети"] = self.слот_сети
-        st["слот_уведомлений"] = self.слот_уведомлений
-        st["слот_возраст_с"] = (round(time.time() - self.t_слот, 2)
+        st["kill_path"] = str(self.состояние.kill_path)
+        st["kill_readable"] = доступен
+        st["kill_active"] = убит
+        st["kill_note"] = (почему if доступен else почему) or причина
+        st["net_slot"] = self.слот_сети
+        st["slot_notifications"] = self.слот_уведомлений
+        st["net_slot_age_s"] = (round(time.time() - self.t_слот, 2)
                                  if self.t_слот else None)
-        st["баланс_sol"] = self.баланс_sol
-        st["баланс_возраст_с"] = (round(time.time() - self.t_баланс, 2)
+        st["balance_sol"] = self.баланс_sol
+        st["balance_age_s"] = (round(time.time() - self.t_баланс, 2)
                                    if self.t_баланс else None)
-        st["rpc_вызовов"] = self.helius.вызовов
-        st["rpc_по_методам"] = dict(self.helius.по_методам)
-        st["кредитов_за_сессию"] = (getattr(self.helius.метр, "session_credits", None)
+        st["rpc_calls"] = self.helius.вызовов
+        st["rpc_by_method"] = dict(self.helius.по_методам)
+        st["session_credits"] = (getattr(self.helius.метр, "session_credits", None)
                                      if self.helius.метр else None)
-        st["учёт_кредитов_пишется"] = self.helius.учёт_пишется
-        st["учёт_кредитов_почему"] = self.helius.учёт_почему
+        st["credits_logged"] = self.helius.учёт_пишется
+        st["credits_log_error"] = self.helius.учёт_почему
         з = sorted(self.задержки_мс[-200:])
-        st["задержка_решения_мс"] = ({"n": len(з), "медиана": з[len(з) // 2],
-                                       "мин": з[0], "макс": з[-1]} if з else None)
+        st["decide_latency_ms"] = ({"n": len(з), "median": з[len(з) // 2],
+                                       "min": з[0], "max": з[-1]} if з else None)
         ST.atomic_write_json(self.статус_путь(), st)
         return st
 
@@ -883,9 +884,9 @@ class Детектор:
             откуда_разбор = РАЗБОР_ЧЕРЕЗ_RPC
             tx = self.helius.транзакция(подпись)
         if tx is None:
-            строка = {"подпись": подпись, "источник": источник, "слот": слот,
-                       "действие": "пропуск", "код": КОД_НЕ_ДОСТАЛИ, "как": как,
-                       "причина": "getTransaction не отдал транзакцию за отведённые попытки"}
+            строка = {"signature": подпись, "source": источник, "slot": слот,
+                       "action": "skip", "code": КОД_НЕ_ДОСТАЛИ, "via": как,
+                       "reason": "getTransaction не отдал транзакцию за отведённые попытки"}
             self.по_кодам[КОД_НЕ_ДОСТАЛИ] = self.по_кодам.get(КОД_НЕ_ДОСТАЛИ, 0) + 1
             self.состояние.log_decision(строка)
             return строка
@@ -900,28 +901,28 @@ class Детектор:
         t_решение = time.time()
         задержка = round((t_решение - t_recv) * 1000.0, 1)
         self.задержки_мс.append(задержка)
-        строка["как"] = как
-        строка["разбор_откуда"] = откуда_разбор
-        строка["t_получено_ts"] = round(t_recv, 6)
-        строка["t_получено_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_recv))
-        строка["t_решение_ts"] = round(t_решение, 6)
-        строка["задержка_решения_мс"] = задержка
-        строка["слот_источника"] = сиг.get("слот")
-        строка["слот_сети_на_решении"] = self.слот_сети
-        строка["слот_возраст_на_решении_с"] = (round(t_решение - self.t_слот, 3)
+        строка["via"] = как
+        строка["parsed_from"] = откуда_разбор
+        строка["t_recv_ts"] = round(t_recv, 6)
+        строка["t_recv_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_recv))
+        строка["t_decide_ts"] = round(t_решение, 6)
+        строка["decide_latency_ms"] = задержка
+        строка["source_slot"] = сиг.get("slot")
+        строка["net_slot_at_decision"] = self.слот_сети
+        строка["net_slot_age_s"] = (round(t_решение - self.t_слот, 3)
                                                 if self.t_слот else None)
-        строка["курс_пояснение"] = пояснение
-        строка["курс_источник"] = self.курс.источник
-        строка["задача_источника"] = self.источники.get(источник)
-        строка["режим"] = self.режим
-        if строка.get("действие") == "покупка":
+        строка["rate_note"] = пояснение
+        строка["rate_source"] = self.курс.источник
+        строка["source_task"] = self.источники.get(источник)
+        строка["mode"] = self.режим
+        if строка.get("action") == "buy":
             # Это уже ПОСЛЕ решения: на задержку не влияет, в журнал идёт
             # как признак токена, а не как условие покупки.
-            налог = self.helius.налог_минта(строка["минт"])
-            строка["таксируемый"] = налог.get("таксируемый")
-            строка["ставка_налога_bps"] = налог.get("ставка_bps")
+            налог = self.helius.налог_минта(строка["mint"])
+            строка["taxed"] = налог.get("taxed")
+            строка["tax_bps"] = налог.get("fee_bps")
             self.к_покупке += 1
-        код = строка.get("код") or "?"
+        код = строка.get("code") or "?"
         self.по_кодам[код] = self.по_кодам.get(код, 0) + 1
         self.состояние.log_decision(строка)
         return строка
@@ -1179,11 +1180,11 @@ def self_test() -> int:
     # 1. покупка за USDC, первый вход
     t = tx(pre=[бал(USDC, 600_000000)], post=[бал(USDC, 100_000000), бал("MINTA", 5_000000, idx=2)])
     s = сигнал_из_транзакции(t, "SRC", подпись="SIG", слот=100)
-    chk("покупка распознана", s["тип"] == "buy", s["тип"])
-    chk("минт покупки верный", s["минт"] == "MINTA", s["минт"])
-    chk("первый вход виден", s["первый_вход"] is True, s["первый_вход"])
-    chk("трата в USDC = 500", abs((s["трата_ui"] or 0) - 500) < 1e-9, s["трата_ui"])
-    chk("в SOL без курса не пересчитывается", s["трата"] is None, s["трата"])
+    chk("покупка распознана", s["kind"] == "buy", s["kind"])
+    chk("минт покупки верный", s["mint"] == "MINTA", s["mint"])
+    chk("первый вход виден", s["first_entry"] is True, s["first_entry"])
+    chk("трата в USDC = 500", abs((s["spend_ui"] or 0) - 500) < 1e-9, s["spend_ui"])
+    chk("в SOL без курса не пересчитывается", s["spend"] is None, s["spend"])
     v, _ = в_sol(s, 200.0)
     chk("500 USDC при 200 USD/SOL = 2.5 SOL", abs(v - 2.5) < 1e-9, v)
     v2, поч = в_sol(s, None)
@@ -1193,7 +1194,7 @@ def self_test() -> int:
     t2 = tx(pre=[бал(USDC, 600_000000), бал("MINTA", 1_000000, idx=2)],
              post=[бал(USDC, 100_000000), бал("MINTA", 6_000000, idx=2)])
     s2 = сигнал_из_транзакции(t2, "SRC", подпись="SIG2")
-    chk("докупка: первый_вход False", s2["первый_вход"] is False, s2["первый_вход"])
+    chk("докупка: первый_вход False", s2["first_entry"] is False, s2["first_entry"])
     ок, код, _ = фильтры_dbot(s2, 2.5)
     chk("докупка отсекается кодом DBot", (not ок) and код == КОД_ДОКУПКА, код)
 
@@ -1206,7 +1207,7 @@ def self_test() -> int:
     # 4. продажа
     t3 = tx(pre=[бал("MINTA", 5_000000, idx=2)], post=[бал(USDC, 500_000000)])
     s3 = сигнал_из_транзакции(t3, "SRC", подпись="SIG3")
-    chk("продажа распознана", s3["тип"] == "sell", s3["тип"])
+    chk("продажа распознана", s3["kind"] == "sell", s3["kind"])
     ок, код, поч = фильтры_dbot(s3, 5.0)
     chk("продажа не копируется", (not ок) and код == КОД_НЕ_ПОКУПКА, код)
     chk("причина называет only_pnl", "only_pnl" in поч, поч)
@@ -1215,25 +1216,25 @@ def self_test() -> int:
     t4 = tx(pre=[], post=[бал("MINTB", 7_000000, idx=2)],
              native=(3 * LAMPORT, 1 * LAMPORT), fee=5000, ключи=("SRC",))
     s4 = сигнал_из_транзакции(t4, "SRC", подпись="SIG4")
-    chk("трата в SOL посчитана", abs(s4["трата"] - (2 - 5000 / LAMPORT)) < 1e-12, s4["трата"])
-    chk("комиссия вычтена из траты", s4["трата"] < 2.0, s4["трата"])
+    chk("трата в SOL посчитана", abs(s4["spend"] - (2 - 5000 / LAMPORT)) < 1e-12, s4["spend"])
+    chk("комиссия вычтена из траты", s4["spend"] < 2.0, s4["spend"])
     chk("для SOL курс не нужен", в_sol(s4, None)[0] is not None, в_sol(s4, None))
 
     # 6. WSOL считается вместе с нативным
     t5 = tx(pre=[бал(WSOL, 3 * LAMPORT, dec=9)], post=[бал("MINTC", 1, idx=2)])
     s5 = сигнал_из_транзакции(t5, "SRC", подпись="SIG5")
-    chk("WSOL-трата = 3 SOL", abs(s5["трата"] - 3.0) < 1e-9, s5["трата"])
+    chk("WSOL-трата = 3 SOL", abs(s5["spend"] - 3.0) < 1e-9, s5["spend"])
 
     # 7. ошибка цепи
     t6 = tx(pre=[], post=[], err={"InstructionError": [0, "X"]})
     s6 = сигнал_из_транзакции(t6, "SRC", подпись="SIG6")
-    chk("неуспешная транзакция -- не сигнал", s6["тип"] == "fail", s6["тип"])
+    chk("неуспешная транзакция -- не сигнал", s6["kind"] == "fail", s6["kind"])
 
     # 8. два выросших минта -- неоднозначно, а не угадываем
     t7 = tx(pre=[бал(USDC, 600_000000)],
              post=[бал(USDC, 0), бал("M1", 1, idx=2), бал("M2", 1, idx=3)])
     s7 = сигнал_из_транзакции(t7, "SRC", подпись="SIG7")
-    chk("две покупки в одной транзакции -- ambiguous", s7["тип"] == "ambiguous", s7["тип"])
+    chk("две покупки в одной транзакции -- ambiguous", s7["kind"] == "ambiguous", s7["kind"])
     ок, код, _ = фильтры_dbot(s7, 3.0)
     chk("ambiguous не исполняется", (not ок) and код == КОД_НЕЯСНО, код)
 
@@ -1241,9 +1242,9 @@ def self_test() -> int:
     t_пришёл = tx(pre=[], post=[бал("ПОДАРОК", 6_000000, idx=2)])
     s_пришёл = сигнал_из_транзакции(t_пришёл, "SRC", подпись="SIG8b")
     chk("получение токена -- отдельный тип, а не ambiguous",
-        s_пришёл["тип"] == "received", s_пришёл["тип"])
+        s_пришёл["kind"] == "received", s_пришёл["kind"])
     chk("в причине названа нулевая нативная дельта",
-        "+0.000000000 SOL" in s_пришёл["решение_причина"], s_пришёл["решение_причина"])
+        "+0.000000000 SOL" in s_пришёл["decide_reason"], s_пришёл["decide_reason"])
     ок_, код_, _ = фильтры_dbot(s_пришёл, None)
     chk("и свой код, а не AMBIGUOUS_TX",
         (not ок_) and код_ == КОД_ПОЛУЧЕН_НЕ_КУПЛЕН, код_)
@@ -1253,24 +1254,24 @@ def self_test() -> int:
     t8 = tx(pre=[бал(USDC, 600_000000, owner="OTHER")],
              post=[бал("MINTA", 5_000000, owner="OTHER", idx=2)])
     s8 = сигнал_из_транзакции(t8, "SRC", подпись="SIG8")
-    chk("чужие балансы не считаются нашими", s8["тип"] == "other", s8["тип"])
+    chk("чужие балансы не считаются нашими", s8["kind"] == "other", s8["kind"])
 
     # 10. программы DEX -- факт, а не догадка
     t9 = tx(pre=[бал(USDC, 600_000000)], post=[бал(USDC, 0), бал("MINTA", 5_000000, idx=2)],
              инстр=("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", "НЕИЗВЕСТНАЯ"))
     s9 = сигнал_из_транзакции(t9, "SRC", подпись="SIG9")
-    chk("известная программа DEX названа", s9["программы_dex"] == ["Raydium AMM v4"], s9["программы_dex"])
-    chk("неизвестная программа не выдумывается", "НЕИЗВЕСТНАЯ" not in str(s9["программы_dex"]))
+    chk("известная программа DEX названа", s9["dex_programs"] == ["Raydium AMM v4"], s9["dex_programs"])
+    chk("неизвестная программа не выдумывается", "НЕИЗВЕСТНАЯ" not in str(s9["dex_programs"]))
     chk("адрес пула не придумывается", "пул" not in s9 and s9.get("pool") is None)
 
     # 11. Token-2022 виден из балансов
     t10 = tx(pre=[бал(USDC, 600_000000)],
               post=[бал(USDC, 0), бал("MINTA", 5_000000, idx=2, prog=TOKEN_2022)])
     s10 = сигнал_из_транзакции(t10, "SRC", подпись="SIG10")
-    chk("программа токена определена", s10["программа_токена"] == TOKEN_2022, s10["программа_токена"])
+    chk("программа токена определена", s10["token_program"] == TOKEN_2022, s10["token_program"])
 
     # 12. источники из конфига
-    конфиг = {"тело": {"res": [
+    конфиг = {"body": {"res": [
         {"name": "BATCH-5", "enabled": True, "targetIds": ["Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn"]},
         {"name": "BATCH-3", "enabled": True, "targetIds": ["BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm"]},
         {"name": "BATCH-7", "enabled": True, "targetIds": ["4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8"]},
@@ -1284,13 +1285,13 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         r = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
-        chk("решение -- покупка", r["действие"] == "покупка", r)
-        chk("код покупки", r["код"] == КОД_КУПИТЬ, r["код"])
+        chk("решение -- покупка", r["action"] == "buy", r)
+        chk("код покупки", r["code"] == КОД_КУПИТЬ, r["code"])
         r2 = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=105)
-        chk("устаревший сигнал отсекается", r2["код"] == КОД_УСТАРЕЛ, r2["код"])
-        chk("устаревание проверяется до наших лимитов", r2.get("фильтр") is None, r2.get("фильтр"))
+        chk("устаревший сигнал отсекается", r2["code"] == КОД_УСТАРЕЛ, r2["code"])
+        chk("устаревание проверяется до наших лимитов", r2.get("filter") is None, r2.get("filter"))
         r3 = решение(s, состояние=st, трата_sol=2.5, баланс_sol=0.05, текущий_слот=101)
-        chk("нехватка баланса -- наш лимит", r3["код"] == ST.КОД_БАЛАНС, r3["код"])
+        chk("нехватка баланса -- наш лимит", r3["code"] == ST.КОД_БАЛАНС, r3["code"])
         chk("помечено, что DBot бы купил", r3.get("dbot_бы_купил") is True, r3.get("dbot_бы_купил"))
 
         # дубль по минту -- отдельный код, а не «расхождение»
@@ -1298,14 +1299,14 @@ def self_test() -> int:
                          source_slot=1, sol_in=0.2, pool=None, program=None,
                          taxed=None, tax_bps=None, mode="dry", sell_after_s=28.8)
         r4 = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
-        chk("дубль по минту -- SKIPPED_DUP_MINT", r4["код"] == "SKIPPED_DUP_MINT", r4["код"])
-        chk("дубль помечен как наш лимит", r4.get("фильтр") == "наш лимит", r4.get("фильтр"))
+        chk("дубль по минту -- SKIPPED_DUP_MINT", r4["code"] == "SKIPPED_DUP_MINT", r4["code"])
+        chk("дубль помечен как наш лимит", r4.get("filter") == "наш лимит", r4.get("filter"))
 
         # рубильник сильнее всего остального
         st.kill_path.write_text("стоп", encoding="utf-8")
         r5 = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
-        chk("рубильник запрещает покупку", r5["действие"] == "пропуск", r5)
-        chk("код рубильника", r5["код"] == ST.КОД_РУБИЛЬНИК, r5["код"])
+        chk("рубильник запрещает покупку", r5["action"] == "skip", r5)
+        chk("код рубильника", r5["code"] == ST.КОД_РУБИЛЬНИК, r5["code"])
 
     # 14. курс: без сети не выдумывается
     к = КурсSOL(ttl_s=1.0)
@@ -1326,19 +1327,24 @@ def self_test() -> int:
                             курс=КурсSOL(), режим="dry")
             j = det.признак_жизни()
             chk("признак жизни записан на диск", det.статус_путь().exists())
-            chk("в признаке жизни виден режим", j["режим"] == "dry", j["режим"])
-            chk("в признаке жизни число источников", j["источников"] == 2, j["источников"])
+            chk("в признаке жизни виден режим", j["mode"] == "dry", j["mode"])
+            chk("в признаке жизни есть версия формата",
+                j.get(ST.SCHEMA_VERSION_KEY) == ST.SCHEMA_VERSION,
+                j.get(ST.SCHEMA_VERSION_KEY))
+            chk("все ключи признака жизни латинские",
+                all(k.isascii() for k in j), [k for k in j if not k.isascii()])
+            chk("в признаке жизни число источников", j["sources"] == 2, j["sources"])
             chk("в признаке жизни видно, читается ли рубильник",
-                j["рубильник_доступен"] is True and j["рубильник_включён"] is False,
-                (j["рубильник_доступен"], j["рубильник_включён"]))
+                j["kill_readable"] is True and j["kill_active"] is False,
+                (j["kill_readable"], j["kill_active"]))
             det2 = Детектор(источники=dict(ист), состояние=ST.ExecState(
                 base=Path(d) / "s3", kill=Path(d) / "нет_каталога" / "KILL"),
                 helius=Helius(key="нет"), курс=КурсSOL(), режим="dry")
             j2 = det2.признак_жизни()
             chk("нечитаемый рубильник не выдаётся за выключенный",
-                j2["рубильник_доступен"] is False, j2["рубильник_доступен"])
+                j2["kill_readable"] is False, j2["kill_readable"])
             снят = json.loads(det.статус_путь().read_text(encoding="utf-8"))
-            chk("файл признака жизни читается", снят["источников"] == 2, снят)
+            chk("файл признака жизни читается", снят["sources"] == 2, снят)
 
             # смена списка поднимает поколение
             det.источники = {"ОДИН": "BATCH-5"}
@@ -1351,6 +1357,41 @@ def self_test() -> int:
         finally:
             if было is not None:
                 os.environ["DBOT_API_KEY"] = было
+
+    # 15b. ветка "решение -- покупка" в обработать(): именно она сломалась
+    # молча при переводе ключей на ASCII, потому что её не покрывал ни один
+    # тест. Сравнение шло со строкой, которую переименовали в другом месте.
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+
+        class HeliusЗаглушка(Helius):
+            def __init__(self):
+                super().__init__(key="нет", служба="")
+                self.спрошено = []
+
+            def налог_минта(self, минт):
+                self.спрошено.append(минт)
+                return {"taxed": True, "fee_bps": 300}
+
+        h = HeliusЗаглушка()
+        det = Детектор(источники={"SRC": "BATCH-5"}, состояние=st, helius=h,
+                        курс=КурсSOL(), режим="dry")
+        det.курс.значение, det.курс.когда = 200.0, time.time()
+        det.слот_сети, det.t_слот = 100, time.time()
+        det.баланс_sol, det.t_баланс = 5.0, time.time()
+        t_ок = tx(pre=[бал(USDC, 600_000000)],
+                   post=[бал(USDC, 0), бал("MINT_OK", 5_000000, idx=2)])
+        r = det.обработать("ПОДПИСЬ_ОК", 100, "SRC", "тест", t_ок)
+        chk("решение о покупке доходит до ветки покупки",
+            r["action"] == "buy", r.get("action"))
+        chk("налог минта спрошен именно в этой ветке",
+            h.спрошено == ["MINT_OK"], h.спрошено)
+        chk("признак налога попал в запись",
+            r.get("taxed") is True and r.get("tax_bps") == 300, r.get("taxed"))
+        chk("счётчик к покупке вырос", det.к_покупке == 1, det.к_покупке)
+        chk("все ключи записи решения латинские",
+            all(k.isascii() for k in r), [k for k in r if not k.isascii()])
+        chk("значение action тоже латинское", r["action"].isascii(), r["action"])
 
     # 16. маршрут: промежуточный токен виден, прямой -- нет
     def tx_маршрут(минты_пулов):
@@ -1366,37 +1407,37 @@ def self_test() -> int:
 
     s_прямой = сигнал_из_транзакции(tx_маршрут([]), "SRC", подпись="M1")
     chk("прямой маршрут: промежуточных нет",
-        s_прямой["маршрут"]["промежуточные_минты"] == [], s_прямой["маршрут"])
+        s_прямой["route"]["intermediate_mints"] == [], s_прямой["route"])
     chk("прямой маршрут не помечен как через промежуточный",
-        s_прямой["маршрут"]["через_промежуточный_токен"] is False)
-    chk("вызовы DEX посчитаны", s_прямой["маршрут"]["вызовов_dex"] == 2,
-        s_прямой["маршрут"]["вызовов_dex"])
+        s_прямой["route"]["via_intermediate"] is False)
+    chk("вызовы DEX посчитаны", s_прямой["route"]["dex_calls"] == 2,
+        s_прямой["route"]["dex_calls"])
 
     s_через = сигнал_из_транзакции(tx_маршрут(["ПРОМЕЖ"]), "SRC", подпись="M2")
     chk("промежуточный минт найден",
-        s_через["маршрут"]["промежуточные_минты"] == ["ПРОМЕЖ"], s_через["маршрут"])
+        s_через["route"]["intermediate_mints"] == ["ПРОМЕЖ"], s_через["route"])
     chk("помечен как через промежуточный",
-        s_через["маршрут"]["через_промежуточный_токен"] is True)
+        s_через["route"]["via_intermediate"] is True)
     chk("хопов больше, чем у прямого",
-        s_через["маршрут"]["хопов_оценка_по_минтам"]
-        > s_прямой["маршрут"]["хопов_оценка_по_минтам"],
-        (s_через["маршрут"]["хопов_оценка_по_минтам"],
-         s_прямой["маршрут"]["хопов_оценка_по_минтам"]))
+        s_через["route"]["hops_by_mints"]
+        > s_прямой["route"]["hops_by_mints"],
+        (s_через["route"]["hops_by_mints"],
+         s_прямой["route"]["hops_by_mints"]))
     s_wsol = сигнал_из_транзакции(tx_маршрут([WSOL, USDT]), "SRC", подпись="M3")
     chk("котировочные минты не считаются промежуточными",
-        s_wsol["маршрут"]["промежуточные_минты"] == [], s_wsol["маршрут"])
+        s_wsol["route"]["intermediate_mints"] == [], s_wsol["route"])
 
     with tempfile.TemporaryDirectory() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         r = решение(s_через, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=100)
-        chk("маршрут через промежуточный -- пропуск", r["действие"] == "пропуск", r)
-        chk("код INTERMEDIATE_ROUTE", r["код"] == КОД_ПРОМЕЖУТОЧНЫЙ, r["код"])
-        chk("это НАШ лимит, а не отказ DBot", r.get("фильтр") == "наш лимит", r.get("фильтр"))
+        chk("маршрут через промежуточный -- пропуск", r["action"] == "skip", r)
+        chk("код INTERMEDIATE_ROUTE", r["code"] == КОД_ПРОМЕЖУТОЧНЫЙ, r["code"])
+        chk("это НАШ лимит, а не отказ DBot", r.get("filter") == "наш лимит", r.get("filter"))
         chk("помечено, что DBot бы купил", r.get("dbot_бы_купил") is True)
         r2 = решение(s_прямой, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=100)
-        chk("прямой маршрут покупается", r2["действие"] == "покупка", r2)
-        chk("в решении есть маршрут", (r2.get("маршрут") or {}).get("вызовов_dex") == 2,
-            r2.get("маршрут"))
+        chk("прямой маршрут покупается", r2["action"] == "buy", r2)
+        chk("в решении есть маршрут", (r2.get("route") or {}).get("dex_calls") == 2,
+            r2.get("route"))
 
     # 17. свежесть баланса: протухший баланс -- это неизвестный баланс
     with tempfile.TemporaryDirectory() as d:
@@ -1526,15 +1567,15 @@ def main() -> int:
     детектор.откуда_источники = откуда
 
     if a.check_only:
-        print(json.dumps({"источников": len(ист), "откуда": откуда,
-                           "задачи": sorted(set(ист.values())),
-                           "адреса": sorted(ист),
-                           "курс_usd_sol": курс.получить(),
-                           "курс_источник": курс.источник,
-                           "курс_отказы": курс.отказы,
-                           "слот": helius.слот(),
-                           "рубильник": состояние.kill_active(),
-                           "признак_жизни": str(детектор.статус_путь())},
+        print(json.dumps({"sources": len(ист), "from_where": откуда,
+                           "tasks": sorted(set(ист.values())),
+                           "addresses": sorted(ист),
+                           "rate_usd_sol": курс.получить(),
+                           "rate_source": курс.источник,
+                           "rate_failures": курс.отказы,
+                           "slot": helius.слот(),
+                           "kill_switch": состояние.kill_active(),
+                           "heartbeat_path": str(детектор.статус_путь())},
                           ensure_ascii=False, indent=2))
         return 0
 

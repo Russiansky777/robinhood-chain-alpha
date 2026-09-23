@@ -119,9 +119,9 @@ jobs:
               printf 'первое: %s\n' \"\$(head -n 1 \"\$F\" | grep -oE '\"ts_utc\": ?\"[^\"]*\"' | head -n 1)\"
               printf 'последнее: %s\n' \"\$(tail -n 1 \"\$F\" | grep -oE '\"ts_utc\": ?\"[^\"]*\"' | head -n 1)\"
               echo 'по кодам:'
-              grep -oE '\"код\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
+              grep -oE '\"code\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
               echo 'по задачам источника:'
-              grep -oE '\"задача_источника\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
+              grep -oE '\"source_task\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
             else
               echo 'журнал решений пуст'
             fi
