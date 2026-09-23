@@ -62,7 +62,35 @@ jobs:
         run: |
           ssh -n $SSH_OPTS root@45.59.170.76 '
             cd /home/bot/dbot_sold_guard 2>/dev/null || cd /home/bot
-            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only" 2>&1 | tail -60
+            # Раньше здесь был source под sudo -u bot, и он молча не давал
+            # окружения: --check-only падал на "DBOT_API_KEY пуст". Берём
+            # переменные ровно так же, как их берёт systemd -- через env-файл
+            # целиком, и запускаем от root, как и сама служба.
+            set -a; . /etc/dbot-guard/env; set +a
+            /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only 2>&1 | tail -60
+          ' 2>&1 | tee -a data/guard_state_check.txt
+
+      - name: "4. Целостность env-файлов (я их правил -- проверяю, что не испортил). ТОЛЬКО ИМЕНА"
+        run: |
+          # Ключи и значения НЕ печатаются: только имена переменных, число
+          # строк и явная пометка строк, не похожих на ИМЯ=значение.
+          # Риск, который проверяем: дописывание в файл без завершающего
+          # перевода строки склеило бы последнюю строку с новой.
+          ssh -n $SSH_OPTS root@45.59.170.76 '
+            for f in /etc/dbot-guard/env /etc/dbot-detect-probe/env; do
+              echo "=== $f ==="
+              [ -f "$f" ] || { echo "нет файла"; continue; }
+              echo "строк: $(wc -l < "$f"); последний байт перевод строки: $(tail -c1 "$f" | od -An -c | tr -d " ")"
+              echo "имена переменных:"
+              grep -oE "^[A-Za-z_][A-Za-z0-9_]*=" "$f" | tr -d "=" | sort | sed "s/^/  /"
+              bad=$(grep -vcE "^([A-Za-z_][A-Za-z0-9_]*=|#|$)" "$f")
+              echo "строк НЕ вида ИМЯ=значение: $bad"
+              if [ "$bad" != "0" ]; then
+                echo "  номера таких строк:"; grep -nvE "^([A-Za-z_][A-Za-z0-9_]*=|#|$)" "$f" | cut -d: -f1 | sed "s/^/    /"
+              fi
+              echo "дубли имён:"; grep -oE "^[A-Za-z_][A-Za-z0-9_]*=" "$f" | sort | uniq -d | sed "s/^/  /"
+              echo "копии, сделанные перед правкой:"; ls -1 "$f".bak.* 2>/dev/null | tail -3 | sed "s/^/  /"
+            done
           ' 2>&1 | tee -a data/guard_state_check.txt
 
       - name: "Коммит"
