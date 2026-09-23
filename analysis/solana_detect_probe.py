@@ -260,6 +260,29 @@ HELIUS_REPROBE_S = 600.0
 _helius_429_streak = 0
 _helius_demoted_until = 0.0
 _rpc_lock = threading.Lock()
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from solana_rpc_client import CreditMeter as _CreditMeter  # noqa: PLC0415
+    _METER = _CreditMeter("зонд")
+except Exception:  # noqa: BLE001 -- учёт не должен ронять зонд
+    _METER = None
+
+
+def _charge(url: str, method: str, n_bytes: int = 0) -> None:
+    """Кредиты Helius. Публичный узел бесплатен.
+    Трафик WebSocket считается отдельно: 2 кредита за 0.1 МБ."""
+    if _METER is None or url == PUBLIC_RPC:
+        return
+    try:
+        if n_bytes:
+            chunk = 100_000
+            _METER.add(2 * ((n_bytes + chunk - 1) // chunk), bytes_in=n_bytes)
+        else:
+            _METER.add(10 if method == "getProgramAccounts" else 1)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 RPC_STATS: dict = {"helius_ok": 0, "helius_429": 0, "публичный_ok": 0, "публичный_429": 0,
                     "helius_понижен": False, "первый_ответ_429_от_helius": None}
 
@@ -309,6 +332,7 @@ def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | N
     pinned = url  # явно заданный адрес (сверка у второго провайдера) не подменяем
     for attempt in range(4):
         url = pinned or _pick_url(key)
+        _charge(url, method)
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                   timeout=30)
@@ -373,6 +397,7 @@ def rpc_checked(method: str, params: list, key: str,
     last = None
     for attempt in range(4):
         url = pinned or _pick_url(key)
+        _charge(url, method)
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1,
                                              "method": method, "params": params}, timeout=30)

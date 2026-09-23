@@ -59,9 +59,28 @@ CREDITS_BY_METHOD = {"getProgramAccounts": 10}
 CREDITS_ENHANCED = 100
 CREDITS_PER_01MB_WS = 2
 
-# Дневной бюджет кредитов по службам (владелец).
-DAILY_BUDGET = {"зонд": 150_000, "ledger": 50_000, "прогоны": 100_000}
+# Дневной бюджет кредитов (владелец, уточнено 23.09).
+#
+# Службы названы поимённо, а не одним словом "прогоны": на замере надо
+# видеть, КТО именно ест кредиты, иначе цифра "прогоны: столько-то"
+# ничего не подсказывает. Бюджет при этом общий на всю группу прогонов --
+# они не идут одновременно постоянно, и делить его поштучно значило бы
+# душить тот прогон, который сегодня нужнее.
+DAILY_BUDGET = {"зонд": 150_000, "ledger": 50_000}
+BUDGET_GROUPS = {"прогоны": 200_000}
+GROUP_OF = {
+    "горизонты": "прогоны",
+    "разбор_пилота": "прогоны",
+    "ретро": "прогоны",
+    "скан_толпы": "прогоны",
+    "порог_влияния": "прогоны",
+    "прогоны": "прогоны",
+}
 WARN_AT = 0.70
+# Что делать при 70%. Владелец: горизонты НЕ останавливать, только
+# доложить. Поэтому флаг -- сигнальный, а не тормоз: ни одна служба здесь
+# сама себя не глушит.
+STOP_AT_WARN = False
 
 
 def helius_key() -> tuple[str, str]:
@@ -150,10 +169,22 @@ class CreditMeter:
             h = svc["по_часам"].setdefault(hour, {"кредитов": 0, "байт": 0})
             h["кредитов"] += credits
             h["байт"] += bytes_in
-            svc["бюджет_за_день"] = DAILY_BUDGET.get(self.service)
+            group = GROUP_OF.get(self.service)
+            svc["группа"] = group
+            own = DAILY_BUDGET.get(self.service)
+            svc["бюджет_за_день"] = own if own else BUDGET_GROUPS.get(group)
+            # У службы из группы бюджет ОБЩИЙ: считаем потраченное всей
+            # группой, иначе каждая по отдельности вечно будет "в норме",
+            # а вместе они уже вышли за предел.
+            spent = svc["кредитов_за_день"]
+            if group:
+                spent = sum(v.get("кредитов_за_день", 0) for k, v in d.items()
+                            if isinstance(v, dict) and GROUP_OF.get(k) == group)
+                svc["потрачено_группой"] = spent
             if svc["бюджет_за_день"]:
-                svc["доля_бюджета"] = round(svc["кредитов_за_день"] / svc["бюджет_за_день"], 4)
+                svc["доля_бюджета"] = round(spent / svc["бюджет_за_день"], 4)
                 svc["выше_70_процентов"] = svc["доля_бюджета"] >= WARN_AT
+                svc["останавливать_при_пороге"] = STOP_AT_WARN
             data["обновлено_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             data["тариф"] = "Developer: 10 млн кредитов/мес, 50 rps узел, 10 rps расширенные API"
             data["бюджеты_за_день"] = DAILY_BUDGET
@@ -165,8 +196,12 @@ class CreditMeter:
     @staticmethod
     def over_budget(service: str, path: Path = USAGE_PATH) -> dict:
         """Состояние бюджета службы: доля и флаг 70%."""
-        out = {"служба": service, "бюджет": DAILY_BUDGET.get(service),
-               "потрачено": 0, "доля": 0.0, "выше_70_процентов": False}
+        group = GROUP_OF.get(service)
+        own = DAILY_BUDGET.get(service)
+        out = {"служба": service, "группа": group,
+               "бюджет": own if own else BUDGET_GROUPS.get(group),
+               "потрачено": 0, "потрачено_группой": 0, "доля": 0.0,
+               "выше_70_процентов": False, "останавливать_при_пороге": STOP_AT_WARN}
         if not path.exists():
             return out
         try:
@@ -174,11 +209,58 @@ class CreditMeter:
         except (ValueError, OSError):
             return out
         day = time.strftime("%Y-%m-%d", time.gmtime())
-        svc = ((data.get("дни") or {}).get(day) or {}).get(service) or {}
+        d = (data.get("дни") or {}).get(day) or {}
+        svc = d.get(service) or {}
         out["потрачено"] = svc.get("кредитов_за_день", 0)
+        spent = out["потрачено"]
+        if group:
+            spent = sum(v.get("кредитов_за_день", 0) for k, v in d.items()
+                        if isinstance(v, dict) and GROUP_OF.get(k) == group)
+        out["потрачено_группой"] = spent
         if out["бюджет"]:
-            out["доля"] = round(out["потрачено"] / out["бюджет"], 4)
+            out["доля"] = round(spent / out["бюджет"], 4)
             out["выше_70_процентов"] = out["доля"] >= WARN_AT
+        return out
+
+    @staticmethod
+    def report(path: Path = USAGE_PATH, day: str | None = None) -> dict:
+        """Расход за день по КАЖДОЙ службе отдельно + по группам.
+
+        Нужен ровно для замера: без разбивки поимённо не видно, кто ест."""
+        out = {"день": day or time.strftime("%Y-%m-%d", time.gmtime()),
+               "по_службам": {}, "по_группам": {}, "всего_кредитов": 0}
+        if not path.exists():
+            out["почему_пусто"] = f"файла {path} нет -- ни одна служба ещё не писала учёт"
+            return out
+        try:
+            data = json.loads(path.read_text())
+        except (ValueError, OSError) as exc:
+            out["почему_пусто"] = f"файл не читается: {type(exc).__name__}"
+            return out
+        d = (data.get("дни") or {}).get(out["день"]) or {}
+        for name, v in sorted(d.items()):
+            if not isinstance(v, dict):
+                continue
+            hours = v.get("по_часам") or {}
+            out["по_службам"][name] = {
+                "кредитов_за_день": v.get("кредитов_за_день", 0),
+                "байт_за_день": v.get("байт_за_день", 0),
+                "часов_с_активностью": len(hours),
+                "кредитов_в_час_в_среднем": (round(v.get("кредитов_за_день", 0) / len(hours))
+                                              if hours else None),
+                "пик_за_час": max((h.get("кредитов", 0) for h in hours.values()), default=0),
+                "группа": GROUP_OF.get(name),
+            }
+            out["всего_кредитов"] += v.get("кредитов_за_день", 0)
+        for g, budget in BUDGET_GROUPS.items():
+            spent = sum(x["кредитов_за_день"] for n, x in out["по_службам"].items()
+                        if GROUP_OF.get(n) == g)
+            out["по_группам"][g] = {"потрачено": spent, "бюджет": budget,
+                                     "доля": round(spent / budget, 4) if budget else None}
+        for n, budget in DAILY_BUDGET.items():
+            spent = out["по_службам"].get(n, {}).get("кредитов_за_день", 0)
+            out["по_группам"][n] = {"потрачено": spent, "бюджет": budget,
+                                     "доля": round(spent / budget, 4) if budget else None}
         return out
 
 
@@ -446,6 +528,24 @@ def self_test() -> None:
     chk("порог 70% срабатывает", st["выше_70_процентов"] is True, str(st))
     chk("другая служба не задета",
         CreditMeter.over_budget("ledger", tmp)["потрачено"] == 0)
+
+    m2 = CreditMeter("горизонты", tmp)
+    m2.add(50_000)
+    m3 = CreditMeter("разбор_пилота", tmp)
+    svc3 = m3.add(100_000)
+    chk("бюджет группы прогонов -- 200 тыс.", svc3["бюджет_за_день"] == 200_000,
+        str(svc3["бюджет_за_день"]))
+    chk("считается потраченное ВСЕЙ группой", svc3["потрачено_группой"] == 150_000,
+        str(svc3["потрачено_группой"]))
+    chk("порог 70% от группы, а не от службы", svc3["выше_70_процентов"] is True,
+        str(svc3["доля_бюджета"]))
+    chk("при пороге НЕ останавливаемся", svc3["останавливать_при_пороге"] is False)
+    rep = CreditMeter.report(tmp)
+    chk("в отчёте службы видны поимённо",
+        set(rep["по_службам"]) >= {"зонд", "горизонты", "разбор_пилота"}, str(list(rep["по_службам"])))
+    chk("и группа посчитана отдельно", rep["по_группам"]["прогоны"]["потрачено"] == 150_000,
+        str(rep["по_группам"]["прогоны"]))
+    chk("зонд в группу прогонов не попал", rep["по_службам"]["зонд"]["группа"] is None)
 
     r = SolanaRpc("прогоны", key="KEY", usage_path=tmp)
     chk("пока Helius жив -- Helius", r.pick_url().startswith(HELIUS_RPC_HOST))

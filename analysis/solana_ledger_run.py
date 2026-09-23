@@ -142,6 +142,24 @@ HELIUS_REPROBE_S = 600.0
 _rpc_lock = threading.Lock()
 _public_last_call = 0.0
 
+# Учёт кредитов Helius по имени службы (см. solana_rpc_client.CreditMeter).
+# Публичный узел бесплатен и не считается.
+try:
+    from solana_rpc_client import CreditMeter as _CreditMeter  # noqa: PLC0415
+    _METER = _CreditMeter("ledger")
+except Exception:  # noqa: BLE001 -- учёт не должен ронять конвейер
+    _METER = None
+
+
+def _charge(url: str, method: str) -> None:
+    if _METER is None or url == PUBLIC_RPC:
+        return
+    try:
+        _METER.add(10 if method == "getProgramAccounts" else 1)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 RPC_STATS: dict = {
     "helius_ok": 0, "helius_429": 0, "helius_прочие_ошибки": 0,
     "публичный_ok": 0, "публичный_429": 0, "публичный_прочие_ошибки": 0,
@@ -214,6 +232,7 @@ def rpc_call(method: str, params: list, retries: int = 20):
         url = _helius_url() if _helius_available() else PUBLIC_RPC
         if url is None:
             url = PUBLIC_RPC
+        _charge(url, method)
         try:
             resp = _post_rpc(url, payload, 30)
         except Exception as exc:  # noqa: BLE001

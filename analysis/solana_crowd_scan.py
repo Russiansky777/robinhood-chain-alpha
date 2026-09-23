@@ -117,7 +117,8 @@ class Rpc:
     спираль бэкоффа. Темп 0.12с, множитель 1.5 и потолок 8с держат
     нагрузку под лимитом провайдера."""
     def __init__(self, key: str, min_interval_s: float = 0.12, workers: int = 4,
-                  backoff_mult: float = 1.5, backoff_cap: float = 8.0) -> None:
+                  backoff_mult: float = 1.5, backoff_cap: float = 8.0,
+                  service: str | None = None) -> None:
         self.key = key
         self.url = f"https://mainnet.helius-rpc.com/?api-key={key}"
         self.min_interval_s = min_interval_s
@@ -143,6 +144,28 @@ class Rpc:
         self._demoted_until = 0.0
         self.first_429_body: str | None = None
         self.demoted_once = False
+        # Учёт кредитов Helius по ИМЕНИ службы. Без него замер показывает
+        # одну общую цифру, по которой не видно, кто именно ест.
+        self.service = service
+        self.meter = None
+        if service:
+            try:
+                from solana_rpc_client import CreditMeter  # noqa: PLC0415
+                self.meter = CreditMeter(service)
+            except Exception:  # noqa: BLE001 -- учёт не должен ронять прогон
+                self.meter = None
+        self.credits = 0
+
+    def _charge(self, target: str, method: str) -> None:
+        """Кредиты берёт только Helius: публичный узел бесплатен."""
+        if target == PUBLIC_RPC or self.meter is None:
+            return
+        cost = 10 if method == "getProgramAccounts" else 1
+        self.credits += cost
+        try:
+            self.meter.add(cost)
+        except Exception:  # noqa: BLE001
+            pass
 
     def target_url(self) -> str:
         """Helius, пока он не понижен; иначе публичный узел."""
@@ -211,6 +234,7 @@ class Rpc:
                 raise RuntimeError(f"{method}: бюджет времени прогона истёк")
             target = pinned or self.target_url()
             self._pace()
+            self._charge(target, method)
             try:
                 resp = self.session().post(
                     target, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=45)

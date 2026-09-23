@@ -346,7 +346,7 @@ def main() -> None:
     except Exception:  # noqa: BLE001
         key, key_name = "", "нет"
     rpc = Rpc(key, min_interval_s=args.min_interval_s, workers=args.workers,
-              backoff_mult=1.5, backoff_cap=15.0)
+              backoff_mult=1.5, backoff_cap=15.0, service="горизонты")
     if args.public_only:
         rpc.url = PUBLIC_RPC
         rpc.allow_public = False
