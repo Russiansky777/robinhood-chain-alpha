@@ -159,7 +159,11 @@ def полная_картина(tx: dict) -> dict:
                 "mint": инфо.get("mint"),
                 "amount": ((инфо.get("tokenAmount") or {}).get("uiAmountString")
                            or инфо.get("amount"))})
+    # Логи инструкций: без них "ProgramFailedToComplete" -- это констатация
+    # без причины. Берётся хвост: причина всегда в последних строках.
+    логи = (meta.get("logMessages") or [])[-25:]
     return {"token_deltas": строки, "spl_transfers": переводы_spl,
+            "logs_tail": логи,
             "programs": программы(tx),
             "fee_payer": (все_счета(tx) or [None])[0],
             "signers": [k for k in (все_счета(tx) or [])[:3]],
@@ -431,6 +435,8 @@ def main() -> int:
             for d in t.get("token_deltas") or []:
                 print(f"    {str(d['owner'])[:12]} {str(d['mint'])[:12]} "
                       f"{d['before']} -> {d['after']} ({d['delta']:+})")
+            for л in t.get("logs_tail") or []:
+                print(f"    лог: {л[:160]}")
             for пер in (t.get("spl_transfers") or [])[:8]:
                 print(f"    перевод {пер['amount']} {str(пер.get('mint'))[:10]}: "
                       f"{str(пер.get('source'))[:10]} -> {str(пер.get('destination'))[:10]}"
