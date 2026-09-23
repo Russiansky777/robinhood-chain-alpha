@@ -1,70 +1,73 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-23T20:14:44Z",
+  "built_utc": "2026-09-23T20:44:15Z",
   "since_ts": null,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 0,
-    "v2": 17
+    "v2": 51
   },
   "decisions": {
-    "total": 17,
-    "real_sources": 17,
+    "total": 51,
+    "real_sources": 51,
     "test_source": 0,
     "by_code": {
-      "TARGET_AMOUNT_OUT_OF_RANGE": 9,
-      "NOT_A_BUY": 7,
-      "TOKEN_RECEIVED_NOT_BOUGHT": 1
+      "TARGET_AMOUNT_OUT_OF_RANGE": 18,
+      "NOT_A_BUY": 23,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 3,
+      "INTERMEDIATE_ROUTE": 3,
+      "AMBIGUOUS_TX": 1,
+      "SKIP_TARGET_INCREASE_POSITION": 3
     },
     "by_code_test_source": {}
   },
   "parse_groups": {
-    "total": 17,
+    "total": 51,
     "by_group": {
       "PARSE_VIA_MSG": {
-        "decisions": 6,
-        "share": 0.3529,
+        "decisions": 29,
+        "share": 0.5686,
         "to_buy": 0,
         "slot_lag": {
-          "n": 6,
+          "n": 29,
           "min": 0,
-          "median": 0.0,
+          "median": 0,
           "max": 0
         },
         "net_slot_minus_source": {
-          "n": 6,
+          "n": 29,
           "min": 0,
-          "median": 0.0,
+          "median": 0,
           "max": 0
         },
         "decide_latency_ms": {
-          "n": 6,
-          "min": 0.3,
-          "median": 0.35,
-          "max": 0.4
+          "n": 29,
+          "min": 0.2,
+          "median": 0.5,
+          "max": 1.3
         }
       },
       "PARSE_VIA_RPC": {
-        "decisions": 11,
-        "share": 0.6471,
+        "decisions": 22,
+        "share": 0.4314,
         "to_buy": 0,
         "slot_lag": {
-          "n": 11,
+          "n": 22,
           "min": 1,
-          "median": 1,
+          "median": 1.0,
           "max": 2
         },
         "net_slot_minus_source": {
-          "n": 11,
+          "n": 22,
           "min": 1,
-          "median": 1,
+          "median": 1.0,
           "max": 2
         },
         "decide_latency_ms": {
-          "n": 11,
-          "min": 244.5,
-          "median": 288.7,
+          "n": 22,
+          "min": 244.0,
+          "median": 322.45,
           "max": 618.3
         }
       }
@@ -273,27 +276,131 @@
     "route_known": 0,
     "multihop": 0,
     "multihop_share": null,
-    "skipped_intermediate": 0
+    "skipped_intermediate": 3
   },
   "our_brakes": {
-    "by_code": {},
-    "total": 0
+    "by_code": {
+      "INTERMEDIATE_ROUTE": 3
+    },
+    "total": 3
   },
   "reconciliation": {
     "known": true,
-    "signals_dbot_would_buy": 0,
-    "compared": 0,
-    "agreed": 0,
+    "signals_dbot_would_buy": 3,
+    "compared": 8,
+    "agreed": 8,
     "dbot_bought_we_did_not": [],
     "we_would_buy_dbot_refused": [],
-    "skipped_by_our_limit_dbot_bought": [],
-    "dbot_record_not_found": 14,
-    "by_dbot_code": {},
+    "skipped_by_our_limit_dbot_bought": [
+      {
+        "signature": "4GuLGZozuvHb8KRP1LHnjmxpV7txAcBwqDbw2KPfryHXaKCjSGgzGfLVoqciWqLJR7CrTm6HGaA1xVhfKxjqJLSE",
+        "mint": "FYayBW6PMhzuNUVTJSr4ruk66p1nVhJ3bSmYueMr1ZMS",
+        "our_code": "INTERMEDIATE_ROUTE",
+        "dbot_code": "ПРОШЛО",
+        "dbot_record_id": "mu7p7wkz0a4070_muejts41mgvmyw",
+        "match_delta_s": 0.0
+      },
+      {
+        "signature": "4P9sC5ZHyXuYDJnPSmYk5sthVDNwrVoLgpcBbBgfWs3ncffMLAMtn52TixaYxpAAr1y3ruWpDfwHK15zNcV7Crrr",
+        "mint": "9GJQgnwKZL6oqsPcLmSohBb61w6cdj629b1RFhWvUe7j",
+        "our_code": "INTERMEDIATE_ROUTE",
+        "dbot_code": "ПРОШЛО",
+        "dbot_record_id": "mu7p7wkz0a4070_muek4wdm985pom",
+        "match_delta_s": 0.0
+      },
+      {
+        "signature": "496iPttxBq737RZbKk44fi9ssYin8j2bfVK8rVnfksUTuNhnenYCbvjWr7gH4X76KxMB1ReVDCcYytvgUiTey8m2",
+        "mint": "DoqY9DZPnP11ptofS2jX5EZSnq6Cvt1mSzw1XJscwGUK",
+        "our_code": "INTERMEDIATE_ROUTE",
+        "dbot_code": "ПРОШЛО",
+        "dbot_record_id": "mu7p7wkz0a4070_muek7ddgt9lvps",
+        "match_delta_s": 0.1
+      }
+    ],
+    "dbot_record_not_found": 16,
+    "not_comparable_source_did_not_buy": 27,
+    "by_dbot_code": {
+      "ПРОШЛО": 3,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 2,
+      "SKIP_TARGET_INCREASE_POSITION": 3
+    },
+    "dbot_records": {
+      "loaded": 1715,
+      "sources": 22,
+      "with_follow": 1715,
+      "oldest_utc": "2026-09-19T01:41:01Z",
+      "newest_utc": "2026-09-23T20:36:56Z",
+      "by_skip_reason": {
+        "FOLLOW_ORDER_IS_ONLY_PNL_MODE": 810,
+        "SKIP_TARGET_INCREASE_POSITION": 430,
+        "TARGET_AMOUNT_OUT_OF_RANGE": 228,
+        "ПРОШЛО": 172,
+        "DUPLICATE_TOKEN_BUY": 72,
+        "MAX_BUY_TIMES_PER_TOKEN_REACHED": 3
+      }
+    },
+    "unmatched_diag": [
+      {
+        "signature": "4zGYxRdJQ2Br1YkqoJx6kW1x5VsLtqTWqwZMKLGWmXiXwReQ3ffCTUPixoaS9dpKfJAQL6MJVAm4c7pXt4vnqKpd",
+        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
+        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
+        "records_same_source": 123,
+        "records_same_source_and_mint": 0,
+        "nearest_same_source_s": 825.6,
+        "nearest_same_mint_s": null,
+        "why": "источник есть, но минта нет ни в одной его записи"
+      },
+      {
+        "signature": "5Rw1Yo1fzMeRwLtNiSJd49DEfQ3Nm5zjSyZM49h65aSsfwSGBjHvssywwSPANJBWVXHSo2rCyRYu12opvg5mZpq9",
+        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
+        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
+        "records_same_source": 123,
+        "records_same_source_and_mint": 0,
+        "nearest_same_source_s": 830.6,
+        "nearest_same_mint_s": null,
+        "why": "источник есть, но минта нет ни в одной его записи"
+      },
+      {
+        "signature": "5RGzzEPRxmjJEj6Re9inXZKTjSdEZHt3h3FZ1iXxtgQUTHVuzhMZT8byGi1533GkXisUc3PVs56pSZBBtuV3msXz",
+        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
+        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
+        "records_same_source": 123,
+        "records_same_source_and_mint": 0,
+        "nearest_same_source_s": 849.3,
+        "nearest_same_mint_s": null,
+        "why": "источник есть, но минта нет ни в одной его записи"
+      },
+      {
+        "signature": "5yBeu58kWUfSE1yEa9wC6ZQGzXxzrFbtuWB84J5f6ysSpniyhfU4Be5b7HCvUoRG6xMtCNF674neyJ6raXVf5FVr",
+        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
+        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
+        "records_same_source": 123,
+        "records_same_source_and_mint": 0,
+        "nearest_same_source_s": 851.8,
+        "nearest_same_mint_s": null,
+        "why": "источник есть, но минта нет ни в одной его записи"
+      },
+      {
+        "signature": "3Ev3cDfRmnaWWTex7yEjkXqaiYHgCMwaXiJk2Ut9wRW5AxT4wjJrzbVT6MfLK8Rg92MtzKmTKtqTfqtdGX8LQdye",
+        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
+        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
+        "records_same_source": 123,
+        "records_same_source_and_mint": 0,
+        "nearest_same_source_s": 862.7,
+        "nearest_same_mint_s": null,
+        "why": "источник есть, но минта нет ни в одной его записи"
+      }
+    ],
     "divergences": 0,
-    "agreement": null,
+    "agreement": 1.0,
     "gate_signals_reached": false,
     "gate_no_missed_buys": true,
-    "gate_agreement": false,
+    "gate_agreement": true,
     "note": "записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с"
   },
   "pairs": {
@@ -330,18 +437,18 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 415,
+          "кредитов": 628,
           "бюджет": 60000,
-          "доля": 0.0069,
+          "доля": 0.0105,
           "группа": null,
-          "потрачено_по_бюджету": 415,
+          "потрачено_по_бюджету": 628,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 415,
+      "всего_кредитов": 628,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
@@ -358,10 +465,10 @@
     },
     "reconciliation": {
       "ok": false,
-      "signals": 0,
+      "signals": 3,
       "need": 30,
       "missed_buys": 0,
-      "agreement": null
+      "agreement": 1.0
     },
     "balance": {
       "ok": false,
