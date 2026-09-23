@@ -1,0 +1,129 @@
+name: "Helius: сверка ключей и проверка узла (getSlot)"
+
+# Владелец перевёл Helius на тариф Developer. Перед тем как переводить на
+# него все службы, надо убедиться, что ключ в секретах репозитория и ключ
+# на сервере -- ОДИН И ТОТ ЖЕ: иначе один из двух путей продолжит биться
+# в старый исчерпанный ключ, а выглядеть это будет как "тариф не помог".
+#
+# САМ КЛЮЧ НИГДЕ НЕ ПЕЧАТАЕТСЯ. Только код ответа и последние 4 символа.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: helius-key-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Ключ с сервера -> файл (значение не печатается)"
+        run: |
+          set -e
+          # Достаём ТОЛЬКО значение, сразу в файл, ничего не эхоим.
+          ssh -n $SSH_OPTS root@45.59.170.76 \
+            "grep -E '^HELIUS_API(_KEY)?=' /etc/dbot-detect-probe/env | head -1 | cut -d= -f2-" \
+            > /tmp/server_key.txt 2>/dev/null || true
+          # Убираем перевод строки и возможные кавычки.
+          tr -d '\r\n"'"'" < /tmp/server_key.txt > /tmp/server_key.clean
+          mv /tmp/server_key.clean /tmp/server_key.txt
+          echo "длина ключа с сервера: $(wc -c < /tmp/server_key.txt) символов"
+
+      - name: "getSlot обоими ключами + сверка"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, sys
+          import requests
+
+          def tail(k: str) -> str:
+              return f"...{k[-4:]}" if len(k) >= 4 else "(пусто)"
+
+          def get_slot(key: str) -> tuple[int | None, str]:
+              if not key:
+                  return None, "ключ пуст"
+              try:
+                  r = requests.post(f"https://mainnet.helius-rpc.com/?api-key={key}",
+                                     json={"jsonrpc": "2.0", "id": 1,
+                                           "method": "getSlot", "params": []}, timeout=30)
+              except Exception as exc:
+                  return None, f"сеть: {type(exc).__name__}"
+              body = ""
+              try:
+                  body = json.dumps(r.json(), ensure_ascii=False)[:200]
+              except ValueError:
+                  body = r.text[:200]
+              return r.status_code, body.replace(key, "<КЛЮЧ>")
+
+          secret = (os.environ.get("HELIUS_API_KEY") or "").strip()
+          p = pathlib.Path("/tmp/server_key.txt")
+          server = (p.read_text().strip() if p.exists() else "")
+
+          rows = []
+          for name, key in (("секрет GitHub", secret), ("сервер NL", server)):
+              code, body = get_slot(key)
+              rows.append({"источник": name, "хвост_ключа": tail(key),
+                           "код_ответа": code, "ответ": body})
+              print(f"{name}: хвост {tail(key)}, код {code}, ответ {body}")
+
+          same = bool(secret) and secret == server
+          print()
+          print("ключи совпадают:" , "ДА" if same else "НЕТ")
+          out = {"проверено_utc": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                               __import__("time").gmtime()),
+                 "ключи_совпадают": same, "проверки": rows}
+          pathlib.Path("data/helius_key_check.json").write_text(
+              json.dumps(out, ensure_ascii=False, indent=2))
+          if not same:
+              print("::error::Ключ в секретах GitHub и ключ на сервере РАЗНЫЕ. "
+                     "Перевод служб на Helius не продолжаем: один из путей бился бы "
+                     "в старый ключ, и это выглядело бы как 'тариф не помог'.")
+              sys.exit(2)
+          if any(r["код_ответа"] != 200 for r in rows):
+              print("::error::getSlot вернул не 200 -- узел не подтверждён.")
+              sys.exit(3)
+          PY
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/helius_key_check.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Helius: сверка ключей и проверка узла [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
