@@ -156,10 +156,46 @@ def таблица_слотов(строки: list, n: int = 15) -> list:
             "net_slot_age_s": r.get("net_slot_age_s"),
             "slot_lag": r.get("slot_lag"),
             "parsed_from": r.get("parsed_from"),
+            "tx_version": r.get("tx_version"),
+            "source": r.get("source"),
+            "mint": r.get("mint"),
             "action": r.get("action"),
             "code": r.get("code"),
         })
     return out
+
+
+def версии_и_разбор(строки: list) -> dict:
+    """Версия транзакции против пути разбора -- проверка гипотезы.
+
+    Гипотеза: сообщения без meta (а значит и медленный путь через
+    getTransaction) -- это транзакции версии 1, которые подписка с потолком
+    0 разобрать не может. Здесь она либо подтверждается числами, либо нет.
+    Отсутствие поля версии считается отдельной строкой: старые записи
+    журнала его не несут, и выдавать их за версию 0 нельзя.
+    """
+    таблица: dict = {}
+    for r in строки:
+        в = str(r.get("tx_version")) if "tx_version" in r else "НЕТ_ПОЛЯ"
+        путь = r.get("parsed_from") or "неизвестно"
+        таблица.setdefault(в, {}).setdefault(путь, 0)
+        таблица[в][путь] += 1
+    известные = {в: d for в, d in таблица.items() if в != "НЕТ_ПОЛЯ"}
+    вывод = "данных о версиях пока нет: в записях нет поля tx_version"
+    if известные:
+        rpc_по_версиям = {в: d.get("PARSE_VIA_RPC", 0) for в, d in известные.items()}
+        всего_rpc = sum(rpc_по_версиям.values())
+        только_одна = [в for в, n in rpc_по_версиям.items() if n]
+        if всего_rpc == 0:
+            вывод = ("медленного пути в записях с версией нет -- проверять "
+                     "гипотезу не на чем")
+        elif len(только_одна) == 1:
+            вывод = (f"весь медленный путь ({всего_rpc}) идёт на транзакциях "
+                     f"версии {только_одна[0]} -- гипотеза подтверждается")
+        else:
+            вывод = (f"медленный путь встречается на версиях {sorted(только_одна)} "
+                     "-- версия не единственная причина")
+    return {"by_version": таблица, "verdict": вывод}
 
 
 # ------------------------------------------------------------------ маршруты
@@ -487,6 +523,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
                       "by_code": по_кодам,
                       "by_code_test_source": по_кодам_стенда},
         "parse_groups": группы_разбора(б),
+        "version_vs_parse": версии_и_разбор(строки),
         "slot_table": таблица_слотов(б, n_таблицы),
         "routes": маршруты(б),
         "our_brakes": наши_тормоза(б),
@@ -523,10 +560,16 @@ def в_текст(о: dict) -> str:
         L.append(f"    слот сети минус слот источника: {г['net_slot_minus_source']}")
         L.append(f"    задержка решения, мс: {г['decide_latency_ms']}")
     L.append(f"  примечание: {о['parse_groups']['note']}")
+    вр = о.get("version_vs_parse") or {}
+    L.append("")
+    L.append("--- версия транзакции против пути разбора ---")
+    for в, d in sorted((вр.get("by_version") or {}).items()):
+        L.append(f"  версия {в}: " + ", ".join(f"{k}={n}" for k, n in sorted(d.items())))
+    L.append(f"  вывод: {вр.get('verdict')}")
     L.append("")
     L.append(f"--- первые {len(о['slot_table'])} решений: слоты и время ---")
     L.append("подпись               задача   слот источника  получено             "
-             "решение,мс  слот сети  возраст,с  отставание  разбор         итог")
+             "решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог")
     for r in о["slot_table"]:
         L.append(f"{(r['signature'] or ''):22s}{str(r['source_task'] or '-'):9s}"
                  f"{str(r['source_slot'] or '-'):16s}{str(r['t_recv_utc'] or '-'):21s}"
@@ -534,7 +577,9 @@ def в_текст(о: dict) -> str:
                  f"{str(r['net_slot_at_decision'] or '-'):11s}"
                  f"{str(r['net_slot_age_s'] if r['net_slot_age_s'] is not None else '-'):11s}"
                  f"{str(r['slot_lag'] if r['slot_lag'] is not None else '-'):12s}"
-                 f"{str(r['parsed_from'] or '-'):15s}{r['action'] or '-'}/{r['code'] or '-'}")
+                 f"{str(r['parsed_from'] or '-'):15s}"
+                 f"{str(r.get('tx_version', '-')):8s}"
+                 f"{r['action'] or '-'}/{r['code'] or '-'}")
     L.append("")
     м = о["routes"]
     L.append(f"--- маршруты наших покупок --- покупок {м['buys']}, маршрут известен "
@@ -776,6 +821,28 @@ def self_test() -> None:
         chk("в срезе видно источников и коды",
             срез["loaded"] == 2 and срез["sources"] == 1
             and срез["by_skip_reason"].get("ПРОПУСК") == 1, срез)
+
+        # --- версия транзакции против пути разбора
+        вр = версии_и_разбор([
+            строка(parsed_from="PARSE_VIA_RPC", tx_version=1),
+            строка(parsed_from="PARSE_VIA_RPC", tx_version=1),
+            строка(parsed_from="PARSE_VIA_MSG", tx_version=0),
+        ])
+        chk("весь медленный путь на версии 1 -- гипотеза подтверждается",
+            "гипотеза подтверждается" in вр["verdict"], вр["verdict"])
+        вр2 = версии_и_разбор([
+            строка(parsed_from="PARSE_VIA_RPC", tx_version=1),
+            строка(parsed_from="PARSE_VIA_RPC", tx_version=0),
+        ])
+        chk("медленный путь на двух версиях -- версия не единственная причина",
+            "не единственная причина" in вр2["verdict"], вр2["verdict"])
+        вр3 = версии_и_разбор([строка(parsed_from="PARSE_VIA_MSG", tx_version=0)])
+        chk("без медленного пути гипотезу проверять не на чем",
+            "не на чем" in вр3["verdict"], вр3["verdict"])
+        вр4 = версии_и_разбор([строка(parsed_from="PARSE_VIA_RPC")])
+        chk("записи без поля версии считаются отдельно, а не версией 0",
+            "НЕТ_ПОЛЯ" in вр4["by_version"] and
+            "нет поля tx_version" in вр4["verdict"], вр4)
 
         # --- гейт по сигналам считает именно dbot_бы_купил
         много = [строка(action="buy", code="BUY", signature=f"s{i}")

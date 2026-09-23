@@ -152,9 +152,15 @@ jobs:
             # Исполнитель подключён, но dry-run: BLOOM_LIVE_BUY НЕ задан, и
             # пока его нет, ни один POST в Bloom не уходит.
             grep -q '^BLOOM_EXEC=' $ENV_DIR/env || echo 'BLOOM_EXEC=1' >> $ENV_DIR/env
-            # Тестовый источник стенда и его собственный порог.
-            sed -i '/^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d' $ENV_DIR/env
-            echo 'BLOOM_TEST_SOURCE=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX' >> $ENV_DIR/env
+            # Тестовые источники стенда и их общий порог. Их ДВА:
+            #   DNJeTYni... -- обычный кошелёк владельца;
+            #   8aTMUKsp... -- кошелёк владельца в Fomo. Это путь НАШИХ
+            #     источников: комиссию платит Fomo, владелец второй
+            #     подписант, и разбор такой сделки надо проверить отдельно.
+            # Старое одиночное имя чистится, чтобы не осталось расхождения
+            # между двумя переменными.
+            sed -i '/^BLOOM_TEST_SOURCES=/d; /^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d' $ENV_DIR/env
+            echo 'BLOOM_TEST_SOURCES=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX,8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA' >> $ENV_DIR/env
             echo 'BLOOM_TEST_MIN_SOL=0.05' >> $ENV_DIR/env
             echo 'BLOOM_TEST_BUY_SOL=0.01' >> $ENV_DIR/env
             # BLOOM_LIVE_BUY вычищается ВСЕГДА: боевые покупки по реальным

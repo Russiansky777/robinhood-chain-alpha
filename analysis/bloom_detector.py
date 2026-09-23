@@ -156,9 +156,50 @@ LAMPORT = 10 ** 9
 # Тестовый источник -- кошелёк владельца для контролируемого стенда.
 # Порог у него СВОЙ и много ниже боевого: стенд ставится на маленькие
 # покупки. Всё остальное -- фильтры как у BATCH-5.
-TEST_SOURCE = (os.environ.get("BLOOM_TEST_SOURCE") or "").strip()
+def _тестовые_из_окружения() -> tuple:
+    """Тестовых источников может быть несколько: у владельца их два --
+    кошелёк в Fomo (там комиссию платит Fomo, а владелец второй подписант --
+    это путь НАШИХ источников) и обычный кошелёк. Порядок не важен,
+    повторы убираются, пустые строки отбрасываются.
+
+    Читаются оба имени: BLOOM_TEST_SOURCES (список) и BLOOM_TEST_SOURCE
+    (одиночный, как было). Старое имя оставлено, чтобы уже развёрнутый
+    env не перестал работать молча.
+    """
+    сырое = ((os.environ.get("BLOOM_TEST_SOURCES") or "") + "," +
+             (os.environ.get("BLOOM_TEST_SOURCE") or ""))
+    видели, out = set(), []
+    for часть in сырое.split(","):
+        а = часть.strip()
+        if а and а not in видели:
+            видели.add(а)
+            out.append(а)
+    return tuple(out)
+
+
+TEST_SOURCES = _тестовые_из_окружения()
+# Оставлено для совместимости отчётов: первый из списка.
+TEST_SOURCE = TEST_SOURCES[0] if TEST_SOURCES else ""
 TEST_SOURCE_TASK = "TEST"
 TEST_MIN_SOL = ST.env_float("BLOOM_TEST_MIN_SOL", 0.05)
+
+# Версия транзакции в записи решения. Отсутствие поля -- это отсутствие, а
+# не версия 0: путать их уже случалось, и именно на версиях строится
+# проверка гипотезы о сообщениях без meta.
+ВЕРСИЯ_НЕТ = "absent"
+
+
+def версия_транзакции(tx: dict) -> object:
+    """Версия транзакции из конверта -- как его отдаёт и подписка, и
+    getTransaction."""
+    if not isinstance(tx, dict):
+        return ВЕРСИЯ_НЕТ
+    if "version" in tx:
+        return tx["version"]
+    внутр = tx.get("transaction")
+    if isinstance(внутр, dict) and "version" in внутр:
+        return внутр["version"]
+    return ВЕРСИЯ_НЕТ
 
 
 # ------------------------------------------------------- разбор транзакции
@@ -615,12 +656,26 @@ class Helius:
             pass
 
     def call(self, метод: str, параметры: list, *, таймаут: float = 10.0):
+        """Любая неудача наружу идёт как RuntimeError.
+
+        Это не косметика. Все вызывающие ловят RuntimeError, а requests
+        бросает свои исключения (ConnectionError, Timeout, ProxyError), и
+        они проходили НАСКВОЗЬ: одна сетевая заминка в налог_минта уносила
+        решение, ещё не записанное в журнал, а в слушателе всплывала как
+        обрыв подписки с переподпиской. Сигнал терялся молча.
+        """
         if requests is None:
             raise RuntimeError("нет requests")
         self.вызовов += 1
-        r = requests.post(self.url, json={"jsonrpc": "2.0", "id": 1,
-                                           "method": метод, "params": параметры},
-                           timeout=таймаут)
+        try:
+            r = requests.post(self.url, json={"jsonrpc": "2.0", "id": 1,
+                                               "method": метод, "params": параметры},
+                               timeout=таймаут)
+        except RuntimeError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"{метод}: {type(exc).__name__}: "
+                                f"{str(exc)[:160]}") from exc
         self._учесть(метод, len(r.content or b""))
         if not r.ok:
             raise RuntimeError(f"{метод}: http {r.status_code}")
@@ -785,10 +840,12 @@ def источники(задачи: tuple, снимок: Path) -> tuple[dict, s
         log.warning("DBOT_API_KEY не задан -- беру снимок источников из репозитория")
     if ист is None:
         ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
-    if TEST_SOURCE:
+    if TEST_SOURCES:
         ист = dict(ист)
-        ист[TEST_SOURCE] = TEST_SOURCE_TASK
-        откуда = f"{откуда} + тестовый источник из окружения"
+        for а in TEST_SOURCES:
+            ист[а] = TEST_SOURCE_TASK
+        откуда = (f"{откуда} + тестовых источников из окружения: "
+                  f"{len(TEST_SOURCES)}")
     return ист, откуда
 
 
@@ -870,8 +927,10 @@ class Детектор:
                "to_buy": self.к_покупке,
                "by_code": dict(self.по_кодам),
                "by_code_test_source": dict(self.по_кодам_теста),
+               "test_sources": list(TEST_SOURCES),
                "test_source": TEST_SOURCE or None,
-               "test_min_sol": TEST_MIN_SOL if TEST_SOURCE else None,
+               "test_min_sol": TEST_MIN_SOL if TEST_SOURCES else None,
+               "max_tx_version": ПОТОЛОК_ВЕРСИИ_TX,
                "rate_source": self.курс.источник,
                "rate_usd_sol": self.курс.значение,
                "rate_fresh": self.курс.свежий(),
@@ -926,7 +985,7 @@ class Детектор:
         return False
 
     def это_тестовый(self, источник: str) -> bool:
-        return bool(TEST_SOURCE) and источник == TEST_SOURCE
+        return источник in TEST_SOURCES
 
     def порог_для(self, источник: str) -> float:
         """Порог входа: у тестового источника свой, у остальных боевой."""
@@ -987,6 +1046,9 @@ class Детектор:
         self.задержки_мс.append(задержка)
         строка["via"] = как
         строка["parsed_from"] = откуда_разбор
+        # Версия транзакции рядом с путём разбора: именно эта пара
+        # проверяет гипотезу "сообщения без meta -- это версия 1".
+        строка["tx_version"] = версия_транзакции(tx)
         строка["t_recv_ts"] = round(t_recv, 6)
         строка["t_recv_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_recv))
         строка["t_decide_ts"] = round(t_решение, 6)
@@ -1001,10 +1063,17 @@ class Детектор:
         строка["mode"] = self.режим
         if строка.get("action") == "buy":
             # Это уже ПОСЛЕ решения: на задержку не влияет, в журнал идёт
-            # как признак токена, а не как условие покупки.
-            налог = self.helius.налог_минта(строка["mint"])
+            # как признак токена, а не как условие покупки. Поэтому и
+            # падать из-за него решение не должно: признак токена -- не
+            # причина потерять сигнал.
+            try:
+                налог = self.helius.налог_минта(строка["mint"])
+            except Exception as exc:  # noqa: BLE001
+                налог = {"taxed": None, "fee_bps": None,
+                          "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
             строка["taxed"] = налог.get("taxed")
             строка["tax_bps"] = налог.get("fee_bps")
+            строка["tax_why_not"] = налог.get("why_not")
             self.к_покупке += 1
         код = строка.get("code") or "?"
         # Разделы журнала разные: боевые источники и тестовый стенд нельзя
@@ -1457,6 +1526,31 @@ def self_test() -> int:
         hп.параметры[1]["maxSupportedTransactionVersion"] == ПОТОЛОК_ВЕРСИИ_TX,
         hп.параметры[1].get("maxSupportedTransactionVersion"))
 
+    # 12д. несколько тестовых источников и версия транзакции в записи
+    chk("версия из конверта читается",
+        версия_транзакции({"version": 1}) == 1)
+    chk("версия из вложенной транзакции читается",
+        версия_транзакции({"transaction": {"version": "legacy"}}) == "legacy")
+    chk("отсутствие версии -- не ноль",
+        версия_транзакции({}) == ВЕРСИЯ_НЕТ, версия_транзакции({}))
+    chk("версия 0 не путается с отсутствием",
+        версия_транзакции({"version": 0}) == 0)
+    chk("не словарь -- тоже отсутствие",
+        версия_транзакции(None) == ВЕРСИЯ_НЕТ)
+
+    старое_окружение = (os.environ.get("BLOOM_TEST_SOURCES"),
+                        os.environ.get("BLOOM_TEST_SOURCE"))
+    os.environ["BLOOM_TEST_SOURCES"] = " A1 , B2 ,, A1 "
+    os.environ["BLOOM_TEST_SOURCE"] = "C3"
+    список = _тестовые_из_окружения()
+    chk("список тестовых источников без повторов и пустых",
+        список == ("A1", "B2", "C3"), список)
+    for имя, знач in zip(("BLOOM_TEST_SOURCES", "BLOOM_TEST_SOURCE"), старое_окружение):
+        if знач is None:
+            os.environ.pop(имя, None)
+        else:
+            os.environ[имя] = знач
+
     # 13. решение с настоящим состоянием
     import tempfile  # noqa: PLC0415
     with tempfile.TemporaryDirectory() as d:
@@ -1569,6 +1663,92 @@ def self_test() -> int:
         chk("все ключи записи решения латинские",
             all(k.isascii() for k in r), [k for k in r if not k.isascii()])
         chk("значение action тоже латинское", r["action"].isascii(), r["action"])
+        chk("версия транзакции попала в запись",
+            "tx_version" in r, sorted(r))
+
+    # 15а. сетевая ошибка НЕ проходит сквозь call и НЕ уносит решение.
+    # Нашлось тем, что новая проверка двух тестовых источников впервые
+    # довела дело до ветки покупки: оттуда полетел ProxyError, которого не
+    # ловит ни один except RuntimeError.
+    class ЗаглушкаRequests:
+        class _Ошибка(Exception):
+            pass
+
+        def post(self, *a, **kw):
+            raise self._Ошибка("туннель закрыт")
+
+    было_requests = globals().get("requests")
+    globals()["requests"] = ЗаглушкаRequests()
+    try:
+        h_сеть = Helius(key="нет", служба="")
+        try:
+            h_сеть.call("getSlot", [])
+            упало_как = None
+        except RuntimeError as exc:
+            упало_как = ("RuntimeError", str(exc))
+        except Exception as exc:  # noqa: BLE001
+            упало_как = (type(exc).__name__, str(exc))
+        chk("сетевая ошибка приходит как RuntimeError",
+            упало_как and упало_как[0] == "RuntimeError", упало_как)
+        chk("и имя исходной ошибки не потеряно",
+            упало_как and "_Ошибка" in упало_как[1], упало_как)
+        chk("вызов всё равно посчитан", h_сеть.вызовов == 1, h_сеть.вызовов)
+        chk("транзакция при сетевом отказе возвращает None, а не падает",
+            h_сеть.транзакция("ПОДПИСЬ", попыток=1, пауза_s=0) is None)
+        chk("слот при сетевом отказе -- None", h_сеть.слот() is None)
+        chk("баланс при сетевом отказе -- None",
+            h_сеть.баланс_sol("КОШЕЛЁК") is None)
+    finally:
+        if было_requests is None:
+            globals().pop("requests", None)
+        else:
+            globals()["requests"] = было_requests
+
+    # 15б. ДВА тестовых источника: у каждого свой низкий порог, флаг
+    # test_source стоит, счётчики ведутся отдельно от боевых. Без этого
+    # теста весь стенд опирался бы на непроверенный код: покупка на 0.1
+    # SOL у боевого источника должна отсекаться порогом 2, а у тестового --
+    # проходить.
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+        было = TEST_SOURCES
+        globals()["TEST_SOURCES"] = ("ТЕСТ_ОДИН", "ТЕСТ_ДВА")
+        try:
+            det = Детектор(источники={"SRC": "BATCH-5", "ТЕСТ_ОДИН": "TEST",
+                                       "ТЕСТ_ДВА": "TEST"},
+                            состояние=st, helius=Helius(key="нет", служба=""),
+                            курс=КурсSOL(), режим="dry")
+            det.курс.значение, det.курс.когда = 200.0, time.time()
+            det.слот_сети, det.t_слот = 100, time.time()
+            det.баланс_sol, det.t_баланс = 5.0, time.time()
+            chk("оба тестовых источника опознаны",
+                det.это_тестовый("ТЕСТ_ОДИН") and det.это_тестовый("ТЕСТ_ДВА"))
+            chk("боевой источник тестовым не считается",
+                not det.это_тестовый("SRC"))
+            chk("порог у тестовых свой",
+                det.порог_для("ТЕСТ_ДВА") == TEST_MIN_SOL, det.порог_для("ТЕСТ_ДВА"))
+            chk("у боевого порог боевой",
+                det.порог_для("SRC") == ПОРОГ_ВХОДА_SOL, det.порог_для("SRC"))
+            мелкая = tx(pre=[бал(USDC, 20_000000, owner="ТЕСТ_ДВА")],
+                         post=[бал(USDC, 0, owner="ТЕСТ_ДВА"),
+                               бал("MINT_SMALL", 5_000000, owner="ТЕСТ_ДВА", idx=2)],
+                         ключи=("ТЕСТ_ДВА",))
+            rт = det.обработать("ПОДПИСЬ_ТЕСТ2", 100, "ТЕСТ_ДВА", "тест", мелкая)
+            chk("вход 0.1 SOL у тестового источника проходит порог",
+                rт["action"] == "buy", (rт.get("action"), rт.get("code")))
+            chk("флаг test_source стоит", rт.get("test_source") is True, rт.get("test_source"))
+            мелкая2 = tx(pre=[бал(USDC, 20_000000)],
+                          post=[бал(USDC, 0),
+                                бал("MINT_SMALL2", 5_000000, idx=2)])
+            rб = det.обработать("ПОДПИСЬ_БОЕВАЯ", 100, "SRC", "тест", мелкая2)
+            chk("тот же вход у боевого источника отсекается порогом",
+                rб["code"] == КОД_МАЛО, rб.get("code"))
+            chk("счётчики тестового и боевого раздельные",
+                det.по_кодам_теста and det.по_кодам
+                and КОД_МАЛО in det.по_кодам and КОД_МАЛО not in det.по_кодам_теста,
+                (det.по_кодам_теста, det.по_кодам))
+        finally:
+            globals()["TEST_SOURCES"] = было
 
     # 15c. исполнитель подключён: решение о покупке доходит до него,
     # его падение НЕ валит детектор, а решение всё равно остаётся в журнале
