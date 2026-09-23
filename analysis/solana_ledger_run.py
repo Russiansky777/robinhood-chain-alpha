@@ -48,6 +48,7 @@ import json
 import os
 import sys
 import time
+import threading
 from decimal import Decimal as D
 from pathlib import Path
 
@@ -79,6 +80,19 @@ RELAY_PREFIXES = ("astra", "AsTra", "ste11", "LandX")
 # же, что раньше.
 RESCUE_WALLET_ADDRESS = (os.environ.get("RESCUE_WALLET_ADDRESS") or "").strip() or None
 
+# Владелец: на кошельке BATCH-8 с 23.09 00:30Z параллельно с DBot
+# работает ДРУГОЙ бот -- TradeWiz. Его сделки идут по той же цепочке и
+# внешне неотличимы от наших, поэтому в итоги задач DBot они попадать не
+# должны. Признак строго проверяемый: сделка на этом кошельке, начиная с
+# отсечки, у которой НЕТ подтверждающей записи DBot. Ничего не
+# домысливаем: если запись DBot есть -- это DBot, как бы ни выглядело
+# остальное.
+TRADEWIZ_WALLET = "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+TRADEWIZ_FROM_TS = 1790123400  # 2026-09-23T00:30:00Z
+TRADEWIZ_LABEL = "tradewiz"
+DBOT_LABEL = "dbot"
+UNKNOWN_BOT_LABEL = "неизвестен"
+
 FOLLOW_ORDERS_PATH = REPO_ROOT / "data" / "dbot_follow_orders_raw.json"
 FOLLOW_TRADES_PATH = REPO_ROOT / "data" / "dbot_follow_trades_raw.json"
 FOLLOW_TRADES_SAMPLE_PATH = REPO_ROOT / "data" / "dbot_follow_trades_sample.json"
@@ -109,36 +123,142 @@ def save_json(path: Path, obj) -> None:
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2, default=str))
 
 
-# ---------- RPC: Helius, ключ из секрета в query ----------
+# ---------- RPC: Helius основной, публичный узел -- запасной ----------
+# Учёт не должен зависеть от того, сколько кредитов Helius сожрал тяжёлый
+# ретро-прогон. Поэтому при 429 запрос уходит на публичный узел, а сам
+# Helius временно понижается в правах (иначе каждый вызов снова упирался
+# бы в те же 20 попыток по 30 секунд -- ровно так конвейер и вставал на
+# 15 минут и падал).
+
+PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
+
+# Публичный узел жёстче по темпу, поэтому свой минимальный интервал.
+PUBLIC_MIN_INTERVAL_S = 0.25
+# Сколько подряд 429 от Helius, чтобы перестать его дёргать.
+HELIUS_DEMOTE_AFTER_429 = 3
+# Через сколько секунд снова пробовать Helius: квота могла восстановиться.
+HELIUS_REPROBE_S = 600.0
+
+_rpc_lock = threading.Lock()
+_public_last_call = 0.0
+
+RPC_STATS: dict = {
+    "helius_ok": 0, "helius_429": 0, "helius_прочие_ошибки": 0,
+    "публичный_ok": 0, "публичный_429": 0, "публичный_прочие_ошибки": 0,
+    "helius_понижен": False, "helius_понижен_utc": None,
+    "последняя_причина_отказа": None, "первый_ответ_429_от_helius": None,
+}
+_helius_429_streak = 0
+_helius_demoted_until = 0.0
+
+
+def _helius_url() -> str | None:
+    key = os.environ.get("HELIUS_API", "")
+    return f"https://mainnet.helius-rpc.com/?api-key={key}" if key else None
+
 
 def _rpc_url() -> str:
-    key = os.environ.get("HELIUS_API", "")
-    if not key:
+    """Оставлено для совместимости: основной адрес, если ключ есть."""
+    url = _helius_url()
+    if not url:
         raise RuntimeError("HELIUS_API пуст в окружении")
-    return f"https://mainnet.helius-rpc.com/?api-key={key}"
+    return url
+
+
+def _helius_available() -> bool:
+    return bool(_helius_url()) and time.monotonic() >= _helius_demoted_until
+
+
+def _demote_helius(reason: str) -> None:
+    global _helius_demoted_until
+    with _rpc_lock:
+        _helius_demoted_until = time.monotonic() + HELIUS_REPROBE_S
+        if not RPC_STATS["helius_понижен"]:
+            RPC_STATS["helius_понижен"] = True
+            RPC_STATS["helius_понижен_utc"] = now_utc()
+            print(f"[ledger] RPC: Helius понижен ({reason}); работаю через публичный узел, "
+                  f"повторная проба через {HELIUS_REPROBE_S:.0f}с", flush=True)
+
+
+def _post_rpc(url: str, payload, timeout: int):
+    """Один сетевой вызов с уважением к темпу публичного узла."""
+    global _public_last_call
+    if url == PUBLIC_RPC:
+        with _rpc_lock:
+            wait = PUBLIC_MIN_INTERVAL_S - (time.monotonic() - _public_last_call)
+            if wait > 0:
+                time.sleep(wait)
+            _public_last_call = time.monotonic()
+    return requests.post(url, json=payload, timeout=timeout)
+
+
+def _note(url: str, outcome: str) -> None:
+    prefix = "helius" if url != PUBLIC_RPC else "публичный"
+    key = f"{prefix}_{outcome}"
+    with _rpc_lock:
+        RPC_STATS[key] = RPC_STATS.get(key, 0) + 1
 
 
 def rpc_call(method: str, params: list, retries: int = 20):
+    """Каждая попытка сама выбирает узел: Helius, пока он жив, иначе публичный.
+
+    Причина последнего отказа сохраняется в RPC_STATS: раньше исключение
+    говорило только "исчерпал попытки", и отличить квоту от сетевого сбоя
+    по логу было нельзя.
+    """
+    global _helius_429_streak
     backoff = 0.0
+    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+    last_reason = "попыток не было"
     for _ in range(retries):
+        url = _helius_url() if _helius_available() else PUBLIC_RPC
+        if url is None:
+            url = PUBLIC_RPC
         try:
-            resp = requests.post(_rpc_url(), json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=30)
-        except Exception:  # noqa: BLE001
+            resp = _post_rpc(url, payload, 30)
+        except Exception as exc:  # noqa: BLE001
+            _note(url, "прочие_ошибки")
+            last_reason = f"{'helius' if url != PUBLIC_RPC else 'публичный'}: {type(exc).__name__}"
             backoff = min(max(backoff * 2, 0.5), 30.0)
             time.sleep(backoff)
             continue
         if resp.status_code == 429:
+            _note(url, "429")
+            last_reason = f"{'helius' if url != PUBLIC_RPC else 'публичный'}: HTTP 429"
+            if url != PUBLIC_RPC:
+                with _rpc_lock:
+                    _helius_429_streak += 1
+                    if RPC_STATS["первый_ответ_429_от_helius"] is None:
+                        RPC_STATS["первый_ответ_429_от_helius"] = resp.text[:200]
+                    streak = _helius_429_streak
+                if streak >= HELIUS_DEMOTE_AFTER_429:
+                    _demote_helius(f"{streak} ответов 429 подряд")
+                # На публичный узел уходим СРАЗУ, не отсиживая паузу:
+                # смысл запасного пути в том, чтобы не ждать.
+                continue
             backoff = min(max(backoff * 2, 0.5), 30.0)
             time.sleep(backoff)
             continue
         if not resp.ok:
+            _note(url, "прочие_ошибки")
+            last_reason = f"{'helius' if url != PUBLIC_RPC else 'публичный'}: HTTP {resp.status_code}"
+            if url != PUBLIC_RPC:
+                _demote_helius(f"HTTP {resp.status_code}: {resp.text[:120]}")
+                continue
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
         body = resp.json()
         if "error" in body:
+            _note(url, "прочие_ошибки")
             raise RuntimeError(f"RPC error {method}: {body['error']}")
+        _note(url, "ok")
+        if url != PUBLIC_RPC:
+            with _rpc_lock:
+                _helius_429_streak = 0
         backoff = max(backoff * 0.5, 0.0)
         return body.get("result")
-    raise RuntimeError(f"{method} исчерпал попытки")
+    with _rpc_lock:
+        RPC_STATS["последняя_причина_отказа"] = last_reason
+    raise RuntimeError(f"{method} исчерпал попытки, последняя причина: {last_reason}")
 
 
 def rpc_batch(reqs: list[tuple[str, list]]) -> list:
@@ -147,7 +267,10 @@ def rpc_batch(reqs: list[tuple[str, list]]) -> list:
         return []
     body = [{"jsonrpc": "2.0", "id": i, "method": m, "params": p} for i, (m, p) in enumerate(reqs)]
     try:
-        resp = requests.post(_rpc_url(), json=body, timeout=60)
+        # Тот же выбор узла, что и у одиночного вызова: иначе батч продолжал
+        # бы ломиться в Helius уже после того, как он понижен.
+        url = _helius_url() if _helius_available() else PUBLIC_RPC
+        resp = _post_rpc(url or PUBLIC_RPC, body, 60)
         if resp.ok:
             results = resp.json()
             if isinstance(results, list):
@@ -709,6 +832,21 @@ def classify_external_flow(v: dict):
     return "withdrawal", -sol_leg, recipient
 
 
+def classify_bot(wallet: str, buy_block_time, has_dbot_record: bool) -> str:
+    """Чей это бот: DBot, TradeWiz или неизвестно.
+
+    Запись DBot -- решающее доказательство: она есть только у наших сделок.
+    TradeWiz ставим лишь там, где владелец его и запускал (кошелёк BATCH-8
+    начиная с 23.09 00:30Z) И записи DBot нет. Всё остальное без записи --
+    честно "неизвестен", а не догадка в пользу удобного ответа.
+    """
+    if has_dbot_record:
+        return DBOT_LABEL
+    if wallet == TRADEWIZ_WALLET and buy_block_time is not None and buy_block_time >= TRADEWIZ_FROM_TS:
+        return TRADEWIZ_LABEL
+    return UNKNOWN_BOT_LABEL
+
+
 def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) -> list[dict]:
     wallet = task["wallet"]
     # is_signer=True обязательно: иначе в "сделки" попадают транзакции, которые
@@ -859,6 +997,7 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
                 "status": status,
                 "held_seconds": held_seconds, "is_hung": is_hung,
                 "dbot_fail_reason": None,
+                "bot": classify_bot(wallet, buy_v.get("blockTime"), buy_record is not None),
             })
 
     for r in records:
@@ -885,6 +1024,8 @@ def build_trades_for_task(task: dict, records: list[dict], chain_cache: dict) ->
             "buy_signature": sig, "status": "срыв",
             "held_seconds": None, "is_hung": False,  # не исполнилась в цепочке -- держать нечего
             "dbot_fail_reason": r.get("errorMessage") or r.get("skipReason") or r.get("errorCode"),
+            # Срыв строится ИЗ записи DBot -- значит это по определению DBot.
+            "bot": DBOT_LABEL,
         })
     return trades
 
@@ -895,6 +1036,10 @@ def build_source_stats(trades_all: list[dict]) -> list[dict]:
     # а не отбрасываем.
     by_key: dict = {}
     for t in trades_all:
+        # Сделки чужого бота (TradeWiz) в статистику ИСТОЧНИКОВ DBot не идут:
+        # источник ему назначали не мы, и приписывать их нашим сигналам нельзя.
+        if t.get("bot") == TRADEWIZ_LABEL:
+            continue
         key = (t["task_id"], t.get("source_address"))
         by_key.setdefault(key, {"task_id": t["task_id"], "task_name": t.get("task_name"),
                                  "source_address": t.get("source_address"),
@@ -1042,12 +1187,29 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
     out = []
     for task in tasks:
         wallet = task["wallet"]
-        task_trades = [t for t in trades_all if t["task_id"] == task["id"]]
+        all_task_trades = [t for t in trades_all if t["task_id"] == task["id"]]
+        # Владелец: сделки TradeWiz в итоги задач DBot не включать. Они не
+        # выбрасываются -- выносятся отдельным блоком, чтобы было видно и
+        # сколько их, и на сколько SOL они двигают баланс кошелька (иначе
+        # сверка баланса развалилась бы на ровном месте).
+        foreign = [t for t in all_task_trades if t.get("bot") == TRADEWIZ_LABEL]
+        task_trades = [t for t in all_task_trades if t.get("bot") != TRADEWIZ_LABEL]
         n_trades = sum(1 for t in task_trades if t["status"] == "закрыта")
         net_sum = sum(t["net_sol"] for t in task_trades if t.get("net_sol") is not None)
         n_open = sum(1 for t in task_trades if t["status"] == "незакрыта")
         n_hung = sum(1 for t in task_trades if t.get("is_hung"))
         n_no_source = sum(1 for t in task_trades if t["status"] in ("закрыта", "незакрыта") and not t.get("source_address"))
+        foreign_net = sum(t["net_sol"] for t in foreign if t.get("net_sol") is not None)
+        foreign_row = {
+            "бот": TRADEWIZ_LABEL,
+            "учтено_в_итогах_задачи": False,
+            "с_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(TRADEWIZ_FROM_TS)),
+            "n_сделок": len(foreign),
+            "n_закрытых": sum(1 for t in foreign if t["status"] == "закрыта"),
+            "n_незакрытых": sum(1 for t in foreign if t["status"] == "незакрыта"),
+            "net_sol_sum": round(foreign_net, 6),
+            "признак": "сделка на кошельке BATCH-8 после отсечки без подтверждающей записи DBot",
+        } if foreign else None
 
         recon = build_wallet_reconciliation(wallet, chain_cache)
 
@@ -1074,6 +1236,9 @@ def build_task_stats(tasks: list[dict], trades_all: list[dict], chain_cache: dic
             "reconciliation": recon,
             "reconciliation_diff_sol": diff,
             "reconciliation_flag": bool(diff is not None and abs(diff) > 0.01),
+            "чужой_бот": foreign_row,
+            "n_сделок_без_записи_dbot": sum(
+                1 for t in task_trades if t.get("bot") == UNKNOWN_BOT_LABEL),
         })
 
     # Владелец: если адрес пополнения/вывода повторяется у нескольких РАЗНЫХ
@@ -1301,10 +1466,92 @@ def main() -> None:
 
     status["validation"] = validation
     status["rescue_wallet"] = build_rescue_wallet_row()
+    status["rpc"] = dict(RPC_STATS)
     save_json(STATUS_PATH, status)
     print(f"[ledger] ГОТОВО: сделок={status['n_trades']} открыто={status['n_open']} "
           f"срывов={status['n_unmatched']} контроль_ок={validation.get('all_ok')}", flush=True)
+    print("[ledger] RPC: " + json.dumps(RPC_STATS, ensure_ascii=False), flush=True)
+
+
+def self_test() -> None:
+    """Проверки без сети: разметка бота и выбор RPC-узла."""
+    checks: list[tuple[str, bool, str]] = []
+
+    def chk(name: str, ok: bool, got: str = "") -> None:
+        checks.append((name, bool(ok), got))
+
+    ts = TRADEWIZ_FROM_TS
+    chk("запись DBot побеждает всё",
+        classify_bot(TRADEWIZ_WALLET, ts + 99, True) == DBOT_LABEL)
+    chk("BATCH-8 после отсечки без записи -- tradewiz",
+        classify_bot(TRADEWIZ_WALLET, ts, False) == TRADEWIZ_LABEL)
+    chk("BATCH-8 ДО отсечки без записи -- не tradewiz",
+        classify_bot(TRADEWIZ_WALLET, ts - 1, False) == UNKNOWN_BOT_LABEL)
+    chk("другой кошелёк без записи -- не tradewiz",
+        classify_bot("GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq", ts + 99, False)
+        == UNKNOWN_BOT_LABEL)
+    chk("без времени покупки не гадаем",
+        classify_bot(TRADEWIZ_WALLET, None, False) == UNKNOWN_BOT_LABEL)
+    chk("отсечка -- это 23.09 00:30Z",
+        time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(TRADEWIZ_FROM_TS))
+        == "2026-09-23T00:30:00Z",
+        time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(TRADEWIZ_FROM_TS)))
+
+    # Итоги задачи не должны включать чужого бота.
+    fake = [{"task_id": "T", "task_name": "BATCH-8", "wallet": TRADEWIZ_WALLET,
+             "wallet_name": None, "status": "закрыта", "net_sol": 1.0,
+             "source_address": "S", "source_remark": None, "bot": DBOT_LABEL},
+            {"task_id": "T", "task_name": "BATCH-8", "wallet": TRADEWIZ_WALLET,
+             "wallet_name": None, "status": "закрыта", "net_sol": -5.0,
+             "source_address": "S", "source_remark": None, "bot": TRADEWIZ_LABEL}]
+    rows = build_task_stats([{"id": "T", "name": "BATCH-8", "wallet": TRADEWIZ_WALLET,
+                               "sources": []}], fake, {}, {TRADEWIZ_WALLET: 0.0})
+    chk("net задачи считается без TradeWiz", rows[0]["net_sol_sum"] == 1.0,
+        str(rows[0]["net_sol_sum"]))
+    chk("TradeWiz вынесен отдельной строкой",
+        (rows[0]["чужой_бот"] or {}).get("net_sol_sum") == -5.0,
+        str(rows[0].get("чужой_бот")))
+    chk("TradeWiz помечен как не учтённый",
+        (rows[0]["чужой_бот"] or {}).get("учтено_в_итогах_задачи") is False)
+    src = build_source_stats(fake)
+    chk("в статистику источников TradeWiz не попал",
+        sum(r["n_trades"] for r in src) == 1, str([r["n_trades"] for r in src]))
+
+    # Выбор узла.
+    global _helius_demoted_until
+    saved = _helius_demoted_until
+    os.environ["HELIUS_API"] = "x"
+    _helius_demoted_until = 0.0
+    chk("пока Helius жив -- берём Helius", _helius_available())
+    _demote_helius("самотест")
+    chk("после понижения -- публичный узел", not _helius_available())
+    _helius_demoted_until = saved
+    RPC_STATS["helius_понижен"] = False
+    RPC_STATS["helius_понижен_utc"] = None
+
+    bad = 0
+    for name, ok, got in checks:
+        print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}" + (f"  -> {got}" if got and not ok else ""))
+        bad += (not ok)
+    print(f"самопроверка учёта: {len(checks) - bad}/{len(checks)} пройдено")
+    if bad:
+        raise SystemExit(f"самопроверка не пройдена: {bad} из {len(checks)}")
 
 
 if __name__ == "__main__":
-    main()
+    if "--self-test" in sys.argv:
+        self_test()
+        raise SystemExit(0)
+    # Даже при падении состояние RPC должно попасть в файл: без этого
+    # причину обрыва приходилось выкапывать из логов задания, а именно на
+    # этом конвейер и простоял 8 часов.
+    try:
+        main()
+    except BaseException as exc:  # noqa: BLE001
+        st = load_json(STATUS_PATH, {})
+        st["updated_utc"] = now_utc()
+        st["last_error"] = f"{type(exc).__name__}: {exc}"[:800]
+        st["rpc"] = dict(RPC_STATS)
+        save_json(STATUS_PATH, st)
+        print("[ledger] RPC: " + json.dumps(RPC_STATS, ensure_ascii=False), flush=True)
+        raise

@@ -38,6 +38,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
+      - name: "Самопроверка учёта (без сети)"
+        run: python -u analysis/solana_ledger_run.py --self-test
       - name: "Единый конвейер учёта (A-E)"
         env:
           HELIUS_API: ${{ secrets.HELIUS_API }}
