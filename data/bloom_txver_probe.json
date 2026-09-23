@@ -1,0 +1,58 @@
+{
+  "checked_utc": "2026-09-23T20:47:11Z",
+  "seconds": 600.0,
+  "sources": 17,
+  "tasks": [
+    "BATCH-5",
+    "BATCH-3"
+  ],
+  "failures": [
+    "потолок 1: ConnectionClosedError: no close frame received or sent"
+  ],
+  "by_ceiling": {
+    "0": {
+      "messages": 3,
+      "with_meta": 3,
+      "without_meta": 0,
+      "versions_with_meta": {
+        "0": 3
+      },
+      "versions_without_meta": {},
+      "acked": 17,
+      "errors": [],
+      "samples_without_meta": []
+    },
+    "1": {
+      "messages": 3,
+      "with_meta": 3,
+      "without_meta": 0,
+      "versions_with_meta": {
+        "0": 3
+      },
+      "versions_without_meta": {},
+      "acked": 17,
+      "errors": [],
+      "samples_without_meta": []
+    }
+  },
+  "signatures_seen": {
+    "0": 3,
+    "1": 3
+  },
+  "comparison": {
+    "ceilings": [
+      0,
+      1
+    ],
+    "share_with_meta": {
+      "0": 1.0,
+      "1": 1.0
+    },
+    "signatures_common": 3,
+    "fixed_by_higher_ceiling": [],
+    "fixed_count": 0,
+    "broken_by_higher_ceiling": [],
+    "broken_count": 0,
+    "verdict": "по общим подписям разницы нет: потолок версии не объясняет сообщения без meta, искать другую причину"
+  }
+}
