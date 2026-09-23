@@ -1,8 +1,8 @@
-=== Bloom: доклад 2026-09-23T22:35:17Z (формат 2) ===
-журнал: новых записей 114, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 0
-решений в окне: 114 -- боевые источники 102, стенд 12
+=== Bloom: доклад 2026-09-23T22:41:17Z (формат 2) ===
+журнал: новых записей 115, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 0
+решений в окне: 115 -- боевые источники 103, стенд 12
 по кодам (боевые источники):
-     65  NOT_A_BUY
+     66  NOT_A_BUY
      22  TARGET_AMOUNT_OUT_OF_RANGE
       5  TOKEN_RECEIVED_NOT_BOUGHT
       5  INTERMEDIATE_ROUTE
@@ -15,41 +15,36 @@
       1  SKIP_TARGET_INCREASE_POSITION
 
 --- откуда разбор (группы не смешиваются) ---
-PARSE_VIA_MSG: решений 80, доля 0.7843, к покупке 0
-    отставание слотов: {'n': 80, 'min': 0, 'median': 0.0, 'max': 0}
-    слот сети минус слот источника: {'n': 80, 'min': 0, 'median': 0.0, 'max': 0}
-    задержка решения, мс: {'n': 80, 'min': 0.2, 'median': 0.4, 'max': 1.6}
-PARSE_VIA_RPC: решений 22, доля 0.2157, к покупке 0
+PARSE_VIA_MSG: решений 81, доля 0.7864, к покупке 0
+    отставание слотов: {'n': 81, 'min': 0, 'median': 0, 'max': 0}
+    слот сети минус слот источника: {'n': 81, 'min': 0, 'median': 0, 'max': 0}
+    задержка решения, мс: {'n': 81, 'min': 0.2, 'median': 0.4, 'max': 1.6}
+PARSE_VIA_RPC: решений 22, доля 0.2136, к покупке 0
     отставание слотов: {'n': 22, 'min': 1, 'median': 1.0, 'max': 2}
     слот сети минус слот источника: {'n': 22, 'min': 1, 'median': 1.0, 'max': 2}
     задержка решения, мс: {'n': 22, 'min': 244.0, 'median': 322.45, 'max': 618.3}
   примечание: PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота
 
 --- версия транзакции против пути разбора ---
-  версия 0: PARSE_VIA_MSG=39
+  версия 0: PARSE_VIA_MSG=40
   версия 1: PARSE_VIA_MSG=4
   версия legacy: PARSE_VIA_MSG=8
   версия НЕТ_ПОЛЯ: PARSE_VIA_MSG=40, PARSE_VIA_RPC=22, неизвестно=1
   вывод: медленного пути в записях с версией нет -- проверять гипотезу не на чем
 
---- первые 5 решений: слоты и время ---
+--- первые 3 решений: слоты и время ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
 4zGYxRdJQ2Br1YkqoJx6  BATCH-5  449805358       2026-09-23T20:00:25Z 252.3       449805359  0.226      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
 5Rw1Yo1fzMeRwLtNiSJd  BATCH-5  449805376       2026-09-23T20:00:30Z 356.2       449805377  0.175      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
 5RGzzEPRxmjJEj6Re9in  BATCH-5  449805449       2026-09-23T20:00:49Z 288.7       449805450  0.165      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5yBeu58kWUfSE1yEa9wC  BATCH-5  449805458       2026-09-23T20:00:51Z 244.5       449805459  0.156      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-3Ev3cDfRmnaWWTex7yEj  BATCH-5  449805499       2026-09-23T20:01:02Z 466.5       449805500  0.114      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
 
---- стенд: решения по тестовым источникам (5) ---
+--- стенд: решения по тестовым источникам (3) ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
 4ukG2WmJdyzG4rCuNDzA  TEST     449821563       2026-09-23T21:12:02Z 0.6         449821563  0.007      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
 4UH7USs4vSNZt6ccK3HB  TEST     449821615       2026-09-23T21:12:16Z 0.3         449821615  0.058      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
 55fyYF24TmhqHLPBYhXf  TEST     449821724       2026-09-23T21:12:45Z 0.3         449821724  0.123      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-48sJym3N2ZED3HikvDRw  TEST     449821746       2026-09-23T21:12:51Z 1.2         449821746  0.056      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-3rgPdyAuuQf5B3wZEYw7  TEST     449832375       2026-09-23T21:59:52Z 0.3         449832375  0.07       0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
 
 --- стенд: записи целиком ---
-{"schema_version": 2, "ts_utc": "2026-09-23T22:17:24Z", "stage": "exec_result", "signature": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4", "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY", "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6", "source_sig": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4", "exec_code": "SENT", "reason": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым", "live": false, "dry_run": false, "mode": "live-test", "test_source": true, "order_id": "API-a893bf03-f3f9-4c14-9362-baa9c1ebac9b", "signatures": ["5ycBKDykfUDATQthzAhTtXMjfJd74nLgFAboEUPFCFiLGv1DQVYm98C2A1of3SY2anpx6ngRjmRCEEitcXPNFizY"]}
 {"schema_version": 2, "ts_utc": "2026-09-23T22:23:00Z", "signature": "2DrxoRisvTKBXgH9EqAgdkPZKyuNoV3hnKSXiSvHjdBuwbyabRt4hC7nSgd8zs6VijNQ16e6dNu94NgZjnQgNj4X", "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA", "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY", "slot": 449837610, "kind": "buy", "spend_sol_eq": 0.060671008510946776, "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "spend_ui": 7.0, "first_entry": false, "dex_programs": ["Orca Whirlpool", "Raydium CLMM", "Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Orca Whirlpool", "Raydium CLMM", "Raydium CPMM"], "intermediate_mints": ["XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX"], "mints_in_route": 3, "hops_by_mints": 2, "dex_calls": 3, "via_intermediate": true, "all_tx_mints": ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY", "So11111111111111111111111111111111111111112", "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX"]}, "slot_lag": 0, "action": "skip", "code": "SKIP_TARGET_INCREASE_POSITION", "reason": "источник докупает уже имеющийся токен (skipTargetIncreasePosition=true)", "filter": "задача DBot", "test_source": true, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790202180.043857, "t_recv_utc": "2026-09-23T22:23:00Z", "t_decide_ts": 1790202180.044959, "decide_latency_ms": 1.1, "source_slot": 449837610, "net_slot_at_decision": 449837610, "net_slot_age_s": 0.046, "rate_note": "по курсу 115.38 USD/SOL", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
 
 --- маршруты наших покупок --- покупок 0, маршрут известен 0, многохоповых 0 (доля None), отброшено за промежуточный токен 5
@@ -70,4 +65,4 @@ PARSE_VIA_RPC: решений 22, доля 0.2157, к покупке 0
   [НЕТ] test_call_full_circle: live_test_positions=1, still_open=1
 
 --- расход Helius ---
-{"день": "2026-09-23", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 1343, "бюджет": 60000, "доля": 0.0224, "группа": null, "потрачено_по_бюджету": 1343, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 138, "бюджет": 15000, "доля": 0.0092, "группа": null, "потрачено_по_бюджету": 138, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 1481, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
+{"день": "2026-09-23", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 1379, "бюджет": 60000, "доля": 0.023, "группа": null, "потрачено_по_бюджету": 1379, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 186, "бюджет": 15000, "доля": 0.0124, "группа": null, "потрачено_по_бюджету": 186, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 1565, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}

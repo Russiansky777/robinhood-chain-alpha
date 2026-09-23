@@ -1,0 +1,63 @@
+{
+ "state_dir": "/tmp/bloom_state",
+ "heartbeat": {
+  "schema_version": 2,
+  "updated_utc": "2026-09-23T22:40:58Z",
+  "updated_ts": 1790203258.500567,
+  "mode": "live",
+  "positions_in_cycle": 1,
+  "slippage_pct": 40.0,
+  "grace_s": 15.0,
+  "give_up_after_s": 600.0,
+  "kill_buy": {
+   "path": "/etc/bloom-executor/KILL",
+   "readable": true,
+   "active": false,
+   "note": "путь рубильника доступен на чтение"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "kill_sell": {
+   "path": "/etc/bloom-executor/KILL_SELL",
+   "readable": true,
+   "active": false,
+   "note": "путь рубильника доступен на чтение"
+  }
+ },
+ "heartbeat_why_not": null,
+ "positions_rows": [
+  {
+   "schema_version": 2,
+   "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6",
+   "state": "intent",
+   "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+   "source_sig": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4",
+   "source_slot": 449836345,
+   "sol_in": 0.001,
+   "pool": null,
+   "program": "Meteora DLMM",
+   "taxed": true,
+   "tax_bps": 100,
+   "mode": "live-test",
+   "sell_after_s": 28.8,
+   "ts_intent": 1790201844.6449163,
+   "ts_intent_utc": "2026-09-23T22:17:24Z",
+   "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6",
+   "ts_update": 1790201844.8135173,
+   "ts_update_utc": "2026-09-23T22:17:24Z",
+   "state": "bought",
+   "order_id": "API-a893bf03-f3f9-4c14-9362-baa9c1ebac9b",
+   "signatures": [
+    "5ycBKDykfUDATQthzAhTtXMjfJd74nLgFAboEUPFCFiLGv1DQVYm98C2A1of3SY2anpx6ngRjmRCEEitcXPNFizY"
+   ],
+   "ts_accepted": 1790201844.8135145,
+   "caveat": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым"
+  }
+ ],
+ "positions_why_not": null,
+ "seller_rows": []
+}
