@@ -184,6 +184,52 @@ def foreign_activity(helius, wallet: str, ours: set, *,
             "foreign_count": len(свежие) + len(прежние)}
 
 
+def объяснить_свежие(helius, свежие: list, минты: set, wallet: str, *,
+                      предел: int = 10) -> dict:
+    """Какие из "чужих" свежих сделок -- выходы Bloom по НАШИМ позициям.
+
+    Зачем это нужно. Основной выход стенда -- таймерный авто-ордер Bloom,
+    прикреплённый к покупке. Его транзакцию подписывает наш кошелёк, но её
+    подпись нам не сообщают: ответ /swap отдаёт подписи только по своему
+    вызову. Поэтому продажа по авто-ордеру выглядит для сверки чужой
+    сделкой -- и блокирует следующий запуск на ровном месте.
+
+    Правило узкое НАМЕРЕННО: объясняется только сделка, в которой упал
+    остаток минта НАШЕЙ позиции. Всё остальное остаётся чужим: списывать
+    незнакомую активность на "наверное Bloom" -- это ровно тот подлог,
+    из-за которого сверка и существует.
+    """
+    import bloom_detector as BD  # noqa: PLC0415
+    объяснённые, необъяснённые, сбои = [], [], []
+    for зап in свежие[:предел]:
+        sig = зап.get("signature")
+        try:
+            tx = helius.транзакция(sig)
+        except Exception as exc:  # noqa: BLE001
+            сбои.append({"signature": sig, "why_not": f"{type(exc).__name__}"})
+            необъяснённые.append(зап)
+            continue
+        if not tx:
+            сбои.append({"signature": sig, "why_not": "узел не отдал транзакцию"})
+            необъяснённые.append(зап)
+            continue
+        б = BD.балансы_кошелька(tx, wallet)
+        упали = sorted({м for м, з in (б.get("by_mint") or {}).items()
+                        if м in минты and (з.get("delta_raw") or 0) < 0})
+        if упали:
+            объяснённые.append({**зап, "mints": упали,
+                                 "why": "выход по нашей позиции: остаток нашего "
+                                        "минта уменьшился, подпись авто-ордера "
+                                        "Bloom нам не сообщается"})
+        else:
+            необъяснённые.append(зап)
+    if len(свежие) > предел:
+        необъяснённые.extend(свежие[предел:])
+    return {"explained": объяснённые, "unexplained": необъяснённые,
+             "failures": сбои, "checked": min(len(свежие), предел),
+             "limit": предел}
+
+
 def mixed_journal(state: ST.ExecState) -> dict:
     """Есть ли в журнале записи прежнего формата рядом с новыми."""
     итог = {"decisions": {"v1": 0, "v2": 0, "unreadable": 0},
@@ -226,7 +272,8 @@ def archive_dry(state: ST.ExecState, *, stamp: str | None = None) -> dict:
 
 def reconcile(state: ST.ExecState, *, mode: str, helius=None,
               min_balance_sol: float = MIN_BALANCE_SOL,
-              balance_sol: float | None = None) -> dict:
+              balance_sol: float | None = None,
+              allow_open_live_test: bool = False) -> dict:
     """Сводка готовности. Ничего не меняет."""
     dry = state.dry_positions()
     real = state.open_positions()
@@ -243,21 +290,51 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
         чужая = foreign_activity(helius, ST.EXECUTOR_WALLET, ours,
                                  since_ts=(метка.get("stand_start_ts")
                                            if метка.get("set") else None))
+        if чужая.get("recent"):
+            минты_наши = {p.get("mint") for p in state.positions().values()
+                          if p.get("mint")}
+            разбор = объяснить_свежие(helius, чужая["recent"], минты_наши,
+                                       ST.EXECUTOR_WALLET)
+            чужая["explained"] = разбор["explained"]
+            чужая["unexplained"] = разбор["unexplained"]
+            чужая["explain_failures"] = разбор["failures"]
+            чужая["unexplained_count"] = len(разбор["unexplained"])
 
     журнал = mixed_journal(state)
 
     блокеры = []
     if mode in ST.MODES_REAL and dry:
         блокеры.append(f"в журнале {len(dry)} позиций dry-run -- отложить перед стендом")
-    if real:
+    заметки = []
+    только_стенд = bool(real) and all(p.get("mode") == ST.MODE_LIVE_TEST for p in real)
+    if real and allow_open_live_test and только_стенд:
+        # Исключение разрешено владельцем ПРЯМО и только для стенда: позиция
+        # стенда стоит открытой именно потому, что её не удалось продать, и
+        # ждать её закрытия -- значит не ставить правку, которая её закрывает.
+        заметки.append(f"открыто {len(real)} позиций стенда (live-test) -- старт "
+                        "разрешён исключением владельца, боевых позиций нет")
+    elif real:
         блокеры.append(f"открыто {len(real)} настоящих позиций -- сначала должны закрыться")
     if not читается:
         блокеры.append(f"рубильник не читается службой: {почему_читается}")
     if убит:
         блокеры.append(f"рубильник включён: {почему_убит}")
-    заметки = []
     if чужая.get("known") is False:
         блокеры.append(f"чужая активность НЕИЗВЕСТНА: {чужая.get('why')}")
+    elif чужая.get("unexplained_count") is not None:
+        if чужая["unexplained_count"]:
+            блокеры.append(f"на кошельке {чужая['unexplained_count']} сделок за "
+                            f"последние {чужая.get('window_h')} ч, которых мы не "
+                            "делали и объяснить не смогли -- мы в кошельке не одни")
+        if чужая.get("explained"):
+            заметки.append(f"{len(чужая['explained'])} свежих сделок объяснены как "
+                            "выходы по нашим позициям (авто-ордер Bloom, его подпись "
+                            "в ответе /swap не приходит): "
+                            + ", ".join(f"{x['signature'][:12]} ({','.join(x['mints'])})"
+                                        for x in чужая["explained"]))
+        if чужая.get("explain_failures"):
+            заметки.append(f"{len(чужая['explain_failures'])} свежих сделок разобрать "
+                            "не удалось -- они считаются чужими")
     elif чужая.get("recent_count"):
         блокеры.append(f"на кошельке {чужая['recent_count']} сделок за последние "
                        f"{чужая.get('window_h')} ч, которых мы не делали -- "
@@ -409,6 +486,83 @@ def self_test() -> int:
         chk("и в блокере названо окно",
             any("за последние" in b for b in r["blockers"]), r["blockers"])
 
+    # выход по авто-ордеру Bloom: подпись чужая, сделка наша
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        st.write_intent(client_order_id="ao", mint="MINTX", source_sig="S",
+                        source_slot=1, sol_in=0.001, pool=None, program=None,
+                        taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                        sell_after_s=28.8)
+        st.update_position("ao", state="bought", signatures=["НАША_ПОКУПКА"])
+
+        class HeliusСПродажей(HeliusЗаглушка):
+            def транзакция(self, подпись, **kw):
+                # остаток НАШЕГО минта уменьшился -- это выход по позиции
+                бал = lambda raw, idx: {  # noqa: E731
+                    "accountIndex": idx, "mint": "MINTX",
+                    "owner": ST.EXECUTOR_WALLET,
+                    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                    "uiTokenAmount": {"amount": str(raw), "decimals": 6,
+                                       "uiAmount": raw / 1e6}}
+                return {"slot": 5,
+                        "transaction": {"message": {
+                            "accountKeys": [{"pubkey": ST.EXECUTOR_WALLET}],
+                            "instructions": []}},
+                        "meta": {"err": None, "fee": 5000,
+                                  "preBalances": [10 ** 9], "postBalances": [10 ** 9],
+                                  "preTokenBalances": [бал(92_000000, 1)],
+                                  "postTokenBalances": [бал(0, 1)],
+                                  "innerInstructions": []}}
+
+        h = HeliusСПродажей([{"signature": "ПРОДАЖА_БЛУМА",
+                              "blockTime": int(сейчас - 60)}], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h,
+                      allow_open_live_test=True)
+        ч = r["foreign_activity"]
+        chk("выход по нашей позиции объяснён, а не записан в чужие",
+            ч.get("unexplained_count") == 0 and len(ч.get("explained") or []) == 1, ч)
+        chk("и объяснение названо в примечаниях",
+            any("авто-ордер Bloom" in n for n in r["notes"]), r["notes"])
+        chk("сверка при этом чистая", r["clean"], r["blockers"])
+
+        class HeliusЧужая(HeliusСПродажей):
+            def транзакция(self, подпись, **kw):
+                tx = HeliusСПродажей.транзакция(self, подпись, **kw)
+                for где in ("preTokenBalances", "postTokenBalances"):
+                    for b in tx["meta"][где]:
+                        b["mint"] = "НЕ_НАШ"
+                return tx
+
+        h2 = HeliusЧужая([{"signature": "ЧУЖАЯ_СДЕЛКА",
+                           "blockTime": int(сейчас - 60)}], баланс=0.35)
+        r2 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h2,
+                       allow_open_live_test=True)
+        chk("сделка по чужому минту объяснением не считается",
+            not r2["clean"] and r2["foreign_activity"]["unexplained_count"] == 1,
+            r2["foreign_activity"])
+
+    # открытая позиция стенда: блокер по умолчанию, исключение -- по слову владельца
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        st.write_intent(client_order_id="lt", mint="M", source_sig="S", source_slot=1,
+                        sol_in=0.001, pool=None, program=None, taxed=None,
+                        tax_bps=None, mode=ST.MODE_LIVE_TEST, sell_after_s=28.8)
+        st.update_position("lt", state="bought")
+        h = HeliusЗаглушка([], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("по умолчанию открытая позиция стенда блокирует старт", not r["clean"],
+            r["blockers"])
+        r2 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h, allow_open_live_test=True)
+        chk("с разрешением владельца -- не блокирует", r2["clean"], r2["blockers"])
+        chk("и сказано, что это исключение, а не норма",
+            any("исключением владельца" in n for n in r2["notes"]), r2["notes"])
+        st.write_intent(client_order_id="lv", mint="M2", source_sig="S2", source_slot=2,
+                        sol_in=0.2, pool=None, program=None, taxed=None,
+                        tax_bps=None, mode=ST.MODE_LIVE, sell_after_s=28.8)
+        st.update_position("lv", state="bought")
+        r3 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h, allow_open_live_test=True)
+        chk("боевую позицию исключение НЕ покрывает", not r3["clean"], r3["blockers"])
+
     # прежняя история кошелька старт не держит, но названа вслух
     with tempfile.TemporaryDirectory() as d:
         st = состояние(d)
@@ -533,6 +687,9 @@ def main() -> int:
                    help="режим, для которого проверяем готовность")
     p.add_argument("--mark-start", action="store_true",
                    help="поставить метку начала стенда (только по слову владельца)")
+    p.add_argument("--allow-open-live-test", action="store_true",
+                   help="не блокировать старт открытыми позициями стенда "
+                        "(только по слову владельца; боевые позиции не покрывает)")
     p.add_argument("--note", default="",
                    help="пояснение к метке начала стенда")
     a = p.parse_args()
@@ -554,7 +711,8 @@ def main() -> int:
         м = поставить_метку(state, note=a.note)
         print(json.dumps({"stand_start": м}, ensure_ascii=False, indent=2))
 
-    сводка = reconcile(state, mode=mode, helius=helius)
+    сводка = reconcile(state, mode=mode, helius=helius,
+                        allow_open_live_test=a.allow_open_live_test)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     ST.atomic_write_json(OUT_PATH, сводка)
     ST.atomic_write_json(state.base / "reconcile.json", сводка)

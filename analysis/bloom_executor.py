@@ -85,6 +85,7 @@ SELL_AFTER_FALLBACK_S = ST.env_float("BLOOM_SELL_AFTER_FALLBACK_S", 29.0)
 TARGET_HINT = re.compile(r"target_value|target_type|auto_order|integer|"
                           r"whole|целое|секунд", re.I)
 EXEC_SENT_AFTER_TARGET = "SENT_AFTER_TARGET_FIX"
+EXEC_SENT_AFTER_ADDRESS = "SENT_AFTER_ADDRESS_FIX"
 
 # Один и только один повтор с УВЕЛИЧЕННОЙ суммой -- и только если запрос
 # был отвергнут до отправки. INVALID_REQUEST означает, что Bloom тело не
@@ -154,12 +155,19 @@ class Executor:
     # --------------------------------------------------------------- тело
 
     def build_body(self, mint: str, *, amount_sol: float | None = None,
-                   sell_after_s: float | None = None) -> dict:
+                   sell_after_s: float | None = None,
+                   address: str | None = None) -> dict:
         """Тело покупки с ОБЯЗАТЕЛЬНЫМ таймерным авто-ордером.
 
         auto_orders непустой -- принципиально: при отсутствии поля Bloom
         подставит сохранённую в кабинете стратегию аккаунта, и мы получим
         чужие условия выхода вместо своих 28.8 с.
+
+        address отличается от mint, когда покупаем ПО ID ПУЛА источника.
+        Смысл: по минту маршрут выбирает Bloom, и на п. 1 стенда он выбрал
+        двухшаговый через пул без ликвидности в диапазоне, тогда как
+        источник шёл одним пулом. Минт при этом остаётся минтом: он нужен
+        для учёта позиции, налога и остатка по цепи.
         """
         order = API.build_timer_order(
             seconds=(self.sell_after_s if sell_after_s is None else sell_after_s),
@@ -167,7 +175,7 @@ class Executor:
             priority_fee=self.priority_fee, processor_tip=self.processor_tip,
             amount_percent=100)
         return API.build_buy_body(
-            address=mint,
+            address=(address or mint),
             amount_sol=self.buy_sol if amount_sol is None else amount_sol,
             slippage_pct=self.slippage_pct,
             priority_fee=self.priority_fee, processor_tip=self.processor_tip,
@@ -219,8 +227,19 @@ class Executor:
 
         # 2. Тело и его проверка ДО записи намерения: отказ в теле -- это не
         #    попытка покупки, и класть о ней намерение в журнал неверно.
+        # Чем покупаем: ID пула источника, если он в его транзакции виден,
+        # иначе минт. Пул не выдумывается: детектор отдаёт его только когда
+        # в транзакции нашёлся владелец хранилищ пары токен/WSOL, и помечает
+        # NO_SOL_POOL_IN_TX, когда такого владельца нет (пул к USDC, RFQ,
+        # маршрут без видимого пула).
+        адрес = (decision.get("source_pool") or "").strip() or mint
+        вид_адреса = "pool" if адрес != mint else "mint"
+        out["buy_address"] = адрес
+        out["buy_address_kind"] = вид_адреса
+        if decision.get("pool_why_not"):
+            out["pool_why_not"] = decision.get("pool_why_not")
         try:
-            body = self.build_body(mint)
+            body = self.build_body(mint, address=адрес)
             API.validate_swap_body(body)
         except API.BloomRefusal as exc:
             self.refused += 1
@@ -237,7 +256,8 @@ class Executor:
         self.state.write_intent(
             client_order_id=cid, mint=mint, source_sig=sig,
             source_slot=decision.get("source_slot"), sol_in=self.buy_sol,
-            pool=None, program=(route.get("programs") or [None])[0],
+            pool=(адрес if вид_адреса == "pool" else None),
+            program=(route.get("programs") or [None])[0],
             taxed=decision.get("taxed"), tax_bps=decision.get("tax_bps"),
             mode=self.mode, sell_after_s=self.sell_after_s)
 
@@ -255,6 +275,7 @@ class Executor:
                 cid, state="bought", order_id=res.get("order_id"),
                 signatures=res.get("signatures") or [],
                 ts_accepted=time.time(),
+                buy_address=адрес, buy_address_kind=вид_адреса,
                 caveat=res.get("caveat"))
             out.update(exec_code=(EXEC_DRY_RUN if res.get("dry_run") else EXEC_SENT),
                        order_id=res.get("order_id"),
@@ -274,20 +295,29 @@ class Executor:
         # INVALID_REQUEST -- 29.
         сумма_тек = self.buy_sol
         срок_тек = self.sell_after_s
+        адрес_тек = адрес
         поднимали = False
         правили_срок = False
+        правили_адрес = False
         код_первый = res.get("error_code") or "?"
         текст_первый = str(res.get("why_not") or "")
-        for _ in range(2):
+        for _ in range(3):
             если_можно = (self.mode in (ST.MODE_LIVE_TEST, ST.MODE_LIVE)
                           and (res.get("error_code") or "?") in BUMP_SAFE_CODES)
             if not если_можно:
                 break
             текст = str(res.get("why_not") or "")
             код = res.get("error_code") or "?"
-            новая_сумма, новый_срок = сумма_тек, срок_тек
+            новая_сумма, новый_срок, новый_адрес = сумма_тек, срок_тек, адрес_тек
             что = None
-            if (not поднимали and BUMP_HINT.search(текст)
+            # Адрес правится ПЕРВЫМ и без разбора текста: принимает ли Bloom
+            # ID пула в поле address -- пока не проверено ни одной живой
+            # сделкой, а INVALID_REQUEST означает, что в цепь не ушло
+            # ничего. Поэтому отказ на пуле -- повтор по минту, и покупка не
+            # теряется из-за непроверенной догадки.
+            if not правили_адрес and адрес_тек != mint:
+                новый_адрес, что = mint, "адрес"
+            elif (not поднимали and BUMP_HINT.search(текст)
                     and сумма_тек < self.bump_sol):
                 новая_сумма, что = self.bump_sol, "сумма"
             elif (not правили_срок and TARGET_HINT.search(текст)
@@ -295,20 +325,24 @@ class Executor:
                 новый_срок, что = SELL_AFTER_FALLBACK_S, "срок"
             if что is None:
                 break
+            было = {"сумма": сумма_тек, "срок": срок_тек, "адрес": адрес_тек}[что]
+            стало = {"сумма": новая_сумма, "срок": новый_срок,
+                      "адрес": новый_адрес}[что]
             log.warning("Bloom отверг тело (%s: %s) -- одна попытка: %s "
-                        "%s -> %s", код, текст[:120], что,
-                        сумма_тек if что == "сумма" else срок_тек,
-                        новая_сумма if что == "сумма" else новый_срок)
+                        "%s -> %s", код, текст[:120], что, было, стало)
             self.state.log_decision({"stage": "exec_retry", "what": что,
                                      "mint": mint, "signature": sig,
                                      "from_sol": сумма_тек, "to_sol": новая_сумма,
                                      "from_sell_after_s": срок_тек,
                                      "to_sell_after_s": новый_срок,
+                                     "from_address": адрес_тек,
+                                     "to_address": новый_адрес,
                                      "error_code": код,
                                      "why_not": текст[:200]})
             try:
                 body2 = self.build_body(mint, amount_sol=новая_сумма,
-                                        sell_after_s=новый_срок)
+                                        sell_after_s=новый_срок,
+                                        address=новый_адрес)
                 API.validate_swap_body(body2)
             except API.BloomRefusal as exc:
                 self.refused += 1
@@ -318,15 +352,21 @@ class Executor:
                                            close_reason="retry_body_refused",
                                            error_code=код_первый)
                 return out
-            сумма_тек, срок_тек = новая_сумма, новый_срок
+            сумма_тек, срок_тек, адрес_тек = новая_сумма, новый_срок, новый_адрес
             поднимали = поднимали or что == "сумма"
             правили_срок = правили_срок or что == "срок"
+            правили_адрес = правили_адрес or что == "адрес"
             res = self.api.swap(body2, client_order_id=cid,
                                 why=(f"повтор: {что} {сумма_тек} SOL / "
                                      f"{срок_тек} с после {код}"))
             if res.get("ok"):
                 self.sent += 1
-                итоговый_код = (EXEC_BUMPED if поднимали else EXEC_SENT_AFTER_TARGET)
+                правки = ([n for n, было in (("сумма", поднимали),
+                                               ("срок", правили_срок),
+                                               ("адрес", правили_адрес)) if было])
+                итоговый_код = (EXEC_BUMPED if поднимали else
+                                 EXEC_SENT_AFTER_TARGET if правили_срок else
+                                 EXEC_SENT_AFTER_ADDRESS)
                 self.state.update_position(
                     cid, state="bought", order_id=res.get("order_id"),
                     signatures=res.get("signatures") or [],
@@ -334,12 +374,20 @@ class Executor:
                     sell_after_s=срок_тек,
                     bumped_from_sol=(self.buy_sol if поднимали else None),
                     target_from_s=(self.sell_after_s if правили_срок else None),
+                    pool=(адрес_тек if адрес_тек != mint else None),
+                    buy_address=адрес_тек,
+                    buy_address_kind=("pool" if адрес_тек != mint else "mint"),
+                    address_from=(адрес if правили_адрес else None),
+                    fixes=",".join(правки),
                     first_error_code=код_первый,
                     caveat=res.get("caveat"))
                 out.update(exec_code=итоговый_код, order_id=res.get("order_id"),
                            signatures=res.get("signatures") or [],
                            sol_in=сумма_тек, sell_after_s=срок_тек,
+                           buy_address=адрес_тек,
+                           buy_address_kind=("pool" if адрес_тек != mint else "mint"),
                            first_error_code=код_первый,
+                           fixes=",".join(правки),
                            reason=res.get("caveat") or f"принято после правки: {что}")
                 return out
 
@@ -638,6 +686,66 @@ def self_test() -> int:
                 r["exec_code"] == EXEC_LIVE_TEST_SKIP, r["exec_code"])
             chk("и в сеть ничего не ушло", сессия.запросы == [], сессия.запросы)
             chk("и позиции не создано", st.positions() == {}, st.positions())
+
+        # покупка ПО ID ПУЛА источника и откат к минту
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отв = ОтветЗаглушка(200, {"success": True,
+                                      "data": {"order_id": "op", "signatures": ["sp1"]}})
+            сессия = СессияЗаглушка([отв])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True,
+                            "source_pool": "POOLSRC"}, balance_sol=5.0)
+            chk("покупка уходит по ID пула источника",
+                сессия.запросы[0]["json"]["address"] == "POOLSRC",
+                сессия.запросы[0]["json"]["address"])
+            chk("и это видно в записи попытки", r.get("buy_address_kind") == "pool", r)
+            одна = list(st.positions().values())[0]
+            chk("пул записан в позицию", одна.get("pool") == "POOLSRC", одна.get("pool"))
+            chk("а минт остался минтом -- по нему учёт и остаток",
+                одна.get("mint") == "MINT1", одна.get("mint"))
+
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отказ = ОтветЗаглушка(400, {"error": {"code": "INVALID_REQUEST",
+                                                  "message": "address is not a token"}})
+            удача = ОтветЗаглушка(200, {"success": True,
+                                        "data": {"order_id": "om", "signatures": ["sm1"]}})
+            сессия = СессияЗаглушка([отказ, удача])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True,
+                            "source_pool": "POOLSRC"}, balance_sol=5.0)
+            chk("Bloom не принял пул -- повтор по минту, покупка не потеряна",
+                r["exec_code"] == EXEC_SENT_AFTER_ADDRESS, r["exec_code"])
+            chk("и код честно называет правку адресом, а не срока",
+                r.get("fixes") == "адрес", r.get("fixes"))
+            chk("второе тело ушло с минтом",
+                сессия.запросы[1]["json"]["address"] == "MINT1",
+                сессия.запросы[1]["json"]["address"])
+            chk("и всего два запроса, не больше", len(сессия.запросы) == 2,
+                len(сессия.запросы))
+            одна = list(st.positions().values())[0]
+            chk("в позиции видно, что адрес правился",
+                одна.get("address_from") == "POOLSRC"
+                and одна.get("buy_address_kind") == "mint", одна)
+
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отв = ОтветЗаглушка(200, {"success": True,
+                                      "data": {"order_id": "on", "signatures": ["sn1"]}})
+            сессия = СессияЗаглушка([отв])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True,
+                            "pool_why_not": "пул к USDC, к WSOL пула нет"},
+                           balance_sol=5.0)
+            chk("пула нет -- покупаем по минту",
+                сессия.запросы[0]["json"]["address"] == "MINT1"
+                and r.get("buy_address_kind") == "mint", r)
+            chk("и причина отсутствия пула в записи попытки",
+                "USDC" in str(r.get("pool_why_not")), r.get("pool_why_not"))
 
         # тестовый источник -- покупается по-настоящему
         with tempfile.TemporaryDirectory() as d:

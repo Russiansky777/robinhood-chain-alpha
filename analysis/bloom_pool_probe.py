@@ -51,103 +51,14 @@ PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 
 # Проверенные по цепи служебные адреса: владельцы хранилищ, но НЕ пулы.
 # Пополняется только по факту проверки (см. --check), с доказательством.
-ИСКЛЮЧЕНИЯ_ПУЛОВ_ФАЙЛ = Path(__file__).resolve().parent.parent / "data" / "bloom_pool_exclusions.json"
+ИСКЛЮЧЕНИЯ_ПУЛОВ_ФАЙЛ = (Path(__file__).resolve().parent.parent / "data"
+                          / "bloom_pool_exclusions.json")
 
 
-def исключения() -> dict:
-    """Служебные адреса, проверенные по цепи. Нечитаемый файл -- пусто."""
-    try:
-        d = json.loads(ИСКЛЮЧЕНИЯ_ПУЛОВ_ФАЙЛ.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return d if isinstance(d, dict) else {}
-
-
-def _хранилища(tx: dict) -> dict:
-    """Владелец счёта -> минты, которые он держит в этой транзакции."""
-    из_владельца: dict = {}
-    meta = (tx or {}).get("meta") or {}
-    for где in ("preTokenBalances", "postTokenBalances"):
-        for b in meta.get(где) or []:
-            if not isinstance(b, dict):
-                continue
-            вл, м = b.get("owner"), b.get("mint")
-            if вл and м:
-                из_владельца.setdefault(вл, set()).add(м)
-    return из_владельца
-
-
-def _счета_инструкций_dex(tx: dict) -> dict:
-    """Адрес счёта -> программы DEX, в чьих инструкциях он встретился."""
-    вых: dict = {}
-    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
-    meta = (tx or {}).get("meta") or {}
-    пачки = [msg.get("instructions") or []]
-    for гр in meta.get("innerInstructions") or []:
-        пачки.append((гр or {}).get("instructions") or [])
-    for пачка in пачки:
-        for ins in пачка:
-            if not isinstance(ins, dict):
-                continue
-            имя = BD.ПРОГРАММЫ_DEX.get(ins.get("programId"))
-            if not имя:
-                continue
-            for acc in ins.get("accounts") or []:
-                if isinstance(acc, str):
-                    вых.setdefault(acc, [])
-                    if имя not in вых[acc]:
-                        вых[acc].append(имя)
-    return вых
-
-
-def кандидаты_пулов(tx: dict, *, минт: str, кошелёк: str | None = None,
-                     исключить: dict | None = None) -> dict:
-    """Кандидаты в пул из одной транзакции. БЕЗ СЕТИ.
-
-    Возвращает всех кандидатов с доказательствами и отдельно лучший выбор
-    для пары токен/WSOL. Если выбора нет -- сказано, почему нет.
-    """
-    исключить = исключить if исключить is not None else исключения()
-    хран = _хранилища(tx)
-    в_dex = _счета_инструкций_dex(tx)
-    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
-    ключи = BD._баланс_ключи(tx)
-    плательщик = ключи[0] if ключи else None
-
-    кандидаты = []
-    for вл, минты in sorted(хран.items()):
-        if len(минты) < 2 or минт not in минты:
-            continue
-        причина_нет = None
-        if вл == кошелёк or вл == плательщик:
-            причина_нет = "это кошелёк сделки, а не пул"
-        elif вл in исключить:
-            причина_нет = f"служебный адрес, проверен по цепи: {исключить[вл].get('why', '')}"
-        elif вл not in в_dex:
-            причина_нет = "адрес не встречается в счетах инструкций DEX"
-        кандидаты.append({
-            "address": вл,
-            "mints": sorted(минты),
-            "with_wsol": WSOL in минты,
-            "dex_programs": в_dex.get(вл, []),
-            "vault_mints_count": len(минты),
-            "rejected": причина_нет,
-        })
-
-    годные = [k for k in кандидаты if not k["rejected"] and k["with_wsol"]]
-    выбор = годные[0]["address"] if len(годные) == 1 else None
-    почему_нет = None
-    if выбор is None:
-        if not кандидаты:
-            почему_нет = "в транзакции нет владельца с хранилищами двух минтов, один из которых наш"
-        elif not годные:
-            почему_нет = "ни один кандидат не парный к WSOL или все отклонены"
-        else:
-            почему_нет = f"кандидатов с WSOL больше одного ({len(годные)}) -- какой пул наш, неясно"
-    return {"mint": минт, "pool_wsol": выбор, "why_not": почему_нет,
-             "candidates": кандидаты,
-             "payer": плательщик,
-             "dex_programs": BD.программы_dex(tx)}
+# Чистый разбор живёт в детекторе: он на горячем пути, и второй копии у
+# него быть не должно. Здесь -- только сеть и проверка кандидатов.
+кандидаты_пулов = BD.кандидаты_пулов
+исключения = lambda: BD.СЛУЖЕБНЫЕ_НЕ_ПУЛЫ  # noqa: E731
 
 
 # --------------------------------------------------------------- сеть
@@ -265,7 +176,10 @@ def self_test() -> int:
                                  "uiTokenAmount": {"amount": "1", "decimals": 6,
                                                     "uiAmount": 1.0}})
         return {"transaction": {"message": {
-                    "accountKeys": [{"pubkey": КОШ}, {"pubkey": ПУЛ}, {"pubkey": СЛУЖ}],
+                    "accountKeys": [{"pubkey": КОШ, "signer": True},
+                                     {"pubkey": ПУЛ, "signer": False},
+                                     {"pubkey": СЛУЖ, "signer": False},
+                                     {"pubkey": "ЧУЖОЙ_КОШ", "signer": True}],
                     "instructions": [{"programId": программа, "accounts": dex_accounts,
                                        "data": "x"}]}},
                 "meta": {"preTokenBalances": балансы, "postTokenBalances": балансы,
@@ -285,6 +199,13 @@ def self_test() -> int:
     chk("проверенный служебный адрес за пул не выдаётся", d2["pool_wsol"] is None, d2)
     chk("и причина названа", "служебный" in (d2["why_not"] or "")
         or any("служебный" in (k["rejected"] or "") for k in d2["candidates"]), d2)
+
+    dП = кандидаты_пулов(tx(владельцы={"ЧУЖОЙ_КОШ": [ТОКЕН, WSOL]},
+                             dex_accounts=["ЧУЖОЙ_КОШ"]),
+                          минт=ТОКЕН, кошелёк=None, исключить={})
+    chk("подписант с токеном и WSOL пулом не считается -- это кошелёк",
+        dП["pool_wsol"] is None and "подписант" in (dП["candidates"][0]["rejected"] or ""),
+        dП)
 
     d3 = кандидаты_пулов(tx(владельцы={ПУЛ: [ТОКЕН, "USDC_M"]}, dex_accounts=[ПУЛ]),
                           минт=ТОКЕН, кошелёк=КОШ, исключить={})
@@ -307,12 +228,21 @@ def self_test() -> int:
     chk("пустая транзакция: пула нет и причина названа",
         d6["pool_wsol"] is None and "нет владельца" in (d6["why_not"] or ""), d6)
 
-    src = Path(__file__).read_text(encoding="utf-8")
-    тело = src.split("def self_test")[0]
-    chk("ни одного зашитого индекса счёта в инструкции",
-        "accounts\"][0]" not in тело and "accounts'][0]" not in тело)
     chk("чистый разбор сети не касается",
         "requests" not in кандидаты_пулов.__code__.co_names)
+    # Файл доказательств и список в детекторе не должны разойтись молча:
+    # разойдутся -- и служебный адрес снова поедет в Bloom как пул.
+    try:
+        из_файла = json.loads(ИСКЛЮЧЕНИЯ_ПУЛОВ_ФАЙЛ.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        из_файла = None
+        chk("файл доказательств по служебным адресам читается", False, str(exc))
+    if из_файла is not None:
+        chk("список служебных адресов в детекторе совпадает с файлом доказательств",
+            set(из_файла) == set(BD.СЛУЖЕБНЫЕ_НЕ_ПУЛЫ),
+            (sorted(set(из_файла) ^ set(BD.СЛУЖЕБНЫЕ_НЕ_ПУЛЫ))))
+        chk("и у каждого адреса есть подпись, в которой он встретился, и метод",
+            all(v.get("seen_in_sig") and v.get("method") for v in из_файла.values()))
 
     плохо = [c for c in checks if not c[1]]
     for имя, ок, факт in checks:

@@ -167,37 +167,64 @@ def rpc_call(method: str, params: list, *, timeout: int = 20) -> dict:
     return {"ok": False, "why_not": последняя}
 
 
-def token_balance_raw(wallet: str, mint: str) -> dict:
-    """Остаток токена НА ЦЕПИ. Сумма по всем счетам обеих программ.
+def _счета_из_ответа(r: dict, mint: str) -> tuple:
+    """Сумма, ui и число счетов из ответа getTokenAccountsByOwner."""
+    сумма, ui, счетов = 0, 0.0, 0
+    for it in ((r.get("result") or {}).get("value") or []):
+        info = ((((it.get("account") or {}).get("data") or {}).get("parsed") or {})
+                .get("info") or {})
+        if info.get("mint") and info.get("mint") != mint:
+            continue          # запасной путь берёт счета программы целиком
+        amt = info.get("tokenAmount") or {}
+        try:
+            сумма += int(amt.get("amount") or 0)
+        except (TypeError, ValueError):
+            pass
+        ui += float(amt.get("uiAmount") or 0.0)
+        счетов += 1
+    return сумма, ui, счетов
 
-    Нельзя брать один счёт: у Token-2022 и классического SPL это разные
-    счета, и остаток может лежать не там, где ждём.
+
+def token_balance_raw(wallet: str, mint: str) -> dict:
+    """Остаток токена НА ЦЕПИ.
+
+    Фильтр у getTokenAccountsByOwner -- РОВНО ОДИН: либо mint, либо
+    programId. Оба вместе узел отвергает как неверные параметры, и это уже
+    стоило живого стенда: сторож 23.09 не сделал ни одной попытки продажи
+    при открытой позиции, потому что каждый круг получал отказ, а ветка
+    "остаток не прочитан" была единственной, которая при этом молчала.
+
+    Фильтра по минту достаточно и для Token-2022: минт принадлежит одной
+    программе токена, и счета этого минта заводятся в ней же. Запасной
+    путь (фильтр по программе с отбором по минту у нас) оставлен на случай,
+    если узел по минту не ответит -- но он дороже и берёт лишние данные.
     """
-    сумма = 0
-    ui = 0.0
-    счетов = 0
-    сбои = []
+    r = rpc_call("getTokenAccountsByOwner", [wallet, {"mint": mint},
+                                              {"encoding": "jsonParsed"}])
+    if r.get("ok"):
+        сумма, ui, счетов = _счета_из_ответа(r, mint)
+        return {"ok": True, "raw": сумма, "ui": ui, "accounts": счетов,
+                 "filter": "mint", "failures": []}
+
+    сбои = [{"filter": "mint", "why_not": r.get("why_not")}]
+    сумма, ui, счетов = 0, 0.0, 0
+    удалось = False
     for prog in (TOKEN_CLASSIC, TOKEN_2022):
-        r = rpc_call("getTokenAccountsByOwner",
-                      [wallet, {"mint": mint, "programId": prog},
-                       {"encoding": "jsonParsed"}])
-        if not r.get("ok"):
-            сбои.append({"program": prog, "why_not": r.get("why_not")})
+        r2 = rpc_call("getTokenAccountsByOwner", [wallet, {"programId": prog},
+                                                   {"encoding": "jsonParsed"}])
+        if not r2.get("ok"):
+            сбои.append({"filter": f"programId:{prog}", "why_not": r2.get("why_not")})
             continue
-        for it in ((r.get("result") or {}).get("value") or []):
-            info = ((((it.get("account") or {}).get("data") or {}).get("parsed") or {})
-                    .get("info") or {})
-            amt = info.get("tokenAmount") or {}
-            try:
-                сумма += int(amt.get("amount") or 0)
-            except (TypeError, ValueError):
-                pass
-            ui += float(amt.get("uiAmount") or 0.0)
-            счетов += 1
-    if сбои and счетов == 0:
+        удалось = True
+        с, u, к = _счета_из_ответа(r2, mint)
+        сумма += с
+        ui += u
+        счетов += к
+    if not удалось:
         return {"ok": False, "failures": сбои,
-                 "why_not": "остаток не прочитан ни по одной программе токена"}
-    return {"ok": True, "raw": сумма, "ui": ui, "accounts": счетов, "failures": сбои}
+                 "why_not": "остаток не прочитан ни по минту, ни по программам токена"}
+    return {"ok": True, "raw": сумма, "ui": ui, "accounts": счетов,
+             "filter": "programId", "failures": сбои}
 
 
 def kill_sell_active() -> tuple[bool, str]:
@@ -249,6 +276,41 @@ def due_for_watch(pos: dict, *, grace_s: float, now: float | None = None) -> boo
     return now >= (float(основа) + срок + grace_s)
 
 
+ПРЕДЕЛ_НЕУДАЧ = env_int("BLOOM_SELL_MAX_ATTEMPTS", 2)
+
+
+def адрес_продажи(pos: dict, *, попытка: int) -> tuple:
+    """Чем продаём: ID пула НАШЕЙ покупки или минт. Возвращает (адрес, вид).
+
+    Первая попытка -- по пулу, но только если наша покупка прошла ОДНИМ
+    пулом токен/WSOL. Причина из живого стенда: по минту маршрут выбирает
+    Bloom, и на п. 1 он выбрал двухшаговый через пул без ликвидности в
+    диапазоне -- продажа упала с "assertion failed: liquidity > 0".
+    Если пул неизвестен или маршрут покупки был многохоповый -- по минту:
+    одного пула нашей покупки в этом случае просто нет, и выдумывать его
+    нельзя.
+
+    Вторая попытка -- всегда по минту: если по пулу не вышло, пусть Bloom
+    ищет маршрут сам. Третьей попытки нет, см. ПРЕДЕЛ_НЕУДАЧ.
+    """
+    пул = (pos.get("our_pool") or "").strip()
+    прямой = bool(pos.get("our_pool_direct"))
+    if попытка <= 1 and пул and прямой:
+        return пул, "pool"
+    return pos.get("mint"), "mint"
+
+
+def сдаться_по_неудачам(pos: dict, *, предел: int = ПРЕДЕЛ_НЕУДАЧ) -> bool:
+    """Две неудачные попытки -- дальше не тратим десять минут.
+
+    Неудача считается по ЦЕПИ, а не по ответу Bloom: 200 означает только
+    приём запроса. Если после попытки остаток токена на месте и пауза
+    выждана, попытка не сработала. Поэтому предел считается по числу
+    сделанных попыток при живом остатке.
+    """
+    return int(pos.get("sell_attempts") or 0) >= max(1, предел)
+
+
 def give_up(pos: dict, *, give_up_after_s: float, now: float | None = None) -> bool:
     """Пора ли сдаваться и звать владельца."""
     now = now if now is not None else time.time()
@@ -270,6 +332,9 @@ class Seller:
         self.give_up_after_s = env_float("BLOOM_SELL_GIVE_UP_AFTER_S",
                                           DEFAULT_GIVE_UP_AFTER_S)
         self.dust_raw = env_int("BLOOM_DUST_RAW", DEFAULT_DUST_RAW)
+        self.предел_неудач = env_int("BLOOM_SELL_MAX_ATTEMPTS", ПРЕДЕЛ_НЕУДАЧ)
+        self.жалоба_каждые_s = env_float("BLOOM_SELL_COMPLAIN_EVERY_S", 60.0)
+        self._жалобы: dict = {}
         self.priority_fee = env_float("BLOOM_PRIORITY_FEE", DEFAULT_PRIORITY_FEE)
         self.processor_tip = env_float("BLOOM_PROCESSOR_TIP", DEFAULT_PROCESSOR_TIP)
         self.api = api or BloomApi(os.environ.get("BLOOM_API_KEY", ""),
@@ -295,8 +360,19 @@ class Seller:
         # Баланс по цепи ПЕРЕД любым действием.
         bal = balance_reader(EXECUTOR_WALLET, mint)
         if not bal.get("ok"):
+            # МОЛЧАТЬ ЗДЕСЬ НЕЛЬЗЯ. Именно эта ветка 23.09 съела живой
+            # стенд: позиция была открыта, круг проходил, кредиты
+            # тратились, а в журнале не появилось ни строки -- потому что
+            # "ничего не делаем" ничего и не писало. Пишем, но не каждый
+            # круг: журнал раз в 15 с был бы шумом, который не читают.
             итог.update(action="остаток не прочитан -- ничего не делаем",
-                         why_not=bal.get("why_not"))
+                         why_not=bal.get("why_not"), failures=bal.get("failures"))
+            self.state.update_position(cid, balance_read_failed_at=now,
+                                        balance_read_why_not=str(bal.get("why_not"))[:300])
+            прошло = now - float(self._жалобы.get(cid) or 0.0)
+            if прошло >= self.жалоба_каждые_s:
+                self._жалобы[cid] = now
+                self.log(итог)
             return итог
         итог["balance_raw"] = bal.get("raw")
         итог["balance_ui"] = bal.get("ui")
@@ -332,19 +408,24 @@ class Seller:
             self.log(итог)
             return итог
 
-        if give_up(pos, give_up_after_s=self.give_up_after_s, now=now):
+        по_неудачам = сдаться_по_неудачам(pos, предел=self.предел_неудач)
+        if по_неудачам or give_up(pos, give_up_after_s=self.give_up_after_s, now=now):
+            причина_сдачи = (f"{pos.get('sell_attempts')} неудачных попыток подряд"
+                              if по_неудачам else
+                              f"не продано за {self.give_up_after_s:.0f} с")
             if pos.get("state") != "unsold":
                 self.state.update_position(cid, state="unsold",
                                             unsold_since=now,
-                                            unsold_reason=(f"не продано за "
-                                                            f"{self.give_up_after_s:.0f} с"))
+                                            unsold_reason=причина_сдачи)
                 self.state.note_sell_outcome(sold=False)
-                текст = (f"Bloom: позиция НЕ ПРОДАНА за {self.give_up_after_s / 60:.0f} мин\n"
+                текст = (f"Bloom: позиция НЕ ПРОДАНА -- {причина_сдачи}\n"
                           f"кошелёк {EXECUTOR_WALLET}\nминт {mint}\n"
                           f"остаток {bal.get('ui')} ({bal.get('raw')} сырых)\n"
-                          f"попыток {pos.get('sell_attempts', 0)}\n"
+                          f"попыток {pos.get('sell_attempts', 0)}, "
+                          f"чем пробовали: {pos.get('sell_address_kinds') or '-'}\n"
                           f"продать руками через Phantom/Jupiter")
                 self.log({**итог, "action": "UNSOLD, доклад владельцу",
+                           "why_not": причина_сдачи,
                            "telegram": telegram(текст)})
             итог["action"] = "UNSOLD -- ждём владельца"
             return итог
@@ -358,13 +439,18 @@ class Seller:
 
         # Продажа. Проскальзывание НЕ поднимается.
         попытка = int(pos.get("sell_attempts") or 0) + 1
-        body = build_sell_body(address=mint, percent=100, slippage_pct=self.slippage,
+        адрес, вид = адрес_продажи(pos, попытка=попытка)
+        body = build_sell_body(address=адрес, percent=100, slippage_pct=self.slippage,
                                priority_fee=self.priority_fee,
                                processor_tip=self.processor_tip)
         res = self.api.swap(body, client_order_id=f"{cid}:sell{попытка}",
-                             why=f"сторож, попытка {попытка}")
+                             why=f"сторож, попытка {попытка} по {вид}")
+        виды = [v for v in (pos.get("sell_address_kinds") or "").split(",") if v]
+        виды.append(вид)
         поля = {"state": "selling", "sell_attempts": попытка,
-                 "ts_last_sell_attempt": now}
+                 "ts_last_sell_attempt": now,
+                 "sell_address": адрес, "sell_address_kind": вид,
+                 "sell_address_kinds": ",".join(виды)}
         if not pos.get("ts_first_sell_attempt"):
             поля["ts_first_sell_attempt"] = now
         if res.get("order_id"):
@@ -376,7 +462,8 @@ class Seller:
         self.state.update_position(cid, **поля)
         итог.update(action=("продажа отправлена" if res.get("ok")
                                else "продажа не принята"),
-                     attempt=попытка, mode="dry-run" if self.api.dry_run else "live",
+                     attempt=попытка, sell_address=адрес, sell_address_kind=вид,
+                     mode="dry-run" if self.api.dry_run else "live",
                      ответ={k: res.get(k) for k in
                              ("ok", "код", "код_ошибки", "order_id", "signatures",
                               "rate_limited", "retry_after_s", "dry_run")})
@@ -408,6 +495,18 @@ class Seller:
             "updated_ts": time.time(),
             "mode": "live" if self.live else "dry-run",
             "positions_in_cycle": итог.get("positions"),
+            # Что именно сделано с каждой позицией в ПОСЛЕДНЕМ круге.
+            # Без этого "журнал пуст" снаружи не отличить от "сторож не
+            # видел позиции" и от "остаток не читается": ветки ожидания в
+            # журнал не пишут, и так уже потерялся весь п. 1 стенда.
+            "last_cycle": [{"client_order_id": r.get("client_order_id"),
+                            "mint": r.get("mint"),
+                            "action": r.get("action"),
+                            "why_not": r.get("why_not"),
+                            "balance_raw": r.get("balance_raw"),
+                            "attempt": r.get("attempt")}
+                           for r in (итог.get("rows") or [])],
+            "max_attempts": self.предел_неудач,
             "slippage_pct": self.slippage,
             "grace_s": self.grace_s,
             "give_up_after_s": self.give_up_after_s,
@@ -558,6 +657,110 @@ def self_test() -> None:
     r = s.handle(st.positions()["p3"], balance_reader=нечитаемый)
     chk("остаток не прочитан -- продажи нет",
         r["action"].startswith("остаток не прочитан"))
+    журнал = (st.base / "seller.jsonl")
+    строк_после = len(журнал.read_text(encoding="utf-8").splitlines()) if журнал.exists() else 0
+    chk("и нечитаемый остаток ПОПАЛ в журнал -- молчать здесь нельзя",
+        строк_после >= 1, строк_после)
+    s.handle(st.positions()["p3"], balance_reader=нечитаемый)
+    chk("но не каждый круг: жалоба раз в минуту, а не раз в 15 с",
+        len(журнал.read_text(encoding="utf-8").splitlines()) == строк_после)
+    chk("и причина отказа осталась в записи позиции",
+        "узел молчит" in str(st.positions()["p3"].get("balance_read_why_not")))
+
+    # --- чем продаём: пул нашей покупки или минт
+    прямая = {"mint": "MINT9", "our_pool": "POOL9", "our_pool_direct": True}
+    chk("первая попытка по пулу, если покупка шла одним пулом токен/WSOL",
+        адрес_продажи(прямая, попытка=1) == ("POOL9", "pool"))
+    chk("вторая попытка -- по минту, пусть Bloom ищет маршрут сам",
+        адрес_продажи(прямая, попытка=2) == ("MINT9", "mint"))
+    chk("многохоповая покупка -- сразу по минту, пул не выдумывается",
+        адрес_продажи({"mint": "MINT9", "our_pool": "POOL9",
+                        "our_pool_direct": False}, попытка=1) == ("MINT9", "mint"))
+    chk("пула нет -- по минту",
+        адрес_продажи({"mint": "MINT9"}, попытка=1) == ("MINT9", "mint"))
+
+    # --- две неудачи вместо десяти минут
+    chk("без попыток не сдаёмся", сдаться_по_неудачам({}, предел=2) is False)
+    chk("после одной попытки ещё нет",
+        сдаться_по_неудачам({"sell_attempts": 1}, предел=2) is False)
+    chk("после двух -- да", сдаться_по_неудачам({"sell_attempts": 2}, предел=2) is True)
+
+    st.write_intent(client_order_id="p4", mint="MINT4", source_sig="S4", source_slot=4,
+                     sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
+                     mode="dry-run", sell_after_s=28.8)
+    st.update_position("p4", state="bought", ts_accepted=time.time() - 100,
+                        our_pool="POOL4", our_pool_direct=True)
+    r = s.handle(st.positions()["p4"], balance_reader=читатель(5_000_000))
+    chk("попытка 1 по пулу нашей покупки", r.get("sell_address_kind") == "pool", r)
+    st.update_position("p4", ts_last_sell_attempt=time.time() - 100)
+    r = s.handle(st.positions()["p4"], balance_reader=читатель(5_000_000))
+    chk("попытка 2 по минту", r.get("sell_address_kind") == "mint", r)
+    st.update_position("p4", ts_last_sell_attempt=time.time() - 100)
+    r = s.handle(st.positions()["p4"], balance_reader=читатель(5_000_000))
+    chk("третьей попытки нет: две неудачи -- UNSOLD",
+        st.positions()["p4"]["state"] == "unsold", r)
+    chk("и причина -- неудачи, а не десять минут",
+        "неудачных попыток" in str(st.positions()["p4"].get("unsold_reason")),
+        st.positions()["p4"].get("unsold_reason"))
+    chk("чем пробовали -- записано",
+        st.positions()["p4"].get("sell_address_kinds") == "pool,mint",
+        st.positions()["p4"].get("sell_address_kinds"))
+
+    # --- фильтр остатка: mint и programId вместе узел не принимает
+    тело_ф = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+    chk("оба фильтра сразу больше не отправляются",
+        '"mint": mint, "programId"' not in тело_ф)
+
+    вызовы = []
+
+    def поддельный_rpc(метод, параметры, **kw):
+        вызовы.append((метод, параметры))
+        фильтр = параметры[1] if len(параметры) > 1 else {}
+        if "mint" in фильтр:
+            return {"ok": True, "result": {"value": [
+                {"pubkey": "ACC1", "account": {"data": {"parsed": {"info": {
+                    "mint": "MINTX",
+                    "tokenAmount": {"amount": "92278326", "uiAmount": 92.278326}}}}}}]}}
+        return {"ok": False, "why_not": "не должен вызываться"}
+
+    глоб = sys.modules[__name__].__dict__
+    старый_rpc = глоб["rpc_call"]
+    глоб["rpc_call"] = поддельный_rpc
+    try:
+        bal = token_balance_raw("W", "MINTX")
+        chk("остаток читается фильтром по минту, одним запросом",
+            bal["ok"] and bal["raw"] == 92278326 and len(вызовы) == 1, (bal, вызовы))
+        chk("и в ответе сказано, каким фильтром", bal.get("filter") == "mint")
+
+        вызовы.clear()
+
+        def минт_падает(метод, параметры, **kw):
+            вызовы.append((метод, параметры))
+            фильтр = параметры[1] if len(параметры) > 1 else {}
+            if "mint" in фильтр:
+                return {"ok": False, "why_not": "RPC error: invalid params"}
+            return {"ok": True, "result": {"value": [
+                {"pubkey": "ACC1", "account": {"data": {"parsed": {"info": {
+                    "mint": "MINTX",
+                    "tokenAmount": {"amount": "5", "uiAmount": 5.0}}}}}},
+                {"pubkey": "ACC2", "account": {"data": {"parsed": {"info": {
+                    "mint": "ЧУЖОЙ",
+                    "tokenAmount": {"amount": "999", "uiAmount": 999.0}}}}}}]}}
+
+        глоб["rpc_call"] = минт_падает
+        bal2 = token_balance_raw("W", "MINTX")
+        chk("минт не сработал -- запасной путь по программам токена",
+            bal2["ok"] and bal2.get("filter") == "programId", bal2)
+        chk("и чужой минт в сумму не попал", bal2["raw"] == 10, bal2)
+        chk("и отказ по минту не потерян",
+            any("mint" == (f.get("filter")) for f in bal2.get("failures") or []), bal2)
+
+        глоб["rpc_call"] = lambda *a, **k: {"ok": False, "why_not": "узел молчит"}
+        bal3 = token_balance_raw("W", "MINTX")
+        chk("всё отказало -- честный отказ, а не нулевой остаток",
+            bal3["ok"] is False and "не прочитан" in bal3["why_not"], bal3)
+    finally:
+        глоб["rpc_call"] = старый_rpc
 
     # --- сдача и доклад
     st.update_position("p3", ts_first_sell_attempt=time.time() - 601,
@@ -565,8 +768,11 @@ def self_test() -> None:
     r = s.handle(st.positions()["p3"], balance_reader=читатель(5_000_000))
     chk("через 10 минут позиция помечена UNSOLD",
         st.positions()["p3"]["state"] == "unsold", r["action"])
+    # Серия считает ВСЕ непроданные: выше в самопроверке уже сдалась p4
+    # по двум неудачам, поэтому проверяется рост, а не ровно единица.
     chk("и серия непроданных выросла",
-        int(st.counters().get("unsold_streak", 0)) == 1)
+        int(st.counters().get("unsold_streak", 0)) >= 2,
+        st.counters().get("unsold_streak"))
 
     # --- тело продажи, которое сторож реально отправляет
     body = build_sell_body(address="MINT3", percent=100, slippage_pct=40.0,

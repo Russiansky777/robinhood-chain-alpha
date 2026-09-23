@@ -36,6 +36,14 @@ on:
         description: "горизонт продажи, с (для справки в env)"
         required: false
         default: "28.8"
+      allow_live_test_restart:
+        description: "'yes' -- перезапуск разрешён, если ВСЕ открытые позиции live-test"
+        required: false
+        default: "no"
+      max_attempts:
+        description: "сколько неудачных попыток до UNSOLD (по умолчанию 2)"
+        required: false
+        default: "2"
 
 concurrency:
   group: bloom-seller-deploy
@@ -140,6 +148,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
+          MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
         run: |
           set -e
           ssh -n $SSH_OPTS root@$HOST "
@@ -161,6 +170,10 @@ jobs:
             echo "BLOOM_SELL_GRACE_S=15"
             echo "BLOOM_SELL_RETRY_EVERY_S=45"
             echo "BLOOM_SELL_GIVE_UP_AFTER_S=600"
+            # Две неудачи -- и UNSOLD: десять минут на позицию, которая не
+            # продаётся, владелец тратить не хочет. Потолок 600 с остаётся
+            # вторым пределом, на случай если попытки вообще не доходят.
+            echo "BLOOM_SELL_MAX_ATTEMPTS=$MAX_ATTEMPTS"
             echo "BLOOM_SELLER_LOOP_S=15"
             echo "BLOOM_PRIORITY_FEE=0.001"
             echo "BLOOM_PROCESSOR_TIP=0.001"
@@ -260,9 +273,29 @@ jobs:
           set -e
           # PYTHONPATH вместо sys.path.insert: иначе внутри команды ssh
           # пришлось бы вкладывать кавычки в кавычки и гейт молча ломался бы.
-          OPEN=$(ssh -n $SSH_OPTS root@$HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; print(len(ExecState().open_positions()))'" || echo "ОШИБКА")
-          echo "открытых позиций: $OPEN"
-          [ "$OPEN" = "0" ] || { echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN -- сначала они должны закрыться"; exit 1; }
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; p=ExecState().open_positions(); print(len(p), sum(1 for x in p if x.get(\"mode\")==\"live-test\"))'" || echo "ОШИБКА ОШИБКА")
+          OPEN=$(echo "$OUT" | awk "{print \$1}")
+          LT=$(echo "$OUT" | awk "{print \$2}")
+          echo "открытых позиций: $OPEN, из них live-test: $LT"
+          # Непрочитанное состояние -- это ЗАПРЕТ, а не исключение. Без этой
+          # проверки сбой ssh давал "ОШИБКА ОШИБКА", числа совпадали, и
+          # исключение для стенда срабатывало на неизвестном состоянии.
+          case "$OPEN" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
+          case "$LT" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
+          if [ "$OPEN" = "0" ]; then
+            echo "гейт пройден: открытых позиций нет"
+          elif [ "${{ github.event.inputs.allow_live_test_restart }}" = "yes" ] \
+                && [ -n "$LT" ] && [ "$OPEN" = "$LT" ]; then
+            # Исключение разрешено владельцем ПРЯМО и только для стенда:
+            # позиция стенда стоит открытой именно потому, что сторож её не
+            # продал, и ждать её закрытия -- значит не ставить правку,
+            # которая её и закрывает. Боевая позиция таким исключением не
+            # покрывается: там перезапуск ждёт закрытия.
+            echo "гейт: исключение для стенда -- все $OPEN позиций в режиме live-test"
+          else
+            echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN (live-test $LT)"
+            exit 1
+          fi
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
         if: ${{ github.event.inputs.enable_service == 'yes' }}

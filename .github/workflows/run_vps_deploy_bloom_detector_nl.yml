@@ -39,6 +39,10 @@ on:
         description: "'yes' -- поставить метку начала стенда (ТОЛЬКО по слову владельца)"
         required: false
         default: "no"
+      allow_open_live_test:
+        description: "'yes' -- сверка не блокирует старт открытыми позициями стенда (боевые не покрывает)"
+        required: false
+        default: "no"
 
 concurrency:
   group: bloom-detector-deploy
@@ -274,13 +278,22 @@ jobs:
       - name: "Сверка при старте (bloom_reconcile): можно ли включать деньги"
         run: |
           set -e
+          # Исключение для стенда -- отдельным входом и только по слову
+          # владельца: позиция стенда стоит открытой именно потому, что её не
+          # удалось продать, а правка, которая её закрывает, ставится этим же
+          # деплоем. Боевые позиции исключение не покрывает -- это в сверке.
+          RECON_ARGS=""
+          if [ "${{ inputs.allow_open_live_test }}" = "yes" ]; then
+            RECON_ARGS="--allow-open-live-test"
+          fi
+          echo "аргументы сверки: [$RECON_ARGS]"
           # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
           # начинается с неизвестного исходного состояния. В dry-run она
           # информационная: там позиции dry-run помехой не считаются.
           set +e
           OUT=$(ssh -n $SSH_OPTS root@$HOST "
             set -a; . $ENV_DIR/env; set +a
-            PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py 2>&1")
+            PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py $RECON_ARGS 2>&1")
           RC=$?
           set -e
           echo "$OUT" | tail -60 | tee -a data/bloom_detector_deploy.txt

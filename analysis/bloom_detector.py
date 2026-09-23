@@ -132,6 +132,11 @@ LAMPORT = 10 ** 9
 # покупал, а получил. DBot на тех же пяти сделках тоже ничего не купил
 # (1681 запись follow, совпадений по источнику и минту в окне 180 с нет).
 КОД_ПОЛУЧЕН_НЕ_КУПЛЕН = "TOKEN_RECEIVED_NOT_BOUGHT"
+# Флаги -- не коды. Код один на решение, флагов может быть несколько, и
+# они не меняют решения: покупка по минту при отсутствии пула остаётся
+# покупкой, а расхождение маршрутов -- поводом для доклада, не для отказа.
+ФЛАГ_НЕТ_ПУЛА_SOL = "NO_SOL_POOL_IN_TX"
+ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ = "ROUTE_MISMATCH"
 РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
 РАЗБОР_ЧЕРЕЗ_RPC = "PARSE_VIA_RPC"
 
@@ -334,6 +339,139 @@ def маршрут_из_транзакции(tx: dict, *, минт_покупк�
              "all_tx_mints": sorted(минты)}
 
 
+# ------------------------------------------------------------------ пулы
+
+# Служебные адреса: владельцы хранилищ пула, но НЕ пулы. Правило "пул --
+# это владелец хранилищ обеих сторон пары" верно для концентрированной
+# ликвидности (Raydium CLMM, Orca Whirlpool, Meteora DLMM/DAMM), но у
+# Raydium AMM v4 и CPMM владельцем хранилищ выступает ОДИН служебный адрес
+# на все пулы. Каждый адрес здесь проверен по цепи: getMultipleAccounts
+# отдаёт владельцем системную программу и нулевую длину данных, тогда как у
+# настоящего пула владелец -- программа DEX и данные есть. Доказательства и
+# подписи, в которых адрес встретился -- в data/bloom_pool_exclusions.json,
+# и самопроверка следит, чтобы файл и этот список не разошлись.
+СЛУЖЕБНЫЕ_НЕ_ПУЛЫ = {
+    "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL":
+        "владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- "
+        "системная программа, длина данных 0",
+}
+
+
+def _хранилища(tx: dict) -> dict:
+    """Владелец счёта -> минты, которые он держит в этой транзакции."""
+    из_владельца: dict = {}
+    meta = (tx or {}).get("meta") or {}
+    for где in ("preTokenBalances", "postTokenBalances"):
+        for b in meta.get(где) or []:
+            if not isinstance(b, dict):
+                continue
+            вл, м = b.get("owner"), b.get("mint")
+            if вл and м:
+                из_владельца.setdefault(вл, set()).add(м)
+    return из_владельца
+
+
+def _счета_инструкций_dex(tx: dict) -> dict:
+    """Адрес счёта -> программы DEX, в чьих инструкциях он встретился."""
+    вых: dict = {}
+    meta = (tx or {}).get("meta") or {}
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    пачки = [msg.get("instructions") or []]
+    for гр in meta.get("innerInstructions") or []:
+        пачки.append((гр or {}).get("instructions") or [])
+    for пачка in пачки:
+        for ins in пачка:
+            if not isinstance(ins, dict):
+                continue
+            имя = ПРОГРАММЫ_DEX.get(ins.get("programId"))
+            if not имя:
+                continue
+            for acc in ins.get("accounts") or []:
+                if isinstance(acc, str):
+                    вых.setdefault(acc, [])
+                    if имя not in вых[acc]:
+                        вых[acc].append(имя)
+    return вых
+
+
+def кандидаты_пулов(tx: dict, *, минт: str, кошелёк: str | None = None,
+                     исключить: dict | None = None) -> dict:
+    """ID пула пары токен/WSOL из транзакции. БЕЗ СЕТИ, на горячем пути.
+
+    Правило и его цена ошибки. Пул держит обе стороны пары на своих счетах,
+    поэтому в pre/postTokenBalances у этих счетов владельцем стоит сам пул
+    (проверено по цепи на живой сделке: Meteora DLMM
+    5N9DdF1w1Q6tae6Xy7DbSNxwbYraorNfGSo6ddtLQoGD, владелец счёта --
+    программа DEX, данные 904 байта). Индексы счетов в инструкции НЕ
+    зашиваются: у каждой программы они свои и меняются с версией.
+
+    Три отказа, каждый честный, вместо догадки:
+      * подписант или плательщик -- это кошелёк сделки, а не пул (кошелёк
+        источника в одной транзакции держит и токен, и котировочный минт,
+        то есть выглядит кандидатом ровно как пул);
+      * адрес из проверенного списка служебных -- не пул;
+      * кандидатов с WSOL больше одного -- какой наш, неясно, выбор наугад
+        не делается.
+    """
+    исключить = СЛУЖЕБНЫЕ_НЕ_ПУЛЫ if исключить is None else исключить
+    хран = _хранилища(tx)
+    в_dex = _счета_инструкций_dex(tx)
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    ключи = _баланс_ключи(tx)
+    плательщик = ключи[0] if ключи else None
+    подписанты = {k.get("pubkey") for k in (msg.get("accountKeys") or [])
+                  if isinstance(k, dict) and k.get("signer") and k.get("pubkey")}
+
+    кандидаты = []
+    for вл, минты in sorted(хран.items()):
+        if len(минты) < 2 or минт not in минты:
+            continue
+        причина_нет = None
+        if вл == кошелёк or вл == плательщик or вл in подписанты:
+            причина_нет = "это кошелёк сделки, а не пул (подписант или плательщик)"
+        elif вл in исключить:
+            причина_нет = f"служебный адрес, проверен по цепи: {исключить[вл]}"
+        elif вл not in в_dex:
+            причина_нет = "адрес не встречается в счетах инструкций DEX"
+        кандидаты.append({"address": вл, "mints": sorted(минты),
+                           "with_wsol": WSOL in минты,
+                           "dex_programs": в_dex.get(вл, []),
+                           "vault_mints_count": len(минты),
+                           "rejected": причина_нет})
+
+    годные = [k for k in кандидаты if not k["rejected"] and k["with_wsol"]]
+    выбор = годные[0]["address"] if len(годные) == 1 else None
+    почему_нет = None
+    if выбор is None:
+        if not кандидаты:
+            почему_нет = ("в транзакции нет владельца с хранилищами двух минтов, "
+                           "один из которых наш")
+        elif not годные:
+            почему_нет = "ни один кандидат не парный к WSOL или все отклонены"
+        else:
+            почему_нет = (f"кандидатов с WSOL больше одного ({len(годные)}) -- "
+                           "какой пул наш, неясно")
+    return {"mint": минт, "pool_wsol": выбор, "why_not": почему_нет,
+             "candidates": кандидаты, "payer": плательщик,
+             "dex_programs": программы_dex(tx)}
+
+
+def пул_и_прямизна(tx: dict, *, минт: str, кошелёк: str | None = None) -> dict:
+    """Пул НАШЕЙ покупки и был ли маршрут одним пулом токен/WSOL.
+
+    Сторожу нужно ровно это: продавать по ID пула можно только если покупка
+    прошла одним пулом. На п. 1 стенда наша покупка шла двумя хопами
+    (WSOL -> промежуточный -> токен), пула токен/WSOL в ней не было вовсе,
+    и продавать по пулу было нечем.
+    """
+    марш = маршрут_из_транзакции(tx, минт_покупки=минт, трата_минт=WSOL)
+    пулы = кандидаты_пулов(tx, минт=минт, кошелёк=кошелёк)
+    прямой = bool(пулы.get("pool_wsol")) and not марш.get("via_intermediate")
+    return {"pool": пулы.get("pool_wsol"), "direct": прямой,
+             "why_not": пулы.get("why_not"), "route": марш,
+             "candidates": пулы.get("candidates")}
+
+
 def сигнал_из_транзакции(tx: dict, источник: str, *, подпись: str,
                           слот: int | None = None) -> dict:
     """Чистый разбор: что именно сделал источник. Без сети и состояния."""
@@ -398,6 +536,16 @@ def сигнал_из_транзакции(tx: dict, источник: str, *, �
                 "получение токена, а не покупка -- копировать нечего")
         сиг["route"] = маршрут_из_транзакции(
             tx, минт_покупки=сиг["mint"], трата_минт=сиг.get("spend_mint"))
+        # ID пула источника: чем покупать, если пул пары токен/WSOL в его
+        # транзакции виден. Разбор чистый, без сети -- см. bloom_pool_probe.
+        пулы = кандидаты_пулов(tx, минт=сиг["mint"], кошелёк=источник)
+        сиг["source_pool"] = пулы.get("pool_wsol")
+        сиг["source_pool_candidates"] = [
+            {k: c[k] for k in ("address", "with_wsol", "dex_programs", "rejected")}
+            for c in пулы.get("candidates") or []]
+        if not сиг["source_pool"]:
+            сиг["pool_why_not"] = пулы.get("why_not")
+            сиг["flags"] = sorted(set(сиг.get("flags") or []) | {ФЛАГ_НЕТ_ПУЛА_SOL})
         return сиг
 
     if вышли:
@@ -1135,7 +1283,87 @@ class Детектор:
                         tax_bps=налог.get("fee_bps"))
                 except Exception as exc:  # noqa: BLE001
                     log.warning("налог в позицию не записан: %s", type(exc).__name__)
+
+        # Маршрут НАШЕЙ покупки по цепи -- рядом с маршрутом источника.
+        # Зачем: на п. 1 стенда источник шёл одним пулом Meteora DLMM, а наша
+        # покупка -- двумя хопами Raydium CLMM+CPMM через промежуточный
+        # токен, и продажа упала на пуле без ликвидности в диапазоне. Пока
+        # маршрут не записан рядом, такое расхождение видно только вручную.
+        # Разбор идёт ПОСЛЕ отправки и в отдельном потоке: getTransaction --
+        # это сотни миллисекунд плюс ожидание подтверждения, и держать этим
+        # разбор следующих сигналов нельзя.
+        подписи = (итог or {}).get("signatures") if cid_исполнения else None
+        if cid_исполнения and подписи:
+            self.назначить_разбор_нашей_покупки(
+                cid=cid_исполнения, минт=строка.get("mint"),
+                подпись=подписи[0], источник_маршрут=строка.get("route") or {},
+                источник_пул=строка.get("source_pool"))
         return строка
+
+    # ------------------------------------------------- маршрут нашей покупки
+
+    def назначить_разбор_нашей_покупки(self, **кв) -> None:
+        """В отдельном потоке, если есть цикл событий; иначе сразу.
+
+        Синхронный вызов оставлен не для удобства, а чтобы самопроверка и
+        разовый прогон из командной строки шли тем же кодом, что служба.
+        """
+        try:
+            цикл = asyncio.get_running_loop()
+        except RuntimeError:
+            self.разобрать_нашу_покупку(**кв)
+            return
+        цикл.run_in_executor(None, lambda: self.разобрать_нашу_покупку(**кв))
+
+    def разобрать_нашу_покупку(self, *, cid: str, минт: str, подпись: str,
+                                источник_маршрут: dict,
+                                источник_пул: str | None = None) -> dict:
+        """Пул и маршрут нашей покупки; метка при расхождении с источником."""
+        запись = {"stage": "our_route", "client_order_id": cid, "mint": минт,
+                   "signature": подпись}
+        try:
+            tx = self.helius.транзакция(подпись)
+        except Exception as exc:  # noqa: BLE001
+            tx = None
+            запись["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+        if not tx:
+            запись.setdefault("why_not", "нашей транзакции узел не отдал")
+            self.состояние.log_decision(запись)
+            return запись
+
+        наш = пул_и_прямизна(tx, минт=минт, кошелёк=ST.EXECUTOR_WALLET)
+        источник_прямой = bool(источник_пул) and not (источник_маршрут or {}).get(
+            "via_intermediate")
+        флаги = []
+        if источник_прямой and not наш["direct"]:
+            флаги.append(ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ)
+        запись.update(our_pool=наш["pool"], our_pool_direct=наш["direct"],
+                       our_pool_why_not=наш["why_not"],
+                       our_route={k: наш["route"].get(k) for k in
+                                   ("programs", "intermediate_mints", "hops_by_mints",
+                                    "dex_calls", "via_intermediate")},
+                       our_slot=tx.get("slot"),
+                       source_pool=источник_пул,
+                       source_route={k: (источник_маршрут or {}).get(k) for k in
+                                      ("programs", "intermediate_mints",
+                                       "hops_by_mints", "dex_calls",
+                                       "via_intermediate")},
+                       source_direct=источник_прямой, flags=флаги)
+        self.состояние.log_decision(запись)
+        try:
+            self.состояние.update_position(
+                cid, our_pool=наш["pool"], our_pool_direct=наш["direct"],
+                our_route_programs=",".join(наш["route"].get("programs") or []),
+                our_route_hops=наш["route"].get("hops_by_mints"),
+                our_slot=tx.get("slot"), flags=",".join(флаги))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("маршрут в позицию не записан: %s", type(exc).__name__)
+        if флаги:
+            log.warning("ROUTE_MISMATCH: источник одним пулом %s, наш маршрут "
+                        "%s хопов через %s", источник_пул,
+                        наш["route"].get("hops_by_mints"),
+                        наш["route"].get("intermediate_mints"))
+        return запись
 
 
 async def _подписка_транзакций(ws, адреса: list) -> None:
@@ -1898,6 +2126,138 @@ def self_test() -> int:
         chk("прямой маршрут покупается", r2["action"] == "buy", r2)
         chk("в решении есть маршрут", (r2.get("route") or {}).get("dex_calls") == 2,
             r2.get("route"))
+
+    # 16б. ID пула источника и маршрут нашей покупки
+    DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+    CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+
+    def tx_пул(*, владельцы, счета, программы=(DLMM,), подписанты=("SRC",),
+                купленный="КУПЛЕН"):
+        балансы = []
+        i = 0
+        for вл, минты in владельцы.items():
+            for м in минты:
+                i += 1
+                балансы.append(бал(м, 1_000000, owner=вл, idx=i))
+        pre = балансы
+        post = балансы + [бал(купленный, 5_000000, owner="SRC", idx=90)]
+        ключи = [{"pubkey": k, "signer": k in подписанты}
+                  for k in list(подписанты) + list(счета)]
+        return {"slot": 100,
+                 "transaction": {"message": {
+                     "accountKeys": ключи,
+                     "instructions": [{"programId": pr, "accounts": list(счета)}
+                                       for pr in программы]},
+                     "signatures": ["SIG"]},
+                 "meta": {"err": None, "fee": 0,
+                           "preBalances": [10 ** 9], "postBalances": [10 ** 9 - 1],
+                           "preTokenBalances": pre, "postTokenBalances": post,
+                           "innerInstructions": []}}
+
+    t_пул = tx_пул(владельцы={"POOLA": ["КУПЛЕН", WSOL], "SRC": [WSOL]},
+                    счета=("POOLA", "VAULT1"))
+    s_пул = сигнал_из_транзакции(t_пул, "SRC", подпись="P1")
+    chk("ID пула источника достаётся из его транзакции",
+        s_пул.get("source_pool") == "POOLA", s_пул.get("source_pool"))
+    chk("и метки об отсутствии пула нет",
+        ФЛАГ_НЕТ_ПУЛА_SOL not in (s_пул.get("flags") or []), s_пул.get("flags"))
+
+    t_usdc = tx_пул(владельцы={"POOLB": ["КУПЛЕН", USDC], "SRC": [USDC]},
+                     счета=("POOLB",))
+    s_usdc = сигнал_из_транзакции(t_usdc, "SRC", подпись="P2")
+    chk("пул только к USDC -- пула к SOL нет, и это помечено",
+        s_usdc.get("source_pool") is None
+        and ФЛАГ_НЕТ_ПУЛА_SOL in (s_usdc.get("flags") or []), s_usdc.get("flags"))
+    chk("и причина названа словами", bool(s_usdc.get("pool_why_not")),
+        s_usdc.get("pool_why_not"))
+
+    t_кош = tx_пул(владельцы={"SRC": ["КУПЛЕН", WSOL]}, счета=("SRC",))
+    s_кош = сигнал_из_транзакции(t_кош, "SRC", подпись="P3")
+    chk("кошелёк источника за пул не выдаётся",
+        s_кош.get("source_pool") is None, s_кош.get("source_pool"))
+
+    t_служ = tx_пул(владельцы={"GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL":
+                                ["КУПЛЕН", WSOL]},
+                     счета=("GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",))
+    s_служ = сигнал_из_транзакции(t_служ, "SRC", подпись="P4")
+    chk("проверенный служебный адрес Raydium CPMM за пул не выдаётся",
+        s_служ.get("source_pool") is None, s_служ.get("source_pool"))
+
+    # прямизна нашей покупки
+    наш_прямой = пул_и_прямизна(
+        tx_пул(владельцы={"POOLA": ["КУПЛЕН", WSOL]}, счета=("POOLA",),
+                подписанты=("НАШ",)), минт="КУПЛЕН", кошелёк="НАШ")
+    chk("наша покупка одним пулом токен/WSOL -- прямая",
+        наш_прямой["direct"] is True and наш_прямой["pool"] == "POOLA", наш_прямой)
+    наш_хоп = пул_и_прямизна(
+        tx_пул(владельцы={"POOL1": ["ПРОМЕЖ", WSOL], "POOL2": ["КУПЛЕН", "ПРОМЕЖ"]},
+                счета=("POOL1", "POOL2"), программы=(CLMM, DLMM), подписанты=("НАШ",)),
+        минт="КУПЛЕН", кошелёк="НАШ")
+    chk("двухшаговая покупка через промежуточный -- НЕ прямая",
+        наш_хоп["direct"] is False, наш_хоп)
+
+    # метка расхождения маршрутов
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+
+        class HeliusНашаTx:
+            def __init__(self, tx):
+                self.tx = tx
+
+            def транзакция(self, подпись, **kw):
+                return self.tx
+
+        детектор_р = Детектор(
+            источники={"SRC": "BATCH-5"}, состояние=st, курс=КурсSOL(), режим="dry",
+            helius=HeliusНашаTx(tx_пул(
+                владельцы={"POOL1": ["ПРОМЕЖ", WSOL], "POOL2": ["КУПЛЕН", "ПРОМЕЖ"]},
+                счета=("POOL1", "POOL2"), программы=(CLMM, DLMM), подписанты=("НАШ",))))
+        st.write_intent(client_order_id="cr", mint="КУПЛЕН", source_sig="S",
+                         source_slot=1, sol_in=0.001, pool="POOLA", program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                         sell_after_s=28.8)
+        зап = детектор_р.разобрать_нашу_покупку(
+            cid="cr", минт="КУПЛЕН", подпись="НАШАПОДПИСЬ",
+            источник_маршрут={"via_intermediate": False, "programs": ["Meteora DLMM"]},
+            источник_пул="POOLA")
+        chk("маршрут нашей покупки записан рядом с маршрутом источника",
+            зап.get("our_route", {}).get("via_intermediate") is True
+            and зап.get("source_route", {}).get("via_intermediate") is False, зап)
+        chk("расхождение маршрутов помечено ROUTE_MISMATCH",
+            ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ in (зап.get("flags") or []), зап.get("flags"))
+        поз = st.positions()["cr"]
+        chk("сторожу видно, что пула нашей покупки нет и маршрут не прямой",
+            поз.get("our_pool") is None and поз.get("our_pool_direct") is False, поз)
+
+        детектор_п = Детектор(
+            источники={"SRC": "BATCH-5"}, состояние=st, курс=КурсSOL(), режим="dry",
+            helius=HeliusНашаTx(tx_пул(владельцы={"POOLA": ["КУПЛЕН", WSOL]},
+                                        счета=("POOLA",), подписанты=("НАШ",))))
+        st.write_intent(client_order_id="cp", mint="КУПЛЕН", source_sig="S2",
+                         source_slot=2, sol_in=0.001, pool="POOLA", program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                         sell_after_s=28.8)
+        зап2 = детектор_п.разобрать_нашу_покупку(
+            cid="cp", минт="КУПЛЕН", подпись="НАШАПОДПИСЬ2",
+            источник_маршрут={"via_intermediate": False}, источник_пул="POOLA")
+        chk("совпавший маршрут метки не получает",
+            зап2.get("flags") == [], зап2.get("flags"))
+        chk("и сторожу записан пул нашей покупки",
+            st.positions()["cp"].get("our_pool") == "POOLA"
+            and st.positions()["cp"].get("our_pool_direct") is True,
+            st.positions()["cp"])
+
+        class HeliusМолчит:
+            def транзакция(self, подпись, **kw):
+                return None
+
+        детектор_м = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                               курс=КурсSOL(), режим="dry", helius=HeliusМолчит())
+        зап3 = детектор_м.разобрать_нашу_покупку(
+            cid="cq", минт="КУПЛЕН", подпись="НЕТ", источник_маршрут={},
+            источник_пул=None)
+        chk("узел не отдал нашу транзакцию -- сказано, а не выдумано",
+            зап3.get("why_not") and зап3.get("our_pool") is None, зап3)
 
     # 17. свежесть баланса: протухший баланс -- это неизвестный баланс
     with tempfile.TemporaryDirectory() as d:
