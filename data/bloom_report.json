@@ -1,21 +1,21 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-23T22:41:17Z",
+  "built_utc": "2026-09-23T23:11:44Z",
   "since_ts": null,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 0,
-    "v2": 115
+    "v2": 126
   },
   "decisions": {
-    "total": 115,
-    "real_sources": 103,
+    "total": 126,
+    "real_sources": 114,
     "test_source": 12,
     "by_code": {
-      "TARGET_AMOUNT_OUT_OF_RANGE": 22,
-      "NOT_A_BUY": 66,
-      "TOKEN_RECEIVED_NOT_BOUGHT": 5,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 25,
+      "NOT_A_BUY": 73,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 6,
       "INTERMEDIATE_ROUTE": 5,
       "AMBIGUOUS_TX": 1,
       "SKIP_TARGET_INCREASE_POSITION": 4
@@ -28,26 +28,26 @@
     }
   },
   "parse_groups": {
-    "total": 103,
+    "total": 114,
     "by_group": {
       "PARSE_VIA_MSG": {
-        "decisions": 81,
-        "share": 0.7864,
+        "decisions": 92,
+        "share": 0.807,
         "to_buy": 0,
         "slot_lag": {
-          "n": 81,
+          "n": 92,
           "min": 0,
-          "median": 0,
+          "median": 0.0,
           "max": 0
         },
         "net_slot_minus_source": {
-          "n": 81,
+          "n": 92,
           "min": 0,
-          "median": 0,
+          "median": 0.0,
           "max": 0
         },
         "decide_latency_ms": {
-          "n": 81,
+          "n": 92,
           "min": 0.2,
           "median": 0.4,
           "max": 1.6
@@ -55,7 +55,7 @@
       },
       "PARSE_VIA_RPC": {
         "decisions": 22,
-        "share": 0.2136,
+        "share": 0.193,
         "to_buy": 0,
         "slot_lag": {
           "n": 22,
@@ -87,10 +87,10 @@
         "неизвестно": 1
       },
       "0": {
-        "PARSE_VIA_MSG": 40
+        "PARSE_VIA_MSG": 47
       },
       "1": {
-        "PARSE_VIA_MSG": 4
+        "PARSE_VIA_MSG": 8
       },
       "legacy": {
         "PARSE_VIA_MSG": 8
@@ -292,7 +292,7 @@
     "live_test": {
       "count": 1,
       "open": 1,
-      "spent_sol": 0.0
+      "spent_sol": 0.001
     },
     "dry_run": {
       "count": 0,
@@ -302,6 +302,26 @@
     "open_real": 1,
     "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"
   },
+  "position_rows": [
+    {
+      "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6",
+      "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+      "mode": "live-test",
+      "state": "unsold",
+      "buy_address_kind": null,
+      "buy_address": null,
+      "source_program": "Meteora DLMM",
+      "our_pool": null,
+      "our_pool_direct": null,
+      "our_route_programs": null,
+      "our_route_hops": null,
+      "flags": null,
+      "sell_address_kinds": "mint,mint",
+      "sell_attempts": 2,
+      "unsold_reason": "2 неудачных попыток подряд",
+      "balance_read_why_not": null
+    }
+  ],
   "credits": {
     "known": true,
     "usage": {
@@ -310,11 +330,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 1379,
+          "кредитов": 1569,
           "бюджет": 60000,
-          "доля": 0.023,
+          "доля": 0.0261,
           "группа": null,
-          "потрачено_по_бюджету": 1379,
+          "потрачено_по_бюджету": 1569,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -322,18 +342,18 @@
         },
         {
           "служба": "bloom_seller",
-          "кредитов": 186,
+          "кредитов": 394,
           "бюджет": 15000,
-          "доля": 0.0124,
+          "доля": 0.0263,
           "группа": null,
-          "потрачено_по_бюджету": 186,
+          "потрачено_по_бюджету": 394,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 1565,
+      "всего_кредитов": 1963,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
@@ -345,7 +365,7 @@
     "executor_on_host": {
       "ok": true,
       "mode": "live-test",
-      "sent": 1,
+      "sent": 0,
       "refused": 0
     },
     "reconciliation": {
@@ -357,7 +377,7 @@
     },
     "balance": {
       "ok": false,
-      "balance_sol": 0.352814089,
+      "balance_sol": 0.350814089,
       "need": 2.0
     },
     "test_call_full_circle": {
