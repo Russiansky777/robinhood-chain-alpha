@@ -52,6 +52,45 @@ FOREIGN_SCAN_LIMIT = ST.env_int("BLOOM_FOREIGN_SCAN_LIMIT", 40)
 FOREIGN_WINDOW_S = ST.env_float("BLOOM_FOREIGN_WINDOW_H", 24.0) * 3600.0
 
 
+def метка_старта(state: ST.ExecState) -> dict:
+    """Момент, с которого активность кошелька считается нашей заботой.
+
+    Ставится ОДИН раз и только по слову владельца (--mark-start). Всё, что
+    было до неё, -- прежняя жизнь кошелька: ручная торговля, чистка пустых
+    токен-счетов, переводы себе. Всё, что после, -- уже опыт, и там чужая
+    подпись означает, что ключом распоряжается кто-то ещё.
+
+    Метка ограничивает только ПРОШЛОЕ. Бот, который торгует сейчас, будет
+    поймана следующей же проверкой -- метка его не прячет.
+    """
+    путь = state.base / "stand_start.json"
+    if not путь.exists():
+        return {"set": False, "path": str(путь)}
+    try:
+        j = json.loads(путь.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"set": False, "path": str(путь),
+                "why": f"метка не читается: {type(exc).__name__}"}
+    ts = j.get("stand_start_ts")
+    if not isinstance(ts, (int, float)):
+        return {"set": False, "path": str(путь),
+                "why": "в метке нет stand_start_ts"}
+    return {"set": True, "path": str(путь), "stand_start_ts": float(ts),
+            "stand_start_utc": j.get("stand_start_utc"),
+            "note": j.get("note")}
+
+
+def поставить_метку(state: ST.ExecState, *, note: str = "",
+                    now: float | None = None) -> dict:
+    now = time.time() if now is None else now
+    j = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
+         "stand_start_ts": now,
+         "stand_start_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+         "note": note or "метка поставлена по слову владельца"}
+    ST.atomic_write_json(state.base / "stand_start.json", j)
+    return j
+
+
 def _подписи_из_файла(путь: Path) -> set:
     out = set()
     try:
@@ -92,6 +131,7 @@ def our_signatures(state: ST.ExecState) -> set:
 def foreign_activity(helius, wallet: str, ours: set, *,
                      limit: int = FOREIGN_SCAN_LIMIT,
                      window_s: float = FOREIGN_WINDOW_S,
+                     since_ts: float | None = None,
                      now: float | None = None) -> dict:
     """Сделки кошелька, которых нет среди наших, с разделением по времени.
 
@@ -113,6 +153,11 @@ def foreign_activity(helius, wallet: str, ours: set, *,
                 "checked": 0}
     строки = res or []
     порог = (now - window_s) if window_s else None
+    # Метка начала стенда сдвигает границу ВПЕРЁД, но никогда назад: она
+    # может только сузить прошлое, а не расширить окно доверия.
+    откуда_порог = "окно" if порог is not None else "без границы"
+    if since_ts is not None and (порог is None or since_ts > порог):
+        порог, откуда_порог = since_ts, "метка начала стенда"
     свежие, прежние = [], []
     for r in строки:
         sig = (r or {}).get("signature")
@@ -129,6 +174,9 @@ def foreign_activity(helius, wallet: str, ours: set, *,
             прежние.append(зап)
     return {"known": True, "checked": len(строки),
             "window_h": (round(window_s / 3600.0, 2) if window_s else None),
+            "boundary_from": откуда_порог,
+            "boundary_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(порог))
+                             if порог else None),
             "recent": свежие[:20], "recent_count": len(свежие),
             "older_count": len(прежние),
             "newest_older_utc": (прежние[0]["utc"] if прежние else None),
@@ -186,11 +234,15 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
     читается, почему_читается = state.kill_readable()
 
     ours = our_signatures(state)
+    метка = метка_старта(state)
     чужая = {"known": None, "why": "проверка не запрашивалась"}
     if helius is not None:
         if balance_sol is None:
             balance_sol = helius.баланс_sol(ST.EXECUTOR_WALLET)
-        чужая = foreign_activity(helius, ST.EXECUTOR_WALLET, ours)
+        метка = метка_старта(state)
+        чужая = foreign_activity(helius, ST.EXECUTOR_WALLET, ours,
+                                 since_ts=(метка.get("stand_start_ts")
+                                           if метка.get("set") else None))
 
     журнал = mixed_journal(state)
 
@@ -210,6 +262,12 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
         блокеры.append(f"на кошельке {чужая['recent_count']} сделок за последние "
                        f"{чужая.get('window_h')} ч, которых мы не делали -- "
                        "мы в кошельке не одни")
+    if not метка.get("set"):
+        заметки.append("метка начала стенда не поставлена: границей служит окно "
+                       f"{round(FOREIGN_WINDOW_S / 3600.0, 2)} ч. Поставить "
+                       "метку -- bloom_reconcile.py --mark-start, и только по "
+                       "слову владельца: она объявляет всю прежнюю активность "
+                       "кошелька его прежней жизнью")
     if чужая.get("older_count"):
         заметки.append(f"у кошелька есть прежняя история: {чужая['older_count']} "
                        f"сделок старше окна, самая свежая из них "
@@ -238,6 +296,7 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
             "kill_readable": читается,
             "kill_active": убит,
             "foreign_activity": чужая,
+            "stand_start": метка,
             "journal": журнал,
             "notes": заметки,
             "blockers": блокеры,
@@ -389,6 +448,37 @@ def self_test() -> int:
             r["foreign_activity"]["recent_count"] == 0, r["foreign_activity"])
         chk("и старт не заблокирован", r["clean"], r["blockers"])
 
+    # метка начала стенда объявляет прежнюю активность прежней жизнью
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        h = HeliusЗаглушка([{"signature": "ДО_МЕТКИ",
+                             "blockTime": int(сейчас - 600)}], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("без метки свежая подпись блокирует", not r["clean"], r["blockers"])
+        chk("и в примечаниях сказано, как поставить метку",
+            any("--mark-start" in n for n in r["notes"]), r["notes"])
+        поставить_метку(st, note="проверка")
+        r2 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("после метки прежняя подпись старт не держит", r2["clean"], r2["blockers"])
+        chk("границей названа метка, а не окно",
+            r2["foreign_activity"]["boundary_from"] == "метка начала стенда",
+            r2["foreign_activity"]["boundary_from"])
+        chk("метка видна в сводке",
+            r2["stand_start"]["set"] is True, r2["stand_start"])
+        # Метка не прячет того, кто торгует СЕЙЧАС.
+        h2 = HeliusЗаглушка([{"signature": "ПОСЛЕ_МЕТКИ",
+                              "blockTime": int(сейчас + 120)}], баланс=0.35)
+        r3 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h2)
+        chk("подпись после метки блокирует старт", not r3["clean"], r3["blockers"])
+
+    # битая метка -- это отсутствие метки, а не доверие ко всему прошлому
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        (st.base / "stand_start.json").write_text("{не json", encoding="utf-8")
+        м = метка_старта(st)
+        chk("нечитаемая метка не считается поставленной", м["set"] is False, м)
+        chk("и причина названа", "не читается" in (м.get("why") or ""), м)
+
     # отказ узла -- это НЕ "чужой активности нет"
     with tempfile.TemporaryDirectory() as d:
         st = состояние(d)
@@ -441,6 +531,10 @@ def main() -> int:
                    help="отложить журналы с позициями dry-run (ничего не удаляет)")
     p.add_argument("--mode", default=None,
                    help="режим, для которого проверяем готовность")
+    p.add_argument("--mark-start", action="store_true",
+                   help="поставить метку начала стенда (только по слову владельца)")
+    p.add_argument("--note", default="",
+                   help="пояснение к метке начала стенда")
     a = p.parse_args()
     if a.self_test:
         return self_test()
@@ -455,6 +549,10 @@ def main() -> int:
     if a.archive:
         итог = archive_dry(state)
         print(json.dumps({"archived": итог}, ensure_ascii=False, indent=2))
+
+    if a.mark_start:
+        м = поставить_метку(state, note=a.note)
+        print(json.dumps({"stand_start": м}, ensure_ascii=False, indent=2))
 
     сводка = reconcile(state, mode=mode, helius=helius)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -475,6 +573,8 @@ def main() -> int:
           f"{ч.get('newest_older_utc')})")
     for x in (ч.get("recent") or [])[:5]:
         print(f"    свежая чужая: {x['signature']} {x['utc']}")
+    print(f"граница чужой активности: {ч.get('boundary_from')} "
+          f"({ч.get('boundary_utc')})")
     print(f"позиции: dry-run {сводка['dry_positions']}, "
           f"настоящих открытых {сводка['real_open_positions']}")
     for b in сводка["blockers"]:

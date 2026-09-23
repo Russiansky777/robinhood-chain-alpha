@@ -35,6 +35,10 @@ on:
         description: "'yes' -- отложить журналы прежнего формата (ключи сменились)"
         required: false
         default: "no"
+      mark_stand_start:
+        description: "'yes' -- поставить метку начала стенда (ТОЛЬКО по слову владельца)"
+        required: false
+        default: "no"
 
 concurrency:
   group: bloom-detector-deploy
@@ -239,6 +243,24 @@ jobs:
             sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
             echo 'каталог состояния пишется службой'
           "
+
+      - name: "Метка начала стенда (только по явному входу владельца)"
+        if: ${{ inputs.mark_stand_start == 'yes' }}
+        run: |
+          set -e
+          # Метка объявляет всю ПРЕЖНЮЮ активность кошелька его прежней
+          # жизнью: ручная торговля, чистка пустых токен-счетов, переводы
+          # себе. Того, кто торгует СЕЙЧАС, она не прячет -- ограничивает
+          # только прошлое. Ставится от имени службы, иначе файл будет
+          # root-овым и служба его не перепишет.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python \
+                 $CODE_DIR/bloom_reconcile.py --mark-start \
+                 --note 'начало стенда, подтверждено владельцем' 2>&1 | head -20
+          " | tee -a data/bloom_detector_deploy.txt
 
       - name: "Сверка при старте (bloom_reconcile): можно ли включать деньги"
         run: |
