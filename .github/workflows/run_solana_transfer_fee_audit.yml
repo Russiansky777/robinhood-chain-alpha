@@ -1,0 +1,65 @@
+name: "Комиссия на перевод и маршруты через промежуточные токены"
+
+# На живой сделке SANTA установлено: цена в пуле выросла, а сделка дала
+# -13.4%, потому что с каждого из шести переводов маршрута удерживалось 3%.
+# Здесь это проверяется по ВСЕМ закрытым сделкам, а не на одном примере:
+# ставка комиссии читается из самих минтов, удержанное -- из балансов.
+# Только чтение цепочки.
+on:
+  workflow_dispatch:
+    inputs:
+      min_interval_s:
+        description: "интервал между RPC-вызовами"
+        required: false
+        default: "0.05"
+      limit:
+        description: "ограничить число сделок (0 -- все)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: solana-transfer-fee-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Самопроверка (без сети)"
+        run: python -u analysis/solana_transfer_fee_audit.py --self-test
+      - name: "Аудит"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python -u analysis/solana_transfer_fee_audit.py \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
+            --limit "${{ github.event.inputs.limit || '0' }}" 2>&1 | tail -250
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A data/helius_usage 2>/dev/null || true
+          for f in data/solana_transfer_fee_audit.json data/solana_transfer_fee_audit_cache.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Комиссия на перевод: аудит по всем закрытым сделкам [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
