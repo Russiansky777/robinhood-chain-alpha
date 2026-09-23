@@ -1,0 +1,256 @@
+name: "Bloom: деплой сторожа продаж на NL-хост (по умолчанию dry-run)"
+
+# Первый коммит задачи B: на хост ставится ТОЛЬКО сторож продаж. Кода,
+# способного что-то купить, на хосте ещё нет вообще -- тормоза раньше газа.
+#
+# Чего нет в прежних деплой-workflow и что добавлено здесь:
+#   * бэкап env перед правкой (cp -a), а не перезапись без копии;
+#   * проверка НЕПУСТОТЫ секретов до записи env -- иначе служба падает уже
+#     на хосте со строкой KEY= в файле;
+#   * сверка sha256 доставленного кода с падением job при расхождении, а не
+#     печать обеих сумм в лог;
+#   * systemctl is-active --quiet || exit 1 -- прежние шаги были
+#     информационными и возвращали 0 при любом содержимом;
+#   * гейт "нет открытых позиций" перед перезапуском;
+#   * concurrency, чтобы два деплоя боевой службы не шли одновременно;
+#   * ужесточение юнита: ProtectSystem, ProtectHome, PrivateTmp,
+#     ReadWritePaths, NoNewPrivileges, лимит памяти.
+#
+# BLOOM_LIVE_SELL=0 по умолчанию: сторож считает и пишет, но не продаёт.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_service:
+        description: "'yes' -- включить и перезапустить службу"
+        required: false
+        default: "no"
+      live_sell:
+        description: "'1' -- РЕАЛЬНЫЕ продажи сторожем (по умолчанию 0)"
+        required: false
+        default: "0"
+      sell_after_s:
+        description: "горизонт продажи, с (для справки в env)"
+        required: false
+        default: "28.8"
+
+concurrency:
+  group: bloom-seller-deploy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SVC: bloom-seller
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО доставки (без сети)"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_exec_state.py --self-test
+          python3 bloom_api.py --self-test
+          python3 bloom_seller.py --self-test
+
+      - name: "Секреты не пусты (значения не печатаются)"
+        env:
+          BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          fail=0
+          for NAME in BLOOM_API_KEY HELIUS_API_KEY VPS_SSH_KEY; do
+            V="${!NAME}"
+            if [ -z "$V" ]; then echo "$NAME: НЕ ЗАДАН"; fail=1
+            else echo "$NAME: задан, длина ${#V}"; fi
+          done
+          [ "$fail" = "0" ] || { echo "деплой остановлен: нет обязательных секретов"; exit 1; }
+
+      - name: "SSH key + known_hosts"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Каталоги и владельцы"
+        run: |
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            id -u bot >/dev/null 2>&1 || useradd -m -s /bin/bash bot
+            mkdir -p $CODE_DIR $STATE_DIR $ENV_DIR
+            chown -R bot:bot $CODE_DIR $STATE_DIR
+            chmod 750 $CODE_DIR $STATE_DIR
+            chown root:root $ENV_DIR && chmod 750 $ENV_DIR
+          "
+
+      - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
+        run: |
+          set -e
+          for f in bloom_exec_state.py bloom_api.py bloom_seller.py; do
+            local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
+            ssh -n $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
+            remote_sum=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
+            echo "$f: локально $local_sum, на хосте $remote_sum"
+            [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
+          done
+
+      - name: "env: бэкап перед правкой, затем запись 600 root:root"
+        env:
+          BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
+          SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            f=$ENV_DIR/env
+            if [ -f \"\$f\" ]; then cp -a \"\$f\" \"\$f.bak.\$(date +%s)\"; echo 'бэкап env сделан'; fi
+          "
+          umask 077
+          {
+            echo "BLOOM_API_KEY=$BLOOM_API_KEY"
+            echo "HELIUS_API_KEY=$HELIUS_API_KEY"
+            echo "HELIUS_API=$HELIUS_API_KEY"
+            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN"
+            echo "TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID"
+            echo "BLOOM_STATE_DIR=$STATE_DIR"
+            echo "BLOOM_KILL_FILE=$ENV_DIR/KILL"
+            echo "BLOOM_KILL_SELL_FILE=$ENV_DIR/KILL_SELL"
+            echo "BLOOM_LIVE_SELL=$LIVE_SELL"
+            echo "BLOOM_SELL_SLIPPAGE_PCT=40"
+            echo "BLOOM_SELL_GRACE_S=15"
+            echo "BLOOM_SELL_RETRY_EVERY_S=45"
+            echo "BLOOM_SELL_GIVE_UP_AFTER_S=600"
+            echo "BLOOM_SELLER_LOOP_S=15"
+            echo "BLOOM_PRIORITY_FEE=0.001"
+            echo "BLOOM_PROCESSOR_TIP=0.001"
+            echo "BLOOM_SELL_AFTER_S=$SELL_AFTER_S"
+            echo "BLOOM_MAX_OPEN=5"
+            echo "BLOOM_DAILY_LOSS_SOL=1"
+            echo "BLOOM_BUY_SOL=0.2"
+          } > /tmp/bloom_env
+          ssh -n $SSH_OPTS root@$HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
+          shred -u /tmp/bloom_env
+          echo "строк в env на хосте:"
+          ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+
+      - name: "systemd-юнит с ужесточением"
+        run: |
+          ssh -n $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service" <<'EOF'
+[Unit]
+Description=Bloom sell guard (dry-run by default)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bot
+Group=bot
+WorkingDirectory=/home/bot/bloom_executor
+EnvironmentFile=/etc/bloom-executor/env
+ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/bot/bloom_executor_live_data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
+EOF
+          ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
+
+      - name: "logrotate"
+        run: |
+          ssh -n $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC" <<'EOF'
+/home/bot/bloom_executor_live_data/*.jsonl {
+  daily
+  rotate 14
+  compress
+  missingok
+  notifempty
+  copytruncate
+}
+EOF
+
+      - name: "ГЕЙТ: открытых позиций нет -- только тогда перезапуск"
+        if: ${{ github.event.inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          OPEN=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            /home/bot/robinhood-chain-alpha/venv/bin/python -c \"
+import json,sys
+sys.path.insert(0,'$CODE_DIR')
+from bloom_exec_state import ExecState
+print(len(ExecState().open_positions()))
+\"" || echo "ОШИБКА")
+          echo "открытых позиций: $OPEN"
+          [ "$OPEN" = "0" ] || { echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN -- сначала они должны закрыться"; exit 1; }
+
+      - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
+        if: ${{ github.event.inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
+          sleep 8
+          ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
+            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 60 --no-pager"; exit 1; }
+          RESTARTS=$(ssh -n $SSH_OPTS root@$HOST "systemctl show -p NRestarts --value $SVC")
+          echo "NRestarts=$RESTARTS"
+          ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 30 --no-pager"
+
+      - name: "Проверка признака жизни и --check-only (ничего не продаёт)"
+        if: ${{ github.event.inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          sleep 20
+          ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cat $STATE_DIR/seller_heartbeat.json 2>/dev/null || echo 'признака жизни ещё нет'
+            /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_seller.py --check-only
+          " 2>&1 | tail -40 | tee -a data/bloom_seller_deploy.txt
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_seller_deploy.txt ] && git add data/bloom_seller_deploy.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: деплой сторожа продаж, отчёт [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
