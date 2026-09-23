@@ -3,12 +3,12 @@
 --- исполнитель ---
 {
   "schema_version": 2,
-  "mode": "dry-run",
+  "mode": "live-test",
   "live_buy_enabled": false,
-  "live_test_enabled": false,
-  "dry_run": true,
-  "bump_sol": 0.02,
-  "buy_sol": 0.2,
+  "live_test_enabled": true,
+  "dry_run": false,
+  "bump_sol": 0.005,
+  "buy_sol": 0.001,
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
   "processor_tip": 0.001,
@@ -59,8 +59,8 @@
   }
 }
   "schema_version": 2,
-  "checked_utc": "2026-09-23T21:00:25Z",
-  "mode": "dry-run",
+  "checked_utc": "2026-09-23T22:00:39Z",
+  "mode": "live-test",
   "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
   "balance_sol": 0.362935329,
   "min_balance_sol": 0.3,
@@ -92,7 +92,7 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 62,
+      "v2": 96,
       "unreadable": 0
     },
     "positions": {
@@ -111,7 +111,7 @@
   "verdict": "сверка чистая: настоящие покупки включать можно"
 }
 --- коротко ---
-режим: dry-run, вердикт: сверка чистая: настоящие покупки включать можно
+режим: live-test, вердикт: сверка чистая: настоящие покупки включать можно
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.362935329 SOL при пороге 0.3
 чужая активность: известно=True, свежих за 24.0 ч 0, прежних 40 (самая свежая 2026-09-23T19:46:12Z)
 граница чужой активности: метка начала стенда (2026-09-23T20:50:35Z)
@@ -120,9 +120,9 @@
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T21:00:32Z",
-  "updated_ts": 1790197232.3976233,
-  "alive_since_utc": "2026-09-23T21:00:32Z",
+  "updated_utc": "2026-09-23T22:00:44Z",
+  "updated_ts": 1790200844.8394084,
+  "alive_since_utc": "2026-09-23T22:00:44Z",
   "mode": "dry",
   "sources": 19,
   "sources_from": "DBot живьём + тестовых источников из окружения: 2",
@@ -141,7 +141,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 114.16986800338557,
+  "rate_usd_sol": 114.54704212700612,
   "rate_fresh": true,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
@@ -152,7 +152,7 @@
   "slot_notifications": 0,
   "net_slot_age_s": null,
   "balance_sol": 0.362935329,
-  "balance_age_s": 0.06,
+  "balance_age_s": 0.03,
   "rpc_calls": 1,
   "rpc_by_method": {
     "getBalance": 1
@@ -163,12 +163,12 @@
   "exec_by_code": {},
   "executor": {
     "schema_version": 2,
-    "mode": "dry-run",
+    "mode": "live-test",
     "live_buy_enabled": false,
-    "live_test_enabled": false,
-    "dry_run": true,
-    "bump_sol": 0.02,
-    "buy_sol": 0.2,
+    "live_test_enabled": true,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.001,
     "slippage_pct": 35.0,
     "priority_fee": 0.001,
     "processor_tip": 0.001,
@@ -183,6 +183,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-62
+97
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 0
