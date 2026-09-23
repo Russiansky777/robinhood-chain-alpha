@@ -1127,9 +1127,12 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
             if t.get("task_id"):
                 tasks[t["task_id"]] = t
 
-    seen = matched = missed = 0
-    missed_rows: list[dict] = []
-    per_task: dict[str, dict] = {}
+    # ДЕДУБЛИКАЦИЯ ПОПЫТОК. DBot на одну сделку источника заводит
+    # НЕСКОЛЬКО записей, если повторяет попытку: в выгрузке видны
+    # четыре записи state=fail от одного источника за две минуты. Без
+    # склейки такие повторы считались бы отдельными "пропусками" и
+    # раздували бы оценку. Склеиваем по (источник, минт, окно 60с).
+    recs: list[dict] = []
     for tid, task in tasks.items():
         for rec in fetch_follow_trades(tid, dbot_key, max_pages=20):
             if str(rec.get("type") or "").lower() != "buy":
@@ -1140,37 +1143,68 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
             src = (rec.get("follow") or {}).get("wallet")
             if not src or src not in sources:
                 continue
-            seen += 1
-            name = task.get("task_name") or tid
-            row = per_task.setdefault(name, {"всего": 0, "есть_событие": 0, "пропущено": 0})
-            row["всего"] += 1
-            ts = created / 1000.0
-            near = [t for t in by_source.get(src, []) if abs(t - ts) <= window_s]
-            if near:
-                matched += 1
-                row["есть_событие"] += 1
-            else:
-                missed += 1
-                row["пропущено"] += 1
-                if len(missed_rows) < 15:
-                    missed_rows.append({
-                        "источник": src, "задача": name,
-                        "когда_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)),
-                        "state": rec.get("state")})
+            mint = (((rec.get("receive") or {}).get("info") or {}).get("contract")
+                    or ((rec.get("follow") or {}).get("receive") or {}).get("info", {}).get("contract"))
+            recs.append({"src": src, "mint": mint, "ts": created / 1000.0,
+                         "state": str(rec.get("state") or ""),
+                         "task": task.get("task_name") or tid})
+    recs.sort(key=lambda r: r["ts"])
+    groups: dict[tuple, dict] = {}
+    for r in recs:
+        key = (r["src"], r["mint"], int(r["ts"] // 60))
+        g = groups.get(key)
+        if g is None:
+            # соседнее окно: попытка могла попасть в следующую минуту
+            g = groups.get((r["src"], r["mint"], int(r["ts"] // 60) - 1))
+        if g is None:
+            groups[key] = {"src": r["src"], "task": r["task"], "ts": r["ts"],
+                            "states": [r["state"]], "n": 1}
+        else:
+            g["states"].append(r["state"])
+            g["n"] += 1
+    by_state = {}
+    for r in recs:
+        by_state[r["state"]] = by_state.get(r["state"], 0) + 1
+
+    seen = matched = missed = 0
+    missed_rows: list[dict] = []
+    per_task: dict[str, dict] = {}
+    for g in groups.values():
+        seen += 1
+        name = g["task"]
+        row = per_task.setdefault(name, {"всего": 0, "есть_событие": 0, "пропущено": 0})
+        row["всего"] += 1
+        near = [t for t in by_source.get(g["src"], []) if abs(t - g["ts"]) <= window_s]
+        if near:
+            matched += 1
+            row["есть_событие"] += 1
+        else:
+            missed += 1
+            row["пропущено"] += 1
+            if len(missed_rows) < 15:
+                missed_rows.append({
+                    "источник": g["src"], "задача": name,
+                    "когда_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(g["ts"])),
+                    "состояния_попыток": g["states"][:5], "попыток": g["n"]})
 
     print()
     print("=== ПРОПУСКИ: покупки DBot без события в зонде ===")
     print(f"окно {hours}ч, допуск по времени +-{window_s}с")
-    print(f"покупок DBot от наших источников: {seen}")
+    print(f"записей DBot всего: {len(recs)} (по состояниям: {json.dumps(by_state, ensure_ascii=False)})")
+    print(f"РАЗНЫХ сделок источников после склейки повторов: {seen}")
     print(f"  событие в зонде ЕСТЬ:  {matched}")
     print(f"  события НЕТ (пропуск): {missed}"
           + (f" = {missed / seen:.1%}" if seen else ""))
     print("по задачам:", json.dumps(per_task, ensure_ascii=False))
     if missed_rows:
         print("примеры пропусков:", json.dumps(missed_rows, ensure_ascii=False, indent=1))
-    print("ОГОВОРКА: считаются только сделки, на которые DBot среагировал. "
-          "Сделки источников, которые DBot не копировал, здесь не видны, "
-          "поэтому это НИЖНЯЯ граница пропусков.")
+    print("ОГОВОРКИ:")
+    print("  1. Считаются только сделки, на которые DBot среагировал. Сделки источников, "
+          "которые DBot не копировал, здесь не видны -- это НИЖНЯЯ граница пропусков.")
+    print("  2. Повторы одной сделки склеены по (источник, минт, минута): без склейки четыре "
+          "попытки state=fail подряд считались бы четырьмя пропусками.")
+    print("  3. Список источников берётся СЕЙЧАС; если за сутки он менялся, часть записей "
+          "могла относиться к источнику, на который зонд тогда ещё не был подписан.")
 
 
 def offsets_report() -> None:
