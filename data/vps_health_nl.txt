@@ -1,0 +1,107 @@
+=== NL-хост, живучесть служб, 2026-09-23T18:18:00Z ===
+dbot-sold-guard: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
+dbot-detect-probe: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
+bloom-seller: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:03:53 CEST
+bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:13:18 CEST
+
+--- признаки жизни ---
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T18:17:19Z):
+{
+  "обновлено_utc": "2026-09-23T18:17:19Z",
+  "обновлено_ts": 1790187439.4248316,
+  "живёт_с_utc": "2026-09-23T18:13:19Z",
+  "режим": "dry",
+  "источников": 17,
+  "источники_откуда": "DBot живьём",
+  "поколение_источников": 0,
+  "способ_подписки": "transactionSubscribe",
+  "обрывов_подписки": 0,
+  "обработано_сигналов": 3,
+  "к_покупке": 0,
+  "по_кодам": {
+    "NOT_A_BUY": 2,
+    "KILL_SWITCH": 1
+  },
+  "курс_источник": "geckoterminal",
+  "курс_usd_sol": 114.28461129825496,
+  "курс_свежий": true,
+  "курс_отказы": []
+}
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T18:18:08Z):
+{
+  "обновлено_utc": "2026-09-23T18:18:08Z",
+  "обновлено_ts": 1790187488.425374,
+  "режим": "dry-run",
+  "позиций_в_круге": 0,
+  "проскальзывание_pct": 40.0,
+  "запас_после_срока_с": 15.0,
+  "потолок_ожидания_с": 600.0
+}
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T18:17:57Z):
+{
+  "updated_utc": "2026-09-23T18:17:57Z",
+  "uptime_s": 24481.4,
+  "tx_method_работает": "logsSubscribe",
+  "tx_method_история": [
+    {
+      "utc": "2026-09-23T11:29:56Z",
+      "method": "transactionSubscribe",
+      "acked": 57,
+      "of": 57
+    },
+    {
+      "utc": "2026-09-23T13:43:50Z",
+      "method": "logsSubscribe",
+      "acked": 57,
+      "of": 57
+    },
+    {
+      "utc": "2026-09-23T15:20:09Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-23T17:21:13Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-23T17:29:06Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    }
+  ],
+  "источников": 17,
+  "событий_записано": 963,
+  "дублей_пропущено": 9,
+  "неудачных_пропущено": 68,
+  "переподключений_tx": 3,
+  "причины_разрыва_tx": {
+    "ConnectionClosedError: no close frame received or sent": 3
+  },
+  "слепое_время_с": 3.3,
+  "слепое_время_доля": 0.00013,
+  "переподключений_slot": 2,
+  "slot_уведо�
+--- размеры журналов ---
+/home/bot/bloom_executor_live_data/decisions.jsonl: 12 строк
+/home/bot/bloom_executor_live_data/positions.jsonl: нет или пуст
+/home/bot/dbot_detect_probe/events.jsonl: 5747 строк
+
+--- решения детектора по кодам ---
+всего решений: 12
+первое: "ts_utc": "2026-09-23T18:12:29Z"
+последнее: "ts_utc": "2026-09-23T18:14:49Z"
+по кодам:
+     11 NOT_A_BUY
+      1 KILL_SWITCH
+по задачам источника:
+     12 BATCH-3
+
+--- последние 3 решений ---
+{"ts_utc": "2026-09-23T18:14:06Z", "подпись": "5bhH2edMWUgLZJ8yM4EtSdpwF7ryBHaWXHwaihjsmznEp5LR7pSjRMRxWHt7aYYfTu5mXy8w8x239eGyMsSaPjx5", "источник": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8", "минт": "EYMBTNraihZkLhjVQhDivPhjAWFgRF1By2zVd8rcNcGz", "слот": 449781305, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM", "Raydium CLMM"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
+{"ts_utc": "2026-09-23T18:14:35Z", "подпись": "5HgGpzF3LXMByeGWYwFfhs4V6rDCofuFqE4JGBomvns8L7LLneYj5Mg8iiZTQBCHuf27Tpeey6aAfZfLkJ6GFe91", "источник": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8", "минт": "8VEM1Yc4JPFqVwsTcoBKiqAmsUD7xEzCLuDZWXccZGPN", "слот": 449781412, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Pump AMM", "Orca Whirlpool"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
+{"ts_utc": "2026-09-23T18:14:49Z", "подпись": "39P4TLqDz3pZvS1UBkghPufhGJVC6S8xqioatFhwb1RmzbdrV4fpaNPcS8F3mJiNDSqP4W4dpbzRrVm7XhZ8FnJt", "источник": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8", "минт": "AotFYJVM4hFQS97MWq6c2KoDgDYWFDCxLF9i8ZCfABPt", "слот": 449781461, "тип": "buy", "трата_sol_экв": 23.3830719941203, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 2672.558984, "первый_вход": true, "программы_dex": [], "программа_токена": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "отставание_слотов": 0, "действие": "пропуск", "код": "KILL_SWITCH", "причина": "проверка рубильника не удалась (PermissionError) -- торговля запрещена, потому что неясность трактуется как запрет", "фильтр": "наш лимит", "dbot_бы_купил": true, "как": "transactionSubscribe", "курс_пояснение": "по курсу 114.29 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
