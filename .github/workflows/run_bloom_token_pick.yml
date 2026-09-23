@@ -1,0 +1,66 @@
+name: "Bloom: выбор токена для тестового вызова (только чтение)"
+
+# Токен для единственного ручного вызова прохода B нельзя назвать по
+# памяти: состав пулов и их глубина меняются ежедневно. Кандидаты берутся
+# из списка пулов, у которых вторая сторона -- WSOL, и каждый проверяется
+# котировкой маршрутизатора (один ли хоп, какое ценовое влияние на 0.01,
+# 0.05 и 0.2 SOL) и цепью (комиссия на перевод у Token-2022).
+#
+# Только чтение. Ни одного ордера, кошелёк не трогается.
+on:
+  workflow_dispatch:
+    inputs:
+      mints:
+        description: "адреса кандидатов через запятую (пусто -- взять из списка пулов)"
+        required: false
+        default: ""
+      top:
+        description: "сколько кандидатов взять из пулов"
+        required: false
+        default: "8"
+
+concurrency:
+  group: bloom-token-pick
+  cancel-in-progress: false
+
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО запросов в сеть"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_token_pick.py --self-test
+
+      - name: "Проверка кандидатов"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          ARGS="--top ${{ inputs.top }}"
+          if [ -n "${{ inputs.mints }}" ]; then ARGS="--mints ${{ inputs.mints }}"; fi
+          python3 analysis/bloom_token_pick.py $ARGS
+
+      - name: "Коммит вердикта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_token_pick.json ] && git add data/bloom_token_pick.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: кандидаты для тестового вызова [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
