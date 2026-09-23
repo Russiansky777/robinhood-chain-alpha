@@ -1,0 +1,68 @@
+name: "Пилот: пересчёт наценки от цены пула (резервы из балансов хранилищ)"
+
+# Точка отсчёта была неверная: средняя цена исполнения лидера лежит ровно
+# посередине между ценой пула до и после его сделки, поэтому прежняя
+# "наценка к лидеру" включала вторую половину его же следа.
+# Здесь всё считается от ЦЕНЫ ПУЛА, резервы читаются прямо из
+# preTokenBalances/postTokenBalances хранилищ в самих транзакциях.
+# Только чтение цепочки. Объём маленький: по две транзакции на сделку.
+on:
+  workflow_dispatch:
+    inputs:
+      public_only:
+        description: "'yes' -- считать только через публичный узел"
+        required: false
+        default: ""
+      min_interval_s:
+        description: "интервал между RPC-вызовами"
+        required: false
+        default: "0.05"
+
+concurrency:
+  group: solana-pool-price-recompute
+  cancel-in-progress: false
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Самопроверка (без сети)"
+        run: python -u analysis/solana_pool_price_recompute.py --self-test
+      - name: "Пересчёт от цены пула"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          python -u analysis/solana_pool_price_recompute.py \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
+            ${{ github.event.inputs.public_only == 'yes' && '--public-only' || '' }} \
+            2>&1 | tail -200
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/solana_pool_price_recompute.json data/helius_usage.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Пилот: пересчёт наценки от цены пула [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
