@@ -178,10 +178,27 @@ async def прогон(секунд: float, задачи: tuple, снимок: P
         raise RuntimeError("источников не нашлось в снимке конфига")
     счёт = Счёт()
     стоп = time.time() + секунд
-    await asyncio.gather(*[_слушать(счёт, ключ, p, адреса, стоп) for p in ПОТОЛКИ])
+    # Жёсткий будильник поверх окна. Прогон уже висел дольше окна: если
+    # закрытие соединения или recv застрянут, замер не должен висеть до
+    # таймаута всего прогона -- лучше неполные данные с честной пометкой,
+    # чем тишина на полчаса.
+    задачи_ws = [asyncio.create_task(_слушать(счёт, ключ, p, адреса, стоп))
+                 for p in ПОТОЛКИ]
+    просрочено = False
+    try:
+        await asyncio.wait_for(asyncio.gather(*задачи_ws, return_exceptions=True),
+                               timeout=секунд + 45)
+    except asyncio.TimeoutError:
+        просрочено = True
+        счёт.сбои.append(f"замер не уложился в окно {секунд:.0f} с + 45 с -- "
+                          "подписки сняты будильником, данные могут быть неполными")
+        for t in задачи_ws:
+            t.cancel()
+        await asyncio.gather(*задачи_ws, return_exceptions=True)
     итог = {"checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "seconds": секунд, "sources": len(адреса), "tasks": list(задачи),
             "failures": счёт.сбои,
+            "watchdog_fired": просрочено,
             "by_ceiling": {str(p): {k: v for k, v in счёт.по_потолку[p].items()
                                     if k != "signatures"}
                            for p in ПОТОЛКИ},

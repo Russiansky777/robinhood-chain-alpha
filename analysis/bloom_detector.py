@@ -135,6 +135,18 @@ LAMPORT = 10 ** 9
 РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
 РАЗБОР_ЧЕРЕЗ_RPC = "PARSE_VIA_RPC"
 
+# Потолок версии транзакции -- ОДИН для подписки и для getTransaction.
+# Раньше подписка просила 0, а getTransaction 1, и эта асимметрия была
+# названа в коде, но не убрана: на прогоне Части A узел прямо отвечал
+# -32015 "Transaction version (1) is not supported" при потолке 0, то есть
+# в блоках есть транзакции версии 1. Сообщение о такой транзакции
+# приходило без meta, детектор падал на getTransaction -- а это только
+# confirmed, то есть 1-2 слота и ~300 мс вместо 0 слотов и 0.3 мс.
+# Держать два разных потолка нельзя: подписка обязана уметь разобрать всё,
+# что умеет разобрать запасной путь, иначе запасной путь становится
+# основным незаметно.
+ПОТОЛОК_ВЕРСИИ_TX = ST.env_int("BLOOM_MAX_TX_VERSION", 1)
+
 # Порог DBot: targetMinAmountUI = 2 (SOL-эквивалент). Верхней границы
 # нет: targetMaxAmountUI = null в обеих задачах.
 ПОРОГ_ВХОДА_SOL = ST.env_float("BLOOM_MIN_TARGET_SOL", 2.0)
@@ -626,7 +638,7 @@ class Helius:
             try:
                 r = self.call("getTransaction", [подпись, {
                     "encoding": "jsonParsed", "commitment": "confirmed",
-                    "maxSupportedTransactionVersion": 1}])
+                    "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX}])
             except RuntimeError as exc:
                 последняя = exc
                 r = None
@@ -1032,7 +1044,7 @@ async def _подписка_транзакций(ws, адреса: list) -> None
             "params": [{"accountInclude": [a], "failed": False, "vote": False},
                         {"commitment": "processed", "transactionDetails": "full",
                          "encoding": "jsonParsed", "showRewards": False,
-                         "maxSupportedTransactionVersion": 0}]}))
+                         "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX}]}))
 
 
 async def _подписка_логов(ws, адреса: list) -> None:
@@ -1404,6 +1416,46 @@ def self_test() -> int:
             sorted(set(ист_снимок.values())))
     else:
         chk("снимок конфига на месте", False, f"нет файла {снимок_репо}")
+
+    # 12г. потолок версии транзакции ОДИН у подписки и у getTransaction.
+    # Асимметрия (подписка 0, getTransaction 1) была настоящей причиной
+    # того, что разбор уходил на медленный путь, и вернуться она не должна.
+    class WSЗапись:
+        def __init__(self):
+            self.отправлено = []
+
+        async def send(self, тело):
+            self.отправлено.append(json.loads(тело))
+
+    async def _собрать_подписку():
+        ws = WSЗапись()
+        await _подписка_транзакций(ws, ["Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn"])
+        return ws.отправлено
+
+    отправлено = asyncio.run(_собрать_подписку())
+    настройки = отправлено[0]["params"][1]
+    chk("в подписке потолок версии равен нашей константе",
+        настройки["maxSupportedTransactionVersion"] == ПОТОЛОК_ВЕРСИИ_TX,
+        настройки.get("maxSupportedTransactionVersion"))
+    chk("и он не нулевой: транзакции версии 1 в блоках есть",
+        ПОТОЛОК_ВЕРСИИ_TX >= 1, ПОТОЛОК_ВЕРСИИ_TX)
+    chk("подписка по-прежнему на processed",
+        настройки["commitment"] == "processed", настройки.get("commitment"))
+
+    class HeliusПотолок(Helius):
+        def __init__(self):
+            super().__init__(key="нет", служба="")
+            self.параметры = None
+
+        def call(self, метод, параметры, **kw):
+            self.параметры = параметры
+            return None
+
+    hп = HeliusПотолок()
+    hп.транзакция("ПОДПИСЬ", попыток=1, пауза_s=0)
+    chk("у getTransaction тот же потолок, что у подписки",
+        hп.параметры[1]["maxSupportedTransactionVersion"] == ПОТОЛОК_ВЕРСИИ_TX,
+        hп.параметры[1].get("maxSupportedTransactionVersion"))
 
     # 13. решение с настоящим состоянием
     import tempfile  # noqa: PLC0415
