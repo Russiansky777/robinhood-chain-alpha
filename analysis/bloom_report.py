@@ -441,14 +441,60 @@ def позиции_срез(state: ST.ExecState) -> dict:
     все = list(state.positions().values())
     def срез(предикат):
         p = [x for x in все if предикат(x)]
+        # Исполнитель пишет вход как sol_in. Поле spend_sol не писал никто,
+        # и сумма потраченного была ровным нулём при живых покупках: старый
+        # доклад показывал spent_sol 0.0 при позиции на 0.001 SOL.
+        # Оба ключа читаются, чтобы прежние записи не потерялись.
+        def вход(x):
+            for к in ("sol_in", "spend_sol"):
+                try:
+                    v = float(x.get(к) or 0)
+                except (TypeError, ValueError):
+                    v = 0.0
+                if v:
+                    return v
+            return 0.0
         return {"count": len(p),
                 "open": sum(1 for x in p if x.get("state") in ST.STATES_OPEN),
-                "spent_sol": round(sum(float(x.get("spend_sol") or 0) for x in p), 6)}
+                "spent_sol": round(sum(вход(x) for x in p), 6)}
     return {"live": срез(lambda x: x.get("mode") == ST.MODE_LIVE),
             "live_test": срез(lambda x: x.get("mode") == ST.MODE_LIVE_TEST),
             "dry_run": срез(lambda x: not ST.is_real_mode(x.get("mode"))),
             "open_real": len(state.open_positions()),
             "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"}
+
+
+def позиции_таблица(state: ST.ExecState) -> list:
+    """По каждой НАСТОЯЩЕЙ позиции: чем покупали, каким маршрутом, чем продавали.
+
+    Владельцу нужно в чек-лист: где покупал Bloom (пул и программа) и через
+    какой пул шла продажа. Всё это лежит в записях позиций -- отдельными
+    полями, а не в свободном тексте.
+    """
+    строки = []
+    for p in state.positions().values():
+        if not ST.is_real_mode(p.get("mode")):
+            continue
+        строки.append({
+            "client_order_id": p.get("client_order_id"),
+            "mint": p.get("mint"),
+            "mode": p.get("mode"),
+            "state": p.get("state"),
+            "buy_address_kind": p.get("buy_address_kind"),
+            "buy_address": p.get("buy_address") or p.get("pool"),
+            "source_program": p.get("program"),
+            "our_pool": p.get("our_pool"),
+            "our_pool_direct": p.get("our_pool_direct"),
+            "our_route_programs": p.get("our_route_programs"),
+            "our_route_hops": p.get("our_route_hops"),
+            "flags": p.get("flags"),
+            "sell_address_kinds": p.get("sell_address_kinds"),
+            "sell_attempts": p.get("sell_attempts"),
+            "unsold_reason": p.get("unsold_reason"),
+            "balance_read_why_not": p.get("balance_read_why_not"),
+        })
+    строки.sort(key=lambda r: str(r.get("client_order_id")))
+    return строки
 
 
 # ------------------------------------------------------------------ кредиты
@@ -535,6 +581,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "reconciliation": св,
         "pairs": пары(строки, св),
         "positions": поз,
+        "position_rows": позиции_таблица(state),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
     }
@@ -655,6 +702,21 @@ def в_текст(о: dict) -> str:
     поз = о["positions"]
     L.append(f"--- позиции --- live {поз['live']}, live-test {поз['live_test']}, "
              f"dry-run {поз['dry_run']} (не учитывается)")
+    for r in о.get("position_rows") or []:
+        L.append(f"  позиция {str(r.get('client_order_id'))[:8]} {r.get('mode')}/"
+                 f"{r.get('state')} минт {r.get('mint')}")
+        L.append(f"      покупка: по {r.get('buy_address_kind')} "
+                 f"{r.get('buy_address')}, программа источника "
+                 f"{r.get('source_program')}")
+        L.append(f"      наш маршрут: {r.get('our_route_programs')}, хопов "
+                 f"{r.get('our_route_hops')}, пул {r.get('our_pool')} "
+                 f"(прямой: {r.get('our_pool_direct')}), метки {r.get('flags') or '-'}")
+        L.append(f"      продажа: чем пробовали {r.get('sell_address_kinds') or '-'}, "
+                 f"попыток {r.get('sell_attempts') or 0}"
+                 + (f", не продано: {r.get('unsold_reason')}"
+                    if r.get("unsold_reason") else "")
+                 + (f", остаток не читался: {r.get('balance_read_why_not')}"
+                    if r.get("balance_read_why_not") else ""))
     L.append("")
     L.append("--- гейты live на реальных источниках ---")
     for имя, г in о["gates"].items():
@@ -891,6 +953,32 @@ def self_test() -> None:
         поз = позиции_срез(st)
         chk("dry-run в своём разделе", поз["dry_run"]["count"] == 1, поз["dry_run"])
         chk("live-test считается настоящей", поз["open_real"] == 1, поз["open_real"])
+
+        # --- вход считается по тому полю, которое пишет исполнитель
+        st.positions_path.write_text("\n".join([
+            json.dumps({"client_order_id": "c", "state": "bought",
+                        "mode": ST.MODE_LIVE_TEST, "sol_in": 0.001,
+                        "mint": "MINTX", "buy_address": "POOLX",
+                        "buy_address_kind": "pool", "program": "Meteora DLMM",
+                        "our_pool": None, "our_pool_direct": False,
+                        "our_route_programs": "Raydium CLMM,Raydium CPMM",
+                        "our_route_hops": 2, "flags": "ROUTE_MISMATCH",
+                        "sell_address_kinds": "pool,mint", "sell_attempts": 2,
+                        "unsold_reason": "2 неудачных попыток подряд",
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        поз2 = позиции_срез(st)
+        chk("вход берётся из sol_in, а не из несуществующего spend_sol",
+            поз2["live_test"]["spent_sol"] == 0.001, поз2["live_test"])
+        тб = позиции_таблица(st)
+        chk("в таблице позиций одна настоящая", len(тб) == 1, тб)
+        chk("видно, чем покупали", тб[0]["buy_address_kind"] == "pool"
+            and тб[0]["buy_address"] == "POOLX", тб[0])
+        chk("видно наш маршрут и метку расхождения",
+            тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        chk("видно, чем продавали и почему не продано",
+            тб[0]["sell_address_kinds"] == "pool,mint"
+            and "неудачных" in тб[0]["unsold_reason"], тб[0])
 
         # --- пары: малый размер помечен
         п = пары([строка(action="buy", code="BUY",
