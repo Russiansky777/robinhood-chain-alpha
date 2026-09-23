@@ -23,6 +23,10 @@ on:
         description: "кошелёк (пусто -- кошелёк исполнителя)"
         required: false
         default: ""
+      sigs:
+        description: "подписи через запятую: разобрать транзакции ЦЕЛИКОМ (все владельцы и минты)"
+        required: false
+        default: ""
 
 concurrency:
   group: bloom-wallet-activity
@@ -53,6 +57,11 @@ jobs:
           pip install -q requests
           ARGS="--hours ${{ inputs.hours }} --limit ${{ inputs.limit }}"
           if [ -n "${{ inputs.wallet }}" ]; then ARGS="$ARGS --wallet ${{ inputs.wallet }}"; fi
+          if [ -n "${{ inputs.sigs }}" ]; then
+            for S in $(echo "${{ inputs.sigs }}" | tr ',' ' '); do
+              ARGS="$ARGS --sig $S"
+            done
+          fi
           python3 analysis/bloom_wallet_activity.py $ARGS
 
       - name: "Коммит разбора"
@@ -60,7 +69,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/bloom_wallet_activity.json ] && git add data/bloom_wallet_activity.json
+          for f in data/bloom_wallet_activity.json data/bloom_tx_picture.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Bloom: разбор активности кошелька исполнителя [automated]"
           for i in 1 2 3 4 5; do

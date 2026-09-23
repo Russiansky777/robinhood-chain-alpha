@@ -109,6 +109,65 @@ def переводы(tx: dict) -> list:
     return out
 
 
+def полная_картина(tx: dict) -> dict:
+    """ВСЕ токенные балансы транзакции с владельцами и дельтами.
+
+    Нужно, когда покупка не видна по адресу источника: п. 1 стенда показал
+    транзакцию Fomo, где у источника ушёл только USDC, а купленный токен на
+    его кошелёк не пришёл. Понять, кому он достался, можно лишь посмотрев
+    ВСЕ балансы, а не только балансы источника.
+    """
+    meta = (tx or {}).get("meta") or {}
+    def свод(сп):
+        out = {}
+        for b in сп or []:
+            if not isinstance(b, dict):
+                continue
+            ключ = (b.get("owner"), b.get("mint"))
+            сумма = ((b.get("uiTokenAmount") or {}).get("uiAmount") or 0)
+            try:
+                out[ключ] = float(сумма or 0)
+            except (TypeError, ValueError):
+                out[ключ] = 0.0
+        return out
+    до = свод(meta.get("preTokenBalances"))
+    после = свод(meta.get("postTokenBalances"))
+    строки = []
+    for ключ in sorted(set(до) | set(после), key=lambda k: (str(k[0]), str(k[1]))):
+        было, стало = до.get(ключ, 0.0), после.get(ключ, 0.0)
+        if было == стало:
+            continue
+        строки.append({"owner": ключ[0], "mint": ключ[1],
+                       "before": было, "after": стало,
+                       "delta": round(стало - было, 9)})
+    # Переводы SPL: кто кому и сколько, по разобранным инструкциям.
+    переводы_spl = []
+    списки = [((tx or {}).get("transaction") or {}).get("message", {}).get("instructions") or []]
+    for вн in meta.get("innerInstructions") or []:
+        списки.append((вн or {}).get("instructions") or [])
+    for сп in списки:
+        for i in сп:
+            разб = (i or {}).get("parsed") or {}
+            тип = разб.get("type") or ""
+            if тип not in ("transfer", "transferChecked"):
+                continue
+            инфо = разб.get("info") or {}
+            переводы_spl.append({
+                "type": тип,
+                "authority": инфо.get("authority") or инфо.get("multisigAuthority"),
+                "source": инфо.get("source"), "destination": инфо.get("destination"),
+                "mint": инфо.get("mint"),
+                "amount": ((инфо.get("tokenAmount") or {}).get("uiAmountString")
+                           or инфо.get("amount"))})
+    return {"token_deltas": строки, "spl_transfers": переводы_spl,
+            "programs": программы(tx),
+            "fee_payer": (все_счета(tx) or [None])[0],
+            "signers": [k for k in (все_счета(tx) or [])[:3]],
+            "version": (tx or {}).get("version"),
+            "slot": (tx or {}).get("slot"),
+            "err": meta.get("err")}
+
+
 def разобрать(tx: dict, кошелёк: str) -> dict:
     """Что эта транзакция сделала с кошельком и кто её подписал."""
     meta = (tx or {}).get("meta") or {}
@@ -271,6 +330,38 @@ def self_test() -> int:
     chk("вложенный перевод виден",
         r["transfers"] and r["transfers"][0]["to"] == К, r["transfers"])
 
+    # полная картина: видны ВСЕ владельцы, а не только наш кошелёк
+    полная = tx(ключи=["ПЛАТЕЛЬЩИК", К], pre=[5_000_000_000, 1_000],
+                post=[4_999_000_000, 1_000],
+                токены=[{"owner": К, "mint": "USDC", "accountIndex": 5,
+                         "uiTokenAmount": {"uiAmount": 10.0}},
+                        {"owner": "ЧУЖОЙ_СЧЁТ", "mint": "КУПЛЕННЫЙ",
+                         "accountIndex": 6, "uiTokenAmount": {"uiAmount": 500.0}}])
+    полная["meta"]["preTokenBalances"] = [
+        {"owner": К, "mint": "USDC", "accountIndex": 5,
+         "uiTokenAmount": {"uiAmount": 18.0}},
+        {"owner": "ЧУЖОЙ_СЧЁТ", "mint": "КУПЛЕННЫЙ", "accountIndex": 6,
+         "uiTokenAmount": {"uiAmount": 0.0}}]
+    полная["transaction"]["message"]["instructions"] = [
+        {"programId": "TOKEN", "parsed": {"type": "transferChecked", "info": {
+            "authority": К, "source": "СЧЁТ_НАШ", "destination": "СЧЁТ_ЧУЖОЙ",
+            "mint": "USDC", "tokenAmount": {"uiAmountString": "8"}}}}]
+    к = полная_картина(полная)
+    владельцы = {d["owner"] for d in к["token_deltas"]}
+    chk("в полной картине видны оба владельца",
+        владельцы == {К, "ЧУЖОЙ_СЧЁТ"}, владельцы)
+    наш = [d for d in к["token_deltas"] if d["owner"] == К][0]
+    chk("у нашего кошелька дельта USDC отрицательная",
+        наш["delta"] == -8.0 and наш["mint"] == "USDC", наш)
+    чужой = [d for d in к["token_deltas"] if d["owner"] == "ЧУЖОЙ_СЧЁТ"][0]
+    chk("купленный токен виден у ЧУЖОГО владельца",
+        чужой["delta"] == 500.0 and чужой["mint"] == "КУПЛЕННЫЙ", чужой)
+    chk("перевод SPL разобран с получателем",
+        к["spl_transfers"] and к["spl_transfers"][0]["destination"] == "СЧЁТ_ЧУЖОЙ",
+        к["spl_transfers"])
+    chk("неизменившиеся балансы в картину не идут",
+        all(d["delta"] != 0 for d in к["token_deltas"]), к["token_deltas"])
+
     # сводка: одна наша подпись меняет вердикт
     с = сводка([
         разобрать(tx(ключи=[К], pre=[2_000_000_000], post=[1_900_000_000]), К),
@@ -302,12 +393,49 @@ def main() -> int:
     p.add_argument("--limit", type=int, default=40)
     p.add_argument("--hours", type=float, default=24.0,
                    help="окно, в котором разбирать сделки поштучно")
+    p.add_argument("--sig", action="append", default=[],
+                   help="разобрать ОДНУ транзакцию целиком: все владельцы и минты")
     a = p.parse_args()
     if a.self_test:
         return self_test()
 
     import bloom_detector as BD  # noqa: PLC0415
     helius = BD.Helius(служба="")
+
+    if a.sig:
+        итог = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
+                "checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "wallet": a.wallet, "transactions": []}
+        for sig in a.sig:
+            try:
+                tx = helius.call("getTransaction",
+                                 [sig, {"encoding": "jsonParsed",
+                                        "maxSupportedTransactionVersion": 1}])
+            except Exception as exc:  # noqa: BLE001
+                итог["transactions"].append({"signature": sig,
+                                             "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"})
+                continue
+            картина = полная_картина(tx or {})
+            картина["signature"] = sig
+            картина["wallet_view"] = разобрать(tx or {}, a.wallet)
+            итог["transactions"].append(картина)
+        OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUT_PATH.with_name("bloom_tx_picture.json").write_text(
+            json.dumps(итог, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps(итог, ensure_ascii=False, indent=2))
+        print("--- коротко ---")
+        for t in итог["transactions"]:
+            print(f"{t.get('signature')}: версия {t.get('version')}, слот "
+                  f"{t.get('slot')}, плательщик {str(t.get('fee_payer'))[:12]}")
+            for d in t.get("token_deltas") or []:
+                print(f"    {str(d['owner'])[:12]} {str(d['mint'])[:12]} "
+                      f"{d['before']} -> {d['after']} ({d['delta']:+})")
+            for пер in (t.get("spl_transfers") or [])[:8]:
+                print(f"    перевод {пер['amount']} {str(пер.get('mint'))[:10]}: "
+                      f"{str(пер.get('source'))[:10]} -> {str(пер.get('destination'))[:10]}"
+                      f" (кто {str(пер.get('authority'))[:10]})")
+        return 0
+
     порог = time.time() - a.hours * 3600
 
     подписи = helius.call("getSignaturesForAddress",
