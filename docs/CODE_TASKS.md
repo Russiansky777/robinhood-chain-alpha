@@ -75,9 +75,10 @@ fail-closed, сторож продаж, dry-run. Кода, способного 
 | состояние, лимиты, рубильник | `analysis/bloom_exec_state.py` | 66/66 |
 | клиент Bloom (единственный POST) | `analysis/bloom_api.py` | 53/53 |
 | сторож продаж (отдельный процесс) | `analysis/bloom_seller.py` | 41/41 |
-| детектор v2 (сигналы источников) | `analysis/bloom_detector.py` | 95/95 |
+| детектор v2 (сигналы источников) | `analysis/bloom_detector.py` | 104/104 |
 | сверка вхолостую против DBot | `analysis/bloom_detector_validate.py` | 38/38 |
 | деплой на NL-хост | `.github/workflows/run_vps_deploy_bloom_seller_nl.yml` | — |
+| исполнитель (единственный, кто покупает) | `analysis/bloom_executor.py` | 56/56 |
 | сверка (прогон в CI) | `.github/workflows/run_bloom_detector_validate.yml` | — |
 
 **Детектор v2 сделан.** Источники — из `targetIds` задач BATCH-5/BATCH-3

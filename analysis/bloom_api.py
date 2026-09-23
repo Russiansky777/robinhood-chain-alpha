@@ -79,6 +79,9 @@ RATE_HEADERS = re.compile(r"rate.?limit|retry.?after", re.I)
 
 # Коды ошибок из документации. Делятся по тому, что с ними делать.
 ERR_RATE_LIMITED = "RATE_LIMITED"
+# Свой код на "ответ не JSON": по нему ветвится исполнитель, значит это
+# машинный код, а не фраза для человека.
+ERR_NOT_JSON = "RESPONSE_NOT_JSON"
 ERR_RETRYABLE = ("INTERNAL_ERROR",)
 ERR_SKIP_NOT_FAILURE = ("NO_ROUTE", "TOKEN_OR_POOL_NOT_FOUND",
                          "LIQUIDITY_OUT_OF_RANGE", "MARKET_CAP_OUT_OF_RANGE")
@@ -286,7 +289,7 @@ class BloomApi:
         """
         validate_swap_body(body)
         # Тело можно печатать целиком: ключа в нём нет, он только в заголовке.
-        запись = {"stage": "запрос", "path": SWAP_PATH, "client_order_id": client_order_id,
+        запись = {"stage": "request", "path": SWAP_PATH, "client_order_id": client_order_id,
                    "why": why, "mode": "dry-run" if self.dry_run else "live",
                    "body": body}
         if self.dry_run:
@@ -306,7 +309,7 @@ class BloomApi:
                     "retry_only_after_chain_check": True}
             if self.state is not None:
                 self.state.note_api_result(ok=False, code="СЕТЬ")
-            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
+            self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
         return self._parse_swap(r, client_order_id)
 
@@ -317,11 +320,11 @@ class BloomApi:
         try:
             body = r.json()
         except ValueError:
-            out.update(ok=False, почему=scrub(r.text[:300], self.key),
-                        код_ошибки="ОТВЕТ_НЕ_JSON")
+            out.update(ok=False, why_not=scrub(r.text[:300], self.key),
+                        error_code=ERR_NOT_JSON)
             if self.state is not None:
-                self.state.note_api_result(ok=False, code="ОТВЕТ_НЕ_JSON")
-            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
+                self.state.note_api_result(ok=False, code=ERR_NOT_JSON)
+            self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
         if r.status_code == 200 and body.get("success"):
             data = body.get("data") or {}
@@ -332,12 +335,12 @@ class BloomApi:
                                "не подтверждённые, и массив может быть пустым")
             if self.state is not None:
                 self.state.note_api_result(ok=True)
-            self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
+            self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
         err = (body.get("error") or {}) if isinstance(body, dict) else {}
         код = err.get("code") or f"HTTP_{r.status_code}"
-        out.update(ok=False, код_ошибки=код,
-                    почему=scrub(str(err.get("message") or "")[:300], self.key),
+        out.update(ok=False, error_code=код,
+                    why_not=scrub(str(err.get("message") or "")[:300], self.key),
                     details=err.get("details"))
         rl = код == ERR_RATE_LIMITED or r.status_code == 429
         out["rate_limited"] = rl
@@ -353,7 +356,7 @@ class BloomApi:
                 self.state.note_api_result(ok=True)
             else:
                 self.state.note_api_result(ok=False, rate_limited=rl, code=код)
-        self._log_call({"stage": "ответ", "client_order_id": client_order_id, **out})
+        self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
         return out
 
     @staticmethod

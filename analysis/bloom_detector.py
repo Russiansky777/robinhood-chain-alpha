@@ -65,6 +65,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bloom_exec_state as ST  # noqa: E402
 
 try:
+    import bloom_executor as EXEC
+except ImportError:  # pragma: no cover
+    EXEC = None
+
+try:
     import requests
 except ImportError:  # pragma: no cover
     requests = None
@@ -761,7 +766,13 @@ def подпись_и_слот(res: dict) -> tuple[str | None, int | None]:
 
 class Детектор:
     def __init__(self, *, источники: dict, состояние, helius: Helius,
-                  курс: КурсSOL, режим: str = "dry") -> None:
+                  курс: КурсSOL, режим: str = "dry", исполнитель=None) -> None:
+        # Исполнитель вызывается В ЭТОМ ЖЕ ПРОЦЕССЕ, сразу после решения:
+        # по замеру решение готово за 0.4 мс и в слоте источника, и отдавать
+        # этот запас процессу-посреднику, вычитывающему журнал, нельзя.
+        self.исполнитель = исполнитель
+        self.исполнено = 0
+        self.по_кодам_исполнителя: dict = {}
         self.источники = источники
         self.состояние = состояние
         self.helius = helius
@@ -830,6 +841,11 @@ class Детектор:
         st["rpc_by_method"] = dict(self.helius.по_методам)
         st["session_credits"] = (getattr(self.helius.метр, "session_credits", None)
                                      if self.helius.метр else None)
+        st["executor_attached"] = self.исполнитель is not None
+        st["executed"] = self.исполнено
+        st["exec_by_code"] = dict(self.по_кодам_исполнителя)
+        if self.исполнитель is not None:
+            st["executor"] = self.исполнитель.report()
         st["credits_logged"] = self.helius.учёт_пишется
         st["credits_log_error"] = self.helius.учёт_почему
         з = sorted(self.задержки_мс[-200:])
@@ -925,6 +941,26 @@ class Детектор:
         код = строка.get("code") or "?"
         self.по_кодам[код] = self.по_кодам.get(код, 0) + 1
         self.состояние.log_decision(строка)
+
+        # Исполнение -- ПОСЛЕ записи решения в журнал: если процесс упадёт
+        # между решением и отправкой, решение уже на диске, и добор его
+        # подхватит. Обратный порядок терял бы сигнал молча.
+        if строка.get("action") == "buy" and self.исполнитель is not None:
+            try:
+                итог = self.исполнитель.execute(строка, balance_sol=self.свежий_баланс())
+            except Exception as exc:  # noqa: BLE001
+                # Падение исполнителя не должно валить детектор: он и дальше
+                # обязан слушать источники и вести журнал.
+                итог = {"exec_code": "EXECUTOR_CRASHED",
+                         "reason": f"{type(exc).__name__}: {str(exc)[:200]}"}
+                log.exception("исполнитель упал на %s", (строка.get("signature") or "")[:12])
+            self.исполнено += 1
+            ик = итог.get("exec_code") or "?"
+            self.по_кодам_исполнителя[ик] = self.по_кодам_исполнителя.get(ик, 0) + 1
+            строка["exec"] = итог
+            self.состояние.log_decision({"stage": "exec_result",
+                                          "signature": строка.get("signature"),
+                                          "mint": строка.get("mint"), **итог})
         return строка
 
 
@@ -1393,6 +1429,77 @@ def self_test() -> int:
             all(k.isascii() for k in r), [k for k in r if not k.isascii()])
         chk("значение action тоже латинское", r["action"].isascii(), r["action"])
 
+    # 15c. исполнитель подключён: решение о покупке доходит до него,
+    # его падение НЕ валит детектор, а решение всё равно остаётся в журнале
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+
+        class ИсполнительЗаглушка:
+            def __init__(self, падать=False):
+                self.вызовы = []
+                self.падать = падать
+
+            def execute(self, решение, *, balance_sol):
+                self.вызовы.append((решение.get("signature"), balance_sol))
+                if self.падать:
+                    raise RuntimeError("притворное падение исполнителя")
+                return {"exec_code": "DRY_RUN", "reason": "заглушка"}
+
+            def report(self):
+                return {"live_buy_enabled": False}
+
+        class HeliusБезСети(Helius):
+            def __init__(self):
+                super().__init__(key="нет", служба="")
+
+            def налог_минта(self, минт):
+                return {"taxed": False, "fee_bps": None}
+
+        исп = ИсполнительЗаглушка()
+        det = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                        helius=HeliusБезСети(), курс=КурсSOL(),
+                        режим="dry", исполнитель=исп)
+        det.курс.значение, det.курс.когда = 200.0, time.time()
+        det.слот_сети, det.t_слот = 100, time.time()
+        det.баланс_sol, det.t_баланс = 5.0, time.time()
+        t_ок = tx(pre=[бал(USDC, 600_000000)],
+                   post=[бал(USDC, 0), бал("MINT_EX", 5_000000, idx=2)])
+        r = det.обработать("ПОДПИСЬ_EX", 100, "SRC", "тест", t_ок)
+        chk("решение о покупке дошло до исполнителя",
+            исп.вызовы == [("ПОДПИСЬ_EX", 5.0)], исп.вызовы)
+        chk("итог исполнителя лёг в запись решения",
+            (r.get("exec") or {}).get("exec_code") == "DRY_RUN", r.get("exec"))
+        chk("счётчик исполнений вырос", det.исполнено == 1, det.исполнено)
+        chk("код исполнителя учтён",
+            det.по_кодам_исполнителя == {"DRY_RUN": 1}, det.по_кодам_исполнителя)
+        j = det.признак_жизни()
+        chk("в признаке жизни видно, что исполнитель подключён",
+            j["executor_attached"] is True and j["executed"] == 1, j.get("executed"))
+
+        # падение исполнителя не валит детектор
+        st2 = ST.ExecState(base=Path(d) / "s2", kill=Path(d) / "kill2")
+        исп2 = ИсполнительЗаглушка(падать=True)
+        det2 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st2,
+                         helius=HeliusБезСети(), курс=КурсSOL(),
+                         режим="dry", исполнитель=исп2)
+        det2.курс.значение, det2.курс.когда = 200.0, time.time()
+        det2.слот_сети, det2.t_слот = 100, time.time()
+        det2.баланс_sol, det2.t_баланс = 5.0, time.time()
+        r2 = det2.обработать("ПОДПИСЬ_EX2", 100, "SRC", "тест", t_ок)
+        chk("падение исполнителя не валит детектор",
+            r2["action"] == "buy", r2.get("action"))
+        chk("падение помечено отдельным кодом",
+            (r2.get("exec") or {}).get("exec_code") == "EXECUTOR_CRASHED", r2.get("exec"))
+        chk("решение всё равно записано в журнал",
+            st2.decisions_path.exists() and st2.decisions_path.stat().st_size > 0)
+
+        # без исполнителя детектор работает как прежде
+        det3 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st2,
+                         helius=HeliusБезСети(), курс=КурсSOL(), режим="dry")
+        j3 = det3.признак_жизни()
+        chk("без исполнителя это видно в признаке жизни",
+            j3["executor_attached"] is False and "executor" not in j3, j3.get("executor"))
+
     # 16. маршрут: промежуточный токен виден, прямой -- нет
     def tx_маршрут(минты_пулов):
         pre = [бал(USDC, 600_000000)]
@@ -1561,9 +1668,23 @@ def main() -> int:
     # весь расход детектора.
     helius = Helius(служба="" if a.check_only else "bloom_detector")
     курс = КурсSOL()
+    исполнитель = None
+    if (os.environ.get("BLOOM_EXEC") or "").strip() == "1":
+        if EXEC is None:
+            log.error("BLOOM_EXEC=1, но модуль исполнителя не импортируется -- "
+                      "детектор будет только вести журнал")
+        else:
+            исполнитель = EXEC.Executor(
+                state=состояние,
+                api=__import__("bloom_api").BloomApi(
+                    os.environ.get("BLOOM_API_KEY", ""),
+                    dry_run=not EXEC.live_buy_enabled(), state=состояние))
+            log.info("исполнитель подключён: живые покупки %s",
+                     "ВКЛЮЧЕНЫ" if EXEC.live_buy_enabled() else "выключены (dry-run)")
     детектор = Детектор(источники=ист, состояние=состояние,
                          helius=helius, курс=курс,
-                         режим=os.environ.get("BLOOM_MODE", "dry"))
+                         режим=os.environ.get("BLOOM_MODE", "dry"),
+                         исполнитель=исполнитель)
     детектор.откуда_источники = откуда
 
     if a.check_only:
