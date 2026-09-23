@@ -36,6 +36,14 @@ on:
         description: "'yes' -- ничего не деплоить, только снять отчёт с уже работающей службы"
         required: false
         default: ""
+      reenrich:
+        description: "'yes' -- пересчитать ВСЕ обогащённые записи исправленной сшивкой (старый файл сохраняется рядом)"
+        required: false
+        default: ""
+      missed:
+        description: "'yes' -- посчитать покупки DBot без события в зонде (оценка пропусков за разрывы)"
+        required: false
+        default: ""
 
 concurrency:
   group: vps-deploy-detect-probe
@@ -199,6 +207,25 @@ jobs:
             cd /home/bot/dbot_detect_probe
             sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --report"
           ' 2>&1 | tee data/dbot_detect_probe_report.txt || true
+
+      - name: "Пересчёт сшивки и чистое распределение смещений"
+        if: github.event.inputs.reenrich == 'yes'
+        run: |
+          # Пересчёт идёт по УЖЕ ЗАПИСАННЫМ событиям: старая сшивка
+          # принимала копию раньше источника, и без пересчёта чистое
+          # распределение пришлось бы ждать ещё сутки.
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_detect_probe
+            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --reenrich"
+          ' 2>&1 | tee data/dbot_detect_probe_offsets.txt || true
+
+      - name: "Пропуски: покупки DBot без события в зонде"
+        if: github.event.inputs.missed == 'yes'
+        run: |
+          ssh $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_detect_probe
+            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --missed"
+          ' 2>&1 | tee data/dbot_detect_probe_missed.txt || true
           ssh $SSH_OPTS root@45.59.170.76 'tail -50 /home/bot/dbot_detect_probe/events.jsonl 2>/dev/null' > data/dbot_detect_probe_sample.jsonl || true
           ssh $SSH_OPTS root@45.59.170.76 'tail -20 /home/bot/dbot_detect_probe/enriched.jsonl 2>/dev/null' > data/dbot_detect_probe_enriched_sample.jsonl || true
           wc -l data/dbot_detect_probe_*.jsonl data/dbot_detect_probe_report.txt 2>/dev/null || true
@@ -208,7 +235,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/dbot_detect_probe_report.txt data/dbot_detect_probe_selfcheck.txt data/dbot_detect_probe_sample.jsonl data/dbot_detect_probe_enriched_sample.jsonl; do
+          for f in data/dbot_detect_probe_report.txt data/dbot_detect_probe_selfcheck.txt data/dbot_detect_probe_sample.jsonl data/dbot_detect_probe_enriched_sample.jsonl data/dbot_detect_probe_offsets.txt data/dbot_detect_probe_missed.txt; do
             [ -s "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
