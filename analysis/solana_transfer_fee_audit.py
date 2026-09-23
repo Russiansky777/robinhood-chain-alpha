@@ -525,10 +525,19 @@ def main() -> None:
                 промеж[m]["удержано_sol"] += по_минтам[m]["удержано_sol"]
                 промеж[m]["переводов"] += по_минтам[m]["переводов"]
         строки.append({"задача": задача, "минт": mint,
+                        "подпись_покупки": t.get("buy_signature"),
+                        "подпись_продажи": t.get("sell_signature"),
+                        "источник": t.get("source_address"),
+                        "источник_метка": t.get("source_remark"),
+                        "кошелёк": t.get("wallet"),
                         "цель_таксируемая": mint in таксируемые,
                         "промежуточные_таксируемые": межд,
                         "переводов_по_минтам": {m: v["переводов"] for m, v in по_минтам.items()},
-                        "удержано_sol": round(уд, 9), "sol_in": t.get("sol_in"),
+                        "удержано_sol": round(уд, 9),
+                        "налог_неполон_нет_курса": нет_курса,
+                        "sol_in": t.get("sol_in"), "sol_out": t.get("sol_out"),
+                        "net_sol": t.get("net_sol"),
+                        "held_seconds": t.get("held_seconds"),
                         "gross_pct": t.get("gross_pct")})
 
     rep["свод"] = {
