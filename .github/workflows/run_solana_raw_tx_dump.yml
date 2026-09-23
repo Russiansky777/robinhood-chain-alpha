@@ -1,0 +1,56 @@
+name: "Сырая выгрузка транзакций сделки (для разбора без сети)"
+
+# Опознание пула провалилось на всех 15 сделках с одной и той же причиной.
+# Дальше гадать нельзя: нужен сырой ответ узла по обеим транзакциям сделки,
+# чтобы отличить "пул устроен иначе" от "мы неправильно читаем балансы".
+# Два вызова getTransaction -- 2 кредита.
+on:
+  workflow_dispatch:
+    inputs:
+      trade:
+        description: "признак сделки: время (03:09) или mint"
+        required: false
+        default: "03:09"
+
+concurrency:
+  group: solana-raw-tx-dump
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Выгрузка"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python -u analysis/solana_raw_tx_dump.py \
+            --trade "${{ github.event.inputs.trade || '03:09' }}" 2>&1 | tail -20
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/solana_raw_tx_dump.json ] && git add data/solana_raw_tx_dump.json
+          [ -f data/helius_usage.json ] && git add data/helius_usage.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Сырая выгрузка транзакций сделки 03:09 [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
