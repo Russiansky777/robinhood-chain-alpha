@@ -32,7 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from solana_crowd_scan import PUBLIC_RPC, Rpc, helius_key, now_utc, scrub  # noqa: E402
-from solana_retro_signal import SlotTrades, log  # noqa: E402
+from solana_retro_signal import SlotTrades, log, tx_trades_for_mint  # noqa: E402
 
 TRADES_PATH = REPO_ROOT / "data" / "solana_trades_all.json"
 CHAIN_CACHE_PATH = REPO_ROOT / "data" / "chain_tx_cache.json"
@@ -53,18 +53,39 @@ def horizon_key(h: int) -> str:
 
 # ---------- выборка и вход ----------
 
-def our_entry(row: dict, cache: dict) -> tuple[float | None, int | None, int | None, str | None]:
-    """(цена входа SOL/токен, слот, block_time, причина отказа)."""
+def our_entry(row: dict, cache: dict, rpc=None) -> tuple[float | None, int | None, int | None,
+                                                          str | None, str | None]:
+    """(цена входа SOL/токен, слот, block_time, причина отказа, откуда цена).
+
+    Кэш цепочки собирается учётом только для записей DBot со state=done,
+    и на первом прогоне 70 закрытых сделок из 353 оказались без покупки в
+    кэше -- причём НЕ равномерно: BATCH-4 терял 52%, пилот 46%, а
+    BATCH-5/6 почти ничего. Считать пилота по половине его сделок значило
+    бы получить перекошенный ответ, поэтому недостающую транзакцию
+    дотягиваем с цепочки поштучно (getTransaction -- один вызов, дёшево),
+    а не списываем в "не удалось".
+    """
     v = cache.get(f"{row['buy_signature']}:{row['wallet']}")
-    if not v:
-        return None, None, None, "нашей покупки нет в кэше цепочки"
-    qty = (v.get("token_deltas") or {}).get(row["mint"])
-    if not qty:
-        return None, v.get("slot"), v.get("blockTime"), "в транзакции нет дельты этого минта"
-    sol_in = row.get("sol_in")
-    if not sol_in:
-        return None, v.get("slot"), v.get("blockTime"), "нет sol_in в учёте"
-    return abs(sol_in) / abs(qty), v.get("slot"), v.get("blockTime"), None
+    if v:
+        qty = (v.get("token_deltas") or {}).get(row["mint"])
+        sol_in = row.get("sol_in")
+        if qty and sol_in:
+            return abs(sol_in) / abs(qty), v.get("slot"), v.get("blockTime"), None, "кэш_учёта"
+    if rpc is None:
+        return None, (v or {}).get("slot"), (v or {}).get("blockTime"), \
+            "нашей покупки нет в кэше цепочки", None
+    try:
+        tx = rpc.call("getTransaction", [row["buy_signature"], {
+            "encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
+    except RuntimeError as exc:
+        return None, None, None, f"getTransaction не отдался: {scrub(str(exc))[:120]}", None
+    if not tx:
+        return None, None, None, "транзакции нет на цепочке (узел вернул пусто)", None
+    r = tx_trades_for_mint(tx, row["mint"], 0, tx.get("blockTime"))
+    if not r or r.get("price_sol_per_token") is None:
+        why = (r or {}).get("price_note") or "цена по транзакции не считается"
+        return None, tx.get("slot"), tx.get("blockTime"), f"дотянули, но {why}", None
+    return r["price_sol_per_token"], tx.get("slot"), tx.get("blockTime"), None, "дотянуто_с_цепочки"
 
 
 def closed_trades() -> list[dict]:
@@ -124,14 +145,14 @@ def exit_at(st: SlotTrades, mint: str, buy_slot: int, buy_time: int, horizon_s: 
 
 
 def analyse(st: SlotTrades, row: dict, cache: dict, max_blocks: int) -> dict:
-    price, slot, bt, why = our_entry(row, cache)
+    price, slot, bt, why, src = our_entry(row, cache, st.rpc)
     out: dict = {
         "task_name": row.get("task_name"), "wallet": row.get("wallet"),
         "source_address": row.get("source_address"), "mint": row["mint"],
         "buy_signature": row["buy_signature"], "buy_block_time": bt,
         "наш_вход_sol": row.get("sol_in"), "наш_итог_gross_pct": row.get("gross_pct"),
         "наш_итог_net_sol": row.get("net_sol"), "держали_с": row.get("held_seconds"),
-        "цена_входа": price,
+        "цена_входа": price, "откуда_цена_входа": src,
     }
     if price is None or slot is None or bt is None:
         out["не_удалось"] = why or "нет слота/времени покупки"
@@ -166,6 +187,50 @@ def _stats(vals: list[float]) -> dict:
     }
 
 
+PILOT_TASK = "pointfarmcap"
+
+
+def failures_by_task(rows: list[dict], all_rows: list[dict]) -> dict:
+    """Почему НЕ посчитали -- в разрезе задач, а не одним числом.
+
+    Одно число ("70 сделок без цены входа") скрывает перекос: если выпала
+    половина пилота, а у BATCH-5 почти ничего, то сравнение задач между
+    собой уже нечестное. Поэтому доля потерь считается по каждой задаче.
+    """
+    total: dict = {}
+    for r in all_rows:
+        total[r.get("task_name")] = total.get(r.get("task_name"), 0) + 1
+    out: dict = {}
+    for r in rows:
+        if not r.get("не_удалось"):
+            continue
+        t = r.get("task_name")
+        d = out.setdefault(t, {"не_удалось": 0, "всего_в_задаче": total.get(t, 0),
+                                "причины": {}})
+        d["не_удалось"] += 1
+        w = r["не_удалось"]
+        d["причины"][w] = d["причины"].get(w, 0) + 1
+    for t, d in out.items():
+        d["доля_потерь"] = (round(d["не_удалось"] / d["всего_в_задаче"], 4)
+                             if d["всего_в_задаче"] else None)
+        d["пилот"] = (t == PILOT_TASK)
+    return dict(sorted(out.items(), key=lambda kv: -(kv[1]["доля_потерь"] or 0)))
+
+
+def entry_source_by_task(rows: list[dict]) -> dict:
+    """Откуда взялась цена входа -- по задачам. Дотянутое с цепочки видно
+    отдельно, чтобы не выдавать дотяжку за исходные данные учёта."""
+    out: dict = {}
+    for r in rows:
+        if r.get("не_удалось"):
+            continue
+        d = out.setdefault(r.get("task_name"), {"кэш_учёта": 0, "дотянуто_с_цепочки": 0})
+        k = r.get("откуда_цена_входа")
+        if k in d:
+            d[k] += 1
+    return out
+
+
 def group_table(rows: list[dict], key: str, min_n: int = 1) -> list[dict]:
     by: dict = {}
     for r in rows:
@@ -177,6 +242,8 @@ def group_table(rows: list[dict], key: str, min_n: int = 1) -> list[dict]:
         if len(rs) < min_n:
             continue
         item = {key: k, "сделок": len(rs)}
+        if key == "task_name":
+            item["пилот"] = (k == PILOT_TASK)
         for h in HORIZONS_S:
             hk = horizon_key(h)
             vals = [r[hk]["сигнал_pct"] for r in rs
@@ -339,6 +406,8 @@ def main() -> None:
         "не_удалось": sum(1 for r in results if r.get("не_удалось")),
         "оборвано_бюджетом": оборвано,
         "по_задачам": group_table(results, "task_name"),
+        "не_удалось_по_задачам": failures_by_task(results, results),
+        "откуда_цена_входа_по_задачам": entry_source_by_task(results),
         "пилот_pointfarmcap": {"сделок": len(pilot), **{
             horizon_key(h): _stats([r[horizon_key(h)]["сигнал_pct"] for r in pilot
                                      if not r.get("не_удалось") and r.get(horizon_key(h))
@@ -426,6 +495,26 @@ def self_test() -> None:
         c["300с_лучше_35с_шт"] == 1 and c["300с_хуже_35с_шт"] == 1, str(c))
     chk("медиана проигрыша отрицательная", c["медиана_проигрыша_pct"] == -100.0,
         str(c["медиана_проигрыша_pct"]))
+
+    fb = failures_by_task(
+        [{"task_name": "pointfarmcap", "не_удалось": "нет в кэше"},
+         {"task_name": "pointfarmcap"},
+         {"task_name": "BATCH-5", "не_удалось": "нет в кэше"}],
+        [{"task_name": "pointfarmcap"}] * 2 + [{"task_name": "BATCH-5"}] * 10)
+    chk("доля потерь считается по каждой задаче",
+        fb["pointfarmcap"]["доля_потерь"] == 0.5 and fb["BATCH-5"]["доля_потерь"] == 0.1,
+        str(fb))
+    chk("пилот помечен в разбивке отказов", fb["pointfarmcap"]["пилот"] is True)
+    chk("задачи без отказов в разбивку не попадают", "BATCH-9" not in fb)
+    gt = group_table([{"task_name": "pointfarmcap", "35с": {"сигнал_pct": 1.0}},
+                      {"task_name": "BATCH-5", "35с": {"сигнал_pct": 2.0}}], "task_name")
+    chk("пилот -- отдельная помеченная строка таблицы задач",
+        [r["пилот"] for r in gt if r["task_name"] == "pointfarmcap"] == [True], str(gt))
+    es = entry_source_by_task([{"task_name": "T", "откуда_цена_входа": "дотянуто_с_цепочки"},
+                                {"task_name": "T", "откуда_цена_входа": "кэш_учёта"},
+                                {"task_name": "T", "не_удалось": "x"}])
+    chk("дотянутое с цепочки видно отдельно от учёта",
+        es["T"] == {"кэш_учёта": 1, "дотянуто_с_цепочки": 1}, str(es))
 
     ne = no_exit_report([{"35с": {"сигнал_pct": None, "no_exit": "токен встал"}},
                           {"35с": {"сигнал_pct": 1.0}}])
