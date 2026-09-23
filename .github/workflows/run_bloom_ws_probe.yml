@@ -1,0 +1,61 @@
+name: "Bloom: замер вебсокета -- что приходит и кто теряет (только чтение)"
+
+# Отвечает на два вопроса владельца фактами с провода:
+#   1. хватает ли сообщения transactionSubscribe для разбора БЕЗ
+#      getTransaction (который не умеет processed и стоит слот-два);
+#   2. теряет ли transactionSubscribe с accountInclude транзакции,
+#      ПОДПИСАННЫЕ источником, -- или расхождение только за счёт чужих
+#      упоминаний адреса.
+# Оба способа слушают ОДИН набор источников в ОДНО окно.
+# Только чтение цепи. Ни одного ордера.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "длительность окна наблюдения, секунд"
+        required: false
+        default: "900"
+
+concurrency:
+  group: bloom-ws-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests websockets
+      - name: "Самопроверки (без сети)"
+        run: |
+          set -e
+          python -u analysis/bloom_detector.py --self-test
+          python -u analysis/bloom_ws_probe.py --self-test
+      - name: "Замер"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/bloom_ws_probe.py --seconds "${{ inputs.seconds }}"
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_ws_probe.json ] && git add data/bloom_ws_probe.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: замер вебсокета -- форма сообщений и полнота детекции [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
