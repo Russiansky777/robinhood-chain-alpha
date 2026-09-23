@@ -77,6 +77,38 @@ def программы(tx: dict) -> list:
     return out
 
 
+SYSTEM_PROGRAM = "11111111111111111111111111111111"
+
+
+def переводы(tx: dict) -> list:
+    """Разобранные системные переводы: откуда, куда, сколько.
+
+    Без адресата вывод неполон: "со кошелька ушло 2.13 SOL" и "ушло на наш
+    же второй кошелёк" -- разные вещи, и решать по первому нельзя.
+    """
+    out = []
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    списки = [msg.get("instructions") or []]
+    for вн in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        списки.append((вн or {}).get("instructions") or [])
+    for сп in списки:
+        for i in сп:
+            i = i or {}
+            if i.get("programId") != SYSTEM_PROGRAM and i.get("program") != "system":
+                continue
+            разб = i.get("parsed") or {}
+            if (разб.get("type") or "") not in ("transfer", "transferWithSeed"):
+                continue
+            инфо = разб.get("info") or {}
+            лампорты = инфо.get("lamports")
+            out.append({"from": инфо.get("source"),
+                        "to": инфо.get("destination"),
+                        "sol": (round(int(лампорты) / 1_000_000_000, 9)
+                                if isinstance(лампорты, (int, str))
+                                and str(лампорты).isdigit() else None)})
+    return out
+
+
 def разобрать(tx: dict, кошелёк: str) -> dict:
     """Что эта транзакция сделала с кошельком и кто её подписал."""
     meta = (tx or {}).get("meta") or {}
@@ -88,7 +120,8 @@ def разобрать(tx: dict, кошелёк: str) -> dict:
             "err": meta.get("err"),
             "fee_lamports": meta.get("fee"),
             "slot": (tx or {}).get("slot"),
-            "block_time": (tx or {}).get("blockTime")}
+            "block_time": (tx or {}).get("blockTime"),
+            "transfers": переводы(tx)}
     pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
     try:
         i = счета.index(кошелёк)
@@ -140,17 +173,22 @@ def сводка(разборы: list) -> dict:
     for r in разборы:
         по_классам[r["class"]] = по_классам.get(r["class"], 0) + 1
     наши_подписи = [r for r in разборы if r["class"] == КЛАСС_НАШ_КЛЮЧ]
+    неразобранных = [r for r in разборы if r["class"] == КЛАСС_НЕИЗВЕСТНО]
     траты = round(sum(r["native_delta_sol"] for r in разборы
                       if isinstance(r.get("native_delta_sol"), float)
                       and r["native_delta_sol"] < 0), 9)
     return {"by_class": по_классам,
             "signed_by_our_key": len(наши_подписи),
+            "not_parsed": len(неразобранных),
+            "not_parsed_signatures": [r.get("signature") for r in неразобранных],
             "net_outflow_sol": траты,
             "verdict": ("НАШИМ КЛЮЧОМ РАСПОРЯЖАЕТСЯ КТО-ТО ЕЩЁ: "
                         f"{len(наши_подписи)} транзакций подписано кошельком"
                         if наши_подписи else
                         "кошельком никто не распоряжается: все найденные "
-                        "транзакции подписаны не нашим ключом")}
+                        "транзакции подписаны не нашим ключом")
+            + (f"; НЕ РАЗОБРАНО {len(неразобранных)} транзакций -- "
+               "вердикт неполный" if неразобранных else "")}
 
 
 def self_test() -> int:
@@ -212,6 +250,27 @@ def self_test() -> int:
     chk("короткие списки балансов не дают выдуманной дельты",
         r["class"] == КЛАСС_НЕТ_В_СЧЕТАХ, r)
 
+    # адресат перевода назван: по нему и решают, куда ушли деньги
+    перевод = tx(ключи=[К, "КУДА"], pre=[3_000_000_000, 0],
+                 post=[900_000_000, 2_100_000_000])
+    перевод["transaction"]["message"]["instructions"] = [
+        {"programId": SYSTEM_PROGRAM, "parsed": {"type": "transfer", "info": {
+            "source": К, "destination": "КУДА", "lamports": 2_100_000_000}}}]
+    r = разобрать(перевод, К)
+    chk("адресат перевода назван",
+        r["transfers"] == [{"from": К, "to": "КУДА", "sol": 2.1}], r["transfers"])
+    chk("и это подпись нашим ключом", r["class"] == КЛАСС_НАШ_КЛЮЧ, r["class"])
+
+    # перевод из вложенных инструкций тоже виден
+    вложенный = tx(ключи=["ЧУЖОЙ", К], pre=[3_000_000_000, 0],
+                   post=[2_000_000_000, 1_000_000_000])
+    вложенный["meta"]["innerInstructions"] = [{"instructions": [
+        {"program": "system", "parsed": {"type": "transfer", "info": {
+            "source": "ЧУЖОЙ", "destination": К, "lamports": 1_000_000_000}}}]}]
+    r = разобрать(вложенный, К)
+    chk("вложенный перевод виден",
+        r["transfers"] and r["transfers"][0]["to"] == К, r["transfers"])
+
     # сводка: одна наша подпись меняет вердикт
     с = сводка([
         разобрать(tx(ключи=[К], pre=[2_000_000_000], post=[1_900_000_000]), К),
@@ -261,13 +320,24 @@ def main() -> int:
         sig = r.get("signature")
         if not sig:
             continue
-        try:
-            tx = helius.call("getTransaction",
-                             [sig, {"encoding": "jsonParsed",
-                                    "maxSupportedTransactionVersion": 0}])
-        except Exception as exc:  # noqa: BLE001
+        tx, почему = None, ""
+        for попытка in (1, 2):
+            try:
+                tx = helius.call("getTransaction",
+                                 [sig, {"encoding": "jsonParsed",
+                                        "maxSupportedTransactionVersion": 0}])
+                почему = ""
+                break
+            except Exception as exc:  # noqa: BLE001
+                почему = f"{type(exc).__name__}: {str(exc)[:120]}"
+                tx = None
+                if попытка == 1:
+                    time.sleep(1.0)
+        if tx is None:
+            # Один отказ узла оставлял дыру в вердикте: транзакция есть, а
+            # что она сделала -- неизвестно. Повтор и явная пометка.
             разборы.append({"signature": sig, "class": КЛАСС_НЕИЗВЕСТНО,
-                            "note": f"getTransaction не отдался: {type(exc).__name__}"})
+                            "note": f"getTransaction не отдался дважды: {почему}"})
             continue
         разбор = разобрать(tx or {}, a.wallet)
         разбор["signature"] = sig
@@ -297,6 +367,13 @@ def main() -> int:
               f"{r.get('native_delta_sol')} SOL, плательщик "
               f"{str(r.get('fee_payer'))[:12]}, программы "
               f"{[str(x)[:12] for x in (r.get('programs') or [])][:3]}")
+        for t in r.get("transfers") or []:
+            print(f"      перевод {t['sol']} SOL: {str(t['from'])[:12]} -> "
+                  f"{str(t['to'])[:12]}")
+        if r.get("note") and r["class"] in (КЛАСС_НЕИЗВЕСТНО,
+                                            КЛАСС_НЕТ_В_СЧЕТАХ,
+                                            КЛАСС_ИСХОДЯЩИЙ_БЕЗ_ПОДПИСИ):
+            print(f"      {r.get('signature')}: {r['note']}")
     print(f"вердикт: {итог['summary']['verdict']}")
     print(f"по классам: {итог['summary']['by_class']}")
     return 0
