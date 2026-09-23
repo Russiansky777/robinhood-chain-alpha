@@ -127,6 +127,29 @@ jobs:
             fi
           " 2>&1 | tee -a data/vps_health_nl.txt
 
+      - name: "Расход кредитов Helius по службам хоста"
+        run: |
+          set -e
+          mkdir -p data/helius_usage
+          # Осколки лежат в каталоге состояния: дерево репозитория службе
+          # недоступно (ProtectHome=read-only). Забираем их поимённо, чтобы
+          # расход хоста попал в тот же учёт, что и расход прогонов.
+          СПИСОК=$(ssh -n $SSH_OPTS root@$HOST "ls -1 /home/bot/bloom_executor_live_data/helius_usage/*.json 2>/dev/null || true")
+          if [ -z "$СПИСОК" ]; then
+            echo "осколков учёта на хосте нет" | tee -a data/vps_health_nl.txt
+          else
+            for f in $СПИСОК; do
+              ИМЯ=$(basename "$f")
+              ssh -n $SSH_OPTS root@$HOST "cat $f" > "data/helius_usage/$ИМЯ"
+              echo "забран $ИМЯ ($(wc -c < data/helius_usage/$ИМЯ) байт)" | tee -a data/vps_health_nl.txt
+            done
+          fi
+          {
+            echo ""
+            echo "--- расход Helius за сегодня по всем службам ---"
+          } >> data/vps_health_nl.txt
+          python3 analysis/helius_usage_report.py | tee -a data/vps_health_nl.txt
+
       - name: "Хвост решений (по запросу)"
         if: ${{ inputs.tail_decisions != '0' && inputs.tail_decisions != '' }}
         run: |

@@ -119,6 +119,9 @@ LAMPORT = 10 ** 9
 КОД_НЕЯСНО = "AMBIGUOUS_TX"
 КОД_ОШИБКА_ЦЕПИ = "TX_FAILED"
 КОД_НЕ_ДОСТАЛИ = "TX_NOT_FETCHED"
+КОД_ПРОМЕЖУТОЧНЫЙ = "INTERMEDIATE_ROUTE"
+РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
+РАЗБОР_ЧЕРЕЗ_RPC = "PARSE_VIA_RPC"
 
 # Порог DBot: targetMinAmountUI = 2 (SOL-эквивалент). Верхней границы
 # нет: targetMaxAmountUI = null в обеих задачах.
@@ -209,6 +212,56 @@ def программы_dex(tx: dict) -> list:
     return найдено
 
 
+def маршрут_из_транзакции(tx: dict, *, минт_покупки: str | None,
+                           трата_минт: str | None) -> dict:
+    """Маршрут свопа источника: программы, хопы, промежуточные минты.
+
+    Как считается и почему именно так. Пулы держат токены на своих
+    счетах, поэтому КАЖДЫЙ минт маршрута появляется в
+    pre/postTokenBalances транзакции -- даже тот, через который просто
+    прошли. Значит промежуточные минты -- это все минты транзакции, кроме
+    котировочных и кроме купленного. Ровно этот приём вскрыл -13.4% на
+    SANTA: маршрут шёл через таксируемый промежуточный токен, и комиссия
+    на перевод бралась на каждой ноге.
+
+    Два измерения хопов даются отдельно, потому что это РАЗНЫЕ вещи:
+      * минтов_в_маршруте - 1 -- оценка по числу задействованных токенов;
+      * вызовов_dex -- сколько раз вызваны известные программы DEX.
+    Ни одно из них не выдаётся за "точное число хопов".
+
+    Оговорка, которую нельзя прятать: если источник в одной транзакции
+    сделал несколько свопов, минты параллельной ноги попадут в
+    промежуточные. Это всё равно многохоповый маршрут, но называть его
+    "один своп через промежуточный токен" было бы неверно.
+    """
+    meta = (tx or {}).get("meta") or {}
+    минты = set()
+    for где in ("preTokenBalances", "postTokenBalances"):
+        for b in meta.get(где) or []:
+            if isinstance(b, dict) and b.get("mint"):
+                минты.add(b["mint"])
+    промежуточные = sorted(минты - set(КОТИРОВОЧНЫЕ) - {минт_покупки or ""})
+
+    вызовов = 0
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    пачки = [msg.get("instructions") or []]
+    for гр in meta.get("innerInstructions") or []:
+        пачки.append((гр or {}).get("instructions") or [])
+    for пачка in пачки:
+        for ins in пачка:
+            if isinstance(ins, dict) and ins.get("programId") in ПРОГРАММЫ_DEX:
+                вызовов += 1
+
+    в_маршруте = len(промежуточные) + 1 + (1 if трата_минт else 0)
+    return {"программы": программы_dex(tx),
+             "промежуточные_минты": промежуточные,
+             "минтов_в_маршруте": в_маршруте,
+             "хопов_оценка_по_минтам": max(1, в_маршруте - 1),
+             "вызовов_dex": вызовов,
+             "через_промежуточный_токен": bool(промежуточные),
+             "все_минты_транзакции": sorted(минты)}
+
+
 def сигнал_из_транзакции(tx: dict, источник: str, *, подпись: str,
                           слот: int | None = None) -> dict:
     """Чистый разбор: что именно сделал источник. Без сети и состояния."""
@@ -269,6 +322,8 @@ def сигнал_из_транзакции(tx: dict, источник: str, *, �
             сиг["тип"] = "ambiguous"
             сиг["решение_причина"] = ("минт вырос, но ни SOL, ни стейблов не потрачено -- "
                                        "это не покупка за котировочный актив")
+        сиг["маршрут"] = маршрут_из_транзакции(
+            tx, минт_покупки=сиг["минт"], трата_минт=сиг.get("трата_минт"))
         return сиг
 
     if вышли:
@@ -409,7 +464,8 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
                "трата_минт": сигнал.get("трата_минт"), "трата_ui": сигнал.get("трата_ui"),
                "первый_вход": сигнал.get("первый_вход"),
                "программы_dex": сигнал.get("программы_dex"),
-               "программа_токена": сигнал.get("программа_токена")}
+               "программа_токена": сигнал.get("программа_токена"),
+               "маршрут": сигнал.get("маршрут")}
 
     отставание = None
     if slot_ok(текущий_слот) and slot_ok(сигнал.get("слот")):
@@ -427,6 +483,18 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
                         "фильтр": "задача DBot"})
         return строка
 
+    # Маршрут через промежуточный токен -- НАШ отказ, не отказ DBot: у
+    # задач dexFilter=null и такого фильтра нет. Поэтому помечается как
+    # наш лимит с dbot_бы_купил, чтобы сверка не считала это расхождением.
+    м = сигнал.get("маршрут") or {}
+    if м.get("через_промежуточный_токен"):
+        строка.update({"действие": "пропуск", "код": КОД_ПРОМЕЖУТОЧНЫЙ,
+                        "причина": (f"источник купил через промежуточный токен "
+                                    f"{', '.join(x[:10] for x in м['промежуточные_минты'])}: "
+                                    f"комиссия на перевод берётся на каждой ноге"),
+                        "фильтр": "наш лимит", "dbot_бы_купил": True})
+        return строка
+
     можно, почему, код2 = состояние.can_open_detailed(
         mint=сигнал["минт"], source_sig=сигнал["подпись"], balance_sol=баланс_sol)
     if not можно:
@@ -442,12 +510,65 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
 
 # ------------------------------------------------------------------- RPC
 
+def счётчик_кредитов(служба: str):
+    """Учёт кредитов Helius по службе, по УЖЕ согласованной модели из
+    solana_rpc_client -- свою придумывать нельзя.
+
+    Пишется в каталог состояния, а не в дерево репозитория: на хосте
+    ProtectHome=read-only, и repo/data службе недоступен. Оттуда осколок
+    забирает проверка живучести.
+    """
+    try:
+        from solana_rpc_client import CreditMeter  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        log.warning("учёт кредитов недоступен (%s) -- расход не будет виден",
+                    type(exc).__name__)
+        return None
+    try:
+        каталог = ST.state_dir() / "helius_usage"
+        каталог.mkdir(parents=True, exist_ok=True)
+        return CreditMeter(служба, base=каталог)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("счётчик кредитов не создан: %s: %s", type(exc).__name__, str(exc)[:160])
+        return None
+
+
 class Helius:
-    def __init__(self, key: str | None = None) -> None:
+    def __init__(self, key: str | None = None, служба: str = "bloom_detector") -> None:
         self.key = key or os.environ.get("HELIUS_API_KEY") or ""
         self.url = f"https://mainnet.helius-rpc.com/?api-key={self.key}"
         self.вызовов = 0
+        self.по_методам: dict = {}
         self._кеш_минтов: dict = {}
+        self.метр = счётчик_кредитов(служба) if служба else None
+
+    def _учесть(self, метод: str, байт: int = 0) -> None:
+        self.по_методам[метод] = self.по_методам.get(метод, 0) + 1
+        if self.метр is None:
+            return
+        try:
+            from solana_rpc_client import CREDITS_BY_METHOD, CREDITS_DEFAULT  # noqa: PLC0415
+            self.метр.add(CREDITS_BY_METHOD.get(метод, CREDITS_DEFAULT), bytes_in=байт)
+        except Exception:  # noqa: BLE001
+            pass          # учёт не должен ронять торговлю
+
+    def учесть_вебсокет(self, байт: int) -> None:
+        """Подписка тоже стоит кредитов: 2 за 0.1 МБ по тарифу."""
+        if self.метр is None or байт <= 0:
+            return
+        try:
+            from solana_rpc_client import CREDITS_PER_01MB_WS  # noqa: PLC0415
+            # Округление ВВЕРХ и целочисленно. Недосчитанный расход -- это
+            # порог бюджета, который не сработает; для сторожа расхода
+            # ошибаться надо в сторону перерасхода, а не наоборот. Дробное
+            # умножение здесь давало 3 кредита вместо 4 на 0.2 МБ.
+            ПОРЦИЯ = 104858            # 0.1 МиБ с округлением вверх
+            порций = -(-байт // ПОРЦИЯ)
+            кредитов = порций * CREDITS_PER_01MB_WS
+            if кредитов > 0:
+                self.метр.add(кредитов, bytes_in=байт)
+        except Exception:  # noqa: BLE001
+            pass
 
     def call(self, метод: str, параметры: list, *, таймаут: float = 10.0):
         if requests is None:
@@ -456,6 +577,7 @@ class Helius:
         r = requests.post(self.url, json={"jsonrpc": "2.0", "id": 1,
                                            "method": метод, "params": параметры},
                            timeout=таймаут)
+        self._учесть(метод, len(r.content or b""))
         if not r.ok:
             raise RuntimeError(f"{метод}: http {r.status_code}")
         j = r.json() or {}
@@ -635,6 +757,17 @@ class Детектор:
         self.способ: str | None = None
         self.старт = time.time()
         self.по_кодам: dict = {}
+        # Часы в слотах -- отдельной подпиской slotSubscribe, а НЕ вызовом
+        # getSlot в горячем пути: вызов и стоит задержку, и меряет слот
+        # уже ПОСЛЕ неё, то есть врёт в нашу пользу.
+        self.слот_сети: int | None = None
+        self.t_слот: float | None = None
+        self.слот_уведомлений = 0
+        # Баланс кошелька тоже обновляется в фоне: getBalance в горячем
+        # пути -- это ещё один круг до сети перед отправкой ордера.
+        self.баланс_sol: float | None = None
+        self.t_баланс: float | None = None
+        self.задержки_мс: list = []
 
     def статус_путь(self) -> Path:
         return self.состояние.base / "detector_status.json"
@@ -665,6 +798,20 @@ class Детектор:
         st["рубильник_доступен"] = доступен
         st["рубильник_включён"] = убит
         st["рубильник_пояснение"] = (почему if доступен else почему) or причина
+        st["слот_сети"] = self.слот_сети
+        st["слот_уведомлений"] = self.слот_уведомлений
+        st["слот_возраст_с"] = (round(time.time() - self.t_слот, 2)
+                                 if self.t_слот else None)
+        st["баланс_sol"] = self.баланс_sol
+        st["баланс_возраст_с"] = (round(time.time() - self.t_баланс, 2)
+                                   if self.t_баланс else None)
+        st["rpc_вызовов"] = self.helius.вызовов
+        st["rpc_по_методам"] = dict(self.helius.по_методам)
+        st["кредитов_за_сессию"] = (getattr(self.helius.метр, "session_credits", None)
+                                     if self.helius.метр else None)
+        з = sorted(self.задержки_мс[-200:])
+        st["задержка_решения_мс"] = ({"n": len(з), "медиана": з[len(з) // 2],
+                                       "мин": з[0], "макс": з[-1]} if з else None)
         ST.atomic_write_json(self.статус_путь(), st)
         return st
 
@@ -684,9 +831,24 @@ class Детектор:
         self.источники = новые
         return False
 
+    def свежий_баланс(self, предел_с: float = 60.0) -> float | None:
+        """Баланс, если он не старше предела. Старый баланс -- это
+        неизвестный баланс: can_open на None ответит запретом."""
+        if self.баланс_sol is None or self.t_баланс is None:
+            return None
+        return self.баланс_sol if (time.time() - self.t_баланс) <= предел_с else None
+
     def обработать(self, подпись: str, слот: int | None, источник: str | None,
-                    как: str, tx: dict | None = None) -> dict | None:
-        """Один сигнал: достать транзакцию, разобрать, решить, записать."""
+                    как: str, tx: dict | None = None,
+                    t_recv: float | None = None) -> dict | None:
+        """Один сигнал: разобрать, решить, записать.
+
+        tx, пришедший из сообщения вебсокета, используется КАК ЕСТЬ.
+        getTransaction вызывается только если сообщение пришло без meta:
+        он не поддерживает processed (только confirmed/finalized), то есть
+        стоит слот-два ожидания -- ровно то, что мы и меряем.
+        """
+        t_recv = t_recv if t_recv is not None else time.time()
         if подпись in self.видели:
             return None
         self.видели.add(подпись)
@@ -694,7 +856,9 @@ class Детектор:
             return None
         self.обработано += 1
 
+        откуда_разбор = РАЗБОР_ИЗ_СООБЩЕНИЯ
         if tx is None:
+            откуда_разбор = РАЗБОР_ЧЕРЕЗ_RPC
             tx = self.helius.транзакция(подпись)
         if tx is None:
             строка = {"подпись": подпись, "источник": источник, "слот": слот,
@@ -705,18 +869,32 @@ class Детектор:
             return строка
 
         сиг = сигнал_из_транзакции(tx, источник, подпись=подпись, слот=слот)
-        трата, пояснение = в_sol(сиг, self.курс.получить())
-        текущий = self.helius.слот() if сиг.get("тип") == "buy" else None
-        баланс = (self.helius.баланс_sol(ST.EXECUTOR_WALLET)
-                   if сиг.get("тип") == "buy" else None)
+        # Курс и баланс берутся из фоновых кешей: в горячем пути ни одного
+        # обращения к сети, иначе замер задержки мерил бы нашу же сеть.
+        трата, пояснение = в_sol(сиг, self.курс.значение if self.курс.свежий() else None)
         строка = решение(сиг, состояние=self.состояние, трата_sol=трата,
-                          баланс_sol=баланс, текущий_слот=текущий)
+                          баланс_sol=self.свежий_баланс(),
+                          текущий_слот=self.слот_сети)
+        t_решение = time.time()
+        задержка = round((t_решение - t_recv) * 1000.0, 1)
+        self.задержки_мс.append(задержка)
         строка["как"] = как
+        строка["разбор_откуда"] = откуда_разбор
+        строка["t_получено_ts"] = round(t_recv, 6)
+        строка["t_получено_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_recv))
+        строка["t_решение_ts"] = round(t_решение, 6)
+        строка["задержка_решения_мс"] = задержка
+        строка["слот_источника"] = сиг.get("слот")
+        строка["слот_сети_на_решении"] = self.слот_сети
+        строка["слот_возраст_на_решении_с"] = (round(t_решение - self.t_слот, 3)
+                                                if self.t_слот else None)
         строка["курс_пояснение"] = пояснение
         строка["курс_источник"] = self.курс.источник
         строка["задача_источника"] = self.источники.get(источник)
         строка["режим"] = self.режим
         if строка.get("действие") == "покупка":
+            # Это уже ПОСЛЕ решения: на задержку не влияет, в журнал идёт
+            # как признак токена, а не как условие покупки.
             налог = self.helius.налог_минта(строка["минт"])
             строка["таксируемый"] = налог.get("таксируемый")
             строка["ставка_налога_bps"] = налог.get("ставка_bps")
@@ -734,7 +912,7 @@ async def _подписка_транзакций(ws, адреса: list) -> None
             "params": [{"accountInclude": [a], "failed": False, "vote": False},
                         {"commitment": "processed", "transactionDetails": "full",
                          "encoding": "jsonParsed", "showRewards": False,
-                         "maxSupportedTransactionVersion": 1}]}))
+                         "maxSupportedTransactionVersion": 0}]}))
 
 
 async def _подписка_логов(ws, адреса: list) -> None:
@@ -769,12 +947,18 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                 id_адреса = {i: a for i, a in enumerate(адреса, 1)}
                 подписка_адреса: dict = {}
                 подтверждено, отказы = 0, []
+                ws_байт = ws_учтено = 0
                 async for raw in ws:
                     if дедлайн and time.time() > дедлайн:
                         return
                     if детектор.поколение != поколение:
                         log.info("список источников изменился -- переподписываюсь")
                         break
+                    t_получено = time.time()   # до разбора json, а не после
+                    ws_байт += len(raw) if isinstance(raw, (str, bytes)) else 0
+                    if ws_байт - ws_учтено >= 0.1 * 1024 * 1024:
+                        детектор.helius.учесть_вебсокет(ws_байт - ws_учтено)
+                        ws_учтено = ws_байт
                     msg = json.loads(raw)
                     if "id" in msg and ("result" in msg or "error" in msg):
                         if "error" in msg:
@@ -808,7 +992,7 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                         if isinstance(sig, str) and SIG_RE.match(sig):
                             await asyncio.to_thread(детектор.обработать, sig,
                                                      слот if isinstance(слот, int) else None,
-                                                     источник, "logsSubscribe", None)
+                                                     источник, "logsSubscribe", None, t_получено)
                         continue
                     sig, слот = подпись_и_слот(res)
                     tx = res.get("transaction") if isinstance(res.get("transaction"), dict) else None
@@ -816,7 +1000,7 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                         tx = None            # пришла форма без meta -- добираем по RPC
                     if sig:
                         await asyncio.to_thread(детектор.обработать, sig, слот,
-                                                 источник, метод, tx)
+                                                 источник, метод, tx, t_получено)
                 backoff = 1.0
                 if детектор.поколение != поколение:
                     continue
@@ -861,6 +1045,71 @@ async def биение(детектор: Детектор, стоп_через_s
             log.warning("признак жизни не записался: %s: %s",
                         type(exc).__name__, str(exc)[:160])
         await asyncio.sleep(ПУЛЬС_S)
+
+
+async def часы_слотов(детектор: Детектор, ключ: str,
+                       стоп_через_s: float | None = None) -> None:
+    """slotSubscribe -- часы в слотах.
+
+    У slotSubscribe нет параметра commitment: он и есть processed, узел
+    шлёт слот как только его обработал. Так и фиксируем, а не делаем вид,
+    что что-то передали. Нужны именно они: getSlot в горячем пути стоит
+    круг до сети и меряет слот ПОСЛЕ задержки.
+    """
+    if websockets is None:
+        return
+    дедлайн = (time.time() + стоп_через_s) if стоп_через_s else None
+    backoff = 1.0
+    while True:
+        if дедлайн and time.time() > дедлайн:
+            return
+        try:
+            async with websockets.connect(ws_url(ключ, atlas=False), ping_interval=20,
+                                           ping_timeout=30, max_size=1024 * 1024) as ws:
+                await ws.send(json.dumps({"jsonrpc": "2.0", "id": 1,
+                                           "method": "slotSubscribe", "params": []}))
+                ack = json.loads(await asyncio.wait_for(ws.recv(), timeout=30))
+                if "error" in ack:
+                    raise RuntimeError(f"slotSubscribe отклонён: {ack['error']}")
+                log.info("slotSubscribe подтверждён (подписка %s)", ack.get("result"))
+                backoff = 1.0
+                async for raw in ws:
+                    if дедлайн and time.time() > дедлайн:
+                        return
+                    msg = json.loads(raw)
+                    if msg.get("method") != "slotNotification":
+                        continue
+                    слот = ((msg.get("params") or {}).get("result") or {}).get("slot")
+                    if isinstance(слот, int):
+                        детектор.слот_сети = слот
+                        детектор.t_слот = time.time()
+                        детектор.слот_уведомлений += 1
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            log.warning("часы слотов оборвались (%s: %s) -- переподключение через %.0f с",
+                        type(exc).__name__, str(exc)[:160], backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60.0)
+
+
+async def часы_баланса(детектор: Детектор, период_s: float = 10.0,
+                        стоп_через_s: float | None = None) -> None:
+    """Баланс кошелька исполнителя в фоне. В горячем пути используется
+    кеш, и если он протух -- баланс считается НЕИЗВЕСТНЫМ, а неизвестный
+    баланс запрещает покупку."""
+    дедлайн = (time.time() + стоп_через_s) if стоп_через_s else None
+    while True:
+        if дедлайн and time.time() > дедлайн:
+            return
+        try:
+            b = await asyncio.to_thread(детектор.helius.баланс_sol, ST.EXECUTOR_WALLET)
+            if b is not None:
+                детектор.баланс_sol = b
+                детектор.t_баланс = time.time()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("баланс не обновился: %s: %s", type(exc).__name__, str(exc)[:160])
+        await asyncio.sleep(период_s)
 
 
 async def обновлятель(детектор: Детектор, задачи: tuple, снимок: Path) -> None:
@@ -1062,7 +1311,110 @@ def self_test() -> int:
             if было is not None:
                 os.environ["DBOT_API_KEY"] = было
 
-    # 16. slot_ok
+    # 16. маршрут: промежуточный токен виден, прямой -- нет
+    def tx_маршрут(минты_пулов):
+        pre = [бал(USDC, 600_000000)]
+        post = [бал(USDC, 0), бал("КУПЛЕН", 5_000000, idx=2)]
+        # балансы пулов -- чужие владельцы, но минты в транзакции есть
+        for i, m in enumerate(минты_пулов, start=10):
+            pre.append(бал(m, 1_000000, owner="ПУЛ", idx=i))
+            post.append(бал(m, 2_000000, owner="ПУЛ", idx=i))
+        return tx(pre=pre, post=post,
+                   инстр=("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+                           "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"))
+
+    s_прямой = сигнал_из_транзакции(tx_маршрут([]), "SRC", подпись="M1")
+    chk("прямой маршрут: промежуточных нет",
+        s_прямой["маршрут"]["промежуточные_минты"] == [], s_прямой["маршрут"])
+    chk("прямой маршрут не помечен как через промежуточный",
+        s_прямой["маршрут"]["через_промежуточный_токен"] is False)
+    chk("вызовы DEX посчитаны", s_прямой["маршрут"]["вызовов_dex"] == 2,
+        s_прямой["маршрут"]["вызовов_dex"])
+
+    s_через = сигнал_из_транзакции(tx_маршрут(["ПРОМЕЖ"]), "SRC", подпись="M2")
+    chk("промежуточный минт найден",
+        s_через["маршрут"]["промежуточные_минты"] == ["ПРОМЕЖ"], s_через["маршрут"])
+    chk("помечен как через промежуточный",
+        s_через["маршрут"]["через_промежуточный_токен"] is True)
+    chk("хопов больше, чем у прямого",
+        s_через["маршрут"]["хопов_оценка_по_минтам"]
+        > s_прямой["маршрут"]["хопов_оценка_по_минтам"],
+        (s_через["маршрут"]["хопов_оценка_по_минтам"],
+         s_прямой["маршрут"]["хопов_оценка_по_минтам"]))
+    s_wsol = сигнал_из_транзакции(tx_маршрут([WSOL, USDT]), "SRC", подпись="M3")
+    chk("котировочные минты не считаются промежуточными",
+        s_wsol["маршрут"]["промежуточные_минты"] == [], s_wsol["маршрут"])
+
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+        r = решение(s_через, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=100)
+        chk("маршрут через промежуточный -- пропуск", r["действие"] == "пропуск", r)
+        chk("код INTERMEDIATE_ROUTE", r["код"] == КОД_ПРОМЕЖУТОЧНЫЙ, r["код"])
+        chk("это НАШ лимит, а не отказ DBot", r.get("фильтр") == "наш лимит", r.get("фильтр"))
+        chk("помечено, что DBot бы купил", r.get("dbot_бы_купил") is True)
+        r2 = решение(s_прямой, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=100)
+        chk("прямой маршрут покупается", r2["действие"] == "покупка", r2)
+        chk("в решении есть маршрут", (r2.get("маршрут") or {}).get("вызовов_dex") == 2,
+            r2.get("маршрут"))
+
+    # 17. свежесть баланса: протухший баланс -- это неизвестный баланс
+    with tempfile.TemporaryDirectory() as d:
+        st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
+        det = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                        helius=Helius(key="нет"), курс=КурсSOL(), режим="dry")
+        chk("без замера баланс неизвестен", det.свежий_баланс() is None)
+        det.баланс_sol, det.t_баланс = 3.0, time.time()
+        chk("свежий баланс отдаётся", det.свежий_баланс() == 3.0)
+        det.t_баланс = time.time() - 120
+        chk("протухший баланс -- None, а не последнее известное",
+            det.свежий_баланс() is None, det.свежий_баланс())
+
+    # 18. учёт кредитов пишется по службе и не роняет работу
+    with tempfile.TemporaryDirectory() as d:
+        было = os.environ.get("BLOOM_STATE_DIR")
+        os.environ["BLOOM_STATE_DIR"] = str(Path(d) / "st")
+        try:
+            h = Helius(key="нет", служба="bloom_detector")
+            chk("счётчик кредитов создан", h.метр is not None)
+            h._учесть("getTransaction", 1234)
+            h._учесть("getTransaction", 1234)
+            h._учесть("getBalance", 100)
+            chk("вызовы считаются по методам",
+                h.по_методам == {"getTransaction": 2, "getBalance": 1}, h.по_методам)
+            путь = Path(d) / "st" / "helius_usage" / "bloom_detector.json"
+            chk("осколок учёта записан на диск", путь.exists(), путь)
+            данные = json.loads(путь.read_text(encoding="utf-8"))
+            день = list((данные.get("дни") or {}).values())[0]
+            chk("кредиты легли на имя службы", "bloom_detector" in день, list(день))
+            chk("кредитов ровно по числу вызовов",
+                день["bloom_detector"]["кредитов_за_день"] == 3,
+                день["bloom_detector"]["кредитов_за_день"])
+            chk("бюджет службе не выдуман",
+                день["bloom_detector"].get("бюджет_за_день") is None,
+                день["bloom_detector"].get("бюджет_за_день"))
+            h.учесть_вебсокет(int(0.2 * 1024 * 1024))
+            данные2 = json.loads(путь.read_text(encoding="utf-8"))
+            день2 = list((данные2.get("дни") or {}).values())[0]
+            chk("вебсокетные байты тоже стоят кредитов",
+                день2["bloom_detector"]["кредитов_за_день"] == 3 + 4,
+                день2["bloom_detector"]["кредитов_за_день"])
+            h.учесть_вебсокет(1)
+            данные3 = json.loads(путь.read_text(encoding="utf-8"))
+            день3 = list((данные3.get("дни") or {}).values())[0]
+            chk("один байт -- уже порция, а не ноль",
+                день3["bloom_detector"]["кредитов_за_день"] == 3 + 4 + 2,
+                день3["bloom_detector"]["кредитов_за_день"])
+            h2 = Helius(key="нет", служба="")
+            chk("без имени службы учёт не ведётся и это не падение", h2.метр is None)
+            h2._учесть("getSlot")
+            chk("и вызовы всё равно считаются", h2.по_методам == {"getSlot": 1}, h2.по_методам)
+        finally:
+            if было is None:
+                os.environ.pop("BLOOM_STATE_DIR", None)
+            else:
+                os.environ["BLOOM_STATE_DIR"] = было
+
+    # 19. slot_ok
     chk("слот 0 -- не слот", not slot_ok(0))
     chk("слот None -- не слот", not slot_ok(None))
     chk("слот 5 -- слот", slot_ok(5))
@@ -1136,6 +1488,8 @@ def main() -> int:
         async def прогон():
             задачи_фона = [
                 asyncio.create_task(биение(детектор, a.seconds)),
+                asyncio.create_task(часы_слотов(детектор, helius.key, a.seconds)),
+                asyncio.create_task(часы_баланса(детектор, стоп_через_s=a.seconds)),
                 asyncio.create_task(обновлятель(детектор, задачи, Path(a.config))),
                 asyncio.create_task(слушать(детектор, helius.key, стоп_через_s=a.seconds)),
             ]

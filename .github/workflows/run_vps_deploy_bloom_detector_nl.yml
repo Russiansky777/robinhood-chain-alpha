@@ -99,7 +99,10 @@ jobs:
         run: |
           set -e
           EMPTY_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py; do
+          # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
+          # Без него службы работают, но расход не попадает в учёт, и
+          # почасовая проверка кредитов смотрит на четверть картины.
+          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"

@@ -96,6 +96,32 @@ def scrub_all(text: str) -> str:
     return text
 
 
+_МЕТР = None
+_МЕТР_ПРОБОВАЛИ = False
+
+
+def метр_кредитов():
+    """Счётчик кредитов сторожа. Один на процесс, создаётся лениво.
+
+    Модель кредитов берётся из solana_rpc_client -- та, что уже
+    согласована. Пишется в каталог состояния: на хосте дерево репозитория
+    службе недоступно (ProtectHome=read-only).
+    """
+    global _МЕТР, _МЕТР_ПРОБОВАЛИ  # noqa: PLW0603
+    if _МЕТР_ПРОБОВАЛИ:
+        return _МЕТР
+    _МЕТР_ПРОБОВАЛИ = True
+    try:
+        from bloom_exec_state import state_dir  # noqa: PLC0415
+        from solana_rpc_client import CreditMeter  # noqa: PLC0415
+        каталог = state_dir() / "helius_usage"
+        каталог.mkdir(parents=True, exist_ok=True)
+        _МЕТР = CreditMeter("bloom_seller", base=каталог)
+    except Exception:  # noqa: BLE001
+        _МЕТР = None       # учёт не должен мешать продавать
+    return _МЕТР
+
+
 def rpc_call(method: str, params: list, *, timeout: int = 20) -> dict:
     """Один вызов узла: Helius, при отказе -- публичный. Ключ не печатается."""
     key = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
@@ -109,6 +135,16 @@ def rpc_call(method: str, params: list, *, timeout: int = 20) -> dict:
         except requests.RequestException as exc:
             последняя = scrub_all(f"{type(exc).__name__}: {exc}")
             continue
+        if url != PUBLIC_RPC:
+            м = метр_кредитов()
+            if м is not None:
+                try:
+                    from solana_rpc_client import (  # noqa: PLC0415
+                        CREDITS_BY_METHOD, CREDITS_DEFAULT)
+                    м.add(CREDITS_BY_METHOD.get(method, CREDITS_DEFAULT),
+                          bytes_in=len(r.content or b""))
+                except Exception:  # noqa: BLE001
+                    pass
         if r.status_code != 200:
             последняя = scrub_all(f"HTTP {r.status_code}: {r.text[:200]}")
             continue
