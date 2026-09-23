@@ -1157,6 +1157,15 @@ def self_test_method() -> None:
     chk("при явной пометке оценка не подменяет факт", tr2["оценка_обрыва_в_no_exit"] is None)
     chk("помечено оборванными ровно незавершённое", tr2["оборвано_бюджетом_помечено"] == 1)
     chk("затронутых обрывом считаем шире", tr2["помечено_как_затронутые_обрывом_всего"] == 2)
+    rec_s = {"E0": 1.0, "E1": 2.0, "E2": 2.0, "exit": 3.0}
+    c0, m0 = compare_prices(rec_s, {"helius": {}, "публичный_узел": {}})
+    chk("пустой ответ провайдера не даёт сверенных пар", (c0, m0) == (0, 0), f"{c0}/{m0}")
+    c1, m1 = compare_prices(rec_s, {"helius": dict(rec_s), "публичный_узел": dict(rec_s)})
+    chk("полное совпадение: 8 пар, 0 расхождений", (c1, m1) == (8, 0), f"{c1}/{m1}")
+    c2, m2 = compare_prices(rec_s, {"helius": {"exit": 3.5}})
+    chk("расхождение ловится", (c2, m2) == (1, 1), f"{c2}/{m2}")
+    c3, m3 = compare_prices({"E0": None}, {"helius": {"E0": 1.0}})
+    chk("None в записанном не сверяется", (c3, m3) == (0, 0), f"{c3}/{m3}")
     chk("окно выхода равно горизонту удержания", EXIT_TO_S == EXIT_SLOW_S == 45,
         f"{EXIT_TO_S}/{EXIT_SLOW_S}")
     chk("потолок добора соответствует окну", EXIT_DEEP_MAX_BLOCKS == 60,
@@ -1172,6 +1181,26 @@ def self_test_method() -> None:
 
 
 # ---------- самопроверка ----------
+
+def compare_prices(recorded: dict, by_provider: dict) -> tuple[int, int]:
+    """Сколько пар цен реально сверено и сколько из них разошлось.
+
+    Отдельной функцией -- чтобы правило "нечего сверить != совпало" проверялось
+    самотестом без сети. Пара считается сверенной, только когда ОБЕ стороны
+    дали число; None у любой стороны -- это отсутствие проверки, не успех.
+    """
+    compared = mismatched = 0
+    for k in ("E0", "E1", "E2", "exit"):
+        want = recorded.get(k)
+        for prices in by_provider.values():
+            got = (prices or {}).get(k)
+            if want is None or got is None:
+                continue
+            compared += 1
+            if abs(got - want) > max(abs(want) * 1e-9, 1e-18):
+                mismatched += 1
+    return compared, mismatched
+
 
 def self_check(rpc: Rpc, rows: list[dict], n: int = 3) -> dict:
     pool = [r for r in rows if r.get("sim_E2") is not None]
@@ -1203,19 +1232,28 @@ def self_check(rpc: Rpc, rows: list[dict], n: int = 3) -> dict:
         rec = {k: (r.get("scenarios") or {}).get(k, {}).get("entry_price") for k in ("E0", "E1", "E2")}
         rec["exit"] = r.get("exit_price")
         item["записано"] = rec
-        ok = True
-        for k in ("E0", "E1", "E2", "exit"):
-            want = rec.get(k)
-            for prov in ("helius", "публичный_узел"):
-                got = (item.get(prov) or {}).get(k)
-                if want is None or got is None:
-                    continue
-                if abs(got - want) > max(abs(want) * 1e-9, 1e-18):
-                    ok = False
-        item["совпало"] = ok
-        all_ok = all_ok and ok
+        compared, mismatched = compare_prices(
+            rec, {prov: item.get(prov) for prov in ("helius", "публичный_узел")})
+        ok = mismatched == 0
+        item["сверено_пар"] = compared
+        item["расхождений"] = mismatched
+        # ВАЖНО: если сверять было нечего (провайдер не ответил, бюджет истёк),
+        # это НЕ "совпало". Пустое сравнение с пустым -- не проверка.
+        item["совпало"] = ok if compared else None
+        item["не_проверено"] = compared == 0
+        if compared == 0:
+            item.setdefault("почему_не_проверено",
+                             item.get("helius_ошибка") or item.get("публичный_узел_ошибка")
+                             or "оба провайдера вернули пусто")
         checks.append(item)
-    return {"ok": all_ok, "checks": checks}
+    verified = [c for c in checks if c["сверено_пар"]]
+    if not verified:
+        return {"ok": None, "проверено_строк": 0, "всего_строк": len(checks),
+                "note": "самопроверка НЕ выполнена: ни одной пары цен не удалось сверить",
+                "checks": checks}
+    all_ok = all(c["совпало"] for c in verified)
+    return {"ok": all_ok, "проверено_строк": len(verified), "всего_строк": len(checks),
+            "сверено_пар_всего": sum(c["сверено_пар"] for c in verified), "checks": checks}
 
 
 def recompute_price(rpc: Rpc, slot: int, mint: str, signature: str, url: str | None) -> float | None:
@@ -1472,6 +1510,35 @@ def reaggregate(min_leg_sol: float, mode: str) -> None:
     report(out)
 
 
+def recheck(mode: str, n: int, time_budget_s: int) -> None:
+    """Прогнать самопроверку у двух провайдеров по УЖЕ посчитанному файлу.
+
+    Нужен отдельным режимом потому, что в основном прогоне самопроверка идёт
+    последней и первой попадает под обрыв бюджета времени: тогда сверять
+    оказывается нечего. Здесь бюджет свой и тратится только на 3 блока.
+    """
+    path = out_path_for(mode)
+    if not path.exists():
+        raise SystemExit(f"файла {path} нет -- проверять нечего (режим {mode})")
+    out = json.loads(path.read_text())
+    key, key_name = helius_key()
+    rpc = Rpc(key, min_interval_s=0.12, workers=2)
+    rpc.deadline = time.monotonic() + time_budget_s
+    log(f"ключ Helius из {key_name}; пересверка {n} строк из {path.name}")
+    res = self_check(rpc, out["sims"], n=n)
+    out["self_check"] = res
+    out["self_check"]["выполнена_отдельным_прогоном_utc"] = now_utc()
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    log("самопроверка: " + json.dumps({k: v for k, v in res.items() if k != "checks"},
+                                       ensure_ascii=False))
+    for it in res.get("checks") or []:
+        log(f"  слот {it['source_slot']}: сверено пар={it.get('сверено_пар')} "
+            f"расхождений={it.get('расхождений')} совпало={it.get('совпало')}"
+            + (f" ({it.get('почему_не_проверено')})" if it.get("не_проверено") else ""))
+    if res.get("ok") is not True:
+        raise SystemExit("самопроверка не подтверждена -- см. вывод выше")
+
+
 def main() -> None:
     # Потолок глубокого добора выхода задаётся ключом: если добор съедает
     # весь бюджет времени, его можно понизить, не трогая код.
@@ -1507,6 +1574,9 @@ def main() -> None:
                           "окно); запись замещает основную по тому же адресу")
     ap.add_argument("--self-test", action="store_true",
                      help="проверить правку метода без сети и без ключей и выйти")
+    ap.add_argument("--recheck", action="store_true",
+                     help="только самопроверка у двух провайдеров по готовому файлу")
+    ap.add_argument("--recheck-n", type=int, default=3)
     ap.add_argument("--reaggregate", action="store_true",
                     help="пересчитать сводку из готового файла, без вызовов сети")
     args = ap.parse_args()
@@ -1515,6 +1585,9 @@ def main() -> None:
         self_test_method()
         return
     EXIT_DEEP_MAX_BLOCKS = args.exit_deep_max_blocks
+    if args.recheck:
+        recheck(args.mode, args.recheck_n, args.time_budget_s)
+        return
     if args.reaggregate:
         reaggregate(args.min_leg_sol, args.mode)
         return

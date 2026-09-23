@@ -66,6 +66,14 @@ on:
         description: "потолок блоков глубокого добора выхода (60 = окно T+33..45с, которым мы торгуем)"
         required: false
         default: "60"
+      recheck:
+        description: "'yes' -- НЕ считать прогон, а только пересверить готовый файл у двух провайдеров"
+        required: false
+        default: ""
+      recheck_n:
+        description: "сколько строк пересверять в режиме recheck"
+        required: false
+        default: "3"
 
 concurrency:
   group: solana-retro-signal
@@ -102,6 +110,18 @@ jobs:
           set -o pipefail
           if [ -z "$HELIUS_API_KEY" ]; then
             echo "СТОП: секрет HELIUS_API пуст." >&2; exit 1
+          fi
+          # Пересверка -- отдельная ветка: у неё свой короткий бюджет, и
+          # она не должна делить его с расчётом. В основном прогоне
+          # самопроверка идёт последней и первой попадает под обрыв.
+          if [ "${{ github.event.inputs.recheck }}" = "yes" ]; then
+            python -u analysis/solana_retro_signal.py \
+              --recheck \
+              --mode "${{ github.event.inputs.mode || 'full' }}" \
+              --recheck-n "${{ github.event.inputs.recheck_n || 3 }}" \
+              --time-budget-s 900 \
+              2>&1 | tail -200
+            exit $?
           fi
           python -u analysis/solana_retro_signal.py \
             --mode "${{ github.event.inputs.mode || 'calibrate' }}" \
