@@ -1,0 +1,377 @@
+{
+  "schema_version": 2,
+  "built_utc": "2026-09-23T20:14:44Z",
+  "since_ts": null,
+  "journal": {
+    "v1": 0,
+    "unreadable": 0,
+    "before_since": 0,
+    "v2": 17
+  },
+  "decisions": {
+    "total": 17,
+    "real_sources": 17,
+    "test_source": 0,
+    "by_code": {
+      "TARGET_AMOUNT_OUT_OF_RANGE": 9,
+      "NOT_A_BUY": 7,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 1
+    },
+    "by_code_test_source": {}
+  },
+  "parse_groups": {
+    "total": 17,
+    "by_group": {
+      "PARSE_VIA_MSG": {
+        "decisions": 6,
+        "share": 0.3529,
+        "to_buy": 0,
+        "slot_lag": {
+          "n": 6,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "net_slot_minus_source": {
+          "n": 6,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "decide_latency_ms": {
+          "n": 6,
+          "min": 0.3,
+          "median": 0.35,
+          "max": 0.4
+        }
+      },
+      "PARSE_VIA_RPC": {
+        "decisions": 11,
+        "share": 0.6471,
+        "to_buy": 0,
+        "slot_lag": {
+          "n": 11,
+          "min": 1,
+          "median": 1,
+          "max": 2
+        },
+        "net_slot_minus_source": {
+          "n": 11,
+          "min": 1,
+          "median": 1,
+          "max": 2
+        },
+        "decide_latency_ms": {
+          "n": 11,
+          "min": 244.5,
+          "median": 288.7,
+          "max": 618.3
+        }
+      }
+    },
+    "note": "PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота"
+  },
+  "slot_table": [
+    {
+      "signature": "4zGYxRdJQ2Br1YkqoJx6",
+      "source_task": "BATCH-5",
+      "source_slot": 449805358,
+      "t_recv_utc": "2026-09-23T20:00:25Z",
+      "decide_latency_ms": 252.3,
+      "net_slot_at_decision": 449805359,
+      "net_slot_age_s": 0.226,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "5Rw1Yo1fzMeRwLtNiSJd",
+      "source_task": "BATCH-5",
+      "source_slot": 449805376,
+      "t_recv_utc": "2026-09-23T20:00:30Z",
+      "decide_latency_ms": 356.2,
+      "net_slot_at_decision": 449805377,
+      "net_slot_age_s": 0.175,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "5RGzzEPRxmjJEj6Re9in",
+      "source_task": "BATCH-5",
+      "source_slot": 449805449,
+      "t_recv_utc": "2026-09-23T20:00:49Z",
+      "decide_latency_ms": 288.7,
+      "net_slot_at_decision": 449805450,
+      "net_slot_age_s": 0.165,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "5yBeu58kWUfSE1yEa9wC",
+      "source_task": "BATCH-5",
+      "source_slot": 449805458,
+      "t_recv_utc": "2026-09-23T20:00:51Z",
+      "decide_latency_ms": 244.5,
+      "net_slot_at_decision": 449805459,
+      "net_slot_age_s": 0.156,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "3Ev3cDfRmnaWWTex7yEj",
+      "source_task": "BATCH-5",
+      "source_slot": 449805499,
+      "t_recv_utc": "2026-09-23T20:01:02Z",
+      "decide_latency_ms": 466.5,
+      "net_slot_at_decision": 449805500,
+      "net_slot_age_s": 0.114,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "5RzcSpRrZAco2hde23MM",
+      "source_task": "BATCH-5",
+      "source_slot": 449805533,
+      "t_recv_utc": "2026-09-23T20:01:11Z",
+      "decide_latency_ms": 265.7,
+      "net_slot_at_decision": 449805534,
+      "net_slot_age_s": 0.231,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "45SBeJTUZ3thZ5hPQ8P9",
+      "source_task": "BATCH-5",
+      "source_slot": 449805723,
+      "t_recv_utc": "2026-09-23T20:02:01Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449805723,
+      "net_slot_age_s": 0.153,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "3WGRsbev9xiccfBbmJ2b",
+      "source_task": "BATCH-5",
+      "source_slot": 449805917,
+      "t_recv_utc": "2026-09-23T20:02:52Z",
+      "decide_latency_ms": 486.8,
+      "net_slot_at_decision": 449805918,
+      "net_slot_age_s": 0.254,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "23RgYs6Cju45Mu4JpA1G",
+      "source_task": "BATCH-5",
+      "source_slot": 449806109,
+      "t_recv_utc": "2026-09-23T20:03:43Z",
+      "decide_latency_ms": 461.0,
+      "net_slot_at_decision": 449806111,
+      "net_slot_age_s": 0.113,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "53CXJTSTxdJY6S1jWCYL",
+      "source_task": "BATCH-5",
+      "source_slot": 449806150,
+      "t_recv_utc": "2026-09-23T20:03:54Z",
+      "decide_latency_ms": 618.3,
+      "net_slot_at_decision": 449806152,
+      "net_slot_age_s": 0.151,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "21bfk8UujcRP2kiCPqvw",
+      "source_task": "BATCH-5",
+      "source_slot": 449806222,
+      "t_recv_utc": "2026-09-23T20:04:14Z",
+      "decide_latency_ms": 261.6,
+      "net_slot_at_decision": 449806223,
+      "net_slot_age_s": 0.187,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "5feShY6s8hCxrJXApUwh",
+      "source_task": "BATCH-5",
+      "source_slot": 449806450,
+      "t_recv_utc": "2026-09-23T20:05:14Z",
+      "decide_latency_ms": 271.3,
+      "net_slot_at_decision": 449806451,
+      "net_slot_age_s": 0.254,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "action": "skip",
+      "code": "TARGET_AMOUNT_OUT_OF_RANGE"
+    },
+    {
+      "signature": "3dJQrNodgmh533qEEuYo",
+      "source_task": "BATCH-3",
+      "source_slot": 449806471,
+      "t_recv_utc": "2026-09-23T20:05:20Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449806471,
+      "net_slot_age_s": 0.185,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "5TWxekjP4U2oAR1dC4kp",
+      "source_task": "BATCH-5",
+      "source_slot": 449806923,
+      "t_recv_utc": "2026-09-23T20:07:20Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449806923,
+      "net_slot_age_s": 0.1,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "2mWrLWL8gjr8HkQT3GMJ",
+      "source_task": "BATCH-5",
+      "source_slot": 449807351,
+      "t_recv_utc": "2026-09-23T20:09:12Z",
+      "decide_latency_ms": 0.4,
+      "net_slot_at_decision": 449807351,
+      "net_slot_age_s": 0.19,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "action": "skip",
+      "code": "TOKEN_RECEIVED_NOT_BOUGHT"
+    }
+  ],
+  "routes": {
+    "buys": 0,
+    "route_known": 0,
+    "multihop": 0,
+    "multihop_share": null,
+    "skipped_intermediate": 0
+  },
+  "our_brakes": {
+    "by_code": {},
+    "total": 0
+  },
+  "reconciliation": {
+    "known": true,
+    "signals_dbot_would_buy": 0,
+    "compared": 0,
+    "agreed": 0,
+    "dbot_bought_we_did_not": [],
+    "we_would_buy_dbot_refused": [],
+    "skipped_by_our_limit_dbot_bought": [],
+    "dbot_record_not_found": 14,
+    "by_dbot_code": {},
+    "divergences": 0,
+    "agreement": null,
+    "gate_signals_reached": false,
+    "gate_no_missed_buys": true,
+    "gate_agreement": false,
+    "note": "записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с"
+  },
+  "pairs": {
+    "our_sent": 0,
+    "small_size_pairs": 0,
+    "gate_pairs": 50,
+    "gate_reached": false,
+    "note": "пары с входом меньше 0.2 SOL идут в зачёт слотов, но не разницы результата: объёмы разные"
+  },
+  "positions": {
+    "live": {
+      "count": 0,
+      "open": 0,
+      "spent_sol": 0
+    },
+    "live_test": {
+      "count": 0,
+      "open": 0,
+      "spent_sol": 0
+    },
+    "dry_run": {
+      "count": 0,
+      "open": 0,
+      "spent_sol": 0
+    },
+    "open_real": 0,
+    "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"
+  },
+  "credits": {
+    "known": true,
+    "usage": {
+      "день": "2026-09-23",
+      "осколков": 1,
+      "службы": [
+        {
+          "служба": "bloom_detector",
+          "кредитов": 415,
+          "бюджет": 60000,
+          "доля": 0.0069,
+          "группа": null,
+          "потрачено_по_бюджету": 415,
+          "выше_70": false,
+          "выше_бюджета": false,
+          "останавливать": false,
+          "останов_запрещён_владельцем": true
+        }
+      ],
+      "всего_кредитов": 415,
+      "без_бюджета": [],
+      "выше_70_процентов": [],
+      "выше_бюджета": [],
+      "к_останову": [],
+      "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."
+    }
+  },
+  "gates": {
+    "executor_on_host": {
+      "ok": true,
+      "mode": "dry-run",
+      "sent": 0,
+      "refused": 0
+    },
+    "reconciliation": {
+      "ok": false,
+      "signals": 0,
+      "need": 30,
+      "missed_buys": 0,
+      "agreement": null
+    },
+    "balance": {
+      "ok": false,
+      "balance_sol": 0.362935329,
+      "need": 2.0
+    },
+    "test_call_full_circle": {
+      "ok": false,
+      "live_test_positions": 0,
+      "still_open": 0
+    }
+  }
+}
