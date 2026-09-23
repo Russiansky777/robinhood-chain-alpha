@@ -55,7 +55,12 @@ LEADER = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 TASK_NAME = "pointfarmcap"
 
 SLOT_MS = 250                 # с 18.09 слот 250 мс
-BACK_SLOTS = 24               # сколько слотов смотрим ДО нашей покупки (6 с)
+# Сколько слотов смотрим ДО нашей покупки. Было 24 (6 с) -- и "влияние
+# лидера на цену" не посчиталось почти нигде: в шести секундах до его
+# сделки по свежему минту просто нет ни одной другой сделки с ценой.
+# 120 слотов = 30 с: столько же, сколько окно поиска выхода, и этого
+# хватает, чтобы найти цену рынка до лидера, а не выдумывать её.
+BACK_SLOTS = 120
 WINDOW_SLOTS = 5              # окно S..S+5 из задания
 PATH_SECONDS = (5, 10, 20, 35)
 MAX_PATH_SLOTS = 140          # 35 с при слоте 250 мс
@@ -112,9 +117,25 @@ def pick_samples(rows: list[dict], n: int = 8) -> tuple[list[dict], list[dict], 
 
 # ---------- разбор одной сделки ----------
 
-def our_buy_slot(sig: str, wallet: str, cache: dict) -> int | None:
+def cache_lookup(cache: dict, sig: str, wallet: str) -> dict | None:
+    """Запись о транзакции -- по ОБОИМ форматам ключа кэша цепочки.
+
+    Кэш хранит и старый ключ "<подпись>", и новый "<подпись>:<кошелёк>".
+    Поиск только по новому стоил пяти из восьми сделок выборки Б: они
+    получили "нашей покупки нет в кэше" при том, что запись лежала рядом
+    под старым ключом. Старую запись берём только если она про ЭТОТ
+    кошелёк -- одна подпись бывает актуальна сразу для двух наших."""
     v = cache.get(f"{sig}:{wallet}")
-    return (v or {}).get("slot")
+    if v is not None:
+        return v
+    v = cache.get(sig)
+    if v is not None and v.get("_wallet") in (None, wallet):
+        return v
+    return None
+
+
+def our_buy_slot(sig: str, wallet: str, cache: dict) -> int | None:
+    return (cache_lookup(cache, sig, wallet) or {}).get("slot")
 
 
 def scan_window(st: SlotTrades, mint: str, first_slot: int, last_slot: int) -> list[dict]:
@@ -477,6 +498,15 @@ def self_test() -> None:
     chk("граница Б по UTC, а не по поясу раннера",
         [r["buy_block_time"] for r in b_edge] == [lo_want, lo_want + 10],
         str([r["buy_block_time"] for r in b_edge]))
+
+    C = {"sigA:W": {"slot": 1}, "sigB": {"slot": 2, "_wallet": "W"},
+         "sigC": {"slot": 3, "_wallet": "ДРУГОЙ"}, "sigD": {"slot": 4}}
+    chk("новый ключ находится", our_buy_slot("sigA", "W", C) == 1)
+    chk("старый ключ находится", our_buy_slot("sigB", "W", C) == 2)
+    chk("чужой кошелёк по старому ключу не берём", our_buy_slot("sigC", "W", C) is None)
+    chk("старая запись без _wallet берётся", our_buy_slot("sigD", "W", C) == 4)
+    chk("окно назад покрывает 30с", BACK_SLOTS * SLOT_MS / 1000 == 30.0,
+        str(BACK_SLOTS * SLOT_MS / 1000))
 
     ev = [{"slot": 10, "index": 1, "price_sol_per_token": 1.0},
           {"slot": 10, "index": 5, "price_sol_per_token": 2.0},
