@@ -216,6 +216,55 @@ def _наше_намерение(r: dict) -> str:
     return "не куплю"
 
 
+def _срез_записей(записи: list) -> dict:
+    """Что вообще загружено из DBot. Без этого «записи не нашлось» нельзя
+    отличить от «записи не загружены»."""
+    времена = [(r.get("createAt") or 0) / 1000.0 for r in записи
+               if isinstance(r.get("createAt"), (int, float))]
+    источники = {((r.get("follow") or {}).get("wallet")) for r in записи}
+    источники.discard(None)
+    коды: dict = {}
+    for r in записи:
+        к = r.get("skipReason") or "ПРОШЛО"
+        коды[к] = коды.get(к, 0) + 1
+    return {"loaded": len(записи),
+            "sources": len(источники),
+            "with_follow": sum(1 for r in записи if r.get("follow")),
+            "oldest_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(min(времена)))
+                           if времена else None),
+            "newest_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(времена)))
+                           if времена else None),
+            "by_skip_reason": dict(sorted(коды.items(), key=lambda x: -x[1])[:8])}
+
+
+def _почему_не_сошлось(записи: list, решение: dict, время: float,
+                        окно_с: float) -> dict:
+    """Почему к решению не нашлось записи DBot: нет источника, нет минта или
+    не сошлось время. «Не нашлось» без этого -- не факт, а отписка."""
+    свои = [r for r in записи
+            if ((r.get("follow") or {}).get("wallet")) == решение.get("source")]
+    по_минту = [r for r in свои
+                if ((((r.get("follow") or {}).get("receive")) or {})
+                    .get("info") or {}).get("contract") == решение.get("mint")]
+    def ближайшее(сп):
+        д = [abs((r.get("createAt") or 0) / 1000.0 - время) for r in сп
+             if isinstance(r.get("createAt"), (int, float))]
+        return round(min(д), 1) if д else None
+    вывод = ("источника нет в записях DBot" if not свои else
+             "источник есть, но минта нет ни в одной его записи" if not по_минту else
+             f"источник и минт есть, но ближайшая запись в "
+             f"{ближайшее(по_минту)} с при окне {окно_с:.0f} с")
+    return {"signature": решение.get("signature"),
+            "source": решение.get("source"),
+            "mint": решение.get("mint"),
+            "our_code": решение.get("code"),
+            "records_same_source": len(свои),
+            "records_same_source_and_mint": len(по_минту),
+            "nearest_same_source_s": ближайшее(свои),
+            "nearest_same_mint_s": ближайшее(по_минту),
+            "why": вывод}
+
+
 def сверка_с_dbot(строки: list, записи: list, *, окно_с: float = 180.0) -> dict:
     """Живая сверка нарастающим итогом. Только боевые источники.
 
@@ -237,8 +286,18 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
             "we_would_buy_dbot_refused": [],
             "skipped_by_our_limit_dbot_bought": [],
             "dbot_record_not_found": 0,
-            "by_dbot_code": {}}
+            "not_comparable_source_did_not_buy": 0,
+            "by_dbot_code": {},
+            "dbot_records": _срез_записей(записи),
+            "unmatched_diag": []}
     for r in боевые(строки):
+        # Продажа источника и «получен, не куплен» сравнению не подлежат:
+        # у DBot по ним нет решения о покупке, и записывать это в
+        # «записи не нашлось» значит прятать отсутствие вопроса за
+        # отсутствием ответа.
+        if r.get("kind") not in ("buy", None):
+            итог["not_comparable_source_did_not_buy"] += 1
+            continue
         намерение = _наше_намерение(r)
         if намерение == "куплю":
             итог["signals_dbot_would_buy"] += 1
@@ -249,6 +308,9 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
                          время_сделки=float(сиг_время), окно_с=окно_с)
         if в.get("result") not in ("купил", "отказал"):
             итог["dbot_record_not_found"] += 1
+            if len(итог["unmatched_diag"]) < 5:
+                итог["unmatched_diag"].append(
+                    _почему_не_сошлось(записи, r, float(сиг_время), окно_с))
             continue
         итог["compared"] += 1
         код = в.get("код_dbot") or "?"
@@ -478,6 +540,18 @@ def в_текст(о: dict) -> str:
         L.append(f"  пропущено по НАШЕМУ лимиту, DBot купил: "
                  f"{len(св['skipped_by_our_limit_dbot_bought'])} "
                  "(в числитель расхождений не идёт)")
+        L.append(f"  не сравнивалось (источник не покупал): "
+                 f"{св.get('not_comparable_source_did_not_buy')}")
+        зап = св.get("dbot_records") or {}
+        L.append(f"  записей DBot загружено: {зап.get('loaded')} "
+                 f"(источников {зап.get('sources')}, с полем follow "
+                 f"{зап.get('with_follow')}), окно записей "
+                 f"{зап.get('oldest_utc')} -- {зап.get('newest_utc')}")
+        if зап.get("by_skip_reason"):
+            L.append(f"  коды DBot в загруженных записях: {зап['by_skip_reason']}")
+        for d in св.get("unmatched_diag") or []:
+            L.append(f"    не сошлось {str(d['signature'])[:16]} ({d['our_code']}): "
+                     f"{d['why']}")
         L.append(f"  примечание: {св['note']}")
     L.append("")
     п = о["pairs"]
@@ -619,6 +693,44 @@ def self_test() -> None:
             св5["dbot_record_not_found"] == 1 and св5["compared"] == 0, св5)
         chk("совпадение без сопоставленных -- None",
             св5["agreement"] is None, св5["agreement"])
+
+        # --- продажа источника не идёт в "записи не нашлось"
+        св_прод = сверка_с_dbot(
+            [строка(kind="sell", code="NOT_A_BUY")], [запись_dbot()])
+        chk("продажа источника не считается пропавшей записью",
+            св_прод["dbot_record_not_found"] == 0 and
+            св_прод["not_comparable_source_did_not_buy"] == 1, св_прод)
+        chk("и в сопоставленные она не попала",
+            св_прод["compared"] == 0, св_прод["compared"])
+
+        # --- диагностика несовпадения называет причину, а не "не нашлось"
+        св_диаг = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", source="ДРУГОЙ")],
+            [запись_dbot()])
+        chk("причина: источника нет в записях",
+            св_диаг["unmatched_diag"][0]["why"].startswith("источника нет"),
+            св_диаг["unmatched_diag"][0])
+        св_диаг2 = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", mint="ДРУГОЙ_МИНТ")],
+            [запись_dbot()])
+        chk("причина: минта нет ни в одной записи источника",
+            "минта нет" in св_диаг2["unmatched_diag"][0]["why"],
+            св_диаг2["unmatched_diag"][0])
+        св_диаг3 = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY")],
+            [запись_dbot(ts=1000.0 + 600)])
+        chk("причина: не сошлось время, и разница названа числом",
+            "ближайшая запись" in св_диаг3["unmatched_diag"][0]["why"]
+            and св_диаг3["unmatched_diag"][0]["nearest_same_mint_s"] == 600.0,
+            св_диаг3["unmatched_diag"][0])
+
+        # --- срез загруженных записей отличает "не нашлось" от "не загружено"
+        chk("пустой список записей виден как loaded 0",
+            сверка_с_dbot([], [])["dbot_records"]["loaded"] == 0)
+        срез = сверка_с_dbot([], [запись_dbot(), запись_dbot(skip="ПРОПУСК")])["dbot_records"]
+        chk("в срезе видно источников и коды",
+            срез["loaded"] == 2 and срез["sources"] == 1
+            and срез["by_skip_reason"].get("ПРОПУСК") == 1, срез)
 
         # --- гейт по сигналам считает именно dbot_бы_купил
         много = [строка(action="buy", code="BUY", signature=f"s{i}")
