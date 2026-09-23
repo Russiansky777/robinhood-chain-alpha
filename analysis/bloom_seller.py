@@ -54,6 +54,11 @@ try:
     import bloom_notify as NT
 except ImportError:  # pragma: no cover
     NT = None
+
+try:
+    import bloom_jupiter_sell as JUP
+except ImportError:  # pragma: no cover
+    JUP = None
 from bloom_exec_state import (  # noqa: E402
     EXECUTOR_WALLET, STATE_CLOSED, ExecState, append_jsonl_fsync)
 
@@ -376,6 +381,9 @@ class Seller:
         self.жалоба_каждые_s = env_float("BLOOM_SELL_COMPLAIN_EVERY_S", 60.0)
         self._жалобы: dict = {}
         self.оповещатель = NT.Оповещатель() if NT is not None else None
+        # Путь через Jupiter -- отдельным выключателем: он требует ключа
+        # кошелька в окружении, и включать его молча нельзя.
+        self.jupiter_включён = (os.environ.get("BLOOM_SELL_VIA_JUPITER", "0").strip() == "1")
         self.priority_fee = env_float("BLOOM_PRIORITY_FEE", DEFAULT_PRIORITY_FEE)
         self.processor_tip = env_float("BLOOM_PROCESSOR_TIP", DEFAULT_PROCESSOR_TIP)
         self.api = api or BloomApi(os.environ.get("BLOOM_API_KEY", ""),
@@ -506,6 +514,22 @@ class Seller:
             return итог
 
         по_неудачам = сдаться_по_неудачам(pos, предел=self.предел_неудач)
+
+        # Второй путь выхода: Jupiter Ultra. Включается ПОСЛЕ того, как путь
+        # Bloom исчерпан -- маршрут там выбирает Bloom, и на токене п. 1 он
+        # трижды подряд выбрал пул без ликвидности. Пол по выходу -- правило
+        # 4 владельца, проверка в bloom_jupiter_sell: подпись только когда
+        # минимум выхода не ниже 70 % котировки, а котировка ниже 30 % от
+        # входа означает UNSOLD, а не продажу за бесценок.
+        if по_неудачам and self.jupiter_включён and not pos.get("jup_attempts"):
+            r = self.продать_через_jupiter(pos, bal=bal, now=now)
+            if r.get("ok"):
+                итог.update(action="продажа через Jupiter отправлена", jupiter=r)
+                self.log(итог)
+                return итог
+            итог["jupiter"] = r
+            # Не получилось -- идём в UNSOLD ниже, причина уже в журнале.
+
         if по_неудачам or give_up(pos, give_up_after_s=self.give_up_after_s, now=now):
             причина_сдачи = (f"{pos.get('sell_attempts')} неудачных попыток подряд"
                               if по_неудачам else
@@ -571,6 +595,44 @@ class Seller:
         self.log(итог)
         return итог
 
+    def продать_через_jupiter(self, pos: dict, *, bal: dict, now: float) -> dict:
+        """Продажа через Ultra с полом по выходу. Одна попытка на позицию.
+
+        Одна -- намеренно: если Ultra отказала или котировка ниже границы, то
+        второй запрос через 45 с ответит тем же, а позиция должна дойти до
+        UNSOLD и доклада, а не крутиться в цикле.
+        """
+        cid = pos.get("client_order_id")
+        if JUP is None:
+            return {"ok": False, "why_not": "модуль продажи через Jupiter не загружен"}
+        r = JUP.продать(mint=pos.get("mint"), amount_raw=int(bal.get("raw") or 0),
+                         taker=EXECUTOR_WALLET, вход_sol=pos.get("sol_in"),
+                         живьём=self.live)
+        поля = {"jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
+                 "ts_jup_attempt": now,
+                 "jup_floor": (r.get("floor") or {}).get("checks"),
+                 "jup_why_not": r.get("why_not")}
+        if r.get("signature"):
+            поля["jup_signature"] = r["signature"]
+            поля["last_sell_signatures"] = [r["signature"]]
+            поля["sell_address_kind"] = "jupiter"
+        self.state.update_position(cid, **поля)
+        self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                   "action": ("продажа через Jupiter отправлена" if r.get("ok")
+                               else "Jupiter не продал"),
+                   "why_not": r.get("why_not"), "jupiter": r})
+        if self.оповещатель is not None and NT is not None:
+            основа = pos.get("ts_accepted") or pos.get("ts_intent")
+            секунды = (now - float(основа)) if основа else None
+            порог = ((r.get("floor") or {}).get("checks") or {})
+            вышло = порог.get("out_amount")
+            self.оповещатель.послать(NT.строка_продажи(
+                ok=bool(r.get("ok")), код=r.get("why_not"),
+                через="Jupiter Ultra", секунды=секунды,
+                sol_вернулось=(float(вышло) / 1e9 if вышло else None),
+                подпись=r.get("signature")))
+        return r
+
     def heartbeat(self, итог: dict) -> None:
         """Признак жизни на диск каждый круг.
 
@@ -608,6 +670,12 @@ class Seller:
                             "attempt": r.get("attempt")}
                            for r in (итог.get("rows") or [])],
             "max_attempts": self.предел_неудач,
+            "jupiter": {"enabled": self.jupiter_включён,
+                         "key": (JUP.ключ_есть()[1] or "ключ есть")
+                                 if JUP is not None else "модуль не загружен",
+                         "floor_pct": (JUP.ПОЛ_ПРОЦЕНТОВ if JUP is not None else None),
+                         "min_quote_share_pct": (JUP.МИН_ДОЛЯ_ОТ_ВХОДА
+                                                  if JUP is not None else None)},
             "slippage_pct": self.slippage,
             "grace_s": self.grace_s,
             "give_up_after_s": self.give_up_after_s,
@@ -904,6 +972,69 @@ def self_test() -> None:
             bal3["ok"] is False and "не прочитан" in bal3["why_not"], bal3)
     finally:
         глоб["rpc_call"] = старый_rpc
+
+    # --- путь через Jupiter: после двух неудач Bloom, до UNSOLD
+    st.write_intent(client_order_id="pj", mint="MINTJ", source_sig="SJ", source_slot=9,
+                     sol_in=0.001, pool=None, program=None, taxed=None, tax_bps=None,
+                     mode="dry-run", sell_after_s=28.8)
+    st.update_position("pj", state="selling", ts_accepted=time.time() - 200,
+                        sell_attempts=2, ts_last_sell_attempt=time.time() - 100)
+    было_вкл = os.environ.get("BLOOM_SELL_VIA_JUPITER")
+    os.environ["BLOOM_SELL_VIA_JUPITER"] = "1"
+    try:
+        sj = Seller(state=st, live=False, api=api)
+        chk("выключатель Jupiter прочитан", sj.jupiter_включён is True)
+
+        import bloom_jupiter_sell as JT  # noqa: PLC0415
+        старый = JT.продать
+        вызовы = []
+        try:
+            JT.продать = lambda **kw: (вызовы.append(kw) or
+                                        {"ok": True, "signature": "ПОДПИСЬ_JUP",
+                                         "floor": {"checks": {"out_amount": 900000}}})
+            r = sj.handle(st.positions()["pj"], balance_reader=читатель(5_000_000))
+            chk("после двух неудач Bloom идёт попытка через Jupiter",
+                r["action"] == "продажа через Jupiter отправлена", r["action"])
+            chk("и в неё передан остаток по цепи и вход позиции",
+                вызовы and вызовы[0]["amount_raw"] == 5_000_000
+                and вызовы[0]["вход_sol"] == 0.001, вызовы)
+            chk("подпись Jupiter записана в позицию",
+                st.positions()["pj"].get("jup_signature") == "ПОДПИСЬ_JUP",
+                st.positions()["pj"].get("jup_signature"))
+            chk("и UNSOLD при удаче не ставится",
+                st.positions()["pj"].get("state") != "unsold",
+                st.positions()["pj"].get("state"))
+
+            # второй раз Jupiter не пробуем: позиция должна дойти до UNSOLD
+            вызовы.clear()
+            st.update_position("pj", ts_last_sell_attempt=time.time() - 100)
+            r2 = sj.handle(st.positions()["pj"], balance_reader=читатель(5_000_000))
+            chk("вторую попытку через Jupiter не делаем", вызовы == [], вызовы)
+            chk("и позиция помечена UNSOLD",
+                st.positions()["pj"].get("state") == "unsold", r2["action"])
+
+            # отказ Jupiter не должен мешать UNSOLD
+            st.write_intent(client_order_id="pk", mint="MINTK", source_sig="SK",
+                             source_slot=10, sol_in=0.001, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode="dry-run", sell_after_s=28.8)
+            st.update_position("pk", state="selling", ts_accepted=time.time() - 200,
+                                sell_attempts=2, ts_last_sell_attempt=time.time() - 100)
+            JT.продать = lambda **kw: {"ok": False, "unsold": True,
+                                        "why_not": "котировка 12.0 % от входа ниже 30 %",
+                                        "floor": {"checks": {"out_amount": 120000}}}
+            r3 = sj.handle(st.positions()["pk"], balance_reader=читатель(5_000_000))
+            chk("котировка ниже 30 % -- не продаём и идём в UNSOLD",
+                st.positions()["pk"].get("state") == "unsold", r3["action"])
+            chk("и причина отказа Jupiter сохранена в позиции",
+                "ниже 30" in str(st.positions()["pk"].get("jup_why_not")),
+                st.positions()["pk"].get("jup_why_not"))
+        finally:
+            JT.продать = старый
+    finally:
+        if было_вкл is None:
+            os.environ.pop("BLOOM_SELL_VIA_JUPITER", None)
+        else:
+            os.environ["BLOOM_SELL_VIA_JUPITER"] = было_вкл
 
     # --- сдача и доклад
     st.update_position("p3", ts_first_sell_attempt=time.time() - 601,

@@ -48,6 +48,10 @@ on:
         description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
         required: false
         default: "1"
+      via_jupiter:
+        description: "'1' -- второй путь выхода через Jupiter Ultra (нужен секрет BLOOM_WALLET_KEY)"
+        required: false
+        default: "0"
 
 concurrency:
   group: bloom-seller-deploy
@@ -131,7 +135,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py solana_rpc_client.py; do
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
@@ -144,6 +148,22 @@ jobs:
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
 
+      - name: "Путь через Jupiter: ключ обязателен, иначе останов"
+        if: ${{ github.event.inputs.via_jupiter == '1' }}
+        env:
+          BLOOM_WALLET_KEY: ${{ secrets.BLOOM_WALLET_KEY }}
+        run: |
+          set -e
+          # Включить путь и не положить ключ -- значит получить сторожа,
+          # который каждый раз отказывается продавать по причине "нет ключа".
+          # Лучше остановить деплой здесь и сказать это прямо.
+          [ -n "$BLOOM_WALLET_KEY" ] || {
+            echo "СБОЙ: via_jupiter=1, но секрет BLOOM_WALLET_KEY пуст."
+            echo "Владелец кладёт приватный ключ кошелька исполнителя в секрет"
+            echo "репозитория BLOOM_WALLET_KEY (base58 или массив байтов)."
+            exit 1; }
+          echo "ключ кошелька в секрете есть (значение не печатается)"
+
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         env:
           BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
@@ -154,6 +174,8 @@ jobs:
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
           TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
+          VIA_JUPITER: ${{ github.event.inputs.via_jupiter || '0' }}
+          BLOOM_WALLET_KEY: ${{ secrets.BLOOM_WALLET_KEY }}
         run: |
           set -e
           ssh -n $SSH_OPTS root@$HOST "
@@ -174,6 +196,13 @@ jobs:
             # TELEGRAM_CHAT_ID владельца, боевые источники молчат, а сбой
             # отправки живёт в признаке жизни и торговлю не останавливает.
             echo "BLOOM_TELEGRAM_LIVE_TEST=$TELEGRAM_LIVE_TEST"
+            # Второй путь выхода -- Jupiter Ultra. Ключ кошелька пишется
+            # ТОЛЬКО когда путь включён: лишнего ключа на хосте быть не
+            # должно. В логи он не попадает -- пишется через переменную.
+            echo "BLOOM_SELL_VIA_JUPITER=$VIA_JUPITER"
+            if [ "$VIA_JUPITER" = "1" ]; then echo "BLOOM_WALLET_KEY=$BLOOM_WALLET_KEY"; fi
+            echo "BLOOM_JUP_FLOOR_PCT=70"
+            echo "BLOOM_JUP_MIN_QUOTE_PCT=30"
             echo "BLOOM_LIVE_SELL=$LIVE_SELL"
             echo "BLOOM_SELL_SLIPPAGE_PCT=40"
             echo "BLOOM_SELL_GRACE_S=15"
@@ -195,6 +224,12 @@ jobs:
           shred -u /tmp/bloom_env
           echo "строк в env на хосте:"
           ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+
+      - name: "Зависимость solders в venv хоста (только для пути Jupiter)"
+        if: ${{ github.event.inputs.via_jupiter == '1' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q solders && /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import solders; print(\"solders\", solders.__doc__ is not None)'"
 
       - name: "ГЕЙТ: каталог состояния принадлежит службе, а не root"
         run: |

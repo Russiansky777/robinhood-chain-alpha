@@ -167,11 +167,21 @@ def quote_sol_for(mint: str, amount_raw: int, slippage_bps: int,
 
 
 def ultra_order(mint: str, amount_raw: int, taker: str,
-                 scrub: Callable[[str], str] = lambda s: s) -> dict:
+                 scrub: Callable[[str], str] = lambda s: s,
+                 slippage_bps: int | None = None) -> dict:
     """Jupiter Ultra: заказ на обмен. Возвращает base64-транзакцию и
-    requestId -- без requestId execute не примет подписанную сделку."""
+    requestId -- без requestId execute не примет подписанную сделку.
+
+    slippage_bps -- ЗАДАЁТСЯ ЯВНО, когда вызывающему нужен пол по выходу:
+    по документации Ultra это параметр запроса, а 0 означает "Ultra сама
+    выберет динамическое проскальзывание". Ответ отдаёт otherAmountThreshold
+    -- при swapMode ExactIn это минимальный выход выданной транзакции, то
+    есть ровно то число, ниже которого подписывать нельзя.
+    """
     params = {"inputMint": mint, "outputMint": WSOL_MINT,
               "amount": str(amount_raw), "taker": taker}
+    if slippage_bps is not None:
+        params["slippageBps"] = str(int(slippage_bps))
     try:
         r = requests.get(f"{JUP_ULTRA}/order", params=params, timeout=30)
     except Exception as exc:  # noqa: BLE001
@@ -185,7 +195,13 @@ def ultra_order(mint: str, amount_raw: int, taker: str,
     if not b.get("transaction") or not b.get("requestId"):
         return {"ошибка": f"в ответе нет transaction/requestId: {scrub(json.dumps(b, default=str)[:300])}"}
     return {"transaction": b["transaction"], "requestId": b["requestId"],
-            "outAmount": b.get("outAmount"), "priceImpactPct": b.get("priceImpactPct")}
+            "outAmount": b.get("outAmount"), "priceImpactPct": b.get("priceImpactPct"),
+            # Поля, по которым вызывающий проверяет пол по выходу ДО подписи.
+            "otherAmountThreshold": b.get("otherAmountThreshold"),
+            "slippageBps": b.get("slippageBps"),
+            "swapMode": b.get("swapMode"),
+            "inAmount": b.get("inAmount"),
+            "router": b.get("router") or b.get("swapType") or b.get("mode")}
 
 
 def ultra_execute(signed_b64: str, request_id: str,
