@@ -349,6 +349,14 @@ class Seller:
         файл обновляется только при реально пройденном круге.
         """
         from bloom_exec_state import atomic_write_json  # noqa: PLC0415
+        # Оба рубильника: отдельно "читается ли путь" и отдельно "включён".
+        # Нечитаемый рубильник продаж опаснее нечитаемого рубильника
+        # покупок: он оставляет открытую позицию без выхода, и при этом
+        # снаружи выглядит как тишина.
+        куп_доступен, куп_поч = self.state.kill_readable()
+        куп_включён, _ = self.state.kill_active()
+        прод_доступен, прод_поч = self.state.kill_readable(kill_sell_file())
+        прод_включён, _ = kill_sell_active()
         atomic_write_json(self.state.base / "seller_heartbeat.json", {
             "обновлено_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "обновлено_ts": time.time(),
@@ -357,6 +365,12 @@ class Seller:
             "проскальзывание_pct": self.slippage,
             "запас_после_срока_с": self.grace_s,
             "потолок_ожидания_с": self.give_up_after_s,
+            "рубильник_покупок": {"путь": str(self.state.kill_path),
+                                   "доступен": куп_доступен, "включён": куп_включён,
+                                   "пояснение": куп_поч},
+            "рубильник_продаж": {"путь": str(kill_sell_file()),
+                                  "доступен": прод_доступен, "включён": прод_включён,
+                                  "пояснение": прод_поч},
         })
 
     def cycle(self, *, now: float | None = None, balance_reader=token_balance_raw) -> dict:
@@ -530,6 +544,32 @@ def self_test() -> None:
     chk("check-only даёт план", isinstance(план.get("план"), list))
     chk("и ничего не пишет в журнал позиций",
         st.positions_path.stat().st_size == до)
+
+    chk("в признаке жизни есть оба рубильника",
+        "рубильник_покупок" in hb_data and "рубильник_продаж" in hb_data, list(hb_data))
+    chk("и отдельно сказано, читаются ли они",
+        hb_data["рубильник_покупок"].get("доступен") is True
+        and hb_data["рубильник_продаж"].get("доступен") is True, hb_data)
+    chk("и что оба выключены",
+        not hb_data["рубильник_покупок"]["включён"]
+        and not hb_data["рубильник_продаж"]["включён"], hb_data)
+
+    # нечитаемый рубильник продаж не должен выглядеть как тишина
+    было_ks = os.environ.get("BLOOM_KILL_SELL_FILE")
+    os.environ["BLOOM_KILL_SELL_FILE"] = str(st.base / "нет_каталога" / "KILL_SELL")
+    try:
+        s.heartbeat({"позиций": 0})
+        hb3 = json.loads(hb.read_text())
+        chk("нечитаемый рубильник продаж помечен недоступным",
+            hb3["рубильник_продаж"]["доступен"] is False, hb3["рубильник_продаж"])
+        chk("и причина названа словами",
+            "не существует" in hb3["рубильник_продаж"]["пояснение"],
+            hb3["рубильник_продаж"]["пояснение"])
+    finally:
+        if было_ks is None:
+            os.environ.pop("BLOOM_KILL_SELL_FILE", None)
+        else:
+            os.environ["BLOOM_KILL_SELL_FILE"] = было_ks
 
     chk("ключи вычищаются", "СЕКРЕТ" not in scrub_all("текст СЕКРЕТ")
         if os.environ.get("BLOOM_API_KEY") == "СЕКРЕТ" else True)

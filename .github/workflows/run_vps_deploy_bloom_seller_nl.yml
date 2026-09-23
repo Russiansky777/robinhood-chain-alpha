@@ -102,7 +102,12 @@ jobs:
             mkdir -p $CODE_DIR $STATE_DIR $ENV_DIR
             chown -R bot:bot $CODE_DIR $STATE_DIR
             chmod 750 $CODE_DIR $STATE_DIR
-            chown root:root $ENV_DIR && chmod 750 $ENV_DIR
+            chown root:root $ENV_DIR && chmod 711 $ENV_DIR
+            # 711, а не 750: служба работает от bot и обязана ПРОЧИТАТЬ
+            # файл рубильника. При 750 root:root bot не мог войти в
+            # каталог, exists() бросал PermissionError, fail-closed
+            # запрещал покупки -- снаружи это выглядело как тишина.
+            # Сам env остаётся 600 root:root: systemd читает его root-ом.
           "
 
       - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
@@ -214,6 +219,22 @@ jobs:
             echo '  copytruncate'
             echo '}'
           } | ssh $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC"
+
+      - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
+        run: |
+          set -e
+          # Проверка от root бесполезна: первый живой прогон детектора
+          # встал на PermissionError именно потому, что деплой спрашивал
+          # root-а, а служба работает от bot. Спрашиваем того, кто работает.
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 BLOOM_KILL_FILE=\"\$BLOOM_KILL_FILE\" \
+                 BLOOM_KILL_SELL_FILE=\"\$BLOOM_KILL_SELL_FILE\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import bloom_exec_state as S; s=S.ExecState(); d,p=s.kill_readable(); print((\"ДОСТУПЕН\" if d else \"НЕДОСТУПЕН\"), p); import sys; sys.exit(0 if d else 1)'
+          ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
+          echo "рубильник от имени bot: $OUT"
 
       - name: "ГЕЙТ: открытых позиций нет -- только тогда перезапуск"
         if: ${{ github.event.inputs.enable_service == 'yes' }}

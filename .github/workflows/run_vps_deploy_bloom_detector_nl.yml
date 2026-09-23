@@ -90,7 +90,7 @@ jobs:
             set -e
             install -d -o bot -g bot -m 755 $CODE_DIR
             install -d -o bot -g bot -m 750 $STATE_DIR
-            install -d -o root -g root -m 750 $ENV_DIR
+            install -d -o root -g root -m 711 $ENV_DIR   # bot должен читать рубильник
             test -s $ENV_DIR/env || { echo 'СБОЙ: нет $ENV_DIR/env -- сначала деплой сторожа'; exit 1; }
             ls -ld $CODE_DIR $STATE_DIR $ENV_DIR
           "
@@ -150,6 +150,22 @@ jobs:
             set -a; . $ENV_DIR/env; set +a
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
           " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+
+      - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
+        run: |
+          set -e
+          # Проверка от root бесполезна: первый живой прогон детектора
+          # встал на PermissionError именно потому, что деплой спрашивал
+          # root-а, а служба работает от bot. Спрашиваем того, кто работает.
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 BLOOM_KILL_FILE=\"\$BLOOM_KILL_FILE\" \
+                 BLOOM_KILL_SELL_FILE=\"\$BLOOM_KILL_SELL_FILE\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import bloom_exec_state as S; s=S.ExecState(); d,p=s.kill_readable(); print((\"ДОСТУПЕН\" if d else \"НЕДОСТУПЕН\"), p); import sys; sys.exit(0 if d else 1)'
+          ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
+          echo "рубильник от имени bot: $OUT"
 
       - name: "systemd-юнит с ужесточением"
         run: |
