@@ -1,0 +1,101 @@
+2026-09-23T00:51:19Z INFO ключ Helius взят из переменной HELIUS_API_KEY
+
+=== ПРОПУСКИ: покупки DBot без события в зонде ===
+окно 24ч, допуск по времени +-120с
+покупок DBot от наших источников: 683
+  событие в зонде ЕСТЬ:  471
+  события НЕТ (пропуск): 212 = 31.0%
+по задачам: {"BATCH-7": {"всего": 150, "есть_событие": 145, "пропущено": 5}, "BATCH-6": {"всего": 20, "есть_событие": 14, "пропущено": 6}, "BATCH-5": {"всего": 67, "есть_событие": 47, "пропущено": 20}, "BATCH-4": {"всего": 12, "есть_событие": 12, "пропущено": 0}, "BATCH-3": {"всего": 43, "есть_событие": 27, "пропущено": 16}, "BATCH-2": {"всего": 43, "есть_событие": 42, "пропущено": 1}, "BATCH-1": {"всего": 82, "есть_событие": 81, "пропущено": 1}, "pointfarmcap": {"всего": 266, "есть_событие": 103, "пропущено": 163}}
+примеры пропусков: [
+ {
+  "источник": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+  "задача": "BATCH-7",
+  "когда_utc": "2026-09-23T00:41:33Z",
+  "state": "done"
+ },
+ {
+  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
+  "задача": "BATCH-7",
+  "когда_utc": "2026-09-23T00:11:36Z",
+  "state": "fail"
+ },
+ {
+  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
+  "задача": "BATCH-7",
+  "когда_utc": "2026-09-22T23:57:50Z",
+  "state": "fail"
+ },
+ {
+  "источник": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+  "задача": "BATCH-7",
+  "когда_utc": "2026-09-22T23:54:41Z",
+  "state": "fail"
+ },
+ {
+  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
+  "задача": "BATCH-7",
+  "когда_utc": "2026-09-22T23:49:58Z",
+  "state": "fail"
+ },
+ {
+  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-23T00:33:49Z",
+  "state": "fail"
+ },
+ {
+  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T23:51:45Z",
+  "state": "fail"
+ },
+ {
+  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T23:50:45Z",
+  "state": "fail"
+ },
+ {
+  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T23:50:20Z",
+  "state": "fail"
+ },
+ {
+  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T22:21:14Z",
+  "state": "fail"
+ },
+ {
+  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T21:36:13Z",
+  "state": "fail"
+ },
+ {
+  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-23T00:50:38Z",
+  "state": "fail"
+ },
+ {
+  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-23T00:50:34Z",
+  "state": "fail"
+ },
+ {
+  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-23T00:49:55Z",
+  "state": "fail"
+ },
+ {
+  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-23T00:48:58Z",
+  "state": "fail"
+ }
+]
+ОГОВОРКА: считаются только сделки, на которые DBot среагировал. Сделки источников, которые DBot не копировал, здесь не видны, поэтому это НИЖНЯЯ граница пропусков.
