@@ -1,34 +1,34 @@
-=== ЗОНД ОБНАРУЖЕНИЯ: отчёт на 2026-09-23T00:59:22Z ===
+=== ЗОНД ОБНАРУЖЕНИЯ: отчёт на 2026-09-23T06:29:09Z ===
 --- состояние службы ---
 {
-  "updated_utc": "2026-09-23T00:58:40Z",
-  "uptime_s": 120.2,
+  "updated_utc": "2026-09-23T06:28:40Z",
+  "uptime_s": 6724.2,
   "tx_method_работает": null,
   "tx_method_история": [],
   "источников": 57,
   "событий_записано": 0,
   "дублей_пропущено": 0,
   "неудачных_пропущено": 0,
-  "переподключений_tx": 8,
+  "переподключений_tx": 118,
   "причины_разрыва_tx": {
-    "InvalidStatus: server rejected WebSocket connection: HTTP 429": 7,
+    "InvalidStatus: server rejected WebSocket connection: HTTP 429": 117,
     "InvalidStatus: server rejected WebSocket connection: HTTP 403": 1
   },
   "слепое_время_с": 0.0,
   "слепое_время_доля": 0.0,
-  "переподключений_slot": 7,
+  "переподключений_slot": 117,
   "slot_уведомлений": 0,
   "текущий_слот": null,
   "последнее_событие_utc": null,
   "часы": {
-    "checked_at_utc": "2026-09-23T00:56:40Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Wed 2026-09-23 02:56:40 CEST\nRTCTimeUSec=Wed 2026-09-23 02:56:40 CEST",
+    "checked_at_utc": "2026-09-23T05:36:36Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Wed 2026-09-23 07:36:36 CEST\nRTCTimeUSec=Wed 2026-09-23 07:36:36 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-событий всего: 4784; обогащено: 62
+событий всего: 4784; обогащено: 2921
 
 --- как быстро мы узнаём о сделке источника ---
 lag_slots (текущий слот минус слот транзакции) n=4784: {-1: 38, -6: 1, 0: 4741, 1: 4}
@@ -41,23 +41,23 @@ ms_since_slot_seen n=4784: медиана=121.4 мин=0.0 макс=1969.2
 Сколько слотов проходит между тем, как МЫ увидели транзакцию источника,
 и тем, как покупка DBot села на цепочку:
   ПОКА НЕТ ДАННЫХ: ни одно событие не сшито с нашей покупкой (источники могли не торговать, или DBot не скопировал сделку)
-  сшивок с DBot: {None: 62}
+  сшивок с DBot: {None: 2919, 'не найдена': 2}
 
 === САМОПРОВЕРКА: сверить вручную на Solscan ===
+
+  событие 2026-09-22T00:20:47Z источник=7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H
+    транзакция источника: https://solscan.io/tx/62VFehRzVaRPNz7CtWX4JTvY15mxoAFXL9crPxzFfuELJ3GHPohu3GUew1TWMbSVUWWZ5fyeA9X6WGHwnWJNgTaS
+      ожидаем slot=449215109 (из вебсокета), source_slot=None (из getTransaction)
+    наша покупка: не сшита -- сверять нечего
 
   событие 2026-09-22T00:11:27Z источник=BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN
     транзакция источника: https://solscan.io/tx/3JThu1GejA9UMbgFdyZYd7nKpLxqkgWw22S1RRx27fQMCXkhyv8kUSdyu1ES2pU9xgmtAko5zNtGhy6uX8DW3qkj
       ожидаем slot=449213012 (из вебсокета), source_slot=None (из getTransaction)
     наша покупка: не сшита -- сверять нечего
 
-  событие 2026-09-22T00:11:36Z источник=DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc
-    транзакция источника: https://solscan.io/tx/49XfkbCd7gunLsM4hSed1LFV5cVwAhH6E7uEXy3Yq38j518FqYWifV7NW2f1MDj2GPo3yru6d7okqouphYuF25Ab
-      ожидаем slot=449213045 (из вебсокета), source_slot=None (из getTransaction)
-    наша покупка: не сшита -- сверять нечего
-
-  событие 2026-09-22T00:12:03Z источник=2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8
-    транзакция источника: https://solscan.io/tx/4oFSrmbcwHA3n7FPsK9CrXQZnVJ4WSmiCWyLGEPqh45LeswiB6eXWRyZFZhEtoJupNgjg7PzZtdRDmhaGtY2yAiB
-      ожидаем slot=449213149 (из вебсокета), source_slot=None (из getTransaction)
+  событие 2026-09-22T00:21:51Z источник=DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y
+    транзакция источника: https://solscan.io/tx/26bLUDQXZVeAnHYnHNK6fxeKFfGZD14pTvS9sY2M4KD37kpS4ZyjqvAJ8PRYd91rBZUr1TwLorH1atJ8YLyS7qj4
+      ожидаем slot=449215354 (из вебсокета), source_slot=None (из getTransaction)
     наша покупка: не сшита -- сверять нечего
 
   Как сверять: открыть ссылку, найти на странице Solscan поле Slot (Block) и
