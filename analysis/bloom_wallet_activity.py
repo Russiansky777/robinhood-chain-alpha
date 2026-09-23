@@ -410,7 +410,8 @@ def main() -> int:
             try:
                 tx = helius.call("getTransaction",
                                  [sig, {"encoding": "jsonParsed",
-                                        "maxSupportedTransactionVersion": 1}])
+                                        "maxSupportedTransactionVersion":
+                                            BD.ПОТОЛОК_ВЕРСИИ_TX}])
             except Exception as exc:  # noqa: BLE001
                 итог["transactions"].append({"signature": sig,
                                              "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"})
@@ -451,9 +452,14 @@ def main() -> int:
         tx, почему = None, ""
         for попытка in (1, 2):
             try:
+                # Потолок версии берётся из детектора, а не зашит нулём:
+                # с нулём узел отвечает -32015 "Transaction version (1) is
+                # not supported", и транзакция остаётся неразобранной. Ровно
+                # это скрыло продажу на первом пункте стенда.
                 tx = helius.call("getTransaction",
                                  [sig, {"encoding": "jsonParsed",
-                                        "maxSupportedTransactionVersion": 0}])
+                                        "maxSupportedTransactionVersion":
+                                            BD.ПОТОЛОК_ВЕРСИИ_TX}])
                 почему = ""
                 break
             except Exception as exc:  # noqa: BLE001
