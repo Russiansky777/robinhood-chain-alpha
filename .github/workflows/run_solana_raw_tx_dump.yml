@@ -10,7 +10,11 @@ on:
       trade:
         description: "признак сделки: время (03:09) или mint"
         required: false
-        default: "03:09"
+        default: ""
+      sigs:
+        description: "подписи через запятую (вместо признака сделки)"
+        required: false
+        default: ""
 
 concurrency:
   group: solana-raw-tx-dump
@@ -36,8 +40,12 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
           HELIUS_API: ${{ secrets.HELIUS_API }}
         run: |
-          python -u analysis/solana_raw_tx_dump.py \
-            --trade "${{ github.event.inputs.trade || '03:09' }}" 2>&1 | tail -20
+          ARGS=""
+          [ -n "${{ github.event.inputs.trade }}" ] && ARGS="$ARGS --trade ${{ github.event.inputs.trade }}"
+          for s in $(echo "${{ github.event.inputs.sigs }}" | tr ',' ' '); do
+            ARGS="$ARGS --sig $s"
+          done
+          python -u analysis/solana_raw_tx_dump.py $ARGS 2>&1 | tail -20
       - name: "Коммит"
         if: always()
         run: |
@@ -48,7 +56,7 @@ jobs:
           [ -f data/helius_usage.json ] && git add data/helius_usage.json
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git pull --rebase origin claude/nifty-sagan-r0polg || true
-          git commit -m "Сырая выгрузка транзакций сделки 03:09 [automated]"
+          git commit -m "Сырая выгрузка транзакций [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase origin claude/nifty-sagan-r0polg
