@@ -1,0 +1,264 @@
+{
+  "окно_с": 900.0,
+  "снято_utc": "2026-09-23T18:49:15Z",
+  "источников": 17,
+  "источники_откуда": "DBot живьём",
+  "подтверждено_подписок": {
+    "transactionSubscribe": 17,
+    "logsSubscribe": 17
+  },
+  "отказы_подписок": {
+    "transactionSubscribe": [],
+    "logsSubscribe": []
+  },
+  "ошибки": [],
+  "сообщений": {
+    "transactionSubscribe": 28,
+    "logsSubscribe": 30
+  },
+  "уникальных_подписей": {
+    "transactionSubscribe": 28,
+    "logsSubscribe": 28,
+    "общих": 28,
+    "только_logs": 0,
+    "только_tx": 0
+  },
+  "разбор_расхождения": {
+    "проверено": 0,
+    "подписано_источником": [],
+    "только_упомянут": [],
+    "не_достали": [],
+    "подписано_источником_шт": 0,
+    "только_упомянут_шт": 0
+  },
+  "дырка_в_детекции": false,
+  "вывод_по_расхождению": "из 0 расхождений ни одна не подписана источником: 0 -- чужие упоминания адреса, 0 не достали по RPC",
+  "опережение_logs_над_tx_мс": {
+    "n": 28,
+    "медиана": -2.5,
+    "мин": -6.8,
+    "макс": 0.6
+  },
+  "поля_в_сообщении_transactionSubscribe": {
+    "transaction.meta.preTokenBalances": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.meta.postTokenBalances": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.meta.preBalances": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.meta.postBalances": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.meta.innerInstructions": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.meta.err": {
+      "есть": 0,
+      "нет": 28,
+      "доля": 0.0
+    },
+    "transaction.meta.fee": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.transaction.message.accountKeys": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.transaction.message.instructions": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "transaction.transaction.signatures": {
+      "есть": 25,
+      "нет": 3,
+      "доля": 0.8929
+    },
+    "signature": {
+      "есть": 28,
+      "нет": 0,
+      "доля": 1.0
+    },
+    "slot": {
+      "есть": 28,
+      "нет": 0,
+      "доля": 1.0
+    }
+  },
+  "разбор_из_сообщения_возможен": false,
+  "образцы_формы": [
+    {
+      "подпись": "d7nxHu8sgcp5UvniNWKoFpWNXegeLac4v9BbGighfrRjHyReNwnSXk6Qnq9Z7hgZ9RNoiSkdLr9Cb7XNvde3448",
+      "слот": 449786250,
+      "форма": {
+        "slot": "int",
+        "signature": "str",
+        "transaction": "dict",
+        "transaction.transaction": "dict",
+        "transaction.transaction.signatures": "list",
+        "transaction.transaction.signatures[]": "list(2)",
+        "transaction.transaction.message": "dict",
+        "transaction.transaction.message.accountKeys": "list",
+        "transaction.transaction.message.accountKeys[]": "list(37)",
+        "transaction.transaction.message.recentBlockhash": "str",
+        "transaction.transaction.message.instructions": "list",
+        "transaction.transaction.message.instructions[]": "list(5)",
+        "transaction.transaction.message.addressTableLookups": "list",
+        "transaction.transaction.message.addressTableLookups[]": "list(4)",
+        "transaction.meta": "dict",
+        "transaction.meta.err": "NoneType",
+        "transaction.meta.status": "dict",
+        "transaction.meta.status.Ok": "NoneType",
+        "transaction.meta.fee": "int",
+        "transaction.meta.preBalances": "list",
+        "transaction.meta.preBalances[]": "list(37)",
+        "transaction.meta.postBalances": "list",
+        "transaction.meta.postBalances[]": "list(37)",
+        "transaction.meta.innerInstructions": "list",
+        "transaction.meta.innerInstructions[]": "list(1)",
+        "transaction.meta.innerInstructions[0].index": "int",
+        "transaction.meta.innerInstructions[0].instructions": "list",
+        "transaction.meta.logMessages": "list",
+        "transaction.meta.logMessages[]": "list(69)",
+        "transaction.meta.preTokenBalances": "list",
+        "transaction.meta.preTokenBalances[]": "list(8)",
+        "transaction.meta.preTokenBalances[0].accountIndex": "int",
+        "transaction.meta.preTokenBalances[0].mint": "str",
+        "transaction.meta.preTokenBalances[0].uiTokenAmount": "dict",
+        "transaction.meta.preTokenBalances[0].owner": "str",
+        "transaction.meta.preTokenBalances[0].programId": "str",
+        "transaction.meta.postTokenBalances": "list",
+        "transaction.meta.postTokenBalances[]": "list(9)",
+        "transaction.meta.postTokenBalances[0].accountIndex": "int",
+        "transaction.meta.postTokenBalances[0].mint": "str",
+        "transaction.meta.postTokenBalances[0].uiTokenAmount": "dict",
+        "transaction.meta.postTokenBalances[0].owner": "str",
+        "transaction.meta.postTokenBalances[0].programId": "str",
+        "transaction.meta.rewards": "NoneType",
+        "transaction.meta.computeUnitsConsumed": "int",
+        "transaction.meta.costUnits": "int",
+        "transaction.version": "int",
+        "transactionIndex": "int"
+      }
+    },
+    {
+      "подпись": "5PXpAmoFGEb7DfmURRrPLXWbZ9cU5e6oSiF3vnkhTFf9nF7zpQ6C5qPRHFrH7aARopYAFvyTBuD2Jv1D2QG8rdUY",
+      "слот": 449786347,
+      "форма": {
+        "slot": "int",
+        "signature": "str",
+        "transaction": "dict",
+        "transaction.transaction": "dict",
+        "transaction.transaction.signatures": "list",
+        "transaction.transaction.signatures[]": "list(1)",
+        "transaction.transaction.message": "dict",
+        "transaction.transaction.message.accountKeys": "list",
+        "transaction.transaction.message.accountKeys[]": "list(24)",
+        "transaction.transaction.message.recentBlockhash": "str",
+        "transaction.transaction.message.instructions": "list",
+        "transaction.transaction.message.instructions[]": "list(3)",
+        "transaction.transaction.message.addressTableLookups": "list",
+        "transaction.transaction.message.addressTableLookups[]": "list(0)",
+        "transaction.meta": "dict",
+        "transaction.meta.err": "NoneType",
+        "transaction.meta.status": "dict",
+        "transaction.meta.status.Ok": "NoneType",
+        "transaction.meta.fee": "int",
+        "transaction.meta.preBalances": "list",
+        "transaction.meta.preBalances[]": "list(24)",
+        "transaction.meta.postBalances": "list",
+        "transaction.meta.postBalances[]": "list(24)",
+        "transaction.meta.innerInstructions": "list",
+        "transaction.meta.innerInstructions[]": "list(1)",
+        "transaction.meta.innerInstructions[0].index": "int",
+        "transaction.meta.innerInstructions[0].instructions": "list",
+        "transaction.meta.logMessages": "list",
+        "transaction.meta.logMessages[]": "list(38)",
+        "transaction.meta.preTokenBalances": "list",
+        "transaction.meta.preTokenBalances[]": "list(0)",
+        "transaction.meta.postTokenBalances": "list",
+        "transaction.meta.postTokenBalances[]": "list(0)",
+        "transaction.meta.rewards": "NoneType",
+        "transaction.meta.computeUnitsConsumed": "int",
+        "transaction.meta.costUnits": "int",
+        "transaction.version": "int",
+        "transactionIndex": "int"
+      }
+    },
+    {
+      "подпись": "217G3U96Nb4o3iD3MXyQxwc2uAFJ8SepBcgVJLsBgZMTY461CRiDZRfujwN5U1nQv9Uf68gBr2anRNSiMFy7YJXb",
+      "слот": 449786401,
+      "форма": {
+        "slot": "int",
+        "signature": "str",
+        "transaction": "dict",
+        "transaction.transaction": "dict",
+        "transaction.transaction.signatures": "list",
+        "transaction.transaction.signatures[]": "list(2)",
+        "transaction.transaction.message": "dict",
+        "transaction.transaction.message.accountKeys": "list",
+        "transaction.transaction.message.accountKeys[]": "list(45)",
+        "transaction.transaction.message.recentBlockhash": "str",
+        "transaction.transaction.message.instructions": "list",
+        "transaction.transaction.message.instructions[]": "list(6)",
+        "transaction.transaction.message.addressTableLookups": "list",
+        "transaction.transaction.message.addressTableLookups[]": "list(5)",
+        "transaction.meta": "dict",
+        "transaction.meta.err": "NoneType",
+        "transaction.meta.status": "dict",
+        "transaction.meta.status.Ok": "NoneType",
+        "transaction.meta.fee": "int",
+        "transaction.meta.preBalances": "list",
+        "transaction.meta.preBalances[]": "list(45)",
+        "transaction.meta.postBalances": "list",
+        "transaction.meta.postBalances[]": "list(45)",
+        "transaction.meta.innerInstructions": "list",
+        "transaction.meta.innerInstructions[]": "list(1)",
+        "transaction.meta.innerInstructions[0].index": "int",
+        "transaction.meta.innerInstructions[0].instructions": "list",
+        "transaction.meta.logMessages": "list",
+        "transaction.meta.logMessages[]": "list(84)",
+        "transaction.meta.preTokenBalances": "list",
+        "transaction.meta.preTokenBalances[]": "list(12)",
+        "transaction.meta.preTokenBalances[0].accountIndex": "int",
+        "transaction.meta.preTokenBalances[0].mint": "str",
+        "transaction.meta.preTokenBalances[0].uiTokenAmount": "dict",
+        "transaction.meta.preTokenBalances[0].owner": "str",
+        "transaction.meta.preTokenBalances[0].programId": "str",
+        "transaction.meta.postTokenBalances": "list",
+        "transaction.meta.postTokenBalances[]": "list(12)",
+        "transaction.meta.postTokenBalances[0].accountIndex": "int",
+        "transaction.meta.postTokenBalances[0].mint": "str",
+        "transaction.meta.postTokenBalances[0].uiTokenAmount": "dict",
+        "transaction.meta.postTokenBalances[0].owner": "str",
+        "transaction.meta.postTokenBalances[0].programId": "str",
+        "transaction.meta.rewards": "NoneType",
+        "transaction.meta.computeUnitsConsumed": "int",
+        "transaction.meta.costUnits": "int",
+        "transaction.version": "int",
+        "transactionIndex": "int"
+      }
+    }
+  ],
+  "оговорки": [
+    "Оба способа слушали ОДИН набор источников в ОДНО окно -- иначе сравнивать нельзя.",
+    "logsSubscribe отдаёт только подпись и слот, поэтому расхождение разбиралось отдельным getTransaction: подписант-источник против простого упоминания адреса.",
+    "Неуспешные транзакции у logsSubscribe отбрасывались, как и в бою (у transactionSubscribe для этого есть failed:false)."
+  ]
+}
