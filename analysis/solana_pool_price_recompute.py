@@ -61,39 +61,71 @@ def _bal_map(entries) -> dict:
     return out
 
 
-def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
-    """Резервы пула ДО и ПОСЛЕ сделки по балансам его хранилищ.
+def native_balance(tx: dict, pubkey: str) -> tuple[float | None, float | None]:
+    """Нативный SOL счёта до и после -- по preBalances/postBalances."""
+    meta = (tx or {}).get("meta") or {}
+    txn = (tx or {}).get("transaction") or {}
+    keys_raw = txn.get("accountKeys") or ((txn.get("message") or {}).get("accountKeys")) or []
+    keys = [k.get("pubkey") if isinstance(k, dict) else k for k in keys_raw]
+    if pubkey not in keys:
+        return None, None
+    i = keys.index(pubkey)
+    pb, po = meta.get("preBalances") or [], meta.get("postBalances") or []
+    if i >= len(pb) or i >= len(po):
+        return None, None
+    return pb[i] / 1e9, po[i] / 1e9
 
-    Хранилища опознаём так: владелец счёта НЕ трейдер, и этот владелец
-    держит и нужный минт, и котировочный актив -- это и есть пара
-    хранилищ одного пула. Если таких владельцев несколько (маршрут через
-    два пула), берём того, у кого дельта минта наибольшая по модулю:
-    именно он принял основной объём.
+
+def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
+    """Резервы пула ДО и ПОСЛЕ сделки по балансам в самой транзакции.
+
+    Два вида пулов, и первая версия видела только первый:
+      1) котировка лежит ТОКЕНОМ (WSOL/USDC/USDT) -- у владельца хранилищ
+         есть и минт, и котировочный счёт;
+      2) котировка лежит НАТИВНЫМ SOL -- так устроены кривые pump.fun и
+         им подобные: токен на счёте, а SOL прямо на самом счёте кривой,
+         и в preTokenBalances котировки просто нет.
+    На первом прогоне 11 сделок из 15 отвалились именно поэтому: не
+    "данных нет", а метод смотрел не туда.
+
+    Адрес пула здесь -- ВЛАДЕЛЕЦ хранилищ (для AMM это PDA-полномочие, для
+    кривой -- сам счёт кривой). Это не всегда тот же адрес, что "адрес
+    пула" в интерфейсах, и так и подписано.
     """
     meta = (tx or {}).get("meta") or {}
     pre, post = _bal_map(meta.get("preTokenBalances")), _bal_map(meta.get("postTokenBalances"))
     owners_mint = {o for (o, m) in set(pre) | set(post) if m == mint and o != trader}
     best = None
     for o in owners_mint:
+        t0 = pre.get((o, mint), (0.0, None))[0]
+        t1 = post.get((o, mint), (0.0, None))[0]
+        if t0 <= 0 or t1 <= 0:
+            continue
+        # (1) котировка токеном
         for q in QUOTES:
-            if (o, q) not in pre and (o, q) not in post:
-                continue
-            t0 = pre.get((o, mint), (0.0, None))[0]
-            t1 = post.get((o, mint), (0.0, None))[0]
             q0 = pre.get((o, q), (0.0, None))[0]
             q1 = post.get((o, q), (0.0, None))[0]
-            if t0 <= 0 or t1 <= 0 or q0 <= 0 or q1 <= 0:
+            if q0 <= 0 or q1 <= 0:
                 continue
-            cand = {"владелец_хранилищ": o, "котировка": q,
+            cand = {"адрес_пула": o, "котировка": q, "вид_котировки": "токен",
                     "резерв_токена_до": t0, "резерв_токена_после": t1,
                     "резерв_котировки_до": q0, "резерв_котировки_после": q1,
                     "дельта_токена": t1 - t0}
             if best is None or abs(cand["дельта_токена"]) > abs(best["дельта_токена"]):
                 best = cand
+        # (2) котировка нативным SOL на самом счёте
+        n0, n1 = native_balance(tx, o)
+        if n0 and n1 and n0 > 0 and n1 > 0:
+            cand = {"адрес_пула": o, "котировка": "нативный SOL", "вид_котировки": "нативный",
+                    "резерв_токена_до": t0, "резерв_токена_после": t1,
+                    "резерв_котировки_до": n0, "резерв_котировки_после": n1,
+                    "дельта_токена": t1 - t0}
+            if best is None or abs(cand["дельта_токена"]) > abs(best["дельта_токена"]):
+                best = cand
     if best is None:
-        return {"ок": False, "почему": "хранилища пула в транзакции не опознаны: "
-                                        "нет владельца, держащего и минт, и котировку "
-                                        "с ненулевыми резервами по обе стороны"}
+        return {"ок": False, "почему": "хранилища пула не опознаны: ни у одного владельца "
+                                        "минта нет ни котировочного счёта, ни нативного "
+                                        "остатка по обе стороны сделки"}
     best["цена_до"] = best["резерв_котировки_до"] / best["резерв_токена_до"]
     best["цена_после"] = best["резерв_котировки_после"] / best["резерв_токена_после"]
     best["ок"] = True
@@ -123,6 +155,43 @@ def exec_price(tx: dict, mint: str, trader: str) -> float | None:
                 if i == 0:
                     dq += (meta.get("fee") or 0) / 1e9
     return abs(dq) / abs(dt) if dq else None
+
+
+MAX_GAP_S = 30.0
+SLOT_MS = 250
+
+
+def our_pool_price_at(rpc: Rpc, mint: str, pool: str, from_slot: int, to_slot: int,
+                       t_leader: int | None) -> dict:
+    """Цена НАШЕГО пула в слоте лидера -- по ближайшей сделке в нём.
+
+    Берётся первая транзакция начиная со слота лидера, которая трогает
+    именно этот пул: её резервы ДО -- и есть состояние пула на тот момент.
+    Дальше 30 секунд не уходим: иначе это уже не "в слоте лидера", а
+    "когда-нибудь потом", и цифра означала бы не то, чем выглядит.
+    """
+    for slot in range(from_slot, to_slot + 1):
+        try:
+            blk = rpc.call("getBlock", [slot, {
+                "encoding": "jsonParsed", "transactionDetails": "accounts",
+                "maxSupportedTransactionVersion": 1, "rewards": False}])
+        except RuntimeError as exc:
+            if any(c in str(exc) for c in ("-32004", "-32007", "-32009")):
+                continue          # слот пропущен лидером -- это не ошибка
+            return {"ок": False, "почему": f"getBlock {slot}: {scrub(str(exc))[:120]}"}
+        if not blk:
+            continue
+        bt = blk.get("blockTime")
+        if t_leader is not None and bt is not None and bt - t_leader > MAX_GAP_S:
+            return {"ок": False, "почему": f"ближайшая сделка в нашем пуле дальше "
+                                            f"{MAX_GAP_S:.0f}с от слота лидера"}
+        for t in blk.get("transactions") or []:
+            r = pool_reserves(t, mint, "")
+            if r.get("ок") and r.get("адрес_пула") == pool:
+                return {"ок": True, "цена": r["цена_до"], "слот": slot, "block_time": bt,
+                        "резерв_котировки": r["резерв_котировки_до"]}
+    return {"ок": False, "почему": "в просмотренных слотах не нашлось ни одной сделки "
+                                    "в нашем пуле"}
 
 
 def recompute_one(rpc: Rpc, row: dict, leader: str, wallet: str) -> dict:
@@ -161,9 +230,33 @@ def recompute_one(rpc: Rpc, row: dict, leader: str, wallet: str) -> dict:
         out["не_удалось"] = "в нашей сделке: " + po["почему"]
         return out
 
+    out["адрес_пула_лидера"] = pl["адрес_пула"]
+    out["котировка_лидера"] = pl["котировка"]
+    out["адрес_нашего_пула"] = po["адрес_пула"]
+    out["котировка_нашего"] = po["котировка"]
+    same_pool = pl["адрес_пула"] == po["адрес_пула"]
+    out["разные_пулы"] = not same_pool
+
     p_before = pl["цена_до"]
     p_after_leader = pl["цена_после"]
     p_before_us = po["цена_до"]
+    if not same_pool:
+        # Лидер двигал ОДИН пул, а мы покупали в ДРУГОМ. Считать (б) от
+        # цены чужого пула нельзя: это разные рынки, связанные только
+        # арбитражём. Точка отсчёта для (б) -- состояние НАШЕГО пула на
+        # момент сделки лидера.
+        s_lead = row.get("слот_лидера_S")
+        s_ours = row.get("наш_слот")
+        t_lead = None
+        if s_lead is None or s_ours is None:
+            out["не_удалось"] = "разные пулы, но нет слотов лидера/нашего -- точку отсчёта не взять"
+            return out
+        at = our_pool_price_at(rpc, row["mint"], po["адрес_пула"], s_lead, s_ours, t_lead)
+        out["наш_пул_в_слоте_лидера"] = at
+        if not at.get("ок"):
+            out["не_удалось"] = "разные пулы: " + at["почему"]
+            return out
+        p_after_leader = at["цена"]
     our_exec = exec_price(to, row["mint"], wallet)
     lead_exec = exec_price(tl, row["mint"], leader)
     out["наша_средняя_цена_исполнения"] = our_exec
@@ -191,6 +284,10 @@ def recompute_one(rpc: Rpc, row: dict, leader: str, wallet: str) -> dict:
         # Наценка к ЦЕНЕ ПУЛА после лидера -- то, что раньше считалось от
         # его средней цены и было завышено на вторую половину его следа.
         out["наценка_к_цене_пула_после_лидера_pct"] = round(((1 + b) * (1 + c) - 1) * 100, 3)
+        if out.get("разные_пулы"):
+            # У разных пулов (б) -- это не "дрейф за лидером", а то,
+            # насколько ЧУЖОЕ движение перетащили в наш пул арбитражёры.
+            out["влияние_на_наш_пул_pct"] = out["б_дрейф_до_нас_pct"]
         old = row.get("наша_наценка_к_лидеру_pct")
         if old is not None:
             out["насколько_прежняя_наценка_была_завышена_пп"] = round(
@@ -222,6 +319,10 @@ def summarise(label: str, items: list[dict]) -> dict:
         "медиана_наш_вход_к_резерву": _med([x.get("наш_вход_к_резерву_перед_нами") for x in good]),
         "медиана_лидер_sol": _med([x.get("лидер_sol") for x in good]),
         "медиана_итог_gross_pct": _med([x.get("итог_gross_pct") for x in items]),
+        "сделок_с_разными_пулами": sum(1 for x in good if x.get("разные_пулы")),
+        "сделок_в_одном_пуле": sum(1 for x in good if x.get("разные_пулы") is False),
+        "медиана_влияния_на_наш_пул_pct": _med(
+            [x.get("влияние_на_наш_пул_pct") for x in good if x.get("разные_пулы")]),
     }
 
 
@@ -279,7 +380,10 @@ def main() -> None:
         "A": items[:args.a_size], "Б": items[args.a_size:],
         "сводка_A": summarise("A -- серия минусов", items[:args.a_size]),
         "сводка_Б": summarise("Б -- плюсовые 19-21.09", items[args.a_size:]),
-        "rpc": {"calls": rpc.calls, "retries": rpc.retries, "кредитов": rpc.credits},
+        "rpc": {"calls": rpc.calls, "retries": rpc.retries, "кредитов": rpc.credits,
+                 "оговорка_по_кредитам": "пачка getTransaction идёт своим путём и в счётчик "
+                                          "кредитов не попадает; счёт занижен на число запросов "
+                                          "в пачках"},
     }
     OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2))
     print(json.dumps({"сводка_A": out["сводка_A"], "сводка_Б": out["сводка_Б"]},
@@ -308,7 +412,7 @@ def self_test() -> None:
     post = [B("POOL", M, 909_090.909), B("POOL", WSOL, 1100),
             B("LEADER", M, 90_909.091), B("LEADER", WSOL, 0)]
     r = pool_reserves(TX(pre, post), M, "LEADER")
-    chk("хранилища пула опознаны", r["ок"] and r["владелец_хранилищ"] == "POOL", str(r)[:120])
+    chk("хранилища пула опознаны", r["ок"] and r["адрес_пула"] == "POOL", str(r)[:120])
     chk("цена пула до", abs(r["цена_до"] - 0.001) < 1e-9, str(r["цена_до"]))
     chk("цена пула после выросла", r["цена_после"] > r["цена_до"])
     chk("цена после = резерв/резерв", abs(r["цена_после"] - 1100 / 909_090.909) < 1e-12)
@@ -336,7 +440,25 @@ def self_test() -> None:
     chk("нативная нога подхватывается", abs(exec_price(t2, M, "TRADER") - 0.01) < 1e-9,
         str(exec_price(t2, M, "TRADER")))
 
+    # Пул с НАТИВНЫМ SOL (кривая pump.fun): котировки в токенах нет вовсе.
+    keys_n = [{"pubkey": "TRADER"}, {"pubkey": "CURVE"}]
+    tn = TX([B("CURVE", M, 1_000_000), B("TRADER", M, 0)],
+            [B("CURVE", M, 900_000), B("TRADER", M, 100_000)],
+            keys=keys_n, pre_b=[5_000_000_000, 100_000_000_000],
+            post_b=[4_000_000_000, 101_000_000_000])
+    rn = pool_reserves(tn, M, "TRADER")
+    chk("пул с нативным SOL опознан", rn.get("ок") and rn["адрес_пула"] == "CURVE", str(rn)[:120])
+    chk("котировка помечена нативной", rn.get("вид_котировки") == "нативный")
+    chk("цена из нативных резервов", abs(rn["цена_до"] - 100.0 / 1_000_000) < 1e-12,
+        str(rn.get("цена_до")))
+
     s = summarise("тест", [{"не_удалось": "нет"}])
+    s2 = summarise("тест2", [{"разные_пулы": True, "влияние_на_наш_пул_pct": 5.0},
+                              {"разные_пулы": False}])
+    chk("разные пулы считаются в сводке",
+        s2["сделок_с_разными_пулами"] == 1 and s2["сделок_в_одном_пуле"] == 1, str(s2))
+    chk("влияние на наш пул -- только по разным пулам",
+        s2["медиана_влияния_на_наш_пул_pct"] == 5.0)
     chk("нерасшифрованная сделка в медианы не идёт",
         s["пересчитано"] == 0 and s["медиана_а_влияние_лидера_pct"] is None)
     chk("но из счёта не пропадает", s["сделок"] == 1)
