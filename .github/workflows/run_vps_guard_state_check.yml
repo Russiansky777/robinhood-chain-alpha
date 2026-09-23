@@ -1,0 +1,84 @@
+name: "Сторож: состояние после перезапуска (только чтение)"
+
+# Зачем. Ключ Helius доставлялся на сервер, и вместе с ним сторож
+# (dbot-sold-guard) был перезапущен. Владелец требует убедиться, что
+# после старта он снова видит все открытые позиции и их таймеры 35 с.
+#
+# Этот workflow НИЧЕГО не меняет: ни файлов, ни служб. Только читает
+# состояние службы, журнал и остатки токенов на кошельках задач.
+on:
+  workflow_dispatch:
+    inputs:
+      journal_lines:
+        description: "сколько строк журнала показать"
+        required: false
+        default: "200"
+
+concurrency:
+  group: guard-state-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: SSH key + known_hosts
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 45.59.170.76 >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "1. Состояние служб: когда стартовали, живы ли"
+        run: |
+          ssh -n $SSH_OPTS root@45.59.170.76 '
+            for u in dbot-sold-guard dbot-detect-probe; do
+              echo "=== $u ==="
+              systemctl is-active "$u" 2>/dev/null || true
+              systemctl show "$u" -p ActiveEnterTimestamp -p NRestarts -p ExecMainStartTimestamp 2>/dev/null || true
+            done
+          ' 2>&1 | tee data/guard_state_check.txt
+
+      - name: "2. Журнал сторожа С МОМЕНТА последнего старта"
+        run: |
+          ssh -n $SSH_OPTS root@45.59.170.76 "
+            SINCE=\$(systemctl show dbot-sold-guard -p ActiveEnterTimestamp --value)
+            echo \"--- журнал с \$SINCE ---\"
+            journalctl -u dbot-sold-guard --no-pager -n ${{ github.event.inputs.journal_lines || 200 }}
+          " 2>&1 | tee -a data/guard_state_check.txt
+
+      - name: "3. Что сторож считает открытым ПРЯМО СЕЙЧАС (его же --check-only, ничего не продаёт)"
+        run: |
+          ssh -n $SSH_OPTS root@45.59.170.76 '
+            cd /home/bot/dbot_sold_guard 2>/dev/null || cd /home/bot
+            sudo -u bot bash -c "set -a; source /etc/dbot-guard/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only" 2>&1 | tail -60
+          ' 2>&1 | tee -a data/guard_state_check.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/guard_state_check.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Сторож: состояние после перезапуска [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
