@@ -1,0 +1,93 @@
+name: "Пилот: поблочный разбор -- что происходит за лидером"
+
+# Только чтение цепочки, ни одной сделки. Helius сейчас без квоты
+# ("max usage reached"), поэтому по умолчанию весь разбор идёт через
+# публичный узел с более спокойным темпом -- это медленнее, зато не
+# зависит от квоты.
+#
+# Регистрация расписания/входов -- с default-ветки, работа и коммиты --
+# в claude/nifty-sagan-r0polg.
+on:
+  workflow_dispatch:
+    inputs:
+      time_budget_s:
+        description: "мягкий бюджет времени, секунд"
+        required: false
+        default: "18000"
+      min_interval_s:
+        description: "минимальный интервал между RPC-вызовами (публичный узел жёстче Helius)"
+        required: false
+        default: "0.30"
+      deep_slots:
+        description: "сколько слотов вперёд смотреть от входа лидера (140 = 35с)"
+        required: false
+        default: "140"
+      n:
+        description: "сколько сделок в каждой выборке"
+        required: false
+        default: "8"
+      use_helius:
+        description: "'yes' -- ходить в Helius вместо публичного узла"
+        required: false
+        default: ""
+
+concurrency:
+  group: solana-pilot-block-autopsy
+  cancel-in-progress: false
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Самопроверка разбора (без сети)"
+        run: python -u analysis/solana_pilot_block_autopsy.py --self-test
+
+      - name: "Поблочный разбор (только чтение цепочки)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          python -u analysis/solana_pilot_block_autopsy.py \
+            --time-budget-s "${{ github.event.inputs.time_budget_s || 18000 }}" \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.30' }}" \
+            --deep-slots "${{ github.event.inputs.deep_slots || 140 }}" \
+            --n "${{ github.event.inputs.n || 8 }}" \
+            ${{ github.event.inputs.use_helius == 'yes' && '--use-helius' || '' }} \
+            2>&1 | tail -400
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
+          # добавляет НИЧЕГО, включая существующие соседние пути.
+          for f in data/solana_pilot_block_autopsy.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Пилот: поблочный разбор сделок [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
