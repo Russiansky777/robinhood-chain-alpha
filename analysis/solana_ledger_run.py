@@ -573,7 +573,7 @@ def find_source_by_onchain_time(source_addr: str, mint: str, buy_time: int,
         candidates = [h for h in page if h.get("blockTime") is not None
                       and buy_time - window_s <= h["blockTime"] <= buy_time]
         for h in candidates:
-            tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+            tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 1}])
             if tx is None:
                 continue
             parsed = parse_tx_for_wallet(h["signature"], tx, source_addr)
@@ -764,7 +764,7 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
                 cache[_cache_key(h["signature"], wallet)] = {"signature": h["signature"], "slot": h.get("slot"),
                                                               "blockTime": h.get("blockTime"), "err": h.get("err"), "_wallet": wallet}
         if ok_chunk:
-            reqs = [("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}]) for h in ok_chunk]
+            reqs = [("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 1}]) for h in ok_chunk]
             results = rpc_batch(reqs)
             for h, tx in zip(ok_chunk, results):
                 if tx is None:
@@ -777,7 +777,7 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
                     # ошибка, но и не помечается для гарантированного
                     # повтора). Один прямой одиночный вызов перед тем, как
                     # сдаться, закрывает именно этот случай.
-                    tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+                    tx = rpc_call("getTransaction", [h["signature"], {"encoding": "json", "maxSupportedTransactionVersion": 1}])
                     if tx is None:
                         continue
                 parsed = parse_tx_for_wallet(h["signature"], tx, wallet)
@@ -790,7 +790,7 @@ def sync_wallet_chain(wallet: str, cache: dict, deadline: float) -> int:
 def fetch_missing_tx(sig: str, wallet: str, cache: dict) -> None:
     if _has_own_view(cache, sig, wallet):
         return
-    tx = rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+    tx = rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 1}])
     if tx is None:
         cache[_cache_key(sig, wallet)] = {"signature": sig, "err": "getTransaction_null", "_wallet": wallet}
         return

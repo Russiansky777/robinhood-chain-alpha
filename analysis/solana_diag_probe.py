@@ -22,7 +22,7 @@ N_HTUY = "HtuYE3nYd7y9vxqiUjZdjTscGiFKt5JCcjD41vFwuebT"
 
 def dump_tx() -> None:
     print("=" * 20, "1) Разбор транзакции", SIG, "=" * 20, flush=True)
-    tx = lr.rpc_call("getTransaction", [SIG, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+    tx = lr.rpc_call("getTransaction", [SIG, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1}])
     if tx is None:
         print("getTransaction вернул null", flush=True)
         return
@@ -140,7 +140,7 @@ def check_full_signature_history() -> None:
         if h.get("err") is not None:
             print(f"  {sig[:20]}.. err={h.get('err')} (не влияет на баланс)")
             continue
-        tx = lr.rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}])
+        tx = lr.rpc_call("getTransaction", [sig, {"encoding": "json", "maxSupportedTransactionVersion": 1}])
         if tx is None:
             print(f"  {sig[:20]}.. getTransaction -> null")
             continue
