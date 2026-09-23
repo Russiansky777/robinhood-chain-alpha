@@ -193,12 +193,58 @@ def проверить_пол(order: dict, *, вход_sol: float | None = None,
     return итог
 
 
+# Имена переменной с ключом. Первое -- как назвал владелец в секрете;
+# второе осталось от первой версии и читается, чтобы имя не разошлось
+# между секретом, env на хосте и кодом: такое расхождение уже стоило
+# прогона.
+ИМЕНА_КЛЮЧА = ("EXEC_WALLET_KEY", "BLOOM_WALLET_KEY")
+
+
+def ключ_сырой() -> str:
+    for имя in ИМЕНА_КЛЮЧА:
+        v = (os.environ.get(имя) or "").strip()
+        if v:
+            return v
+    return ""
+
+
 def ключ_есть() -> tuple:
-    сырое = (os.environ.get("BLOOM_WALLET_KEY") or "").strip()
-    if not сырое:
-        return False, ("ключа кошелька нет в окружении (BLOOM_WALLET_KEY) -- "
-                        "продажа через Jupiter невозможна, остаётся путь Bloom")
+    if not ключ_сырой():
+        return False, ("ключа кошелька нет в окружении ("
+                        + " или ".join(ИМЕНА_КЛЮЧА) + ") -- продажа через "
+                        "Jupiter невозможна, остаётся путь Bloom")
     return True, ""
+
+
+def публичный_ключ(секрет: str | None = None) -> dict:
+    """Публичный ключ из секрета. Сам секрет не возвращается и не печатается."""
+    сырое = секрет if секрет is not None else ключ_сырой()
+    if not сырое:
+        return {"ok": False, "why_not": "ключа нет"}
+    try:
+        from dbot_rescue import load_rescue_keypair  # noqa: PLC0415
+        kp = load_rescue_keypair(сырое)
+        return {"ok": True, "pubkey": str(kp.pubkey())}
+    except Exception as exc:  # noqa: BLE001
+        # Текст исключения не печатаем: в него может попасть сам секрет.
+        return {"ok": False, "why_not": f"ключ не разобрался ({type(exc).__name__})"}
+
+
+def ключ_от_нашего_кошелька(ожидаемый: str, секрет: str | None = None) -> dict:
+    """Тот ли это кошелёк. Несовпадение -- ЗАПРЕТ, а не предупреждение.
+
+    Цена ошибки прямая: чужой ключ подпишет чужой кошелёк, и продажа уйдёт
+    не с нашей позиции. Поэтому проверка обязательна перед подписью, а не
+    один раз при деплое.
+    """
+    п = публичный_ключ(секрет)
+    if not п.get("ok"):
+        return {"ok": False, "why_not": п.get("why_not")}
+    совпал = п["pubkey"] == ожидаемый
+    return {"ok": совпал, "pubkey": п["pubkey"], "expected": ожидаемый,
+             "why_not": (None if совпал else
+                          f"ключ принадлежит {п['pubkey']}, а позиция на "
+                          f"{ожидаемый} -- подписывать нельзя")}
 
 
 def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: float | None,
@@ -230,12 +276,17 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
             итог["why_not"] = почему
             шаги.append({"step": "key", "ok": False, "why_not": почему})
             return итог
+        свой = ключ_от_нашего_кошелька(taker)
+        шаги.append({"step": "key", "ok": bool(свой.get("ok")),
+                      "pubkey": свой.get("pubkey"), "why_not": свой.get("why_not")})
+        if not свой.get("ok"):
+            итог["why_not"] = свой.get("why_not")
+            return итог
         from dbot_rescue import (  # noqa: PLC0415
             load_rescue_keypair, sign_versioned_b64)
 
         def подписать_фн(tx_b64):  # noqa: E306
-            return sign_versioned_b64(
-                tx_b64, load_rescue_keypair(os.environ.get("BLOOM_WALLET_KEY", "")))
+            return sign_versioned_b64(tx_b64, load_rescue_keypair(ключ_сырой()))
 
     order = ордер_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
     шаги.append({"step": "order", "ok": not order.get("ошибка"),
@@ -396,7 +447,50 @@ def self_test() -> int:
     chk("Ultra отказала -- честный отказ без подписи",
         r12["ok"] is False and "429" in r12["why_not"] and len(подписей) == 0, r12)
 
+    # Сверка публичного ключа. Пара создаётся здесь же и к деньгам отношения
+    # не имеет: проверяется механика, а не чей-то настоящий ключ.
+    try:
+        from solders.keypair import Keypair  # noqa: PLC0415
+        свежая = Keypair()
+        секрет = str(свежая)
+        мой = str(свежая.pubkey())
+        chk("публичный ключ из секрета выводится", публичный_ключ(секрет)["pubkey"] == мой,
+            публичный_ключ(секрет))
+        chk("свой кошелёк опознан", ключ_от_нашего_кошелька(мой, секрет)["ok"] is True)
+        чужой = ключ_от_нашего_кошелька("4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+                                          секрет)
+        chk("чужой кошелёк -- запрет подписи",
+            чужой["ok"] is False and "подписывать нельзя" in чужой["why_not"], чужой)
+        chk("мусор вместо ключа -- отказ без печати секрета",
+            публичный_ключ("НЕ_КЛЮЧ")["ok"] is False
+            and "НЕ_КЛЮЧ" not in публичный_ключ("НЕ_КЛЮЧ")["why_not"],
+            публичный_ключ("НЕ_КЛЮЧ"))
+
+        # живой проход с чужим ключом не должен дойти до подписи
+        подписей2 = []
+        было_имя = os.environ.get("EXEC_WALLET_KEY")
+        os.environ["EXEC_WALLET_KEY"] = секрет
+        try:
+            r_чужой = продать(mint="M", amount_raw=1,
+                               taker="4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+                               вход_sol=0.001, живьём=True, ордер_фн=ордер_ок,
+                               исполнить_фн=исполнить_ок)
+            chk("живьём с ключом ЧУЖОГО кошелька -- отказ до подписи",
+                r_чужой["ok"] is False and "подписывать нельзя" in r_чужой["why_not"],
+                r_чужой.get("why_not"))
+            chk("и имя EXEC_WALLET_KEY читается",
+                ключ_есть()[0] is True, ключ_есть())
+        finally:
+            if было_имя is None:
+                os.environ.pop("EXEC_WALLET_KEY", None)
+            else:
+                os.environ["EXEC_WALLET_KEY"] = было_имя
+        del подписей2
+    except ImportError:
+        chk("solders доступен для сверки ключа", False, "solders не установлен")
+
     было = os.environ.pop("BLOOM_WALLET_KEY", None)
+    было_exec = os.environ.pop("EXEC_WALLET_KEY", None)
     try:
         есть, почему = ключ_есть()
         chk("без ключа путь через Jupiter недоступен и причина названа",
@@ -412,6 +506,8 @@ def self_test() -> int:
     finally:
         if было is not None:
             os.environ["BLOOM_WALLET_KEY"] = было
+        if было_exec is not None:
+            os.environ["EXEC_WALLET_KEY"] = было_exec
 
     # Имена в общем клиенте проверяются ЗДЕСЬ, а не в бою: первый живой
     # прогон упал именно на несуществующем имени load_keypair, потому что
@@ -426,8 +522,8 @@ def self_test() -> int:
 
     src = Path(__file__).read_text(encoding="utf-8")
     тело = src.split("def self_test")[0]
-    chk("ключ в этом модуле не печатается",
-        "BLOOM_WALLET_KEY\", \"\")" in тело or "os.environ.get(\"BLOOM_WALLET_KEY\"" in тело)
+    chk("секрет ключа в текст ошибок не подставляется",
+        "type(exc).__name__" in тело.split("def публичный_ключ")[1].split("def ")[0])
     chk("подпись строго после проверки пола",
         тело.index("проверить_пол(order") < тело.index("подписать_фн(order"))
 

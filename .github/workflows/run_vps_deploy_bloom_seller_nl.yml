@@ -49,7 +49,7 @@ on:
         required: false
         default: "1"
       via_jupiter:
-        description: "'1' -- второй путь выхода через Jupiter Ultra (нужен секрет BLOOM_WALLET_KEY)"
+        description: "'1' -- второй путь выхода через Jupiter Ultra (нужен секрет EXEC_WALLET_KEY)"
         required: false
         default: "0"
 
@@ -148,21 +148,27 @@ jobs:
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
 
-      - name: "Путь через Jupiter: ключ обязателен, иначе останов"
+      - name: "Путь через Jupiter: ключ обязателен и должен быть НАШЕГО кошелька"
         if: ${{ github.event.inputs.via_jupiter == '1' }}
         env:
-          BLOOM_WALLET_KEY: ${{ secrets.BLOOM_WALLET_KEY }}
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
         run: |
           set -e
           # Включить путь и не положить ключ -- значит получить сторожа,
           # который каждый раз отказывается продавать по причине "нет ключа".
           # Лучше остановить деплой здесь и сказать это прямо.
-          [ -n "$BLOOM_WALLET_KEY" ] || {
-            echo "СБОЙ: via_jupiter=1, но секрет BLOOM_WALLET_KEY пуст."
+          [ -n "$EXEC_WALLET_KEY" ] || {
+            echo "СБОЙ: via_jupiter=1, но секрет EXEC_WALLET_KEY пуст."
             echo "Владелец кладёт приватный ключ кошелька исполнителя в секрет"
-            echo "репозитория BLOOM_WALLET_KEY (base58 или массив байтов)."
+            echo "репозитория EXEC_WALLET_KEY (base58 или массив байтов)."
             exit 1; }
           echo "ключ кошелька в секрете есть (значение не печатается)"
+          pip install -q solders requests
+          # Сверка публичного ключа ДО доставки: чужой ключ подписал бы
+          # чужой кошелёк. Печатается только публичный ключ -- он публичный.
+          # Отдельным файлом, а не heredoc: вложенный heredoc в "run: |" уже
+          # ломался на закрывающей метке с отступом.
+          python3 analysis/bloom_key_match.py
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         env:
@@ -175,7 +181,7 @@ jobs:
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
           TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
           VIA_JUPITER: ${{ github.event.inputs.via_jupiter || '0' }}
-          BLOOM_WALLET_KEY: ${{ secrets.BLOOM_WALLET_KEY }}
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
         run: |
           set -e
           ssh -n $SSH_OPTS root@$HOST "
@@ -200,7 +206,7 @@ jobs:
             # ТОЛЬКО когда путь включён: лишнего ключа на хосте быть не
             # должно. В логи он не попадает -- пишется через переменную.
             echo "BLOOM_SELL_VIA_JUPITER=$VIA_JUPITER"
-            if [ "$VIA_JUPITER" = "1" ]; then echo "BLOOM_WALLET_KEY=$BLOOM_WALLET_KEY"; fi
+            if [ "$VIA_JUPITER" = "1" ]; then echo "EXEC_WALLET_KEY=$EXEC_WALLET_KEY"; fi
             echo "BLOOM_JUP_FLOOR_PCT=70"
             echo "BLOOM_JUP_MIN_QUOTE_PCT=30"
             echo "BLOOM_LIVE_SELL=$LIVE_SELL"

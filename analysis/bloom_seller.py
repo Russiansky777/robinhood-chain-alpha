@@ -384,6 +384,11 @@ class Seller:
         # Путь через Jupiter -- отдельным выключателем: он требует ключа
         # кошелька в окружении, и включать его молча нельзя.
         self.jupiter_включён = (os.environ.get("BLOOM_SELL_VIA_JUPITER", "0").strip() == "1")
+        # Сверка кошелька один раз при старте -- чтобы несовпадение было
+        # видно в признаке жизни сразу, а не только в момент продажи.
+        self.jupiter_ключ = ({"ok": False, "why_not": "путь выключен"}
+                              if not self.jupiter_включён or JUP is None else
+                              JUP.ключ_от_нашего_кошелька(EXECUTOR_WALLET))
         self.priority_fee = env_float("BLOOM_PRIORITY_FEE", DEFAULT_PRIORITY_FEE)
         self.processor_tip = env_float("BLOOM_PROCESSOR_TIP", DEFAULT_PROCESSOR_TIP)
         self.api = api or BloomApi(os.environ.get("BLOOM_API_KEY", ""),
@@ -673,6 +678,9 @@ class Seller:
             "jupiter": {"enabled": self.jupiter_включён,
                          "key": (JUP.ключ_есть()[1] or "ключ есть")
                                  if JUP is not None else "модуль не загружен",
+                         "key_matches_wallet": self.jupiter_ключ.get("ok"),
+                         "key_pubkey": self.jupiter_ключ.get("pubkey"),
+                         "key_why_not": self.jupiter_ключ.get("why_not"),
                          "floor_pct": (JUP.ПОЛ_ПРОЦЕНТОВ if JUP is not None else None),
                          "min_quote_share_pct": (JUP.МИН_ДОЛЯ_ОТ_ВХОДА
                                                   if JUP is not None else None)},
