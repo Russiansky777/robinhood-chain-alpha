@@ -1,0 +1,86 @@
+name: "Bloom: пулы из транзакции и проба остатка (только чтение)"
+
+# Два вопроса по цепи, оба только чтением:
+#   1. какой адрес в транзакции является пулом пары токен/WSOL -- кандидаты
+#      берутся из владельцев хранилищ и проверяются getMultipleAccounts;
+#   2. каким способом узел вообще отдаёт остаток токена -- сторож живьём
+#      не сделал ни одной попытки продажи, и ветка "остаток не прочитан"
+#      единственная, которая при этом молчит.
+on:
+  workflow_dispatch:
+    inputs:
+      sigs:
+        description: "подписи через запятую"
+        required: false
+        default: ""
+      mint:
+        description: "минт токена сделки"
+        required: false
+        default: ""
+      wallet:
+        description: "кошелёк сделки (исключается из кандидатов)"
+        required: false
+        default: ""
+      balance_wallet:
+        description: "проба остатка: кошелёк (пусто -- пробу не делать)"
+        required: false
+        default: ""
+      balance_mint:
+        description: "проба остатка: минт"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-pool-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора ДО запросов в цепь"
+        run: |
+          set -e
+          python3 analysis/bloom_pool_probe.py --self-test
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          ARGS=""
+          if [ -n "${{ inputs.mint }}" ]; then ARGS="$ARGS --mint ${{ inputs.mint }}"; fi
+          if [ -n "${{ inputs.wallet }}" ]; then ARGS="$ARGS --wallet ${{ inputs.wallet }}"; fi
+          if [ -n "${{ inputs.sigs }}" ]; then
+            for S in $(echo "${{ inputs.sigs }}" | tr ',' ' '); do
+              ARGS="$ARGS --sig $S"
+            done
+          fi
+          if [ -n "${{ inputs.balance_wallet }}" ] && [ -n "${{ inputs.balance_mint }}" ]; then
+            ARGS="$ARGS --balance-probe ${{ inputs.balance_wallet }} ${{ inputs.balance_mint }}"
+          fi
+          echo "аргументы: $ARGS"
+          python3 analysis/bloom_pool_probe.py $ARGS
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_pool_probe.json ] && git add data/bloom_pool_probe.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: пулы из транзакции и проба остатка [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
