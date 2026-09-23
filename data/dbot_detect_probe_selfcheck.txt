@@ -1,19 +1,27 @@
-2026-09-22T00:17:45Z INFO ключ Helius взят из переменной HELIUS_API_KEY
+2026-09-23T00:30:49Z INFO ключ Helius взят из переменной HELIUS_API_KEY
 === САМОПРОВЕРКА 3 СОБЫТИЙ: сверка с цепочкой у ДВУХ провайдеров ===
 
--- событие 2026-09-22T00:17:14Z источник=Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB (Brez)
-   транзакция источника: https://solscan.io/tx/38sBc9kjgkvfioR8EGrUztcGsi33RUAiJuQuBNPFd1XkQCskwn4sauxssvMCiuDjkmTVeGE65dheNdAWKQ4gCGAV
-   slot из вебсокета=449214312 | Helius getTransaction=449214312 | публичный узел=449214312 -> СОВПАДАЕТ
-   наша покупка не сшита с этим событием -- our_slot/dbot_offset_slots сверять нечего
+-- событие 2026-09-22T19:20:16Z источник=8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr (Qwerty)
+   транзакция источника: https://solscan.io/tx/4171HDhitd5M99PsdrbNmYKzqu9AQwJtZz6bJ37M3LA4UT1MgtvAo3USEzSufqgNK65JUoR1pvA6iqFNgQHchu5Z
+   slot из вебсокета=449471112 | Helius getTransaction=449471112 | публичный узел=449471112 -> СОВПАДАЕТ
+   наша покупка: https://solscan.io/tx/2VunA2nnW7CunjkX3uNqemV1pkD8MPN3HLCjppzRujk5X7iTSRAbEn8n9r25gv5YQUxaCGz29vrGdLcmXxu9Ny1d
+   our_slot записан=449471031 | Helius=449471031 | публичный узел=449471031 -> СОВПАДАЕТ
+   dbot_offset_slots записан=-81 | пересчитан по свежим ответам (449471031 - 449471112)=-81 -> СОВПАДАЕТ
 
--- событие 2026-09-22T00:17:25Z источник=Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn (gginvestments)
-   транзакция источника: https://solscan.io/tx/2pvqrNfzJih6GczYLkApQzaP7UindfBEnxr2JX7Gz4kh2BejPxTJorTg729tJcVAGFdKT72qfE6Fs47qNVcKwQ9A
-   slot из вебсокета=449214354 | Helius getTransaction=449214354 | публичный узел=449214354 -> СОВПАДАЕТ
-   наша покупка не сшита с этим событием -- our_slot/dbot_offset_slots сверять нечего
+-- событие 2026-09-22T19:20:19Z источник=8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr (Qwerty)
+   транзакция источника: https://solscan.io/tx/62udUbD3MNx96KCA32BSKfpmWrQPmKR3qoEhMeCoy7Xqp6UJkrqAoVPXucdT7en2sBN2oyhR5PsTVU52Ke3jano6
+   slot из вебсокета=449471123 | Helius getTransaction=None | публичный узел=449471123 -> РАСХОЖДЕНИЕ
+   наша покупка: https://solscan.io/tx/2VunA2nnW7CunjkX3uNqemV1pkD8MPN3HLCjppzRujk5X7iTSRAbEn8n9r25gv5YQUxaCGz29vrGdLcmXxu9Ny1d
+   our_slot записан=449471031 | Helius=None | публичный узел=449471031 -> РАСХОЖДЕНИЕ
+   dbot_offset_slots записан=-92 | пересчитан по свежим ответам (None - None)=None -> РАСХОЖДЕНИЕ
+   ВНИМАНИЕ: source_slot в записи=449471123, а сейчас getTransaction даёт None
 
--- событие 2026-09-22T00:17:25Z источник=GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1 (Nach)
-   транзакция источника: https://solscan.io/tx/26V2fbUonj1kMv2JwedCZrFXWjcgUVv1kAWAYQvWeHfCSK8GKe3cKTCYMpb1qJ2yWxAdwYdp92rJwdBjzz8uYRww
-   slot из вебсокета=449214356 | Helius getTransaction=449214356 | публичный узел=449214356 -> СОВПАДАЕТ
-   наша покупка не сшита с этим событием -- our_slot/dbot_offset_slots сверять нечего
+-- событие 2026-09-22T19:20:23Z источник=8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr (Qwerty)
+   транзакция источника: https://solscan.io/tx/5zJ9ayT4bnfNCag4K6hZ5v5Dr4qfRkGqziv4JKT8T2AUcFubtqk4WjdmJKMEPkiwevDwyLqJZuQMpWE28xafWuqC
+   slot из вебсокета=449471138 | Helius getTransaction=None | публичный узел=449471138 -> РАСХОЖДЕНИЕ
+   наша покупка: https://solscan.io/tx/2VunA2nnW7CunjkX3uNqemV1pkD8MPN3HLCjppzRujk5X7iTSRAbEn8n9r25gv5YQUxaCGz29vrGdLcmXxu9Ny1d
+   our_slot записан=449471031 | Helius=None | публичный узел=449471031 -> РАСХОЖДЕНИЕ
+   dbot_offset_slots записан=-107 | пересчитан по свежим ответам (None - None)=None -> РАСХОЖДЕНИЕ
+   ВНИМАНИЕ: source_slot в записи=449471138, а сейчас getTransaction даёт None
 
-ИТОГ САМОПРОВЕРКИ: все сверенные числа совпали
+ИТОГ САМОПРОВЕРКИ: ЕСТЬ РАСХОЖДЕНИЯ -- смотри выше
