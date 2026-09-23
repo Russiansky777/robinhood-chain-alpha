@@ -18,6 +18,14 @@ on:
         description: "сколько кандидатов взять из пулов"
         required: false
         default: "8"
+      classes:
+        description: "'yes' -- искать токены для пунктов 3, 5 и 6 прохода A"
+        required: false
+        default: "no"
+      pages:
+        description: "сколько страниц пулов просмотреть"
+        required: false
+        default: "6"
 
 concurrency:
   group: bloom-token-pick
@@ -48,6 +56,9 @@ jobs:
           pip install -q requests
           ARGS="--top ${{ inputs.top }}"
           if [ -n "${{ inputs.mints }}" ]; then ARGS="--mints ${{ inputs.mints }}"; fi
+          if [ "${{ inputs.classes }}" = "yes" ]; then
+            ARGS="--classes --pages ${{ inputs.pages }}"
+          fi
           python3 analysis/bloom_token_pick.py $ARGS
 
       - name: "Коммит вердикта"
