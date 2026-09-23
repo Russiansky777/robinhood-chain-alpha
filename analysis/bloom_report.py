@@ -492,6 +492,11 @@ def позиции_таблица(state: ST.ExecState) -> list:
             "sell_attempts": p.get("sell_attempts"),
             "unsold_reason": p.get("unsold_reason"),
             "balance_read_why_not": p.get("balance_read_why_not"),
+            "jup_attempts": p.get("jup_attempts"),
+            "jup_signature": p.get("jup_signature"),
+            "jup_why_not": p.get("jup_why_not"),
+            "jup_floor": p.get("jup_floor"),
+            "closed_reason": p.get("closed_reason"),
         })
     строки.sort(key=lambda r: str(r.get("client_order_id")))
     return строки
@@ -711,6 +716,17 @@ def в_текст(о: dict) -> str:
         L.append(f"      наш маршрут: {r.get('our_route_programs')}, хопов "
                  f"{r.get('our_route_hops')}, пул {r.get('our_pool')} "
                  f"(прямой: {r.get('our_pool_direct')}), метки {r.get('flags') or '-'}")
+        if r.get("jup_attempts"):
+            пол = r.get("jup_floor") or {}
+            L.append(f"      Jupiter: попыток {r.get('jup_attempts')}, подпись "
+                     f"{r.get('jup_signature') or '-'}, котировка "
+                     f"{пол.get('out_amount')} лампортов при поле "
+                     f"{пол.get('floor_needed')} ({пол.get('slippage_bps')} bps, "
+                     f"маршрут {пол.get('router')}), доля от входа "
+                     f"{пол.get('quote_share_of_entry_pct')} %"
+                     + (f", отказ: {r.get('jup_why_not')}" if r.get("jup_why_not") else ""))
+        if r.get("closed_reason"):
+            L.append(f"      закрыта: {r.get('closed_reason')}")
         L.append(f"      продажа: чем пробовали {r.get('sell_address_kinds') or '-'}, "
                  f"попыток {r.get('sell_attempts') or 0}"
                  + (f", не продано: {r.get('unsold_reason')}"
@@ -976,6 +992,37 @@ def self_test() -> None:
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",
             тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        # запись с путём Jupiter должна попасть и в таблицу, и в текст
+        st.positions_path.write_text("\n".join([
+            json.dumps({"client_order_id": "j1", "state": "closed",
+                        "mode": ST.MODE_LIVE_TEST, "sol_in": 0.001, "mint": "MINTJ",
+                        "jup_attempts": 1, "jup_signature": "ПОДПИСЬ_JUP",
+                        "jup_floor": {"out_amount": 810693, "floor_needed": 567485,
+                                       "slippage_bps": 3000, "router": "metis",
+                                       "quote_share_of_entry_pct": 81.07},
+                        "closed_reason": "остаток ноль дважды подряд",
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        тбj = позиции_таблица(st)
+        chk("путь Jupiter виден в таблице позиций",
+            тбj[0]["jup_signature"] == "ПОДПИСЬ_JUP"
+            and тбj[0]["jup_floor"]["router"] == "metis", тбj[0])
+        chk("и причина закрытия тоже",
+            "ноль дважды" in тбj[0]["closed_reason"], тбj[0])
+
+        st.positions_path.write_text("\n".join([
+            json.dumps({"client_order_id": "c", "state": "bought",
+                        "mode": ST.MODE_LIVE_TEST, "sol_in": 0.001,
+                        "mint": "MINTX", "buy_address": "POOLX",
+                        "buy_address_kind": "pool", "program": "Meteora DLMM",
+                        "our_pool": None, "our_pool_direct": False,
+                        "our_route_programs": "Raydium CLMM,Raydium CPMM",
+                        "our_route_hops": 2, "flags": "ROUTE_MISMATCH",
+                        "sell_address_kinds": "pool,mint", "sell_attempts": 2,
+                        "unsold_reason": "2 неудачных попыток подряд",
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        тб = позиции_таблица(st)
         chk("видно, чем продавали и почему не продано",
             тб[0]["sell_address_kinds"] == "pool,mint"
             and "неудачных" in тб[0]["unsold_reason"], тб[0])

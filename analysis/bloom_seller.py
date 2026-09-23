@@ -529,8 +529,10 @@ class Seller:
         if по_неудачам and self.jupiter_включён and not pos.get("jup_attempts"):
             r = self.продать_через_jupiter(pos, bal=bal, now=now)
             if r.get("ok"):
+                # Вторая запись в журнал не нужна: продать_через_jupiter уже
+                # записал эту попытку. Строк на одно событие должно быть
+                # ровно столько, сколько событий.
                 итог.update(action="продажа через Jupiter отправлена", jupiter=r)
-                self.log(итог)
                 return итог
             итог["jupiter"] = r
             # Не получилось -- идём в UNSOLD ниже, причина уже в журнале.
