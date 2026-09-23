@@ -1,13 +1,13 @@
-    false,
-    ""
-  ],
   "heartbeat_path": "/home/bot/bloom_executor_live_data/detector_status.json"
 }
 --- исполнитель ---
 {
   "schema_version": 2,
+  "mode": "dry-run",
   "live_buy_enabled": false,
+  "live_test_enabled": false,
   "dry_run": true,
+  "bump_sol": 0.02,
   "buy_sol": 0.2,
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
@@ -58,22 +58,85 @@
     }
   }
 }
+        "blockTime": 1790000630,
+        "err": null
+      },
+      {
+        "signature": "3JTSnyqjX5XNSnZ9m2wd8W94rFkBQ989F5z5zx67V5twVYc5W9wjes55GcTvDj71hMqufTFfSXxZkQrVhnFv5yF6",
+        "blockTime": 1790000120,
+        "err": null
+      },
+      {
+        "signature": "CagoekDF3dHBrwmYqU4oP5f8LgjPS2rtMh4yxRhGQ8ybeoW29NNP7iUPxLGB1VHBFmhz9dYY5AixoBsiqM1bFpY",
+        "blockTime": 1790000087,
+        "err": null
+      },
+      {
+        "signature": "3sRihTrYxLZaTnsYwoeips2ZpXRNsByt25LMTd7VMyhEAVKCovHH2sxcoLEM8n3E4yVw6aKMYaLRLABkPeHjUMr2",
+        "blockTime": 1789997134,
+        "err": null
+      },
+      {
+        "signature": "5iLEn7aiUH3377hbauCBp436HnzsnN9rzDxpmSpS8Z3pocHJJ227rX1UyzaU77wA9bJ3zubH9FJah38WMNyHF7pa",
+        "blockTime": 1789997099,
+        "err": null
+      },
+      {
+        "signature": "btTy2uhkfF7mcYa11aKEF6Kr8qsChWTrLE5sRWc6FnKnh1KzhSDQQouGG8DV7VtuZ7JYF4f5wegkvsRiLdsjkVw",
+        "blockTime": 1789996079,
+        "err": null
+      },
+      {
+        "signature": "3AxkZ2vdcbp18swQ8iF8M82a729sFEdQacS9TTYWw4UnvTVeSNZsbp5w3Z9zBFwWrPMHx13Kg1Y3rTQ6uLrD7RMM",
+        "blockTime": 1789996046,
+        "err": null
+      },
+      {
+        "signature": "5otnuycdu2a4JsHpEu34BmP5yTWPoRGMM8pu2NnqmG6CPkHYy26vkwduXLMswjcTtapM3D369BvAdwcrdmWD3fir",
+        "blockTime": 1789963834,
+        "err": null
+      }
+    ],
+    "foreign_count": 40
+  },
+  "journal": {
+    "decisions": {
+      "v1": 0,
+      "v2": 0,
+      "unreadable": 0
+    },
+    "positions": {
+      "v1": 0,
+      "v2": 0,
+      "unreadable": 0
+    },
+    "mixed": false
+  },
+  "blockers": [
+    "на кошельке 40 сделок, которых мы не делали -- мы в кошельке не одни"
+  ],
+  "clean": false,
+  "verdict": "старт заблокирован, причин 1"
+}
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T19:42:04Z",
-  "updated_ts": 1790192524.2361896,
-  "alive_since_utc": "2026-09-23T19:42:04Z",
+  "updated_utc": "2026-09-23T19:58:55Z",
+  "updated_ts": 1790193535.753799,
+  "alive_since_utc": "2026-09-23T19:58:55Z",
   "mode": "dry",
-  "sources": 17,
-  "sources_from": "DBot живьём",
+  "sources": 18,
+  "sources_from": "DBot живьём + тестовый источник из окружения",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
   "signals_seen": 0,
   "to_buy": 0,
   "by_code": {},
+  "by_code_test_source": {},
+  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+  "test_min_sol": 0.05,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 114.85017365960019,
+  "rate_usd_sol": 115.020901598238,
   "rate_fresh": true,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
@@ -83,7 +146,7 @@
   "net_slot": null,
   "slot_notifications": 0,
   "net_slot_age_s": null,
-  "balance_sol": 0.00089088,
+  "balance_sol": 0.362935329,
   "balance_age_s": 0.04,
   "rpc_calls": 1,
   "rpc_by_method": {
@@ -95,8 +158,11 @@
   "exec_by_code": {},
   "executor": {
     "schema_version": 2,
+    "mode": "dry-run",
     "live_buy_enabled": false,
+    "live_test_enabled": false,
     "dry_run": true,
+    "bump_sol": 0.02,
     "buy_sol": 0.2,
     "slippage_pct": 35.0,
     "priority_fee": 0.001,
