@@ -1,101 +1,213 @@
-2026-09-23T00:51:19Z INFO ключ Helius взят из переменной HELIUS_API_KEY
+2026-09-23T13:13:02Z INFO ключ Helius взят из переменной HELIUS_API_KEY
+
+=== СОСТАВ ЗАПИСЕЙ DBot за окно ===
+всего записей по нашим источникам: 1189; ещё 96 записей по источникам, которых нет в текущем списке зонда
+  по направлению сделки ИСТОЧНИКА: {"источник_купил": 708, "источник_продал": 481}
+  по нашему типу:                  {"buy": 708, "sell": 481}
+  по состоянию:                    {"fail": 1136, "done": 53}
+  по причине отказа (топ):         {"FOLLOW_ORDER_IS_ONLY_PNL_MODE": 481, "TARGET_AMOUNT_OUT_OF_RANGE": 336, "SKIP_TARGET_INCREASE_POSITION": 281, "(пусто)": 53, "DUPLICATE_TOKEN_BUY": 25, "Jupiter:Request Order Failed:Request failed with status code": 4}
+  для оценки пропусков берутся только покупки источника: 708 (отложено 481)
 
 === ПРОПУСКИ: покупки DBot без события в зонде ===
 окно 24ч, допуск по времени +-120с
-покупок DBot от наших источников: 683
-  событие в зонде ЕСТЬ:  471
-  события НЕТ (пропуск): 212 = 31.0%
-по задачам: {"BATCH-7": {"всего": 150, "есть_событие": 145, "пропущено": 5}, "BATCH-6": {"всего": 20, "есть_событие": 14, "пропущено": 6}, "BATCH-5": {"всего": 67, "есть_событие": 47, "пропущено": 20}, "BATCH-4": {"всего": 12, "есть_событие": 12, "пропущено": 0}, "BATCH-3": {"всего": 43, "есть_событие": 27, "пропущено": 16}, "BATCH-2": {"всего": 43, "есть_событие": 42, "пропущено": 1}, "BATCH-1": {"всего": 82, "есть_событие": 81, "пропущено": 1}, "pointfarmcap": {"всего": 266, "есть_событие": 103, "пропущено": 163}}
+записей DBot всего: 708 (по состояниям: {"fail": 655, "done": 53})
+РАЗНЫХ сделок источников после склейки повторов: 428
+  событие в зонде ЕСТЬ:  157
+  события НЕТ (пропуск): 271 = 63.3%
+по задачам: {"BATCH-6": {"всего": 46, "есть_событие": 20, "пропущено": 26, "пропущено_по_состоянию": {"fail": 26}}, "BATCH-2": {"всего": 24, "есть_событие": 21, "пропущено": 3, "пропущено_по_состоянию": {"fail": 1, "done": 2}}, "BATCH-7": {"всего": 74, "есть_событие": 59, "пропущено": 15, "пропущено_по_состоянию": {"fail": 11, "done": 4}}, "BATCH-5": {"всего": 58, "есть_событие": 12, "пропущено": 46, "пропущено_по_состоянию": {"fail": 38, "done": 8}}, "BATCH-4": {"всего": 9, "есть_событие": 5, "пропущено": 4, "пропущено_по_состоянию": {"done": 3, "fail": 1}}, "BATCH-3": {"всего": 30, "есть_событие": 12, "пропущено": 18, "пропущено_по_состоянию": {"fail": 14, "done": 4}}, "BATCH-1": {"всего": 8, "есть_событие": 6, "пропущено": 2, "пропущено_по_состоянию": {"fail": 2}}, "pointfarmcap": {"всего": 179, "есть_событие": 22, "пропущено": 157, "пропущено_по_состоянию": {"fail": 154, "done": 3}}}
 примеры пропусков: [
  {
-  "источник": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
-  "задача": "BATCH-7",
-  "когда_utc": "2026-09-23T00:41:33Z",
-  "state": "done"
+  "источник": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-22T21:15:56Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "TARGET_AMOUNT_OUT_OF_RANGE"
+  ]
  },
  {
-  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
-  "задача": "BATCH-7",
-  "когда_utc": "2026-09-23T00:11:36Z",
-  "state": "fail"
+  "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T21:18:40Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
  },
  {
-  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
-  "задача": "BATCH-7",
-  "когда_utc": "2026-09-22T23:57:50Z",
-  "state": "fail"
- },
- {
-  "источник": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
-  "задача": "BATCH-7",
-  "когда_utc": "2026-09-22T23:54:41Z",
-  "state": "fail"
- },
- {
-  "источник": "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ",
-  "задача": "BATCH-7",
-  "когда_utc": "2026-09-22T23:49:58Z",
-  "state": "fail"
- },
- {
-  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
-  "задача": "BATCH-6",
-  "когда_utc": "2026-09-23T00:33:49Z",
-  "state": "fail"
- },
- {
-  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
-  "задача": "BATCH-6",
-  "когда_utc": "2026-09-22T23:51:45Z",
-  "state": "fail"
- },
- {
-  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
-  "задача": "BATCH-6",
-  "когда_utc": "2026-09-22T23:50:45Z",
-  "state": "fail"
- },
- {
-  "источник": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
-  "задача": "BATCH-6",
-  "когда_utc": "2026-09-22T23:50:20Z",
-  "state": "fail"
- },
- {
-  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
-  "задача": "BATCH-6",
-  "когда_utc": "2026-09-22T22:21:14Z",
-  "state": "fail"
+  "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn",
+  "задача": "BATCH-5",
+  "когда_utc": "2026-09-22T21:26:56Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "TARGET_AMOUNT_OUT_OF_RANGE"
+  ]
  },
  {
   "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
   "задача": "BATCH-6",
   "когда_utc": "2026-09-22T21:36:13Z",
-  "state": "fail"
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "TARGET_AMOUNT_OUT_OF_RANGE"
+  ]
  },
  {
-  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-  "задача": "BATCH-5",
-  "когда_utc": "2026-09-23T00:50:38Z",
-  "state": "fail"
+  "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T21:48:47Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
  },
  {
-  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn",
   "задача": "BATCH-5",
-  "когда_utc": "2026-09-23T00:50:34Z",
-  "state": "fail"
+  "когда_utc": "2026-09-22T21:50:31Z",
+  "состояния_попыток": [
+   "fail",
+   "fail",
+   "fail",
+   "fail",
+   "fail"
+  ],
+  "попыток": 9,
+  "причины": [
+   "TARGET_AMOUNT_OUT_OF_RANGE",
+   "TARGET_AMOUNT_OUT_OF_RANGE",
+   "TARGET_AMOUNT_OUT_OF_RANGE"
+  ]
  },
  {
-  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-  "задача": "BATCH-5",
-  "когда_utc": "2026-09-23T00:49:55Z",
-  "state": "fail"
+  "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T21:56:32Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
  },
  {
-  "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+  "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv",
   "задача": "BATCH-5",
-  "когда_utc": "2026-09-23T00:48:58Z",
-  "state": "fail"
+  "когда_utc": "2026-09-22T22:02:52Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
+ },
+ {
+  "источник": "4ugDhHJ8XDXAeABmrNmGffFaLbJb9BkPyiFGVSV9ocwo",
+  "задача": "BATCH-1",
+  "когда_utc": "2026-09-22T22:06:10Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
+ },
+ {
+  "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
+  "задача": "BATCH-6",
+  "когда_utc": "2026-09-22T22:21:14Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "TARGET_AMOUNT_OUT_OF_RANGE"
+  ]
+ },
+ {
+  "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T22:25:40Z",
+  "состояния_попыток": [
+   "done",
+   "fail"
+  ],
+  "попыток": 2,
+  "причины": [
+   "DUPLICATE_TOKEN_BUY"
+  ]
+ },
+ {
+  "источник": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T22:39:16Z",
+  "состояния_попыток": [
+   "fail",
+   "fail"
+  ],
+  "попыток": 2,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION",
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
+ },
+ {
+  "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T22:39:47Z",
+  "состояния_попыток": [
+   "fail"
+  ],
+  "попыток": 1,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
+ },
+ {
+  "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T22:42:27Z",
+  "состояния_попыток": [
+   "done"
+  ],
+  "попыток": 1,
+  "причины": []
+ },
+ {
+  "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+  "задача": "BATCH-3",
+  "когда_utc": "2026-09-22T23:15:44Z",
+  "состояния_попыток": [
+   "fail",
+   "fail"
+  ],
+  "попыток": 2,
+  "причины": [
+   "SKIP_TARGET_INCREASE_POSITION",
+   "SKIP_TARGET_INCREASE_POSITION"
+  ]
  }
 ]
-ОГОВОРКА: считаются только сделки, на которые DBot среагировал. Сделки источников, которые DBot не копировал, здесь не видны, поэтому это НИЖНЯЯ граница пропусков.
+ОГОВОРКИ:
+  1. Считаются только сделки, на которые DBot среагировал. Сделки источников, которые DBot не копировал, здесь не видны -- это НИЖНЯЯ граница пропусков.
+  2. Повторы одной сделки склеены по (источник, минт, минута): без склейки четыре попытки state=fail подряд считались бы четырьмя пропусками.
+  3. В оценку идут ТОЛЬКО покупки источника. Продажа источника и наша продажа по таймеру пары в зонде иметь не обязаны -- смешивать их с пропусками значит мерить не то.
+  4. Список источников берётся СЕЙЧАС; если за сутки он менялся, часть записей могла относиться к источнику, на который зонд тогда ещё не был подписан.
