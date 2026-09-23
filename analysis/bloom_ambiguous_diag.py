@@ -79,7 +79,10 @@ def записи_dbot(ключ: str, задачи: tuple, конфиг: Path) ->
     """Свежие записи follow нужных задач. Только GET."""
     from solana_ledger_run import fetch_follow_trades_for_task  # noqa: PLC0415
     конф = json.loads(конфиг.read_text(encoding="utf-8"))
-    res = ((конф or {}).get("body") or конф or {}).get("res") or []
+    # Через BD.тело_ответа: снимок хранит тело под ключом "тело", и
+    # прямое чтение "body" давало пустой список -- то есть записи DBot не
+    # загружались ВООБЩЕ, а сверка честно писала "записи не нашлось".
+    res = BD.тело_ответа(конф).get("res") or []
     out = []
     for t in res:
         if t.get("name") in задачи and t.get("id"):
