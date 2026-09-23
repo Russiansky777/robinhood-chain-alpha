@@ -1,0 +1,66 @@
+name: "Bloom: потолок версии транзакции против сообщений без meta (замер)"
+
+# Доля решений, разобранных через RPC, выросла с 11 % до 65 %. Разбор через
+# RPC структурно поздний: getTransaction поддерживает только confirmed, это
+# 1-2 слота и ~300 мс вместо 0 слотов и 0.3 мс. Проверяется гипотеза:
+# подписка просит maxSupportedTransactionVersion: 0, а в блоках есть
+# транзакции версии 1, и сообщения о них приходят без meta.
+#
+# Две подписки в ОДНОМ окне на ОДНИХ источниках, потолок 0 и потолок 1.
+# Только чтение, ни одного ордера.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "длина окна замера, секунд"
+        required: false
+        default: "600"
+      tasks:
+        description: "задачи DBot, чьи источники слушать"
+        required: false
+        default: "BATCH-5,BATCH-3"
+
+concurrency:
+  group: bloom-txver-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО подписки"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_txver_probe.py --self-test
+
+      - name: "Замер"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q websockets requests
+          python3 analysis/bloom_txver_probe.py \
+            --seconds ${{ inputs.seconds }} --tasks ${{ inputs.tasks }}
+
+      - name: "Коммит замера"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_txver_probe.json ] && git add data/bloom_txver_probe.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: замер потолка версии транзакции [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
