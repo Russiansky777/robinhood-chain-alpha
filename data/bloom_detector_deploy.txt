@@ -58,9 +58,6 @@
     }
   }
 }
-      },
-      {
-        "signature": "NUJNjN16sEsYUQ8n9ywD9LEAP25ipjJcBhbWPjCdDUWQRrpfMXH8a6YKkvDg6Yn6XBryNuHuVcKYnpJMRZgVhWD",
         "blockTime": 1790201873,
         "utc": "2026-09-23T22:17:53Z",
         "err": {
@@ -68,11 +65,16 @@
             4,
             "ProgramFailedToComplete"
           ]
-        }
+        },
+        "mints": [
+          "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY"
+        ],
+        "why": "неудачная попытка выхода по нашей позиции: транзакция с ошибкой, платил наш кошелёк, в счетах наш минт"
       }
     ],
+    "unexplained": [],
     "explain_failures": [],
-    "unexplained_count": 3
+    "unexplained_count": 0
   },
   "stand_start": {
     "set": true,
@@ -84,37 +86,103 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 125,
+      "v2": 126,
       "unreadable": 0
     },
     "positions": {
       "v1": 0,
-      "v2": 16,
+      "v2": 34,
       "unreadable": 0
     },
     "mixed": false
   },
   "notes": [
     "открыто 1 позиций стенда (live-test) -- старт разрешён исключением владельца, боевых позиций нет",
+    "2 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)",
     "у кошелька есть прежняя история: 36 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
     "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
   ],
-  "blockers": [
-    "на кошельке 3 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни"
-  ],
-  "clean": false,
-  "verdict": "старт заблокирован, причин 1"
+  "blockers": [],
+  "clean": true,
+  "verdict": "сверка чистая: настоящие покупки включать можно"
 }
 --- коротко ---
-режим: live-test, вердикт: старт заблокирован, причин 1
+режим: live-test, вердикт: сверка чистая: настоящие покупки включать можно
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.350814089 SOL при пороге 0.3
-чужая активность: известно=True, свежих за 24.0 ч 3, прежних 36 (самая свежая 2026-09-23T19:46:12Z)
-    свежая чужая: 2ZcRWqDoTBfmt9PMx7uywfwHp65pL2Zq6dzwRwqvyWnJZm1SdLy1jNxvNnvHk7cHb2pchX9BucTovMyEro7GPL6Y 2026-09-23T23:03:21Z
+чужая активность: известно=True, свежих за 24.0 ч 2, прежних 36 (самая свежая 2026-09-23T19:46:12Z)
     свежая чужая: 4wFuEBkspadsPNj4pZTRzn2M7Vg2GRWFLHxiGahwDzi3hunNb6nh1u1beEAHucwpgGAJAhP8cbVB5sPr9PvdUu87 2026-09-23T23:02:36Z
     свежая чужая: NUJNjN16sEsYUQ8n9ywD9LEAP25ipjJcBhbWPjCdDUWQRrpfMXH8a6YKkvDg6Yn6XBryNuHuVcKYnpJMRZgVhWD 2026-09-23T22:17:53Z
 граница чужой активности: метка начала стенда (2026-09-23T20:50:35Z)
 позиции: dry-run 0, настоящих открытых 1
-  БЛОКЕР: на кошельке 3 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
   примечание: открыто 1 позиций стенда (live-test) -- старт разрешён исключением владельца, боевых позиций нет
+  примечание: 2 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)
   примечание: у кошелька есть прежняя история: 36 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
+{
+  "schema_version": 2,
+  "updated_utc": "2026-09-23T23:09:57Z",
+  "updated_ts": 1790204997.8273122,
+  "alive_since_utc": "2026-09-23T23:09:57Z",
+  "mode": "dry",
+  "sources": 19,
+  "sources_from": "DBot живьём + тестовых источников из окружения: 2",
+  "sources_generation": 0,
+  "subscribe_method": "transactionSubscribe",
+  "subscribe_drops": 0,
+  "signals_seen": 0,
+  "to_buy": 0,
+  "by_code": {},
+  "by_code_test_source": {},
+  "test_sources": [
+    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+    "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
+  ],
+  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+  "test_min_sol": 0.05,
+  "max_tx_version": 1,
+  "rate_source": "geckoterminal",
+  "rate_usd_sol": 115.35363273021858,
+  "rate_fresh": true,
+  "rate_failures": [],
+  "kill_path": "/etc/bloom-executor/KILL",
+  "kill_readable": true,
+  "kill_active": false,
+  "kill_note": "путь рубильника доступен на чтение",
+  "net_slot": null,
+  "slot_notifications": 0,
+  "net_slot_age_s": null,
+  "balance_sol": 0.350814089,
+  "balance_age_s": 0.03,
+  "rpc_calls": 1,
+  "rpc_by_method": {
+    "getBalance": 1
+  },
+  "session_credits": 1,
+  "executor_attached": true,
+  "executed": 0,
+  "exec_by_code": {},
+  "executor": {
+    "schema_version": 2,
+    "mode": "live-test",
+    "live_buy_enabled": false,
+    "live_test_enabled": true,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.001,
+    "slippage_pct": 35.0,
+    "priority_fee": 0.001,
+    "processor_tip": 0.001,
+    "sell_after_s": 28.8,
+    "sell_slippage_pct": 40.0,
+    "sent": 0,
+    "refused": 0,
+    "last_error": "",
+    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "decide_latency_ms": null
+}--- решений в журнале ---
+126
+--- позиций в журнале (должно быть 0: покупать нечем) ---
+38
