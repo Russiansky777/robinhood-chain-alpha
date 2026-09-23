@@ -86,8 +86,12 @@ def program_touching(tx: dict, accounts: set[str]) -> str | None:
             for ins in instrs:
                 accs = set(ins.get("accounts") or [])
                 if not accs:
-                    pa = (ins.get("parsed") or {}).get("info") or {}
-                    accs = {v for v in pa.values() if isinstance(v, str)}
+                    # У разобранной инструкции parsed бывает СТРОКОЙ, а не
+                    # объектом: на этом прогон и падал на 9-й сделке.
+                    parsed = ins.get("parsed")
+                    pa = parsed.get("info") if isinstance(parsed, dict) else None
+                    accs = ({v for v in pa.values() if isinstance(v, str)}
+                            if isinstance(pa, dict) else set())
                 hit = len(accs & accounts)
                 if hit and (best is None or hit > best[0]):
                     best = (hit, ins.get("programId"))
@@ -668,6 +672,11 @@ def self_test() -> None:
     chk("известная программа берётся из файла меток репозитория",
         program_label("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8") == "Raydium",
         program_label("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"))
+    стр = {"transaction": {"message": {"instructions": [
+        {"parsed": "строка вместо объекта", "programId": "P1"}]}},
+        "meta": {"innerInstructions": []}}
+    chk("инструкция с parsed-строкой не роняет разбор",
+        program_touching(стр, {"V"}) is None)
     empty = pool_reserves(TX([B("X", M, 5)], [B("X", M, 4)]), M, "TRADER")
     chk("нет котировки -- честный отказ с причиной",
         empty["ок"] is False and "не опознаны" in empty["почему"])
