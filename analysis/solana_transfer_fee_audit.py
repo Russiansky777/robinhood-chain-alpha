@@ -149,8 +149,31 @@ def transfers_by_mint(tx: dict, acc_mint: dict) -> dict:
     return dict(counts)
 
 
+def _native_delta(tx: dict, owner: str) -> float:
+    """Изменение нативного баланса счёта, без комиссии сети у подписанта."""
+    meta = (tx or {}).get("meta") or {}
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    raw = msg.get("accountKeys") or []
+    keys = [k.get("pubkey") if isinstance(k, dict) else k for k in raw]
+    if owner not in keys:
+        return 0.0
+    i = keys.index(owner)
+    pb, po = meta.get("preBalances") or [], meta.get("postBalances") or []
+    if i >= len(pb) or i >= len(po):
+        return 0.0
+    d = (po[i] - pb[i]) / 1e9
+    if i == 0:
+        d += (meta.get("fee") or 0) / 1e9
+    return d
+
+
 def rate_in_sol(tx: dict, mint: str) -> float | None:
-    """Курс минта в SOL ПО ЭТОЙ ЖЕ транзакции. Нет ноги -- честно None."""
+    """Курс минта в SOL ПО ЭТОЙ ЖЕ транзакции. Нет ноги -- честно None.
+
+    Две ветки, и вторая обязательна: у половины сделок кошелёк платит
+    НАТИВНЫМ SOL, а не WSOL-токеном, и поиск только по токеновым балансам
+    оставлял без курса 182 сделки из 367.
+    """
     if mint == WSOL:
         return 1.0
     meta = (tx or {}).get("meta") or {}
@@ -162,7 +185,16 @@ def rate_in_sol(tx: dict, mint: str) -> float | None:
         dw = post.get((o, WSOL), 0.0) - pre.get((o, WSOL), 0.0)
         if dm and dw and (dm > 0) != (dw > 0):
             return abs(dw) / abs(dm)
-    return None
+    # Нативная ветка: тот, у кого минт и SOL двигаются навстречу.
+    best = None
+    for o in owners:
+        dm = post.get((o, mint), 0.0) - pre.get((o, mint), 0.0)
+        if not dm:
+            continue
+        dn = _native_delta(tx, o)
+        if dn and (dm > 0) != (dn > 0) and (best is None or abs(dm) > best[0]):
+            best = (abs(dm), abs(dn) / abs(dm))
+    return best[1] if best else None
 
 
 def route_of(tx: dict, target: str) -> dict:
@@ -279,6 +311,14 @@ def self_test() -> None:
     chk("минт не прочитался -- честная причина, а не пустая ставка",
         "не отдался" in mint_info(DeadRpc(), "X").get("почему", ""))
 
+    # Курс по нативному SOL: кошелёк платит не WSOL-токеном, а прямо SOL.
+    tx4 = {"meta": {"preTokenBalances": [B(1, "US", M, 0.0)],
+                     "postTokenBalances": [B(1, "US", M, 100.0)],
+                     "preBalances": [3_000_000_000], "postBalances": [2_000_000_000], "fee": 0},
+            "transaction": {"message": {"accountKeys": [{"pubkey": "US"}], "instructions": []}}}
+    chk("курс берётся и по нативному SOL", abs((rate_in_sol(tx4, M) or 0) - 0.01) < 1e-12,
+        str(rate_in_sol(tx4, M)))
+
     bad = 0
     for n, ok, got in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {n}" + (f"  -> {got}" if got and not ok else ""))
@@ -290,13 +330,19 @@ def self_test() -> None:
 
 # ------------------------------------------------------------------ прогон
 
+CACHE_VERSION = 2   # курс минта теперь ищется и по нативному SOL
+
+
 def load_cache() -> dict:
     if CACHE_PATH.exists():
         try:
-            return json.loads(CACHE_PATH.read_text())
+            d = json.loads(CACHE_PATH.read_text())
         except (ValueError, OSError):
             return {}
-    return {}
+        if d.get("_версия") == CACHE_VERSION:
+            return d
+        print(f"[кэш] версия {d.get('_версия')} устарела -- маршруты пересчитываются заново")
+    return {"_версия": CACHE_VERSION}
 
 
 def save_cache(cache: dict) -> None:
@@ -374,6 +420,7 @@ def main() -> None:
         trades = trades[:args.limit]
     cache = load_cache()
     sigs = []
+    cache.setdefault("_версия", CACHE_VERSION)
     for t in trades:
         for s in (t["buy_signature"], t["sell_signature"]):
             if s not in cache:
@@ -395,7 +442,7 @@ def main() -> None:
     все_минты = set()
     for t in trades:
         for s_ in (t["buy_signature"], t["sell_signature"]):
-            r = (cache.get(s_) or {}).get("маршрут")
+            r = (cache.get(s_) or {}).get("маршрут") if isinstance(cache.get(s_), dict) else None
             if r:
                 все_минты |= set(r["токены"])
     все_минты -= set(BASE)
