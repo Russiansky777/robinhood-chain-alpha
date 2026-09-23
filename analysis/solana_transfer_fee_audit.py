@@ -87,6 +87,11 @@ def mint_info(rpc, mint: str) -> dict:
         out["ставка_комиссии_прежняя_bps"] = older.get("transferFeeBasisPoints")
         out["потолок_комиссии"] = newer.get("maximumFee")
         out["эпоха_ставки"] = newer.get("epoch")
+    for e in exts:
+        if isinstance(e, dict) and e.get("extension") == "tokenMetadata":
+            st = e.get("state") or {}
+            out["название"] = st.get("name")
+            out["тикер"] = st.get("symbol")
     out["таксируемый"] = bool(out.get("ставка_комиссии_bps"))
     if out["ставка_комиссии_bps"] is None and out["программа_токена_id"] == TOKEN_2022:
         out["оговорка"] = "Token-2022 без расширения комиссии на перевод"
@@ -544,6 +549,8 @@ def main() -> None:
     rep["промежуточные_токены"] = {
         m: {**v, "сумма_по_цепи_sol": round(v["сумма_по_цепи_sol"], 6),
             "удержано_sol": round(v["удержано_sol"], 6),
+            "тикер": (минты.get(m) or {}).get("тикер"),
+            "название": (минты.get(m) or {}).get("название"),
             "ставка_комиссии_bps": (минты.get(m) or {}).get("ставка_комиссии_bps"),
             "программа_токена": (минты.get(m) or {}).get("программа_токена")}
         for m, v in sorted(промеж.items(), key=lambda kv: -kv[1]["сделок"])}
@@ -567,7 +574,8 @@ def main() -> None:
                     continue
                 g = итог["по_токенам"].setdefault(m, {
                     "переводов": 0, "удержано_токена": 0.0, "удержано_sol": 0.0,
-                    "ставка_комиссии_bps": (минты.get(m) or {}).get("ставка_комиссии_bps")})
+                    "ставка_комиссии_bps": (минты.get(m) or {}).get("ставка_комиссии_bps"),
+                    "тикер": (минты.get(m) or {}).get("тикер")})
                 g["переводов"] += v["переводов"]
                 g["удержано_токена"] += v["недостача"]
                 if v["удержано_sol"]:
