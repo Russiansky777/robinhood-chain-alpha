@@ -1,0 +1,114 @@
+name: "Bloom: суточный доклад и живая сверка с DBot"
+
+# Доклад считается НЕ на хосте, а на бегунке: журналы копируются сюда
+# только на чтение, и сопоставление с записями follow идёт ключом DBot,
+# который на бегунке уже есть. Так на хост не надо везти ни ещё один
+# модуль, ни ключ, ни сеть до DBot.
+#
+# Только чтение: ни одна служба не трогается, ни один ордер не уходит.
+on:
+  workflow_dispatch:
+    inputs:
+      rows:
+        description: "строк в таблице слотов"
+        required: false
+        default: "15"
+      since:
+        description: "начало окна UTC, например 2026-09-23T00:00:00Z (пусто -- всё)"
+        required: false
+        default: ""
+      dbot:
+        description: "'yes' -- сопоставить с записями follow у DBot"
+        required: false
+        default: "yes"
+      tasks:
+        description: "какие задачи DBot сверять"
+        required: false
+        default: "BATCH-5,BATCH-3"
+
+concurrency:
+  group: bloom-report
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка доклада ДО его построения"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_report.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Копия журналов с хоста (только чтение)"
+        run: |
+          set -e
+          mkdir -p /tmp/bloom_state/helius_usage
+          for f in decisions.jsonl positions.jsonl detector_status.json seller_heartbeat.json; do
+            if ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/$f"; then
+              ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/bloom_state/$f"
+              echo "$f: $(wc -c < /tmp/bloom_state/$f) байт"
+            else
+              echo "$f: нет или пуст на хосте"
+            fi
+          done
+          # Осколки учёта кредитов -- по одному файлу на службу и день.
+          OSKOLKI=$(ssh -n $SSH_OPTS root@$HOST "ls -1 $STATE_DIR/helius_usage 2>/dev/null || true")
+          for f in $OSKOLKI; do
+            ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/helius_usage/$f" > "/tmp/bloom_state/helius_usage/$f"
+            echo "учёт: $f"
+          done
+          ls -l /tmp/bloom_state
+
+      - name: "Доклад"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          BLOOM_STATE_DIR: /tmp/bloom_state
+        run: |
+          set -e
+          ARGS="--rows ${{ inputs.rows }}"
+          if [ -n "${{ inputs.since }}" ]; then ARGS="$ARGS --since ${{ inputs.since }}"; fi
+          if [ "${{ inputs.dbot }}" = "yes" ]; then
+            ARGS="$ARGS --dbot --tasks ${{ inputs.tasks }} --config data/final/20260923T145755Z/konfig.json"
+          fi
+          echo "аргументы доклада: $ARGS"
+          python3 analysis/bloom_report.py $ARGS --out data/bloom_report.txt
+
+      - name: "Коммит доклада"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/bloom_report.txt data/bloom_report.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: суточный доклад [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
