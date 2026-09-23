@@ -389,6 +389,44 @@ def find_pair_trades(rpc, wallet: str, mint: str, limit: int = 300) -> list:
     return out
 
 
+RED_SIGS = ("4mUwP3S5gDiZqU3FGuNXdMNZdUrWbnHhiKoyWi2UW7yGWw3VoAyP6t93honHP5GT755Fxbp6Qc2j4jZiAKGn6zqp",
+             "5Y5mNiTLAmoV3vbw29tUe2e91xTsVYJxTp255Ze1XqrneBHmJYZNbvmC2T7FzHqoiiqjUxBbxFy6JqtbKPUgLVUw")
+
+
+def find_pair_by_sigs(rpc, wallet: str, sigs) -> dict:
+    """Пара по ЗАДАННЫМ подписям. Минт не задаётся руками, а определяется
+    по самим транзакциям: это токен, который кошелёк получил в первой ноге
+    и отдал во второй. Ошибиться в адресе минта тут нечем."""
+    txs = rpc.transactions(list(sigs))
+    ноги = []
+    минт = None
+    for sig in sigs:
+        tx = txs.get(sig)
+        if not tx:
+            ноги.append({"подпись": sig, "почему": "транзакция не отдалась"})
+            continue
+        meta = tx.get("meta") or {}
+        pre = {(o, m): a for i, o, m, a in _bal(meta.get("preTokenBalances"))}
+        post = {(o, m): a for i, o, m, a in _bal(meta.get("postTokenBalances"))}
+        дельты = {}
+        for (o, m) in set(pre) | set(post):
+            if o != wallet or m in BASE:
+                continue
+            дельты[m] = post.get((o, m), 0.0) - pre.get((o, m), 0.0)
+        свой = max(дельты.items(), key=lambda kv: abs(kv[1]), default=(None, 0.0))
+        if минт is None and свой[0]:
+            минт = свой[0]
+        ноги.append({"подпись": sig, "слот": tx.get("slot"),
+                      "время_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                   time.gmtime(tx["blockTime"]))
+                                     if tx.get("blockTime") else None),
+                      "минт": свой[0], "дельта_токена_у_нас": round(свой[1], 6),
+                      "направление": "покупка" if свой[1] > 0 else "продажа",
+                      "sol_дельта": round(_native_delta(tx, wallet), 9),
+                      "маршрут": route_of(tx, свой[0] or "")})
+    return {"кошелёк": wallet, "минт": минт, "сделки": ноги}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--self-test", action="store_true")
@@ -420,6 +458,8 @@ def main() -> None:
         пары[имя] = {"кошелёк": wallet, "минт": mint,
                       "сделки": find_pair_trades(rpc, wallet, mint)}
         print(f"[пары] {имя}: найдено {len(пары[имя]['сделки'])} транзакций")
+    пары["RED у TEST1"] = find_pair_by_sigs(rpc, TEST1, RED_SIGS)
+    print(f"[пары] RED у TEST1: минт {пары['RED у TEST1']['минт']}")
     rep["пары"] = пары
 
     # 3. Свод по закрытым сделкам.
@@ -503,6 +543,11 @@ def main() -> None:
                         по_минтам[m]["удержано_sol"] += v["удержано_sol"]
                         уд += v["удержано_sol"]
         межд = sorted(m for m in по_минтам if m != mint)
+        межд_нога = {}
+        for имя_ноги, r in (("покупка", rb), ("продажа", rs)):
+            межд_нога[имя_ноги] = sorted(
+                m for m, v in r["токены"].items()
+                if m in таксируемые and m != mint and (v["переводов"] or v["недостача"]))
         цепь = (t.get("sol_in") or 0.0) + (t.get("sol_out") or 0.0)
         задача = t.get("task_name") or "без задачи"
         g = по_задачам[задача]
@@ -532,6 +577,8 @@ def main() -> None:
                         "кошелёк": t.get("wallet"),
                         "цель_таксируемая": mint in таксируемые,
                         "промежуточные_таксируемые": межд,
+                        "промежуточные_покупка": межд_нога["покупка"],
+                        "промежуточные_продажа": межд_нога["продажа"],
                         "переводов_по_минтам": {m: v["переводов"] for m, v in по_минтам.items()},
                         "удержано_sol": round(уд, 9),
                         "налог_неполон_нет_курса": нет_курса,
@@ -600,6 +647,11 @@ def main() -> None:
     краткое = {k: v for k, v in rep.items() if k not in ("строки", "минты")}
     краткое["пары"] = {k: {"кошелёк": v["кошелёк"], "минт": v["минт"],
                             "транзакций": len(v["сделки"]),
+                            "по_ногам": [{"время_utc": x.get("время_utc"),
+                                           "направление": x.get("направление"),
+                                           "sol_дельта": x.get("sol_дельта"),
+                                           "промежуточные": (x.get("маршрут") or {}).get("промежуточные")}
+                                          for x in v["сделки"]],
                             "комиссия_на_перевод": v.get("комиссия_на_перевод")}
                         for k, v in пары.items()}
     print(json.dumps(краткое, ensure_ascii=False, indent=2)[:7000])
