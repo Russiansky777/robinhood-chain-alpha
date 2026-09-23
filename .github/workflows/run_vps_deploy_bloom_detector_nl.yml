@@ -159,10 +159,13 @@ jobs:
             #     подписант, и разбор такой сделки надо проверить отдельно.
             # Старое одиночное имя чистится, чтобы не осталось расхождения
             # между двумя переменными.
-            sed -i '/^BLOOM_TEST_SOURCES=/d; /^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d' $ENV_DIR/env
+            sed -i '/^BLOOM_TEST_SOURCES=/d; /^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d; /^BLOOM_TEST_BUY_SOL_BUMP=/d' $ENV_DIR/env
             echo 'BLOOM_TEST_SOURCES=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX,8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA' >> $ENV_DIR/env
             echo 'BLOOM_TEST_MIN_SOL=0.05' >> $ENV_DIR/env
-            echo 'BLOOM_TEST_BUY_SOL=0.01' >> $ENV_DIR/env
+            # Размер стенда по слову владельца: 0.001 SOL, при отказе
+            # площадки по минимуму -- один повтор на 0.005.
+            echo 'BLOOM_TEST_BUY_SOL=0.001' >> $ENV_DIR/env
+            echo 'BLOOM_TEST_BUY_SOL_BUMP=0.005' >> $ENV_DIR/env
             # BLOOM_LIVE_BUY вычищается ВСЕГДА: боевые покупки по реальным
             # источникам этот файл не включает ни при каких входных данных.
             sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env

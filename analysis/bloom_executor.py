@@ -73,8 +73,18 @@ EXEC_RATE_LIMITED = "RATE_LIMITED"
 EXEC_NOT_A_BUY = "NOT_A_BUY_DECISION"
 
 
-DEFAULT_TEST_BUY_SOL = ST.env_float("BLOOM_TEST_BUY_SOL", 0.01)
-DEFAULT_TEST_BUY_SOL_BUMP = ST.env_float("BLOOM_TEST_BUY_SOL_BUMP", 0.02)
+# Размер стенда по слову владельца 23.09: 0.001 SOL, при отказе по
+# минимуму -- 0.005. Цель прогона -- проверить путь, а не заработать.
+DEFAULT_TEST_BUY_SOL = ST.env_float("BLOOM_TEST_BUY_SOL", 0.001)
+DEFAULT_TEST_BUY_SOL_BUMP = ST.env_float("BLOOM_TEST_BUY_SOL_BUMP", 0.005)
+
+# Срок авто-ордера 28.8 с -- дробный, и Bloom может не принять его как
+# целое число секунд. Тогда РАЗРЕШЕНА одна замена на 29: это тоже отказ
+# тела (INVALID_REQUEST), значит в цепь ничего не ушло.
+SELL_AFTER_FALLBACK_S = ST.env_float("BLOOM_SELL_AFTER_FALLBACK_S", 29.0)
+TARGET_HINT = re.compile(r"target_value|target_type|auto_order|integer|"
+                          r"whole|целое|секунд", re.I)
+EXEC_SENT_AFTER_TARGET = "SENT_AFTER_TARGET_FIX"
 
 # Один и только один повтор с УВЕЛИЧЕННОЙ суммой -- и только если запрос
 # был отвергнут до отправки. INVALID_REQUEST означает, что Bloom тело не
@@ -143,7 +153,8 @@ class Executor:
 
     # --------------------------------------------------------------- тело
 
-    def build_body(self, mint: str, *, amount_sol: float | None = None) -> dict:
+    def build_body(self, mint: str, *, amount_sol: float | None = None,
+                   sell_after_s: float | None = None) -> dict:
         """Тело покупки с ОБЯЗАТЕЛЬНЫМ таймерным авто-ордером.
 
         auto_orders непустой -- принципиально: при отсутствии поля Bloom
@@ -151,7 +162,8 @@ class Executor:
         чужие условия выхода вместо своих 28.8 с.
         """
         order = API.build_timer_order(
-            seconds=self.sell_after_s, slippage=self.sell_slippage_pct,
+            seconds=(self.sell_after_s if sell_after_s is None else sell_after_s),
+            slippage=self.sell_slippage_pct,
             priority_fee=self.priority_fee, processor_tip=self.processor_tip,
             amount_percent=100)
         return API.build_buy_body(
@@ -250,51 +262,85 @@ class Executor:
                        reason=res.get("caveat") or "принято")
             return out
 
-        # Один безопасный повтор с УВЕЛИЧЕННОЙ суммой -- только на стенде и
-        # только если Bloom отверг само тело (INVALID_REQUEST) со ссылкой на
-        # минимум. Это значит, что в цепь ничего не ушло, и повтор не может
-        # купить дважды. На любом другом коде повтора нет: 200 у Bloom --
-        # это "принято", и слепой повтор способен купить второй раз.
+        # Безопасные повторы -- ТОЛЬКО когда Bloom отверг само тело
+        # (INVALID_REQUEST). Это значит, что в цепь ничего не ушло, и повтор
+        # не может купить дважды. На любом другом коде повтора нет: 200 у
+        # Bloom -- это "принято", и слепой повтор способен купить второй раз.
+        #
+        # Поправок две, каждая применяется не больше одного раза:
+        #   * сумма ниже минимума площадки -> поднять до bump_sol;
+        #   * срок авто-ордера 28.8 не принят как целое -> заменить на 29.
+        # Решение владельца: первый живой вызов идёт с 28.8, и только при
+        # INVALID_REQUEST -- 29.
+        сумма_тек = self.buy_sol
+        срок_тек = self.sell_after_s
+        поднимали = False
+        правили_срок = False
         код_первый = res.get("error_code") or "?"
         текст_первый = str(res.get("why_not") or "")
-        можно_поднять = (self.mode == ST.MODE_LIVE_TEST
-                          and код_первый in BUMP_SAFE_CODES
-                          and BUMP_HINT.search(текст_первый)
-                          and self.buy_sol < self.bump_sol)
-        if можно_поднять:
-            log.warning("Bloom отверг %s SOL (%s: %s) -- одна попытка с %s SOL",
-                        self.buy_sol, код_первый, текст_первый[:120], self.bump_sol)
-            self.state.log_decision({"stage": "exec_bump", "mint": mint,
-                                     "signature": sig, "from_sol": self.buy_sol,
-                                     "to_sol": self.bump_sol,
-                                     "first_error_code": код_первый,
-                                     "first_why_not": текст_первый[:200]})
+        for _ in range(2):
+            если_можно = (self.mode in (ST.MODE_LIVE_TEST, ST.MODE_LIVE)
+                          and (res.get("error_code") or "?") in BUMP_SAFE_CODES)
+            if not если_можно:
+                break
+            текст = str(res.get("why_not") or "")
+            код = res.get("error_code") or "?"
+            новая_сумма, новый_срок = сумма_тек, срок_тек
+            что = None
+            if (not поднимали and BUMP_HINT.search(текст)
+                    and сумма_тек < self.bump_sol):
+                новая_сумма, что = self.bump_sol, "сумма"
+            elif (not правили_срок and TARGET_HINT.search(текст)
+                    and float(срок_тек) != float(int(срок_тек))):
+                новый_срок, что = SELL_AFTER_FALLBACK_S, "срок"
+            if что is None:
+                break
+            log.warning("Bloom отверг тело (%s: %s) -- одна попытка: %s "
+                        "%s -> %s", код, текст[:120], что,
+                        сумма_тек if что == "сумма" else срок_тек,
+                        новая_сумма if что == "сумма" else новый_срок)
+            self.state.log_decision({"stage": "exec_retry", "what": что,
+                                     "mint": mint, "signature": sig,
+                                     "from_sol": сумма_тек, "to_sol": новая_сумма,
+                                     "from_sell_after_s": срок_тек,
+                                     "to_sell_after_s": новый_срок,
+                                     "error_code": код,
+                                     "why_not": текст[:200]})
             try:
-                body2 = self.build_body(mint, amount_sol=self.bump_sol)
+                body2 = self.build_body(mint, amount_sol=новая_сумма,
+                                        sell_after_s=новый_срок)
                 API.validate_swap_body(body2)
             except API.BloomRefusal as exc:
                 self.refused += 1
                 out.update(exec_code=EXEC_REFUSED, reason=str(exc),
                            first_error_code=код_первый)
                 self.state.update_position(cid, state=ST.STATE_CLOSED,
-                                           close_reason="bump_body_refused",
+                                           close_reason="retry_body_refused",
                                            error_code=код_первый)
                 return out
+            сумма_тек, срок_тек = новая_сумма, новый_срок
+            поднимали = поднимали or что == "сумма"
+            правили_срок = правили_срок or что == "срок"
             res = self.api.swap(body2, client_order_id=cid,
-                                why=f"повтор с {self.bump_sol} SOL после {код_первый}")
+                                why=(f"повтор: {что} {сумма_тек} SOL / "
+                                     f"{срок_тек} с после {код}"))
             if res.get("ok"):
                 self.sent += 1
+                итоговый_код = (EXEC_BUMPED if поднимали else EXEC_SENT_AFTER_TARGET)
                 self.state.update_position(
                     cid, state="bought", order_id=res.get("order_id"),
                     signatures=res.get("signatures") or [],
-                    ts_accepted=time.time(), sol_in=self.bump_sol,
-                    bumped_from_sol=self.buy_sol,
+                    ts_accepted=time.time(), sol_in=сумма_тек,
+                    sell_after_s=срок_тек,
+                    bumped_from_sol=(self.buy_sol if поднимали else None),
+                    target_from_s=(self.sell_after_s if правили_срок else None),
                     first_error_code=код_первый,
                     caveat=res.get("caveat"))
-                out.update(exec_code=EXEC_BUMPED, order_id=res.get("order_id"),
+                out.update(exec_code=итоговый_код, order_id=res.get("order_id"),
                            signatures=res.get("signatures") or [],
-                           sol_in=self.bump_sol, first_error_code=код_первый,
-                           reason=res.get("caveat") or "принято после повышения суммы")
+                           sol_in=сумма_тек, sell_after_s=срок_тек,
+                           first_error_code=код_первый,
+                           reason=res.get("caveat") or f"принято после правки: {что}")
                 return out
 
         # Отказ. Позиция НЕ остаётся в intent навсегда: помечаем её
@@ -605,7 +651,7 @@ def self_test() -> int:
             chk("тестовый источник на стенде покупается",
                 r["exec_code"] == EXEC_SENT, r["exec_code"])
             тело = сессия.запросы[0]["json"]
-            chk("сумма на стенде -- 0.01 SOL",
+            chk("сумма на стенде -- из настройки стенда",
                 тело["wallets"][0]["amount"] == f"{DEFAULT_TEST_BUY_SOL}",
                 тело["wallets"][0]["amount"])
             одна = list(st.positions().values())[0]
@@ -633,7 +679,7 @@ def self_test() -> int:
                 r.get("first_error_code") == "INVALID_REQUEST", r.get("first_error_code"))
             chk("запросов ровно два, не больше", len(сессия.запросы) == 2,
                 len(сессия.запросы))
-            chk("второй запрос на 0.02 SOL",
+            chk("второй запрос на поднятую сумму",
                 сессия.запросы[1]["json"]["wallets"][0]["amount"]
                 == f"{DEFAULT_TEST_BUY_SOL_BUMP}",
                 сессия.запросы[1]["json"]["wallets"][0]["amount"])
@@ -643,6 +689,82 @@ def self_test() -> int:
             chk("и то, с чего подняли",
                 одна.get("bumped_from_sol") == DEFAULT_TEST_BUY_SOL,
                 одна.get("bumped_from_sol"))
+
+        # отказ по сроку авто-ордера -> ОДНА замена 28.8 -> 29
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отказ = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST",
+                "message": "target_value must be an integer number of seconds"}})
+            успех = ОтветЗаглушка(200, {"success": True,
+                                        "data": {"order_id": "o3", "signatures": ["s3"]}})
+            сессия = СессияЗаглушка([отказ, успех])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("после отказа по сроку срок заменён и покупка прошла",
+                r["exec_code"] == EXEC_SENT_AFTER_TARGET, r["exec_code"])
+            chk("запросов ровно два", len(сессия.запросы) == 2, len(сессия.запросы))
+            chk("первый запрос шёл с 28.8",
+                сессия.запросы[0]["json"]["auto_orders"][0]["target_value"] == 28.8,
+                сессия.запросы[0]["json"]["auto_orders"][0]["target_value"])
+            chk("второй запрос -- с 29",
+                сессия.запросы[1]["json"]["auto_orders"][0]["target_value"]
+                == SELL_AFTER_FALLBACK_S,
+                сессия.запросы[1]["json"]["auto_orders"][0]["target_value"])
+            chk("сумма при правке срока НЕ менялась",
+                сессия.запросы[1]["json"]["wallets"][0]["amount"]
+                == f"{DEFAULT_TEST_BUY_SOL}",
+                сессия.запросы[1]["json"]["wallets"][0]["amount"])
+            одна = list(st.positions().values())[0]
+            chk("в позиции записан новый срок",
+                одна.get("sell_after_s") == SELL_AFTER_FALLBACK_S,
+                одна.get("sell_after_s"))
+            chk("и то, с чего срок правили",
+                одна.get("target_from_s") == DEFAULT_SELL_AFTER_S,
+                одна.get("target_from_s"))
+
+        # обе поправки подряд: сначала минимум, потом срок -- и не больше
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            о1 = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "amount below minimum"}})
+            о2 = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "target_value integer required"}})
+            успех = ОтветЗаглушка(200, {"success": True,
+                                        "data": {"order_id": "o4", "signatures": ["s4"]}})
+            сессия = СессияЗаглушка([о1, о2, успех])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("две поправки подряд доводят до принятия",
+                r["exec_code"] == EXEC_BUMPED, r["exec_code"])
+            chk("запросов ровно три, не больше", len(сессия.запросы) == 3,
+                len(сессия.запросы))
+            тело = сессия.запросы[2]["json"]
+            chk("в третьем запросе и сумма поднята, и срок целый",
+                тело["wallets"][0]["amount"] == f"{DEFAULT_TEST_BUY_SOL_BUMP}"
+                and тело["auto_orders"][0]["target_value"] == SELL_AFTER_FALLBACK_S,
+                (тело["wallets"][0]["amount"],
+                 тело["auto_orders"][0]["target_value"]))
+
+        # третий отказ подряд повтора уже не даёт
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            о = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "amount below minimum"}})
+            о2 = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "target_value integer required"}})
+            о3 = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "amount below minimum again"}})
+            сессия = СессияЗаглушка([о, о2, о3])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("после двух поправок третьей попытки нет",
+                len(сессия.запросы) == 3, len(сессия.запросы))
+            chk("итог -- отказ, а не молчание",
+                r["exec_code"] in (EXEC_API_ERROR, EXEC_REFUSED), r["exec_code"])
 
         # НЕ поднимаем на других кодах: 200 у Bloom -- это "принято"
         with tempfile.TemporaryDirectory() as d:
