@@ -440,7 +440,7 @@ def в_текст(о: dict) -> str:
     L.append("")
     L.append(f"--- первые {len(о['slot_table'])} решений: слоты и время ---")
     L.append("подпись               задача   слот источника  получено             "
-             "решение,мс  слот сети  возраст,с  отставание  разбор      итог")
+             "решение,мс  слот сети  возраст,с  отставание  разбор         итог")
     for r in о["slot_table"]:
         L.append(f"{(r['signature'] or ''):22s}{str(r['source_task'] or '-'):9s}"
                  f"{str(r['source_slot'] or '-'):16s}{str(r['t_recv_utc'] or '-'):21s}"
@@ -448,7 +448,7 @@ def в_текст(о: dict) -> str:
                  f"{str(r['net_slot_at_decision'] or '-'):11s}"
                  f"{str(r['net_slot_age_s'] if r['net_slot_age_s'] is not None else '-'):11s}"
                  f"{str(r['slot_lag'] if r['slot_lag'] is not None else '-'):12s}"
-                 f"{str(r['parsed_from'] or '-'):12s}{r['action'] or '-'}/{r['code'] or '-'}")
+                 f"{str(r['parsed_from'] or '-'):15s}{r['action'] or '-'}/{r['code'] or '-'}")
     L.append("")
     м = о["routes"]
     L.append(f"--- маршруты наших покупок --- покупок {м['buys']}, маршрут известен "
