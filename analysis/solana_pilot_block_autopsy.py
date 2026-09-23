@@ -347,8 +347,11 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--deep-slots", type=int, default=MAX_PATH_SLOTS)
     ap.add_argument("--n", type=int, default=8)
-    ap.add_argument("--use-helius", action="store_true",
-                     help="ходить в Helius (по умолчанию нет: квота исчерпана)")
+    # Квота Helius восстановлена (тариф Developer, 23.09), поэтому он снова
+    # ОСНОВНОЙ: он быстрее публичного в разы. Публичный остаётся запасным --
+    # Rpc сам уходит на него после трёх отказов 429 подряд.
+    ap.add_argument("--public-only", action="store_true",
+                     help="считать только через публичный узел (Helius не трогать)")
     ap.add_argument("--checkpoint-s", type=float, default=600.0)
     ap.add_argument("--checkpoint-push", action="store_true",
                      help="выгружать чекпойнт в git прямо из прогона")
@@ -368,12 +371,13 @@ def main() -> None:
         key_name = "нет"
     rpc = Rpc(key, min_interval_s=args.min_interval_s, workers=args.workers,
               backoff_mult=1.5, backoff_cap=15.0)
-    if not args.use_helius:
+    if args.public_only:
         rpc.url = PUBLIC_RPC
-        log("узел: ПУБЛИЧНЫЙ (Helius без квоты) -- медленнее, темп "
+        rpc.allow_public = False
+        log("узел: только ПУБЛИЧНЫЙ по ключу --public-only, темп "
             f"{args.min_interval_s}с")
     else:
-        log(f"узел: Helius (ключ из {key_name})")
+        log(f"узел: Helius основной (ключ из {key_name}), публичный -- запасной при 429")
     rpc.deadline = started + args.time_budget_s
     st = SlotTrades(rpc, capacity=20000)
 
@@ -388,7 +392,7 @@ def main() -> None:
         "generated_at_utc": now_utc(),
         "лидер": LEADER,
         "задача": TASK_NAME,
-        "узел": "публичный" if not args.use_helius else "helius",
+        "узел": "только публичный" if args.public_only else "helius основной, публичный запасной",
         "ЧЕСТНЫЕ_ОГОВОРКИ": [
             "Только чтение цепочки: ни одного вызова покупки/продажи.",
             "Цена -- по дельтам балансов ТРЕЙДЕРА (как в ретро-сигнале): в неё входят "

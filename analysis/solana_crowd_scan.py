@@ -132,6 +132,48 @@ class Rpc:
         self.errors = 0
         self.splits = 0
         self.deadline: float | None = None
+        # Запасной путь. Раньше публичный узел здесь включался только
+        # вручную, и когда у Helius кончилась квота, прогоны просто
+        # упирались в 429 до конца бюджета. Теперь три отказа подряд
+        # временно понижают Helius, и вызовы идут на публичный узел.
+        self.allow_public = True
+        self.demote_after_429 = 3
+        self.demote_for_s = 600.0
+        self._429_streak = 0
+        self._demoted_until = 0.0
+        self.first_429_body: str | None = None
+        self.demoted_once = False
+
+    def target_url(self) -> str:
+        """Helius, пока он не понижен; иначе публичный узел."""
+        if not self.allow_public:
+            return self.url
+        with self._lock:
+            demoted = time.monotonic() < self._demoted_until
+        return PUBLIC_RPC if demoted else self.url
+
+    def _note_429(self, target: str, body: str) -> None:
+        if target == PUBLIC_RPC:
+            return
+        with self._lock:
+            if self.first_429_body is None:
+                # Тело нужно, чтобы отличить нехватку кредитов
+                # ("max usage reached") от превышения темпа.
+                self.first_429_body = scrub(body)[:200]
+            self._429_streak += 1
+            hit = self._429_streak >= self.demote_after_429 and self.allow_public
+            if hit:
+                self._demoted_until = time.monotonic() + self.demote_for_s
+                first = not self.demoted_once
+                self.demoted_once = True
+        if hit and first:
+            print(f"[rpc] Helius понижен на {self.demote_for_s:.0f}с "
+                  f"({self._429_streak} ответов 429 подряд): {self.first_429_body}", flush=True)
+
+    def _note_ok(self, target: str) -> None:
+        if target != PUBLIC_RPC:
+            with self._lock:
+                self._429_streak = 0
 
     def session(self) -> requests.Session:
         s = getattr(self._local, "s", None)
@@ -162,11 +204,12 @@ class Rpc:
 
     def call(self, method: str, params: list, url: str | None = None, attempts: int = 8):
         """Возвращает result. Бросает RuntimeError на неустранимой ошибке."""
-        target = url or self.url
+        pinned = url  # явно заданный адрес (сверка у второго провайдера) не подменяем
         last = None
         for _ in range(attempts):
             if self.expired():
                 raise RuntimeError(f"{method}: бюджет времени прогона истёк")
+            target = pinned or self.target_url()
             self._pace()
             try:
                 resp = self.session().post(
@@ -177,6 +220,12 @@ class Rpc:
                 continue
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
                 last = f"HTTP {resp.status_code}"
+                if resp.status_code == 429:
+                    self._note_429(target, resp.text)
+                    # Helius только что понижен -- следующая попытка уйдёт
+                    # на публичный узел, отсиживать паузу незачем.
+                    if target != PUBLIC_RPC and not pinned and self.target_url() == PUBLIC_RPC:
+                        continue
                 self._slow_down()
                 continue
             if not resp.ok:
@@ -191,6 +240,7 @@ class Rpc:
                     continue
                 raise RuntimeError(f"{method}: RPC error {err}")
             self._speed_up()
+            self._note_ok(target)
             return body.get("result")
         self.errors += 1
         raise RuntimeError(f"{method}: исчерпаны попытки, последняя причина: {last}")

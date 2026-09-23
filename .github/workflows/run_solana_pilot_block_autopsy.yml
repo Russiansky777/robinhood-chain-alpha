@@ -34,8 +34,8 @@ on:
         description: "'yes' -- считать заново, не продолжать с кэша"
         required: false
         default: ""
-      use_helius:
-        description: "'yes' -- ходить в Helius вместо публичного узла"
+      public_only:
+        description: "'yes' -- считать только через публичный узел (Helius основной по умолчанию)"
         required: false
         default: ""
 
@@ -78,7 +78,7 @@ jobs:
             --checkpoint-s "${{ github.event.inputs.checkpoint_s || 600 }}" \
             --checkpoint-push \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
-            ${{ github.event.inputs.use_helius == 'yes' && '--use-helius' || '' }} \
+            ${{ github.event.inputs.public_only == 'yes' && '--public-only' || '' }} \
             2>&1 | tail -400
 
       - name: "Коммит результата"

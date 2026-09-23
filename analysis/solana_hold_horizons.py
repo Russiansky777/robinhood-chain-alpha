@@ -327,7 +327,11 @@ def main() -> None:
     ap.add_argument("--max-blocks", type=int, default=160)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--checkpoint-s", type=float, default=900.0)
-    ap.add_argument("--use-helius", action="store_true")
+    # Квота Helius восстановлена (тариф Developer, 23.09), поэтому он снова
+    # ОСНОВНОЙ: он быстрее публичного в разы. Публичный остаётся запасным --
+    # Rpc сам уходит на него после трёх отказов 429 подряд.
+    ap.add_argument("--public-only", action="store_true",
+                     help="считать только через публичный узел (Helius не трогать)")
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
@@ -343,11 +347,12 @@ def main() -> None:
         key, key_name = "", "нет"
     rpc = Rpc(key, min_interval_s=args.min_interval_s, workers=args.workers,
               backoff_mult=1.5, backoff_cap=15.0)
-    if not args.use_helius:
+    if args.public_only:
         rpc.url = PUBLIC_RPC
-        log(f"узел: ПУБЛИЧНЫЙ (Helius без квоты), темп {args.min_interval_s}с")
+        rpc.allow_public = False
+        log(f"узел: только ПУБЛИЧНЫЙ по ключу --public-only, темп {args.min_interval_s}с")
     else:
-        log(f"узел: Helius (ключ из {key_name})")
+        log(f"узел: Helius основной (ключ из {key_name}), публичный -- запасной при 429")
     rpc.deadline = started + args.time_budget_s
     st = SlotTrades(rpc, capacity=20000)
 
@@ -404,7 +409,7 @@ def main() -> None:
     pilot = [r for r in results if r.get("task_name") == "pointfarmcap"]
     out = {
         "generated_at_utc": now_utc(),
-        "узел": "публичный" if not args.use_helius else "helius",
+        "узел": "только публичный" if args.public_only else "helius основной, публичный запасной",
         "горизонты_с": list(HORIZONS_S),
         "ЧЕСТНЫЕ_ОГОВОРКИ": [
             "Только чтение цепочки: ни одного вызова покупки/продажи.",

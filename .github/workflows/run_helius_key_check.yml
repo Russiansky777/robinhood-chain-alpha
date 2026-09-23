@@ -138,8 +138,49 @@ jobs:
             done
             shred -u /root/.helius_new 2>/dev/null || rm -f /root/.helius_new
             systemctl restart dbot-detect-probe 2>/dev/null && echo "зонд перезапущен" || echo "зонд: службы нет"
-            systemctl restart dbot-sold-guard 2>/dev/null && echo "сторож перезапущен" || echo "сторож: службы нет"
+                      '
+
+      - name: "3a. ГЕЙТ: открытые позиции ПРЯМО СЕЙЧАС -- перед перезапуском сторожа"
+        if: env.SERIES_ALL_OK == '1' && github.event.inputs.deploy != 'no'
+        run: |
+          # Сторож -- боевая служба: перезапуск в момент, когда позиция в
+          # работе, может стоить денег. Проверяем состояние В МОМЕНТ
+          # РЕСТАРТА, а не по снимку учёта: сторож сам опрашивает DBot и
+          # знает, что у него на руках. Безопасно -- только когда ноль.
+          ssh -n $SSH_OPTS root@45.59.170.76 '
+            set -a; . /etc/dbot-guard/env; set +a
+            /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py --check-only 2>&1 | tail -40
+          ' > /tmp/guard_gate.txt 2>&1 || true
+          cat /tmp/guard_gate.txt
+          python - <<'PYGATE'
+          import pathlib, re, sys
+          t = pathlib.Path("/tmp/guard_gate.txt").read_text()
+          m = re.search(r"\u0438\u0437 \u043d\u0438\u0445 \u043d\u0430\u0448\u0438 \u043a\u043e\u0448\u0435\u043b\u044c\u043a\u0438=(\d+)", t)
+          if not m:
+              print("::warning::\u0447\u0438\u0441\u043b\u043e \u043f\u043e\u0437\u0438\u0446\u0438\u0439 \u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043b\u043e\u0441\u044c -- \u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u043a \u041d\u0415 \u0434\u0435\u043b\u0430\u044e")
+              pathlib.Path("/tmp/guard_gate_ok").write_text("0")
+              sys.exit(0)
+          n = int(m.group(1))
+          print("\u0441\u0442\u043e\u0440\u043e\u0436 \u0434\u0435\u0440\u0436\u0438\u0442 \u043f\u043e\u0437\u0438\u0446\u0438\u0439:", n)
+          pathlib.Path("/tmp/guard_gate_ok").write_text("1" if n == 0 else "0")
+          PYGATE
+          echo "GUARD_GATE_OK=$(cat /tmp/guard_gate_ok)" >> "$GITHUB_ENV"
+
+      - name: "3b. Перезапуск сторожа -- ТОЛЬКО при пустом гейте"
+        if: env.SERIES_ALL_OK == '1' && github.event.inputs.deploy != 'no' && env.GUARD_GATE_OK == '1'
+        run: |
+          ssh -n $SSH_OPTS root@45.59.170.76 '
+            systemctl restart dbot-sold-guard && echo "сторож перезапущен"
+            sleep 3
+            journalctl -u dbot-sold-guard --no-pager -n 8
           '
+
+      - name: "3в. Сторож НЕ перезапущен -- сказать прямо"
+        if: env.SERIES_ALL_OK == '1' && github.event.inputs.deploy != 'no' && env.GUARD_GATE_OK != '1'
+        run: |
+          echo "Сторож НЕ перезапущен: на момент проверки у него были позиции в работе"
+          echo "или их число не удалось прочитать. Новый ключ в env-файле уже лежит и"
+          echo "подхватится при следующем штатном перезапуске. Это НЕ ошибка, это гейт."
 
       - name: "4. getSlot С САМОГО СЕРВЕРА (не с раннера)"
         if: env.SERIES_ALL_OK == '1' && github.event.inputs.deploy != 'no'

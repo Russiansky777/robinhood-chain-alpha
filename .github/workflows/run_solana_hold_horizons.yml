@@ -29,8 +29,8 @@ on:
         description: "'yes' -- считать всё заново, не продолжать"
         required: false
         default: ""
-      use_helius:
-        description: "'yes' -- ходить в Helius вместо публичного узла"
+      public_only:
+        description: "'yes' -- считать только через публичный узел (Helius основной по умолчанию)"
         required: false
         default: ""
 
@@ -71,7 +71,7 @@ jobs:
             --max-blocks "${{ github.event.inputs.max_blocks || 130 }}" \
             --limit "${{ github.event.inputs.limit || 0 }}" \
             ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
-            ${{ github.event.inputs.use_helius == 'yes' && '--use-helius' || '' }} \
+            ${{ github.event.inputs.public_only == 'yes' && '--public-only' || '' }} \
             2>&1 | tail -400
 
       - name: "Коммит результата"
