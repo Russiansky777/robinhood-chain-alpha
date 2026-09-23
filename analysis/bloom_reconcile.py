@@ -91,6 +91,22 @@ def поставить_метку(state: ST.ExecState, *, note: str = "",
     return j
 
 
+# Где в записях лежат подписи НАШИХ отправок. Ключей два, и второй
+# добавлен по факту: сторож пишет подписи продажи в last_sell_signatures, и
+# без него его собственные продажи сверка считала чужими сделками и
+# блокировала следующий запуск.
+КЛЮЧИ_ПОДПИСЕЙ = ("signatures", "last_sell_signatures")
+
+
+def _подписи_из_записи(r: dict) -> set:
+    out = set()
+    for ключ in КЛЮЧИ_ПОДПИСЕЙ:
+        for s in (r or {}).get(ключ) or []:
+            if isinstance(s, str):
+                out.add(s)
+    return out
+
+
 def _подписи_из_файла(путь: Path) -> set:
     out = set()
     try:
@@ -105,9 +121,7 @@ def _подписи_из_файла(путь: Path) -> set:
             r = json.loads(line)
         except ValueError:
             continue
-        for s in (r or {}).get("signatures") or []:
-            if isinstance(s, str):
-                out.add(s)
+        out |= _подписи_из_записи(r)
     return out
 
 
@@ -120,9 +134,7 @@ def our_signatures(state: ST.ExecState) -> set:
     """
     out = set()
     for p in state.positions().values():
-        for s in p.get("signatures") or []:
-            if isinstance(s, str):
-                out.add(s)
+        out |= _подписи_из_записи(p)
     for путь in sorted(state.base.glob(f"{state.positions_path.name}.*")):
         out |= _подписи_из_файла(путь)
     return out
@@ -216,11 +228,26 @@ def объяснить_свежие(helius, свежие: list, минты: set,
         б = BD.балансы_кошелька(tx, wallet)
         упали = sorted({м for м, з in (б.get("by_mint") or {}).items()
                         if м in минты and (з.get("delta_raw") or 0) < 0})
+        ошибка = ((tx.get("meta") or {}).get("err") is not None)
+        ключи = BD._баланс_ключи(tx)
+        платили_мы = bool(ключи) and ключи[0] == wallet
+        наши_минты_в_tx = sorted({м for м in (б.get("by_mint") or {}) if м in минты})
         if упали:
             объяснённые.append({**зап, "mints": упали,
                                  "why": "выход по нашей позиции: остаток нашего "
                                         "минта уменьшился, подпись авто-ордера "
                                         "Bloom нам не сообщается"})
+        elif ошибка and платили_мы and наши_минты_в_tx:
+            # Упавшая транзакция баланс не меняет -- и по одному признаку
+            # "остаток уменьшился" её не объяснить. Но это НЕУДАЧНАЯ ПОПЫТКА
+            # ВЫХОДА по нашей позиции: платил наш кошелёк, и в счетах наш
+            # минт. Ровно так упал авто-ордер по п. 1 стенда
+            # (assertion failed: liquidity > 0), и он блокировал следующий
+            # запуск как чужая сделка.
+            объяснённые.append({**зап, "mints": наши_минты_в_tx,
+                                 "why": "неудачная попытка выхода по нашей позиции: "
+                                        "транзакция с ошибкой, платил наш кошелёк, "
+                                        "в счетах наш минт"})
         else:
             необъяснённые.append(зап)
     if len(свежие) > предел:
@@ -540,6 +567,57 @@ def self_test() -> int:
         chk("сделка по чужому минту объяснением не считается",
             not r2["clean"] and r2["foreign_activity"]["unexplained_count"] == 1,
             r2["foreign_activity"])
+
+    # подписи продаж сторожа -- наши, и упавшая попытка выхода -- тоже наша
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        st.write_intent(client_order_id="sp", mint="MINTX", source_sig="S",
+                        source_slot=1, sol_in=0.001, pool=None, program=None,
+                        taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                        sell_after_s=28.8)
+        st.update_position("sp", state="selling", signatures=["НАША_ПОКУПКА"],
+                           last_sell_signatures=["НАША_ПРОДАЖА"])
+        chk("подпись продажи сторожа считается нашей",
+            {"НАША_ПОКУПКА", "НАША_ПРОДАЖА"} <= our_signatures(st),
+            sorted(our_signatures(st)))
+
+        class HeliusУпавшая(HeliusЗаглушка):
+            def транзакция(self, подпись, **kw):
+                бал = {"accountIndex": 1, "mint": "MINTX",
+                       "owner": ST.EXECUTOR_WALLET,
+                       "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                       "uiTokenAmount": {"amount": "92000000", "decimals": 6,
+                                          "uiAmount": 92.0}}
+                return {"slot": 7,
+                        "transaction": {"message": {
+                            "accountKeys": [{"pubkey": ST.EXECUTOR_WALLET}],
+                            "instructions": []}},
+                        "meta": {"err": {"InstructionError": [4, "ProgramFailedToComplete"]},
+                                  "fee": 5000,
+                                  "preBalances": [10 ** 9], "postBalances": [10 ** 9],
+                                  "preTokenBalances": [бал], "postTokenBalances": [бал],
+                                  "innerInstructions": []}}
+
+        h = HeliusУпавшая([{"signature": "УПАВШИЙ_ВЫХОД",
+                            "blockTime": int(сейчас - 60)}], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h, allow_open_live_test=True)
+        chk("упавшая попытка выхода по нашему минту объяснена",
+            r["foreign_activity"]["unexplained_count"] == 0
+            and any("неудачная попытка выхода" in x["why"]
+                    for x in r["foreign_activity"]["explained"]),
+            r["foreign_activity"])
+
+        class HeliusЧужойПлательщик(HeliusУпавшая):
+            def транзакция(self, подпись, **kw):
+                tx = HeliusУпавшая.транзакция(self, подпись, **kw)
+                tx["transaction"]["message"]["accountKeys"] = [{"pubkey": "ЧУЖОЙ"}]
+                return tx
+
+        h2 = HeliusЧужойПлательщик([{"signature": "ЧУЖОЙ_СБОЙ",
+                                     "blockTime": int(сейчас - 60)}], баланс=0.35)
+        r2 = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h2, allow_open_live_test=True)
+        chk("упавшая транзакция, которую платил не наш кошелёк, остаётся чужой",
+            r2["foreign_activity"]["unexplained_count"] == 1, r2["foreign_activity"])
 
     # открытая позиция стенда: блокер по умолчанию, исключение -- по слову владельца
     with tempfile.TemporaryDirectory() as d:
