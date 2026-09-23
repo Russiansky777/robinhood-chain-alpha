@@ -1,0 +1,51 @@
+name: "DBot: конфигурация задач -- ТОЛЬКО ЧТЕНИЕ (GET)"
+
+# Владелец: запрос конфигурации задач -- только чтение, никаких записей.
+# Здесь ровно один сетевой вызов: GET /automation/follow_orders, без тела.
+# POST/PUT/PATCH/DELETE в скрипте отсутствуют, и это проверяется самотестом
+# ПО ИСХОДНИКУ перед запуском, а не обещанием в комментарии.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: dbot-task-config-readonly
+  cancel-in-progress: false
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Границы доказываются ДО сети: методов записи в коде нет"
+        run: python -u analysis/dbot_task_config_readonly.py --self-test
+      - name: "Чтение конфигурации задач (GET)"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: python -u analysis/dbot_task_config_readonly.py 2>&1 | tail -60
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/dbot_task_config_readonly.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "DBot: конфигурация задач, только чтение [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
