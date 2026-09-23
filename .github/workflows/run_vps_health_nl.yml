@@ -1,0 +1,159 @@
+name: "NL-хост: живучесть служб (только чтение)"
+
+# Почасовая проверка живучести. ТОЛЬКО ЧТЕНИЕ: systemctl show/is-active,
+# размеры журналов, признаки жизни. Ничего не запускается, не
+# перезапускается и не правится. Ни одного ордера.
+#
+# Проверяются все четыре службы:
+#   dbot-sold-guard     -- сторож проданных позиций DBot;
+#   dbot-detect-probe   -- зонд обнаружения (замер, не торговля);
+#   bloom-seller        -- сторож продаж Bloom (dry-run);
+#   bloom-detector      -- детектор сигналов Bloom (только журнал).
+#
+# Отсутствие службы -- это факт, а не сбой: пишем "не установлена" и
+# идём дальше. Падает job только если служба установлена и НЕ активна.
+on:
+  workflow_dispatch:
+    inputs:
+      tail_decisions:
+        description: "сколько последних решений детектора показать (0 -- не показывать)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: vps-health-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Состояние служб"
+        run: |
+          set -e
+          {
+            echo "=== NL-хост, живучесть служб, $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+          } > data/vps_health_nl.txt
+          FAIL=0
+          for SVC in dbot-sold-guard dbot-detect-probe bloom-seller bloom-detector; do
+            OUT=$(ssh -n $SSH_OPTS root@$HOST "
+              if ! systemctl list-unit-files --no-legend '$SVC.service' | grep -q .; then
+                echo 'не установлена'
+              else
+                printf 'active=%s enabled=%s restarts=%s since=%s\n' \
+                  \"\$(systemctl is-active $SVC 2>/dev/null)\" \
+                  \"\$(systemctl is-enabled $SVC 2>/dev/null)\" \
+                  \"\$(systemctl show -p NRestarts --value $SVC)\" \
+                  \"\$(systemctl show -p ActiveEnterTimestamp --value $SVC)\"
+              fi" || echo "ssh не ответил")
+            echo "$SVC: $OUT" | tee -a data/vps_health_nl.txt
+            case "$OUT" in
+              "не установлена") ;;
+              *active=active*) ;;
+              *) echo "  ТРЕВОГА: $SVC установлена, но не активна"; FAIL=1 ;;
+            esac
+          done
+          echo "FAIL=$FAIL" >> $GITHUB_ENV
+
+      - name: "Признаки жизни и журналы"
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- признаки жизни ---"
+          } >> data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "
+            for f in /home/bot/bloom_executor_live_data/detector_status.json \
+                     /home/bot/bloom_executor_live_data/seller_heartbeat.json \
+                     /home/bot/dbot_detect_probe/status.json; do
+              if [ -s \"\$f\" ]; then
+                printf '%s (изменён %s):\n' \"\$f\" \"\$(date -u -r \"\$f\" +%Y-%m-%dT%H:%M:%SZ)\"
+                head -c 1200 \"\$f\"; echo
+              else
+                echo \"\$f: нет или пуст\"
+              fi
+            done
+            echo '--- размеры журналов ---'
+            for f in /home/bot/bloom_executor_live_data/decisions.jsonl \
+                     /home/bot/bloom_executor_live_data/positions.jsonl \
+                     /home/bot/dbot_detect_probe/events.jsonl; do
+              if [ -s \"\$f\" ]; then printf '%s: %s строк\n' \"\$f\" \"\$(wc -l < \"\$f\")\"; else echo \"\$f: нет или пуст\"; fi
+            done
+          " 2>&1 | tee -a data/vps_health_nl.txt
+
+      - name: "Сводка решений детектора по кодам (только счётчики)"
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- решения детектора по кодам ---"
+          } >> data/vps_health_nl.txt
+          # Без heredoc и без вложенного python: тело heredoc обязано стоять
+          # в нулевой колонке и ломает YAML внутри блока run. Коды достаются
+          # grep-ом -- журнал построчный JSON, этого достаточно для счётчиков.
+          ssh -n $SSH_OPTS root@$HOST "
+            F=/home/bot/bloom_executor_live_data/decisions.jsonl
+            if [ -s \"\$F\" ]; then
+              printf 'всего решений: %s\n' \"\$(wc -l < \"\$F\")\"
+              printf 'первое: %s\n' \"\$(head -n 1 \"\$F\" | grep -oE '\"ts_utc\": ?\"[^\"]*\"' | head -n 1)\"
+              printf 'последнее: %s\n' \"\$(tail -n 1 \"\$F\" | grep -oE '\"ts_utc\": ?\"[^\"]*\"' | head -n 1)\"
+              echo 'по кодам:'
+              grep -oE '\"код\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
+              echo 'по задачам источника:'
+              grep -oE '\"задача_источника\": ?\"[^\"]*\"' \"\$F\" | sed 's/.*: *\"//; s/\"\$//' | sort | uniq -c | sort -rn
+            else
+              echo 'журнал решений пуст'
+            fi
+          " 2>&1 | tee -a data/vps_health_nl.txt
+
+      - name: "Хвост решений (по запросу)"
+        if: ${{ inputs.tail_decisions != '0' && inputs.tail_decisions != '' }}
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- последние ${{ inputs.tail_decisions }} решений ---"
+          } >> data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "tail -n ${{ inputs.tail_decisions }} /home/bot/bloom_executor_live_data/decisions.jsonl 2>/dev/null || echo 'журнала нет'" \
+            | tee -a data/vps_health_nl.txt
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/vps_health_nl.txt ] && git add data/vps_health_nl.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "NL-хост: проверка живучести служб [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
+
+      - name: "Итог: падаем, если установленная служба мертва"
+        run: |
+          [ "$FAIL" = "0" ] || { echo "есть мёртвые службы -- см. отчёт выше"; exit 1; }
+          echo "все установленные службы активны"
