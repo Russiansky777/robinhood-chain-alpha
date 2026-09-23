@@ -39,6 +39,19 @@ TOL_AMM = 0.03
 MIN_PASSED_FOR_SUMMARY = 12
 
 
+# Пулы с СОСРЕДОТОЧЕННОЙ ликвидностью. У них x*y=k не выполняется, и цена
+# не выводится из остатков хранилищ вообще: ликвидность стоит в диапазонах,
+# а не размазана по всей кривой. Проверять их моделью постоянного
+# произведения бессмысленно -- это не "сверка не прошла", а "метод к ним
+# неприменим", и мешать одно с другим нельзя.
+СОСРЕДОТОЧЕННЫЕ = ("clmm", "dlmm", "whirlpool", "concentrated")
+
+
+def концентрированный(program: str | None) -> bool:
+    p = (program or "").lower()
+    return any(x in p for x in СОСРЕДОТОЧЕННЫЕ)
+
+
 def tolerance(program: str | None) -> float:
     p = (program or "").lower()
     return TOL_CURVE if ("pump" in p and "amm" not in p) else TOL_AMM
@@ -72,6 +85,13 @@ def check_side(pool: dict | None, fact_price: float | None, label: str) -> dict:
     p0, p1 = pool.get("цена_до"), pool.get("цена_после")
     if not p0 or not p1 or p0 <= 0 or p1 <= 0:
         out.update(прошла=None, почему="нет цен пула до/после")
+        return out
+    if концентрированный(pool.get("программа")):
+        out.update(прошла=None, программа=pool.get("программа"),
+                   почему=("пул с сосредоточенной ликвидностью: цена до и после не "
+                            "выводится из остатков хранилищ, модель постоянного "
+                            "произведения к нему неприменима -- нужен отдельный метод "
+                            "по фактическим ценам сделок в этом пуле"))
         return out
     model = math.sqrt(p0 * p1)
     out["модель_sqrt_до_после"] = model
@@ -134,7 +154,9 @@ def check_trade(item: dict) -> dict:
                       item.get("наша_средняя_цена_исполнения"), "мы")
     принята = bool(lead.get("прошла")) and bool(ours.get("прошла"))
     причины = [s["почему"] for s in (lead, ours) if s.get("почему")]
+    неприменим = any(концентрированный((s or {}).get("программа")) for s in (lead, ours))
     res["сверка"] = {"принята": принята, "лидер": lead, "мы": ours,
+                      "метод_неприменим": неприменим,
                       "почему": "; ".join(причины) if причины else None}
     if not принята:
         # Цифры непринятой сделки нельзя молча оставлять в выгрузке: их
@@ -192,7 +214,8 @@ def main() -> None:
     all_items = A + B
     passed = sum(1 for x in all_items if (x.get("сверка") or {}).get("принята"))
     failed = [{"когда": x.get("когда"), "mint": x.get("mint"),
-                "почему": (x.get("сверка") or {}).get("почему") or "не удалось"}
+                "почему": (x.get("сверка") or {}).get("почему") or "не удалось",
+                "метод_неприменим": bool((x.get("сверка") or {}).get("метод_неприменим"))}
                for x in all_items if not (x.get("сверка") or {}).get("принята")]
 
     out = {
@@ -209,6 +232,10 @@ def main() -> None:
             "выглядит как результат.",
         ],
         "всего_сделок": len(all_items), "прошли_сверку": passed,
+        "метод_неприменим_сосредоточенная_ликвидность": sum(
+            1 for x in failed if x["метод_неприменим"]),
+        "сверка_реально_не_сошлась": sum(
+            1 for x in failed if not x["метод_неприменим"]),
         "порог_для_сводной": MIN_PASSED_FOR_SUMMARY,
         "сводная_выдана": passed >= MIN_PASSED_FOR_SUMMARY,
         "не_прошли": failed,
