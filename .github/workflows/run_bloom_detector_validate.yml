@@ -1,0 +1,58 @@
+name: "Bloom детектор v2: сверка вхолостую против триггеров DBot"
+
+# Только чтение: снимок follow_trades из репозитория + минутные свечи
+# SOL/USDC с GeckoTerminal для пересчёта трат источников в
+# SOL-эквивалент. Ни DBot, ни цепь, ни Bloom не опрашиваются, ни одного
+# ордера. Самопроверки всех модулей исполнителя гоняются до сверки:
+# если тормоза сломаны, сверка бессмысленна.
+on:
+  workflow_dispatch:
+    inputs:
+      min_sol:
+        description: "Порог входа источника в SOL-эквиваленте (DBot: targetMinAmountUI=2)"
+        required: false
+        default: "2.0"
+
+concurrency:
+  group: bloom-detector-validate
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests websockets
+      - name: "Самопроверки: тормоза, клиент, сторож, детектор, сверка"
+        run: |
+          set -e
+          python -u analysis/bloom_exec_state.py --self-test
+          python -u analysis/bloom_api.py --self-test
+          python -u analysis/bloom_seller.py --self-test
+          python -u analysis/bloom_detector.py --self-test
+          python -u analysis/bloom_detector_validate.py --self-test
+      - name: "Сверка"
+        run: python -u analysis/bloom_detector_validate.py --min-sol "${{ inputs.min_sol }}"
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_detector_validation.json ] && git add data/bloom_detector_validation.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom детектор v2: сверка вхолостую против триггеров DBot [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

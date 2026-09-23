@@ -65,6 +65,24 @@ WEEK_BUDGET = 10_000
 WEEK_STOP_AT = 0.80
 
 STATES_OPEN = ("intent", "bought", "selling", "unsold")
+
+# Машиночитаемые коды отказов can_open_detailed. Текст причины пишется
+# людям, код -- в журнал и в сверку: по тексту сверка ломается от любой
+# правки формулировки, а SKIPPED_DUP_MINT владелец просил считать
+# отдельной строкой, а не расхождением.
+КОД_ОК = "OK"
+КОД_РУБИЛЬНИК = "KILL_SWITCH"
+КОД_СЧЁТЧИКИ_БИТЫ = "COUNTERS_CORRUPT"
+КОД_ПАУЗА_API = "PAUSED_API_ERRORS"
+КОД_ПАУЗА_НЕПРОДАНО = "PAUSED_UNSOLD"
+КОД_ПАУЗА_429 = "PAUSED_RATE_LIMITED"
+КОД_БЮДЖЕТ_НЕДЕЛИ = "WEEK_BUDGET"
+КОД_ЛИМИТ_ОТКРЫТЫХ = "MAX_OPEN_POSITIONS"
+КОД_ДУБЛЬ_МИНТА = "SKIPPED_DUP_MINT"
+КОД_ПОКУПОК_НА_МИНТ = "MAX_BUY_TIMES_PER_TOKEN_REACHED"
+КОД_ПОДПИСЬ_ВИДЕЛИ = "SIGNATURE_SEEN"
+КОД_ДНЕВНОЙ_УБЫТОК = "DAILY_LOSS_LIMIT"
+КОД_БАЛАНС = "INSUFFICIENT_BALANCE"
 STATE_CLOSED = "closed"
 
 
@@ -407,6 +425,15 @@ class ExecState:
 
     def can_open(self, *, mint: str, source_sig: str, balance_sol: float | None,
                   now: float | None = None) -> tuple[bool, str]:
+        """Совместимая обёртка: (можно, причина). Код отказа -- в
+        can_open_detailed."""
+        можно, причина, _ = self.can_open_detailed(
+            mint=mint, source_sig=source_sig, balance_sol=balance_sol, now=now)
+        return можно, причина
+
+    def can_open_detailed(self, *, mint: str, source_sig: str,
+                           balance_sol: float | None,
+                           now: float | None = None) -> tuple[bool, str, str]:
         """Можно ли открыть позицию. Вызывается НЕПОСРЕДСТВЕННО перед
         отправкой, а не при приёме сигнала: между этими моментами могло
         измениться всё."""
@@ -414,65 +441,66 @@ class ExecState:
 
         убит, почему = self.kill_active()
         if убит:
-            return False, почему
+            return False, почему, КОД_РУБИЛЬНИК
 
         c = self.counters()
         if c.get("повреждены"):
             return False, ("счётчики повреждены -- торговля запрещена, пока их не "
-                            "починят: иначе автопауза не сработает")
+                            "починят: иначе автопауза не сработает"), КОД_СЧЁТЧИКИ_БИТЫ
         if int(c.get("api_error_streak", 0)) >= self.api_error_streak_max:
             return False, (f"автопауза: {c.get('api_error_streak')} ошибок API подряд "
-                            f"при пороге {self.api_error_streak_max}")
+                            f"при пороге {self.api_error_streak_max}"), КОД_ПАУЗА_API
         if int(c.get("unsold_streak", 0)) >= self.unsold_streak_max:
             return False, (f"автопауза: {c.get('unsold_streak')} непроданных позиций "
-                            f"подряд при пороге {self.unsold_streak_max}")
+                            f"подряд при пороге {self.unsold_streak_max}"), КОД_ПАУЗА_НЕПРОДАНО
         с_каких = c.get("rate_limited_since")
         if с_каких and (now - float(с_каких)) >= self.rate_limited_pause_s:
             return False, (f"автопауза: 429 подряд дольше "
-                            f"{self.rate_limited_pause_s:.0f} с")
+                            f"{self.rate_limited_pause_s:.0f} с"), КОД_ПАУЗА_429
 
         wb = self.week_budget_state()
         if wb.get("стоп"):
             return False, (f"недельный бюджет запросов Bloom израсходован на "
                             f"{wb['израсходовано_доля'] * 100:.0f}% при пороге "
-                            f"{WEEK_STOP_AT * 100:.0f}%")
+                            f"{WEEK_STOP_AT * 100:.0f}%"), КОД_БЮДЖЕТ_НЕДЕЛИ
 
         открытые = self.open_positions()
         if self.max_open <= 0:
-            return False, "лимит открытых позиций задан как 0 -- торговля запрещена"
+            return False, "лимит открытых позиций задан как 0 -- торговля запрещена", КОД_ЛИМИТ_ОТКРЫТЫХ
         if len(открытые) >= self.max_open:
-            return False, f"уже открыто {len(открытые)} позиций при лимите {self.max_open}"
+            return False, (f"уже открыто {len(открытые)} позиций при лимите "
+                            f"{self.max_open}"), КОД_ЛИМИТ_ОТКРЫТЫХ
 
         # Лимит считается ПО МИНТАМ, а не по записям: пять позиций в двух
         # токенах -- это не диверсификация, а концентрация.
         if any(p.get("mint") == mint for p in открытые):
-            return False, f"по минту {mint[:10]} уже есть открытая позиция"
+            return False, (f"по минту {mint[:10]} уже есть открытая позиция"), КОД_ДУБЛЬ_МИНТА
 
         ts, buys = self.mint_state(mint)
         if buys >= self.max_buys_per_mint > 0:
             return False, (f"по минту {mint[:10]} уже {buys} покупок при лимите "
-                            f"{self.max_buys_per_mint}")
+                            f"{self.max_buys_per_mint}"), КОД_ПОКУПОК_НА_МИНТ
         if ts is not None and (now - ts) < self.mint_cooldown_s:
             return False, (f"по минту {mint[:10]} кулдаун: прошло "
-                            f"{now - ts:.0f} с из {self.mint_cooldown_s:.0f}")
+                            f"{now - ts:.0f} с из {self.mint_cooldown_s:.0f}"), КОД_ДУБЛЬ_МИНТА
 
         if self.seen_signature(source_sig):
-            return False, f"подпись источника {source_sig[:10]} уже обработана"
+            return False, (f"подпись источника {source_sig[:10]} уже обработана"), КОД_ПОДПИСЬ_ВИДЕЛИ
 
         p = self.pnl(now)
         if -float(p.get("realized_sol", 0.0)) >= self.daily_loss_sol:
             return False, (f"дневной лимит потерь: {p.get('realized_sol'):.4f} SOL "
                             f"при пределе -{self.daily_loss_sol} SOL "
-                            f"(сутки по {DAY_TZ})")
+                            f"(сутки по {DAY_TZ})"), КОД_ДНЕВНОЙ_УБЫТОК
 
         нужно = self.buy_sol + self.fee_reserve_sol
         if balance_sol is None:
-            return False, "баланс кошелька неизвестен -- покупать нельзя"
+            return False, "баланс кошелька неизвестен -- покупать нельзя", КОД_БАЛАНС
         if balance_sol < нужно:
             return False, (f"баланса не хватает: {balance_sol:.4f} SOL при нужных "
                             f"{нужно:.4f} (вход {self.buy_sol} + резерв на комиссии "
-                            f"{self.fee_reserve_sol})")
-        return True, "ок"
+                            f"{self.fee_reserve_sol})"), КОД_БАЛАНС
+        return True, "ок", КОД_ОК
 
     # ------------------------------------------------------------------ отчёт
 
@@ -693,6 +721,29 @@ def self_test() -> None:
     день, беда = day_key(1790178120)
     chk("дата суток получена", len(день) == 10, день)
     chk("недоступность часового пояса не скрывается", isinstance(беда, bool))
+
+    # --- машиночитаемые коды отказов
+    with tempfile.TemporaryDirectory() as d:
+        st = ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+        можно, _, код = st.can_open_detailed(mint="M1", source_sig="s1", balance_sol=3.0)
+        chk("разрешение отдаёт код OK", можно and код == КОД_ОК, код)
+        st.write_intent(client_order_id="c", mint="M1", source_sig="s0", source_slot=1,
+                        sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
+                        mode="dry", sell_after_s=28.8)
+        можно, _, код = st.can_open_detailed(mint="M1", source_sig="s1", balance_sol=3.0)
+        chk("дубль минта даёт SKIPPED_DUP_MINT",
+            (not можно) and код == КОД_ДУБЛЬ_МИНТА, код)
+        chk("код дубля -- ровно та метка, что просил владелец",
+            КОД_ДУБЛЬ_МИНТА == "SKIPPED_DUP_MINT", КОД_ДУБЛЬ_МИНТА)
+        можно, _, код = st.can_open_detailed(mint="M2", source_sig="s2", balance_sol=None)
+        chk("неизвестный баланс даёт код баланса",
+            (not можно) and код == КОД_БАЛАНС, код)
+        st.kill_path.write_text("стоп", encoding="utf-8")
+        можно, причина, код = st.can_open_detailed(mint="M3", source_sig="s3", balance_sol=3.0)
+        chk("рубильник даёт свой код", (not можно) and код == КОД_РУБИЛЬНИК, код)
+        can2 = st.can_open(mint="M3", source_sig="s3", balance_sol=3.0)
+        chk("старая обёртка can_open возвращает пару", len(can2) == 2 and can2[0] is False, can2)
+        chk("текст причины у обёртки тот же", can2[1] == причина)
 
     # --- кошельки
     chk("адрес исполнителя -- константа нужного вида",
