@@ -31,7 +31,7 @@ fail-closed, сторож продаж, dry-run. Кода, способного 
 | клиент Bloom (единственный POST) | `analysis/bloom_api.py` | 53/53 |
 | сторож продаж (отдельный процесс) | `analysis/bloom_seller.py` | 34/34 |
 | детектор v2 (сигналы источников) | `analysis/bloom_detector.py` | 43/43 |
-| сверка вхолостую против DBot | `analysis/bloom_detector_validate.py` | 32/32 |
+| сверка вхолостую против DBot | `analysis/bloom_detector_validate.py` | 38/38 |
 | деплой на NL-хост | `.github/workflows/run_vps_deploy_bloom_seller_nl.yml` | — |
 | сверка (прогон в CI) | `.github/workflows/run_bloom_detector_validate.yml` | — |
 
