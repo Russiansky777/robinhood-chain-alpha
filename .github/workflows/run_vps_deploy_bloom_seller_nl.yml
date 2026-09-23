@@ -58,7 +58,6 @@ jobs:
       - name: "Самопроверки ДО доставки (без сети)"
         run: |
           set -e
-          python3 -c "import sys; sys.path.insert(0,'analysis')"
           cd analysis
           python3 bloom_exec_state.py --self-test
           python3 bloom_api.py --self-test
