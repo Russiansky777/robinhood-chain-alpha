@@ -27,6 +27,10 @@ on:
         description: "какие задачи DBot слушать"
         required: false
         default: "BATCH-5,BATCH-3"
+      live_test:
+        description: "'yes' -- режим стенда: покупки ТОЛЬКО по тестовому источнику"
+        required: false
+        default: "no"
       rotate_journals:
         description: "'yes' -- отложить журналы прежнего формата (ключи сменились)"
         required: false
@@ -63,6 +67,7 @@ jobs:
           python3 bloom_seller.py --self-test
           python3 bloom_detector.py --self-test
           python3 bloom_executor.py --self-test
+          python3 bloom_reconcile.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -108,7 +113,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_executor.py solana_rpc_client.py; do
+          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -143,10 +148,24 @@ jobs:
             # Исполнитель подключён, но dry-run: BLOOM_LIVE_BUY НЕ задан, и
             # пока его нет, ни один POST в Bloom не уходит.
             grep -q '^BLOOM_EXEC=' $ENV_DIR/env || echo 'BLOOM_EXEC=1' >> $ENV_DIR/env
+            # Тестовый источник стенда и его собственный порог.
+            sed -i '/^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d' $ENV_DIR/env
+            echo 'BLOOM_TEST_SOURCE=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX' >> $ENV_DIR/env
+            echo 'BLOOM_TEST_MIN_SOL=0.05' >> $ENV_DIR/env
+            echo 'BLOOM_TEST_BUY_SOL=0.01' >> $ENV_DIR/env
+            # BLOOM_LIVE_BUY вычищается ВСЕГДА: боевые покупки по реальным
+            # источникам этот файл не включает ни при каких входных данных.
             sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env
+            sed -i '/^BLOOM_LIVE_TEST=/d' $ENV_DIR/env
             chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
             ls -l $ENV_DIR/env
           "
+          if [ "${{ inputs.live_test }}" = "yes" ]; then
+            echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
+            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_TEST=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+          else
+            echo "режим dry-run: BLOOM_LIVE_TEST не задан"
+          fi
           echo "строк в env и сколько из них -- присваивания:"
           ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
 
@@ -220,6 +239,24 @@ jobs:
             sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
             echo 'каталог состояния пишется службой'
           "
+
+      - name: "Сверка при старте (bloom_reconcile): можно ли включать деньги"
+        run: |
+          set -e
+          # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
+          # начинается с неизвестного исходного состояния. В dry-run она
+          # информационная: там позиции dry-run помехой не считаются.
+          set +e
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py 2>&1")
+          RC=$?
+          set -e
+          echo "$OUT" | tail -60 | tee -a data/bloom_detector_deploy.txt
+          if [ "${{ inputs.live_test }}" = "yes" ] && [ "$RC" != "0" ]; then
+            echo "СТЕНД НЕ ЗАПУЩЕН: сверка при старте не чистая (см. blockers выше)"
+            exit 1
+          fi
 
       - name: "systemd-юнит с ужесточением"
         run: |

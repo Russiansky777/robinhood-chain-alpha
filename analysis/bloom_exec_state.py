@@ -66,6 +66,30 @@ WEEK_STOP_AT = 0.80
 
 STATES_OPEN = ("intent", "bought", "selling", "unsold")
 
+# Три режима позиции. Разделение не косметическое:
+#   dry-run   -- позиции существуют только в журнале, за ними НЕТ сделок.
+#                Они не учитываются НИГДЕ: ни в can_open, ни у сторожа, ни
+#                в отчётах, ни в сверке. Иначе пять придуманных позиций
+#                закроют гейт для настоящих, а сторож пойдёт искать по цепи
+#                токены, которых никто не покупал.
+#   live-test  -- настоящие деньги на стенде владельца. Продаются и
+#                сторожатся по-настоящему, но в пары А/Б не идут.
+#   live       -- боевые позиции по реальным источникам.
+MODE_DRY = "dry-run"
+MODE_LIVE_TEST = "live-test"
+MODE_LIVE = "live"
+MODES_REAL = (MODE_LIVE_TEST, MODE_LIVE)
+
+
+def is_real_mode(mode) -> bool:
+    """Настоящая ли позиция. Неизвестный режим считается НАСТОЯЩИМ.
+
+    Специально так: если в журнале окажется запись с режимом, которого мы
+    не знаем, безопаснее посторожить лишнее, чем пропустить открытую
+    позицию с деньгами.
+    """
+    return mode != MODE_DRY
+
 # Версия формата журналов и состояния. Ключи переведены на ASCII 23.09 по
 # слову владельца; версия нужна, чтобы потребитель не гадал, кириллица
 # перед ним или латиница, а СПРОСИЛ. Записи версии 1 (кириллические
@@ -273,7 +297,14 @@ class ExecState:
                                  (mint,)).fetchone()
         return (float(row[0]), int(row[1])) if row else (None, 0)
 
-    def mark_mint_buy(self, mint: str) -> None:
+    def mark_mint_buy(self, mint: str, *, mode: str = MODE_LIVE) -> None:
+        """Отметить покупку по минту. Для dry-run НЕ отмечаем: иначе
+        придуманная покупка закроет минт для настоящей."""
+        if not is_real_mode(mode):
+            return
+        self._mark_mint_buy(mint)
+
+    def _mark_mint_buy(self, mint: str) -> None:
         ts, buys = self.mint_state(mint)
         self.db().execute("INSERT OR REPLACE INTO mint_last(mint, ts, buys) VALUES(?,?,?)",
                            (mint, time.time(), buys + 1))
@@ -302,8 +333,23 @@ class ExecState:
                 cur.update(row)
         return out
 
-    def open_positions(self) -> list:
-        return [p for p in self.positions().values() if p.get("state") in STATES_OPEN]
+    def open_positions(self, *, include_dry: bool = False) -> list:
+        """Открытые позиции. По умолчанию БЕЗ dry-run.
+
+        include_dry=True нужен только отчётам, которые честно показывают
+        оба раздела. Всё, что принимает решения -- гейт, сторож, сверка --
+        зовёт без него.
+        """
+        out = [p for p in self.positions().values() if p.get("state") in STATES_OPEN]
+        if include_dry:
+            return out
+        return [p for p in out if is_real_mode(p.get("mode"))]
+
+    def dry_positions(self) -> list:
+        """Позиции dry-run отдельным списком: для отчёта и для откладывания
+        при переходе в live-test."""
+        return [p for p in self.positions().values()
+                if p.get("state") in STATES_OPEN and not is_real_mode(p.get("mode"))]
 
     def new_client_order_id(self) -> str:
         return uuid.uuid4().hex
@@ -614,7 +660,7 @@ def self_test() -> None:
     cid = st.new_client_order_id()
     st.write_intent(client_order_id=cid, mint="MINT1", source_sig="SIG1",
                      source_slot=100, sol_in=0.2, pool="POOL", program="Raydium",
-                     taxed=False, tax_bps=None, mode="dry-run", sell_after_s=28.8)
+                     taxed=False, tax_bps=None, mode=MODE_LIVE_TEST, sell_after_s=28.8)
     chk("намерение записано и видно как открытая позиция",
         len(st.open_positions()) == 1)
     st2 = ExecState(base=st.base, kill=kill)
@@ -662,7 +708,7 @@ def self_test() -> None:
     for i in range(st4.max_open):
         st4.write_intent(client_order_id=f"c{i}", mint=f"M{i}", source_sig=f"S{i}",
                           source_slot=i, sol_in=0.2, pool=None, program=None,
-                          taxed=None, tax_bps=None, mode="dry-run", sell_after_s=29)
+                          taxed=None, tax_bps=None, mode=MODE_LIVE_TEST, sell_after_s=29)
     ok, почему7 = st4.can_open(mint="MNEW", source_sig="SNEW", balance_sol=1.0)
     chk("потолок открытых позиций держится", ok is False and "при лимите" in почему7,
         почему7)
@@ -671,7 +717,7 @@ def self_test() -> None:
     st5 = ExecState(base=base / "state5", kill=kill)
     st5.write_intent(client_order_id="a", mint="SAME", source_sig="SA", source_slot=1,
                       sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
-                      mode="dry-run", sell_after_s=29)
+                      mode=MODE_LIVE_TEST, sell_after_s=29)
     ok, почему8 = st5.can_open(mint="SAME", source_sig="SB", balance_sol=1.0)
     chk("вторая позиция по тому же минту запрещена",
         ok is False and "уже есть открытая позиция" in почему8, почему8)
@@ -772,7 +818,7 @@ def self_test() -> None:
         chk("разрешение отдаёт код OK", можно and код == КОД_ОК, код)
         st.write_intent(client_order_id="c", mint="M1", source_sig="s0", source_slot=1,
                         sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
-                        mode="dry", sell_after_s=28.8)
+                        mode=MODE_LIVE_TEST, sell_after_s=28.8)
         можно, _, код = st.can_open_detailed(mint="M1", source_sig="s1", balance_sol=3.0)
         chk("дубль минта даёт SKIPPED_DUP_MINT",
             (not можно) and код == КОД_ДУБЛЬ_МИНТА, код)
@@ -815,6 +861,47 @@ def self_test() -> None:
     отчёт = st.report()
     chk("отчёт собирается", "limits" in отчёт and "kill_switch" in отчёт)
 
+    # --- ИЗОЛЯЦИЯ dry-run: придуманные позиции не должны мешать настоящим
+    with tempfile.TemporaryDirectory() as d:
+        st = ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+        # набиваем ПОЛНЫЙ потолок позициями dry-run
+        for i in range(st.max_open + 2):
+            st.write_intent(client_order_id=f"d{i}", mint=f"DM{i}",
+                            source_sig=f"DS{i}", source_slot=i, sol_in=0.2,
+                            pool=None, program=None, taxed=None, tax_bps=None,
+                            mode=MODE_DRY, sell_after_s=28.8)
+        chk("dry-run позиции не считаются открытыми",
+            st.open_positions() == [], st.open_positions())
+        chk("но в журнале они есть и видны отдельно",
+            len(st.dry_positions()) == st.max_open + 2, len(st.dry_positions()))
+        chk("include_dry показывает оба раздела",
+            len(st.open_positions(include_dry=True)) == st.max_open + 2)
+        ok, почему = st.can_open(mint="REAL", source_sig="RS", balance_sol=5.0)
+        chk("гейт открыт: придуманные позиции его не закрыли", ok, почему)
+        ok2, _ = st.can_open(mint="DM0", source_sig="RS2", balance_sol=5.0)
+        chk("минт из dry-run не блокирует настоящую покупку", ok2)
+
+        st.mark_mint_buy("DM0", mode=MODE_DRY)
+        _, покупок = st.mint_state("DM0")
+        chk("покупка в dry-run не занимает лимит покупок по минту",
+            покупок == 0, покупок)
+        st.mark_mint_buy("DM0", mode=MODE_LIVE_TEST)
+        _, покупок2 = st.mint_state("DM0")
+        chk("а настоящая -- занимает", покупок2 == 1, покупок2)
+
+        # live-test считается настоящей
+        st.write_intent(client_order_id="lt", mint="LTM", source_sig="LTS",
+                        source_slot=1, sol_in=0.01, pool=None, program=None,
+                        taxed=None, tax_bps=None, mode=MODE_LIVE_TEST,
+                        sell_after_s=28.8)
+        chk("live-test позиция считается открытой",
+            [p["mint"] for p in st.open_positions()] == ["LTM"],
+            [p.get("mint") for p in st.open_positions()])
+
+    chk("неизвестный режим трактуется как настоящий", is_real_mode("что-то новое"))
+    chk("и отсутствие режима тоже", is_real_mode(None))
+    chk("только dry-run считается ненастоящим", not is_real_mode(MODE_DRY))
+
     # --- версия формата: читатель не должен гадать, какие перед ним ключи
     chk("версия формата -- 2", SCHEMA_VERSION == 2, SCHEMA_VERSION)
     chk("в отчёте есть версия формата",
@@ -823,7 +910,7 @@ def self_test() -> None:
         st = ExecState(base=Path(d) / "s", kill=Path(d) / "k")
         st.write_intent(client_order_id="c", mint="M", source_sig="s", source_slot=1,
                         sol_in=0.2, pool=None, program=None, taxed=None, tax_bps=None,
-                        mode="dry", sell_after_s=28.8)
+                        mode=MODE_LIVE_TEST, sell_after_s=28.8)
         st.update_position("c", state="bought")
         st.log_decision({"code": "BUY"})
         строки = [json.loads(x) for x in

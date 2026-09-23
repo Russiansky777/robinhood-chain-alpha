@@ -48,6 +48,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import re  # noqa: E402
+
 import bloom_api as API  # noqa: E402
 import bloom_exec_state as ST  # noqa: E402
 
@@ -71,14 +73,43 @@ EXEC_RATE_LIMITED = "RATE_LIMITED"
 EXEC_NOT_A_BUY = "NOT_A_BUY_DECISION"
 
 
+DEFAULT_TEST_BUY_SOL = ST.env_float("BLOOM_TEST_BUY_SOL", 0.01)
+DEFAULT_TEST_BUY_SOL_BUMP = ST.env_float("BLOOM_TEST_BUY_SOL_BUMP", 0.02)
+
+# Один и только один повтор с УВЕЛИЧЕННОЙ суммой -- и только если запрос
+# был отвергнут до отправки. INVALID_REQUEST означает, что Bloom тело не
+# принял, то есть в цепь ничего не ушло, и повтор не может купить дважды.
+# Повторять на любом другом коде нельзя: 200 у Bloom -- это "принято", и
+# слепой повтор способен купить второй раз.
+BUMP_SAFE_CODES = ("INVALID_REQUEST",)
+BUMP_HINT = re.compile(r"min|minimum|too\s*small|мал", re.I)
+
+EXEC_LIVE_TEST_SKIP = "LIVE_TEST_SKIP_REAL_SOURCE"
+EXEC_BUMPED = "SENT_AFTER_BUMP"
+
+
 def live_buy_enabled() -> bool:
-    """Живые покупки -- только по явному 1 в окружении.
+    """Живые покупки по РЕАЛЬНЫМ источникам -- только по явному 1.
 
     Проверка отдельной функцией, чтобы её можно было назвать в отчёте и
     проверить в самопроверке: "по умолчанию не покупаем" -- это свойство,
     а не надежда.
     """
     return (os.environ.get("BLOOM_LIVE_BUY") or "").strip() == "1"
+
+
+def live_test_enabled() -> bool:
+    """Режим стенда: покупки ТОЛЬКО по тестовому источнику."""
+    return (os.environ.get("BLOOM_LIVE_TEST") or "").strip() == "1"
+
+
+def current_mode() -> str:
+    """Режим исполнителя. live сильнее live-test, dry-run -- по умолчанию."""
+    if live_buy_enabled():
+        return ST.MODE_LIVE
+    if live_test_enabled():
+        return ST.MODE_LIVE_TEST
+    return ST.MODE_DRY
 
 
 class Executor:
@@ -91,7 +122,16 @@ class Executor:
                  sell_slippage_pct: float = DEFAULT_SELL_SLIPPAGE_PCT) -> None:
         self.state = state
         self.api = api
-        self.buy_sol = buy_sol if buy_sol is not None else state.buy_sol
+        self.mode = current_mode()
+        if buy_sol is not None:
+            self.buy_sol = buy_sol
+        elif self.mode == ST.MODE_LIVE_TEST:
+            # На стенде размер свой и маленький: цель -- проверить путь, а
+            # не заработать.
+            self.buy_sol = DEFAULT_TEST_BUY_SOL
+        else:
+            self.buy_sol = state.buy_sol
+        self.bump_sol = DEFAULT_TEST_BUY_SOL_BUMP
         self.slippage_pct = slippage_pct
         self.priority_fee = priority_fee
         self.processor_tip = processor_tip
@@ -103,7 +143,7 @@ class Executor:
 
     # --------------------------------------------------------------- тело
 
-    def build_body(self, mint: str) -> dict:
+    def build_body(self, mint: str, *, amount_sol: float | None = None) -> dict:
         """Тело покупки с ОБЯЗАТЕЛЬНЫМ таймерным авто-ордером.
 
         auto_orders непустой -- принципиально: при отсутствии поля Bloom
@@ -115,7 +155,9 @@ class Executor:
             priority_fee=self.priority_fee, processor_tip=self.processor_tip,
             amount_percent=100)
         return API.build_buy_body(
-            address=mint, amount_sol=self.buy_sol, slippage_pct=self.slippage_pct,
+            address=mint,
+            amount_sol=self.buy_sol if amount_sol is None else amount_sol,
+            slippage_pct=self.slippage_pct,
             priority_fee=self.priority_fee, processor_tip=self.processor_tip,
             auto_orders=[order])
 
@@ -138,6 +180,19 @@ class Executor:
         if not mint or not sig:
             out.update(exec_code=EXEC_NOT_A_BUY,
                        reason="в решении нет минта или подписи источника")
+            return out
+
+        out["mode"] = self.mode
+        out["test_source"] = bool(decision.get("test_source"))
+        # На стенде покупаем ТОЛЬКО по тестовому источнику. Сигналы реальных
+        # источников в этом режиме идут исключительно в журнал -- иначе
+        # стенд незаметно превратился бы в боевой запуск.
+        if self.mode == ST.MODE_LIVE_TEST and not decision.get("test_source"):
+            out.update(exec_code=EXEC_LIVE_TEST_SKIP,
+                       reason="режим стенда: покупки только по тестовому источнику")
+            self.state.log_decision({"stage": "exec_skip_real_source",
+                                     "mint": mint, "signature": sig,
+                                     "mode": self.mode})
             return out
 
         # 1. Гейт ПОВТОРНО, непосредственно перед отправкой.
@@ -172,8 +227,7 @@ class Executor:
             source_slot=decision.get("source_slot"), sol_in=self.buy_sol,
             pool=None, program=(route.get("programs") or [None])[0],
             taxed=decision.get("taxed"), tax_bps=decision.get("tax_bps"),
-            mode=("live" if not self.api.dry_run else "dry"),
-            sell_after_s=self.sell_after_s)
+            mode=self.mode, sell_after_s=self.sell_after_s)
 
         # 4. Один POST. Повторов нет.
         res = self.api.swap(body, client_order_id=cid,
@@ -181,7 +235,7 @@ class Executor:
 
         # 5. Отметки и разбор ответа.
         self.state.mark_signature(sig, source="executor")
-        self.state.mark_mint_buy(mint)
+        self.state.mark_mint_buy(mint, mode=self.mode)
 
         if res.get("ok"):
             self.sent += 1
@@ -195,6 +249,53 @@ class Executor:
                        signatures=res.get("signatures") or [],
                        reason=res.get("caveat") or "принято")
             return out
+
+        # Один безопасный повтор с УВЕЛИЧЕННОЙ суммой -- только на стенде и
+        # только если Bloom отверг само тело (INVALID_REQUEST) со ссылкой на
+        # минимум. Это значит, что в цепь ничего не ушло, и повтор не может
+        # купить дважды. На любом другом коде повтора нет: 200 у Bloom --
+        # это "принято", и слепой повтор способен купить второй раз.
+        код_первый = res.get("error_code") or "?"
+        текст_первый = str(res.get("why_not") or "")
+        можно_поднять = (self.mode == ST.MODE_LIVE_TEST
+                          and код_первый in BUMP_SAFE_CODES
+                          and BUMP_HINT.search(текст_первый)
+                          and self.buy_sol < self.bump_sol)
+        if можно_поднять:
+            log.warning("Bloom отверг %s SOL (%s: %s) -- одна попытка с %s SOL",
+                        self.buy_sol, код_первый, текст_первый[:120], self.bump_sol)
+            self.state.log_decision({"stage": "exec_bump", "mint": mint,
+                                     "signature": sig, "from_sol": self.buy_sol,
+                                     "to_sol": self.bump_sol,
+                                     "first_error_code": код_первый,
+                                     "first_why_not": текст_первый[:200]})
+            try:
+                body2 = self.build_body(mint, amount_sol=self.bump_sol)
+                API.validate_swap_body(body2)
+            except API.BloomRefusal as exc:
+                self.refused += 1
+                out.update(exec_code=EXEC_REFUSED, reason=str(exc),
+                           first_error_code=код_первый)
+                self.state.update_position(cid, state=ST.STATE_CLOSED,
+                                           close_reason="bump_body_refused",
+                                           error_code=код_первый)
+                return out
+            res = self.api.swap(body2, client_order_id=cid,
+                                why=f"повтор с {self.bump_sol} SOL после {код_первый}")
+            if res.get("ok"):
+                self.sent += 1
+                self.state.update_position(
+                    cid, state="bought", order_id=res.get("order_id"),
+                    signatures=res.get("signatures") or [],
+                    ts_accepted=time.time(), sol_in=self.bump_sol,
+                    bumped_from_sol=self.buy_sol,
+                    first_error_code=код_первый,
+                    caveat=res.get("caveat"))
+                out.update(exec_code=EXEC_BUMPED, order_id=res.get("order_id"),
+                           signatures=res.get("signatures") or [],
+                           sol_in=self.bump_sol, first_error_code=код_первый,
+                           reason=res.get("caveat") or "принято после повышения суммы")
+                return out
 
         # Отказ. Позиция НЕ остаётся в intent навсегда: помечаем её
         # закрытой с причиной, иначе сторож будет вечно искать токен,
@@ -211,14 +312,19 @@ class Executor:
                               EXEC_SKIP_NOT_FAILURE if пропуск else EXEC_API_ERROR),
                    error_code=код, reason=res.get("why_not") or "",
                    retry_after_s=res.get("retry_after_s"))
+        if код_первый != код:
+            out["first_error_code"] = код_первый
         return out
 
     # --------------------------------------------------------------- отчёт
 
     def report(self) -> dict:
         return {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
+                "mode": self.mode,
                 "live_buy_enabled": live_buy_enabled(),
+                "live_test_enabled": live_test_enabled(),
                 "dry_run": self.api.dry_run,
+                "bump_sol": self.bump_sol,
                 "buy_sol": self.buy_sol,
                 "slippage_pct": self.slippage_pct,
                 "priority_fee": self.priority_fee,
@@ -341,7 +447,12 @@ def self_test() -> int:
         chk("срок продажи записан", одна.get("sell_after_s") == 28.8)
         chk("подпись помечена виденной", st.seen_signature("SIG1"))
         _, покупок = st.mint_state("MINT1")
-        chk("покупка по минту учтена", покупок == 1, покупок)
+        chk("в dry-run покупка по минту НЕ учитывается: иначе придуманная "
+            "покупка закроет минт для настоящей", покупок == 0, покупок)
+        chk("режим позиции -- dry-run", одна.get("mode") == ST.MODE_DRY, одна.get("mode"))
+        chk("dry-run позиция не считается открытой",
+            st.open_positions() == [], st.open_positions())
+        chk("но видна в разделе dry-run", len(st.dry_positions()) == 1)
         chk("все ключи позиции латинские",
             all(k.isascii() for k in одна), [k for k in одна if not k.isascii()])
 
@@ -461,6 +572,108 @@ def self_test() -> int:
             [r["signature"] for r in pending_from_journal(st)] == ["S3"],
             [r["signature"] for r in pending_from_journal(st)])
 
+    # --- режим стенда live-test
+    было_lt = os.environ.pop("BLOOM_LIVE_TEST", None)
+    os.environ["BLOOM_LIVE_TEST"] = "1"
+    try:
+        chk("режим стенда распознан", current_mode() == ST.MODE_LIVE_TEST, current_mode())
+        chk("и это НЕ боевой режим", live_buy_enabled() is False)
+
+        # реальный источник в режиме стенда -- только журнал
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            сессия = СессияЗаглушка([])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            chk("на стенде размер входа свой", ex.buy_sol == DEFAULT_TEST_BUY_SOL,
+                ex.buy_sol)
+            r = ex.execute({**решение_buy, "test_source": False}, balance_sol=5.0)
+            chk("реальный источник на стенде не покупается",
+                r["exec_code"] == EXEC_LIVE_TEST_SKIP, r["exec_code"])
+            chk("и в сеть ничего не ушло", сессия.запросы == [], сессия.запросы)
+            chk("и позиции не создано", st.positions() == {}, st.positions())
+
+        # тестовый источник -- покупается по-настоящему
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отв = ОтветЗаглушка(200, {"success": True,
+                                      "data": {"order_id": "ot", "signatures": ["st1"]}})
+            сессия = СессияЗаглушка([отв])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("тестовый источник на стенде покупается",
+                r["exec_code"] == EXEC_SENT, r["exec_code"])
+            тело = сессия.запросы[0]["json"]
+            chk("сумма на стенде -- 0.01 SOL",
+                тело["wallets"][0]["amount"] == f"{DEFAULT_TEST_BUY_SOL}",
+                тело["wallets"][0]["amount"])
+            одна = list(st.positions().values())[0]
+            chk("режим позиции -- live-test",
+                одна.get("mode") == ST.MODE_LIVE_TEST, одна.get("mode"))
+            chk("позиция стенда считается открытой: её надо сторожить",
+                len(st.open_positions()) == 1, st.open_positions())
+            _, покупок = st.mint_state("MINT1")
+            chk("и лимит покупок по минту она занимает", покупок == 1, покупок)
+
+        # отказ по минимуму -> ОДИН повтор с 0.02
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отказ = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "amount below minimum"}})
+            успех = ОтветЗаглушка(200, {"success": True,
+                                        "data": {"order_id": "o2", "signatures": ["s2"]}})
+            сессия = СессияЗаглушка([отказ, успех])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("после отказа по минимуму сумма поднята и покупка прошла",
+                r["exec_code"] == EXEC_BUMPED, r["exec_code"])
+            chk("первый код ошибки сохранён для доклада",
+                r.get("first_error_code") == "INVALID_REQUEST", r.get("first_error_code"))
+            chk("запросов ровно два, не больше", len(сессия.запросы) == 2,
+                len(сессия.запросы))
+            chk("второй запрос на 0.02 SOL",
+                сессия.запросы[1]["json"]["wallets"][0]["amount"]
+                == f"{DEFAULT_TEST_BUY_SOL_BUMP}",
+                сессия.запросы[1]["json"]["wallets"][0]["amount"])
+            одна = list(st.positions().values())[0]
+            chk("в позиции записана поднятая сумма",
+                одна.get("sol_in") == DEFAULT_TEST_BUY_SOL_BUMP, одна.get("sol_in"))
+            chk("и то, с чего подняли",
+                одна.get("bumped_from_sol") == DEFAULT_TEST_BUY_SOL,
+                одна.get("bumped_from_sol"))
+
+        # НЕ поднимаем на других кодах: 200 у Bloom -- это "принято"
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отказ = ОтветЗаглушка(500, {"success": False, "error": {
+                "code": "INTERNAL_ERROR", "message": "minimum something"}})
+            сессия = СессияЗаглушка([отказ])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("на INTERNAL_ERROR повтора нет даже со словом minimum",
+                len(сессия.запросы) == 1, len(сессия.запросы))
+            chk("и это отмечено как ошибка API",
+                r["exec_code"] == EXEC_API_ERROR, r["exec_code"])
+
+        # отказ по минимуму БЕЗ упоминания минимума -- тоже без повтора
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            отказ = ОтветЗаглушка(400, {"success": False, "error": {
+                "code": "INVALID_REQUEST", "message": "wallet not owned"}})
+            сессия = СессияЗаглушка([отказ])
+            api = API.BloomApi("КЛЮЧ", dry_run=False, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            ex.execute({**решение_buy, "test_source": True}, balance_sol=5.0)
+            chk("INVALID_REQUEST не про минимум повтора не вызывает",
+                len(сессия.запросы) == 1, len(сессия.запросы))
+    finally:
+        os.environ.pop("BLOOM_LIVE_TEST", None)
+        if было_lt is not None:
+            os.environ["BLOOM_LIVE_TEST"] = было_lt
+
     # --- отчёт
     with tempfile.TemporaryDirectory() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
@@ -492,7 +705,7 @@ def main() -> int:
 
     state = ST.ExecState()
     api = API.BloomApi(os.environ.get("BLOOM_API_KEY", ""),
-                       dry_run=not live_buy_enabled(), state=state)
+                       dry_run=(current_mode() == ST.MODE_DRY), state=state)
     ex = Executor(state=state, api=api)
 
     if a.check_only:
