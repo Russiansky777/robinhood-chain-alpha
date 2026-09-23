@@ -268,6 +268,54 @@ def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | N
     return None
 
 
+# Допуск только на расхождение часов между нашим детектом и меткой
+# createAt у DBot. Раньше здесь было -60 000 мс, и запись, созданная до
+# минуты РАНЬШЕ детекта, засчитывалась копией этого события.
+MATCH_CLOCK_SKEW_MS = -2_000
+
+# Подписи покупок, уже приписанных событию: одна покупка не может быть
+# копией двух разных транзакций источника.
+USED_DBOT_SIGS: set[str] = set()
+
+
+def rpc_checked(method: str, params: list, key: str,
+                 url: str | None = None) -> tuple[dict | None, str | None]:
+    """То же, что rpc(), но РАЗЛИЧАЕТ исходы: (результат, причина_отказа).
+
+    Зачем. rpc() отдаёт None в четырёх разных случаях: транзакции правда
+    нет; HTTP-ошибка; ошибка в теле ответа; исчерпаны попытки. В
+    самопроверке это привело к вердикту "РАСХОЖДЕНИЕ" там, где на самом
+    деле провайдер просто не ответил, а записанные данные были верны --
+    то есть сбой был выдан за факт."""
+    url = url or f"https://mainnet.helius-rpc.com/?api-key={key}"
+    last = None
+    for attempt in range(4):
+        try:
+            resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1,
+                                             "method": method, "params": params}, timeout=30)
+        except Exception as exc:  # noqa: BLE001
+            last = f"сеть: {type(exc).__name__}"
+            time.sleep(2 * (attempt + 1))
+            continue
+        if resp.status_code == 429 or 500 <= resp.status_code < 600:
+            last = f"http={resp.status_code}"
+            time.sleep(2 * (attempt + 1))
+            continue
+        if not resp.ok:
+            return None, f"http={resp.status_code}: {_scrub_all(resp.text[:160])}"
+        body = resp.json()
+        if "error" in body:
+            return None, f"ошибка RPC: {_scrub_all(str(body['error'])[:160])}"
+        res = body.get("result")
+        return res, (None if res is not None else "узел ответил: такой транзакции нет")
+    return None, f"исчерпаны попытки, последняя причина: {last}"
+
+
+def get_tx_checked(sig: str, key: str, url: str | None = None) -> tuple[dict | None, str | None]:
+    return rpc_checked("getTransaction", [sig, {"encoding": "jsonParsed",
+                                                 "maxSupportedTransactionVersion": 1}], key, url)
+
+
 def get_tx(sig: str, key: str, url: str | None = None) -> dict | None:
     # maxSupportedTransactionVersion=1: на реальном прогоне Части A узел
     # отвечал -32015 "Transaction version (1) is not supported" на
@@ -648,8 +696,17 @@ def enrich_once(helius_key: str, dbot_key: str) -> int:
                 if not isinstance(created, (int, float)):
                     continue
                 dt_ms = created - float(ev["t_recv"]) * 1000
-                if dt_ms < -60_000 or dt_ms > 600_000:
+                # ОКНО СШИВКИ. Было -60 000 мс: запись DBot, созданная до
+                # минуты РАНЬШЕ нашего детекта, считалась копией этого
+                # события. Копия не может возникнуть раньше источника, и
+                # именно отсюда взялись отрицательные dbot_offset_slots
+                # вплоть до -218 слотов (~61с -- ровно ширина того окна).
+                # Оставлен только допуск на расхождение часов.
+                if dt_ms < MATCH_CLOCK_SKEW_MS or dt_ms > 600_000:
                     continue
+                # Берём ПЕРВУЮ запись после детекта. Прежнее "минимальное
+                # dt" при отрицательном окне выбирало самую раннюю, то
+                # есть заведомо чужую сделку.
                 if best is None or dt_ms < best[0]:
                     best = (dt_ms, rec, task)
         if best is None:
@@ -660,6 +717,18 @@ def enrich_once(helius_key: str, dbot_key: str) -> int:
 
         dt_ms, rec, task = best
         our_sig = dbot_signature(rec)
+        # ОДНА ПОКУПКА -- ОДНО СОБЫТИЕ. В отчёте за сутки одна и та же
+        # наша покупка оказалась приписана трём разным транзакциям
+        # источника: каждое событие искало запись независимо и находило
+        # ту же самую.
+        if our_sig and our_sig in USED_DBOT_SIGS:
+            out["dbot_match"] = "дубль_той_же_покупки"
+            out["our_signature_дубль"] = our_sig
+            out["почему"] = ("эта покупка DBot уже приписана более раннему событию -- "
+                              "одна покупка не может быть копией двух разных транзакций")
+            append_jsonl(ENRICHED_PATH, out)
+            n += 1
+            continue
         out["dbot_match"] = "найдена"
         out["dbot_task_name"] = task.get("task_name")
         out["our_wallet"] = task.get("our_wallet")
@@ -673,7 +742,23 @@ def enrich_once(helius_key: str, dbot_key: str) -> int:
                 out["our_block_time"] = otx.get("blockTime")
                 out["our_tx_err"] = (otx.get("meta") or {}).get("err") is not None
                 if isinstance(out.get("our_slot"), int) and isinstance(out.get("source_slot"), int):
-                    out["dbot_offset_slots"] = out["our_slot"] - out["source_slot"]
+                    off = out["our_slot"] - out["source_slot"]
+                    if off < 0:
+                        # ПРОВЕРКА ПО ЦЕПОЧКЕ. Наша покупка не может сесть
+                        # в блок РАНЬШЕ транзакции, которую копирует.
+                        # Отрицательное значение -- признак неверной
+                        # сшивки, и записывать его как измерение нельзя.
+                        out["dbot_match"] = "отклонена_обратный_порядок"
+                        out["почему"] = (f"our_slot {out['our_slot']} раньше source_slot "
+                                          f"{out['source_slot']} -- копия не может опередить источник")
+                        out.pop("our_slot", None)
+                        out.pop("our_block_time", None)
+                        out["our_signature_отклонена"] = out.pop("our_signature", None)
+                        append_jsonl(ENRICHED_PATH, out)
+                        n += 1
+                        continue
+                    out["dbot_offset_slots"] = off
+                    USED_DBOT_SIGS.add(our_sig)
                 if isinstance(out.get("our_block_time"), int):
                     out["ms_detect_to_dbot_land"] = round(
                         out["our_block_time"] * 1000 - float(ev["t_recv"]) * 1000, 1)
@@ -840,6 +925,11 @@ def print_report(n_selfcheck: int = 3) -> None:
     print("  сравнить с ожидаемым числом выше. dbot_offset_slots должен быть ровно разностью.")
 
 
+def _prov(slot: int | None, err: str | None) -> str:
+    """Как показать ответ провайдера: число, или ПОЧЕМУ числа нет."""
+    return str(slot) if slot is not None else f"НЕ ОТДАЛ ({err or 'причина не названа'})"
+
+
 def self_check(helius_key: str, n: int = 3) -> bool:
     """Владелец: «перед отчётом прогони самопроверку: возьми 3 события из
     events.jsonl и вручную сверь slot, our_slot и dbot_offset_slots».
@@ -865,40 +955,58 @@ def self_check(helius_key: str, n: int = 3) -> bool:
         enr = enriched.get(sig, {})
         print(f"\n-- событие {ev.get('t_recv_utc')} источник={ev.get('source')} ({ev.get('source_remark')})")
         print(f"   транзакция источника: https://solscan.io/tx/{sig}")
-        h = get_tx(sig, helius_key)
-        pub = get_tx(sig, helius_key, PUBLIC_RPC)
+        # НЕ ОТДАЛСЯ != РАСХОЖДЕНИЕ. В отчёте за первые сутки Helius не
+        # вернул две транзакции из трёх, и самопроверка объявила это
+        # расхождением, хотя записанные числа в точности совпадали с
+        # независимым публичным узлом. Сбой провайдера выдавался за
+        # ошибку в данных. Теперь молчание провайдера названо молчанием
+        # и на вердикт не влияет; вердикт делается по тем, кто ответил.
+        h, h_err = get_tx_checked(sig, helius_key)
+        pub, p_err = get_tx_checked(sig, helius_key, PUBLIC_RPC)
         h_slot = h.get("slot") if h else None
         p_slot = pub.get("slot") if pub else None
         ws_slot = ev.get("slot")
-        ok = (h_slot == ws_slot) and (p_slot is None or p_slot == ws_slot)
+        answered = [x for x in (h_slot, p_slot) if x is not None]
+        ok = bool(answered) and all(x == ws_slot for x in answered)
         all_ok = all_ok and ok
-        print(f"   slot из вебсокета={ws_slot} | Helius getTransaction={h_slot} | "
-              f"публичный узел={p_slot if p_slot is not None else 'не ответил'} -> "
-              f"{'СОВПАДАЕТ' if ok else 'РАСХОЖДЕНИЕ'}")
+        print(f"   slot из вебсокета={ws_slot} | Helius={_prov(h_slot, h_err)} | "
+              f"публичный узел={_prov(p_slot, p_err)} -> "
+              f"{'СОВПАДАЕТ' if ok else ('РАСХОЖДЕНИЕ' if answered else 'НИКТО НЕ ОТВЕТИЛ')}")
         our_sig = enr.get("our_signature")
         if not our_sig:
             print("   наша покупка не сшита с этим событием -- our_slot/dbot_offset_slots сверять нечего")
             continue
         print(f"   наша покупка: https://solscan.io/tx/{our_sig}")
-        oh = get_tx(our_sig, helius_key)
-        op = get_tx(our_sig, helius_key, PUBLIC_RPC)
+        oh, oh_err = get_tx_checked(our_sig, helius_key)
+        op, op_err = get_tx_checked(our_sig, helius_key, PUBLIC_RPC)
         oh_slot = oh.get("slot") if oh else None
         op_slot = op.get("slot") if op else None
         rec_our = enr.get("our_slot")
-        ok2 = (oh_slot == rec_our) and (op_slot is None or op_slot == rec_our)
+        answered2 = [x for x in (oh_slot, op_slot) if x is not None]
+        ok2 = bool(answered2) and all(x == rec_our for x in answered2)
         all_ok = all_ok and ok2
-        print(f"   our_slot записан={rec_our} | Helius={oh_slot} | "
-              f"публичный узел={op_slot if op_slot is not None else 'не ответил'} -> "
-              f"{'СОВПАДАЕТ' if ok2 else 'РАСХОЖДЕНИЕ'}")
+        print(f"   our_slot записан={rec_our} | Helius={_prov(oh_slot, oh_err)} | "
+              f"публичный узел={_prov(op_slot, op_err)} -> "
+              f"{'СОВПАДАЕТ' if ok2 else ('РАСХОЖДЕНИЕ' if answered2 else 'НИКТО НЕ ОТВЕТИЛ')}")
         rec_off = enr.get("dbot_offset_slots")
         src_slot = enr.get("source_slot")
-        recomputed = (oh_slot - h_slot) if (isinstance(oh_slot, int) and isinstance(h_slot, int)) else None
-        ok3 = rec_off == recomputed
-        all_ok = all_ok and ok3
-        print(f"   dbot_offset_slots записан={rec_off} | пересчитан по свежим ответам "
-              f"({oh_slot} - {h_slot})={recomputed} -> {'СОВПАДАЕТ' if ok3 else 'РАСХОЖДЕНИЕ'}")
-        if src_slot is not None and src_slot != h_slot:
-            print(f"   ВНИМАНИЕ: source_slot в записи={src_slot}, а сейчас getTransaction даёт {h_slot}")
+        # Пересчёт по ЛЮБОМУ ответившему провайдеру, а не только по Helius.
+        our_now = oh_slot if oh_slot is not None else op_slot
+        src_now = h_slot if h_slot is not None else p_slot
+        recomputed = (our_now - src_now) if (isinstance(our_now, int) and isinstance(src_now, int)) else None
+        if recomputed is None:
+            print(f"   dbot_offset_slots записан={rec_off} | пересчитать не у кого -- "
+                  f"оба провайдера промолчали (это НЕ расхождение)")
+        else:
+            ok3 = rec_off == recomputed
+            all_ok = all_ok and ok3
+            print(f"   dbot_offset_slots записан={rec_off} | пересчитан ({our_now} - {src_now})"
+                  f"={recomputed} -> {'СОВПАДАЕТ' if ok3 else 'РАСХОЖДЕНИЕ'}")
+            if isinstance(recomputed, int) and recomputed < 0:
+                print("   ВНИМАНИЕ: отрицательное смещение -- копия не может опередить источник, "
+                      "это неверная сшивка, а не измерение")
+        if src_slot is not None and src_now is not None and src_slot != src_now:
+            print(f"   ВНИМАНИЕ: source_slot в записи={src_slot}, сейчас цепочка даёт {src_now}")
     print(f"\nИТОГ САМОПРОВЕРКИ: {'все сверенные числа совпали' if all_ok else 'ЕСТЬ РАСХОЖДЕНИЯ -- смотри выше'}")
     return all_ok
 
