@@ -58,31 +58,61 @@
     }
   }
 }
-        "blockTime": 1790165168,
-        "utc": "2026-09-23T12:06:08Z",
-        "err": null
-      },
-      {
-        "signature": "4xYu1BQnGpkThZ8J9rw6dxuNsiEwUcbzDaQ771jawim88vWNcLdZjhJVqZ37LTkxV6pyERbz2y34y3ndBjMh4Vma",
-        "blockTime": 1790163030,
-        "utc": "2026-09-23T11:30:30Z",
-        "err": null
-      }
-    ],
-    "recent_count": 14,
-    "older_count": 26,
-    "newest_older_utc": "2026-09-22T17:23:30Z",
+{
+  "stand_start": {
+    "schema_version": 2,
+    "stand_start_ts": 1790196635.113487,
+    "stand_start_utc": "2026-09-23T20:50:35Z",
+    "note": "начало стенда, подтверждено владельцем"
+  }
+}
+{
+  "schema_version": 2,
+  "checked_utc": "2026-09-23T20:50:35Z",
+  "mode": "dry-run",
+  "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+  "balance_sol": null,
+  "min_balance_sol": 0.3,
+  "dry_positions": 0,
+  "real_open_positions": 0,
+  "real_open_mints": [],
+  "kill_readable": true,
+  "kill_active": false,
+  "schema_version": 2,
+  "checked_utc": "2026-09-23T20:50:37Z",
+  "mode": "dry-run",
+  "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+  "balance_sol": 0.362935329,
+  "min_balance_sol": 0.3,
+  "dry_positions": 0,
+  "real_open_positions": 0,
+  "real_open_mints": [],
+  "kill_readable": true,
+  "kill_active": false,
+  "foreign_activity": {
+    "known": true,
+    "checked": 40,
+    "window_h": 24.0,
+    "boundary_from": "метка начала стенда",
+    "boundary_utc": "2026-09-23T20:50:35Z",
+    "recent": [],
+    "recent_count": 0,
+    "older_count": 40,
+    "newest_older_utc": "2026-09-23T19:46:12Z",
     "truncated": true,
     "foreign_count": 40
   },
   "stand_start": {
-    "set": false,
-    "path": "/home/bot/bloom_executor_live_data/stand_start.json"
+    "set": true,
+    "path": "/home/bot/bloom_executor_live_data/stand_start.json",
+    "stand_start_ts": 1790196635.113487,
+    "stand_start_utc": "2026-09-23T20:50:35Z",
+    "note": "начало стенда, подтверждено владельцем"
   },
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 51,
+      "v2": 53,
       "unreadable": 0
     },
     "positions": {
@@ -93,36 +123,26 @@
     "mixed": false
   },
   "notes": [
-    "метка начала стенда не поставлена: границей служит окно 24.0 ч. Поставить метку -- bloom_reconcile.py --mark-start, и только по слову владельца: она объявляет всю прежнюю активность кошелька его прежней жизнью",
-    "у кошелька есть прежняя история: 26 сделок старше окна, самая свежая из них 2026-09-22T17:23:30Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
+    "у кошелька есть прежняя история: 40 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
     "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
   ],
-  "blockers": [
-    "на кошельке 14 сделок за последние 24.0 ч, которых мы не делали -- мы в кошельке не одни"
-  ],
-  "clean": false,
-  "verdict": "старт заблокирован, причин 1"
+  "blockers": [],
+  "clean": true,
+  "verdict": "сверка чистая: настоящие покупки включать можно"
 }
 --- коротко ---
-режим: dry-run, вердикт: старт заблокирован, причин 1
+режим: dry-run, вердикт: сверка чистая: настоящие покупки включать можно
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.362935329 SOL при пороге 0.3
-чужая активность: известно=True, свежих за 24.0 ч 14, прежних 26 (самая свежая 2026-09-22T17:23:30Z)
-    свежая чужая: 4XNthCT2ZBYbFP3zXgsVFhBrAZqoimpkAdth9vc3afRAWQtRpzwgLSm8hvu86sqU5cSERw48LL5jn2HiTh2ozunc 2026-09-23T19:46:12Z
-    свежая чужая: 45bpUGdtENPqW9ecz8aug2AAkWGD4TRrMuWtWaC3wTc6UYVEJe5pSJahbFCLamQokZXqt25iXcvJoGe2uDZQc6wu 2026-09-23T19:46:04Z
-    свежая чужая: 4uXskrHvx8QaSS2uDsMN5CFUHdEyWNN6NqomdJzaMjGJsMw3XF1s2rqmHaQZKTs4Lbwh3vwYhfMVg9nQrH7Cou3c 2026-09-23T19:46:00Z
-    свежая чужая: 4sxmN6E9i3FLfVBSb8bz3SeZ13uAXU8bQmzfAPH5JGEvi342yTeV3KUmqNGKUMQrxMp5Rb5uDGSEaZdGZiG48PP9 2026-09-23T19:45:39Z
-    свежая чужая: 5yaSoq9cX9CZBsTgFk9kqjvj6uMRgmgtwMK5eJcNfaJnMqSfmjqr8RAsABp71Q4r2hNbRhvCYmpFckZTUdRpuYvK 2026-09-23T15:45:24Z
-граница чужой активности: окно (2026-09-22T20:37:55Z)
+чужая активность: известно=True, свежих за 24.0 ч 0, прежних 40 (самая свежая 2026-09-23T19:46:12Z)
+граница чужой активности: метка начала стенда (2026-09-23T20:50:35Z)
 позиции: dry-run 0, настоящих открытых 0
-  БЛОКЕР: на кошельке 14 сделок за последние 24.0 ч, которых мы не делали -- мы в кошельке не одни
-  примечание: метка начала стенда не поставлена: границей служит окно 24.0 ч. Поставить метку -- bloom_reconcile.py --mark-start, и только по слову владельца: она объявляет всю прежнюю активность кошелька его прежней жизнью
-  примечание: у кошелька есть прежняя история: 26 сделок старше окна, самая свежая из них 2026-09-22T17:23:30Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
+  примечание: у кошелька есть прежняя история: 40 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T20:38:00Z",
-  "updated_ts": 1790195880.1919389,
-  "alive_since_utc": "2026-09-23T20:38:00Z",
+  "updated_utc": "2026-09-23T20:50:44Z",
+  "updated_ts": 1790196644.3595746,
+  "alive_since_utc": "2026-09-23T20:50:44Z",
   "mode": "dry",
   "sources": 18,
   "sources_from": "DBot живьём + тестовый источник из окружения",
@@ -136,7 +156,7 @@
   "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
   "test_min_sol": 0.05,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 113.977777777778,
+  "rate_usd_sol": 114.41909466360647,
   "rate_fresh": true,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
@@ -147,7 +167,7 @@
   "slot_notifications": 0,
   "net_slot_age_s": null,
   "balance_sol": 0.362935329,
-  "balance_age_s": 0.05,
+  "balance_age_s": 0.04,
   "rpc_calls": 1,
   "rpc_by_method": {
     "getBalance": 1
@@ -178,6 +198,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-51
+53
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 0
