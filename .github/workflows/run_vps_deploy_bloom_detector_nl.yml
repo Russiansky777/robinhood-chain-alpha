@@ -1,0 +1,229 @@
+name: "Bloom: деплой детектора v2 на NL-хост (только журнал, покупок нет)"
+
+# Детектор слушает источники, разбирает сделки и ПИШЕТ РЕШЕНИЯ В ЖУРНАЛ.
+# Ни одного POST в Bloom из него не уходит: покупать умеет только
+# bloom_executor, которого ещё нет ни в репозитории, ни на хосте. Это и
+# есть сутки вхолостую, о которых просил владелец.
+#
+# Своё имя юнита (bloom-detector), свой каталог состояния делится со
+# сторожем (журнал решений и позиции -- общие, это одно хозяйство), свой
+# env-файл общий с исполнителем (/etc/bloom-executor/env).
+#
+# Уроки предыдущих деплоев, учтённые здесь:
+#   * тело systemd-юнита пишется блоком echo, а не heredoc: терминатор
+#     heredoc обязан стоять в нулевой колонке и ломает YAML;
+#   * у ssh, которому нужен stdin, НЕ ставится -n: он подменяет stdin на
+#     /dev/null, и на хост уезжает пустой файл;
+#   * сверка sha256 с отдельной проверкой на сумму пустого файла.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_service:
+        description: "'yes' -- включить и перезапустить службу"
+        required: false
+        default: "no"
+      tasks:
+        description: "какие задачи DBot слушать"
+        required: false
+        default: "BATCH-5,BATCH-3"
+
+concurrency:
+  group: bloom-detector-deploy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SVC: bloom-detector
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО доставки (без сети)"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_exec_state.py --self-test
+          python3 bloom_api.py --self-test
+          python3 bloom_seller.py --self-test
+          python3 bloom_detector.py --self-test
+
+      - name: "Секреты не пусты (значения не печатаются)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          fail=0
+          for NAME in HELIUS_API_KEY DBOT_API_KEY VPS_SSH_KEY; do
+            V="${!NAME}"
+            if [ -z "$V" ]; then echo "$NAME: НЕ ЗАДАН"; fail=1
+            else echo "$NAME: задан, длина ${#V}"; fi
+          done
+          [ "$fail" = "0" ] || { echo "деплой остановлен: нет обязательных секретов"; exit 1; }
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Каталоги на месте (сторож их уже создал -- проверяем, не ломаем)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            install -d -o bot -g bot -m 755 $CODE_DIR
+            install -d -o bot -g bot -m 750 $STATE_DIR
+            install -d -o root -g root -m 750 $ENV_DIR
+            test -s $ENV_DIR/env || { echo 'СБОЙ: нет $ENV_DIR/env -- сначала деплой сторожа'; exit 1; }
+            ls -ld $CODE_DIR $STATE_DIR $ENV_DIR
+          "
+
+      - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
+        run: |
+          set -e
+          EMPTY_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py; do
+            [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
+            local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
+            ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
+            remote_sum=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
+            echo "$f: локально $local_sum, на хосте $remote_sum"
+            [ "$remote_sum" != "$EMPTY_SHA" ] || { echo "СБОЙ: на хост уехал ПУСТОЙ $f"; exit 1; }
+            [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
+          done
+
+      - name: "Снимок задач как откат, если DBot недоступен"
+        run: |
+          set -e
+          SNAP=data/final/20260923T145755Z/konfig.json
+          [ -s "$SNAP" ] || { echo "СБОЙ: нет снимка $SNAP"; exit 1; }
+          ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/konfig_snapshot.json && chown bot:bot $CODE_DIR/konfig_snapshot.json && chmod 644 $CODE_DIR/konfig_snapshot.json" < "$SNAP"
+          ssh -n $SSH_OPTS root@$HOST "wc -c < $CODE_DIR/konfig_snapshot.json"
+
+      - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
+          # Ключ передаётся через stdin, а не аргументом: аргументы видны в ps.
+          printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$HOST "
+            cat > /tmp/dbot_line
+            grep -q '^DBOT_API_KEY=' $ENV_DIR/env && sed -i '/^DBOT_API_KEY=/d' $ENV_DIR/env
+            cat /tmp/dbot_line >> $ENV_DIR/env
+            shred -u /tmp/dbot_line
+            grep -q '^BLOOM_MODE=' $ENV_DIR/env || echo 'BLOOM_MODE=dry' >> $ENV_DIR/env
+            grep -q '^BLOOM_TASKS=' $ENV_DIR/env || echo 'BLOOM_TASKS=${{ inputs.tasks }}' >> $ENV_DIR/env
+            chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
+            ls -l $ENV_DIR/env
+          "
+          echo "строк в env и сколько из них -- присваивания:"
+          ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+
+      - name: "Зависимость websockets в venv хоста"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets; print(\"websockets\", websockets.__version__)' || /home/bot/robinhood-chain-alpha/venv/bin/pip install -q websockets"
+          ssh -n $SSH_OPTS root@$HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets, requests; print(\"есть websockets\", websockets.__version__, \"и requests\", requests.__version__)'"
+
+      - name: "Проверка --check-only ДО запуска службы (ничего не решает)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
+          " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+
+      - name: "systemd-юнит с ужесточением"
+        run: |
+          {
+            echo '[Unit]'
+            echo 'Description=Bloom signal detector (journal only, no buying code present)'
+            echo 'After=network-online.target'
+            echo 'Wants=network-online.target'
+            echo ""
+            echo '[Service]'
+            echo 'Type=simple'
+            echo 'User=bot'
+            echo 'Group=bot'
+            echo 'WorkingDirectory=/home/bot/bloom_executor'
+            echo 'EnvironmentFile=/etc/bloom-executor/env'
+            echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_detector.py --serve --config /home/bot/bloom_executor/konfig_snapshot.json'
+            echo 'Restart=always'
+            echo 'RestartSec=5'
+            echo 'StandardOutput=journal'
+            echo 'StandardError=journal'
+            echo 'NoNewPrivileges=true'
+            echo 'PrivateTmp=true'
+            echo 'ProtectSystem=strict'
+            echo 'ProtectHome=read-only'
+            echo 'ReadWritePaths=/home/bot/bloom_executor_live_data'
+            echo 'ProtectKernelTunables=true'
+            echo 'ProtectControlGroups=true'
+            echo 'RestrictSUIDSGID=true'
+            echo 'LockPersonality=true'
+            echo 'MemoryMax=512M'
+            echo 'TasksMax=64'
+            echo ""
+            echo '[Install]'
+            echo 'WantedBy=multi-user.target'
+          } | ssh $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
+          ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
+
+      - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
+          sleep 10
+          ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
+            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          RESTARTS=$(ssh -n $SSH_OPTS root@$HOST "systemctl show -p NRestarts --value $SVC")
+          echo "NRestarts=$RESTARTS"
+          [ "$RESTARTS" -lt 3 ] || { echo "СБОЙ: служба уже перезапускалась $RESTARTS раз"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 40 --no-pager"
+
+      - name: "Признак жизни детектора должен появиться"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          sleep 25
+          ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/detector_status.json" || {
+            echo "СБОЙ: признака жизни нет"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/detector_status.json" | tee -a data/bloom_detector_deploy.txt
+          echo "--- решений в журнале ---" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+          echo "--- позиций в журнале (должно быть 0: покупать нечем) ---" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$HOST "wc -l < $STATE_DIR/positions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_detector_deploy.txt ] && git add data/bloom_detector_deploy.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: деплой детектора v2, отчёт [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
