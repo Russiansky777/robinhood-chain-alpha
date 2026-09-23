@@ -164,22 +164,29 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
     шаги: list = []
     итог = {"ok": False, "steps": шаги, "mint": mint, "amount_raw": amount_raw}
 
-    if ордер_фн is None or исполнить_фн is None or подписать_фн is None:
-        from dbot_rescue import (  # noqa: PLC0415
-            load_keypair, sign_versioned_b64, ultra_execute, ultra_order)
+    if ордер_фн is None or исполнить_фн is None:
+        # Клиент Ultra один на весь репозиторий -- в dbot_rescue. Второй
+        # копии быть не должно: расхождение двух клиентов по полю порога
+        # стоило бы денег.
+        from dbot_rescue import ultra_execute, ultra_order  # noqa: PLC0415
         ордер_фн = ордер_фн or ultra_order
         исполнить_фн = исполнить_фн or ultra_execute
-        if подписать_фн is None:
-            есть, почему = ключ_есть()
-            if не_готов := (not есть):
-                итог["why_not"] = почему
-                шаги.append({"step": "ключ", "ok": False, "why_not": почему})
-                return итог
-            del не_готов
 
-            def подписать_фн(tx_b64):  # noqa: E306
-                return sign_versioned_b64(tx_b64, load_keypair(
-                    os.environ.get("BLOOM_WALLET_KEY", "")))
+    # Подпись нужна ТОЛЬКО для живой отправки: при живьём=False (проверка
+    # котировки и пола) ни ключ, ни solders не требуются вовсе, и падать на
+    # их отсутствии этот путь не имеет права.
+    if подписать_фн is None and живьём:
+        есть, почему = ключ_есть()
+        if not есть:
+            итог["why_not"] = почему
+            шаги.append({"step": "key", "ok": False, "why_not": почему})
+            return итог
+        from dbot_rescue import (  # noqa: PLC0415
+            load_rescue_keypair, sign_versioned_b64)
+
+        def подписать_фн(tx_b64):  # noqa: E306
+            return sign_versioned_b64(
+                tx_b64, load_rescue_keypair(os.environ.get("BLOOM_WALLET_KEY", "")))
 
     order = ордер_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
     шаги.append({"step": "order", "ok": not order.get("ошибка"),
@@ -329,9 +336,28 @@ def self_test() -> int:
         есть, почему = ключ_есть()
         chk("без ключа путь через Jupiter недоступен и причина названа",
             есть is False and "BLOOM_WALLET_KEY" in почему, почему)
+        r13 = продать(mint="M", amount_raw=1, taker="W", вход_sol=0.001, живьём=True,
+                       ордер_фн=ордер_ок, исполнить_фн=исполнить_ок)
+        chk("живьём без ключа -- отказ на шаге ключа, ордер не подписан",
+            r13["ok"] is False and "BLOOM_WALLET_KEY" in r13["why_not"], r13)
+        r14 = продать(mint="M", amount_raw=1, taker="W", вход_sol=0.001, живьём=False,
+                       ордер_фн=ордер_ок, исполнить_фн=исполнить_ок)
+        chk("а проверка котировки без ключа проходит: ключ ей не нужен",
+            r14["ok"] is True and r14.get("dry_run") is True, r14)
     finally:
         if было is not None:
             os.environ["BLOOM_WALLET_KEY"] = было
+
+    # Имена в общем клиенте проверяются ЗДЕСЬ, а не в бою: первый живой
+    # прогон упал именно на несуществующем имени load_keypair, потому что
+    # ленивый импорт внутри ветки самотестом не покрывался.
+    import dbot_rescue as DR  # noqa: PLC0415
+    for имя in ("ultra_order", "ultra_execute", "sign_versioned_b64",
+                 "load_rescue_keypair"):
+        chk(f"в общем клиенте есть {имя}", hasattr(DR, имя), имя)
+    chk("ultra_order принимает slippage_bps",
+        "slippage_bps" in DR.ultra_order.__code__.co_varnames,
+        DR.ultra_order.__code__.co_varnames)
 
     src = Path(__file__).read_text(encoding="utf-8")
     тело = src.split("def self_test")[0]
