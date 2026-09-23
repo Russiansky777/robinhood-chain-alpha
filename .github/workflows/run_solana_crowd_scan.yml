@@ -130,6 +130,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
           # добавляет НИЧЕГО, включая существующие соседние пути.
+          git add -A data/helius_usage 2>/dev/null || true
           for f in data/solana_crowd_scan.json data/solana_crowd_scan_cache.json "${{ github.event.inputs.out }}"; do
             [ -n "$f" ] && [ -f "$f" ] && git add "$f"
           done

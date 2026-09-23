@@ -32,6 +32,55 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 USAGE_PATH = REPO_ROOT / "data" / "helius_usage.json"
+# Учёт ведётся ОТДЕЛЬНЫМ файлом на службу. Общий файл не годится: каждый
+# прогон в Actions работает в своей копии репозитория, и при коммите
+# второй прогон затирал бы цифры первого. По этой причине в репозитории
+# на 13:07Z оказалась только одна служба из четырёх.
+USAGE_DIR = REPO_ROOT / "data" / "helius_usage"
+
+
+def usage_path_for(service: str, base: Path = USAGE_DIR) -> Path:
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in service)
+    return base / f"{safe}.json"
+
+
+def usage_shards(base: Path = USAGE_DIR) -> list[Path]:
+    """Все осколки учёта. Старый общий файл подхватывается только для
+    настоящего каталога -- в тестах он не должен подмешиваться."""
+    out = sorted(base.glob("*.json")) if base.exists() else []
+    if base == USAGE_DIR and USAGE_PATH.exists():
+        out.append(USAGE_PATH)
+    return out
+
+
+def merge_usage(paths: list[Path]) -> dict:
+    """Слить осколки учёта в одну картину. Складываем, а не перезаписываем:
+    одна и та же служба может писать из разных прогонов."""
+    merged: dict = {"дни": {}}
+    for p in paths:
+        try:
+            data = json.loads(p.read_text())
+        except (ValueError, OSError):
+            continue
+        for day, svcs in (data.get("дни") or {}).items():
+            dd = merged["дни"].setdefault(day, {})
+            for name, v in (svcs or {}).items():
+                if not isinstance(v, dict):
+                    continue
+                cur = dd.setdefault(name, {"кредитов_за_день": 0, "байт_за_день": 0,
+                                            "по_часам": {}})
+                cur["кредитов_за_день"] += v.get("кредитов_за_день", 0)
+                cur["байт_за_день"] += v.get("байт_за_день", 0)
+                for hour, h in (v.get("по_часам") or {}).items():
+                    ch = cur["по_часам"].setdefault(hour, {"кредитов": 0, "байт": 0})
+                    ch["кредитов"] += h.get("кредитов", 0)
+                    ch["байт"] += h.get("байт", 0)
+        for k in ("обновлено_utc", "тариф"):
+            if data.get(k):
+                merged[k] = max(merged.get(k, ""), data[k]) if k == "обновлено_utc" else data[k]
+    merged["осколков"] = len(paths)
+    merged["источники"] = [p.name for p in paths]
+    return merged
 
 PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 HELIUS_RPC_HOST = "https://mainnet.helius-rpc.com"
@@ -139,9 +188,11 @@ class CreditMeter:
     дневного бюджета, помечается -- по этой пометке прогоны ставятся на
     паузу, а зонд не трогается (он и есть источник данных)."""
 
-    def __init__(self, service: str, path: Path = USAGE_PATH) -> None:
+    def __init__(self, service: str, base: Path | None = None) -> None:
         self.service = service
-        self.path = path
+        self.base = Path(base) if base else USAGE_DIR
+        self.path = usage_path_for(service, self.base)
+        self.base.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self.session_credits = 0
 
@@ -178,7 +229,13 @@ class CreditMeter:
             # а вместе они уже вышли за предел.
             spent = svc["кредитов_за_день"]
             if group:
-                spent = sum(v.get("кредитов_за_день", 0) for k, v in d.items()
+                # Соседние службы группы пишут в СВОИ осколки, поэтому
+                # тратой группы считается сумма по всем осколкам, а не
+                # только по своему файлу.
+                all_d = (merge_usage(usage_shards(self.base)).get("дни") or {}).get(day) or {}
+                all_d = dict(all_d)
+                all_d[self.service] = svc
+                spent = sum(v.get("кредитов_за_день", 0) for k, v in all_d.items()
                             if isinstance(v, dict) and GROUP_OF.get(k) == group)
                 svc["потрачено_группой"] = spent
             if svc["бюджет_за_день"]:
@@ -194,7 +251,7 @@ class CreditMeter:
             return svc
 
     @staticmethod
-    def over_budget(service: str, path: Path = USAGE_PATH) -> dict:
+    def over_budget(service: str, base: Path | None = None) -> dict:
         """Состояние бюджета службы: доля и флаг 70%."""
         group = GROUP_OF.get(service)
         own = DAILY_BUDGET.get(service)
@@ -202,11 +259,8 @@ class CreditMeter:
                "бюджет": own if own else BUDGET_GROUPS.get(group),
                "потрачено": 0, "потрачено_группой": 0, "доля": 0.0,
                "выше_70_процентов": False, "останавливать_при_пороге": STOP_AT_WARN}
-        if not path.exists():
-            return out
-        try:
-            data = json.loads(path.read_text())
-        except (ValueError, OSError):
+        data = merge_usage(usage_shards(Path(base) if base else USAGE_DIR))
+        if not data.get("дни"):
             return out
         day = time.strftime("%Y-%m-%d", time.gmtime())
         d = (data.get("дни") or {}).get(day) or {}
@@ -223,20 +277,20 @@ class CreditMeter:
         return out
 
     @staticmethod
-    def report(path: Path = USAGE_PATH, day: str | None = None) -> dict:
+    def report(base: Path | None = None, day: str | None = None) -> dict:
         """Расход за день по КАЖДОЙ службе отдельно + по группам.
 
         Нужен ровно для замера: без разбивки поимённо не видно, кто ест."""
         out = {"день": day or time.strftime("%Y-%m-%d", time.gmtime()),
                "по_службам": {}, "по_группам": {}, "всего_кредитов": 0}
-        if not path.exists():
-            out["почему_пусто"] = f"файла {path} нет -- ни одна служба ещё не писала учёт"
+        paths = usage_shards(Path(base) if base else USAGE_DIR)
+        if not paths:
+            out["почему_пусто"] = "осколков учёта нет -- ни одна служба ещё не писала"
             return out
-        try:
-            data = json.loads(path.read_text())
-        except (ValueError, OSError) as exc:
-            out["почему_пусто"] = f"файл не читается: {type(exc).__name__}"
-            return out
+        out["осколки"] = [x.name for x in paths]
+        data = merge_usage(paths)
+        if False:
+            pass
         d = (data.get("дни") or {}).get(out["день"]) or {}
         for name, v in sorted(d.items()):
             if not isinstance(v, dict):
@@ -283,12 +337,12 @@ class SolanaRpc:
 
     def __init__(self, service: str, key: str | None = None, *,
                   node_rps: float = NODE_RPS, enhanced_rps: float = ENHANCED_RPS,
-                  usage_path: Path = USAGE_PATH, allow_public: bool = True) -> None:
+                  usage_dir: Path = USAGE_DIR, allow_public: bool = True) -> None:
         self.service = service
         self.key = key if key is not None else helius_key()[0]
         self.node_limiter = RateLimiter(node_rps)
         self.enhanced_limiter = RateLimiter(enhanced_rps)
-        self.meter = CreditMeter(service, usage_path)
+        self.meter = CreditMeter(service, usage_dir)
         self.allow_public = allow_public
         self._lock = threading.Lock()
         self._429_streak = 0
@@ -516,7 +570,7 @@ def self_test() -> None:
     chk("ограничитель держит темп", dt >= (60 - 50) / 50.0 * 0.9, f"{dt:.3f}с на 60 вызовов")
 
     import tempfile  # noqa: PLC0415
-    tmp = Path(tempfile.mkdtemp()) / "usage.json"
+    tmp = Path(tempfile.mkdtemp()) / "учёт"
     m = CreditMeter("зонд", tmp)
     svc = m.add(1000, bytes_in=200_000)
     chk("учёт пишет кредиты", svc["кредитов_за_день"] == 1000)
@@ -543,11 +597,18 @@ def self_test() -> None:
     rep = CreditMeter.report(tmp)
     chk("в отчёте службы видны поимённо",
         set(rep["по_службам"]) >= {"зонд", "горизонты", "разбор_пилота"}, str(list(rep["по_службам"])))
+    chk("каждая служба в своём файле, не в общем",
+        {x.name for x in usage_shards(tmp)} ==
+        {"зонд.json", "горизонты.json", "разбор_пилота.json"},
+        str(sorted(x.name for x in usage_shards(tmp))))
+    chk("слияние осколков складывает, а не затирает",
+        merge_usage(usage_shards(tmp))["дни"][time.strftime("%Y-%m-%d", time.gmtime())]
+        ["зонд"]["кредитов_за_день"] == 150_000 * 7 // 10)
     chk("и группа посчитана отдельно", rep["по_группам"]["прогоны"]["потрачено"] == 150_000,
         str(rep["по_группам"]["прогоны"]))
     chk("зонд в группу прогонов не попал", rep["по_службам"]["зонд"]["группа"] is None)
 
-    r = SolanaRpc("прогоны", key="KEY", usage_path=tmp)
+    r = SolanaRpc("прогоны", key="KEY", usage_dir=tmp)
     chk("пока Helius жив -- Helius", r.pick_url().startswith(HELIUS_RPC_HOST))
     for _ in range(DEMOTE_AFTER_429):
         r._note_429(r.helius_url(), '{"error":"max usage reached"}')
@@ -556,7 +617,7 @@ def self_test() -> None:
         "max usage reached" in (r.stats["первый_ответ_429_от_helius"] or ""))
     chk("ключ в сохранённом теле не светится",
         "KEY" not in (r.stats["первый_ответ_429_от_helius"] or "").replace("<КЛЮЧ>", ""))
-    r2 = SolanaRpc("прогоны", key="KEY", usage_path=tmp, allow_public=False)
+    r2 = SolanaRpc("прогоны", key="KEY", usage_dir=tmp, allow_public=False)
     for _ in range(DEMOTE_AFTER_429):
         r2._note_429(r2.helius_url(), "x")
     chk("с запретом публичного не уходим на него",

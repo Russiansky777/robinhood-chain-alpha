@@ -76,20 +76,27 @@ def program_touching(tx: dict, accounts: set[str]) -> str | None:
     Просто "какая DEX-программа есть в транзакции" не годится: на маршруте
     их несколько, и пул приписался бы не той."""
     msg = ((tx or {}).get("transaction") or {}).get("message") or {}
-    groups = [msg.get("instructions") or []]
-    for g in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
-        groups.append(g.get("instructions") or [])
-    best = None
-    for instrs in groups:
-        for ins in instrs:
-            accs = set(ins.get("accounts") or [])
-            if not accs:
-                pa = (ins.get("parsed") or {}).get("info") or {}
-                accs = {v for v in pa.values() if isinstance(v, str)}
-            hit = len(accs & accounts)
-            if hit and (best is None or hit > best[0]):
-                best = (hit, ins.get("programId"))
-    return best[1] if best else None
+    внешние = [msg.get("instructions") or []]
+    внутренние = [g.get("instructions") or []
+                   for g in (((tx or {}).get("meta") or {}).get("innerInstructions") or [])]
+
+    def подобрать(groups):
+        best = None
+        for instrs in groups:
+            for ins in instrs:
+                accs = set(ins.get("accounts") or [])
+                if not accs:
+                    pa = (ins.get("parsed") or {}).get("info") or {}
+                    accs = {v for v in pa.values() if isinstance(v, str)}
+                hit = len(accs & accounts)
+                if hit and (best is None or hit > best[0]):
+                    best = (hit, ins.get("programId"))
+        return best[1] if best else None
+
+    # Сначала ВНУТРЕННИЕ инструкции: внешняя -- это агрегатор маршрута
+    # (Jupiter и подобные), у него в списке все счета сразу, и пул
+    # приписался бы агрегатору, а не бирже, где он на самом деле стоит.
+    return подобрать(внутренние) or подобрать(внешние)
 
 
 def _bal_map(entries) -> dict:
@@ -166,8 +173,30 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
             return False                      # отдал заметно меньше, чем трейдер получил
         return True
 
+    def сохранение_k(t0, t1, q0, q1) -> float:
+        """Насколько сохранилось произведение резервов. У постоянного
+        произведения k растёт только на комиссию, то есть на проценты.
+        Если наши "резервы" взяты не у того счёта, k уедет в разы."""
+        k0, k1 = t0 * q0, t1 * q1
+        return (k1 / k0 - 1.0) if k0 > 0 else float("inf")
+
     owners_mint = {o for (o, m) in set(pre) | set(post) if m == mint and o != trader}
+    # Котировкой может быть ЛЮБОЙ токен, а не только SOL/USDC/USDT. Пул
+    # сделки 23.09 03:09 котируется третьим токеном, и из-за жёсткого
+    # списка котировок опознание проваливалось на всех 15 сделках.
+    mints_by_owner: dict[str, set] = {}
+    for (o, m) in set(pre) | set(post):
+        mints_by_owner.setdefault(o, set()).add(m)
     best = None
+    def лучше(a, b) -> bool:
+        """Из двух кандидатов берём того, у кого k сохранилось точнее:
+        это и есть признак настоящего пула, а не совпавшего движения."""
+        if b is None:
+            return True
+        ka, kb = abs(a.get("k_изменилось_на", 9e9)), abs(b.get("k_изменилось_на", 9e9))
+        if abs(ka - kb) > 1e-9:
+            return ka < kb
+        return abs(a["дельта_токена"]) > abs(b["дельта_токена"])
     for o in owners_mint:
         t_pre, t_post = pre.get((o, mint)), post.get((o, mint))
         t0 = (t_pre or (0.0, None))[0]
@@ -175,7 +204,7 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
         if t0 <= 0 or t1 <= 0:
             continue
         token_vault = addr((t_post or t_pre)[1])
-        for q in QUOTES:
+        for q in sorted(mints_by_owner.get(o, set()) - {mint}):
             q_pre, q_post = pre.get((o, q)), post.get((o, q))
             q0 = (q_pre or (0.0, None))[0]
             q1 = (q_post or (0.0, None))[0]
@@ -184,10 +213,12 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
             quote_vault = addr((q_post or q_pre)[1])
             cand = {"хранилище_токена": token_vault, "хранилище_котировки": quote_vault,
                     "владелец_хранилищ": o, "котировка": q, "вид_котировки": "токен",
+                    "котировка_известная": q in QUOTES,
                     "резерв_токена_до": t0, "резерв_токена_после": t1,
                     "резерв_котировки_до": q0, "резерв_котировки_после": q1,
-                    "дельта_токена": t1 - t0}
-            if best is None or abs(cand["дельта_токена"]) > abs(best["дельта_токена"]):
+                    "дельта_токена": t1 - t0,
+                    "k_изменилось_на": сохранение_k(t0, t1, q0, q1)}
+            if лучше(cand, best):
                 best = cand
         n0, n1 = native_balance(tx, o)
         # Нативная ветка опаснее токеновой: рента есть на любом счёте, и
@@ -197,9 +228,11 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
                     "владелец_хранилищ": o, "котировка": "нативный SOL",
                     "вид_котировки": "нативный",
                     "резерв_токена_до": t0, "резерв_токена_после": t1,
+                    "котировка_известная": True,
                     "резерв_котировки_до": n0, "резерв_котировки_после": n1,
-                    "дельта_токена": t1 - t0}
-            if best is None or abs(cand["дельта_токена"]) > abs(best["дельта_токена"]):
+                    "дельта_токена": t1 - t0,
+                    "k_изменилось_на": сохранение_k(t0, t1, n0, n1)}
+            if лучше(cand, best):
                 best = cand
     if best is None:
         return {"ок": False, "почему": "хранилища пула не опознаны: ни у одного владельца "
@@ -217,8 +250,48 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
     best["кривая_pump_fun"] = (pid == PUMP_CURVE)
     best["цена_до"] = best["резерв_котировки_до"] / best["резерв_токена_до"]
     best["цена_после"] = best["резерв_котировки_после"] / best["резерв_токена_после"]
+    # Средняя цена САМОГО ПУЛА по его же ногам. Для многоножного маршрута
+    # это единственная честная "фактическая" цена: у трейдера ноги в
+    # другой валюте, и сравнивать её с моделью пула нельзя.
+    dq = best["резерв_котировки_после"] - best["резерв_котировки_до"]
+    dt2 = best["резерв_токена_после"] - best["резерв_токена_до"]
+    best["средняя_цена_пула"] = abs(dq) / abs(dt2) if dt2 else None
+    # Платил ли трейдер той же валютой, в которой котируется пул. Если
+    # нет -- маршрут многоножный, и его чек с ценой пула не сопоставим.
+    if best["вид_котировки"] == "нативный":
+        n0, n1 = native_balance(tx, trader)
+        best["трейдер_платил_котировкой_пула"] = bool(n0 is not None and n1 is not None
+                                                        and n0 != n1)
+    else:
+        d = (post.get((trader, best["котировка"]), (0.0, None))[0]
+             - pre.get((trader, best["котировка"]), (0.0, None))[0])
+        best["трейдер_платил_котировкой_пула"] = bool(d)
+    best["курс_котировки_в_sol"] = quote_rate_in_sol(tx, best["котировка"])
+    best["резерв_котировки_до_sol"] = (
+        best["резерв_котировки_до"] * best["курс_котировки_в_sol"]
+        if best["курс_котировки_в_sol"] else None)
     best["ок"] = True
     return best
+
+
+def quote_rate_in_sol(tx: dict, quote: str) -> float | None:
+    """Сколько SOL стоит единица котировки -- ПО ЭТОЙ ЖЕ транзакции.
+
+    Если котировка не SOL и не стейбл, курс не выдумывается: он берётся из
+    соседней ноги маршрута в той же транзакции (пул котировка/WSOL). Нет
+    такой ноги -- честно None, и резерв в SOL не печатается вовсе.
+    """
+    if quote in ("нативный SOL", WSOL):
+        return 1.0
+    meta = (tx or {}).get("meta") or {}
+    pre, post = _bal_map(meta.get("preTokenBalances")), _bal_map(meta.get("postTokenBalances"))
+    owners = {o for (o, m) in set(pre) | set(post)}
+    for o in owners:
+        dq = (post.get((o, quote), (0.0, None))[0] - pre.get((o, quote), (0.0, None))[0])
+        dw = (post.get((o, WSOL), (0.0, None))[0] - pre.get((o, WSOL), (0.0, None))[0])
+        if dq and dw and (dq > 0) != (dw > 0):
+            return abs(dw) / abs(dq)
+    return None
 
 
 def exec_price(tx: dict, mint: str, trader: str) -> float | None:
@@ -367,19 +440,33 @@ def recompute_one(rpc: Rpc, row: dict, leader: str, wallet: str) -> dict:
     out["средняя_цена_исполнения_лидера"] = lead_exec
     out["резерв_котировки_до_лидера"] = pl["резерв_котировки_до"]
     out["резерв_котировки_после_лидера"] = pl["резерв_котировки_после"]
-    out["покупка_лидера_к_резерву"] = (round(row["лидер_sol"] / pl["резерв_котировки_до"], 4)
-                                        if row.get("лидер_sol") and pl["резерв_котировки_до"] else None)
-    out["наш_вход_к_резерву_перед_нами"] = (round(row["наш_вход_sol"] / po["резерв_котировки_до"], 4)
-                                             if row.get("наш_вход_sol") and po["резерв_котировки_до"] else None)
+    # Доля покупки от резерва -- величина в SOL / величина в SOL. Если
+    # котировка пула не SOL, резерв сначала переводится по курсу ИЗ ТОЙ ЖЕ
+    # транзакции; курса нет -- честно None, а не деление разных валют.
+    r_lead_sol = pl.get("резерв_котировки_до_sol")
+    r_ours_sol = po.get("резерв_котировки_до_sol")
+    out["резерв_котировки_до_лидера_sol"] = r_lead_sol
+    out["резерв_котировки_перед_нами_sol"] = r_ours_sol
+    out["покупка_лидера_к_резерву"] = (round(row["лидер_sol"] / r_lead_sol, 4)
+                                        if row.get("лидер_sol") and r_lead_sol else None)
+    out["наш_вход_к_резерву_перед_нами"] = (round(row["наш_вход_sol"] / r_ours_sol, 4)
+                                             if row.get("наш_вход_sol") and r_ours_sol else None)
 
+    # (в) считается по НАШЕЙ ноге в самом пуле, а не по нашему чеку.
+    # Чек может быть в другой валюте: маршрут бывает многоножным, и тогда
+    # деление чека на цену пула -- деление разных величин.
+    our_in_pool = po.get("средняя_цена_пула")
+    out["наша_средняя_цена_в_пуле"] = our_in_pool
+    out["валюта_котировки_пула"] = po.get("котировка")
+    out["чек_в_валюте_пула"] = po.get("трейдер_платил_котировкой_пула")
     a = p_after_leader / p_before - 1
     b = p_before_us / p_after_leader - 1
-    c = (our_exec / p_before_us - 1) if our_exec else None
+    c = (our_in_pool / p_before_us - 1) if our_in_pool else None
     out["а_влияние_лидера_pct"] = round(a * 100, 3)
     out["б_дрейф_до_нас_pct"] = round(b * 100, 3)
     out["в_наше_влияние_pct"] = round(c * 100, 3) if c is not None else None
     if c is not None:
-        итог = our_exec / p_before - 1
+        итог = our_in_pool / p_before - 1
         out["итог_от_цены_пула_до_лидера_pct"] = round(итог * 100, 3)
         out["произведение_частей_pct"] = round(((1 + a) * (1 + b) * (1 + c) - 1) * 100, 3)
         out["сходимость_пп"] = round(((1 + a) * (1 + b) * (1 + c) - 1 - итог) * 100, 9)
@@ -417,8 +504,13 @@ def summarise(label: str, items: list[dict]) -> dict:
             [x.get("прежняя_наценка_к_средней_лидера_pct") for x in good]),
         "медиана_завышения_прежней_наценки_пп": _med(
             [x.get("насколько_прежняя_наценка_была_завышена_пп") for x in good]),
-        "медиана_резерва_котировки_до_лидера": _med(
-            [x.get("резерв_котировки_до_лидера") for x in good]),
+        # Медиана резерва берётся ТОЛЬКО в SOL: у разных сделок котировки
+        # разные (бывает и третий токен), и медиана по смешанным валютам
+        # была бы числом без смысла.
+        "медиана_резерва_до_лидера_sol": _med(
+            [x.get("резерв_котировки_до_лидера_sol") for x in good]),
+        "сделок_без_курса_котировки_в_sol": sum(
+            1 for x in good if x.get("резерв_котировки_до_лидера_sol") is None),
         "медиана_лидер_к_резерву": _med([x.get("покупка_лидера_к_резерву") for x in good]),
         "медиана_наш_вход_к_резерву": _med([x.get("наш_вход_к_резерву_перед_нами") for x in good]),
         "медиана_лидер_sol": _med([x.get("лидер_sol") for x in good]),

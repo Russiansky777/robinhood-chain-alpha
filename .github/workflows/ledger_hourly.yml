@@ -48,6 +48,7 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          git add -A data/helius_usage 2>/dev/null || true
           for f in data/dbot_follow_orders_raw.json data/dbot_follow_trades_raw.json \
                    data/chain_tx_cache.json data/solana_trades_all.json \
                    data/solana_source_stats.json data/solana_task_stats.json data/ledger_status.json; do
