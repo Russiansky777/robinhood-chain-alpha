@@ -26,6 +26,14 @@ on:
         description: "сколько сделок в каждой выборке"
         required: false
         default: "8"
+      checkpoint_s:
+        description: "как часто выгружать чекпойнт в git, секунд"
+        required: false
+        default: "600"
+      no_cache:
+        description: "'yes' -- считать заново, не продолжать с кэша"
+        required: false
+        default: ""
       use_helius:
         description: "'yes' -- ходить в Helius вместо публичного узла"
         required: false
@@ -67,6 +75,9 @@ jobs:
             --min-interval-s "${{ github.event.inputs.min_interval_s || '0.30' }}" \
             --deep-slots "${{ github.event.inputs.deep_slots || 140 }}" \
             --n "${{ github.event.inputs.n || 8 }}" \
+            --checkpoint-s "${{ github.event.inputs.checkpoint_s || 600 }}" \
+            --checkpoint-push \
+            ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
             ${{ github.event.inputs.use_helius == 'yes' && '--use-helius' || '' }} \
             2>&1 | tail -400
 
@@ -77,7 +88,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
           # добавляет НИЧЕГО, включая существующие соседние пути.
-          for f in data/solana_pilot_block_autopsy.json; do
+          for f in data/solana_pilot_block_autopsy.json data/solana_pilot_block_autopsy_cache.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }

@@ -52,7 +52,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 80
     permissions:
       contents: write
     steps:
@@ -214,24 +214,63 @@ jobs:
           # Пересчёт идёт по УЖЕ ЗАПИСАННЫМ событиям: старая сшивка
           # принимала копию раньше источника, и без пересчёта чистое
           # распределение пришлось бы ждать ещё сутки.
-          # ПОД NOHUP. Первый запуск шёл синхронно по ssh и оборвался на
-          # "client_loop: send disconnect: Broken pipe": пересчёт длиннее,
-          # чем живёт ssh-сессия, и вместе с ней погиб сам процесс.
-          # Теперь пересчёт отвязан от сессии, а мы только ждём его конца.
-          ssh $SSH_OPTS root@45.59.170.76 '
-            cd /home/bot/dbot_detect_probe
-            rm -f reenrich.log reenrich.done
-            sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a;               setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --reenrich               > /home/bot/dbot_detect_probe/reenrich.log 2>&1; echo \$? > /home/bot/dbot_detect_probe/reenrich.done" &
-            sleep 2
-            echo "пересчёт запущен в фоне"
-          '
-          for i in $(seq 1 60); do
-            code=$(ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
-            if [ -n "$code" ]; then echo "пересчёт завершён, код=$code"; break; fi
-            echo "жду пересчёт... ($i/60)"
-            sleep 20
-          done
-          ssh $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null | tail -80'             2>&1 | tee data/dbot_detect_probe_offsets.txt || true
+          #
+          # Два раза этот шаг умирал на "client_loop: send disconnect:
+          # Broken pipe". Первый раз -- потому что пересчёт шёл синхронно
+          # и был длиннее ssh-сессии. Второй раз -- потому что setsid
+          # nohup НА ВНУТРЕННЕЙ команде не помогает: внешний
+          # `sudo ... &` продолжает держать открытыми stdout/stderr
+          # ssh-канала, и ssh ждёт их закрытия, сколько бы ни жил сам
+          # процесс. Лечится перенаправлением ВНЕШНЕЙ команды в /dev/null
+          # и `ssh -n` (не занимать stdin).
+          #
+          # Окно ожидания -- 60 минут, а не 20: на публичном узле пересчёт
+          # идёт заметно медленнее, и прошлый прогон обрывался просто
+          # потому, что цикл кончался раньше работы.
+          POLL_N=180
+          #
+          # Если пересчёт уже доведён прошлым запуском -- не начинаем
+          # заново, а просто забираем результат.
+          done_code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
+          # Идёт ли пересчёт ПРЯМО СЕЙЧАС с прошлого запуска. Без этой
+          # проверки каждый новый запуск начинал всё заново (rm -f
+          # reenrich.log), и работа предыдущего пропадала.
+          running=$(ssh -n $SSH_OPTS root@45.59.170.76 "pgrep -af 'solana_detect_probe.py --reenrich' | head -1" || true)
+          if [ -n "$done_code" ]; then
+            echo "пересчёт уже доведён прошлым запуском, код=$done_code -- забираю готовое"
+          elif [ -n "$running" ]; then
+            echo "пересчёт УЖЕ ИДЁТ с прошлого запуска, не перезапускаю: $running"
+            for i in $(seq 1 $POLL_N); do
+              code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
+              if [ -n "$code" ]; then echo "пересчёт завершён, код=$code"; break; fi
+              echo "жду пересчёт (чужой запуск)... ($i/$POLL_N)"
+              ssh -n $SSH_OPTS root@45.59.170.76 'tail -1 /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null' || true
+              sleep 20
+            done
+          else
+            ssh -n $SSH_OPTS root@45.59.170.76 '
+              cd /home/bot/dbot_detect_probe
+              rm -f reenrich.log reenrich.done
+              setsid sudo -u bot bash -c "set -a; source /etc/dbot-detect-probe/env 2>/dev/null; set +a; /home/bot/robinhood-chain-alpha/venv/bin/python -u solana_detect_probe.py --reenrich > /home/bot/dbot_detect_probe/reenrich.log 2>&1; echo \$? > /home/bot/dbot_detect_probe/reenrich.done" > /dev/null 2>&1 < /dev/null &
+              sleep 2
+              echo "пересчёт запущен в фоне"
+            '
+            for i in $(seq 1 $POLL_N); do
+              code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
+              if [ -n "$code" ]; then echo "пересчёт завершён, код=$code"; break; fi
+              echo "жду пересчёт... ($i/$POLL_N)"
+              ssh -n $SSH_OPTS root@45.59.170.76 'tail -1 /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null' || true
+              sleep 20
+            done
+          fi
+          ssh -n $SSH_OPTS root@45.59.170.76 'tail -120 /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null' 2>&1 | tee data/dbot_detect_probe_offsets.txt || true
+          # Явно: если файла .done нет, пересчёт НЕ завершился -- в лог
+          # уйдёт незаконченная картинка, и молча выдавать её за чистое
+          # распределение нельзя.
+          if ! ssh -n $SSH_OPTS root@45.59.170.76 'test -f /home/bot/dbot_detect_probe/reenrich.done'; then
+            echo "::warning::пересчёт НЕ завершился за 60 минут -- распределение ниже неполное"
+            echo "ВНИМАНИЕ: пересчёт не завершён, распределение неполное" >> data/dbot_detect_probe_offsets.txt
+          fi
 
       - name: "Пропуски: покупки DBot без события в зонде"
         if: github.event.inputs.missed == 'yes'
