@@ -26,6 +26,10 @@ on:
         description: "какие задачи DBot слушать"
         required: false
         default: "BATCH-5,BATCH-3"
+      rotate_journals:
+        description: "'yes' -- отложить журналы прежнего формата (ключи сменились)"
+        required: false
+        default: "no"
 
 concurrency:
   group: bloom-detector-deploy
@@ -169,6 +173,30 @@ jobs:
                  /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import bloom_exec_state as S; s=S.ExecState(); d,p=s.kill_readable(); print((\"ДОСТУПЕН\" if d else \"НЕДОСТУПЕН\"), p); import sys; sys.exit(0 if d else 1)'
           ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
           echo "рубильник от имени bot: $OUT"
+
+      - name: "Отложить журналы прежнего формата (по запросу)"
+        if: ${{ inputs.rotate_journals == 'yes' }}
+        run: |
+          set -e
+          # Ключи журналов переведены на ASCII (schema_version 2). Смешивать
+          # записи v1 и v2 в одном файле нельзя: любая сводка по ключу
+          # посчитает только половину. Поэтому старые файлы откладываются
+          # ОДИН раз, с меткой времени, а не удаляются.
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            cd $STATE_DIR
+            for f in decisions.jsonl positions.jsonl; do
+              if [ -s \"\$f\" ]; then
+                mv \"\$f\" \"\$f.v1.$stamp\"
+                echo \"отложен \$f -> \$f.v1.$stamp\"
+              else
+                echo \"\$f пуст или отсутствует -- откладывать нечего\"
+              fi
+            done
+            chown -R bot:bot $STATE_DIR
+            ls -l $STATE_DIR | head -20
+          "
 
       - name: "ГЕЙТ: каталог состояния принадлежит службе, а не root"
         run: |
