@@ -294,6 +294,11 @@ class Rpc:
                 raise RuntimeError("getTransaction batch: бюджет времени истёк")
             self._pace()
             try:
+                # Пачка идёт своим путём мимо call(), поэтому кредиты за неё
+                # надо посчитать здесь -- иначе счёт занижен на все запросы
+                # внутри пачек, а это основная масса вызовов.
+                for _ in sigs:
+                    self._charge(self.target_url(), "getTransaction")
                 resp = self.session().post(self.url, json=payload, timeout=120)
             except Exception:  # noqa: BLE001
                 self._slow_down()
