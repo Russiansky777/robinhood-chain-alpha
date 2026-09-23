@@ -16,6 +16,10 @@ name: "Bloom: деплой сторожа продаж на NL-хост (по у
 #   * ужесточение юнита: ProtectSystem, ProtectHome, PrivateTmp,
 #     ReadWritePaths, NoNewPrivileges, лимит памяти.
 #
+# Вместе со сторожем на хост кладётся и детектор (bloom_detector.py) --
+# он ничего не покупает, ни одного POST в Bloom из него не уходит, службы
+# для него пока нет. Кода, способного КУПИТЬ, на хосте по-прежнему нет.
+#
 # BLOOM_LIVE_SELL=0 по умолчанию: сторож считает и пишет, но не продаёт.
 on:
   workflow_dispatch:
@@ -62,6 +66,7 @@ jobs:
           python3 bloom_exec_state.py --self-test
           python3 bloom_api.py --self-test
           python3 bloom_seller.py --self-test
+          python3 bloom_detector.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -103,11 +108,19 @@ jobs:
       - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
         run: |
           set -e
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py; do
+          # Сумма пустого файла: если она появится, значит доставка
+          # прошла «успешно», но ничего не доставила -- называем это прямо.
+          EMPTY_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py; do
+            [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
-            ssh -n $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
+            # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
+            # то есть на хост уезжает пустота. Первый прогон именно так и
+            # упал -- сверка sha256 показала сумму пустого файла.
+            ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
             remote_sum=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
             echo "$f: локально $local_sum, на хосте $remote_sum"
+            [ "$remote_sum" != "$EMPTY_SHA" ] || { echo "СБОЙ: на хост уехал ПУСТОЙ $f (stdin не дошёл до ssh)"; exit 1; }
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
 
@@ -148,7 +161,7 @@ jobs:
             echo "BLOOM_DAILY_LOSS_SOL=1"
             echo "BLOOM_BUY_SOL=0.2"
           } > /tmp/bloom_env
-          ssh -n $SSH_OPTS root@$HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
+          ssh $SSH_OPTS root@$HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
           shred -u /tmp/bloom_env
           echo "строк в env на хосте:"
           ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
@@ -186,7 +199,7 @@ jobs:
             echo ""
             echo '[Install]'
             echo 'WantedBy=multi-user.target'
-          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
+          } | ssh $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
           ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
 
       - name: "logrotate"
@@ -200,7 +213,7 @@ jobs:
             echo '  notifempty'
             echo '  copytruncate'
             echo '}'
-          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC"
+          } | ssh $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC"
 
       - name: "ГЕЙТ: открытых позиций нет -- только тогда перезапуск"
         if: ${{ github.event.inputs.enable_service == 'yes' }}
