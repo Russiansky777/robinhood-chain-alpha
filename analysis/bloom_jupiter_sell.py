@@ -55,6 +55,50 @@ def пол_bps(процент: float = ПОЛ_ПРОЦЕНТОВ) -> int:
     return int(round((100.0 - доля) * 100))
 
 
+def _в_байтах(сырое: bytes, число: int, размер: int) -> bool:
+    try:
+        return int(число).to_bytes(размер, "little") in сырое
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def что_в_байтах(tx_b64: str, *, порог: int | None, котировка: int | None,
+                  slippage_bps: int | None) -> dict:
+    """Что из заявленного реально лежит в байтах выданной транзакции.
+
+    Зачем три числа, а не одно. Маршрутизатор Jupiter (metis) кодирует в
+    инструкции КОТИРОВКУ и ПРОСКАЛЬЗЫВАНИЕ, а минимум выхода считает на
+    цепи как котировка * (1 - slippage). Поэтому самого порога в байтах
+    может не быть -- и это не признак подлога: если в байтах есть котировка
+    и наше проскальзывание 3000 bps, то пол 70 % обеспечен теми же байтами,
+    которые мы подписываем. Проверка сообщает, что именно нашла, и ничего
+    не выдаёт за полный разбор маршрута.
+    """
+    try:
+        сырое = base64.b64decode(tx_b64, validate=True)
+    except Exception as exc:  # noqa: BLE001
+        return {"known": False, "why_not": f"база64 не разобралась: {type(exc).__name__}"}
+    if not сырое:
+        return {"known": False, "why_not": "транзакция пустая"}
+    вых = {"known": True, "bytes_len": len(сырое),
+            "threshold_found": (_в_байтах(сырое, порог, 8) if порог is not None else None),
+            "quote_found": (_в_байтах(сырое, котировка, 8)
+                             if котировка is not None else None),
+            "slippage_found": (any(_в_байтах(сырое, slippage_bps, n) for n in (2, 4))
+                                if slippage_bps is not None else None)}
+    if вых["threshold_found"]:
+        вых["note"] = "минимум выхода лежит в байтах транзакции прямым числом"
+    elif вых["quote_found"] and вых["slippage_found"]:
+        вых["note"] = ("минимума прямым числом нет, но в байтах есть котировка и "
+                        "наше проскальзывание: на цепи минимум считается из них, "
+                        "то есть пол обеспечен подписываемыми байтами")
+    else:
+        вых["note"] = ("ни минимума, ни пары котировка+проскальзывание в байтах не "
+                        "нашлось: проверка согласованности НЕ пройдена, полагаться "
+                        "можно только на заявленный порог ответа API")
+    return вых
+
+
 def порог_в_байтах(tx_b64: str, порог: int) -> dict:
     """Встречается ли заявленный порог в данных транзакции как u64 LE.
 
@@ -116,7 +160,12 @@ def проверить_пол(order: dict, *, вход_sol: float | None = None,
     итог["checks"]["slippage_bps"] = order.get("slippageBps")
     итог["checks"]["router"] = order.get("router")
     if order.get("transaction"):
-        итог["checks"]["threshold_in_tx"] = порог_в_байтах(order["transaction"], порог)
+        try:
+            слиппедж = int(order.get("slippageBps"))
+        except (TypeError, ValueError):
+            слиппедж = None
+        итог["checks"]["in_tx"] = что_в_байтах(order["transaction"], порог=порог,
+                                                котировка=out, slippage_bps=слиппедж)
 
     if порог < нужный:
         итог["why_not"] = (f"минимум выхода {порог} ниже пола {нужный} "
@@ -271,6 +320,22 @@ def self_test() -> int:
                          "swapMode": "ExactIn"}, вход_sol=None)
     chk("вход неизвестен -- правило 30 % не применяется, пол работает",
         r8["ok"] is True and "quote_share_of_entry_pct" not in r8["checks"], r8)
+
+    # что лежит в байтах транзакции
+    tx_кот = base64.b64encode(b"\x09" + (895562).to_bytes(8, "little")
+                               + (3000).to_bytes(2, "little") + b"\x07").decode()
+    вб = что_в_байтах(tx_кот, порог=626893, котировка=895562, slippage_bps=3000)
+    chk("порога прямым числом нет, но котировка и проскальзывание найдены",
+        вб["threshold_found"] is False and вб["quote_found"] is True
+        and вб["slippage_found"] is True and "пол обеспечен" in вб["note"], вб)
+    tx_пор = base64.b64encode(b"\x09" + (626893).to_bytes(8, "little")).decode()
+    вб2 = что_в_байтах(tx_пор, порог=626893, котировка=895562, slippage_bps=3000)
+    chk("порог прямым числом опознан",
+        вб2["threshold_found"] is True and "прямым числом" in вб2["note"], вб2)
+    вб3 = что_в_байтах(base64.b64encode(b"\x01\x02\x03\x04").decode(),
+                        порог=626893, котировка=895562, slippage_bps=3000)
+    chk("ничего не нашлось -- сказано прямо, без успокоения",
+        вб3["threshold_found"] is False and "НЕ пройдена" in вб3["note"], вб3)
 
     # порог в байтах транзакции
     tx = base64.b64encode(b"\x01\x02" + (700000).to_bytes(8, "little") + b"\x03").decode()
