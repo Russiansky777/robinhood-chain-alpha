@@ -115,6 +115,12 @@ class State:
         self.sources_generation = 0
         self.tx_method: str | None = None           # что РЕАЛЬНО сработало
         self.tx_method_history: list[dict] = []
+        # ПОЧЕМУ рвётся соединение. Keepalive (ping_interval=20) стоял с
+        # самого начала, значит 221 переподключение за сутки -- не от
+        # отсутствия пингов. Без учёта причин чинить было бы гаданием.
+        self.tx_close_reasons: dict[str, int] = {}
+        self.tx_blind_s = 0.0          # суммарное время без подписки
+        self.tx_last_drop_at: float | None = None
         self.events_written = 0
         self.dup_skipped = 0
         self.failed_skipped = 0
@@ -272,6 +278,11 @@ def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | N
 # createAt у DBot. Раньше здесь было -60 000 мс, и запись, созданная до
 # минуты РАНЬШЕ детекта, засчитывалась копией этого события.
 MATCH_CLOCK_SKEW_MS = -2_000
+
+# Пинги были всегда (ping_interval=20). Поднят только ТАЙМАУТ ожидания
+# понга: при 63 подписках и плотном потоке понг может задержаться, и
+# тогда соединение рвёт НАШ клиент, а не сервер. 20с -- слишком жёстко.
+PING_TIMEOUT_S = 60
 
 # Подписи покупок, уже приписанных событию: одна покупка не может быть
 # копией двух разных транзакций источника.
@@ -440,7 +451,7 @@ async def slot_watcher(key: str) -> None:
     while True:
         try:
             async with websockets.connect(ws_url(key, atlas=False), ping_interval=20,
-                                           ping_timeout=20, max_size=8 * 1024 * 1024) as ws:
+                                           ping_timeout=PING_TIMEOUT_S, max_size=8 * 1024 * 1024) as ws:
                 await ws.send(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "slotSubscribe", "params": []}))
                 ack = json.loads(await asyncio.wait_for(ws.recv(), timeout=30))
                 if "error" in ack:
@@ -551,7 +562,7 @@ async def tx_watcher(key: str) -> None:
         method = "transactionSubscribe" if atlas else "logsSubscribe"
         try:
             async with websockets.connect(ws_url(key, atlas=atlas), ping_interval=20,
-                                           ping_timeout=20, max_size=16 * 1024 * 1024) as ws:
+                                           ping_timeout=PING_TIMEOUT_S, max_size=16 * 1024 * 1024) as ws:
                 if atlas:
                     await _subscribe_transactions(ws, sources)
                 else:
@@ -591,6 +602,9 @@ async def tx_watcher(key: str) -> None:
                             if rejected:
                                 log.warning("%s: подтверждено %d из %d, отказов %d (первый: %s)",
                                             method, acked, len(sources), len(rejected), str(rejected[0])[:200])
+                            if ST.tx_last_drop_at is not None:
+                                ST.tx_blind_s += time.time() - ST.tx_last_drop_at
+                                ST.tx_last_drop_at = None
                             ST.tx_method = method
                             ST.tx_method_history.append(
                                 {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -609,6 +623,9 @@ async def tx_watcher(key: str) -> None:
             raise
         except Exception as exc:  # noqa: BLE001
             ST.tx_reconnects += 1
+            ST.tx_last_drop_at = time.time()
+            reason = f"{type(exc).__name__}: {str(exc)[:80]}"
+            ST.tx_close_reasons[reason] = ST.tx_close_reasons.get(reason, 0) + 1
             log.warning("tx_watcher (%s) оборвался (%s: %s)", method, type(exc).__name__, str(exc)[:300])
             if atlas:
                 # Enhanced Websockets есть не на всех тарифах -- один
@@ -835,6 +852,10 @@ def write_status() -> None:
         "дублей_пропущено": ST.dup_skipped,
         "неудачных_пропущено": ST.failed_skipped,
         "переподключений_tx": ST.tx_reconnects,
+        "причины_разрыва_tx": dict(sorted(ST.tx_close_reasons.items(), key=lambda kv: -kv[1])[:8]),
+        "слепое_время_с": round(ST.tx_blind_s, 1),
+        "слепое_время_доля": (round(ST.tx_blind_s / max(time.time() - ST.started_at, 1), 5)
+                               if getattr(ST, "started_at", None) else None),
         "переподключений_slot": ST.slot_reconnects,
         "slot_уведомлений": ST.slot_notifications,
         "текущий_слот": ST.current_slot,
@@ -1053,6 +1074,149 @@ async def run_service(helius_key: str, dbot_key: str) -> None:
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
+def reenrich_all(helius_key: str, dbot_key: str) -> int:
+    """Пересчитать ВСЕ обогащённые записи заново, исправленной сшивкой.
+
+    Старый файл сохраняется рядом с суффиксом .before_refix -- если
+    пересчёт окажется хуже, есть с чем сравнить и куда вернуться.
+    Иначе пришлось бы ждать ещё сутки, чтобы увидеть чистое
+    распределение."""
+    backup = ENRICHED_PATH.with_suffix(ENRICHED_PATH.suffix + ".before_refix")
+    if ENRICHED_PATH.exists():
+        ENRICHED_PATH.replace(backup)
+        log.info("старый обогащённый файл сохранён как %s", backup.name)
+    USED_DBOT_SIGS.clear()
+    ST.sources = fetch_sources(dbot_key)
+    total = 0
+    while True:
+        n = enrich_once(helius_key, dbot_key)
+        total += n
+        log.info("пересчёт: обработано %d (всего %d)", n, total)
+        if n == 0:
+            break
+    return total
+
+
+def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) -> None:
+    """Сколько сделок источников мы ПРОПУСТИЛИ во время разрывов.
+
+    Метод: берём покупки DBot за окно, у каждой известен источник
+    (follow.wallet), минт и время создания. Если у нас НЕТ ни одного
+    события от этого источника в пределах window_s вокруг -- значит
+    транзакцию источника зонд не увидел.
+
+    Оговорка, которую надо держать в голове: DBot копирует не всё
+    подряд, а у зонда события есть и по тем сделкам, которые DBot не
+    копировал. Поэтому это оценка ТОЛЬКО по тем сделкам, на которые DBot
+    среагировал -- нижняя граница пропусков, а не полная картина."""
+    events = read_jsonl(EVENTS_PATH)
+    by_source: dict[str, list[float]] = {}
+    for e in events:
+        src = e.get("source")
+        t = e.get("t_recv")
+        if src and isinstance(t, (int, float)):
+            by_source.setdefault(src, []).append(float(t))
+    for v in by_source.values():
+        v.sort()
+
+    cutoff_ms = (time.time() - hours * 3600) * 1000
+    sources = fetch_sources(dbot_key)
+    tasks: dict[str, dict] = {}
+    for addr, info in sources.items():
+        for t in (info.get("tasks") or []):
+            if t.get("task_id"):
+                tasks[t["task_id"]] = t
+
+    seen = matched = missed = 0
+    missed_rows: list[dict] = []
+    per_task: dict[str, dict] = {}
+    for tid, task in tasks.items():
+        for rec in fetch_follow_trades(tid, dbot_key, max_pages=20):
+            if str(rec.get("type") or "").lower() != "buy":
+                continue
+            created = rec.get("createAt")
+            if not isinstance(created, (int, float)) or created < cutoff_ms:
+                continue
+            src = (rec.get("follow") or {}).get("wallet")
+            if not src or src not in sources:
+                continue
+            seen += 1
+            name = task.get("task_name") or tid
+            row = per_task.setdefault(name, {"всего": 0, "есть_событие": 0, "пропущено": 0})
+            row["всего"] += 1
+            ts = created / 1000.0
+            near = [t for t in by_source.get(src, []) if abs(t - ts) <= window_s]
+            if near:
+                matched += 1
+                row["есть_событие"] += 1
+            else:
+                missed += 1
+                row["пропущено"] += 1
+                if len(missed_rows) < 15:
+                    missed_rows.append({
+                        "источник": src, "задача": name,
+                        "когда_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)),
+                        "state": rec.get("state")})
+
+    print()
+    print("=== ПРОПУСКИ: покупки DBot без события в зонде ===")
+    print(f"окно {hours}ч, допуск по времени +-{window_s}с")
+    print(f"покупок DBot от наших источников: {seen}")
+    print(f"  событие в зонде ЕСТЬ:  {matched}")
+    print(f"  события НЕТ (пропуск): {missed}"
+          + (f" = {missed / seen:.1%}" if seen else ""))
+    print("по задачам:", json.dumps(per_task, ensure_ascii=False))
+    if missed_rows:
+        print("примеры пропусков:", json.dumps(missed_rows, ensure_ascii=False, indent=1))
+    print("ОГОВОРКА: считаются только сделки, на которые DBot среагировал. "
+          "Сделки источников, которые DBot не копировал, здесь не видны, "
+          "поэтому это НИЖНЯЯ граница пропусков.")
+
+
+def offsets_report() -> None:
+    """Чистое распределение dbot_offset_slots: 0/1/2/3+ и по задачам.
+    Отрицательные и заведомо невозможные значения выделены отдельно, а
+    не смешаны с измерением."""
+    enriched = read_jsonl(ENRICHED_PATH)
+    offs = [(e.get("dbot_offset_slots"), e.get("dbot_task_name"))
+            for e in enriched if isinstance(e.get("dbot_offset_slots"), int)]
+    rejected = sum(1 for e in enriched if e.get("dbot_match") == "отклонена_обратный_порядок")
+    dup = sum(1 for e in enriched if e.get("dbot_match") == "дубль_той_же_покупки")
+    print()
+    print("=== РАСПРЕДЕЛЕНИЕ dbot_offset_slots (после починки сшивки) ===")
+    print(f"сшивок с измерением: {len(offs)}; "
+          f"отклонено по обратному порядку: {rejected}; дублей одной покупки: {dup}")
+    if not offs:
+        print("измерений нет -- честный ноль")
+        return
+
+    def buckets(vals: list[int]) -> dict:
+        b = {"0": 0, "1": 0, "2": 0, "3+": 0, "отрицательные": 0}
+        for v in vals:
+            if v < 0:
+                b["отрицательные"] += 1
+            elif v >= 3:
+                b["3+"] += 1
+            else:
+                b[str(v)] += 1
+        return b
+
+    allv = [v for v, _ in offs]
+    b = buckets(allv)
+    n = len(allv)
+    print("всего: " + ", ".join(f"{k}={v} ({v / n:.1%})" for k, v in b.items()))
+    print(f"медиана={statistics.median(allv)} | p75={sorted(allv)[int(n * 0.75)]} | макс={max(allv)}")
+    per: dict[str, list[int]] = {}
+    for v, t in offs:
+        per.setdefault(t or "(задача неизвестна)", []).append(v)
+    print()
+    print(f"  {'задача':<16}{'n':>5}{'медиана':>9}{'0':>6}{'1':>6}{'2':>6}{'3+':>6}")
+    for t, vals in sorted(per.items(), key=lambda kv: -len(kv[1])):
+        bb = buckets(vals)
+        print(f"  {t[:15]:<16}{len(vals):>5}{statistics.median(vals):>9}"
+              f"{bb['0']:>6}{bb['1']:>6}{bb['2']:>6}{bb['3+']:>6}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check-only", action="store_true", help="показать источники/слот/часы и выйти")
@@ -1060,10 +1224,16 @@ def main() -> None:
     ap.add_argument("--enrich-now", action="store_true", help="один прогон обогащения и выйти")
     ap.add_argument("--selfcheck", action="store_true",
                     help="сверить 3 события с цепочкой у двух провайдеров и выйти")
+    ap.add_argument("--reenrich", action="store_true",
+                    help="пересчитать ВСЕ обогащённые записи исправленной сшивкой и выйти")
+    ap.add_argument("--offsets", action="store_true",
+                    help="чистое распределение dbot_offset_slots (0/1/2/3+) и по задачам")
+    ap.add_argument("--missed", action="store_true",
+                    help="сколько покупок DBot остались без события в зонде (оценка пропусков)")
     args = ap.parse_args()
     setup_logging()
 
-    if args.report and not args.selfcheck:
+    if args.report and not (args.selfcheck or args.reenrich or args.offsets or args.missed):
         print_report()
         return
 
@@ -1080,6 +1250,18 @@ def main() -> None:
             print()
             print_report()
         sys.exit(0 if ok else 1)
+    if args.reenrich:
+        print("пересчитано записей:", reenrich_all(helius_key, dbot_key))
+        offsets_report()
+        return
+    if args.offsets:
+        offsets_report()
+        if args.missed:
+            missed_events_report(dbot_key)
+        return
+    if args.missed:
+        missed_events_report(dbot_key)
+        return
     if args.enrich_now:
         ST.sources = fetch_sources(dbot_key)
         print("обогащено:", enrich_once(helius_key, dbot_key))
