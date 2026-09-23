@@ -1,86 +1,86 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-23T23:45:26Z",
+  "built_utc": "2026-09-23T23:52:39Z",
   "since_ts": null,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 0,
-    "v2": 161
+    "v2": 181
   },
   "decisions": {
-    "total": 161,
-    "real_sources": 149,
-    "test_source": 12,
+    "total": 181,
+    "real_sources": 168,
+    "test_source": 13,
     "by_code": {
-      "TARGET_AMOUNT_OUT_OF_RANGE": 32,
-      "NOT_A_BUY": 95,
-      "TOKEN_RECEIVED_NOT_BOUGHT": 6,
-      "INTERMEDIATE_ROUTE": 5,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 34,
+      "NOT_A_BUY": 106,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 7,
+      "INTERMEDIATE_ROUTE": 7,
       "AMBIGUOUS_TX": 1,
-      "SKIP_TARGET_INCREASE_POSITION": 6,
+      "SKIP_TARGET_INCREASE_POSITION": 9,
       "BUY": 1,
       "?": 3
     },
     "by_code_test_source": {
-      "NOT_A_BUY": 9,
+      "NOT_A_BUY": 10,
       "BUY": 1,
       "?": 1,
       "SKIP_TARGET_INCREASE_POSITION": 1
     }
   },
   "parse_groups": {
-    "total": 149,
+    "total": 168,
     "by_group": {
       "PARSE_VIA_MSG": {
-        "decisions": 124,
-        "share": 0.8322,
+        "decisions": 140,
+        "share": 0.8333,
         "to_buy": 1,
         "slot_lag": {
-          "n": 124,
+          "n": 140,
           "min": 0,
           "median": 0.0,
           "max": 0
         },
         "net_slot_minus_source": {
-          "n": 124,
+          "n": 140,
           "min": 0,
           "median": 0.0,
           "max": 0
         },
         "decide_latency_ms": {
-          "n": 124,
+          "n": 140,
           "min": 0.2,
           "median": 0.4,
           "max": 24.2
         }
       },
       "PARSE_VIA_RPC": {
-        "decisions": 22,
-        "share": 0.1477,
+        "decisions": 25,
+        "share": 0.1488,
         "to_buy": 0,
         "slot_lag": {
-          "n": 22,
+          "n": 25,
           "min": 1,
-          "median": 1.0,
+          "median": 1,
           "max": 2
         },
         "net_slot_minus_source": {
-          "n": 22,
+          "n": 25,
           "min": 1,
-          "median": 1.0,
+          "median": 1,
           "max": 2
         },
         "decide_latency_ms": {
-          "n": 22,
-          "min": 244.0,
-          "median": 322.45,
+          "n": 25,
+          "min": 242.7,
+          "median": 356.2,
           "max": 618.3
         }
       },
       "неизвестно": {
         "decisions": 3,
-        "share": 0.0201,
+        "share": 0.0179,
         "to_buy": 0,
         "slot_lag": null,
         "net_slot_minus_source": null,
@@ -97,16 +97,18 @@
         "неизвестно": 4
       },
       "0": {
-        "PARSE_VIA_MSG": 73
+        "PARSE_VIA_MSG": 84,
+        "PARSE_VIA_RPC": 2
       },
       "1": {
-        "PARSE_VIA_MSG": 14
+        "PARSE_VIA_MSG": 20
       },
       "legacy": {
-        "PARSE_VIA_MSG": 8
+        "PARSE_VIA_MSG": 8,
+        "PARSE_VIA_RPC": 1
       }
     },
-    "verdict": "медленного пути в записях с версией нет -- проверять гипотезу не на чем"
+    "verdict": "медленный путь встречается на версиях ['0', 'legacy'] -- версия не единственная причина"
   },
   "slot_table": [
     {
@@ -211,6 +213,152 @@
   "stand_rows": [
     {
       "schema_version": 2,
+      "ts_utc": "2026-09-23T22:01:32Z",
+      "signature": "MA5PVTzzfZKboQq1vCocD8iTLwPTMK9fjDcTypLpwQvvzNnWkopyDfgw7wtBMBbJevhmVggN3cdkwsjLwuWwknF",
+      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+      "mint": null,
+      "slot": 449832752,
+      "kind": "other",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "ни один некотировочный минт не изменился",
+      "filter": "задача DBot",
+      "test_source": true,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "t_recv_ts": 1790200892.885689,
+      "t_recv_utc": "2026-09-23T22:01:32Z",
+      "t_decide_ts": 1790200892.88587,
+      "decide_latency_ms": 0.2,
+      "source_slot": 449832752,
+      "net_slot_at_decision": 449832752,
+      "net_slot_age_s": 0.118,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
+    },
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T22:09:01Z",
+      "signature": "5QhGiLjMXgkF4VZECARJ1ZpPpzEqxeQcX27L9mx61JzMnUb9HcR794ouW5er8deXuZ2F71XcVf92RzbddJy2xqwe",
+      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
+      "mint": null,
+      "slot": 449834446,
+      "kind": "other",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "ни один некотировочный минт не изменился",
+      "filter": "задача DBot",
+      "test_source": true,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "t_recv_ts": 1790201341.509356,
+      "t_recv_utc": "2026-09-23T22:09:01Z",
+      "t_decide_ts": 1790201341.509628,
+      "decide_latency_ms": 0.3,
+      "source_slot": 449834446,
+      "net_slot_at_decision": 449834446,
+      "net_slot_age_s": 0.029,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
+    },
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T22:17:24Z",
+      "signature": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4",
+      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
+      "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+      "slot": 449836345,
+      "kind": "buy",
+      "spend_sol_eq": 0.06065807122582486,
+      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "spend_ui": 7.0,
+      "first_entry": true,
+      "dex_programs": [
+        "Meteora DLMM"
+      ],
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "route": {
+        "programs": [
+          "Meteora DLMM"
+        ],
+        "intermediate_mints": [],
+        "mints_in_route": 2,
+        "hops_by_mints": 1,
+        "dex_calls": 3,
+        "via_intermediate": false,
+        "all_tx_mints": [
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+          "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+          "So11111111111111111111111111111111111111112"
+        ]
+      },
+      "slot_lag": 0,
+      "action": "buy",
+      "code": "BUY",
+      "reason": "фильтры задачи и наши лимиты пройдены",
+      "test_source": true,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "t_recv_ts": 1790201844.596812,
+      "t_recv_utc": "2026-09-23T22:17:24Z",
+      "t_decide_ts": 1790201844.607938,
+      "decide_latency_ms": 11.1,
+      "source_slot": 449836345,
+      "net_slot_at_decision": 449836345,
+      "net_slot_age_s": 0.04,
+      "rate_note": "по курсу 115.40 USD/SOL",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry",
+      "taxed": true,
+      "tax_bps": 100,
+      "tax_why_not": null
+    },
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T22:17:24Z",
+      "stage": "exec_result",
+      "signature": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4",
+      "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+      "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6",
+      "source_sig": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4",
+      "exec_code": "SENT",
+      "reason": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым",
+      "live": false,
+      "dry_run": false,
+      "mode": "live-test",
+      "test_source": true,
+      "order_id": "API-a893bf03-f3f9-4c14-9362-baa9c1ebac9b",
+      "signatures": [
+        "5ycBKDykfUDATQthzAhTtXMjfJd74nLgFAboEUPFCFiLGv1DQVYm98C2A1of3SY2anpx6ngRjmRCEEitcXPNFizY"
+      ]
+    },
+    {
+      "schema_version": 2,
       "ts_utc": "2026-09-23T22:23:00Z",
       "signature": "2DrxoRisvTKBXgH9EqAgdkPZKyuNoV3hnKSXiSvHjdBuwbyabRt4hC7nSgd8zs6VijNQ16e6dNu94NgZjnQgNj4X",
       "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
@@ -267,6 +415,46 @@
       "rate_source": "geckoterminal",
       "source_task": "TEST",
       "mode": "dry"
+    },
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T23:50:50Z",
+      "signature": "5JLUUk8pka1y2GinTdNcf8DJDAtukzSregmpL9EaKSaLePTqSQnBfQ25PqCo93RTo7hC2NQxLe1TqZBMGCV3TjEw",
+      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
+      "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
+      "slot": 449857427,
+      "kind": "sell",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [
+        "Raydium CPMM"
+      ],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки",
+      "filter": "задача DBot",
+      "test_source": true,
+      "parse_ms": 0.34,
+      "gate_ms": 0.01,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "t_recv_ts": 1790207450.960165,
+      "t_recv_utc": "2026-09-23T23:50:50Z",
+      "t_decide_ts": 1790207450.960517,
+      "decide_latency_ms": 0.4,
+      "source_slot": 449857427,
+      "net_slot_at_decision": 449857427,
+      "net_slot_age_s": 0.023,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
     }
   ],
   "routes": {
@@ -274,13 +462,13 @@
     "route_known": 1,
     "multihop": 0,
     "multihop_share": 0.0,
-    "skipped_intermediate": 5
+    "skipped_intermediate": 7
   },
   "our_brakes": {
     "by_code": {
-      "INTERMEDIATE_ROUTE": 5
+      "INTERMEDIATE_ROUTE": 7
     },
-    "total": 5
+    "total": 7
   },
   "reconciliation": {
     "known": false,
@@ -329,7 +517,29 @@
       "sell_address_kinds": "mint,mint",
       "sell_attempts": 2,
       "unsold_reason": "2 неудачных попыток подряд",
-      "balance_read_why_not": null
+      "balance_read_why_not": null,
+      "jup_attempts": 1,
+      "jup_signature": "o7X4sWmi96eCgk5Wmeob4k2SRmADSSnU9z8nXofHgY1pxAPQUCwM4J1A2K5WgH3MRcS4a6oiuiEi47L1hq3wFC1",
+      "jup_why_not": null,
+      "jup_floor": {
+        "out_amount": 810693,
+        "threshold": 567485,
+        "floor_needed": 567485,
+        "floor_pct": 70.0,
+        "slippage_bps": 3000,
+        "router": "metis",
+        "in_tx": {
+          "known": true,
+          "bytes_len": 649,
+          "threshold_found": false,
+          "quote_found": true,
+          "slippage_found": true,
+          "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+        },
+        "quote_share_of_entry_pct": 81.07,
+        "entry_lamports": 1000000
+      },
+      "closed_reason": "остаток ноль дважды подряд"
     }
   ],
   "credits": {
@@ -340,11 +550,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 1796,
+          "кредитов": 1866,
           "бюджет": 60000,
-          "доля": 0.0299,
+          "доля": 0.0311,
           "группа": null,
-          "потрачено_по_бюджету": 1796,
+          "потрачено_по_бюджету": 1866,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -363,7 +573,7 @@
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 2321,
+      "всего_кредитов": 2391,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
