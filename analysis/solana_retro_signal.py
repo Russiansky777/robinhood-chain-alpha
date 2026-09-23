@@ -1158,14 +1158,17 @@ def self_test_method() -> None:
     chk("помечено оборванными ровно незавершённое", tr2["оборвано_бюджетом_помечено"] == 1)
     chk("затронутых обрывом считаем шире", tr2["помечено_как_затронутые_обрывом_всего"] == 2)
     rec_s = {"E0": 1.0, "E1": 2.0, "E2": 2.0, "exit": 3.0}
-    c0, m0 = compare_prices(rec_s, {"helius": {}, "публичный_узел": {}})
-    chk("пустой ответ провайдера не даёт сверенных пар", (c0, m0) == (0, 0), f"{c0}/{m0}")
-    c1, m1 = compare_prices(rec_s, {"helius": dict(rec_s), "публичный_узел": dict(rec_s)})
+    c0, m0, p0 = compare_prices(rec_s, {"helius": {}, "публичный_узел": {}})
+    chk("пустой ответ провайдера не даёт сверенных пар", (c0, m0, p0) == (0, 0, {}), f"{c0}/{m0}")
+    c1, m1, p1 = compare_prices(rec_s, {"helius": dict(rec_s), "публичный_узел": dict(rec_s)})
     chk("полное совпадение: 8 пар, 0 расхождений", (c1, m1) == (8, 0), f"{c1}/{m1}")
-    c2, m2 = compare_prices(rec_s, {"helius": {"exit": 3.5}})
+    chk("вклад провайдеров считается врозь", p1 == {"helius": 4, "публичный_узел": 4}, str(p1))
+    c2, m2, _ = compare_prices(rec_s, {"helius": {"exit": 3.5}})
     chk("расхождение ловится", (c2, m2) == (1, 1), f"{c2}/{m2}")
-    c3, m3 = compare_prices({"E0": None}, {"helius": {"E0": 1.0}})
+    c3, m3, _ = compare_prices({"E0": None}, {"helius": {"E0": 1.0}})
     chk("None в записанном не сверяется", (c3, m3) == (0, 0), f"{c3}/{m3}")
+    c4, m4, p4 = compare_prices(rec_s, {"helius": {}, "публичный_узел": dict(rec_s)})
+    chk("односторонняя сверка видна по разбивке", p4 == {"публичный_узел": 4} and c4 == 4, str(p4))
     chk("окно выхода равно горизонту удержания", EXIT_TO_S == EXIT_SLOW_S == 45,
         f"{EXIT_TO_S}/{EXIT_SLOW_S}")
     chk("потолок добора соответствует окну", EXIT_DEEP_MAX_BLOCKS == 60,
@@ -1182,24 +1185,31 @@ def self_test_method() -> None:
 
 # ---------- самопроверка ----------
 
-def compare_prices(recorded: dict, by_provider: dict) -> tuple[int, int]:
-    """Сколько пар цен реально сверено и сколько из них разошлось.
+def compare_prices(recorded: dict, by_provider: dict) -> tuple[int, int, dict]:
+    """Сколько пар цен реально сверено, сколько разошлось и КЕМ сверено.
 
     Отдельной функцией -- чтобы правило "нечего сверить != совпало" проверялось
     самотестом без сети. Пара считается сверенной, только когда ОБЕ стороны
     дали число; None у любой стороны -- это отсутствие проверки, не успех.
+
+    Разбивка по провайдерам нужна, чтобы "сверено у двух провайдеров" не
+    прикрывало случай, когда один из них весь прогон отвечал 429 и вклада
+    не дал: 20 пар от одного узла и 2 от другого -- это не то же самое,
+    что 11 и 11.
     """
     compared = mismatched = 0
+    per: dict[str, int] = {}
     for k in ("E0", "E1", "E2", "exit"):
         want = recorded.get(k)
-        for prices in by_provider.values():
+        for prov, prices in by_provider.items():
             got = (prices or {}).get(k)
             if want is None or got is None:
                 continue
             compared += 1
+            per[prov] = per.get(prov, 0) + 1
             if abs(got - want) > max(abs(want) * 1e-9, 1e-18):
                 mismatched += 1
-    return compared, mismatched
+    return compared, mismatched, per
 
 
 def self_check(rpc: Rpc, rows: list[dict], n: int = 3) -> dict:
@@ -1232,10 +1242,11 @@ def self_check(rpc: Rpc, rows: list[dict], n: int = 3) -> dict:
         rec = {k: (r.get("scenarios") or {}).get(k, {}).get("entry_price") for k in ("E0", "E1", "E2")}
         rec["exit"] = r.get("exit_price")
         item["записано"] = rec
-        compared, mismatched = compare_prices(
+        compared, mismatched, per_prov = compare_prices(
             rec, {prov: item.get(prov) for prov in ("helius", "публичный_узел")})
         ok = mismatched == 0
         item["сверено_пар"] = compared
+        item["сверено_пар_по_провайдерам"] = per_prov
         item["расхождений"] = mismatched
         # ВАЖНО: если сверять было нечего (провайдер не ответил, бюджет истёк),
         # это НЕ "совпало". Пустое сравнение с пустым -- не проверка.
@@ -1252,8 +1263,20 @@ def self_check(rpc: Rpc, rows: list[dict], n: int = 3) -> dict:
                 "note": "самопроверка НЕ выполнена: ни одной пары цен не удалось сверить",
                 "checks": checks}
     all_ok = all(c["совпало"] for c in verified)
-    return {"ok": all_ok, "проверено_строк": len(verified), "всего_строк": len(checks),
-            "сверено_пар_всего": sum(c["сверено_пар"] for c in verified), "checks": checks}
+    per_total: dict[str, int] = {}
+    for c in verified:
+        for prov, n_pairs in (c.get("сверено_пар_по_провайдерам") or {}).items():
+            per_total[prov] = per_total.get(prov, 0) + n_pairs
+    res = {"ok": all_ok, "проверено_строк": len(verified), "всего_строк": len(checks),
+           "сверено_пар_всего": sum(c["сверено_пар"] for c in verified),
+           "сверено_пар_по_провайдерам": per_total, "checks": checks}
+    # Один ответивший провайдер -- это всё ещё сверка (записанное против
+    # независимого узла), но НЕ "у двух провайдеров". Говорим это прямо.
+    отвечали = [p for p, n_pairs in per_total.items() if n_pairs]
+    if len(отвечали) < 2:
+        res["оговорка"] = ("сверка односторонняя: вклад дал только " + ", ".join(отвечали)
+                            + " -- второй провайдер не ответил")
+    return res
 
 
 def recompute_price(rpc: Rpc, slot: int, mint: str, signature: str, url: str | None) -> float | None:
