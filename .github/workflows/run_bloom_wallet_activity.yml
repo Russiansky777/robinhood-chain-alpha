@@ -1,0 +1,71 @@
+name: "Bloom: кто хозяйничает в кошельке исполнителя (только чтение)"
+
+# Сверка при старте нашла на кошельке исполнителя сделки, которых нет в
+# нашем журнале. Этот прогон отвечает на решающий вопрос: подписаны ли они
+# НАШИМ ключом. Если кошелёк платит за транзакцию, значит ключом
+# распоряжается кто-то ещё, и стенд начинать нельзя. Если кошелёк только
+# получает -- это входящий перевод или рассылка пыли.
+#
+# Только чтение цепи: getSignaturesForAddress и getTransaction. Ни одного
+# ордера, ключ кошелька не используется и на бегунок не попадает.
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "окно в часах"
+        required: false
+        default: "24"
+      limit:
+        description: "сколько последних подписей смотреть"
+        required: false
+        default: "40"
+      wallet:
+        description: "кошелёк (пусто -- кошелёк исполнителя)"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-wallet-activity
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора ДО запросов в цепь"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_wallet_activity.py --self-test
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          ARGS="--hours ${{ inputs.hours }} --limit ${{ inputs.limit }}"
+          if [ -n "${{ inputs.wallet }}" ]; then ARGS="$ARGS --wallet ${{ inputs.wallet }}"; fi
+          python3 analysis/bloom_wallet_activity.py $ARGS
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_wallet_activity.json ] && git add data/bloom_wallet_activity.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: разбор активности кошелька исполнителя [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
