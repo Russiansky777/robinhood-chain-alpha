@@ -58,51 +58,34 @@
     }
   }
 }
-        "blockTime": 1790000630,
+        "signature": "5zvjwu4MCSGyy92FBnvhBSAqJhhhUbaVN88NYZUt6V1zvBhmu3r6b9AFq3qjDbqzbMgTc4ybb9vH1G4w5eSk2qGd",
+        "blockTime": 1790165308,
+        "utc": "2026-09-23T12:08:28Z",
         "err": null
       },
       {
-        "signature": "3JTSnyqjX5XNSnZ9m2wd8W94rFkBQ989F5z5zx67V5twVYc5W9wjes55GcTvDj71hMqufTFfSXxZkQrVhnFv5yF6",
-        "blockTime": 1790000120,
+        "signature": "idwgUzhqTVY1UCVWwafyGNWsjoTptJKqbzyjy8dWdXF9vrVJwaTQxBFgDrZddamjNn9WNJhrn6bR5FVJ2MoDNcj",
+        "blockTime": 1790165168,
+        "utc": "2026-09-23T12:06:08Z",
         "err": null
       },
       {
-        "signature": "CagoekDF3dHBrwmYqU4oP5f8LgjPS2rtMh4yxRhGQ8ybeoW29NNP7iUPxLGB1VHBFmhz9dYY5AixoBsiqM1bFpY",
-        "blockTime": 1790000087,
-        "err": null
-      },
-      {
-        "signature": "3sRihTrYxLZaTnsYwoeips2ZpXRNsByt25LMTd7VMyhEAVKCovHH2sxcoLEM8n3E4yVw6aKMYaLRLABkPeHjUMr2",
-        "blockTime": 1789997134,
-        "err": null
-      },
-      {
-        "signature": "5iLEn7aiUH3377hbauCBp436HnzsnN9rzDxpmSpS8Z3pocHJJ227rX1UyzaU77wA9bJ3zubH9FJah38WMNyHF7pa",
-        "blockTime": 1789997099,
-        "err": null
-      },
-      {
-        "signature": "btTy2uhkfF7mcYa11aKEF6Kr8qsChWTrLE5sRWc6FnKnh1KzhSDQQouGG8DV7VtuZ7JYF4f5wegkvsRiLdsjkVw",
-        "blockTime": 1789996079,
-        "err": null
-      },
-      {
-        "signature": "3AxkZ2vdcbp18swQ8iF8M82a729sFEdQacS9TTYWw4UnvTVeSNZsbp5w3Z9zBFwWrPMHx13Kg1Y3rTQ6uLrD7RMM",
-        "blockTime": 1789996046,
-        "err": null
-      },
-      {
-        "signature": "5otnuycdu2a4JsHpEu34BmP5yTWPoRGMM8pu2NnqmG6CPkHYy26vkwduXLMswjcTtapM3D369BvAdwcrdmWD3fir",
-        "blockTime": 1789963834,
+        "signature": "4xYu1BQnGpkThZ8J9rw6dxuNsiEwUcbzDaQ771jawim88vWNcLdZjhJVqZ37LTkxV6pyERbz2y34y3ndBjMh4Vma",
+        "blockTime": 1790163030,
+        "utc": "2026-09-23T11:30:30Z",
         "err": null
       }
     ],
+    "recent_count": 14,
+    "older_count": 26,
+    "newest_older_utc": "2026-09-22T17:23:30Z",
+    "truncated": true,
     "foreign_count": 40
   },
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 0,
+      "v2": 14,
       "unreadable": 0
     },
     "positions": {
@@ -112,17 +95,34 @@
     },
     "mixed": false
   },
+  "notes": [
+    "у кошелька есть прежняя история: 26 сделок старше окна, самая свежая из них 2026-09-22T17:23:30Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
+    "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
+  ],
   "blockers": [
-    "на кошельке 40 сделок, которых мы не делали -- мы в кошельке не одни"
+    "на кошельке 14 сделок за последние 24.0 ч, которых мы не делали -- мы в кошельке не одни"
   ],
   "clean": false,
   "verdict": "старт заблокирован, причин 1"
 }
+--- коротко ---
+режим: dry-run, вердикт: старт заблокирован, причин 1
+кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.362935329 SOL при пороге 0.3
+чужая активность: известно=True, свежих за 24.0 ч 14, прежних 26 (самая свежая 2026-09-22T17:23:30Z)
+    свежая чужая: 4XNthCT2ZBYbFP3zXgsVFhBrAZqoimpkAdth9vc3afRAWQtRpzwgLSm8hvu86sqU5cSERw48LL5jn2HiTh2ozunc 2026-09-23T19:46:12Z
+    свежая чужая: 45bpUGdtENPqW9ecz8aug2AAkWGD4TRrMuWtWaC3wTc6UYVEJe5pSJahbFCLamQokZXqt25iXcvJoGe2uDZQc6wu 2026-09-23T19:46:04Z
+    свежая чужая: 4uXskrHvx8QaSS2uDsMN5CFUHdEyWNN6NqomdJzaMjGJsMw3XF1s2rqmHaQZKTs4Lbwh3vwYhfMVg9nQrH7Cou3c 2026-09-23T19:46:00Z
+    свежая чужая: 4sxmN6E9i3FLfVBSb8bz3SeZ13uAXU8bQmzfAPH5JGEvi342yTeV3KUmqNGKUMQrxMp5Rb5uDGSEaZdGZiG48PP9 2026-09-23T19:45:39Z
+    свежая чужая: 5yaSoq9cX9CZBsTgFk9kqjvj6uMRgmgtwMK5eJcNfaJnMqSfmjqr8RAsABp71Q4r2hNbRhvCYmpFckZTUdRpuYvK 2026-09-23T15:45:24Z
+позиции: dry-run 0, настоящих открытых 0
+  БЛОКЕР: на кошельке 14 сделок за последние 24.0 ч, которых мы не делали -- мы в кошельке не одни
+  примечание: у кошелька есть прежняя история: 26 сделок старше окна, самая свежая из них 2026-09-22T17:23:30Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
+  примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T19:58:55Z",
-  "updated_ts": 1790193535.753799,
-  "alive_since_utc": "2026-09-23T19:58:55Z",
+  "updated_utc": "2026-09-23T20:09:02Z",
+  "updated_ts": 1790194142.509055,
+  "alive_since_utc": "2026-09-23T20:09:02Z",
   "mode": "dry",
   "sources": 18,
   "sources_from": "DBot живьём + тестовый источник из окружения",
@@ -136,7 +136,7 @@
   "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
   "test_min_sol": 0.05,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 115.020901598238,
+  "rate_usd_sol": 113.955353535354,
   "rate_fresh": true,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
@@ -147,7 +147,7 @@
   "slot_notifications": 0,
   "net_slot_age_s": null,
   "balance_sol": 0.362935329,
-  "balance_age_s": 0.04,
+  "balance_age_s": 0.03,
   "rpc_calls": 1,
   "rpc_by_method": {
     "getBalance": 1
@@ -178,6 +178,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-0
+15
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 0
