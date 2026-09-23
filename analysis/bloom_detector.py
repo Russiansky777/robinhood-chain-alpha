@@ -70,6 +70,11 @@ except ImportError:  # pragma: no cover
     EXEC = None
 
 try:
+    import bloom_notify as NT
+except ImportError:  # pragma: no cover
+    NT = None
+
+try:
     import requests
 except ImportError:  # pragma: no cover
     requests = None
@@ -1056,6 +1061,10 @@ class Детектор:
         self.баланс_sol: float | None = None
         self.t_баланс: float | None = None
         self.задержки_мс: list = []
+        # Оповещатель стенда. Строки уходят в фоновом потоке и только по
+        # тестовым источникам; сбой отправки живёт в признаке жизни, а не в
+        # исключении -- см. bloom_notify.
+        self.оповещатель = NT.Оповещатель() if NT is not None else None
 
     def статус_путь(self) -> Path:
         return self.состояние.base / "detector_status.json"
@@ -1103,6 +1112,9 @@ class Детектор:
         st["rpc_by_method"] = dict(self.helius.по_методам)
         st["session_credits"] = (getattr(self.helius.метр, "session_credits", None)
                                      if self.helius.метр else None)
+        st["telegram"] = (self.оповещатель.статус() if self.оповещатель is not None
+                           else {"enabled": False,
+                                 "off_reason": "модуль оповещений не загружен"})
         st["executor_attached"] = self.исполнитель is not None
         st["executed"] = self.исполнено
         st["exec_by_code"] = dict(self.по_кодам_исполнителя)
@@ -1297,7 +1309,14 @@ class Детектор:
             self.назначить_разбор_нашей_покупки(
                 cid=cid_исполнения, минт=строка.get("mint"),
                 подпись=подписи[0], источник_маршрут=строка.get("route") or {},
-                источник_пул=строка.get("source_pool"))
+                источник_пул=строка.get("source_pool"),
+                exec_row=итог, слот_источника=строка.get("source_slot"))
+
+        # Строка в Telegram -- ТОЛЬКО по тестовому источнику и только после
+        # журнала и отправки ордера. Боевые источники молчат: сто решений в
+        # час в телефоне не читает никто, а стенд владелец смотрит живьём.
+        if строка.get("test_source") and self.оповещатель is not None:
+            self.оповещатель.послать(NT.строка_решения(строка))
         return строка
 
     # ------------------------------------------------- маршрут нашей покупки
@@ -1317,7 +1336,9 @@ class Детектор:
 
     def разобрать_нашу_покупку(self, *, cid: str, минт: str, подпись: str,
                                 источник_маршрут: dict,
-                                источник_пул: str | None = None) -> dict:
+                                источник_пул: str | None = None,
+                                exec_row: dict | None = None,
+                                слот_источника: int | None = None) -> dict:
         """Пул и маршрут нашей покупки; метка при расхождении с источником."""
         запись = {"stage": "our_route", "client_order_id": cid, "mint": минт,
                    "signature": подпись}
@@ -1363,6 +1384,17 @@ class Детектор:
                         "%s хопов через %s", источник_пул,
                         наш["route"].get("hops_by_mints"),
                         наш["route"].get("intermediate_mints"))
+        # Строка о нашей покупке идёт ОТСЮДА, а не сразу после отправки:
+        # только здесь известны наш слот по цепи и метка расхождения
+        # маршрутов, а без них строка была бы наполовину пустой.
+        if exec_row is not None and self.оповещатель is not None:
+            try:
+                размер = self.состояние.positions().get(cid, {}).get("sol_in")
+            except Exception:  # noqa: BLE001
+                размер = None
+            self.оповещатель.послать(NT.строка_покупки(
+                exec_row=exec_row, наш_слот=tx.get("slot"),
+                слот_источника=слот_источника, размер_sol=размер, метки=флаги))
         return запись
 
 

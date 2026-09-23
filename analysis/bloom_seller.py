@@ -49,6 +49,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import requests  # noqa: E402
 
 from bloom_api import BloomApi, build_sell_body, scrub  # noqa: E402
+
+try:
+    import bloom_notify as NT
+except ImportError:  # pragma: no cover
+    NT = None
 from bloom_exec_state import (  # noqa: E402
     EXECUTOR_WALLET, STATE_CLOSED, ExecState, append_jsonl_fsync)
 
@@ -320,6 +325,41 @@ def give_up(pos: dict, *, give_up_after_s: float, now: float | None = None) -> b
     return (now - float(первая)) >= give_up_after_s
 
 
+def итог_продажи(tx: dict, wallet: str, mint: str) -> dict:
+    """Что вышло из отправленной продажи -- ПО ЦЕПИ, а не по ответу Bloom.
+
+    200 у Bloom означает только приём запроса. Единственный честный
+    источник -- транзакция: ошибка инструкции или изменение остатков. SOL
+    считается по нативной дельте нашего кошелька вместе с комиссией:
+    владельцу нужен результат, а не выручка до вычета.
+    """
+    if not tx:
+        return {"known": False, "why_not": "узел не отдал транзакцию продажи"}
+    мета = (tx or {}).get("meta") or {}
+    ошибка = мета.get("err")
+    код = None
+    if ошибка is not None:
+        try:
+            ошибки = ошибка.get("InstructionError")
+            код = str(ошибки[1]) if ошибки else str(ошибка)[:80]
+        except Exception:  # noqa: BLE001
+            код = str(ошибка)[:80]
+    sol = None
+    минт_дельта = None
+    try:
+        import bloom_detector as BD  # noqa: PLC0415
+        б = BD.балансы_кошелька(tx, wallet)
+        sol = б.get("native_delta_sol")
+        з = (б.get("by_mint") or {}).get(mint) or {}
+        минт_дельта = з.get("delta_ui")
+    except Exception as exc:  # noqa: BLE001
+        return {"known": True, "ok": ошибка is None, "error_code": код,
+                 "slot": tx.get("slot"),
+                 "why_not": f"балансы не разобраны: {type(exc).__name__}"}
+    return {"known": True, "ok": ошибка is None, "error_code": код,
+             "slot": tx.get("slot"), "sol_delta": sol, "mint_delta_ui": минт_дельта}
+
+
 class Seller:
     def __init__(self, *, state: ExecState | None = None, live: bool | None = None,
                   api: BloomApi | None = None) -> None:
@@ -335,6 +375,7 @@ class Seller:
         self.предел_неудач = env_int("BLOOM_SELL_MAX_ATTEMPTS", ПРЕДЕЛ_НЕУДАЧ)
         self.жалоба_каждые_s = env_float("BLOOM_SELL_COMPLAIN_EVERY_S", 60.0)
         self._жалобы: dict = {}
+        self.оповещатель = NT.Оповещатель() if NT is not None else None
         self.priority_fee = env_float("BLOOM_PRIORITY_FEE", DEFAULT_PRIORITY_FEE)
         self.processor_tip = env_float("BLOOM_PROCESSOR_TIP", DEFAULT_PROCESSOR_TIP)
         self.api = api or BloomApi(os.environ.get("BLOOM_API_KEY", ""),
@@ -345,10 +386,57 @@ class Seller:
                             {"ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                              **row})
 
+    def tx_читатель(self, подпись: str):
+        """Транзакция по подписи. Потолок версии тот же, что у детектора:
+        разные потолки уже прятали упавшую продажу версии 1."""
+        r = rpc_call("getTransaction",
+                      [подпись, {"encoding": "jsonParsed",
+                                 "maxSupportedTransactionVersion":
+                                     env_int("BLOOM_MAX_TX_VERSION", 1),
+                                 "commitment": "confirmed"}])
+        return r.get("result") if r.get("ok") else None
+
+    def доложить_прошлую_попытку(self, pos: dict, *, читатель_tx=None) -> dict:
+        """Строка о ПРЕДЫДУЩЕЙ попытке продажи: успех или код ошибки.
+
+        Вызывается раз на попытку: следующая попытка (или закрытие позиции)
+        уже знает, чем кончилась прошлая. Отдельный флаг в записи позиции не
+        даёт доложить дважды.
+        """
+        подписи = pos.get("last_sell_signatures") or []
+        if not подписи or pos.get("last_sell_reported") == подписи[-1]:
+            return {"skipped": True}
+        cid = pos.get("client_order_id")
+        подпись = подписи[-1]
+        tx = None
+        if читатель_tx is not None:
+            tx = читатель_tx(подпись)
+        итог = итог_продажи(tx, EXECUTOR_WALLET, pos.get("mint"))
+        основа = pos.get("ts_accepted") or pos.get("ts_intent")
+        секунды = None
+        if основа and pos.get("ts_last_sell_attempt"):
+            секунды = float(pos["ts_last_sell_attempt"]) - float(основа)
+        # В данных вид адреса латиницей (ASCII), в строке для человека --
+        # по-русски: это разные вещи, и смешивать их нельзя.
+        вид = {"mint": "минт", "pool": "пул"}.get(pos.get("sell_address_kind"), "минт")
+        через = f"сторож, {вид}"
+        if self.оповещатель is not None and NT is not None:
+            self.оповещатель.послать(NT.строка_продажи(
+                ok=bool(итог.get("ok")), код=итог.get("error_code") or итог.get("why_not"),
+                через=через, секунды=секунды, sol_вернулось=итог.get("sol_delta"),
+                подпись=подпись))
+        self.state.update_position(cid, last_sell_reported=подпись,
+                                    last_sell_outcome=итог)
+        self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                   "action": "итог прошлой попытки по цепи", "signature": подпись,
+                   "outcome": итог})
+        return итог
+
     def handle(self, pos: dict, *, now: float | None = None,
-                balance_reader=token_balance_raw) -> dict:
+                balance_reader=token_balance_raw, читатель_tx=None) -> dict:
         """Одна позиция за один круг. Возвращает, что сделано и почему."""
         now = now if now is not None else time.time()
+        читатель_tx = читатель_tx if читатель_tx is not None else self.tx_читатель
         cid = pos.get("client_order_id")
         mint = pos.get("mint")
         итог = {"client_order_id": cid, "mint": mint, "state_before": pos.get("state")}
@@ -376,6 +464,13 @@ class Seller:
             return итог
         итог["balance_raw"] = bal.get("raw")
         итог["balance_ui"] = bal.get("ui")
+
+        # Итог ПРЕДЫДУЩЕЙ попытки -- по цепи и один раз на попытку. Стоит
+        # здесь, а не после продажи: сразу после отправки транзакции ещё нет
+        # в confirmed, и вопрос "получилось ли" честно закрывается только
+        # следующим кругом.
+        if pos.get("last_sell_signatures"):
+            self.доложить_прошлую_попытку(pos, читатель_tx=читатель_tx)
 
         if int(bal.get("raw") or 0) <= 0:
             # Два нуля подряд перед закрытием: одиночный ноль бывает гонкой
@@ -405,6 +500,8 @@ class Seller:
         убит, почему = kill_sell_active()
         if убит:
             итог.update(action="продажа запрещена рубильником продаж", why_not=почему)
+            if self.оповещатель is not None and NT is not None:
+                self.оповещатель.послать(NT.строка_тревоги("рубильник продаж", почему))
             self.log(итог)
             return итог
 
@@ -424,6 +521,10 @@ class Seller:
                           f"попыток {pos.get('sell_attempts', 0)}, "
                           f"чем пробовали: {pos.get('sell_address_kinds') or '-'}\n"
                           f"продать руками через Phantom/Jupiter")
+                if self.оповещатель is not None and NT is not None:
+                    self.оповещатель.послать(NT.строка_тревоги(
+                        "UNSOLD", f"{причина_сдачи}, минт {mint}, "
+                                   f"остаток {bal.get('ui')}"))
                 self.log({**итог, "action": "UNSOLD, доклад владельцу",
                            "why_not": причина_сдачи,
                            "telegram": telegram(текст)})
@@ -513,6 +614,9 @@ class Seller:
             "kill_buy": {"path": str(self.state.kill_path),
                                    "readable": куп_доступен, "active": куп_включён,
                                    "note": куп_поч},
+            "telegram": (self.оповещатель.статус() if self.оповещатель is not None
+                          else {"enabled": False,
+                                "off_reason": "модуль оповещений не загружен"}),
             "credits_logged": _УЧЁТ_ПИШЕТСЯ,
             "credits_log_error": _УЧЁТ_ПОЧЕМУ,
             "kill_sell": {"path": str(kill_sell_file()),
@@ -520,10 +624,12 @@ class Seller:
                                   "note": прод_поч},
         })
 
-    def cycle(self, *, now: float | None = None, balance_reader=token_balance_raw) -> dict:
+    def cycle(self, *, now: float | None = None, balance_reader=token_balance_raw,
+               читатель_tx=None) -> dict:
         now = now if now is not None else time.time()
         открытые = self.state.open_positions()
-        строки = [self.handle(p, now=now, balance_reader=balance_reader)
+        строки = [self.handle(p, now=now, balance_reader=balance_reader,
+                               читатель_tx=читатель_tx)
                   for p in открытые]
         итог = {"positions": len(открытые), "mode": "live" if self.live else "dry-run",
                  "rows": строки}
@@ -666,6 +772,43 @@ def self_test() -> None:
         len(журнал.read_text(encoding="utf-8").splitlines()) == строк_после)
     chk("и причина отказа осталась в записи позиции",
         "узел молчит" in str(st.positions()["p3"].get("balance_read_why_not")))
+
+    # --- итог прошлой попытки по цепи и строка о нём
+    def tx_упавшая(подпись):
+        return {"slot": 777, "meta": {
+            "err": {"InstructionError": [4, "ProgramFailedToComplete"]},
+            "fee": 5000, "preBalances": [10 ** 9], "postBalances": [10 ** 9 - 1_000_000],
+            "preTokenBalances": [], "postTokenBalances": [], "innerInstructions": []},
+            "transaction": {"message": {"accountKeys": [{"pubkey": EXECUTOR_WALLET}],
+                                          "instructions": []}}}
+
+    и = итог_продажи(tx_упавшая("X"), EXECUTOR_WALLET, "MINTX")
+    chk("упавшая продажа: код ошибки из инструкции",
+        и["ok"] is False and и["error_code"] == "ProgramFailedToComplete", и)
+    chk("и потраченный SOL со знаком минус", и["sol_delta"] < 0, и)
+    chk("узел не отдал транзакцию -- сказано, а не выдумано",
+        итог_продажи(None, EXECUTOR_WALLET, "M")["known"] is False)
+
+    st.write_intent(client_order_id="p5", mint="MINT5", source_sig="S5", source_slot=5,
+                     sol_in=0.001, pool=None, program=None, taxed=None, tax_bps=None,
+                     mode="dry-run", sell_after_s=28.8)
+    st.update_position("p5", state="selling", ts_accepted=time.time() - 100,
+                        sell_attempts=1, sell_address_kind="mint",
+                        ts_last_sell_attempt=time.time() - 50,
+                        last_sell_signatures=["ПОДПИСЬ_ПРОДАЖИ"])
+    посланное = []
+    s.оповещатель = type("О", (), {
+        "послать": lambda self_, текст: посланное.append(текст) or {"ok": True},
+        "статус": lambda self_: {"enabled": True}})()
+    r = s.доложить_прошлую_попытку(st.positions()["p5"], читатель_tx=tx_упавшая)
+    chk("итог прошлой попытки посчитан", r.get("error_code") == "ProgramFailedToComplete", r)
+    chk("и строка о продаже ушла", посланное and "НЕ продана" in посланное[0], посланное)
+    chk("и в ней есть, через что продавали", "сторож, минт" in посланное[0], посланное)
+    было_строк = len(посланное)
+    s.доложить_прошлую_попытку(st.positions()["p5"], читатель_tx=tx_упавшая)
+    chk("дважды об одной попытке не докладываем", len(посланное) == было_строк,
+        посланное)
+    s.оповещатель = None
 
     # --- чем продаём: пул нашей покупки или минт
     прямая = {"mint": "MINT9", "our_pool": "POOL9", "our_pool_direct": True}

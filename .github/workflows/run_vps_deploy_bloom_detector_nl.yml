@@ -43,6 +43,10 @@ on:
         description: "'yes' -- сверка не блокирует старт открытыми позициями стенда (боевые не покрывает)"
         required: false
         default: "no"
+      telegram_live_test:
+        description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
+        required: false
+        default: "1"
 
 concurrency:
   group: bloom-detector-deploy
@@ -121,7 +125,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -170,6 +174,11 @@ jobs:
             # площадки по минимуму -- один повтор на 0.005.
             echo 'BLOOM_TEST_BUY_SOL=0.001' >> $ENV_DIR/env
             echo 'BLOOM_TEST_BUY_SOL_BUMP=0.005' >> $ENV_DIR/env
+            # Строки о событиях стенда в Telegram: только тестовые источники.
+            # Токен и получатель уже в этом файле -- их пишет деплой сторожа;
+            # здесь только выключатель, и он переписывается на каждом деплое.
+            sed -i '/^BLOOM_TELEGRAM_LIVE_TEST=/d' $ENV_DIR/env
+            echo 'BLOOM_TELEGRAM_LIVE_TEST=${{ inputs.telegram_live_test }}' >> $ENV_DIR/env
             # BLOOM_LIVE_BUY вычищается ВСЕГДА: боевые покупки по реальным
             # источникам этот файл не включает ни при каких входных данных.
             sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env

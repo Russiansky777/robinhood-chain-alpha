@@ -53,6 +53,11 @@ import re  # noqa: E402
 import bloom_api as API  # noqa: E402
 import bloom_exec_state as ST  # noqa: E402
 
+try:
+    import bloom_notify as NT
+except ImportError:  # pragma: no cover
+    NT = None
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("bloom_executor")
 
@@ -93,6 +98,10 @@ EXEC_SENT_AFTER_ADDRESS = "SENT_AFTER_ADDRESS_FIX"
 # Повторять на любом другом коде нельзя: 200 у Bloom -- это "принято", и
 # слепой повтор способен купить второй раз.
 BUMP_SAFE_CODES = ("INVALID_REQUEST",)
+# Коды гейта, о которых владельцу сообщается отдельной строкой с пометкой:
+# это не рядовой отказ (маленькая сумма, докупка), а остановка торговли.
+ГЕЙТ_КОДЫ_ТРЕВОГИ = (ST.КОД_РУБИЛЬНИК, ST.КОД_СЧЁТЧИКИ_БИТЫ, ST.КОД_ПАУЗА_API,
+                      ST.КОД_ПАУЗА_НЕПРОДАНО, ST.КОД_ПАУЗА_429)
 BUMP_HINT = re.compile(r"min|minimum|too\s*small|мал", re.I)
 
 EXEC_LIVE_TEST_SKIP = "LIVE_TEST_SKIP_REAL_SOURCE"
@@ -221,6 +230,10 @@ class Executor:
         if not ok:
             self.refused += 1
             out.update(exec_code=EXEC_GATE, reason=why, gate_code=code)
+            # Автопауза и рубильник -- это не рядовой отказ гейта, а стоп
+            # торговли: владелец должен узнать сразу, а не из доклада утром.
+            if code in ГЕЙТ_КОДЫ_ТРЕВОГИ and NT is not None:
+                NT.Оповещатель().послать(NT.строка_тревоги(code, why))
             self.state.log_decision({"stage": "exec_gate", "mint": mint,
                                      "signature": sig, "code": code, "reason": why})
             return out
@@ -649,6 +662,46 @@ def self_test() -> int:
         r2 = ex.execute({"action": "buy", "mint": None, "signature": "S"},
                         balance_sol=5.0)
         chk("покупка без минта отвергается", r2["exec_code"] == EXEC_NOT_A_BUY)
+
+    # --- тревожные коды гейта уходят строкой, рядовые -- нет
+    import bloom_notify as NT_T  # noqa: PLC0415
+    было_вкл = os.environ.get("BLOOM_TELEGRAM_LIVE_TEST")
+    os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = "1"
+    посланное = []
+    старый_класс = NT_T.Оповещатель
+    try:
+        class ЛовушкаОповещений(старый_класс):
+            def послать(self_, текст):
+                посланное.append(текст)
+                return {"ok": True}
+
+        NT_T.Оповещатель = ЛовушкаОповещений
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            (Path(d) / "k").write_text("стоп", encoding="utf-8")
+            сессия = СессияЗаглушка([])
+            api = API.BloomApi("КЛЮЧ", dry_run=True, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            r = ex.execute(решение_buy, balance_sol=5.0)
+            chk("рубильник остановил покупку", r["exec_code"] == EXEC_GATE, r)
+            chk("и о нём ушла строка с пометкой",
+                посланное and "⚠️" in посланное[0] and "KILL_SWITCH" in посланное[0],
+                посланное)
+        посланное.clear()
+        with tempfile.TemporaryDirectory() as d:
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            сессия = СессияЗаглушка([])
+            api = API.BloomApi("КЛЮЧ", dry_run=True, state=st, session=сессия)
+            ex = Executor(state=st, api=api)
+            ex.execute(решение_buy, balance_sol=0.0001)
+            chk("про нехватку баланса тревожной строки НЕ шлём: это рядовой отказ",
+                посланное == [], посланное)
+    finally:
+        NT_T.Оповещатель = старый_класс
+        if было_вкл is None:
+            os.environ.pop("BLOOM_TELEGRAM_LIVE_TEST", None)
+        else:
+            os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = было_вкл
 
     # --- добор из журнала
     with tempfile.TemporaryDirectory() as d:

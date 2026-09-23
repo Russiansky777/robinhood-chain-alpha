@@ -44,6 +44,10 @@ on:
         description: "сколько неудачных попыток до UNSOLD (по умолчанию 2)"
         required: false
         default: "2"
+      telegram_live_test:
+        description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
+        required: false
+        default: "1"
 
 concurrency:
   group: bloom-seller-deploy
@@ -127,7 +131,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py solana_rpc_client.py; do
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
@@ -149,6 +153,7 @@ jobs:
           LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
+          TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
         run: |
           set -e
           ssh -n $SSH_OPTS root@$HOST "
@@ -165,6 +170,10 @@ jobs:
             echo "BLOOM_STATE_DIR=$STATE_DIR"
             echo "BLOOM_KILL_FILE=$ENV_DIR/KILL"
             echo "BLOOM_KILL_SELL_FILE=$ENV_DIR/KILL_SELL"
+            # Строки о событиях стенда в Telegram. Получатель -- только
+            # TELEGRAM_CHAT_ID владельца, боевые источники молчат, а сбой
+            # отправки живёт в признаке жизни и торговлю не останавливает.
+            echo "BLOOM_TELEGRAM_LIVE_TEST=$TELEGRAM_LIVE_TEST"
             echo "BLOOM_LIVE_SELL=$LIVE_SELL"
             echo "BLOOM_SELL_SLIPPAGE_PCT=40"
             echo "BLOOM_SELL_GRACE_S=15"
