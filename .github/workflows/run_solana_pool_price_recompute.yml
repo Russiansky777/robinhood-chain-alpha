@@ -49,12 +49,26 @@ jobs:
             --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
             ${{ github.event.inputs.public_only == 'yes' && '--public-only' || '' }} \
             2>&1 | tail -200
+      - name: "Сверка модели с фактом (без сети) + гейт сводной"
+        if: always()
+        run: |
+          python -u analysis/solana_pool_check.py --self-test
+          python -u analysis/solana_pool_check.py 2>&1 | tail -80
+
+      - name: "Разбор ОДНОЙ сделки до последнего счёта: 23.09 03:09"
+        if: always()
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: python -u analysis/solana_pool_check.py --audit-trade "03:09" 2>&1 | tail -120
+
       - name: "Коммит"
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/solana_pool_price_recompute.json data/helius_usage.json; do
+          for f in data/solana_pool_price_recompute.json data/solana_pool_check.json \
+                   data/solana_pool_audit_one.json data/helius_usage.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
