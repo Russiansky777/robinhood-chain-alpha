@@ -1,0 +1,60 @@
+name: "Разбор живой сделки SANTA кошелька TEST1 (-13.4%)"
+
+# Живые деньги: покупка 1.998 WSOL -> продажа 1.7307 WSOL. Надо понять,
+# откуда взялись -13.4%: движение цены между сделками, сэндвич, маршрут
+# через другой пул или комбинация.
+# Окно между покупкой и продажей читается ПОБЛОЧНО: порядок транзакций
+# внутри блока -- единственное доказательство сэндвича.
+# Только чтение цепочки.
+on:
+  workflow_dispatch:
+    inputs:
+      min_interval_s:
+        description: "интервал между RPC-вызовами"
+        required: false
+        default: "0.05"
+
+concurrency:
+  group: solana-santa-trade-autopsy
+  cancel-in-progress: false
+
+jobs:
+  autopsy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Самопроверка (без сети)"
+        run: python -u analysis/solana_santa_trade_autopsy.py --self-test
+      - name: "Разбор"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python -u analysis/solana_santa_trade_autopsy.py \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" 2>&1 | tail -200
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A data/helius_usage 2>/dev/null || true
+          [ -f data/solana_santa_trade_autopsy.json ] && git add data/solana_santa_trade_autopsy.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Разбор живой сделки SANTA [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
