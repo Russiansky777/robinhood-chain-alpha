@@ -100,6 +100,13 @@ jobs:
             cat data/bloom_seller_tail.jsonl
           fi
 
+      - name: "Диагностика сторожа: признак жизни и строки позиций"
+        run: |
+          set -e
+          python3 analysis/bloom_seller_diag.py --self-test
+          python3 analysis/bloom_seller_diag.py --state-dir /tmp/bloom_state \
+            --out data/bloom_seller_diag.json
+
       - name: "Доклад"
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
@@ -119,7 +126,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/bloom_report.txt data/bloom_report.json data/bloom_seller_tail.jsonl; do
+          for f in data/bloom_report.txt data/bloom_report.json \
+                   data/bloom_seller_tail.jsonl data/bloom_seller_diag.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
