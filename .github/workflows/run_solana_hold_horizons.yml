@@ -1,0 +1,97 @@
+name: "Горизонты удержания: что дали бы наши реальные сделки при 60с/2мин/5мин"
+
+# Только чтение цепочки. Вход НЕ симулируется -- берётся наша фактическая
+# цена покупки из учёта; симулируется только выход.
+#
+# Helius без квоты ("max usage reached"), поэтому по умолчанию публичный
+# узел. Он медленный, поэтому у прогона есть кэш и возобновление: второй
+# запуск продолжает с того места, где кончился бюджет, а не с нуля.
+on:
+  workflow_dispatch:
+    inputs:
+      time_budget_s:
+        description: "мягкий бюджет времени, секунд"
+        required: false
+        default: "18000"
+      min_interval_s:
+        description: "минимальный интервал между RPC-вызовами"
+        required: false
+        default: "0.30"
+      max_blocks:
+        description: "потолок блоков на один горизонт (130 = окно 30с + запас)"
+        required: false
+        default: "130"
+      limit:
+        description: "только N сделок (отладка, 0 = все)"
+        required: false
+        default: "0"
+      no_cache:
+        description: "'yes' -- считать всё заново, не продолжать"
+        required: false
+        default: ""
+      use_helius:
+        description: "'yes' -- ходить в Helius вместо публичного узла"
+        required: false
+        default: ""
+
+concurrency:
+  group: solana-hold-horizons
+  cancel-in-progress: false
+
+jobs:
+  horizons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Самопроверка (без сети)"
+        run: python -u analysis/solana_hold_horizons.py --self-test
+
+      - name: "Симуляция горизонтов (только чтение цепочки)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          python -u analysis/solana_hold_horizons.py \
+            --time-budget-s "${{ github.event.inputs.time_budget_s || 18000 }}" \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.30' }}" \
+            --max-blocks "${{ github.event.inputs.max_blocks || 130 }}" \
+            --limit "${{ github.event.inputs.limit || 0 }}" \
+            ${{ github.event.inputs.no_cache == 'yes' && '--no-cache' || '' }} \
+            ${{ github.event.inputs.use_helius == 'yes' && '--use-helius' || '' }} \
+            2>&1 | tail -400
+
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # ПООТДЕЛЬНОСТИ: git add с несуществующим путём падает и не
+          # добавляет НИЧЕГО, включая существующие соседние пути.
+          for f in data/solana_hold_horizons.json data/solana_hold_horizons_cache.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git pull --rebase origin claude/nifty-sagan-r0polg || true
+          git commit -m "Горизонты удержания: прогон [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            echo "push отклонён, попытка $i/5"
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          echo "не удалось запушить после 5 попыток" >&2
+          exit 1
