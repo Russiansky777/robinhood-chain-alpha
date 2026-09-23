@@ -70,7 +70,7 @@ jobs:
         run: |
           set -e
           mkdir -p /tmp/bloom_state/helius_usage
-          for f in decisions.jsonl positions.jsonl detector_status.json seller_heartbeat.json; do
+          for f in decisions.jsonl positions.jsonl detector_status.json seller_heartbeat.json seller.jsonl; do
             if ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/$f"; then
               ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/bloom_state/$f"
               echo "$f: $(wc -c < /tmp/bloom_state/$f) байт"
@@ -85,6 +85,16 @@ jobs:
             echo "учёт: $f"
           done
           ls -l /tmp/bloom_state
+
+      - name: "Журнал сторожа: последние записи как есть"
+        run: |
+          set -e
+          if [ -s /tmp/bloom_state/seller.jsonl ]; then
+            echo "--- журнал сторожа, последние 30 записей ---"
+            tail -30 /tmp/bloom_state/seller.jsonl
+          else
+            echo "журнал сторожа пуст или не скопирован"
+          fi
 
       - name: "Доклад"
         env:
