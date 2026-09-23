@@ -39,6 +39,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 from collections import deque
 from pathlib import Path
@@ -249,10 +250,65 @@ def dbot_signature(rec: dict) -> str | None:
 
 PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 
+# Квота Helius кончается ("max usage reached" в теле 429), и тогда пересчёт
+# зонда молча упирался в потолок попыток: на прогоне 23.09 он отработал 23
+# минуты без единой строки результата. Поэтому тот же запасной путь, что
+# уже сделан для учёта: после нескольких 429 подряд Helius временно
+# понижается, и запросы идут на публичный узел без отсиживания пауз.
+HELIUS_DEMOTE_AFTER_429 = 3
+HELIUS_REPROBE_S = 600.0
+_helius_429_streak = 0
+_helius_demoted_until = 0.0
+_rpc_lock = threading.Lock()
+RPC_STATS: dict = {"helius_ok": 0, "helius_429": 0, "публичный_ok": 0, "публичный_429": 0,
+                    "helius_понижен": False, "первый_ответ_429_от_helius": None}
+
+
+def _helius_url(key: str) -> str:
+    return f"https://mainnet.helius-rpc.com/?api-key={key}"
+
+
+def _pick_url(key: str) -> str:
+    """Helius, пока он не понижен; иначе публичный узел."""
+    with _rpc_lock:
+        demoted = time.monotonic() < _helius_demoted_until
+    return PUBLIC_RPC if (demoted or not key) else _helius_url(key)
+
+
+def _note_429(url: str, body: str) -> None:
+    global _helius_429_streak, _helius_demoted_until
+    with _rpc_lock:
+        if url == PUBLIC_RPC:
+            RPC_STATS["публичный_429"] += 1
+            return
+        RPC_STATS["helius_429"] += 1
+        if RPC_STATS["первый_ответ_429_от_helius"] is None:
+            RPC_STATS["первый_ответ_429_от_helius"] = (body or "")[:200]
+        _helius_429_streak += 1
+        if _helius_429_streak >= HELIUS_DEMOTE_AFTER_429 and not RPC_STATS["helius_понижен"]:
+            _helius_demoted_until = time.monotonic() + HELIUS_REPROBE_S
+            RPC_STATS["helius_понижен"] = True
+            log.warning("RPC: Helius понижен (%d ответов 429 подряд, тело %r) -- "
+                         "работаю через публичный узел", _helius_429_streak,
+                         RPC_STATS["первый_ответ_429_от_helius"])
+        elif _helius_429_streak >= HELIUS_DEMOTE_AFTER_429:
+            _helius_demoted_until = time.monotonic() + HELIUS_REPROBE_S
+
+
+def _note_ok(url: str) -> None:
+    global _helius_429_streak
+    with _rpc_lock:
+        if url == PUBLIC_RPC:
+            RPC_STATS["публичный_ok"] += 1
+        else:
+            RPC_STATS["helius_ok"] += 1
+            _helius_429_streak = 0
+
 
 def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | None:
-    url = url or f"https://mainnet.helius-rpc.com/?api-key={key}"
+    pinned = url  # явно заданный адрес (сверка у второго провайдера) не подменяем
     for attempt in range(4):
+        url = pinned or _pick_url(key)
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                   timeout=30)
@@ -261,8 +317,14 @@ def rpc(method: str, params: list, key: str, url: str | None = None) -> dict | N
             time.sleep(2 * (attempt + 1))
             continue
         if resp.status_code == 429 or 500 <= resp.status_code < 600:
+            if resp.status_code == 429:
+                _note_429(url, resp.text)
+                if url != PUBLIC_RPC and not pinned:
+                    continue  # уходим на публичный сразу, без паузы
             time.sleep(2 * (attempt + 1))
             continue
+        if resp.ok:
+            _note_ok(url)
         if not resp.ok:
             log.warning("rpc %s http=%d: %s", method, resp.status_code, _scrub_all(resp.text[:200]))
             return None
@@ -307,15 +369,19 @@ def rpc_checked(method: str, params: list, key: str,
     самопроверке это привело к вердикту "РАСХОЖДЕНИЕ" там, где на самом
     деле провайдер просто не ответил, а записанные данные были верны --
     то есть сбой был выдан за факт."""
-    url = url or f"https://mainnet.helius-rpc.com/?api-key={key}"
+    pinned = url
     last = None
     for attempt in range(4):
+        url = pinned or _pick_url(key)
         try:
             resp = requests.post(url, json={"jsonrpc": "2.0", "id": 1,
                                              "method": method, "params": params}, timeout=30)
         except Exception as exc:  # noqa: BLE001
             last = f"сеть: {type(exc).__name__}"
             time.sleep(2 * (attempt + 1))
+            continue
+        if resp.status_code == 429 and url != PUBLIC_RPC and not pinned:
+            _note_429(url, resp.text)
             continue
         if resp.status_code == 429 or 500 <= resp.status_code < 600:
             last = f"http={resp.status_code}"

@@ -43,11 +43,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from solana_crowd_scan import PUBLIC_RPC, Rpc, helius_key, now_utc, scrub  # noqa: E402
-from solana_retro_signal import SlotTrades, log  # noqa: E402
+from solana_retro_signal import SlotTrades, log, push_checkpoint  # noqa: E402
 
 TRADES_PATH = REPO_ROOT / "data" / "solana_trades_all.json"
 CHAIN_CACHE_PATH = REPO_ROOT / "data" / "chain_tx_cache.json"
 OUT_PATH = REPO_ROOT / "data" / "solana_pilot_block_autopsy.json"
+CACHE_PATH = REPO_ROOT / "data" / "solana_pilot_block_autopsy_cache.json"
+METHOD_VERSION = 1
 
 LEADER = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 TASK_NAME = "pointfarmcap"
@@ -326,6 +328,10 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=8)
     ap.add_argument("--use-helius", action="store_true",
                      help="ходить в Helius (по умолчанию нет: квота исчерпана)")
+    ap.add_argument("--checkpoint-s", type=float, default=600.0)
+    ap.add_argument("--checkpoint-push", action="store_true",
+                     help="выгружать чекпойнт в git прямо из прогона")
+    ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
 
@@ -376,23 +382,62 @@ def main() -> None:
         "отбор_выборок": note,
     }
 
+    # Возобновление и наблюдаемость. На первом прогоне не было ни того, ни
+    # другого: логи задания GitHub по идущему job'у не отдаёт, промежуточный
+    # файл лежал только на раннере, и доказать, что прогон жив, было нечем --
+    # а смерть на 300-й минуте стоила бы всей работы. Теперь каждая
+    # разобранная сделка ложится в кэш, а кэш периодически уходит в git.
+    done: dict = {}
+    if CACHE_PATH.exists() and not args.no_cache:
+        try:
+            prev = json.loads(CACHE_PATH.read_text())
+            if prev.get("версия_метода") == METHOD_VERSION:
+                done = prev.get("строки") or {}
+                log(f"возобновление: готовых сделок {len(done)}")
+        except (ValueError, OSError) as exc:
+            log(f"кэш не читается ({type(exc).__name__}) -- считаю заново")
+
+    last_cp = time.monotonic()
+
+    def save(note: str, force: bool = False) -> None:
+        nonlocal last_cp
+        CACHE_PATH.write_text(json.dumps(
+            {"версия_метода": METHOD_VERSION, "сохранено_utc": now_utc(),
+             "разобрано": len(done), "всего": len(a_rows) + len(b_rows),
+             "строки": done}, ensure_ascii=False))
+        if force or time.monotonic() - last_cp >= args.checkpoint_s:
+            last_cp = time.monotonic()
+            if args.checkpoint_push:
+                log(f"чекпойнт: {push_checkpoint([CACHE_PATH, OUT_PATH], note)}")
+
     for label, rs, key_out in (("A -- серия минусов", a_rows, "A"),
                                 ("Б -- плюсовые 19-21.09", b_rows, "Б")):
         items = []
         for r in rs:
+            sig = r["buy_signature"]
+            if sig in done:
+                items.append(done[sig])
+                continue
             if rpc.expired():
                 items.append({"mint": r["mint"], "не_удалось": "бюджет времени прогона истёк"})
                 continue
             try:
-                items.append(analyse_trade(st, r, cache, args.deep_slots))
+                item = analyse_trade(st, r, cache, args.deep_slots)
             except RuntimeError as exc:
-                items.append({"mint": r["mint"], "не_удалось": scrub(str(exc))[:200]})
-            log(f"[{key_out}] {r['mint'][:10]} разобрана; блоков всего "
-                f"fetched={st.fetched} skipped={st.skipped} failed={st.failed}")
+                item = {"mint": r["mint"], "не_удалось": scrub(str(exc))[:200]}
+            done[sig] = item
+            items.append(item)
+            log(f"[{key_out}] {r['mint'][:10]} разобрана ({len(done)}/"
+                f"{len(a_rows) + len(b_rows)}); блоков fetched={st.fetched} "
+                f"skipped={st.skipped} failed={st.failed}")
             OUT_PATH.write_text(json.dumps({**out, "промежуточно": True,
+                                             "разобрано": len(done),
+                                             "всего": len(a_rows) + len(b_rows),
                                              key_out: items}, ensure_ascii=False, indent=2))
+            save(f"{key_out}: {len(done)}/{len(a_rows) + len(b_rows)}")
         out[key_out] = items
         out[f"сводка_{key_out}"] = summarise(label, items)
+    save("финал", force=True)
 
     out["rpc"] = {"calls": rpc.calls, "retries": rpc.retries, "errors": rpc.errors,
                    "блоков_получено": st.fetched, "пропущенных_слотов": st.skipped,

@@ -53,6 +53,26 @@ def horizon_key(h: int) -> str:
 
 # ---------- выборка и вход ----------
 
+def cache_lookup(cache: dict, sig: str, wallet: str) -> dict | None:
+    """Запись о транзакции в кэше цепочки -- по ОБОИМ форматам ключа.
+
+    Кэш исторически содержит два вида ключей: старый "<подпись>" и новый
+    "<подпись>:<кошелёк>". На первом прогоне я искал только по новому и
+    получил 70 "сделок без цены входа" из 353 -- причём неравномерно по
+    задачам, что выглядело как перекос данных. Данные были на месте,
+    ошибка была в ключе. Старую запись берём только если она про ЭТОТ же
+    кошелёк: одна подпись бывает актуальна сразу для двух наших кошельков,
+    и чужой взгляд на транзакцию дал бы чужую цену.
+    """
+    v = cache.get(f"{sig}:{wallet}")
+    if v is not None:
+        return v
+    v = cache.get(sig)
+    if v is not None and v.get("_wallet") in (None, wallet):
+        return v
+    return None
+
+
 def our_entry(row: dict, cache: dict, rpc=None) -> tuple[float | None, int | None, int | None,
                                                           str | None, str | None]:
     """(цена входа SOL/токен, слот, block_time, причина отказа, откуда цена).
@@ -65,7 +85,7 @@ def our_entry(row: dict, cache: dict, rpc=None) -> tuple[float | None, int | Non
     дотягиваем с цепочки поштучно (getTransaction -- один вызов, дёшево),
     а не списываем в "не удалось".
     """
-    v = cache.get(f"{row['buy_signature']}:{row['wallet']}")
+    v = cache_lookup(cache, row["buy_signature"], row["wallet"])
     if v:
         qty = (v.get("token_deltas") or {}).get(row["mint"])
         sol_in = row.get("sol_in")
@@ -495,6 +515,14 @@ def self_test() -> None:
         c["300с_лучше_35с_шт"] == 1 and c["300с_хуже_35с_шт"] == 1, str(c))
     chk("медиана проигрыша отрицательная", c["медиана_проигрыша_pct"] == -100.0,
         str(c["медиана_проигрыша_pct"]))
+
+    C = {"sigA:W": {"m": 1}, "sigB": {"m": 2, "_wallet": "W"},
+         "sigC": {"m": 3, "_wallet": "ДРУГОЙ"}, "sigD": {"m": 4}}
+    chk("новый ключ находится", cache_lookup(C, "sigA", "W") == {"m": 1})
+    chk("старый ключ находится", cache_lookup(C, "sigB", "W")["m"] == 2)
+    chk("чужой кошелёк по старому ключу не берём", cache_lookup(C, "sigC", "W") is None)
+    chk("старая запись без _wallet берётся", cache_lookup(C, "sigD", "W")["m"] == 4)
+    chk("неизвестной подписи нет", cache_lookup(C, "sigX", "W") is None)
 
     fb = failures_by_task(
         [{"task_name": "pointfarmcap", "не_удалось": "нет в кэше"},

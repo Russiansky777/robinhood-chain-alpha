@@ -52,7 +52,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 80
     permissions:
       contents: write
     steps:
@@ -224,11 +224,29 @@ jobs:
           # процесс. Лечится перенаправлением ВНЕШНЕЙ команды в /dev/null
           # и `ssh -n` (не занимать stdin).
           #
+          # Окно ожидания -- 60 минут, а не 20: на публичном узле пересчёт
+          # идёт заметно медленнее, и прошлый прогон обрывался просто
+          # потому, что цикл кончался раньше работы.
+          POLL_N=180
+          #
           # Если пересчёт уже доведён прошлым запуском -- не начинаем
           # заново, а просто забираем результат.
           done_code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
+          # Идёт ли пересчёт ПРЯМО СЕЙЧАС с прошлого запуска. Без этой
+          # проверки каждый новый запуск начинал всё заново (rm -f
+          # reenrich.log), и работа предыдущего пропадала.
+          running=$(ssh -n $SSH_OPTS root@45.59.170.76 "pgrep -af 'solana_detect_probe.py --reenrich' | head -1" || true)
           if [ -n "$done_code" ]; then
             echo "пересчёт уже доведён прошлым запуском, код=$done_code -- забираю готовое"
+          elif [ -n "$running" ]; then
+            echo "пересчёт УЖЕ ИДЁТ с прошлого запуска, не перезапускаю: $running"
+            for i in $(seq 1 $POLL_N); do
+              code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
+              if [ -n "$code" ]; then echo "пересчёт завершён, код=$code"; break; fi
+              echo "жду пересчёт (чужой запуск)... ($i/$POLL_N)"
+              ssh -n $SSH_OPTS root@45.59.170.76 'tail -1 /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null' || true
+              sleep 20
+            done
           else
             ssh -n $SSH_OPTS root@45.59.170.76 '
               cd /home/bot/dbot_detect_probe
@@ -237,10 +255,10 @@ jobs:
               sleep 2
               echo "пересчёт запущен в фоне"
             '
-            for i in $(seq 1 60); do
+            for i in $(seq 1 $POLL_N); do
               code=$(ssh -n $SSH_OPTS root@45.59.170.76 'cat /home/bot/dbot_detect_probe/reenrich.done 2>/dev/null' || true)
               if [ -n "$code" ]; then echo "пересчёт завершён, код=$code"; break; fi
-              echo "жду пересчёт... ($i/60)"
+              echo "жду пересчёт... ($i/$POLL_N)"
               ssh -n $SSH_OPTS root@45.59.170.76 'tail -1 /home/bot/dbot_detect_probe/reenrich.log 2>/dev/null' || true
               sleep 20
             done
@@ -250,7 +268,7 @@ jobs:
           # уйдёт незаконченная картинка, и молча выдавать её за чистое
           # распределение нельзя.
           if ! ssh -n $SSH_OPTS root@45.59.170.76 'test -f /home/bot/dbot_detect_probe/reenrich.done'; then
-            echo "::warning::пересчёт НЕ завершился за 20 минут -- распределение ниже неполное"
+            echo "::warning::пересчёт НЕ завершился за 60 минут -- распределение ниже неполное"
             echo "ВНИМАНИЕ: пересчёт не завершён, распределение неполное" >> data/dbot_detect_probe_offsets.txt
           fi
 
