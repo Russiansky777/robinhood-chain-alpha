@@ -499,7 +499,7 @@ def гейты(*, сверка: dict, позиции: dict, статус: dict |
 
 def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
           записи_dbot: list | None = None, статус: dict | None = None,
-          n_таблицы: int = 15) -> dict:
+          n_таблицы: int = 15, n_стенда: int = 10) -> dict:
     строки, счёт = читать_решения(state.decisions_path, since_ts=since_ts)
     б = боевые(строки)
     с = стенд(строки)
@@ -525,6 +525,11 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "parse_groups": группы_разбора(б),
         "version_vs_parse": версии_и_разбор(строки),
         "slot_table": таблица_слотов(б, n_таблицы),
+        # Стенд идёт по тестовым источникам, и его записи в таблицу боевых
+        # не попадают. Для прохода чек-листа нужны они ЦЕЛИКОМ: ожидаемый
+        # код против фактического, путь разбора, версия, исполнение.
+        "stand_slot_table": таблица_слотов(с, n_таблицы),
+        "stand_rows": с[-n_стенда:] if n_стенда else [],
         "routes": маршруты(б),
         "our_brakes": наши_тормоза(б),
         "reconciliation": св,
@@ -581,6 +586,26 @@ def в_текст(о: dict) -> str:
                  f"{str(r.get('tx_version', '-')):8s}"
                  f"{r['action'] or '-'}/{r['code'] or '-'}")
     L.append("")
+    if о.get("stand_slot_table"):
+        L.append(f"--- стенд: решения по тестовым источникам "
+                 f"({len(о['stand_slot_table'])}) ---")
+        L.append("подпись               задача   слот источника  получено             "
+                 "решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог")
+        for r in о["stand_slot_table"]:
+            L.append(f"{(r['signature'] or ''):22s}{str(r['source_task'] or '-'):9s}"
+                     f"{str(r['source_slot'] or '-'):16s}{str(r['t_recv_utc'] or '-'):21s}"
+                     f"{str(r['decide_latency_ms'] or '-'):12s}"
+                     f"{str(r['net_slot_at_decision'] or '-'):11s}"
+                     f"{str(r['net_slot_age_s'] if r['net_slot_age_s'] is not None else '-'):11s}"
+                     f"{str(r['slot_lag'] if r['slot_lag'] is not None else '-'):12s}"
+                     f"{str(r['parsed_from'] or '-'):15s}"
+                     f"{str(r.get('tx_version', '-')):8s}"
+                     f"{r['action'] or '-'}/{r['code'] or '-'}")
+        L.append("")
+        L.append("--- стенд: записи целиком ---")
+        for r in о.get("stand_rows") or []:
+            L.append(json.dumps(r, ensure_ascii=False))
+        L.append("")
     м = о["routes"]
     L.append(f"--- маршруты наших покупок --- покупок {м['buys']}, маршрут известен "
              f"{м['route_known']}, многохоповых {м['multihop']} (доля {м['multihop_share']}), "
@@ -894,6 +919,25 @@ def self_test() -> None:
             о["reconciliation"]["known"] is False, о["reconciliation"])
         chk("текст непустой и с заголовком", "Bloom: доклад" in текст, текст[:40])
 
+        # --- записи стенда идут отдельным разделом и ЦЕЛИКОМ
+        p.write_text("\n".join([
+            json.dumps(строка(action="buy", code="BUY", test_source=True,
+                              tx_version=0, signature="СТЕНД1"), ensure_ascii=False),
+            json.dumps(строка(code="NOT_A_BUY"), ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        о2 = отчёт(state=st)
+        chk("решение стенда в свою таблицу попало",
+            len(о2["stand_slot_table"]) == 1, о2["stand_slot_table"])
+        chk("боевое решение в таблицу стенда не попало",
+            о2["stand_slot_table"][0]["signature"].startswith("СТЕНД1"),
+            о2["stand_slot_table"][0]["signature"])
+        chk("запись стенда отдана целиком",
+            о2["stand_rows"] and о2["stand_rows"][0].get("code") == "BUY",
+            о2["stand_rows"])
+        т2 = в_текст(о2)
+        chk("в тексте есть раздел стенда", "стенд: записи целиком" in т2)
+        chk("и запись стенда в тексте видна", "СТЕНД1" in т2)
+
     for имя, ок, факт in checks:
         if ок:
             прошло += 1
@@ -915,6 +959,8 @@ def main() -> int:
     p.add_argument("--tasks", default="BATCH-5,BATCH-3")
     p.add_argument("--config", default=None, help="снимок конфига задач DBot")
     p.add_argument("--rows", type=int, default=15, help="строк в таблице слотов")
+    p.add_argument("--stand-rows", type=int, default=10,
+                   help="сколько последних решений стенда печатать целиком")
     p.add_argument("--out", default=None, help="куда положить текст отчёта")
     a = p.parse_args()
     if a.self_test:
@@ -948,7 +994,7 @@ def main() -> int:
                                  конфиг)
 
     о = отчёт(state=state, since_ts=since_ts, записи_dbot=записи,
-              статус=статус, n_таблицы=a.rows)
+              статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows)
     текст = в_текст(о)
     print(текст)
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)

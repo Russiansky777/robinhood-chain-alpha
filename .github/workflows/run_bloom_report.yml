@@ -25,6 +25,10 @@ on:
         description: "какие задачи DBot сверять"
         required: false
         default: "BATCH-5,BATCH-3"
+      stand_rows:
+        description: "сколько последних решений стенда печатать целиком"
+        required: false
+        default: "10"
 
 concurrency:
   group: bloom-report
@@ -88,7 +92,7 @@ jobs:
           BLOOM_STATE_DIR: /tmp/bloom_state
         run: |
           set -e
-          ARGS="--rows ${{ inputs.rows }}"
+          ARGS="--rows ${{ inputs.rows }} --stand-rows ${{ inputs.stand_rows }}"
           if [ -n "${{ inputs.since }}" ]; then ARGS="$ARGS --since ${{ inputs.since }}"; fi
           if [ "${{ inputs.dbot }}" = "yes" ]; then
             ARGS="$ARGS --dbot --tasks ${{ inputs.tasks }} --config data/final/20260923T145755Z/konfig.json"
