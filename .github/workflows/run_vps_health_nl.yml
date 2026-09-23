@@ -173,6 +173,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f data/vps_health_nl.txt ] && git add data/vps_health_nl.txt
+          # Осколки расхода тоже в репозиторий: иначе сводка печатается на
+          # бегунке и исчезает вместе с ним, а проверить её потом нечем.
+          git add -A data/helius_usage 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "NL-хост: проверка живучести служб [automated]"
           for i in 1 2 3 4 5; do

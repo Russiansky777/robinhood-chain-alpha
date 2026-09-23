@@ -98,6 +98,8 @@ def scrub_all(text: str) -> str:
 
 _МЕТР = None
 _МЕТР_ПРОБОВАЛИ = False
+_УЧЁТ_ПИШЕТСЯ = None
+_УЧЁТ_ПОЧЕМУ = ""
 
 
 def метр_кредитов():
@@ -138,13 +140,18 @@ def rpc_call(method: str, params: list, *, timeout: int = 20) -> dict:
         if url != PUBLIC_RPC:
             м = метр_кредитов()
             if м is not None:
+                global _УЧЁТ_ПИШЕТСЯ, _УЧЁТ_ПОЧЕМУ  # noqa: PLW0603
                 try:
                     from solana_rpc_client import (  # noqa: PLC0415
                         CREDITS_BY_METHOD, CREDITS_DEFAULT)
                     м.add(CREDITS_BY_METHOD.get(method, CREDITS_DEFAULT),
                           bytes_in=len(r.content or b""))
-                except Exception:  # noqa: BLE001
-                    pass
+                    _УЧЁТ_ПИШЕТСЯ, _УЧЁТ_ПОЧЕМУ = True, ""
+                except Exception as exc:  # noqa: BLE001
+                    # Продавать учёт не мешает, но молчать он не должен:
+                    # так уже потерялся весь расход детектора.
+                    _УЧЁТ_ПИШЕТСЯ = False
+                    _УЧЁТ_ПОЧЕМУ = f"{type(exc).__name__}: {str(exc)[:160]}"
         if r.status_code != 200:
             последняя = scrub_all(f"HTTP {r.status_code}: {r.text[:200]}")
             continue
@@ -404,6 +411,8 @@ class Seller:
             "рубильник_покупок": {"путь": str(self.state.kill_path),
                                    "доступен": куп_доступен, "включён": куп_включён,
                                    "пояснение": куп_поч},
+            "учёт_кредитов_пишется": _УЧЁТ_ПИШЕТСЯ,
+            "учёт_кредитов_почему": _УЧЁТ_ПОЧЕМУ,
             "рубильник_продаж": {"путь": str(kill_sell_file()),
                                   "доступен": прод_доступен, "включён": прод_включён,
                                   "пояснение": прод_поч},

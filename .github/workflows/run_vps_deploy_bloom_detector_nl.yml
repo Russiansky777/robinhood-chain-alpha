@@ -170,6 +170,21 @@ jobs:
           ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
           echo "рубильник от имени bot: $OUT"
 
+      - name: "ГЕЙТ: каталог состояния принадлежит службе, а не root"
+        run: |
+          set -e
+          # Шаги деплоя идут от root, и всё, что они создают в каталоге
+          # состояния, остаётся root-овым -- служба от bot потом писать
+          # туда не может. Так уже потерялся весь учёт кредитов детектора:
+          # каталог helius_usage создал --check-only от root.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            chown -R bot:bot $STATE_DIR
+            find $STATE_DIR ! -user bot -print | head -5
+            sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
+            echo 'каталог состояния пишется службой'
+          "
+
       - name: "systemd-юнит с ужесточением"
         run: |
           {
