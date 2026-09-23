@@ -141,6 +141,31 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
     def addr(idx):
         return keys[idx] if isinstance(idx, int) and 0 <= idx < len(keys) else None
 
+    # Дельта токена у трейдера: настоящий пул обязан отдать примерно
+    # столько же, сколько трейдер получил. Без этой привязки в кандидаты
+    # лезут любые счета, где просто лежит минт.
+    tr_d = (post.get((trader, mint), (0.0, None))[0]
+            - pre.get((trader, mint), (0.0, None))[0]) if trader else 0.0
+
+    def годится(t0, t1, q0, q1) -> bool:
+        """Пул -- это когда РЕЗЕРВЫ ДВИГАЮТСЯ, и навстречу друг другу.
+
+        Первая версия принимала кандидата, у которого котировка не менялась
+        вовсе (1274.643358201 -> 1274.643358201 при падении токена на 12 млн):
+        это не пул, а посторонний счёт с минтом, и он давал влияние лидера
+        -67% на ровном месте.
+        """
+        dt, dq = t1 - t0, q1 - q0
+        if dt == 0 or dq == 0:
+            return False
+        if (dt > 0) == (dq > 0):
+            return False                      # обе ноги в одну сторону -- не обмен
+        if tr_d and (dt > 0) == (tr_d > 0):
+            return False                      # пул должен двигаться ПРОТИВ трейдера
+        if tr_d and abs(dt) < abs(tr_d) * 0.5:
+            return False                      # отдал заметно меньше, чем трейдер получил
+        return True
+
     owners_mint = {o for (o, m) in set(pre) | set(post) if m == mint and o != trader}
     best = None
     for o in owners_mint:
@@ -154,7 +179,7 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
             q_pre, q_post = pre.get((o, q)), post.get((o, q))
             q0 = (q_pre or (0.0, None))[0]
             q1 = (q_post or (0.0, None))[0]
-            if q0 <= 0 or q1 <= 0:
+            if q0 <= 0 or q1 <= 0 or not годится(t0, t1, q0, q1):
                 continue
             quote_vault = addr((q_post or q_pre)[1])
             cand = {"хранилище_токена": token_vault, "хранилище_котировки": quote_vault,
@@ -165,7 +190,9 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
             if best is None or abs(cand["дельта_токена"]) > abs(best["дельта_токена"]):
                 best = cand
         n0, n1 = native_balance(tx, o)
-        if n0 and n1 and n0 > 0 and n1 > 0:
+        # Нативная ветка опаснее токеновой: рента есть на любом счёте, и
+        # без проверки движения сюда попадал бы любой счёт из транзакции.
+        if n0 and n1 and n0 > 0 and n1 > 0 and годится(t0, t1, n0, n1):
             cand = {"хранилище_токена": token_vault, "хранилище_котировки": o,
                     "владелец_хранилищ": o, "котировка": "нативный SOL",
                     "вид_котировки": "нативный",
@@ -176,8 +203,8 @@ def pool_reserves(tx: dict, mint: str, trader: str) -> dict:
                 best = cand
     if best is None:
         return {"ок": False, "почему": "хранилища пула не опознаны: ни у одного владельца "
-                                        "минта нет ни котировочного счёта, ни нативного "
-                                        "остатка по обе стороны сделки"}
+                                        "минта резервы не двигаются навстречу друг другу "
+                                        "и против трейдера"}
     # Ключ пула -- ПАРА адресов хранилищ. Именно он различает пулы одной
     # программы, у которых владелец общий.
     best["ключ_пула"] = "|".join(sorted(x for x in (best["хранилище_токена"],
@@ -522,6 +549,28 @@ def self_test() -> None:
         r1["ключ_пула"] != r2["ключ_пула"], f"{r1['ключ_пула']} vs {r2['ключ_пула']}")
     chk("ключ собран из адресов хранилищ",
         r1["ключ_пула"] == "|".join(sorted(["VAULT_T1", "VAULT_Q1"])), r1["ключ_пула"])
+    # Главный отсев: котировка не двигалась -- это НЕ пул.
+    frozen = TX([B("FAKE", M, 85_923_742.68, 1), B("TRADER", M, 0, 0)],
+                 [B("FAKE", M, 73_673_515.47, 1), B("TRADER", M, 12_250_227.2, 0)],
+                 keys=[{"pubkey": "TRADER"}, {"pubkey": "FAKE"}],
+                 pre_b=[1_000_000_000, 1_274_643_358_201],
+                 post_b=[1_000_000_000, 1_274_643_358_201])
+    chk("счёт с неподвижной котировкой пулом не считается",
+        pool_reserves(frozen, M, "TRADER").get("ок") is not True,
+        str(pool_reserves(frozen, M, "TRADER"))[:140])
+    # И встречный случай: резервы двигаются навстречу -- это пул.
+    moving = TX([B("REAL", M, 1000, 1), B("REAL", WSOL, 10, 2), B("TRADER", M, 0, 0)],
+                 [B("REAL", M, 900, 1), B("REAL", WSOL, 11, 2), B("TRADER", M, 100, 0)],
+                 keys=[{"pubkey": "TRADER"}, {"pubkey": "V_T"}, {"pubkey": "V_Q"}])
+    chk("пул с встречным движением резервов принимается",
+        pool_reserves(moving, M, "TRADER").get("ок") is True)
+    # Пул отдал сильно меньше, чем трейдер получил -- посторонний счёт.
+    tiny = TX([B("REAL", M, 1000, 1), B("REAL", WSOL, 10, 2), B("TRADER", M, 0, 0)],
+               [B("REAL", M, 999, 1), B("REAL", WSOL, 11, 2), B("TRADER", M, 100, 0)],
+               keys=[{"pubkey": "TRADER"}, {"pubkey": "V_T"}, {"pubkey": "V_Q"}])
+    chk("отдал меньше половины полученного трейдером -- не пул",
+        pool_reserves(tiny, M, "TRADER").get("ок") is not True)
+
     chk("незнакомая программа не приписывается молча",
         program_label("НЕИЗВЕСТНАЯ").startswith("другое ("), program_label("НЕИЗВЕСТНАЯ"))
     chk("известная программа берётся из файла меток репозитория",
