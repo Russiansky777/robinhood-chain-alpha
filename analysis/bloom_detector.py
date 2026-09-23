@@ -1013,11 +1013,18 @@ async def слушать(детектор: Детектор, ключ: str, *, �
             детектор.признак_жизни()
             log.warning("подписка (%s) оборвалась: %s: %s", метод,
                         type(exc).__name__, str(exc)[:200])
+            # transactionSubscribe -- ОСНОВНОЙ способ: он несёт всю
+            # транзакцию (разбор без RPC, отставание 0 слотов) и приходит
+            # даже чуть раньше логов. logsSubscribe -- запасной НА ОДНУ
+            # попытку: после неё снова пробуем основной, иначе один обрыв
+            # навсегда сажал бы нас на путь, где каждый сигнал стоит слота.
             if atlas:
-                log.warning("перехожу на запасной logsSubscribe")
+                log.warning("перехожу на запасной logsSubscribe на одну попытку")
                 atlas = False
                 await asyncio.sleep(1)
                 continue
+            atlas = True
+            log.info("возвращаюсь на основной transactionSubscribe")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60.0)
 
@@ -1389,8 +1396,8 @@ def self_test() -> int:
             chk("кредитов ровно по числу вызовов",
                 день["bloom_detector"]["кредитов_за_день"] == 3,
                 день["bloom_detector"]["кредитов_за_день"])
-            chk("бюджет службе не выдуман",
-                день["bloom_detector"].get("бюджет_за_день") is None,
+            chk("бюджет службы -- тот, что назвал владелец (60 000)",
+                день["bloom_detector"].get("бюджет_за_день") == 60_000,
                 день["bloom_detector"].get("бюджет_за_день"))
             h.учесть_вебсокет(int(0.2 * 1024 * 1024))
             данные2 = json.loads(путь.read_text(encoding="utf-8"))

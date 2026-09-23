@@ -1,0 +1,68 @@
+name: "Bloom: разбор AMBIGUOUS_TX по цепи и вердикт DBot (только чтение)"
+
+# Пять сигналов от одного источника получили AMBIGUOUS_TX. Токенная
+# сторона разобралась, нативная -- нет. Скрипт проверяет по цепи, где
+# именно найден источник (accountKeys или подгруженные адреса таблицы) и
+# сходятся ли индексы pre/postBalances, а рядом ставит вердикт DBot по
+# записям follow. Правило разбора меняем только там, где DBot купил.
+# Только GET: getTransaction и follow_trades.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "адрес источника"
+        required: true
+      sigs:
+        description: "подписи через запятую"
+        required: true
+
+concurrency:
+  group: bloom-ambiguous-diag
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests websockets
+      - name: "Самопроверки (без сети)"
+        run: |
+          set -e
+          python -u analysis/bloom_detector.py --self-test
+          python -u analysis/bloom_ambiguous_diag.py --self-test
+      - name: "Диагностика"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -e
+          args=""
+          for s in $(echo "${{ inputs.sigs }}" | tr ',' ' '); do
+            args="$args --sig $s"
+          done
+          python -u analysis/bloom_ambiguous_diag.py --source "${{ inputs.source }}" \
+            --with-dbot $args
+      - name: "Коммит результата"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_ambiguous_diag.json ] && git add data/bloom_ambiguous_diag.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: разбор AMBIGUOUS_TX по цепи [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
