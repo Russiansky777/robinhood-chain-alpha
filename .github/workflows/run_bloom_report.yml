@@ -86,14 +86,18 @@ jobs:
           done
           ls -l /tmp/bloom_state
 
-      - name: "Журнал сторожа: последние записи как есть"
+      - name: "Журнал сторожа: последние записи в файл отчёта"
         run: |
           set -e
+          # В лог прогона он тоже печатается, но лог живёт недолго и его
+          # неудобно читать частями. Файл коммитится вместе с докладом.
           if [ -s /tmp/bloom_state/seller.jsonl ]; then
-            echo "--- журнал сторожа, последние 30 записей ---"
-            tail -30 /tmp/bloom_state/seller.jsonl
+            tail -60 /tmp/bloom_state/seller.jsonl > data/bloom_seller_tail.jsonl
+            echo "--- журнал сторожа, последние записи ---"
+            cat data/bloom_seller_tail.jsonl
           else
-            echo "журнал сторожа пуст или не скопирован"
+            echo "журнал сторожа пуст или не скопирован" > data/bloom_seller_tail.jsonl
+            cat data/bloom_seller_tail.jsonl
           fi
 
       - name: "Доклад"
@@ -115,7 +119,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/bloom_report.txt data/bloom_report.json; do
+          for f in data/bloom_report.txt data/bloom_report.json data/bloom_seller_tail.jsonl; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
