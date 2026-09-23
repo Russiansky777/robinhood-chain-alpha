@@ -1,0 +1,47 @@
+name: "Bloom, шаг 0: проверка ключа и кошелька (только чтение)"
+
+# До любого кода исполнителя: работает ли ключ, есть ли в списке кошелёк
+# исполнителя 4s87RRC2, какой лимит запросов. Только GET, ключ не
+# печатается нигде, тела ответов целиком в лог не идут.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: bloom-key-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Самопроверка (без сети)"
+        run: python -u analysis/bloom_key_check.py --self-test
+      - name: "Проверка ключа"
+        env:
+          BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
+        run: python -u analysis/bloom_key_check.py
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_key_check.json ] && git add data/bloom_key_check.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom шаг 0: проверка ключа и кошелька [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
