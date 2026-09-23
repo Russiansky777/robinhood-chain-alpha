@@ -89,7 +89,7 @@ jobs:
                      /home/bot/dbot_detect_probe/status.json; do
               if [ -s \"\$f\" ]; then
                 printf '%s (изменён %s):\n' \"\$f\" \"\$(date -u -r \"\$f\" +%Y-%m-%dT%H:%M:%SZ)\"
-                head -c 1200 \"\$f\"; echo
+                head -c 3000 \"\$f\"; echo
               else
                 echo \"\$f: нет или пуст\"
               fi
@@ -134,14 +134,18 @@ jobs:
           # Осколки лежат в каталоге состояния: дерево репозитория службе
           # недоступно (ProtectHome=read-only). Забираем их поимённо, чтобы
           # расход хоста попал в тот же учёт, что и расход прогонов.
-          СПИСОК=$(ssh -n $SSH_OPTS root@$HOST "ls -1 /home/bot/bloom_executor_live_data/helius_usage/*.json 2>/dev/null || true")
-          if [ -z "$СПИСОК" ]; then
+          # Имена переменных ТОЛЬКО латиницей: bash требует
+          # [a-zA-Z_][a-zA-Z0-9_]*, а "СПИСОК=..." он разбирает как попытку
+          # запустить команду с таким именем -- шаг падал молча, и bash -n
+          # этого не видел.
+          shards=$(ssh -n $SSH_OPTS root@$HOST "ls -1 /home/bot/bloom_executor_live_data/helius_usage/*.json 2>/dev/null || true")
+          if [ -z "$shards" ]; then
             echo "осколков учёта на хосте нет" | tee -a data/vps_health_nl.txt
           else
-            for f in $СПИСОК; do
-              ИМЯ=$(basename "$f")
-              ssh -n $SSH_OPTS root@$HOST "cat $f" > "data/helius_usage/$ИМЯ"
-              echo "забран $ИМЯ ($(wc -c < data/helius_usage/$ИМЯ) байт)" | tee -a data/vps_health_nl.txt
+            for f in $shards; do
+              name=$(basename "$f")
+              ssh -n $SSH_OPTS root@$HOST "cat $f" > "data/helius_usage/$name"
+              echo "забран $name ($(wc -c < "data/helius_usage/$name") байт)" | tee -a data/vps_health_nl.txt
             done
           fi
           {
@@ -151,7 +155,9 @@ jobs:
           python3 analysis/helius_usage_report.py | tee -a data/vps_health_nl.txt
 
       - name: "Хвост решений (по запросу)"
-        if: ${{ inputs.tail_decisions != '0' && inputs.tail_decisions != '' }}
+        # always(): если шаг выше упал, хвост журнала всё равно нужен --
+        # именно он отвечает на вопрос про слоты.
+        if: ${{ always() && inputs.tail_decisions != '0' && inputs.tail_decisions != '' }}
         run: |
           set -e
           {
