@@ -1,14 +1,14 @@
-=== NL-хост, живучесть служб, 2026-09-23T18:56:01Z ===
+=== NL-хост, живучесть служб, 2026-09-23T19:11:12Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:22:25 CEST
 bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:43:35 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T18:55:38Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T19:10:42Z):
 {
-  "обновлено_utc": "2026-09-23T18:55:38Z",
-  "обновлено_ts": 1790189738.6232028,
+  "обновлено_utc": "2026-09-23T19:10:42Z",
+  "обновлено_ts": 1790190642.658887,
   "живёт_с_utc": "2026-09-23T18:43:35Z",
   "режим": "dry",
   "источников": 17,
@@ -16,44 +16,44 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
   "поколение_источников": 0,
   "способ_подписки": "transactionSubscribe",
   "обрывов_подписки": 0,
-  "обработано_сигналов": 16,
+  "обработано_сигналов": 26,
   "к_покупке": 0,
   "по_кодам": {
-    "NOT_A_BUY": 5,
+    "NOT_A_BUY": 13,
     "SKIP_TARGET_INCREASE_POSITION": 2,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 4,
-    "AMBIGUOUS_TX": 5
+    "TARGET_AMOUNT_OUT_OF_RANGE": 5,
+    "AMBIGUOUS_TX": 6
   },
   "курс_источник": "geckoterminal",
-  "курс_usd_sol": 114.5449843268323,
+  "курс_usd_sol": 114.37800366918911,
   "курс_свежий": true,
   "курс_отказы": [],
   "рубильник_путь": "/etc/bloom-executor/KILL",
   "рубильник_доступен": true,
   "рубильник_включён": false,
   "рубильник_пояснение": "путь рубильника доступен на чтение",
-  "слот_сети": 449790699,
-  "слот_уведомлений": 2728,
-  "слот_возраст_с": 0.08,
+  "слот_сети": 449794113,
+  "слот_уведомлений": 6142,
+  "слот_возраст_с": 0.12,
   "баланс_sol": 0.00089088,
-  "баланс_возраст_с": 8.36,
-  "rpc_вызовов": 86,
+  "баланс_возраст_с": 7.9,
+  "rpc_вызовов": 178,
   "rpc_по_методам": {
-    "getBalance": 72,
-    "getTransaction": 14
+    "getBalance": 162,
+    "getTransaction": 16
   },
-  "кредитов_за_сессию": 94,
+  "кредитов_за_сессию": 190,
   "задержка_решения_мс": {
-    "n": 16,
-    "медиана": 0.6,
+    "n": 26,
+    "медиана": 0.4,
     "мин": 0.2,
     "макс": 459.8
   }
 }
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T18:55:55Z):
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T19:11:10Z):
 {
-  "обновлено_utc": "2026-09-23T18:55:55Z",
-  "обновлено_ts": 1790189755.4363952,
+  "обновлено_utc": "2026-09-23T19:11:10Z",
+  "обновлено_ts": 1790190670.4442139,
   "режим": "dry-run",
   "позиций_в_круге": 0,
   "проскальзывание_pct": 40.0,
@@ -72,10 +72,10 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
     "пояснение": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T18:55:57Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T19:10:57Z):
 {
-  "updated_utc": "2026-09-23T18:55:57Z",
-  "uptime_s": 26761.4,
+  "updated_utc": "2026-09-23T19:10:57Z",
+  "uptime_s": 27661.5,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -110,9 +110,9 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
     }
   ],
   "источников": 17,
-  "событий_записано": 1003,
+  "событий_записано": 1013,
   "дублей_пропущено": 9,
-  "неудачных_пропущено": 73,
+  "неудачных_пропущено": 75,
   "переподключений_tx": 3,
   "причины_разрыва_tx": {
     "ConnectionClosedError: no close frame received or sent": 3
@@ -120,9 +120,9 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
   "слепое_время_с": 3.3,
   "слепое_время_доля": 0.00012,
   "переподключений_slot": 2,
-  "slot_уведомлений": 100507,
-  "текущий_слот": 449790773,
-  "последнее_событие_utc": "2026-09-23T18:55:31Z",
+  "slot_уведомлений": 103905,
+  "текущий_слот": 449794171,
+  "последнее_событие_utc": "2026-09-23T19:08:57Z",
   "часы": {
     "checked_at_utc": "2026-09-23T18:29:56Z",
     "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Wed 2026-09-23 20:29:57 CEST\nRTCTimeUSec=Wed 2026-09-23 20:29:57 CEST",
@@ -132,53 +132,26 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 52 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 62 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: нет или пуст
-/home/bot/dbot_detect_probe/events.jsonl: 5787 строк
+/home/bot/dbot_detect_probe/events.jsonl: 5797 строк
 
 --- решения детектора по кодам ---
-всего решений: 52
+всего решений: 62
 первое: "ts_utc": "2026-09-23T18:12:29Z"
-последнее: "ts_utc": "2026-09-23T18:55:31Z"
+последнее: "ts_utc": "2026-09-23T19:08:57Z"
 по кодам:
-     26 NOT_A_BUY
-     12 TARGET_AMOUNT_OUT_OF_RANGE
-      7 AMBIGUOUS_TX
+     34 NOT_A_BUY
+     13 TARGET_AMOUNT_OUT_OF_RANGE
+      8 AMBIGUOUS_TX
       6 SKIP_TARGET_INCREASE_POSITION
       1 KILL_SWITCH
 по задачам источника:
-     27 BATCH-5
-     25 BATCH-3
+     32 BATCH-3
+     30 BATCH-5
 забран bloom_detector.json (634 байт)
 
 --- расход Helius за сегодня по всем службам ---
   bloom_detector: 1 кредитов, бюджет 60000, доля 0.0
   разбор_пилота: 7500 кредитов, бюджет 200000, доля 0.0375
   ВСЕГО за 2026-09-23: 7501 кредитов
-
---- последние 25 решений ---
-{"ts_utc": "2026-09-23T18:40:23Z", "подпись": "3Z1P8wE2vbUtkq4zvNqDmiaNS5dxNsEpCvq5SG8tkb5wb1pbzzeKYZgaSCM6jdAD9akG6LrYkvXsU2HZQnLYHgoG", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "CbmEA5UsmdW1fHV4CWngHFEGzPKf8qh5S2uN5ZaYYSTr", "слот": 449787246, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Raydium CLMM"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:41:01Z", "подпись": "4CAmdJYCnS1ffLAVfUg9jy4s5Wv92B8C3LhageB1d58Gm2dTr7ZELbAWVDnTPYQZ8HHvU8cB5Qv8y7H4ZyxTheoa", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449787390, "тип": "buy", "трата_sol_экв": 1.1962390764944415, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 136.592262, "первый_вход": true, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "отставание_слотов": -1, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 1.196 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "по курсу 114.18 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:41:29Z", "подпись": "3VQ3GmkZkCAdfLUcPVBfWZiJkPpyrKU7ginCTC1qEiNYeUjSp9UbCGAR3gxBopnPmz4qny5APxTc88bF7X8W6Nxg", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "27tNoYYhtovz1EmCQz3VufMMuDh6Nrv35QRX2vAyBNeA", "слот": 449787495, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Jupiter v6", "Raydium CPMM", "Orca Whirlpool"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:41:38Z", "подпись": "5jWKizybnvLN13xCzEuX2F5mkq6bNiLJYLRVQ3BjvKTKWB36f7FUdeRHYGELKV6vTgWpQDvYEbmzf4pZP8cSDoRL", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449787527, "тип": "buy", "трата_sol_экв": 1.0976935665027105, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 125.462024, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "отставание_слотов": -1, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 1.098 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "по курсу 114.30 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:42:26Z", "подпись": "2hQRsbuatucqqw89FRMZ3jRFjiLsvoeAHHSi9PRVNYeDDjW46soLAfp55kpVK3YL8qqB7MDs4ehadLdWgLtGMbY8", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "EgP1f5J9LDn1fuTMfrrgT5ZRMiLBitYdkmDs818BS44k", "слот": 449787709, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Raydium CLMM"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:42:28Z", "подпись": "pVavaMCHchEC2Fpq6sKMPYfitJRK5SyyMe2EMwqwZR2odXS2TZRsE299yfDnwUVc8nJiT8W3XpGN4av6iHuiPea", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "24Sv1cfUuJ6gRUjQ6wastvHdfz8xysLghWNAX2qRpump", "слот": 449787717, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": true, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "отставание_слотов": null, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:42:47Z", "подпись": "7V5Tw2GvnEtoR641ratWJvR1mzbTWzDoW2dc92bmixGE1Vs1A7NXqresFoZLSNRtcEGJDXhGHTKv7fcpyveQDbb", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449787785, "тип": "buy", "трата_sol_экв": 1.251469211986077, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 143.010695, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "отставание_слотов": -1, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 1.251 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "по курсу 114.27 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:43:10Z", "подпись": "2jvd8Gn3VhPfAW9LM9ywXnhLyRgASwGyyBi4XxqdyFw9Tgk8d8m8vee3LBGfBrkPoAruf3TLwzit48CGo3ZPbkk8", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BbjGgcuB2FpXkgVcLHptwfuEyK58ehc9KmAD5ArucvKk", "слот": 449787873, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Jupiter v6", "Raydium CLMM"], "программа_токена": null, "отставание_слотов": null, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:43:17Z", "подпись": "4XFZzmq1CHiiHJPmyVRwyCmGSaXxUFenhVaEaPxzwkTYykWvQ1KEM7zLuXWsjtqgX8jDUaqHLjJuQendLNamgW4B", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449787903, "тип": "buy", "трата_sol_экв": 1.0508595059602621, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 120.086173, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "отставание_слотов": -1, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 1.051 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "курс_пояснение": "по курсу 114.27 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:43:41Z", "подпись": "2SdbQJVFJ6srWSZEwASbpb9Fb5Fpw9ndGbwsfLyjgVtEBaLPRMEPuXy2LHW4U9RfKRgchgQdH1uBACsGYozTDkyp", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BbjGgcuB2FpXkgVcLHptwfuEyK58ehc9KmAD5ArucvKk", "слот": 449787994, "тип": "sell", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Jupiter v6", "Raydium CLMM"], "программа_токена": null, "маршрут": null, "отставание_слотов": 0, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189021.761334, "t_получено_utc": "2026-09-23T18:43:41Z", "t_решение_ts": 1790189021.761739, "задержка_решения_мс": 0.4, "слот_источника": 449787994, "слот_сети_на_решении": 449787994, "слот_возраст_на_решении_с": 0.02, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:43:49Z", "подпись": "5UNLe49GdbaMsPwrMsByFFj1nf5wMT85v9qfDgoXiweRHNhNwHbbgZUepC8a4QXooZRWtkGRS9nNVd5E8JJgqGCR", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449788022, "тип": "buy", "трата_sol_экв": 2.0956716556825055, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 240.125835, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 4, "через_промежуточный_токен": false, "все_минты_транзакции": ["BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "SKIP_TARGET_INCREASE_POSITION", "причина": "источник докупает уже имеющийся токен (skipTargetIncreasePosition=true)", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189029.293, "t_получено_utc": "2026-09-23T18:43:49Z", "t_решение_ts": 1790189029.29359, "задержка_решения_мс": 0.6, "слот_источника": 449788022, "слот_сети_на_решении": 449788022, "слот_возраст_на_решении_с": 0.049, "курс_пояснение": "по курсу 114.58 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:43:58Z", "подпись": "5zSmo5CqMwXsdDJnf7caMuPGEapYXhqMGakmicU4zGpRLTMYNe3ivDyGr3qS2Ck2EtTVwt1EJseTN93EqRryVKE8", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449788058, "тип": "buy", "трата_sol_экв": 0.07697557409064168, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 8.82, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 4, "через_промежуточный_токен": false, "все_минты_транзакции": ["BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 0.077 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189038.946784, "t_получено_utc": "2026-09-23T18:43:58Z", "t_решение_ts": 1790189038.947698, "задержка_решения_мс": 0.9, "слот_источника": 449788058, "слот_сети_на_решении": 449788058, "слот_возраст_на_решении_с": 0.093, "курс_пояснение": "по курсу 114.58 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:44:27Z", "подпись": "6ZC1TtkHVhF6aAjNJBm8mJrEpqc7ZGa5Auno9SYQdjWMcR8ouWRT62rzUUhrPqcVfXEJ1SHQiqYS5r4jc8ftfF9", "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1", "минт": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP", "слот": 449788163, "тип": "buy", "трата_sol_экв": 17.454778705360926, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 2000.0, "первый_вход": false, "программы_dex": ["Meteora DLMM"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Meteora DLMM"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 6, "через_промежуточный_токен": false, "все_минты_транзакции": ["DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "SKIP_TARGET_INCREASE_POSITION", "причина": "источник докупает уже имеющийся токен (skipTargetIncreasePosition=true)", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189067.81907, "t_получено_utc": "2026-09-23T18:44:27Z", "t_решение_ts": 1790189067.819447, "задержка_решения_мс": 0.4, "слот_источника": 449788163, "слот_сети_на_решении": 449788163, "слот_возраст_на_решении_с": 0.085, "курс_пояснение": "по курсу 114.58 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:44:47Z", "подпись": "4tx4MXrepoKYRzNMmjC8uUscFG4zVAHCQaqQuAeHr14SbjFZB8FPeA5nS9ocSiVUZ51nUGkVcsRGFTAUUNBAdXou", "источник": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y", "минт": null, "слот": 449788235, "тип": "other", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Pump.fun"], "программа_токена": null, "маршрут": null, "отставание_слотов": 0, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "ни один некотировочный минт не изменился", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189087.240149, "t_получено_utc": "2026-09-23T18:44:47Z", "t_решение_ts": 1790189087.240437, "задержка_решения_мс": 0.3, "слот_источника": 449788235, "слот_сети_на_решении": 449788235, "слот_возраст_на_решении_с": 0.192, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:45:15Z", "подпись": "2VmZEEsVQfVRg92jnAwzGRJzaite76ymukqRjtkhvntWFsE4nuGSgWXr4Xpa9RwqWbmaVLmeYzSAnsjp7LBU1mF1", "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1", "минт": null, "слот": 449788340, "тип": "other", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": [], "программа_токена": null, "маршрут": null, "отставание_слотов": 0, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "ни один некотировочный минт не изменился", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189115.281934, "t_получено_utc": "2026-09-23T18:45:15Z", "t_решение_ts": 1790189115.282231, "задержка_решения_мс": 0.3, "слот_источника": 449788340, "слот_сети_на_решении": 449788340, "слот_возраст_на_решении_с": 0.174, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:45:18Z", "подпись": "YTMAbw33Co9XjDYnXMYFUDHndkWzuUH5G5c6uScSUeBeW35NWNrMJBAVNqhfstmDRZp7cRnW8wFmVwgpzguJeyR", "источник": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1", "минт": null, "слот": 449788354, "тип": "other", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": [], "программа_токена": null, "маршрут": null, "отставание_слотов": 0, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "ни один некотировочный минт не изменился", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189118.859215, "t_получено_utc": "2026-09-23T18:45:18Z", "t_решение_ts": 1790189118.859603, "задержка_решения_мс": 0.4, "слот_источника": 449788354, "слот_сети_на_решении": 449788354, "слот_возраст_на_решении_с": 0.231, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:47:28Z", "подпись": "3VqnhbXWeyEy8AVi1JesUJX1xXrcLmz4vDNmbmQPqb9b8K53wygaGpyKTVLsTnBF3gFWqQjHpzU1zmwrgdrxY3s4", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "81CKmTfvKkPqXAo5LugkMpbLPyLNqQtz49DAq8mzpump", "слот": 449788842, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": true, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 1, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["81CKmTfvKkPqXAo5LugkMpbLPyLNqQtz49DAq8mzpump"]}, "отставание_слотов": 1, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_RPC", "t_получено_ts": 1790189247.597332, "t_получено_utc": "2026-09-23T18:47:27Z", "t_решение_ts": 1790189248.049324, "задержка_решения_мс": 452.0, "слот_источника": 449788842, "слот_сети_на_решении": 449788843, "слот_возраст_на_решении_с": 0.257, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:48:46Z", "подпись": "5MZgo2nFqbpHiu7rZi8388pNDLJBQsMDqUaWieU7Lf6JothYJv1J9LKmD9mAegQFWMWXiJVs9JekEkg2KHfTDSB2", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "81CKmTfvKkPqXAo5LugkMpbLPyLNqQtz49DAq8mzpump", "слот": 449789138, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 1, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["81CKmTfvKkPqXAo5LugkMpbLPyLNqQtz49DAq8mzpump"]}, "отставание_слотов": 1, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_RPC", "t_получено_ts": 1790189326.42188, "t_получено_utc": "2026-09-23T18:48:46Z", "t_решение_ts": 1790189326.867591, "задержка_решения_мс": 445.7, "слот_источника": 449789138, "слот_сети_на_решении": 449789139, "слот_возраст_на_решении_с": 0.255, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:48:55Z", "подпись": "KAmPdQgpi5brA9sRGKi79XiGQQwuFMfQRW8ZKe7M8QdpFpjeJHyQbVWuxDPK7rJmncLi78wrJEZuVFbeAR8ntjZ", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449789173, "тип": "buy", "трата_sol_экв": 0.03623933709222232, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 4.145241, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 4, "через_промежуточный_токен": false, "все_минты_транзакции": ["BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 0.036 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189335.645351, "t_получено_utc": "2026-09-23T18:48:55Z", "t_решение_ts": 1790189335.645975, "задержка_решения_мс": 0.6, "слот_источника": 449789173, "слот_сети_на_решении": 449789173, "слот_возраст_на_решении_с": 0.032, "курс_пояснение": "по курсу 114.39 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:51:05Z", "подпись": "2ieuh1CZZT3k3F7v7QCDM8PtC146jAjygcL9ZoDpSrzBVwBcUeAUAb1ErNKCtYMSMZz95so4RbtDEU6YNLf91WVc", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump", "слот": 449789666, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": true, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 1, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump"]}, "отставание_слотов": 2, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_RPC", "t_получено_ts": 1790189464.755758, "t_получено_utc": "2026-09-23T18:51:04Z", "t_решение_ts": 1790189465.215063, "задержка_решения_мс": 459.3, "слот_источника": 449789666, "слот_сети_на_решении": 449789668, "слот_возраст_на_решении_с": 0.019, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:52:04Z", "подпись": "BpHBVX25m3y887EZuSfYVMgFy5knHMQCJjMNJASA4K9mBmHu1XyQB2GfPj4QfKXRb96584UN2tDM9PUpV3crAhN", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449789892, "тип": "buy", "трата_sol_экв": 0.1398540735633242, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 15.9984, "первый_вход": false, "программы_dex": ["Pump AMM"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump AMM"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 0.140 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189524.706809, "t_получено_utc": "2026-09-23T18:52:04Z", "t_решение_ts": 1790189524.707411, "задержка_решения_мс": 0.6, "слот_источника": 449789892, "слот_сети_на_решении": 449789892, "слот_возраст_на_решении_с": 0.194, "курс_пояснение": "по курсу 114.39 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:52:36Z", "подпись": "2dytPjs5vdcE6htw5WQvNcUe2snp7WUEDwT3SmLB4DFi7Bg1HbxbjczfdfiqKx4fKdoEzFJs8ccKr2fBCohYhexh", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump", "слот": 449790008, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 1, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump"]}, "отставание_слотов": 1, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_RPC", "t_получено_ts": 1790189556.165197, "t_получено_utc": "2026-09-23T18:52:36Z", "t_решение_ts": 1790189556.428383, "задержка_решения_мс": 263.2, "слот_источника": 449790008, "слот_сети_на_решении": 449790009, "слот_возраст_на_решении_с": 0.157, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:53:10Z", "подпись": "3y8g7SkXG17hTpSef5fsFTR6SU687Z1pcNqaGPVEk6DVxWCVDxjiXHFa2YRgFvzYgmJz7FbzSawEDs1xR5gRfmcW", "источник": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y", "минт": null, "слот": 449790142, "тип": "other", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": null, "программы_dex": ["Pump.fun"], "программа_токена": null, "маршрут": null, "отставание_слотов": 0, "действие": "пропуск", "код": "NOT_A_BUY", "причина": "ни один некотировочный минт не изменился", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189590.746016, "t_получено_utc": "2026-09-23T18:53:10Z", "t_решение_ts": 1790189590.746246, "задержка_решения_мс": 0.2, "слот_источника": 449790142, "слот_сети_на_решении": 449790142, "слот_возраст_на_решении_с": 0.07, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-3", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:54:36Z", "подпись": "5z4dL2SKGJFKfCUBNM5CtywkSzGvFvTT2s5sGK1DUyLujQ116QPb4KX4b43EECvTF4jVaBhhjfdEiN5iMUuZnpAK", "источник": "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv", "минт": "9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump", "слот": 449790464, "тип": "ambiguous", "трата_sol_экв": null, "трата_минт": null, "трата_ui": null, "первый_вход": false, "программы_dex": ["Pump.fun"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump.fun"], "промежуточные_минты": [], "минтов_в_маршруте": 1, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["9fQH1GWsW8XbJj6waHScWebHARtp7xff7LVh9EZpump"]}, "отставание_слотов": 2, "действие": "пропуск", "код": "AMBIGUOUS_TX", "причина": "минт вырос, но ни SOL, ни стейблов не потрачено -- это не покупка за котировочный актив", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_RPC", "t_получено_ts": 1790189675.715171, "t_получено_utc": "2026-09-23T18:54:35Z", "t_решение_ts": 1790189676.174967, "задержка_решения_мс": 459.8, "слот_источника": 449790464, "слот_сети_на_решении": 449790466, "слот_возраст_на_решении_с": 0.072, "курс_пояснение": "трата не определена", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
-{"ts_utc": "2026-09-23T18:55:31Z", "подпись": "5t27NYr2UUo1peG1ypySDbqLgV42z2sNPPoPBBeqW7mXi6ZQemYEwA1fq73PX3x5pcV9DNcMUbG96aR8h28DMBKC", "источник": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn", "минт": "BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "слот": 449790673, "тип": "buy", "трата_sol_экв": 0.0252083018889763, "трата_минт": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "трата_ui": 2.884984, "первый_вход": false, "программы_dex": ["Pump AMM"], "программа_токена": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "маршрут": {"программы": ["Pump AMM"], "промежуточные_минты": [], "минтов_в_маршруте": 2, "хопов_оценка_по_минтам": 1, "вызовов_dex": 2, "через_промежуточный_токен": false, "все_минты_транзакции": ["BhhEH4T5AEbbCAhn2FhPDQnssrqKCvKZz4Mj8NGGpump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "отставание_слотов": 0, "действие": "пропуск", "код": "TARGET_AMOUNT_OUT_OF_RANGE", "причина": "вход источника 0.025 SOL-эквивалента меньше targetMinAmountUI=2.0", "фильтр": "задача DBot", "как": "transactionSubscribe", "разбор_откуда": "PARSE_VIA_MSG", "t_получено_ts": 1790189731.608387, "t_получено_utc": "2026-09-23T18:55:31Z", "t_решение_ts": 1790189731.608811, "задержка_решения_мс": 0.4, "слот_источника": 449790673, "слот_сети_на_решении": 449790673, "слот_возраст_на_решении_с": 0.017, "курс_пояснение": "по курсу 114.45 USD/SOL", "курс_источник": "geckoterminal", "задача_источника": "BATCH-5", "режим": "dry"}
