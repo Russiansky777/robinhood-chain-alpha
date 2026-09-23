@@ -1,24 +1,24 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-23T23:52:39Z",
+  "built_utc": "2026-09-23T23:55:11Z",
   "since_ts": null,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 0,
-    "v2": 181
+    "v2": 183
   },
   "decisions": {
-    "total": 181,
-    "real_sources": 168,
+    "total": 183,
+    "real_sources": 170,
     "test_source": 13,
     "by_code": {
       "TARGET_AMOUNT_OUT_OF_RANGE": 34,
-      "NOT_A_BUY": 106,
+      "NOT_A_BUY": 107,
       "TOKEN_RECEIVED_NOT_BOUGHT": 7,
       "INTERMEDIATE_ROUTE": 7,
       "AMBIGUOUS_TX": 1,
-      "SKIP_TARGET_INCREASE_POSITION": 9,
+      "SKIP_TARGET_INCREASE_POSITION": 10,
       "BUY": 1,
       "?": 3
     },
@@ -30,11 +30,11 @@
     }
   },
   "parse_groups": {
-    "total": 168,
+    "total": 170,
     "by_group": {
       "PARSE_VIA_MSG": {
         "decisions": 140,
-        "share": 0.8333,
+        "share": 0.8235,
         "to_buy": 1,
         "slot_lag": {
           "n": 140,
@@ -56,31 +56,31 @@
         }
       },
       "PARSE_VIA_RPC": {
-        "decisions": 25,
-        "share": 0.1488,
+        "decisions": 27,
+        "share": 0.1588,
         "to_buy": 0,
         "slot_lag": {
-          "n": 25,
+          "n": 27,
           "min": 1,
           "median": 1,
           "max": 2
         },
         "net_slot_minus_source": {
-          "n": 25,
+          "n": 27,
           "min": 1,
           "median": 1,
           "max": 2
         },
         "decide_latency_ms": {
-          "n": 25,
+          "n": 27,
           "min": 242.7,
-          "median": 356.2,
+          "median": 368.1,
           "max": 618.3
         }
       },
       "неизвестно": {
         "decisions": 3,
-        "share": 0.0179,
+        "share": 0.0176,
         "to_buy": 0,
         "slot_lag": null,
         "net_slot_minus_source": null,
@@ -98,17 +98,18 @@
       },
       "0": {
         "PARSE_VIA_MSG": 84,
-        "PARSE_VIA_RPC": 2
+        "PARSE_VIA_RPC": 3
       },
       "1": {
-        "PARSE_VIA_MSG": 20
+        "PARSE_VIA_MSG": 20,
+        "PARSE_VIA_RPC": 1
       },
       "legacy": {
         "PARSE_VIA_MSG": 8,
         "PARSE_VIA_RPC": 1
       }
     },
-    "verdict": "медленный путь встречается на версиях ['0', 'legacy'] -- версия не единственная причина"
+    "verdict": "медленный путь встречается на версиях ['0', '1', 'legacy'] -- версия не единственная причина"
   },
   "slot_table": [
     {
@@ -211,6 +212,78 @@
     }
   ],
   "stand_rows": [
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T22:00:16Z",
+      "signature": "2o9xkRGb9yKRpsio3DPB8D4KCypfkXifhe24Mh48QaevCj5mGYbmoDjJdQW9FVMnJ1rwcUvfNH3u8tgcUKCog4b9",
+      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+      "mint": null,
+      "slot": 449832463,
+      "kind": "other",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "ни один некотировочный минт не изменился",
+      "filter": "задача DBot",
+      "test_source": true,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "t_recv_ts": 1790200816.020688,
+      "t_recv_utc": "2026-09-23T22:00:16Z",
+      "t_decide_ts": 1790200816.021003,
+      "decide_latency_ms": 0.3,
+      "source_slot": 449832463,
+      "net_slot_at_decision": 449832463,
+      "net_slot_age_s": 0.015,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
+    },
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-23T22:01:26Z",
+      "signature": "3dhTr7tT1eqgXLDQ9NhaWgm3nreFXLqdPVorh3Mza45p9eBMjysWcgcrnaYQztZ1txrmgY4iN1TQ9GTHYD4wLXqr",
+      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+      "mint": null,
+      "slot": 449832728,
+      "kind": "other",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "ни один некотировочный минт не изменился",
+      "filter": "задача DBot",
+      "test_source": true,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "t_recv_ts": 1790200886.767406,
+      "t_recv_utc": "2026-09-23T22:01:26Z",
+      "t_decide_ts": 1790200886.767665,
+      "decide_latency_ms": 0.3,
+      "source_slot": 449832728,
+      "net_slot_at_decision": 449832728,
+      "net_slot_age_s": 0.07,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
+    },
     {
       "schema_version": 2,
       "ts_utc": "2026-09-23T22:01:32Z",
@@ -550,11 +623,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 1866,
+          "кредитов": 1887,
           "бюджет": 60000,
-          "доля": 0.0311,
+          "доля": 0.0314,
           "группа": null,
-          "потрачено_по_бюджету": 1866,
+          "потрачено_по_бюджету": 1887,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -573,7 +646,7 @@
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 2391,
+      "всего_кредитов": 2412,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
