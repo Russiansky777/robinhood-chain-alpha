@@ -552,6 +552,48 @@ def загрузить_источники(путь: Path, задачи: tuple) -
     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
 
 
+DBOT_HOST = "https://api-bot-v1.dbotx.com"
+DBOT_READ = "/automation/follow_orders"
+
+
+def источники_живьём(ключ: str, задачи: tuple, *, таймаут: float = 20.0) -> dict:
+    """Список источников прямо из DBot. ТОЛЬКО GET.
+
+    Задачи владелец правит в DBot, а не в репозитории, поэтому зашитый
+    снимок со временем разойдётся с боем -- и разойдётся молча, пропуская
+    сигналы нового источника. Снимок остаётся откатом, и в лог пишется,
+    какой из двух путей сработал.
+    """
+    if requests is None:
+        raise RuntimeError("нет requests")
+    r = requests.get(DBOT_HOST + DBOT_READ, timeout=таймаут,
+                      headers={"X-API-KEY": ключ, "Accept": "application/json"},
+                      params={"page": 0, "size": 100})
+    if not r.ok:
+        raise RuntimeError(f"DBot {DBOT_READ}: http {r.status_code}")
+    body = r.json() or {}
+    if body.get("err"):
+        raise RuntimeError(f"DBot вернул ошибку: {str(body['err'])[:200]}")
+    ист = источники_из_конфига({"res": body.get("res")}, задачи)
+    if not ист:
+        raise RuntimeError("DBot ответил, но нужных задач в ответе нет")
+    return ист
+
+
+def источники(задачи: tuple, снимок: Path) -> tuple[dict, str]:
+    """(источники, откуда). Сначала DBot, затем снимок -- и это видно."""
+    ключ = os.environ.get("DBOT_API_KEY") or ""
+    if ключ:
+        try:
+            return источники_живьём(ключ, задачи), "DBot живьём"
+        except Exception as exc:  # noqa: BLE001
+            log.warning("живой список источников не получен (%s: %s) -- беру снимок",
+                        type(exc).__name__, str(exc)[:200])
+    else:
+        log.warning("DBOT_API_KEY не задан -- беру снимок источников из репозитория")
+    return загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+
+
 # ---------------------------------------------------------------- вебсокет
 
 def ws_url(key: str, atlas: bool) -> str:
@@ -587,6 +629,49 @@ class Детектор:
         self.к_покупке = 0
         self.видели: set = set()
         self.последний_слот: int | None = None
+        self.поколение = 0
+        self.откуда_источники = "не задано"
+        self.обрывов = 0
+        self.способ: str | None = None
+        self.старт = time.time()
+        self.по_кодам: dict = {}
+
+    def статус_путь(self) -> Path:
+        return self.состояние.base / "detector_status.json"
+
+    def признак_жизни(self) -> dict:
+        st = {"обновлено_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+               "обновлено_ts": time.time(),
+               "живёт_с_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.старт)),
+               "режим": self.режим,
+               "источников": len(self.источники),
+               "источники_откуда": self.откуда_источники,
+               "поколение_источников": self.поколение,
+               "способ_подписки": self.способ,
+               "обрывов_подписки": self.обрывов,
+               "обработано_сигналов": self.обработано,
+               "к_покупке": self.к_покупке,
+               "по_кодам": dict(self.по_кодам),
+               "курс_источник": self.курс.источник,
+               "курс_свежий": self.курс.свежий()}
+        ST.atomic_write_json(self.статус_путь(), st)
+        return st
+
+    def обновить_источники(self, задачи: tuple, снимок: Path) -> bool:
+        """True, если список изменился -- тогда нужно переподписаться."""
+        новые, откуда = источники(задачи, снимок)
+        self.откуда_источники = откуда
+        if set(новые) != set(self.источники):
+            добавлены = sorted(set(новые) - set(self.источники))
+            ушли = sorted(set(self.источники) - set(новые))
+            self.источники = новые
+            self.поколение += 1
+            log.info("источники обновлены: всего %d (+%d %s, -%d %s), откуда: %s",
+                     len(новые), len(добавлены), [a[:8] for a in добавлены],
+                     len(ушли), [a[:8] for a in ушли], откуда)
+            return True
+        self.источники = новые
+        return False
 
     def обработать(self, подпись: str, слот: int | None, источник: str | None,
                     как: str, tx: dict | None = None) -> dict | None:
@@ -604,6 +689,7 @@ class Детектор:
             строка = {"подпись": подпись, "источник": источник, "слот": слот,
                        "действие": "пропуск", "код": КОД_НЕ_ДОСТАЛИ, "как": как,
                        "причина": "getTransaction не отдал транзакцию за отведённые попытки"}
+            self.по_кодам[КОД_НЕ_ДОСТАЛИ] = self.по_кодам.get(КОД_НЕ_ДОСТАЛИ, 0) + 1
             self.состояние.log_decision(строка)
             return строка
 
@@ -624,6 +710,8 @@ class Детектор:
             строка["таксируемый"] = налог.get("таксируемый")
             строка["ставка_налога_bps"] = налог.get("ставка_bps")
             self.к_покупке += 1
+        код = строка.get("код") or "?"
+        self.по_кодам[код] = self.по_кодам.get(код, 0) + 1
         self.состояние.log_decision(строка)
         return строка
 
@@ -654,7 +742,12 @@ async def слушать(детектор: Детектор, ключ: str, *, �
         if дедлайн and time.time() > дедлайн:
             return
         адреса = sorted(детектор.источники)
+        поколение = детектор.поколение
         метод = "transactionSubscribe" if atlas else "logsSubscribe"
+        if not адреса:
+            log.warning("список источников пуст -- подписываться не на что")
+            await asyncio.sleep(5)
+            continue
         try:
             async with websockets.connect(ws_url(ключ, atlas), ping_interval=20,
                                            ping_timeout=30, max_size=16 * 1024 * 1024) as ws:
@@ -668,6 +761,9 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                 async for raw in ws:
                     if дедлайн and time.time() > дедлайн:
                         return
+                    if детектор.поколение != поколение:
+                        log.info("список источников изменился -- переподписываюсь")
+                        break
                     msg = json.loads(raw)
                     if "id" in msg and ("result" in msg or "error" in msg):
                         if "error" in msg:
@@ -677,6 +773,11 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                             a = id_адреса.get(msg["id"])
                             if a and isinstance(msg.get("result"), int):
                                 подписка_адреса[msg["result"]] = a
+                        if подтверждено == 1:
+                            детектор.способ = метод
+                            log.info("РАБОТАЕТ %s (хост %s), источников %d",
+                                     метод, "atlas" if atlas else "mainnet", len(адреса))
+                            детектор.признак_жизни()
                         if подтверждено == 0 and len(отказы) >= len(адреса):
                             raise RuntimeError(f"{метод}: все подписки отклонены: "
                                                 f"{str(отказы[:1])[:200]}")
@@ -706,10 +807,15 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                         await asyncio.to_thread(детектор.обработать, sig, слот,
                                                  источник, метод, tx)
                 backoff = 1.0
+                if детектор.поколение != поколение:
+                    continue
                 raise RuntimeError(f"{метод}: сервер закрыл соединение")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
+            детектор.обрывов += 1
+            детектор.способ = None
+            детектор.признак_жизни()
             log.warning("подписка (%s) оборвалась: %s: %s", метод,
                         type(exc).__name__, str(exc)[:200])
             if atlas:
@@ -719,6 +825,36 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                 continue
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60.0)
+
+
+ПУЛЬС_S = ST.env_float("BLOOM_DETECTOR_PULSE_S", 60.0)
+ОБНОВЛЕНИЕ_ИСТОЧНИКОВ_S = ST.env_float("BLOOM_SOURCES_REFRESH_S", 900.0)
+
+
+async def биение(детектор: Детектор, стоп_через_s: float | None = None) -> None:
+    """Признак жизни пишется независимо от потока событий: тишина в
+    источниках -- это нормально, а вот тишина в файле состояния означает,
+    что служба умерла, и почасовая проверка должна это увидеть."""
+    дедлайн = (time.time() + стоп_через_s) if стоп_через_s else None
+    while True:
+        if дедлайн and time.time() > дедлайн:
+            return
+        try:
+            детектор.признак_жизни()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("признак жизни не записался: %s: %s",
+                        type(exc).__name__, str(exc)[:160])
+        await asyncio.sleep(ПУЛЬС_S)
+
+
+async def обновлятель(детектор: Детектор, задачи: tuple, снимок: Path) -> None:
+    while True:
+        await asyncio.sleep(ОБНОВЛЕНИЕ_ИСТОЧНИКОВ_S)
+        try:
+            await asyncio.to_thread(детектор.обновить_источники, задачи, снимок)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("обновление источников не удалось: %s: %s",
+                        type(exc).__name__, str(exc)[:200])
 
 
 # ------------------------------------------------------------ самопроверка
@@ -871,7 +1007,37 @@ def self_test() -> int:
     к.значение, к.когда, к.источник = 200.0, time.time(), "тест"
     chk("свежий курс отдаётся", к.получить() == 200.0, к.значение)
 
-    # 15. slot_ok
+    # 15. признак жизни, поколение источников, откат на снимок
+    with tempfile.TemporaryDirectory() as d:
+        снимок = Path(d) / "konfig.json"
+        снимок.write_text(json.dumps(конфиг, ensure_ascii=False), encoding="utf-8")
+        было = os.environ.pop("DBOT_API_KEY", None)
+        try:
+            ист, откуда = источники(("BATCH-5", "BATCH-3"), снимок)
+            chk("без ключа DBot берётся снимок", len(ист) == 2 and "снимок" in откуда, откуда)
+            st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            det = Детектор(источники=dict(ист), состояние=st, helius=Helius(key="нет"),
+                            курс=КурсSOL(), режим="dry")
+            j = det.признак_жизни()
+            chk("признак жизни записан на диск", det.статус_путь().exists())
+            chk("в признаке жизни виден режим", j["режим"] == "dry", j["режим"])
+            chk("в признаке жизни число источников", j["источников"] == 2, j["источников"])
+            снят = json.loads(det.статус_путь().read_text(encoding="utf-8"))
+            chk("файл признака жизни читается", снят["источников"] == 2, снят)
+
+            # смена списка поднимает поколение
+            det.источники = {"ОДИН": "BATCH-5"}
+            менялось = det.обновить_источники(("BATCH-5", "BATCH-3"), снимок)
+            chk("смена списка замечена", менялось is True, менялось)
+            chk("поколение выросло", det.поколение == 1, det.поколение)
+            снова = det.обновить_источники(("BATCH-5", "BATCH-3"), снимок)
+            chk("одинаковый список поколение не двигает",
+                снова is False and det.поколение == 1, (снова, det.поколение))
+        finally:
+            if было is not None:
+                os.environ["DBOT_API_KEY"] = было
+
+    # 16. slot_ok
     chk("слот 0 -- не слот", not slot_ok(0))
     chk("слот None -- не слот", not slot_ok(None))
     chk("слот 5 -- слот", slot_ok(5))
@@ -891,6 +1057,8 @@ def main() -> int:
     p.add_argument("--sig", help="разобрать одну подпись и показать решение")
     p.add_argument("--source", help="адрес источника для --sig")
     p.add_argument("--serve", action="store_true")
+    p.add_argument("--check-only", action="store_true",
+                    help="что вижу и чем считаю -- без подписки и без решений")
     p.add_argument("--config", default=str(REPO_ROOT / "data" / "final" /
                                             "20260923T145755Z" / "konfig.json"))
     p.add_argument("--tasks", default=os.environ.get("BLOOM_TASKS", "BATCH-5,BATCH-3"))
@@ -903,13 +1071,27 @@ def main() -> int:
         return self_test()
 
     задачи = tuple(x.strip() for x in a.tasks.split(",") if x.strip())
-    источники = загрузить_источники(Path(a.config), задачи)
+    ист, откуда = источники(задачи, Path(a.config))
     состояние = ST.ExecState()
     helius = Helius()
     курс = КурсSOL()
-    детектор = Детектор(источники=источники, состояние=состояние,
+    детектор = Детектор(источники=ист, состояние=состояние,
                          helius=helius, курс=курс,
                          режим=os.environ.get("BLOOM_MODE", "dry"))
+    детектор.откуда_источники = откуда
+
+    if a.check_only:
+        print(json.dumps({"источников": len(ист), "откуда": откуда,
+                           "задачи": sorted(set(ист.values())),
+                           "адреса": sorted(ист),
+                           "курс_usd_sol": курс.получить(),
+                           "курс_источник": курс.источник,
+                           "курс_отказы": курс.отказы,
+                           "слот": helius.слот(),
+                           "рубильник": состояние.kill_active(),
+                           "признак_жизни": str(детектор.статус_путь())},
+                          ensure_ascii=False, indent=2))
+        return 0
 
     if a.sig:
         источник = a.source
@@ -921,8 +1103,23 @@ def main() -> int:
         return 0
 
     if a.serve:
-        log.info("источников: %d (%s)", len(источники), ", ".join(sorted(set(источники.values()))))
-        asyncio.run(слушать(детектор, helius.key, стоп_через_s=a.seconds))
+        log.info("источников: %d (%s), откуда: %s", len(детектор.источники),
+                 ", ".join(sorted(set(детектор.источники.values()))),
+                 детектор.откуда_источники)
+        детектор.признак_жизни()
+
+        async def прогон():
+            задачи_фона = [
+                asyncio.create_task(биение(детектор, a.seconds)),
+                asyncio.create_task(обновлятель(детектор, задачи, Path(a.config))),
+                asyncio.create_task(слушать(детектор, helius.key, стоп_через_s=a.seconds)),
+            ]
+            try:
+                await задачи_фона[-1]
+            finally:
+                for t in задачи_фона[:-1]:
+                    t.cancel()
+        asyncio.run(прогон())
         log.info("обработано сигналов: %d, к покупке: %d",
                  детектор.обработано, детектор.к_покупке)
         return 0
