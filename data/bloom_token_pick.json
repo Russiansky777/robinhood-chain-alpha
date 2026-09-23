@@ -1,54 +1,447 @@
 {
   "pools": {
-    "to_sol": 97,
+    "to_sol": 78,
     "to_usdc": 10,
-    "failures": [],
+    "failures": [
+      {
+        "page": 6,
+        "why": "http 429"
+      },
+      {
+        "page": 7,
+        "why": "http 429"
+      },
+      {
+        "page": 8,
+        "why": "http 429"
+      }
+    ],
     "source": "https://api.geckoterminal.com/api/v2/networks/solana/pools"
   },
   "item3_taxed_direct_sol": [],
-  "item5_raydium_meteora_direct": [],
-  "item6_usdc_only": [
+  "item5_raydium_meteora_direct": [
     {
-      "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
-      "pool_name": "PUMP / USDC",
-      "dex": null,
-      "reserve_usd": 21818712.7455,
-      "volume_24h_usd": 6989011.6653929,
-      "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "hops": null,
-      "price_impact": null,
-      "quote_known": false,
-      "markets": []
-    },
+      "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
+      "pool_name": "Pepe / SOL",
+      "dex": "raydium",
+      "reserve_usd": 380171.8303,
+      "volume_24h_usd": 2124714.1468248,
+      "quote": "So11111111111111111111111111111111111111112",
+      "hops": 1,
+      "price_impact": 0.0012855220190056444,
+      "quote_known": true,
+      "quote_why_not": null,
+      "markets": [
+        {
+          "label": "Raydium",
+          "amm": "FCEnSxyJfRSKsz6tASUENCsfGwKgkH6YuRn1AMmyHhZn",
+          "in": "So11111111111111111111111111111111111111112",
+          "out": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B"
+        }
+      ],
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "taxed": false
+    }
+  ],
+  "item6_usdc_only": [
     {
       "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
       "pool_name": "NVDAx / USDC",
-      "dex": null,
-      "reserve_usd": 2917169.8711,
-      "volume_24h_usd": 7371593.80589087,
+      "dex": "raydium-clmm",
+      "reserve_usd": 2914955.9836,
+      "volume_24h_usd": 7386522.39658123,
       "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "hops": null,
-      "price_impact": null,
-      "quote_known": false,
-      "markets": []
+      "hops": 2,
+      "price_impact": 0.00039826584158887137,
+      "quote_known": true,
+      "markets": [
+        {
+          "label": "BisonFi",
+          "amm": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+          "in": "So11111111111111111111111111111111111111112",
+          "out": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        },
+        {
+          "label": "Whirlpool",
+          "amm": "6R4r93V5fcMzc13CL2enEepDSYcr4Qx3ptZBDwudTXCo",
+          "in": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "out": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+        }
+      ]
     },
     {
       "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
       "pool_name": "KMNO / USDC",
-      "dex": null,
-      "reserve_usd": 1856816.066,
-      "volume_24h_usd": 7484027.41414674,
+      "dex": "orca",
+      "reserve_usd": 1847022.0826,
+      "volume_24h_usd": 7490601.46818007,
       "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "hops": null,
-      "price_impact": null,
-      "quote_known": false,
-      "markets": []
+      "hops": 2,
+      "price_impact": 0.0,
+      "quote_known": true,
+      "markets": [
+        {
+          "label": "BisonFi",
+          "amm": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+          "in": "So11111111111111111111111111111111111111112",
+          "out": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        },
+        {
+          "label": "Whirlpool",
+          "amm": "3ndjN1nJVUKGrJBc1hhVpER6kWTZKHdyDrPyCJyX3CXK",
+          "in": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "out": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS"
+        }
+      ]
+    },
+    {
+      "mint": "Xsf9mBktVB9BSU5kf4nHxPq5hCBJ2j2ui3ecFGxPRGc",
+      "pool_name": "GMEx / USDC",
+      "dex": "orca",
+      "reserve_usd": 528199.5401,
+      "volume_24h_usd": 3670265.73296107,
+      "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "hops": 2,
+      "price_impact": 0.002006849026252818,
+      "quote_known": true,
+      "markets": [
+        {
+          "label": "BisonFi",
+          "amm": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+          "in": "So11111111111111111111111111111111111111112",
+          "out": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        },
+        {
+          "label": "Raydium CLMM",
+          "amm": "yrNqjGSrZmUdcSNqzEjbrEouvazH9XbpxRCiJEa8AVJ",
+          "in": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "out": "Xsf9mBktVB9BSU5kf4nHxPq5hCBJ2j2ui3ecFGxPRGc"
+        }
+      ]
     }
   ],
-  "checked": 39,
+  "checked": 36,
   "notes": [
-    "п. 3 (Token-2022 с налогом, прямой пул к SOL): кандидатов не нашлось на просмотренных страницах пулов",
-    "п. 5 (Raydium/Meteora, прямой пул к SOL): кандидатов не нашлось на просмотренных страницах пулов"
+    "п. 3 (Token-2022 с налогом, прямой пул к SOL): кандидатов не нашлось на просмотренных страницах пулов"
   ],
-  "checked_utc": "2026-09-23T21:09:04Z"
+  "quote_failed": [
+    {
+      "mint": "i8f7DYMXeYXAhvZWVZta1LfgFgDEXwvj5sPxQX5kbCc",
+      "why": "https://lite-api.jup.ag/swap/v1/quote: http 400: {\"error\":\"No routes found\",\"errorCode\":\"NO_ROUTES_FOUND\"}; https://quote-api.jup.ag/v6/quote: ConnectionError: HTTPSConnectionPool(host='quote-api.jup.ag', port=443): Max retries exceeded wit; https://api.jup.ag/swap/v1/quote: http 400: {\"error\":\"No routes found\",\"errorCode\":\"NO_ROUTES_FOUND\"}"
+    }
+  ],
+  "seen": [
+    {
+      "mint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.002035409566646745,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 4686300.3421,
+      "volume_24h_usd": 2788703.18428939
+    },
+    {
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "dex": "raydium-clmm",
+      "hops": 2,
+      "price_impact": 0.003741761772508807,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 4097540.9463,
+      "volume_24h_usd": 23589479.7684765
+    },
+    {
+      "mint": "gBiiUhaYjAj4zCGSzKJa1S23ZgB9U7w8k3epbbQpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0021313528768832322,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 3544435.0409,
+      "volume_24h_usd": 2156945.18918969
+    },
+    {
+      "mint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+      "dex": "meteora",
+      "hops": 2,
+      "price_impact": 0.00298232537565592,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 2830805.2779,
+      "volume_24h_usd": 14303872.652349
+    },
+    {
+      "mint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+      "dex": "orca",
+      "hops": 2,
+      "price_impact": 6.365364792962259e-05,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 2455980.2088,
+      "volume_24h_usd": 14726337.9358213
+    },
+    {
+      "mint": "tTthNiywcdw5KApjD7c6JfFnFW3KdgMBBKgzc14pump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.006784262104873994,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 1816615.0243,
+      "volume_24h_usd": 1291266.70918915
+    },
+    {
+      "mint": "2dfyCX3hJs6uzzXH2KPgHduDgsXCTP57mQf3E1nFpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0021379807603814998,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 1261811.6986,
+      "volume_24h_usd": 636959.925549345
+    },
+    {
+      "mint": "7hMgPAo2NLwJN7rrRs9pBKaF8otoLzfQLunjmr2hpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.002200959140682118,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 1203397.8241,
+      "volume_24h_usd": 998529.872257122
+    },
+    {
+      "mint": "EjtmF2ETLsc96oW7E59gXTLf4g1or9oVNCaVQkk1pump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0021470605109005134,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 1107827.6015,
+      "volume_24h_usd": 767209.270439211
+    },
+    {
+      "mint": "AQ4G2mk3VJQbqp1HFTzYpTZzmfvBUbpMTG4j2zxpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 960523.2654,
+      "volume_24h_usd": 154438.350660568
+    },
+    {
+      "mint": "E82puAP2v5hKejxoeNWKthYyNA2rguPcMSEbzZ4spump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0022702925166671398,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 651353.6055,
+      "volume_24h_usd": 389448.430134564
+    },
+    {
+      "mint": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.010815577803580615,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 582362.8452,
+      "volume_24h_usd": 2222559.14751443
+    },
+    {
+      "mint": "Mt35YvgRr7Skc1f1ihAztT8MfzE3C3JvS6z6qAVpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.02027098522175096,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 506376.5546,
+      "volume_24h_usd": 1967979.3634961
+    },
+    {
+      "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "dex": "orca",
+      "hops": 1,
+      "price_impact": 0.0021018751696019505,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 410796.8601,
+      "volume_24h_usd": 2656916.60029565
+    },
+    {
+      "mint": "Hs2Y4n9LNPwHeUVCutCqGY72ptTyvwxtmQqHpujAGTiK",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 1.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 386872.7613,
+      "volume_24h_usd": 84069500.1212385
+    },
+    {
+      "mint": "2xt7Yf1ynpAhT1SgH2TGTEx9wirwYRB8D5V8vwjNGbjY",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 1.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 386794.9403,
+      "volume_24h_usd": 85382440.8568006
+    },
+    {
+      "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
+      "dex": "raydium",
+      "hops": 1,
+      "price_impact": 0.0012855220190056444,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 380171.8303,
+      "volume_24h_usd": 2124714.1468248
+    },
+    {
+      "mint": "4Cy2YPPEcBQ2pmqJhqJw6iz9kTeqTCgMxcadxkiFpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0025456668056331702,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 376743.1262,
+      "volume_24h_usd": 289424.98244585
+    },
+    {
+      "mint": "MsKqgUCTYpsLdLACrG8cum6EnuQsCH76i9QSg5spump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.007232253783831597,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 325367.8916,
+      "volume_24h_usd": 276937.714624656
+    },
+    {
+      "mint": "FQpan4m9K8hTxiAcJAGqHXidF5tcEBn6DBiFNxZ9pump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0025810499045843096,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 313888.8015,
+      "volume_24h_usd": 457897.176029205
+    },
+    {
+      "mint": "4i7bMumYkqc8jnRVUEgZoKgWhxgGbH1qDH4svwnuxFoH",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 1.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 290373.079,
+      "volume_24h_usd": 70222535.6579809
+    },
+    {
+      "mint": "Bqxka4EqR1DYdHbN93ny9u4vgprVZNGr2YdJbQW1cKtK",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 1.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 285051.1188,
+      "volume_24h_usd": 52544069.8187916
+    },
+    {
+      "mint": "tZQ8QSnPVg864CZLLKQNtVuqinyzsUnWMys93Hrpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.06367468611398802,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 283713.846,
+      "volume_24h_usd": 2389690.13916818
+    },
+    {
+      "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      "dex": "pancakeswap-v3-solana",
+      "hops": 2,
+      "price_impact": 0.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 255743.03,
+      "volume_24h_usd": 4011226.97059955
+    },
+    {
+      "mint": "EMUsaS7begH1hQNNfEBpHtGuSkbZb64GgJcSe5NjcPKV",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 1.0,
+      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "fee_bps": null,
+      "reserve_usd": 164731.7767,
+      "volume_24h_usd": 2642469.01290409
+    },
+    {
+      "mint": "Hvp3bfmHHWMeC1AXLMk7gHBDQf2HNEw27Yi5MM1pump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.009898055646319142,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 110136.847,
+      "volume_24h_usd": 68372.3477245672
+    },
+    {
+      "mint": "c4AtfqMRbC9FuHtVEHDhCm453tytU9E34MXXrp6bLuf",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.02221360190394135,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 67984.1163,
+      "volume_24h_usd": 4854092.27552519
+    },
+    {
+      "mint": "CbouD8khLcz1Y1QngvRtQufUimSRKpHkvGn6y1n8pump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.011046980106562935,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 39881.3709,
+      "volume_24h_usd": 255113.615079436
+    },
+    {
+      "mint": "FDaJxBqw1fDhwPQTn8XU3bKH8sXXRe8o5kzC3CdUAv7X",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.025386635158970057,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 32687.414,
+      "volume_24h_usd": 2761689.87150877
+    },
+    {
+      "mint": "4wYd4vPhzaUQs5vqUrEJ7CPtKg1qzXHhauERuh4MiNMB",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.012360598466541396,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 26025.2681,
+      "volume_24h_usd": 3848950.37361281
+    },
+    {
+      "mint": "a7AwjN8oUUBjP9NqESsgq2fa9BWaofzGDmX5Q4Wpump",
+      "dex": "pumpswap",
+      "hops": 1,
+      "price_impact": 0.0,
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "fee_bps": null,
+      "reserve_usd": 22175.0627,
+      "volume_24h_usd": 346011.117506483
+    }
+  ],
+  "checked_utc": "2026-09-23T21:14:13Z"
 }
