@@ -81,6 +81,27 @@ jobs:
                   body = r.text[:200]
               return r.status_code, body.replace(key, "<КЛЮЧ>")
 
+          def probe_series(key: str, n: int = 12, pause: float = 1.0) -> dict:
+              """Серия одиночных getSlot с паузой в секунду.
+
+              Две точки ничего не говорят: 200 и следом 429 тем же ключом
+              можно объяснить и исчерпанными кредитами, и незавершённым
+              переключением тарифа. Серия различает: сплошные 429 -- это
+              кредиты, чередование -- что-то другое.
+              """
+              import time as _t
+              codes, bodies = [], []
+              for i in range(n):
+                  c, b = get_slot(key)
+                  codes.append(c)
+                  if c != 200 and len(bodies) < 3:
+                      bodies.append(b)
+                  if i < n - 1:
+                      _t.sleep(pause)
+              return {"кодов": codes, "успехов": sum(1 for c in codes if c == 200),
+                      "отказов_429": sum(1 for c in codes if c == 429),
+                      "примеры_ответов_не_200": bodies}
+
           secret = (os.environ.get("HELIUS_API_KEY") or "").strip()
           p = pathlib.Path("/tmp/server_key.txt")
           server = (p.read_text().strip() if p.exists() else "")
@@ -95,9 +116,15 @@ jobs:
           same = bool(secret) and secret == server
           print()
           print("ключи совпадают:" , "ДА" if same else "НЕТ")
+
+          series = probe_series(secret or server)
+          print("серия getSlot (12 вызовов, пауза 1 с):", series["кодов"])
+          print(f"успехов {series['успехов']}, отказов 429 {series['отказов_429']}")
+          for b in series["примеры_ответов_не_200"]:
+              print("  ответ не-200:", b)
           out = {"проверено_utc": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ",
                                                                __import__("time").gmtime()),
-                 "ключи_совпадают": same, "проверки": rows}
+                 "ключи_совпадают": same, "проверки": rows, "серия": series}
           pathlib.Path("data/helius_key_check.json").write_text(
               json.dumps(out, ensure_ascii=False, indent=2))
           if not same:
@@ -105,9 +132,13 @@ jobs:
                      "Перевод служб на Helius не продолжаем: один из путей бился бы "
                      "в старый ключ, и это выглядело бы как 'тариф не помог'.")
               sys.exit(2)
-          if any(r["код_ответа"] != 200 for r in rows):
-              print("::error::getSlot вернул не 200 -- узел не подтверждён.")
+          if series["успехов"] == 0:
+              print("::error::Ни один getSlot из серии не прошёл -- узел не подтверждён.")
               sys.exit(3)
+          if series["отказов_429"]:
+              print(f"::warning::В серии {series['отказов_429']} отказов 429 из "
+                     f"{len(series['кодов'])}. Ключ рабочий, но лимит ещё режет: "
+                     "перевод служб на Helius пока НЕ полный.")
           PY
 
       - name: "Коммит результата"
