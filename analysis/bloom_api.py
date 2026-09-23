@@ -41,20 +41,25 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 from pathlib import Path
 
 import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# Путь к соседним модулям добавляется ДО их импорта: иначе модуль нельзя
+# импортировать ниоткуда, кроме собственного каталога, и учёт с докладом
+# об этом узнают только в бою.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from bloom_exec_state import (  # noqa: E402
+    EXECUTOR_WALLET, FOREIGN_WALLET_W1, ExecState)
 
 HOST_EU = "https://eu.solana.bloombot.app"
 PING_PATH = "/api/v1/ping"
 WALLETS_PATH = "/api/v1/wallets"
 SWAP_PATH = "/api/v1/swap"
-
-from bloom_exec_state import (  # noqa: E402
-    EXECUTOR_WALLET, FOREIGN_WALLET_W1, ExecState)
 
 # Обязательные поля /swap по документации.
 SWAP_REQUIRED = ("address", "side", "wallets", "slippage", "priority_fee",
@@ -560,8 +565,6 @@ def self_test() -> None:
 
 
 if __name__ == "__main__":
-    import sys  # noqa: PLC0415
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
     ap = argparse.ArgumentParser()
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
