@@ -250,14 +250,38 @@ def _почему_не_сошлось(записи: list, решение: dict, 
         д = [abs((r.get("createAt") or 0) / 1000.0 - время) for r in сп
              if isinstance(r.get("createAt"), (int, float))]
         return round(min(д), 1) if д else None
+
+    def ближайшая_запись(сп):
+        """Сама ближайшая запись источника -- чтобы отличить "DBot не
+        отреагировал на эту сделку" от "мы извлекли не тот минт". Если у
+        DBot в ту же секунду есть запись по ДРУГОМУ минту, ошибка наша."""
+        пары = [(abs((r.get("createAt") or 0) / 1000.0 - время), r) for r in сп
+                if isinstance(r.get("createAt"), (int, float))]
+        if not пары:
+            return None
+        пары.sort(key=lambda x: x[0])
+        д, r = пары[0]
+        ф = r.get("follow") or {}
+        return {"delta_s": round(д, 1),
+                "dbot_mint": (((ф.get("receive") or {}).get("info") or {})
+                              .get("contract")),
+                "dbot_type": r.get("type"),
+                "dbot_code": r.get("skipReason") or "ПРОШЛО",
+                "same_second": д <= 5.0}
     вывод = ("источника нет в записях DBot" if not свои else
              "источник есть, но минта нет ни в одной его записи" if not по_минту else
              f"источник и минт есть, но ближайшая запись в "
              f"{ближайшее(по_минту)} с при окне {окно_с:.0f} с")
+    близкая = ближайшая_запись(свои)
+    if not по_минту and близкая and близкая["same_second"]:
+        вывод = (f"в те же секунды у DBot есть запись источника, но по ДРУГОМУ "
+                 f"минту ({близкая['dbot_mint']}, {близкая['dbot_type']}, "
+                 f"{близкая['dbot_code']}) -- проверить наше извлечение минта")
     return {"signature": решение.get("signature"),
             "source": решение.get("source"),
             "mint": решение.get("mint"),
             "our_code": решение.get("code"),
+            "nearest_same_source_record": близкая,
             "records_same_source": len(свои),
             "records_same_source_and_mint": len(по_минту),
             "nearest_same_source_s": ближайшее(свои),
@@ -710,12 +734,16 @@ def self_test() -> None:
         chk("причина: источника нет в записях",
             св_диаг["unmatched_diag"][0]["why"].startswith("источника нет"),
             св_диаг["unmatched_diag"][0])
+        # Минта нет ни в одной записи, и ближайшая запись источника далеко:
+        # это "DBot не отреагировал", а не наша ошибка разбора. Различие
+        # появилось после уточнения диагностики -- рядом по времени запись
+        # по другому минту означает совсем другое.
         св_диаг2 = сверка_с_dbot(
             [строка(kind="buy", action="buy", code="BUY", mint="ДРУГОЙ_МИНТ")],
-            [запись_dbot()])
+            [запись_dbot(ts=1000.0 + 600)])
         chk("причина: минта нет ни в одной записи источника",
             "минта нет" in св_диаг2["unmatched_diag"][0]["why"],
-            св_диаг2["unmatched_diag"][0])
+            св_диаг2["unmatched_diag"][0]["why"])
         св_диаг3 = сверка_с_dbot(
             [строка(kind="buy", action="buy", code="BUY")],
             [запись_dbot(ts=1000.0 + 600)])
@@ -723,6 +751,23 @@ def self_test() -> None:
             "ближайшая запись" in св_диаг3["unmatched_diag"][0]["why"]
             and св_диаг3["unmatched_diag"][0]["nearest_same_mint_s"] == 600.0,
             св_диаг3["unmatched_diag"][0])
+
+        # --- запись DBot в ту же секунду, но по другому минту: наша ошибка
+        св_другой = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", mint="НАШ_МИНТ")],
+            [запись_dbot(минт="МИНТ_DBOT", ts=1000.0 + 2)])
+        д = св_другой["unmatched_diag"][0]
+        chk("запись в те же секунды по другому минту названа нашей ошибкой",
+            "проверить наше извлечение минта" in д["why"], д["why"])
+        chk("и минт DBot назван",
+            д["nearest_same_source_record"]["dbot_mint"] == "МИНТ_DBOT", д)
+        # а запись через десять минут -- это уже не та же сделка
+        св_далеко = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", mint="НАШ_МИНТ")],
+            [запись_dbot(минт="МИНТ_DBOT", ts=1000.0 + 600)])
+        chk("далёкая запись по другому минту нашей ошибкой не объявляется",
+            "минта нет" in св_далеко["unmatched_diag"][0]["why"],
+            св_далеко["unmatched_diag"][0]["why"])
 
         # --- срез загруженных записей отличает "не нашлось" от "не загружено"
         chk("пустой список записей виден как loaded 0",
