@@ -284,6 +284,15 @@ MATCH_CLOCK_SKEW_MS = -2_000
 # тогда соединение рвёт НАШ клиент, а не сервер. 20с -- слишком жёстко.
 PING_TIMEOUT_S = 60
 
+# Котировочные активы: по ним определяется направление сделки ИСТОЧНИКА.
+# Пустая строка -- нативный SOL, DBot иногда отдаёт его именно так.
+QUOTE_MINTS = {
+    "So11111111111111111111111111111111111111112",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "",
+}
+
 # Подписи покупок, уже приписанных событию: одна покупка не может быть
 # копией двух разных транзакций источника.
 USED_DBOT_SIGS: set[str] = set()
@@ -1132,22 +1141,69 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
     # четыре записи state=fail от одного источника за две минуты. Без
     # склейки такие повторы считались бы отдельными "пропусками" и
     # раздували бы оценку. Склеиваем по (источник, минт, окно 60с).
+    # НАПРАВЛЕНИЕ СДЕЛКИ ИСТОЧНИКА, а не тип нашей записи. Владелец
+    # указал на настоящую причину перекоса: у пилота большая часть
+    # записей -- "Follow order is only pnl mode", то есть источник
+    # ПРОДАВАЛ, а мы продаём по таймеру и копировать его продажу не
+    # стали. Пары в зонде у таких записей быть не может по построению,
+    # и считать их пропусками -- значит мерить не то.
     recs: list[dict] = []
+    skipped_other_source = 0
     for tid, task in tasks.items():
         for rec in fetch_follow_trades(tid, dbot_key, max_pages=20):
-            if str(rec.get("type") or "").lower() != "buy":
-                continue
             created = rec.get("createAt")
             if not isinstance(created, (int, float)) or created < cutoff_ms:
                 continue
-            src = (rec.get("follow") or {}).get("wallet")
-            if not src or src not in sources:
+            follow = rec.get("follow") or {}
+            src = follow.get("wallet")
+            if not src:
                 continue
-            mint = (((rec.get("receive") or {}).get("info") or {}).get("contract")
-                    or ((rec.get("follow") or {}).get("receive") or {}).get("info", {}).get("contract"))
+            if src not in sources:
+                skipped_other_source += 1
+                continue
+            src_send = ((follow.get("send") or {}).get("info") or {}).get("contract") or ""
+            src_recv = ((follow.get("receive") or {}).get("info") or {}).get("contract") or ""
+            send_q, recv_q = src_send in QUOTE_MINTS, src_recv in QUOTE_MINTS
+            if send_q and not recv_q:
+                direction = "источник_купил"
+                mint = src_recv
+            elif recv_q and not send_q:
+                direction = "источник_продал"
+                mint = src_send
+            else:
+                direction = "направление_неясно"
+                mint = src_recv or src_send
             recs.append({"src": src, "mint": mint, "ts": created / 1000.0,
                          "state": str(rec.get("state") or ""),
+                         "наш_тип": str(rec.get("type") or ""),
+                         "направление": direction,
+                         "причина": str(rec.get("skipReason") or rec.get("errorMessage") or "")[:60],
                          "task": task.get("task_name") or tid})
+    # Разбивка ВСЕХ записей до фильтрации -- чтобы было видно, что из
+    # чего состоит, а не только итог.
+    def tally(key):
+        d: dict[str, int] = {}
+        for r in recs:
+            d[r[key] or "(пусто)"] = d.get(r[key] or "(пусто)", 0) + 1
+        return dict(sorted(d.items(), key=lambda kv: -kv[1]))
+
+    print()
+    print("=== СОСТАВ ЗАПИСЕЙ DBot за окно ===")
+    print(f"всего записей по нашим источникам: {len(recs)}"
+          + (f"; ещё {skipped_other_source} записей по источникам, которых нет "
+             f"в текущем списке зонда" if skipped_other_source else ""))
+    print("  по направлению сделки ИСТОЧНИКА:", json.dumps(tally("направление"), ensure_ascii=False))
+    print("  по нашему типу:                 ", json.dumps(tally("наш_тип"), ensure_ascii=False))
+    print("  по состоянию:                   ", json.dumps(tally("state"), ensure_ascii=False))
+    print("  по причине отказа (топ):        ",
+          json.dumps(dict(list(tally("причина").items())[:6]), ensure_ascii=False))
+
+    # ПРОПУСКИ СЧИТАЮТСЯ ТОЛЬКО ПО ПОКУПКАМ ИСТОЧНИКА. Продажа источника
+    # и наша продажа по таймеру пары в зонде иметь не обязаны.
+    other = [r for r in recs if r["направление"] != "источник_купил"]
+    recs = [r for r in recs if r["направление"] == "источник_купил"]
+    print(f"  для оценки пропусков берутся только покупки источника: {len(recs)} "
+          f"(отложено {len(other)})")
     recs.sort(key=lambda r: r["ts"])
     groups: dict[tuple, dict] = {}
     for r in recs:
@@ -1158,9 +1214,10 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
             g = groups.get((r["src"], r["mint"], int(r["ts"] // 60) - 1))
         if g is None:
             groups[key] = {"src": r["src"], "task": r["task"], "ts": r["ts"],
-                            "states": [r["state"]], "n": 1}
+                            "states": [r["state"]], "причины": [r["причина"]], "n": 1}
         else:
             g["states"].append(r["state"])
+            g["причины"].append(r["причина"])
             g["n"] += 1
     by_state = {}
     for r in recs:
@@ -1181,11 +1238,15 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
         else:
             missed += 1
             row["пропущено"] += 1
+            st = "done" if "done" in g["states"] else (g["states"][0] or "?")
+            row.setdefault("пропущено_по_состоянию", {})
+            row["пропущено_по_состоянию"][st] = row["пропущено_по_состоянию"].get(st, 0) + 1
             if len(missed_rows) < 15:
                 missed_rows.append({
                     "источник": g["src"], "задача": name,
                     "когда_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(g["ts"])),
-                    "состояния_попыток": g["states"][:5], "попыток": g["n"]})
+                    "состояния_попыток": g["states"][:5], "попыток": g["n"],
+                    "причины": [x for x in g["причины"] if x][:3]})
 
     print()
     print("=== ПРОПУСКИ: покупки DBot без события в зонде ===")
@@ -1203,7 +1264,9 @@ def missed_events_report(dbot_key: str, hours: int = 24, window_s: int = 120) ->
           "которые DBot не копировал, здесь не видны -- это НИЖНЯЯ граница пропусков.")
     print("  2. Повторы одной сделки склеены по (источник, минт, минута): без склейки четыре "
           "попытки state=fail подряд считались бы четырьмя пропусками.")
-    print("  3. Список источников берётся СЕЙЧАС; если за сутки он менялся, часть записей "
+    print("  3. В оценку идут ТОЛЬКО покупки источника. Продажа источника и наша продажа по "
+          "таймеру пары в зонде иметь не обязаны -- смешивать их с пропусками значит мерить не то.")
+    print("  4. Список источников берётся СЕЙЧАС; если за сутки он менялся, часть записей "
           "могла относиться к источнику, на который зонд тогда ещё не был подписан.")
 
 
