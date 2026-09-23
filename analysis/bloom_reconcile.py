@@ -44,46 +44,96 @@ OUT_PATH = REPO_ROOT / "data" / "bloom_reconcile.json"
 MIN_BALANCE_SOL = ST.env_float("BLOOM_MIN_START_BALANCE_SOL", 0.3)
 # Сколько последних подписей кошелька смотреть на чужую активность.
 FOREIGN_SCAN_LIMIT = ST.env_int("BLOOM_FOREIGN_SCAN_LIMIT", 40)
+# Окно, в котором чужая сделка блокирует старт. Кошелёк исполнителя не с
+# чистого листа: им уже торговали до нас, и вся та история по определению
+# "не наша". Вопрос владельца был про ДРУГОЕ -- выключен ли TradeWiz, то
+# есть нет ли активности СЕЙЧАС. Поэтому блокирует свежая активность, а
+# прежняя история называется отдельной строкой и старт не держит.
+FOREIGN_WINDOW_S = ST.env_float("BLOOM_FOREIGN_WINDOW_H", 24.0) * 3600.0
 
 
-def our_signatures(state: ST.ExecState) -> set:
-    """Подписи, которые мы считаем своими: всё, что писал исполнитель."""
+def _подписи_из_файла(путь: Path) -> set:
     out = set()
-    for p in state.positions().values():
-        for s in p.get("signatures") or []:
+    try:
+        текст = путь.read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for line in текст.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        for s in (r or {}).get("signatures") or []:
             if isinstance(s, str):
                 out.add(s)
     return out
 
 
+def our_signatures(state: ST.ExecState) -> set:
+    """Подписи, которые мы считаем своими: всё, что писал исполнитель.
+
+    Отложенные журналы -- тоже НАШИ записи. После откладывания текущий
+    журнал пуст, и без их чтения вся прежняя наша активность выглядела бы
+    чужой: ровно то различие, которое стенд обязан делать.
+    """
+    out = set()
+    for p in state.positions().values():
+        for s in p.get("signatures") or []:
+            if isinstance(s, str):
+                out.add(s)
+    for путь in sorted(state.base.glob(f"{state.positions_path.name}.*")):
+        out |= _подписи_из_файла(путь)
+    return out
+
+
 def foreign_activity(helius, wallet: str, ours: set, *,
                      limit: int = FOREIGN_SCAN_LIMIT,
-                     since_ts: float | None = None) -> dict:
-    """Сделки кошелька, которых нет среди наших.
+                     window_s: float = FOREIGN_WINDOW_S,
+                     now: float | None = None) -> dict:
+    """Сделки кошелька, которых нет среди наших, с разделением по времени.
 
     Ошибку RPC нельзя выдавать за отсутствие чужой активности: если узел
     не ответил, результат -- "неизвестно", и это блокирует старт так же,
-    как найденная чужая активность.
+    как найденная свежая чужая сделка.
+
+    Сделка без blockTime попадает в свежие: неизвестное время трактуется в
+    сторону осторожности, а не в сторону удобного ответа.
     """
+    now = time.time() if now is None else now
     try:
         res = helius.call("getSignaturesForAddress",
                           [wallet, {"limit": limit}])
     except Exception as exc:  # noqa: BLE001
         return {"known": False,
                 "why": f"getSignaturesForAddress не отдался: {type(exc).__name__}",
-                "foreign": [], "checked": 0}
+                "recent": [], "recent_count": None, "older_count": None,
+                "checked": 0}
     строки = res or []
-    чужие = []
+    порог = (now - window_s) if window_s else None
+    свежие, прежние = [], []
     for r in строки:
         sig = (r or {}).get("signature")
         if not sig or sig in ours:
             continue
         t = (r or {}).get("blockTime")
-        if since_ts is not None and t is not None and t < since_ts:
-            continue
-        чужие.append({"signature": sig, "blockTime": t, "err": (r or {}).get("err")})
-    return {"known": True, "checked": len(строки), "foreign": чужие,
-            "foreign_count": len(чужие)}
+        зап = {"signature": sig, "blockTime": t,
+               "utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+                       if isinstance(t, (int, float)) else None),
+               "err": (r or {}).get("err")}
+        if порог is None or not isinstance(t, (int, float)) or t >= порог:
+            свежие.append(зап)
+        else:
+            прежние.append(зап)
+    return {"known": True, "checked": len(строки),
+            "window_h": (round(window_s / 3600.0, 2) if window_s else None),
+            "recent": свежие[:20], "recent_count": len(свежие),
+            "older_count": len(прежние),
+            "newest_older_utc": (прежние[0]["utc"] if прежние else None),
+            "truncated": len(строки) >= limit,
+            "foreign_count": len(свежие) + len(прежние)}
 
 
 def mixed_journal(state: ST.ExecState) -> dict:
@@ -153,11 +203,22 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
         блокеры.append(f"рубильник не читается службой: {почему_читается}")
     if убит:
         блокеры.append(f"рубильник включён: {почему_убит}")
+    заметки = []
     if чужая.get("known") is False:
         блокеры.append(f"чужая активность НЕИЗВЕСТНА: {чужая.get('why')}")
-    elif чужая.get("foreign_count"):
-        блокеры.append(f"на кошельке {чужая['foreign_count']} сделок, которых мы "
-                       f"не делали -- мы в кошельке не одни")
+    elif чужая.get("recent_count"):
+        блокеры.append(f"на кошельке {чужая['recent_count']} сделок за последние "
+                       f"{чужая.get('window_h')} ч, которых мы не делали -- "
+                       "мы в кошельке не одни")
+    if чужая.get("older_count"):
+        заметки.append(f"у кошелька есть прежняя история: {чужая['older_count']} "
+                       f"сделок старше окна, самая свежая из них "
+                       f"{чужая.get('newest_older_utc')}. Старт не блокирует, но "
+                       "кошелёк не с чистого листа, и приписывать себе весь его "
+                       "результат нельзя")
+    if чужая.get("truncated"):
+        заметки.append(f"список подписей уперся в лимит {FOREIGN_SCAN_LIMIT}: видно "
+                       "не всю историю кошелька, только последние сделки")
     if balance_sol is None:
         блокеры.append("баланс кошелька неизвестен")
     elif balance_sol < min_balance_sol:
@@ -178,6 +239,7 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
             "kill_active": убит,
             "foreign_activity": чужая,
             "journal": журнал,
+            "notes": заметки,
             "blockers": блокеры,
             "clean": not блокеры,
             "verdict": ("сверка чистая: настоящие покупки включать можно"
@@ -268,21 +330,64 @@ def self_test() -> int:
         chk("минт открытой позиции назван", r["real_open_mints"] == ["LT"],
             r["real_open_mints"])
 
-    # чужая активность
+    # чужая активность: свежая блокирует, прежняя история -- нет
+    сейчас = time.time()
     with tempfile.TemporaryDirectory() as d:
         st = состояние(d)
         st.write_intent(client_order_id="c", mint="M", source_sig="S", source_slot=1,
                         sol_in=0.01, pool=None, program=None, taxed=None,
                         tax_bps=None, mode=ST.MODE_LIVE_TEST, sell_after_s=28.8)
         st.update_position("c", state=ST.STATE_CLOSED, signatures=["НАША"])
-        h = HeliusЗаглушка([{"signature": "НАША", "blockTime": 1},
-                            {"signature": "ЧУЖАЯ", "blockTime": 2}], баланс=0.35)
+        h = HeliusЗаглушка([{"signature": "НАША", "blockTime": int(сейчас - 60)},
+                            {"signature": "ЧУЖАЯ", "blockTime": int(сейчас - 60)}],
+                           баланс=0.35)
         r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
-        chk("чужая подпись найдена", r["foreign_activity"]["foreign_count"] == 1,
-            r["foreign_activity"])
+        chk("свежая чужая подпись найдена",
+            r["foreign_activity"]["recent_count"] == 1, r["foreign_activity"])
         chk("наша подпись чужой не считается",
-            [x["signature"] for x in r["foreign_activity"]["foreign"]] == ["ЧУЖАЯ"])
-        chk("чужая активность блокирует старт", not r["clean"], r["blockers"])
+            [x["signature"] for x in r["foreign_activity"]["recent"]] == ["ЧУЖАЯ"])
+        chk("свежая чужая активность блокирует старт", not r["clean"], r["blockers"])
+        chk("и в блокере названо окно",
+            any("за последние" in b for b in r["blockers"]), r["blockers"])
+
+    # прежняя история кошелька старт не держит, но названа вслух
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        h = HeliusЗаглушка([{"signature": "СТАРАЯ",
+                             "blockTime": int(сейчас - 53.6 * 3600)}], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("прежняя история не блокирует старт", r["clean"], r["blockers"])
+        chk("прежняя история посчитана отдельно",
+            r["foreign_activity"]["older_count"] == 1 and
+            r["foreign_activity"]["recent_count"] == 0, r["foreign_activity"])
+        chk("и о ней есть примечание",
+            any("прежняя история" in n for n in r["notes"]), r["notes"])
+        chk("время самой свежей из прежних названо",
+            r["foreign_activity"]["newest_older_utc"] is not None,
+            r["foreign_activity"])
+
+    # сделка без времени считается свежей: осторожность важнее удобства
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        h = HeliusЗаглушка([{"signature": "БЕЗ_ВРЕМЕНИ", "blockTime": None}],
+                           баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("сделка без времени блокирует старт", not r["clean"], r["blockers"])
+
+    # отложенный журнал -- это НАШИ подписи, а не чужие
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        st.write_intent(client_order_id="a", mint="M", source_sig="S", source_slot=1,
+                        sol_in=0.01, pool=None, program=None, taxed=None,
+                        tax_bps=None, mode=ST.MODE_LIVE_TEST, sell_after_s=28.8)
+        st.update_position("a", state=ST.STATE_CLOSED, signatures=["БЫЛА_НАША"])
+        archive_dry(st)
+        h = HeliusЗаглушка([{"signature": "БЫЛА_НАША",
+                             "blockTime": int(сейчас - 60)}], баланс=0.35)
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=h)
+        chk("подпись из отложенного журнала своя, а не чужая",
+            r["foreign_activity"]["recent_count"] == 0, r["foreign_activity"])
+        chk("и старт не заблокирован", r["clean"], r["blockers"])
 
     # отказ узла -- это НЕ "чужой активности нет"
     with tempfile.TemporaryDirectory() as d:
@@ -354,7 +459,28 @@ def main() -> int:
     сводка = reconcile(state, mode=mode, helius=helius)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     ST.atomic_write_json(OUT_PATH, сводка)
+    ST.atomic_write_json(state.base / "reconcile.json", сводка)
     print(json.dumps(сводка, ensure_ascii=False, indent=2))
+    # Короткая сводка идёт ПОСЛЕ полного JSON: шаг деплоя оставляет от
+    # вывода только хвост, и один раз это уже скрыло ровно те данные, по
+    # которым принималось решение.
+    ч = сводка["foreign_activity"]
+    print("--- коротко ---")
+    print(f"режим: {сводка['mode']}, вердикт: {сводка['verdict']}")
+    print(f"кошелёк {сводка['wallet']}: баланс {сводка['balance_sol']} SOL "
+          f"при пороге {сводка['min_balance_sol']}")
+    print(f"чужая активность: известно={ч.get('known')}, свежих за "
+          f"{ч.get('window_h')} ч {ч.get('recent_count')}, "
+          f"прежних {ч.get('older_count')} (самая свежая "
+          f"{ч.get('newest_older_utc')})")
+    for x in (ч.get("recent") or [])[:5]:
+        print(f"    свежая чужая: {x['signature']} {x['utc']}")
+    print(f"позиции: dry-run {сводка['dry_positions']}, "
+          f"настоящих открытых {сводка['real_open_positions']}")
+    for b in сводка["blockers"]:
+        print(f"  БЛОКЕР: {b}")
+    for n in сводка.get("notes") or []:
+        print(f"  примечание: {n}")
     return 0 if сводка["clean"] else 1
 
 
