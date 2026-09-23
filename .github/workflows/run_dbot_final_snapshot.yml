@@ -1,0 +1,78 @@
+name: "Финальный снимок фазы DBot + инвентаризация кошельков (только чтение)"
+
+# Снимок ДО любых удалений: полная конфигурация задач, все записи follow
+# за всё время, балансы девяти кошельков и инвентаризация их токен-счетов.
+# Только чтение: по DBot -- один GET на список задач и постраничный GET
+# follow; по цепи -- балансы и счета. Ни продаж, ни переводов, ни правок
+# задач.
+on:
+  workflow_dispatch:
+    inputs:
+      min_interval_s:
+        description: "интервал между RPC-вызовами"
+        required: false
+        default: "0.05"
+      price_positions:
+        description: "сколько позиций оценивать по последней сделке (0 -- не оценивать)"
+        required: false
+        default: "250"
+
+concurrency:
+  group: dbot-final-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Зависимости
+        run: pip install -q requests
+      - name: "Самопроверки (без сети)"
+        run: |
+          python -u analysis/solana_wallet_inventory.py --self-test
+          python -u analysis/dbot_final_snapshot.py --self-test
+          python -u analysis/dbot_task_config_readonly.py --self-test
+      - name: "Инвентаризация кошельков по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python -u analysis/solana_wallet_inventory.py \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
+            --price-positions "${{ github.event.inputs.price_positions || '250' }}" \
+            2>&1 | tail -60
+      - name: "Финальный снимок DBot"
+        if: always()
+        env:
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python -u analysis/dbot_final_snapshot.py \
+            --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
+            2>&1 | tail -60
+      - name: "Коммит"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A data/final 2>/dev/null || true
+          git add -A data/helius_usage 2>/dev/null || true
+          [ -f data/solana_wallet_inventory.json ] && git add data/solana_wallet_inventory.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Финальный снимок фазы DBot и инвентаризация кошельков [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
