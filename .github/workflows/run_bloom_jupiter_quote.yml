@@ -1,0 +1,53 @@
+name: "Bloom: котировка Jupiter Ultra и проверка пола (без подписи)"
+
+# Только запрос ордера и проверка правила 4. НИЧЕГО не подписывается и не
+# отправляется: ключа кошелька в этом прогоне нет вообще, а /order сам по
+# себе обязательств не создаёт. Нужен, чтобы увидеть на живом API, что
+# slippageBps принимается, а otherAmountThreshold приходит -- и какой выход
+# дают по конкретному минту.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "минт токена"
+        required: true
+      amount_raw:
+        description: "остаток в сырых единицах"
+        required: true
+      taker:
+        description: "кошелёк (пусто -- кошелёк исполнителя)"
+        required: false
+        default: ""
+      entry_sol:
+        description: "вход позиции в SOL (для правила 30 %)"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-jupiter-quote
+  cancel-in-progress: false
+
+jobs:
+  quote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО обращения к API"
+        run: |
+          set -e
+          python3 analysis/bloom_jupiter_sell.py --self-test
+
+      - name: "Ордер и проверка пола"
+        run: |
+          set -e
+          pip install -q requests
+          TAKER="${{ inputs.taker }}"
+          if [ -z "$TAKER" ]; then TAKER=4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N; fi
+          ARGS="--quote-only ${{ inputs.mint }} ${{ inputs.amount_raw }} $TAKER"
+          if [ -n "${{ inputs.entry_sol }}" ]; then ARGS="$ARGS --entry-sol ${{ inputs.entry_sol }}"; fi
+          echo "аргументы: $ARGS"
+          python3 analysis/bloom_jupiter_sell.py $ARGS
