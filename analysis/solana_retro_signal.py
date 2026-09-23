@@ -849,6 +849,18 @@ def per_wallet(rows: list[dict], meta: dict[str, dict], min_leg_sol: float = MIN
         row["n_entry_market"] = sum(1 for x in srcs if x == "market")
         row["n_entry_leader_price"] = sum(1 for x in srcs if x == "leader_price")
         row["доля_leader_price"] = round(row["n_entry_leader_price"] / len(srcs), 4) if srcs else None
+        # Медиана E2 ТОЛЬКО по рыночным входам. Откат на цену лидера берёт
+        # цену самой сделки лидера -- вход без проскальзывания и без чужой
+        # очереди, поэтому он систематически завышает результат (по всему
+        # прогону: +3.24% на откате против -0.31% на рынке). Отбирать
+        # источники по смешанной медиане значит отбирать по доле отката.
+        e2_market = [r["sim_E2"] for r in rs
+                      if r.get("sim_E2") is not None
+                      and ((r.get("scenarios") or {}).get("E2", {}) or {}).get("entry_src") == "market"]
+        row["n_E2_рыночных"] = len(e2_market)
+        row["median_E2_рыночная"] = round(statistics.median(e2_market), 4) if e2_market else None
+        row["доля_в_плюс_E2_рыночная"] = (round(sum(1 for x in e2_market if x > 0) / len(e2_market), 4)
+                                            if e2_market else None)
         # Фактическая задержка выхода -- после расширения окна это уже не
         # константа 33-37с, и её надо видеть по кошельку.
         dl = [r["exit_delay_s"] for r in rs if r.get("exit_delay_s") is not None]
@@ -973,36 +985,58 @@ def truncation_report(rows: list[dict], budget_exhausted: bool) -> dict:
     }
 
 
-def passing_candidates(wallets: list[dict], min_e2: float = 5.0, min_n: int = 4,
-                        min_crowd: float = 3.0, min_share_pos: float = 0.5) -> dict:
-    """Фильтр владельца: ретро E2 >= +5%, n >= 4, толпа >= 3, больше
-    половины симуляций в плюс. Строго "больше половины" -- ровно 0.5 не
-    проходит, иначе это "не меньше половины".
+def passing_candidates(wallets: list[dict], min_e2_market: float = 5.0, min_n: int = 4,
+                        min_crowd: float = 3.0, min_share_pos: float = 0.5,
+                        max_leader_price: float = 0.30) -> dict:
+    """Фильтр владельца (уточнён 23.09): медиана E2 ТОЛЬКО по рыночным
+    входам >= +5%, доля leader_price <= 30%, n >= 4, толпа >= 3, больше
+    половины симуляций в плюс.
+
+    Почему по рыночным: откат на цену лидера берёт цену самой сделки
+    лидера, то есть вход без проскальзывания и без чужой очереди, и
+    систематически завышает результат. Смешанная медиана отбирала бы
+    источники по доле отката, а не по силе сигнала.
+
+    Строго "больше половины" -- ровно 0.5 не проходит, иначе это "не
+    меньше половины". Доля leader_price -- "не больше 30%", 0.30 проходит.
+
+    Кошелёк, у которого нет НИ ОДНОГО рыночного входа, фильтр не
+    проходит: подтверждать его нечем. Это не отказ в пользу отрицательного
+    ответа, а отсутствие доказательства -- и так и помечается отдельно.
 
     Отдельно возвращается, сколько кошельков отсеял КАЖДЫЙ критерий по
     отдельности: иначе нельзя понять, узок ли фильтр или данных мало."""
     cand = [w for w in wallets if w.get("status") == "кандидат"]
     def ok_e2(w):
-        return w.get("median_E2") is not None and w["median_E2"] >= min_e2
+        return w.get("median_E2_рыночная") is not None and w["median_E2_рыночная"] >= min_e2_market
     def ok_n(w):
         return (w.get("n_sim") or 0) >= min_n
     def ok_crowd(w):
         return w.get("crowd_2") is not None and w["crowd_2"] >= min_crowd
     def ok_pos(w):
         return w.get("доля_в_плюс_E2") is not None and w["доля_в_плюс_E2"] > min_share_pos
-    passed = [w for w in cand if ok_e2(w) and ok_n(w) and ok_crowd(w) and ok_pos(w)]
-    passed.sort(key=lambda w: -(w.get("median_E2") or 0))
+    def ok_lp(w):
+        return w.get("доля_leader_price") is not None and w["доля_leader_price"] <= max_leader_price
+    passed = [w for w in cand if ok_e2(w) and ok_n(w) and ok_crowd(w) and ok_pos(w) and ok_lp(w)]
+    passed.sort(key=lambda w: -(w.get("median_E2_рыночная") or 0))
     return {
-        "порог": {"median_E2_не_меньше": min_e2, "n_sim_не_меньше": min_n,
-                   "crowd_2_не_меньше": min_crowd, "доля_в_плюс_строго_больше": min_share_pos},
+        "порог": {"median_E2_рыночная_не_меньше": min_e2_market, "n_sim_не_меньше": min_n,
+                   "crowd_2_не_меньше": min_crowd, "доля_в_плюс_строго_больше": min_share_pos,
+                   "доля_leader_price_не_больше": max_leader_price},
         "кандидатов_всего": len(cand),
+        "кандидатов_без_единого_рыночного_входа": sum(
+            1 for w in cand if not (w.get("n_E2_рыночных") or 0)),
         "отсев_по_каждому_критерию_поодиночке": {
-            "не_прошли_E2": sum(1 for w in cand if not ok_e2(w)),
+            "не_прошли_E2_рыночную": sum(1 for w in cand if not ok_e2(w)),
             "не_прошли_n": sum(1 for w in cand if not ok_n(w)),
             "не_прошли_толпу": sum(1 for w in cand if not ok_crowd(w)),
-            "не_прошли_долю_в_плюс": sum(1 for w in cand if not ok_pos(w))},
+            "не_прошли_долю_в_плюс": sum(1 for w in cand if not ok_pos(w)),
+            "не_прошли_долю_leader_price": sum(1 for w in cand if not ok_lp(w))},
         "прошли": [{"address": w["address"], "name": w.get("name"), "crowd_2": w.get("crowd_2"),
-                     "n_sim": w.get("n_sim"), "median_E2": w.get("median_E2"),
+                     "n_sim": w.get("n_sim"),
+                     "median_E2_рыночная": w.get("median_E2_рыночная"),
+                     "n_E2_рыночных": w.get("n_E2_рыночных"),
+                     "median_E2": w.get("median_E2"),
                      "доля_в_плюс_E2": w.get("доля_в_плюс_E2"),
                      "доля_leader_price": w.get("доля_leader_price"),
                      "медиана_задержки_выхода_с": w.get("медиана_задержки_выхода_с"),
@@ -1105,11 +1139,14 @@ def self_test_method() -> None:
 
     pc = passing_candidates([
         {"status": "кандидат", "address": "A", "median_E2": 6.0, "n_sim": 5,
-         "crowd_2": 4, "доля_в_плюс_E2": 0.6},
+         "crowd_2": 4, "доля_в_плюс_E2": 0.6, "median_E2_рыночная": 6.0,
+         "n_E2_рыночных": 5, "доля_leader_price": 0.0},
         {"status": "кандидат", "address": "B", "median_E2": 6.0, "n_sim": 5,
-         "crowd_2": 4, "доля_в_плюс_E2": 0.5},
+         "crowd_2": 4, "доля_в_плюс_E2": 0.5, "median_E2_рыночная": 6.0,
+         "n_E2_рыночных": 5, "доля_leader_price": 0.0},
         {"status": "в задаче", "address": "C", "median_E2": 99.0, "n_sim": 9,
-         "crowd_2": 9, "доля_в_плюс_E2": 1.0},
+         "crowd_2": 9, "доля_в_плюс_E2": 1.0, "median_E2_рыночная": 99.0,
+         "n_E2_рыночных": 9, "доля_leader_price": 0.0},
     ])
     chk("фильтр пропускает подходящего кандидата",
         [x["address"] for x in pc["прошли"]] == ["A"], str(pc["прошли"]))
@@ -1169,6 +1206,40 @@ def self_test_method() -> None:
     chk("None в записанном не сверяется", (c3, m3) == (0, 0), f"{c3}/{m3}")
     c4, m4, p4 = compare_prices(rec_s, {"helius": {}, "публичный_узел": dict(rec_s)})
     chk("односторонняя сверка видна по разбивке", p4 == {"публичный_узел": 4} and c4 == 4, str(p4))
+    # Фильтр кандидатов: отбор идёт по РЫНОЧНОЙ медиане, не по смешанной.
+    W_BASE = {"status": "кандидат", "n_sim": 5, "crowd_2": 5.0, "доля_в_плюс_E2": 0.8,
+              "доля_leader_price": 0.0, "median_E2": 20.0,
+              "median_E2_рыночная": 9.0, "n_E2_рыночных": 5, "address": "A"}
+    def W(**kw):
+        w = dict(W_BASE); w.update(kw); return w
+    r = passing_candidates([W()])
+    chk("чистый рыночный кандидат проходит", len(r["прошли"]) == 1, str(len(r["прошли"])))
+    r = passing_candidates([W(median_E2=30.0, median_E2_рыночная=1.0)])
+    chk("высокая смешанная медиана не спасает при слабой рыночной",
+        len(r["прошли"]) == 0, str(r["прошли"]))
+    r = passing_candidates([W(доля_leader_price=0.30)])
+    chk("ровно 30% отката проходит", len(r["прошли"]) == 1)
+    r = passing_candidates([W(доля_leader_price=0.31)])
+    chk("31% отката уже нет", len(r["прошли"]) == 0)
+    r = passing_candidates([W(median_E2_рыночная=None, n_E2_рыночных=0)])
+    chk("без рыночных входов не проходит", len(r["прошли"]) == 0)
+    chk("и считается отдельно", r["кандидатов_без_единого_рыночного_входа"] == 1)
+    r = passing_candidates([W(доля_в_плюс_E2=0.5)])
+    chk("ровно половина в плюс не проходит", len(r["прошли"]) == 0)
+
+    # median_E2_рыночная считается только по строкам с entry_src=market.
+    def RW(e2, src):
+        return {"leader": "L", "sim_E2": e2, "sim_E0": e2, "sim_E1": e2,
+                "exit_delay_s": 33, "exit_sol_size": 1.0, "exit_slow": False,
+                "scenarios": {"E2": {"entry_src": src, "entry_sol_size": 1.0}},
+                "status": "ok"}
+    pw = per_wallet([RW(10.0, "market"), RW(50.0, "leader_price"), RW(20.0, "market")], {})
+    chk("рыночная медиана игнорирует откат", pw[0]["median_E2_рыночная"] == 15.0,
+        str(pw[0]["median_E2_рыночная"]))
+    chk("смешанная медиана осталась прежней", pw[0]["median_E2"] == 20.0,
+        str(pw[0]["median_E2"]))
+    chk("число рыночных строк посчитано", pw[0]["n_E2_рыночных"] == 2)
+
     chk("окно выхода равно горизонту удержания", EXIT_TO_S == EXIT_SLOW_S == 45,
         f"{EXIT_TO_S}/{EXIT_SLOW_S}")
     chk("потолок добора соответствует окну", EXIT_DEEP_MAX_BLOCKS == 60,
@@ -1511,17 +1582,34 @@ def reaggregate(min_leg_sol: float, mode: str) -> None:
         raise SystemExit(f"файла {path} нет -- пересчитывать нечего (режим {mode})")
     out = json.loads(path.read_text())
     rows = out["sims"]
+    # Мета берём из ТЕХ ЖЕ сканов, что использовал сам прогон (их список
+    # он записал в параметры_отбора): иначе при пересчёте у кошельков из
+    # дополнительного скана пропадало окно_скана и строка выглядела бы
+    # посчитанной по 72ч, хотя считалась по расширенному окну.
+    extra_raw = (out.get("параметры_отбора") or {}).get("дополнительные_сканы") or ""
+    extra = [Path(x.strip()) if Path(x.strip()).is_absolute() else REPO_ROOT / x.strip()
+             for x in str(extra_raw).split(",") if x.strip()]
     meta: dict[str, dict] = {}
-    if CROWD_PATH.exists():
-        for w in json.loads(CROWD_PATH.read_text()).get("wallets") or []:
+    # Имя переменной цикла НЕ path: оно затирало путь выгрузки, и в конце
+    # функции результат уходил в файл последнего скана вместо своего.
+    for scan_path, tag in ([(CROWD_PATH, "72ч")] + [(x, "расширенный") for x in extra]):
+        if not scan_path.exists():
+            log(f"пересчёт: скана нет, пропускаю: {scan_path}")
+            continue
+        for w in json.loads(scan_path.read_text()).get("wallets") or []:
+            if not w.get("address"):
+                continue
             meta[w["address"]] = {"name": w.get("name"), "status": w.get("status"),
                                    "crowd_2": w.get("crowd_2_median"), "level": w.get("level"),
-                                   "n_buys": w.get("n_buys")}
+                                   "n_buys": w.get("n_buys"), "окно_скана": tag}
     out["config"]["min_leg_sol"] = min_leg_sol
     out["overall"] = overall(rows, "все кошельки", min_leg_sol)
     out["overall_pilot"] = overall([r for r in rows if r["leader"] == PILOT], "пилот", min_leg_sol)
     if out.get("mode") == "full":
         out["wallets"] = per_wallet(rows, meta, min_leg_sol)
+        # Фильтр кандидатов пересчитывается вместе с таблицей: иначе после
+        # смены порогов в файле оставался список, посчитанный по старым.
+        out["кандидаты_прошедшие_фильтр"] = passing_candidates(out["wallets"])
     if out.get("calibration"):
         out["calibration"] = calibration([r for r in rows if row_usable(r, min_leg_sol)
                                            or r.get("sim_E2") is None])
