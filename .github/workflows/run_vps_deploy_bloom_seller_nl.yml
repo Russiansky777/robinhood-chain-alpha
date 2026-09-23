@@ -155,65 +155,60 @@ jobs:
 
       - name: "systemd-юнит с ужесточением"
         run: |
-          ssh -n $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service" <<'EOF'
-[Unit]
-Description=Bloom sell guard (dry-run by default)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=bot
-Group=bot
-WorkingDirectory=/home/bot/bloom_executor
-EnvironmentFile=/etc/bloom-executor/env
-ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/bot/bloom_executor_live_data
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-LockPersonality=true
-MemoryMax=512M
-TasksMax=64
-
-[Install]
-WantedBy=multi-user.target
-EOF
+          {
+            echo '[Unit]'
+            echo 'Description=Bloom sell guard (dry-run by default)'
+            echo 'After=network-online.target'
+            echo 'Wants=network-online.target'
+            echo ""
+            echo '[Service]'
+            echo 'Type=simple'
+            echo 'User=bot'
+            echo 'Group=bot'
+            echo 'WorkingDirectory=/home/bot/bloom_executor'
+            echo 'EnvironmentFile=/etc/bloom-executor/env'
+            echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py'
+            echo 'Restart=always'
+            echo 'RestartSec=5'
+            echo 'StandardOutput=journal'
+            echo 'StandardError=journal'
+            echo 'NoNewPrivileges=true'
+            echo 'PrivateTmp=true'
+            echo 'ProtectSystem=strict'
+            echo 'ProtectHome=read-only'
+            echo 'ReadWritePaths=/home/bot/bloom_executor_live_data'
+            echo 'ProtectKernelTunables=true'
+            echo 'ProtectControlGroups=true'
+            echo 'RestrictSUIDSGID=true'
+            echo 'LockPersonality=true'
+            echo 'MemoryMax=512M'
+            echo 'TasksMax=64'
+            echo ""
+            echo '[Install]'
+            echo 'WantedBy=multi-user.target'
+          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
           ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
 
       - name: "logrotate"
         run: |
-          ssh -n $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC" <<'EOF'
-/home/bot/bloom_executor_live_data/*.jsonl {
-  daily
-  rotate 14
-  compress
-  missingok
-  notifempty
-  copytruncate
-}
-EOF
+          {
+            echo '/home/bot/bloom_executor_live_data/*.jsonl {'
+            echo '  daily'
+            echo '  rotate 14'
+            echo '  compress'
+            echo '  missingok'
+            echo '  notifempty'
+            echo '  copytruncate'
+            echo '}'
+          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC"
 
       - name: "ГЕЙТ: открытых позиций нет -- только тогда перезапуск"
         if: ${{ github.event.inputs.enable_service == 'yes' }}
         run: |
           set -e
-          OPEN=$(ssh -n $SSH_OPTS root@$HOST "
-            set -a; . $ENV_DIR/env; set +a
-            /home/bot/robinhood-chain-alpha/venv/bin/python -c \"
-import json,sys
-sys.path.insert(0,'$CODE_DIR')
-from bloom_exec_state import ExecState
-print(len(ExecState().open_positions()))
-\"" || echo "ОШИБКА")
+          # PYTHONPATH вместо sys.path.insert: иначе внутри команды ssh
+          # пришлось бы вкладывать кавычки в кавычки и гейт молча ломался бы.
+          OPEN=$(ssh -n $SSH_OPTS root@$HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; print(len(ExecState().open_positions()))'" || echo "ОШИБКА")
           echo "открытых позиций: $OPEN"
           [ "$OPEN" = "0" ] || { echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN -- сначала они должны закрыться"; exit 1; }
 
