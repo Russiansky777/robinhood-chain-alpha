@@ -1,14 +1,14 @@
-=== NL-хост, живучесть служб, 2026-09-23T18:47:27Z ===
+=== NL-хост, живучесть служб, 2026-09-23T18:53:00Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:22:25 CEST
 bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20:43:35 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T18:47:36Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T18:52:37Z):
 {
-  "обновлено_utc": "2026-09-23T18:47:36Z",
-  "обновлено_ts": 1790189256.3791828,
+  "обновлено_utc": "2026-09-23T18:52:37Z",
+  "обновлено_ts": 1790189557.522432,
   "живёт_с_utc": "2026-09-23T18:43:35Z",
   "режим": "dry",
   "источников": 17,
@@ -16,31 +16,31 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
   "поколение_источников": 0,
   "способ_подписки": "transactionSubscribe",
   "обрывов_подписки": 0,
-  "обработано_сигналов": 8,
+  "обработано_сигналов": 13,
   "к_покупке": 0,
   "по_кодам": {
     "NOT_A_BUY": 4,
     "SKIP_TARGET_INCREASE_POSITION": 2,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 1,
-    "AMBIGUOUS_TX": 1
+    "TARGET_AMOUNT_OUT_OF_RANGE": 3,
+    "AMBIGUOUS_TX": 4
   },
   "курс_источник": "geckoterminal",
-  "курс_usd_sol": 114.41072974162752,
+  "курс_usd_sol": 113.983699264772,
   "курс_свежий": true,
   "курс_отказы": [],
   "рубильник_путь": "/etc/bloom-executor/KILL",
   "рубильник_доступен": true,
   "рубильник_включён": false,
   "рубильник_пояснение": "путь рубильника доступен на чтение",
-  "слот_сети": 449788874,
-  "слот_уведомлений": 903,
-  "слот_возраст_с": 0.09,
+  "слот_сети": 449790014,
+  "слот_уведомлений": 2043,
+  "слот_возраст_с": 0.11,
   "баланс_sol": 0.00089088,
-  "ба�
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T18:47:25Z):
+  "бал
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T18:53:10Z):
 {
-  "обновлено_utc": "2026-09-23T18:47:25Z",
-  "обновлено_ts": 1790189245.4324715,
+  "обновлено_utc": "2026-09-23T18:53:10Z",
+  "обновлено_ts": 1790189590.434996,
   "режим": "dry-run",
   "позиций_в_круге": 0,
   "проскальзывание_pct": 40.0,
@@ -59,10 +59,10 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
     "пояснение": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T18:46:57Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T18:52:57Z):
 {
-  "updated_utc": "2026-09-23T18:46:57Z",
-  "uptime_s": 26221.4,
+  "updated_utc": "2026-09-23T18:52:57Z",
+  "uptime_s": 26581.4,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -97,7 +97,7 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
     }
   ],
   "источников": 17,
-  "событий_записано": 994,
+  "событий_записано": 1000,
   "дублей_пропущено": 9,
   "неудачных_пропущено": 72,
   "переподключений_tx": 3,
@@ -105,24 +105,24 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 20
     "ConnectionClosedError: no close frame received or sent": 3
   },
   "слепое_время_с": 3.3,
-  "слепое_время_доля": 0.00013,
+  "слепое_время_доля": 0.00012,
   "переподключений_slot": 2,
-  "slot_уведо�
+  "slot_уведо
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 44 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 49 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: нет или пуст
-/home/bot/dbot_detect_probe/events.jsonl: 5779 строк
+/home/bot/dbot_detect_probe/events.jsonl: 5784 строк
 
 --- решения детектора по кодам ---
-всего решений: 44
+всего решений: 50
 первое: "ts_utc": "2026-09-23T18:12:29Z"
-последнее: "ts_utc": "2026-09-23T18:47:28Z"
+последнее: "ts_utc": "2026-09-23T18:53:10Z"
 по кодам:
-     25 NOT_A_BUY
-      9 TARGET_AMOUNT_OUT_OF_RANGE
+     26 NOT_A_BUY
+     11 TARGET_AMOUNT_OUT_OF_RANGE
       6 SKIP_TARGET_INCREASE_POSITION
-      3 AMBIGUOUS_TX
+      6 AMBIGUOUS_TX
       1 KILL_SWITCH
 по задачам источника:
-     24 BATCH-3
-     20 BATCH-5
+     25 BATCH-5
+     25 BATCH-3
