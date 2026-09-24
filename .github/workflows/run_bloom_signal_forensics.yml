@@ -1,0 +1,114 @@
+name: "Bloom: разбор пропавшего сигнала (только чтение)"
+
+# Сигнал по тестовому источнику был на цепи, а решения в журнале нет. Чтобы
+# назвать причину, а не гадать, нужны три вещи разом:
+#   1. сырой ответ узла по этой транзакции -- для офлайн-проверки разбора;
+#   2. признак жизни детектора -- счётчик увиденных сигналов и обрывов;
+#   3. хвост системного журнала службы за окно -- ошибки и исключения.
+# Всё только чтение: ни ордеров, ни записи на хост.
+on:
+  workflow_dispatch:
+    inputs:
+      sigs:
+        description: "подписи через запятую"
+        required: true
+      since:
+        description: "журнал службы с какого времени (формат systemd)"
+        required: false
+        default: "30 min ago"
+      grep:
+        description: "что искать в журнале службы (расширенное регулярное)"
+        required: false
+        default: "Traceback|Error|ошибк|обрыв|drop"
+
+concurrency:
+  group: bloom-signal-forensics
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  forensics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки до сети"
+        run: |
+          set -e
+          python3 analysis/bloom_seller_diag.py --self-test
+          python3 analysis/bloom_detector.py --self-test | tail -1
+
+      - name: "Сырой ответ узла по транзакции"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          ARGS=""
+          for S in $(echo "${{ inputs.sigs }}" | tr ',' ' '); do
+            ARGS="$ARGS --sig $S"
+          done
+          python3 analysis/bloom_tx_dump.py $ARGS --out data/bloom_tx_raw.json
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Состояние служб и хвост системного журнала"
+        run: |
+          set -e
+          mkdir -p /tmp/bloom_state
+          for f in detector_status.json seller_heartbeat.json positions.jsonl seller.jsonl; do
+            if ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/$f"; then
+              ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/bloom_state/$f"
+              echo "$f: $(wc -c < /tmp/bloom_state/$f) байт"
+            else
+              echo "$f: нет или пуст"
+            fi
+          done
+          python3 analysis/bloom_seller_diag.py --state-dir /tmp/bloom_state \
+            --out data/bloom_seller_diag.json > /dev/null
+          echo "--- признак жизни детектора: счётчики ---"
+          python3 -c "import json;d=json.load(open('data/bloom_seller_diag.json'));s=d.get('detector_status') or {};print(json.dumps({k:s.get(k) for k in ('updated_utc','signals_seen','to_buy','by_code','by_code_test_source','subscribe_drops','subscribe_method','sources','test_sources','alive_since_utc','executed','exec_by_code')}, ensure_ascii=False, indent=1))"
+          echo "--- хвост журнала службы детектора ---"
+          ssh -n $SSH_OPTS root@$HOST "journalctl -u bloom-detector --since '${{ inputs.since }}' --no-pager | tail -400" > /tmp/det.log || true
+          wc -l /tmp/det.log
+          grep -nE "${{ inputs.grep }}" /tmp/det.log | tail -40 > data/bloom_detector_log_hits.txt || true
+          echo "совпадений по образцу: $(wc -l < data/bloom_detector_log_hits.txt)"
+          cat data/bloom_detector_log_hits.txt || true
+          tail -60 /tmp/det.log > data/bloom_detector_log_tail.txt
+          echo "--- последние строки журнала ---"
+          cat data/bloom_detector_log_tail.txt
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/bloom_tx_raw.json data/bloom_seller_diag.json \
+                   data/bloom_detector_log_tail.txt data/bloom_detector_log_hits.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: разбор пропавшего сигнала [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

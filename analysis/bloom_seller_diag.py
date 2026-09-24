@@ -24,6 +24,14 @@ def собрать(база: Path) -> dict:
     вых: dict = {"state_dir": str(база), "heartbeat": None,
                  "heartbeat_why_not": None, "positions_rows": [],
                  "positions_why_not": None, "seller_rows": []}
+    # Признак жизни ДЕТЕКТОРА тоже нужен рядом: без него "решения нет"
+    # нельзя отличить от "сигнал не приходил" -- в нём счётчик увиденных
+    # сигналов и обрывов подписки.
+    dh = база / "detector_status.json"
+    try:
+        вых["detector_status"] = json.loads(dh.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        вых["detector_status_why_not"] = f"{type(exc).__name__}: {exc}"
     hb = база / "seller_heartbeat.json"
     try:
         вых["heartbeat"] = json.loads(hb.read_text(encoding="utf-8"))
