@@ -33,6 +33,10 @@ on:
         description: "подписи через запятую: показать записи журнала целиком"
         required: false
         default: ""
+      find_mint:
+        description: "минты через запятую: показать ВСЕ решения по этому минту"
+        required: false
+        default: ""
       stand_rows:
         description: "сколько последних решений стенда печатать целиком"
         required: false
@@ -130,6 +134,11 @@ jobs:
           if [ -n "${{ inputs.find_sig }}" ]; then
             for S in $(echo "${{ inputs.find_sig }}" | tr ',' ' '); do
               ARGS="$ARGS --find-sig $S"
+            done
+          fi
+          if [ -n "${{ inputs.find_mint }}" ]; then
+            for M in $(echo "${{ inputs.find_mint }}" | tr ',' ' '); do
+              ARGS="$ARGS --find-mint $M"
             done
           fi
           if [ -n "${{ inputs.since }}" ]; then ARGS="$ARGS --since ${{ inputs.since }}"; fi

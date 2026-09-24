@@ -427,13 +427,63 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
                 итог["dbot_bought_we_did_not"].append(краткое)
         else:
             итог["we_would_buy_dbot_refused"].append(краткое)
+    # ОБРАТНЫЙ ПРОХОД. Всё выше идёт ПО НАШИМ РЕШЕНИЯМ, а значит не видит
+    # худший случай: DBot купил, а решения у нас нет ВООБЩЕ -- сигнал не
+    # пришёл, разбор упал, служба была в рестарте. Такая покупка выглядела
+    # как тишина и ни в одно число не попадала.
+    #
+    # Границы берём по нашему же журналу: за его пределами мы про сигналы
+    # ничего не знаем и приписывать себе пропуск не имеем права.
+    времена = [float(r.get("t_recv_ts") or r.get("ts") or 0)
+                for r in боевые(строки)
+                if (r.get("t_recv_ts") or r.get("ts"))]
+    итог["dbot_bought_no_decision"] = []
+    if времена:
+        с_края, до_края = min(времена), max(времена)
+        итог["window_utc"] = [
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(с_края)),
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(до_края))]
+        наши = [(r.get("source"), r.get("mint"),
+                  float(r.get("t_recv_ts") or r.get("ts") or 0))
+                 for r in боевые(строки)]
+        for z in записи:
+            if z.get("skipReason"):
+                continue
+            f = z.get("follow") or {}
+            кошелёк = f.get("wallet")
+            минт = (((f.get("receive") or {}).get("info")) or {}).get("contract")
+            t = (z.get("createAt") or 0) / 1000.0
+            if not (кошелёк and минт) or not (с_края - окно_с <= t <= до_края + окно_с):
+                continue
+            есть = any(и == кошелёк and м == минт and abs(t - tt) <= окно_с
+                        for и, м, tt in наши)
+            if есть:
+                continue
+            отдал = ((z.get("pay") or {}).get("info")) or {}
+            получил = ((z.get("receive") or {}).get("info")) or {}
+            итог["dbot_bought_no_decision"].append({
+                "source": кошелёк, "mint": минт,
+                "dbot_record_id": z.get("id"),
+                "dbot_time_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t)),
+                "dbot_paid": {"минт": отдал.get("contract"),
+                               "количество": отдал.get("amount") or отдал.get("amountUI"),
+                               "символ": отдал.get("symbol")},
+                "dbot_got": {"минт": получил.get("contract"),
+                              "количество": получил.get("amount") or получил.get("amountUI"),
+                              "символ": получил.get("symbol")},
+                "our_decision": None,
+                "why": ("покупка DBot внутри окна нашего журнала, а решения по "
+                         "этому источнику и минту у нас нет ни одного")})
+
     расхождений = (len(итог["dbot_bought_we_did_not"])
-                   + len(итог["we_would_buy_dbot_refused"]))
+                   + len(итог["we_would_buy_dbot_refused"])
+                   + len(итог["dbot_bought_no_decision"]))
     итог["divergences"] = расхождений
     итог["agreement"] = (round(итог["agreed"] / итог["compared"], 4)
                          if итог["compared"] else None)
     итог["gate_signals_reached"] = итог["signals_dbot_would_buy"] >= ГЕЙТ_СИГНАЛОВ
-    итог["gate_no_missed_buys"] = len(итог["dbot_bought_we_did_not"]) == 0
+    итог["gate_no_missed_buys"] = (len(итог["dbot_bought_we_did_not"]) == 0
+                                    and len(итог["dbot_bought_no_decision"]) == 0)
     итог["gate_agreement"] = (итог["agreement"] is not None
                               and итог["agreement"] >= ГЕЙТ_СОВПАДЕНИЕ)
     итог["note"] = ("записи follow не несут подписи транзакции источника, "
@@ -511,6 +561,18 @@ def найти_подпись(строки: list, подписи: tuple) -> list
                 вых.append(r)
                 break
     return вых
+
+
+def найти_по_минту(строки: list, минты: tuple, *, предел: int = 24) -> list:
+    """Все решения по минту, свежие первыми.
+
+    Нужно, когда известна покупка DBot, а наша запись неизвестна: искать по
+    подписи нечего -- запись DBot подписи источника не несёт.
+    """
+    если = {m for m in минты if m}
+    вых = [r for r in строки if r.get("mint") in если]
+    вых.sort(key=lambda r: str(r.get("ts_utc") or ""), reverse=True)
+    return вых[:предел]
 
 
 def найти_по_коду(строки: list, коды: tuple, *, предел: int = 24) -> list:
@@ -630,7 +692,7 @@ def гейты(*, сверка: dict, позиции: dict, статус: dict |
 # ------------------------------------------------------------------- отчёт
 
 def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
-           найти: tuple = (), коды: tuple = (), почему_нет_dbot: str | None = None,
+           найти: tuple = (), коды: tuple = (), минты: tuple = (), почему_нет_dbot: str | None = None,
           записи_dbot: list | None = None, статус: dict | None = None,
           n_таблицы: int = 15, n_стенда: int = 10) -> dict:
     строки, счёт = читать_решения(state.decisions_path, since_ts=since_ts)
@@ -673,6 +735,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "positions": поз,
         "found_by_signature": найти_подпись(строки, найти or ()),
         "found_by_code": найти_по_коду(строки, коды or ()),
+        "found_by_mint": найти_по_минту(строки, минты or ()),
         "position_rows": позиции_таблица(state),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
@@ -779,6 +842,11 @@ def в_текст(о: dict) -> str:
                  "(должно быть 0)")
         for x in св["dbot_bought_we_did_not"][:10]:
             L.append(f"      {x['signature']} {x['mint']} наш код {x['our_code']}")
+        L.append(f"  DBot купил, а решения у нас НЕТ ВООБЩЕ: "
+                 f"{len(св.get('dbot_bought_no_decision') or [])} (должно быть 0)")
+        for x in (св.get("dbot_bought_no_decision") or [])[:10]:
+            L.append(f"      {x['dbot_time_utc']} источник {x['source'][:12]} "
+                     f"минт {x['mint'][:12]} запись {x['dbot_record_id']}")
         L.append(f"  мы бы купили, DBot отказал: {len(св['we_would_buy_dbot_refused'])}")
         L.append(f"  пропущено по НАШЕМУ лимиту, DBot купил: "
                  f"{len(св['skipped_by_our_limit_dbot_bought'])} "
@@ -1003,6 +1071,47 @@ def self_test() -> None:
         chk("причина: минта нет ни в одной записи источника",
             "минта нет" in св_диаг2["unmatched_diag"][0]["why"],
             св_диаг2["unmatched_diag"][0]["why"])
+
+        # --- ХУДШИЙ СЛУЧАЙ: DBot купил, а решения у нас нет ВООБЩЕ.
+        # Прямой проход идёт по нашим решениям и такого не видит: пропущенная
+        # покупка выглядит как тишина. Здесь она обязана всплыть.
+        св_нет = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", mint="ДРУГОЙ_МИНТ", ts=1000.0)],
+            [запись_dbot(минт="ПРОПУЩЕННЫЙ", ts=1000.0)])
+        chk("покупка DBot без нашего решения видна отдельным списком",
+            len(св_нет["dbot_bought_no_decision"]) == 1,
+            св_нет["dbot_bought_no_decision"])
+        chk("и в ней названы источник, минт и запись DBot",
+            св_нет["dbot_bought_no_decision"][0]["mint"] == "ПРОПУЩЕННЫЙ"
+            and св_нет["dbot_bought_no_decision"][0]["source"] == "SRC"
+            and св_нет["dbot_bought_no_decision"][0]["dbot_record_id"] == "rec",
+            св_нет["dbot_bought_no_decision"][0])
+        chk("она идёт в расхождения и рубит гейт пропущенных покупок",
+            св_нет["divergences"] >= 1 and св_нет["gate_no_missed_buys"] is False,
+            (св_нет["divergences"], св_нет["gate_no_missed_buys"]))
+        with tempfile.TemporaryDirectory() as d_св:
+            основа = отчёт(state=ST.ExecState(base=Path(d_св) / "s",
+                                               kill=Path(d_св) / "k"),
+                            записи_dbot=[])
+            chk("и в тексте доклада эта строка есть",
+                "решения у нас НЕТ ВООБЩЕ" in в_текст(
+                    {**основа, "reconciliation": св_нет}))
+
+        # Запись DBot ВНЕ окна нашего журнала пропуском не считается: за
+        # пределами журнала мы про сигналы ничего не знаем.
+        св_вне = сверка_с_dbot(
+            [строка(kind="buy", action="buy", code="BUY", mint="ДРУГОЙ_МИНТ", ts=1000.0)],
+            [запись_dbot(минт="ПРОПУЩЕННЫЙ", ts=1000.0 + 10_000)])
+        chk("запись вне окна журнала пропуском не считается",
+            св_вне["dbot_bought_no_decision"] == [], св_вне["dbot_bought_no_decision"])
+
+        # --- поиск по минту: когда подпись источника неизвестна
+        по_м = найти_по_минту([строка(mint="M1", ts_utc="2026-09-24T02:00:00Z"),
+                                строка(mint="M2", ts_utc="2026-09-24T02:01:00Z"),
+                                строка(mint="M1", ts_utc="2026-09-24T02:02:00Z")],
+                               ("M1",))
+        chk("поиск по минту нашёл оба решения и свежее первым",
+            len(по_м) == 2 and по_м[0]["ts_utc"] == "2026-09-24T02:02:00Z", по_м)
         св_диаг3 = сверка_с_dbot(
             [строка(kind="buy", action="buy", code="BUY")],
             [запись_dbot(ts=1000.0 + 600)])
@@ -1259,6 +1368,8 @@ def main() -> int:
                    help="показать записи журнала с этим кодом целиком")
     p.add_argument("--find-sig", action="append", default=[],
                    help="показать записи журнала по подписи целиком (можно несколько)")
+    p.add_argument("--find-mint", action="append", default=[],
+                   help="показать все решения по этому минту (можно несколько)")
     a = p.parse_args()
     if a.self_test:
         self_test()
@@ -1309,6 +1420,7 @@ def main() -> int:
     о = отчёт(state=state, since_ts=since_ts, записи_dbot=записи,
               статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows,
               найти=tuple(a.find_sig or ()), коды=tuple(a.find_code or ()),
+              минты=tuple(a.find_mint or ()),
               почему_нет_dbot=почему_нет_dbot)
     текст = в_текст(о)
     print(текст)

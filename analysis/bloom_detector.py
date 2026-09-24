@@ -872,6 +872,23 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
                "token_program": сигнал.get("token_program"),
                "route": сигнал.get("route")}
 
+    # ПЕРЕНОС РАЗБОРА В РЕШЕНИЕ. Исполнитель покупает по адресу
+    # decision["source_pool"], а сюда это поле не копировалось вообще -- оно
+    # оставалось только в сигнале. Поэтому ветка "покупать по ID пула
+    # источника" не срабатывала НИ РАЗУ, сколько бы пулов разбор ни нашёл:
+    # исполнитель каждый раз видел None и покупал по минту. Той же причиной
+    # был искалечен разбор нашей покупки -- источник_пул приходил пустым, и
+    # сравнивать наш маршрут было не с чем.
+    #
+    # Числа траты (ноги, аренда, брутто-SOL) идут в запись по той же
+    # причине: без них вопрос "почему вход 0.007" не проверить по журналу.
+    for поле in ("source_pool", "source_pool_candidates", "pool_why_not",
+                  "flags", "spend_candidates", "sol_out_gross",
+                  "rent_new_accounts_sol", "native_delta_sol", "received_ui"):
+        значение = сигнал.get(поле)
+        if значение not in (None, [], {}):
+            строка[поле] = значение
+
     отставание = None
     if slot_ok(текущий_слот) and slot_ok(сигнал.get("slot")):
         отставание = текущий_слот - сигнал["slot"]
@@ -2538,6 +2555,53 @@ def self_test() -> int:
         s_пул.get("source_pool") == "POOLA", s_пул.get("source_pool"))
     chk("и метки об отсутствии пула нет",
         ФЛАГ_НЕТ_ПУЛА_SOL not in (s_пул.get("flags") or []), s_пул.get("flags"))
+
+    # И ГЛАВНОЕ: ID пула должен доехать ДО ИСПОЛНИТЕЛЯ. Он покупает по
+    # decision["source_pool"], а не по сигналу, и именно на этом стыке поле
+    # терялось -- восемь покупок стенда ушли по минту при найденном пуле.
+    with tempfile.TemporaryDirectory() as d:
+        stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+        rп = решение(s_пул, состояние=stп, трата_sol=2.5, баланс_sol=3.0,
+                      текущий_слот=100)
+        chk("ID пула источника есть в ЗАПИСИ РЕШЕНИЯ, а не только в сигнале",
+            rп.get("source_pool") == "POOLA", rп.get("source_pool"))
+        chk("и кандидаты пулов тоже в записи",
+            bool(rп.get("source_pool_candidates")), rп.get("source_pool_candidates"))
+
+        class ИсполнительЗапоминает:
+            mode = ST.MODE_LIVE_TEST
+
+            def __init__(self):
+                self.видел = []
+
+            def execute(self, решение_вх, *, balance_sol):
+                self.видел.append(решение_вх.get("source_pool"))
+                return {"exec_code": "DRY_RUN", "reason": "заглушка"}
+
+            def report(self):
+                return {"live_buy_enabled": False}
+
+        class HeliusТихий(Helius):
+            def __init__(self):
+                super().__init__(key="нет", служба="")
+
+            def налог_минта(self, минт):
+                return {"taxed": False, "fee_bps": None}
+
+        испп = ИсполнительЗапоминает()
+        stп2 = ST.ExecState(base=Path(d) / "s2", kill=Path(d) / "k2")
+        детп = Детектор(источники={"SRC": "BATCH-5"}, состояние=stп2,
+                         helius=HeliusТихий(), курс=КурсSOL(), режим="dry",
+                         исполнитель=испп)
+        детп.курс.значение, детп.курс.когда = 200.0, time.time()
+        детп.слот_сети, детп.t_слот = 100, time.time()
+        детп.баланс_sol, детп.t_баланс = 5.0, time.time()
+        детп.порог_для = lambda источник: 0.0  # noqa: ARG005
+        строка_п = детп.обработать("SIGPOOL", 100, "SRC", "тест", t_пул)
+        chk("решение по этой транзакции -- покупка",
+            строка_п.get("action") == "buy", (строка_п.get("code"), строка_п.get("reason")))
+        chk("исполнитель ПОЛУЧИЛ ID пула источника, а не None",
+            испп.видел == ["POOLA"], испп.видел)
 
     t_usdc = tx_пул(владельцы={"POOLB": ["КУПЛЕН", USDC], "SRC": [USDC]},
                      счета=("POOLB",))
