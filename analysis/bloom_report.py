@@ -494,6 +494,42 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
 
 # ------------------------------------------------------------------ пары А/Б
 
+def замер_места(путь: Path | None = None) -> dict:
+    """Замер места в блоке относительно источника -- из отдельного прогона.
+
+    Считает его analysis/bloom_block_position.py (ему нужен getBlock, а
+    докладу узел не нужен вовсе). Здесь только чтение готового файла, и
+    возраст замера называется прямо: старый замер -- не свежий факт.
+    """
+    путь = путь or (Path(__file__).resolve().parents[1] / "data"
+                     / "bloom_block_position.json")
+    try:
+        d = json.loads(путь.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"known": False, "why": f"замер не прочитан: {type(exc).__name__}"}
+    строки = d.get("rows") or []
+    кратко = []
+    for r in строки:
+        м = r.get("measure") or {}
+        кратко.append({
+            "mint": r.get("mint"),
+            "source_task": r.get("source_task"),
+            "slot_delta": м.get("slot_delta"),
+            "our_index": м.get("our_index"),
+            "source_index": м.get("source_index"),
+            "index_delta_same_block": м.get("index_delta_same_block"),
+            "ahead_of_source": м.get("ahead_of_source"),
+            "crowd_between": (м.get("crowd_between") or {}).get("count"),
+            "dbot_index_delta_same_block": м.get("dbot_index_delta_same_block"),
+            "why_not": м.get("source_why_not") or м.get("our_why_not"),
+        })
+    return {"known": True, "built_utc": d.get("built_utc"), "rows": кратко,
+            "note": ("место в блоке считает отдельный прогон "
+                      "run_bloom_block_position; один слот с источником "
+                      "(S+0) не значит одну цену -- порядок в блоке решает "
+                      "валидатор")}
+
+
 def пары(строки: list, сверка: dict) -> dict:
     """Пары "наша покупка против покупки DBot".
 
@@ -732,6 +768,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "threshold_edge": у_порога(строки),
         "reconciliation": св,
         "pairs": пары(строки, св),
+        "block_position": замер_места(),
         "positions": поз,
         "found_by_signature": найти_подпись(строки, найти or ()),
         "found_by_code": найти_по_коду(строки, коды or ()),
@@ -898,6 +935,22 @@ def в_текст(о: dict) -> str:
                     if r.get("unsold_reason") else "")
                  + (f", остаток не читался: {r.get('balance_read_why_not')}"
                     if r.get("balance_read_why_not") else ""))
+    зм = о.get("block_position") or {}
+    L.append("--- место в блоке относительно источника ---")
+    if not зм.get("known"):
+        L.append(f"  замера нет: {зм.get('why')}")
+    else:
+        L.append(f"  замер от {зм.get('built_utc')}")
+        for r in зм.get("rows") or []:
+            толпа = r.get("crowd_between")
+            L.append(f"  {str(r.get('mint'))[:12]} {r.get('source_task') or ''} "
+                     f"S+{r.get('slot_delta')}: наш индекс {r.get('our_index')}, "
+                     f"источник {r.get('source_index')}, разница "
+                     f"{r.get('index_delta_same_block')}, чужих покупок между "
+                     f"нами {толпа if толпа is not None else '?'}, "
+                     f"DBot к источнику {r.get('dbot_index_delta_same_block')}"
+                     + (f" | {r['why_not']}" if r.get("why_not") else ""))
+        L.append(f"  примечание: {зм.get('note')}")
     L.append("")
     по_коду = о.get("found_by_code") or []
     if по_коду:
