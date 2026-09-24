@@ -1,17 +1,97 @@
 active
 {
-  "utc": "2026-09-24T13:44:34Z",
-  "channels": 1,
+  "utc": "2026-09-24T13:46:07Z",
+  "started_utc": "2026-09-24T13:45:47Z",
+  "uptime_s": 20.0,
+  "channels": 3,
+  "channel_names": [
+    "ws",
+    "grpc",
+    "grpc2"
+  ],
   "addresses": 19,
   "sources": 19,
   "boosters": [],
-  "boosters_why_not": "getBlock 450038906: RuntimeError: getBlock: {'code': -32015, 'message': 'Transaction version (1) is not supported by the requesting client. Please try the request again with the following configuration parameter: \"maxSupportedTransactionVersion",
+  "boosters_slot": null,
+  "boosters_why_not": "getBlock 450046366: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 450046366'}",
+  "grpc_target": {
+    "grpc": {
+      "target": "grpc.ams.shyft.to:443",
+      "tls": true,
+      "auth_header": "x-token",
+      "token_present": true
+    },
+    "grpc2": {
+      "target": "beta-grpc.fra.shyft.to:443",
+      "tls": true,
+      "auth_header": "x-token",
+      "token_present": true
+    }
+  },
+  "subscriptions": {
+    "grpc2": {
+      "requested": 19,
+      "connected": false,
+      "generation": 0
+    },
+    "grpc": {
+      "requested": 19,
+      "connected": true,
+      "generation": 0
+    }
+  },
+  "helius_credits": {
+    "spent_today": 2,
+    "limit": 9000,
+    "share": 0.0002,
+    "projected_daily": null,
+    "threshold": 0.7,
+    "boosters_dropped": false,
+    "drop_needed": false,
+    "why": "",
+    "service": "grpc_feed_probe",
+    "session": 2,
+    "dropped_utc": null
+  },
+  "addresses_now": 19,
+  "generation": 0,
+  "failures": {
+    "last": {
+      "grpc": {
+        "utc": "2026-09-24T13:46:04Z",
+        "type": "_MultiThreadedRendezvous",
+        "code": "StatusCode.INVALID_ARGUMENT",
+        "details": "failed to create filter: Max amount of filters/data_slices reached, only 10 allowed"
+      },
+      "grpc2": {
+        "utc": "2026-09-24T13:46:06Z",
+        "type": "_MultiThreadedRendezvous",
+        "code": "StatusCode.INVALID_ARGUMENT",
+        "details": "failed to check filter: FiltersOverflow { max: 10 }"
+      }
+    },
+    "count": {
+      "grpc": 9,
+      "grpc2": 10
+    },
+    "first_utc": {
+      "grpc": "2026-09-24T13:45:48Z",
+      "grpc2": "2026-09-24T13:45:48Z"
+    }
+  },
   "summary": {
-    "pairs_total": 0,
+    "base": "helius_ws",
     "messages": {},
     "duplicates": {},
-    "unpaired_pending": {},
+    "unpaired_single_channel": {
+      "helius_ws": 0,
+      "ws": 0,
+      "grpc": 0,
+      "grpc2": 0
+    },
     "by_channel": {},
-    "by_group": {}
+    "by_group": {},
+    "pairwise": {},
+    "pairs_total": 0
   }
 }
