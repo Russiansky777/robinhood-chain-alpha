@@ -56,7 +56,7 @@ jobs:
             echo "=== NL-хост, живучесть служб, $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
           } > data/vps_health_nl.txt
           FAIL=0
-          for SVC in dbot-sold-guard dbot-detect-probe bloom-seller bloom-detector; do
+          for SVC in dbot-sold-guard dbot-detect-probe bloom-seller bloom-detector grpc-feed-probe; do
             OUT=$(ssh -n $SSH_OPTS root@$HOST "
               if ! systemctl list-unit-files --no-legend '$SVC.service' | grep -q .; then
                 echo 'не установлена'
@@ -86,10 +86,11 @@ jobs:
           ssh -n $SSH_OPTS root@$HOST "
             for f in /home/bot/bloom_executor_live_data/detector_status.json \
                      /home/bot/bloom_executor_live_data/seller_heartbeat.json \
-                     /home/bot/dbot_detect_probe/status.json; do
+                     /home/bot/dbot_detect_probe/status.json \
+                     /home/bot/grpc_feed_probe_data/heartbeat.json; do
               if [ -s \"\$f\" ]; then
                 printf '%s (изменён %s):\n' \"\$f\" \"\$(date -u -r \"\$f\" +%Y-%m-%dT%H:%M:%SZ)\"
-                head -c 3000 \"\$f\"; echo
+                head -c 6000 \"\$f\"; echo
               else
                 echo \"\$f: нет или пуст\"
               fi
