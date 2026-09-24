@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos"
+        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos | route"
         required: false
         default: "both"
       days:
@@ -107,6 +107,24 @@ jobs:
           python analysis/c2_swap_build.py --self-test
           python analysis/c2_swap_sim.py --self-test
           python analysis/c2_block_position.py --self-test
+          python analysis/c2_route_htm.py --self-test
+
+      - name: "Задача G: SOL -> HTm -> токен, симуляция (без отправки)"
+        if: env.C2_TASK == 'route'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_route_htm.py 2>&1 | tee "data/c2_logs/route_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит задачи G"
+        if: always() && env.C2_TASK == 'route'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python analysis/c2_commit.py -m "C2: задача G, маршрут через HTm [automated]" "data/c2_route_htm_*.json" "data/c2_logs/route_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача E: место в блоке источника (только чтение цепи)"
         if: env.C2_TASK == 'blockpos'
@@ -140,7 +158,7 @@ jobs:
         env:
           HELIUS_API: ${{ secrets.HELIUS_API }}
         run: |
-          python analysis/c2_commit.py -m "C2: задача D, симуляция сборки [automated]" "data/c2_swap_sim_*.json" "data/c2_logs/build_*.log" "data/helius_usage/c2_*.json"
+          python analysis/c2_commit.py -m "C2: задача D, симуляция сборки [automated]" "data/c2_swap_sim_*.json" "data/c2_pool_samples/*.json" "data/c2_logs/build_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача D, шаг 1: программы пулов сигналов (только чтение цепи)"
         if: env.C2_TASK == 'pools'

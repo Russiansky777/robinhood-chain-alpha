@@ -73,30 +73,44 @@ def launchlab_check(rpc) -> dict:
     data = B.b58decode(ix["data"])
     name = "buy_exact_in" if data[:8] == B.disc("buy_exact_in") else data[:8].hex()
     amount_in, min_out, share_fee = struct.unpack("<QQQ", data[8:32])
-    rows = {r["account"]: r for r in C.token_rows(lead).values()}
-    bv, qv = rows[pool["pool_vault"]], rows[pool["quote_vault"]]
-    lix = next(i for i in B.all_instructions(lead)
-               if i.get("programId") == B.LAUNCHLAB and pool["pool_vault"] in i["accounts"])
-    spent = sum(r["post"] - r["pre"] for a, r in rows.items()
-                if a in lix["accounts"] and r["mint"] == qv["mint"] and r["post"] > r["pre"])
-    dy = bv["pre"] - bv["post"]
-    f = D(qv["pre"]) * D(dy) / (D(bv["post"]) * D(spent))
-    a_eff = D(amount_in) * f
-    expected = D(bv["post"]) * a_eff / (D(qv["post"]) + a_eff)
-    ours_min35 = int(expected * D("0.65"))
+    mo = B.launchlab_min_out(lead, amount_in, 0.35)
+    if not mo.get("ok"):
+        return {"ok": False, "why_not": mo.get("why_not")}
     logs = (ours.get("meta") or {}).get("logMessages") or []
     left = next((int(l.rsplit(":", 1)[1]) for l in logs if l.startswith("Program log: Left:")), None)
     right = next((int(l.rsplit(":", 1)[1]) for l in logs if l.startswith("Program log: Right:")), None)
     return {"ok": True, "our_ix": name, "our_amount_in_quote_raw": amount_in,
             "our_min_out_sent_raw": min_out, "share_fee_rate": share_fee,
             "log_left_raw": left, "log_right_raw": right,
-            "quote_mint": qv["mint"], "lead_index_note": "лидер 155-й в слоте, мы 1172-е",
-            "reserves_after_leader_raw": {"quote": qv["post"], "base": bv["post"]},
-            "fee_factor_from_leader": float(f), "formula_expected_out_raw": int(expected),
-            "formula_min_out_35pct_raw": ours_min35,
-            "would_pass_if_actual_out_is_left": (left >= ours_min35) if left is not None else None,
-            "caveat": ("Launchlab -- кривая с виртуальными резервами; реальные остатки хранилищ "
-                       "в postTokenBalances цену кривой не задают, формула x*y=k здесь приближение")}
+            "lead_index_note": "лидер 155-й в слоте, мы 1172-е",
+            "method": "кривая Launchlab на виртуальных резервах из события TradeEvent сделки лидера",
+            "fee_rate": mo["fee_rate"], "virtual_reserves_after_leader": mo["virtual_reserves_after"],
+            "formula_expected_out_raw": mo["expected_out"],
+            "formula_min_out_35pct_raw": mo["min_out"],
+            "would_pass_if_actual_out_is_left": (left >= mo["min_out"]) if left is not None else None,
+            "slippage_needed_to_pass": (round(1 - left / mo["expected_out"], 4)
+                                        if left is not None and mo["expected_out"] else None)}
+
+
+def topup_launchlab(rpc) -> dict:
+    """Добрать настоящие транзакции Launchlab из сделок задачи A (pool_program)."""
+    path = B.SAMPLES_DIR / f"{B.LAUNCHLAB}.json"
+    have = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    seen = {C.first_signature(x["tx"]) for x in have}
+    src = sorted(C.DATA.glob("crowd_metric_2*.json"))[-1]
+    d = json.loads(src.read_text(encoding="utf-8"))
+    want = [(ps["address"], t) for ps in d["per_source"] for t in ps.get("trades") or []
+            if t.get("pool_program") == B.LAUNCHLAB and t["signature"] not in seen][:30]
+    got = rpc.get_txs([t["signature"] for _, t in want])
+    added = 0
+    for addr, t in want:
+        tx = got.get(t["signature"])
+        if tx:
+            have.append({"source": addr, "mint": t.get("mint"), "pool_vault": t.get("pool_vault"),
+                         "quote_mint": t.get("quote_mint"), "tx": tx})
+            added += 1
+    path.write_text(json.dumps(have, ensure_ascii=False), encoding="utf-8")
+    return {"added": added, "total": len(have)}
 
 
 def main() -> int:
@@ -106,6 +120,15 @@ def main() -> int:
         return 2
     rpc = C.C2Rpc(SERVICE, key=key)
     out = {"generated_utc": C.utc(time.time()), "types": {}, "rows": []}
+    out["launchlab_topup"] = topup_launchlab(rpc)
+    out["rebuild_check"] = {}
+    for program, spec in B.SPECS.items():
+        res = [B.rebuild_check(x, program) for x in B.load_samples(program)]
+        out["rebuild_check"][spec["label"]] = {
+            "samples": len(res), "exact": sum(1 for r in res if r["ok"]),
+            "not_verifiable": sum(1 for r in res if r["ok"] is None),
+            "mismatch": sum(1 for r in res if r["ok"] is False)}
+    print("байт в байт:", json.dumps(out["rebuild_check"], ensure_ascii=False))
     for program, spec in B.SPECS.items():
         n = 0
         stat = {"balance_error": 0, "success": 0, "other_error": 0, "skipped": 0, "build_ms": []}
