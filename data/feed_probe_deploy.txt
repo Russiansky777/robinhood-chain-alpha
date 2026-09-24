@@ -1,7 +1,7 @@
 active
 {
-  "utc": "2026-09-24T14:33:08Z",
-  "started_utc": "2026-09-24T14:32:48Z",
+  "utc": "2026-09-24T14:45:19Z",
+  "started_utc": "2026-09-24T14:44:59Z",
   "uptime_s": 20.0,
   "channels": 3,
   "channel_names": [
@@ -12,26 +12,26 @@ active
   "addresses": 21,
   "sources": 20,
   "boosters": [
-    "GRV6aYozLxNaH1Yj6T2h2qfEog9ctssas6brwCcbuSK5"
+    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8"
   ],
-  "boosters_slot": 450056807,
+  "boosters_slot": 450059547,
   "boosters_rates_per_min": {
-    "GRV6aYozLxNaH1Yj6T2h2qfEog9ctssas6brwCcbuSK5": 187.5
+    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0
   },
-  "boosters_total_per_min": 187.5,
+  "boosters_total_per_min": 500.0,
   "boosters_target_per_min": 5.0,
   "boosters_band": [
     0.2,
     50.0
   ],
-  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 187.5 транзакций в минуту",
+  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 500.0 транзакций в минуту",
   "boosters_rejected": {
     "FVnv5qH7dsrBzEDwJ8dN2m9PFtKTBAQFtqWF3M9LpwMg": 3000.0,
-    "sp1nLqqjVZ1kTusFjJmHp1xHDpH6M4F7KXCr1iJ3xpX": 3000.0,
-    "A8A9GoxfmcjY2QAQ8tYS98SqDBF6hUFDmxAKBsLw29sL": 1500.0,
-    "77777nPhGvFUVAj6uq8MGyLneBt4SMwCScYZDzzztdsa": 750.0,
-    "7TRGFC2EcrPWf9SXBzNW5qLXXUvUjyyARp6iJ6uJqkKE": 3000.0,
-    "83TSSS7qojPowqrrvH23mCrhEJjnJG2ygaf7FEq9ZgKC": 3000.0
+    "3KvsoNxgn64nsuHKPBHQJsguef3DgEkP2izE49k6CSAZ": 3000.0,
+    "CEwz7AauCmQG5vijHgLZ5ps4tHxGKBUcHuRrWmzHCkXH": 3000.0,
+    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0,
+    "327677XqTEwYxo8kaQxAJUWvUvzpVoSjiMXMc8u4wQS6": 3000.0,
+    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 3000.0
   },
   "boosters_why_not": null,
   "grpc_target": {
@@ -49,12 +49,12 @@ active
     }
   },
   "subscriptions": {
-    "grpc2": {
+    "grpc": {
       "requested": 21,
       "connected": true,
       "generation": 0
     },
-    "grpc": {
+    "grpc2": {
       "requested": 21,
       "connected": true,
       "generation": 0
@@ -67,16 +67,23 @@ active
     }
   },
   "helius_credits": {
-    "spent_today": 94,
+    "spent_today": 136,
     "limit": 300000,
-    "share": 0.0003,
+    "share": 0.0005,
     "projected_daily": null,
     "threshold": 0.7,
+    "projection_limit": 200000,
+    "window_s": 3600.0,
+    "window_cap": 30000,
+    "window_spent": 122,
+    "in_window": true,
+    "window_left_s": 3580.0,
+    "window_started_utc": "2026-09-24T14:44:59Z",
     "boosters_dropped": false,
     "drop_needed": false,
     "why": "",
     "service": "grpc_feed_probe",
-    "session": 94,
+    "session": 136,
     "dropped_utc": null
   },
   "addresses_now": 21,
@@ -94,9 +101,9 @@ active
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "helius_ws": 19,
-      "grpc": 19,
-      "grpc2": 19
+      "helius_ws": 40,
+      "grpc2": 40,
+      "grpc": 40
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -106,102 +113,82 @@ active
     },
     "by_channel": {
       "grpc": {
-        "pairs": 19,
-        "first_share": 0.2105,
-        "median_ms": -4.97,
-        "p10_ms": -7.77,
-        "p90_ms": 9.95,
-        "p95_ms": 137.33,
-        "mean_ms": 11.28
+        "pairs": 40,
+        "first_share": 0.0,
+        "median_ms": -4.66,
+        "p10_ms": -6.48,
+        "p90_ms": -0.84,
+        "p95_ms": -0.7,
+        "mean_ms": -4.03
       },
       "grpc2": {
-        "pairs": 19,
-        "first_share": 0.4737,
-        "median_ms": -0.43,
-        "p10_ms": -7.37,
-        "p90_ms": 10.51,
-        "p95_ms": 150.39,
-        "mean_ms": 15.48
+        "pairs": 40,
+        "first_share": 0.225,
+        "median_ms": -0.98,
+        "p10_ms": -4.64,
+        "p90_ms": 0.77,
+        "p95_ms": 2.03,
+        "mean_ms": -1.26
       }
     },
     "by_group": {
-      "источники": {
-        "grpc": {
-          "pairs": 2,
-          "first_share": 0.0,
-          "median_ms": -5.99,
-          "p10_ms": -7.02,
-          "p90_ms": -4.97,
-          "p95_ms": -4.97,
-          "mean_ms": -5.99
-        },
-        "grpc2": {
-          "pairs": 2,
-          "first_share": 0.0,
-          "median_ms": -5.34,
-          "p10_ms": -9.44,
-          "p90_ms": -1.24,
-          "p95_ms": -1.24,
-          "mean_ms": -5.34
-        }
-      },
       "разгонные": {
         "grpc": {
-          "pairs": 17,
-          "first_share": 0.2353,
-          "median_ms": -4.24,
-          "p10_ms": -7.77,
-          "p90_ms": 9.95,
-          "p95_ms": 137.33,
-          "mean_ms": 13.31
+          "pairs": 40,
+          "first_share": 0.0,
+          "median_ms": -4.66,
+          "p10_ms": -6.48,
+          "p90_ms": -0.84,
+          "p95_ms": -0.7,
+          "mean_ms": -4.03
         },
         "grpc2": {
-          "pairs": 17,
-          "first_share": 0.5294,
-          "median_ms": 0.49,
-          "p10_ms": -1.93,
-          "p90_ms": 10.51,
-          "p95_ms": 150.39,
-          "mean_ms": 17.93
+          "pairs": 40,
+          "first_share": 0.225,
+          "median_ms": -0.98,
+          "p10_ms": -4.64,
+          "p90_ms": 0.77,
+          "p95_ms": 2.03,
+          "mean_ms": -1.26
         }
       }
     },
     "pairwise": {
       "helius_ws_vs_grpc": {
-        "pairs": 19,
-        "first_share": 0.7895,
-        "median_ms": 4.97,
-        "p10_ms": -9.95,
-        "p90_ms": 7.77,
-        "p95_ms": 8.91,
-        "mean_ms": -11.28
+        "pairs": 40,
+        "first_share": 1.0,
+        "median_ms": 4.66,
+        "p10_ms": 0.84,
+        "p90_ms": 6.48,
+        "p95_ms": 7.0,
+        "mean_ms": 4.03
       },
       "helius_ws_vs_grpc2": {
-        "pairs": 19,
-        "first_share": 0.5263,
-        "median_ms": 0.43,
-        "p10_ms": -10.51,
-        "p90_ms": 7.37,
-        "p95_ms": 8.16,
-        "mean_ms": -15.48
+        "pairs": 40,
+        "first_share": 0.775,
+        "median_ms": 0.98,
+        "p10_ms": -0.77,
+        "p90_ms": 4.64,
+        "p95_ms": 4.93,
+        "mean_ms": 1.26
       },
       "grpc_vs_grpc2": {
-        "pairs": 19,
-        "first_share": 0.2632,
-        "median_ms": -4.5,
-        "p10_ms": -7.94,
-        "p90_ms": 3.12,
-        "p95_ms": 6.2,
-        "mean_ms": -4.2
+        "pairs": 40,
+        "first_share": 0.2,
+        "median_ms": -3.69,
+        "p10_ms": -5.87,
+        "p90_ms": 1.4,
+        "p95_ms": 1.57,
+        "mean_ms": -2.77
       }
     },
-    "pairs_total": 19
+    "pairs_total": 40
   }
 }
 --- журнал службы, последние 60 строк ---
-Sep 24 16:32:47 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
-Sep 24 16:32:47 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
-Sep 24 16:32:47 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
-Sep 24 16:32:47 claude-nl systemd[1]: grpc-feed-probe.service: Consumed 3.295s CPU time, 43.8M memory peak, 0B memory swap peak.
-Sep 24 16:32:47 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
-Sep 24 16:32:48 claude-nl python[483563]: зонд запущен: каналов 3, адресов 21 (источников 20, разгонных 1), откуда источники: DBot живьём + тестовых источников из окружения: 2
+Sep 24 16:44:58 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
+Sep 24 16:44:58 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
+Sep 24 16:44:58 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:44:58 claude-nl systemd[1]: grpc-feed-probe.service: Consumed 3.575s CPU time, 51.3M memory peak, 0B memory swap peak.
+Sep 24 16:44:58 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:44:59 claude-nl python[485154]: зонд запущен: каналов 3, адресов 21 (источников 20, разгонных 1), откуда источники: DBot живьём + тестовых источников из окружения: 2
