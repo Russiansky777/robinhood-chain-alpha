@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos | route"
+        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos | route | groups"
         required: false
         default: "both"
       days:
@@ -108,6 +108,24 @@ jobs:
           python analysis/c2_swap_sim.py --self-test
           python analysis/c2_block_position.py --self-test
           python analysis/c2_route_htm.py --self-test
+          python analysis/c2_groups.py --self-test
+
+      - name: "Группы сделок задачи A (только чтение цепи)"
+        if: env.C2_TASK == 'groups'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_groups.py 2>&1 | tee "data/c2_logs/groups_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит групп"
+        if: always() && env.C2_TASK == 'groups'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python analysis/c2_commit.py -m "C2: группы сделок задачи A [automated]" "data/c2_groups_*.json" "data/c2_logs/groups_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача G: SOL -> HTm -> токен, симуляция (без отправки)"
         if: env.C2_TASK == 'route'
