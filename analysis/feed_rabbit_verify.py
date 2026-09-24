@@ -165,10 +165,25 @@ def проверить_канал(helius, подписи: dict, наши: set, *
             итог["without_our"] += 1
             гр["without_any"] += 1
             if len(итог["examples_without_any"]) < 5:
+                # Что это за транзакции вообще -- плательщик и программы.
+                # Без них "ни одного нашего адреса" остаётся загадкой.
+                сообщение = ((tx.get("transaction") or {}).get("message") or {})
+                ключи = сообщение.get("accountKeys") or []
+                первый = ключи[0] if ключи else None
+                плательщик = (первый.get("pubkey")
+                               if isinstance(первый, dict) else первый)
+                программы = []
+                for и in (сообщение.get("instructions") or []):
+                    pid = и.get("programId") if isinstance(и, dict) else None
+                    if pid and pid not in программы:
+                        программы.append(pid)
                 итог["examples_without_any"].append(
                     {"signature": подпись, "filter": имя_ф,
                       "slot": tx.get("slot"),
-                      "accounts": len(все_счета)})
+                      "accounts": len(все_счета),
+                      "fee_payer": плательщик,
+                      "programs": программы[:4],
+                      "err": (tx.get("meta") or {}).get("err") is not None})
     n = итог["checked"]
     итог["share_with_our"] = round(итог["with_our"] / n, 4) if n else None
     итог["share_with_any"] = (round((итог["with_our"] + итог["with_booster"]) / n, 4)
@@ -339,7 +354,9 @@ def main() -> int:
         for пример in р["examples_without_any"]:
             print(f"   ни одного нашего адреса: {пример['signature'][:14]} "
                    f"(фильтр {пример['filter']}), слот {пример['slot']}, "
-                   f"счетов {пример['accounts']}")
+                   f"счетов {пример['accounts']}, упала {пример.get('err')}")
+            print(f"      плательщик {str(пример.get('fee_payer'))[:12]}, "
+                   f"программы {[p[:10] for p in (пример.get('programs') or [])]}")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(итог, ensure_ascii=False, indent=1),
                             encoding="utf-8")
