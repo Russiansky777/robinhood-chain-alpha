@@ -19,7 +19,11 @@ on:
         required: false
         default: "60"
       pool_vault:
-        description: "хранилище USDC пула (пусто -- выбрать самому)"
+        description: "хранилище токена в пуле (пусто -- выбрать самому)"
+        required: false
+        default: ""
+      mint:
+        description: "минт, если нужен конкретный (пусто -- выбрать самому)"
         required: false
         default: ""
 
@@ -94,6 +98,7 @@ jobs:
             $PYHOST -u $CHECKOUT/analysis/bloom_send_race_test.py --discover \
               --scan ${{ inputs.scan }} \
               --pool-vault '${{ inputs.pool_vault }}' \
+              --mint '${{ inputs.mint }}' \
               --out $OUT
           " 2>&1 | tee /tmp/discover_log.txt
 

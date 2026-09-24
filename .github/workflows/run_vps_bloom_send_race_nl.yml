@@ -36,7 +36,11 @@ on:
         required: false
         default: "30"
       pool_vault:
-        description: "хранилище USDC пула из разведки"
+        description: "хранилище токена в пуле (из разведки)"
+        required: false
+        default: ""
+      mint:
+        description: "минт токена пары (из разведки)"
         required: false
         default: ""
       watch_s:
@@ -155,6 +159,7 @@ jobs:
           OWN_SEND_LIVE: ${{ inputs.own_send_live }}
           PAIRS: ${{ inputs.pairs }}
           POOL_VAULT: ${{ inputs.pool_vault }}
+          MINT: ${{ inputs.mint }}
           WATCH_S: ${{ inputs.watch_s }}
           MAX_MINUTES: ${{ inputs.max_minutes }}
           NO_SELL: ${{ inputs.no_sell }}
@@ -170,6 +175,7 @@ jobs:
           if [ "$LIVE" = "1" ]; then ARGS="$ARGS --live"; fi
           if [ "$NO_SELL" = "1" ]; then ARGS="$ARGS --no-sell"; fi
           if [ -n "$POOL_VAULT" ]; then ARGS="$ARGS --pool-vault $POOL_VAULT"; fi
+          if [ -n "$MINT" ]; then ARGS="$ARGS --mint $MINT"; fi
           set -o pipefail
           echo "аргументы: $ARGS"
           # Ключи уезжают на хост ПОТОКОМ, не аргументами и не файлом: в
