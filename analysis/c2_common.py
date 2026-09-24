@@ -59,6 +59,8 @@ NATIVE_QUOTE = "native_sol"
 # Тот же пул SOL/USDC, что у детектора (bloom_detector.py:747) и у
 # solana_buyer200_fast_price.py:64 -- берём по цепи, а не свечи Gecko.
 REF_SOL_USDC_POOL = "3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv"
+REF2_SOL_USDC_WSOL_VAULT = "ATRsNGv2nDw7hSMfkUTBoVUDsFDwN7po7KbecyiGWNB4"
+RATE_MAX_AGE_S = 600
 # Курс вне этих границ -- не курс, а неверно спаренные счета.
 RATE_SANE_MIN, RATE_SANE_MAX = 20.0, 2000.0
 
@@ -643,35 +645,49 @@ class RateBook:
                 self.stats["missing"] += 1
             return None, "нет узла"
         sig = first_signature(tx)
-        try:
-            page = self.rpc.signatures(REF_SOL_USDC_POOL, before=sig, limit=20)
-        except RuntimeError as exc:
-            with self.lock:
-                self.stats["missing"] += 1
-            return None, f"getSignaturesForAddress пула SOL/USDC: {str(exc)[:80]}"
-        tried = 0
-        for s in page:
-            if s.get("err") is not None:
-                continue
-            sbt = s.get("blockTime")
-            if sbt is None or sbt > bt or bt - sbt > 120:
-                continue
-            if tried >= 5:  # курс нужен только для порога 2 SOL: пяти попыток хватает
-                break
-            tried += 1
+        why = []
+        # Два опорных пула SOL/USDC: пул детектора и пул 8FnX3xo2 (адрес его
+        # WSOL-хранилища взят из настоящей транзакции, data/bloom_tx_raw.json).
+        for ref in (REF_SOL_USDC_POOL, REF2_SOL_USDC_WSOL_VAULT):
             try:
-                t2 = self.rpc.get_tx(s["signature"])
-            except RuntimeError:
+                page = self.rpc.signatures(ref, before=sig, limit=25)
+            except RuntimeError as exc:
+                why.append(f"{ref[:6]}: {str(exc)[:60]}")
                 continue
-            r2 = rate_from_tx(t2 or {})
-            if r2 is not None:
-                with self.lock:
-                    self.by_minute[bt // 60] = (r2, "ref_pool")
-                    self.stats["ref_pool"] += 1
-                return r2, f"ref_pool:{s['signature'][:16]}"
+            tried = 0
+            for x in page:
+                if x.get("err") is not None:
+                    continue
+                sbt = x.get("blockTime")
+                if sbt is None or sbt > bt or bt - sbt > RATE_MAX_AGE_S:
+                    continue
+                if tried >= 6:
+                    break
+                tried += 1
+                try:
+                    t2 = self.rpc.get_tx(x["signature"])
+                except RuntimeError:
+                    continue
+                r2 = rate_from_tx(t2 or {})
+                if r2 is not None:
+                    with self.lock:
+                        self.by_minute[bt // 60] = (r2, "ref_pool")
+                        self.stats["ref_pool"] += 1
+                    return r2, f"ref_pool:{ref[:6]}:{x['signature'][:16]}"
+            why.append(f"{ref[:6]}: свопа не нашлось ({tried} попыток)")
+        # Последний довод -- ближайший курс, уже полученный по цепи в этом
+        # прогоне, не дальше 10 минут: для порога 2 SOL сдвиг курса за это
+        # время на порядок меньше расстояния до порога у большинства сделок.
+        with self.lock:
+            near = sorted((abs(m - bt // 60), v) for m, v in self.by_minute.items()
+                          if abs(m - bt // 60) <= 10)
+        if near:
+            with self.lock:
+                self.stats["cache"] += 1
+            return near[0][1][0], f"cache_near_{near[0][0]}min:{near[0][1][1]}"
         with self.lock:
             self.stats["missing"] += 1
-        return None, "в пуле SOL/USDC не нашлось свопа за 120 с до покупки"
+        return None, "курс не найден: " + "; ".join(why)
 
 
 _CTX = threading.local()

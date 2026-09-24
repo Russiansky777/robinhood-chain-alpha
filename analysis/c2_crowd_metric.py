@@ -48,9 +48,9 @@ SERVICE = "c2_crowd"
 CACHE_PATH = C.DATA / "c2_cache" / "crowd_cache.json"
 CACHE_VERSION = 1
 MAX_SIG_PAGES = 80          # 80 000 подписей на источник за окно -- выше честное «не выкачано»
-WINDOW_MAX_PAGES = 10       # 10 000 подписей на минт/хранилище за 60 с
+WINDOW_MAX_PAGES = 30       # владелец 24.09: 30 000 подписей на минт/хранилище за 60 с
 DT8_MAX_LAG = 3             # владелец: окно S+0..S+3 слота
-METHOD_VERSION = 2          # меняется -- кэш покупок пересчитывается
+METHOD_VERSION = 3          # меняется -- кэш покупок пересчитывается (толпа и DT8 берутся из прошлого)
 CLASSIFY_BATCH = 100
 
 
@@ -216,8 +216,44 @@ def dt8_check(rpc, anchor_sig: str, slot0: int, pos0: dict, idx_buy: int, mint: 
     return out
 
 
+# Пулы, где остатки хранилищ -- это и есть резервы x*y=k (спот = котировка /
+# токен). У CLMM/DLMM/DAMM v2 и кривых (pump.fun, Launchlab, DBC) остатки
+# хранилищ цену не задают -- там спот по резервам «нет данных».
+RESERVE_SPOT_PROGRAMS = {
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": "Pump AMM",
+    "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": "Raydium CPMM",
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "Raydium AMM v4",
+}
+CROWD_KEYS = ("crowd_30s", "crowd_30s_copy_wallets", "crowd_30s_rule2", "why_no_crowd")
+DT8_KEYS = ("dt8", "dt8_why", "dt8_sig", "dt8_slot", "dt8_lag_slots", "dt8_index_in_block",
+            "dt8_before_source")
+
+
+def pool_program_of(tx: dict, vault: str | None) -> str | None:
+    """Программа пула: programId неразобранной инструкции, где стоит хранилище,
+    из списка 107 программ DEX (роутеры туда не входят)."""
+    if not vault:
+        return None
+    import c2_pool_programs as PP  # noqa: PLC0415
+    return PP.pool_program(tx, vault, PP.labels())["pool_program"]
+
+
+def spot_after(tx: dict, pool: dict) -> tuple:
+    """(спот после сделки источника по остаткам хранилищ, причина если нет)."""
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    tv = rows.get(pool["pool_vault"])
+    if tv is None or not tv["post"]:
+        return None, "нет остатка хранилища токена"
+    if pool["quote_mint"] == C.NATIVE_QUOTE:
+        return None, "котировка -- натив кривой, резервы виртуальные"
+    qv = rows.get(pool["quote_vault"])
+    if qv is None:
+        return None, "нет остатка хранилища котировки"
+    return C.ui(qv["post"], qv["dec"]) / C.ui(tv["post"], tv["dec"]), None
+
+
 def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
-                cap: int, known: dict, probe: dict) -> dict:
+                cap: int, known: dict, probe: dict, prev: dict | None = None) -> dict:
     sig, slot, bt, mint = ev["signature"], ev["slot"], tx.get("blockTime"), ev["mint"]
     row = {"signature": sig, "slot": slot, "block_time": bt, "block_time_utc": C.utc(bt),
            "mint": mint, "spend_sol_equiv": round(ev["spend_sol_equiv"], 6),
@@ -233,10 +269,17 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
            "why_no_crowd": None, "window_tx_30s": None, "window_tx_60s": None,
            "anchor_slot": None, "dt8": "нет данных", "dt8_why": None, "dt8_sig": None,
            "dt8_slot": None, "dt8_lag_slots": None, "dt8_index_in_block": None,
-           "dt8_before_source": None}
+           "dt8_before_source": None, "pool_program": None, "spot_after": None,
+           "impact_source": None, "growth_after_30s": None, "growth_after_60s": None,
+           "why_no_after": None, "failed_same_block_tx": None, "failed_same_block_wallets": None,
+           "why_no_failed": None}
+    # Уже посчитанные толпа и DT8 (прошлый прогон, те же окна) не пересчитываются.
+    reuse_crowd = bool(prev) and prev.get("crowd_30s") is not None
+    reuse_dt8 = bool(prev) and prev.get("dt8") in ("да", "нет")
 
     def all_no(why):
-        for k in ("why_no_growth_30s", "why_no_growth_60s", "why_no_crowd"):
+        for k in ("why_no_growth_30s", "why_no_growth_60s", "why_no_crowd", "why_no_after",
+                  "why_no_failed"):
             row[k] = row[k] or why
         row["dt8_why"] = row["dt8_why"] or why
         return row
@@ -246,6 +289,20 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
     row.update(pool_vault=pool["pool_vault"], pool_owner=pool["pool_owner"],
                quote_mint=pool["quote_mint"], split_route=pool["split"],
                price_0=str(pool["price"]) if pool["price"] is not None else None)
+    prog = pool_program_of(tx, pool["pool_vault"]) if pool["ok"] else None
+    row["pool_program"] = prog
+    spot = None
+    if not pool["ok"]:
+        row["why_no_after"] = f"пул: {pool['why_not']}"
+    elif prog not in RESERVE_SPOT_PROGRAMS:
+        row["why_no_after"] = f"тип пула {prog} -- остатки хранилищ не дают спот"
+    else:
+        spot, why = spot_after(tx, pool)
+        if spot is None:
+            row["why_no_after"] = why
+        else:
+            row["spot_after"] = str(spot)
+            row["impact_source"] = round(float(spot / pool["price"]), 6)
     try:
         sigs0 = block_signatures(rpc, slot)
         if not sigs0 or sig not in sigs0:
@@ -258,7 +315,10 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
         row["anchor_slot"] = anchor["slot"]
 
         # DT8 -- по его собственной истории, независимо от пула и толпы.
-        row.update(dt8_check(rpc, anchor["signature"], slot, pos0, idx_buy, mint, pos_cache))
+        if reuse_dt8:
+            row.update({k: prev.get(k) for k in DT8_KEYS})
+        else:
+            row.update(dt8_check(rpc, anchor["signature"], slot, pos0, idx_buy, mint, pos_cache))
 
         mint_sigs, m_ok = sig_window(rpc, mint, anchor["signature"], slot)
         vault_sigs, v_ok = (sig_window(rpc, pool["pool_vault"], anchor["signature"], slot)
@@ -277,6 +337,28 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
     except RuntimeError as exc:
         return all_no(f"окно не построено: {str(exc)[:160]}")
 
+    # Упавшие в блоке источника ПОСЛЕ него транзакции с этим минтом (у других
+    # кошельков): как 12 из 15 в слоте 5HdXjagm52. Подписанты -- по самим
+    # транзакциям (до 60 штук).
+    if m_ok:
+        fl = {}
+        for x in mint_sigs + vault_sigs:
+            if (x.get("slot") == slot and x.get("err") is not None
+                    and (pos0.get(x.get("signature")) or -1) > idx_buy):
+                fl[x["signature"]] = x
+        row["failed_same_block_tx"] = len(fl)
+        if fl:
+            got_f = rpc.get_txs(list(fl)[:60])
+            wallets = set()
+            for t in got_f.values():
+                for w in C.signers(t or {}):
+                    if w != source:
+                        wallets.add(w)
+            row["failed_same_block_wallets"] = len(wallets)
+        else:
+            row["failed_same_block_wallets"] = 0
+    else:
+        row["why_no_failed"] = "история минта в окне не выкачана"
     mint_ok = after_buy(mint_sigs, slot, pos0, idx_buy, bt + w2)
     vault_ok = after_buy(vault_sigs, slot, pos0, idx_buy, bt + w2)
     union: dict = {}
@@ -287,7 +369,9 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
     row["window_tx_60s"] = len(union)
     fetched: dict = {}
 
-    if not m_ok or not v_ok:
+    if reuse_crowd:
+        row.update({k: prev.get(k) for k in CROWD_KEYS})
+    elif not m_ok or not v_ok:
         row["why_no_crowd"] = f"окно не выкачано целиком (> {WINDOW_MAX_PAGES * 1000} подписей)"
     elif len(in30) > cap:
         row["why_no_crowd"] = f"в окне 30 с {len(in30)} транзакций > предела {cap}"
@@ -325,6 +409,12 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
         row[f"price_{tag}_sig"] = pa.get("sig")
         row[f"last_trade_is_source_{tag}"] = pa.get("last_trade_is_source")
         row[f"growth_{tag}"] = round(float(pa["price"] / p0), 6)
+        if spot is not None:
+            row[f"growth_after_{tag}"] = round(float(pa["price"] / spot), 6)
+    if spot is not None:
+        for tag in ("30s", "60s"):
+            if row[f"growth_after_{tag}"] is None and not row["why_no_after"]:
+                row["why_no_after"] = row[f"why_no_growth_{tag}"]
     return row
 
 
@@ -409,6 +499,7 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
             if hit and hit.get("_w") == [w1, w2, cap, METHOD_VERSION]:
                 out["trades"].append(hit)
                 continue
+            prev = hit if hit and (hit.get("_w") or [None] * 3)[:3] == [w1, w2, cap] else None
             tx = buys_tx.get(s) or rpc.get_txs([s]).get(s)
             if tx is None:
                 row = {"signature": s, "mint": ev["mint"], "slot": ev["slot"],
@@ -416,7 +507,8 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
                        "why_no_growth_60s": "узел не отдал транзакцию покупки",
                        "why_no_crowd": "узел не отдал транзакцию покупки"}
             else:
-                row = analyze_buy(rpc, addr, ev, tx, w1=w1, w2=w2, cap=cap, known=known, probe=probe)
+                row = analyze_buy(rpc, addr, ev, tx, w1=w1, w2=w2, cap=cap, known=known, probe=probe,
+                                  prev=prev)
             row["_w"] = [w1, w2, cap, METHOD_VERSION]
             with cache_lock:
                 cache["buys"][s] = row
@@ -435,6 +527,10 @@ def aggregate(res: dict) -> dict:
     g30 = [t["growth_30s"] for t in tr if t.get("growth_30s") is not None]
     g60 = [t["growth_60s"] for t in tr if t.get("growth_60s") is not None]
     cr = [t["crowd_30s"] for t in tr if t.get("crowd_30s") is not None]
+    ga30 = [t["growth_after_30s"] for t in tr if t.get("growth_after_30s") is not None]
+    ga60 = [t["growth_after_60s"] for t in tr if t.get("growth_after_60s") is not None]
+    imp = [t["impact_source"] for t in tr if t.get("impact_source") is not None]
+    fb = [t for t in tr if t.get("failed_same_block_tx") is not None]
     d8 = [t for t in tr if t.get("dt8") in ("да", "нет")]
     d8_yes = [t for t in d8 if t.get("dt8") == "да"]
     d8_lag = [t["dt8_lag_slots"] for t in d8_yes if t.get("dt8_lag_slots") is not None]
@@ -455,6 +551,14 @@ def aggregate(res: dict) -> dict:
         "growth_60s_median": round(C.median(g60), 4) if g60 else None,
         "share_x2_30s": round(sum(1 for g in g30 if g >= 2) / len(g30), 4) if g30 else None,
         "crowd_30s_median": C.median(cr) if cr else None,
+        "impact_source_median": round(C.median(imp), 4) if imp else None,
+        "growth_after_30s_median": round(C.median(ga30), 4) if ga30 else None,
+        "growth_after_60s_median": round(C.median(ga60), 4) if ga60 else None,
+        "share_x1.3_after_30s": round(sum(1 for g in ga30 if g >= 1.3) / len(ga30), 4) if ga30 else None,
+        "n_after_30s": len(ga30),
+        "trades_with_failed_same_block": sum(1 for t in fb if t["failed_same_block_tx"] > 0),
+        "n_failed_checked": len(fb),
+        "no_after_reasons": reasons("why_no_after"),
         "dt8_share": round(len(d8_yes) / len(d8), 4) if d8 else None,
         "dt8_lag_median_slots": C.median(d8_lag) if d8_lag else None,
         "n_dt8_checked": len(d8), "n_dt8_before_source": sum(1 for t in d8_yes if t.get("dt8_before_source")),
@@ -471,8 +575,10 @@ def aggregate(res: dict) -> dict:
     }
 
 
-AGG_COLS = ["task", "source", "remark", "trades_7d", "growth_30s_median", "growth_60s_median",
-            "share_x2_30s", "crowd_30s_median", "dt8_share", "dt8_lag_median_slots", "n_dt8_checked",
+AGG_COLS = ["task", "source", "remark", "trades_7d", "growth_after_30s_median",
+            "growth_after_60s_median", "share_x1.3_after_30s", "impact_source_median", "n_after_30s",
+            "growth_30s_median", "growth_60s_median", "share_x2_30s", "crowd_30s_median",
+            "trades_with_failed_same_block", "n_failed_checked", "no_after_reasons", "dt8_share", "dt8_lag_median_slots", "n_dt8_checked",
             "n_dt8_before_source", "n_growth_30s", "n_growth_60s", "n_crowd_30s",
             "no_growth_30s_reasons", "no_crowd_reasons", "buys_rate_missing", "first_entries_lt2",
             "multi_mint_skipped", "n_signatures_window", "tx_fetch_failed", "scan_complete", "error"]
@@ -482,13 +588,35 @@ TRADE_COLS = ["task", "source", "remark", "signature", "slot", "index_in_block",
               "price_30s", "growth_30s", "last_trade_is_source_30s", "why_no_growth_30s",
               "price_60s", "growth_60s", "last_trade_is_source_60s", "why_no_growth_60s",
               "crowd_30s", "crowd_30s_copy_wallets", "crowd_30s_rule2", "why_no_crowd",
+              "pool_program", "spot_after", "impact_source", "growth_after_30s", "growth_after_60s",
+              "why_no_after", "failed_same_block_tx", "failed_same_block_wallets", "why_no_failed",
               "dt8", "dt8_slot", "dt8_lag_slots", "dt8_index_in_block", "dt8_before_source", "dt8_sig",
               "dt8_why", "window_tx_30s", "window_tx_60s", "price_30s_sig", "price_60s_sig", "anchor_slot"]
 
 
 def sort_key(a: dict):
-    s = a.get("share_x2_30s")
+    s = a.get("growth_after_30s_median")
     return (s is None, -(s or 0), a.get("task") or "", a.get("remark") or "")
+
+
+def failed_block_summary(results: list) -> dict:
+    """Теряем ли мы лучшие сделки: сделки источника, где в его блоке после
+    него упали чужие транзакции с минтом, против остальных."""
+    tr = [t for r in results for t in r.get("trades") or [] if t.get("failed_same_block_tx") is not None]
+
+    def grp(ts):
+        g30 = [t["growth_30s"] for t in ts if t.get("growth_30s") is not None]
+        ga = [t["growth_after_30s"] for t in ts if t.get("growth_after_30s") is not None]
+        return {"n": len(ts), "growth_30s_median": round(C.median(g30), 4) if g30 else None,
+                "share_x2_30s": round(sum(g >= 2 for g in g30) / len(g30), 4) if g30 else None,
+                "n_growth_30s": len(g30),
+                "growth_after_30s_median": round(C.median(ga), 4) if ga else None,
+                "n_after_30s": len(ga)}
+    with_f = [t for t in tr if t["failed_same_block_tx"] > 0]
+    no_f = [t for t in tr if t["failed_same_block_tx"] == 0]
+    many = [t for t in tr if t["failed_same_block_tx"] >= 5]
+    return {"with_failed": grp(with_f), "without_failed": grp(no_f), "failed_ge5": grp(many),
+            "n_checked": len(tr)}
 
 
 def write_outputs(date: str, rows: list, leader_row: dict | None, meta: dict,
@@ -511,7 +639,8 @@ def write_outputs(date: str, rows: list, leader_row: dict | None, meta: dict,
             for t in res.get("trades") or []:
                 w.writerow({**{k: t.get(k) for k in TRADE_COLS}, "task": res.get("task"),
                             "source": res.get("address"), "remark": res.get("remark")})
-    body = {"schema_version": 1, **meta, "sources_sorted_by_share_x2_30s": rows,
+    body = {"schema_version": 2, **meta, "sources_sorted_by_growth_after_30s": rows,
+            "failed_same_block_summary": failed_block_summary(results),
             "leader_row": leader_row,
             "per_source": [{k: v for k, v in r.items() if k != "trades"} | {"trades": [
                 {k: v for k, v in t.items() if k != "_w"} for t in r.get("trades") or []]}
@@ -653,6 +782,7 @@ def main() -> int:
             "before_semantics_check": {k: v for k, v in probe.items() if k != "lock"},
             "fast_copier": C.FAST_COPIER_DT8, "fast_copier_window_slots": DT8_MAX_LAG,
             "rate_stats": book.stats, "rpc_stats": rpc.stats,
+            "failed_same_block_summary": failed_block_summary(results),
             "rpc_calls_by_method": rpc.calls_by_method,
             "credits_this_run": rpc.stats.get("кредитов"),
             "c2_usage": C.c2_usage_report(),
@@ -669,12 +799,15 @@ def main() -> int:
     paths = write_outputs(date, agg, leader_row, meta, results)
     C.log(f"выгрузка: {paths}")
     C.log(f"кредитов за прогон: {rpc.stats.get('кредитов')}, C2 сегодня: {C.c2_spent_today()}")
-    print("--- коротко (сортировка по share_x2_30s) ---")
+    print("--- упавшие в блоке источника:", json.dumps(failed_block_summary(results), ensure_ascii=False))
+    print("--- коротко (сортировка по growth_after_30s) ---")
     for r in sorted(agg, key=sort_key) + ([leader_row] if leader_row else []):
         print(f"{r['task']:<8} {str(r['remark'])[:14]:<14} n={r['trades_7d']} "
               f"g30={r['growth_30s_median']} g60={r['growth_60s_median']} "
               f"x2={r['share_x2_30s']} crowd={r['crowd_30s_median']} dt8={r['dt8_share']}/"
-              f"{r['dt8_lag_median_slots']} ошибка={r['error']}")
+              f"{r['dt8_lag_median_slots']} ga30={r['growth_after_30s_median']} imp={r['impact_source_median']} "
+              f"x1.3={r['share_x1.3_after_30s']} fail={r['trades_with_failed_same_block']}/{r['n_failed_checked']} "
+              f"ошибка={r['error']}")
     return 0
 
 
@@ -819,6 +952,13 @@ def self_test() -> int:
         row["dt8"] == "да" and row["dt8_lag_slots"] == 0 and row["dt8_index_in_block"] == 2
         and row["dt8_before_source"] is False, row)
     chk("котировка -- xStock, без пересчёта", str(row["quote_mint"]).startswith("Xsa62"))
+    sp, why = spot_after(buy, pool)
+    # У мелкой покупки в CPMM спот после неё НИЖЕ цены исполнения: в цене
+    # исполнения сидит комиссия пула, а сдвиг от мелкой сделки меньше неё.
+    chk("спот после покупки посчитан по остаткам хранилищ и близок к цене исполнения (±5 %)",
+        sp is not None and abs(float(sp / pool["price"]) - 1) < 0.05, (sp, pool["price"], why))
+    chk("программа пула на настоящей транзакции -- Raydium CPMM (резервы дают спот)",
+        pool_program_of(buy, vault) in RESERVE_SPOT_PROGRAMS, pool_program_of(buy, vault))
 
     # DT8 купил на S+4 -- вне окна; и DT8 в S+2 купил ДРУГОЙ минт -- не считается
     t_d8_late = later("9" * 88, slot0 + 4, bt0 + 2, DT8, dv, q("1.2"), buyer_gain=5)
@@ -877,11 +1017,11 @@ def self_test() -> int:
     chk("причины «нет данных» перечислены", "пул:" in ag["no_growth_30s_reasons"], ag)
     chk("неполный скан -- число сделок не выдаётся за полное",
         "неполно" in str(aggregate(dict(res, sig_scan_complete=False))["trades_7d"]))
-    rows = sorted([ag, dict(ag, remark="z", share_x2_30s=None), dict(ag, remark="y", share_x2_30s=0.9)],
-                  key=sort_key)
-    chk("сортировка по share_x2_30s, «нет данных» в конце",
-        rows[0]["share_x2_30s"] == 0.9 and rows[-1]["share_x2_30s"] is None,
-        [r["share_x2_30s"] for r in rows])
+    rows = sorted([dict(ag, growth_after_30s_median=1.1), dict(ag, remark="z", growth_after_30s_median=None),
+                   dict(ag, remark="y", growth_after_30s_median=1.9)], key=sort_key)
+    chk("сортировка по growth_after_30s, «нет данных» в конце",
+        rows[0]["growth_after_30s_median"] == 1.9 and rows[-1]["growth_after_30s_median"] is None,
+        [r["growth_after_30s_median"] for r in rows])
     import tempfile  # noqa: PLC0415
     tmp = Path(tempfile.mkdtemp())
     paths = write_outputs("2099-01-01", [ag], dict(ag, source=C.LEADER_BEQV), {"x": 1}, [res], tmp)
