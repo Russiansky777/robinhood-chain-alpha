@@ -35,6 +35,10 @@ on:
         description: "верх полосы скорости разгонных, транзакций в минуту (0 -- десять целей)"
         required: false
         default: "0"
+      runner:
+        description: "'nl' -- свой раннер на хосте (по умолчанию), 'cloud' -- запасной облачный путь по ssh"
+        required: false
+        default: "nl"
 
 concurrency:
   group: feed-probe-deploy
@@ -49,7 +53,9 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Свой раннер стоит НА хосте, поэтому ssh идёт по петле, а файлы не едут
+    # через океан. Облачный путь остаётся запасным: вход runner=cloud.
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
     timeout-minutes: 20
     permissions:
       contents: write
@@ -58,15 +64,46 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Начало круга и адрес хоста"
+        run: |
+          set -e
+          echo "CIRCLE_START=$(date +%s)" >> "$GITHUB_ENV"
+          # На своём раннере ходим по петле: это и есть выигрыш, ради которого
+          # раннер ставился. На облачном -- по внешнему адресу, как раньше.
+          if [ "${{ inputs.runner }}" = "cloud" ]; then
+            echo "TARGET_HOST=$HOST" >> "$GITHUB_ENV"
+            echo "где выполняюсь: облачный бегунок, хост $HOST"
+          else
+            echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
+            echo "где выполняюсь: свой раннер на NL-хосте, ssh по петле"
+          fi
+          echo "пользователь раннера: $(id -un), машина: $(uname -n)"
+
+      - name: "Питон для самопроверок"
+        run: |
+          set -e
+          # На своём раннере системный python3 может быть без requests: его
+          # тянет solana_rpc_client в проверке пределов. Ставим не в систему,
+          # а во временное окружение прогона -- хосту ничего не меняем.
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+            echo "requests есть в системном python3"
+          else
+            python3 -m venv "$RUNNER_TEMP/selftest_venv"
+            "$RUNNER_TEMP/selftest_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/selftest_venv/bin/python" >> "$GITHUB_ENV"
+            echo "поставлено временное окружение с requests"
+          fi
+
       - name: "Самопроверки ДО доставки"
         run: |
           set -e
           cd analysis
-          python3 grpc_feed_probe.py --self-test
+          "$PY" grpc_feed_probe.py --self-test
           # Правило владельца: зонд не обгоняет детектор по расходу Helius.
-          python3 -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); import solana_rpc_client as R; assert p and p <= R.ОБЩИЙ_ПОТОЛОК_СУТКИ, 'предел зонда выше общего потолка'; print('предел зонда', p, 'кредитов в сутки, детектор', d, ', общий потолок', R.ОБЩИЙ_ПОТОЛОК_СУТКИ)"
-          python3 check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          "$PY" -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); import solana_rpc_client as R; assert p and p <= R.ОБЩИЙ_ПОТОЛОК_СУТКИ, 'предел зонда выше общего потолка'; print('предел зонда', p, 'кредитов в сутки, детектор', d, ', общий потолок', R.ОБЩИЙ_ПОТОЛОК_СУТКИ)"
+          "$PY" check_shell_ascii.py --self-test
+          "$PY" check_shell_ascii.py ../.github/workflows
 
       - name: "SSH key"
         env:
@@ -82,7 +119,7 @@ jobs:
       - name: "Каталоги от пользователя службы, не от root"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             install -d -o bot -g bot -m 755 $CODE_DIR
             install -d -o bot -g bot -m 755 $CODE_DIR/proto
@@ -129,7 +166,7 @@ jobs:
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
             true
-          } | ssh $SSH_OPTS root@$HOST "
+          } | ssh $SSH_OPTS root@$TARGET_HOST "
             set -e
             umask 077
             cat > $ENV_DIR/feed_probe_env
@@ -142,15 +179,15 @@ jobs:
         run: |
           set -e
           for F in grpc_feed_probe.py bloom_detector.py bloom_exec_state.py bloom_api.py solana_rpc_client.py; do
-            scp $SSH_OPTS analysis/$F root@$HOST:$CODE_DIR/$F
+            scp $SSH_OPTS analysis/$F root@$TARGET_HOST:$CODE_DIR/$F
           done
           for F in geyser_pb2.py geyser_pb2_grpc.py solana_storage_pb2.py solana_storage_pb2_grpc.py; do
-            scp $SSH_OPTS analysis/proto/$F root@$HOST:$CODE_DIR/proto/$F
+            scp $SSH_OPTS analysis/proto/$F root@$TARGET_HOST:$CODE_DIR/proto/$F
           done
-          ssh -n $SSH_OPTS root@$HOST "chown -R bot:bot $CODE_DIR"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $CODE_DIR"
           for F in grpc_feed_probe.py; do
             HERE=$(sha256sum analysis/$F | awk '{print $1}')
-            THERE=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$F | awk '{print \$1}'")
+            THERE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$F | awk '{print \$1}'")
             [ -n "$THERE" ] || { echo "СБОЙ: пустая сумма для $F"; exit 1; }
             [ "$HERE" = "$THERE" ] || { echo "СБОЙ: суммы не сошлись для $F"; exit 1; }
             echo "$F: сумма сошлась"
@@ -159,21 +196,21 @@ jobs:
       - name: "Зависимости зонда в venv хоста"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             /home/bot/robinhood-chain-alpha/venv/bin/pip install -q grpcio protobuf websockets 2>&1 | tail -2
             /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import grpc, google.protobuf, websockets; print(\"зависимости на месте\")'"
 
       - name: "Самопроверка зонда НА ХОСТЕ"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --self-test | tail -3"
 
       - name: "systemd-юнит"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             {
               echo '[Unit]'
@@ -206,7 +243,7 @@ jobs:
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             # ИМЕННО restart, а не 'enable --now': у работающей службы
             # 'enable --now' ничего не перезапускает, и новый код на хосте
@@ -245,6 +282,13 @@ jobs:
               print("в отчёте видны значения: " + ", ".join(плохо)); sys.exit(1)
           print("токенов в отчёте нет")
           PY
+
+      - name: "Круг в секундах"
+        if: always()
+        run: |
+          set -e
+          CIRCLE_END=$(date +%s)
+          echo "круг деплоя: $((CIRCLE_END - CIRCLE_START)) с (раннер: ${{ inputs.runner }})"
 
       - name: "Коммит отчёта"
         if: ${{ inputs.enable_service == 'yes' }}
