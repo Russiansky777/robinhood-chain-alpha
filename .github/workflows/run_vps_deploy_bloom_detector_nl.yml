@@ -115,15 +115,15 @@ jobs:
         run: |
           set -e
           cd analysis
-          \"$PY\" bloom_exec_state.py --self-test
-          \"$PY\" bloom_api.py --self-test
-          \"$PY\" bloom_seller.py --self-test
-          \"$PY\" bloom_detector.py --self-test
-          \"$PY\" bloom_executor.py --self-test
-          \"$PY\" bloom_reconcile.py --self-test
+          "$PY" bloom_exec_state.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" bloom_seller.py --self-test
+          "$PY" bloom_detector.py --self-test
+          "$PY" bloom_executor.py --self-test
+          "$PY" bloom_reconcile.py --self-test
           # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
           # не принимает, и деплой падает посреди дела (проверено 11:24Z).
-          \"$PY\" check_shell_ascii.py --self-test
+          "$PY" check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"

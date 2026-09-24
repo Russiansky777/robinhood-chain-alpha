@@ -108,11 +108,11 @@ jobs:
         run: |
           set -e
           cd analysis
-          \"$PY\" bloom_exec_state.py --self-test
-          \"$PY\" bloom_api.py --self-test
-          \"$PY\" bloom_seller.py --self-test
-          \"$PY\" bloom_detector.py --self-test
-          \"$PY\" check_shell_ascii.py --self-test
+          "$PY" bloom_exec_state.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" bloom_seller.py --self-test
+          "$PY" bloom_detector.py --self-test
+          "$PY" check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
@@ -199,7 +199,7 @@ jobs:
           # чужой кошелёк. Печатается только публичный ключ -- он публичный.
           # Отдельным файлом, а не heredoc: вложенный heredoc в "run: |" уже
           # ломался на закрывающей метке с отступом.
-          \"$PY\" analysis/bloom_key_match.py
+          "$PY" analysis/bloom_key_match.py
 
       - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
         run: |
