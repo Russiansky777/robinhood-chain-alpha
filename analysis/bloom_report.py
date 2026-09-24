@@ -536,11 +536,31 @@ def позиции_таблица(state: ST.ExecState) -> list:
     for p in state.positions().values():
         if not ST.is_real_mode(p.get("mode")):
             continue
+        # Наша подпись, слот посадки и вернувшийся SOL нужны в чек-лист по
+        # каждому пункту. Раньше таблица их не несла, и приходилось искать
+        # их отдельным прогоном раскладки.
+        подписи = p.get("signatures") or []
         строки.append({
             "client_order_id": p.get("client_order_id"),
             "mint": p.get("mint"),
             "mode": p.get("mode"),
             "state": p.get("state"),
+            "our_signature": (подписи[0] if подписи else None),
+            "source_signature": p.get("source_sig"),
+            "source_slot": p.get("source_slot"),
+            "our_slot": p.get("our_slot"),
+            "slot_delta": ((p.get("our_slot") - p.get("source_slot"))
+                            if isinstance(p.get("our_slot"), int)
+                            and isinstance(p.get("source_slot"), int) else None),
+            "sol_in": p.get("sol_in"),
+            "sol_back": (p.get("closed_sol_delta")
+                          if p.get("closed_sol_delta") is not None
+                          else (p.get("last_sell_outcome") or {}).get("sol_delta")),
+            "sol_back_net": (p.get("closed_sol_net")
+                              if p.get("closed_sol_net") is not None
+                              else (p.get("last_sell_outcome") or {}).get("sol_delta_net")),
+            "closed_via": p.get("closed_via"),
+            "closed_signature": p.get("closed_signature"),
             "buy_address_kind": p.get("buy_address_kind"),
             "buy_address": p.get("buy_address") or p.get("pool"),
             "source_program": p.get("program"),
@@ -1072,6 +1092,11 @@ def self_test() -> None:
                         "our_route_hops": 2, "flags": "ROUTE_MISMATCH",
                         "sell_address_kinds": "pool,mint", "sell_attempts": 2,
                         "unsold_reason": "2 неудачных попыток подряд",
+                        "signatures": ["НАША_ПОДПИСЬ"], "source_sig": "ПОДПИСЬ_ИСТОЧНИКА",
+                        "source_slot": 100, "our_slot": 101,
+                        "closed_via": "авто-ордер Bloom",
+                        "closed_signature": "ПОДПИСЬ_ЗАКРЫТИЯ",
+                        "closed_sol_delta": 0.000810693,
                         ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
         ]) + "\n", encoding="utf-8")
         поз2 = позиции_срез(st)
@@ -1083,6 +1108,12 @@ def self_test() -> None:
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",
             тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        chk("в таблице позиций есть наша подпись и слот посадки",
+            тб[0]["our_signature"] == "НАША_ПОДПИСЬ" and тб[0]["our_slot"] == 101
+            and тб[0]["slot_delta"] == 1, тб[0])
+        chk("и сколько SOL вернулось при закрытии",
+            abs((тб[0]["sol_back"] or 0) - 0.000810693) < 1e-9
+            and тб[0]["closed_via"] == "авто-ордер Bloom", тб[0])
         # причина пропуска сверки видна В ДОКЛАДЕ, а не только в логе
         о_без = отчёт(state=st, почему_нет_dbot="DBOT_API_KEY пуст в окружении прогона")
         chk("причина пропуска сверки названа в докладе",
