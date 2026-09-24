@@ -464,6 +464,25 @@ def позиции_срез(state: ST.ExecState) -> dict:
             "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"}
 
 
+def найти_подпись(строки: list, подписи: tuple) -> list:
+    """Все записи журнала по указанным подписям, целиком.
+
+    Нужно для разбора "сигнал был, решения нет": без поиска по журналу
+    нельзя отличить пропущенный сигнал от сигнала, записанного под другим
+    источником или с другим кодом.
+    """
+    если = {s for s in подписи if s}
+    вых = []
+    for r in строки:
+        for ключ in ("signature", "source_sig"):
+            v = r.get(ключ)
+            if v and (v in если or any(v.startswith(x) or x.startswith(v)
+                                        for x in если)):
+                вых.append(r)
+                break
+    return вых
+
+
 def позиции_таблица(state: ST.ExecState) -> list:
     """По каждой НАСТОЯЩЕЙ позиции: чем покупали, каким маршрутом, чем продавали.
 
@@ -549,6 +568,7 @@ def гейты(*, сверка: dict, позиции: dict, статус: dict |
 # ------------------------------------------------------------------- отчёт
 
 def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
+           найти: tuple = (),
           записи_dbot: list | None = None, статус: dict | None = None,
           n_таблицы: int = 15, n_стенда: int = 10) -> dict:
     строки, счёт = читать_решения(state.decisions_path, since_ts=since_ts)
@@ -586,6 +606,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "reconciliation": св,
         "pairs": пары(строки, св),
         "positions": поз,
+        "found_by_signature": найти_подпись(строки, найти or ()),
         "position_rows": позиции_таблица(state),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
@@ -734,6 +755,13 @@ def в_текст(о: dict) -> str:
                  + (f", остаток не читался: {r.get('balance_read_why_not')}"
                     if r.get("balance_read_why_not") else ""))
     L.append("")
+    нашлось = о.get("found_by_signature") or []
+    if нашлось:
+        L.append("")
+        L.append(f"--- записи по искомым подписям: {len(нашлось)} ---")
+        for r in нашлось:
+            L.append(json.dumps(r, ensure_ascii=False)[:1500])
+        L.append("")
     L.append("--- гейты live на реальных источниках ---")
     for имя, г in о["gates"].items():
         L.append(f"  [{'ДА ' if г.get('ok') else 'НЕТ'}] {имя}: "
@@ -992,6 +1020,21 @@ def self_test() -> None:
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",
             тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        # поиск по подписи: сигнал был, решения нет -- это надо уметь показать
+        нашлись = найти_подпись(
+            [строка(signature="ПОДПИСЬ_A"), строка(signature="ПОДПИСЬ_B"),
+             {"source_sig": "ПОДПИСЬ_A", "stage": "exec_result"}],
+            ("ПОДПИСЬ_A",))
+        chk("поиск по подписи находит и решение, и запись исполнителя",
+            len(нашлись) == 2, нашлись)
+        chk("чужую подпись не приносит",
+            найти_подпись([строка(signature="ПОДПИСЬ_B")], ("ПОДПИСЬ_A",)) == [])
+        chk("сокращённая подпись тоже находится",
+            len(найти_подпись([строка(signature="ПОДПИСЬ_ДЛИННАЯ_XYZ")],
+                               ("ПОДПИСЬ_ДЛИННАЯ",))) == 1)
+        chk("пустой список подписей ничего не приносит",
+            найти_подпись([строка(signature="A")], ()) == [])
+
         # запись с путём Jupiter должна попасть и в таблицу, и в текст
         st.positions_path.write_text("\n".join([
             json.dumps({"client_order_id": "j1", "state": "closed",
@@ -1097,6 +1140,8 @@ def main() -> int:
     p.add_argument("--stand-rows", type=int, default=10,
                    help="сколько последних решений стенда печатать целиком")
     p.add_argument("--out", default=None, help="куда положить текст отчёта")
+    p.add_argument("--find-sig", action="append", default=[],
+                   help="показать записи журнала по подписи целиком (можно несколько)")
     a = p.parse_args()
     if a.self_test:
         self_test()
@@ -1129,7 +1174,8 @@ def main() -> int:
                                  конфиг)
 
     о = отчёт(state=state, since_ts=since_ts, записи_dbot=записи,
-              статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows)
+              статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows,
+              найти=tuple(a.find_sig or ()))
     текст = в_текст(о)
     print(текст)
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
