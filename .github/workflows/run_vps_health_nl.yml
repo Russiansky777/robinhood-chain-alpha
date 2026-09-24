@@ -19,6 +19,10 @@ on:
         description: "сколько последних решений детектора показать (0 -- не показывать)"
         required: false
         default: "0"
+      diag_min:
+        description: "разбор сбоев за N минут: журнал детектора + строки HANDLER_CRASHED/UNSOLD (0 -- не делать)"
+        required: false
+        default: "0"
 
 concurrency:
   group: vps-health-nl
@@ -155,6 +159,92 @@ jobs:
           } >> data/vps_health_nl.txt
           python3 analysis/helius_usage_report.py | tee -a data/vps_health_nl.txt
 
+      - name: "Свежесть признаков жизни (порог 10 минут)"
+        if: always()
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- возраст признаков жизни (порог 600 с) ---"
+          } >> data/vps_health_nl.txt
+          # Возраст СЧИТАЕТСЯ НА ХОСТЕ: часы бегунка и часы хоста -- разные
+          # часы, и вычитать одно из другого значит мерить их расхождение.
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            NOW=\$(date +%s)
+            for f in /home/bot/bloom_executor_live_data/detector_status.json \
+                     /home/bot/bloom_executor_live_data/seller_heartbeat.json \
+                     /home/bot/dbot_detect_probe/status.json \
+                     /home/bot/grpc_feed_probe_data/heartbeat.json; do
+              if [ -s \"\$f\" ]; then
+                AGE=\$(( NOW - \$(stat -c %Y \"\$f\") ))
+                if [ \"\$AGE\" -gt 600 ]; then STATE=СТАРШЕ_10_МИНУТ; else STATE=свежий; fi
+                printf '%s: %s с (%s)\n' \"\$f\" \"\$AGE\" \"\$STATE\"
+              else
+                echo \"\$f: нет или пуст\"
+              fi
+            done")
+          echo "$OUT" | tee -a data/vps_health_nl.txt
+          case "$OUT" in
+            *СТАРШЕ_10_МИНУТ*) echo "ТРЕВОГА: признак жизни старше 10 минут"; echo "STALE=1" >> $GITHUB_ENV ;;
+            *) echo "STALE=0" >> $GITHUB_ENV ;;
+          esac
+
+      - name: "Разбор сбоев за окно (только чтение)"
+        if: ${{ always() && inputs.diag_min != '0' && inputs.diag_min != '' }}
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- сбои за последние ${{ inputs.diag_min }} минут ---"
+          } >> data/vps_health_nl.txt
+          # Решения: коды сбоев за окно. Журнал построчный JSON, поэтому
+          # отбор grep-ом -- по коду, а окно -- по метке времени в строке.
+          ssh -n $SSH_OPTS root@$HOST "
+            F=/home/bot/bloom_executor_live_data/decisions.jsonl
+            if [ -s \"\$F\" ]; then
+              grep -E 'HANDLER_CRASHED|UNSOLD|AUTO_PAUSE' \"\$F\" | tail -n 20
+            else
+              echo 'журнал решений пуст'
+            fi
+            echo '--- сторож продаж: UNSOLD и автопауза ---'
+            G=/home/bot/bloom_executor_live_data/seller_log.jsonl
+            if [ -s \"\$G\" ]; then grep -E 'UNSOLD|автопауз' \"\$G\" | tail -n 10; else echo 'журнала продаж нет'; fi
+          " 2>&1 | tee -a data/vps_health_nl.txt
+          # Журнал службы: ТОЛЬКО он несёт traceback (log.exception). Берём
+          # во временный файл и чистим от ключей ДО того, как он попадёт в
+          # отчёт: в URL Helius ключ стоит прямо в строке запроса.
+          ssh -n $SSH_OPTS root@$HOST "journalctl -u bloom-detector --since '-${{ inputs.diag_min }} min' --no-pager | tail -n 300" \
+            > /tmp/detector_journal.txt 2>&1 || true
+          python3 - <<'PY'
+          import re, pathlib
+          сырое = pathlib.Path("/tmp/detector_journal.txt").read_text(encoding="utf-8", errors="replace")
+          чистое = re.sub(r"api-key=[A-Za-z0-9._\-]+", "api-key=СКРЫТ", сырое)
+          чистое = re.sub(r"(?i)(x-token[\"']?\s*[:=]\s*)[A-Za-z0-9._\-]{8,}", r"\1СКРЫТ", чистое)
+          чистое = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._\-]{8,}", r"\1СКРЫТ", чистое)
+          отчёт = pathlib.Path("data/vps_health_nl.txt")
+          отчёт.write_text(отчёт.read_text(encoding="utf-8", errors="replace")
+                            + "\n--- журнал детектора (ключи вычищены) ---\n" + чистое,
+                            encoding="utf-8")
+          print("журнал детектора добавлен, строк:", чистое.count("\n"))
+          PY
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, sys, pathlib
+          п = pathlib.Path("data/vps_health_nl.txt")
+          т = п.read_text(encoding="utf-8", errors="replace") if п.exists() else ""
+          плохо = [и for и, о in (("api-key", r"api-key=[A-Za-z0-9._\-]{8,}"),
+                                   ("x-token", r"x-token[\"']?\s*[:=]\s*[A-Za-z0-9._\-]{8,}"),
+                                   ("bearer", r"(?i)bearer\s+[A-Za-z0-9._\-]{20,}"))
+                    if re.search(о, т)]
+          if плохо:
+              print("в отчёте видны значения: " + ", ".join(плохо)); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
       - name: "Хвост решений (по запросу)"
         # always(): если шаг выше упал, хвост журнала всё равно нужен --
         # именно он отвечает на вопрос про слоты.
@@ -186,7 +276,8 @@ jobs:
           done
           exit 1
 
-      - name: "Итог: падаем, если установленная служба мертва"
+      - name: "Итог: падаем, если служба мертва или признак жизни протух"
         run: |
           [ "$FAIL" = "0" ] || { echo "есть мёртвые службы -- см. отчёт выше"; exit 1; }
-          echo "все установленные службы активны"
+          [ "$STALE" = "0" ] || { echo "признак жизни старше 10 минут -- см. отчёт выше"; exit 1; }
+          echo "все установленные службы активны, признаки жизни свежие"
