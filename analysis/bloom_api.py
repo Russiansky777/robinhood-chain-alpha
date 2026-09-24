@@ -299,19 +299,29 @@ class BloomApi:
                      "order_id": None, "signatures": [],
                      "why_not": "dry-run: запрос не отправлялся"}
         self._log_call(запись)
+        # Время площадки измеряется ЗДЕСЬ, вокруг единственного POST: иначе в
+        # "сколько съедает Bloom" попадает и наша сборка тела, и запись в
+        # журнал. Владелец спрашивает про площадку -- значит мерить надо
+        # площадку.
+        t_отправлено = time.time()
         try:
             r = self.session.post(self.host + SWAP_PATH, headers=self._headers(),
                                    json=body, timeout=self.timeout)
         except requests.RequestException as exc:
             out = {"ok": False, "code": None, "network": True, "order_id": None,
                     "signatures": [],
+                    "bloom_ms": round((time.time() - t_отправлено) * 1000.0, 1),
+                    "sent_ts": t_отправлено,
                     "why_not": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300],
                     "retry_only_after_chain_check": True}
             if self.state is not None:
                 self.state.note_api_result(ok=False, code="СЕТЬ")
             self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
-        return self._parse_swap(r, client_order_id)
+        итог = self._parse_swap(r, client_order_id)
+        итог["bloom_ms"] = round((time.time() - t_отправлено) * 1000.0, 1)
+        итог["sent_ts"] = t_отправлено
+        return итог
 
     def _parse_swap(self, r, client_order_id: str) -> dict:
         заг = self._note_headers(r.headers)
@@ -390,6 +400,14 @@ def self_test() -> None:
         "for попытка" not in тело and "while" not in тело.split("def swap")[1].split("def ")[0])
 
     # --- тело покупки
+    # Замер времени площадки: он должен быть в ответе и вокруг ОДНОГО POST.
+    тело_кл = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+    chk("время площадки мерится вокруг единственного POST",
+        тело_кл.count("t_отправлено = time.time()") == 1
+        and "bloom_ms" in тело_кл, "")
+    chk("и в сетевом отказе тоже есть -- отказ бывает медленным",
+        тело_кл.count("\"bloom_ms\"") >= 2, тело_кл.count("\"bloom_ms\""))
+
     order = build_timer_order(seconds=29, slippage=40, priority_fee=0.001,
                                processor_tip=0.001)
     chk("таймерный ордер: тип time", order["target_type"] == "time")

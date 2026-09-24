@@ -580,7 +580,7 @@ def гейты(*, сверка: dict, позиции: dict, статус: dict |
 # ------------------------------------------------------------------- отчёт
 
 def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
-           найти: tuple = (), коды: tuple = (),
+           найти: tuple = (), коды: tuple = (), почему_нет_dbot: str | None = None,
           записи_dbot: list | None = None, статус: dict | None = None,
           n_таблицы: int = 15, n_стенда: int = 10) -> dict:
     строки, счёт = читать_решения(state.decisions_path, since_ts=since_ts)
@@ -588,7 +588,9 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
     с = стенд(строки)
     св = (сверка_с_dbot(строки, записи_dbot)
           if записи_dbot is not None
-          else {"known": False, "why": "записи DBot не переданы (нужен ключ и сеть)"})
+          else {"known": False,
+                "why": (почему_нет_dbot
+                        or "записи DBot не переданы (сверка не запрашивалась)")})
     поз = позиции_срез(state)
     по_кодам: dict = {}
     for r in б:
@@ -1040,6 +1042,14 @@ def self_test() -> None:
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",
             тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        # причина пропуска сверки видна В ДОКЛАДЕ, а не только в логе
+        о_без = отчёт(state=st, почему_нет_dbot="DBOT_API_KEY пуст в окружении прогона")
+        chk("причина пропуска сверки названа в докладе",
+            "DBOT_API_KEY пуст" in (о_без["reconciliation"].get("why") or ""),
+            о_без["reconciliation"])
+        chk("и в тексте доклада она тоже есть",
+            "DBOT_API_KEY пуст" in в_текст(о_без), "")
+
         # поиск по коду: разбор начинается с того, что владелец видел
         по_к = найти_по_коду([строка(code="INTERMEDIATE_ROUTE", ts_utc="2026-09-24T00:18:07Z"),
                                строка(code="NOT_A_BUY", ts_utc="2026-09-24T00:16:53Z"),
@@ -1196,21 +1206,38 @@ def main() -> int:
             статус = None
 
     записи = None
+    почему_нет_dbot = None
     if a.dbot:
         import os  # noqa: PLC0415
         ключ = os.environ.get("DBOT_API_KEY") or ""
         конфиг = Path(a.config) if a.config else None
-        if not ключ or not конфиг or not конфиг.exists():
-            print("сверка с DBot пропущена: нет ключа или снимка конфига",
-                  file=sys.stderr)
+        # Причина пропуска идёт В ДОКЛАД, а не в stderr прогона: "записи не
+        # переданы" без причины выглядело как "сверка невозможна вообще", и
+        # гейт live стоял на этом трое суток.
+        if not ключ:
+            почему_нет_dbot = "DBOT_API_KEY пуст в окружении прогона"
+        elif not конфиг or not конфиг.exists():
+            почему_нет_dbot = f"снимка конфига нет: {конфиг}"
         else:
             from bloom_ambiguous_diag import записи_dbot  # noqa: PLC0415
-            записи = записи_dbot(ключ, tuple(x.strip() for x in a.tasks.split(",")),
-                                 конфиг)
+            try:
+                записи = записи_dbot(ключ, tuple(x.strip() for x in a.tasks.split(",")),
+                                     конфиг)
+            except Exception as exc:  # noqa: BLE001
+                записи = None
+                почему_нет_dbot = f"запрос к DBot не удался: {type(exc).__name__}: {str(exc)[:200]}"
+            else:
+                неполные = sum(1 for r in записи if r.get("_полностью") is False)
+                print(f"записи DBot получены: {len(записи)}, из них из неполной "
+                      f"выгрузки {неполные}")
+                if not записи:
+                    почему_нет_dbot = ("DBot ответил, но записей follow по задачам "
+                                        f"{a.tasks} за окно нет")
 
     о = отчёт(state=state, since_ts=since_ts, записи_dbot=записи,
               статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows,
-              найти=tuple(a.find_sig or ()), коды=tuple(a.find_code or ()))
+              найти=tuple(a.find_sig or ()), коды=tuple(a.find_code or ()),
+              почему_нет_dbot=почему_нет_dbot)
     текст = в_текст(о)
     print(текст)
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
