@@ -1,57 +1,57 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-24T00:55:29Z",
+  "built_utc": "2026-09-24T01:01:34Z",
   "since_ts": null,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 0,
-    "v2": 260
+    "v2": 281
   },
   "decisions": {
-    "total": 260,
-    "real_sources": 228,
-    "test_source": 32,
+    "total": 281,
+    "real_sources": 235,
+    "test_source": 46,
     "by_code": {
       "TARGET_AMOUNT_OUT_OF_RANGE": 39,
-      "NOT_A_BUY": 142,
+      "NOT_A_BUY": 145,
       "TOKEN_RECEIVED_NOT_BOUGHT": 9,
       "INTERMEDIATE_ROUTE": 8,
       "AMBIGUOUS_TX": 1,
       "SKIP_TARGET_INCREASE_POSITION": 15,
       "BUY": 1,
-      "?": 13
+      "?": 17
     },
     "by_code_test_source": {
-      "NOT_A_BUY": 16,
-      "BUY": 6,
-      "?": 6,
+      "NOT_A_BUY": 26,
+      "BUY": 8,
+      "?": 8,
       "SKIP_TARGET_INCREASE_POSITION": 1,
       "TARGET_AMOUNT_OUT_OF_RANGE": 1,
       "INTERMEDIATE_ROUTE": 2
     }
   },
   "parse_groups": {
-    "total": 228,
+    "total": 235,
     "by_group": {
       "PARSE_VIA_MSG": {
-        "decisions": 178,
-        "share": 0.7807,
+        "decisions": 181,
+        "share": 0.7702,
         "to_buy": 1,
         "slot_lag": {
-          "n": 178,
+          "n": 181,
           "min": 0,
-          "median": 0.0,
+          "median": 0,
           "max": 0
         },
         "net_slot_minus_source": {
-          "n": 178,
+          "n": 181,
           "min": 0,
-          "median": 0.0,
+          "median": 0,
           "max": 0
         },
         "decide_latency_ms": {
-          "n": 178,
+          "n": 181,
           "min": 0.2,
           "median": 0.4,
           "max": 24.2
@@ -59,7 +59,7 @@
       },
       "PARSE_VIA_RPC": {
         "decisions": 37,
-        "share": 0.1623,
+        "share": 0.1574,
         "to_buy": 0,
         "slot_lag": {
           "n": 37,
@@ -81,8 +81,8 @@
         }
       },
       "неизвестно": {
-        "decisions": 13,
-        "share": 0.057,
+        "decisions": 17,
+        "share": 0.0723,
         "to_buy": 0,
         "slot_lag": null,
         "net_slot_minus_source": null,
@@ -96,10 +96,10 @@
       "НЕТ_ПОЛЯ": {
         "PARSE_VIA_RPC": 22,
         "PARSE_VIA_MSG": 40,
-        "неизвестно": 19
+        "неизвестно": 25
       },
       "0": {
-        "PARSE_VIA_MSG": 121,
+        "PARSE_VIA_MSG": 134,
         "PARSE_VIA_RPC": 14
       },
       "1": {
@@ -107,7 +107,7 @@
         "PARSE_VIA_RPC": 1
       },
       "legacy": {
-        "PARSE_VIA_MSG": 17,
+        "PARSE_VIA_MSG": 19,
         "PARSE_VIA_RPC": 2
       }
     },
@@ -216,157 +216,81 @@
   "stand_rows": [
     {
       "schema_version": 2,
-      "ts_utc": "2026-09-24T00:52:22Z",
-      "signature": "5PsagzwKQhcHvuhoM5H9MQVf28Ck566j5TKZfN551xgjmEgsU8ULmVhzbhqGucc3kAwuRpXewbzkF5ifTrkPQHHJ",
+      "ts_utc": "2026-09-24T00:56:44Z",
+      "signature": "48QVAF9jHBZyU4ELfY4cLR41D9fmYgbaSU49BeDEXV8Lf1FYyTinRPEQeepsff3mkWpmoRkm1DYAiN3AbHwSoLyo",
       "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump",
-      "slot": 449871317,
-      "kind": "buy",
-      "spend_sol_eq": 0.073612166,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.073612166,
-      "first_entry": true,
-      "dex_programs": [
-        "Pump.fun"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Pump.fun"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 2,
-        "via_intermediate": false,
-        "intermediate_from": "промежуточных нет",
-        "authorized_only_mints": [],
-        "other_tx_mints": [],
-        "all_tx_mints": [
-          "So11111111111111111111111111111111111111112",
-          "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump"
-        ]
-      },
+      "mint": null,
+      "slot": 449872296,
+      "kind": "other",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [],
+      "token_program": null,
+      "route": null,
       "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 0.97,
-      "gate_ms": 1.3,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790211142.882094,
-      "t_recv_utc": "2026-09-24T00:52:22Z",
-      "t_decide_ts": 1790211142.884368,
-      "decide_latency_ms": 2.3,
-      "source_slot": 449871317,
-      "net_slot_at_decision": 449871317,
-      "net_slot_age_s": 0.041,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:52:22Z",
-      "stage": "exec_result",
-      "signature": "5PsagzwKQhcHvuhoM5H9MQVf28Ck566j5TKZfN551xgjmEgsU8ULmVhzbhqGucc3kAwuRpXewbzkF5ifTrkPQHHJ",
-      "mint": "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump",
-      "client_order_id": "fccb81b2654f4082bdc7a22659c8bdd1",
-      "source_sig": "5PsagzwKQhcHvuhoM5H9MQVf28Ck566j5TKZfN551xgjmEgsU8ULmVhzbhqGucc3kAwuRpXewbzkF5ifTrkPQHHJ",
-      "exec_code": "SENT",
-      "reason": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым",
-      "live": false,
-      "dry_run": false,
-      "mode": "live-test",
-      "test_source": true,
-      "buy_address": "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump",
-      "buy_address_kind": "mint",
-      "order_id": "API-38946f6c-7d48-46cc-8a41-b3687e208e38",
-      "signatures": [
-        "5rigEM8hcHfjG96WCYBTcYSvZsprzEnMkQUCdT7z5wckNRPYRL4cumYfzUPtiGukdeSyQFTxAyYa8VzfNZ9YW2Xe"
-      ]
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:53:22Z",
-      "signature": "4bGrF4aXq32ZSqnFYngogrHk15JVXHoeUeXiEa6gYxhu28pjGZifsU6a1awYZUJsaZx7LhJNPZKh86Nh3Pzfsx5M",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-      "slot": 449871539,
-      "kind": "buy",
-      "spend_sol_eq": 0.07,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.07,
-      "first_entry": true,
-      "dex_programs": [
-        "Jupiter v6",
-        "Raydium AMM v4"
-      ],
-      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Raydium AMM v4"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 3,
-        "via_intermediate": false,
-        "intermediate_from": "промежуточных нет",
-        "authorized_only_mints": [],
-        "other_tx_mints": [],
-        "all_tx_mints": [
-          "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "ни один некотировочный минт не изменился",
+      "filter": "задача DBot",
       "test_source": true,
       "parse_ms": 0.32,
-      "gate_ms": 1.31,
+      "gate_ms": 0.01,
       "via": "transactionSubscribe",
       "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790211202.555191,
-      "t_recv_utc": "2026-09-24T00:53:22Z",
-      "t_decide_ts": 1790211202.556822,
-      "decide_latency_ms": 1.6,
-      "source_slot": 449871539,
-      "net_slot_at_decision": 449871539,
-      "net_slot_age_s": 0.037,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
+      "tx_version": "legacy",
+      "t_recv_ts": 1790211404.971883,
+      "t_recv_utc": "2026-09-24T00:56:44Z",
+      "t_decide_ts": 1790211404.972211,
+      "decide_latency_ms": 0.3,
+      "source_slot": 449872296,
+      "net_slot_at_decision": 449872296,
+      "net_slot_age_s": 0.209,
+      "rate_note": "трата не определена",
       "rate_source": "geckoterminal",
       "source_task": "TEST",
       "mode": "dry"
     },
     {
       "schema_version": 2,
-      "ts_utc": "2026-09-24T00:53:22Z",
-      "stage": "exec_result",
-      "signature": "4bGrF4aXq32ZSqnFYngogrHk15JVXHoeUeXiEa6gYxhu28pjGZifsU6a1awYZUJsaZx7LhJNPZKh86Nh3Pzfsx5M",
-      "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-      "client_order_id": "5b68bd6f7faa4493b2e40b36b9f67f03",
-      "source_sig": "4bGrF4aXq32ZSqnFYngogrHk15JVXHoeUeXiEa6gYxhu28pjGZifsU6a1awYZUJsaZx7LhJNPZKh86Nh3Pzfsx5M",
-      "exec_code": "SENT",
-      "reason": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым",
-      "live": false,
-      "dry_run": false,
-      "mode": "live-test",
+      "ts_utc": "2026-09-24T00:57:09Z",
+      "signature": "45eX8L4odzcGfvH6D3tUNZszKQ6CXjd5kF3G8UCyXctKVUAjtKB5JGGgs3YVTbD8p8trcUpnPv7k4WUjpwT4wP5k",
+      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
+      "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
+      "slot": 449872389,
+      "kind": "sell",
+      "spend_sol_eq": null,
+      "spend_mint": null,
+      "spend_ui": null,
+      "first_entry": null,
+      "dex_programs": [
+        "Meteora DLMM"
+      ],
+      "token_program": null,
+      "route": null,
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "NOT_A_BUY",
+      "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки",
+      "filter": "задача DBot",
       "test_source": true,
-      "buy_address": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-      "buy_address_kind": "mint",
-      "order_id": "API-437e119f-d2d2-4e47-b6ca-a20181b25bd0",
-      "signatures": [
-        "3dDU1RnxmFmU53fvSPA3QTZJfFnt6ieRhMGiQe3zGy8jXz8f9NqGoeHzNu4hS2Dia6YP19XzZCMD1h2CAtVvWPnm"
-      ]
+      "parse_ms": 0.36,
+      "gate_ms": 0.01,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "t_recv_ts": 1790211429.432704,
+      "t_recv_utc": "2026-09-24T00:57:09Z",
+      "t_decide_ts": 1790211429.433074,
+      "decide_latency_ms": 0.4,
+      "source_slot": 449872389,
+      "net_slot_at_decision": 449872389,
+      "net_slot_age_s": 0.153,
+      "rate_note": "трата не определена",
+      "rate_source": "geckoterminal",
+      "source_task": "TEST",
+      "mode": "dry"
     }
   ],
   "routes": {
@@ -383,216 +307,8 @@
     "total": 8
   },
   "reconciliation": {
-    "known": true,
-    "signals_dbot_would_buy": 9,
-    "compared": 40,
-    "agreed": 38,
-    "dbot_bought_we_did_not": [
-      {
-        "signature": "2EwScfixkH1ZZwZkAJ6GpZbiFS4gKDgohTXEYHn2hjHixJ7Ldqsbjh8QmYDigkxdZjjeAvoMm9ZAcceEoG7pEBzw",
-        "mint": "FLyzixQCC1osJxi3uhQAntuKvgDZ1pUAiDEobi8z9MNL",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu8ui24g0kb00c_mueli68tg94hbd",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "33Kvehwq4LDNkWb75mDwJcRr5ppdEZV3oJ8osxMeA1ET2aTmxF3rr9cHm3QPFXuZta5x4aNLr7z837HRSmcccVJy",
-        "mint": "CvUX4G2tzq7J3ECmNvWZLayZYV6KpgQp6SJ5K8Uvsu5g",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muese49juj0qbk",
-        "match_delta_s": 35.1
-      }
-    ],
-    "we_would_buy_dbot_refused": [],
-    "skipped_by_our_limit_dbot_bought": [
-      {
-        "signature": "4GuLGZozuvHb8KRP1LHnjmxpV7txAcBwqDbw2KPfryHXaKCjSGgzGfLVoqciWqLJR7CrTm6HGaA1xVhfKxjqJLSE",
-        "mint": "FYayBW6PMhzuNUVTJSr4ruk66p1nVhJ3bSmYueMr1ZMS",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muejts41mgvmyw",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "4P9sC5ZHyXuYDJnPSmYk5sthVDNwrVoLgpcBbBgfWs3ncffMLAMtn52TixaYxpAAr1y3ruWpDfwHK15zNcV7Crrr",
-        "mint": "9GJQgnwKZL6oqsPcLmSohBb61w6cdj629b1RFhWvUe7j",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muek4wdm985pom",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "496iPttxBq737RZbKk44fi9ssYin8j2bfVK8rVnfksUTuNhnenYCbvjWr7gH4X76KxMB1ReVDCcYytvgUiTey8m2",
-        "mint": "DoqY9DZPnP11ptofS2jX5EZSnq6Cvt1mSzw1XJscwGUK",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muek7ddgt9lvps",
-        "match_delta_s": 0.1
-      },
-      {
-        "signature": "3jYZjKVWjDuoKBLrBmeRxXnhmC4atqyipLuvGfWtmhriHugocDvrdugigRE6E3s4RTUmKspppCfNU7L99UFzBYqj",
-        "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muelgyvxuqzw6l",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "2kLHjtpm2e43C8Ek5rDeFGbLd2kNsErseTNE9spuhQ4oqC6UKY6Nn7P3P68SewyZjLm8EfMdtFvYeQQWLKNQcYf5",
-        "mint": "DtYzXe9cR6b6ExReMCn5yHzvbS4nUQZ1GkBQDqQoSTNK",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muelqoz9echngv",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "4kozkrJN8KVso62JF8zquVCRyf14zvbmwmqNSQMUVYw2wanZ8SeU7e72PbBbo3Dw11cbDTyWQwPohLm2uyZLHU7s",
-        "mint": "HpWGRTs5x2pmWrGKpD5cXpZhja1uuXbPBqf7kYo2mz86",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muer6kp6o8zhbv",
-        "match_delta_s": 0.0
-      },
-      {
-        "signature": "5gojtrRZK57Xvyy4iyQjGcsooESb3WtBKVr1xV6GXD5wPN9ENKFNATCGumhiwyd7p7Vr2yyJqU1Fy5ev4JUFLhTL",
-        "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muerc0nnox0bh3",
-        "match_delta_s": 0.2
-      },
-      {
-        "signature": "2j46i2LVmm5M6ffbT1BaeK1k2ERU6fzkfHZmiJwPoVc8rNZJBsDj5hQP3CjwywdC33NQSbhp8aFqh15eB8h1ivGD",
-        "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
-        "our_code": "INTERMEDIATE_ROUTE",
-        "dbot_code": "ПРОШЛО",
-        "dbot_record_id": "mu7p7wkz0a4070_muesnngi10vki1",
-        "match_delta_s": 0.0
-      }
-    ],
-    "dbot_record_not_found": 23,
-    "not_comparable_source_did_not_buy": 152,
-    "by_dbot_code": {
-      "ПРОШЛО": 11,
-      "TARGET_AMOUNT_OUT_OF_RANGE": 14,
-      "SKIP_TARGET_INCREASE_POSITION": 13,
-      "DUPLICATE_TOKEN_BUY": 2
-    },
-    "dbot_records": {
-      "loaded": 1794,
-      "sources": 22,
-      "with_follow": 1794,
-      "oldest_utc": "2026-09-19T01:41:01Z",
-      "newest_utc": "2026-09-24T00:47:22Z",
-      "by_skip_reason": {
-        "FOLLOW_ORDER_IS_ONLY_PNL_MODE": 856,
-        "SKIP_TARGET_INCREASE_POSITION": 440,
-        "TARGET_AMOUNT_OUT_OF_RANGE": 240,
-        "ПРОШЛО": 181,
-        "DUPLICATE_TOKEN_BUY": 74,
-        "MAX_BUY_TIMES_PER_TOKEN_REACHED": 3
-      }
-    },
-    "unmatched_diag": [
-      {
-        "signature": "4zGYxRdJQ2Br1YkqoJx6kW1x5VsLtqTWqwZMKLGWmXiXwReQ3ffCTUPixoaS9dpKfJAQL6MJVAm4c7pXt4vnqKpd",
-        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "nearest_same_source_record": {
-          "delta_s": 825.6,
-          "dbot_mint": "So11111111111111111111111111111111111111112",
-          "dbot_type": "sell",
-          "dbot_code": "FOLLOW_ORDER_IS_ONLY_PNL_MODE",
-          "same_second": false
-        },
-        "records_same_source": 140,
-        "records_same_source_and_mint": 0,
-        "nearest_same_source_s": 825.6,
-        "nearest_same_mint_s": null,
-        "why": "источник есть, но минта нет ни в одной его записи"
-      },
-      {
-        "signature": "5Rw1Yo1fzMeRwLtNiSJd49DEfQ3Nm5zjSyZM49h65aSsfwSGBjHvssywwSPANJBWVXHSo2rCyRYu12opvg5mZpq9",
-        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "nearest_same_source_record": {
-          "delta_s": 830.6,
-          "dbot_mint": "So11111111111111111111111111111111111111112",
-          "dbot_type": "sell",
-          "dbot_code": "FOLLOW_ORDER_IS_ONLY_PNL_MODE",
-          "same_second": false
-        },
-        "records_same_source": 140,
-        "records_same_source_and_mint": 0,
-        "nearest_same_source_s": 830.6,
-        "nearest_same_mint_s": null,
-        "why": "источник есть, но минта нет ни в одной его записи"
-      },
-      {
-        "signature": "5RGzzEPRxmjJEj6Re9inXZKTjSdEZHt3h3FZ1iXxtgQUTHVuzhMZT8byGi1533GkXisUc3PVs56pSZBBtuV3msXz",
-        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "nearest_same_source_record": {
-          "delta_s": 849.3,
-          "dbot_mint": "So11111111111111111111111111111111111111112",
-          "dbot_type": "sell",
-          "dbot_code": "FOLLOW_ORDER_IS_ONLY_PNL_MODE",
-          "same_second": false
-        },
-        "records_same_source": 140,
-        "records_same_source_and_mint": 0,
-        "nearest_same_source_s": 849.3,
-        "nearest_same_mint_s": null,
-        "why": "источник есть, но минта нет ни в одной его записи"
-      },
-      {
-        "signature": "5yBeu58kWUfSE1yEa9wC6ZQGzXxzrFbtuWB84J5f6ysSpniyhfU4Be5b7HCvUoRG6xMtCNF674neyJ6raXVf5FVr",
-        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "nearest_same_source_record": {
-          "delta_s": 851.8,
-          "dbot_mint": "So11111111111111111111111111111111111111112",
-          "dbot_type": "sell",
-          "dbot_code": "FOLLOW_ORDER_IS_ONLY_PNL_MODE",
-          "same_second": false
-        },
-        "records_same_source": 140,
-        "records_same_source_and_mint": 0,
-        "nearest_same_source_s": 851.8,
-        "nearest_same_mint_s": null,
-        "why": "источник есть, но минта нет ни в одной его записи"
-      },
-      {
-        "signature": "3Ev3cDfRmnaWWTex7yEjkXqaiYHgCMwaXiJk2Ut9wRW5AxT4wjJrzbVT6MfLK8Rg92MtzKmTKtqTfqtdGX8LQdye",
-        "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-        "mint": "DwxWrEkpsxQ7ZurKk2Zj6447sw3qsqRdYVqH5Mo2Aoga",
-        "our_code": "TARGET_AMOUNT_OUT_OF_RANGE",
-        "nearest_same_source_record": {
-          "delta_s": 862.7,
-          "dbot_mint": "So11111111111111111111111111111111111111112",
-          "dbot_type": "sell",
-          "dbot_code": "FOLLOW_ORDER_IS_ONLY_PNL_MODE",
-          "same_second": false
-        },
-        "records_same_source": 140,
-        "records_same_source_and_mint": 0,
-        "nearest_same_source_s": 862.7,
-        "nearest_same_mint_s": null,
-        "why": "источник есть, но минта нет ни в одной его записи"
-      }
-    ],
-    "divergences": 2,
-    "agreement": 0.95,
-    "gate_signals_reached": false,
-    "gate_no_missed_buys": false,
-    "gate_agreement": true,
-    "note": "записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с"
+    "known": false,
+    "why": "записи DBot не переданы (сверка не запрашивалась)"
   },
   "pairs": {
     "our_sent": 0,
@@ -608,719 +324,186 @@
       "spent_sol": 0
     },
     "live_test": {
-      "count": 6,
-      "open": 1,
-      "spent_sol": 0.006
+      "count": 8,
+      "open": 0,
+      "spent_sol": 0.008
     },
     "dry_run": {
       "count": 0,
       "open": 0,
       "spent_sol": 0
     },
-    "open_real": 1,
+    "open_real": 0,
     "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"
   },
-  "found_by_signature": [],
-  "found_by_code": [
+  "found_by_signature": [
     {
       "schema_version": 2,
-      "ts_utc": "2026-09-24T00:53:22Z",
-      "signature": "4bGrF4aXq32ZSqnFYngogrHk15JVXHoeUeXiEa6gYxhu28pjGZifsU6a1awYZUJsaZx7LhJNPZKh86Nh3Pzfsx5M",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-      "slot": 449871539,
+      "ts_utc": "2026-09-23T20:21:48Z",
+      "signature": "4GuLGZozuvHb8KRP1LHnjmxpV7txAcBwqDbw2KPfryHXaKCjSGgzGfLVoqciWqLJR7CrTm6HGaA1xVhfKxjqJLSE",
+      "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+      "mint": "FYayBW6PMhzuNUVTJSr4ruk66p1nVhJ3bSmYueMr1ZMS",
+      "slot": 449810193,
       "kind": "buy",
-      "spend_sol_eq": 0.07,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.07,
+      "spend_sol_eq": 8.734834898016114,
+      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "spend_ui": 1000.0,
       "first_entry": true,
       "dex_programs": [
-        "Jupiter v6",
-        "Raydium AMM v4"
-      ],
-      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Raydium AMM v4"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 3,
-        "via_intermediate": false,
-        "intermediate_from": "промежуточных нет",
-        "authorized_only_mints": [],
-        "other_tx_mints": [],
-        "all_tx_mints": [
-          "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 0.32,
-      "gate_ms": 1.31,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790211202.555191,
-      "t_recv_utc": "2026-09-24T00:53:22Z",
-      "t_decide_ts": 1790211202.556822,
-      "decide_latency_ms": 1.6,
-      "source_slot": 449871539,
-      "net_slot_at_decision": 449871539,
-      "net_slot_age_s": 0.037,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:52:22Z",
-      "signature": "5PsagzwKQhcHvuhoM5H9MQVf28Ck566j5TKZfN551xgjmEgsU8ULmVhzbhqGucc3kAwuRpXewbzkF5ifTrkPQHHJ",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump",
-      "slot": 449871317,
-      "kind": "buy",
-      "spend_sol_eq": 0.073612166,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.073612166,
-      "first_entry": true,
-      "dex_programs": [
-        "Pump.fun"
+        "Raydium CPMM"
       ],
       "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
       "route": {
         "programs": [
-          "Pump.fun"
+          "Raydium CPMM"
         ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 2,
-        "via_intermediate": false,
-        "intermediate_from": "промежуточных нет",
-        "authorized_only_mints": [],
-        "other_tx_mints": [],
+        "intermediate_mints": [
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
+        ],
+        "mints_in_route": 3,
+        "hops_by_mints": 2,
+        "dex_calls": 1,
+        "via_intermediate": true,
         "all_tx_mints": [
-          "So11111111111111111111111111111111111111112",
-          "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump"
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "FYayBW6PMhzuNUVTJSr4ruk66p1nVhJ3bSmYueMr1ZMS",
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
         ]
       },
       "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 0.97,
-      "gate_ms": 1.3,
+      "action": "skip",
+      "code": "INTERMEDIATE_ROUTE",
+      "reason": "источник купил через промежуточный токен Xs8S1uUs1z: комиссия на перевод берётся на каждой ноге",
+      "filter": "наш лимит",
+      "dbot_бы_купил": true,
+      "test_source": false,
       "via": "transactionSubscribe",
       "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790211142.882094,
-      "t_recv_utc": "2026-09-24T00:52:22Z",
-      "t_decide_ts": 1790211142.884368,
-      "decide_latency_ms": 2.3,
-      "source_slot": 449871317,
-      "net_slot_at_decision": 449871317,
-      "net_slot_age_s": 0.041,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
+      "t_recv_ts": 1790194908.796318,
+      "t_recv_utc": "2026-09-23T20:21:48Z",
+      "t_decide_ts": 1790194908.796871,
+      "decide_latency_ms": 0.6,
+      "source_slot": 449810193,
+      "net_slot_at_decision": 449810193,
+      "net_slot_age_s": 0.01,
+      "rate_note": "по курсу 114.48 USD/SOL",
       "rate_source": "geckoterminal",
-      "source_task": "TEST",
+      "source_task": "BATCH-3",
       "mode": "dry"
     },
     {
       "schema_version": 2,
-      "ts_utc": "2026-09-24T00:50:48Z",
-      "signature": "32Bf8aXz6dvyNHqAMFaazStQ9jyg1pe9kxmMH9yxsv2CBn7v5agHaBHKBMSvbuzPZVfvLcyznxKtzQ22X8pYu3RW",
-      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
-      "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
-      "slot": 449870962,
+      "ts_utc": "2026-09-23T20:30:27Z",
+      "signature": "4P9sC5ZHyXuYDJnPSmYk5sthVDNwrVoLgpcBbBgfWs3ncffMLAMtn52TixaYxpAAr1y3ruWpDfwHK15zNcV7Crrr",
+      "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+      "mint": "9GJQgnwKZL6oqsPcLmSohBb61w6cdj629b1RFhWvUe7j",
+      "slot": 449812144,
       "kind": "buy",
-      "spend_sol_eq": 0.06078610205893893,
+      "spend_sol_eq": 6.124961296395402,
       "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 7.0,
+      "spend_ui": 700.0,
       "first_entry": true,
       "dex_programs": [
-        "Orca Whirlpool",
         "Meteora DLMM"
       ],
       "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
       "route": {
         "programs": [
-          "Orca Whirlpool",
           "Meteora DLMM"
         ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 4,
-        "via_intermediate": false,
-        "intermediate_from": "промежуточных нет",
-        "authorized_only_mints": [],
-        "other_tx_mints": [],
-        "all_tx_mints": [
-          "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 0.5,
-      "gate_ms": 5.05,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790211048.293248,
-      "t_recv_utc": "2026-09-24T00:50:48Z",
-      "t_decide_ts": 1790211048.298795,
-      "decide_latency_ms": 5.5,
-      "source_slot": 449870962,
-      "net_slot_at_decision": 449870962,
-      "net_slot_age_s": 0.158,
-      "rate_note": "по курсу 115.16 USD/SOL",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:28:59Z",
-      "signature": "2j46i2LVmm5M6ffbT1BaeK1k2ERU6fzkfHZmiJwPoVc8rNZJBsDj5hQP3CjwywdC33NQSbhp8aFqh15eB8h1ivGD",
-      "source": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
-      "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
-      "slot": 449866031,
-      "kind": "buy",
-      "spend_sol_eq": 34.70745725165158,
-      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 4000.0,
-      "first_entry": true,
-      "dex_programs": [
-        "Orca Whirlpool",
-        "Raydium CPMM",
-        "Raydium CLMM"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Orca Whirlpool",
-          "Raydium CPMM",
-          "Raydium CLMM"
-        ],
         "intermediate_mints": [
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
         ],
         "mints_in_route": 3,
         "hops_by_mints": 2,
         "dex_calls": 3,
         "via_intermediate": true,
         "all_tx_mints": [
-          "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
+          "9GJQgnwKZL6oqsPcLmSohBb61w6cdj629b1RFhWvUe7j",
           "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
           "So11111111111111111111111111111111111111112",
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
         ]
       },
       "slot_lag": 0,
       "action": "skip",
       "code": "INTERMEDIATE_ROUTE",
-      "reason": "источник купил через промежуточный токен Xsv9hRk1z5: комиссия на перевод берётся на каждой ноге",
+      "reason": "источник купил через промежуточный токен Xs8S1uUs1z: комиссия на перевод берётся на каждой ноге",
       "filter": "наш лимит",
       "dbot_бы_купил": true,
       "test_source": false,
-      "parse_ms": 0.52,
-      "gate_ms": 0.02,
       "via": "transactionSubscribe",
       "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790209739.351633,
-      "t_recv_utc": "2026-09-24T00:28:59Z",
-      "t_decide_ts": 1790209739.352177,
+      "t_recv_ts": 1790195427.534094,
+      "t_recv_utc": "2026-09-23T20:30:27Z",
+      "t_decide_ts": 1790195427.534626,
       "decide_latency_ms": 0.5,
-      "source_slot": 449866031,
-      "net_slot_at_decision": 449866031,
-      "net_slot_age_s": 0.171,
-      "rate_note": "по курсу 115.25 USD/SOL",
+      "source_slot": 449812144,
+      "net_slot_at_decision": 449812144,
+      "net_slot_age_s": 0.046,
+      "rate_note": "по курсу 114.29 USD/SOL",
       "rate_source": "geckoterminal",
       "source_task": "BATCH-3",
       "mode": "dry"
     },
     {
       "schema_version": 2,
-      "ts_utc": "2026-09-24T00:21:06Z",
-      "signature": "2r7o2xMzvhQKDT2EABSsCvUqF46jHCB94RfLHYViU3XRkKkWyKyGPjRvSE8jM6ETk4kTdJJnjGKggncEr2NUtga",
-      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
-      "mint": "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
-      "slot": 449864246,
+      "ts_utc": "2026-09-23T20:32:22Z",
+      "signature": "496iPttxBq737RZbKk44fi9ssYin8j2bfVK8rVnfksUTuNhnenYCbvjWr7gH4X76KxMB1ReVDCcYytvgUiTey8m2",
+      "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+      "mint": "DoqY9DZPnP11ptofS2jX5EZSnq6Cvt1mSzw1XJscwGUK",
+      "slot": 449812574,
       "kind": "buy",
-      "spend_sol_eq": 0.06055603654469274,
+      "spend_sol_eq": 4.375402054610357,
       "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 6.988764,
+      "spend_ui": 500.0,
       "first_entry": true,
       "dex_programs": [
-        "Pump AMM"
+        "Raydium CLMM",
+        "Raydium CPMM"
       ],
-      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
       "route": {
         "programs": [
-          "Pump AMM"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 4,
-        "via_intermediate": false,
-        "all_tx_mints": [
-          "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 0.47,
-      "gate_ms": 5.16,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790209266.80814,
-      "t_recv_utc": "2026-09-24T00:21:06Z",
-      "t_decide_ts": 1790209266.813766,
-      "decide_latency_ms": 5.6,
-      "source_slot": 449864246,
-      "net_slot_at_decision": 449864246,
-      "net_slot_age_s": 0.121,
-      "rate_note": "по курсу 115.41 USD/SOL",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:18:52Z",
-      "signature": "fKySoSW4pXgjgvUJyB8oomL1qoaDqzZ216ydwz1EF1rXn9PX5h6hBBXatCQa7WeiUG12KsQ4T3LCxcNjcCat922",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "NeonTjSjsuo3rexg9o6vHuMXw62f9V7zvmu8M8Zut44",
-      "slot": 449863736,
-      "kind": "buy",
-      "spend_sol_eq": 0.07148844,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.07148844,
-      "first_entry": true,
-      "dex_programs": [
-        "Jupiter v6",
-        "Orca Whirlpool",
-        "Meteora Pools"
-      ],
-      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Orca Whirlpool",
-          "Meteora Pools"
+          "Raydium CLMM",
+          "Raydium CPMM"
         ],
         "intermediate_mints": [
-          "3RpEekjLE5cdcG15YcXJUpxSepemvq2FpmMcgo342BwC",
-          "7tM6wUpXWjw4Jkd1ULUHDpdJXgLZrTji8kn5bKQESoRU",
-          "UPTx1d24aBWuRgwxVnFmX4gNraj3QGFzL3QqBgxtWQG"
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
         ],
-        "mints_in_route": 5,
-        "hops_by_mints": 4,
-        "dex_calls": 5,
+        "mints_in_route": 3,
+        "hops_by_mints": 2,
+        "dex_calls": 3,
         "via_intermediate": true,
         "all_tx_mints": [
-          "3RpEekjLE5cdcG15YcXJUpxSepemvq2FpmMcgo342BwC",
-          "7tM6wUpXWjw4Jkd1ULUHDpdJXgLZrTji8kn5bKQESoRU",
+          "DoqY9DZPnP11ptofS2jX5EZSnq6Cvt1mSzw1XJscwGUK",
           "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "NeonTjSjsuo3rexg9o6vHuMXw62f9V7zvmu8M8Zut44",
-          "So11111111111111111111111111111111111111112",
-          "UPTx1d24aBWuRgwxVnFmX4gNraj3QGFzL3QqBgxtWQG"
+          "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"
         ]
       },
       "slot_lag": 0,
       "action": "skip",
       "code": "INTERMEDIATE_ROUTE",
-      "reason": "источник купил через промежуточный токен 3RpEekjLE5, 7tM6wUpXWj, UPTx1d24aB: комиссия на перевод берётся на каждой ноге",
+      "reason": "источник купил через промежуточный токен Xs8S1uUs1z: комиссия на перевод берётся на каждой ноге",
       "filter": "наш лимит",
       "dbot_бы_купил": true,
-      "test_source": true,
-      "parse_ms": 1.12,
-      "gate_ms": 0.02,
+      "test_source": false,
       "via": "transactionSubscribe",
       "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790209132.713648,
-      "t_recv_utc": "2026-09-24T00:18:52Z",
-      "t_decide_ts": 1790209132.714784,
+      "t_recv_ts": 1790195542.878048,
+      "t_recv_utc": "2026-09-23T20:32:22Z",
+      "t_decide_ts": 1790195542.879103,
       "decide_latency_ms": 1.1,
-      "source_slot": 449863736,
-      "net_slot_at_decision": 449863736,
-      "net_slot_age_s": 0.151,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:18:07Z",
-      "signature": "K6k7PzMs2BiMMvnqMtki36xWae15KVn1KGc2YJef52bACmwbJoH1t7yw4dcb5jGmRL8sWNXmFKKPzTEu4ss8R34",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "AC1vvvYcG3Kqq61EQNVmRojDaokJ4xbpnSE5sw3pump",
-      "slot": 449863567,
-      "kind": "buy",
-      "spend_sol_eq": 0.074971299,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.074971299,
-      "first_entry": true,
-      "dex_programs": [
-        "Jupiter v6",
-        "Pump.fun"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Pump.fun"
-        ],
-        "intermediate_mints": [
-          "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
-        ],
-        "mints_in_route": 3,
-        "hops_by_mints": 2,
-        "dex_calls": 7,
-        "via_intermediate": true,
-        "all_tx_mints": [
-          "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
-          "AC1vvvYcG3Kqq61EQNVmRojDaokJ4xbpnSE5sw3pump",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "skip",
-      "code": "INTERMEDIATE_ROUTE",
-      "reason": "источник купил через промежуточный токен 3NZ9JMVBmG: комиссия на перевод берётся на каждой ноге",
-      "filter": "наш лимит",
-      "dbot_бы_купил": true,
-      "test_source": true,
-      "parse_ms": 1.9,
-      "gate_ms": 0.02,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790209087.919179,
-      "t_recv_utc": "2026-09-24T00:18:07Z",
-      "t_decide_ts": 1790209087.921103,
-      "decide_latency_ms": 1.9,
-      "source_slot": 449863567,
-      "net_slot_at_decision": 449863567,
-      "net_slot_age_s": 0.173,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-24T00:07:05Z",
-      "signature": "23SefhJsSQ79XfNSYzSzjptCZQSZNXyVtp4ZR7E5aWKmPEJCewrfyBGCZFRwYU8yxJC2GFaZujNtD6DsSFLMCqZh",
-      "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-      "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
-      "slot": 449861101,
-      "kind": "buy",
-      "spend_sol_eq": 0.07148844,
-      "spend_mint": "So11111111111111111111111111111111111111112",
-      "spend_ui": 0.07148844,
-      "first_entry": true,
-      "dex_programs": [
-        "Jupiter v6",
-        "Orca Whirlpool"
-      ],
-      "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Orca Whirlpool"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 3,
-        "via_intermediate": false,
-        "all_tx_mints": [
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 1,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "parse_ms": 432.21,
-      "gate_ms": 1.0,
-      "via": "logsSubscribe",
-      "parsed_from": "PARSE_VIA_RPC",
-      "tx_version": 0,
-      "t_recv_ts": 1790208425.116052,
-      "t_recv_utc": "2026-09-24T00:07:05Z",
-      "t_decide_ts": 1790208425.549265,
-      "decide_latency_ms": 433.2,
-      "source_slot": 449861101,
-      "net_slot_at_decision": 449861102,
-      "net_slot_age_s": 0.175,
-      "rate_note": "трата в SOL/WSOL, курс не нужен",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-23T23:51:57Z",
-      "signature": "5gojtrRZK57Xvyy4iyQjGcsooESb3WtBKVr1xV6GXD5wPN9ENKFNATCGumhiwyd7p7Vr2yyJqU1Fy5ev4JUFLhTL",
-      "source": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
-      "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
-      "slot": 449857676,
-      "kind": "buy",
-      "spend_sol_eq": 18.028432598593334,
-      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 2067.887064,
-      "first_entry": true,
-      "dex_programs": [
-        "Jupiter v6",
-        "Orca Whirlpool",
-        "Raydium CLMM",
-        "Raydium CPMM"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Jupiter v6",
-          "Orca Whirlpool",
-          "Raydium CLMM",
-          "Raydium CPMM"
-        ],
-        "intermediate_mints": [
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
-        ],
-        "mints_in_route": 3,
-        "hops_by_mints": 2,
-        "dex_calls": 5,
-        "via_intermediate": true,
-        "all_tx_mints": [
-          "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
-        ]
-      },
-      "slot_lag": 1,
-      "action": "skip",
-      "code": "INTERMEDIATE_ROUTE",
-      "reason": "источник купил через промежуточный токен Xsv9hRk1z5: комиссия на перевод берётся на каждой ноге",
-      "filter": "наш лимит",
-      "dbot_бы_купил": true,
-      "test_source": false,
-      "parse_ms": 242.68,
-      "gate_ms": 0.02,
-      "via": "logsSubscribe",
-      "parsed_from": "PARSE_VIA_RPC",
-      "tx_version": 0,
-      "t_recv_ts": 1790207516.864263,
-      "t_recv_utc": "2026-09-23T23:51:56Z",
-      "t_decide_ts": 1790207517.106968,
-      "decide_latency_ms": 242.7,
-      "source_slot": 449857676,
-      "net_slot_at_decision": 449857677,
-      "net_slot_age_s": 0.224,
-      "rate_note": "по курсу 114.70 USD/SOL",
+      "source_slot": 449812574,
+      "net_slot_at_decision": 449812574,
+      "net_slot_age_s": 0.24,
+      "rate_note": "по курсу 114.28 USD/SOL",
       "rate_source": "geckoterminal",
       "source_task": "BATCH-3",
       "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-23T23:47:43Z",
-      "signature": "4kozkrJN8KVso62JF8zquVCRyf14zvbmwmqNSQMUVYw2wanZ8SeU7e72PbBbo3Dw11cbDTyWQwPohLm2uyZLHU7s",
-      "source": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
-      "mint": "HpWGRTs5x2pmWrGKpD5cXpZhja1uuXbPBqf7kYo2mz86",
-      "slot": 449856724,
-      "kind": "buy",
-      "spend_sol_eq": 3.338642465829441,
-      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 383.941752,
-      "first_entry": true,
-      "dex_programs": [
-        "Orca Whirlpool",
-        "Raydium CLMM",
-        "Raydium CPMM"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Orca Whirlpool",
-          "Raydium CLMM",
-          "Raydium CPMM"
-        ],
-        "intermediate_mints": [
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
-        ],
-        "mints_in_route": 3,
-        "hops_by_mints": 2,
-        "dex_calls": 3,
-        "via_intermediate": true,
-        "all_tx_mints": [
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "HpWGRTs5x2pmWrGKpD5cXpZhja1uuXbPBqf7kYo2mz86",
-          "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "skip",
-      "code": "INTERMEDIATE_ROUTE",
-      "reason": "источник купил через промежуточный токен Xsv9hRk1z5: комиссия на перевод берётся на каждой ноге",
-      "filter": "наш лимит",
-      "dbot_бы_купил": true,
-      "test_source": false,
-      "parse_ms": 0.97,
-      "gate_ms": 0.02,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790207263.026222,
-      "t_recv_utc": "2026-09-23T23:47:43Z",
-      "t_decide_ts": 1790207263.02721,
-      "decide_latency_ms": 1.0,
-      "source_slot": 449856724,
-      "net_slot_at_decision": 449856724,
-      "net_slot_age_s": 0.058,
-      "rate_note": "по курсу 115.00 USD/SOL",
-      "rate_source": "geckoterminal",
-      "source_task": "BATCH-3",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-23T23:38:34Z",
-      "signature": "4fz6dXanDpGyE6h6FUEUX1ZsZmjcpYoWdWrmLFPxgezjWYAkC1Cn8qZubZLdn7PwYuJ54imaW91QP4227Eo4HSpp",
-      "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-      "mint": "2PENPmfgJfq6CG3k4byj4oWwHf8SerqakmYHMkUupump",
-      "slot": 449854643,
-      "kind": "buy",
-      "spend_sol_eq": 21.723728946163522,
-      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 2500.0,
-      "first_entry": true,
-      "dex_programs": [
-        "Pump AMM"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Pump AMM"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 2,
-        "via_intermediate": false,
-        "all_tx_mints": [
-          "2PENPmfgJfq6CG3k4byj4oWwHf8SerqakmYHMkUupump",
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": false,
-      "parse_ms": 0.49,
-      "gate_ms": 4.55,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790206714.905479,
-      "t_recv_utc": "2026-09-23T23:38:34Z",
-      "t_decide_ts": 1790206714.910519,
-      "decide_latency_ms": 5.0,
-      "source_slot": 449854643,
-      "net_slot_at_decision": 449854643,
-      "net_slot_age_s": 0.09,
-      "rate_note": "по курсу 115.08 USD/SOL",
-      "rate_source": "geckoterminal",
-      "source_task": "BATCH-5",
-      "mode": "dry"
-    },
-    {
-      "schema_version": 2,
-      "ts_utc": "2026-09-23T22:17:24Z",
-      "signature": "2ffNL1jtzpVoCpfXFMbaw4zWuErGRVpj6iD1Ncjh98wXf5bnrrigQY1ES4LKtqVmV8xZzboxocVbiSpfHwsrhQk4",
-      "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA",
-      "mint": "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
-      "slot": 449836345,
-      "kind": "buy",
-      "spend_sol_eq": 0.06065807122582486,
-      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "spend_ui": 7.0,
-      "first_entry": true,
-      "dex_programs": [
-        "Meteora DLMM"
-      ],
-      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-      "route": {
-        "programs": [
-          "Meteora DLMM"
-        ],
-        "intermediate_mints": [],
-        "mints_in_route": 2,
-        "hops_by_mints": 1,
-        "dex_calls": 3,
-        "via_intermediate": false,
-        "all_tx_mints": [
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-          "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY",
-          "So11111111111111111111111111111111111111112"
-        ]
-      },
-      "slot_lag": 0,
-      "action": "buy",
-      "code": "BUY",
-      "reason": "фильтры задачи и наши лимиты пройдены",
-      "test_source": true,
-      "via": "transactionSubscribe",
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "t_recv_ts": 1790201844.596812,
-      "t_recv_utc": "2026-09-23T22:17:24Z",
-      "t_decide_ts": 1790201844.607938,
-      "decide_latency_ms": 11.1,
-      "source_slot": 449836345,
-      "net_slot_at_decision": 449836345,
-      "net_slot_age_s": 0.04,
-      "rate_note": "по курсу 115.40 USD/SOL",
-      "rate_source": "geckoterminal",
-      "source_task": "TEST",
-      "mode": "dry",
-      "taxed": true,
-      "tax_bps": 100,
-      "tax_why_not": null
     }
   ],
+  "found_by_code": [],
   "position_rows": [
     {
       "client_order_id": "1ad780af6eed472aab0dce9a340d9f10",
@@ -1372,7 +555,7 @@
       "client_order_id": "5b68bd6f7faa4493b2e40b36b9f67f03",
       "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
       "mode": "live-test",
-      "state": "bought",
+      "state": "closed",
       "buy_address_kind": "mint",
       "buy_address": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
       "source_program": "Jupiter v6",
@@ -1389,7 +572,7 @@
       "jup_signature": null,
       "jup_why_not": null,
       "jup_floor": null,
-      "closed_reason": null
+      "closed_reason": "остаток ноль дважды подряд"
     },
     {
       "client_order_id": "64a565dbd15e499dbfdd1e5b7c0547f6",
@@ -1429,6 +612,52 @@
         "quote_share_of_entry_pct": 81.07,
         "entry_lamports": 1000000
       },
+      "closed_reason": "остаток ноль дважды подряд"
+    },
+    {
+      "client_order_id": "8657d4f891814466834277b6e628be7a",
+      "mint": "BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE",
+      "mode": "live-test",
+      "state": "closed",
+      "buy_address_kind": "mint",
+      "buy_address": "BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE",
+      "source_program": "Pump.fun",
+      "our_pool": null,
+      "our_pool_direct": false,
+      "our_route_programs": "Pump.fun",
+      "our_route_hops": 1,
+      "flags": "",
+      "sell_address_kinds": null,
+      "sell_attempts": null,
+      "unsold_reason": null,
+      "balance_read_why_not": null,
+      "jup_attempts": null,
+      "jup_signature": null,
+      "jup_why_not": null,
+      "jup_floor": null,
+      "closed_reason": "остаток ноль дважды подряд"
+    },
+    {
+      "client_order_id": "9d4b422989754e4d8e3d391199c1c25f",
+      "mint": "AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9",
+      "mode": "live-test",
+      "state": "closed",
+      "buy_address_kind": "mint",
+      "buy_address": "AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9",
+      "source_program": "Pump.fun",
+      "our_pool": null,
+      "our_pool_direct": false,
+      "our_route_programs": "Pump.fun",
+      "our_route_hops": 1,
+      "flags": "",
+      "sell_address_kinds": null,
+      "sell_attempts": null,
+      "unsold_reason": null,
+      "balance_read_why_not": null,
+      "jup_attempts": null,
+      "jup_signature": null,
+      "jup_why_not": null,
+      "jup_floor": null,
       "closed_reason": "остаток ноль дважды подряд"
     },
     {
@@ -1486,11 +715,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 405,
+          "кредитов": 466,
           "бюджет": 60000,
-          "доля": 0.0067,
+          "доля": 0.0078,
           "группа": null,
-          "потрачено_по_бюджету": 405,
+          "потрачено_по_бюджету": 466,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -1498,18 +727,18 @@
         },
         {
           "служба": "bloom_seller",
-          "кредитов": 12,
+          "кредитов": 25,
           "бюджет": 15000,
-          "доля": 0.0008,
+          "доля": 0.0017,
           "группа": null,
-          "потрачено_по_бюджету": 12,
+          "потрачено_по_бюджету": 25,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 417,
+      "всего_кредитов": 491,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
@@ -1521,25 +750,25 @@
     "executor_on_host": {
       "ok": true,
       "mode": "live-test",
-      "sent": 2,
+      "sent": 5,
       "refused": 0
     },
     "reconciliation": {
       "ok": false,
-      "signals": 9,
+      "signals": null,
       "need": 30,
-      "missed_buys": 2,
-      "agreement": 0.95
+      "missed_buys": 0,
+      "agreement": null
     },
     "balance": {
       "ok": false,
-      "balance_sol": 0.320581602,
+      "balance_sol": 0.302275588,
       "need": 2.0
     },
     "test_call_full_circle": {
-      "ok": false,
-      "live_test_positions": 6,
-      "still_open": 1
+      "ok": true,
+      "live_test_positions": 8,
+      "still_open": 0
     }
   }
 }
