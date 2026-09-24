@@ -71,7 +71,7 @@ FAST_COPIER_DT8 = "DT8hib8jY4CGJcmcqcinVGYh5zzVPZAV3iosdQF9a6jX"
 OURS_FROM_UTC = "2026-09-24T00:00:00Z"
 TASK_NAMES = ("BATCH-3", "BATCH-5")
 
-C2_DAILY_BUDGET = 100_000
+C2_DAILY_BUDGET = 200_000  # владелец 24.09: поднят до 200 000 на сутки
 C2_PREFIX = "c2_"
 TX_VERSION = 1  # как у детектора: с 0 узел отвечает -32015 на транзакциях версии 1
 
