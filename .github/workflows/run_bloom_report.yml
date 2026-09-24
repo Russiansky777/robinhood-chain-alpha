@@ -25,6 +25,10 @@ on:
         description: "какие задачи DBot сверять"
         required: false
         default: "BATCH-5,BATCH-3"
+      find_sig:
+        description: "подписи через запятую: показать записи журнала целиком"
+        required: false
+        default: ""
       stand_rows:
         description: "сколько последних решений стенда печатать целиком"
         required: false
@@ -114,6 +118,11 @@ jobs:
         run: |
           set -e
           ARGS="--rows ${{ inputs.rows }} --stand-rows ${{ inputs.stand_rows }}"
+          if [ -n "${{ inputs.find_sig }}" ]; then
+            for S in $(echo "${{ inputs.find_sig }}" | tr ',' ' '); do
+              ARGS="$ARGS --find-sig $S"
+            done
+          fi
           if [ -n "${{ inputs.since }}" ]; then ARGS="$ARGS --since ${{ inputs.since }}"; fi
           if [ "${{ inputs.dbot }}" = "yes" ]; then
             ARGS="$ARGS --dbot --tasks ${{ inputs.tasks }} --config data/final/20260923T145755Z/konfig.json"
