@@ -1,19 +1,22 @@
 active
 {
-  "utc": "2026-09-24T13:46:07Z",
-  "started_utc": "2026-09-24T13:45:47Z",
+  "utc": "2026-09-24T13:49:20Z",
+  "started_utc": "2026-09-24T13:49:00Z",
   "uptime_s": 20.0,
   "channels": 3,
   "channel_names": [
-    "ws",
+    "helius_ws",
     "grpc",
     "grpc2"
   ],
-  "addresses": 19,
-  "sources": 19,
-  "boosters": [],
-  "boosters_slot": null,
-  "boosters_why_not": "getBlock 450046366: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 450046366'}",
+  "addresses": 22,
+  "sources": 20,
+  "boosters": [
+    "FVnv5qH7dsrBzEDwJ8dN2m9PFtKTBAQFtqWF3M9LpwMg",
+    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr"
+  ],
+  "boosters_slot": 450047094,
+  "boosters_why_not": null,
   "grpc_target": {
     "grpc": {
       "target": "grpc.ams.shyft.to:443",
@@ -30,12 +33,12 @@ active
   },
   "subscriptions": {
     "grpc2": {
-      "requested": 19,
-      "connected": false,
+      "requested": 22,
+      "connected": true,
       "generation": 0
     },
     "grpc": {
-      "requested": 19,
+      "requested": 22,
       "connected": true,
       "generation": 0
     }
@@ -53,45 +56,38 @@ active
     "session": 2,
     "dropped_utc": null
   },
-  "addresses_now": 19,
+  "addresses_now": 22,
   "generation": 0,
   "failures": {
-    "last": {
-      "grpc": {
-        "utc": "2026-09-24T13:46:04Z",
-        "type": "_MultiThreadedRendezvous",
-        "code": "StatusCode.INVALID_ARGUMENT",
-        "details": "failed to create filter: Max amount of filters/data_slices reached, only 10 allowed"
-      },
-      "grpc2": {
-        "utc": "2026-09-24T13:46:06Z",
-        "type": "_MultiThreadedRendezvous",
-        "code": "StatusCode.INVALID_ARGUMENT",
-        "details": "failed to check filter: FiltersOverflow { max: 10 }"
-      }
-    },
-    "count": {
-      "grpc": 9,
-      "grpc2": 10
-    },
-    "first_utc": {
-      "grpc": "2026-09-24T13:45:48Z",
-      "grpc2": "2026-09-24T13:45:48Z"
-    }
+    "last": {},
+    "count": {},
+    "first_utc": {}
   },
   "summary": {
     "base": "helius_ws",
-    "messages": {},
+    "messages": {
+      "grpc": 3142,
+      "grpc2": 3130
+    },
     "duplicates": {},
     "unpaired_single_channel": {
+      "grpc": 11,
       "helius_ws": 0,
-      "ws": 0,
-      "grpc": 0,
       "grpc2": 0
     },
     "by_channel": {},
     "by_group": {},
-    "pairwise": {},
-    "pairs_total": 0
+    "pairwise": {
+      "grpc_vs_grpc2": {
+        "pairs": 3130,
+        "first_share": 0.6706,
+        "median_ms": 0.86,
+        "p10_ms": -1.88,
+        "p90_ms": 6.76,
+        "p95_ms": 10.68,
+        "mean_ms": 2.26
+      }
+    },
+    "pairs_total": 3130
   }
 }
