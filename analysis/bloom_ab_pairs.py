@@ -187,6 +187,23 @@ def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
                            "index": з.get("index"), "total": з.get("total"),
                            "signature": з.get("signature")}
                 break
+        if вход_d is None and поз.get("source_slot"):
+            # DBot мог сесть НЕ в тот блок, где мы, и не в блок источника: на
+            # четырёх парах из пяти его вход так и не нашёлся, пока смотрели
+            # только два блока. Ищем по окну от блока источника и дальше.
+            с = int(поз["source_slot"])
+            до = max(int(поз.get("our_slot") or с), с) + 2
+            окно = list(range(с, до + 1))
+            п = BP.покупатели_минта(helius, минт, окно,
+                                     известные={кошелёк_dbot: "DBot"})
+            свои = [r for r in (п.get("rows") or [])
+                     if r.get("owner") == кошелёк_dbot]
+            if свои:
+                свои.sort(key=lambda r: (r.get("slot") or 0, r.get("index") or 0))
+                r0 = свои[0]
+                вход_d = {"slot": r0.get("slot"), "index": r0.get("index"),
+                           "total": r0.get("total"), "signature": r0.get("signature"),
+                           "found_by": f"поиск по окну {окно[0]}-{окно[-1]}"}
         итог["dbot"] = {"wallet": кошелёк_dbot, "entry": вход_d}
         if вход_d and вход_d.get("signature"):
             tx_вх = helius.транзакция(вход_d["signature"])
@@ -301,6 +318,27 @@ def self_test() -> None:
         "абсолютные числа нет" in (р.get("note") or ""), р.get("note"))
     chk("толпа между источником и нами посчитана",
         р["place"]["crowd_between"] == 1, р["place"])
+
+    # Вход DBot в ТРЕТЬЕМ блоке: ни блок источника, ни наш его не содержат.
+    class HeliusDBotПозже(Helius):
+        def call(self, метод, параметры):
+            if метод == "getBlock" and параметры[0] == 102:
+                return {"transactions": [покупка_dbot]}
+            if метод == "getBlock" and параметры[0] in (100, 101):
+                if параметры[0] == 100:
+                    return {"transactions": [
+                        tx("ИСТОЧНИК", кто=ИСТ, было=0, стало=500,
+                            sol_до=10 ** 9, sol_после=10 ** 9 - 1)]}
+                return {"transactions": [tx("НАША", кто=МЫ, было=0, стало=200,
+                                             sol_до=10 ** 9, sol_после=10 ** 9 - 1,
+                                             slot=101)]}
+            return super().call(метод, параметры)
+
+    р_п = пара(HeliusDBotПозже(), поз, кошелёк_dbot=DBOT, наш_кошелёк=МЫ)
+    chk("вход DBot найден поиском по окну, а не потерян",
+        (р_п.get("dbot") or {}).get("entry", {}).get("signature") == "DBOT_BUY"
+        and "поиск по окну" in ((р_п["dbot"]["entry"] or {}).get("found_by") or ""),
+        р_п.get("dbot"))
 
     # Кошелёк DBot не задан -- блок dbot отсутствует, но пара всё равно строится
     р2 = пара(Helius(), поз, кошелёк_dbot=None, наш_кошелёк=МЫ)
