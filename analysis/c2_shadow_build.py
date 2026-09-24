@@ -160,6 +160,8 @@ class LegCache:
         self.lock = threading.Lock()
         self.calls = collections.Counter()
         self.last_status: dict = {}
+        self.seen: dict = {}       # q -> подписи, уже разобранные (не шаблон)
+        self.workers = 8
 
     def _rpc(self, method, params):
         self.calls[method] += 1
@@ -183,41 +185,58 @@ class LegCache:
         if cur and ok and ok[0] == cur["sig"]:
             cur["checked_at"] = now
             return "без изменений"
+        seen = self.seen.setdefault(q, collections.deque(maxlen=200))
         for sg in ok[:4]:
             if cur and sg == cur["sig"]:
                 break
+            if sg in seen:
+                continue
             tx = self._rpc("getTransaction", [sg, TX_OPTS])
             if not tx:
                 continue
-            tpl = B.extract_template(tx, p["program"], p["q_vault"])
-            if not tpl.get("ok"):
-                continue
-            mv = B.mints_and_vaults(tpl, tx)
-            if mv.get("quote_mint") != C.WSOL or mv.get("base_mint") != q:
-                continue
-            ev = C.pool_event(tx, {"pool_vault": mv["base_vault"], "quote_vault": mv["quote_vault"],
-                                   "quote_mint": C.WSOL})
-            if ev.get("kind") != "swap":
+            seen.append(sg)
+            ent = self._template_from(tx, p, q)
+            if ent is None:
                 continue
             self.load_luts(_lut_keys(tx))
-            dec = next((r["dec"] for r in C.token_rows(tx).values() if r["account"] == mv["base_vault"]), None)
+            ent.update(sig=sg, checked_at=now)
             with self.lock:
-                self.entries[q] = {"tpl": tpl, "tx": tx, "sig": sg, "mv": mv, "price_sol": ev["price"],
-                                   "q_dec": dec, "program": p["program"], "checked_at": now,
-                                   "trade_time": tx.get("blockTime")}
-            return "новый шаблон"
+                self.entries[q] = ent
+            return "новый шаблон" + (" (из продажи, перевёрнут)" if ent["tpl"].get("flipped") else "")
         if cur and p["program"] not in PRICE_DEPENDENT:
             cur["checked_at"] = now    # счета от цены не зависят -- шаблон годен
             return "новых покупок нет, шаблон годен (счета не зависят от цены)"
-        return "новых покупок нет" if cur else "шаблона нет"
+        return "новых сделок-шаблонов нет" if cur else "шаблона нет"
+
+    @staticmethod
+    def _template_from(tx: dict, p: dict, q: str):
+        tpl = B.extract_template(tx, p["program"], p["q_vault"])
+        if not tpl.get("ok"):
+            return None
+        mv = B.mints_and_vaults(tpl, tx)
+        if mv.get("quote_mint") == q and mv.get("base_mint") == C.WSOL and p["program"] in PRICE_DEPENDENT:
+            tpl = B.flip_template(tpl, C.WSOL)
+            mv = B.mints_and_vaults(tpl, tx)
+        if mv.get("quote_mint") != C.WSOL or mv.get("base_mint") != q:
+            return None
+        ev = C.pool_event(tx, {"pool_vault": mv["base_vault"], "quote_vault": mv["quote_vault"],
+                               "quote_mint": C.WSOL})
+        if ev.get("kind") != "swap":
+            return None
+        dec = next((r["dec"] for r in C.token_rows(tx).values() if r["account"] == mv["base_vault"]), None)
+        return {"tpl": tpl, "tx": tx, "mv": mv, "price_sol": ev["price"], "q_dec": dec,
+                "program": p["program"], "trade_time": tx.get("blockTime")}
 
     def refresh_all(self) -> dict:
-        st = {}
-        for q in list(self.pools):
+        from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+
+        def one(q):
             try:
-                st[q] = self.refresh_pool(q)
+                return q, self.refresh_pool(q)
             except Exception as exc:  # noqa: BLE001
-                st[q] = f"сбой: {type(exc).__name__}"
+                return q, f"сбой: {type(exc).__name__}: {str(exc)[:100]}"
+        with ThreadPoolExecutor(max_workers=self.workers) as ex:
+            st = dict(ex.map(one, list(self.pools)))
         self.last_status = st
         return st
 
@@ -249,6 +268,7 @@ def _two_hop(res: dict, source_tx: dict, tpl2: dict, q: str, our_wallet: str, am
         res["why_not"] = "котировка не SOL: шаблона SOL -> Q в кэше нет"
         return None
     res.update(route="two_hop", leg1_pool_program=e["program"], leg1_template_age_s=round(age, 1),
+               leg1_flipped=bool(e["tpl"].get("flipped")),
                leg1_trade_age_s=round(time.time() - e["trade_time"], 1) if e.get("trade_time") else None)
     if age > LEG_MAX_AGE_S:
         res["why_not"] = f"шаблон шага 1 старше {LEG_MAX_AGE_S} с ({age:.0f} с)"
@@ -478,6 +498,34 @@ def self_test() -> int:
     checks.append((f"два шага SOL -> HTm -> токен одной транзакцией: собрано и «симулировано» "
                    f"{two_ok} из {two_n}, размеры {sorted(set(sim_sizes))[:3]}...",
                    two_n >= 5 and two_ok == two_n))
+    # ---- переворот: настоящие продажи Q -> WSOL в DLMM/CLMM дают шаблон покупки
+    n_fl = n_fl_ok = 0
+    for x in allx + [{"tx": t} for t in C.load_real_txs().values()]:
+        for ix in B.all_instructions(x["tx"]):
+            prog = ix.get("programId")
+            if prog not in PRICE_DEPENDENT:
+                continue
+            vi = (2, 3) if prog == B.DLMM else (5, 6)
+            for qv in [ix["accounts"][i] for i in vi if i < len(ix["accounts"])]:
+                tpl = B.extract_template(x["tx"], prog, qv)
+                mv = B.mints_and_vaults(tpl, x["tx"]) if tpl.get("ok") else {}
+                if mv.get("base_mint") != C.WSOL or not mv.get("quote_mint"):
+                    continue
+                q = mv["quote_mint"]
+                e = LegCache._template_from(x["tx"], {"program": prog, "q_vault": mv["quote_vault"]}, q)
+                n_fl += 1
+                if e and e["tpl"].get("flipped"):
+                    m2 = e["mv"]
+                    ixo = B.swap_instruction(e["tpl"], x["tx"], C.EXECUTOR_WALLET, 1000, 1)
+                    acc = [str(a.pubkey) for a in ixo.accounts]
+                    in_i, out_i = B.DYN[prog]["in"], B.DYN[prog]["out"]
+                    n_fl_ok += (m2["quote_mint"] == C.WSOL and m2["base_mint"] == q
+                                and acc[in_i] == B.ata(C.EXECUTOR_WALLET, C.WSOL, m2["quote_program"])
+                                and acc[out_i] == B.ata(C.EXECUTOR_WALLET, q, m2["base_program"])
+                                and (prog != B.CLMM or (acc[5] == m2["quote_vault"] and acc[11] == C.WSOL)))
+                break
+    checks.append((f"продажа Q -> SOL в DLMM/CLMM перевёрнута в покупку (вход WSOL, выход Q, у CLMM "
+                   f"хранилища/минты переставлены): {n_fl_ok} из {n_fl}", n_fl >= 1 and n_fl_ok == n_fl))
     # ---- какие методы узла модуль вообще зовёт: только чтение и симуляция
     import re  # noqa: PLC0415
     src = Path(__file__).read_text(encoding="utf-8")

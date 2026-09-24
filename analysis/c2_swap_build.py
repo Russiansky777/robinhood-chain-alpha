@@ -181,7 +181,7 @@ def roles_damm2(tpl: dict, tx: dict) -> dict:
     va, vb = rows.get(acc[k["va"]]), rows.get(acc[k["vb"]])
     if not va or not vb:
         return {}
-    a_in = (va["post"] - va["pre"]) > 0
+    a_in = (acc[k["ma"]] == tpl["force_in"]) if tpl.get("force_in") else (va["post"] - va["pre"]) > 0
     in_mint, out_mint = (acc[k["ma"]], acc[k["mb"]]) if a_in else (acc[k["mb"]], acc[k["ma"]])
     if k["pa"] is None:
         progs = {b["mint"]: b.get("programId") for side in ("preTokenBalances", "postTokenBalances")
@@ -195,6 +195,20 @@ def roles_damm2(tpl: dict, tx: dict) -> dict:
     return {"in": (k["in"], in_mint, in_prog), "out": (k["out"], out_mint, out_prog),
             "quote_vault": acc[k["va"]] if a_in else acc[k["vb"]],
             "base_vault": acc[k["vb"]] if a_in else acc[k["va"]]}
+
+
+def flip_template(tpl: dict, in_mint: str) -> dict:
+    """Шаблон ценозависимого пула из сделки обратного направления: вход --
+    in_mint. DLMM: хранилища и минты в инструкции по порядку пула, достаточно
+    указать вход. CLMM swap_v2: хранилища/минты по направлению -- меняются
+    местами 5<->6 и 11<->12. Массивы бинов/тиков остаются от чужой сделки
+    (начинаются с текущего) -- годность проверяет симуляция."""
+    t = dict(tpl, force_in=in_mint, flipped=True)
+    if tpl["program"] == CLMM:
+        a = list(tpl["accounts"])
+        a[5], a[6], a[11], a[12] = a[6], a[5], a[12], a[11]
+        t["accounts"] = a
+    return t
 
 
 def user_accounts(tpl: dict, tx: dict, user: str) -> dict:

@@ -144,7 +144,7 @@ jobs:
         env:
           HELIUS_API: ${{ secrets.HELIUS_API }}
         run: |
-          python analysis/c2_commit.py -m "C2: два шага, кэш шаблонов, покрытие [automated]" "data/c2_twohop_*.json" "data/c2_leg_pools_*.json" "data/c2_logs/twohop_*.log" "data/helius_usage/c2_*.json"
+          python analysis/c2_commit.py -m "C2: два шага, кэш шаблонов, покрытие [automated]" "data/c2_twohop_*.json" "data/c2_leg_pools_*.json" "data/c2_pool_samples/legs_flipped.json" "data/c2_logs/twohop_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача G: SOL -> HTm -> токен, симуляция (без отправки)"
         if: env.C2_TASK == 'route'

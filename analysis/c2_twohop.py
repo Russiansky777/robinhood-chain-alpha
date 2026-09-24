@@ -120,6 +120,17 @@ def main() -> int:
             pools[q][(prog, qv, wv)] += 1
     need = collections.Counter(t["quote_mint"] for t in trades if t.get("quote_mint")
                                and t["quote_mint"] not in (C.WSOL, C.NATIVE_QUOTE))
+    # в маршрутах источников пула SOL<->Q нет -- ищем по свежим сделкам минта Q
+    found_by_mint = {}
+    for q in [q for q in need if q not in pools]:
+        sigs = [x["signature"] for x in rpc.signatures(q, limit=15) if x.get("err") is None][:12]
+        for tx in rpc.get_txs(sigs).values():
+            for prog, qv, wv, q2 in sol_pools_in_tx(tx or {}):
+                if q2 == q:
+                    pools.setdefault(q, {}).setdefault((prog, qv, wv), 0)
+                    pools[q][(prog, qv, wv)] += 1
+                    found_by_mint[q] = True
+    out["pools_found_by_mint"] = len(found_by_mint)
     vaults = sorted({v for q in pools.values() for k in q for v in (k[1], k[2])})
     bal = {}
     for i in range(0, len(vaults), 100):
@@ -138,6 +149,7 @@ def main() -> int:
             prog, qv, wv = cands[0]
             leg_pools[q] = {"program": prog, "q_vault": qv, "w_vault": wv, "sol_depth": bal.get(wv)}
             row.update(pool_program=lab.get(prog, prog), q_vault=qv, sol_depth=bal.get(wv),
+                       found_by="минт Q" if q in found_by_mint else "маршрут источника",
                        price_dependent=prog in SB.PRICE_DEPENDENT, status="пул есть")
         cov.append(row)
     out["pools_per_quote"] = cov
@@ -193,11 +205,14 @@ def main() -> int:
                     res = SB.shadow_build(stx, t["source"], t["mint"], C.EXECUTOR_WALLET, 20_000_000, rpc.call,
                                           leg_cache=cache)
                     r.update({k: res.get(k) for k in ("route", "sim_verdict", "why_not", "build_ms", "sim_ms",
+                                                      "leg1_flipped",
                                                       "tx_size", "leg1_pool_program", "leg1_template_age_s",
                                                       "leg1_trade_age_s", "hot_lut_calls", "sim_units")})
                     r["sim_logs_tail"] = (res.get("sim_logs_tail") or [])[-3:]
                     if res.get("ok") and res.get("sim_verdict") in OK_VERDICTS:
                         r["outcome"] = "два шага: собрано, программа дошла до сумм"
+                    elif res.get("ok") and "PoolMigrated" in " ".join(res.get("sim_logs_tail") or []):
+                        r["outcome"] = "шаг 2: пул источника с тех пор мигрировал (реплей старой сделки)"
                     elif res.get("ok"):
                         r["outcome"] = f"два шага: симуляция {res.get('sim_verdict')}"
                     else:
@@ -211,6 +226,14 @@ def main() -> int:
                                                              / max(bg_min, 1e-9), 1)
     out["cache_measure"]["background_minutes"] = round(bg_min, 2)
     out["replay"] = rows
+    fl = [r for r in rows if r.get("route") == "two_hop" and r.get("sim_verdict")]
+    out["flipped_templates"] = {
+        k: dict(collections.Counter(r["sim_verdict"] for r in fl if bool(r.get("leg1_flipped")) == k))
+        for k in (True, False)}
+    legs = [{"tx": e["tx"], "pool_vault": e["mv"]["base_vault"], "source": None, "mint": q,
+             "quote_mint": C.WSOL, "flipped": True} for q, e in cache.entries.items() if e["tpl"].get("flipped")]
+    if legs:
+        (B.SAMPLES_DIR / "legs_flipped.json").write_text(json.dumps(legs, ensure_ascii=False), encoding="utf-8")
     covered = {"один шаг SOL (сборка проверена в D)", "два шага: собрано, программа дошла до сумм"}
     big = {c["quote"] for c in cov if c["share"] >= 0.02}
     by_type: dict = {}
