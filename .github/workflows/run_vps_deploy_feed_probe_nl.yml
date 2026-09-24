@@ -230,6 +230,14 @@ jobs:
           for F in geyser_pb2.py geyser_pb2_grpc.py solana_storage_pb2.py solana_storage_pb2_grpc.py; do
             scp $SSH_OPTS analysis/proto/$F root@$TARGET_HOST:$CODE_DIR/proto/$F
           done
+          # СНИМОК ИСТОЧНИКОВ рядом с кодом. Без него запасной путь у зонда
+          # был сломан по построению: путь по умолчанию считается от каталога
+          # модуля, то есть на хосте указывал в /home/bot/data/final/... --
+          # такого каталога там нет. Пока ключ DBot был на месте, это не
+          # всплывало; 24.09 в 15:43 ключ перестал читаться, и зонд ушёл в
+          # перезапуск по кругу (счётчик 168) вместо работы по снимку.
+          scp $SSH_OPTS data/final/20260923T145755Z/konfig.json \
+            root@$TARGET_HOST:$CODE_DIR/konfig.json
           ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $CODE_DIR"
           for F in grpc_feed_probe.py; do
             HERE=$(sha256sum analysis/$F | awk '{print $1}')
@@ -238,6 +246,15 @@ jobs:
             [ "$HERE" = "$THERE" ] || { echo "СБОЙ: суммы не сошлись для $F"; exit 1; }
             echo "$F: сумма сошлась"
           done
+
+      - name: "Снимок источников на хосте читается"
+        run: |
+          set -e
+          # Проверяем ДО запуска службы: запасной путь обязан работать, иначе
+          # при недоступном ключе DBot зонд уходит в перезапуск по кругу.
+          # Питон ОДНОЙ строкой: многострочный внутри ssh-кавычек ломает
+          # блок YAML -- его строки встают в нулевую колонку.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python -c \"import sys; sys.path.insert(0, '$CODE_DIR'); from pathlib import Path; import bloom_detector as BD; ист = BD.загрузить_источники(Path('$CODE_DIR/konfig.json'), tuple('${{ inputs.tasks }}'.split(','))); print('источников в снимке на хосте:', len(ист)); assert ист, 'снимок на хосте не дал ни одного источника'\""
 
       - name: "Зависимости зонда в venv хоста"
         run: |
@@ -274,7 +291,7 @@ jobs:
               echo 'EnvironmentFile=$ENV_DIR/env'
               echo 'EnvironmentFile=-$ENV_DIR/feed_probe_env'
               echo 'WorkingDirectory=$CODE_DIR'
-              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --booster-rate ${{ inputs.booster_rate }} --booster-max-rate ${{ inputs.booster_max_rate }} --tasks ${{ inputs.tasks }}'
+              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --config $CODE_DIR/konfig.json --boosters ${{ inputs.boosters }} --booster-rate ${{ inputs.booster_rate }} --booster-max-rate ${{ inputs.booster_max_rate }} --tasks ${{ inputs.tasks }}'
               echo 'Restart=always'
               echo 'RestartSec=5'
               echo 'NoNewPrivileges=true'
