@@ -1451,6 +1451,7 @@ class Детектор:
         self.ног_прогрето = None            # сколько таблиц адресов загружено при старте
         self.ног_прогрев_почему = "ещё не было"
         self.ног_догружено = 0
+        self.chain_ok_догнано = 0
         self.ног_догрузка_почему = ""
         self.ног_первые: list = []          # первые события -- на сверку с ingest_stats
         # ЦЕНА ЗАМЕРА ОТДЕЛЬНОЙ СТРОКОЙ. Замер 24.09, первые две минуты
@@ -1567,6 +1568,7 @@ class Детектор:
         # ЗАПАСНОЙ ПУТЬ ВИДЕН ЧИСЛОМ. 24.09 служба просидела на нём три часа,
         # и по признаку жизни это было незаметно: поле subscribe_method там
         # было, но никто на него не смотрел.
+        st["chain_ok_backfilled"] = self.chain_ok_догнано
         st["fallback_seconds"] = (round(time.time() - self.запасной_путь_с, 1)
                                    if self.запасной_путь_с else 0)
         st["fallback_window_s"] = ОКНО_ЗАПАСНОГО_S
@@ -1931,6 +1933,68 @@ class Детектор:
             log.warning("прогрев таблиц адресов не удался: %s",
                         self.ног_прогрев_почему)
 
+    def догнать_chain_ok(self, *, предел: int = 5) -> dict:
+        """Позиции без вердикта по цепи -- добрать отложенным getTransaction.
+
+        ВНЕ горячего пути: вызывается из пульса. Зачем нужен догон, а не
+        только разбор покупки:
+          * замерная подписка идёт с "failed": False, поэтому УПАВШАЯ наша
+            транзакция по ней не придёт никогда -- chain_ok=False из неё
+            недостижим в принципе;
+          * уведомление подписки часто приходит без meta (24.09: 547 216
+            пустых против 4 123 с телом), и вердикта в нём нет;
+          * если при разборе покупки узел транзакцию не отдал, поле
+            оставалось пустым НАВСЕГДА -- повторной попытки не было.
+
+        Берём не больше `предел` позиций за круг: это замер, а не гонка, и
+        занимать узел им нельзя.
+        """
+        итог = {"looked": 0, "filled": 0, "still_unknown": 0, "why_not": ""}
+        try:
+            позиции = self.состояние.positions()
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"{type(exc).__name__}"
+            return итог
+        кандидаты = []
+        for cid, p_ in (позиции or {}).items():
+            if p_.get("chain_ok") is not None:
+                continue
+            if not ST.is_real_mode(p_.get("mode")):
+                continue
+            подписи = p_.get("signatures") or []
+            подпись = подписи[0] if подписи else None
+            if not подпись:
+                continue
+            кандидаты.append((cid, подпись))
+        кандидаты.sort(key=lambda x: x[0])
+        for cid, подпись in кандидаты[:предел]:
+            итог["looked"] += 1
+            try:
+                tx = self.helius.транзакция(подпись)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("догон chain_ok: узел отказал на %s (%s)",
+                            подпись[:10], type(exc).__name__)
+                итог["still_unknown"] += 1
+                continue
+            мета = (tx or {}).get("meta") if isinstance(tx, dict) else None
+            if not isinstance(мета, dict):
+                # Узел не отдал транзакцию -- вердикта нет. Ничего не пишем:
+                # выдумывать посадку по отсутствию ответа нельзя.
+                итог["still_unknown"] += 1
+                continue
+            вердикт = мета.get("err") is None
+            try:
+                self.состояние.update_position(
+                    cid, chain_ok=вердикт, own_tx_seen_chain_ok=вердикт,
+                    chain_ok_from="догон getTransaction",
+                    **({"chain_err": мета.get("err")} if not вердикт else {}))
+                итог["filled"] += 1
+                self.chain_ok_догнано += 1
+            except Exception as exc:  # noqa: BLE001
+                log.warning("догон chain_ok: позиция не записана (%s)",
+                            type(exc).__name__)
+        return итог
+
     def догрузить_таблицы_ног(self) -> None:
         """Таблицы адресов, накопленные ingest. ВНЕ горячего пути.
 
@@ -2089,12 +2153,22 @@ class Детектор:
             запись["bloom_ms"] = поз.get("bloom_ms")
         self.состояние.log_decision(запись)
         try:
-            self.состояние.update_position(
-                cid, own_tx_seen_ts=round(t_recv, 6),
-                own_tx_seen_ms=запись.get("own_tx_seen_ms"),
-                bloom_to_seen_ms=запись.get("bloom_to_seen_ms"),
-                own_tx_seen_slot=слот,
-                own_tx_seen_chain_ok=запись.get("chain_ok"))
+            # ИМЯ ОДНО. Прежде здесь писалось own_tx_seen_chain_ok, а все
+            # потребители -- пределы полосы, доклад, таблица кругов -- читают
+            # chain_ok. Вердикт физически лежал в позиции и ни до кого не
+            # доходил. Второе имя оставлено как было: на него смотрят уже
+            # написанные разборы, и ломать их незачем.
+            поля = {"own_tx_seen_ts": round(t_recv, 6),
+                     "own_tx_seen_ms": запись.get("own_tx_seen_ms"),
+                     "bloom_to_seen_ms": запись.get("bloom_to_seen_ms"),
+                     "own_tx_seen_slot": слот,
+                     "own_tx_seen_chain_ok": запись.get("chain_ok")}
+            # chain_ok пишется ТОЛЬКО когда он известен: замерная подписка
+            # часто приходит без meta, и записать туда None значило бы
+            # затереть вердикт, уже добытый разбором покупки.
+            if "chain_ok" in запись:
+                поля["chain_ok"] = запись["chain_ok"]
+            self.состояние.update_position(cid, **поля)
         except Exception as exc:  # noqa: BLE001
             log.warning("круг в позицию не записан: %s", type(exc).__name__)
         log.info("наша покупка в потоке: %s, от решения %s мс, от ответа Bloom "
@@ -2451,6 +2525,8 @@ async def биение(детектор: Детектор, стоп_через_s
             # горячему пути -- сборка тогда стоит 82 мс вместо 0.65 мс.
             # Грузим здесь: раз в пульс, в своём потоке, одним вызовом.
             await asyncio.to_thread(детектор.догрузить_таблицы_ног)
+            # Вердикт по цепи у позиций, где его нет. Тоже вне горячего пути.
+            await asyncio.to_thread(детектор.догнать_chain_ok)
             детектор.признак_жизни()
         except Exception as exc:  # noqa: BLE001
             log.warning("признак жизни не записался: %s: %s",
@@ -3753,6 +3829,69 @@ def self_test() -> int:
             нет_модуля.вернуть()
         chk("после проверок тени модуль на месте, как был",
             "SB" in globals(), "SB" in globals())
+
+        # ---- ДОГОН chain_ok ОТЛОЖЕННЫМ getTransaction ----
+        # Замерная подписка идёт с "failed": False, поэтому упавшая наша
+        # транзакция по ней не придёт НИКОГДА, а уведомление часто приходит
+        # без meta. Догон закрывает и то, и другое -- вне горячего пути.
+        class HeliusДогон:
+            def __init__(self, ответы):
+                self.ответы = ответы
+                self.спрошено = []
+
+            def транзакция(self, подпись, **kw):
+                self.спрошено.append(подпись)
+                return self.ответы.get(подпись)
+
+        st.write_intent(client_order_id="dg1", mint="M1", source_sig="S1",
+                         source_slot=1, sol_in=0.2, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                         sell_after_s=28.8)
+        st.update_position("dg1", signatures=["ПОДПИСЬ_СЕЛА"])
+        st.write_intent(client_order_id="dg2", mint="M2", source_sig="S2",
+                         source_slot=2, sol_in=0.2, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                         sell_after_s=28.8)
+        st.update_position("dg2", signatures=["ПОДПИСЬ_УПАЛА"])
+        st.write_intent(client_order_id="dg3", mint="M3", source_sig="S3",
+                         source_slot=3, sol_in=0.2, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                         sell_after_s=28.8)
+        st.update_position("dg3", signatures=["ПОДПИСЬ_МОЛЧИТ"])
+        st.write_intent(client_order_id="dg4", mint="M4", source_sig="S4",
+                         source_slot=4, sol_in=0.2, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                         sell_after_s=28.8)
+        st.update_position("dg4", signatures=["ПОДПИСЬ_УЖЕ"], chain_ok=True)
+        h_дг = HeliusДогон({
+            "ПОДПИСЬ_СЕЛА": {"slot": 10, "meta": {"err": None}},
+            "ПОДПИСЬ_УПАЛА": {"slot": 11, "meta": {"err": {"Custom": 6001}}},
+            "ПОДПИСЬ_МОЛЧИТ": None})
+        д_дг = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                         курс=КурсSOL(), режим="dry", helius=h_дг)
+        и_дг = д_дг.догнать_chain_ok()
+        поз_дг = st.positions()
+        chk("догон заполнил вердикт севшей покупки",
+            поз_дг["dg1"].get("chain_ok") is True, поз_дг["dg1"].get("chain_ok"))
+        chk("догон заполнил вердикт УПАВШЕЙ -- то, чего подписка дать не может",
+            поз_дг["dg2"].get("chain_ok") is False
+            and поз_дг["dg2"].get("chain_err") == {"Custom": 6001},
+            поз_дг["dg2"].get("chain_ok"))
+        chk("узел молчит -- поле остаётся пустым, посадка не выдумывается",
+            поз_дг["dg3"].get("chain_ok") is None, поз_дг["dg3"].get("chain_ok"))
+        chk("позицию с УЖЕ известным вердиктом догон не трогает и не спрашивает",
+            "ПОДПИСЬ_УЖЕ" not in h_дг.спрошено, h_дг.спрошено)
+        chk("итог догона назван числами",
+            и_дг["looked"] == 3 and и_дг["filled"] == 2
+            and и_дг["still_unknown"] == 1, и_дг)
+        chk("оба имени поля теперь согласованы",
+            поз_дг["dg2"].get("own_tx_seen_chain_ok") is False,
+            поз_дг["dg2"].get("own_tx_seen_chain_ok"))
+        chk("догон посчитан в признаке жизни",
+            д_дг.chain_ok_догнано == 2, д_дг.chain_ok_догнано)
+        предел = д_дг.догнать_chain_ok(предел=1)
+        chk("за круг берётся не больше предела -- узел не занимаем",
+            предел["looked"] <= 1, предел)
 
         # ---- ЗАПАСНОЙ ПУТЬ ОГРАНИЧЕН ПО ЧАСАМ, А НЕ ПО ЗДОРОВЬЮ ----
         # 24.09 между 18:48 и 19:12 служба ушла на запасной logsSubscribe и
