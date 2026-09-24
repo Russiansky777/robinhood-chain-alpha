@@ -1511,6 +1511,35 @@ def зонд_bloom(*, rpc, api, поток, кошелёк: str, наблюда�
 
 # ------------------------------------------------------------------ вход
 
+def строка_итога(итог: dict) -> str:
+    """Итог теста одной строкой -- для основного чата Telegram.
+
+    Слово владельца 25.09: итоги синтетического теста идут в основной чат.
+    Строка короткая намеренно: её читают с телефона.
+    """
+    с = итог.get("summary") or {}
+    a = (с.get("a_send_to_seen_ms") or {}).get("median")
+    b = (с.get("b_send_to_seen_ms") or {}).get("median")
+    д = (с.get("b_minus_a_ms") or {}).get("median")
+    знак = "" if д is None else ("+" if д > 0 else "")
+    return (f"🏁 гонка отправок: пар {с.get('pairs')} (не зачтено "
+             f"{с.get('pairs_not_counted')}), Bloom {a} мс, своя {b} мс, "
+             f"разница {знак}{д} мс · упавших A {с.get('a_failed')} "
+             f"B {с.get('b_failed')} · потрачено "
+             f"{итог.get('spent_sol', 0):.4f} SOL")
+
+
+def послать_итог(итог: dict) -> dict:
+    """Строка итога в ОСНОВНОЙ чат. Сбой отправки прогон не роняет."""
+    try:
+        import bloom_notify as NT  # noqa: PLC0415
+
+        о = NT.Оповещатель(в_фоне=False)
+        return о.отправить(строка_итога(итог), куда=NT.КУДА_ОСНОВНОЙ)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
 def напечатать_зонд(итог: dict) -> None:
     """Печать зонда. Отдельно от работы: печать не имеет права ронять прогон."""
     try:
@@ -1725,6 +1754,8 @@ def main(argv=None) -> int:
         напечатать_доклад(итог, заголовок=f"итог, пар {len(итог['pairs'])}")
     except Exception as exc:  # noqa: BLE001
         print(f"печать доклада не вышла ({type(exc).__name__}) -- отчёт записан")
+    итог["telegram"] = послать_итог(итог)
+    print(f"строка итога в Telegram: {json.dumps(итог['telegram'], ensure_ascii=False)}")
     if a.live and not a.no_sell:
         вход = sum(РАЗМЕР_SOL for п in итог["pairs"]
                     for с in ("a", "b") if (п.get(с) or {}).get("ok"))
@@ -2143,6 +2174,11 @@ def self_test() -> int:
     chk("печать зонда идёт по существующим ключам",
         all(к in (зонд_печать["seen"][0]) for к in
             ("signature", "mint_delta", "ours_by_response", "t_after_send_s")))
+
+    итог_строка = строка_итога({"spent_sol": 0.1234, "summary": свод(пары)})
+    chk("строка итога несёт медианы, упавших и расход",
+        "гонка отправок" in итог_строка and "мс" in итог_строка
+        and "0.1234 SOL" in итог_строка, итог_строка)
 
     # -- 18. продажа: нечего продавать -- Jupiter не зовём
     продажа = продать_всё(RpcЗаглушка(), кошелёк=ST.EXECUTOR_WALLET,
