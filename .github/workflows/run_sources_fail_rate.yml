@@ -1,0 +1,98 @@
+name: "Источники: доля упавших сделок по цепи (только чтение)"
+
+# Цена торговли по потоку из шредов: он показывает сделку ДО исполнения.
+# Здесь считается, какая доля сделок наших источников вообще не доезжает
+# до успешного блока. Ни одного ордера, на VPS не ходит.
+on:
+  workflow_dispatch:
+    inputs:
+      tasks:
+        description: "задачи DBot, откуда брать источники"
+        required: false
+        default: "BATCH-5,BATCH-3"
+      since:
+        description: "с какого UTC считать (семь суток)"
+        required: false
+        default: "2026-09-17T00:00:00Z"
+      pages:
+        description: "страниц подписей на источник (по 1000)"
+        required: false
+        default: "3"
+      buys_sample:
+        description: "сколько транзакций осматривать на источник ради доли среди покупок"
+        required: false
+        default: "40"
+
+concurrency:
+  group: sources-fail-rate
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Самопроверки"
+        run: |
+          set -e
+          python analysis/solana_sources_fail_rate.py --self-test
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data
+          python -u analysis/solana_sources_fail_rate.py \
+            --tasks "${{ inputs.tasks }}" \
+            --since "${{ inputs.since }}" \
+            --pages "${{ inputs.pages }}" \
+            --buys-sample "${{ inputs.buys_sample }}" \
+            --out data/solana_sources_fail_rate.json | tee data/solana_sources_fail_rate.txt
+
+      - name: "Ключа в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          python - <<'PY'
+          import re, sys, pathlib
+          путь = pathlib.Path("data/solana_sources_fail_rate.txt")
+          if not путь.exists():
+              print("отчёта нет"); sys.exit(0)
+          if re.search(r"api-key=[A-Za-z0-9._\-]{8,}", путь.read_text(encoding="utf-8", errors="replace")):
+              print("в отчёте виден ключ"); sys.exit(1)
+          print("ключа в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/solana_sources_fail_rate.json data/solana_sources_fail_rate.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git add -A data/helius_usage 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Источники: доля упавших сделок по цепи [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

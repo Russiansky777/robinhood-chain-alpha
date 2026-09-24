@@ -145,6 +145,8 @@ jobs:
           GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
           GRPC_FEED2_URL: ${{ secrets.GRPC_FEED2_URL }}
           GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+          GRPC_FEED3_URL: ${{ secrets.GRPC_FEED3_URL }}
+          GRPC_FEED4_URL: ${{ secrets.GRPC_FEED4_URL }}
           GRPC_FEED_AUTH_HEADER: ${{ secrets.GRPC_FEED_AUTH_HEADER }}
         run: |
           set -e
@@ -176,6 +178,14 @@ jobs:
             echo "GRPC_FEED_TOKEN: задан, длина ${#GRPC_FEED_TOKEN}"
           fi
           echo "заголовок авторизации: $HEADER"
+          for N in 3 4; do
+            eval "V=\$GRPC_FEED${N}_URL"
+            if [ -z "$V" ]; then
+              echo "GRPC_FEED${N}_URL не задан -- канал RabbitStream не поднимется"
+            else
+              echo "GRPC_FEED${N}_URL: задан, длина ${#V}"
+            fi
+          done
           # Значения уезжают через stdin: в аргументах ssh они были бы видны
           # в ps на хосте.
           {
@@ -188,6 +198,11 @@ jobs:
             printf 'PROBE_PROJECTION_LIMIT=%s\n' "$PROJ_LIMIT"
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
+            # RabbitStream: свой адрес, ОБЩИЙ токен GRPC_FEED_TOKEN -- так
+            # написано в документации Shyft (data/docs/shyft_rabbitstream.md):
+            # "drop-in replacement ... requiring only a change of endpoint URL".
+            [ -n "$GRPC_FEED3_URL" ] && printf 'GRPC_FEED3_URL=%s\n' "$GRPC_FEED3_URL"
+            [ -n "$GRPC_FEED4_URL" ] && printf 'GRPC_FEED4_URL=%s\n' "$GRPC_FEED4_URL"
             true
           } | ssh $SSH_OPTS root@$TARGET_HOST "
             set -e
