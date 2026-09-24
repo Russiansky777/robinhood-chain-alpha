@@ -308,6 +308,30 @@ def программы_dex(tx: dict) -> list:
     return найдено
 
 
+def программы_в_транзакции(tx: dict) -> list:
+    """ВСЕ программы транзакции, не только DEX -- факт, а не толкование.
+
+    Нужно там, где транзакция подписана нашим ключом, но в журнале её нет:
+    список программ показывает, ЧТО именно произошло (перевод системной
+    программой, свап через DEX, вызов программы площадки), и не требует
+    гадать по сумме.
+    """
+    найдено = []
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    meta = (tx or {}).get("meta") or {}
+    пачки = [msg.get("instructions") or []]
+    for гр in meta.get("innerInstructions") or []:
+        пачки.append((гр or {}).get("instructions") or [])
+    for пачка in пачки:
+        for ins in пачка:
+            if not isinstance(ins, dict):
+                continue
+            pid = ins.get("programId")
+            if pid and pid not in найдено:
+                найдено.append(pid)
+    return найдено
+
+
 def _минты_источника(tx: dict, источник: str | None) -> tuple:
     """Минты, которые ДВИГАЛИСЬ на счетах самого источника, и все минты tx.
 
