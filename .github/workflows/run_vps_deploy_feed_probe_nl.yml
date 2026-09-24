@@ -200,10 +200,25 @@ jobs:
           set -e
           ssh -n $SSH_OPTS root@$HOST "
             set -e
-            systemctl enable --now $SVC
+            # ИМЕННО restart, а не 'enable --now': у работающей службы
+            # 'enable --now' ничего не перезапускает, и новый код на хосте
+            # лежит, но не работает. Три деплоя подряд доставляли правки в
+            # пустоту, а признак жизни оставался прежним.
+            systemctl enable $SVC
+            systemctl restart $SVC
+            # Признак жизни должен быть НОВЕЕ момента перезапуска, иначе мы
+            # читаем файл, оставшийся от прошлого запуска, и считаем его
+            # доказательством.
+            RESTART_TS=\$(date +%s)
             sleep 25
             systemctl is-active $SVC || { journalctl -u $SVC -n 40 --no-pager; exit 1; }
             test -s $STATE_DIR/heartbeat.json || { echo 'СБОЙ: признака жизни нет'; journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            HEARTBEAT_TS=\$(stat -c %Y $STATE_DIR/heartbeat.json)
+            if [ \"\$HEARTBEAT_TS\" -lt \"\$RESTART_TS\" ]; then
+              echo 'СБОЙ: признак жизни старше перезапуска -- служба его не обновила'
+              journalctl -u $SVC -n 40 --no-pager
+              exit 1
+            fi
             cat $STATE_DIR/heartbeat.json" | tee data/feed_probe_deploy.txt
 
       - name: "Токенов в отчёте быть не должно"
