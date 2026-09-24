@@ -1,4 +1,4 @@
-name: "Bloom: котировка Jupiter Ultra и проверка пола (без подписи)"
+name: "Bloom: котировка Jupiter (Ultra и Swap V2) и проверка пола (без подписи)"
 
 # Только запрос ордера и проверка правила 4. НИЧЕГО не подписывается и не
 # отправляется: ключа кошелька в этом прогоне нет вообще, а /order сам по
@@ -22,6 +22,10 @@ on:
         description: "вход позиции в SOL (для правила 30 %)"
         required: false
         default: ""
+      api:
+        description: "какой путь: v2 (по умолчанию при ключе), ultra, both"
+        required: false
+        default: "both"
 
 concurrency:
   group: bloom-jupiter-quote
@@ -42,6 +46,8 @@ jobs:
           python3 analysis/bloom_jupiter_sell.py --self-test
 
       - name: "Ордер и проверка пола"
+        env:
+          JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY }}
         run: |
           set -e
           pip install -q requests
@@ -50,4 +56,14 @@ jobs:
           ARGS="--quote-only ${{ inputs.mint }} ${{ inputs.amount_raw }} $TAKER"
           if [ -n "${{ inputs.entry_sol }}" ]; then ARGS="$ARGS --entry-sol ${{ inputs.entry_sol }}"; fi
           echo "аргументы: $ARGS"
-          python3 analysis/bloom_jupiter_sell.py $ARGS
+          # Ключ Swap V2 -- ТОЛЬКО в окружении, в аргументы и в вывод не попадает.
+          if [ -n "$JUPITER_API_KEY" ]; then echo "ключ Swap V2: есть"; else echo "ключ Swap V2: НЕТ"; fi
+          КАКОЙ="${{ inputs.api }}"
+          if [ "$КАКОЙ" = "both" ] || [ "$КАКОЙ" = "v2" ]; then
+            echo "=== путь Swap V2 ==="
+            BLOOM_JUP_API=v2 python3 analysis/bloom_jupiter_sell.py $ARGS || echo "V2 не отдал ордер"
+          fi
+          if [ "$КАКОЙ" = "both" ] || [ "$КАКОЙ" = "ultra" ]; then
+            echo "=== путь Ultra ==="
+            BLOOM_JUP_API=ultra python3 analysis/bloom_jupiter_sell.py $ARGS || echo "Ultra не отдала ордер"
+          fi

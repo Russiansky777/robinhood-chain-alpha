@@ -1,9 +1,10 @@
 name: "Bloom: деплой детектора v2 на NL-хост (только журнал, покупок нет)"
 
-# Детектор слушает источники, разбирает сделки и ПИШЕТ РЕШЕНИЯ В ЖУРНАЛ.
-# Ни одного POST в Bloom из него не уходит: покупать умеет только
-# bloom_executor, которого ещё нет ни в репозитории, ни на хосте. Это и
-# есть сутки вхолостую, о которых просил владелец.
+# Детектор слушает источники, разбирает сделки, пишет решения в журнал и
+# вызывает ИСПОЛНИТЕЛЯ в том же процессе. Исполнитель работает в dry-run:
+# BLOOM_LIVE_BUY в env НЕ задан и явно вычищается этим деплоем, поэтому ни
+# один POST в Bloom не уходит -- пишутся только намерения и позиции.
+# Живые покупки включаются ОТДЕЛЬНЫМ решением владельца, не этим файлом.
 #
 # Своё имя юнита (bloom-detector), свой каталог состояния делится со
 # сторожем (журнал решений и позиции -- общие, это одно хозяйство), свой
@@ -26,6 +27,38 @@ on:
         description: "какие задачи DBot слушать"
         required: false
         default: "BATCH-5,BATCH-3"
+      live_test:
+        description: "'yes' -- режим стенда: покупки ТОЛЬКО по тестовому источнику"
+        required: false
+        default: "no"
+      rotate_journals:
+        description: "'yes' -- отложить журналы прежнего формата (ключи сменились)"
+        required: false
+        default: "no"
+      mark_stand_start:
+        description: "'yes' -- поставить метку начала стенда (ТОЛЬКО по слову владельца)"
+        required: false
+        default: "no"
+      allow_open_live_test:
+        description: "'yes' -- сверка не блокирует старт открытыми позициями стенда (боевые не покрывает)"
+        required: false
+        default: "no"
+      telegram_live_test:
+        description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
+        required: false
+        default: "1"
+      live_buy:
+        description: "'1' -- ЖИВЫЕ покупки по РЕАЛЬНЫМ источникам (только по слову владельца)"
+        required: false
+        default: "0"
+      min_start_balance:
+        description: "порог баланса для старта, SOL (пусто -- 0.3; менять только по слову владельца)"
+        required: false
+        default: ""
+      buy_sol:
+        description: "размер боевой покупки в SOL"
+        required: false
+        default: "0.05"
 
 concurrency:
   group: bloom-detector-deploy
@@ -57,6 +90,8 @@ jobs:
           python3 bloom_api.py --self-test
           python3 bloom_seller.py --self-test
           python3 bloom_detector.py --self-test
+          python3 bloom_executor.py --self-test
+          python3 bloom_reconcile.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -90,7 +125,7 @@ jobs:
             set -e
             install -d -o bot -g bot -m 755 $CODE_DIR
             install -d -o bot -g bot -m 750 $STATE_DIR
-            install -d -o root -g root -m 750 $ENV_DIR
+            install -d -o root -g root -m 711 $ENV_DIR   # bot должен читать рубильник
             test -s $ENV_DIR/env || { echo 'СБОЙ: нет $ENV_DIR/env -- сначала деплой сторожа'; exit 1; }
             ls -ld $CODE_DIR $STATE_DIR $ENV_DIR
           "
@@ -99,7 +134,10 @@ jobs:
         run: |
           set -e
           EMPTY_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py; do
+          # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
+          # Без него службы работают, но расход не попадает в учёт, и
+          # почасовая проверка кредитов смотрит на четверть картины.
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -131,9 +169,56 @@ jobs:
             shred -u /tmp/dbot_line
             grep -q '^BLOOM_MODE=' $ENV_DIR/env || echo 'BLOOM_MODE=dry' >> $ENV_DIR/env
             grep -q '^BLOOM_TASKS=' $ENV_DIR/env || echo 'BLOOM_TASKS=${{ inputs.tasks }}' >> $ENV_DIR/env
+            # Исполнитель подключён, но dry-run: BLOOM_LIVE_BUY НЕ задан, и
+            # пока его нет, ни один POST в Bloom не уходит.
+            grep -q '^BLOOM_EXEC=' $ENV_DIR/env || echo 'BLOOM_EXEC=1' >> $ENV_DIR/env
+            # Тестовые источники стенда и их общий порог. Их ДВА:
+            #   DNJeTYni... -- обычный кошелёк владельца;
+            #   8aTMUKsp... -- кошелёк владельца в Fomo. Это путь НАШИХ
+            #     источников: комиссию платит Fomo, владелец второй
+            #     подписант, и разбор такой сделки надо проверить отдельно.
+            # Старое одиночное имя чистится, чтобы не осталось расхождения
+            # между двумя переменными.
+            sed -i '/^BLOOM_TEST_SOURCES=/d; /^BLOOM_TEST_SOURCE=/d; /^BLOOM_TEST_MIN_SOL=/d; /^BLOOM_TEST_BUY_SOL=/d; /^BLOOM_TEST_BUY_SOL_BUMP=/d' $ENV_DIR/env
+            echo 'BLOOM_TEST_SOURCES=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX,8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA' >> $ENV_DIR/env
+            echo 'BLOOM_TEST_MIN_SOL=0.05' >> $ENV_DIR/env
+            # Размер стенда по слову владельца: 0.001 SOL, при отказе
+            # площадки по минимуму -- один повтор на 0.005.
+            echo 'BLOOM_TEST_BUY_SOL=0.001' >> $ENV_DIR/env
+            echo 'BLOOM_TEST_BUY_SOL_BUMP=0.005' >> $ENV_DIR/env
+            # Строки о событиях стенда в Telegram: только тестовые источники.
+            # Токен и получатель уже в этом файле -- их пишет деплой сторожа;
+            # здесь только выключатель, и он переписывается на каждом деплое.
+            sed -i '/^BLOOM_TELEGRAM_LIVE_TEST=/d' $ENV_DIR/env
+            echo 'BLOOM_TELEGRAM_LIVE_TEST=${{ inputs.telegram_live_test }}' >> $ENV_DIR/env
+            # Строки по БОЕВЫМ источникам идут вместе с боевыми покупками:
+            # включать поток в 260 решений в сутки, не включая покупки,
+            # смысла нет, а включать покупки без строк -- опасно.
+            sed -i '/^BLOOM_TELEGRAM_REAL=/d' $ENV_DIR/env
+            echo 'BLOOM_TELEGRAM_REAL=${{ inputs.live_buy }}' >> $ENV_DIR/env
+            # BLOOM_LIVE_BUY вычищается ВСЕГДА и включается ТОЛЬКО отдельным
+            # входом live_buy ниже: покупка по реальному источнику -- это
+            # настоящие деньги, и включаться она должна одним осознанным
+            # действием, а не побочным следствием любого деплоя.
+            sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env
+            sed -i '/^BLOOM_BUY_SOL=/d' $ENV_DIR/env
+            echo 'BLOOM_BUY_SOL=${{ inputs.buy_sol }}' >> $ENV_DIR/env
+            sed -i '/^BLOOM_LIVE_TEST=/d' $ENV_DIR/env
             chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
             ls -l $ENV_DIR/env
           "
+          if [ "${{ inputs.live_buy }}" = "1" ]; then
+            echo "БОЕВЫЕ ПОКУПКИ: включаю BLOOM_LIVE_BUY=1, размер ${{ inputs.buy_sol }} SOL"
+            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_BUY=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+          else
+            echo "боевые покупки ВЫКЛЮЧЕНЫ: BLOOM_LIVE_BUY не задан"
+          fi
+          if [ "${{ inputs.live_test }}" = "yes" ]; then
+            echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
+            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_TEST=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+          else
+            echo "режим dry-run: BLOOM_LIVE_TEST не задан"
+          fi
           echo "строк в env и сколько из них -- присваивания:"
           ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
 
@@ -149,7 +234,120 @@ jobs:
           ssh -n $SSH_OPTS root@$HOST "
             set -a; . $ENV_DIR/env; set +a
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
+            echo '--- исполнитель ---'
+            /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_executor.py --check-only
           " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+
+      - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
+        run: |
+          set -e
+          # Проверка от root бесполезна: первый живой прогон детектора
+          # встал на PermissionError именно потому, что деплой спрашивал
+          # root-а, а служба работает от bot. Спрашиваем того, кто работает.
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 BLOOM_KILL_FILE=\"\$BLOOM_KILL_FILE\" \
+                 BLOOM_KILL_SELL_FILE=\"\$BLOOM_KILL_SELL_FILE\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import bloom_exec_state as S; s=S.ExecState(); d,p=s.kill_readable(); print((\"ДОСТУПЕН\" if d else \"НЕДОСТУПЕН\"), p); import sys; sys.exit(0 if d else 1)'
+          ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
+          echo "рубильник от имени bot: $OUT"
+
+      - name: "Отложить журналы прежнего формата (по запросу)"
+        if: ${{ inputs.rotate_journals == 'yes' }}
+        run: |
+          set -e
+          # Ключи журналов переведены на ASCII (schema_version 2). Смешивать
+          # записи v1 и v2 в одном файле нельзя: любая сводка по ключу
+          # посчитает только половину. Поэтому старые файлы откладываются
+          # ОДИН раз, с меткой времени, а не удаляются.
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            cd $STATE_DIR
+            for f in decisions.jsonl positions.jsonl; do
+              if [ -s \"\$f\" ]; then
+                mv \"\$f\" \"\$f.v1.$stamp\"
+                echo \"отложен \$f -> \$f.v1.$stamp\"
+              else
+                echo \"\$f пуст или отсутствует -- откладывать нечего\"
+              fi
+            done
+            chown -R bot:bot $STATE_DIR
+            ls -l $STATE_DIR | head -20
+          "
+
+      - name: "ГЕЙТ: каталог состояния принадлежит службе, а не root"
+        run: |
+          set -e
+          # Шаги деплоя идут от root, и всё, что они создают в каталоге
+          # состояния, остаётся root-овым -- служба от bot потом писать
+          # туда не может. Так уже потерялся весь учёт кредитов детектора:
+          # каталог helius_usage создал --check-only от root.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            chown -R bot:bot $STATE_DIR
+            find $STATE_DIR ! -user bot -print | head -5
+            sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
+            echo 'каталог состояния пишется службой'
+          "
+
+      - name: "Метка начала стенда (только по явному входу владельца)"
+        if: ${{ inputs.mark_stand_start == 'yes' }}
+        run: |
+          set -e
+          # Метка объявляет всю ПРЕЖНЮЮ активность кошелька его прежней
+          # жизнью: ручная торговля, чистка пустых токен-счетов, переводы
+          # себе. Того, кто торгует СЕЙЧАС, она не прячет -- ограничивает
+          # только прошлое. Ставится от имени службы, иначе файл будет
+          # root-овым и служба его не перепишет.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python \
+                 $CODE_DIR/bloom_reconcile.py --mark-start \
+                 --note 'начало стенда, подтверждено владельцем' 2>&1 | head -20
+          " | tee -a data/bloom_detector_deploy.txt
+
+      - name: "Сверка при старте (bloom_reconcile): можно ли включать деньги"
+        run: |
+          set -e
+          # Исключение для стенда -- отдельным входом и только по слову
+          # владельца: позиция стенда стоит открытой именно потому, что её не
+          # удалось продать, а правка, которая её закрывает, ставится этим же
+          # деплоем. Боевые позиции исключение не покрывает -- это в сверке.
+          RECON_ARGS=""
+          if [ "${{ inputs.allow_open_live_test }}" = "yes" ]; then
+            RECON_ARGS="--allow-open-live-test"
+          fi
+          # Порог баланса -- ДЕНЬГИ, и менять его молча нельзя. Пустой вход
+          # оставляет 0.3; заданный передаётся сверке как осознанное решение
+          # владельца и печатается в лог деплоя числом.
+          ПОРОГ_БАЛАНСА="${{ inputs.min_start_balance }}"
+          if [ -n "$ПОРОГ_БАЛАНСА" ]; then
+            case "$ПОРОГ_БАЛАНСА" in
+              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $ПОРОГ_БАЛАНСА"; exit 1;;
+            esac
+            echo "порог баланса для старта задан входом: $ПОРОГ_БАЛАНСА SOL"
+          fi
+          echo "аргументы сверки: [$RECON_ARGS]"
+          # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
+          # начинается с неизвестного исходного состояния. В dry-run она
+          # информационная: там позиции dry-run помехой не считаются.
+          set +e
+          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            ${ПОРОГ_БАЛАНСА:+BLOOM_MIN_START_BALANCE_SOL=$ПОРОГ_БАЛАНСА} \
+            PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py $RECON_ARGS 2>&1")
+          RC=$?
+          set -e
+          echo "$OUT" | tail -60 | tee -a data/bloom_detector_deploy.txt
+          if [ "${{ inputs.live_test }}" = "yes" ] && [ "$RC" != "0" ]; then
+            echo "СТЕНД НЕ ЗАПУЩЕН: сверка при старте не чистая (см. blockers выше)"
+            exit 1
+          fi
 
       - name: "systemd-юнит с ужесточением"
         run: |
