@@ -87,6 +87,9 @@ SPECS = {
     CPMM: {"label": "Raydium CPMM", "ix": "swap_base_input", "alt": [], "n_accounts": 13,
            "user": [0], "user_ata": [(4, 10, 8), (5, 11, 9)], "pda": [],
            "base_mint": 11, "quote_mint": 10, "base_vault": 7, "quote_vault": 6},
+    LAUNCHLAB: {"label": "Raydium Launchlab", "ix": "buy_exact_in", "alt": [], "n_accounts": 18,
+                "user": [0], "user_ata": [(5, 9, 11), (6, 10, 12)], "pda": [], "tail": True,
+                "base_mint": 9, "quote_mint": 10, "base_vault": 7, "quote_vault": 8},
     DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"], "n_accounts": 14,
             "user": [8], "user_ata": "damm2", "pda": [],
             "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
@@ -204,8 +207,11 @@ def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
                                  is_writable=is_user or tpl["writable"].get(a, False)))
     if keep_source_ix:   # только для самопроверки: инструкция источника как есть
         data = tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:]
-    else:                # наша сборка: всегда основная инструкция типа, ровно два u64
+    else:                # наша сборка: основная инструкция типа, два u64 (+ хвост источника,
+                         # у Launchlab это share_fee_rate u64)
         data = disc(SPECS[tpl["program"]]["ix"]) + struct.pack("<QQ", arg0, arg1)
+        if SPECS[tpl["program"]].get("tail"):
+            data += tpl["data"][24:]
     return Instruction(Pubkey.from_string(tpl["program"]), data, metas)
 
 
@@ -276,6 +282,8 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
     всё, что ушло из котировки в счета этой инструкции (пул + комиссии)."""
     if tpl["program"] == DAMM2:
         return {"ok": False, "why_not": "DAMM v2: сосредоточенная ликвидность, резервы цену не дают"}
+    if tpl["program"] == LAUNCHLAB:
+        return launchlab_min_out(tx, amount_in, slippage)
     mv = mints_and_vaults(tpl, tx)
     rows = {r["account"]: r for r in C.token_rows(tx).values()}
     qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
@@ -293,6 +301,54 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
     mn = int(expected * D(1 - slippage))
     return {"ok": True, "fee_factor": float(f), "reserves_after": [x1, y1],
             "expected_out": int(expected), "min_out": mn}
+
+
+# ------------------------------------------------------------ Launchlab: виртуальные резервы
+
+# Событие сделки Launchlab: дискриминатор Anchor sha256("event:TradeEvent")[:8]
+# = bddb7fd34ee661ee (совпадает с «Program data» настоящих транзакций).
+# Раскладка u64 после pool_state (32 байта) установлена по данным: реальные
+# резервы до/после сходятся с движением хранилищ, выход сделки источника
+# воспроизводится формулой кривой ТОЧНО (самопроверка на всех образцах).
+LL_EVENT_DISC = hashlib.sha256(b"event:TradeEvent").digest()[:8]
+LL_FIELDS = ("total_base_sell", "virtual_base", "virtual_quote", "real_base_before",
+             "real_quote_before", "real_base_after", "real_quote_after", "amount_in", "amount_out",
+             "protocol_fee", "platform_fee")
+
+
+def launchlab_event(tx: dict) -> dict | None:
+    for ln in ((tx or {}).get("meta") or {}).get("logMessages") or []:
+        if not ln.startswith("Program data: "):
+            continue
+        try:
+            raw = base64.b64decode(ln[len("Program data: "):].strip())
+        except ValueError:
+            continue
+        if raw[:8] != LL_EVENT_DISC or len(raw) < 40 + 8 * len(LL_FIELDS):
+            continue
+        vals = struct.unpack("<" + "Q" * len(LL_FIELDS), raw[40:40 + 8 * len(LL_FIELDS)])
+        return dict(zip(LL_FIELDS, vals))
+    return None
+
+
+def launchlab_out(ev: dict, amount_in: int, after: bool, fee_rate: D) -> D:
+    rb = ev["real_base_after"] if after else ev["real_base_before"]
+    rq = ev["real_quote_after"] if after else ev["real_quote_before"]
+    base_res, quote_res = D(ev["virtual_base"] - rb), D(ev["virtual_quote"] + rq)
+    net = D(amount_in) * (1 - fee_rate)
+    return base_res * net / (quote_res + net)
+
+
+def launchlab_min_out(tx: dict, amount_in: int, slippage: float) -> dict:
+    ev = launchlab_event(tx)
+    if not ev:
+        return {"ok": False, "why_not": "нет события TradeEvent Launchlab в логах"}
+    fee = ev["amount_in"] - (ev["real_quote_after"] - ev["real_quote_before"])
+    fee_rate = D(fee) / D(ev["amount_in"]) if ev["amount_in"] else D(0)
+    exp = launchlab_out(ev, amount_in, True, fee_rate)
+    return {"ok": True, "fee_rate": float(fee_rate), "virtual_reserves_after": [
+        ev["virtual_base"] - ev["real_base_after"], ev["virtual_quote"] + ev["real_quote_after"]],
+        "expected_out": int(exp), "min_out": int(exp * D(1 - slippage))}
 
 
 # ------------------------------------------------------------ самопроверка
@@ -376,6 +432,21 @@ def self_test() -> int:
         f = D(qv["pre"]) * D(bv["pre"] - bv["post"]) / (D(bv["post"]) * D(spent))
         pred = D(bv["pre"]) * D(spent) * f / (D(qv["pre"]) + D(spent) * f)
         errs.append(abs(float(pred) / (bv["pre"] - bv["post"]) - 1))
+    ll = []
+    for s in load_samples(LAUNCHLAB):
+        ev = launchlab_event(s["tx"])
+        if not ev:
+            continue
+        fee = ev["amount_in"] - (ev["real_quote_after"] - ev["real_quote_before"])
+        pred = launchlab_out(ev, ev["amount_in"], False, D(fee) / D(ev["amount_in"]))
+        ll.append(abs(float(pred) - ev["amount_out"]) / ev["amount_out"])
+        rows = {r["account"]: r for r in C.token_rows(s["tx"]).values()}
+        bv = rows.get(s["pool_vault"])
+        if bv and bv["pre"] - bv["post"] != ev["amount_out"]:
+            ll.append(1.0)
+    checks.append((f"Launchlab: кривая на виртуальных резервах из события воспроизводит выход "
+                   f"источника ({len(ll)} проверок, макс. отклонение {max(ll) if ll else None})",
+                   len(ll) >= 10 and max(ll) < 1e-6))
     checks.append((f"формула x*y=k с калибровкой воспроизводит сделку источника ({len(errs)} сделок, "
                    f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
     bad_n = 0

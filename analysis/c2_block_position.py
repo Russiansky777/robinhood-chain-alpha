@@ -198,8 +198,15 @@ def main() -> int:
                 handle_ours(t, btx, ours_rows)
         del b, btx
     tip_accounts = {a for a, ws in recv_wallets.items() if len(ws) >= TIP_MIN_WALLETS}
+    # Ядро получателей: адреса, куда шлют переводы >= 200 разных кошельков выборки
+    # (плотная группа, резко отделённая от остальных). Чаевые считаются дважды:
+    # в ядро и во все частые адреса -- второе шире и включает сервисные сборы.
+    core = {a for a, ws in recv_wallets.items() if len(ws) >= 200}
     for r in rows + ours_rows:
-        r["tip_lamports"] = sum(lam for to, lam in r.pop("_transfers", []) if to in tip_accounts)
+        tr = r.pop("_transfers", [])
+        r["sol_transfers"] = tr
+        r["tip_lamports"] = sum(lam for to, lam in tr if to in tip_accounts)
+        r["tip_core_lamports"] = sum(lam for to, lam in tr if to in core)
     # ранговые четверти по каждой сделке
     by_trade: dict = {}
     for r in rows:
@@ -220,6 +227,8 @@ def main() -> int:
                     "cu_price_p75": q([r["cu_price_micro"] for r in rs], 0.75),
                     "priority_lamports_median": q([r["priority_lamports"] for r in rs], 0.5),
                     "tip_lamports_median": q([r["tip_lamports"] for r in rs], 0.5),
+                    "tip_core_lamports_median": q([r["tip_core_lamports"] for r in rs], 0.5),
+                    "share_with_core_tip": round(sum(1 for r in rs if r["tip_core_lamports"]) / len(rs), 3) if rs else None,
                     "share_with_tip": round(sum(1 for r in rs if r["tip_lamports"]) / len(rs), 3) if rs else None,
                     "exec_vs_spot_after_median": q([r["exec_vs_spot_after"] for r in rs], 0.5),
                     "n_same_pool": sum(1 for r in rs if r["exec_vs_spot_after"] is not None)}
@@ -229,11 +238,18 @@ def main() -> int:
         rs = [r for r in rows if (r["cu_price_micro"] or 0) >= thr]
         thresholds[thr] = {"n": len(rs), "share_q1": round(sum(1 for r in rs if r["quartile"] == 1) / len(rs), 3)
                            if rs else None}
+    core_list = sorted(core)
+    tip_thr = {}
+    for thr in (0, 100_000, 1_000_000, 5_000_000, 10_000_000, 30_000_000):
+        rs = [r for r in rows if r["tip_core_lamports"] >= thr]
+        tip_thr[thr] = {"n": len(rs), "share_q1": round(sum(1 for r in rs if r["quartile"] == 1) / len(rs), 3)
+                        if rs else None}
     router_cnt = Counter(tuple(r["routers"][:2]) for r in rows)
     out = {"generated_utc": C.utc(time.time()), "trades": len(per_trade), "rows": len(rows),
            "tip_accounts_from_data": sorted(({"address": a, "distinct_senders": len(recv_wallets[a])}
                                              for a in tip_accounts), key=lambda x: -x["distinct_senders"]),
            "quartiles": quart, "cu_price_thresholds_share_q1": thresholds,
+           "tip_core_accounts": core_list, "tip_core_thresholds_share_q1": tip_thr,
            "routers_top": [(list(k), v) for k, v in router_cnt.most_common(12)],
            "ours_s0": ours_rows, "per_trade": per_trade, "followers": rows,
            "credits_this_run": rpc.stats.get("кредитов"), "elapsed_s": round(time.time() - t0, 1),
@@ -243,6 +259,7 @@ def main() -> int:
     print("сделок", len(per_trade), "покупателей после источника", len(rows))
     print("четверти:", json.dumps(quart, ensure_ascii=False))
     print("пороги:", json.dumps(thresholds))
+    print("пороги чаевых (ядро):", json.dumps(tip_thr), "ядро:", len(core_list))
     print("наши S+0:", json.dumps(ours_rows, ensure_ascii=False, default=str))
     print("tip-адреса из данных:", len(tip_accounts))
     print(f"кредитов {rpc.stats.get('кредитов')}; C2 сегодня {C.c2_spent_today()}")
