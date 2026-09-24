@@ -260,12 +260,31 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
     итог = {"ok": False, "steps": шаги, "mint": mint, "amount_raw": amount_raw}
 
     if ордер_фн is None or исполнить_фн is None:
-        # Клиент Ultra один на весь репозиторий -- в dbot_rescue. Второй
-        # копии быть не должно: расхождение двух клиентов по полю порога
-        # стоило бы денег.
-        from dbot_rescue import ultra_execute, ultra_order  # noqa: PLC0415
-        ордер_фн = ордер_фн or ultra_order
-        исполнить_фн = исполнить_фн or ultra_execute
+        # Клиент один на весь репозиторий -- в dbot_rescue. Второй копии быть
+        # не должно: расхождение двух клиентов по полю порога стоило бы денег.
+        #
+        # Путь по умолчанию -- Swap V2 (Ultra по документации больше не
+        # развивают, а lite-api уходит). Ultra остаётся запасным на случай,
+        # когда ключа V2 нет: терять выход из-за отсутствия ключа нельзя.
+        from dbot_rescue import (  # noqa: PLC0415
+            jup_v2_key_present, swap_v2_execute, swap_v2_order,
+            ultra_execute, ultra_order)
+        путь = (os.environ.get("BLOOM_JUP_API") or "").strip().lower()
+        есть_ключ, почему_нет_ключа = jup_v2_key_present()
+        if путь == "ultra":
+            выбран, о_фн, и_фн = "ultra", ultra_order, ultra_execute
+        elif путь in ("v2", "swap-v2", "swapv2"):
+            выбран, о_фн, и_фн = "swap-v2", swap_v2_order, swap_v2_execute
+        elif есть_ключ:
+            выбран, о_фн, и_фн = "swap-v2", swap_v2_order, swap_v2_execute
+        else:
+            выбран, о_фн, и_фн = "ultra", ultra_order, ultra_execute
+        ордер_фн = ордер_фн or о_фн
+        исполнить_фн = исполнить_фн or и_фн
+        итог["api"] = выбран
+        шаги.append({"step": "api", "ok": True, "api": выбран,
+                      "why_not": (None if выбран == "swap-v2" else почему_нет_ключа
+                                   or "выбран вход BLOOM_JUP_API=ultra")})
 
     # Подпись нужна ТОЛЬКО для живой отправки: при живьём=False (проверка
     # котировки и пола) ни ключ, ни solders не требуются вовсе, и падать на
@@ -521,6 +540,35 @@ def self_test() -> int:
         DR.ultra_order.__code__.co_varnames)
 
     src = Path(__file__).read_text(encoding="utf-8")
+    # --- выбор пути API: V2 по умолчанию при ключе, Ultra как запасной
+    было_ключ = os.environ.get("JUPITER_API_KEY")
+    было_путь = os.environ.get("BLOOM_JUP_API")
+    try:
+        os.environ.pop("JUPITER_API_KEY", None)
+        os.environ.pop("BLOOM_JUP_API", None)
+        r_у = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                       живьём=False)
+        chk("без ключа V2 путь -- Ultra", r_у.get("api") == "ultra", r_у.get("api"))
+        os.environ["JUPITER_API_KEY"] = "КЛЮЧ"
+        r_в = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                       живьём=False)
+        chk("с ключом путь по умолчанию -- Swap V2", r_в.get("api") == "swap-v2",
+            r_в.get("api"))
+        os.environ["BLOOM_JUP_API"] = "ultra"
+        r_н = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                       живьём=False)
+        chk("вход BLOOM_JUP_API=ultra сильнее наличия ключа",
+            r_н.get("api") == "ultra", r_н.get("api"))
+        chk("и выбор пути виден в шагах записи",
+            any(ш.get("step") == "api" for ш in (r_н.get("steps") or [])), r_н.get("steps"))
+    finally:
+        os.environ.pop("JUPITER_API_KEY", None)
+        os.environ.pop("BLOOM_JUP_API", None)
+        if было_ключ is not None:
+            os.environ["JUPITER_API_KEY"] = было_ключ
+        if было_путь is not None:
+            os.environ["BLOOM_JUP_API"] = было_путь
+
     тело = src.split("def self_test")[0]
     chk("секрет ключа в текст ошибок не подставляется",
         "type(exc).__name__" in тело.split("def публичный_ключ")[1].split("def ")[0])

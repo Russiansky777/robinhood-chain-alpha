@@ -59,6 +59,11 @@ WSOL_MINT = "So11111111111111111111111111111111111111112"
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 JUP_ULTRA = "https://lite-api.jup.ag/ultra/v1"
+# Swap V2 -- то, на что Jupiter переводит Ultra. База отличается хостом и
+# путём, ключ передаётся заголовком x-api-key. Держим ОДНИМ клиентом рядом с
+# Ultra: две копии клиента, расходящиеся по имени поля порога, стоили бы
+# денег, а поле порога здесь -- это и есть наш пол по выходу.
+JUP_SWAP_V2 = os.environ.get("JUPITER_SWAP_V2_BASE", "https://api.jup.ag/swap/v2")
 JUP_QUOTE_HOSTS = ("https://lite-api.jup.ag/swap/v1/quote",
                    "https://quote-api.jup.ag/v6/quote")
 
@@ -219,6 +224,86 @@ def ultra_execute(signed_b64: str, request_id: str,
     return {"http": r.status_code, "ответ": b,
             "signature": b.get("signature") or b.get("txSignature"),
             "status": b.get("status")}
+
+
+def jup_v2_headers() -> dict:
+    """Заголовки для Swap V2. Ключ НИКОГДА не печатается и не логируется."""
+    ключ = (os.environ.get("JUPITER_API_KEY") or "").strip()
+    h = {"Accept": "application/json"}
+    if ключ:
+        h["x-api-key"] = ключ
+    return h
+
+
+def jup_v2_key_present() -> tuple:
+    ключ = (os.environ.get("JUPITER_API_KEY") or "").strip()
+    if not ключ:
+        return False, "JUPITER_API_KEY не задан"
+    return True, ""
+
+
+def swap_v2_order(mint: str, amount_raw: int, taker: str,
+                   scrub: Callable[[str], str] = lambda s: s,
+                   slippage_bps: int | None = None) -> dict:
+    """Swap V2: заказ на обмен. Возвращает те же поля, что ultra_order.
+
+    Имена полей ответа СВЕРЕНЫ на живом API (см. data/bloom_jup_v2_probe.json
+    и раздел в docs/BLOOM_STAND_CHECKLIST.md). Там, где V2 называет поле
+    иначе, читаются оба имени: тихо потерять порог нельзя -- это наш пол.
+    """
+    params = {"inputMint": mint, "outputMint": WSOL_MINT,
+               "amount": str(amount_raw), "taker": taker}
+    if slippage_bps is not None:
+        params["slippageBps"] = str(int(slippage_bps))
+    try:
+        r = requests.get(f"{JUP_SWAP_V2}/order", params=params,
+                          headers=jup_v2_headers(), timeout=30)
+    except Exception as exc:  # noqa: BLE001
+        return {"ошибка": f"сеть: {type(exc).__name__}"}
+    if r.status_code != 200:
+        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}"}
+    try:
+        b = r.json()
+    except ValueError:
+        return {"ошибка": "не JSON"}
+    tx = b.get("transaction") or b.get("swapTransaction")
+    зид = b.get("requestId") or b.get("orderId") or b.get("id")
+    if not tx or not зид:
+        return {"ошибка": ("в ответе нет transaction/requestId: "
+                            f"{scrub(json.dumps(b, default=str)[:300])}")}
+    порог = b.get("otherAmountThreshold")
+    if порог is None:
+        порог = ((b.get("quote") or {}).get("otherAmountThreshold")
+                  if isinstance(b.get("quote"), dict) else None)
+    выход = b.get("outAmount")
+    if выход is None and isinstance(b.get("quote"), dict):
+        выход = b["quote"].get("outAmount")
+    return {"transaction": tx, "requestId": зид,
+             "outAmount": выход, "priceImpactPct": b.get("priceImpactPct"),
+             "otherAmountThreshold": порог,
+             "slippageBps": b.get("slippageBps"),
+             "swapMode": b.get("swapMode"),
+             "inAmount": b.get("inAmount"),
+             "api": "swap-v2",
+             "router": b.get("router") or b.get("swapType") or b.get("mode")}
+
+
+def swap_v2_execute(signed_b64: str, request_id: str,
+                     scrub: Callable[[str], str] = lambda s: s) -> dict:
+    try:
+        r = requests.post(f"{JUP_SWAP_V2}/execute",
+                           json={"signedTransaction": signed_b64,
+                                  "requestId": request_id},
+                           headers=jup_v2_headers(), timeout=60)
+    except Exception as exc:  # noqa: BLE001
+        return {"ошибка": f"сеть: {type(exc).__name__}"}
+    try:
+        b = r.json()
+    except ValueError:
+        return {"ошибка": f"http={r.status_code}, не JSON: {scrub(r.text[:300])}"}
+    return {"http": r.status_code, "ответ": b, "api": "swap-v2",
+             "signature": b.get("signature") or b.get("txSignature"),
+             "status": b.get("status")}
 
 
 # ---------- подпись (solders импортируется лениво) ----------
