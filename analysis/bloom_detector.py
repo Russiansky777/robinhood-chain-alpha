@@ -2190,8 +2190,17 @@ class Детектор:
                        source_direct=источник_прямой, flags=флаги)
         self.состояние.log_decision(запись)
         try:
+            # chain_ok=True пишется ЗДЕСЬ, в ветке удачи. Прежде его писала
+            # только ветка падения (chain_ok=False), и у всех севших покупок
+            # поле оставалось пустым: 24.09 у пяти боевых покупок с 17:12Z
+            # оно было null при meta.err=null по цепи. Пустое поле читается
+            # как "неизвестно", и любой счёт, который ищет удачу, её не
+            # находил -- в том числе обрыв серии упавших у полосы своей
+            # отправки. Ошибка цепи выше уже вернула управление, значит сюда
+            # приходят только транзакции с meta.err == null.
             self.состояние.update_position(
-                cid, our_pool=наш["pool"], our_pool_direct=наш["direct"],
+                cid, chain_ok=True, our_pool=наш["pool"],
+                our_pool_direct=наш["direct"],
                 our_route_programs=",".join(наш["route"].get("programs") or []),
                 our_route_hops=наш["route"].get("hops_by_mints"),
                 our_slot=tx.get("slot"), flags=",".join(флаги))
@@ -3978,6 +3987,39 @@ def self_test() -> int:
             and "🟢" not in послано_у[0], послано_у)
         chk("маршрут упавшей покупки не считается",
             зап4.get("our_pool") is None and "our_route" not in зап4, зап4)
+
+        # СЕВШАЯ ПОКУПКА ТОЖЕ ОБЯЗАНА ПОМЕТИТЬ ПОЗИЦИЮ. 24.09 у пяти боевых
+        # покупок с 17:12Z chain_ok в позиции остался пустым при meta.err=null
+        # по цепи: ветка падения поле писала, ветка удачи -- нет. Пустое поле
+        # читается как "неизвестно", и всякий счёт, который ищет УДАЧУ, её не
+        # находил: в том числе обрыв серии упавших у полосы своей отправки,
+        # где три упавших подряд останавливают торговлю.
+        севшая = tx_пул(владельцы={"POOLA": ["КУПЛЕН", WSOL]}, счета=("POOLA",),
+                         подписанты=(ST.EXECUTOR_WALLET,))
+        севшая.setdefault("meta", {})
+        севшая["meta"]["err"] = None
+        севшая["slot"] = 781
+        детектор_с = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                               курс=КурсSOL(), режим="dry",
+                               helius=HeliusНашаTx(севшая))
+        st.write_intent(client_order_id="cs", mint="КУПЛЕН", source_sig="S4",
+                         source_slot=780, sol_in=0.2, pool="POOLA", program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                         sell_after_s=28.8)
+        зап5 = детектор_с.разобрать_нашу_покупку(
+            cid="cs", минт="КУПЛЕН", подпись="СЕВШАЯ", источник_маршрут={},
+            источник_пул="POOLA", exec_row={"signatures": ["СЕВШАЯ"],
+                                             "exec_code": "SENT"},
+            слот_источника=780)
+        chk("севшая покупка помечена chain_ok=True в ЗАПИСИ журнала",
+            зап5.get("chain_ok") is True and зап5.get("code") != КОД_ПОКУПКА_УПАЛА,
+            зап5.get("chain_ok"))
+        chk("и chain_ok=True доехал до ПОЗИЦИИ, а не остался в журнале",
+            st.positions()["cs"].get("chain_ok") is True,
+            st.positions()["cs"].get("chain_ok"))
+        chk("позиция севшей покупки НЕ закрыта -- её продаёт сторож",
+            st.positions()["cs"].get("state") != ST.STATE_CLOSED,
+            st.positions()["cs"].get("state"))
 
     # 16в. ЖИВЫЕ транзакции: разбор на настоящих данных.
     #
