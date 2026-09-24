@@ -83,7 +83,8 @@ PRICE_DEPENDENT = {B.DLMM, B.CLMM}    # счета инструкции (бин�
 LEG_MAX_AGE_S = 30
 LEG_REFRESH_S = 10
 LEG1_HAIRCUT = 0.05
-TX_OPTS = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0, "commitment": "confirmed"}
+TX_OPTS = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": C.TX_VERSION, "commitment": "confirmed"}
+FLIP_OK = {B.DLMM}    # CLMM: перевёрнутый шаблон программа отвергла в 9 из 9 симуляций (0x1787)
 SIM_OPTS = {"encoding": "base64", "sigVerify": False, "replaceRecentBlockhash": True,
             "commitment": "processed"}
 
@@ -191,7 +192,12 @@ class LegCache:
                 break
             if sg in seen:
                 continue
-            tx = self._rpc("getTransaction", [sg, TX_OPTS])
+            try:
+                tx = self._rpc("getTransaction", [sg, TX_OPTS])
+            except Exception:  # noqa: BLE001 -- одна нечитаемая tx не рвёт обновление пула
+                seen.append(sg)
+                self.calls["tx_errors"] += 1
+                continue
             if not tx:
                 continue
             seen.append(sg)
@@ -214,7 +220,7 @@ class LegCache:
         if not tpl.get("ok"):
             return None
         mv = B.mints_and_vaults(tpl, tx)
-        if mv.get("quote_mint") == q and mv.get("base_mint") == C.WSOL and p["program"] in PRICE_DEPENDENT:
+        if mv.get("quote_mint") == q and mv.get("base_mint") == C.WSOL and p["program"] in FLIP_OK:
             tpl = B.flip_template(tpl, C.WSOL)
             mv = B.mints_and_vaults(tpl, tx)
         if mv.get("quote_mint") != C.WSOL or mv.get("base_mint") != q:
@@ -503,7 +509,7 @@ def self_test() -> int:
     for x in allx + [{"tx": t} for t in C.load_real_txs().values()]:
         for ix in B.all_instructions(x["tx"]):
             prog = ix.get("programId")
-            if prog not in PRICE_DEPENDENT:
+            if prog not in FLIP_OK:
                 continue
             vi = (2, 3) if prog == B.DLMM else (5, 6)
             for qv in [ix["accounts"][i] for i in vi if i < len(ix["accounts"])]:
@@ -524,8 +530,8 @@ def self_test() -> int:
                                 and acc[out_i] == B.ata(C.EXECUTOR_WALLET, q, m2["base_program"])
                                 and (prog != B.CLMM or (acc[5] == m2["quote_vault"] and acc[11] == C.WSOL)))
                 break
-    checks.append((f"продажа Q -> SOL в DLMM/CLMM перевёрнута в покупку (вход WSOL, выход Q, у CLMM "
-                   f"хранилища/минты переставлены): {n_fl_ok} из {n_fl}", n_fl >= 1 and n_fl_ok == n_fl))
+    checks.append((f"продажа Q -> SOL в DLMM перевёрнута в покупку (вход WSOL, выход Q): {n_fl_ok} из {n_fl}",
+                   n_fl >= 5 and n_fl_ok == n_fl))
     # ---- какие методы узла модуль вообще зовёт: только чтение и симуляция
     import re  # noqa: PLC0415
     src = Path(__file__).read_text(encoding="utf-8")

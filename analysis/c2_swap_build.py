@@ -106,7 +106,7 @@ SPECS = {
     LAUNCHLAB: {"label": "Raydium Launchlab", "ix": "buy_exact_in", "alt": [], "n_accounts": 18,
                 "user": [0], "user_ata": [(5, 9, 11), (6, 10, 12)], "pda": [], "tail": True,
                 "base_mint": 9, "quote_mint": 10, "base_vault": 7, "quote_vault": 8},
-    DLMM: {"label": "Meteora DLMM", "ix": "swap2", "alt": [], "n_accounts": None, "min_accounts": 16,
+    DLMM: {"label": "Meteora DLMM", "ix": "swap2", "alt": ["swap"], "n_accounts": None, "min_accounts": 16,
            "user": [10], "user_ata": "dyn", "pda": [], "tail": True,
            "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
     CLMM: {"label": "Raydium CLMM", "ix": "swap_v2", "alt": [], "n_accounts": None, "min_accounts": 13,
@@ -152,7 +152,7 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
         if ix.get("programId") != program or pool_vault not in ix["accounts"]:
             continue
         data = b58decode(ix["data"])
-        name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output")
+        name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output", "swap")
                      if data[:8] == disc(n)), data[:8].hex())
         if data[:8] != want and name not in spec["alt"]:
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
@@ -160,7 +160,9 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
                 len(ix["accounts"]) < (spec.get("min_accounts") or 0):
             return {"ok": False, "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
         a0, a1 = struct.unpack("<QQ", data[8:24])
-        if program in (DLMM, CLMM) and name != spec["ix"]:
+        # DLMM swap (v1): счета 0..12 те же, что у swap2 (проверено на
+        # настоящих транзакциях), данные -- дискриминатор + 2 u64 без хвоста.
+        if program == CLMM and name != spec["ix"] or program == DLMM and name not in ("swap2", "swap"):
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
         # CLMM: хвост -- sqrt_price_limit_x64 (u128) + is_base_input (bool).
         # Хвост переносится в нашу сборку как есть, поэтому берём только
@@ -263,8 +265,9 @@ def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
         data = tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:]
     else:                # наша сборка: основная инструкция типа, два u64 (+ хвост источника,
                          # у Launchlab это share_fee_rate u64)
-        data = disc(SPECS[tpl["program"]]["ix"]) + struct.pack("<QQ", arg0, arg1)
-        if SPECS[tpl["program"]].get("tail"):
+        ix_name = tpl["ix"] if tpl["program"] == DLMM else SPECS[tpl["program"]]["ix"]
+        data = disc(ix_name) + struct.pack("<QQ", arg0, arg1)
+        if SPECS[tpl["program"]].get("tail") and not (tpl["program"] == DLMM and ix_name == "swap"):
             data += tpl["data"][24:]
     return Instruction(Pubkey.from_string(tpl["program"]), data, metas)
 
@@ -424,7 +427,8 @@ def load_samples(program: str) -> list:
             for ix in all_instructions(x["tx"]):
                 if ix.get("programId") != program or len(ix["accounts"]) < n_min:
                     continue
-                if b58decode(ix["data"])[:8] != disc(ix_name):
+                if b58decode(ix["data"])[:8] not in ((disc(ix_name), disc("swap")) if program == DLMM
+                                                     else (disc(ix_name),)):
                     continue
                 key = (C.first_signature(x["tx"]), ix["accounts"][vi])
                 if key in seen:
@@ -489,12 +493,21 @@ def self_test() -> int:
             if not tpl["ok"]:
                 continue
             kp = Keypair()
-            b = build_buy(tpl, s["tx"], user=str(kp.pubkey()), payer=s["source"], amount_in=10_000_000,
+            b = build_buy(tpl, s["tx"], user=str(kp.pubkey()), payer=s["source"] or str(kp.pubkey()), amount_in=10_000_000,
                           min_out=1, cu_price_micro=100_000, tip=None)
             n += 1
             assert b["size"] <= 1232, b["size"]
         dt = (time.perf_counter() - t0) * 1000 / max(1, n)
         checks.append((f"{spec['label']}: сборка {n} транзакций, среднее {dt:.2f} мс, размер <= 1232", n >= 10))
+    v1 = v1_ok = 0
+    for s_ in load_samples(DLMM):
+        tpl = extract_template(s_["tx"], DLMM, s_["pool_vault"])
+        if tpl.get("ok") and tpl["ix"] == "swap":
+            v1 += 1
+            ix = swap_instruction(tpl, s_["tx"], tpl["accounts"][10], tpl["arg0"], tpl["arg1"])
+            v1_ok += bytes(ix.data) == tpl["data"]
+    checks.append((f"DLMM swap v1: наши данные совпадают с данными источника байт в байт: {v1_ok} из {v1}",
+                   v1 >= 5 and v1_ok == v1))
     # минимум по резервам: на настоящей покупке Pump AMM формула с f должна
     # вернуть сделку самого источника (его трата -> его токены).
     sm = load_samples(PUMP_AMM)
