@@ -1,0 +1,66 @@
+Warning: Permanently added '45.59.170.76' (ED25519) to the list of known hosts.
+=== имя и адреса ===
+2606:4700:440d::6812:24a9 mainnet.helius-rpc.com
+2a06:98c1:3104::ac40:9757 mainnet.helius-rpc.com
+адреса v4: 104.18.36.169
+172.64.151.87
+
+=== RTT (ICMP, 10 пакетов) ===
+--- mainnet.helius-rpc.com ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss, time 9010ms
+rtt min/avg/max/mdev = 1.015/1.300/1.466/0.117 ms
+
+=== RTT по TCP-соединению (curl, 5 замеров) ===
+  tcp=0.002514 tls=0.022716 ttfb=0.035053
+  tcp=0.002428 tls=0.021254 ttfb=0.031392
+  tcp=0.002499 tls=0.022695 ttfb=0.036855
+  tcp=0.002618 tls=0.027341 ttfb=0.041801
+  tcp=0.002133 tls=0.022367 ttfb=0.033558
+
+=== traceroute ICMP ===
+traceroute to mainnet.helius-rpc.com (172.64.151.87), 20 hops max, 60 byte packets
+ 1  45.59.170.1  0.503 ms
+ 2  109.234.75.50  0.431 ms
+ 3  109.234.75.0  0.405 ms
+ 4  45.138.19.0  1.170 ms
+ 5  217.119.132.5  0.939 ms
+ 6  141.101.65.132  1.546 ms
+ 7  141.101.65.185  0.941 ms
+ 8  *
+ 9  *
+10  172.64.151.87  1.144 ms
+
+=== traceroute TCP 443 (ICMP часто режут) ===
+traceroute to mainnet.helius-rpc.com (172.64.151.87), 20 hops max, 60 byte packets
+ 1  45.59.170.1  0.327 ms
+ 2  109.234.75.50  0.296 ms
+ 3  109.234.75.0  0.323 ms
+ 4  *
+ 5  217.119.132.4  0.860 ms
+ 6  141.101.65.132  1.457 ms
+ 7  141.101.65.184  1.287 ms
+ 8  141.101.65.201  1.383 ms
+ 9  *
+10  172.64.151.87  1.364 ms
+
+=== whois и ASN по каждому адресу ===
+-- 104.18.36.169
+NetName:        CLOUDFLARENET
+OriginAS:       
+Organization:   Cloudflare, Inc. (CLOUD14)
+OrgName:        Cloudflare, Inc.
+City:           San Francisco
+Country:        US
+-- 172.64.151.87
+NetName:        CLOUDFLARENET
+OriginAS:       
+Organization:   Cloudflare, Inc. (CLOUD14)
+OrgName:        Cloudflare, Inc.
+City:           San Francisco
+Country:        US
+
+=== заголовки ответа (код колокации, если есть) ===
+HTTP/2 404 
+server: cloudflare
+cf-ray: a40202ccc9208072-AMS
+alt-svc: h3=":443"; ma=86400
