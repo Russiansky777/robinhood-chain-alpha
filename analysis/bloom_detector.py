@@ -58,12 +58,18 @@ import os
 import re
 import sqlite3
 import sys
+import threading
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bloom_exec_state as ST  # noqa: E402
+
+try:                                  # тень не обязана быть на хосте
+    import c2_shadow_build as SB      # noqa: E402
+except Exception:                     # noqa: BLE001
+    SB = None
 
 try:
     import bloom_telegram_cmd as TGC  # noqa: E402
@@ -1393,6 +1399,13 @@ class Детектор:
         # Сколько раз мы увидели в потоке СВОЮ транзакцию. Это замер, а не
         # торговля: сигналом наш кошелёк не становится никогда.
         self.наших_транзакций = 0
+        # Тень: сколько собрано, сколько прошло бы симуляцию, сколько дорогих
+        # по капитализации и сколько упало. Торговля от них не зависит.
+        self.тень_включена = ST.env_int("BLOOM_SHADOW", 1) == 1 and SB is not None
+        self.теней = 0
+        self.теней_прошло = 0
+        self.теней_дорогих = 0
+        self.теней_упало = 0
         self._последняя_тревога_разбора = 0.0
         self.способ: str | None = None
         self.старт = time.time()
@@ -1484,6 +1497,10 @@ class Детектор:
                            else {"enabled": False,
                                  "off_reason": "модуль оповещений не загружен"})
         st["own_tx_seen"] = self.наших_транзакций
+        st["shadow"] = {"enabled": self.тень_включена, "built": self.теней,
+                         "would_pass": self.теней_прошло,
+                         "over_cap": self.теней_дорогих,
+                         "failed": self.теней_упало}
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
                                     else {"enabled": False, "why_not": "не запущены"})
@@ -1672,6 +1689,11 @@ class Детектор:
         # записи и невидимую задержку дальше. Кеш минтов на процесс тут не
         # спасает: первый раз токен всегда новый.
         if строка.get("action") == "buy" and self.исполнитель is not None:
+            # ТЕНЬ -- ДО вызова Bloom, но в СВОЁМ потоке и без ожидания:
+            # запускается и тут же отпускается, Bloom уходит следующей
+            # строкой. Ставить её после отправки нельзя -- тогда она мерила
+            # бы уже другое состояние пула.
+            self.запустить_тень(строка, tx)
             try:
                 итог = self.исполнитель.execute(строка, balance_sol=self.свежий_баланс())
             except Exception as exc:  # noqa: BLE001
@@ -1746,6 +1768,59 @@ class Детектор:
         return строка
 
     # ------------------------------------------------- маршрут нашей покупки
+
+    def запустить_тень(self, строка: dict, tx: dict | None) -> None:
+        """Теневая сборка и симуляция -- параллельно Bloom, НЕ задерживая его.
+
+        Слово владельца: на каждый сигнал buy собрать покупку самим и
+        проверить её simulateTransaction от адреса нашего кошелька
+        (sigVerify=false), НИЧЕГО не отправляя. Торговля от этого не
+        меняется ни в одном байте: модуль не умеет отправлять транзакции, а
+        cap_usd и would_skip_cap идут в журнал пометкой.
+
+        Поток отдельный и "умирающий": исключение внутри не может ни
+        задержать Bloom, ни уронить детектор -- оно записывается в журнал.
+        """
+        if SB is None or not self.тень_включена:
+            return
+        try:
+            поток = threading.Thread(
+                target=self._тень_внутри, args=(dict(строка), tx),
+                name="shadow", daemon=True)
+            поток.start()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("тень не запустилась: %s", type(exc).__name__)
+
+    def _тень_внутри(self, строка: dict, tx: dict | None) -> None:
+        t0 = time.time()
+        запись = {"stage": "shadow", "signature": строка.get("signature"),
+                   "mint": строка.get("mint"), "source": строка.get("source")}
+        try:
+            курс, _, _ = self.курс.для_решения()
+            res = SB.shadow_build(
+                tx or {}, строка.get("source") or "", строка.get("mint") or "",
+                ST.EXECUTOR_WALLET,
+                int(round(float(self.исполнитель.buy_sol) * 1e9))
+                if self.исполнитель is not None else 0,
+                self.helius.call,
+                sol_usd=курс,
+                spend_sol_equiv=строка.get("spend_sol"),
+                slippage=(float(self.исполнитель.slippage_pct) / 100.0
+                           if self.исполнитель is not None else 0.35))
+            запись.update(res or {})
+            self.теней += 1
+            if (res or {}).get("sim_verdict") == "would_pass":
+                self.теней_прошло += 1
+            if (res or {}).get("would_skip_cap"):
+                self.теней_дорогих += 1
+        except Exception as exc:  # noqa: BLE001
+            запись["why_not"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            self.теней_упало += 1
+        запись["shadow_total_ms"] = round((time.time() - t0) * 1000.0, 2)
+        try:
+            self.состояние.log_decision(запись)
+        except Exception:  # noqa: BLE001
+            log.exception("запись тени в журнал не легла")
 
     def отметить_нашу_транзакцию(self, подпись: str, слот, tx, t_recv: float):
         """Наша покупка увидена в потоке: считаем два круга в миллисекундах.
@@ -3284,6 +3359,88 @@ def self_test() -> int:
             "own_tx_seen_ms" not in зп and зп.get("why_not"), зп)
         chk("счётчик наших транзакций растёт",
             детектор_з.наших_транзакций == 3, детектор_з.наших_транзакций)
+
+        # ТЕНЬ. Проверяем главное: она не задерживает Bloom, не может его
+        # уронить и ничего не отправляет.
+        class ТеньЗаглушка:
+            вызовов = 0
+            задержка = 0.0
+
+            @staticmethod
+            def shadow_build(*a, **kw):
+                ТеньЗаглушка.вызовов += 1
+                if ТеньЗаглушка.задержка:
+                    time.sleep(ТеньЗаглушка.задержка)
+                return {"ok": True, "sim_verdict": "would_pass",
+                         "pool_label": "Pump AMM", "build_ms": 3.0,
+                         "sim_ms": 40.0, "cap_usd": 250000.0,
+                         "would_skip_cap": True}
+
+        было_sb = globals().get("SB")
+        globals()["SB"] = ТеньЗаглушка
+        try:
+            # У заглушки узла обязан быть call: тень получает его как
+            # rpc_call. Без него падает построение аргументов, и тень
+            # считается упавшей -- ровно это и поймала проверка.
+            class HeliusДляТени(HeliusМолчит):
+                @staticmethod
+                def call(*a, **kw):
+                    return None
+
+            детектор_т = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                                   курс=КурсSOL(), режим="dry",
+                                   helius=HeliusДляТени())
+            детектор_т.тень_включена = True
+            ТеньЗаглушка.задержка = 0.35
+            t_до = time.time()
+            детектор_т.запустить_тень({"signature": "S", "mint": "M",
+                                        "source": "SRC", "spend_sol": 3.0}, {})
+            прошло = time.time() - t_до
+            chk("тень не задерживает горячий путь", прошло < 0.1, прошло)
+            for _ in range(60):
+                if детектор_т.теней:
+                    break
+                time.sleep(0.05)
+            chk("тень отработала в своём потоке и посчитана",
+                детектор_т.теней == 1 and детектор_т.теней_прошло == 1,
+                (детектор_т.теней, детектор_т.теней_прошло,
+                 детектор_т.теней_упало))
+            chk("дорогая по капитализации помечена, но это только пометка",
+                детектор_т.теней_дорогих == 1, детектор_т.теней_дорогих)
+
+            class ТеньПадает:
+                @staticmethod
+                def shadow_build(*a, **kw):
+                    raise RuntimeError("узел молчит")
+
+            globals()["SB"] = ТеньПадает
+            детектор_т2 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                                    курс=КурсSOL(), режим="dry",
+                                    helius=HeliusДляТени())
+            детектор_т2.тень_включена = True
+            детектор_т2.запустить_тень({"signature": "S2", "mint": "M"}, {})
+            for _ in range(60):
+                if детектор_т2.теней_упало:
+                    break
+                time.sleep(0.05)
+            chk("падение тени не роняет детектор и записано",
+                детектор_т2.теней_упало == 1, детектор_т2.теней_упало)
+
+            детектор_т3 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                                    курс=КурсSOL(), режим="dry",
+                                    helius=HeliusДляТени())
+            детектор_т3.тень_включена = False
+            детектор_т3.запустить_тень({"signature": "S3", "mint": "M"}, {})
+            chk("выключенная тень не запускается вовсе",
+                детектор_т3.теней == 0, детектор_т3.теней)
+        finally:
+            if было_sb is None:
+                globals().pop("SB", None)
+            else:
+                globals()["SB"] = было_sb
+        chk("модуль тени не умеет отправлять транзакции",
+            "sendTransaction" not in (REPO_ROOT / "analysis"
+                                       / "c2_shadow_build.py").read_text(encoding="utf-8"))
 
         # УПАВШАЯ ПО ЦЕПИ ПОКУПКА. 24.09 в 14:10:08Z владелец получил
         # "🟢 покупка SENT ... S+0 по цепи" по транзакции, которая в цепи
