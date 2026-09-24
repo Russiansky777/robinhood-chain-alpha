@@ -2778,6 +2778,13 @@ def self_test() -> int:
          "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4"),
         ("2j46i2LVmm5M", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
          "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4"),
+        # ещё три из тех же восьми: источник GAsnqm4X…, все три DBot купил
+        ("4GuLGZozuvHb", "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+         "FYayBW6PMhzuNUVTJSr4ruk66p1nVhJ3bSmYueMr1ZMS"),
+        ("4P9sC5ZHyXuY", "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+         "9GJQgnwKZL6oqsPcLmSohBb61w6cdj629b1RFhWvUe7j"),
+        ("496iPttxBq73", "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+         "DoqY9DZPnP11ptofS2jX5EZSnq6Cvt1mSzw1XJscwGUK"),
     )
     for начало, источник_м, минт_м in МАРШРУТЫ:
         tx_м = найти_tx(начало)
