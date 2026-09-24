@@ -1,0 +1,81 @@
+{
+  "generated_at_utc": "2026-09-24T13:50:56Z",
+  "mode": "full",
+  "ЧЕСТНЫЕ_ОГОВОРКИ": [
+    "Только чтение цепочки: ни одного вызова покупки/продажи, из DBot только GET follow_orders.",
+    "crowd_2 -- УНИКАЛЬНЫЕ чужие адреса за окно слот..слот+2; crowd_2_tx -- число транзакций. Живой buyers_between из Части A считал транзакции, поэтому сравнивать с ним честно именно crowd_2_tx, и калибровка смотрит на обе величины.",
+    "Окно скана -- фиксированные 3 слота вперёд. Живой buyers_between измерялся до НАШЕЙ покупки, а её медианное отставание 2 слота -- окна сопоставимы, но не тождественны.",
+    "Покупка определяется тем же кодом, что прошлый отбор Fomo (classify_tx импортируется, не копируется): баланс минта до транзакции 0, кошелёк среди подписантов, в транзакции есть DEX-программа, USDC/USDT пересчитаны в SOL по курсу Gecko на момент сделки.",
+    "Кошельки без первых покупок >=2 SOL за 72ч помечены no_buys и не попадают в таблицу уровней."
+  ],
+  "config": {
+    "min_spend_sol": 2.0,
+    "max_buys_per_wallet": 8,
+    "lookback_hours": 168,
+    "slots_ahead": 2,
+    "только_адреса": [
+      "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+    ],
+    "workers": 4,
+    "helius_key_env_name": "HELIUS_API_KEY",
+    "levels": {
+      "сильный": ">=8",
+      "средний": "3-7",
+      "пустой": "<=2"
+    }
+  },
+  "run_stats": {
+    "wallets_scanned": 1,
+    "blocks_fetched": 0,
+    "blocks_from_cache": 0,
+    "blocks_skipped": 0,
+    "blocks_failed": 0,
+    "rpc_calls": 22,
+    "rpc_retries": 0,
+    "rpc_errors": 0,
+    "batch_splits": 0,
+    "wallets_from_cache": 0,
+    "elapsed_s": 20.9,
+    "budget_exhausted": false
+  },
+  "calibration": {
+    "pilot": {
+      "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+      "live_buyers_between_median": 19.0,
+      "live_n": 20,
+      "scan_crowd_2_median": null,
+      "scan_crowd_2_tx_median": null,
+      "scan_n_buys": 0,
+      "scan_status": "no_buys"
+    },
+    "n_pairs": 0,
+    "pairs": [],
+    "pearson_crowd2_vs_live": null,
+    "spearman_crowd2_vs_live": null,
+    "pearson_crowd2tx_vs_live": null,
+    "spearman_crowd2tx_vs_live": null,
+    "pilot_same_order": null,
+    "best_spearman": 0,
+    "verdict_ok": false
+  },
+  "self_check": {
+    "ok": null,
+    "note": "нет покупок с посчитанной толпой -- сверять нечего"
+  },
+  "wallets": [
+    {
+      "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+      "name": "pointfarmcap",
+      "status": "в задаче",
+      "n_sigs_72h": 6552,
+      "n_tx_examined": 300,
+      "n_tx_fetch_failed": 0,
+      "n_multi_mint_skipped": 0,
+      "n_chunk_failed": 0,
+      "signatures_complete": true,
+      "status_scan": "no_buys",
+      "n_buys": 0,
+      "note": "нет первых покупок >=2.0 SOL-экв за 168ч (просмотрено транзакций: 300)"
+    }
+  ]
+}
