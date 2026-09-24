@@ -393,6 +393,12 @@ jobs:
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
+          # Момент перезапуска берётся НА ХОСТЕ: часы бегунка и часы
+          # хоста -- разные часы. Ниже признак жизни обязан быть НОВЕЕ
+          # этого момента, иначе мы читаем файл прошлого запуска и
+          # считаем его доказательством. На зонде это стоило трёх
+          # деплоев в пустоту 24.09.
+          echo "RESTART_TS=$(ssh -n $SSH_OPTS root@$HOST 'date +%s')" >> "$GITHUB_ENV"
           ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
           sleep 10
           ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
@@ -409,6 +415,13 @@ jobs:
           sleep 25
           ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/detector_status.json" || {
             echo "СБОЙ: признака жизни нет"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          HEARTBEAT_TS=$(ssh -n $SSH_OPTS root@$HOST "stat -c %Y $STATE_DIR/detector_status.json")
+          if [ "$HEARTBEAT_TS" -lt "$RESTART_TS" ]; then
+            echo "СБОЙ: признак жизни детектора старше перезапуска -- служба его не обновила"
+            ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1
+          fi
+          echo "признак жизни новее перезапуска на $((HEARTBEAT_TS - RESTART_TS)) с"
           ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/detector_status.json" | tee -a data/bloom_detector_deploy.txt
           echo "--- решений в журнале ---" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt

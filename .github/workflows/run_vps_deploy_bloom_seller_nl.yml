@@ -373,6 +373,9 @@ jobs:
         if: ${{ github.event.inputs.enable_service == 'yes' }}
         run: |
           set -e
+          # Момент перезапуска берётся НА ХОСТЕ: часы бегунка и часы хоста --
+          # разные часы. Признак жизни ниже обязан быть НОВЕЕ этого момента.
+          echo "RESTART_TS=$(ssh -n $SSH_OPTS root@$HOST 'date +%s')" >> "$GITHUB_ENV"
           ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
           sleep 8
           ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
@@ -386,9 +389,23 @@ jobs:
         run: |
           set -e
           sleep 20
+          # Отсутствующий или старый признак жизни -- это СБОЙ, а не заметка.
+          # Раньше шаг печатал "признака жизни ещё нет" и шёл дальше: деплой
+          # считался удачным, хотя служба могла не подняться.
+          ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/seller_heartbeat.json" || {
+            echo "СБОЙ: признака жизни продавца нет"
+            ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1; }
+          HEARTBEAT_TS=$(ssh -n $SSH_OPTS root@$HOST "stat -c %Y $STATE_DIR/seller_heartbeat.json")
+          if [ "$HEARTBEAT_TS" -lt "$RESTART_TS" ]; then
+            echo "СБОЙ: признак жизни продавца старше перезапуска -- служба его не обновила"
+            ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1
+          fi
+          echo "признак жизни новее перезапуска на $((HEARTBEAT_TS - RESTART_TS)) с"
           ssh -n $SSH_OPTS root@$HOST "
             set -a; . $ENV_DIR/env; set +a
-            cat $STATE_DIR/seller_heartbeat.json 2>/dev/null || echo 'признака жизни ещё нет'
+            cat $STATE_DIR/seller_heartbeat.json
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_seller.py --check-only
           " 2>&1 | tail -40 | tee -a data/bloom_seller_deploy.txt
 
