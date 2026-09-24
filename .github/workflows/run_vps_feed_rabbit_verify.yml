@@ -1,0 +1,138 @@
+name: "RabbitStream: проверка потока по цепи (только чтение)"
+
+# Вопрос владельца: RabbitStream дал 103 сообщения за 20 с против 3 у
+# Yellowstone на тех же адресах. Для потока до исполнения это невозможно.
+# Прогон забирает журнал зонда и проверяет ПО ЦЕПИ: сколько разных подписей,
+# в скольких наш адрес действительно есть среди счетов (включая счета из
+# таблиц адресов), сколько пришло по фильтру разгонных, сколько подписей
+# вообще не попало в блок и сколько село с ошибкой.
+#
+# Только чтение: службы не трогаются, ни одного ордера.
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "'nl' -- свой раннер на хосте, 'cloud' -- запасной путь по ssh"
+        required: false
+        default: "nl"
+      channels:
+        description: "какие каналы проверять"
+        required: false
+        default: "rabbit_ams,rabbit_fra,grpc,grpc2"
+      sample:
+        description: "сколько подписей на канал проверять по цепи"
+        required: false
+        default: "40"
+      tasks:
+        description: "задачи DBot, откуда берётся список наших адресов"
+        required: false
+        default: "BATCH-5,BATCH-3"
+
+concurrency:
+  group: feed-rabbit-verify
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/grpc_feed_probe_data
+
+jobs:
+  verify:
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Адрес хоста"
+        run: |
+          set -e
+          if [ "${{ inputs.runner }}" = "cloud" ]; then
+            echo "TARGET_HOST=$HOST" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
+          fi
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Питон с requests"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/venv_verify"
+            "$RUNNER_TEMP/venv_verify/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/venv_verify/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Самопроверка"
+        run: |
+          set -e
+          "$PY" analysis/feed_rabbit_verify.py --self-test
+
+      - name: "Забрать журнал зонда"
+        run: |
+          set -e
+          mkdir -p /tmp/rv
+          scp $SSH_OPTS root@$TARGET_HOST:$STATE_DIR/feed_race.jsonl /tmp/rv/feed_race.jsonl
+          echo "журнал: $(wc -l < /tmp/rv/feed_race.jsonl) строк"
+
+      - name: "Проверка по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data
+          "$PY" -u analysis/feed_rabbit_verify.py \
+            --journal /tmp/rv/feed_race.jsonl \
+            --channels "${{ inputs.channels }}" \
+            --tasks "${{ inputs.tasks }}" \
+            --sample "${{ inputs.sample }}" \
+            --out data/feed_rabbit_verify.json | tee data/feed_rabbit_verify.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          "$PY" - <<'PY'
+          import re, sys, pathlib
+          путь = pathlib.Path("data/feed_rabbit_verify.txt")
+          if not путь.exists():
+              print("отчёта нет"); sys.exit(0)
+          if re.search(r"api-key=[A-Za-z0-9._\-]{8,}", путь.read_text(encoding="utf-8", errors="replace")):
+              print("в отчёте виден ключ"); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/feed_rabbit_verify.json data/feed_rabbit_verify.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git add -A data/helius_usage 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "RabbitStream: проверка потока по цепи [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
