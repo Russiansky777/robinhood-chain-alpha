@@ -1,109 +1,33 @@
-=== Bloom: доклад 2026-09-24T01:48:41Z (формат 2) ===
-журнал: новых записей 307, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 25
-решений в окне: 282 -- боевые источники 244, стенд 38
+=== Bloom: доклад 2026-09-24T01:52:20Z (формат 2) ===
+журнал: новых записей 308, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 304
+решений в окне: 4 -- боевые источники 4, стенд 0
 по кодам (боевые источники):
-    171  NOT_A_BUY
-     39  TARGET_AMOUNT_OUT_OF_RANGE
-     15  SKIP_TARGET_INCREASE_POSITION
-      9  TOKEN_RECEIVED_NOT_BOUGHT
-      8  INTERMEDIATE_ROUTE
-      1  AMBIGUOUS_TX
-      1  BUY
-по кодам (тестовый источник, в сверку НЕ идёт):
-     26  NOT_A_BUY
-      8  BUY
-      2  INTERMEDIATE_ROUTE
-      1  SKIP_TARGET_INCREASE_POSITION
-      1  TARGET_AMOUNT_OUT_OF_RANGE
+      4  NOT_A_BUY
 
 --- откуда разбор (группы не смешиваются) ---
-PARSE_VIA_MSG: решений 207, доля 0.8484, к покупке 1
-    отставание слотов: {'n': 207, 'min': 0, 'median': 0, 'max': 0}
-    слот сети минус слот источника: {'n': 207, 'min': 0, 'median': 0, 'max': 0}
-    задержка решения, мс: {'n': 207, 'min': 0.2, 'median': 0.4, 'max': 24.2}
-PARSE_VIA_RPC: решений 37, доля 0.1516, к покупке 0
-    отставание слотов: {'n': 37, 'min': 0, 'median': 1, 'max': 2}
-    слот сети минус слот источника: {'n': 37, 'min': 0, 'median': 1, 'max': 2}
-    задержка решения, мс: {'n': 37, 'min': 234.3, 'median': 368.1, 'max': 618.3}
+PARSE_VIA_MSG: решений 4, доля 1.0, к покупке 0
+    отставание слотов: {'n': 4, 'min': 0, 'median': 0.0, 'max': 0}
+    слот сети минус слот источника: {'n': 4, 'min': 0, 'median': 0.0, 'max': 0}
+    задержка решения, мс: {'n': 4, 'min': 0.2, 'median': 0.3, 'max': 0.3}
   примечание: PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота
 
 --- версия транзакции против пути разбора ---
-  версия 0: PARSE_VIA_MSG=147, PARSE_VIA_RPC=14
-  версия 1: PARSE_VIA_MSG=24, PARSE_VIA_RPC=1
-  версия legacy: PARSE_VIA_MSG=32, PARSE_VIA_RPC=2
-  версия НЕТ_ПОЛЯ: PARSE_VIA_MSG=40, PARSE_VIA_RPC=22
-  вывод: медленный путь встречается на версиях ['0', '1', 'legacy'] -- версия не единственная причина
+  версия 0: PARSE_VIA_MSG=1
+  версия legacy: PARSE_VIA_MSG=3
+  вывод: медленного пути в записях с версией нет -- проверять гипотезу не на чем
 
---- первые 15 решений: слоты и время ---
+--- первые 4 решений: слоты и время ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
-4zGYxRdJQ2Br1YkqoJx6  BATCH-5  449805358       2026-09-23T20:00:25Z 252.3       449805359  0.226      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5Rw1Yo1fzMeRwLtNiSJd  BATCH-5  449805376       2026-09-23T20:00:30Z 356.2       449805377  0.175      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5RGzzEPRxmjJEj6Re9in  BATCH-5  449805449       2026-09-23T20:00:49Z 288.7       449805450  0.165      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5yBeu58kWUfSE1yEa9wC  BATCH-5  449805458       2026-09-23T20:00:51Z 244.5       449805459  0.156      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-3Ev3cDfRmnaWWTex7yEj  BATCH-5  449805499       2026-09-23T20:01:02Z 466.5       449805500  0.114      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5RzcSpRrZAco2hde23MM  BATCH-5  449805533       2026-09-23T20:01:11Z 265.7       449805534  0.231      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-45SBeJTUZ3thZ5hPQ8P9  BATCH-5  449805723       2026-09-23T20:02:01Z 0.3         449805723  0.153      0           PARSE_VIA_MSG  None    skip/NOT_A_BUY
-3WGRsbev9xiccfBbmJ2b  BATCH-5  449805917       2026-09-23T20:02:52Z 486.8       449805918  0.254      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-23RgYs6Cju45Mu4JpA1G  BATCH-5  449806109       2026-09-23T20:03:43Z 461.0       449806111  0.113      2           PARSE_VIA_RPC  None    skip/NOT_A_BUY
-53CXJTSTxdJY6S1jWCYL  BATCH-5  449806150       2026-09-23T20:03:54Z 618.3       449806152  0.151      2           PARSE_VIA_RPC  None    skip/NOT_A_BUY
-21bfk8UujcRP2kiCPqvw  BATCH-5  449806222       2026-09-23T20:04:14Z 261.6       449806223  0.187      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-5feShY6s8hCxrJXApUwh  BATCH-5  449806450       2026-09-23T20:05:14Z 271.3       449806451  0.254      1           PARSE_VIA_RPC  None    skip/TARGET_AMOUNT_OUT_OF_RANGE
-3dJQrNodgmh533qEEuYo  BATCH-3  449806471       2026-09-23T20:05:20Z 0.3         449806471  0.185      0           PARSE_VIA_MSG  None    skip/NOT_A_BUY
-5TWxekjP4U2oAR1dC4kp  BATCH-5  449806923       2026-09-23T20:07:20Z 0.3         449806923  0.1        0           PARSE_VIA_MSG  None    skip/NOT_A_BUY
-2mWrLWL8gjr8HkQT3GMJ  BATCH-5  449807351       2026-09-23T20:09:12Z 0.4         449807351  0.19       0           PARSE_VIA_MSG  None    skip/TOKEN_RECEIVED_NOT_BOUGHT
+VwwP6f5XkBcbTjL2dYbR  BATCH-5  449883197       2026-09-24T01:44:57Z 0.2         449883197  0.108      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
+mS7kwLujSvVMMekcUL6t  BATCH-3  449883617       2026-09-24T01:46:48Z 0.3         449883617  0.063      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
+4KMboWpc23vNpeRUZu3J  BATCH-3  449883639       2026-09-24T01:46:54Z 0.3         449883639  0.028      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
+2T8EKReZ5vd5cXk4DCxU  BATCH-5  449884116       2026-09-24T01:49:01Z 0.3         449884116  0.058      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
 
---- стенд: решения по тестовым источникам (15) ---
-подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
-4ukG2WmJdyzG4rCuNDzA  TEST     449821563       2026-09-23T21:12:02Z 0.6         449821563  0.007      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-4UH7USs4vSNZt6ccK3HB  TEST     449821615       2026-09-23T21:12:16Z 0.3         449821615  0.058      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-55fyYF24TmhqHLPBYhXf  TEST     449821724       2026-09-23T21:12:45Z 0.3         449821724  0.123      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-48sJym3N2ZED3HikvDRw  TEST     449821746       2026-09-23T21:12:51Z 1.2         449821746  0.056      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-3rgPdyAuuQf5B3wZEYw7  TEST     449832375       2026-09-23T21:59:52Z 0.3         449832375  0.07       0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-2o9xkRGb9yKRpsio3DPB  TEST     449832463       2026-09-23T22:00:16Z 0.3         449832463  0.015      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-3dhTr7tT1eqgXLDQ9Nha  TEST     449832728       2026-09-23T22:01:26Z 0.3         449832728  0.07       0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-MA5PVTzzfZKboQq1vCoc  TEST     449832752       2026-09-23T22:01:32Z 0.2         449832752  0.118      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-5QhGiLjMXgkF4VZECARJ  TEST     449834446       2026-09-23T22:09:01Z 0.3         449834446  0.029      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-2ffNL1jtzpVoCpfXFMba  TEST     449836345       2026-09-23T22:17:24Z 11.1        449836345  0.04       0           PARSE_VIA_MSG  0       buy/BUY
-2DrxoRisvTKBXgH9EqAg  TEST     449837610       2026-09-23T22:23:00Z 1.1         449837610  0.046      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-5JLUUk8pka1y2GinTdNc  TEST     449857427       2026-09-23T23:50:50Z 0.4         449857427  0.023      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-23SefhJsSQ79XfNSYzSz  TEST     449861101       2026-09-24T00:07:05Z 433.2       449861102  0.175      1           PARSE_VIA_RPC  0       buy/BUY
-WqHZQa5StzWmpynTGGB2  TEST     449861346       2026-09-24T00:08:11Z 443.4       449861348  0.023      2           PARSE_VIA_RPC  0       skip/TARGET_AMOUNT_OUT_OF_RANGE
-4qDugRDsdChq87t85LWe  TEST     449862127       2026-09-24T00:11:40Z 0.4         449862127  0.137      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-
---- стенд: записи целиком ---
-{"schema_version": 2, "ts_utc": "2026-09-24T00:55:07Z", "signature": "5k4UNpCrr8dAzpKmaEh7tLK3FKEZkyyfLsD9ApuZfh7YLTancbsbLAcg1WWXfc9KjHodKjexT5ifZhrb3mYDcdLH", "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA", "mint": null, "slot": 449871939, "kind": "other", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": [], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "ни один некотировочный минт не изменился", "filter": "задача DBot", "test_source": true, "parse_ms": 0.26, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211307.650377, "t_recv_utc": "2026-09-24T00:55:07Z", "t_decide_ts": 1790211307.650656, "decide_latency_ms": 0.3, "source_slot": 449871939, "net_slot_at_decision": 449871939, "net_slot_age_s": 0.129, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:55:37Z", "signature": "37kH3pGVBtCuchomEAyMBkupeusgwnGvMCXKXZCNtYtDFPvGzpWPaBaNAPRA8ZjzUvrcCRJueHvCSyidnn7YqP5W", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9", "slot": 449872052, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Pump.fun"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.25, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211337.836776, "t_recv_utc": "2026-09-24T00:55:37Z", "t_decide_ts": 1790211337.837038, "decide_latency_ms": 0.3, "source_slot": 449872052, "net_slot_at_decision": 449872052, "net_slot_age_s": 0.214, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:55:57Z", "signature": "eujUJZHjx2LfQ4GUH2osALiuf6tNzw5rucNLLj7NM2Zk51ZBZ1CqRj5CviQ3wNzyvpwvG37J8pogAs3ZqY4TUt9", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump", "slot": 449872123, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Pump.fun"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.37, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211357.123353, "t_recv_utc": "2026-09-24T00:55:57Z", "t_decide_ts": 1790211357.123735, "decide_latency_ms": 0.4, "source_slot": 449872123, "net_slot_at_decision": 449872123, "net_slot_age_s": 0.18, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:04Z", "signature": "4wzNmf6eWvk68f7PNPEHw7QU1iUbPwCg4aioGsWevTQJUorpQiNCoJGNJSfyKXuVvfFNn8CZfyoUAzLH6sNAXVtk", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B", "slot": 449872150, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Raydium AMM v4"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 1.17, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211364.186489, "t_recv_utc": "2026-09-24T00:56:04Z", "t_decide_ts": 1790211364.18767, "decide_latency_ms": 1.2, "source_slot": 449872150, "net_slot_at_decision": 449872150, "net_slot_age_s": 0.106, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:10Z", "signature": "4QuTEAvxiEbpTMsFH3NDztVHn25Dok8ZLuKdRpjyEGS7csEoiSWGmGj8o6Dms1aC9r2vXteTgYgpuvSdwnJcZUd7", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "NeonTjSjsuo3rexg9o6vHuMXw62f9V7zvmu8M8Zut44", "slot": 449872174, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Orca Whirlpool"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.3, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211370.726572, "t_recv_utc": "2026-09-24T00:56:10Z", "t_decide_ts": 1790211370.726885, "decide_latency_ms": 0.3, "source_slot": 449872174, "net_slot_at_decision": 449872174, "net_slot_age_s": 0.227, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:18Z", "signature": "4bUQq1sXBgTwApYMXDe2R87eYHz9j8QbRAnv7En5Kqku9oQzKWoDfWfogdW3nqwcLRJZc6PnsUbHRtbzbjk4Dv5z", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "AC1vvvYcG3Kqq61EQNVmRojDaokJ4xbpnSE5sw3pump", "slot": 449872198, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Pump.fun"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.52, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211378.591218, "t_recv_utc": "2026-09-24T00:56:18Z", "t_decide_ts": 1790211378.591749, "decide_latency_ms": 0.5, "source_slot": 449872198, "net_slot_at_decision": 449872198, "net_slot_age_s": 0.137, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:26Z", "signature": "GxRX8WYfAxJDm3HdTX4fv7SbvzpZE4EtNXfMypX87Q7DwN7CALb3s26uXpks9JnkdAkupghbwERQJMDhHb7SmFa", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": "BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE", "slot": 449872226, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Pump.fun"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.47, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211386.182347, "t_recv_utc": "2026-09-24T00:56:26Z", "t_decide_ts": 1790211386.182824, "decide_latency_ms": 0.5, "source_slot": 449872226, "net_slot_at_decision": 449872226, "net_slot_age_s": 0.084, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:35Z", "signature": "8RozaUVqrSBcSdV6qcpVXLgvxDvtseaMU7Hc6wYQCobNy9kmMNrBy9XEaQyNnaRpph35wXxqTZsLwUvqEfiH6Uc", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": null, "slot": 449872260, "kind": "other", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Raydium CLMM"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "ни один некотировочный минт не изменился", "filter": "задача DBot", "test_source": true, "parse_ms": 1.04, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211395.605645, "t_recv_utc": "2026-09-24T00:56:35Z", "t_decide_ts": 1790211395.6067, "decide_latency_ms": 1.1, "source_slot": 449872260, "net_slot_at_decision": 449872260, "net_slot_age_s": 0.168, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:56:44Z", "signature": "48QVAF9jHBZyU4ELfY4cLR41D9fmYgbaSU49BeDEXV8Lf1FYyTinRPEQeepsff3mkWpmoRkm1DYAiN3AbHwSoLyo", "source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX", "mint": null, "slot": 449872296, "kind": "other", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": [], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "ни один некотировочный минт не изменился", "filter": "задача DBot", "test_source": true, "parse_ms": 0.32, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": "legacy", "t_recv_ts": 1790211404.971883, "t_recv_utc": "2026-09-24T00:56:44Z", "t_decide_ts": 1790211404.972211, "decide_latency_ms": 0.3, "source_slot": 449872296, "net_slot_at_decision": 449872296, "net_slot_age_s": 0.209, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-{"schema_version": 2, "ts_utc": "2026-09-24T00:57:09Z", "signature": "45eX8L4odzcGfvH6D3tUNZszKQ6CXjd5kF3G8UCyXctKVUAjtKB5JGGgs3YVTbD8p8trcUpnPv7k4WUjpwT4wP5k", "source": "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA", "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x", "slot": 449872389, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Meteora DLMM"], "token_program": null, "route": null, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": true, "parse_ms": 0.36, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790211429.432704, "t_recv_utc": "2026-09-24T00:57:09Z", "t_decide_ts": 1790211429.433074, "decide_latency_ms": 0.4, "source_slot": 449872389, "net_slot_at_decision": 449872389, "net_slot_age_s": 0.153, "rate_note": "трата не определена", "rate_source": "geckoterminal", "source_task": "TEST", "mode": "dry"}
-
---- маршруты наших покупок --- покупок 1, маршрут известен 1, многохоповых 0 (доля 0.0), отброшено за промежуточный токен 8
---- остановлено НАШИМ лимитом: 8 ---
-      8  INTERMEDIATE_ROUTE
+--- маршруты наших покупок --- покупок 0, маршрут известен 0, многохоповых 0 (доля None), отброшено за промежуточный токен 0
+--- остановлено НАШИМ лимитом: 0 ---
 
 --- живая сверка с DBot (нарастающим итогом) ---
-  сигналов, где фильтры задачи пройдены (dbot_бы_купил): 9 из 30 нужных
-  сопоставлено с записями DBot: 40, записи не нашлось: 23
-  совпадений: 38, совпадение 0.95 (порог 0.9)
-  DBot купил, мы нет: 2 (должно быть 0)
-      2EwScfixkH1ZZwZkAJ6GpZbiFS4gKDgohTXEYHn2hjHixJ7Ldqsbjh8QmYDigkxdZjjeAvoMm9ZAcceEoG7pEBzw FLyzixQCC1osJxi3uhQAntuKvgDZ1pUAiDEobi8z9MNL наш код TARGET_AMOUNT_OUT_OF_RANGE
-      33Kvehwq4LDNkWb75mDwJcRr5ppdEZV3oJ8osxMeA1ET2aTmxF3rr9cHm3QPFXuZta5x4aNLr7z837HRSmcccVJy CvUX4G2tzq7J3ECmNvWZLayZYV6KpgQp6SJ5K8Uvsu5g наш код TARGET_AMOUNT_OUT_OF_RANGE
-  мы бы купили, DBot отказал: 0
-  пропущено по НАШЕМУ лимиту, DBot купил: 8 (в числитель расхождений не идёт)
-  не сравнивалось (источник не покупал): 181
-  записей DBot загружено: 1796 (источников 22, с полем follow 1796), окно записей 2026-09-19T01:41:01Z -- 2026-09-24T01:40:51Z
-  коды DBot в загруженных записях: {'FOLLOW_ORDER_IS_ONLY_PNL_MODE': 858, 'SKIP_TARGET_INCREASE_POSITION': 440, 'TARGET_AMOUNT_OUT_OF_RANGE': 240, 'ПРОШЛО': 181, 'DUPLICATE_TOKEN_BUY': 74, 'MAX_BUY_TIMES_PER_TOKEN_REACHED': 3}
-    не сошлось 4zGYxRdJQ2Br1Ykq (TARGET_AMOUNT_OUT_OF_RANGE): источник есть, но минта нет ни в одной его записи
-    не сошлось 5Rw1Yo1fzMeRwLtN (TARGET_AMOUNT_OUT_OF_RANGE): источник есть, но минта нет ни в одной его записи
-    не сошлось 5RGzzEPRxmjJEj6R (TARGET_AMOUNT_OUT_OF_RANGE): источник есть, но минта нет ни в одной его записи
-    не сошлось 5yBeu58kWUfSE1yE (TARGET_AMOUNT_OUT_OF_RANGE): источник есть, но минта нет ни в одной его записи
-    не сошлось 3Ev3cDfRmnaWWTex (TARGET_AMOUNT_OUT_OF_RANGE): источник есть, но минта нет ни в одной его записи
-  примечание: записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с
+  не выполнена: записи DBot не переданы (сверка не запрашивалась)
 
 --- пары А/Б --- наших отправленных покупок 0 из 50; из них малым размером 0
   пары с входом меньше 0.2 SOL идут в зачёт слотов, но не разницы результата: объёмы разные
@@ -152,9 +76,9 @@ WqHZQa5StzWmpynTGGB2  TEST     449861346       2026-09-24T00:08:11Z 443.4       
 
 --- гейты live на реальных источниках ---
   [ДА ] executor_on_host: mode=live, sent=0, refused=0
-  [НЕТ] reconciliation: signals=9, need=30, missed_buys=2, agreement=0.95
+  [НЕТ] reconciliation: signals=None, need=30, missed_buys=0, agreement=None
   [НЕТ] balance: balance_sol=0.302275588, need=2.0
   [ДА ] test_call_full_circle: live_test_positions=8, still_open=0
 
 --- расход Helius ---
-{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 746, "бюджет": 60000, "доля": 0.0124, "группа": null, "потрачено_по_бюджету": 746, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 25, "бюджет": 15000, "доля": 0.0017, "группа": null, "потрачено_по_бюджету": 25, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 771, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
+{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 775, "бюджет": 60000, "доля": 0.0129, "группа": null, "потрачено_по_бюджету": 775, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 25, "бюджет": 15000, "доля": 0.0017, "группа": null, "потрачено_по_бюджету": 25, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 800, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
