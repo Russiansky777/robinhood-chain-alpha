@@ -66,6 +66,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bloom_exec_state as ST  # noqa: E402
 
 try:
+    import bloom_telegram_cmd as TGC  # noqa: E402
+except Exception:  # noqa: BLE001
+    TGC = None
+
+try:
     import bloom_executor as EXEC
 except ImportError:  # pragma: no cover
     EXEC = None
@@ -1306,6 +1311,9 @@ class Детектор:
         # Сколько решений принято по ПРОТУХШЕМУ курсу: если это число растёт,
         # значит фоновое обновление не справляется, и это видно числом.
         self.курс_протухший_использован = 0
+        # Команды владельца из Telegram (/kill, /kill_sell, /status). Живут в
+        # своём потоке: сеть Telegram не должна задерживать торговлю.
+        self.команды = None
 
     def режим_денег(self) -> str:
         """Режим, который решают ДЕНЬГИ, а не переменная окружения.
@@ -1371,6 +1379,9 @@ class Детектор:
         st["telegram"] = (self.оповещатель.статус() if self.оповещатель is not None
                            else {"enabled": False,
                                  "off_reason": "модуль оповещений не загружен"})
+        st["telegram_commands"] = (self.команды.признак_жизни()
+                                    if self.команды is not None
+                                    else {"enabled": False, "why_not": "не запущены"})
         st["executor_attached"] = self.исполнитель is not None
         st["executed"] = self.исполнено
         st["exec_by_code"] = dict(self.по_кодам_исполнителя)
@@ -3187,6 +3198,36 @@ def main() -> int:
                          режим=os.environ.get("BLOOM_MODE", "dry"),
                          исполнитель=исполнитель)
     детектор.откуда_источники = откуда
+
+    # Команды владельца из Telegram. Запускаются ПОСЛЕ проверки check_only:
+    # в проверочном режиме служба ничего не слушает и не отвечает.
+    if TGC is not None and not a.check_only:
+        def статус_строкой() -> str:
+            ж = детектор.признак_жизни()
+            исп = ж.get("executor") or {}
+            убит, почему = состояние.kill_active()
+            стоп_прод, _ = состояние.sell_kill_active()
+            открытых = len(состояние.open_positions())
+            дн = состояние.report().get("day_pnl") or {}
+            return ("\n".join([
+                f"режим: {ж.get('mode')}, покупки {'ДА' if исп.get('live_buy_enabled') else 'нет'}"
+                f", размер {исп.get('buy_sol')} SOL",
+                f"рубильник: {'ВКЛЮЧЁН -- ' + почему if убит else 'выключен'}",
+                f"наши продажи: {'ОСТАНОВЛЕНЫ' if стоп_прод else 'разрешены'}",
+                f"баланс: {ж.get('balance_sol')} SOL, открытых позиций {открытых}",
+                f"за сутки: покупок {дн.get('buys')}, продаж {дн.get('sells')}, "
+                f"результат {дн.get('realized_sol')} SOL",
+                f"сигналов {ж.get('signals_seen')}, к покупке {ж.get('to_buy')}, "
+                f"сбоев разбора {ж.get('handler_crashes')}",
+                f"курс {ж.get('rate_usd_sol')} ({ж.get('rate_source')}), "
+                f"решений по протухшему курсу {ж.get('rate_stale_used')}",
+            ]))
+
+        детектор.команды = TGC.Команды(состояние, статус_фн=статус_строкой)
+        поток = детектор.команды.запустить_в_потоке()
+        ок_к, почему_к = TGC.настроено()
+        log.info("команды Telegram: %s%s", "слушаю" if поток else "выключены",
+                  "" if ок_к else f" ({почему_к})")
 
     if a.check_only:
         print(json.dumps({"sources": len(ист), "from_where": откуда,

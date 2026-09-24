@@ -195,6 +195,16 @@ class ExecState:
         self.base = Path(base) if base else state_dir()
         self.base.mkdir(parents=True, exist_ok=True)
         self.kill_path = Path(kill) if kill else kill_file()
+        # ВТОРОЙ рубильник -- в каталоге состояния. Первый лежит в
+        # /etc/bloom-executor и принадлежит root: служба работает от bot и
+        # создать его НЕ МОЖЕТ, только прочитать. Значит команда владельца из
+        # Telegram через него не сработала бы вовсе. Этот путь служба пишет
+        # сама, и он honoured так же строго: любой из двух файлов -- запрет.
+        self.kill_tg_path = self.base / "KILL_BY_TELEGRAM"
+        # Отдельный рубильник ТОЛЬКО на продажу: сторож перестаёт продавать,
+        # покупки при этом решает первый рубильник. Нужен раздельно, потому
+        # что "перестань продавать" и "перестань торговать" -- разные приказы.
+        self.kill_sell_path = self.base / "KILL_SELL_BY_TELEGRAM"
         self.positions_path = self.base / "positions.jsonl"
         self.decisions_path = self.base / "decisions.jsonl"
         self.api_path = self.base / "api_calls.jsonl"
@@ -228,16 +238,38 @@ class ExecState:
         неограниченный убыток.
         """
         try:
-            if self.kill_path.exists():
-                try:
-                    причина = self.kill_path.read_text(encoding="utf-8").strip()[:200]
-                except OSError:
-                    причина = "(файл рубильника не читается -- всё равно запрет)"
-                return True, f"рубильник включён: {причина or 'без пояснения'}"
+            for путь, чей in ((self.kill_path, "рубильник"),
+                               (self.kill_tg_path, "рубильник из Telegram")):
+                if путь.exists():
+                    try:
+                        причина = путь.read_text(encoding="utf-8").strip()[:200]
+                    except OSError:
+                        причина = "(файл рубильника не читается -- всё равно запрет)"
+                    return True, f"{чей} включён: {причина or 'без пояснения'}"
             return False, ""
         except Exception as exc:  # noqa: BLE001
             return True, (f"проверка рубильника не удалась ({type(exc).__name__}) -- "
                            "торговля запрещена, потому что неясность трактуется как запрет")
+
+    def sell_kill_active(self) -> tuple[bool, str]:
+        """Запрет ТОЛЬКО на продажу. Та же строгость: неясность -- запрет.
+
+        Останов продажи не останавливает авто-ордер Bloom: он живёт на
+        стороне площадки. То есть это запрет НАШИМ попыткам продажи, и в
+        докладе он называется именно так, чтобы никто не решил, что позиция
+        защищена от продажи вообще.
+        """
+        try:
+            if self.kill_sell_path.exists():
+                try:
+                    причина = self.kill_sell_path.read_text(encoding="utf-8").strip()[:200]
+                except OSError:
+                    причина = "(файл не читается -- всё равно запрет)"
+                return True, f"продажи остановлены из Telegram: {причина or 'без пояснения'}"
+            return False, ""
+        except Exception as exc:  # noqa: BLE001
+            return True, (f"проверка запрета продаж не удалась ({type(exc).__name__}) -- "
+                           "считаем запретом")
 
     def kill_readable(self, path: Path | None = None) -> tuple[bool, str]:
         """Виден ли путь рубильника ТОМУ, кто спрашивает.
@@ -619,7 +651,10 @@ class ExecState:
         return {
             SCHEMA_VERSION_KEY: SCHEMA_VERSION,
             "state_dir": str(self.base),
-            "kill_switch": {"path": str(self.kill_path), "active": убит, "why_not": почему},
+            "kill_switch": {"path": str(self.kill_path), "active": убит, "why_not": почему,
+                             "telegram_path": str(self.kill_tg_path),
+                             "telegram_active": self.kill_tg_path.exists(),
+                             "sell_stopped": self.sell_kill_active()[0]},
             "limits": {"max_open": self.max_open,
                         "daily_loss_sol": self.daily_loss_sol,
                         "buy_sol": self.buy_sol,
@@ -656,6 +691,29 @@ def self_test() -> None:
     chk("и причина из файла видна", "владельц" in почему, почему)
     kill.unlink()
     chk("файл убран -- снова разрешено", st.kill_active()[0] is False)
+
+    # Рубильник из Telegram -- второй путь, и он запрещает так же строго.
+    # Первый лежит в /etc и принадлежит root: служба от bot создать его не
+    # может, поэтому команда владельца без второго пути не сработала бы.
+    st.kill_tg_path.write_text("останов по команде /kill из Telegram", encoding="utf-8")
+    убит_тг, почему_тг = st.kill_active()
+    chk("рубильник из Telegram запрещает торговлю",
+        убит_тг is True and "Telegram" in почему_тг, (убит_тг, почему_тг))
+    chk("и он виден в отчёте состояния отдельно",
+        st.report()["kill_switch"]["telegram_active"] is True, st.report()["kill_switch"])
+    st.kill_tg_path.unlink()
+    chk("снят -- снова разрешено", st.kill_active()[0] is False)
+
+    # Запрет ТОЛЬКО продажи: покупки он не трогает.
+    chk("без файла продажи разрешены", st.sell_kill_active()[0] is False)
+    st.kill_sell_path.write_text("стоп продажам", encoding="utf-8")
+    стоп_прод, почему_прод = st.sell_kill_active()
+    chk("запрет продаж включается своим файлом",
+        стоп_прод is True and "продажи остановлены" in почему_прод, почему_прод)
+    chk("и покупкам он не мешает", st.kill_active()[0] is False)
+    chk("и он виден в отчёте состояния",
+        st.report()["kill_switch"]["sell_stopped"] is True, st.report()["kill_switch"])
+    st.kill_sell_path.unlink()
 
     class БросаетПриПроверке:
         """Путь, проверка которого падает: права, битый монтаж, что угодно."""

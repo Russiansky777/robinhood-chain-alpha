@@ -237,16 +237,26 @@ def token_balance_raw(wallet: str, mint: str) -> dict:
              "filter": "programId", "failures": сбои}
 
 
-def kill_sell_active() -> tuple[bool, str]:
-    """Отдельный рубильник ПРОДАЖ. Fail-closed, как и основной."""
-    p = kill_sell_file()
+def kill_sell_active(state=None) -> tuple[bool, str]:
+    """Отдельный рубильник ПРОДАЖ. Fail-closed, как и основной.
+
+    Путей ДВА. Первый -- /etc/bloom-executor/KILL_SELL, его ставит владелец
+    или деплой. Второй -- файл в каталоге состояния, который служба может
+    создать сама: именно через него работает команда /kill_sell из Telegram,
+    потому что каталог /etc принадлежит root, а служба работает от bot и
+    писать туда не может. Любой из двух файлов -- запрет.
+    """
+    пути = [kill_sell_file()]
+    if state is not None and getattr(state, "kill_sell_path", None):
+        пути.append(state.kill_sell_path)
     try:
-        if p.exists():
-            try:
-                почему = p.read_text(encoding="utf-8").strip()[:200]
-            except OSError:
-                почему = "(файл не читается -- всё равно запрет)"
-            return True, f"рубильник продаж включён: {почему or 'без пояснения'}"
+        for p in пути:
+            if p.exists():
+                try:
+                    почему = p.read_text(encoding="utf-8").strip()[:200]
+                except OSError:
+                    почему = "(файл не читается -- всё равно запрет)"
+                return True, f"рубильник продаж включён: {почему or 'без пояснения'}"
         return False, ""
     except Exception as exc:  # noqa: BLE001
         return True, (f"проверка рубильника продаж не удалась ({type(exc).__name__}) -- "
@@ -602,7 +612,7 @@ class Seller:
             итог.update(action="закрыта как крошка")
             return итог
 
-        убит, почему = kill_sell_active()
+        убит, почему = kill_sell_active(self.state)
         if убит:
             итог.update(action="продажа запрещена рубильником продаж", why_not=почему)
             if self.оповещатель is not None and NT is not None:
@@ -748,7 +758,7 @@ class Seller:
         куп_доступен, куп_поч = self.state.kill_readable()
         куп_включён, _ = self.state.kill_active()
         прод_доступен, прод_поч = self.state.kill_readable(kill_sell_file())
-        прод_включён, _ = kill_sell_active()
+        прод_включён, _ = kill_sell_active(self.state)
         from bloom_exec_state import (  # noqa: PLC0415
             SCHEMA_VERSION, SCHEMA_VERSION_KEY)
         atomic_write_json(self.state.base / "seller_heartbeat.json", {
@@ -823,7 +833,7 @@ class Seller:
             })
         return {"mode": "live" if self.live else "dry-run",
                  "kill_buy": self.state.kill_active(),
-                 "kill_sell": kill_sell_active(),
+                 "kill_sell": kill_sell_active(self.state),
                  "plan": план}
 
 
@@ -881,6 +891,16 @@ def self_test() -> None:
     (база / "KILL").write_text("стоп покупок", encoding="utf-8")
     chk("рубильник ПОКУПОК включён", st.kill_active()[0] is True)
     chk("а продажи им НЕ запрещены", kill_sell_active()[0] is False)
+    # Второй путь рубильника продаж -- в каталоге состояния: именно через
+    # него работает /kill_sell из Telegram (в /etc служба писать не может).
+    st.kill_sell_path.write_text("/kill_sell из Telegram", encoding="utf-8")
+    тг_убит, тг_почему = kill_sell_active(st)
+    chk("рубильник продаж из Telegram запрещает продажи",
+        тг_убит is True and "Telegram" in тг_почему, (тг_убит, тг_почему))
+    chk("и без состояния этот путь не виден (совместимость сохранена)",
+        kill_sell_active()[0] is False)
+    st.kill_sell_path.unlink()
+    chk("снят -- продажи снова разрешены", kill_sell_active(st)[0] is False)
     (база / "KILL_SELL").write_text("стоп продаж", encoding="utf-8")
     убит, почему = kill_sell_active()
     chk("отдельный рубильник продаж работает", убит is True)
