@@ -91,6 +91,9 @@ jobs:
           # Helius, свой -- за адресом и токеном потока.
           HEADER="$GRPC_FEED_AUTH_HEADER"
           [ -n "$HEADER" ] || HEADER=x-token
+          LIMIT="${{ inputs.helius_daily_limit }}"
+          case "$LIMIT" in ''|*[!0-9]*) echo "СБОЙ: предел кредитов не число: $LIMIT"; exit 1;; esac
+          echo "потолок кредитов Helius у зонда: $LIMIT в сутки"
           if [ -z "$GRPC_FEED_URL" ]; then
             echo "GRPC_FEED_URL не задан -- второй канал не включится"
           else
@@ -108,6 +111,7 @@ jobs:
             printf 'GRPC_FEED_URL=%s\n' "$GRPC_FEED_URL"
             printf 'GRPC_FEED_TOKEN=%s\n' "$GRPC_FEED_TOKEN"
             printf 'GRPC_FEED_AUTH_HEADER=%s\n' "$HEADER"
+            printf 'PROBE_HELIUS_DAILY_LIMIT=%s\n' "$LIMIT"
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
             true
