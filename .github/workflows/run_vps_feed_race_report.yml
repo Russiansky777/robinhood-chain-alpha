@@ -1,0 +1,135 @@
+name: "Зонд потоков: доклад по полной выборке (только чтение)"
+
+# Забирает журнал зонда с NL-хоста и считает доклад по ВСЕЙ выборке:
+# доли "первый", медиана/p10/p90/p95/p99, обрывы, отдельно по нашим
+# источникам, и совместная гонка "Helius + лучший Shyft, кто первый".
+#
+# Только чтение: службы не трогаются, ни одного ордера. Сам журнал в
+# репозиторий НЕ кладётся -- он большой и растёт; кладётся только доклад.
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "'nl' -- свой раннер на хосте, 'cloud' -- запасной путь по ssh"
+        required: false
+        default: "nl"
+      rotate:
+        description: "'yes' -- после доклада отложить журнал в архив на хосте и начать новый"
+        required: false
+        default: "no"
+
+concurrency:
+  group: feed-race-report
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/grpc_feed_probe_data
+
+jobs:
+  report:
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Адрес хоста"
+        run: |
+          set -e
+          if [ "${{ inputs.runner }}" = "cloud" ]; then
+            echo "TARGET_HOST=$HOST" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
+          fi
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка разбора"
+        run: |
+          set -e
+          python3 analysis/feed_race_report.py --self-test
+
+      - name: "Забрать журнал и признак жизни"
+        run: |
+          set -e
+          mkdir -p /tmp/feed
+          scp $SSH_OPTS root@$TARGET_HOST:$STATE_DIR/feed_race.jsonl /tmp/feed/feed_race.jsonl
+          scp $SSH_OPTS root@$TARGET_HOST:$STATE_DIR/heartbeat.json /tmp/feed/heartbeat.json
+          echo "журнал: $(wc -l < /tmp/feed/feed_race.jsonl) строк, $(wc -c < /tmp/feed/feed_race.jsonl) байт"
+
+      - name: "Доклад"
+        run: |
+          set -e
+          mkdir -p data
+          # Разгонные адреса нужны, чтобы отделить нашу группу от разгонной у
+          # Helius WS: у него в записи адрес подписки, а не имя фильтра.
+          BOOSTERS=$(python3 -c "import json;print(','.join((json.load(open('/tmp/feed/heartbeat.json')).get('boosters') or [])))")
+          echo "разгонные: ${BOOSTERS:-нет}"
+          python3 analysis/feed_race_report.py \
+            --journal /tmp/feed/feed_race.jsonl \
+            --boosters "$BOOSTERS" \
+            --out data/feed_race_report.json | tee data/feed_race_report.txt
+          {
+            echo ""
+            echo "--- признак жизни зонда на момент доклада ---"
+            cat /tmp/feed/heartbeat.json
+          } >> data/feed_race_report.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, sys, pathlib
+          текст = pathlib.Path("data/feed_race_report.txt").read_text(encoding="utf-8", errors="replace")
+          плохо = [и for и, о in (("api-key", r"api-key=[A-Za-z0-9._\-]{8,}"),
+                                   ("x-token", r"x-token[\"']?\s*[:=]\s*[A-Za-z0-9._\-]{8,}"),
+                                   ("GRPC_FEED_TOKEN", r"GRPC_FEED2?_TOKEN\s*=\s*\S{8,}"))
+                    if re.search(о, текст, re.I)]
+          if плохо:
+              print("в отчёте видны значения: " + ", ".join(плохо)); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Архивировать журнал на хосте (по запросу)"
+        if: ${{ inputs.rotate == 'yes' }}
+        run: |
+          set -e
+          # Служба пишет через append: переименование не мешает ей работать,
+          # новый файл она создаст сама на следующей записи.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            STAMP=\$(date -u +%Y%m%dT%H%M%SZ)
+            mv $STATE_DIR/feed_race.jsonl $STATE_DIR/feed_race.\$STAMP.jsonl
+            chown bot:bot $STATE_DIR/feed_race.\$STAMP.jsonl
+            echo 'журнал отложен в архив: feed_race.'\$STAMP'.jsonl'"
+
+      - name: "Коммит доклада"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/feed_race_report.json data/feed_race_report.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Зонд потоков: доклад по полной выборке [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
