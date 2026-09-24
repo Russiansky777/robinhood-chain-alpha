@@ -68,8 +68,34 @@ import bloom_exec_state as ST  # noqa: E402
 
 try:                                  # тень не обязана быть на хосте
     import c2_shadow_build as SB      # noqa: E402
-except Exception:                     # noqa: BLE001
+    SHADOW_IMPORT_ERR = ""
+except Exception as _тень_exc:        # noqa: BLE001
+    # Причину прячем в переменную, а не глотаем: без неё "тени нет" на хосте
+    # выглядит как решение, хотя это поломка. Она уходит в признак жизни и
+    # печатается самопроверкой.
     SB = None
+    SHADOW_IMPORT_ERR = f"{type(_тень_exc).__name__}: {_тень_exc}"
+
+
+class ПодменаТени:
+    """Подменяет глобальное SB на время проверки и возвращает как было.
+
+    Отличать "имени нет" от "имя есть и равно None" обязательно: на хосте,
+    где модуль тени не импортировался, SB СУЩЕСТВУЕТ и равно None. Ранняя
+    версия хранила только значение, и восстановление стирало имя совсем --
+    детектор падал на "SB is not None" NameError-ом (деплой 36038500119).
+    """
+
+    def __init__(self, чем):
+        self.было_имя = "SB" in globals()
+        self.было = globals().get("SB")
+        globals()["SB"] = чем
+
+    def вернуть(self):
+        if self.было_имя:
+            globals()["SB"] = self.было
+        else:
+            globals().pop("SB", None)
 
 try:
     import bloom_telegram_cmd as TGC  # noqa: E402
@@ -1500,7 +1526,9 @@ class Детектор:
         st["shadow"] = {"enabled": self.тень_включена, "built": self.теней,
                          "would_pass": self.теней_прошло,
                          "over_cap": self.теней_дорогих,
-                         "failed": self.теней_упало}
+                         "failed": self.теней_упало,
+                         "module_loaded": SB is not None,
+                         "module_why_not": globals().get("SHADOW_IMPORT_ERR", "")}
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
                                     else {"enabled": False, "why_not": "не запущены"})
@@ -3376,8 +3404,12 @@ def self_test() -> int:
                          "sim_ms": 40.0, "cap_usd": 250000.0,
                          "would_skip_cap": True}
 
-        было_sb = globals().get("SB")
-        globals()["SB"] = ТеньЗаглушка
+        # Тень -- замер, и деплой она не блокирует. Но молчать о том, что
+        # модуль не поднялся, нельзя: печатаем причину словами.
+        print("модуль тени: " + ("загружен" if SB is not None
+                                  else "НЕ загружен -- "
+                                       + (SHADOW_IMPORT_ERR or "причина не записана")))
+        подмена = ПодменаТени(ТеньЗаглушка)
         try:
             # У заглушки узла обязан быть call: тень получает его как
             # rpc_call. Без него падает построение аргументов, и тень
@@ -3434,10 +3466,23 @@ def self_test() -> int:
             chk("выключенная тень не запускается вовсе",
                 детектор_т3.теней == 0, детектор_т3.теней)
         finally:
-            if было_sb is None:
-                globals().pop("SB", None)
-            else:
-                globals()["SB"] = было_sb
+            подмена.вернуть()
+        # На хосте без модуля тени SB есть и равно None. Подмена обязана
+        # оставить имя на месте, иначе следующий же Детектор() падает.
+        нет_модуля = ПодменаТени(None)
+        try:
+            вложенная = ПодменаТени(ТеньЗаглушка)
+            вложенная.вернуть()
+            chk("имя SB переживает подмену, когда модуля тени нет",
+                "SB" in globals() and globals()["SB"] is None,
+                ("SB" in globals(), globals().get("SB")))
+            Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                      курс=КурсSOL(), режим="dry", helius=HeliusМолчит())
+            chk("детектор поднимается и без модуля тени", True)
+        finally:
+            нет_модуля.вернуть()
+        chk("после проверок тени модуль на месте, как был",
+            "SB" in globals(), "SB" in globals())
         chk("модуль тени не умеет отправлять транзакции",
             "sendTransaction" not in (REPO_ROOT / "analysis"
                                        / "c2_shadow_build.py").read_text(encoding="utf-8"))
