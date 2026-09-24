@@ -1,0 +1,93 @@
+name: "Наши транзакции по цепи: села или упала (только чтение)"
+
+# Сверка Telegram и отчётов с цепью: по каждой нашей подписи -- meta.err,
+# причина из журнала программ, движение наших балансов, слот и время.
+# Пары "покупка -> продажа" считаются ТОЛЬКО по севшим транзакциям.
+# Ни одного ордера, на VPS не ходит.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "кошелёк исполнителя"
+        required: false
+        default: "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+      since:
+        description: "с какого UTC брать (пусто -- все из выборки)"
+        required: false
+        default: "2026-09-24T00:00:00Z"
+      limit:
+        description: "сколько последних подписей запросить"
+        required: false
+        default: "200"
+
+concurrency:
+  group: bloom-our-tx-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Самопроверки"
+        run: |
+          set -e
+          python analysis/bloom_our_tx_audit.py --self-test
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data
+          python -u analysis/bloom_our_tx_audit.py \
+            --wallet "${{ inputs.wallet }}" \
+            --since "${{ inputs.since }}" \
+            --limit "${{ inputs.limit }}" \
+            --out data/bloom_our_tx_audit.json | tee data/bloom_our_tx_audit.txt
+
+      - name: "Ключа в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          python - <<'PY'
+          import re, sys, pathlib
+          путь = pathlib.Path("data/bloom_our_tx_audit.txt")
+          if not путь.exists():
+              print("отчёта нет"); sys.exit(0)
+          if re.search(r"api-key=[A-Za-z0-9._\-]{8,}", путь.read_text(encoding="utf-8", errors="replace")):
+              print("в отчёте виден ключ"); sys.exit(1)
+          print("ключа в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/bloom_our_tx_audit.json data/bloom_our_tx_audit.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git add -A data/helius_usage 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Наши транзакции по цепи: сверка посадок [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
