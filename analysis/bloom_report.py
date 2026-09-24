@@ -570,9 +570,18 @@ def позиции_срез(state: ST.ExecState) -> dict:
                 if v:
                     return v
             return 0.0
+        # УПАВШИЕ ПО ЦЕПИ ПОКУПКИ НЕ СЧИТАЮТСЯ ПОТРАЧЕННЫМ. 24.09 покупка
+        # на 0.2 SOL упала с ExceededSlippage: по цепи ушла только комиссия
+        # 0.001, а sol_in в записи позиции остался 0.2 -- намерением, а не
+        # фактом. Складывать намерения в "потрачено" значит завышать расход
+        # и занижать остаток.
+        упало = [x for x in p if x.get("chain_ok") is False]
+        села = [x for x in p if x.get("chain_ok") is not False]
         return {"count": len(p),
                 "open": sum(1 for x in p if x.get("state") in ST.STATES_OPEN),
-                "spent_sol": round(sum(вход(x) for x in p), 6)}
+                "failed_on_chain": len(упало),
+                "intent_sol_failed": round(sum(вход(x) for x in упало), 6),
+                "spent_sol": round(sum(вход(x) for x in села), 6)}
     return {"live": срез(lambda x: x.get("mode") == ST.MODE_LIVE),
             "live_test": срез(lambda x: x.get("mode") == ST.MODE_LIVE_TEST),
             "dry_run": срез(lambda x: not ST.is_real_mode(x.get("mode"))),
@@ -643,6 +652,13 @@ def позиции_таблица(state: ST.ExecState) -> list:
             "mint": p.get("mint"),
             "mode": p.get("mode"),
             "state": p.get("state"),
+            # Села ли покупка по цепи и подтверждена ли продажа -- в таблице
+            # обязаны быть видны. Без них отчёт считает упавшую транзакцию
+            # состоявшейся покупкой, а закрытие по нулевому остатку --
+            # продажей: ровно так 24.09 и вышло.
+            "chain_ok": p.get("chain_ok"),
+            "closed_confirmed": p.get("closed_confirmed"),
+            "closed_why_not": p.get("closed_why_not"),
             "our_signature": (подписи[0] if подписи else None),
             "source_signature": p.get("source_sig"),
             "source_slot": p.get("source_slot"),
@@ -1266,6 +1282,29 @@ def self_test() -> None:
             поз2["live_test"]["spent_sol"] == 0.001, поз2["live_test"])
         тб = позиции_таблица(st)
         chk("в таблице позиций одна настоящая", len(тб) == 1, тб)
+        chk("в таблице видно, села ли покупка по цепи",
+            "chain_ok" in тб[0] and "closed_confirmed" in тб[0], тб[0])
+
+        # УПАВШАЯ ПО ЦЕПИ ПОКУПКА: намерение 0.2 SOL не есть потраченные
+        # 0.2 SOL. 24.09 по цепи ушла только комиссия.
+        st.positions_path.write_text("\n".join([
+            json.dumps({"client_order_id": "c", "state": "bought",
+                        "mode": ST.MODE_LIVE_TEST, "sol_in": 0.001,
+                        "mint": "MINTX", ST.SCHEMA_VERSION_KEY: 2},
+                        ensure_ascii=False),
+            json.dumps({"client_order_id": "f", "state": "closed",
+                        "mode": ST.MODE_LIVE_TEST, "sol_in": 0.2,
+                        "mint": "MINTF", "chain_ok": False,
+                        "closed_reason": "покупка упала по цепи: ExceededSlippage",
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        поз3 = позиции_срез(st)
+        chk("упавшая покупка не попадает в потраченное",
+            поз3["live_test"]["spent_sol"] == 0.001, поз3["live_test"])
+        chk("но она посчитана отдельно и с суммой намерения",
+            поз3["live_test"]["failed_on_chain"] == 1
+            and поз3["live_test"]["intent_sol_failed"] == 0.2,
+            поз3["live_test"])
         chk("видно, чем покупали", тб[0]["buy_address_kind"] == "pool"
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",

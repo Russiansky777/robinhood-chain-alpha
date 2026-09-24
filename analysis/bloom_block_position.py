@@ -476,7 +476,15 @@ def main() -> int:
 
     state = ST.ExecState(base=Path(a.state_dir)) if a.state_dir else ST.ExecState()
     свои = state.positions()
-    позиции = [p for p in свои.values() if ST.is_real_mode(p.get("mode"))]
+    # Упавшие по цепи покупки в замер места в блоке НЕ идут: у транзакции,
+    # которая не села, "место относительно источника" -- не число, а
+    # видимость. 24.09 упавшая покупка на 0.2 SOL имела слот и попала бы
+    # сюда как обычная посадка.
+    все_свои = [p for p in свои.values() if ST.is_real_mode(p.get("mode"))]
+    упавшие = [p for p in все_свои if p.get("chain_ok") is False]
+    позиции = [p for p in все_свои if p.get("chain_ok") is not False]
+    if упавшие:
+        print(f"упавших по цепи покупок не берём в замер: {len(упавшие)}")
     позиции.sort(key=lambda p: float(p.get("ts_intent") or 0))
     вых = []
     for поз in позиции[-a.limit:]:
