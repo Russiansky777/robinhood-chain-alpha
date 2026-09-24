@@ -51,9 +51,9 @@
     },
     "bloom_request_budget": {
       "limit_week": 10000,
-      "remaining_week": 9993,
+      "remaining_week": 9988,
       "stop_at": 0.8,
-      "spent_share": 0.0007,
+      "spent_share": 0.0012,
       "stop": false
     }
   }
@@ -64,16 +64,11 @@
             4,
             "ProgramFailedToComplete"
           ]
-        },
-        "mints": [
-          "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY"
-        ],
-        "why": "неудачная попытка выхода по нашей позиции: транзакция с ошибкой, платил наш кошелёк, в счетах наш минт"
+        }
       }
     ],
-    "unexplained": [],
     "explain_failures": [],
-    "unexplained_count": 0
+    "unexplained_count": 5
   },
   "stand_start": {
     "set": true,
@@ -85,113 +80,41 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 304,
+      "v2": 632,
       "unreadable": 0
     },
     "positions": {
       "v1": 0,
-      "v2": 220,
+      "v2": 255,
       "unreadable": 0
     },
     "mixed": false
   },
   "notes": [
-    "10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x), 3kArcaSPoWwo (4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump), qPcB5rNxtYqw (KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS), 2ZcRWqDoTBfm (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)",
-    "у кошелька есть прежняя история: 21 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
+    "10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x)",
+    "у кошелька есть прежняя история: 11 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
     "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
   ],
-  "blockers": [],
-  "clean": true,
-  "verdict": "сверка чистая: настоящие покупки включать можно"
+  "blockers": [
+    "на кошельке 5 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни",
+    "баланс 0.2424 SOL ниже порога 0.3"
+  ],
+  "clean": false,
+  "verdict": "старт заблокирован, причин 2"
 }
 --- коротко ---
-режим: live, вердикт: сверка чистая: настоящие покупки включать можно
-кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.302275588 SOL при пороге 0.3
-чужая активность: известно=True, свежих за 24.0 ч 10, прежних 21 (самая свежая 2026-09-23T19:46:12Z)
-    свежая чужая: 5oKuiQK4t1Hn5vf3gVMoacMBmf78rhBBv4sv1kgcSPb2JByK2u3iigznqqL7236Ln2Ja9suST3MzYwx2euX4sDh2 2026-09-24T00:54:49Z
-    свежая чужая: 4fzGJF46ud9ezU5VbucGPfpdPt1SM59GwxAN4nNpKSaYfv7CQvAzfsdKsvj4DhXuZ8rEpyym5H27ECBhHobCzUpx 2026-09-24T00:54:25Z
-    свежая чужая: 3RoMoincf2teqW21jRN4PvxjJM93Gejqh7tABXFsTBv9WSsBu2H4d13GuHzEb62A99WvhnZQD5D2Xu49ahCjGzpC 2026-09-24T00:53:51Z
-    свежая чужая: 5mgrKFNiZopeNhxy9wKrdPpaN3rg9zvPiyy69UfgNy6fGBDL32Lqft7L6KJzZSEWkW6U26bGo4YYeDQKCK51fbyV 2026-09-24T00:52:51Z
-    свежая чужая: 2YGLuEP86b1K3BoaFW5AEjy2rq6MqgyHy1aA7iZz6MUv8mewP7DLwBMVagYk1mSnxKRcZ5duTtMoPjmpo4xS7ePw 2026-09-24T00:51:17Z
+режим: live, вердикт: старт заблокирован, причин 2
+кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.242435052 SOL при пороге 0.3
+чужая активность: известно=True, свежих за 24.0 ч 15, прежних 11 (самая свежая 2026-09-23T19:46:12Z)
+    свежая чужая: 2BMKe8NGuBdnxZdgbwTYGFGh6d8tHxPWYxwopG1TRqRBZD9y65mfM5jbetU7uSteBwU3jn6sNuDt2gDovoXQX8Pw 2026-09-24T09:41:27Z
+    свежая чужая: 2auzUyuEmMbAcR78aLcUaTmBLN68YhgbB1pTYt7wuFxngNnMRPhFgJvRUYRoDtat6z4n75S8KYaFnTTxqnWbkyDq 2026-09-24T03:47:52Z
+    свежая чужая: 59c7uRPE3A98dvwPwNyHTDXJKEh4uG3wo7SSb3HniK2Uo5QgmohHDZe7WXsGHHGbTFXDJK3VdrBCi6M16r5E6oSB 2026-09-24T03:41:47Z
+    свежая чужая: 2ZgNusHBpK15W9BfMdFRFpapaxFqfLJ6eWN2yzWyJBhYa6zhJdkeT3xX2L8Gh6wsL73EeKAb1dmeUdrv4rtd4TTa 2026-09-24T03:36:40Z
+    свежая чужая: 3pZQnAKittXJ8Q2r2XXpJcwXY2up8jH1LTpp2kARUkH5psd6W9GBMVznRu9ipLHTQ9UhqcBLNty6Qsk4aaaZEVWT 2026-09-24T02:12:30Z
 граница чужой активности: метка начала стенда (2026-09-23T20:50:35Z)
 позиции: dry-run 0, настоящих открытых 0
-  примечание: 10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x), 3kArcaSPoWwo (4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump), qPcB5rNxtYqw (KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS), 2ZcRWqDoTBfm (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)
-  примечание: у кошелька есть прежняя история: 21 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
+  БЛОКЕР: на кошельке 5 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
+  БЛОКЕР: баланс 0.2424 SOL ниже порога 0.3
+  примечание: 10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x)
+  примечание: у кошелька есть прежняя история: 11 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
-{
-  "schema_version": 2,
-  "updated_utc": "2026-09-24T01:43:13Z",
-  "updated_ts": 1790214193.3684635,
-  "alive_since_utc": "2026-09-24T01:43:13Z",
-  "mode": "live",
-  "sources": 19,
-  "sources_from": "DBot живьём + тестовых источников из окружения: 2",
-  "sources_generation": 0,
-  "subscribe_method": "transactionSubscribe",
-  "subscribe_drops": 0,
-  "signals_seen": 0,
-  "to_buy": 0,
-  "by_code": {},
-  "by_code_test_source": {},
-  "test_sources": [
-    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-    "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
-  ],
-  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
-  "test_min_sol": 0.05,
-  "max_tx_version": 1,
-  "rate_source": "geckoterminal",
-  "rate_usd_sol": 115.03536025177999,
-  "rate_fresh": true,
-  "rate_failures": [],
-  "kill_path": "/etc/bloom-executor/KILL",
-  "kill_readable": true,
-  "kill_active": false,
-  "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": null,
-  "slot_notifications": 0,
-  "net_slot_age_s": null,
-  "balance_sol": 0.302275588,
-  "balance_age_s": 0.02,
-  "rpc_calls": 1,
-  "rpc_by_method": {
-    "getBalance": 1
-  },
-  "session_credits": 1,
-  "handler_crashes": 0,
-  "telegram": {
-    "enabled": true,
-    "configured": true,
-    "sent": 0,
-    "failed": 0,
-    "last_error": "",
-    "off_reason": ""
-  },
-  "executor_attached": true,
-  "executed": 0,
-  "exec_by_code": {},
-  "executor": {
-    "schema_version": 2,
-    "mode": "live",
-    "live_buy_enabled": true,
-    "live_test_enabled": true,
-    "dry_run": false,
-    "bump_sol": 0.005,
-    "buy_sol": 0.05,
-    "slippage_pct": 35.0,
-    "priority_fee": 0.001,
-    "processor_tip": 0.001,
-    "sell_after_s": 28.8,
-    "sell_slippage_pct": 40.0,
-    "sent": 0,
-    "refused": 0,
-    "last_error": "",
-    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
-  },
-  "credits_logged": true,
-  "credits_log_error": "",
-  "decide_latency_ms": null
-}--- решений в журнале ---
-304
---- позиций в журнале (должно быть 0: покупать нечем) ---
-220
