@@ -48,6 +48,10 @@ def classify(value: dict) -> dict:
     joined = "\n".join(logs)
     if any(BAL_RE.search(ln) for ln in logs) or "insufficient" in joined.lower():
         return {"verdict": "balance_error", "err": err, "tail": tail}
+    # Программа сама сверяет остаток пользователя с тратой: Anchor
+    # RequireGteViolated, "Left: 0" (остаток), "Right: <трата>" -- тоже баланс.
+    if "RequireGteViolated" in joined and "Program log: Left: 0" in logs:
+        return {"verdict": "balance_error", "err": err, "tail": tail, "kind": "require_gte_balance"}
     return {"verdict": "other_error", "err": err, "tail": tail}
 
 
