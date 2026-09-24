@@ -56,6 +56,9 @@ import bloom_exec_state as ST  # noqa: E402
 
 # Сколько держать записи в памяти для сводки за окно.
 ОКНО_S = 3600.0
+# Слот Solana -- около 0.4 секунды. Нужно там, где blockTime не пришёл, а
+# слот пришёл: слот тоже время, просто в других единицах.
+СЕКУНД_В_СЛОТЕ = 0.4
 
 
 def _процентиль(значения: list, доля: float) -> float | None:
@@ -230,8 +233,19 @@ def скорость_адреса(helius, адрес: str, *, предел: int 
         return {"known": False, "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
     времена = sorted(z.get("blockTime") for z in сп
                       if isinstance(z, dict) and z.get("blockTime"))
-    if len(времена) < 5:
-        return {"known": False, "why_not": f"подписей мало: {len(времена)}"}
+    если_по_слотам = False
+    if len(времена) < 3:
+        # У свежих подписей blockTime приходит не всегда. Слот есть почти
+        # всегда, а слот -- это время: около 0.4 с на слот. Отказ здесь
+        # означал бы, что адрес выпал из отбора не по скорости, а по
+        # отсутствию поля.
+        слоты = sorted(z.get("slot") for z in сп
+                        if isinstance(z, dict) and z.get("slot"))
+        if len(слоты) < 3:
+            return {"known": False,
+                     "why_not": f"подписей мало: времён {len(времена)}, слотов {len(слоты)}"}
+        времена = [int(x * СЕКУНД_В_СЛОТЕ) for x in слоты]
+        если_по_слотам = True
     окно = времена[-1] - времена[0]
     if окно <= 0:
         # Все подписи в одной секунде -- это НЕ "скорость неизвестна", это
@@ -240,15 +254,17 @@ def скорость_адреса(helius, адрес: str, *, предел: int 
         # нижней границе окна в одну секунду и помечаем, что это оценка снизу.
         return {"known": True, "per_min": round(len(времена) * 60.0, 2),
                  "window_s": 0, "signatures": len(времена),
-                 "lower_bound": True,
+                 "lower_bound": True, "by_slots": если_по_слотам,
                  "note": "все подписи в одной секунде -- оценка снизу"}
     return {"known": True, "per_min": round(len(времена) / (окно / 60.0), 2),
-             "window_s": окно, "signatures": len(времена), "lower_bound": False}
+             "window_s": окно, "signatures": len(времена), "lower_bound": False,
+             "by_slots": если_по_слотам}
 
 
 def разгонные_по_цепи(helius, *, сколько: int = 3, исключить: set | None = None,
-                       назад_слотов: int = 30, цель_в_минуту: float = 5.0,
-                       кандидатов: int = 12) -> dict:
+                       назад_слотов: int = 150, цель_в_минуту: float = 5.0,
+                       кандидатов: int = 12, попыток_блока: int = 6,
+                       мин_в_минуту: float = 0.2) -> dict:
     """Разгонные адреса ПО ЦЕПИ, подобранные под нужную скорость выборки.
 
     Зачем вообще разгонные: девятнадцать наших источников дают несколько
@@ -272,14 +288,31 @@ def разгонные_по_цепи(helius, *, сколько: int = 3, иск�
         return {"known": False, "why_not": f"getSlot: {type(exc).__name__}: {exc}"}
     if not isinstance(слот, int):
         return {"known": False, "why_not": "getSlot не отдал число"}
-    цель = слот - назад_слотов
-    try:
-        блок = helius.call("getBlock", [цель, {
-            "encoding": "jsonParsed", "transactionDetails": "accounts",
-            "rewards": False,
-            "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}])
-    except Exception as exc:  # noqa: BLE001
-        return {"known": False, "why_not": f"getBlock {цель}: {type(exc).__name__}: {exc}"}
+    # Слот на 30 назад -- это 12 секунд, и узел такой блок ещё не отдаёт:
+    # прогон 13:59Z получил -32004 "Block not available for slot". Плюс часть
+    # слотов пропущена самой сетью, и блока там нет в принципе. Поэтому
+    # отступаем дальше и перебираем несколько слотов, а не сдаёмся на первом.
+    блок, цель, отказы_блока = None, None, []
+    for шаг in range(попыток_блока):
+        кандидат = слот - назад_слотов - шаг * 20
+        if кандидат <= 0:
+            break
+        try:
+            блок = helius.call("getBlock", [кандидат, {
+                "encoding": "jsonParsed", "transactionDetails": "accounts",
+                "rewards": False,
+                "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}])
+        except Exception as exc:  # noqa: BLE001
+            отказы_блока.append(f"{кандидат}: {str(exc)[:90]}")
+            блок = None
+            continue
+        if блок:
+            цель = кандидат
+            break
+    if not блок:
+        return {"known": False,
+                 "why_not": ("ни один блок не отдался: " + "; ".join(отказы_блока[:3])
+                              if отказы_блока else "блоки пусты")}
     счёт: dict = {}
     for tx in ((блок or {}).get("transactions") or []):
         ключи = ((tx or {}).get("transaction") or {}).get("accountKeys") or []
@@ -289,6 +322,10 @@ def разгонные_по_цепи(helius, *, сколько: int = 3, иск�
             адрес = k.get("pubkey")
             if адрес and адрес not in исключить:
                 счёт[адрес] = счёт.get(адрес, 0) + 1
+    # Частота в блоке -- только порядок осмотра, а не отбор. Жёсткое правило
+    # "встретился дважды" отсеивало бы как раз спокойные адреса и оставляло
+    # шланги -- это поймала самопроверка, и это ровно та беда, от которой
+    # разгонные и подбираются по скорости.
     порядок = [a for a, _ in sorted(счёт.items(), key=lambda kv: -kv[1])][:кандидатов]
     замеры: dict = {}
     for a in порядок:
@@ -298,17 +335,28 @@ def разгонные_по_цепи(helius, *, сколько: int = 3, иск�
     if not замеры:
         return {"known": False, "slot": цель,
                  "why_not": "скорость ни одного кандидата не измерилась"}
-    # Жадно: сначала самые спокойные, чтобы не взять пожарный шланг ради
-    # цели в пять транзакций в минуту.
+    # ПОЛОСА скорости, а не просто "самые спокойные". Снизу -- чтобы адрес
+    # вообще давал поток (мёртвый кошелёк выборку не наберёт), сверху -- чтобы
+    # один адрес не покрывал всю цель с тысячекратным запасом: именно так
+    # прошлый отбор дал 3142 сообщения за полминуты.
+    в_полосе = {a: v for a, v in замеры.items()
+                 if мин_в_минуту <= v <= цель_в_минуту}
+    отброшены = {a: v for a, v in замеры.items() if a not in в_полосе}
     выбраны: list = []
     сумма = 0.0
-    for a, скорость in sorted(замеры.items(), key=lambda kv: kv[1]):
+    for a, скорость in sorted(в_полосе.items(), key=lambda kv: kv[1]):
         if сумма >= цель_в_минуту or len(выбраны) >= сколько:
             break
         выбраны.append(a)
         сумма += скорость
+    if not выбраны:
+        return {"known": False, "slot": цель,
+                 "measured": замеры,
+                 "why_not": (f"ни один кандидат не попал в полосу "
+                              f"{мин_в_минуту}-{цель_в_минуту} транзакций в минуту")}
     return {"known": True, "slot": цель, "accounts": выбраны,
              "rates_per_min": {a: замеры[a] for a in выбраны},
+             "rejected_rates": {a: v for a, v in list(отброшены.items())[:6]},
              "total_per_min": round(сумма, 2),
              "target_per_min": цель_в_минуту,
              "measured_candidates": len(замеры),
@@ -1008,7 +1056,41 @@ def self_test() -> None:
     chk("наш источник в разгонные не попадает", "НАШ" not in р["accounts"])
     chk("скорость каждого выбранного названа числом",
         all(a in р["rates_per_min"] for a in р["accounts"]), р.get("rates_per_min"))
-    chk("и назван слот, из которого они взяты", р["slot"] == 970, р.get("slot"))
+    chk("и назван слот, из которого они взяты", р["slot"] == 850, р.get("slot"))
+
+    chk("шланг назван в отброшенных со своей скоростью",
+        "ШЛАНГ" in (р.get("rejected_rates") or {}), р.get("rejected_rates"))
+
+    # Блок на 30 слотов назад узел ещё не отдаёт (-32004), и часть слотов
+    # пропущена сетью. Перебор нескольких слотов обязателен.
+    class HeliusБлокПозже(HeliusБлок):
+        def __init__(self, скорости, отдать_с_попытки=3):
+            HeliusБлок.__init__(self, скорости)
+            self.попыток = 0
+            self.отдать_с = отдать_с_попытки
+
+        def call(self, метод, параметры):
+            if метод == "getBlock":
+                self.попыток += 1
+                if self.попыток < self.отдать_с:
+                    raise RuntimeError("{'code': -32004, 'message': 'Block not available'}")
+            return HeliusБлок.call(self, метод, параметры)
+
+    h_поздн = HeliusБлокПозже({"СРЕДНИЙ": 4.0, "ТИХИЙ": 1.0, "ЧУЖОЙ": 2.0,
+                                "ШЛАНГ": 600.0})
+    р_п = разгонные_по_цепи(h_поздн, сколько=3, цель_в_минуту=5.0)
+    chk("недоступный блок не роняет отбор: перебираются другие слоты",
+        р_п["known"] and h_поздн.попыток >= 3, (р_п.get("why_not"), h_поздн.попыток))
+
+    class HeliusБезБлоков(HeliusБлок):
+        def call(self, метод, параметры):
+            if метод == "getBlock":
+                raise RuntimeError("{'code': -32004}")
+            return HeliusБлок.call(self, метод, параметры)
+
+    р_нб = разгонные_по_цепи(HeliusБезБлоков({}), сколько=3)
+    chk("если блоков нет вовсе -- честная причина, а не пустой список",
+        р_нб["known"] is False and "блок" in р_нб["why_not"], р_нб)
 
     class HeliusМолчит:
         def call(self, *a, **kw):
