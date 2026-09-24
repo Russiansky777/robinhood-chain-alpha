@@ -1,0 +1,233 @@
+name: "Гонка отправок: зонд Bloom, пары, продажа (ДЕНЬГИ)"
+
+# Синтетический тест владельца: наша отправка через Helius Sender против
+# Bloom на парах покупок USDC по 0.001 SOL. Деньги настоящие, поэтому:
+#   * live по умолчанию 0 -- без явного 1 ничего не отправляется;
+#   * own_send_live по умолчанию 0 -- сторона B молчит, пока его не включат;
+#   * предел расхода 0.2 SOL стоит В КОДЕ, до каждой пары, а не в этом файле;
+#   * рубильники /etc/bloom-executor/KILL и KILL_BY_TELEGRAM останавливают
+#     тест так же, как торговлю;
+#   * боевая покупка рядом -- пара пропускается, а не отменяется;
+#   * пара при запасном пути подписки детектора не засчитывается.
+#
+# Режимы:
+#   probe -- ОДНА покупка USDC у Bloom с auto_orders=[] и наблюдение за
+#            кошельком: не цепляет ли Bloom авто-ордер сам. Это надо знать
+#            ДО тридцати пар -- иначе тест наплодил бы тридцать авто-ордеров.
+#   run   -- пары.
+#   sell  -- продать накопленный USDC (пол 70 % от котировки, в модуле).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe -- одна покупка у Bloom; run -- пары; sell -- продажа"
+        required: true
+        default: "probe"
+      live:
+        description: "'1' -- РЕАЛЬНЫЕ отправки (иначе холостой круг)"
+        required: false
+        default: "0"
+      own_send_live:
+        description: "'1' -- включить нашу отправку (сторона B); для probe не нужно"
+        required: false
+        default: "0"
+      pairs:
+        description: "сколько ЗАЧТЁННЫХ пар (по слову владельца 30)"
+        required: false
+        default: "30"
+      pool_vault:
+        description: "хранилище USDC пула из разведки"
+        required: false
+        default: ""
+      watch_s:
+        description: "сколько секунд наблюдать кошелёк в режиме probe"
+        required: false
+        default: "150"
+      max_minutes:
+        description: "предел времени прогона, минут"
+        required: false
+        default: "25"
+      no_sell:
+        description: "'1' -- не продавать в конце прогона"
+        required: false
+        default: "0"
+
+concurrency:
+  group: bloom-send-race
+  cancel-in-progress: false
+
+env:
+  CHECKOUT: /home/bot/robinhood-chain-alpha
+  PYHOST: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUTDIR: /tmp/bloom_send_race
+
+jobs:
+  race:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО денег"
+        run: |
+          set -e
+          if python3 -c "import requests, solders, websockets" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/venv"
+            "$RUNNER_TEMP/venv/bin/pip" install -q requests solders websockets
+            PY="$RUNNER_TEMP/venv/bin/python"
+          fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          cd analysis
+          "$PY" bloom_send_race_test.py --self-test
+          "$PY" bloom_own_send.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" bloom_jupiter_sell.py --self-test
+          "$PY" check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
+
+      - name: "Режим и рубильник живых денег"
+        run: |
+          set -e
+          case "${{ inputs.mode }}" in
+            probe|run|sell) echo "режим ${{ inputs.mode }}";;
+            *) echo "неизвестный режим"; exit 1;;
+          esac
+          echo "live=${{ inputs.live }}, own_send_live=${{ inputs.own_send_live }}"
+          if [ "${{ inputs.mode }}" = "run" ] && [ "${{ inputs.live }}" = "1" ] \
+             && [ "${{ inputs.own_send_live }}" != "1" ]; then
+            echo "живые пары без own_send_live=1 бессмысленны: сторона B молчала бы"
+            exit 1
+          fi
+
+      - name: "Секреты не пусты (значения не печатаются)"
+        env:
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
+          BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          fail=0
+          for NAME in EXEC_WALLET_KEY BLOOM_API_KEY HELIUS_API_KEY VPS_SSH_KEY; do
+            V="${!NAME}"
+            if [ -z "$V" ]; then echo "$NAME: НЕ ЗАДАН"; fail=1
+            else echo "$NAME: задан, длина ${#V}"; fi
+          done
+          [ "$fail" = "0" ] || { echo "прогон остановлен: нет секретов"; exit 1; }
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Код на хосте -- та же ветка, тот же коммит"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -e
+            sudo -u bot git -C $CHECKOUT fetch -q origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C $CHECKOUT reset -q --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C $CHECKOUT log -1 --oneline
+            $PYHOST -c 'import requests, solders, websockets' \
+              || /home/bot/robinhood-chain-alpha/venv/bin/pip install -q websockets
+            $PYHOST -c 'import requests, solders, websockets; print(\"зависимости есть\")'
+            install -d -m 755 $OUTDIR
+          "
+
+      - name: "Прогон на хосте"
+        env:
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
+          BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          MODE: ${{ inputs.mode }}
+          LIVE: ${{ inputs.live }}
+          OWN_SEND_LIVE: ${{ inputs.own_send_live }}
+          PAIRS: ${{ inputs.pairs }}
+          POOL_VAULT: ${{ inputs.pool_vault }}
+          WATCH_S: ${{ inputs.watch_s }}
+          MAX_MINUTES: ${{ inputs.max_minutes }}
+          NO_SELL: ${{ inputs.no_sell }}
+        run: |
+          set -e
+          case "$MODE" in
+            probe) ARGS="--probe-bloom --watch-s $WATCH_S";;
+            run)   ARGS="--run --pairs $PAIRS --max-minutes $MAX_MINUTES";;
+            sell)  ARGS="--sell-only";;
+          esac
+          # Ни одного "test && cmd" при set -e: ложное условие в конце
+          # списка И роняет весь шаг. Это уже стоило прогона.
+          if [ "$LIVE" = "1" ]; then ARGS="$ARGS --live"; fi
+          if [ "$NO_SELL" = "1" ]; then ARGS="$ARGS --no-sell"; fi
+          if [ -n "$POOL_VAULT" ]; then ARGS="$ARGS --pool-vault $POOL_VAULT"; fi
+          set -o pipefail
+          echo "аргументы: $ARGS"
+          # Ключи уезжают на хост ПОТОКОМ, не аргументами и не файлом: в
+          # списке процессов их не видно, на диске они не остаются.
+          {
+            printf 'EXEC_WALLET_KEY=%s\n' "$EXEC_WALLET_KEY"
+            printf 'BLOOM_API_KEY=%s\n' "$BLOOM_API_KEY"
+            printf 'HELIUS_API_KEY=%s\n' "$HELIUS_API_KEY"
+          } | ssh $SSH_OPTS root@127.0.0.1 "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            while IFS='=' read -r K V; do
+              case \"\$K\" in
+                EXEC_WALLET_KEY|BLOOM_API_KEY|HELIUS_API_KEY)
+                  [ -n \"\$V\" ] && export \"\$K=\$V\" ;;
+              esac
+            done
+            export BLOOM_OWN_SEND=1
+            export BLOOM_OWN_SEND_LIVE=$OWN_SEND_LIVE
+            export BLOOM_SENDER_REGION=ams
+            $PYHOST -u $CHECKOUT/analysis/bloom_send_race_test.py $ARGS \
+              --out $OUTDIR/$MODE.json
+          " 2>&1 | tee /tmp/race_log.txt
+
+      - name: "Забрать отчёт, проверить на ключи, закоммитить"
+        if: always()
+        run: |
+          set -e
+          mkdir -p data
+          ssh -n $SSH_OPTS root@127.0.0.1 "cat $OUTDIR/${{ inputs.mode }}.json" \
+            > data/bloom_send_race_${{ inputs.mode }}.json || true
+          [ -s data/bloom_send_race_${{ inputs.mode }}.json ] || {
+            echo "отчёта нет -- смотреть журнал шага прогона"; exit 0; }
+          python3 - <<'PY'
+          import json, os, pathlib, re, sys
+          путь = pathlib.Path(f"data/bloom_send_race_{os.environ['MODE']}.json")
+          т = путь.read_text(encoding="utf-8", errors="replace")
+          if re.search(r"api-key=[A-Za-z0-9._-]{8,}", т) or "Bearer " in т:
+              print("в отчёте виден ключ"); sys.exit(1)
+          d = json.loads(т)
+          if "summary" in d:
+              print(json.dumps(d["summary"], ensure_ascii=False, indent=1))
+          if "probe" in d:
+              п = d["probe"]
+              print("зонд:", json.dumps({к: п.get(к) for к in
+                    ("response", "unsolicited_sells", "verdict")},
+                    ensure_ascii=False, indent=1))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/bloom_send_race_${{ inputs.mode }}.json
+          if git diff --cached --quiet; then echo "нечего коммитить"; exit 0; fi
+          git commit -m "Gonka otpravok: rezhim ${{ inputs.mode }} [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
+        env:
+          MODE: ${{ inputs.mode }}
