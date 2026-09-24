@@ -209,6 +209,77 @@ def разгонные_по_цепи(helius, *, сколько: int = 3, иск�
                        f"{цель}: самые частые подписанты. В торговлю не идут")}
 
 
+class Отказы:
+    """Последний отказ по каждому каналу -- в признак жизни, а не только в файл.
+
+    Зачем отдельно. Вопрос владельца: если по gRPC ноль сообщений через пять
+    минут, назвать КОД и то, что именно отверг сервер. Если отказ виден лишь
+    в JSONL, за ним надо лезть на хост; в признаке жизни он виден сразу.
+
+    Токен сюда не попадает никогда: у gRPC берутся код и текст сервера, у
+    прочих -- имя класса и первые 200 символов, а сам токен уходит только в
+    метаданных вызова и в тексты ошибок не подставляется.
+    """
+
+    def __init__(self) -> None:
+        self.по_каналам: dict = {}
+        self.счёт: dict = {}
+
+    def записать(self, канал: str, исключение) -> dict:
+        код = detali = None
+        try:
+            import grpc  # noqa: PLC0415
+            if isinstance(исключение, grpc.RpcError):
+                код = str(исключение.code())
+                detali = str(исключение.details())[:200]
+        except Exception:  # noqa: BLE001
+            pass
+        з = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              "type": type(исключение).__name__,
+              "code": код,
+              "details": detali or str(исключение)[:200]}
+        self.по_каналам[канал] = з
+        self.счёт[канал] = self.счёт.get(канал, 0) + 1
+        return з
+
+    def сводка(self) -> dict:
+        return {"last": dict(self.по_каналам), "count": dict(self.счёт)}
+
+
+def адрес_grpc(url: str) -> tuple:
+    """Адрес для gRPC из URL кабинета поставщика: (цель, нужен_ли_TLS).
+
+    Кабинет Shyft показывает адрес со схемой (https://...), а grpc-клиент
+    ждёт "host:port" без схемы -- и порт ОБЯЗАТЕЛЕН: без него канал
+    открывается в никуда и молча не отдаёт ни одного сообщения. Поэтому
+    схема снимается здесь, в коде, а не правкой секрета, и порт
+    дописывается по схеме: 443 для https, 80 для http.
+
+    Адрес в формате host:port тоже принимается как есть.
+    """
+    сырое = (url or "").strip().rstrip("/")
+    tls = True
+    if сырое.startswith("http://"):
+        tls, сырое = False, сырое[len("http://"):]
+    elif сырое.startswith("https://"):
+        сырое = сырое[len("https://"):]
+    elif сырое.startswith("grpc://"):
+        tls, сырое = False, сырое[len("grpc://"):]
+    elif сырое.startswith("grpcs://"):
+        сырое = сырое[len("grpcs://"):]
+    сырое = сырое.split("/", 1)[0]
+    # Порт уже есть, если после последнего двоеточия только цифры. IPv6 в
+    # скобках не трогаем: там двоеточий много, и правило другое.
+    без_порта = True
+    if сырое.startswith("["):
+        без_порта = "]:" not in сырое
+    elif ":" in сырое:
+        без_порта = not сырое.rsplit(":", 1)[1].isdigit()
+    if без_порта:
+        сырое = f"{сырое}:{443 if tls else 80}"
+    return сырое, tls
+
+
 def запись_строки(путь: Path, строка: dict) -> None:
     ST.append_jsonl_fsync(путь, строка)
 
@@ -217,7 +288,7 @@ def запись_строки(путь: Path, строка: dict) -> None:
 
 def слушать_ws(гонка: Гонка, *, ключ: str, адреса: list, группы: dict,
                 стоп: threading.Event, журнал: Path | None = None,
-                учёт=None) -> None:
+                учёт=None, отказы: "Отказы | None" = None) -> None:
     """Вторая, ОТДЕЛЬНАЯ подписка Helius. Соединение детектора не трогается."""
     import asyncio  # noqa: PLC0415
 
@@ -263,15 +334,18 @@ def слушать_ws(гонка: Гонка, *, ключ: str, адреса: li
         try:
             asyncio.run(круг())
         except Exception as exc:  # noqa: BLE001
+            з = отказы.записать(КАНАЛ_WS, exc) if отказы is not None else None
             if журнал is not None:
                 запись_строки(журнал, {"channel": КАНАЛ_WS, "error":
-                                        f"{type(exc).__name__}: {str(exc)[:200]}"})
+                                        f"{type(exc).__name__}: {str(exc)[:200]}",
+                                        "fail": з})
             time.sleep(2.0)
 
 
 def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: str, токен: str,
                   адреса: list, стоп: threading.Event,
-                  заголовок: str = "x-token", журнал: Path | None = None) -> None:
+                  заголовок: str = "x-token", журнал: Path | None = None,
+                  отказы: "Отказы | None" = None) -> None:
     """Подписка Yellowstone. Токен уходит В МЕТАДАННЫХ и нигде не печатается."""
     import grpc  # noqa: PLC0415
 
@@ -279,8 +353,7 @@ def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: 
     import geyser_pb2 as pb  # noqa: PLC0415
     import geyser_pb2_grpc as pbg  # noqa: PLC0415
 
-    цель = url.replace("https://", "").replace("http://", "").rstrip("/")
-    безопасно = not url.startswith("http://")
+    цель, безопасно = адрес_grpc(url)
 
     def запрос():
         req = pb.SubscribeRequest()
@@ -322,9 +395,11 @@ def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: 
                                                 "slot": сд.slot, "t": t,
                                                 "pair": пара})
         except Exception as exc:  # noqa: BLE001
+            з = отказы.записать(канал_имя, exc) if отказы is not None else None
             if журнал is not None:
                 запись_строки(журнал, {"channel": канал_имя, "error":
-                                        f"{type(exc).__name__}: {str(exc)[:200]}"})
+                                        f"{type(exc).__name__}: {str(exc)[:200]}",
+                                        "fail": з})
             time.sleep(2.0)
 
 
@@ -405,6 +480,32 @@ def self_test() -> None:
         (len(г_т.пары), г_т.дубли))
     chk("сведённая подпись в 'без пары' не попадает",
         г_т.без_пары() == {}, г_т.без_пары())
+
+    # 2в. Адрес gRPC: схема снимается в КОДЕ, порт дописывается.
+    chk("схема https снимается, порт 443 дописывается",
+        адрес_grpc("https://grpc.ams.shyft.to") == ("grpc.ams.shyft.to:443", True),
+        адрес_grpc("https://grpc.ams.shyft.to"))
+    chk("хвостовая косая и путь не мешают",
+        адрес_grpc("https://grpc.ams.shyft.to/") == ("grpc.ams.shyft.to:443", True))
+    chk("готовый host:port остаётся как есть",
+        адрес_grpc("grpc.ams.shyft.to:443") == ("grpc.ams.shyft.to:443", True))
+    chk("http даёт порт 80 и выключает TLS",
+        адрес_grpc("http://localhost:10000") == ("localhost:10000", False)
+        and адрес_grpc("http://x.y") == ("x.y:80", False))
+    chk("свой порт не подменяется",
+        адрес_grpc("https://example.com:8443") == ("example.com:8443", True))
+    chk("имя без схемы и без порта тоже годится",
+        адрес_grpc("grpc.ams.shyft.to") == ("grpc.ams.shyft.to:443", True))
+
+    # 2г. Отказ канала виден в признаке жизни с кодом, и БЕЗ токена.
+    о = Отказы()
+    class ОтказСервера(Exception):
+        pass
+    з = о.записать(КАНАЛ_GRPC, ОтказСервера("Unauthenticated: invalid token"))
+    chk("отказ записан с типом и текстом сервера",
+        з["type"] == "ОтказСервера" and "Unauthenticated" in з["details"], з)
+    chk("отказы считаются по каналам",
+        о.сводка()["count"][КАНАЛ_GRPC] == 1, о.сводка())
 
     # 3. Группы считаются раздельно.
     г2 = Гонка()
@@ -516,6 +617,7 @@ def main() -> int:
     группы: dict = {}
 
     гонка = Гонка()
+    отказы = Отказы()
     стоп = threading.Event()
     потоки = []
 
@@ -525,21 +627,32 @@ def main() -> int:
             target=слушать_ws, args=(гонка,),
             kwargs={"ключ": ключ, "адреса": адреса, "группы": группы,
                      "стоп": стоп, "журнал": журнал,
-                     "учёт": helius.учесть_вебсокет},
+                     "учёт": helius.учесть_вебсокет, "отказы": отказы},
             name="ws", daemon=True))
+    цель_grpc: dict = {}
     for имя, префикс in ((КАНАЛ_GRPC, "GRPC_FEED"), (КАНАЛ_GRPC2, "GRPC_FEED2")):
         url = os.environ.get(f"{префикс}_URL", "")
         if not url:
             continue
+        # В признак жизни идёт РАЗОБРАННЫЙ адрес: видно, что схема снята и
+        # порт дописан. Токена здесь нет и быть не может -- он в другой
+        # переменной и в метаданных вызова.
+        цель_grpc[имя] = {"target": адрес_grpc(url)[0],
+                           "tls": адрес_grpc(url)[1],
+                           "auth_header": os.environ.get("GRPC_FEED_AUTH_HEADER",
+                                                          "x-token"),
+                           "token_present": bool(os.environ.get(f"{префикс}_TOKEN"))}
         потоки.append(threading.Thread(
             target=слушать_grpc, args=(гонка,),
             kwargs={"канал_имя": имя, "url": url,
                      "токен": os.environ.get(f"{префикс}_TOKEN", ""),
                      "адреса": адреса, "стоп": стоп,
                      "заголовок": os.environ.get("GRPC_FEED_AUTH_HEADER", "x-token"),
-                     "журнал": журнал},
+                     "журнал": журнал, "отказы": отказы},
             name=имя, daemon=True))
 
+    t0 = time.time()
+    начало_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     for t in потоки:
         t.start()
     print(f"зонд запущен: каналов {len(потоки)}, адресов {len(адреса)} "
@@ -555,11 +668,18 @@ def main() -> int:
             с = гонка.сводка()
             ST.atomic_write_json(признак, {
                 "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "channels": len(потоки), "addresses": len(адреса),
+                "started_utc": начало_utc,
+                "uptime_s": round(time.time() - t0, 1),
+                "channels": len(потоки),
+                "channel_names": [t.name for t in потоки],
+                "addresses": len(адреса),
                 "sources": len(источники),
                 "boosters": разгон.get("accounts") or [],
+                "boosters_slot": разгон.get("slot"),
                 "boosters_why_not": (None if разгон.get("known")
                                       else разгон.get("why_not")),
+                "grpc_target": цель_grpc,
+                "failures": отказы.сводка(),
                 "summary": с})
             if дедлайн and time.time() > дедлайн:
                 break

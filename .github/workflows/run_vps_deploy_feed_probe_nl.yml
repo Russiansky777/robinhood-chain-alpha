@@ -76,6 +76,50 @@ jobs:
             sudo -u bot test -w $STATE_DIR || { echo 'СБОЙ: служба не пишет в каталог состояния'; exit 1; }
             echo 'каталоги готовы и доступны пользователю службы'"
 
+      - name: "Свой env зонда (общий env служб НЕ трогается)"
+        env:
+          GRPC_FEED_URL: ${{ secrets.GRPC_FEED_URL }}
+          GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
+          GRPC_FEED2_URL: ${{ secrets.GRPC_FEED2_URL }}
+          GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+          GRPC_FEED_AUTH_HEADER: ${{ secrets.GRPC_FEED_AUTH_HEADER }}
+        run: |
+          set -e
+          # Общий /etc/bloom-executor/env НЕ переписывается ни одной строкой:
+          # в ночь деплой сторожа уже затирал его, и повторять это нельзя.
+          # У зонда свой файл, и unit читает оба: общий -- только за ключом
+          # Helius, свой -- за адресом и токеном потока.
+          HEADER="$GRPC_FEED_AUTH_HEADER"
+          [ -n "$HEADER" ] || HEADER=x-token
+          if [ -z "$GRPC_FEED_URL" ]; then
+            echo "GRPC_FEED_URL не задан -- второй канал не включится"
+          else
+            echo "GRPC_FEED_URL: задан, длина ${#GRPC_FEED_URL}"
+          fi
+          if [ -z "$GRPC_FEED_TOKEN" ]; then
+            echo "GRPC_FEED_TOKEN: НЕ задан"
+          else
+            echo "GRPC_FEED_TOKEN: задан, длина ${#GRPC_FEED_TOKEN}"
+          fi
+          echo "заголовок авторизации: $HEADER"
+          # Значения уезжают через stdin: в аргументах ssh они были бы видны
+          # в ps на хосте.
+          {
+            printf 'GRPC_FEED_URL=%s\n' "$GRPC_FEED_URL"
+            printf 'GRPC_FEED_TOKEN=%s\n' "$GRPC_FEED_TOKEN"
+            printf 'GRPC_FEED_AUTH_HEADER=%s\n' "$HEADER"
+            [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
+            [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
+            true
+          } | ssh $SSH_OPTS root@$HOST "
+            set -e
+            umask 077
+            cat > $ENV_DIR/feed_probe_env
+            chown root:bot $ENV_DIR/feed_probe_env
+            chmod 640 $ENV_DIR/feed_probe_env
+            echo 'env зонда записан, строк:' \$(wc -l < $ENV_DIR/feed_probe_env)
+            echo 'общий env не тронут, его строк:' \$(wc -l < $ENV_DIR/env)"
+
       - name: "Доставка кода + сверка sha256"
         run: |
           set -e
@@ -123,6 +167,7 @@ jobs:
               echo 'User=bot'
               echo 'Group=bot'
               echo 'EnvironmentFile=$ENV_DIR/env'
+              echo 'EnvironmentFile=-$ENV_DIR/feed_probe_env'
               echo 'WorkingDirectory=$CODE_DIR'
               echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --tasks ${{ inputs.tasks }}'
               echo 'Restart=always'
