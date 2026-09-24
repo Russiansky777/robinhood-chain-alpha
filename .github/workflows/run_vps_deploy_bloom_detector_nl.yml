@@ -63,6 +63,14 @@ on:
         description: "размер боевой покупки в SOL"
         required: false
         default: "0.05"
+      shadow_legs:
+        description: "'1' -- подписка на 4 хранилища котировок для двухшаговой тени (замер, не торговля)"
+        required: false
+        default: "1"
+      shadow_legs_credits:
+        description: "бюджет замера двухшаговой тени, кредитов Helius (замер ~10 000 в час)"
+        required: false
+        default: "30000"
 
 concurrency:
   group: bloom-detector-deploy
@@ -101,13 +109,19 @@ jobs:
             echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
             echo "где выполняюсь: свой раннер на NL-хосте"
           fi
-          # Системный python3 на хосте может быть без requests: ставим не в
-          # систему, а во временное окружение прогона.
-          if python3 -c "import requests" 2>/dev/null; then
+          # Системный python3 на хосте может быть без requests и без solders:
+          # ставим не в систему, а во временное окружение прогона. solders
+          # нужен модулям тени -- без него самопроверка тени идёт мимо
+          # настоящего модуля и проверяет только заглушки.
+          if python3 -c "import requests, solders" 2>/dev/null; then
             echo "PY=python3" >> "$GITHUB_ENV"
           else
             python3 -m venv "$RUNNER_TEMP/selftest_venv"
             "$RUNNER_TEMP/selftest_venv/bin/pip" install -q requests
+            # solders -- не обязателен: без него тень просто выключена, и
+            # деплой торговли из-за замера падать не должен.
+            "$RUNNER_TEMP/selftest_venv/bin/pip" install -q solders \
+              || echo "ВНИМАНИЕ: solders не встал -- самопроверка тени пойдёт без модуля"
             echo "PY=$RUNNER_TEMP/selftest_venv/bin/python" >> "$GITHUB_ENV"
           fi
 
@@ -115,15 +129,15 @@ jobs:
         run: |
           set -e
           cd analysis
-          \"$PY\" bloom_exec_state.py --self-test
-          \"$PY\" bloom_api.py --self-test
-          \"$PY\" bloom_seller.py --self-test
-          \"$PY\" bloom_detector.py --self-test
-          \"$PY\" bloom_executor.py --self-test
-          \"$PY\" bloom_reconcile.py --self-test
+          "$PY" bloom_exec_state.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" bloom_seller.py --self-test
+          "$PY" bloom_detector.py --self-test
+          "$PY" bloom_executor.py --self-test
+          "$PY" bloom_reconcile.py --self-test
           # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
           # не принимает, и деплой падает посреди дела (проверено 11:24Z).
-          \"$PY\" check_shell_ascii.py --self-test
+          "$PY" check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
@@ -170,7 +184,10 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
+          # Модули тени (c2_*) -- замер, не торговля: отправлять транзакции
+          # они не умеют. Без них на хосте тень молча выключена, и раздел
+          # shadow в признаке жизни всегда пуст.
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -179,6 +196,35 @@ jobs:
             [ "$remote_sum" != "$EMPTY_SHA" ] || { echo "СБОЙ: на хост уехал ПУСТОЙ $f"; exit 1; }
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
+
+      - name: "Данные для тени: метки пулов, котировочные пулы, образцы таблиц"
+        run: |
+          set -e
+          # Модули тени ищут данные по своему месту: REPO_ROOT это родитель
+          # каталога кода, то есть на хосте /home/bot, а данные -- в
+          # /home/bot/data. Без них тень собирается, но падает на метках
+          # пулов на КАЖДОМ сигнале, и это выглядит как "тень не работает".
+          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples"
+          for f in $DATA_FILES; do
+            [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
+          done
+          # Архив идёт трубой, без временного файла ни с одной стороны.
+          # Через /tmp на хосте запись отказала ("Permission denied",
+          # прогон 36040165510) -- разбираться, чей это /tmp, незачем, если
+          # временный файл вообще не нужен. pipefail обязателен: без него
+          # падение tar спряталось бы за успехом ssh.
+          set -o pipefail
+          tar -czf - $DATA_FILES | ssh $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            install -d -o bot -g bot -m 755 /home/bot/data
+            tar -xzf - -C /home/bot
+            chown -R bot:bot /home/bot/data
+          "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            ls -l /home/bot/data/c2_leg_pools_2026-09-24.json
+            ls /home/bot/data/c2_pool_samples | wc -l
+            ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
+          "
 
       - name: "Снимок задач как откат, если DBot недоступен"
         run: |
@@ -229,6 +275,16 @@ jobs:
             # смысла нет, а включать покупки без строк -- опасно.
             sed -i '/^BLOOM_TELEGRAM_REAL=/d' $ENV_DIR/env
             echo 'BLOOM_TELEGRAM_REAL=${{ inputs.live_buy }}' >> $ENV_DIR/env
+            # ДВУХШАГОВАЯ ТЕНЬ -- ЗАМЕР, И У НЕГО СВОЯ ЦЕНА. Четыре
+            # котировочных пула дают около 535 МБ в час: это ~10 000
+            # кредитов в час против ~390 на всех двадцати источниках вместе.
+            # Бюджет ограничивает именно замер: когда он исчерпан, хранилища
+            # уходят из подписки, а источники, наш кошелёк, одношаговая тень
+            # и торговля остаются нетронутыми.
+            sed -i '/^BLOOM_SHADOW_LEGS=/d' $ENV_DIR/env
+            echo 'BLOOM_SHADOW_LEGS=${{ inputs.shadow_legs }}' >> $ENV_DIR/env
+            sed -i '/^BLOOM_SHADOW_LEGS_CREDITS=/d' $ENV_DIR/env
+            echo 'BLOOM_SHADOW_LEGS_CREDITS=${{ inputs.shadow_legs_credits }}' >> $ENV_DIR/env
             # BLOOM_LIVE_BUY вычищается ВСЕГДА и включается ТОЛЬКО отдельным
             # входом live_buy ниже: покупка по реальному источнику -- это
             # настоящие деньги, и включаться она должна одним осознанным
