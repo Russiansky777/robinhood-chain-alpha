@@ -1,0 +1,184 @@
+name: "NL-хост: служба зонда гонки потоков (ничего не торгует)"
+
+# Зонд сравнивает два канала: Yellowstone gRPC и наш второй Helius WS.
+# Он НЕ торгует: ни клиента Bloom, ни исполнителя в нём нет, и самопроверка
+# сторожит это по исходнику. Подписку детектора он не трогает -- у него своё
+# соединение и свой каталог состояния.
+#
+# Права. Каталог состояния создаётся СРАЗУ от пользователя службы (bot), а не
+# от root: ровно на этом в ночь сгорел учёт кредитов -- каталог создал root, и
+# служба не могла в него писать. Здесь это проверяется отдельным шагом.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_service:
+        description: "'yes' -- включить и перезапустить службу"
+        required: false
+        default: "no"
+      boosters:
+        description: "сколько разгонных адресов добавить (0 -- только источники)"
+        required: false
+        default: "3"
+      tasks:
+        description: "какие задачи DBot дают список источников"
+        required: false
+        default: "BATCH-5,BATCH-3"
+
+concurrency:
+  group: feed-probe-deploy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SVC: grpc-feed-probe
+  CODE_DIR: /home/bot/feed_probe
+  STATE_DIR: /home/bot/grpc_feed_probe_data
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО доставки"
+        run: |
+          set -e
+          cd analysis
+          python3 grpc_feed_probe.py --self-test
+          python3 check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Каталоги от пользователя службы, не от root"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            install -d -o bot -g bot -m 755 $CODE_DIR
+            install -d -o bot -g bot -m 755 $CODE_DIR/proto
+            install -d -o bot -g bot -m 755 $STATE_DIR
+            sudo -u bot test -w $STATE_DIR || { echo 'СБОЙ: служба не пишет в каталог состояния'; exit 1; }
+            echo 'каталоги готовы и доступны пользователю службы'"
+
+      - name: "Доставка кода + сверка sha256"
+        run: |
+          set -e
+          for F in grpc_feed_probe.py bloom_detector.py bloom_exec_state.py bloom_api.py; do
+            scp $SSH_OPTS analysis/$F root@$HOST:$CODE_DIR/$F
+          done
+          for F in geyser_pb2.py geyser_pb2_grpc.py solana_storage_pb2.py solana_storage_pb2_grpc.py; do
+            scp $SSH_OPTS analysis/proto/$F root@$HOST:$CODE_DIR/proto/$F
+          done
+          ssh -n $SSH_OPTS root@$HOST "chown -R bot:bot $CODE_DIR"
+          for F in grpc_feed_probe.py; do
+            HERE=$(sha256sum analysis/$F | awk '{print $1}')
+            THERE=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$F | awk '{print \$1}'")
+            [ -n "$THERE" ] || { echo "СБОЙ: пустая сумма для $F"; exit 1; }
+            [ "$HERE" = "$THERE" ] || { echo "СБОЙ: суммы не сошлись для $F"; exit 1; }
+            echo "$F: сумма сошлась"
+          done
+
+      - name: "Зависимости зонда в venv хоста"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            /home/bot/robinhood-chain-alpha/venv/bin/pip install -q grpcio protobuf websockets 2>&1 | tail -2
+            /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import grpc, google.protobuf, websockets; print(\"зависимости на месте\")'"
+
+      - name: "Самопроверка зонда НА ХОСТЕ"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            sudo -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --self-test | tail -3"
+
+      - name: "systemd-юнит"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            {
+              echo '[Unit]'
+              echo 'Description=Зонд гонки потоков: gRPC против Helius WS (не торгует)'
+              echo 'After=network-online.target'
+              echo ''
+              echo '[Service]'
+              echo 'Type=simple'
+              echo 'User=bot'
+              echo 'Group=bot'
+              echo 'EnvironmentFile=$ENV_DIR/env'
+              echo 'WorkingDirectory=$CODE_DIR'
+              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --tasks ${{ inputs.tasks }}'
+              echo 'Restart=always'
+              echo 'RestartSec=5'
+              echo 'NoNewPrivileges=true'
+              echo 'PrivateTmp=true'
+              echo 'ProtectSystem=strict'
+              echo 'ProtectHome=read-only'
+              echo 'ReadWritePaths=$STATE_DIR'
+              echo ''
+              echo '[Install]'
+              echo 'WantedBy=multi-user.target'
+            } > /etc/systemd/system/$SVC.service
+            systemctl daemon-reload
+            echo 'юнит записан'"
+
+      - name: "Запуск и проверка признака жизни"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            systemctl enable --now $SVC
+            sleep 25
+            systemctl is-active $SVC || { journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            test -s $STATE_DIR/heartbeat.json || { echo 'СБОЙ: признака жизни нет'; journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            cat $STATE_DIR/heartbeat.json" | tee data/feed_probe_deploy.txt
+
+      - name: "Токенов в отчёте быть не должно"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, sys
+          путь = "data/feed_probe_deploy.txt"
+          текст = open(путь, encoding="utf-8", errors="replace").read()
+          плохо = [и for и, о in (("x-token", r"x-token[\"']?\s*[:=]\s*[A-Za-z0-9\-_.]{8,}"),
+                                   ("api-key", r"api-key=[A-Za-z0-9\-_]{8,}"),
+                                   ("GRPC_FEED_TOKEN", r"GRPC_FEED2?_TOKEN\s*=\s*\S{8,}"))
+                    if re.search(о, текст, re.I)]
+          if плохо:
+              print("в отчёте видны значения: " + ", ".join(плохо)); sys.exit(1)
+          print("токенов в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/feed_probe_deploy.txt ] && git add data/feed_probe_deploy.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Зонд потоков: деплой и признак жизни [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
