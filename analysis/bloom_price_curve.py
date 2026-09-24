@@ -50,6 +50,9 @@ def _ui(b: dict) -> float:
         return 0.0
 
 
+СТЕЙБЛЫ = tuple(BD.СТАБИЛЬНЫЕ)
+
+
 def цена_из_сделки(tx: dict, минт: str) -> dict:
     """Цена токена в SOL по одной сделке. Считается по ВСЕЙ транзакции.
 
@@ -81,8 +84,17 @@ def цена_из_сделки(tx: dict, минт: str) -> dict:
         elif ключ[1] == WSOL:
             wsol_плюс += max(0.0, д)
             wsol_минус += max(0.0, -д)
+    стейбл_плюс = стейбл_минус = 0.0
+    стейбл_минт = None
+    for ключ in set(до) | set(после):
+        if ключ[1] in СТЕЙБЛЫ:
+            д = (после.get(ключ, 0.0) - до.get(ключ, 0.0))
+            стейбл_плюс += max(0.0, д)
+            стейбл_минус += max(0.0, -д)
+            стейбл_минт = стейбл_минт or ключ[1]
     токен = max(токен_плюс, токен_минус)
     wsol = max(wsol_плюс, wsol_минус)
+    стейбл = max(стейбл_плюс, стейбл_минус)
     if токен <= 0:
         return {"known": False, "why_not": "токен в этой сделке не двигался"}
     if wsol <= 0:
@@ -90,11 +102,39 @@ def цена_из_сделки(tx: dict, минт: str) -> dict:
         pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
         сдвиг = max((abs(int(b) - int(a)) for a, b in zip(pre, post)), default=0)
         wsol = сдвиг / ЛАМПОРТ
-        if wsol <= 0:
-            return {"known": False,
-                     "why_not": "котировочная сторона не в SOL/WSOL -- в кривую не идёт"}
-    return {"known": True, "price_sol": wsol / токен,
-             "token_ui": токен, "sol_ui": wsol}
+    # Котировочная сторона выбирается ОДНА, и её имя возвращается: сравнивать
+    # цену в SOL с ценой в USDC нельзя, а проценты к входу сравнивать можно --
+    # но только внутри одной котировочной стороны.
+    if wsol > 0:
+        return {"known": True, "price": wsol / токен, "quote": "SOL",
+                 "quote_mint": WSOL, "token_ui": токен, "quote_ui": wsol,
+                 # Имя price_sol оставлено для совместимости со старыми записями.
+                 "price_sol": wsol / токен}
+    if стейбл > 0:
+        return {"known": True, "price": стейбл / токен, "quote": "стейбл",
+                 "quote_mint": стейбл_минт, "token_ui": токен, "quote_ui": стейбл}
+    return {"known": False,
+             "why_not": "котировочной стороны в сделке нет -- цену не вывести"}
+
+
+def источник_по_подписи(state: ST.ExecState, подпись: str) -> str | None:
+    """Адрес источника по подписи его транзакции -- из журнала решений."""
+    if not подпись:
+        return None
+    try:
+        текст = state.decisions_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in текст.splitlines():
+        if подпись not in line:
+            continue
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("signature") == подпись and r.get("source"):
+            return r["source"]
+    return None
 
 
 def подписи_пула(helius, пул: str, *, предел: int = 1000) -> list:
@@ -123,12 +163,14 @@ def ближайшая(подписи: list, *, слот: int | None = None,
 
 def кривая(helius, *, минт: str, пул: str, слот_источника: int,
             время_источника: float | None, цена_входа: float | None,
+            квота_входа: str | None = None,
             точки_блоков=ТОЧКИ_БЛОКОВ, точки_секунд=ТОЧКИ_СЕКУНД) -> dict:
     подписи = подписи_пула(helius, пул)
     if подписи and подписи[0].get("known") is False:
         return {"known": False, "why_not": подписи[0].get("why_not")}
     итог = {"known": True, "mint": минт, "pool": пул,
-             "entry_price_sol": цена_входа, "points": [], "trades_seen": len(подписи)}
+             "entry_price": цена_входа, "entry_price_sol": цена_входа,
+             "entry_quote": квота_входа, "points": [], "trades_seen": len(подписи)}
     цели = [("+{} блок".format(n), {"слот": слот_источника + n}) for n in точки_блоков]
     if время_источника:
         цели += [("+{:g} с".format(s), {"время": время_источника + s}) for s in точки_секунд]
@@ -144,18 +186,28 @@ def кривая(helius, *, минт: str, пул: str, слот_источни�
                    "slot": z.get("slot"), "block_time": z.get("blockTime")}
         if not ц.get("known"):
             строка.update(known=False, why_not=ц.get("why_not"))
+        elif квота_входа and ц.get("quote") != квота_входа:
+            # Цена в другой котировочной стороне -- это другая величина.
+            строка.update(known=False,
+                           why_not=(f"сделка в другой котировочной стороне "
+                                     f"({ц.get('quote')}), вход был в {квота_входа}"))
         else:
-            строка.update(known=True, price_sol=ц["price_sol"])
+            строка.update(known=True, price=ц["price"], quote=ц.get("quote"),
+                           price_sol=ц.get("price_sol"))
             if цена_входа:
                 строка["vs_entry_pct"] = round(
-                    (ц["price_sol"] - цена_входа) / цена_входа * 100, 2)
+                    (ц["price"] - цена_входа) / цена_входа * 100, 2)
         итог["points"].append(строка)
     return итог
 
 
-def цена_входа_источника(tx: dict, минт: str) -> float | None:
+def цена_входа_источника(tx: dict, минт: str) -> dict:
+    """Цена и котировочная сторона входа источника: (цена, квота)."""
     ц = цена_из_сделки(tx or {}, минт)
-    return ц.get("price_sol") if ц.get("known") else None
+    if not ц.get("known"):
+        return {"known": False, "why_not": ц.get("why_not")}
+    return {"known": True, "price": ц["price"], "quote": ц.get("quote"),
+             "quote_mint": ц.get("quote_mint")}
 
 
 # ------------------------------------------------------------- самопроверка
@@ -203,9 +255,11 @@ def self_test() -> None:
         ц)
     chk("транзакция с ошибкой в цену не идёт",
         цена_из_сделки(сделка(токенов=1000, sol=2.0, ошибка={"X": 1}), МИНТ)["known"] is False)
-    chk("сделка за стейбл в кривую не идёт",
-        цена_из_сделки(сделка(токенов=1000, sol=2.0, стейбл=True), МИНТ)["known"] is False,
-        цена_из_сделки(сделка(токенов=1000, sol=2.0, стейбл=True), МИНТ))
+    # Сделка за стейбл даёт цену В СТЕЙБЛЕ, и котировочная сторона названа:
+    # смешивать её с ценой в SOL нельзя, и кривая это проверяет отдельно.
+    ц_ст = цена_из_сделки(сделка(токенов=1000, sol=2.0, стейбл=True), МИНТ)
+    chk("сделка за стейбл даёт цену в стейбле и сторона названа",
+        ц_ст["known"] and ц_ст["quote"] == "стейбл", ц_ст)
     ц_нат = цена_из_сделки(сделка(токенов=500, sol=1.0, нативный=True), МИНТ)
     chk("пул на кривой без WSOL-счёта: берётся нативный сдвиг",
         ц_нат["known"] and abs(ц_нат["price_sol"] - 0.002) < 1e-9, ц_нат)
@@ -236,6 +290,17 @@ def self_test() -> None:
             return сделка(токенов=1000, sol=2.0 * (1.01 ** n), подпись=подпись,
                            slot=100 + n, bt=1790000000 + n)
 
+    # Подпись должна быть НА или ПОСЛЕ цели (+1 блок = слот 101), иначе
+    # проверяется не то: точка просто не находится.
+    к_смесь = кривая(Helius([{"signature": "S1", "slot": 101,
+                               "blockTime": 1790000001, "err": None}]),
+                      минт=МИНТ, пул="ПУЛ", слот_источника=100,
+                      время_источника=1790000000.0, цена_входа=0.002,
+                      квота_входа="стейбл")
+    chk("точка в другой котировочной стороне в кривую НЕ идёт",
+        к_смесь["points"][0]["known"] is False
+        and "другой котировочной" in к_смесь["points"][0]["why_not"],
+        к_смесь["points"][0])
     к = кривая(Helius(подписи), минт=МИНТ, пул="ПУЛ", слот_источника=100,
                 время_источника=1790000000.0, цена_входа=0.002)
     имена = [p["point"] for p in к["points"]]
@@ -305,21 +370,34 @@ def main() -> int:
             строка["why_not"] = "узел не отдал транзакцию источника"
             вых.append(строка)
             continue
-        пулы = BD.кандидаты_пулов(tx, минт=минт, кошелёк=поз.get("source"))
-        пул = пулы.get("pool_wsol")
-        цена = цена_входа_источника(tx, минт)
-        строка["entry_price_sol"] = цена
+        # Адрес источника в записи позиции не хранится -- берём из журнала
+        # решений по подписи. Без него нельзя отделить кошелёк сделки от пула.
+        источник = поз.get("source") or источник_по_подписи(state, сиг)
+        строка["source"] = источник
+        пулы = BD.кандидаты_пулов(tx, минт=минт, кошелёк=источник)
+        # Пул НЕ обязан быть парой к WSOL: для кривой годится любой пул, где
+        # этот токен торгуется, лишь бы котировочная сторона совпадала с
+        # котировочной стороной входа. Прежнее требование "только токен/WSOL"
+        # отбрасывало все пять пар -- покупки шли за USDC.
+        кандидаты = [c for c in (пулы.get("candidates") or [])
+                      if not c.get("rejected") and минт in (c.get("mints") or [])]
+        пул = пулы.get("pool_wsol") or (кандидаты[0]["address"] if кандидаты else None)
+        вх = цена_входа_источника(tx, минт)
+        строка["entry_price"] = вх.get("price")
+        строка["entry_quote"] = вх.get("quote")
         строка["pool"] = пул
+        строка["pool_candidates"] = [c.get("address") for c in кандидаты][:4]
         if not пул:
             строка["known"] = False
-            строка["why_not"] = ("пула токен/WSOL в транзакции источника нет: "
+            строка["why_not"] = ("пула с этим токеном в транзакции источника нет: "
                                   f"{пулы.get('why_not')}")
             вых.append(строка)
             continue
         строка["curve"] = кривая(helius, минт=минт, пул=пул,
                                   слот_источника=поз.get("source_slot"),
                                   время_источника=tx.get("blockTime"),
-                                  цена_входа=цена)
+                                  цена_входа=вх.get("price"),
+                                  квота_входа=вх.get("quote"))
         строка["known"] = bool(строка["curve"].get("known"))
         вых.append(строка)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
