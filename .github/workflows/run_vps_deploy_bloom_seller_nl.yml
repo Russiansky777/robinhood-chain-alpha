@@ -48,6 +48,10 @@ on:
         description: "сколько неудачных попыток до UNSOLD (по умолчанию 2)"
         required: false
         default: "2"
+      telegram_log_chat_id:
+        description: "ID журнальной группы Telegram (пусто -- оставить прежний с хоста)"
+        required: false
+        default: ""
       telegram_live_test:
         description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
         required: false
@@ -108,11 +112,11 @@ jobs:
         run: |
           set -e
           cd analysis
-          \"$PY\" bloom_exec_state.py --self-test
-          \"$PY\" bloom_api.py --self-test
-          \"$PY\" bloom_seller.py --self-test
-          \"$PY\" bloom_detector.py --self-test
-          \"$PY\" check_shell_ascii.py --self-test
+          "$PY" bloom_exec_state.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" bloom_seller.py --self-test
+          "$PY" bloom_detector.py --self-test
+          "$PY" check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
@@ -194,23 +198,33 @@ jobs:
             echo "репозитория EXEC_WALLET_KEY (base58 или массив байтов)."
             exit 1; }
           echo "ключ кошелька в секрете есть (значение не печатается)"
-          pip install -q solders requests
+          # В систему ставить нельзя: на своём раннере python3 помечен
+          # externally-managed (PEP 668), и pip отказывается -- ровно на этом
+          # упал прогон 36042078292. Ставим во временное окружение прогона.
+          if ! "$PY" -c "import solders, requests" 2>/dev/null; then
+            python3 -m venv "$RUNNER_TEMP/key_venv"
+            "$RUNNER_TEMP/key_venv/bin/pip" install -q solders requests
+            PY="$RUNNER_TEMP/key_venv/bin/python"
+            echo "PY=$PY" >> "$GITHUB_ENV"
+          fi
           # Сверка публичного ключа ДО доставки: чужой ключ подписал бы
           # чужой кошелёк. Печатается только публичный ключ -- он публичный.
           # Отдельным файлом, а не heredoc: вложенный heredoc в "run: |" уже
           # ломался на закрывающей метке с отступом.
-          \"$PY\" analysis/bloom_key_match.py
+          "$PY" analysis/bloom_key_match.py
 
       - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
         run: |
           set -e
           # Читаем только два значения и только их. Ключи не печатаются.
-          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL)=' $ENV_DIR/env || true")
+          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID)=' $ENV_DIR/env || true")
           LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
           BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
-          echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS]"
+          LG=$(echo "$PREV" | sed -n 's/^TELEGRAM_LOG_CHAT_ID=//p' | tail -1)
+          echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS], журнальный чат=[$LG]"
           echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
           echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
+          echo "LOG_CHAT_PREV=$LG" >> $GITHUB_ENV
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         env:
@@ -218,6 +232,7 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_LOG_CHAT_ID: ${{ github.event.inputs.telegram_log_chat_id || env.LOG_CHAT_PREV }}
           LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
@@ -237,6 +252,12 @@ jobs:
             echo "HELIUS_API=$HELIUS_API_KEY"
             echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN"
             echo "TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID"
+            # Журнальный чат: построчные решения детектора. Пусто -- строки
+            # не идут НИКУДА (слово владельца), в основной чат они не
+            # подмешиваются. Прежнее значение с хоста не затирается.
+            if [ -n "$TELEGRAM_LOG_CHAT_ID" ]; then
+              echo "TELEGRAM_LOG_CHAT_ID=$TELEGRAM_LOG_CHAT_ID"
+            fi
             echo "BLOOM_STATE_DIR=$STATE_DIR"
             echo "BLOOM_KILL_FILE=$ENV_DIR/KILL"
             echo "BLOOM_KILL_SELL_FILE=$ENV_DIR/KILL_SELL"
