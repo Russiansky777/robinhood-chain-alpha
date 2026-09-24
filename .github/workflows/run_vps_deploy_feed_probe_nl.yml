@@ -31,6 +31,10 @@ on:
         description: "сколько транзакций в минуту должны давать разгонные суммарно (5 -- это 300 пар в час)"
         required: false
         default: "5"
+      booster_max_rate:
+        description: "верх полосы скорости разгонных, транзакций в минуту (0 -- десять целей)"
+        required: false
+        default: "0"
 
 concurrency:
   group: feed-probe-deploy
@@ -183,7 +187,7 @@ jobs:
               echo 'EnvironmentFile=$ENV_DIR/env'
               echo 'EnvironmentFile=-$ENV_DIR/feed_probe_env'
               echo 'WorkingDirectory=$CODE_DIR'
-              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --booster-rate ${{ inputs.booster_rate }} --tasks ${{ inputs.tasks }}'
+              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --booster-rate ${{ inputs.booster_rate }} --booster-max-rate ${{ inputs.booster_max_rate }} --tasks ${{ inputs.tasks }}'
               echo 'Restart=always'
               echo 'RestartSec=5'
               echo 'NoNewPrivileges=true'
