@@ -16,10 +16,18 @@ name: "Bloom: деплой сторожа продаж на NL-хост (по у
 #   * ужесточение юнита: ProtectSystem, ProtectHome, PrivateTmp,
 #     ReadWritePaths, NoNewPrivileges, лимит памяти.
 #
+# Вместе со сторожем на хост кладётся и детектор (bloom_detector.py) --
+# он ничего не покупает, ни одного POST в Bloom из него не уходит, службы
+# для него пока нет. Кода, способного КУПИТЬ, на хосте по-прежнему нет.
+#
 # BLOOM_LIVE_SELL=0 по умолчанию: сторож считает и пишет, но не продаёт.
 on:
   workflow_dispatch:
     inputs:
+      runner:
+        description: "'nl' -- свой раннер на хосте (по умолчанию), 'cloud' -- запасной облачный путь"
+        required: false
+        default: "nl"
       enable_service:
         description: "'yes' -- включить и перезапустить службу"
         required: false
@@ -32,6 +40,22 @@ on:
         description: "горизонт продажи, с (для справки в env)"
         required: false
         default: "28.8"
+      allow_live_test_restart:
+        description: "'yes' -- перезапуск разрешён, если ВСЕ открытые позиции live-test"
+        required: false
+        default: "no"
+      max_attempts:
+        description: "сколько неудачных попыток до UNSOLD (по умолчанию 2)"
+        required: false
+        default: "2"
+      telegram_live_test:
+        description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
+        required: false
+        default: "1"
+      via_jupiter:
+        description: "'1' -- второй путь выхода через Jupiter Ultra (нужен секрет EXEC_WALLET_KEY)"
+        required: false
+        default: "0"
 
 concurrency:
   group: bloom-seller-deploy
@@ -46,7 +70,10 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Свой раннер стоит НА хосте: файлы не едут через океан, круг
+    # деплоя падает с ~95 до ~50 секунд (замерено 24.09 на зонде).
+    # Облачный путь остаётся запасным входом runner=cloud.
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
     timeout-minutes: 30
     permissions:
       contents: write
@@ -55,13 +82,38 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Адрес хоста и питон"
+        run: |
+          set -e
+          # На своём раннере ssh идёт по петле: файлы не едут через океан.
+          # На облачном -- по внешнему адресу, как раньше.
+          if [ "${{ inputs.runner }}" = "cloud" ]; then
+            echo "TARGET_HOST=$HOST" >> "$GITHUB_ENV"
+            echo "где выполняюсь: облачный бегунок"
+          else
+            echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
+            echo "где выполняюсь: свой раннер на NL-хосте"
+          fi
+          # Системный python3 на хосте может быть без requests: ставим не в
+          # систему, а во временное окружение прогона.
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/selftest_venv"
+            "$RUNNER_TEMP/selftest_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/selftest_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
       - name: "Самопроверки ДО доставки (без сети)"
         run: |
           set -e
           cd analysis
-          python3 bloom_exec_state.py --self-test
-          python3 bloom_api.py --self-test
-          python3 bloom_seller.py --self-test
+          \"$PY\" bloom_exec_state.py --self-test
+          \"$PY\" bloom_api.py --self-test
+          \"$PY\" bloom_seller.py --self-test
+          \"$PY\" bloom_detector.py --self-test
+          \"$PY\" check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -91,25 +143,74 @@ jobs:
 
       - name: "Каталоги и владельцы"
         run: |
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             id -u bot >/dev/null 2>&1 || useradd -m -s /bin/bash bot
             mkdir -p $CODE_DIR $STATE_DIR $ENV_DIR
             chown -R bot:bot $CODE_DIR $STATE_DIR
             chmod 750 $CODE_DIR $STATE_DIR
-            chown root:root $ENV_DIR && chmod 750 $ENV_DIR
+            chown root:root $ENV_DIR && chmod 711 $ENV_DIR
+            # 711, а не 750: служба работает от bot и обязана ПРОЧИТАТЬ
+            # файл рубильника. При 750 root:root bot не мог войти в
+            # каталог, exists() бросал PermissionError, fail-closed
+            # запрещал покупки -- снаружи это выглядело как тишина.
+            # Сам env остаётся 600 root:root: systemd читает его root-ом.
           "
 
       - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
         run: |
           set -e
-          for f in bloom_exec_state.py bloom_api.py bloom_seller.py; do
+          # Сумма пустого файла: если она появится, значит доставка
+          # прошла «успешно», но ничего не доставила -- называем это прямо.
+          EMPTY_SHA=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
+          # Без него службы работают, но расход не попадает в учёт, и
+          # почасовая проверка кредитов смотрит на четверть картины.
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py; do
+            [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
-            ssh -n $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
-            remote_sum=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
+            # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
+            # то есть на хост уезжает пустота. Первый прогон именно так и
+            # упал -- сверка sha256 показала сумму пустого файла.
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
+            remote_sum=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
             echo "$f: локально $local_sum, на хосте $remote_sum"
+            [ "$remote_sum" != "$EMPTY_SHA" ] || { echo "СБОЙ: на хост уехал ПУСТОЙ $f (stdin не дошёл до ssh)"; exit 1; }
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
+
+      - name: "Путь через Jupiter: ключ обязателен и должен быть НАШЕГО кошелька"
+        if: ${{ github.event.inputs.via_jupiter == '1' }}
+        env:
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
+        run: |
+          set -e
+          # Включить путь и не положить ключ -- значит получить сторожа,
+          # который каждый раз отказывается продавать по причине "нет ключа".
+          # Лучше остановить деплой здесь и сказать это прямо.
+          [ -n "$EXEC_WALLET_KEY" ] || {
+            echo "СБОЙ: via_jupiter=1, но секрет EXEC_WALLET_KEY пуст."
+            echo "Владелец кладёт приватный ключ кошелька исполнителя в секрет"
+            echo "репозитория EXEC_WALLET_KEY (base58 или массив байтов)."
+            exit 1; }
+          echo "ключ кошелька в секрете есть (значение не печатается)"
+          pip install -q solders requests
+          # Сверка публичного ключа ДО доставки: чужой ключ подписал бы
+          # чужой кошелёк. Печатается только публичный ключ -- он публичный.
+          # Отдельным файлом, а не heredoc: вложенный heredoc в "run: |" уже
+          # ломался на закрывающей метке с отступом.
+          \"$PY\" analysis/bloom_key_match.py
+
+      - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
+        run: |
+          set -e
+          # Читаем только два значения и только их. Ключи не печатаются.
+          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL)=' $ENV_DIR/env || true")
+          LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
+          BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
+          echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS]"
+          echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
+          echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         env:
@@ -119,9 +220,13 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
+          MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
+          TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
+          VIA_JUPITER: ${{ github.event.inputs.via_jupiter || '0' }}
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             f=$ENV_DIR/env
             if [ -f \"\$f\" ]; then cp -a \"\$f\" \"\$f.bak.\$(date +%s)\"; echo 'бэкап env сделан'; fi
           "
@@ -135,23 +240,68 @@ jobs:
             echo "BLOOM_STATE_DIR=$STATE_DIR"
             echo "BLOOM_KILL_FILE=$ENV_DIR/KILL"
             echo "BLOOM_KILL_SELL_FILE=$ENV_DIR/KILL_SELL"
+            # Строки о событиях стенда в Telegram. Получатель -- только
+            # TELEGRAM_CHAT_ID владельца, боевые источники молчат, а сбой
+            # отправки живёт в признаке жизни и торговлю не останавливает.
+            echo "BLOOM_TELEGRAM_LIVE_TEST=$TELEGRAM_LIVE_TEST"
+            # Второй путь выхода -- Jupiter Ultra. Ключ кошелька пишется
+            # ТОЛЬКО когда путь включён: лишнего ключа на хосте быть не
+            # должно. В логи он не попадает -- пишется через переменную.
+            echo "BLOOM_SELL_VIA_JUPITER=$VIA_JUPITER"
+            if [ "$VIA_JUPITER" = "1" ]; then echo "EXEC_WALLET_KEY=$EXEC_WALLET_KEY"; fi
+            echo "BLOOM_JUP_FLOOR_PCT=70"
+            echo "BLOOM_JUP_MIN_QUOTE_PCT=30"
             echo "BLOOM_LIVE_SELL=$LIVE_SELL"
             echo "BLOOM_SELL_SLIPPAGE_PCT=40"
             echo "BLOOM_SELL_GRACE_S=15"
             echo "BLOOM_SELL_RETRY_EVERY_S=45"
             echo "BLOOM_SELL_GIVE_UP_AFTER_S=600"
+            # Две неудачи -- и UNSOLD: десять минут на позицию, которая не
+            # продаётся, владелец тратить не хочет. Потолок 600 с остаётся
+            # вторым пределом, на случай если попытки вообще не доходят.
+            echo "BLOOM_SELL_MAX_ATTEMPTS=$MAX_ATTEMPTS"
             echo "BLOOM_SELLER_LOOP_S=15"
             echo "BLOOM_PRIORITY_FEE=0.001"
             echo "BLOOM_PROCESSOR_TIP=0.001"
             echo "BLOOM_SELL_AFTER_S=$SELL_AFTER_S"
             echo "BLOOM_MAX_OPEN=5"
             echo "BLOOM_DAILY_LOSS_SOL=1"
-            echo "BLOOM_BUY_SOL=0.2"
+            # Боевой флаг и размер боевой покупки ПЕРЕНОСЯТСЯ из прежнего env,
+            # а не задаются здесь. Этот шаг перезаписывает файл целиком, и без
+            # переноса любой деплой сторожа молча выключал бы боевые покупки и
+            # возвращал размер к 0.2 SOL -- то есть менял деньги на ровном
+            # месте. Значения читаются с хоста ДО перезаписи (см. шаг выше).
+            echo "BLOOM_BUY_SOL=${BUY_SOL_PREV:-0.05}"
+            if [ "${LIVE_BUY_PREV:-}" = "1" ]; then
+              echo "BLOOM_LIVE_BUY=1"
+              echo "BLOOM_TELEGRAM_REAL=1"
+            fi
           } > /tmp/bloom_env
-          ssh -n $SSH_OPTS root@$HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
           shred -u /tmp/bloom_env
           echo "строк в env на хосте:"
-          ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+
+      - name: "Зависимость solders в venv хоста (только для пути Jupiter)"
+        if: ${{ github.event.inputs.via_jupiter == '1' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/pip install -q solders && /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import solders; print(\"solders\", solders.__doc__ is not None)'"
+
+      - name: "ГЕЙТ: каталог состояния принадлежит службе, а не root"
+        run: |
+          set -e
+          # Шаги деплоя идут от root, и всё, что они создают в каталоге
+          # состояния, остаётся root-овым -- служба от bot потом писать
+          # туда не может. Так уже потерялся весь учёт кредитов детектора:
+          # каталог helius_usage создал --check-only от root.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            chown -R bot:bot $STATE_DIR
+            find $STATE_DIR ! -user bot -print | head -5
+            sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
+            echo 'каталог состояния пишется службой'
+          "
 
       - name: "systemd-юнит с ужесточением"
         run: |
@@ -186,8 +336,8 @@ jobs:
             echo ""
             echo '[Install]'
             echo 'WantedBy=multi-user.target'
-          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
-          ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
+          } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$SVC.service"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'юнит записан'"
 
       - name: "logrotate"
         run: |
@@ -200,7 +350,23 @@ jobs:
             echo '  notifempty'
             echo '  copytruncate'
             echo '}'
-          } | ssh -n $SSH_OPTS root@$HOST "cat > /etc/logrotate.d/$SVC"
+          } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/logrotate.d/$SVC"
+
+      - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
+        run: |
+          set -e
+          # Проверка от root бесполезна: первый живой прогон детектора
+          # встал на PermissionError именно потому, что деплой спрашивал
+          # root-а, а служба работает от bot. Спрашиваем того, кто работает.
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
+                 BLOOM_KILL_FILE=\"\$BLOOM_KILL_FILE\" \
+                 BLOOM_KILL_SELL_FILE=\"\$BLOOM_KILL_SELL_FILE\" \
+                 PYTHONPATH=$CODE_DIR \
+                 /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import bloom_exec_state as S; s=S.ExecState(); d,p=s.kill_readable(); print((\"ДОСТУПЕН\" if d else \"НЕДОСТУПЕН\"), p); import sys; sys.exit(0 if d else 1)'
+          ") || { echo "ГЕЙТ НЕ ПРОЙДЕН: $OUT"; exit 1; }
+          echo "рубильник от имени bot: $OUT"
 
       - name: "ГЕЙТ: открытых позиций нет -- только тогда перезапуск"
         if: ${{ github.event.inputs.enable_service == 'yes' }}
@@ -208,30 +374,67 @@ jobs:
           set -e
           # PYTHONPATH вместо sys.path.insert: иначе внутри команды ssh
           # пришлось бы вкладывать кавычки в кавычки и гейт молча ломался бы.
-          OPEN=$(ssh -n $SSH_OPTS root@$HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; print(len(ExecState().open_positions()))'" || echo "ОШИБКА")
-          echo "открытых позиций: $OPEN"
-          [ "$OPEN" = "0" ] || { echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN -- сначала они должны закрыться"; exit 1; }
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; p=ExecState().open_positions(); print(len(p), sum(1 for x in p if x.get(\"mode\")==\"live-test\"))'" || echo "ОШИБКА ОШИБКА")
+          OPEN=$(echo "$OUT" | awk "{print \$1}")
+          LT=$(echo "$OUT" | awk "{print \$2}")
+          echo "открытых позиций: $OPEN, из них live-test: $LT"
+          # Непрочитанное состояние -- это ЗАПРЕТ, а не исключение. Без этой
+          # проверки сбой ssh давал "ОШИБКА ОШИБКА", числа совпадали, и
+          # исключение для стенда срабатывало на неизвестном состоянии.
+          case "$OPEN" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
+          case "$LT" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
+          if [ "$OPEN" = "0" ]; then
+            echo "гейт пройден: открытых позиций нет"
+          elif [ "${{ github.event.inputs.allow_live_test_restart }}" = "yes" ] \
+                && [ -n "$LT" ] && [ "$OPEN" = "$LT" ]; then
+            # Исключение разрешено владельцем ПРЯМО и только для стенда:
+            # позиция стенда стоит открытой именно потому, что сторож её не
+            # продал, и ждать её закрытия -- значит не ставить правку,
+            # которая её и закрывает. Боевая позиция таким исключением не
+            # покрывается: там перезапуск ждёт закрытия.
+            echo "гейт: исключение для стенда -- все $OPEN позиций в режиме live-test"
+          else
+            echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN (live-test $LT)"
+            exit 1
+          fi
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
         if: ${{ github.event.inputs.enable_service == 'yes' }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
+          # Момент перезапуска берётся НА ХОСТЕ: часы бегунка и часы хоста --
+          # разные часы. Признак жизни ниже обязан быть НОВЕЕ этого момента.
+          echo "RESTART_TS=$(ssh -n $SSH_OPTS root@$TARGET_HOST 'date +%s')" >> "$GITHUB_ENV"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl enable $SVC && systemctl restart $SVC"
           sleep 8
-          ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
-            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 60 --no-pager"; exit 1; }
-          RESTARTS=$(ssh -n $SSH_OPTS root@$HOST "systemctl show -p NRestarts --value $SVC")
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active --quiet $SVC" || {
+            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 60 --no-pager"; exit 1; }
+          RESTARTS=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl show -p NRestarts --value $SVC")
           echo "NRestarts=$RESTARTS"
-          ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 30 --no-pager"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 30 --no-pager"
 
       - name: "Проверка признака жизни и --check-only (ничего не продаёт)"
         if: ${{ github.event.inputs.enable_service == 'yes' }}
         run: |
           set -e
           sleep 20
-          ssh -n $SSH_OPTS root@$HOST "
+          # Отсутствующий или старый признак жизни -- это СБОЙ, а не заметка.
+          # Раньше шаг печатал "признака жизни ещё нет" и шёл дальше: деплой
+          # считался удачным, хотя служба могла не подняться.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $STATE_DIR/seller_heartbeat.json" || {
+            echo "СБОЙ: признака жизни продавца нет"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1; }
+          HEARTBEAT_TS=$(ssh -n $SSH_OPTS root@$TARGET_HOST "stat -c %Y $STATE_DIR/seller_heartbeat.json")
+          if [ "$HEARTBEAT_TS" -lt "$RESTART_TS" ]; then
+            echo "СБОЙ: признак жизни продавца старше перезапуска -- служба его не обновила"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1
+          fi
+          echo "признак жизни новее перезапуска на $((HEARTBEAT_TS - RESTART_TS)) с"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
-            cat $STATE_DIR/seller_heartbeat.json 2>/dev/null || echo 'признака жизни ещё нет'
+            cat $STATE_DIR/seller_heartbeat.json
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_seller.py --check-only
           " 2>&1 | tail -40 | tee -a data/bloom_seller_deploy.txt
 

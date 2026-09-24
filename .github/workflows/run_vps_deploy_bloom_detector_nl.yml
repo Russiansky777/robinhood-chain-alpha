@@ -19,6 +19,10 @@ name: "Bloom: деплой детектора v2 на NL-хост (только 
 on:
   workflow_dispatch:
     inputs:
+      runner:
+        description: "'nl' -- свой раннер на хосте (по умолчанию), 'cloud' -- запасной облачный путь"
+        required: false
+        default: "nl"
       enable_service:
         description: "'yes' -- включить и перезапустить службу"
         required: false
@@ -73,7 +77,10 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Свой раннер стоит НА хосте: файлы не едут через океан, круг
+    # деплоя падает с ~95 до ~50 секунд (замерено 24.09 на зонде).
+    # Облачный путь остаётся запасным входом runner=cloud.
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
     timeout-minutes: 20
     permissions:
       contents: write
@@ -82,16 +89,42 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Адрес хоста и питон"
+        run: |
+          set -e
+          # На своём раннере ssh идёт по петле: файлы не едут через океан.
+          # На облачном -- по внешнему адресу, как раньше.
+          if [ "${{ inputs.runner }}" = "cloud" ]; then
+            echo "TARGET_HOST=$HOST" >> "$GITHUB_ENV"
+            echo "где выполняюсь: облачный бегунок"
+          else
+            echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
+            echo "где выполняюсь: свой раннер на NL-хосте"
+          fi
+          # Системный python3 на хосте может быть без requests: ставим не в
+          # систему, а во временное окружение прогона.
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/selftest_venv"
+            "$RUNNER_TEMP/selftest_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/selftest_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
       - name: "Самопроверки ДО доставки (без сети)"
         run: |
           set -e
           cd analysis
-          python3 bloom_exec_state.py --self-test
-          python3 bloom_api.py --self-test
-          python3 bloom_seller.py --self-test
-          python3 bloom_detector.py --self-test
-          python3 bloom_executor.py --self-test
-          python3 bloom_reconcile.py --self-test
+          \"$PY\" bloom_exec_state.py --self-test
+          \"$PY\" bloom_api.py --self-test
+          \"$PY\" bloom_seller.py --self-test
+          \"$PY\" bloom_detector.py --self-test
+          \"$PY\" bloom_executor.py --self-test
+          \"$PY\" bloom_reconcile.py --self-test
+          # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
+          # не принимает, и деплой падает посреди дела (проверено 11:24Z).
+          \"$PY\" check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -121,7 +154,7 @@ jobs:
       - name: "Каталоги на месте (сторож их уже создал -- проверяем, не ломаем)"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             install -d -o bot -g bot -m 755 $CODE_DIR
             install -d -o bot -g bot -m 750 $STATE_DIR
@@ -140,8 +173,8 @@ jobs:
           for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
-            ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
-            remote_sum=$(ssh -n $SSH_OPTS root@$HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
+            remote_sum=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
             echo "$f: локально $local_sum, на хосте $remote_sum"
             [ "$remote_sum" != "$EMPTY_SHA" ] || { echo "СБОЙ: на хост уехал ПУСТОЙ $f"; exit 1; }
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
@@ -152,17 +185,17 @@ jobs:
           set -e
           SNAP=data/final/20260923T145755Z/konfig.json
           [ -s "$SNAP" ] || { echo "СБОЙ: нет снимка $SNAP"; exit 1; }
-          ssh $SSH_OPTS root@$HOST "cat > $CODE_DIR/konfig_snapshot.json && chown bot:bot $CODE_DIR/konfig_snapshot.json && chmod 644 $CODE_DIR/konfig_snapshot.json" < "$SNAP"
-          ssh -n $SSH_OPTS root@$HOST "wc -c < $CODE_DIR/konfig_snapshot.json"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/konfig_snapshot.json && chown bot:bot $CODE_DIR/konfig_snapshot.json && chmod 644 $CODE_DIR/konfig_snapshot.json" < "$SNAP"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -c < $CODE_DIR/konfig_snapshot.json"
 
       - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
           # Ключ передаётся через stdin, а не аргументом: аргументы видны в ps.
-          printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$HOST "
+          printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$TARGET_HOST "
             cat > /tmp/dbot_line
             grep -q '^DBOT_API_KEY=' $ENV_DIR/env && sed -i '/^DBOT_API_KEY=/d' $ENV_DIR/env
             cat /tmp/dbot_line >> $ENV_DIR/env
@@ -209,29 +242,29 @@ jobs:
           "
           if [ "${{ inputs.live_buy }}" = "1" ]; then
             echo "БОЕВЫЕ ПОКУПКИ: включаю BLOOM_LIVE_BUY=1, размер ${{ inputs.buy_sol }} SOL"
-            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_BUY=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "echo 'BLOOM_LIVE_BUY=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
           else
             echo "боевые покупки ВЫКЛЮЧЕНЫ: BLOOM_LIVE_BUY не задан"
           fi
           if [ "${{ inputs.live_test }}" = "yes" ]; then
             echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
-            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_TEST=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "echo 'BLOOM_LIVE_TEST=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
           else
             echo "режим dry-run: BLOOM_LIVE_TEST не задан"
           fi
           echo "строк в env и сколько из них -- присваивания:"
-          ssh -n $SSH_OPTS root@$HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
 
       - name: "Зависимость websockets в venv хоста"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets; print(\"websockets\", websockets.__version__)' || /home/bot/robinhood-chain-alpha/venv/bin/pip install -q websockets"
-          ssh -n $SSH_OPTS root@$HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets, requests; print(\"есть websockets\", websockets.__version__, \"и requests\", requests.__version__)'"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets; print(\"websockets\", websockets.__version__)' || /home/bot/robinhood-chain-alpha/venv/bin/pip install -q websockets"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "/home/bot/robinhood-chain-alpha/venv/bin/python -c 'import websockets, requests; print(\"есть websockets\", websockets.__version__, \"и requests\", requests.__version__)'"
 
       - name: "Проверка --check-only ДО запуска службы (ничего не решает)"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
             echo '--- исполнитель ---'
@@ -244,7 +277,7 @@ jobs:
           # Проверка от root бесполезна: первый живой прогон детектора
           # встал на PermissionError именно потому, что деплой спрашивал
           # root-а, а служба работает от bot. Спрашиваем того, кто работает.
-          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
                  BLOOM_KILL_FILE=\"\$BLOOM_KILL_FILE\" \
@@ -263,7 +296,7 @@ jobs:
           # посчитает только половину. Поэтому старые файлы откладываются
           # ОДИН раз, с меткой времени, а не удаляются.
           stamp=$(date -u +%Y%m%dT%H%M%SZ)
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             cd $STATE_DIR
             for f in decisions.jsonl positions.jsonl; do
@@ -285,7 +318,7 @@ jobs:
           # состояния, остаётся root-овым -- служба от bot потом писать
           # туда не может. Так уже потерялся весь учёт кредитов детектора:
           # каталог helius_usage создал --check-only от root.
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             chown -R bot:bot $STATE_DIR
             find $STATE_DIR ! -user bot -print | head -5
@@ -302,7 +335,7 @@ jobs:
           # себе. Того, кто торгует СЕЙЧАС, она не прячет -- ограничивает
           # только прошлое. Ставится от имени службы, иначе файл будет
           # root-овым и служба его не перепишет.
-          ssh -n $SSH_OPTS root@$HOST "
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             sudo -n -u bot env BLOOM_STATE_DIR=\"\$BLOOM_STATE_DIR\" \
                  PYTHONPATH=$CODE_DIR \
@@ -325,21 +358,21 @@ jobs:
           # Порог баланса -- ДЕНЬГИ, и менять его молча нельзя. Пустой вход
           # оставляет 0.3; заданный передаётся сверке как осознанное решение
           # владельца и печатается в лог деплоя числом.
-          ПОРОГ_БАЛАНСА="${{ inputs.min_start_balance }}"
-          if [ -n "$ПОРОГ_БАЛАНСА" ]; then
-            case "$ПОРОГ_БАЛАНСА" in
-              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $ПОРОГ_БАЛАНСА"; exit 1;;
+          MIN_START_BALANCE="${{ inputs.min_start_balance }}"
+          if [ -n "$MIN_START_BALANCE" ]; then
+            case "$MIN_START_BALANCE" in
+              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $MIN_START_BALANCE"; exit 1;;
             esac
-            echo "порог баланса для старта задан входом: $ПОРОГ_БАЛАНСА SOL"
+            echo "порог баланса для старта задан входом: $MIN_START_BALANCE SOL"
           fi
           echo "аргументы сверки: [$RECON_ARGS]"
           # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
           # начинается с неизвестного исходного состояния. В dry-run она
           # информационная: там позиции dry-run помехой не считаются.
           set +e
-          OUT=$(ssh -n $SSH_OPTS root@$HOST "
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
-            ${ПОРОГ_БАЛАНСА:+BLOOM_MIN_START_BALANCE_SOL=$ПОРОГ_БАЛАНСА} \
+            ${MIN_START_BALANCE:+BLOOM_MIN_START_BALANCE_SOL=$MIN_START_BALANCE} \
             PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py $RECON_ARGS 2>&1")
           RC=$?
           set -e
@@ -382,34 +415,47 @@ jobs:
             echo ""
             echo '[Install]'
             echo 'WantedBy=multi-user.target'
-          } | ssh $SSH_OPTS root@$HOST "cat > /etc/systemd/system/$SVC.service"
-          ssh -n $SSH_OPTS root@$HOST "systemctl daemon-reload && echo 'юнит записан'"
+          } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$SVC.service"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'юнит записан'"
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$HOST "systemctl enable $SVC && systemctl restart $SVC"
+          # Момент перезапуска берётся НА ХОСТЕ: часы бегунка и часы
+          # хоста -- разные часы. Ниже признак жизни обязан быть НОВЕЕ
+          # этого момента, иначе мы читаем файл прошлого запуска и
+          # считаем его доказательством. На зонде это стоило трёх
+          # деплоев в пустоту 24.09.
+          echo "RESTART_TS=$(ssh -n $SSH_OPTS root@$TARGET_HOST 'date +%s')" >> "$GITHUB_ENV"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl enable $SVC && systemctl restart $SVC"
           sleep 10
-          ssh -n $SSH_OPTS root@$HOST "systemctl is-active --quiet $SVC" || {
-            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
-          RESTARTS=$(ssh -n $SSH_OPTS root@$HOST "systemctl show -p NRestarts --value $SVC")
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active --quiet $SVC" || {
+            echo "СБОЙ: служба не активна"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          RESTARTS=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl show -p NRestarts --value $SVC")
           echo "NRestarts=$RESTARTS"
-          [ "$RESTARTS" -lt 3 ] || { echo "СБОЙ: служба уже перезапускалась $RESTARTS раз"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
-          ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 40 --no-pager"
+          [ "$RESTARTS" -lt 3 ] || { echo "СБОЙ: служба уже перезапускалась $RESTARTS раз"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 40 --no-pager"
 
       - name: "Признак жизни детектора должен появиться"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
           sleep 25
-          ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/detector_status.json" || {
-            echo "СБОЙ: признака жизни нет"; ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
-          ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/detector_status.json" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $STATE_DIR/detector_status.json" || {
+            echo "СБОЙ: признака жизни нет"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
+          HEARTBEAT_TS=$(ssh -n $SSH_OPTS root@$TARGET_HOST "stat -c %Y $STATE_DIR/detector_status.json")
+          if [ "$HEARTBEAT_TS" -lt "$RESTART_TS" ]; then
+            echo "СБОЙ: признак жизни детектора старше перезапуска -- служба его не обновила"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"
+            exit 1
+          fi
+          echo "признак жизни новее перезапуска на $((HEARTBEAT_TS - RESTART_TS)) с"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $STATE_DIR/detector_status.json" | tee -a data/bloom_detector_deploy.txt
           echo "--- решений в журнале ---" | tee -a data/bloom_detector_deploy.txt
-          ssh -n $SSH_OPTS root@$HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
           echo "--- позиций в журнале (должно быть 0: покупать нечем) ---" | tee -a data/bloom_detector_deploy.txt
-          ssh -n $SSH_OPTS root@$HOST "wc -l < $STATE_DIR/positions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/positions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
 
       - name: "Коммит отчёта"
         if: always()
