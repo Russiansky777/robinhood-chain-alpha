@@ -1142,7 +1142,24 @@ class Helius:
         self._учесть(метод, len(r.content or b""))
         if not r.ok:
             raise RuntimeError(f"{метод}: http {r.status_code}")
-        j = r.json() or {}
+        # Разбор тела -- ТОЖЕ через RuntimeError. Докстрока обещает: любая
+        # неудача наружу идёт как RuntimeError, и все вызывающие ловят только
+        # его. Но r.json() стоял вне try: при HTTP 200 с телом, которое не
+        # разбирается как JSON (заглушка прокси, обрезанный ответ), летел
+        # ValueError -- мимо всех обработчиков. Путь транзакция() идёт на
+        # КАЖДОЕ сообщение без meta и каждый сигнал logsSubscribe: одно
+        # плохое тело вместо одной из двенадцати попыток уносило весь сигнал
+        # в HANDLER_CRASHED.
+        try:
+            j = r.json()
+        except ValueError as exc:
+            raise RuntimeError(f"{метод}: тело ответа не JSON: "
+                                f"{(r.text or '')[:120]}") from exc
+        if not isinstance(j, dict):
+            # Не словарь -- не ответ JSON-RPC. Молча вернуть None нельзя:
+            # вызывающий примет это за "узел ещё не отдал" и будет ждать.
+            raise RuntimeError(f"{метод}: ответ не объект JSON-RPC: "
+                                f"{type(j).__name__}")
         if "error" in j:
             raise RuntimeError(f"{метод}: {str(j['error'])[:200]}")
         return j.get("result")
@@ -2505,6 +2522,64 @@ def self_test() -> int:
             globals().pop("requests", None)
         else:
             globals()["requests"] = было_requests
+
+    # ТЕЛО 200, КОТОРОЕ НЕ JSON. Заглушка прокси отвечает кодом 200 и
+    # html-страницей. Раньше r.json() стоял вне try, летел ValueError мимо
+    # всех обработчиков -- и сигнал уходил в HANDLER_CRASHED вместо одной
+    # потерянной попытки getTransaction.
+    class ОтветНеJSON:
+        ok = True
+        status_code = 200
+        content = b"<html>upstream connect error</html>"
+        text = "<html>upstream connect error</html>"
+
+        @staticmethod
+        def json():
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    class ОтветНеОбъект(ОтветНеJSON):
+        content = b"[1, 2]"
+        text = "[1, 2]"
+
+        @staticmethod
+        def json():
+            return [1, 2]
+
+    class СессияОтвет:
+        def __init__(self, ответ):
+            self.ответ = ответ
+
+        def post(self, *a, **kw):
+            return self.ответ
+
+    h_тело = Helius(key="нет", служба="")
+    h_тело.sess = СессияОтвет(ОтветНеJSON())
+    упало = None
+    try:
+        h_тело.call("getTransaction", ["S"])
+    except RuntimeError as exc:
+        упало = ("RuntimeError", str(exc))
+    except Exception as exc:  # noqa: BLE001
+        упало = (type(exc).__name__, str(exc))
+    chk("тело 200, но не JSON -- это RuntimeError, а не ValueError",
+        упало and упало[0] == "RuntimeError", упало)
+    chk("и в тексте сказано, что тело не JSON",
+        упало and "не JSON" in упало[1], упало)
+    chk("транзакция на таком теле возвращает None, а не роняет разбор",
+        h_тело.транзакция("ПОДПИСЬ", попыток=1, пауза_s=0) is None)
+
+    h_список = Helius(key="нет", служба="")
+    h_список.sess = СессияОтвет(ОтветНеОбъект())
+    упало2 = None
+    try:
+        h_список.call("getSlot", [])
+    except RuntimeError as exc:
+        упало2 = ("RuntimeError", str(exc))
+    except Exception as exc:  # noqa: BLE001
+        упало2 = (type(exc).__name__, str(exc))
+    chk("ответ-массив -- тоже RuntimeError, а не AttributeError",
+        упало2 and упало2[0] == "RuntimeError", упало2)
+    chk("слот на таком ответе -- None, а не падение", h_список.слот() is None)
 
     # 15б. ДВА тестовых источника: у каждого свой низкий порог, флаг
     # test_source стоит, счётчики ведутся отдельно от боевых. Без этого

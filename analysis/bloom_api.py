@@ -510,7 +510,21 @@ class BloomApi:
                 self.state.note_api_result(ok=True)
             self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
-        err = (body.get("error") or {}) if isinstance(body, dict) else {}
+        # Поле error у Bloom приходит НЕ ТОЛЬКО объектом: при 401/429/5xx от
+        # шлюза обычна форма {"success": false, "error": "rate limited"} --
+        # строкой. Проверка isinstance стояла только на конверте body, и
+        # err.get("code") на строке давал AttributeError прямо здесь. Он
+        # улетал мимо except requests.RequestException в swap(), и -- самое
+        # важное -- до note_api_result и записи ответа в журнал дело не
+        # доходило: серия ошибок API и признак rate_limited не росли, а
+        # предохранитель не срабатывал ровно тогда, когда Bloom нас режет.
+        сырой = body.get("error") if isinstance(body, dict) else None
+        if isinstance(сырой, dict):
+            err = сырой
+        elif сырой:
+            err = {"message": str(сырой)[:300]}
+        else:
+            err = {}
         код = err.get("code") or f"HTTP_{r.status_code}"
         out.update(ok=False, error_code=код,
                     why_not=scrub(str(err.get("message") or "")[:300], self.key),
@@ -732,6 +746,34 @@ def self_test() -> None:
         внутр["retry_safe_per_docs"] is True)
     chk("но повтор всё равно только после проверки цепи",
         внутр["retry_only_after_chain_check"] is True)
+
+    # error СТРОКОЙ. Ровно эта форма приходит от шлюза при 401/429/5xx, и на
+    # ней _parse_swap падал с AttributeError мимо всех обработчиков -- а
+    # значит, не росли ни серия ошибок API, ни признак rate_limited.
+    было_ограничений = int(st.counters().get("rate_limited_count", 0))
+    было_серии = int(st.counters().get("api_error_streak", 0))
+    строкой = api2._parse_swap(
+        Ответ(429, {"success": False, "error": "rate limited"}), "cid9")
+    chk("error строкой не роняет разбор ответа", строкой["ok"] is False, строкой)
+    chk("код берётся из HTTP, раз своего кода нет",
+        строкой["error_code"] == "HTTP_429", строкой)
+    chk("текст ошибки сохранён словами",
+        "rate limited" in (строкой.get("why_not") or ""), строкой)
+    chk("ограничение по 429 распознано и без объекта",
+        строкой["rate_limited"] is True, строкой)
+    chk("и счётчик ограничений вырос -- предохранитель видит отказ",
+        int(st.counters().get("rate_limited_count", 0)) > было_ограничений,
+        st.counters())
+    # Не-429 со строковым error обязан растить именно серию ошибок.
+    строкой500 = api2._parse_swap(
+        Ответ(500, {"success": False, "error": "upstream connect error"}), "cid11")
+    chk("не-429 со строковым error растит серию ошибок",
+        строкой500["ok"] is False
+        and int(st.counters().get("api_error_streak", 0)) > было_серии,
+        st.counters())
+    списком = api2._parse_swap(
+        Ответ(500, {"success": False, "error": [{"code": "X"}]}), "cid10")
+    chk("error списком тоже не роняет", списком["ok"] is False, списком)
 
     нежсон = api2._parse_swap(Ответ(200, None, {}, "<html>ошибка</html>"), "cid8")
     chk("ответ не-json не считается успехом", нежсон["ok"] is False)
