@@ -162,6 +162,7 @@ class LegCache:
         self.calls = collections.Counter()
         self.last_status: dict = {}
         self.seen: dict = {}       # q -> подписи, уже разобранные (не шаблон)
+        self.reject: dict = {}     # q -> Counter причин, почему сделка не стала шаблоном
         self.workers = 8
 
     def _rpc(self, method, params):
@@ -187,7 +188,7 @@ class LegCache:
             cur["checked_at"] = now
             return "без изменений"
         seen = self.seen.setdefault(q, collections.deque(maxlen=200))
-        for sg in ok[:4]:
+        for sg in ok[:4] if cur else ok[:10]:     # первое заполнение -- глубже
             if cur and sg == cur["sig"]:
                 break
             if sg in seen:
@@ -202,7 +203,8 @@ class LegCache:
                 continue
             seen.append(sg)
             ent = self._template_from(tx, p, q)
-            if ent is None:
+            if isinstance(ent, str):
+                self.reject.setdefault(q, collections.Counter())[ent] += 1
                 continue
             self.load_luts(_lut_keys(tx))
             ent.update(sig=sg, checked_at=now)
@@ -216,19 +218,24 @@ class LegCache:
 
     @staticmethod
     def _template_from(tx: dict, p: dict, q: str):
+        """Запись кэша или строка -- причина, почему сделка не шаблон."""
+        if (tx.get("meta") or {}).get("err") is not None:
+            return "сделка неуспешна"
         tpl = B.extract_template(tx, p["program"], p["q_vault"])
         if not tpl.get("ok"):
-            return None
+            return f"шаблон: {tpl.get('why_not')}"
         mv = B.mints_and_vaults(tpl, tx)
-        if mv.get("quote_mint") == q and mv.get("base_mint") == C.WSOL and p["program"] in FLIP_OK:
+        if mv.get("quote_mint") == q and mv.get("base_mint") == C.WSOL:
+            if p["program"] not in FLIP_OK:
+                return "продажа Q -> SOL (переворот для этого типа выключен)"
             tpl = B.flip_template(tpl, C.WSOL)
             mv = B.mints_and_vaults(tpl, tx)
         if mv.get("quote_mint") != C.WSOL or mv.get("base_mint") != q:
-            return None
+            return "роли хранилищ не восстановились"
         ev = C.pool_event(tx, {"pool_vault": mv["base_vault"], "quote_vault": mv["quote_vault"],
                                "quote_mint": C.WSOL})
         if ev.get("kind") != "swap":
-            return None
+            return f"по хранилищам не своп: {ev.get('kind')}"
         dec = next((r["dec"] for r in C.token_rows(tx).values() if r["account"] == mv["base_vault"]), None)
         return {"tpl": tpl, "tx": tx, "mv": mv, "price_sol": ev["price"], "q_dec": dec,
                 "program": p["program"], "trade_time": tx.get("blockTime")}
@@ -520,7 +527,7 @@ def self_test() -> int:
                 q = mv["quote_mint"]
                 e = LegCache._template_from(x["tx"], {"program": prog, "q_vault": mv["quote_vault"]}, q)
                 n_fl += 1
-                if e and e["tpl"].get("flipped"):
+                if isinstance(e, dict) and e["tpl"].get("flipped"):
                     m2 = e["mv"]
                     ixo = B.swap_instruction(e["tpl"], x["tx"], C.EXECUTOR_WALLET, 1000, 1)
                     acc = [str(a.pubkey) for a in ixo.accounts]

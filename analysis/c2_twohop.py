@@ -226,6 +226,8 @@ def main() -> int:
                                                              / max(bg_min, 1e-9), 1)
     out["cache_measure"]["background_minutes"] = round(bg_min, 2)
     out["replay"] = rows
+    out["template_rejects"] = {q: dict(c) for q, c in cache.reject.items()}
+    out["template_rejects_total"] = dict(sum((c for c in cache.reject.values()), collections.Counter()))
     fl = [r for r in rows if r.get("route") == "two_hop" and r.get("sim_verdict")]
     out["flipped_templates"] = {
         k: dict(collections.Counter(r["sim_verdict"] for r in fl if bool(r.get("leg1_flipped")) == k))
@@ -260,6 +262,7 @@ def main() -> int:
                              ensure_ascii=False)[:1500])
     for k, v in out["coverage"]["by_pool_type"].items():
         print("  ", k, json.dumps(v, ensure_ascii=False))
+    print("почему сделки не шаблоны:", json.dumps(out["template_rejects_total"], ensure_ascii=False))
     print("глубина: строк", len(depth_rows))
     print(f"кредитов {rpc.stats.get('кредитов')}; C2 сегодня {C.c2_spent_today()}")
     return 0
