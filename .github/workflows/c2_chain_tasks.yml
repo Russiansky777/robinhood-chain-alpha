@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "crowd | sandwich | both | selftest | probe | pools | build"
+        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos"
         required: false
         default: "both"
       days:
@@ -106,6 +106,24 @@ jobs:
           python analysis/c2_pool_programs.py --self-test
           python analysis/c2_swap_build.py --self-test
           python analysis/c2_swap_sim.py --self-test
+          python analysis/c2_block_position.py --self-test
+
+      - name: "Задача E: место в блоке источника (только чтение цепи)"
+        if: env.C2_TASK == 'blockpos'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_block_position.py 2>&1 | tee "data/c2_logs/blockpos_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит задачи E"
+        if: always() && env.C2_TASK == 'blockpos'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python analysis/c2_commit.py -m "C2: задача E, место в блоке [automated]" "data/c2_block_position_*.json" "data/c2_logs/blockpos_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача D: сборка покупки и simulateTransaction (без отправки)"
         if: env.C2_TASK == 'build'
