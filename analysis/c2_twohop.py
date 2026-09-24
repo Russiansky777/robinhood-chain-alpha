@@ -159,7 +159,7 @@ def main() -> int:
 
     # ---------- кэш: живой цикл обновления раз в 10 с, замер вызовов
     crpc = C.C2Rpc(SERVICE + "_cache", key=key)
-    cache = SB.LegCache(leg_pools, crpc.call)
+    cache = SB.LegCache(leg_pools, crpc.call, allow_polling=True)
     t_start = time.time()
     statuses = []
     for i in range(CACHE_CYCLES):

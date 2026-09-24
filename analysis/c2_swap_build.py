@@ -466,6 +466,12 @@ def rebuild_check(s: dict, program: str) -> dict:
     # выходного счёта разные -- сверять ATA пользователя не с чем.
     if diff and user not in tpl["signers"] and set(diff) <= user_tok and same_data:
         return {"ok": None, "why": "платит роутер, токен-счёт чужой", "diff_idx": diff}
+    # Подписант платит сам, а выход приходит на счёт ДРУГОГО владельца
+    # (получатель не подписант): наш ATA сверять не с чем.
+    foreign = [i for i in diff if i in user_tok and tpl["accounts"][i] in rows
+               and rows[tpl["accounts"][i]]["owner"] != user]
+    if diff and set(diff) == set(foreign) and same_data:
+        return {"ok": None, "why": "выход источника на счёт другого владельца", "diff_idx": diff}
     return {"ok": not diff and same_data, "diff_idx": diff, "same_data": same_data,
             "ix": tpl["ix"], "user_is_signer": user in tpl["signers"]}
 

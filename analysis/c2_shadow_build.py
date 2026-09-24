@@ -31,24 +31,49 @@ simulateTransaction с sigVerify=false и replaceRecentBlockhash=true.
 Покрытие v1: Pump AMM, Raydium CPMM, Meteora DAMM v2, Raydium Launchlab,
 Meteora DLMM, Raydium CLMM -- один шаг, если котировка пула WSOL.
 
-v2 -- два шага (SOL -> Q -> токен) одной транзакцией, если котировка пула
-источника -- промежуточный токен Q (xStock, GP и т.п.):
+v2 -- два шага (SOL -> Q -> токен) одной транзакцией. ЗАПИСКА ДЛЯ CODE-1
+-----------------------------------------------------------------------
+Котировка пула источника -- не SOL, а промежуточный токен Q. Кэш держит
+шаблон шага 1 (последняя сделка SOL<->Q) только для 4 котировок с долей
+сигналов >= 2 % (решение владельца). Все 4 пула -- Meteora DLMM; адреса из
+data/c2_leg_pools_2026-09-24.json:
 
-    cache = SB.LegCache(pools, rpc_call)       # pools: {Q: {"program", "q_vault"}}
-    # ВНЕ горячего пути, в своём потоке: cache.run(stop_event) -- раз в 10 с
-    # cache.refresh_all(): по каждому пулу 1 getSignaturesForAddress
-    # (commitment confirmed) и getTransaction только новых сделок (до 4).
-    res = SB.shadow_build(..., leg_cache=cache)
+  Q (котировка)                                 хранилище Q (q_vault) -- ПОДПИСЫВАТЬ   хранилище WSOL (w_vault)
+  HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ  6oYfJ1yWCuUfX6Q61AEUwEiF2rzii6t9REwykRmnpsL1  Fns6LdcfqNPox3gxoxp46C5NjZoEXbMcvzw489aUNMmT
+  4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3  FGNavW6RiiPe37n6evak1GtoesytosWJs9hEKwF82odD  AUn3Qw5FMAXooFjHsehNfTYGSWXSR39rR2gDRi3eNSoJ
+  6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx  3AeDHaaCjxXZ6mZRkPooXjstZG5AFMtNQF7Ld4P6MH9a  3mZ7ftpz1XSNHKNQqk9a4bUvzWp95rC9qXsBC9VAXNPN
+  Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh   FNaEXnGP3hUrcJSBXBKzzDRJmitNnVwwQ6pQx6LhAumF  HZgAwbRXeUSEjZL5nERN5mDeXTKiu6ZgbDMy4MoEHcd9
 
-Шаг 1 -- шаблон последней сделки WSOL -> Q в самом глубоком пуле SOL<->Q
-(пулы -- из маршрутов источников, data/c2_leg_pools_<дата>.json).
-Возраст шаблона = время с последней проверки, что после него в пуле не было
-сделок, сдвигающих ценозависимые счета (DLMM/CLMM: любая новая сделка без
-нового шаблона покупки -- проверка не засчитывается). Возраст > 30 с --
-отказ с причиной. Сумма шага 2 = ожидаемый выход шага 1 по цене сделки-
-шаблона * (1 - 5 %), она же минимум шага 1; остаток Q остаётся на кошельке.
-Горячий путь v2 зовёт у узла только getMultipleAccounts (таблицы адресов
-транзакции источника, которых ещё нет в кэше) и simulateTransaction.
+1. Создать кэш (сеть не нужна):
+       pools = SB.load_leg_pools()          # 4 пула выше, из data/c2_leg_pools_*.json
+       cache = SB.LegCache(pools, rpc_call) # rpc_call -- только для warm_luts и запасного опроса
+2. Подписка: 4 адреса q_vault добавить в accountInclude той же
+   transactionSubscribe, что у детектора (_подписка_транзакций: processed,
+   jsonParsed, full). Каждое уведомление по этим адресам -- в
+       cache.ingest(notification)           # сеть НЕ зовёт; уведомление целиком или {"transaction","meta"}
+   ingest: своп WSOL->Q -- новый шаблон; продажа Q->WSOL -- тоже (DLMM,
+   переворачивается); сделка без свопа (ликвидность, комиссии) --
+   подтверждает шаблон; своп, из которого шаблон не собрать, -- шаблон
+   НЕ подтверждается и через 30 с даёт отказ.
+3. Прогрев таблиц адресов (вне горячего пути, 1 getMultipleAccounts):
+       cache.load_luts(SB.warm_lut_keys(pools))   # при старте: 32 таблицы из data/c2_pool_samples/*.json
+       cache.warm_luts()                          # периодически: таблицы новых шаблонов из ingest
+   Без прогрева горячий путь сам дочитает недостающие таблицы
+   (getMultipleAccounts, замер: сборка 82 мс вместо 0.65 мс).
+4. На сигнал -- как в v1, плюс leg_cache:
+       res = SB.shadow_build(source_tx, source_wallet, mint, our_wallet, amount_lamports,
+                             rpc_call, leg_cache=cache, ...)
+   res["route"] == "two_hop", leg1_template_age_s, leg1_flipped,
+   leg2_amount_in (= ожидаемый выход шага 1 по цене шаблона - 5 %, он же
+   минимум шага 1; остаток Q остаётся на кошельке). Шаблон старше 30 с
+   (с последнего подтверждения) -- ok=False, why_not «шаблон шага 1 старше
+   30 с (N с)». Котировки вне 4 -- why_not «шаблона SOL -> Q в кэше нет».
+5. Запасной путь -- опрос (если подписка недоступна):
+   LegCache(pools, rpc_call, allow_polling=True) и cache.run(stop_event) в
+   своём потоке; без флага refresh_all()/run() бросают RuntimeError.
+   Замер на 57 пулах: ~13.7 вызова/мин на пул.
+Покрытие по выборке A (прогон 24.09): одни SOL-пулы 26.9 %; все пулы
+SOL<->Q в кэше 59.2 %; только 4 котировки >= 2 % дают +58 сигналов (16.8 %).
 
 Минимум: Pump AMM / CPMM -- x*y=k по резервам после сделки источника с
 комиссией, калиброванной на его сделке; Launchlab -- кривая на
@@ -149,13 +174,19 @@ def _lut_keys(tx: dict) -> list:
 
 
 class LegCache:
-    """Шаблоны шага 1 (WSOL -> Q). Обновление -- refresh_all()/run() вне
-    горячего пути; горячий путь только читает get()."""
+    """Шаблоны шага 1 (WSOL -> Q).
 
-    def __init__(self, pools: dict, rpc_call, *, clock=time.time):
+    Основной путь -- ingest(tx): транзакции пулов из подписки детектора,
+    без сети. Опрос (refresh_all/run) -- запасной путь, только при
+    allow_polling=True. Горячий путь только читает get()."""
+
+    def __init__(self, pools: dict, rpc_call=None, *, clock=time.time, allow_polling: bool = False):
         self.pools = pools
         self.rpc_call = rpc_call
         self.clock = clock
+        self.allow_polling = allow_polling
+        self.pending_luts: set = set()   # таблицы адресов шаблонов, ещё не загруженные (warm_luts)
+        self.ingest_stats = collections.Counter()
         self.entries: dict = {}
         self.luts: dict = {}
         self.lock = threading.Lock()
@@ -167,8 +198,59 @@ class LegCache:
         self.workers = 8
 
     def _rpc(self, method, params):
+        if self.rpc_call is None:
+            raise RuntimeError("LegCache: rpc_call не передан")
         self.calls[method] += 1
         return self.rpc_call(method, params)
+
+    # ---------------------------------------------------- основной путь: подписка
+
+    def ingest(self, tx: dict) -> dict:
+        """Транзакция из transactionSubscribe (jsonParsed): уведомление целиком
+        ({"signature", "slot", "transaction": {"transaction", "meta"}}) или
+        уже развёрнутая {"transaction", "meta"}. Сеть НЕ зовётся.
+        -> {Q: статус} по пулам кэша, чьи хранилища есть в транзакции."""
+        raw = tx.get("transaction") if isinstance(tx.get("transaction"), dict) and "meta" in tx["transaction"] else tx
+        if not isinstance(raw, dict) or "meta" not in raw:
+            self.ingest_stats["не транзакция"] += 1
+            return {}
+        sig = tx.get("signature") or C.first_signature(raw)
+        keys = set(C.account_keys(raw))
+        now = self.clock()
+        out = {}
+        for q, p in self.pools.items():
+            if p["q_vault"] not in keys:
+                continue
+            cur = self.entries.get(q)
+            ent = self._template_from(raw, p, q)
+            if isinstance(ent, dict):
+                ent.update(sig=sig, checked_at=now)
+                if not ent.get("trade_time"):
+                    ent["trade_time"] = now       # в уведомлении подписки blockTime нет
+                with self.lock:
+                    self.entries[q] = ent
+                self.pending_luts |= {k for k in _lut_keys(raw) if k not in self.luts}
+                out[q] = "новый шаблон" + (" (из продажи, перевёрнут)" if ent["tpl"].get("flipped") else "")
+            else:
+                self.reject.setdefault(q, collections.Counter())[ent] += 1
+                ev = C.pool_event(raw, {"pool_vault": p["q_vault"], "quote_vault": p.get("w_vault"),
+                                        "quote_mint": C.WSOL}) if p.get("w_vault") else {"kind": "swap"}
+                if cur and (p["program"] not in PRICE_DEPENDENT or ev.get("kind") not in ("swap", "absent")):
+                    cur["checked_at"] = now
+                    out[q] = "не своп / счета не зависят от цены -- шаблон подтверждён"
+                else:
+                    out[q] = "своп без шаблона -- шаблон не подтверждён" if cur else "шаблона нет"
+            self.ingest_stats[out[q]] += 1
+        return out
+
+    def warm_luts(self) -> int:
+        """Загрузить таблицы адресов шаблонов, накопленные ingest() (1 вызов
+        getMultipleAccounts). Вызывать ВНЕ горячего пути."""
+        need = sorted(self.pending_luts - set(self.luts))
+        if need:
+            self.load_luts(need)
+        self.pending_luts -= set(self.luts)
+        return len(need)
 
     def load_luts(self, keys: list, rpc=None) -> None:
         need = [k for k in dict.fromkeys(keys) if k not in self.luts]
@@ -180,6 +262,8 @@ class LegCache:
             self.luts.update(got)
 
     def refresh_pool(self, q: str) -> str:
+        if not self.allow_polling:
+            raise RuntimeError("LegCache: опрос выключен (allow_polling=False) -- обновление через ingest()")
         p = self.pools[q]
         sigs = self._rpc("getSignaturesForAddress", [p["q_vault"], {"limit": 10, "commitment": "confirmed"}]) or []
         ok = [x["signature"] for x in sigs if x.get("err") is None]
@@ -254,6 +338,8 @@ class LegCache:
                 "program": p["program"], "trade_time": tx.get("blockTime")}
 
     def refresh_all(self) -> dict:
+        if not self.allow_polling:
+            raise RuntimeError("LegCache: опрос выключен (allow_polling=False) -- обновление через ingest()")
         from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
 
         def one(q):
@@ -278,6 +364,33 @@ class LegCache:
         if not e:
             return None, None
         return e, self.clock() - e["checked_at"]
+
+
+QUOTES_GE_2PCT = ("HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ", "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
+                  "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh")
+
+
+def load_leg_pools(path: str | None = None, quotes=QUOTES_GE_2PCT) -> dict:
+    """{Q: {"program", "q_vault", "w_vault", "sol_depth"}} из data/c2_leg_pools_<дата>.json."""
+    import json  # noqa: PLC0415
+    f = Path(path) if path else sorted(C.DATA.glob("c2_leg_pools_2*.json"))[-1]
+    pools = json.loads(f.read_text(encoding="utf-8"))["pools"]
+    return {q: pools[q] for q in quotes if q in pools}
+
+
+def warm_lut_keys(pools: dict, top: int = 32) -> list:
+    """Таблицы адресов для прогрева: те, что встречаются в настоящих
+    транзакциях образцов, где есть хранилища этих пулов, и в транзакциях
+    с котировкой Q (шаг 2), по частоте. Только чтение файлов репо."""
+    import json  # noqa: PLC0415
+    vaults = {p["q_vault"] for p in pools.values()}
+    cnt = collections.Counter()
+    for f in sorted(B.SAMPLES_DIR.glob("*.json")):
+        for x in json.loads(f.read_text(encoding="utf-8")):
+            tx = x.get("tx") or {}
+            if x.get("quote_mint") in pools or vaults & set(C.account_keys(tx)):
+                cnt.update(_lut_keys(tx))
+    return [k for k, _ in cnt.most_common(top)]
 
 
 def _two_hop(res: dict, source_tx: dict, tpl2: dict, q: str, our_wallet: str, amount_lamports: int,
@@ -322,7 +435,7 @@ def _two_hop(res: dict, source_tx: dict, tpl2: dict, q: str, our_wallet: str, am
            B.sol_transfer(our_wallet, w, amount_lamports), B.sync_native(w),
            B.swap_instruction(e["tpl"], e["tx"], our_wallet, amount_lamports, leg2_in),
            B.swap_instruction(tpl2, source_tx, our_wallet, leg2_in, res["min_out"] or 1)]
-    miss = [k for k in _lut_keys(source_tx) if k not in leg_cache.luts]
+    miss = [k for k in _lut_keys(e["tx"]) + _lut_keys(source_tx) if k not in leg_cache.luts]
     if miss:
         leg_cache.load_luts(miss, rpc=rpc_call)
         res["hot_lut_calls"] = 1
@@ -499,7 +612,7 @@ def self_test() -> int:
         raise RuntimeError(method)
     two_ok = two_n = 0
     if leg1_tx and leg2:
-        cache = LegCache({htm: leg1_pool}, rpc2, clock=lambda: clock[0])
+        cache = LegCache({htm: leg1_pool}, rpc2, clock=lambda: clock[0], allow_polling=True)
         st1 = cache.refresh_all()[htm]
         st2 = cache.refresh_all()[htm]
         checks.append((f"кэш: первое обновление -- «{st1}», повтор без новых сделок -- «{st2}», "
@@ -564,6 +677,48 @@ def self_test() -> int:
     checks.append((f"два шага SOL -> HTm -> токен одной транзакцией: собрано и «симулировано» "
                    f"{two_ok} из {two_n}, размеры {sorted(set(sim_sizes))[:3]}...",
                    two_n >= 5 and two_ok == two_n))
+    # ---- ingest: транзакции из подписки, без сети
+    if leg1_tx and leg2:
+        def no_net(method, params):
+            raise AssertionError(f"ingest позвал сеть: {method}")
+        ck = [5000.0]
+        ic = LegCache({htm: dict(leg1_pool)}, no_net, clock=lambda: ck[0])
+        try:
+            ic.refresh_all()
+            poll_refused = False
+        except RuntimeError:
+            poll_refused = True
+        checks.append(("опрос без allow_polling=True -- отказ", poll_refused))
+        note = {"signature": C.first_signature(leg1_tx), "slot": 1,
+                "transaction": {k: v for k, v in leg1_tx.items() if k != "blockTime"}}
+        st_a = ic.ingest(note).get(htm)
+        e, age = ic.get(htm)
+        ok_a = st_a == "новый шаблон" and age == 0 and e["trade_time"] == ck[0] and e["sig"] == note["signature"]
+        ck[0] += 20
+        st_b = ic.ingest(synth(0, 0)).get(htm)                 # не своп -> подтверждён
+        age_b = ic.get(htm)[1]
+        ck[0] += 20
+        st_c = ic.ingest(synth(-5000, 7000)).get(htm)          # своп без шаблона -> не подтверждён
+        age_c = ic.get(htm)[1]
+        st_d = ic.ingest({"transaction": {"message": {"accountKeys": []}}, "meta": {}})
+        r_i = shadow_build(leg2[0]["tx"], leg2[0]["source"], leg2[0]["mint"], C.EXECUTOR_WALLET, 50_000_000,
+                           lambda m, p_: rpc2(m, p_) if m in ("simulateTransaction", "getMultipleAccounts",
+                                                              "getAccountInfo") else no_net(m, p_),
+                           leg_cache=ic)
+        checks.append((f"ingest без сети: уведомление подписки -> «{st_a}»; не своп -> «{st_b}» (возраст "
+                       f"{age_b:.0f} с); своп без шаблона -> «{st_c}» (возраст {age_c:.0f} с); чужая tx -> {st_d}; "
+                       f"сборка из кэша ingest: ok={r_i['ok']}, возраст шаблона {r_i.get('leg1_template_age_s')} с",
+                       ok_a and "подтверждён" in st_b and age_b == 0 and "не подтверждён" in st_c
+                       and age_c == 20 and st_d == {} and r_i["ok"] and r_i["route"] == "two_hop"))
+        ck[0] += 11
+        r_o = shadow_build(leg2[0]["tx"], leg2[0]["source"], leg2[0]["mint"], C.EXECUTOR_WALLET, 50_000_000,
+                           rpc2, leg_cache=ic)
+        checks.append((f"после 31 с без подтверждения -- отказ: «{r_o['why_not']}»",
+                       r_o["ok"] is False and "старше" in (r_o["why_not"] or "")))
+        pools4 = load_leg_pools()
+        wk = warm_lut_keys(pools4)
+        checks.append((f"4 пула котировок >= 2 % из data/c2_leg_pools: {len(pools4)}; таблиц для прогрева "
+                       f"из образцов: {len(wk)}", len(pools4) == 4 and all(p_["q_vault"] for p_ in pools4.values())))
     # ---- переворот: настоящие продажи Q -> WSOL в DLMM/CLMM дают шаблон покупки
     n_fl = n_fl_ok = 0
     for x in allx + [{"tx": t} for t in C.load_real_txs().values()]:
