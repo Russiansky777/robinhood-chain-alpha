@@ -1,0 +1,102 @@
+name: "Bloom: место в блоке относительно источника (только чтение)"
+
+# Сколько толпы мы обгоняем. Три числа по фактам цепи: наш индекс минус
+# индекс источника при S+0, число ЧУЖИХ покупок того же минта между
+# источником и нами, и то же для кошелька задачи DBot.
+#
+# Только чтение: журнал копируется с хоста, в цепь уходят getBlock и
+# getTransaction, ни один ордер не отправляется.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "сколько последних настоящих позиций замерить"
+        required: false
+        default: "6"
+      mint_buyers:
+        description: "разбор: кто покупал этот минт (пусто -- обычный замер)"
+        required: false
+        default: ""
+      slots:
+        description: "слоты для разбора: через запятую или A-B"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-block-position
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка замера ДО обращений в цепь"
+        run: |
+          set -e
+          python3 analysis/bloom_block_position.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Копия журналов с хоста (только чтение)"
+        run: |
+          set -e
+          mkdir -p /tmp/bloom_state
+          for f in decisions.jsonl positions.jsonl; do
+            ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/bloom_state/$f" || true
+            echo "$f: $(wc -c < /tmp/bloom_state/$f) байт"
+          done
+
+      - name: "Замер по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          if [ -n "${{ inputs.mint_buyers }}" ]; then
+            python3 analysis/bloom_block_position.py \
+              --mint-buyers "${{ inputs.mint_buyers }}" \
+              --slots "${{ inputs.slots }}" \
+              --out data/bloom_mint_buyers.json
+          else
+            python3 analysis/bloom_block_position.py \
+              --state-dir /tmp/bloom_state \
+              --limit ${{ inputs.limit }} \
+              --out data/bloom_block_position.json
+          fi
+
+      - name: "Коммит замера"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/bloom_block_position.json data/bloom_mint_buyers.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: место в блоке относительно источника [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
