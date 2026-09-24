@@ -1,0 +1,158 @@
+name: "Bloom/Helius/Jupiter: переиспользуется ли соединение (только чтение)"
+
+# Вопрос владельца: платим ли мы connect+TLS на каждом вызове. Ответ даёт
+# только замер с САМОГО хоста -- из облачного бегунка и из контейнера
+# маршрут другой, и числа будут не те.
+#
+# Как меряется. Один вызов curl с ДВУМЯ одинаковыми URL: второй обязан уйти
+# по уже открытому соединению. Решающее поле -- num_connects: 1 у первого и
+# 0 у второго. Рядом печатаются time_namelookup (DNS), time_connect (TCP),
+# time_appconnect (TLS) и time_starttransfer (первый байт ответа).
+#
+# Секреты. Ключи берутся из env-файла службы на хосте и НИКОГДА не
+# печатаются: в формате -w нет ни url_effective, ни заголовков, тело уходит
+# в /dev/null, а у Helius ключ стоит в строке запроса -- поэтому URL не
+# печатается ни разу. Команда с ключом не эхоится (set -x не включается).
+#
+# Только чтение: ни одна служба не трогается, ни один ордер не уходит.
+# /ping и /wallets бюджет запросов Bloom не тратят, getSlot у Helius -- 1
+# кредит за вызов, Jupiter здесь только на котировке без исполнения.
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "сколько пар запросов на каждую площадку"
+        required: false
+        default: "3"
+
+concurrency:
+  group: vps-keepalive-probe
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Имена переменных оболочки -- только ASCII"
+        run: |
+          set -e
+          cd analysis
+          python3 check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер с хоста"
+        run: |
+          set -e
+          REPEATS="${{ inputs.repeats }}"
+          case "$REPEATS" in ''|*[!0-9]*) REPEATS=3;; esac
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            set +x
+            set -a; . $ENV_DIR/env; set +a
+            FMT='  dns=%{time_namelookup} tcp=%{time_connect} tls=%{time_appconnect} ttfb=%{time_starttransfer} total=%{time_total} code=%{http_code} ver=%{http_version} new_conn=%{num_connects}\n'
+            echo '=== curl ==='; curl --version | head -1
+            echo
+            echo '=== RTT до хоста Bloom (ICMP, может быть закрыт) ==='
+            ping -c 5 -W 2 eu.solana.bloombot.app 2>&1 | tail -3 || echo '  ICMP недоступен -- смотреть tcp= у curl'
+            echo
+            echo '=== Bloom /ping: две пары запросов в ОДНОМ вызове curl ==='
+            for i in \$(seq 1 $REPEATS); do
+              echo \"пара \$i (первый запрос -- новое соединение, второй -- по тому же):\"
+              curl -sS -o /dev/null -o /dev/null -w \"\$FMT\" \
+                -H \"Authorization: Bearer \$BLOOM_API_KEY\" \
+                https://eu.solana.bloombot.app/api/v1/ping \
+                https://eu.solana.bloombot.app/api/v1/ping || echo '  ОТКАЗ'
+            done
+            echo
+            echo '=== Bloom: заголовки ответа про соединение (значения ключа не печатаются) ==='
+            curl -sS -D - -o /dev/null -H \"Authorization: Bearer \$BLOOM_API_KEY\" \
+              https://eu.solana.bloombot.app/api/v1/ping 2>/dev/null \
+              | grep -iE '^(HTTP/|connection|keep-alive|server|alt-svc)' || echo '  заголовков про соединение нет'
+            echo
+            echo '=== Bloom: умеет ли HTTP/2 ==='
+            curl -sS --http2 -o /dev/null -w '  http_version=%{http_version} code=%{http_code}\n' \
+              -H \"Authorization: Bearer \$BLOOM_API_KEY\" \
+              https://eu.solana.bloombot.app/api/v1/ping || echo '  ОТКАЗ'
+            echo
+            echo '=== Helius RPC: getSlot дважды в одном вызове (URL НЕ печатается) ==='
+            for i in \$(seq 1 $REPEATS); do
+              echo \"пара \$i:\"
+              curl -sS -o /dev/null -o /dev/null -w \"\$FMT\" \
+                -H 'Content-Type: application/json' \
+                -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSlot\",\"params\":[{\"commitment\":\"processed\"}]}' \
+                \"https://mainnet.helius-rpc.com/?api-key=\$HELIUS_API_KEY\" \
+                -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSlot\",\"params\":[{\"commitment\":\"processed\"}]}' \
+                \"https://mainnet.helius-rpc.com/?api-key=\$HELIUS_API_KEY\" 2>/dev/null || echo '  ОТКАЗ'
+            done
+            echo
+            echo '=== Helius: HTTP/2 ==='
+            curl -sS --http2 -o /dev/null -w '  http_version=%{http_version} code=%{http_code}\n' \
+              -H 'Content-Type: application/json' \
+              -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSlot\",\"params\":[]}' \
+              \"https://mainnet.helius-rpc.com/?api-key=\$HELIUS_API_KEY\" 2>/dev/null || echo '  ОТКАЗ'
+            echo
+            echo '=== Jupiter Swap V2: две котировки в одном вызове ==='
+            JUP='https://api.jup.ag/swap/v2/order?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=10000000&slippageBps=100&taker=4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N'
+            curl -sS -o /dev/null -o /dev/null -w \"\$FMT\" \
+              -H \"x-api-key: \$JUPITER_API_KEY\" \"\$JUP\" \"\$JUP\" || echo '  ОТКАЗ'
+            echo
+            echo '=== Jupiter: HTTP/2 ==='
+            curl -sS --http2 -o /dev/null -w '  http_version=%{http_version} code=%{http_code}\n' \
+              -H \"x-api-key: \$JUPITER_API_KEY\" \"\$JUP\" || echo '  ОТКАЗ'
+          " 2>&1 | tee data/bloom_keepalive_probe.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import os, re, sys
+          текст = open("data/bloom_keepalive_probe.txt", encoding="utf-8", errors="replace").read()
+          # Ключей в бегунке нет (они только на хосте), поэтому проверяем по
+          # форме: ни api-key= со значением, ни Bearer со значением.
+          плохо = []
+          if re.search(r"api-key=[A-Za-z0-9\-_]{8,}", текст):
+              плохо.append("в отчёте видна строка api-key со значением")
+          if re.search(r"Bearer\s+[A-Za-z0-9\-_.]{8,}", текст):
+              плохо.append("в отчёте виден Bearer со значением")
+          if re.search(r"x-api-key:\s*[A-Za-z0-9\-_.]{8,}", текст, re.I):
+              плохо.append("в отчёте виден x-api-key со значением")
+          if плохо:
+              print("\n".join(плохо)); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_keepalive_probe.txt ] && git add data/bloom_keepalive_probe.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: замер переиспользования соединения [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
