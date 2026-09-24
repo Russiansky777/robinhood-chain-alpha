@@ -1,0 +1,143 @@
+name: "C2: чтение цепи -- сэндвичи (B) и толпа за источником (A)"
+
+# Вторая сессия Code (C2). Рамки владельца:
+# * runs-on: ubuntu-latest, НЕ self-hosted; ни ssh, ни хоста, ни деплоя;
+# * секреты только HELIUS_API и DBOT_API_KEY (DBot -- только GET);
+# * ключи в вывод не печатаются: перед каждым коммитом c2_leak_scan
+#   (шаблоны api-key= / Bearer / X-API-KEY и буквальные значения секретов);
+# * результаты -- файлы в data/ этой же ветки, коммит только в неё
+#   (c2_commit.py отказывается пушить в ветку Code-1);
+# * кредиты Helius -- общая модель solana_rpc_client, службы c2_crowd и
+#   c2_sandwich, общий потолок C2 100 000 в сутки (проверка до запроса).
+#
+# Запуск: workflow_dispatch на ветке claude/c2-hedge-analysis, либо push
+# файла-заявки data/c2_requests/run.json в эту ветку. Второй путь нужен
+# потому, что dispatch по API требует файла workflow в ветке по умолчанию
+# (docs/P3_GUARD.md), а в неё C2 не пишет.
+#
+# Порядок внутри прогона: сначала B (быстрая), коммит; затем A, коммит.
+# Так доклад по B не ждёт A, а потолок кредитов считается строго: A видит
+# расход B в осколке учёта той же рабочей копии.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "crowd | sandwich | both | selftest"
+        required: false
+        default: "both"
+      days:
+        description: "окно, суток (0-14]"
+        required: false
+        default: "7"
+      only:
+        description: "задача A: только эти источники, через запятую"
+        required: false
+        default: ""
+      limit_sources:
+        description: "задача A: первые N источников (0 -- все)"
+        required: false
+        default: "0"
+      workers:
+        description: "задача A: параллельных источников (1-8)"
+        required: false
+        default: "4"
+      time_budget_s:
+        description: "задача A: мягкий бюджет времени, секунд"
+        required: false
+        default: "15000"
+      crowd_cap:
+        description: "задача A: предел транзакций в окне 30 с на покупку"
+        required: false
+        default: "1500"
+  push:
+    branches: [claude/c2-hedge-analysis]
+    paths: ["data/c2_requests/run.json"]
+
+concurrency:
+  group: c2-chain-tasks
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "Зависимости"
+        run: pip install -q requests pyyaml
+
+      - name: "Параметры прогона (проверка по белому списку)"
+        env:
+          IN_TASK: ${{ github.event.inputs.task }}
+          IN_DAYS: ${{ github.event.inputs.days }}
+          IN_ONLY: ${{ github.event.inputs.only }}
+          IN_LIMIT_SOURCES: ${{ github.event.inputs.limit_sources }}
+          IN_WORKERS: ${{ github.event.inputs.workers }}
+          IN_TIME_BUDGET_S: ${{ github.event.inputs.time_budget_s }}
+          IN_CROWD_CAP: ${{ github.event.inputs.crowd_cap }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -e
+          python analysis/c2_request.py --event "$EVENT_NAME" > c2_params.env
+          cat c2_params.env
+          cat c2_params.env >> "$GITHUB_ENV"
+
+      - name: "Самопроверки (без сети)"
+        run: |
+          set -e
+          python analysis/c2_common.py --self-test
+          python analysis/c2_crowd_metric.py --self-test
+          python analysis/c2_sandwich.py --self-test
+          python analysis/c2_leak_scan.py --self-test
+          python analysis/c2_request.py --self-test
+          python analysis/c2_commit.py --self-test
+
+      - name: "Задача B: сэндвичи (только чтение цепи)"
+        if: env.C2_TASK == 'sandwich' || env.C2_TASK == 'both'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_sandwich.py --days "$C2_DAYS" 2>&1 | tee "data/c2_logs/sandwich_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит B"
+        if: always() && (env.C2_TASK == 'sandwich' || env.C2_TASK == 'both')
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          python analysis/c2_commit.py -m "C2: сэндвичи на покупках [automated]" "data/sandwich_*.csv" "data/sandwich_*.json" "data/c2_logs/sandwich_*.log" "data/helius_usage/c2_*.json"
+
+      - name: "Задача A: толпа за источником (только чтение цепи, DBot GET)"
+        if: env.C2_TASK == 'crowd' || env.C2_TASK == 'both'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          test -n "$DBOT_API_KEY" || { echo "СТОП: секрет DBOT_API_KEY пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_crowd_metric.py --days "$C2_DAYS" --only "$C2_ONLY" --limit-sources "$C2_LIMIT_SOURCES" --workers "$C2_WORKERS" --time-budget-s "$C2_TIME_BUDGET_S" --crowd-cap "$C2_CROWD_CAP" 2>&1 | tee "data/c2_logs/crowd_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит A"
+        if: always() && (env.C2_TASK == 'crowd' || env.C2_TASK == 'both')
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
+        run: |
+          python analysis/c2_commit.py -m "C2: толпа за источником [automated]" "data/crowd_metric_*.csv" "data/crowd_metric_*.json" "data/c2_dbot_tasks_*.json" "data/c2_cache/*.json" "data/c2_logs/crowd_*.log" "data/helius_usage/c2_*.json"
