@@ -194,7 +194,15 @@ jobs:
             echo "репозитория EXEC_WALLET_KEY (base58 или массив байтов)."
             exit 1; }
           echo "ключ кошелька в секрете есть (значение не печатается)"
-          pip install -q solders requests
+          # В систему ставить нельзя: на своём раннере python3 помечен
+          # externally-managed (PEP 668), и pip отказывается -- ровно на этом
+          # упал прогон 36042078292. Ставим во временное окружение прогона.
+          if ! "$PY" -c "import solders, requests" 2>/dev/null; then
+            python3 -m venv "$RUNNER_TEMP/key_venv"
+            "$RUNNER_TEMP/key_venv/bin/pip" install -q solders requests
+            PY="$RUNNER_TEMP/key_venv/bin/python"
+            echo "PY=$PY" >> "$GITHUB_ENV"
+          fi
           # Сверка публичного ключа ДО доставки: чужой ключ подписал бы
           # чужой кошелёк. Печатается только публичный ключ -- он публичный.
           # Отдельным файлом, а не heredoc: вложенный heredoc в "run: |" уже
