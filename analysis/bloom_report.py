@@ -367,6 +367,12 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
             "we_would_buy_dbot_refused": [],
             "skipped_by_our_limit_dbot_bought": [],
             "dbot_record_not_found": 0,
+            # ГРУППА "ТОЛЬКО МЫ". Сигналы, по которым у DBot нет даже записи
+            # -- ни покупки, ни отказа. Это не расхождение решений: сравнивать
+            # не с чем, и в гейт "мы / DBot" такие сигналы не входят. Но и
+            # прятать их в общем счётчике "записи не нашлось" нельзя: это
+            # сделки, которые мы сделали в одиночку, и итог по ним -- наш.
+            "only_us": {"count": 0, "rows": []},
             "not_comparable_source_did_not_buy": 0,
             "by_dbot_code": {},
             "dbot_records": _срез_записей(записи),
@@ -389,6 +395,14 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
                          время_сделки=float(сиг_время), окно_с=окно_с)
         if в.get("result") not in ("купил", "отказал"):
             итог["dbot_record_not_found"] += 1
+            if намерение == "куплю" or r.get("action") == "buy":
+                итог["only_us"]["count"] += 1
+                итог["only_us"]["rows"].append({
+                    "signature": r.get("signature"), "mint": r.get("mint"),
+                    "source": r.get("source"), "our_code": r.get("code"),
+                    "our_action": r.get("action"),
+                    "ts_utc": r.get("ts_utc"),
+                    "our_spend_sol_eq": r.get("spend_sol_eq")})
             if len(итог["unmatched_diag"]) < 5:
                 итог["unmatched_diag"].append(
                     _почему_не_сошлось(записи, r, float(сиг_время), окно_с))
@@ -697,6 +711,55 @@ def позиции_таблица(state: ST.ExecState) -> list:
     return строки
 
 
+def итог_группы_только_мы(state: ST.ExecState, сверка: dict) -> dict:
+    """Итог по сигналам, где у DBot нет даже записи.
+
+    Считается по НАШИМ позициям, а не по журналу решений: решение говорит,
+    что мы хотели купить, а сколько вернулось -- знает только позиция.
+    Сделки без закрытия в итог не идут и считаются отдельно, иначе открытая
+    позиция читалась бы как нулевой результат.
+    """
+    группа = (сверка or {}).get("only_us") or {}
+    строки = группа.get("rows") or []
+    если_нет = {"count": len(строки), "with_result": 0, "open_or_unknown": 0,
+                 "sum_pct": None, "median_pct": None, "sum_sol": None,
+                 "note": ("сигналы, где у DBot нет ни покупки, ни отказа: "
+                           "сравнивать не с чем, в гейт мы/DBot они не входят")}
+    if not строки:
+        return если_нет
+    по_минту = {}
+    for p_ in state.positions().values():
+        if ST.is_real_mode(p_.get("mode")) and p_.get("mint"):
+            по_минту.setdefault(p_["mint"], p_)
+    проценты, сумма_sol = [], 0.0
+    for r in строки:
+        поз = по_минту.get(r.get("mint"))
+        вх = (поз or {}).get("sol_in")
+        наз = ((поз or {}).get("closed_sol_net")
+                if (поз or {}).get("closed_sol_net") is not None
+                else (((поз or {}).get("last_sell_outcome") or {}).get("sol_delta_net")))
+        if поз is None or not вх or наз is None:
+            если_нет["open_or_unknown"] += 1
+            r["result_pct"] = None
+            continue
+        pct = round((наз - вх) / вх * 100, 2)
+        r["result_pct"] = pct
+        r["sol_in"] = вх
+        r["sol_back_net"] = наз
+        проценты.append(pct)
+        сумма_sol += (наз - вх)
+    если_нет["with_result"] = len(проценты)
+    if проценты:
+        проценты_с = sorted(проценты)
+        середина = len(проценты_с) // 2
+        если_нет["median_pct"] = (проценты_с[середина] if len(проценты_с) % 2
+                                   else round((проценты_с[середина - 1]
+                                                + проценты_с[середина]) / 2, 2))
+        если_нет["sum_pct"] = round(sum(проценты), 2)
+        если_нет["sum_sol"] = round(сумма_sol, 9)
+    return если_нет
+
+
 def таблица_кругов(state: ST.ExecState, строки: list, место: dict) -> list:
     """Полный круг по каждой боевой сделке: решение -> Bloom -> блок -> продажа.
 
@@ -876,6 +939,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "found_by_mint": найти_по_минту(строки, минты or ()),
         "position_rows": позиции_таблица(state),
         "circles_table": таблица_кругов(state, строки, замер_места()),
+        "only_us": итог_группы_только_мы(state, св),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
     }
@@ -1008,6 +1072,19 @@ def в_текст(о: dict) -> str:
     L.append(f"--- пары А/Б --- наших отправленных покупок {п['our_sent']} из "
              f"{п['gate_pairs']}; из них малым размером {п['small_size_pairs']}")
     L.append(f"  {п['note']}")
+    ом = о.get("only_us") or {}
+    L.append("")
+    L.append(f"--- только мы --- сигналов {ом.get('count', 0)}: у DBot нет ни "
+             f"покупки, ни отказа. В гейт мы/DBot НЕ входят")
+    L.append(f"  с известным итогом {ом.get('with_result', 0)}, без итога "
+             f"{ом.get('open_or_unknown', 0)}; медиана "
+             f"{ом.get('median_pct') if ом.get('median_pct') is not None else '-'} %, "
+             f"сумма {ом.get('sum_pct') if ом.get('sum_pct') is not None else '-'} п.п., "
+             f"{ом.get('sum_sol') if ом.get('sum_sol') is not None else '-'} SOL")
+    for r in ((о.get("reconciliation") or {}).get("only_us") or {}).get("rows") or []:
+        L.append(f"    {r.get('ts_utc') or '-'} минт {str(r.get('mint'))[:12]} "
+                 f"код {r.get('our_code')} итог "
+                 f"{r.get('result_pct') if r.get('result_pct') is not None else '-'} %")
     круги = о.get("circles_table") or []
     L.append("")
     L.append(f"--- таблица кругов --- сделок {len(круги)}; пустое поле значит "
@@ -1232,6 +1309,19 @@ def self_test() -> None:
         chk("совпадение без сопоставленных -- None",
             св5["agreement"] is None, св5["agreement"])
 
+        # --- ГРУППА "ТОЛЬКО МЫ". Сигнал, который мы купили, а у DBot по нему
+        # нет ни покупки, ни отказа. Сравнивать не с чем: в гейт не идёт, но
+        # и потеряться в общем счётчике "записи не нашлось" не должен.
+        chk("наша покупка без записи DBot попала в группу 'только мы'",
+            св5["only_us"]["count"] == 1
+            and св5["only_us"]["rows"][0]["our_code"] == "BUY", св5["only_us"])
+        chk("и в сопоставленные она по-прежнему не идёт",
+            св5["compared"] == 0, св5["compared"])
+        св6 = сверка_с_dbot([строка(action="skip", code="TOKEN_RECEIVED_NOT_BOUGHT")],
+                            [запись_dbot(минт="ДРУГОЙ")])
+        chk("сигнал, который мы НЕ покупали, в группу 'только мы' не идёт",
+            св6["only_us"]["count"] == 0, св6["only_us"])
+
         # --- продажа источника не идёт в "записи не нашлось"
         св_прод = сверка_с_dbot(
             [строка(kind="sell", code="NOT_A_BUY")], [запись_dbot()])
@@ -1440,6 +1530,34 @@ def self_test() -> None:
         текст_кр = в_текст(отчёт(state=st))
         chk("таблица кругов печатается и пустое поле видно чертой",
             "таблица кругов" in текст_кр and "не мерили" in текст_кр, текст_кр[:200])
+
+        # --- ИТОГ ГРУППЫ "ТОЛЬКО МЫ" считается по позициям, а не по журналу:
+        # журнал говорит, что мы хотели купить, а сколько вернулось -- знает
+        # только позиция. Открытая позиция не должна читаться как нулевой итог.
+        st.positions_path.write_text("\n".join([
+            json.dumps({"client_order_id": "om1", "state": "closed",
+                        "mode": ST.MODE_LIVE, "mint": "МИНТ_ОДИН", "sol_in": 0.2,
+                        "closed_sol_net": 0.18, ST.SCHEMA_VERSION_KEY: 2},
+                       ensure_ascii=False),
+            json.dumps({"client_order_id": "om2", "state": "bought",
+                        "mode": ST.MODE_LIVE, "mint": "МИНТ_ДВА", "sol_in": 0.2,
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        гр = итог_группы_только_мы(st, {"only_us": {"count": 3, "rows": [
+            {"mint": "МИНТ_ОДИН", "our_code": "BUY", "ts_utc": "2026-09-24T10:00:00Z"},
+            {"mint": "МИНТ_ДВА", "our_code": "BUY", "ts_utc": "2026-09-24T10:01:00Z"},
+            {"mint": "МИНТ_ТРИ", "our_code": "BUY", "ts_utc": "2026-09-24T10:02:00Z"},
+        ]}})
+        chk("итог группы считается только по закрытым сделкам",
+            гр["count"] == 3 and гр["with_result"] == 1
+            and гр["open_or_unknown"] == 2, гр)
+        chk("и процент взят из позиции, а не из намерения",
+            abs(гр["median_pct"] - (-10.0)) < 0.01
+            and abs(гр["sum_sol"] - (-0.02)) < 1e-9, гр)
+        гр0 = итог_группы_только_мы(st, {"only_us": {"count": 0, "rows": []}})
+        chk("пустая группа -- нули по счёту и пустые проценты, а не нулевые",
+            гр0["count"] == 0 and гр0["median_pct"] is None
+            and гр0["sum_pct"] is None, гр0)
 
         # УПАВШАЯ ПО ЦЕПИ ПОКУПКА: намерение 0.2 SOL не есть потраченные
         # 0.2 SOL. 24.09 по цепи ушла только комиссия.
