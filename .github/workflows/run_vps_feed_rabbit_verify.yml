@@ -88,6 +88,7 @@ jobs:
           set -e
           mkdir -p /tmp/rv
           scp $SSH_OPTS root@$TARGET_HOST:$STATE_DIR/feed_race.jsonl /tmp/rv/feed_race.jsonl
+          scp $SSH_OPTS root@$TARGET_HOST:$STATE_DIR/heartbeat.json /tmp/rv/heartbeat.json
           echo "журнал: $(wc -l < /tmp/rv/feed_race.jsonl) строк"
 
       - name: "Проверка по цепи"
@@ -98,8 +99,14 @@ jobs:
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
           mkdir -p data
+          # Разгонные адреса берём из признака жизни: их сообщения законны,
+          # но к источникам отношения не имеют, и считать их "чужими" значит
+          # соврать себе же.
+          BOOSTERS=$("$PY" -c "import json;print(','.join((json.load(open('/tmp/rv/heartbeat.json')).get('boosters') or [])))")
+          echo "разгонные: ${BOOSTERS:-нет}"
           "$PY" -u analysis/feed_rabbit_verify.py \
             --journal /tmp/rv/feed_race.jsonl \
+            --boosters "$BOOSTERS" \
             --channels "${{ inputs.channels }}" \
             --tasks "${{ inputs.tasks }}" \
             --sample "${{ inputs.sample }}" \

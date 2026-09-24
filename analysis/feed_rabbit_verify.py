@@ -91,47 +91,89 @@ def читать_журнал(путь: Path, каналы: set) -> dict:
     return из_
 
 
-def проверить_канал(helius, подписи: dict, наши: set, *, выборка: int) -> dict:
-    """Сколько из подписей канала РЕАЛЬНО содержат наш адрес среди счетов."""
+def выборка_по_группам(подписи: dict, сколько: int) -> list:
+    """Подписи ПО КАЖДОМУ фильтру отдельно, а не первые подряд.
+
+    Первые подряд -- это почти целиком разгонный адрес: он даёт сотни
+    сообщений против единиц у источников. Такая выборка отвечает только
+    про разгонный и молчит про источники, ради которых всё и делается.
+    """
+    по_фильтрам: dict = {}
+    for подпись, е in подписи.items():
+        имя = max(е["фильтры"], key=lambda k: е["фильтры"][k]) if е["фильтры"] else "?"
+        по_фильтрам.setdefault(имя, []).append(подпись)
+    из_: list = []
+    for имя in sorted(по_фильтрам):
+        из_.extend((имя, п) for п in по_фильтрам[имя][:max(0, сколько)])
+    return из_
+
+
+def проверить_канал(helius, подписи: dict, наши: set, *, выборка: int,
+                     прочие: set | None = None) -> dict:
+    """Сколько из подписей канала РЕАЛЬНО содержат наш адрес среди счетов.
+
+    "наши" -- адреса источников. "прочие" -- разгонные: их сообщения
+    законно не содержат ни одного источника, и считать их "чужими" значит
+    самому себе соврать. Поэтому они считаются отдельной строкой.
+    """
     всего_сообщений = sum(v["сообщений"] for v in подписи.values())
     повторов = всего_сообщений - len(подписи)
     по_фильтрам: dict = {}
     for v in подписи.values():
         for имя, n in v["фильтры"].items():
             по_фильтрам[имя] = по_фильтрам.get(имя, 0) + n
+    прочие = прочие or set()
     итог = {"messages": всего_сообщений, "unique": len(подписи),
              "duplicates": повторов, "by_filter": по_фильтрам,
              "checked": 0, "with_our": 0, "only_via_alt": 0,
+             "with_booster": 0, "without_any": 0,
              "without_our": 0, "not_on_chain": 0, "failed": 0,
-             "examples_without_our": []}
-    for подпись in list(подписи)[:max(0, выборка)]:
+             "by_group": {}, "examples_without_any": []}
+    for имя_ф, подпись in выборка_по_группам(подписи, выборка):
+        гр = итог["by_group"].setdefault(
+            имя_ф, {"checked": 0, "with_our": 0, "with_booster": 0,
+                     "without_any": 0, "failed": 0, "not_on_chain": 0})
         try:
             tx = helius.транзакция(подпись, попыток=2, пауза_s=0.1)
         except Exception:  # noqa: BLE001
             continue
         итог["checked"] += 1
+        гр["checked"] += 1
         if not tx:
             # Узел не отдаёт -- транзакция в блок не попала.
             итог["not_on_chain"] += 1
+            гр["not_on_chain"] += 1
             continue
         if (tx.get("meta") or {}).get("err") is not None:
             итог["failed"] += 1
+            гр["failed"] += 1
         обычные, из_таблиц = счета_транзакции(tx)
+        все_счета = обычные | из_таблиц
         есть_обычно = bool(обычные & наши)
         есть_в_alt = bool(из_таблиц & наши)
         if есть_обычно or есть_в_alt:
             итог["with_our"] += 1
+            гр["with_our"] += 1
             if есть_в_alt and not есть_обычно:
                 итог["only_via_alt"] += 1
+        elif все_счета & прочие:
+            # Разгонный адрес: сообщение законное, просто не про источники.
+            итог["with_booster"] += 1
+            гр["with_booster"] += 1
         else:
+            итог["without_any"] += 1
             итог["without_our"] += 1
-            if len(итог["examples_without_our"]) < 5:
-                итог["examples_without_our"].append(
-                    {"signature": подпись, "slot": tx.get("slot"),
-                      "accounts": len(обычные) + len(из_таблиц)})
-    for ключ, делитель in (("share_with_our", "checked"),):
-        n = итог["checked"]
-        итог[ключ] = round(итог["with_our"] / n, 4) if n else None
+            гр["without_any"] += 1
+            if len(итог["examples_without_any"]) < 5:
+                итог["examples_without_any"].append(
+                    {"signature": подпись, "filter": имя_ф,
+                      "slot": tx.get("slot"),
+                      "accounts": len(все_счета)})
+    n = итог["checked"]
+    итог["share_with_our"] = round(итог["with_our"] / n, 4) if n else None
+    итог["share_with_any"] = (round((итог["with_our"] + итог["with_booster"]) / n, 4)
+                               if n else None)
+    итог["share_without_any"] = (round(итог["without_any"] / n, 4) if n else None)
     итог["share_not_on_chain"] = (round(итог["not_on_chain"] / итог["checked"], 4)
                                    if итог["checked"] else None)
     итог["share_failed"] = (round(итог["failed"] / итог["checked"], 4)
@@ -218,7 +260,24 @@ def self_test() -> None:
     р3 = проверить_канал(h3, читать_журнал(ж, {"rabbit_ams"})["rabbit_ams"],
                           {"НАШ"}, выборка=10)
     chk("транзакция без нашего адреса названа и показана примером",
-        р3["without_our"] == 1 and р3["examples_without_our"][0]["slot"] == 7, р3)
+        р3["without_any"] == 1 and р3["examples_without_any"][0]["slot"] == 7, р3)
+
+    # Разгонный адрес: сообщение законное, но к источникам не относится.
+    tx_разгон = {"transaction": {"message": {"accountKeys": [
+        {"pubkey": "РАЗГОН"}, {"pubkey": "ЧУЖОЙ"}]}}, "meta": {"err": None},
+        "slot": 11}
+    h4 = HeliusЗаглушка({"A": tx_разгон, "B": tx_обычная})
+    р4 = проверить_канал(h4, читать_журнал(ж, {"rabbit_ams"})["rabbit_ams"],
+                          {"НАШ"}, выборка=10, прочие={"РАЗГОН"})
+    chk("сообщение разгонного не считается чужим",
+        р4["with_booster"] == 1 and р4["without_any"] == 0, р4)
+    chk("и разложено по фильтрам отдельно",
+        р4["by_group"]["src0"]["with_booster"] == 1
+        and р4["by_group"]["boost0"]["with_our"] == 1, р4["by_group"])
+    chk("выборка берётся по каждому фильтру, а не первые подряд",
+        {и for и, _ in выборка_по_группам(
+            читать_журнал(ж, {"rabbit_ams"})["rabbit_ams"], 1)} == {"src0", "boost0"},
+        выборка_по_группам(читать_журнал(ж, {"rabbit_ams"})["rabbit_ams"], 1))
 
     print(f"самопроверка проверки RabbitStream: {всего[1]}/{всего[0]}"
            f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
@@ -233,7 +292,11 @@ def main() -> int:
     p.add_argument("--channels", default="rabbit_ams,rabbit_fra,grpc,grpc2")
     p.add_argument("--tasks", default="BATCH-5,BATCH-3")
     p.add_argument("--config", default="data/final/20260923T145755Z/konfig.json")
-    p.add_argument("--sample", type=int, default=40)
+    p.add_argument("--sample", type=int, default=40,
+                    help="сколько подписей проверять НА КАЖДЫЙ фильтр")
+    p.add_argument("--boosters", default="",
+                    help="разгонные адреса через запятую: их сообщения "
+                          "законны, но к источникам отношения не имеют")
     p.add_argument("--out", default="data/feed_rabbit_verify.json")
     a = p.parse_args()
     if a.self_test:
@@ -245,7 +308,9 @@ def main() -> int:
     задачи = tuple(x.strip() for x in a.tasks.split(",") if x.strip())
     ист, откуда = BD.источники(задачи, Path(a.config))
     наши = set(ист)
-    print(f"наших адресов: {len(наши)}, откуда: {откуда}")
+    разгонные = {x.strip() for x in a.boosters.split(",") if x.strip()}
+    print(f"адресов источников: {len(наши)}, откуда: {откуда}; "
+           f"разгонных: {len(разгонные)}")
     каналы = {x.strip() for x in a.channels.split(",") if x.strip()}
     журнал = читать_журнал(Path(a.journal), каналы)
     helius = BD.Helius(служба="feed_rabbit_verify")
@@ -253,20 +318,28 @@ def main() -> int:
              "sources_from": откуда, "our_addresses": len(наши),
              "sample": a.sample, "channels": {}}
     for канал in sorted(журнал):
-        р = проверить_канал(helius, журнал[канал], наши, выборка=a.sample)
+        р = проверить_канал(helius, журнал[канал], наши, выборка=a.sample,
+                             прочие=разгонные)
         итог["channels"][канал] = р
-        доля = ("?" if р["share_with_our"] is None
-                 else f"{р['share_with_our'] * 100:.1f} %")
         print(f"{канал}: сообщений {р['messages']}, разных подписей "
-               f"{р['unique']}, повторов {р['duplicates']}; проверено "
-               f"{р['checked']}, с нашим адресом {р['with_our']} ({доля}), "
-               f"только через ALT {р['only_via_alt']}, без нашего "
-               f"{р['without_our']}, нет в цепи {р['not_on_chain']}, "
-               f"упало {р['failed']}")
-        print(f"   по фильтрам: {json.dumps(р['by_filter'], ensure_ascii=False)}")
-        for пример in р["examples_without_our"]:
-            print(f"   без нашего адреса: {пример['signature'][:14]} "
-                   f"слот {пример['slot']}, счетов {пример['accounts']}")
+               f"{р['unique']}, повторов {р['duplicates']}")
+        print(f"   по фильтрам (все сообщения): "
+               f"{json.dumps(р['by_filter'], ensure_ascii=False)}")
+        for имя_ф, гр in sorted(р["by_group"].items()):
+            n = гр["checked"] or 1
+            print(f"   фильтр {имя_ф}: проверено {гр['checked']}, "
+                   f"с адресом источника {гр['with_our']} "
+                   f"({гр['with_our'] / n * 100:.1f} %), с разгонным "
+                   f"{гр['with_booster']}, ни с одним нашим "
+                   f"{гр['without_any']}, упало {гр['failed']} "
+                   f"({гр['failed'] / n * 100:.1f} %), нет в цепи "
+                   f"{гр['not_on_chain']}")
+        print(f"   всего по каналу: только через ALT {р['only_via_alt']}, "
+               f"ни с одним нашим адресом {р['without_any']}")
+        for пример in р["examples_without_any"]:
+            print(f"   ни одного нашего адреса: {пример['signature'][:14]} "
+                   f"(фильтр {пример['filter']}), слот {пример['slot']}, "
+                   f"счетов {пример['accounts']}")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(итог, ensure_ascii=False, indent=1),
                             encoding="utf-8")
