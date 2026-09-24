@@ -152,6 +152,7 @@ jobs:
           GRPC_FEED3_URL: ${{ secrets.GRPC_FEED3_URL }}
           GRPC_FEED4_URL: ${{ secrets.GRPC_FEED4_URL }}
           GRPC_FEED_AUTH_HEADER: ${{ secrets.GRPC_FEED_AUTH_HEADER }}
+          DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
           set -e
           # Общий /etc/bloom-executor/env НЕ переписывается ни одной строкой:
@@ -174,6 +175,11 @@ jobs:
           echo "вторая подписка Helius в зонде: $HELIUS_WS"
           echo "окно замера: $WINDOW_S с, потолок окна: $WINDOW_CAP кредитов,"
           echo "после окна потолок прогноза: $PROJ_LIMIT в сутки"
+          if [ -z "$DBOT_API_KEY" ]; then
+            echo "DBOT_API_KEY: НЕ задан -- зонд пойдёт по снимку источников"
+          else
+            echo "DBOT_API_KEY: задан, длина ${#DBOT_API_KEY}"
+          fi
           if [ -z "$GRPC_FEED_URL" ]; then
             echo "GRPC_FEED_URL не задан -- второй канал не включится"
           else
@@ -204,6 +210,13 @@ jobs:
             printf 'PROBE_WINDOW_CAP=%s\n' "$WINDOW_CAP"
             printf 'PROBE_PROJECTION_LIMIT=%s\n' "$PROJ_LIMIT"
             printf 'PROBE_HELIUS_WS=%s\n' "$HELIUS_WS"
+            # Ключ DBot -- В СВОЙ env зонда. Он лежит и в общем env, но зонд
+            # его оттуда НЕ видит: 24.09 в 15:43 служба ушла в перезапуск по
+            # кругу с "DBOT_API_KEY не задан", тогда как детектор в ту же
+            # минуту работал на живом списке DBot. Зависеть от чужого файла
+            # там, где можно иметь свой, незачем. Зонд ходит в DBot ТОЛЬКО
+            # GET за списком источников -- задачи он не меняет и не удаляет.
+            [ -n "$DBOT_API_KEY" ] && printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY"
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
             # RabbitStream: свой адрес, ОБЩИЙ токен GRPC_FEED_TOKEN -- так
@@ -332,6 +345,18 @@ jobs:
               exit 1
             fi
             cat $STATE_DIR/heartbeat.json" | tee data/feed_probe_deploy.txt
+
+      - name: "Какие env читает юнит (для протокола)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- EnvironmentFile юнита и что в них видно ---"
+          } >> data/feed_probe_deploy.txt
+          # Имена переменных, а не значения: values не печатаем никогда.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl cat $SVC | grep -E '^(EnvironmentFile|Environment)=' ; echo '--- имена переменных в своём env зонда ---'; cut -d= -f1 $ENV_DIR/feed_probe_env | sort; echo '--- есть ли DBOT_API_KEY в общем env ---'; grep -c '^DBOT_API_KEY=' $ENV_DIR/env || echo 0" \
+            2>&1 | tee -a data/feed_probe_deploy.txt
 
       - name: "Хвост журнала службы"
         if: ${{ inputs.enable_service == 'yes' }}
