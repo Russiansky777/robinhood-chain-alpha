@@ -288,7 +288,8 @@ def запись_строки(путь: Path, строка: dict) -> None:
 
 def слушать_ws(гонка: Гонка, *, ключ: str, адреса: list, группы: dict,
                 стоп: threading.Event, журнал: Path | None = None,
-                учёт=None, отказы: "Отказы | None" = None) -> None:
+                учёт=None, отказы: "Отказы | None" = None,
+                состояние_подписок: dict | None = None) -> None:
     """Вторая, ОТДЕЛЬНАЯ подписка Helius. Соединение детектора не трогается."""
     import asyncio  # noqa: PLC0415
 
@@ -296,6 +297,14 @@ def слушать_ws(гонка: Гонка, *, ключ: str, адреса: li
 
     async def круг():
         url = BD.ws_url(ключ, True)
+        # По подписке НА АДРЕС: ответ на каждый запрос несёт свой номер
+        # подписки, и по нему сообщение однозначно относится к своему адресу.
+        # Без этого группы "источники" и "разгонные" не разделить: в теле
+        # сообщения адрес пришлось бы искать перебором, а при нескольких наших
+        # адресах в одной транзакции выбор был бы произвольным.
+        по_номеру: dict = {}
+        по_id: dict = {i: a for i, a in enumerate(адреса, 1)}
+        подтверждено = отказано = 0
         async with websockets.connect(url, ping_interval=20, ping_timeout=20,
                                        max_queue=None) as ws:
             for i, a in enumerate(адреса, 1):
@@ -303,13 +312,24 @@ def слушать_ws(гонка: Гонка, *, ключ: str, адреса: li
                     "jsonrpc": "2.0", "id": i, "method": "transactionSubscribe",
                     "params": [{"accountInclude": [a], "failed": False,
                                  "vote": False},
+                                # Детали -- FULL, ровно как у детектора: иначе
+                                # зонд мерил бы более лёгкий ответ, чем тот, за
+                                # который детектор платит на самом деле, и
+                                # сравнение отвечало бы не на тот вопрос.
                                 {"commitment": "processed",
-                                 "transactionDetails": "signatures",
+                                 "transactionDetails": "full",
                                  "encoding": "jsonParsed",
                                  "showRewards": False,
-                                 "maxSupportedTransactionVersion": 0}]}))
+                                 "maxSupportedTransactionVersion":
+                                     BD.ПОТОЛОК_ВЕРСИИ_TX}]}))
             while not стоп.is_set():
-                сырое = await asyncio.wait_for(ws.recv(), timeout=60)
+                try:
+                    сырое = await asyncio.wait_for(ws.recv(), timeout=60)
+                except asyncio.TimeoutError:
+                    # Тишина -- это не обрыв. Наши 19 источников молчат
+                    # минутами, и переподключаться на каждую тишину значило бы
+                    # рвать замер на ровном месте: соединение держит ping.
+                    continue
                 t = time.monotonic()          # метка ДО разбора
                 if учёт is not None:
                     учёт(len(сырое or ""))
@@ -317,35 +337,46 @@ def слушать_ws(гонка: Гонка, *, ключ: str, адреса: li
                     j = json.loads(сырое)
                 except ValueError:
                     continue
+                # Ответ на запрос подписки: номер подписки или отказ. Молча
+                # это глотать нельзя -- отказ подписки выглядел бы как "канал
+                # просто ничего не присылает".
+                if j.get("id") is not None and "params" not in j:
+                    адрес = по_id.get(j.get("id"))
+                    if isinstance(j.get("result"), int):
+                        по_номеру[j["result"]] = адрес
+                        подтверждено += 1
+                    else:
+                        отказано += 1
+                        если_отказ = (j.get("error") or {})
+                        if отказы is not None:
+                            отказы.записать(КАНАЛ_WS, RuntimeError(
+                                f"подписка отклонена: {str(если_отказ)[:180]}"))
+                    if состояние_подписок is not None:
+                        состояние_подписок[КАНАЛ_WS] = {
+                            "confirmed": подтверждено, "rejected": отказано,
+                            "requested": len(адреса)}
+                    continue
                 п = ((j.get("params") or {}).get("result") or {})
+                номер = (j.get("params") or {}).get("subscription")
                 tx = (п.get("transaction") or {})
-                подписи = ((tx.get("transaction") or {}).get("signatures") or [])
-                подпись = подписи[0] if подписи else None
+                подпись = (п.get("signature")
+                            or (((tx.get("transaction") or {}).get("signatures")
+                                  or [None])[0]))
                 if not подпись:
                     continue
+                адрес = по_номеру.get(номер)
                 пара = гонка.пришло(КАНАЛ_WS, подпись, слот=п.get("slot"), t=t,
-                                     группа=группы.get(подпись, ГРУППА_НАША))
+                                     группа=группы.get(адрес, ГРУППА_НАША))
                 if журнал is not None:
                     запись_строки(журнал, {"channel": КАНАЛ_WS, "signature": подпись,
                                             "slot": п.get("slot"), "t": t,
-                                            "pair": пара})
-
-    while not стоп.is_set():
-        try:
-            asyncio.run(круг())
-        except Exception as exc:  # noqa: BLE001
-            з = отказы.записать(КАНАЛ_WS, exc) if отказы is not None else None
-            if журнал is not None:
-                запись_строки(журнал, {"channel": КАНАЛ_WS, "error":
-                                        f"{type(exc).__name__}: {str(exc)[:200]}",
-                                        "fail": з})
-            time.sleep(2.0)
-
+                                            "address": адрес, "pair": пара})
 
 def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: str, токен: str,
                   адреса: list, стоп: threading.Event,
                   заголовок: str = "x-token", журнал: Path | None = None,
-                  отказы: "Отказы | None" = None) -> None:
+                  отказы: "Отказы | None" = None, группы: dict | None = None,
+                  состояние_подписок: dict | None = None) -> None:
     """Подписка Yellowstone. Токен уходит В МЕТАДАННЫХ и нигде не печатается."""
     import grpc  # noqa: PLC0415
 
@@ -354,16 +385,29 @@ def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: 
     import geyser_pb2_grpc as pbg  # noqa: PLC0415
 
     цель, безопасно = адрес_grpc(url)
+    группы = группы or {}
 
     def запрос():
+        """Запрос с ОТДЕЛЬНЫМ фильтром на каждый адрес.
+
+        Два выигрыша разом: в ответе приходит имя сработавшего фильтра, и по
+        нему сообщение относится к своему адресу (иначе группы "источники" и
+        "разгонные" не разделить); и поток запросов НЕ закрывается -- после
+        первого запроса генератор ждёт остановки. Закрытая половина потока у
+        части серверов означает конец подписки, и канал молча замолкает.
+        """
         req = pb.SubscribeRequest()
-        подписка = req.transactions["probe"]
-        подписка.vote = False
-        подписка.failed = False
-        for a in адреса:
+        for i, a in enumerate(адреса):
+            подписка = req.transactions[f"a{i}"]
+            подписка.vote = False
+            подписка.failed = False
             подписка.account_include.append(a)
         req.commitment = pb.CommitmentLevel.PROCESSED
         yield req
+        while not стоп.is_set():
+            time.sleep(0.5)
+
+    по_фильтру = {f"a{i}": a for i, a in enumerate(адреса)}
 
     while not стоп.is_set():
         try:
@@ -373,29 +417,40 @@ def слушать_grpc(гонка: Гонка, *, канал_имя: str, url: 
             with канал:
                 клиент = pbg.GeyserStub(канал)
                 мета = ((заголовок, токен),) if токен else ()
-                for ответ in клиент.Subscribe(запрос(), metadata=мета):
+                поток = клиент.Subscribe(запрос(), metadata=мета)
+                if состояние_подписок is not None:
+                    состояние_подписок[канал_имя] = {
+                        "requested": len(адреса), "connected": True}
+                for ответ in поток:
                     t = time.monotonic()      # метка ДО разбора
                     if стоп.is_set():
                         break
                     if not ответ.HasField("transaction"):
                         continue
                     сд = ответ.transaction
-                    подпись = None
                     try:
-                        сырьё = сд.transaction.signature
-                        подпись = _base58(сырьё)
+                        подпись = _base58(сд.transaction.signature)
                     except Exception:  # noqa: BLE001
                         подпись = None
                     if not подпись:
                         continue
-                    пара = гонка.пришло(канал_имя, подпись, слот=сд.slot, t=t)
+                    адрес = None
+                    for имя_ф in (ответ.filters or []):
+                        адрес = по_фильтру.get(имя_ф)
+                        if адрес:
+                            break
+                    пара = гонка.пришло(канал_имя, подпись, слот=сд.slot, t=t,
+                                         группа=группы.get(адрес, ГРУППА_НАША))
                     if журнал is not None:
                         запись_строки(журнал, {"channel": канал_имя,
                                                 "signature": подпись,
                                                 "slot": сд.slot, "t": t,
-                                                "pair": пара})
+                                                "address": адрес, "pair": пара})
         except Exception as exc:  # noqa: BLE001
             з = отказы.записать(канал_имя, exc) if отказы is not None else None
+            if состояние_подписок is not None:
+                состояние_подписок[канал_имя] = {"requested": len(адреса),
+                                                  "connected": False}
             if журнал is not None:
                 запись_строки(журнал, {"channel": канал_имя, "error":
                                         f"{type(exc).__name__}: {str(exc)[:200]}",
@@ -507,6 +562,19 @@ def self_test() -> None:
     chk("отказы считаются по каналам",
         о.сводка()["count"][КАНАЛ_GRPC] == 1, о.сводка())
 
+    # 2д. Группа берётся по АДРЕСУ подписки. Если карта групп пуста, всё
+    # молча считается нашими источниками -- разбиение из доклада исчезает.
+    карта = {"ИСТ1": ГРУППА_НАША, "РАЗГОН1": ГРУППА_РАЗГОН}
+    г_гр = Гонка()
+    г_гр.пришло(КАНАЛ_GRPC, "X", t=1.0, группа=карта.get("РАЗГОН1", ГРУППА_НАША))
+    г_гр.пришло(КАНАЛ_WS, "X", t=1.05, группа=карта.get("РАЗГОН1", ГРУППА_НАША))
+    chk("сообщение по разгонному адресу попало в свою группу",
+        г_гр.сводка()["by_group"].get(ГРУППА_РАЗГОН, {}).get("pairs") == 1
+        and ГРУППА_НАША not in г_гр.сводка()["by_group"],
+        г_гр.сводка()["by_group"])
+    chk("неизвестный адрес по умолчанию считается нашим источником",
+        карта.get("НЕТ_ТАКОГО", ГРУППА_НАША) == ГРУППА_НАША)
+
     # 3. Группы считаются раздельно.
     г2 = Гонка()
     г2.пришло(КАНАЛ_GRPC, "A", t=1.0, группа=ГРУППА_НАША)
@@ -613,8 +681,15 @@ def main() -> int:
     helius = BD.Helius(служба="grpc_feed_probe")
     разгон = разгонные_по_цепи(helius, сколько=a.boosters,
                                 исключить=set(источники))
-    адреса = list(источники) + list(разгон.get("accounts") or [])
-    группы: dict = {}
+    разгонные = list(разгон.get("accounts") or [])
+    адреса = list(источники) + разгонные
+    # Группа определяется по АДРЕСУ подписки, а не по подписи: у одной
+    # транзакции наших адресов может быть несколько, и выбор "по подписи" был
+    # бы произвольным. Пустая карта означала бы, что все сообщения считаются
+    # нашими источниками -- разбиение из доклада исчезло бы молча.
+    группы: dict = {a: ГРУППА_НАША for a in источники}
+    группы.update({a: ГРУППА_РАЗГОН for a in разгонные})
+    состояние_подписок: dict = {}
 
     гонка = Гонка()
     отказы = Отказы()
@@ -627,7 +702,8 @@ def main() -> int:
             target=слушать_ws, args=(гонка,),
             kwargs={"ключ": ключ, "адреса": адреса, "группы": группы,
                      "стоп": стоп, "журнал": журнал,
-                     "учёт": helius.учесть_вебсокет, "отказы": отказы},
+                     "учёт": helius.учесть_вебсокет, "отказы": отказы,
+                     "состояние_подписок": состояние_подписок},
             name="ws", daemon=True))
     цель_grpc: dict = {}
     for имя, префикс in ((КАНАЛ_GRPC, "GRPC_FEED"), (КАНАЛ_GRPC2, "GRPC_FEED2")):
@@ -648,7 +724,9 @@ def main() -> int:
                      "токен": os.environ.get(f"{префикс}_TOKEN", ""),
                      "адреса": адреса, "стоп": стоп,
                      "заголовок": os.environ.get("GRPC_FEED_AUTH_HEADER", "x-token"),
-                     "журнал": журнал, "отказы": отказы},
+                     "журнал": журнал, "отказы": отказы,
+                     "группы": группы,
+                     "состояние_подписок": состояние_подписок},
             name=имя, daemon=True))
 
     t0 = time.time()
@@ -679,6 +757,7 @@ def main() -> int:
                 "boosters_why_not": (None if разгон.get("known")
                                       else разгон.get("why_not")),
                 "grpc_target": цель_grpc,
+                "subscriptions": dict(состояние_подписок),
                 "failures": отказы.сводка(),
                 "summary": с})
             if дедлайн and time.time() > дедлайн:
