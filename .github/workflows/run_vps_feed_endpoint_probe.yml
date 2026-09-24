@@ -1,0 +1,132 @@
+name: "NL-хост: где терминируется наш поток Helius (только чтение)"
+
+# Вопрос владельца: где физически оканчивается наш wss://mainnet.helius-rpc.com.
+# Ответ дают только замеры С ХОСТА: из облачного бегунка маршрут другой.
+#
+# Что снимается:
+#   * IP, в который резолвится имя, и RTT до него (ICMP и, если ICMP закрыт,
+#     время TCP-соединения curl -- оно RTT не хуже);
+#   * traceroute (ICMP и TCP на 443, потому что ICMP часто режут);
+#   * whois/ASN владельца адреса -- страна и организация;
+#   * заголовки ответа на HTTP-запрос к тому же хосту: у Cloudflare это cf-ray
+#     с кодом колокации (три буквы в конце -- код аэропорта), у других
+#     поставщиков -- свои заголовки вроде x-served-by.
+#
+# Ключ не печатается: запрос идёт на голый URL без строки запроса, в формате
+# -w нет url_effective, тело уходит в /dev/null. Отдельный шаг роняет прогон,
+# если в отчёте окажется api-key или x-token со значением.
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "хост для замера"
+        required: false
+        default: "mainnet.helius-rpc.com"
+
+concurrency:
+  group: vps-feed-endpoint-probe
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Имена переменных оболочки -- только ASCII"
+        run: |
+          set -e
+          cd analysis
+          python3 check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер с хоста"
+        run: |
+          set -e
+          TARGET="${{ inputs.host }}"
+          ssh -n $SSH_OPTS root@$HOST "
+            set +e
+            TARGET='$TARGET'
+            echo '=== имя и адреса ==='
+            getent hosts \$TARGET || echo '  getent не отдал адрес'
+            IPS=\$(getent ahostsv4 \$TARGET | awk '{print \$1}' | sort -u)
+            echo \"адреса v4: \$IPS\"
+            echo
+            echo '=== RTT (ICMP, 10 пакетов) ==='
+            ping -c 10 -W 2 \$TARGET 2>&1 | tail -3 || echo '  ICMP закрыт'
+            echo
+            echo '=== RTT по TCP-соединению (curl, 5 замеров) ==='
+            for i in 1 2 3 4 5; do
+              curl -sS -o /dev/null -w '  tcp=%{time_connect} tls=%{time_appconnect} ttfb=%{time_starttransfer}\n' \
+                https://\$TARGET/ 2>/dev/null || echo '  отказ'
+            done
+            echo
+            echo '=== traceroute ICMP ==='
+            which traceroute >/dev/null 2>&1 || apt-get install -y --no-install-recommends traceroute >/dev/null 2>&1
+            traceroute -n -w 2 -q 1 -m 20 \$TARGET 2>&1 | tail -25 || echo '  traceroute недоступен'
+            echo
+            echo '=== traceroute TCP 443 (ICMP часто режут) ==='
+            traceroute -n -T -p 443 -w 2 -q 1 -m 20 \$TARGET 2>&1 | tail -25 || echo '  TCP-traceroute недоступен'
+            echo
+            echo '=== whois и ASN по каждому адресу ==='
+            which whois >/dev/null 2>&1 || apt-get install -y --no-install-recommends whois >/dev/null 2>&1
+            for IP in \$IPS; do
+              echo \"-- \$IP\"
+              whois \$IP 2>/dev/null | grep -iE '^(netname|orgname|org-name|organization|country|descr|origin|originas|city):' | head -12
+            done
+            echo
+            echo '=== заголовки ответа (код колокации, если есть) ==='
+            curl -sS -D - -o /dev/null https://\$TARGET/ 2>/dev/null \
+              | grep -iE '^(HTTP/|server|cf-ray|cf-cache|x-served-by|x-cache|via|alt-svc|fly-region|x-amz-cf-pop)' \
+              || echo '  заголовков про точку присутствия нет'
+          " 2>&1 | tee data/feed_endpoint_probe.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, sys
+          текст = open("data/feed_endpoint_probe.txt", encoding="utf-8", errors="replace").read()
+          плохо = []
+          for имя, образец in (("api-key", r"api-key=[A-Za-z0-9\-_]{8,}"),
+                                ("x-token", r"x-token:\s*[A-Za-z0-9\-_.]{8,}"),
+                                ("Bearer", r"Bearer\s+[A-Za-z0-9\-_.]{8,}")):
+              if re.search(образец, текст, re.I):
+                  плохо.append(f"в отчёте видно {имя} со значением")
+          if плохо:
+              print("\n".join(плохо)); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/feed_endpoint_probe.txt ] && git add data/feed_endpoint_probe.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Поток: где терминируется Helius -- замер с хоста [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
