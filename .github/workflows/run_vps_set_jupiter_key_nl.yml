@@ -1,0 +1,124 @@
+name: "Jupiter Swap V2: ключ на хост (read/set)"
+
+# Слово владельца 25.09: сторож должен продавать через Swap V2, Ultra --
+# запасной. Путь выбирается в bloom_jupiter_sell.продать по наличию
+# JUPITER_API_KEY: ключ есть -> swap-v2, ключа нет -> ultra. Значит всё, что
+# нужно для V2, -- это положить ключ в env службы.
+#
+# Режим read НИЧЕГО не меняет: печатает только ИМЕНА переменных, которые
+# есть в env (значения не печатаются никогда), и что сторож пишет о себе.
+# Режим set пишет ключ (бэкап env перед правкой) и перезапускает сторожа.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "read -- что есть в env сейчас; set -- положить ключ"
+        required: true
+        default: "read"
+      restart:
+        description: "'yes' -- перезапустить сторожа после записи"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: bloom-seller-deploy
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  key:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Что есть в env сейчас (только имена, без значений)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            for NAME in JUPITER_API_KEY JUPITER_SWAP_V2_BASE BLOOM_JUP_API BLOOM_SELL_VIA_JUPITER EXEC_WALLET_KEY BLOOM_JUP_FLOOR_PCT BLOOM_JUP_MIN_QUOTE_PCT BLOOM_LIVE_SELL BLOOM_SELL_MAX_ATTEMPTS; do
+              if grep -q \"^\$NAME=\" $ENV_DIR/env 2>/dev/null; then
+                V=\$(grep \"^\$NAME=\" $ENV_DIR/env | tail -1 | cut -d= -f2-)
+                case \"\$NAME\" in
+                  JUPITER_API_KEY|EXEC_WALLET_KEY) echo \"\$NAME: задан, длина \${#V}\";;
+                  *) echo \"\$NAME=\$V\";;
+                esac
+              else
+                echo \"\$NAME: НЕТ в env\"
+              fi
+            done
+            echo '--- сторож о себе ---'
+            python3 -c \"
+          import json
+          try:
+              d = json.load(open('$STATE_DIR/seller_heartbeat.json'))
+          except Exception as exc:
+              print('признак жизни сторожа не прочитан:', type(exc).__name__)
+              raise SystemExit(0)
+          for k in ('updated_utc', 'mode', 'jupiter', 'exit_path', 'via_jupiter'):
+              if k in d:
+                  print(k, '=', json.dumps(d[k], ensure_ascii=False)[:300])
+          \"
+          "
+
+      - name: "Записать JUPITER_API_KEY и перезапустить сторожа"
+        if: ${{ inputs.mode == 'set' }}
+        env:
+          JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY }}
+          RESTART: ${{ inputs.restart }}
+        run: |
+          set -e
+          if [ -z "$JUPITER_API_KEY" ]; then
+            echo "секрет JUPITER_API_KEY пуст -- писать нечего"
+            exit 1
+          fi
+          echo "ключ получен из секретов, длина ${#JUPITER_API_KEY}"
+          # Ключ уезжает ПОТОКОМ: ни в списке процессов, ни в журнале его нет.
+          printf '%s' "$JUPITER_API_KEY" | ssh $SSH_OPTS root@127.0.0.1 "
+            set -e
+            V=\$(cat)
+            f=$ENV_DIR/env
+            cp -a \"\$f\" \"\$f.bak.\$(date +%s)\"
+            sed -i '/^JUPITER_API_KEY=/d' \"\$f\"
+            umask 077
+            printf 'JUPITER_API_KEY=%s\n' \"\$V\" >> \"\$f\"
+            chmod 600 \"\$f\"
+            chown root:root \"\$f\"
+            echo \"строк JUPITER_API_KEY в env: \$(grep -c '^JUPITER_API_KEY=' \"\$f\")\"
+            if [ '$RESTART' = 'yes' ]; then
+              systemctl restart bloom-seller
+              sleep 6
+              systemctl is-active bloom-seller
+            fi
+          "
+
+      - name: "Проверить, что путь V2 виден коду службы"
+        if: ${{ inputs.mode == 'set' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . $ENV_DIR/env; set +a
+            cd /home/bot/bloom_seller 2>/dev/null || cd /home/bot/bloom_executor
+            /home/bot/robinhood-chain-alpha/venv/bin/python -c \"
+          import sys
+          sys.path.insert(0, '/home/bot/robinhood-chain-alpha/analysis')
+          from dbot_rescue import jup_v2_key_present, JUP_SWAP_V2
+          ок, почему = jup_v2_key_present()
+          print('ключ V2 виден коду:', ок, '|', почему)
+          print('адрес V2:', JUP_SWAP_V2)
+          \"
+          "
