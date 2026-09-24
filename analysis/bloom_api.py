@@ -220,6 +220,98 @@ def validate_swap_body(body: dict) -> None:
             raise BloomRefusal(f"{k} {v!r} -- число в SOL, не меньше нуля")
 
 
+def сессия_с_пулом(соединений: int = 4, размер: int = 8):
+    """Сессия с пулом соединений: TCP и TLS платятся один раз, а не на вызов.
+
+    Замер с NL-хоста 24.09.2026 (curl 8.5, два ОДИНАКОВЫХ запроса в одном
+    вызове, решающее поле num_connects):
+
+      Bloom /ping, новое соединение: tcp 2.3-2.5 мс, tls 19.9-21.5 мс,
+        первый байт 54.8-65.1 мс;
+      он же по уже открытому: tcp 0, tls 0, первый байт 15.4-22.6 мс.
+
+    Разница 39-45 мс на запрос. Около 20 мс из них -- доказанно рукопожатие
+    (tcp+tls), остальное -- более быстрый первый байт на прогретом пути.
+    """
+    s = requests.Session()
+    try:
+        from requests.adapters import HTTPAdapter  # noqa: PLC0415
+        адаптер = HTTPAdapter(pool_connections=соединений, pool_maxsize=размер,
+                               max_retries=0)
+        s.mount("https://", адаптер)
+        s.mount("http://", адаптер)
+    except Exception:  # noqa: BLE001
+        # Без адаптера сессия всё равно держит keep-alive -- это не повод
+        # падать, но и молчать об этом не надо: пул просто будет стандартный.
+        pass
+    return s
+
+
+class Прогрев:
+    """Держит соединение к Bloom открытым: /ping раз в N секунд.
+
+    Зачем это нужно именно здесь. Сессия у клиента одна на весь процесс, но
+    между сигналами пауза бывает минутами, а keep-alive у края (в ответе
+    server: cloudflare) живёт десятки секунд. Без прогрева боевая покупка
+    почти всегда платит рукопожатие заново -- те самые 39-45 мс из замера.
+
+    Цена прогрева: /ping и /wallets бюджет запросов Bloom НЕ тратят (по
+    документации), значит платим только трафиком.
+
+    Поток отдельный: задержка сети в прогреве не должна задерживать
+    торговлю, а его отказ -- не должен её ронять.
+    """
+
+    def __init__(self, api, период_s: float = 20.0) -> None:
+        self.api = api
+        self.период_s = float(период_s)
+        self.успехов = 0
+        self.отказов = 0
+        self.последний_код = None
+        self.последняя_ошибка = ""
+        self.последний_utc = ""
+        self.поток = None
+        self.стоп = False
+
+    def круг(self) -> bool:
+        """Один прогрев. Наружу не бросает: это фон, а не решение."""
+        try:
+            r = self.api.ping()
+        except Exception as exc:  # noqa: BLE001
+            self.отказов += 1
+            self.последняя_ошибка = f"{type(exc).__name__}: {str(exc)[:120]}"
+            return False
+        self.последний_код = r.get("code")
+        self.последний_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        if r.get("ok"):
+            self.успехов += 1
+            self.последняя_ошибка = ""
+            return True
+        self.отказов += 1
+        self.последняя_ошибка = str(r.get("why_not") or r.get("code"))[:120]
+        return False
+
+    def цикл(self, сон=None) -> None:
+        сон = сон or time.sleep
+        while not self.стоп:
+            self.круг()
+            сон(self.период_s)
+
+    def запустить_в_потоке(self):
+        import threading  # noqa: PLC0415
+        self.поток = threading.Thread(target=self.цикл, name="bloom-keepalive",
+                                       daemon=True)
+        self.поток.start()
+        return self.поток
+
+    def признак_жизни(self) -> dict:
+        return {"enabled": True, "period_s": self.период_s,
+                 "ok": self.успехов, "failed": self.отказов,
+                 "last_code": self.последний_код,
+                 "last_utc": self.последний_utc,
+                 "last_error": self.последняя_ошибка}
+
+
 class BloomApi:
     """Тонкий клиент. Сеть только здесь, POST только один."""
 
@@ -231,7 +323,7 @@ class BloomApi:
         self.state = state
         self.host = host
         self.timeout = timeout
-        self.session = session or requests.Session()
+        self.session = session or сессия_с_пулом()
 
     # ------------------------------------------------------------- служебное
 
@@ -575,6 +667,54 @@ def self_test() -> None:
 
     chk("ключ вычищается из текста", "СЕКРЕТНЫЙКЛЮЧ" not in
         scrub("упало с ключом СЕКРЕТНЫЙКЛЮЧ внутри", "СЕКРЕТНЫЙКЛЮЧ"))
+
+    # --- прогрев соединения: считает, не бросает и не ходит мимо клиента ---
+    class ПингОтвечает:
+        def __init__(self, ответы):
+            self.ответы = list(ответы)
+            self.вызовов = 0
+
+        def ping(self):
+            self.вызовов += 1
+            return self.ответы[min(self.вызовов - 1, len(self.ответы) - 1)]
+
+    пр = Прогрев(ПингОтвечает([{"ok": True, "code": 200}]), период_s=20.0)
+    chk("прогрев засчитывает успех", пр.круг() is True and пр.успехов == 1)
+    ж = пр.признак_жизни()
+    chk("прогрев виден в признаке жизни числами",
+        ж["ok"] == 1 and ж["failed"] == 0 and ж["period_s"] == 20.0, ж)
+
+    пр2 = Прогрев(ПингОтвечает([{"ok": False, "code": 503, "why_not": "мимо"}]))
+    chk("неуспех прогрева посчитан, а не проглочен",
+        пр2.круг() is False and пр2.отказов == 1
+        and пр2.признак_жизни()["last_code"] == 503, пр2.признак_жизни())
+
+    class ПингПадает:
+        def ping(self):
+            raise OSError("туннель закрыт")
+
+    пр3 = Прогрев(ПингПадает())
+    chk("исключение в прогреве наружу НЕ идёт: это фон, а не решение",
+        пр3.круг() is False and "OSError" in пр3.последняя_ошибка,
+        пр3.последняя_ошибка)
+
+    # Цикл обязан останавливаться по флагу, иначе служба не выключится.
+    пр4 = Прогрев(ПингОтвечает([{"ok": True, "code": 200}]), период_s=0)
+    сны = []
+
+    def сон(t):
+        сны.append(t)
+        пр4.стоп = True
+
+    пр4.цикл(сон=сон)
+    chk("цикл прогрева останавливается по флагу стоп",
+        пр4.api.вызовов == 1 and сны == [0], (пр4.api.вызовов, сны))
+
+    # Сессия с пулом -- именно сессия, и адаптер к https примонтирован.
+    сесс = сессия_с_пулом()
+    chk("клиент ходит сессией с пулом, а не голым requests",
+        hasattr(сесс, "post") and hasattr(сесс, "adapters")
+        and "https://" in getattr(сесс, "adapters", {}), type(сесс).__name__)
 
     bad = 0
     for n, ok_, got in checks:

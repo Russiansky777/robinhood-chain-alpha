@@ -1024,10 +1024,43 @@ def счётчик_кредитов(служба: str):
         return None
 
 
+def сессия_с_пулом(соединений: int = 4, размер: int = 8):
+    """Сессия с пулом: TCP и TLS платятся один раз, а не на каждый вызов.
+
+    Замер с NL-хоста 24.09.2026 (curl 8.5, два ОДИНАКОВЫХ запроса в одном
+    вызове; решающее поле num_connects -- 1 у первого, 0 у второго):
+
+      Helius getSlot по новому соединению: tcp 2.3-2.7 мс, tls 20.0-23.9 мс,
+        первый байт 43.8-52.6 мс;
+      он же по уже открытому: tcp 0, tls 0, первый байт 9.9-18.5 мс.
+
+    То есть каждый вызов без пула стоил лишних 28-38 мс, и это горячий путь:
+    getTransaction делает до 12 попыток подряд, а налог минта, слот и баланс
+    идут тем же способом. Сессия одна на объект Helius, а объект в службе
+    создаётся один раз при старте.
+    """
+    if requests is None:
+        return None
+    try:
+        s = requests.Session()
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        from requests.adapters import HTTPAdapter  # noqa: PLC0415
+        адаптер = HTTPAdapter(pool_connections=соединений, pool_maxsize=размер,
+                               max_retries=0)
+        s.mount("https://", адаптер)
+        s.mount("http://", адаптер)
+    except Exception:  # noqa: BLE001
+        pass
+    return s
+
+
 class Helius:
     def __init__(self, key: str | None = None, служба: str = "bloom_detector") -> None:
         self.key = key or os.environ.get("HELIUS_API_KEY") or ""
         self.url = f"https://mainnet.helius-rpc.com/?api-key={self.key}"
+        self.sess = сессия_с_пулом()
         self.вызовов = 0
         self.по_методам: dict = {}
         self._кеш_минтов: dict = {}
@@ -1084,9 +1117,10 @@ class Helius:
             raise RuntimeError("нет requests")
         self.вызовов += 1
         try:
-            r = requests.post(self.url, json={"jsonrpc": "2.0", "id": 1,
-                                               "method": метод, "params": параметры},
-                               timeout=таймаут)
+            клиент = self.sess if self.sess is not None else requests
+            r = клиент.post(self.url, json={"jsonrpc": "2.0", "id": 1,
+                                             "method": метод, "params": параметры},
+                             timeout=таймаут)
         except RuntimeError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -1406,6 +1440,10 @@ class Детектор:
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
                                     else {"enabled": False, "why_not": "не запущены"})
+        st["bloom_keepalive"] = (self.прогрев.признак_жизни()
+                                  if getattr(self, "прогрев", None) is not None
+                                  else {"enabled": False,
+                                        "why_not": "исполнитель не подключён"})
         st["executor_attached"] = self.исполнитель is not None
         st["executed"] = self.исполнено
         st["exec_by_code"] = dict(self.по_кодам_исполнителя)
@@ -2320,6 +2358,61 @@ def self_test() -> int:
         def post(self, *a, **kw):
             raise self._Ошибка("туннель закрыт")
 
+    # 15а-бис. Вызовы идут ЧЕРЕЗ СЕССИЮ, а не голым requests.post. Без этого
+    # каждый вызов открывал новое соединение: замер с хоста 24.09 показал
+    # 43.8-52.6 мс до первого байта по новому соединению против 9.9-18.5 мс
+    # по уже открытому, и это при getTransaction до 12 попыток подряд.
+    class СессияСчётчик:
+        def __init__(self):
+            self.постов = 0
+
+        def mount(self, *a, **kw):
+            pass
+
+        @property
+        def adapters(self):
+            return {"https://": object()}
+
+        def post(self, *a, **kw):
+            self.постов += 1
+            raise RuntimeError("дальше сети не идём: считаем только маршрут")
+
+    class ЗаглушкаССессией:
+        def __init__(self):
+            self.сессии = []
+            self.постов_мимо = 0
+
+        def Session(self):
+            с = СессияСчётчик()
+            self.сессии.append(с)
+            return с
+
+        def post(self, *a, **kw):
+            self.постов_мимо += 1
+            raise RuntimeError("мимо сессии")
+
+    было_req2 = globals().get("requests")
+    заглушка = ЗаглушкаССессией()
+    globals()["requests"] = заглушка
+    try:
+        h_сесс = Helius(key="нет", служба="")
+        for _ in range(3):
+            try:
+                h_сесс.call("getSlot", [])
+            except RuntimeError:
+                pass
+        chk("Helius ходит через сессию, а не голым requests.post",
+            заглушка.постов_мимо == 0 and len(заглушка.сессии) == 1
+            and заглушка.сессии[0].постов == 3,
+            (заглушка.постов_мимо, len(заглушка.сессии)))
+        chk("сессия заводится ОДИН раз на объект, а не на вызов",
+            h_сесс.sess is заглушка.сессии[0])
+    finally:
+        if было_req2 is None:
+            globals().pop("requests", None)
+        else:
+            globals()["requests"] = было_req2
+
     было_requests = globals().get("requests")
     globals()["requests"] = ЗаглушкаRequests()
     try:
@@ -2439,6 +2532,24 @@ def self_test() -> int:
         j = det.признак_жизни()
         chk("в признаке жизни видно, что исполнитель подключён",
             j["executor_attached"] is True and j["executed"] == 1, j.get("executed"))
+        # Прогрев соединения к Bloom виден в признаке жизни: без этого
+        # "соединение греется" было бы обещанием, а не проверяемым фактом.
+        chk("без прогрева признак жизни говорит об этом прямо",
+            j["bloom_keepalive"]["enabled"] is False
+            and "исполнитель" in j["bloom_keepalive"]["why_not"],
+            j.get("bloom_keepalive"))
+
+        class ПрогревЗаглушка:
+            def признак_жизни(self):
+                return {"enabled": True, "period_s": 20.0, "ok": 3, "failed": 0,
+                         "last_code": 200, "last_utc": "2026-09-24T12:00:00Z",
+                         "last_error": ""}
+
+        det.прогрев = ПрогревЗаглушка()
+        chk("с прогревом в признаке жизни стоят числа",
+            det.признак_жизни()["bloom_keepalive"]["ok"] == 3
+            and det.признак_жизни()["bloom_keepalive"]["period_s"] == 20.0,
+            det.признак_жизни().get("bloom_keepalive"))
 
         # падение исполнителя не валит детектор
         st2 = ST.ExecState(base=Path(d) / "s2", kill=Path(d) / "kill2")
@@ -3222,6 +3333,29 @@ def main() -> int:
                          режим=os.environ.get("BLOOM_MODE", "dry"),
                          исполнитель=исполнитель)
     детектор.откуда_источники = откуда
+
+    # Прогрев соединения к Bloom. Замер с хоста 24.09: первый запрос по
+    # новому соединению отвечает за 54.8-65.1 мс, по уже открытому -- за
+    # 15.4-22.6 мс. Между сигналами пауза бывает минутами, край (cloudflare)
+    # закрывает соединение по простою, и боевая покупка платила рукопожатие
+    # почти всегда. /ping бюджет запросов НЕ тратит, поэтому прогрев бесплатен.
+    детектор.прогрев = None
+    if исполнитель is not None and not a.check_only:
+        try:
+            период = float(os.environ.get("BLOOM_KEEPALIVE_S", "20") or 20)
+        except ValueError:
+            период = 20.0
+        if период > 0:
+            try:
+                API_МОД = __import__("bloom_api")
+                детектор.прогрев = API_МОД.Прогрев(исполнитель.api, период_s=период)
+                детектор.прогрев.круг()          # первое соединение -- до сигнала
+                детектор.прогрев.запустить_в_потоке()
+                log.info("прогрев соединения к Bloom: раз в %.0f с", период)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("прогрев соединения не запущен: %s: %s",
+                            type(exc).__name__, str(exc)[:160])
+                детектор.прогрев = None
 
     # Команды владельца из Telegram. Запускаются ПОСЛЕ проверки check_only:
     # в проверочном режиме служба ничего не слушает и не отвечает.

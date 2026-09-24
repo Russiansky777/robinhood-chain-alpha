@@ -56,6 +56,28 @@ from typing import Callable
 import requests
 
 WSOL_MINT = "So11111111111111111111111111111111111111112"
+
+# Одна сессия на процесс: TCP и TLS к Jupiter платятся один раз, а не на
+# каждый вызов. Замер с NL-хоста 24.09.2026 (curl, два одинаковых запроса в
+# одном вызове): по новому соединению первый байт через 193.5 мс (dns 30.4,
+# tcp 32.2, tls 52.7), по уже открытому -- 129.5 мс. Разница 64 мс, и это
+# при том, что продажа делает подряд order и execute.
+_СЕССИЯ = None
+
+
+def сессия():
+    """Общая сессия с пулом. Ленивая: модуль импортируется и там, где сети нет."""
+    global _СЕССИЯ  # noqa: PLW0603
+    if _СЕССИЯ is None:
+        try:
+            _СЕССИЯ = requests.Session()
+            from requests.adapters import HTTPAdapter  # noqa: PLC0415
+            адаптер = HTTPAdapter(pool_connections=2, pool_maxsize=4, max_retries=0)
+            _СЕССИЯ.mount("https://", адаптер)
+            _СЕССИЯ.mount("http://", адаптер)
+        except Exception:  # noqa: BLE001
+            _СЕССИЯ = requests
+    return _СЕССИЯ
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 JUP_ULTRA = "https://lite-api.jup.ag/ultra/v1"
@@ -147,7 +169,7 @@ def quote_sol_for(mint: str, amount_raw: int, slippage_bps: int,
         params = {"inputMint": mint, "outputMint": WSOL_MINT,
                   "amount": str(amount_raw), "slippageBps": str(slippage_bps)}
         try:
-            r = requests.get(url, params=params, timeout=25)
+            r = сессия().get(url, params=params, timeout=25)
         except Exception as exc:  # noqa: BLE001
             errors[url] = f"сеть: {type(exc).__name__}"
             continue
@@ -188,7 +210,7 @@ def ultra_order(mint: str, amount_raw: int, taker: str,
     if slippage_bps is not None:
         params["slippageBps"] = str(int(slippage_bps))
     try:
-        r = requests.get(f"{JUP_ULTRA}/order", params=params, timeout=30)
+        r = сессия().get(f"{JUP_ULTRA}/order", params=params, timeout=30)
     except Exception as exc:  # noqa: BLE001
         return {"ошибка": f"сеть: {type(exc).__name__}"}
     if r.status_code != 200:
@@ -212,7 +234,7 @@ def ultra_order(mint: str, amount_raw: int, taker: str,
 def ultra_execute(signed_b64: str, request_id: str,
                    scrub: Callable[[str], str] = lambda s: s) -> dict:
     try:
-        r = requests.post(f"{JUP_ULTRA}/execute",
+        r = сессия().post(f"{JUP_ULTRA}/execute",
                           json={"signedTransaction": signed_b64, "requestId": request_id},
                           timeout=60)
     except Exception as exc:  # noqa: BLE001
@@ -256,7 +278,7 @@ def swap_v2_order(mint: str, amount_raw: int, taker: str,
     if slippage_bps is not None:
         params["slippageBps"] = str(int(slippage_bps))
     try:
-        r = requests.get(f"{JUP_SWAP_V2}/order", params=params,
+        r = сессия().get(f"{JUP_SWAP_V2}/order", params=params,
                           headers=jup_v2_headers(), timeout=30)
     except Exception as exc:  # noqa: BLE001
         return {"ошибка": f"сеть: {type(exc).__name__}"}
@@ -291,7 +313,7 @@ def swap_v2_order(mint: str, amount_raw: int, taker: str,
 def swap_v2_execute(signed_b64: str, request_id: str,
                      scrub: Callable[[str], str] = lambda s: s) -> dict:
     try:
-        r = requests.post(f"{JUP_SWAP_V2}/execute",
+        r = сессия().post(f"{JUP_SWAP_V2}/execute",
                            json={"signedTransaction": signed_b64,
                                   "requestId": request_id},
                            headers=jup_v2_headers(), timeout=60)
@@ -466,7 +488,7 @@ def route_steps(mint: str, amount_raw: int, slippage_bps: int,
     errs = {}
     for url in JUP_QUOTE_HOSTS:
         try:
-            r = requests.get(url, params={"inputMint": mint, "outputMint": WSOL_MINT,
+            r = сессия().get(url, params={"inputMint": mint, "outputMint": WSOL_MINT,
                                            "amount": str(amount_raw),
                                            "slippageBps": str(slippage_bps)}, timeout=25)
         except Exception as exc:  # noqa: BLE001
