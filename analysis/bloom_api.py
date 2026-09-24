@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -220,6 +221,55 @@ def validate_swap_body(body: dict) -> None:
             raise BloomRefusal(f"{k} {v!r} -- число в SOL, не меньше нуля")
 
 
+class СчётчикСоединений(logging.Handler):
+    """Сколько НОВЫХ соединений открыл urllib3 -- прямое доказательство, а не
+    вывод из миллисекунд.
+
+    urllib3 пишет в логгер urllib3.connectionpool строку "Starting new HTTPS
+    connection" ровно на каждое новое соединение. Ловим её обработчиком и
+    считаем. Разница счётчика до и после POST: 0 -- соединение было тёплым,
+    1 и больше -- рукопожатие оплачено заново.
+
+    Обработчик вешается один раз на процесс и ничего не печатает.
+    """
+
+    ФРАЗА = "Starting new HTTP"
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.DEBUG)
+        self.новых = 0
+
+    def emit(self, record) -> None:
+        try:
+            if self.ФРАЗА in str(record.getMessage()):
+                self.новых += 1
+        except Exception:  # noqa: BLE001
+            pass
+
+
+_СЧЁТЧИК_СОЕДИНЕНИЙ = None
+
+
+def счётчик_соединений() -> "СчётчикСоединений | None":
+    """Один счётчик на процесс. Ставится лениво и молча."""
+    global _СЧЁТЧИК_СОЕДИНЕНИЙ  # noqa: PLW0603
+    if _СЧЁТЧИК_СОЕДИНЕНИЙ is None:
+        try:
+            лог = logging.getLogger("urllib3.connectionpool")
+            h = СчётчикСоединений()
+            лог.addHandler(h)
+            # Уровень нужен ровно такой, иначе сообщение до обработчика не
+            # дойдёт. Распространение наверх выключаем, чтобы отладка urllib3
+            # не полезла в общий журнал службы.
+            if лог.level == logging.NOTSET or лог.level > logging.DEBUG:
+                лог.setLevel(logging.DEBUG)
+            лог.propagate = False
+            _СЧЁТЧИК_СОЕДИНЕНИЙ = h
+        except Exception:  # noqa: BLE001
+            return None
+    return _СЧЁТЧИК_СОЕДИНЕНИЙ
+
+
 def сессия_с_пулом(соединений: int = 4, размер: int = 8):
     """Сессия с пулом соединений: TCP и TLS платятся один раз, а не на вызов.
 
@@ -267,6 +317,7 @@ class Прогрев:
         self.период_s = float(период_s)
         self.успехов = 0
         self.отказов = 0
+        self.пропущено = 0
         self.последний_код = None
         self.последняя_ошибка = ""
         self.последний_utc = ""
@@ -275,6 +326,11 @@ class Прогрев:
 
     def круг(self) -> bool:
         """Один прогрев. Наружу не бросает: это фон, а не решение."""
+        if getattr(self.api, "занят_покупкой", False):
+            # Покупка в полёте: свой пинг пропускаем, чтобы пул не отдал ей
+            # второе, холодное соединение. Пропуск считается отдельно.
+            self.пропущено += 1
+            return False
         try:
             r = self.api.ping()
         except Exception as exc:  # noqa: BLE001
@@ -307,6 +363,7 @@ class Прогрев:
     def признак_жизни(self) -> dict:
         return {"enabled": True, "period_s": self.период_s,
                  "ok": self.успехов, "failed": self.отказов,
+                 "skipped_while_buying": self.пропущено,
                  "last_code": self.последний_код,
                  "last_utc": self.последний_utc,
                  "last_error": self.последняя_ошибка}
@@ -324,6 +381,10 @@ class BloomApi:
         self.host = host
         self.timeout = timeout
         self.session = session or сессия_с_пулом()
+        # Покупка в полёте. Прогрев обязан пропустить свой круг, пока флаг
+        # стоит: иначе пул отдаст покупке ВТОРОЕ соединение, а оно холодное.
+        # Покупка при этом НИЧЕГО не ждёт -- флаг только для прогрева.
+        self.занят_покупкой = False
 
     # ------------------------------------------------------------- служебное
 
@@ -396,23 +457,33 @@ class BloomApi:
         # журнал. Владелец спрашивает про площадку -- значит мерить надо
         # площадку.
         t_отправлено = time.time()
+        # Сколько НОВЫХ соединений открылось за время этого POST. 0 -- ушёл по
+        # тёплому, и это факт из urllib3, а не вывод из миллисекунд.
+        сч = счётчик_соединений()
+        новых_до = сч.новых if сч is not None else None
+        self.занят_покупкой = True
         try:
             r = self.session.post(self.host + SWAP_PATH, headers=self._headers(),
                                    json=body, timeout=self.timeout)
         except requests.RequestException as exc:
+            self.занят_покупкой = False
             out = {"ok": False, "code": None, "network": True, "order_id": None,
                     "signatures": [],
                     "bloom_ms": round((time.time() - t_отправлено) * 1000.0, 1),
                     "sent_ts": t_отправлено,
                     "why_not": scrub(f"{type(exc).__name__}: {exc}", self.key)[:300],
+                    "new_connections": ((сч.новых - новых_до)
+                                         if сч is not None else None),
                     "retry_only_after_chain_check": True}
             if self.state is not None:
                 self.state.note_api_result(ok=False, code="СЕТЬ")
             self._log_call({"stage": "response", "client_order_id": client_order_id, **out})
             return out
+        self.занят_покупкой = False
         итог = self._parse_swap(r, client_order_id)
         итог["bloom_ms"] = round((time.time() - t_отправлено) * 1000.0, 1)
         итог["sent_ts"] = t_отправлено
+        итог["new_connections"] = ((сч.новых - новых_до) if сч is not None else None)
         return итог
 
     def _parse_swap(self, r, client_order_id: str) -> dict:
@@ -668,6 +739,41 @@ def self_test() -> None:
     chk("ключ вычищается из текста", "СЕКРЕТНЫЙКЛЮЧ" not in
         scrub("упало с ключом СЕКРЕТНЫЙКЛЮЧ внутри", "СЕКРЕТНЫЙКЛЮЧ"))
 
+    # --- счётчик новых соединений: прямое доказательство тёплого пути ---
+    сч_т = СчётчикСоединений()
+
+    class ЗаписьЛога:
+        def __init__(self, текст):
+            self.текст = текст
+
+        def getMessage(self):
+            return self.текст
+
+    сч_т.emit(ЗаписьЛога("Starting new HTTPS connection (1): eu.solana.bloombot.app:443"))
+    chk("новое соединение посчитано", сч_т.новых == 1, сч_т.новых)
+    сч_т.emit(ЗаписьЛога("https://eu.solana.bloombot.app:443 \"POST /api/v1/swap HTTP/1.1\" 200"))
+    chk("обычная строка журнала соединением не считается", сч_т.новых == 1, сч_т.новых)
+    сч_т.emit(ЗаписьЛога("Starting new HTTP connection (2): example:80"))
+    chk("http без s тоже считается", сч_т.новых == 2, сч_т.новых)
+
+    # В ответе swap должно стоять число новых соединений за время POST.
+    class СессияСчёт:
+        def post(self, *a, **kw):
+            class О:
+                status_code = 200
+                headers = {}
+
+                @staticmethod
+                def json():
+                    return {"order_id": "1", "signatures": []}
+            return О()
+
+    st_сч = ExecState(base=Path(tempfile.mkdtemp()) / "s", kill=Path("/нет"))
+    api_сч = BloomApi("КЛЮЧ", dry_run=False, state=st_сч, session=СессияСчёт())
+    р_сч = api_сч.swap(body, client_order_id="сч", why="тест")
+    chk("в ответе swap стоит число новых соединений за время POST",
+        "new_connections" in р_сч and р_сч["new_connections"] == 0, р_сч.get("new_connections"))
+
     # --- прогрев соединения: считает, не бросает и не ходит мимо клиента ---
     class ПингОтвечает:
         def __init__(self, ответы):
@@ -683,6 +789,29 @@ def self_test() -> None:
     ж = пр.признак_жизни()
     chk("прогрев виден в признаке жизни числами",
         ж["ok"] == 1 and ж["failed"] == 0 and ж["period_s"] == 20.0, ж)
+
+    # Пинг и покупка не должны совпасть: пока покупка в полёте, прогрев
+    # пропускает круг, иначе пул отдаст покупке второе холодное соединение.
+    class КлиентЗанят:
+        занят_покупкой = True
+        вызовов = 0
+
+        def ping(self):
+            КлиентЗанят.вызовов += 1
+            return {"ok": True, "code": 200}
+
+    з = КлиентЗанят()
+    пр_з = Прогрев(з)
+    chk("прогрев молчит, пока покупка в полёте",
+        пр_з.круг() is False and КлиентЗанят.вызовов == 0
+        and пр_з.признак_жизни()["skipped_while_buying"] == 1,
+        пр_з.признак_жизни())
+    з.занят_покупкой = False
+    chk("и возобновляется, когда покупка ушла",
+        пр_з.круг() is True and КлиентЗанят.вызовов == 1)
+
+    # Флаг снимается после POST, иначе прогрев умолкнет навсегда.
+    chk("после покупки флаг занятости снят", api_сч.занят_покупкой is False)
 
     пр2 = Прогрев(ПингОтвечает([{"ok": False, "code": 503, "why_not": "мимо"}]))
     chk("неуспех прогрева посчитан, а не проглочен",

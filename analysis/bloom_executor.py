@@ -290,6 +290,9 @@ class Executor:
                 ts_accepted=time.time(),
                 buy_address=адрес, buy_address_kind=вид_адреса,
                 bloom_ms=res.get("bloom_ms"), ts_sent=res.get("sent_ts"),
+                # Сколько НОВЫХ соединений открылось за время POST:
+                # 0 значит ушло по тёплому. Факт из urllib3, не оценка.
+                new_connections=res.get("new_connections"),
                 caveat=res.get("caveat"))
             out.update(exec_code=(EXEC_DRY_RUN if res.get("dry_run") else EXEC_SENT),
                        order_id=res.get("order_id"),
@@ -389,6 +392,9 @@ class Executor:
                     bumped_from_sol=(self.buy_sol if поднимали else None),
                     target_from_s=(self.sell_after_s if правили_срок else None),
                     bloom_ms=res.get("bloom_ms"), ts_sent=res.get("sent_ts"),
+                # Сколько НОВЫХ соединений открылось за время POST:
+                # 0 значит ушло по тёплому. Факт из urllib3, не оценка.
+                new_connections=res.get("new_connections"),
                     pool=(адрес_тек if адрес_тек != mint else None),
                     buy_address=адрес_тек,
                     buy_address_kind=("pool" if адрес_тек != mint else "mint"),
