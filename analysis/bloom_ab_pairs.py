@@ -63,6 +63,31 @@ def кошельки_dbot(конфиг: Path | None = None) -> dict:
     return out or dict(BP.КОШЕЛЬКИ_DBOT_ПО_УМОЛЧАНИЮ)
 
 
+def задача_по_подписи(state: ST.ExecState, подпись: str) -> str | None:
+    """Задача источника по подписи его транзакции -- из журнала решений.
+
+    В записи позиции задачи нет (исполнитель её не пишет), и без неё кошелёк
+    DBot не выбрать: по первому замеру все пять пар вышли без чисел DBot
+    именно поэтому. Журнал решений её несёт -- source_task.
+    """
+    if not подпись:
+        return None
+    try:
+        текст = state.decisions_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in текст.splitlines():
+        if подпись not in line:
+            continue
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("signature") == подпись and r.get("source_task"):
+            return r["source_task"]
+    return None
+
+
 def sol_итог(tx: dict, кошелёк: str) -> dict:
     """Изменение нативного SOL у кошелька, очищенное от комиссии."""
     б = BD.балансы_кошелька(tx, кошелёк)
@@ -105,6 +130,11 @@ def выход_dbot(helius, кошелёк: str, минт: str, *, после_с
                      "sol_back": и["sol_delta"]}
     return {"known": False, "why_not": "продажи этого минта у кошелька DBot не нашлось",
              "checked": len(кандидаты)}
+
+
+def не_нашли_dbot(p: dict) -> bool:
+    вх = ((p.get("dbot") or {}).get("entry") or {})
+    return not вх.get("signature")
 
 
 def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
@@ -322,9 +352,30 @@ def main() -> int:
     позиции.sort(key=lambda p2: float(p2.get("ts_intent") or 0))
     вых = []
     for поз in позиции[-a.limit:]:
-        задача = поз.get("source_task")
-        вых.append(пара(helius, поз, кошелёк_dbot=кош.get(задача or ""),
-                         наш_кошелёк=поз.get("wallet") or ST.EXECUTOR_WALLET))
+        задача = поз.get("source_task") or задача_по_подписи(state, поз.get("source_sig"))
+        кошелёк = кош.get(задача or "")
+        если_нет = None
+        if not кошелёк:
+            # Задача не нашлась -- пробуем оба кошелька задач: лучше проверить
+            # два адреса, чем отдать таблицу без чисел DBot.
+            если_нет = f"задача источника не определена, пробуем все кошельки: {sorted(кош)}"
+        p2 = пара(helius, {**поз, "source_task": задача},
+                   кошелёк_dbot=кошелёк, наш_кошелёк=(поз.get("wallet")
+                                                        or ST.EXECUTOR_WALLET))
+        if не_нашли_dbot(p2) and not кошелёк:
+            for имя, адрес in кош.items():
+                if имя not in ("BATCH-3", "BATCH-5"):
+                    continue
+                проба = пара(helius, {**поз, "source_task": имя},
+                              кошелёк_dbot=адрес,
+                              наш_кошелёк=(поз.get("wallet") or ST.EXECUTOR_WALLET))
+                if not не_нашли_dbot(проба):
+                    p2 = проба
+                    p2["dbot_wallet_guessed"] = имя
+                    break
+        if если_нет:
+            p2["task_why_not"] = если_нет
+        вых.append(p2)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     ST.atomic_write_json(Path(a.out), {
         "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

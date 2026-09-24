@@ -11,6 +11,10 @@ on:
         description: "сколько последних настоящих позиций свести в пары"
         required: false
         default: "5"
+      price_curve:
+        description: "'no' -- не считать кривую цены (она дороже по вызовам)"
+        required: false
+        default: "yes"
 
 concurrency:
   group: bloom-ab-pairs
@@ -36,6 +40,7 @@ jobs:
           set -e
           python3 analysis/bloom_ab_pairs.py --self-test
           python3 analysis/bloom_block_position.py --self-test | tail -1
+          python3 analysis/bloom_price_curve.py --self-test | tail -1
 
       - name: "SSH key"
         env:
@@ -69,14 +74,27 @@ jobs:
             --config data/final/20260923T145755Z/konfig.json \
             --out data/bloom_ab_pairs.json
 
+      - name: "Кривая цены после покупки источника"
+        if: ${{ inputs.price_curve != 'no' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          python3 analysis/bloom_price_curve.py \
+            --state-dir /tmp/bloom_state \
+            --limit ${{ inputs.limit }} \
+            --out data/bloom_price_curve.json
+
       - name: "Коммит пар"
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/bloom_ab_pairs.json ] && git add data/bloom_ab_pairs.json
+          for f in data/bloom_ab_pairs.json data/bloom_price_curve.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
-          git commit -m "Bloom: пары А/Б мы против DBot [automated]"
+          git commit -m "Bloom: пары А/Б и кривая цены [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
