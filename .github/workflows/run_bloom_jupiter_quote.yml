@@ -40,6 +40,12 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Зависимости ДО самопроверки"
+        # solders нужен самой самопроверке: без него проверка сверки ключа
+        # честно падает, и прогон 12:53Z остановился ровно на ней (39/40).
+        # Ставим ДО самопроверки, а не после -- иначе проверяем не то.
+        run: pip install -q requests solders
+
       - name: "Самопроверка ДО обращения к API"
         run: |
           set -e
@@ -50,7 +56,6 @@ jobs:
           JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY }}
         run: |
           set -e
-          pip install -q requests
           TAKER="${{ inputs.taker }}"
           if [ -z "$TAKER" ]; then TAKER=4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N; fi
           ARGS="--quote-only ${{ inputs.mint }} ${{ inputs.amount_raw }} $TAKER"
