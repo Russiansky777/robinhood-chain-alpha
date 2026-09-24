@@ -23,6 +23,10 @@ on:
         description: "какие задачи DBot дают список источников"
         required: false
         default: "BATCH-5,BATCH-3"
+      helius_daily_limit:
+        description: "потолок кредитов Helius у зонда за сутки (не больше расхода детектора)"
+        required: false
+        default: "9000"
 
 concurrency:
   group: feed-probe-deploy
@@ -51,6 +55,8 @@ jobs:
           set -e
           cd analysis
           python3 grpc_feed_probe.py --self-test
+          # Правило владельца: зонд не обгоняет детектор по расходу Helius.
+          python3 -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); assert p and p <= 9000, 'предел зонда выше правила владельца 9000'; print('предел зонда', p, 'кредитов в сутки против', d, 'у детектора -- зонд не обгоняет')"
           python3 check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
@@ -127,7 +133,7 @@ jobs:
       - name: "Доставка кода + сверка sha256"
         run: |
           set -e
-          for F in grpc_feed_probe.py bloom_detector.py bloom_exec_state.py bloom_api.py; do
+          for F in grpc_feed_probe.py bloom_detector.py bloom_exec_state.py bloom_api.py solana_rpc_client.py; do
             scp $SSH_OPTS analysis/$F root@$HOST:$CODE_DIR/$F
           done
           for F in geyser_pb2.py geyser_pb2_grpc.py solana_storage_pb2.py solana_storage_pb2_grpc.py; do
