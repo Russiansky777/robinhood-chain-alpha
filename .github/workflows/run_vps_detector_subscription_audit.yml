@@ -1,0 +1,155 @@
+name: "Детектор: обрывы подписки за окно (только чтение)"
+
+# Вопрос владельца: у второй подписки Helius в зонде 21 обрыв за 34 минуты.
+# Не бьётся ли это по БОЕВОМУ детектору -- не начал ли и он рваться в то же
+# окно. Сравнение идёт с таким же окном предыдущих суток.
+#
+# Различаются два разных события, и смешивать их нельзя:
+#   * перезапуск СЛУЖБЫ (наш деплой) -- строки systemd Started/Stopped;
+#   * обрыв ПОДПИСКИ при живой службе -- это и есть то, что ищем.
+#
+# Только чтение: journalctl и признак жизни. Ни одного ордера, ничего не
+# перезапускается. Ключи из журнала вычищаются до записи в отчёт.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "начало окна, UTC (например 2026-09-24 14:45:00)"
+        required: true
+      until_utc:
+        description: "конец окна, UTC"
+        required: true
+      since_prev_utc:
+        description: "начало такого же окна прошлых суток, UTC"
+        required: false
+        default: ""
+      until_prev_utc:
+        description: "конец окна прошлых суток, UTC"
+        required: false
+        default: ""
+      unit:
+        description: "служба"
+        required: false
+        default: "bloom-detector"
+
+concurrency:
+  group: detector-subscription-audit
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  audit:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Журналы двух окон"
+        run: |
+          set -e
+          mkdir -p /tmp/jr
+          ssh -n $SSH_OPTS root@127.0.0.1 \
+            "journalctl -u ${{ inputs.unit }} --since '${{ inputs.since_utc }} UTC' --until '${{ inputs.until_utc }} UTC' --no-pager" \
+            > /tmp/jr/now.txt 2>&1 || true
+          echo "строк в окне сегодня: $(wc -l < /tmp/jr/now.txt)"
+          if [ -n "${{ inputs.since_prev_utc }}" ]; then
+            ssh -n $SSH_OPTS root@127.0.0.1 \
+              "journalctl -u ${{ inputs.unit }} --since '${{ inputs.since_prev_utc }} UTC' --until '${{ inputs.until_prev_utc }} UTC' --no-pager" \
+              > /tmp/jr/prev.txt 2>&1 || true
+            echo "строк в окне прошлых суток: $(wc -l < /tmp/jr/prev.txt)"
+          fi
+
+      - name: "Счёт событий и отчёт"
+        run: |
+          set -e
+          mkdir -p data
+          python3 - <<'PY'
+          import re, json, pathlib, os
+          СОБЫТИЯ = [
+              ("перезапуск службы (наш деплой)", r"systemd\[1\]: (Started|Stopped|Stopping) "),
+              ("подписка транзакций поднята", r"РАБОТАЕТ \w+Subscribe"),
+              ("переподписка по смене источников", r"список источников изменился"),
+              ("обрыв часов слотов", r"часы слотов оборвались"),
+              ("slotSubscribe подтверждён", r"slotSubscribe подтверждён"),
+              ("сервер закрыл соединение", r"сервер закрыл соединение"),
+              ("соединение закрыто (websockets)", r"ConnectionClosed\w*"),
+              ("таймаут соединения", r"TimeoutError"),
+              ("подписка отклонена", r"подписк\w+ отклонен"),
+              ("разбор сообщения упал", r"разбор сообщения .* упал"),
+          ]
+          def посчитать(путь):
+              п = pathlib.Path(путь)
+              if not п.exists():
+                  return None
+              текст = п.read_text(encoding="utf-8", errors="replace")
+              из_ = {"строк": texts_len(текст)}
+              for имя, шаблон in СОБЫТИЯ:
+                  наш = re.findall(шаблон, текст)
+                  из_[имя] = len(наш)
+              примеры = [с[:200] for с in текст.splitlines()
+                          if re.search(r"оборвал|закрыл соединение|ConnectionClosed|TimeoutError|отклонен", с)]
+              из_["примеры"] = примеры[:8]
+              return из_
+          def texts_len(t):
+              return len(t.splitlines())
+          сейчас = посчитать("/tmp/jr/now.txt")
+          раньше = посчитать("/tmp/jr/prev.txt")
+          итог = {"unit": os.environ.get("UNIT", ""),
+                   "window_now": {"since": os.environ.get("SINCE", ""),
+                                   "until": os.environ.get("UNTIL", "")},
+                   "now": сейчас, "prev": раньше}
+          # Ключи в журнале детектора могут стоять прямо в строке запроса.
+          сырой = json.dumps(итог, ensure_ascii=False, indent=1)
+          сырой = re.sub(r"api-key=[A-Za-z0-9._\-]+", "api-key=СКРЫТ", сырой)
+          pathlib.Path("data/detector_subscription_audit.json").write_text(
+              сырой, encoding="utf-8")
+          print(сырой[:4000])
+          PY
+        env:
+          UNIT: ${{ inputs.unit }}
+          SINCE: ${{ inputs.since_utc }}
+          UNTIL: ${{ inputs.until_utc }}
+
+      - name: "Ключей в отчёте быть не должно"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, sys, pathlib
+          т = pathlib.Path("data/detector_subscription_audit.json").read_text(
+              encoding="utf-8", errors="replace")
+          if re.search(r"api-key=[A-Za-z0-9._\-]{8,}", т):
+              print("в отчёте виден ключ"); sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/detector_subscription_audit.json ] && git add data/detector_subscription_audit.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Детектор: обрывы подписки за окно [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
