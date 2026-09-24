@@ -24,9 +24,13 @@ on:
         required: false
         default: "BATCH-5,BATCH-3"
       helius_daily_limit:
-        description: "потолок кредитов Helius у зонда за сутки (не больше расхода детектора)"
+        description: "потолок кредитов Helius у зонда за сутки"
         required: false
-        default: "9000"
+        default: "300000"
+      booster_rate:
+        description: "сколько транзакций в минуту должны давать разгонные суммарно (5 -- это 300 пар в час)"
+        required: false
+        default: "5"
 
 concurrency:
   group: feed-probe-deploy
@@ -56,7 +60,7 @@ jobs:
           cd analysis
           python3 grpc_feed_probe.py --self-test
           # Правило владельца: зонд не обгоняет детектор по расходу Helius.
-          python3 -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); assert p and p <= 9000, 'предел зонда выше правила владельца 9000'; print('предел зонда', p, 'кредитов в сутки против', d, 'у детектора -- зонд не обгоняет')"
+          python3 -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); import solana_rpc_client as R; assert p and p <= R.ОБЩИЙ_ПОТОЛОК_СУТКИ, 'предел зонда выше общего потолка'; print('предел зонда', p, 'кредитов в сутки, детектор', d, ', общий потолок', R.ОБЩИЙ_ПОТОЛОК_СУТКИ)"
           python3 check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows
 
@@ -179,7 +183,7 @@ jobs:
               echo 'EnvironmentFile=$ENV_DIR/env'
               echo 'EnvironmentFile=-$ENV_DIR/feed_probe_env'
               echo 'WorkingDirectory=$CODE_DIR'
-              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --tasks ${{ inputs.tasks }}'
+              echo 'ExecStart=/home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/grpc_feed_probe.py --state-dir $STATE_DIR --boosters ${{ inputs.boosters }} --booster-rate ${{ inputs.booster_rate }} --tasks ${{ inputs.tasks }}'
               echo 'Restart=always'
               echo 'RestartSec=5'
               echo 'NoNewPrivileges=true'
@@ -200,10 +204,25 @@ jobs:
           set -e
           ssh -n $SSH_OPTS root@$HOST "
             set -e
-            systemctl enable --now $SVC
+            # ИМЕННО restart, а не 'enable --now': у работающей службы
+            # 'enable --now' ничего не перезапускает, и новый код на хосте
+            # лежит, но не работает. Три деплоя подряд доставляли правки в
+            # пустоту, а признак жизни оставался прежним.
+            systemctl enable $SVC
+            systemctl restart $SVC
+            # Признак жизни должен быть НОВЕЕ момента перезапуска, иначе мы
+            # читаем файл, оставшийся от прошлого запуска, и считаем его
+            # доказательством.
+            RESTART_TS=\$(date +%s)
             sleep 25
             systemctl is-active $SVC || { journalctl -u $SVC -n 40 --no-pager; exit 1; }
             test -s $STATE_DIR/heartbeat.json || { echo 'СБОЙ: признака жизни нет'; journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            HEARTBEAT_TS=\$(stat -c %Y $STATE_DIR/heartbeat.json)
+            if [ \"\$HEARTBEAT_TS\" -lt \"\$RESTART_TS\" ]; then
+              echo 'СБОЙ: признак жизни старше перезапуска -- служба его не обновила'
+              journalctl -u $SVC -n 40 --no-pager
+              exit 1
+            fi
             cat $STATE_DIR/heartbeat.json" | tee data/feed_probe_deploy.txt
 
       - name: "Токенов в отчёте быть не должно"
