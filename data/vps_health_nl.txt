@@ -1,32 +1,28 @@
-=== NL-хост, живучесть служб, 2026-09-23T21:16:18Z ===
+=== NL-хост, живучесть служб, 2026-09-24T12:24:34Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
-bloom-seller: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 21:34:35 CEST
-bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23:00:31 CEST
+bloom-seller: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 02:41:40 CEST
+bloom-detector: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 14:17:31 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-23T21:15:34Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-24T12:24:32Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T21:15:34Z",
-  "updated_ts": 1790198134.4403052,
-  "alive_since_utc": "2026-09-23T21:00:32Z",
-  "mode": "dry",
+  "updated_utc": "2026-09-24T12:24:32Z",
+  "updated_ts": 1790252672.133108,
+  "alive_since_utc": "2026-09-24T12:17:31Z",
+  "mode": "live",
   "sources": 19,
   "sources_from": "DBot живьём + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 12,
+  "signals_seen": 4,
   "to_buy": 0,
   "by_code": {
-    "NOT_A_BUY": 5,
-    "INTERMEDIATE_ROUTE": 2,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 1
-  },
-  "by_code_test_source": {
     "NOT_A_BUY": 4
   },
+  "by_code_test_source": {},
   "test_sources": [
     "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
     "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
@@ -35,33 +31,63 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 114.21208128326035,
+  "rate_usd_sol": 113.3933045124908,
   "rate_fresh": true,
+  "rate_stale_used": 0,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
   "kill_active": false,
   "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": 449822360,
-  "slot_notifications": 3391,
-  "net_slot_age_s": 0.22,
-  "balance_sol": 0.362935329,
-  "balance_age_s": 7.82,
-  "rpc_calls": 90,
+  "net_slot": 450028020,
+  "slot_notifications": 1577,
+  "net_slot_age_s": 0.23,
+  "balance_sol": 2.222584016,
+  "balance_age_s": 9.36,
+  "rpc_calls": 42,
   "rpc_by_method": {
-    "getBalance": 90
+    "getBalance": 42
   },
-  "session_credits": 98,
+  "session_credits": 42,
+  "handler_crashes": 0,
+  "telegram": {
+    "enabled": true,
+    "configured": true,
+    "sent": 4,
+    "failed": 0,
+    "last_error": "",
+    "off_reason": ""
+  },
+  "telegram_commands": {
+    "enabled": true,
+    "why_not": "",
+    "accepted": 0,
+    "from_strangers": 0,
+    "errors": 0,
+    "last_error": "",
+    "last_command": "",
+    "last_command_utc": "",
+    "offset": 0
+  },
+  "bloom_keepalive": {
+    "enabled": true,
+    "period_s": 20.0,
+    "ok": 22,
+    "failed": 0,
+    "last_code": 200,
+    "last_utc": "2026-09-24T12:24:12Z",
+    "last_error": ""
+  },
   "executor_attached": true,
   "executed": 0,
   "exec_by_code": {},
   "executor": {
     "schema_version": 2,
-    "mode": "dry-run",
-    "live_buy_enabled": false,
+    "mode": "live",
+    "live_buy_enabled": true,
     "live_test_enabled": false,
-    "dry_run": true,
-    "bump_sol": 0.02,
+    "dry_run": false,
+    "bump_sol": 0.005,
     "buy_sol": 0.2,
     "slippage_pct": 35.0,
     "priority_fee": 0.001,
@@ -76,19 +102,30 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23
   "credits_logged": true,
   "credits_log_error": "",
   "decide_latency_ms": {
-    "n": 12,
-    "median": 0.6,
-    "min": 0.3,
-    "max": 1.6
+    "n": 4,
+    "median": 0.3,
+    "min": 0.2,
+    "max": 0.4
   }
 }
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-23T21:16:20Z):
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-24T12:24:41Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-23T21:16:20Z",
-  "updated_ts": 1790198180.222832,
-  "mode": "dry-run",
+  "updated_utc": "2026-09-24T12:24:41Z",
+  "updated_ts": 1790252681.2846253,
+  "mode": "live",
   "positions_in_cycle": 0,
+  "last_cycle": [],
+  "max_attempts": 2,
+  "jupiter": {
+    "enabled": true,
+    "key": "ключ есть",
+    "key_matches_wallet": true,
+    "key_pubkey": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+    "key_why_not": null,
+    "floor_pct": 70.0,
+    "min_quote_share_pct": 30.0
+  },
   "slippage_pct": 40.0,
   "grace_s": 15.0,
   "give_up_after_s": 600.0,
@@ -98,7 +135,15 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23
     "active": false,
     "note": "путь рубильника доступен на чтение"
   },
-  "credits_logged": null,
+  "telegram": {
+    "enabled": true,
+    "configured": true,
+    "sent": 12,
+    "failed": 0,
+    "last_error": "",
+    "off_reason": ""
+  },
+  "credits_logged": true,
   "credits_log_error": "",
   "kill_sell": {
     "path": "/etc/bloom-executor/KILL_SELL",
@@ -107,48 +152,12 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-23T21:15:58Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-24T12:23:59Z):
 {
-  "updated_utc": "2026-09-23T21:15:58Z",
-  "uptime_s": 35161.7,
+  "updated_utc": "2026-09-24T12:23:59Z",
+  "uptime_s": 89643.0,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
-    {
-      "utc": "2026-09-23T11:29:56Z",
-      "method": "transactionSubscribe",
-      "acked": 57,
-      "of": 57
-    },
-    {
-      "utc": "2026-09-23T13:43:50Z",
-      "method": "logsSubscribe",
-      "acked": 57,
-      "of": 57
-    },
-    {
-      "utc": "2026-09-23T15:20:09Z",
-      "method": "logsSubscribe",
-      "acked": 17,
-      "of": 17
-    },
-    {
-      "utc": "2026-09-23T17:21:13Z",
-      "method": "logsSubscribe",
-      "acked": 17,
-      "of": 17
-    },
-    {
-      "utc": "2026-09-23T17:29:06Z",
-      "method": "logsSubscribe",
-      "acked": 17,
-      "of": 17
-    },
-    {
-      "utc": "2026-09-23T19:35:33Z",
-      "method": "logsSubscribe",
-      "acked": 17,
-      "of": 17
-    },
     {
       "utc": "2026-09-23T19:58:51Z",
       "method": "logsSubscribe",
@@ -166,53 +175,98 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 23
       "method": "logsSubscribe",
       "acked": 17,
       "of": 17
+    },
+    {
+      "utc": "2026-09-23T22:16:05Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-23T22:54:04Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-24T03:44:29Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-24T04:26:12Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-24T09:13:59Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-24T10:43:39Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
+    },
+    {
+      "utc": "2026-09-24T11:40:21Z",
+      "method": "logsSubscribe",
+      "acked": 17,
+      "of": 17
     }
   ],
   "источников": 17,
-  "событий_записано": 1111,
+  "событий_записано": 1652,
   "дублей_пропущено": 9,
-  "неудачных_пропущено": 89,
-  "переподключений_tx": 7,
+  "неудачных_пропущено": 193,
+  "переподключений_tx": 14,
   "причины_разрыва_tx": {
-    "ConnectionClosedError: no close frame received or sent": 7
+    "ConnectionClosedError: no close frame received or sent": 14
   },
-  "слепое_время_с": 7.6,
-  "слепое_время_доля": 0.00022,
-  "переподключений_slot": 5,
-  "slot_уведомлений": 132119,
-  "текущий_слот": 449822452,
-  "последнее_событие_utc": "2026-09-23T21:15:29Z",
+  "слепое_время_с": 15.1,
+  "слепое_время_доля": 0.00017,
+  "переподключений_slot": 13,
+  "slot_уведомлений": 337469,
+  "текущий_слот": 450027897,
+  "последнее_событие_utc": "2026-09-24T12:22:15Z",
   "часы": {
-    "checked_at_utc": "2026-09-23T20:29:57Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Wed 2026-09-23 22:29:57 CEST\nRTCTimeUSec=Wed 2026-09-23 22:29:57 CEST",
+    "checked_at_utc": "2026-09-24T11:29:57Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Thu 2026-09-24 13:29:57 CEST\nRTCTimeUSec=Thu 2026-09-24 13:29:58 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 75 строк
-/home/bot/bloom_executor_live_data/positions.jsonl: нет или пуст
-/home/bot/dbot_detect_probe/events.jsonl: 5896 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 702 строк
+/home/bot/bloom_executor_live_data/positions.jsonl: 269 строк
+/home/bot/dbot_detect_probe/events.jsonl: 6436 строк
 
 --- решения детектора по кодам ---
-всего решений: 75
+всего решений: 702
 первое: "ts_utc": "2026-09-23T20:00:25Z"
-последнее: "ts_utc": "2026-09-23T21:16:17Z"
+последнее: "ts_utc": "2026-09-24T12:22:15Z"
 по кодам:
-     43 NOT_A_BUY
-     19 TARGET_AMOUNT_OUT_OF_RANGE
-      5 INTERMEDIATE_ROUTE
-      4 TOKEN_RECEIVED_NOT_BOUGHT
-      3 SKIP_TARGET_INCREASE_POSITION
-      1 AMBIGUOUS_TX
+    409 NOT_A_BUY
+    138 SKIP_TARGET_INCREASE_POSITION
+     50 TARGET_AMOUNT_OUT_OF_RANGE
+     30 TOKEN_RECEIVED_NOT_BOUGHT
+     16 BUY
+     10 INTERMEDIATE_ROUTE
+      2 AMBIGUOUS_TX
+      1 UNKNOWN_RATE
 по задачам источника:
-     36 BATCH-5
-     35 BATCH-3
-      4 TEST
-забран bloom_detector.json (1189 байт)
+    314 BATCH-5
+    296 BATCH-3
+     46 TEST
+забран bloom_detector.json (3283 байт)
+забран bloom_seller.json (1927 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 851 кредитов, бюджет 60000, доля 0.0142
-  разбор_пилота: 7500 кредитов, бюджет 200000, доля 0.0375
-  ВСЕГО за 2026-09-23: 8351 кредитов
+  bloom_detector: 5045 кредитов, бюджет 60000, доля 0.0841
+  bloom_seller: 53 кредитов, бюджет 15000, доля 0.0035
+  ВСЕГО за 2026-09-24: 5098 кредитов
