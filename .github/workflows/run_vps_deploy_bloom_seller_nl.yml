@@ -83,6 +83,8 @@ jobs:
           python3 bloom_api.py --self-test
           python3 bloom_seller.py --self-test
           python3 bloom_detector.py --self-test
+          python3 check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:

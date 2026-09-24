@@ -92,6 +92,10 @@ jobs:
           python3 bloom_detector.py --self-test
           python3 bloom_executor.py --self-test
           python3 bloom_reconcile.py --self-test
+          # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
+          # не принимает, и деплой падает посреди дела (проверено 11:24Z).
+          python3 check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -325,12 +329,12 @@ jobs:
           # Порог баланса -- ДЕНЬГИ, и менять его молча нельзя. Пустой вход
           # оставляет 0.3; заданный передаётся сверке как осознанное решение
           # владельца и печатается в лог деплоя числом.
-          ПОРОГ_БАЛАНСА="${{ inputs.min_start_balance }}"
-          if [ -n "$ПОРОГ_БАЛАНСА" ]; then
-            case "$ПОРОГ_БАЛАНСА" in
-              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $ПОРОГ_БАЛАНСА"; exit 1;;
+          MIN_START_BALANCE="${{ inputs.min_start_balance }}"
+          if [ -n "$MIN_START_BALANCE" ]; then
+            case "$MIN_START_BALANCE" in
+              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $MIN_START_BALANCE"; exit 1;;
             esac
-            echo "порог баланса для старта задан входом: $ПОРОГ_БАЛАНСА SOL"
+            echo "порог баланса для старта задан входом: $MIN_START_BALANCE SOL"
           fi
           echo "аргументы сверки: [$RECON_ARGS]"
           # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
@@ -339,7 +343,7 @@ jobs:
           set +e
           OUT=$(ssh -n $SSH_OPTS root@$HOST "
             set -a; . $ENV_DIR/env; set +a
-            ${ПОРОГ_БАЛАНСА:+BLOOM_MIN_START_BALANCE_SOL=$ПОРОГ_БАЛАНСА} \
+            ${MIN_START_BALANCE:+BLOOM_MIN_START_BALANCE_SOL=$MIN_START_BALANCE} \
             PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py $RECON_ARGS 2>&1")
           RC=$?
           set -e
