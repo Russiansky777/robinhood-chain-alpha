@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -66,12 +67,25 @@ def вердикт_dbot(записи: list, *, источник: str, минт: 
     кандидаты.sort(key=lambda x: x[0])
     d, r = кандидаты[0]
     причина = r.get("skipReason")
+    # Сумма и валюта САМОЙ записи DBot. Без них расхождение "DBot купил, мы
+    # нет" не разобрать: наш порог считается по трате источника, и надо
+    # видеть, ту же ли сделку DBot считал своей.
+    отдал = ((r.get("pay") or {}).get("info")) or {}
+    получил = ((r.get("receive") or {}).get("info")) or {}
     return {"result": "купил" if not причина else "отказал",
              "код_dbot": причина or "ПРОШЛО",
              "состояние": r.get("state"),
              "error": r.get("errorMessage") or None,
              "расхождение_по_времени_с": round(d, 1),
              "кандидатов_в_окне": len(кандидаты),
+             "dbot_отдал": {"минт": отдал.get("contract"),
+                             "количество": отдал.get("amount") or отдал.get("amountUI"),
+                             "символ": отдал.get("symbol")},
+             "dbot_получил": {"минт": получил.get("contract"),
+                               "количество": получил.get("amount") or получил.get("amountUI"),
+                               "символ": получил.get("symbol")},
+             "dbot_время_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                              time.gmtime((r.get("createAt") or 0) / 1000.0)),
              "id_записи": r.get("id")}
 
 

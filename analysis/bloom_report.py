@@ -227,6 +227,27 @@ def маршруты(строки: list) -> dict:
 
 # ------------------------------------------------------------- наши тормоза
 
+def у_порога(строки: list) -> dict:
+    """Решения ВПЛОТНУЮ к порогу -- своей строкой.
+
+    Владелец просил видеть такие случаи отдельно: "вход 0.007 при пороге 2" и
+    "вход 1.95 при пороге 2" -- разные события, и второе может означать, что
+    порог или курс нужно уточнять, а первое не означает ничего.
+    """
+    сп = [r for r in строки if r.get("code") == "THRESHOLD_EDGE"]
+    return {"count": len(сп),
+             "rows": [{"ts_utc": r.get("ts_utc"), "signature": r.get("signature"),
+                        "source_task": r.get("source_task"), "mint": r.get("mint"),
+                        "spend_sol_eq": r.get("spend_sol_eq"),
+                        "spend_mint": r.get("spend_mint"),
+                        "spend_ui": r.get("spend_ui"),
+                        "rate_note": r.get("rate_note"),
+                        "reason": r.get("reason")} for r in сп[-12:]],
+             "note": ("код THRESHOLD_EDGE не покупает: он только называет случай. "
+                       "Допуск к порогу не вводится без слова владельца -- это "
+                       "прямое расширение того, что мы копируем")}
+
+
 def наши_тормоза(строки: list) -> dict:
     """Сигналы, которые прошли фильтры задачи, но остановил НАШ лимит."""
     по_кодам: dict = {}
@@ -379,7 +400,16 @@ def сверка_с_dbot(строки: list, записи: list, *, окно_с:
         краткое = {"signature": r.get("signature"), "mint": r.get("mint"),
                    "our_code": r.get("code"), "dbot_code": код,
                    "dbot_record_id": в.get("id_записи"),
-                   "match_delta_s": в.get("расхождение_по_времени_с")}
+                   "match_delta_s": в.get("расхождение_по_времени_с"),
+                   # Чем именно платил DBot по своей записи -- чтобы
+                   # расхождение можно было разобрать, а не только заметить.
+                   "dbot_paid": в.get("dbot_отдал"),
+                   "dbot_got": в.get("dbot_получил"),
+                   "dbot_time_utc": в.get("dbot_время_utc"),
+                   "our_spend_sol_eq": r.get("spend_sol_eq"),
+                   "our_spend_ui": r.get("spend_ui"),
+                   "our_spend_mint": r.get("spend_mint"),
+                   "our_rate_note": r.get("rate_note")}
         наш_лимит = (r.get("filter") == "наш лимит" or r.get("code") in НАШИ_ЛИМИТЫ)
         if намерение == "куплю" and купил:
             итог["agreed"] += 1
@@ -617,6 +647,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "stand_rows": с[-n_стенда:] if n_стенда else [],
         "routes": маршруты(б),
         "our_brakes": наши_тормоза(б),
+        "threshold_edge": у_порога(строки),
         "reconciliation": св,
         "pairs": пары(строки, св),
         "positions": поз,
@@ -698,6 +729,16 @@ def в_текст(о: dict) -> str:
     L.append(f"--- маршруты наших покупок --- покупок {м['buys']}, маршрут известен "
              f"{м['route_known']}, многохоповых {м['multihop']} (доля {м['multihop_share']}), "
              f"отброшено за промежуточный токен {м['skipped_intermediate']}")
+    уп = о.get("threshold_edge") or {}
+    if уп.get("count"):
+        L.append("")
+        L.append(f"--- вплотную к порогу (THRESHOLD_EDGE): {уп['count']} ---")
+        for r in уп.get("rows") or []:
+            L.append(f"  {r.get('ts_utc')} {r.get('source_task')} "
+                     f"{str(r.get('mint'))[:12]} вход {r.get('spend_sol_eq')} "
+                     f"SOL-экв ({r.get('spend_ui')} {str(r.get('spend_mint'))[:8]}) "
+                     f"-- {r.get('reason')}")
+        L.append(f"  {уп.get('note')}")
     т = о["our_brakes"]
     L.append(f"--- остановлено НАШИМ лимитом: {т['total']} ---")
     for k, v in sorted(т["by_code"].items(), key=lambda x: -x[1]):

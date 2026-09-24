@@ -97,7 +97,12 @@ def строка_решения(row: dict) -> str:
     версия = row.get("tx_version")
     трата = row.get("spend_sol_eq")
     трата_s = f"{float(трата):.4f} SOL" if isinstance(трата, (int, float)) else "трата ?"
-    return (f"🔎 {_время()} стенд {код} · лаг {лаг if лаг is not None else '?'} сл · "
+    # Кто источник -- ВИДНО В СТРОКЕ. Пока строки шли только по стенду, слово
+    # "стенд" можно было писать всегда; с включением боевых источников это
+    # стало ложью: владелец прочитал четыре боевых решения как стендовые.
+    чей = ("стенд" if row.get("test_source")
+           else f"боевой {row.get('source_task') or '?'}")
+    return (f"🔎 {_время()} {чей} {код} · лаг {лаг if лаг is not None else '?'} сл · "
             f"{путь} v{версия if версия is not None else '?'} · {трата_s} · "
             f"{кратко(row.get('mint'), 6)} · src {кратко(row.get('signature'), 8)}")
 
@@ -242,7 +247,15 @@ def self_test() -> int:
     try:
         s = строка_решения({"code": "BUY", "slot_lag": 0, "parsed_from": "PARSE_VIA_MSG",
                              "tx_version": 0, "spend_sol_eq": 0.060658,
-                             "mint": "FvhorDts9M8", "signature": "2ffNL1jtzpVo"})
+                             "mint": "FvhorDts9M8", "signature": "2ffNL1jtzpVo",
+                             "test_source": True, "source_task": "TEST"})
+        chk("стендовое решение помечено стендом", "стенд BUY" in s, s)
+        s_бой = строка_решения({"code": "NOT_A_BUY", "slot_lag": 0,
+                                 "parsed_from": "PARSE_VIA_MSG", "tx_version": 0,
+                                 "test_source": False, "source_task": "BATCH-5"})
+        chk("боевое решение помечено боевым и задачей",
+            "боевой BATCH-5 NOT_A_BUY" in s_бой, s_бой)
+        chk("и стендом его не называют", "стенд" not in s_бой, s_бой)
         chk("в строке решения есть код, лаг, путь и версия",
             "BUY" in s and "лаг 0" in s and "MSG" in s and "v0" in s, s)
         chk("и трата в SOL", "0.0607 SOL" in s, s)
