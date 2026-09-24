@@ -279,7 +279,9 @@ jobs:
             echo ""
             echo "--- журнал службы, последние 60 строк ---"
           } >> data/feed_probe_deploy.txt
-          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 60 --no-pager" \
+          # --since, а не только -n: в последних 60 строках может не остаться
+          # НИ ОДНОЙ строки нового запуска -- их вытеснят трассировки прошлого.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC --since '-3 min' --no-pager | tail -n 80" \
             2>&1 | tee -a data/feed_probe_deploy.txt
 
       - name: "Токенов в отчёте быть не должно"
