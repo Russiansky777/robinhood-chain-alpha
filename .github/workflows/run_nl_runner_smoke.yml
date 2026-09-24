@@ -1,0 +1,48 @@
+name: "NL-раннер: пустой прогон для замера круга"
+
+# Первый прогон на своём раннере: ничего не делает, кроме как называет себя.
+# Нужен ровно для одного -- измерить круг (постановка в очередь -> конец) на
+# своём раннере против облачного, на одинаково пустой работе.
+#
+# Обе работы запускаются одним прогоном, чтобы сравнение было честным: одна
+# и та же минута, одна и та же очередь GitHub.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: nl-runner-smoke
+  cancel-in-progress: false
+
+jobs:
+  cloud:
+    name: "облачный бегунок"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Кто я и когда"
+        run: |
+          set -e
+          echo "где: облачный бегунок GitHub"
+          echo "начало: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          uname -a
+          echo "конец: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  nl:
+    name: "раннер на NL-хосте"
+    runs-on: [self-hosted, nl-host]
+    timeout-minutes: 10
+    steps:
+      - name: "Кто я и когда"
+        run: |
+          set -e
+          echo "где: раннер на NL-хосте"
+          echo "начало: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          uname -a
+          echo "пользователь: $(id -un)"
+          echo "доступ к env служб (должно быть отказано):"
+          if cat /etc/bloom-executor/env >/dev/null 2>&1; then
+            echo "  ВНИМАНИЕ: env служб ЧИТАЕТСЯ раннером -- это надо закрыть"
+          else
+            echo "  нет доступа -- как и задумано"
+          fi
+          echo "конец: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
