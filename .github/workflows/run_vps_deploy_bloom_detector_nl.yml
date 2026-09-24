@@ -51,6 +51,10 @@ on:
         description: "'1' -- ЖИВЫЕ покупки по РЕАЛЬНЫМ источникам (только по слову владельца)"
         required: false
         default: "0"
+      min_start_balance:
+        description: "порог баланса для старта, SOL (пусто -- 0.3; менять только по слову владельца)"
+        required: false
+        default: ""
       buy_sol:
         description: "размер боевой покупки в SOL"
         required: false
@@ -318,6 +322,16 @@ jobs:
           if [ "${{ inputs.allow_open_live_test }}" = "yes" ]; then
             RECON_ARGS="--allow-open-live-test"
           fi
+          # Порог баланса -- ДЕНЬГИ, и менять его молча нельзя. Пустой вход
+          # оставляет 0.3; заданный передаётся сверке как осознанное решение
+          # владельца и печатается в лог деплоя числом.
+          ПОРОГ_БАЛАНСА="${{ inputs.min_start_balance }}"
+          if [ -n "$ПОРОГ_БАЛАНСА" ]; then
+            case "$ПОРОГ_БАЛАНСА" in
+              ''|*[!0-9.]*) echo "СБОЙ: порог баланса не число: $ПОРОГ_БАЛАНСА"; exit 1;;
+            esac
+            echo "порог баланса для старта задан входом: $ПОРОГ_БАЛАНСА SOL"
+          fi
           echo "аргументы сверки: [$RECON_ARGS]"
           # В режиме стенда сверка ОБЯЗАНА быть чистой -- иначе опыт
           # начинается с неизвестного исходного состояния. В dry-run она
@@ -325,6 +339,7 @@ jobs:
           set +e
           OUT=$(ssh -n $SSH_OPTS root@$HOST "
             set -a; . $ENV_DIR/env; set +a
+            ${ПОРОГ_БАЛАНСА:+BLOOM_MIN_START_BALANCE_SOL=$ПОРОГ_БАЛАНСА} \
             PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_reconcile.py $RECON_ARGS 2>&1")
           RC=$?
           set -e
