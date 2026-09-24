@@ -1,0 +1,121 @@
+name: "Telegram: журнальный чат -- найти ID и положить в env"
+
+# Слово владельца 25.09: построчные решения детектора идут в отдельную
+# группу-журнал, её ID лежит в env как TELEGRAM_LOG_CHAT_ID.
+#
+# Как ищется ID. Второй getUpdates рядом с работающим опросом команд
+# запускать НЕЛЬЗЯ: два клиента одного бота отбирают обновления друг у
+# друга, и второй мог бы съесть команду владельца. Поэтому ID берётся из
+# признака жизни детектора: обработчик команд записывает туда чужие чаты,
+# из которых приходили сообщения (seen_chats), не исполняя из них ничего.
+#
+# Режимы:
+#   read -- только чтение: показать seen_chats и текущее значение в env;
+#   set  -- записать TELEGRAM_LOG_CHAT_ID в env (бэкап перед правкой) и
+#           перезапустить детектор, чтобы он подхватил переменную.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "read -- показать найденные чаты; set -- записать ID в env"
+        required: true
+        default: "read"
+      chat_id:
+        description: "ID журнальной группы (для режима set)"
+        required: false
+        default: ""
+      restart:
+        description: "'yes' -- перезапустить детектор после записи"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: bloom-detector-deploy
+  cancel-in-progress: false
+
+env:
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  chat:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Чаты из признака жизни и текущее значение в env"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            python3 - <<'PY'
+          import json, pathlib
+          п = pathlib.Path('$STATE_DIR/detector_status.json')
+          try:
+              d = json.loads(п.read_text(encoding='utf-8'))
+          except Exception as exc:
+              print('признак жизни не прочитан:', type(exc).__name__)
+              raise SystemExit(0)
+          к = (d.get('telegram_commands') or {})
+          print('обновлено:', d.get('updated_utc'))
+          print('чужие чаты:', json.dumps(к.get('seen_chats') or {}, ensure_ascii=False))
+          print('журнал настроен:', (d.get('telegram') or {}).get('log_configured'))
+          PY
+            grep -c '^TELEGRAM_LOG_CHAT_ID=' $ENV_DIR/env || echo 'в env переменной нет'
+          "
+
+      - name: "Записать ID в env и перезапустить детектор"
+        if: ${{ inputs.mode == 'set' }}
+        env:
+          CHAT_ID: ${{ inputs.chat_id }}
+          RESTART: ${{ inputs.restart }}
+        run: |
+          set -e
+          if [ -z "$CHAT_ID" ]; then
+            echo "chat_id пуст -- писать нечего"
+            exit 1
+          fi
+          # Значение не секрет, но и печатать его лишний раз незачем: в env
+          # оно уезжает потоком, а не аргументом.
+          printf '%s' "$CHAT_ID" | ssh $SSH_OPTS root@127.0.0.1 "
+            set -e
+            V=\$(cat)
+            f=$ENV_DIR/env
+            cp -a \"\$f\" \"\$f.bak.\$(date +%s)\"
+            sed -i '/^TELEGRAM_LOG_CHAT_ID=/d' \"\$f\"
+            umask 077
+            printf 'TELEGRAM_LOG_CHAT_ID=%s\n' \"\$V\" >> \"\$f\"
+            chmod 600 \"\$f\"
+            grep -c '^TELEGRAM_LOG_CHAT_ID=' \"\$f\"
+            if [ '$RESTART' = 'yes' ]; then
+              systemctl restart bloom-detector
+              sleep 6
+              systemctl is-active bloom-detector
+            fi
+          "
+
+      - name: "Проверить, что журнал настроен"
+        if: ${{ inputs.mode == 'set' }}
+        run: |
+          set -e
+          sleep 8
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            python3 - <<'PY'
+          import json, pathlib
+          d = json.loads(pathlib.Path('$STATE_DIR/detector_status.json').read_text(encoding='utf-8'))
+          т = d.get('telegram') or {}
+          print('журнал настроен:', т.get('log_configured'), '|', т.get('log_off_reason'))
+          print('по адресатам:', json.dumps(т.get('by_target') or {}, ensure_ascii=False))
+          PY
+          "
