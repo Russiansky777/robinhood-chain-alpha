@@ -61,8 +61,31 @@ def candidate_pools() -> dict:
     return out
 
 
+LUTS: list = []   # таблицы адресов из шаблонных транзакций (содержимое -- с цепи)
+
+
+def load_luts(rpc, txs: list) -> list:
+    """Таблицы адресов, которыми пользовались транзакции-шаблоны: без них
+    двухшаговая транзакция не влезает в 1232 байта."""
+    from solders.address_lookup_table_account import AddressLookupTableAccount  # noqa: PLC0415
+    keys = []
+    for tx in txs:
+        for lk in (((tx.get("transaction") or {}).get("message") or {}).get("addressTableLookups") or []):
+            if lk.get("accountKey") and lk["accountKey"] not in keys:
+                keys.append(lk["accountKey"])
+    out = []
+    if not keys:
+        return out
+    vals = (rpc.call("getMultipleAccounts", [keys, {"encoding": "jsonParsed"}]) or {}).get("value") or []
+    for k, v in zip(keys, vals):
+        addrs = ((((v or {}).get("data") or {}).get("parsed") or {}).get("info") or {}).get("addresses") or []
+        if addrs:
+            out.append(AddressLookupTableAccount(Pubkey.from_string(k), [Pubkey.from_string(a) for a in addrs]))
+    return out
+
+
 def tx_b64(ixs: list, payer: str) -> str:
-    msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
+    msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, LUTS, Hash.default())
     vtx = VersionedTransaction.populate(msg, [Signature.default()] * msg.header.num_required_signatures)
     import base64  # noqa: PLC0415
     return base64.b64encode(bytes(vtx)).decode()
@@ -166,6 +189,8 @@ def main() -> int:
         out["why_not"] = "нет шаблона CPMM HTm -> токен"
         return finish(out, rpc)
     mv1, mv2 = B.mints_and_vaults(tpl1, tx1), B.mints_and_vaults(tpl2, tx2)
+    LUTS.extend(load_luts(rpc, [tx1, tx2]))
+    out["lookup_tables"] = [str(t.key) for t in LUTS]
     amount_sol = 10_000_000
 
     def route(user: str, payer: str, htm_in: int, wrap: bool, legs=(1, 2)) -> list:
@@ -185,6 +210,11 @@ def main() -> int:
     kp = str(Keypair().pubkey())
     b_full = tx_b64(route(kp, tpl1["signers"][0], 1_000_000, False), tpl1["signers"][0])
     out["build_ms_two_hop"] = round((time.perf_counter() - t0) * 1000, 3)
+    import base64 as _b64  # noqa: PLC0415
+    out["two_hop_tx_size"] = len(_b64.b64decode(b_full))
+    if out["two_hop_tx_size"] > 1232:
+        out["why_not"] = f"двухшаговая транзакция {out['two_hop_tx_size']} байт > 1232 даже с таблицами адресов"
+        return finish(out, rpc)
     import c2_swap_sim as SIM  # noqa: PLC0415
     va = simulate(rpc, b_full)
     out["sim_a_route_fresh_key"] = {**SIM.classify(va), "units": va.get("unitsConsumed")}
@@ -230,7 +260,7 @@ def finish(out: dict, rpc) -> int:
     out["c2_usage"] = C.c2_usage_report()
     (C.DATA / f"c2_route_htm_{C.today_utc()}.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    for k in ("step1_template", "step2_template", "build_ms_two_hop", "sim_a_route_fresh_key",
+    for k in ("step1_template", "step2_template", "lookup_tables", "two_hop_tx_size", "build_ms_two_hop", "sim_a_route_fresh_key",
               "sim_b_step2_fresh_key", "funded_user", "sim_c1_step1_only", "sim_c2_full_route",
               "step1_cost_vs_last_trade_pct", "sim_c", "why_not"):
         if k in out:
