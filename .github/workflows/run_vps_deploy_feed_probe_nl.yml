@@ -221,6 +221,10 @@ jobs:
               echo 'Type=simple'
               echo 'User=bot'
               echo 'Group=bot'
+              # Без этого стандартный вывод питона буферизуется и в журнал
+              # не попадает: 24.09 в журнале были только трассировки (stderr),
+              # а строки самой службы -- нет, и разбираться пришлось вслепую.
+              echo 'Environment=PYTHONUNBUFFERED=1'
               echo 'EnvironmentFile=$ENV_DIR/env'
               echo 'EnvironmentFile=-$ENV_DIR/feed_probe_env'
               echo 'WorkingDirectory=$CODE_DIR'
