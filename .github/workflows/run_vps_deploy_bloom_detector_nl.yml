@@ -63,6 +63,14 @@ on:
         description: "размер боевой покупки в SOL"
         required: false
         default: "0.05"
+      shadow_legs:
+        description: "'1' -- подписка на 4 хранилища котировок для двухшаговой тени (замер, не торговля)"
+        required: false
+        default: "1"
+      shadow_legs_credits:
+        description: "бюджет замера двухшаговой тени, кредитов Helius (замер ~10 000 в час)"
+        required: false
+        default: "30000"
 
 concurrency:
   group: bloom-detector-deploy
@@ -267,6 +275,16 @@ jobs:
             # смысла нет, а включать покупки без строк -- опасно.
             sed -i '/^BLOOM_TELEGRAM_REAL=/d' $ENV_DIR/env
             echo 'BLOOM_TELEGRAM_REAL=${{ inputs.live_buy }}' >> $ENV_DIR/env
+            # ДВУХШАГОВАЯ ТЕНЬ -- ЗАМЕР, И У НЕГО СВОЯ ЦЕНА. Четыре
+            # котировочных пула дают около 535 МБ в час: это ~10 000
+            # кредитов в час против ~390 на всех двадцати источниках вместе.
+            # Бюджет ограничивает именно замер: когда он исчерпан, хранилища
+            # уходят из подписки, а источники, наш кошелёк, одношаговая тень
+            # и торговля остаются нетронутыми.
+            sed -i '/^BLOOM_SHADOW_LEGS=/d' $ENV_DIR/env
+            echo 'BLOOM_SHADOW_LEGS=${{ inputs.shadow_legs }}' >> $ENV_DIR/env
+            sed -i '/^BLOOM_SHADOW_LEGS_CREDITS=/d' $ENV_DIR/env
+            echo 'BLOOM_SHADOW_LEGS_CREDITS=${{ inputs.shadow_legs_credits }}' >> $ENV_DIR/env
             # BLOOM_LIVE_BUY вычищается ВСЕГДА и включается ТОЛЬКО отдельным
             # входом live_buy ниже: покупка по реальному источнику -- это
             # настоящие деньги, и включаться она должна одним осознанным
