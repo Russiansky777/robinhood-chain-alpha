@@ -1511,6 +1511,20 @@ def зонд_bloom(*, rpc, api, поток, кошелёк: str, наблюда�
 
 # ------------------------------------------------------------------ вход
 
+def напечатать_зонд(итог: dict) -> None:
+    """Печать зонда. Отдельно от работы: печать не имеет права ронять прогон."""
+    try:
+        print(json.dumps({к: итог[к] for к in итог if к != "seen"},
+                          ensure_ascii=False, indent=1, default=str))
+        print(f"замечено транзакций кошелька за наблюдение: {len(итог.get('seen') or [])}, "
+              f"из них продаж токена: {итог.get('unsolicited_sells')}")
+        for с in (итог.get("seen") or []):
+            print(f"   {str(с.get('signature'))[:16]}... +{с.get('t_after_send_s')} с "
+                  f"токен {с.get('mint_delta'):+d} наша_по_ответу={с.get('ours_by_response')}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"печать зонда не вышла ({type(exc).__name__}) -- отчёт уже записан")
+
+
 def записать(путь: Path, данные: dict, *, ключ: str = "") -> None:
     путь.parent.mkdir(parents=True, exist_ok=True)
     текст = json.dumps(данные, ensure_ascii=False, indent=1, default=str)
@@ -1656,14 +1670,11 @@ def main(argv=None) -> int:
         итог = зонд_bloom(rpc=rpc, api=api, поток=поток, кошелёк=кошелёк,
                            наблюдать_s=a.watch_s, живьём=a.live, минт=минт_адрес)
         поток.остановить()
-        print(json.dumps({к: итог[к] for к in итог if к != "seen"},
-                          ensure_ascii=False, indent=1, default=str))
-        print(f"замечено транзакций кошелька за наблюдение: {len(итог['seen'])}, "
-              f"из них продаж USDC: {итог['unsolicited_sells']}")
-        for с in итог["seen"]:
-            print(f"   {с['signature'][:16]}... +{с['t_after_send_s']} с "
-                  f"USDC {с['usdc_delta']:+d} наша_по_ответу={с['ours_by_response']}")
+        # ОТЧЁТ ПИШЕТСЯ ПЕРВЫМ. Однажды опечатка в строке печати уронила
+        # процесс уже ПОСЛЕ живой покупки и вердикта -- деньги потрачены, а
+        # файла с ответом нет. Печать после записи и в своём try.
         записать(путь, {"probe": итог, "credits": rpc.stats.get("кредитов")}, ключ=ключ)
+        напечатать_зонд(итог)
         return 0
 
     if not a.run:
@@ -1701,8 +1712,19 @@ def main(argv=None) -> int:
                    каталог_живого=каталог_живого, ata_есть=(ata["accounts"] > 0),
                    минт=минт_адрес, предел_минут=a.max_minutes,
                    сессия_sender=отправитель)
-    дополнить_вердиктами(rpc, итог)
-    напечатать_доклад(итог, заголовок=f"итог, пар {len(итог['pairs'])}")
+    # Сырые пары на диск СРАЗУ: дальше идут сеть (вердикты по цепи) и
+    # продажа, и если там что-то упадёт, замер должен остаться.
+    записать(путь, итог, ключ=ключ)
+    try:
+        дополнить_вердиктами(rpc, итог)
+    except Exception as exc:  # noqa: BLE001
+        итог["verify_why_not"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        print(f"вердикты по цепи не добрались: {итог['verify_why_not']}")
+    записать(путь, итог, ключ=ключ)
+    try:
+        напечатать_доклад(итог, заголовок=f"итог, пар {len(итог['pairs'])}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"печать доклада не вышла ({type(exc).__name__}) -- отчёт записан")
     if a.live and not a.no_sell:
         вход = sum(РАЗМЕР_SOL for п in итог["pairs"]
                     for с in ("a", "b") if (п.get(с) or {}).get("ok"))
@@ -2113,6 +2135,14 @@ def self_test() -> int:
                        кошелёк=ST.EXECUTOR_WALLET, наблюдать_s=0.0, живьём=False)
     chk("холостой зонд не отправляет ничего",
         api_з2.вызовов == 0 and "не отправлялся" in (зонд.get("why_not") or ""), зонд)
+
+    зонд_печать = {"mint": "м", "unsolicited_sells": 0, "response": {"ok": True},
+                    "seen": [{"signature": "с" * 60, "slot": 1, "mint_delta": 152,
+                               "ours_by_response": True, "t_after_send_s": 1.2}]}
+    напечатать_зонд(зонд_печать)
+    chk("печать зонда идёт по существующим ключам",
+        all(к in (зонд_печать["seen"][0]) for к in
+            ("signature", "mint_delta", "ours_by_response", "t_after_send_s")))
 
     # -- 18. продажа: нечего продавать -- Jupiter не зовём
     продажа = продать_всё(RpcЗаглушка(), кошелёк=ST.EXECUTOR_WALLET,
