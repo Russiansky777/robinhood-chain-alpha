@@ -91,6 +91,28 @@ def describe(task: dict) -> dict:
             continue
         if INTERESTING.search(k):
             out["поля_про_пул_и_исполнение"][k] = v
+    # Рабочее состояние задачи: жива ли она и когда торговала последний раз.
+    # Это не секреты, а ровно то, ради чего задачу и открывают, когда по ней
+    # пропали записи follow. Время DBot отдаёт в миллисекундах -- переводим в
+    # UTC, чтобы не сверять эпохи в уме.
+    рабочее = {}
+    for k in ("enabled", "lastTradeType", "buyTimes", "sellTimes",
+               "boughtUsd", "soldUsd", "pnlOrderCount", "closeReason",
+               "groupName", "walletName", "walletType", "chain"):
+        if k in task:
+            рабочее[k] = task.get(k)
+    for k in ("lastTradeTime", "updateAt", "createAt"):
+        v = task.get(k)
+        рабочее[k] = v
+        if isinstance(v, (int, float)) and v > 1e12:
+            рабочее[k + "_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                 time.gmtime(v / 1000))
+    имена = task.get("targetNames")
+    if isinstance(имена, list):
+        рабочее["targets_count"] = len(имена)
+        рабочее["targetNames"] = имена[:12]
+    out["рабочее_состояние"] = рабочее
+
     pair = task.get("pair") or task.get("pairAddress") or task.get("poolAddress")
     out["пул_задан_явно"] = bool(pair)
     out["пул"] = pair or None
@@ -164,6 +186,15 @@ def self_test() -> None:
     chk("секретоподобное поле не раскрыто",
         "apiKey" in d["скрытые_поля"] and "apiKey" not in d["поля_про_пул_и_исполнение"])
     chk("значение секрета нигде не всплыло", "СЕКРЕТ" not in json.dumps(d, ensure_ascii=False))
+    d2 = describe({"id": "X", "name": "BATCH-3", "enabled": True,
+                    "lastTradeTime": 1790231453000, "lastTradeType": "sell",
+                    "buyTimes": 7, "targetNames": ["A", "B"], "apiKey": "СЕКРЕТ"})
+    chk("рабочее состояние задачи видно: жива ли и когда торговала",
+        d2["рабочее_состояние"]["enabled"] is True
+        and d2["рабочее_состояние"]["lastTradeTime_utc"].startswith("2026-09-24")
+        and d2["рабочее_состояние"]["targets_count"] == 2, d2.get("рабочее_состояние"))
+    chk("секрет не всплыл и в рабочем состоянии",
+        "СЕКРЕТ" not in json.dumps(d2, ensure_ascii=False))
 
     d2 = describe({"id": "T2", "name": "BATCH-6"})
     chk("без пула -- прямо сказано, что выбирает DBot",
