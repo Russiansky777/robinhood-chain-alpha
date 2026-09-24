@@ -1,23 +1,23 @@
-записей журнала 73526, запусков службы 1, подписей 35459
-сообщения по каналам: grpc 35459, grpc2 35437, helius_ws 2507, rabbit_ams 0, rabbit_fra 0
+записей журнала 79874, запусков службы 1, подписей 37575
+сообщения по каналам: grpc 37575, grpc2 37553, helius_ws 4623, rabbit_ams 0, rabbit_fra 0
 все подписи:
-  grpc_vs_grpc2: пар 35437, первым grpc в 72.81 %, медиана 1.56 мс, p10 -2.32, p90 6.87, p95 8.83, p99 17.26
-  helius_ws_vs_grpc: пар 2507, первым helius_ws в 94.69 %, медиана 5.68 мс, p10 1.2, p90 17.5, p95 28.0, p99 107.51
-  helius_ws_vs_grpc2: пар 2507, первым helius_ws в 85.16 %, медиана 2.09 мс, p10 -0.6, p90 7.36, p95 9.82, p99 22.71
+  grpc_vs_grpc2: пар 37553, первым grpc в 69.82 %, медиана 1.19 мс, p10 -3.67, p90 6.77, p95 8.67, p99 16.8
+  helius_ws_vs_grpc: пар 4623, первым helius_ws в 94.74 %, медиана 5.79 мс, p10 1.41, p90 16.49, p95 24.27, p99 102.94
+  helius_ws_vs_grpc2: пар 4623, первым helius_ws в 82.83 %, медиана 2.08 мс, p10 -0.75, p90 7.53, p95 9.47, p99 20.66
 группа источники:
-  grpc_vs_grpc2: пар 151, первым grpc в 39.74 %, медиана -1.45 мс, p10 -6.21, p90 2.48, p95 3.34, p99 20.94
-  helius_ws_vs_grpc: пар 131, первым helius_ws в 92.37 %, медиана 5.12 мс, p10 1.38, p90 7.81, p95 10.9, p99 23.25
-  helius_ws_vs_grpc2: пар 131, первым helius_ws в 91.60 %, медиана 2.53 мс, p10 0.55, p90 6.71, p95 7.36, p99 13.0
+  grpc_vs_grpc2: пар 185, первым grpc в 37.84 %, медиана -1.68 мс, p10 -6.44, p90 2.14, p95 3.18, p99 10.7
+  helius_ws_vs_grpc: пар 165, первым helius_ws в 92.73 %, медиана 5.18 мс, p10 1.45, p90 8.46, p95 16.87, p99 25.02
+  helius_ws_vs_grpc2: пар 165, первым helius_ws в 91.52 %, медиана 2.36 мс, p10 0.56, p90 6.61, p95 7.36, p99 12.04
 группа разгонные:
-  grpc_vs_grpc2: пар 35286, первым grpc в 72.96 %, медиана 1.58 мс, p10 -2.27, p90 6.88, p95 8.83, p99 17.25
-  helius_ws_vs_grpc: пар 2376, первым helius_ws в 94.82 %, медиана 5.71 мс, p10 1.16, p90 18.25, p95 28.75, p99 108.17
-  helius_ws_vs_grpc2: пар 2376, первым helius_ws в 84.81 %, медиана 2.09 мс, p10 -0.61, p90 7.4, p95 9.95, p99 23.53
+  grpc_vs_grpc2: пар 37368, первым grpc в 69.98 %, медиана 1.21 мс, p10 -3.62, p90 6.77, p95 8.69, p99 16.8
+  helius_ws_vs_grpc: пар 4458, первым helius_ws в 94.82 %, медиана 5.82 мс, p10 1.4, p90 16.8, p95 24.94, p99 103.04
+  helius_ws_vs_grpc2: пар 4458, первым helius_ws в 82.50 %, медиана 2.07 мс, p10 -0.76, p90 7.59, p95 9.54, p99 20.74
 совместная гонка: Helius + grpc
-  + grpc: общих подписей 2507, помощник первым в 5.31 %, выигрыш медиана 0.0 мс, p90 0.0, p95 0.38; видел один помощник: 32952, видел один Helius: 0
-  + grpc2: общих подписей 2507, помощник первым в 14.84 %, выигрыш медиана 0.0 мс, p90 0.6, p95 1.66; видел один помощник: 32930, видел один Helius: 0
+  + grpc: общих подписей 4623, помощник первым в 5.26 %, выигрыш медиана 0.0 мс, p90 0.0, p95 0.39; видел один помощник: 32952, видел один Helius: 0
+  + grpc2: общих подписей 4623, помощник первым в 17.17 %, выигрыш медиана 0.0 мс, p90 0.75, p95 1.94; видел один помощник: 32930, видел один Helius: 0
 не дошло до Helius WS (упало или не вошло в блок):
-  grpc: 32952 из 35459 (92.93 %)
-  grpc2: 32930 из 35437 (92.93 %)
+  grpc: 32952 из 37575 (87.70 %)
+  grpc2: 32930 из 37553 (87.69 %)
   rabbit_ams: 0 из 0 (?)
   rabbit_fra: 0 из 0 (?)
 обрывы: grpc 9 (_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC t), grpc2 93 (_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC t), helius_ws 21 (TimeoutError: )
@@ -25,9 +25,9 @@
 
 --- признак жизни зонда на момент доклада ---
 {
-  "utc": "2026-09-24T15:19:20Z",
+  "utc": "2026-09-24T15:43:04Z",
   "started_utc": "2026-09-24T14:44:59Z",
-  "uptime_s": 2061.5,
+  "uptime_s": 3485.1,
   "channels": 3,
   "channel_names": [
     "helius_ws",
@@ -92,23 +92,23 @@
     }
   },
   "helius_credits": {
-    "spent_today": 4890,
+    "spent_today": 9092,
     "limit": 300000,
-    "share": 0.0163,
-    "projected_daily": 204943,
+    "share": 0.0303,
+    "projected_daily": 225402,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 3600.0,
     "window_cap": 30000,
-    "window_spent": 4876,
+    "window_spent": 9078,
     "in_window": true,
-    "window_left_s": 1538.5,
+    "window_left_s": 114.9,
     "window_started_utc": "2026-09-24T14:44:59Z",
     "boosters_dropped": false,
     "drop_needed": false,
     "why": "",
     "service": "grpc_feed_probe",
-    "session": 4890,
+    "session": 9092,
     "dropped_utc": null
   },
   "addresses_now": 21,
@@ -126,9 +126,9 @@
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "helius_ws": 2417,
-      "grpc2": 2417,
-      "grpc": 2417
+      "helius_ws": 4518,
+      "grpc2": 4518,
+      "grpc": 4518
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -138,95 +138,95 @@
     },
     "by_channel": {
       "grpc": {
-        "pairs": 2417,
-        "first_share": 0.0513,
-        "median_ms": -5.71,
-        "p10_ms": -17.84,
-        "p90_ms": -1.23,
-        "p95_ms": 0.29,
-        "mean_ms": -8.39
+        "pairs": 4518,
+        "first_share": 0.0505,
+        "median_ms": -5.83,
+        "p10_ms": -16.78,
+        "p90_ms": -1.52,
+        "p95_ms": 0.24,
+        "mean_ms": -7.82
       },
       "grpc2": {
-        "pairs": 2417,
-        "first_share": 0.1477,
-        "median_ms": -2.1,
-        "p10_ms": -7.38,
-        "p90_ms": 0.6,
-        "p95_ms": 1.53,
-        "mean_ms": -2.87
+        "pairs": 4518,
+        "first_share": 0.1722,
+        "median_ms": -2.08,
+        "p10_ms": -7.56,
+        "p90_ms": 0.75,
+        "p95_ms": 1.91,
+        "mean_ms": -2.49
       }
     },
     "by_group": {
       "источники": {
         "grpc": {
-          "pairs": 62,
-          "first_share": 0.129,
-          "median_ms": -4.91,
-          "p10_ms": -8.16,
-          "p90_ms": 0.55,
-          "p95_ms": 1.31,
-          "mean_ms": 1.1
+          "pairs": 96,
+          "first_share": 0.1042,
+          "median_ms": -5.05,
+          "p10_ms": -8.59,
+          "p90_ms": 0.47,
+          "p95_ms": 0.89,
+          "mean_ms": -2.73
         },
         "grpc2": {
-          "pairs": 62,
-          "first_share": 0.1613,
-          "median_ms": -1.83,
-          "p10_ms": -5.41,
-          "p90_ms": 1.02,
-          "p95_ms": 1.76,
-          "mean_ms": -0.14
+          "pairs": 96,
+          "first_share": 0.1354,
+          "median_ms": -1.95,
+          "p10_ms": -5.66,
+          "p90_ms": 0.84,
+          "p95_ms": 1.24,
+          "mean_ms": -1.22
         }
       },
       "разгонные": {
         "grpc": {
-          "pairs": 2355,
+          "pairs": 4422,
           "first_share": 0.0493,
-          "median_ms": -5.72,
-          "p10_ms": -18.61,
-          "p90_ms": -1.24,
-          "p95_ms": -0.34,
-          "mean_ms": -8.64
+          "median_ms": -5.84,
+          "p10_ms": -16.89,
+          "p90_ms": -1.56,
+          "p95_ms": -0.33,
+          "mean_ms": -7.93
         },
         "grpc2": {
-          "pairs": 2355,
-          "first_share": 0.1473,
-          "median_ms": -2.11,
-          "p10_ms": -7.49,
-          "p90_ms": 0.6,
-          "p95_ms": 1.46,
-          "mean_ms": -2.94
+          "pairs": 4422,
+          "first_share": 0.173,
+          "median_ms": -2.08,
+          "p10_ms": -7.62,
+          "p90_ms": 0.75,
+          "p95_ms": 1.93,
+          "mean_ms": -2.52
         }
       }
     },
     "pairwise": {
       "helius_ws_vs_grpc": {
-        "pairs": 2417,
-        "first_share": 0.9487,
-        "median_ms": 5.71,
-        "p10_ms": 1.23,
-        "p90_ms": 17.84,
-        "p95_ms": 28.4,
-        "mean_ms": 8.39
+        "pairs": 4518,
+        "first_share": 0.9495,
+        "median_ms": 5.83,
+        "p10_ms": 1.52,
+        "p90_ms": 16.78,
+        "p95_ms": 24.53,
+        "mean_ms": 7.82
       },
       "helius_ws_vs_grpc2": {
-        "pairs": 2417,
-        "first_share": 0.8523,
-        "median_ms": 2.1,
-        "p10_ms": -0.6,
-        "p90_ms": 7.38,
-        "p95_ms": 9.94,
-        "mean_ms": 2.87
+        "pairs": 4518,
+        "first_share": 0.8278,
+        "median_ms": 2.08,
+        "p10_ms": -0.75,
+        "p90_ms": 7.56,
+        "p95_ms": 9.5,
+        "mean_ms": 2.49
       },
       "grpc_vs_grpc2": {
-        "pairs": 2417,
-        "first_share": 0.187,
-        "median_ms": -3.49,
-        "p10_ms": -12.63,
-        "p90_ms": 0.77,
-        "p95_ms": 1.69,
-        "mean_ms": -5.53
+        "pairs": 4518,
+        "first_share": 0.189,
+        "median_ms": -3.7,
+        "p10_ms": -11.61,
+        "p90_ms": 0.81,
+        "p95_ms": 1.81,
+        "mean_ms": -5.33
       }
     },
-    "pairs_total": 2417
+    "pairs_total": 4518
   }
 }
