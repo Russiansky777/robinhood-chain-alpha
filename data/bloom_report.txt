@@ -1,42 +1,52 @@
-=== Bloom: доклад 2026-09-24T08:13:14Z (формат 2) ===
-журнал: новых записей 548, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 512
-решений в окне: 36 -- боевые источники 36, стенд 0
+=== Bloom: доклад 2026-09-24T08:21:44Z (формат 2) ===
+журнал: новых записей 549, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 525
+решений в окне: 24 -- боевые источники 24, стенд 0
 по кодам (боевые источники):
-     18  NOT_A_BUY
-     13  SKIP_TARGET_INCREASE_POSITION
-      4  TOKEN_RECEIVED_NOT_BOUGHT
+     14  SKIP_TARGET_INCREASE_POSITION
+      6  NOT_A_BUY
+      3  TOKEN_RECEIVED_NOT_BOUGHT
       1  UNKNOWN_RATE
 
 --- откуда разбор (группы не смешиваются) ---
-PARSE_VIA_MSG: решений 36, доля 1.0, к покупке 0
-    отставание слотов: {'n': 36, 'min': 0, 'median': 0.0, 'max': 0}
-    слот сети минус слот источника: {'n': 36, 'min': 0, 'median': 0.0, 'max': 0}
-    задержка решения, мс: {'n': 36, 'min': 0.2, 'median': 0.5, 'max': 2.0}
+PARSE_VIA_MSG: решений 24, доля 1.0, к покупке 0
+    отставание слотов: {'n': 24, 'min': 0, 'median': 0.0, 'max': 0}
+    слот сети минус слот источника: {'n': 24, 'min': 0, 'median': 0.0, 'max': 0}
+    задержка решения, мс: {'n': 24, 'min': 0.2, 'median': 0.6, 'max': 2.0}
   примечание: PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота
 
 --- версия транзакции против пути разбора ---
-  версия 0: PARSE_VIA_MSG=23
-  версия legacy: PARSE_VIA_MSG=13
+  версия 0: PARSE_VIA_MSG=19
+  версия legacy: PARSE_VIA_MSG=5
   вывод: медленного пути в записях с версией нет -- проверять гипотезу не на чем
 
 --- первые 10 решений: слоты и время ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
-4Ldrr7EM62z53Jm3EA94  BATCH-3  449957335       2026-09-24T07:12:23Z 0.2         449957335  0.104      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-3TZA4Lqgj6oCYVy82PNr  BATCH-3  449957560       2026-09-24T07:13:23Z 0.3         449957560  0.027      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-4u5fNfAuGDrenVG5EgWK  BATCH-3  449957851       2026-09-24T07:14:40Z 0.2         449957851  0.067      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-5A5NkA6SsZy7EAKAQdh9  BATCH-3  449957880       2026-09-24T07:14:47Z 0.3         449957880  0.123      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-5CTPe6rRJ3FF1itXYkH4  BATCH-5  449958752       2026-09-24T07:18:38Z 0.2         449958752  0.147      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-43HP4hbdvgLwjc57MDeS  BATCH-3  449960519       2026-09-24T07:26:24Z 0.4         449960519  0.04       0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-dVPnxNQGjUZughHtYmPW  BATCH-3  449962487       2026-09-24T07:35:06Z 0.2         449962487  0.041      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
-2yhdnqiW7tGDdpwoZbuh  BATCH-3  449962550       2026-09-24T07:35:22Z 0.9         449962550  0.098      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-YoKkE1SnWqS3tMoaDoSZ  BATCH-5  449962560       2026-09-24T07:35:25Z 0.4         449962560  0.056      0           PARSE_VIA_MSG  legacy  skip/TOKEN_RECEIVED_NOT_BOUGHT
-4JiRMwsYjghrHgSFeUEe  BATCH-5  449963820       2026-09-24T07:41:03Z 0.3         449963820  0.001      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
+3nMzjwCm5cLwDhUoTCP3  BATCH-3  449965574       2026-09-24T07:48:49Z 0.2         449965574  0.165      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
+5K9LYeXXWem3VYU4x6Lv  BATCH-3  449965992       2026-09-24T07:50:38Z 0.3         449965992  0.021      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
+4AhYu6StdcN5mn4jfnjy  BATCH-5  449966605       2026-09-24T07:53:21Z 1.3         449966605  0.243      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+5vArGXhECydbUZNsaxaN  BATCH-5  449966617       2026-09-24T07:53:24Z 0.6         449966617  0.15       0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+2KbQhqqUQUTV8eXvemh9  BATCH-5  449966637       2026-09-24T07:53:29Z 0.6         449966637  0.158      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+5gGnRcawgCEt5uNjFycs  BATCH-5  449966695       2026-09-24T07:53:44Z 1.1         449966695  0.018      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+2PJ4tatGCPocgcQqGkuK  BATCH-5  449967250       2026-09-24T07:56:11Z 0.8         449967250  0.147      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+4x27GAC7MN88mK6gbkYr  BATCH-5  449967267       2026-09-24T07:56:15Z 0.6         449967267  0.137      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+66gDU62wza7dnoyrJpRc  BATCH-3  449967717       2026-09-24T07:58:17Z 0.3         449967717  0.117      0           PARSE_VIA_MSG  legacy  skip/NOT_A_BUY
+55FFy2Viv4kitxuvHGuh  BATCH-3  449967900       2026-09-24T07:59:06Z 1.2         449967900  0.261      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
 
 --- маршруты наших покупок --- покупок 0, маршрут известен 0, многохоповых 0 (доля None), отброшено за промежуточный токен 0
 --- остановлено НАШИМ лимитом: 0 ---
 
 --- живая сверка с DBot (нарастающим итогом) ---
-  не выполнена: записи DBot не переданы (сверка не запрашивалась)
+  сигналов, где фильтры задачи пройдены (dbot_бы_купил): 0 из 30 нужных
+  сопоставлено с записями DBot: 15, записи не нашлось: 0
+  совпадений: 15, совпадение 1.0 (порог 0.9)
+  DBot купил, мы нет: 0 (должно быть 0)
+  DBot купил, а решения у нас НЕТ ВООБЩЕ: 0 (должно быть 0)
+  мы бы купили, DBot отказал: 0
+  пропущено по НАШЕМУ лимиту, DBot купил: 0 (в числитель расхождений не идёт)
+  не сравнивалось (источник не покупал): 9
+  записей DBot загружено: 1917 (источников 22, с полем follow 1917), окно записей 2026-09-19T01:41:01Z -- 2026-09-24T08:20:00Z
+  коды DBot в загруженных записях: {'FOLLOW_ORDER_IS_ONLY_PNL_MODE': 876, 'SKIP_TARGET_INCREASE_POSITION': 491, 'TARGET_AMOUNT_OUT_OF_RANGE': 250, 'ПРОШЛО': 186, 'DUPLICATE_TOKEN_BUY': 111, 'MAX_BUY_TIMES_PER_TOKEN_REACHED': 3}
+  примечание: записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с
 
 --- пары А/Б --- наших отправленных покупок 0 из 50; из них малым размером 0
   пары с входом меньше 0.2 SOL идут в зачёт слотов, но не разницы результата: объёмы разные
@@ -105,15 +115,11 @@ YoKkE1SnWqS3tMoaDoSZ  BATCH-5  449962560       2026-09-24T07:35:25Z 0.4         
 --- место в блоке относительно источника ---
   замера нет: замер не прочитан: FileNotFoundError
 
-
---- записи по искомым кодам: 1 ---
-{"schema_version": 2, "ts_utc": "2026-09-24T07:59:49Z", "signature": "21thJLPhzBA6RUF14zoteZqLxKB4hNyLG8g4PYLvdVrLdriV2nyoarnPxgi1DeAGCXCJ6KM8j8E4rA5bJF7YwXpF", "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc", "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump", "slot": 449968061, "kind": "buy", "spend_sol_eq": null, "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "spend_ui": 1000.0, "first_entry": false, "dex_programs": ["Pump AMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Pump AMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 4, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "slot_lag": 0, "action": "skip", "code": "UNKNOWN_RATE", "reason": "трата источника в стейблах, а курса SOL нет -- порог в SOL-эквиваленте не проверить", "filter": "задача DBot", "test_source": false, "parse_ms": 0.61, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790236789.062149, "t_recv_utc": "2026-09-24T07:59:49Z", "t_decide_ts": 1790236789.062771, "decide_latency_ms": 0.6, "source_slot": 449968061, "net_slot_at_decision": 449968061, "net_slot_age_s": 0.095, "rate_note": "курс SOL/USD недоступен", "rate_source": "geckoterminal", "source_task": "BATCH-5", "mode": "live"}
-
 --- гейты live на реальных источниках ---
   [ДА ] executor_on_host: mode=live, sent=4, refused=0
-  [НЕТ] reconciliation: signals=None, need=30, missed_buys=0, agreement=None
+  [НЕТ] reconciliation: signals=0, need=30, missed_buys=0, agreement=1.0
   [НЕТ] balance: balance_sol=0.256813446, need=2.0
   [ДА ] test_call_full_circle: live_test_positions=8, still_open=0
 
 --- расход Helius ---
-{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 3251, "бюджет": 60000, "доля": 0.0542, "группа": null, "потрачено_по_бюджету": 3251, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 41, "бюджет": 15000, "доля": 0.0027, "группа": null, "потрачено_по_бюджету": 41, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 3292, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
+{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 3299, "бюджет": 60000, "доля": 0.055, "группа": null, "потрачено_по_бюджету": 3299, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 41, "бюджет": 15000, "доля": 0.0027, "группа": null, "потрачено_по_бюджету": 41, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 3340, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
