@@ -1,46 +1,48 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-24T01:52:20Z",
+  "built_utc": "2026-09-24T02:17:49Z",
   "since_ts": 1790214180.0,
   "journal": {
     "v1": 0,
     "unreadable": 0,
     "before_since": 304,
-    "v2": 308
+    "v2": 320
   },
   "decisions": {
-    "total": 4,
-    "real_sources": 4,
+    "total": 16,
+    "real_sources": 16,
     "test_source": 0,
     "by_code": {
-      "NOT_A_BUY": 4
+      "NOT_A_BUY": 13,
+      "AMBIGUOUS_TX": 1,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 2
     },
     "by_code_test_source": {}
   },
   "parse_groups": {
-    "total": 4,
+    "total": 16,
     "by_group": {
       "PARSE_VIA_MSG": {
-        "decisions": 4,
+        "decisions": 16,
         "share": 1.0,
         "to_buy": 0,
         "slot_lag": {
-          "n": 4,
+          "n": 16,
           "min": 0,
           "median": 0.0,
           "max": 0
         },
         "net_slot_minus_source": {
-          "n": 4,
+          "n": 16,
           "min": 0,
           "median": 0.0,
           "max": 0
         },
         "decide_latency_ms": {
-          "n": 4,
+          "n": 16,
           "min": 0.2,
           "median": 0.3,
-          "max": 0.3
+          "max": 1.9
         }
       }
     },
@@ -49,10 +51,10 @@
   "version_vs_parse": {
     "by_version": {
       "legacy": {
-        "PARSE_VIA_MSG": 3
+        "PARSE_VIA_MSG": 6
       },
       "0": {
-        "PARSE_VIA_MSG": 1
+        "PARSE_VIA_MSG": 10
       }
     },
     "verdict": "медленного пути в записях с версией нет -- проверять гипотезу не на чем"
@@ -121,6 +123,102 @@
       "mint": null,
       "action": "skip",
       "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "4hBtrSLiFHyYckSCazWx",
+      "source_task": "BATCH-3",
+      "source_slot": 449884937,
+      "t_recv_utc": "2026-09-24T01:52:41Z",
+      "decide_latency_ms": 0.2,
+      "net_slot_at_decision": 449884937,
+      "net_slot_age_s": 0.114,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "source": "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "2tiL9dEmNe4xZJzrYT2f",
+      "source_task": "BATCH-3",
+      "source_slot": 449885345,
+      "t_recv_utc": "2026-09-24T01:54:28Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449885345,
+      "net_slot_age_s": 0.141,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "3dTeX5yiLZaRvcRb16Gi",
+      "source_task": "BATCH-3",
+      "source_slot": 449885925,
+      "t_recv_utc": "2026-09-24T01:57:03Z",
+      "decide_latency_ms": 0.2,
+      "net_slot_at_decision": 449885925,
+      "net_slot_age_s": 0.084,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "2tQcSNGduPbJhRb7SVpk",
+      "source_task": "BATCH-3",
+      "source_slot": 449887278,
+      "t_recv_utc": "2026-09-24T02:03:02Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449887278,
+      "net_slot_age_s": 0.153,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "3GYSPbTUUVBLbLsyzKBm",
+      "source_task": "BATCH-3",
+      "source_slot": 449887296,
+      "t_recv_utc": "2026-09-24T02:03:07Z",
+      "decide_latency_ms": 1.9,
+      "net_slot_at_decision": 449887296,
+      "net_slot_age_s": 0.134,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+      "mint": null,
+      "action": "skip",
+      "code": "AMBIGUOUS_TX"
+    },
+    {
+      "signature": "2ga4NoJXPnKYDsxrrswA",
+      "source_task": "BATCH-5",
+      "source_slot": 449887413,
+      "t_recv_utc": "2026-09-24T02:03:37Z",
+      "decide_latency_ms": 0.3,
+      "net_slot_at_decision": 449887413,
+      "net_slot_age_s": 0.099,
+      "slot_lag": 0,
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": "legacy",
+      "source": "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
     }
   ],
   "stand_slot_table": [],
@@ -142,8 +240,38 @@
     "note": "код THRESHOLD_EDGE не покупает: он только называет случай. Допуск к порогу не вводится без слова владельца -- это прямое расширение того, что мы копируем"
   },
   "reconciliation": {
-    "known": false,
-    "why": "записи DBot не переданы (сверка не запрашивалась)"
+    "known": true,
+    "signals_dbot_would_buy": 0,
+    "compared": 0,
+    "agreed": 0,
+    "dbot_bought_we_did_not": [],
+    "we_would_buy_dbot_refused": [],
+    "skipped_by_our_limit_dbot_bought": [],
+    "dbot_record_not_found": 0,
+    "not_comparable_source_did_not_buy": 16,
+    "by_dbot_code": {},
+    "dbot_records": {
+      "loaded": 1798,
+      "sources": 22,
+      "with_follow": 1798,
+      "oldest_utc": "2026-09-19T01:41:01Z",
+      "newest_utc": "2026-09-24T02:12:01Z",
+      "by_skip_reason": {
+        "FOLLOW_ORDER_IS_ONLY_PNL_MODE": 858,
+        "SKIP_TARGET_INCREASE_POSITION": 440,
+        "TARGET_AMOUNT_OUT_OF_RANGE": 240,
+        "ПРОШЛО": 183,
+        "DUPLICATE_TOKEN_BUY": 74,
+        "MAX_BUY_TIMES_PER_TOKEN_REACHED": 3
+      }
+    },
+    "unmatched_diag": [],
+    "divergences": 0,
+    "agreement": null,
+    "gate_signals_reached": false,
+    "gate_no_missed_buys": true,
+    "gate_agreement": false,
+    "note": "записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с"
   },
   "pairs": {
     "our_sent": 0,
@@ -464,11 +592,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 775,
+          "кредитов": 903,
           "бюджет": 60000,
-          "доля": 0.0129,
+          "доля": 0.015,
           "группа": null,
-          "потрачено_по_бюджету": 775,
+          "потрачено_по_бюджету": 903,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -487,7 +615,7 @@
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 800,
+      "всего_кредитов": 928,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
@@ -504,7 +632,7 @@
     },
     "reconciliation": {
       "ok": false,
-      "signals": null,
+      "signals": 0,
       "need": 30,
       "missed_buys": 0,
       "agreement": null
