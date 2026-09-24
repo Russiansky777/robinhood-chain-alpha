@@ -712,8 +712,17 @@ def main() -> int:
     state = ST.ExecState(base=Path(a.state_dir)) if a.state_dir else ST.ExecState()
     helius = BD.Helius(служба="bloom_ab_pairs")
     кош = кошельки_dbot(Path(a.config) if a.config else None)
-    позиции = [p2 for p2 in state.positions().values()
-                if ST.is_real_mode(p2.get("mode"))]
+    # Позиции УПАВШИХ по цепи покупок в таблицу пар не идут. 24.09 покупка
+    # на 0.2 SOL упала с ExceededSlippage, токен не пришёл -- сделки не
+    # было, и строка в таблице пар означала бы сделку с нулевым возвратом
+    # вместо честного "покупка не села".
+    все_позиции = [p2 for p2 in state.positions().values()
+                    if ST.is_real_mode(p2.get("mode"))]
+    упавшие = [p2 for p2 in все_позиции if p2.get("chain_ok") is False]
+    позиции = [p2 for p2 in все_позиции if p2.get("chain_ok") is not False]
+    if упавшие:
+        print(f"покупок, упавших по цепи, в таблицу не берём: {len(упавшие)} "
+               f"({', '.join(str(p2.get('mint'))[:8] for p2 in упавшие)})")
     позиции.sort(key=lambda p2: float(p2.get("ts_intent") or 0))
     вых = []
     for поз in позиции[-a.limit:]:
@@ -745,8 +754,19 @@ def main() -> int:
     ST.atomic_write_json(Path(a.out), {
         "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "pairs": вых,
+        # Упавшие покупки НЕ прячутся: они отдельным разделом, со своей
+        # причиной. Убрать их из пар и не сказать об этом -- значит снова
+        # отчитаться красивее, чем было на самом деле.
+        "failed_buys": [{"mint": p2.get("mint"),
+                          "signature": (p2.get("signatures") or [None])[0],
+                          "source_sig": p2.get("source_sig"),
+                          "our_slot": p2.get("our_slot"),
+                          "sol_in": p2.get("sol_in"),
+                          "closed_reason": p2.get("closed_reason")}
+                         for p2 in упавшие],
         "note": ("проценты сравнимы, абсолютные числа нет: размеры входа разные. "
-                  "Пары ведутся нарастающим итогом с 24.09")})
+                  "Пары ведутся нарастающим итогом с 24.09. Покупки, упавшие по "
+                  "цепи, в пары не входят и лежат в failed_buys")})
     print(json.dumps(вых, ensure_ascii=False, indent=1)[:6000])
     return 0
 

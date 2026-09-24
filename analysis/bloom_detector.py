@@ -154,6 +154,9 @@ LAMPORT = 10 ** 9
 # они не меняют решения: покупка по минту при отсутствии пула остаётся
 # покупкой, а расхождение маршрутов -- поводом для доклада, не для отказа.
 КОД_РАЗБОР_УПАЛ = "HANDLER_CRASHED"
+# Наша покупка ушла, но В ЦЕПИ УПАЛА (meta.err не null). Это не покупка:
+# токена нет, позиции нет, ждать авто-ордер Bloom не от чего.
+КОД_ПОКУПКА_УПАЛА = "BUY_FAILED_ON_CHAIN"
 ФЛАГ_НЕТ_ПУЛА_SOL = "NO_SOL_POOL_IN_TX"
 ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ = "ROUTE_MISMATCH"
 РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
@@ -1744,6 +1747,51 @@ class Детектор:
             self.состояние.log_decision(запись)
             return запись
 
+        # ПОСАДКА СЧИТАЕТСЯ ТОЛЬКО ПРИ meta.err == null. 24.09 в 14:10:08Z
+        # владелец получил "🟢 покупка SENT ... S+0 по цепи", а транзакция в
+        # цепи упала: токен не пришёл, позиция была пустой с рождения, и
+        # сторож через 68 с доложил "продана" по нулевому остатку. Слот у
+        # упавшей транзакции есть -- поэтому "S+N по цепи" считался и
+        # печатался как доказательство посадки. Он им не является.
+        мета = tx.get("meta") or {}
+        ошибка_цепи = мета.get("err")
+        запись["chain_ok"] = ошибка_цепи is None
+        запись["our_slot"] = tx.get("slot")
+        if ошибка_цепи is not None:
+            запись["code"] = КОД_ПОКУПКА_УПАЛА
+            запись["chain_err"] = ошибка_цепи
+            журнал_прог = мета.get("logMessages") or []
+            запись["logs"] = [с[:200] for с in журнал_прог
+                               if any(сл in с.lower() for сл in
+                                       ("error", "failed", "slippage",
+                                        "insufficient", "exceeded"))][:6]
+            self.состояние.log_decision(запись)
+            # Позиция закрывается СРАЗУ и с честной причиной: иначе сторож
+            # будет ждать продажи того, чего не покупали, и закроет её по
+            # нулевому остатку как "продано".
+            try:
+                self.состояние.update_position(
+                    cid, state=ST.STATE_CLOSED, chain_ok=False,
+                    our_slot=tx.get("slot"),
+                    closed_reason=("покупка упала по цепи: "
+                                    + json.dumps(ошибка_цепи, ensure_ascii=False)[:120]))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("позицию упавшей покупки не закрыть: %s",
+                            type(exc).__name__)
+            log.error("ПОКУПКА УПАЛА по цепи: %s, слот %s, ошибка %s",
+                      (подпись or "")[:12], tx.get("slot"),
+                      json.dumps(ошибка_цепи, ensure_ascii=False)[:120])
+            if self.оповещатель is not None and NT is not None:
+                try:
+                    размер = self.состояние.positions().get(cid, {}).get("sol_in")
+                except Exception:  # noqa: BLE001
+                    размер = None
+                self.оповещатель.послать(NT.строка_покупки_упала(
+                    exec_row=exec_row or {}, наш_слот=tx.get("slot"),
+                    слот_источника=слот_источника, ошибка=ошибка_цепи,
+                    размер_sol=размер))
+            return запись
+
         наш = пул_и_прямизна(tx, минт=минт, кошелёк=ST.EXECUTOR_WALLET)
         источник_прямой = bool(источник_пул) and not (источник_маршрут or {}).get(
             "via_intermediate")
@@ -3033,6 +3081,56 @@ def self_test() -> int:
             источник_пул=None)
         chk("узел не отдал нашу транзакцию -- сказано, а не выдумано",
             зап3.get("why_not") and зап3.get("our_pool") is None, зап3)
+
+        # УПАВШАЯ ПО ЦЕПИ ПОКУПКА. 24.09 в 14:10:08Z владелец получил
+        # "🟢 покупка SENT ... S+0 по цепи" по транзакции, которая в цепи
+        # упала: слот у упавшей есть, и S+N считался как доказательство
+        # посадки. Позиция при этом оставалась открытой, а сторож через 68 с
+        # доложил "продана" по остатку, которого не было никогда.
+        упавшая = tx_пул(владельцы={"POOLA": ["КУПЛЕН", WSOL]}, счета=("POOLA",),
+                          подписанты=(ST.EXECUTOR_WALLET,))
+        упавшая.setdefault("meta", {})
+        упавшая["meta"]["err"] = {"InstructionError": [3, {"Custom": 6001}]}
+        упавшая["meta"]["logMessages"] = [
+            "Program log: Error: slippage tolerance exceeded",
+            "Program XYZ failed: custom program error: 0x1771"]
+        упавшая["slot"] = 777
+        послано_у: list = []
+
+        class Оповещатель:
+            def послать(self, текст):
+                послано_у.append(текст)
+
+        детектор_у = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                               курс=КурсSOL(), режим="dry",
+                               helius=HeliusНашаTx(упавшая))
+        детектор_у.оповещатель = Оповещатель()
+        st.write_intent(client_order_id="cf", mint="КУПЛЕН", source_sig="S3",
+                         source_slot=770, sol_in=0.2, pool="POOLA", program=None,
+                         taxed=None, tax_bps=None, mode=ST.MODE_LIVE_TEST,
+                         sell_after_s=28.8)
+        зап4 = детектор_у.разобрать_нашу_покупку(
+            cid="cf", минт="КУПЛЕН", подпись="УПАВШАЯ", источник_маршрут={},
+            источник_пул="POOLA", exec_row={"signatures": ["УПАВШАЯ"],
+                                             "exec_code": "SENT"},
+            слот_источника=770)
+        chk("упавшая по цепи покупка помечена кодом и chain_ok=False",
+            зап4.get("code") == КОД_ПОКУПКА_УПАЛА and зап4.get("chain_ok") is False,
+            зап4)
+        chk("причина отказа сохранена целиком",
+            зап4.get("chain_err") == {"InstructionError": [3, {"Custom": 6001}]},
+            зап4.get("chain_err"))
+        chk("строка журнала программ с причиной подобрана",
+            any("slippage" in с for с in (зап4.get("logs") or [])), зап4.get("logs"))
+        chk("позиция упавшей покупки закрыта, сторожу ждать нечего",
+            st.positions()["cf"].get("state") == ST.STATE_CLOSED
+            and st.positions()["cf"].get("chain_ok") is False,
+            st.positions()["cf"])
+        chk("в Telegram ушла строка о ПАДЕНИИ, а не зелёная о покупке",
+            послано_у and "покупка УПАЛА" in послано_у[0]
+            and "🟢" not in послано_у[0], послано_у)
+        chk("маршрут упавшей покупки не считается",
+            зап4.get("our_pool") is None and "our_route" not in зап4, зап4)
 
     # 16в. ЖИВЫЕ транзакции: разбор на настоящих данных.
     #
