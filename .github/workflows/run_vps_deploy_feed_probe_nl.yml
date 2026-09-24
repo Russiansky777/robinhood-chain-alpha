@@ -51,6 +51,10 @@ on:
         description: "после окна: потолок суточного прогноза, выше -- разгонные снимаются"
         required: false
         default: "200000"
+      helius_ws:
+        description: "'1' -- вторая подписка Helius в зонде, '0' -- выключить (детектор важнее замера)"
+        required: false
+        default: "1"
 
 concurrency:
   group: feed-probe-deploy
@@ -165,6 +169,9 @@ jobs:
           for V in "$WINDOW_S" "$WINDOW_CAP" "$PROJ_LIMIT"; do
             case "$V" in ''|*[!0-9]*) echo "СБОЙ: окно/потолок не число: $V"; exit 1;; esac
           done
+          HELIUS_WS="${{ inputs.helius_ws }}"
+          case "$HELIUS_WS" in 0|1) ;; *) echo "СБОЙ: helius_ws должен быть 0 или 1: $HELIUS_WS"; exit 1;; esac
+          echo "вторая подписка Helius в зонде: $HELIUS_WS"
           echo "окно замера: $WINDOW_S с, потолок окна: $WINDOW_CAP кредитов,"
           echo "после окна потолок прогноза: $PROJ_LIMIT в сутки"
           if [ -z "$GRPC_FEED_URL" ]; then
@@ -196,6 +203,7 @@ jobs:
             printf 'PROBE_WINDOW_S=%s\n' "$WINDOW_S"
             printf 'PROBE_WINDOW_CAP=%s\n' "$WINDOW_CAP"
             printf 'PROBE_PROJECTION_LIMIT=%s\n' "$PROJ_LIMIT"
+            printf 'PROBE_HELIUS_WS=%s\n' "$HELIUS_WS"
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
             # RabbitStream: свой адрес, ОБЩИЙ токен GRPC_FEED_TOKEN -- так
