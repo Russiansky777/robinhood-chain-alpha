@@ -200,15 +200,18 @@ jobs:
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
-          tar -czf /tmp/shadow_data.tgz $DATA_FILES
-          ssh $SSH_OPTS root@$TARGET_HOST "
+          # Архив идёт трубой, без временного файла ни с одной стороны.
+          # Через /tmp на хосте запись отказала ("Permission denied",
+          # прогон 36040165510) -- разбираться, чей это /tmp, незачем, если
+          # временный файл вообще не нужен. pipefail обязателен: без него
+          # падение tar спряталось бы за успехом ssh.
+          set -o pipefail
+          tar -czf - $DATA_FILES | ssh $SSH_OPTS root@$TARGET_HOST "
             set -e
             install -d -o bot -g bot -m 755 /home/bot/data
-            cat > /tmp/shadow_data.tgz
-            tar -xzf /tmp/shadow_data.tgz -C /home/bot
+            tar -xzf - -C /home/bot
             chown -R bot:bot /home/bot/data
-            rm -f /tmp/shadow_data.tgz
-          " < /tmp/shadow_data.tgz
+          "
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             ls -l /home/bot/data/c2_leg_pools_2026-09-24.json
             ls /home/bot/data/c2_pool_samples | wc -l
