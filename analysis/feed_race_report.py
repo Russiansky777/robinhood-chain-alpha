@@ -41,6 +41,8 @@ from pathlib import Path
 КАНАЛ_WS = "helius_ws"
 КАНАЛ_GRPC = "grpc"
 КАНАЛ_GRPC2 = "grpc2"
+КАНАЛ_RABBIT = "rabbit_ams"
+КАНАЛ_RABBIT2 = "rabbit_fra"
 ГРУППА_НАША = "источники"
 ГРУППА_РАЗГОН = "разгонные"
 # Откат метки времени назад больше этого -- признак нового запуска службы.
@@ -266,6 +268,20 @@ def доклад(записи: list, разгонные: set, каналы: list
                                      if к in е["t"] and е["группа"] == г)
                               for к in каналы}
         из_["by_group"][г] = часть
+    # Цена раннего срабатывания: транзакция пришла по каналу, а по Helius WS
+    # её не было вовсе -- значит, она упала или не вошла в блок. Для потока
+    # из шредов (RabbitStream) это главный вопрос: он показывает сделку ДО
+    # исполнения, и часть его сделок исполнением не станет.
+    из_["not_seen_by_ws"] = {}
+    for к in каналы:
+        if к == КАНАЛ_WS:
+            continue
+        всего_к = sum(1 for е in все_события.values() if к in е["t"])
+        без_ws = sum(1 for е in все_события.values()
+                      if к in е["t"] and КАНАЛ_WS not in е["t"])
+        из_["not_seen_by_ws"][к] = {
+            "messages": всего_к, "not_in_ws": без_ws,
+            "share": (round(без_ws / всего_к, 4) if всего_к else None)}
     помощники = [к for к in каналы if к != КАНАЛ_WS]
     лучший = лучший_помощник(все_события, КАНАЛ_WS, помощники)
     из_["combined"] = {
@@ -377,6 +393,20 @@ def self_test() -> None:
         е4["D"]["повторов"] == 1 and abs(е4["D"]["t"][КАНАЛ_GRPC] - 1.0) < 1e-9,
         е4["D"])
 
+    # Доля "не дошло до Helius": цена раннего срабатывания потока из шредов.
+    ж5 = [{"t": 1.0, "channel": КАНАЛ_RABBIT, "signature": "R1", "filter": "src0"},
+          {"t": 1.01, "channel": КАНАЛ_WS, "signature": "R1", "address": "ИСТ"},
+          {"t": 2.0, "channel": КАНАЛ_RABBIT, "signature": "R2", "filter": "src0"},
+          {"t": 3.0, "channel": КАНАЛ_RABBIT, "signature": "R3", "filter": "src0"},
+          {"t": 9.0, "channel": КАНАЛ_WS, "signature": "ХВОСТ", "address": "ИСТ"}]
+    д5 = доклад(ж5, разгонные=set(), каналы=[КАНАЛ_WS, КАНАЛ_RABBIT])
+    chk("доля не дошедших до Helius посчитана",
+        д5["not_seen_by_ws"][КАНАЛ_RABBIT]["not_in_ws"] == 2
+        and abs(д5["not_seen_by_ws"][КАНАЛ_RABBIT]["share"] - 0.6667) < 0.001,
+        д5["not_seen_by_ws"])
+    chk("сам Helius в эту долю не считается",
+        КАНАЛ_WS not in д5["not_seen_by_ws"], д5["not_seen_by_ws"])
+
     print(f"самопроверка доклада по гонке: {всего[1]}/{всего[0]}"
            f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
     if всего[1] != всего[0]:
@@ -415,6 +445,12 @@ def человеку(д: dict) -> str:
                     f"p95 {с['gain_p95_ms']}; видел один помощник: "
                     f"{с['only_helper_saw']}, видел один Helius: "
                     f"{с['only_base_saw']}")
+    нв = д.get("not_seen_by_ws") or {}
+    if нв:
+        строки.append("не дошло до Helius WS (упало или не вошло в блок):")
+        for к, ч in sorted(нв.items()):
+            доля = ("?" if ч["share"] is None else f"{ч['share'] * 100:.2f} %")
+            строки.append(f"  {к}: {ч['not_in_ws']} из {ч['messages']} ({доля})")
     if д.get("disconnects"):
         строки.append("обрывы: " + ", ".join(
             f"{к} {v['count']} ({v['last'][:60]})"
@@ -431,7 +467,9 @@ def main() -> int:
                     help="файл feed_race.jsonl (можно несколько раз)")
     p.add_argument("--boosters", default="",
                     help="разгонные адреса через запятую (для группы у WS)")
-    p.add_argument("--channels", default=f"{КАНАЛ_WS},{КАНАЛ_GRPC},{КАНАЛ_GRPC2}")
+    p.add_argument("--channels",
+                    default=f"{КАНАЛ_WS},{КАНАЛ_GRPC},{КАНАЛ_GRPC2},"
+                             f"{КАНАЛ_RABBIT},{КАНАЛ_RABBIT2}")
     p.add_argument("--out", default="")
     a = p.parse_args()
     if a.self_test:

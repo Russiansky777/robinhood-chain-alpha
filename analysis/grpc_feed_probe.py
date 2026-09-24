@@ -51,6 +51,17 @@ import bloom_exec_state as ST  # noqa: E402
 КАНАЛ_WS = "helius_ws"
 КАНАЛ_GRPC = "grpc"
 КАНАЛ_GRPC2 = "grpc2"
+# RabbitStream -- поток транзакций, собранных ИЗ ШРЕДОВ, то есть до
+# исполнения. Формат тот же Yellowstone, но без meta: ни балансов, ни
+# логов, ни статуса успеха. Для гонки этого хватает -- нам нужны подпись и
+# слот, а они лежат выше meta. Для торговли не хватает принципиально:
+# успела транзакция или упала, по такому потоку не узнать.
+КАНАЛ_RABBIT = "rabbit_ams"
+КАНАЛ_RABBIT2 = "rabbit_fra"
+# Порядок важен: имя -> переменная окружения с адресом. Токен у всех
+# каналов Shyft один и тот же, отдельный берётся, только если задан.
+КАНАЛЫ_GRPC = ((КАНАЛ_GRPC, "GRPC_FEED"), (КАНАЛ_GRPC2, "GRPC_FEED2"),
+                (КАНАЛ_RABBIT, "GRPC_FEED3"), (КАНАЛ_RABBIT2, "GRPC_FEED4"))
 ГРУППА_НАША = "источники"
 ГРУППА_РАЗГОН = "разгонные"
 
@@ -532,6 +543,16 @@ class Отказы:
     def сводка(self) -> dict:
         return {"last": dict(self.по_каналам), "count": dict(self.счёт),
                  "first_utc": dict(self.первый_utc)}
+
+
+def токен_для(префикс: str) -> str:
+    """Токен канала: свой, если задан, иначе общий GRPC_FEED_TOKEN.
+
+    Слово владельца по RabbitStream: "токен тот же, GRPC_FEED_TOKEN". Свой
+    токен на канал остаётся возможным -- если он появится, он и победит.
+    """
+    свой = os.environ.get(f"{префикс}_TOKEN", "").strip()
+    return свой or os.environ.get("GRPC_FEED_TOKEN", "").strip()
 
 
 def адрес_grpc(url: str) -> tuple:
@@ -1339,6 +1360,41 @@ def self_test() -> None:
         and not б4.состояние(uptime_s=600.0)["drop_needed"],
         б4.состояние(600.0))
 
+    # 15. RabbitStream как пятый и шестой канал: тот же Yellowstone, свой
+    # адрес, общий токен. Отдельный токен канала, если он появится, главнее.
+    старое_окружение = {k: os.environ.get(k) for k in
+                         ("GRPC_FEED_TOKEN", "GRPC_FEED3_TOKEN")}
+    try:
+        os.environ["GRPC_FEED_TOKEN"] = "ОБЩИЙ"
+        os.environ.pop("GRPC_FEED3_TOKEN", None)
+        chk("у RabbitStream берётся общий токен", токен_для("GRPC_FEED3") == "ОБЩИЙ")
+        os.environ["GRPC_FEED3_TOKEN"] = "СВОЙ"
+        chk("свой токен канала главнее общего",
+            токен_для("GRPC_FEED3") == "СВОЙ")
+        os.environ["GRPC_FEED3_TOKEN"] = "   "
+        chk("пустой свой токен не затирает общий",
+            токен_для("GRPC_FEED3") == "ОБЩИЙ")
+    finally:
+        for k, v in старое_окружение.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    chk("каналов gRPC в списке четыре, и имена не повторяются",
+        len(КАНАЛЫ_GRPC) == 4
+        and len({и for и, _ in КАНАЛЫ_GRPC}) == 4
+        and len({п for _, п in КАНАЛЫ_GRPC}) == 4, КАНАЛЫ_GRPC)
+    chk("схема снимается и у адресов RabbitStream",
+        адрес_grpc("https://grpc.ams.shyft.to") == ("grpc.ams.shyft.to:443", True),
+        адрес_grpc("https://grpc.ams.shyft.to"))
+    # Предел фильтров у Shyft общий: десять на подписку, и у RabbitStream
+    # он тот же. Пачки считаются той же функцией -- проверяем на 21 адресе.
+    пачки_р, карта_р = фильтры_пачками([f"А{i}" for i in range(21)],
+                                        {f"А{i}": ГРУППА_НАША for i in range(21)})
+    chk("у RabbitStream та же раскладка по пачкам, не больше десяти фильтров",
+        len(пачки_р) <= ПРЕДЕЛ_ФИЛЬТРОВ
+        and sum(len(v) for v in пачки_р.values()) == 21, пачки_р)
+
     print(f"самопроверка зонда потоков: {всего[1]}/{всего[0]}"
            f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
     if всего[1] != всего[0]:
@@ -1408,10 +1464,11 @@ def main() -> int:
                      "состояние_подписок": состояние_подписок},
             name=КАНАЛ_WS, daemon=True))
     цель_grpc: dict = {}
-    for имя, префикс in ((КАНАЛ_GRPC, "GRPC_FEED"), (КАНАЛ_GRPC2, "GRPC_FEED2")):
+    for имя, префикс in КАНАЛЫ_GRPC:
         url = os.environ.get(f"{префикс}_URL", "")
         if not url:
             continue
+        токен_канала = токен_для(префикс)
         # В признак жизни идёт РАЗОБРАННЫЙ адрес: видно, что схема снята и
         # порт дописан. Токена здесь нет и быть не может -- он в другой
         # переменной и в метаданных вызова.
@@ -1419,11 +1476,11 @@ def main() -> int:
                            "tls": адрес_grpc(url)[1],
                            "auth_header": os.environ.get("GRPC_FEED_AUTH_HEADER",
                                                           "x-token"),
-                           "token_present": bool(os.environ.get(f"{префикс}_TOKEN"))}
+                           "token_present": bool(токен_канала)}
         потоки.append(threading.Thread(
             target=без_молчания, args=(имя, отказы, журнал, слушать_grpc, гонка),
             kwargs={"канал_имя": имя, "url": url,
-                     "токен": os.environ.get(f"{префикс}_TOKEN", ""),
+                     "токен": токен_канала,
                      "набор": набор, "стоп": стоп,
                      "заголовок": os.environ.get("GRPC_FEED_AUTH_HEADER", "x-token"),
                      "журнал": журнал, "отказы": отказы,
