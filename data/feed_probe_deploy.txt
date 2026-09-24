@@ -1,7 +1,7 @@
 active
 {
-  "utc": "2026-09-24T14:17:27Z",
-  "started_utc": "2026-09-24T14:17:07Z",
+  "utc": "2026-09-24T14:22:44Z",
+  "started_utc": "2026-09-24T14:22:24Z",
   "uptime_s": 20.0,
   "channels": 3,
   "channel_names": [
@@ -12,26 +12,26 @@ active
   "addresses": 21,
   "sources": 20,
   "boosters": [
-    "HuBMeYW3aDn8BH65fo8xxbP4oiexyup8udzKyccgi8Ga"
+    "EN99z91jxRDqrDEgXN61XkWEaVB4p9yugy8ZKvz92kb5"
   ],
-  "boosters_slot": 450053291,
+  "boosters_slot": 450054469,
   "boosters_rates_per_min": {
-    "HuBMeYW3aDn8BH65fo8xxbP4oiexyup8udzKyccgi8Ga": 93.75
+    "EN99z91jxRDqrDEgXN61XkWEaVB4p9yugy8ZKvz92kb5": 187.5
   },
-  "boosters_total_per_min": 93.75,
+  "boosters_total_per_min": 187.5,
   "boosters_target_per_min": 5.0,
   "boosters_band": [
     0.2,
     50.0
   ],
-  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 93.75 транзакций в минуту",
+  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 187.5 транзакций в минуту",
   "boosters_rejected": {
-    "83TSSS7qojPowqrrvH23mCrhEJjnJG2ygaf7FEq9ZgKC": 1500.0,
-    "oRC11nW8LAy2ynYgkef76nnpUCfsZdevQYj2zUrBVXF": 3000.0,
-    "CzYQ2kFnBxsNEt9Zy34vQ3n5fSDhvA4o4XaTnq1rLvyr": 1500.0,
+    "FVnv5qH7dsrBzEDwJ8dN2m9PFtKTBAQFtqWF3M9LpwMg": 3000.0,
+    "7TRGFC2EcrPWf9SXBzNW5qLXXUvUjyyARp6iJ6uJqkKE": 3000.0,
     "2VS1k5m7TVtjMzm5bEJcsFJYJJF4UDRyLSDqkxtuLvWh": 3000.0,
     "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 3000.0,
-    "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51": 1000.0
+    "FTp1BybZ51NiZKbnZH6MsrV3tUZNauhpQMbBcqYUEr5f": 1500.0,
+    "EN99z91jxRDqrDEgXN61XkWEaVB4p9yugy8ZKvz92kb5": 187.5
   },
   "boosters_why_not": null,
   "grpc_target": {
@@ -48,7 +48,18 @@ active
       "token_present": true
     }
   },
-  "subscriptions": {},
+  "subscriptions": {
+    "grpc2": {
+      "requested": 21,
+      "connected": true,
+      "generation": 0
+    },
+    "grpc": {
+      "requested": 21,
+      "connected": true,
+      "generation": 0
+    }
+  },
   "helius_credits": {
     "spent_today": 14,
     "limit": 300000,
@@ -64,14 +75,33 @@ active
   },
   "addresses_now": 21,
   "generation": 0,
+  "threads_alive": {
+    "helius_ws": false,
+    "grpc": true,
+    "grpc2": true
+  },
   "failures": {
-    "last": {},
-    "count": {},
-    "first_utc": {}
+    "last": {
+      "helius_ws": {
+        "utc": "2026-09-24T14:22:34Z",
+        "type": "RuntimeError",
+        "code": null,
+        "details": "поток не жив: причина -- в журнале службы"
+      }
+    },
+    "count": {
+      "helius_ws": 1
+    },
+    "first_utc": {
+      "helius_ws": "2026-09-24T14:22:34Z"
+    }
   },
   "summary": {
     "base": "helius_ws",
-    "messages": {},
+    "messages": {
+      "grpc2": 6,
+      "grpc": 6
+    },
     "duplicates": {},
     "unpaired_single_channel": {
       "helius_ws": 0,
@@ -80,15 +110,21 @@ active
     },
     "by_channel": {},
     "by_group": {},
-    "pairwise": {},
-    "pairs_total": 0
+    "pairwise": {
+      "grpc_vs_grpc2": {
+        "pairs": 6,
+        "first_share": 0.6667,
+        "median_ms": 0.62,
+        "p10_ms": -2.91,
+        "p90_ms": 4.11,
+        "p95_ms": 4.65,
+        "mean_ms": 1.15
+      }
+    },
+    "pairs_total": 6
   }
 }
 --- журнал службы, последние 60 строк ---
-Sep 24 16:03:20 claude-nl python[475997]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
-Sep 24 16:03:20 claude-nl python[475997]:     self._target(*self._args, **self._kwargs)
-Sep 24 16:03:20 claude-nl python[475997]: Exception in thread grpc:
-Sep 24 16:03:20 claude-nl python[475997]: Traceback (most recent call last):
 Sep 24 16:03:20 claude-nl python[475997]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
 Sep 24 16:03:20 claude-nl python[475997]: TypeError: без_молчания() got multiple values for argument 'журнал'
 Sep 24 16:03:20 claude-nl python[475997]:     self.run()
@@ -145,3 +181,7 @@ Sep 24 16:17:07 claude-nl python[479033]: TypeError: без_молчания() g
 Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
 Sep 24 16:17:07 claude-nl python[479033]:     self._target(*self._args, **self._kwargs)
 Sep 24 16:17:07 claude-nl python[479033]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:22:24 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
+Sep 24 16:22:24 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
+Sep 24 16:22:24 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:22:24 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
