@@ -1,5 +1,5 @@
 {
-  "built_utc": "2026-09-24T11:00:57Z",
+  "built_utc": "2026-09-24T11:22:22Z",
   "rows": [
     {
       "mint": "87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp",
@@ -8,8 +8,10 @@
       "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
       "entry_price": 2.5644290575238566e-10,
       "entry_quote": "SOL",
-      "pool": null,
-      "pool_from": null,
+      "pool": "J7vjBbQGcx6ZCSpc42hR2rwUth2dGy11of7Vf1h2pv4w",
+      "pool_from": "транзакция источника",
+      "pool_kind": "хранилище минта",
+      "pool_why": "хранилище минта с наибольшим объёмом среди встреченных в инструкциях DEX",
       "pool_candidates": [
         {
           "address": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
@@ -36,31 +38,99 @@
           "from": "транзакция источника"
         },
         {
-          "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "mints_count": 3,
-          "has_mint": true,
-          "with_wsol": true,
-          "dex_programs": [
-            "Raydium CLMM",
-            "Raydium CPMM"
-          ],
-          "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)",
-          "from": "наша покупка"
-        },
-        {
-          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-          "mints_count": 2,
-          "has_mint": true,
-          "with_wsol": false,
+          "from": "транзакция источника",
+          "vault": "J7vjBbQGcx6ZCSpc42hR2rwUth2dGy11of7Vf1h2pv4w",
+          "owner": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "amount": 142061187.698125,
           "dex_programs": [
             "Raydium CPMM"
-          ],
-          "rejected": "служебный адрес, проверен по цепи: владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- системная программа, длина данных 0",
-          "from": "наша покупка"
+          ]
         }
       ],
-      "known": false,
-      "why_not": "пула с этим токеном не нашлось -- транзакция источника: ни один кандидат не парный к WSOL или все отклонены; наша покупка: ни один кандидат не парный к WSOL или все отклонены"
+      "curve": {
+        "known": true,
+        "mint": "87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp",
+        "pool": "J7vjBbQGcx6ZCSpc42hR2rwUth2dGy11of7Vf1h2pv4w",
+        "entry_price": 2.5644290575238566e-10,
+        "entry_price_sol": 2.5644290575238566e-10,
+        "entry_quote": "SOL",
+        "points": [
+          {
+            "point": "+1 блок",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+2 блок",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+3 блок",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 блок",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 блок",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 с",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 с",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+28.8 с",
+            "signature": "Tj7uC95hN3uBxYL7mAnSdBE9i612EbxcUPHvdtMv8VQ16YFYBfnw6nRDx936HtzUE48AwwHCefwhZCp6s85GgW6",
+            "slot": 449889432,
+            "block_time": 1790215951,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+60 с",
+            "signature": "3cQ9gMSDceaUzge6oC3fh9NnhfevTxKn9BQBLNuGQkvSk575fWoA86gTcXriyPSoYEnL5AjrkLssh8PJuKkosiN",
+            "slot": 449889548,
+            "block_time": 1790215981,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          }
+        ],
+        "trades_seen": 980
+      },
+      "known": true
     },
     {
       "mint": "Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV",
@@ -69,8 +139,10 @@
       "source": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
       "entry_price": 2.360652621875497e-06,
       "entry_quote": "SOL",
-      "pool": null,
-      "pool_from": null,
+      "pool": "ESCp5pV2ZhNNQj6RqmvrmgtqNod2FeaTgw94A2B4BeMc",
+      "pool_from": "транзакция источника",
+      "pool_kind": "хранилище минта",
+      "pool_why": "хранилище минта с наибольшим объёмом среди встреченных в инструкциях DEX",
       "pool_candidates": [
         {
           "address": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
@@ -96,31 +168,126 @@
           "from": "транзакция источника"
         },
         {
-          "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "mints_count": 4,
-          "has_mint": true,
-          "with_wsol": true,
-          "dex_programs": [
-            "Orca Whirlpool",
-            "Raydium CPMM"
-          ],
-          "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)",
-          "from": "наша покупка"
-        },
-        {
-          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-          "mints_count": 3,
-          "has_mint": true,
-          "with_wsol": false,
+          "from": "транзакция источника",
+          "vault": "ESCp5pV2ZhNNQj6RqmvrmgtqNod2FeaTgw94A2B4BeMc",
+          "owner": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "amount": 102093679.034584,
           "dex_programs": [
             "Raydium CPMM"
-          ],
-          "rejected": "служебный адрес, проверен по цепи: владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- системная программа, длина данных 0",
-          "from": "наша покупка"
+          ]
         }
       ],
-      "known": false,
-      "why_not": "пула с этим токеном не нашлось -- транзакция источника: ни один кандидат не парный к WSOL или все отклонены; наша покупка: ни один кандидат не парный к WSOL или все отклонены"
+      "curve": {
+        "known": true,
+        "mint": "Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV",
+        "pool": "ESCp5pV2ZhNNQj6RqmvrmgtqNod2FeaTgw94A2B4BeMc",
+        "entry_price": 2.360652621875497e-06,
+        "entry_price_sol": 2.360652621875497e-06,
+        "entry_quote": "SOL",
+        "points": [
+          {
+            "point": "+1 блок",
+            "signature": "2NEuTYc4JRJozfEFzcSvrZinqEwK4mpDpFSQn6uZ9bLMHRjMt4zTTWrbehSDc5qkU1UuLmFjfvhtf8H5xWQdT3Fj",
+            "slot": 449908368,
+            "block_time": 1790220971,
+            "known": true,
+            "price": 5.515394642934641e-06,
+            "quote": "SOL",
+            "price_sol": 5.515394642934641e-06,
+            "vs_entry_pct": 133.64
+          },
+          {
+            "point": "+2 блок",
+            "signature": "45vN1mD9N57k1pU9woigX26JAdgzKvvn21TcUybG7VfaCNiVEfdRQRH3onzpZmYX5fu4SnHeUn9h2gASezdkrB17",
+            "slot": 449908372,
+            "block_time": 1790220972,
+            "known": true,
+            "price": 4.5425030557169455e-06,
+            "quote": "SOL",
+            "price_sol": 4.5425030557169455e-06,
+            "vs_entry_pct": 92.43
+          },
+          {
+            "point": "+3 блок",
+            "signature": "45vN1mD9N57k1pU9woigX26JAdgzKvvn21TcUybG7VfaCNiVEfdRQRH3onzpZmYX5fu4SnHeUn9h2gASezdkrB17",
+            "slot": 449908372,
+            "block_time": 1790220972,
+            "known": true,
+            "price": 4.5425030557169455e-06,
+            "quote": "SOL",
+            "price_sol": 4.5425030557169455e-06,
+            "vs_entry_pct": 92.43
+          },
+          {
+            "point": "+5 блок",
+            "signature": "45vN1mD9N57k1pU9woigX26JAdgzKvvn21TcUybG7VfaCNiVEfdRQRH3onzpZmYX5fu4SnHeUn9h2gASezdkrB17",
+            "slot": 449908372,
+            "block_time": 1790220972,
+            "known": true,
+            "price": 4.5425030557169455e-06,
+            "quote": "SOL",
+            "price_sol": 4.5425030557169455e-06,
+            "vs_entry_pct": 92.43
+          },
+          {
+            "point": "+10 блок",
+            "signature": "286cTxovbnwjpVSSudQTd2MVJAZ8oQy6i9BUPyj4A1SBtxggBXjwMWxfXg2tDjarEgDgiSNUM7FYUnByJhVN5U6r",
+            "slot": 449908384,
+            "block_time": 1790220975,
+            "known": true,
+            "price": 3.722724581949886e-09,
+            "quote": "SOL",
+            "price_sol": 3.722724581949886e-09,
+            "vs_entry_pct": -99.84
+          },
+          {
+            "point": "+5 с",
+            "signature": "5hgPC2iAGGne8Yc4qew969JZ2XrDbzYaRRtHDsV3VXPHJCjrzbfc45DETZrt7hQjTbcmGGHjhLkhaJfjnC2QUs7U",
+            "slot": 449908388,
+            "block_time": 1790220976,
+            "known": true,
+            "price": 5.678314113828094e-06,
+            "quote": "SOL",
+            "price_sol": 5.678314113828094e-06,
+            "vs_entry_pct": 140.54
+          },
+          {
+            "point": "+10 с",
+            "signature": "JB9a2XbpLxBbT9a6XJU9wTTYjbe6JqQ99t4aWuNtDdVS3VC5eGafAsz8BvbCdAdJTv9xWypBC654uU3rVfTnjdJ",
+            "slot": 449908404,
+            "block_time": 1790220981,
+            "known": true,
+            "price": 6.865715744237507e-06,
+            "quote": "SOL",
+            "price_sol": 6.865715744237507e-06,
+            "vs_entry_pct": 190.84
+          },
+          {
+            "point": "+28.8 с",
+            "signature": "2ZgNusHBpK15W9BfMdFRFpapaxFqfLJ6eWN2yzWyJBhYa6zhJdkeT3xX2L8Gh6wsL73EeKAb1dmeUdrv4rtd4TTa",
+            "slot": 449908476,
+            "block_time": 1790221000,
+            "known": true,
+            "price": 5.983502509158807e-06,
+            "quote": "SOL",
+            "price_sol": 5.983502509158807e-06,
+            "vs_entry_pct": 153.47
+          },
+          {
+            "point": "+60 с",
+            "signature": "5xDwnF3bqRSafnb72puhELZd2HjyAFutEyAL51u9QJbmnAqEmNyQC76qBECoQwvv5kJPmUJ4RWaeHS8VKNWNXUpz",
+            "slot": 449908600,
+            "block_time": 1790221032,
+            "known": true,
+            "price": 7.972800108140613e-06,
+            "quote": "SOL",
+            "price_sol": 7.972800108140613e-06,
+            "vs_entry_pct": 237.74
+          }
+        ],
+        "trades_seen": 937
+      },
+      "known": true
     },
     {
       "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
@@ -129,8 +296,10 @@
       "source": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
       "entry_price": 4.812260917469531e-06,
       "entry_quote": "SOL",
-      "pool": null,
-      "pool_from": null,
+      "pool": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
+      "pool_from": "транзакция источника",
+      "pool_kind": "хранилище минта",
+      "pool_why": "хранилище минта с наибольшим объёмом среди встреченных в инструкциях DEX",
       "pool_candidates": [
         {
           "address": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
@@ -156,31 +325,99 @@
           "from": "транзакция источника"
         },
         {
-          "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "mints_count": 4,
-          "has_mint": true,
-          "with_wsol": true,
-          "dex_programs": [
-            "Orca Whirlpool",
-            "Raydium CPMM"
-          ],
-          "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)",
-          "from": "наша покупка"
-        },
-        {
-          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-          "mints_count": 3,
-          "has_mint": true,
-          "with_wsol": false,
+          "from": "транзакция источника",
+          "vault": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
+          "owner": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "amount": 104400425.411682,
           "dex_programs": [
             "Raydium CPMM"
-          ],
-          "rejected": "служебный адрес, проверен по цепи: владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- системная программа, длина данных 0",
-          "from": "наша покупка"
+          ]
         }
       ],
-      "known": false,
-      "why_not": "пула с этим токеном не нашлось -- транзакция источника: ни один кандидат не парный к WSOL или все отклонены; наша покупка: ни один кандидат не парный к WSOL или все отклонены"
+      "curve": {
+        "known": true,
+        "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+        "pool": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
+        "entry_price": 4.812260917469531e-06,
+        "entry_price_sol": 4.812260917469531e-06,
+        "entry_quote": "SOL",
+        "points": [
+          {
+            "point": "+1 блок",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+2 блок",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+3 блок",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 блок",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 блок",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 с",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 с",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+28.8 с",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+60 с",
+            "signature": "3W7y85UpC5WkHJy6SbRiHHGcRaDZqen6ihN7XPUuJwCtHYSP3xovqVqa6C5k7UACd1AwwoPuGuv3gUP7nmjh8KhK",
+            "slot": 449921445,
+            "block_time": 1790224437,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          }
+        ],
+        "trades_seen": 762
+      },
+      "known": true
     },
     {
       "mint": "AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ",
@@ -189,8 +426,10 @@
       "source": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
       "entry_price": 4.799814320478291e-06,
       "entry_quote": "SOL",
-      "pool": null,
-      "pool_from": null,
+      "pool": "8f69bPFgsqecJZ13te6Wyf7AFqxM1gowaBuucB3Lb5nB",
+      "pool_from": "транзакция источника",
+      "pool_kind": "хранилище минта",
+      "pool_why": "хранилище минта с наибольшим объёмом среди встреченных в инструкциях DEX",
       "pool_candidates": [
         {
           "address": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
@@ -213,31 +452,99 @@
           "from": "транзакция источника"
         },
         {
-          "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "mints_count": 3,
-          "has_mint": true,
-          "with_wsol": true,
-          "dex_programs": [
-            "Meteora DLMM",
-            "Raydium CPMM"
-          ],
-          "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)",
-          "from": "наша покупка"
-        },
-        {
-          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-          "mints_count": 2,
-          "has_mint": true,
-          "with_wsol": false,
+          "from": "транзакция источника",
+          "vault": "8f69bPFgsqecJZ13te6Wyf7AFqxM1gowaBuucB3Lb5nB",
+          "owner": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "amount": 59535456.829719,
           "dex_programs": [
             "Raydium CPMM"
-          ],
-          "rejected": "служебный адрес, проверен по цепи: владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- системная программа, длина данных 0",
-          "from": "наша покупка"
+          ]
         }
       ],
-      "known": false,
-      "why_not": "пула с этим токеном не нашлось -- транзакция источника: ни один кандидат не парный к WSOL или все отклонены; наша покупка: ни один кандидат не парный к WSOL или все отклонены"
+      "curve": {
+        "known": true,
+        "mint": "AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ",
+        "pool": "8f69bPFgsqecJZ13te6Wyf7AFqxM1gowaBuucB3Lb5nB",
+        "entry_price": 4.799814320478291e-06,
+        "entry_price_sol": 4.799814320478291e-06,
+        "entry_quote": "SOL",
+        "points": [
+          {
+            "point": "+1 блок",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+2 блок",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+3 блок",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 блок",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 блок",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+5 с",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+10 с",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+28.8 с",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          },
+          {
+            "point": "+60 с",
+            "signature": "5qiw8XGbBogspdqewk2e73suBDfzf2tDbx1egbMo1M9DaWuxDg136xFUsdmogMpHoSJGo2nLUNNs4bsLHC64v1HK",
+            "slot": 450010758,
+            "block_time": 1790248105,
+            "known": false,
+            "why_not": "токен в этой сделке не двигался"
+          }
+        ],
+        "trades_seen": 970
+      },
+      "known": true
     },
     {
       "mint": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
@@ -246,8 +553,10 @@
       "source": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
       "entry_price": 1.574516173842826e-06,
       "entry_quote": "SOL",
-      "pool": null,
-      "pool_from": null,
+      "pool": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
+      "pool_from": "транзакция источника",
+      "pool_kind": "хранилище минта",
+      "pool_why": "хранилище минта с наибольшим объёмом среди встреченных в инструкциях DEX",
       "pool_candidates": [
         {
           "address": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
@@ -273,33 +582,127 @@
           "from": "транзакция источника"
         },
         {
-          "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-          "mints_count": 5,
-          "has_mint": true,
-          "with_wsol": true,
-          "dex_programs": [
-            "Raydium AMM v4",
-            "Orca Whirlpool",
-            "Raydium CPMM"
-          ],
-          "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)",
-          "from": "наша покупка"
-        },
-        {
-          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-          "mints_count": 3,
-          "has_mint": true,
-          "with_wsol": false,
+          "from": "транзакция источника",
+          "vault": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
+          "owner": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "amount": 91546225.979638,
           "dex_programs": [
             "Raydium CPMM"
-          ],
-          "rejected": "служебный адрес, проверен по цепи: владелец хранилищ Raydium CPMM, но не пул: владелец счёта -- системная программа, длина данных 0",
-          "from": "наша покупка"
+          ]
         }
       ],
-      "known": false,
-      "why_not": "пула с этим токеном не нашлось -- транзакция источника: ни один кандидат не парный к WSOL или все отклонены; наша покупка: ни один кандидат не парный к WSOL или все отклонены"
+      "curve": {
+        "known": true,
+        "mint": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
+        "pool": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
+        "entry_price": 1.574516173842826e-06,
+        "entry_price_sol": 1.574516173842826e-06,
+        "entry_quote": "SOL",
+        "points": [
+          {
+            "point": "+1 блок",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+2 блок",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+3 блок",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+5 блок",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+10 блок",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+5 с",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+10 с",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+28.8 с",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          },
+          {
+            "point": "+60 с",
+            "signature": "5zDoA3CsVtBxxyKCSfVrmpUqYDANe4mBWwwWro8zVBvmEa3T1bExXLWSGXLsoAoQdPhdLRExjLa4Z6vgYEqYkUHx",
+            "slot": 450001628,
+            "block_time": 1790245689,
+            "known": true,
+            "price": 3.2765021086484375e-06,
+            "quote": "SOL",
+            "price_sol": 3.2765021086484375e-06,
+            "vs_entry_pct": 108.1
+          }
+        ],
+        "trades_seen": 814
+      },
+      "known": true
     }
   ],
-  "note": "цена считается по СДЕЛКАМ пула, а не по резервам: резервов на нужном слоте обычный RPC не отдаёт. Сделки за стейбл в кривую не идут -- смешивать цену в SOL и в USDC нельзя"
+  "note": "цена считается по СДЕЛКАМ пула, а не по резервам: резервов на нужном слоте обычный RPC не отдаёт. Сделки за стейбл в кривую не идут -- смешивать цену в SOL и в USDC нельзя. Если pool_kind = 'хранилище минта', адрес пула в транзакции отсутствует (Raydium AMM v4 и CPMM держат все хранилища на одном служебном PDA), и подписи берутся по хранилищу: это операции того же пула, но среди них могут быть и ввод/вывод ликвидности, а не только свапы. Цена точки считается по всей транзакции, поэтому маршрут через несколько пулов даёт среднюю по маршруту, а не цену одного пула"
 }
