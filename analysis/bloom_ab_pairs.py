@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bloom_block_position as BP  # noqa: E402
 import bloom_detector as BD  # noqa: E402
 import bloom_exec_state as ST  # noqa: E402
+import bloom_price_curve as PC  # noqa: E402
 
 ЛАМПОРТ = 10 ** 9
 
@@ -137,6 +138,87 @@ def не_нашли_dbot(p: dict) -> bool:
     return not вх.get("signature")
 
 
+def уровни(helius, *, минт: str, подпись_входа: str | None,
+            подпись_выхода: str | None, кошелёк: str | None,
+            нетто_вход: float | None = None,
+            нетто_выход: float | None = None) -> dict:
+    """Три уровня результата одной стороны, чтобы сравнение было честным.
+
+    Зачем три, а не один. Наши комиссии на входе 0.05 SOL съедают около
+    десятой части круга, у DBot на 0.2 SOL -- около двадцатой. Сравнивать
+    только итог кошелька значит сравнивать размеры входа, а не сигнал.
+
+      * "сигнал" -- курс ПУЛА на входе и на выходе: сколько котировки за
+        токен. Считается по счетам той инструкции DEX, где стоит хранилище
+        минта, поэтому в него не входят ни priority, ни tip, ни комиссия
+        площадки, ни рента новых счетов. Это чистая цена события;
+      * "цепь" -- сколько котировки реально ушло в пул на входе и пришло из
+        пула на выходе. Отличие от сигнала -- проскальзывание и разница
+        купленного и проданного количества;
+      * "после комиссий площадки" -- изменение нативного SOL кошелька, то
+        есть то, что действительно осталось. Отличие от цепи -- надбавки.
+
+    Проценты сравнимы только внутри ОДНОЙ котировочной стороны, поэтому
+    сторона возвращается именем, а при её смене между входом и выходом
+    уровень честно отказывается считаться.
+    """
+    из_ = {"signal": {"known": False, "why_not": "подписи входа или выхода нет"},
+            "chain": {"known": False, "why_not": "подписи входа или выхода нет"},
+            "net": {"known": нетто_вход is not None and нетто_выход is not None}}
+    if нетто_вход and нетто_выход is not None:
+        из_["net"].update(sol_in=нетто_вход, sol_back=нетто_выход,
+                           result_sol=round(нетто_выход - нетто_вход, 9),
+                           result_pct=round((нетто_выход - нетто_вход)
+                                             / нетто_вход * 100, 2))
+    if not подпись_входа or not подпись_выхода:
+        return из_
+    tx_вх = helius.транзакция(подпись_входа)
+    tx_вых = helius.транзакция(подпись_выхода)
+    if not tx_вх or not tx_вых:
+        нет = "узел не отдал транзакцию входа" if not tx_вх else "узел не отдал транзакцию выхода"
+        из_["signal"] = {"known": False, "why_not": нет}
+        из_["chain"] = {"known": False, "why_not": нет}
+        return из_
+    к_вх = PC.курс_по_пулу(tx_вх, минт, кошелёк=кошелёк)
+    к_вых = PC.курс_по_пулу(tx_вых, минт, кошелёк=кошелёк)
+    if not к_вх.get("known") or not к_вых.get("known"):
+        нет = (к_вх.get("why_not") if not к_вх.get("known")
+                else к_вых.get("why_not"))
+        из_["signal"] = {"known": False, "why_not": нет}
+        из_["chain"] = {"known": False, "why_not": нет}
+        return из_
+    if к_вх.get("quote") != к_вых.get("quote"):
+        нет = (f"вход в {к_вх.get('quote')}, выход в {к_вых.get('quote')} -- "
+                "это разные величины, процент между ними не считается")
+        из_["signal"] = {"known": False, "why_not": нет}
+        из_["chain"] = {"known": False, "why_not": нет}
+        return из_
+    из_["signal"] = {"known": True, "quote": к_вх.get("quote"),
+                      "entry_rate": к_вх["rate"], "exit_rate": к_вых["rate"],
+                      "result_pct": round((к_вых["rate"] - к_вх["rate"])
+                                           / к_вх["rate"] * 100, 2)}
+    вошло, вышло = к_вх.get("quote_ui"), к_вых.get("quote_ui")
+    из_["chain"] = {"known": bool(вошло), "quote": к_вх.get("quote"),
+                     "quote_in": вошло, "quote_out": вышло,
+                     "token_in": к_вх.get("token_ui"),
+                     "token_out": к_вых.get("token_ui"),
+                     "result_pct": (round((вышло - вошло) / вошло * 100, 2)
+                                     if вошло else None)}
+    # Раскладка издержек между уровнями -- в процентных пунктах. Именно она
+    # отвечает на вопрос "сколько съела площадка", а не сигнал.
+    сигнал = из_["signal"].get("result_pct")
+    цепь = из_["chain"].get("result_pct")
+    нетто = из_["net"].get("result_pct")
+    из_["costs_pp"] = {
+        "slippage": (round(цепь - сигнал, 2)
+                      if сигнал is not None and цепь is not None else None),
+        "platform_and_fees": (round(нетто - цепь, 2)
+                               if нетто is not None and цепь is not None else None),
+        "total": (round(нетто - сигнал, 2)
+                   if нетто is not None and сигнал is not None else None)}
+    return из_
+
+
 def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
           наш_кошелёк: str) -> dict:
     """Одна пара А/Б: наши числа, числа DBot, место в блоке и толпа."""
@@ -160,6 +242,15 @@ def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
     итог["our"]["result_sol"] = (round(из_ - вх, 9) if из_ is not None else None)
     итог["our"]["result_pct"] = (round((из_ - вх) / вх * 100, 2)
                                   if (из_ is not None and вх) else None)
+
+    # Три уровня по НАШЕЙ стороне. Подпись выхода -- та, которой позиция
+    # закрыта (авто-ордер Bloom); без неё уровни сигнала и цепи честно пустые.
+    итог["our"]["levels"] = уровни(
+        helius, минт=минт,
+        подпись_входа=(подписи[0] if подписи else None),
+        подпись_выхода=(поз.get("closed_signature")
+                         or (поз.get("last_sell_outcome") or {}).get("signature")),
+        кошелёк=наш_кошелёк, нетто_вход=вх, нетто_выход=из_)
 
     место = BP.место_относительно_источника(
         helius, минт=минт, слот_источника=поз.get("source_slot"),
@@ -212,13 +303,24 @@ def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
             вых = выход_dbot(helius, кошелёк_dbot, минт,
                               после_слота=int(вход_d["slot"] or 0))
             итог["dbot"]["exit"] = вых
+            if вых.get("known"):
+                итог["dbot"]["levels"] = уровни(
+                    helius, минт=минт, подпись_входа=вход_d.get("signature"),
+                    подпись_выхода=вых.get("signature"), кошелёк=кошелёк_dbot,
+                    нетто_вход=итог["dbot"].get("sol_in"),
+                    нетто_выход=вых.get("sol_back"))
             if вых.get("known") and итог["dbot"].get("sol_in"):
                 вд = итог["dbot"]["sol_in"]
                 итог["dbot"]["result_sol"] = round(вых["sol_back"] - вд, 9)
                 итог["dbot"]["result_pct"] = round(
                     (вых["sol_back"] - вд) / вд * 100, 2) if вд else None
-        итог["note"] = ("проценты сравнимы, абсолютные числа нет: у нас вход "
-                         f"{итог['our']['sol_in']} SOL, у DBot свой размер")
+        итог["note"] = (
+            "проценты сравнимы, абсолютные числа нет: у нас вход "
+            f"{итог['our']['sol_in']} SOL, у DBot свой размер. Сравнивать "
+            "стороны следует на уровне signal: там нет ни priority, ни tip, "
+            "ни комиссии площадки, ни ренты, поэтому разница размеров входа "
+            "(у нас комиссии съедают около десятой части круга, у DBot около "
+            "двадцатой) в него не попадает")
     return итог
 
 
@@ -363,6 +465,72 @@ def self_test() -> None:
         к.get("BATCH-3") == "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu"
         and к.get("BATCH-5") == "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
         {k: v for k, v in к.items() if k in ("BATCH-3", "BATCH-5")})
+
+    # --- три уровня: сигнал / цепь / после комиссий площадки ---
+    RAY_П = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+    СТЕЙБЛ = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+    def своп(*, токенов, котировки, кв=BD.WSOL):
+        """Свап в одном пуле: хранилища стоят в счетах инструкции DEX."""
+        def б(минт, raw, idx, dec):
+            return {"accountIndex": idx, "mint": минт, "owner": "ПУЛ",
+                     "uiTokenAmount": {"amount": str(raw), "decimals": dec,
+                                        "uiAmount": raw / 10 ** dec}}
+        ключи = [{"pubkey": МЫ, "signer": True}, {"pubkey": "ХРАН-МИНТ"},
+                  {"pubkey": "ХРАН-КВ"}]
+        return {"slot": 100, "blockTime": 1790000000,
+                 "transaction": {"signatures": ["S"], "message": {
+                     "accountKeys": ключи,
+                     "instructions": [{"programId": RAY_П,
+                                        "accounts": ["ХРАН-МИНТ", "ХРАН-КВ"]}]}},
+                 "meta": {"err": None, "fee": 5000,
+                           "preBalances": [10 ** 9, 0, 0],
+                           "postBalances": [10 ** 9, 0, 0],
+                           "preTokenBalances": [б(МИНТ, int(токенов * 1e6), 1, 6),
+                                                 б(кв, 0, 2, 9)],
+                           "postTokenBalances": [б(МИНТ, 0, 1, 6),
+                                                  б(кв, int(котировки * 1e9), 2, 9)]}}
+
+    class HeliusУровни:
+        def __init__(self, по_подписи):
+            self.по_подписи = по_подписи
+
+        def транзакция(self, подпись, **kw):
+            return self.по_подписи.get(подпись)
+
+    h_ур = HeliusУровни({"ВХОД": своп(токенов=1000, котировки=2.0),
+                          "ВЫХОД": своп(токенов=1000, котировки=2.4)})
+    у = уровни(h_ур, минт=МИНТ, подпись_входа="ВХОД", подпись_выхода="ВЫХОД",
+                кошелёк=МЫ, нетто_вход=2.1, нетто_выход=2.35)
+    chk("уровень сигнала: курс пула на входе и на выходе",
+        у["signal"]["known"] and abs(у["signal"]["entry_rate"] - 0.002) < 1e-12
+        and abs(у["signal"]["result_pct"] - 20.0) < 0.01, у["signal"])
+    chk("уровень цепи: сколько котировки ушло в пул и пришло из пула",
+        у["chain"]["known"] and abs(у["chain"]["quote_in"] - 2.0) < 1e-9
+        and abs(у["chain"]["quote_out"] - 2.4) < 1e-9, у["chain"])
+    chk("уровень после комиссий площадки -- итог кошелька",
+        у["net"]["known"] and abs(у["net"]["result_pct"] - 11.9) < 0.01, у["net"])
+    chk("издержки разложены в процентных пунктах, а не свалены в одно число",
+        abs(у["costs_pp"]["slippage"]) < 0.01
+        and abs(у["costs_pp"]["platform_and_fees"] + 8.1) < 0.01
+        and abs(у["costs_pp"]["total"] + 8.1) < 0.01, у["costs_pp"])
+
+    # Смена котировочной стороны между входом и выходом -- разные величины.
+    h_см = HeliusУровни({"ВХОД": своп(токенов=1000, котировки=2.0),
+                          "ВЫХОД": своп(токенов=1000, котировки=400.0, кв=СТЕЙБЛ)})
+    у_см = уровни(h_см, минт=МИНТ, подпись_входа="ВХОД", подпись_выхода="ВЫХОД",
+                   кошелёк=МЫ, нетто_вход=2.1, нетто_выход=2.35)
+    chk("вход в SOL, выход в стейбле -- процент НЕ считается, сказано почему",
+        у_см["signal"]["known"] is False
+        and "разные величины" in у_см["signal"]["why_not"], у_см["signal"])
+    chk("а итог кошелька при этом всё равно посчитан",
+        у_см["net"]["known"] and у_см["net"]["result_pct"] is not None, у_см["net"])
+
+    у_нет = уровни(HeliusУровни({}), минт=МИНТ, подпись_входа=None,
+                    подпись_выхода=None, кошелёк=МЫ)
+    chk("без подписей уровни честно пустые, а не нулевые",
+        у_нет["signal"]["known"] is False and у_нет["net"]["known"] is False,
+        у_нет)
 
     print(f"самопроверка пар А/Б: {всего[1]}/{всего[0]}"
           f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
