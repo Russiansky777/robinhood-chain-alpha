@@ -163,6 +163,7 @@ class LegCache:
         self.last_status: dict = {}
         self.seen: dict = {}       # q -> подписи, уже разобранные (не шаблон)
         self.reject: dict = {}     # q -> Counter причин, почему сделка не стала шаблоном
+        self.moved: dict = {}      # подпись -> двигала ли цену (своп)
         self.workers = 8
 
     def _rpc(self, method, params):
@@ -188,23 +189,32 @@ class LegCache:
             cur["checked_at"] = now
             return "без изменений"
         seen = self.seen.setdefault(q, collections.deque(maxlen=200))
-        for sg in ok[:4] if cur else ok[:10]:     # первое заполнение -- глубже
-            if cur and sg == cur["sig"]:
-                break
+        new = ok[:ok.index(cur["sig"])] if cur and cur["sig"] in ok else ok
+        limit = 6 if cur else 10               # первое заполнение -- глубже
+        moved = bool(cur) and (cur["sig"] not in ok or len(new) > limit)
+        for sg in new[:limit]:
             if sg in seen:
+                moved = moved or self.moved.get(sg, True)
                 continue
             try:
                 tx = self._rpc("getTransaction", [sg, TX_OPTS])
             except Exception:  # noqa: BLE001 -- одна нечитаемая tx не рвёт обновление пула
                 seen.append(sg)
                 self.calls["tx_errors"] += 1
+                moved = True
                 continue
             if not tx:
+                moved = True
                 continue
             seen.append(sg)
             ent = self._template_from(tx, p, q)
             if isinstance(ent, str):
                 self.reject.setdefault(q, collections.Counter())[ent] += 1
+                # цена двигается только свопом: по хранилищам пула
+                ev = C.pool_event(tx, {"pool_vault": p["q_vault"], "quote_vault": p.get("w_vault"),
+                                       "quote_mint": C.WSOL}) if p.get("w_vault") else {"kind": "swap"}
+                self.moved[sg] = ev.get("kind") in ("swap", "absent")
+                moved = moved or self.moved[sg]
                 continue
             self.load_luts(_lut_keys(tx))
             ent.update(sig=sg, checked_at=now)
@@ -214,7 +224,10 @@ class LegCache:
         if cur and p["program"] not in PRICE_DEPENDENT:
             cur["checked_at"] = now    # счета от цены не зависят -- шаблон годен
             return "новых покупок нет, шаблон годен (счета не зависят от цены)"
-        return "новых сделок-шаблонов нет" if cur else "шаблона нет"
+        if cur and not moved:
+            cur["checked_at"] = now    # новые сделки -- не свопы (ликвидность, комиссии): цена та же
+            return "новые сделки не свопы, шаблон годен"
+        return "был своп без шаблона -- шаблон не подтверждён" if cur else "шаблона нет"
 
     @staticmethod
     def _template_from(tx: dict, p: dict, q: str):
@@ -493,6 +506,46 @@ def self_test() -> int:
                        f"вызовы {dict(cache.calls)}",
                        st1 == "новый шаблон" and st2 == "без изменений"
                        and cache.calls["getTransaction"] == 1 and cache.calls["getSignaturesForAddress"] == 2))
+        # новая сделка в пуле -- не своп (по хранилищам пула ничего не сдвинулось):
+        # шаблон DLMM остаётся подтверждённым; своп без шаблона -- не подтверждён
+        clock[0] += 5
+        mv1 = B.mints_and_vaults(B.extract_template(leg1_tx, B.DLMM, leg1_pool["q_vault"]), leg1_tx)
+        leg1_pool["w_vault"] = mv1["quote_vault"]
+
+        def synth(dq, dw):     # синтетическая tx: только балансы двух хранилищ пула
+            keys = [{"pubkey": leg1_pool["q_vault"]}, {"pubkey": leg1_pool["w_vault"]}]
+            bal = [(0, htm, 10**12), (1, C.WSOL, 10**12)]
+            pre = [{"accountIndex": i, "mint": m, "owner": "X", "uiTokenAmount": {"amount": str(a), "decimals": 6}}
+                   for i, m, a in bal]
+            post = [{"accountIndex": i, "mint": m, "owner": "X",
+                     "uiTokenAmount": {"amount": str(a + (dq if i == 0 else dw)), "decimals": 6}} for i, m, a in bal]
+            return {"meta": {"err": None, "preTokenBalances": pre, "postTokenBalances": post, "innerInstructions": []},
+                    "transaction": {"message": {"instructions": [], "accountKeys": keys}}}
+        nonswap = synth(0, 0)
+        orig = rpc2
+        other = [None]
+
+        def rpc3(method, params):
+            if method == "getSignaturesForAddress":
+                return [{"signature": "N" + str(clock[0]), "err": None},
+                        {"signature": C.first_signature(leg1_tx), "err": None}]
+            if method == "getTransaction":
+                return other[0]
+            return orig(method, params)
+        cache.rpc_call = rpc3
+        other[0] = nonswap
+        st3 = cache.refresh_pool(htm)
+        age3 = cache.get(htm)[1]
+        clock[0] += 5
+        other[0] = synth(-5000, 7000)     # своп по хранилищам, но инструкции-шаблона нет
+        st4 = cache.refresh_pool(htm)
+        age4 = cache.get(htm)[1]
+        cache.rpc_call = rpc2
+        checks.append((f"не-своп в пуле оставляет шаблон подтверждённым («{st3}», возраст {age3:.0f} с); "
+                       f"неизвестная сделка -- нет («{st4}», возраст {age4:.0f} с)",
+                       age3 == 0 and age4 == 5 and "годен" in st3 and "не подтверждён" in st4))
+        clock[0] -= 10
+        cache.entries[htm]["checked_at"] = clock[0]
         keys = {a for x in leg2 for ix in B.all_instructions(x["tx"]) for a in ix["accounts"]}
         keys |= {a for ix in B.all_instructions(leg1_tx) for a in ix["accounts"]}
         lut_addrs.extend(sorted(keys)[:256])
