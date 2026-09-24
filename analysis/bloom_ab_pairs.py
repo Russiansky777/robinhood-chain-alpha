@@ -310,6 +310,16 @@ def пара(helius, поз: dict, *, кошелёк_dbot: str | None,
         "source_task": поз.get("source_task"),
         "source_slot": поз.get("source_slot"),
         "source_signature": поз.get("source_sig"),
+        # КРУГИ В МИЛЛИСЕКУНДАХ. bloom_ms -- от решения до ответа Bloom,
+        # own_tx_seen_ms -- от решения до появления НАШЕЙ транзакции в
+        # подписке (processed), а разница между ними -- путь Bloom от
+        # ответа до включения в блок. Последние два появляются только у
+        # покупок, сделанных после включения замерной подписки на наш
+        # кошелёк; у прежних их нет, и это честно видно как null.
+        "circles_ms": {"bloom_ms": поз.get("bloom_ms"),
+                        "own_tx_seen_ms": поз.get("own_tx_seen_ms"),
+                        "bloom_to_seen_ms": поз.get("bloom_to_seen_ms"),
+                        "chain_ok": поз.get("own_tx_seen_chain_ok")},
         "our": {"signature": (подписи[0] if подписи else None),
                  "slot": поз.get("our_slot"),
                  "sol_in": поз.get("sol_in"),
@@ -487,9 +497,24 @@ def self_test() -> None:
 
     поз = {"mint": МИНТ, "source_task": "BATCH-3", "source_slot": 100,
             "source_sig": "ИСТОЧНИК", "our_slot": 101, "signatures": ["НАША"],
-            "sol_in": 0.05, "closed_sol_delta": 0.0432, "closed_via": "авто-ордер Bloom"}
+            "sol_in": 0.05, "closed_sol_delta": 0.0432, "closed_via": "авто-ордер Bloom",
+            "bloom_ms": 412.5, "own_tx_seen_ms": 1180.0,
+            "bloom_to_seen_ms": 767.5, "own_tx_seen_chain_ok": True}
     h = Helius()
     р = пара(h, поз, кошелёк_dbot=DBOT, наш_кошелёк=МЫ)
+
+    chk("круги в миллисекундах попали в строку пары",
+        р["circles_ms"]["bloom_ms"] == 412.5
+        and р["circles_ms"]["own_tx_seen_ms"] == 1180.0
+        and р["circles_ms"]["bloom_to_seen_ms"] == 767.5, р["circles_ms"])
+    без_кругов = пара(h, {k: v for k, v in поз.items()
+                           if k not in ("bloom_ms", "own_tx_seen_ms",
+                                         "bloom_to_seen_ms")},
+                       кошелёк_dbot=DBOT, наш_кошелёк=МЫ)
+    chk("у прежних покупок круги пустые, а не нулевые",
+        без_кругов["circles_ms"]["own_tx_seen_ms"] is None
+        and без_кругов["circles_ms"]["bloom_ms"] is None,
+        без_кругов["circles_ms"])
 
     chk("наш результат посчитан", р["our"]["result_sol"] == round(0.0432 - 0.05, 9),
         р["our"])
