@@ -1,0 +1,60 @@
+name: "Bloom: токен-счета кошелька -- рента и пыль (только чтение)"
+
+# Два вопроса владельца одним прогоном:
+#   * рента ATA на уровне "итог" -- возвращена (счёт закрыт при продаже) или
+#     заперта (счёт остался открытым)? Если заперта -- сколько таких счетов и
+#     сколько в них SOL;
+#   * есть ли в кошельке пыль от прошлых сделок (для живого теста продажи
+#     через Swap V2).
+#
+# Только чтение цепи: getTokenAccountsByOwner. Ни одной подписи, ни одного
+# закрытия счёта, ключа кошелька в прогоне нет вообще.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "кошелёк (пусто -- кошелёк исполнителя)"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-token-accounts
+  cancel-in-progress: false
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО сети"
+        run: python3 analysis/bloom_token_accounts.py --self-test
+
+      - name: "Чтение токен-счетов"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          pip install -q requests
+          ARGS=""
+          if [ -n "${{ inputs.wallet }}" ]; then ARGS="--wallet ${{ inputs.wallet }}"; fi
+          python3 analysis/bloom_token_accounts.py $ARGS 2>&1 | tail -60
+
+      - name: "Коммит"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bloom_token_accounts.json ] && git add data/bloom_token_accounts.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Bloom: токен-счета кошелька, рента и пыль [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
