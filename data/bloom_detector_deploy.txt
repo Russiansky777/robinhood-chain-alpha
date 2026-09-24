@@ -82,7 +82,7 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 1107,
+      "v2": 1117,
       "unreadable": 0
     },
     "positions": {
@@ -120,9 +120,9 @@
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-24T18:08:13Z",
-  "updated_ts": 1790273293.1207714,
-  "alive_since_utc": "2026-09-24T18:08:12Z",
+  "updated_utc": "2026-09-24T18:19:40Z",
+  "updated_ts": 1790273980.1334088,
+  "alive_since_utc": "2026-09-24T18:19:39Z",
   "mode": "live",
   "sources": 20,
   "sources_from": "DBot живьём + тестовых источников из окружения: 2",
@@ -141,7 +141,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 116.57168667346187,
+  "rate_usd_sol": 116.98308593734195,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -153,12 +153,13 @@
   "slot_notifications": 0,
   "net_slot_age_s": null,
   "balance_sol": 2.146708149,
-  "balance_age_s": 0.06,
-  "rpc_calls": 1,
+  "balance_age_s": 0.09,
+  "rpc_calls": 2,
   "rpc_by_method": {
+    "getMultipleAccounts": 1,
     "getBalance": 1
   },
-  "session_credits": 1,
+  "session_credits": 2,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -178,6 +179,19 @@
     "module_loaded": true,
     "module_why_not": ""
   },
+  "leg_cache": {
+    "enabled": true,
+    "pools": 4,
+    "templates": {},
+    "fed": 0,
+    "no_tx": 0,
+    "failed": 0,
+    "luts": 32,
+    "luts_pending": 0,
+    "luts_warmed": 32,
+    "warm_why_not": "",
+    "ingest_stats": {}
+  },
   "telegram_commands": {
     "enabled": true,
     "why_not": "",
@@ -196,7 +210,7 @@
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-24T18:08:12Z",
+    "last_utc": "2026-09-24T18:19:40Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -224,6 +238,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-1108
+1137
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 297
