@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import c2_common as C  # noqa: E402
 
 SERVICE = "c2_sandwich"
+BLOOM_SECOND_WALLET = "AvFRdagiRpjxGZnZcAThaMv6MLRtEaFGVZStKn3X2LwD"
 NEXT_BLOCK_TRIES = 6
 BLOCK_OPTS = {"encoding": "jsonParsed", "transactionDetails": "accounts",
               "maxSupportedTransactionVersion": C.TX_VERSION, "rewards": False,
@@ -240,7 +241,23 @@ def safe_analyze(rpc, kind, sig, wallet, mint, tx, *, sources, known) -> dict:
                 "sandwich": "нет данных", "why_no_data": f"узел: {str(exc)[:160]}"}
 
 
-def wallet_buys(rpc, rc, wallet: str, from_ts: int, max_pages: int = 40) -> tuple[list, dict]:
+def describe_tx(tx: dict, wallet: str) -> dict:
+    """Что транзакция сделала с кошельком: покупка/продажа/прочее, дельта SOL."""
+    ld = C.lamport_delta(tx, wallet)
+    up, down = [], []
+    for r in C.token_rows(tx).values():
+        if r["owner"] == wallet and r["mint"] not in (C.WSOL, C.USDC, C.USDT) and r["post"] != r["pre"]:
+            (up if r["post"] > r["pre"] else down).append(r["mint"])
+    signer = wallet in C.signers(tx)
+    kind = ("buy" if up and not down else "sell" if down and not up else
+            "swap_token_token" if up and down else "sol_only" if ld else "other")
+    return {"signature": C.first_signature(tx), "utc": C.utc(tx.get("blockTime")), "kind": kind,
+            "signer": signer, "sol_delta": (ld / 1e9) if ld is not None else None,
+            "mints": sorted(set(up + down)) or None}
+
+
+def wallet_buys(rpc, rc, wallet: str, from_ts: int, max_pages: int = 40,
+                detail: bool = False) -> tuple[list, dict]:
     """Все покупки кошелька по цепи с from_ts: первый вход (classify_tx, без
     порога) и докупки. Сделки, где курс стейбла не получен, -- в счётчик."""
     sigs, before, complete = [], None, False
@@ -257,11 +274,19 @@ def wallet_buys(rpc, rc, wallet: str, from_ts: int, max_pages: int = 40) -> tupl
     out, st = [], {"signatures": len(win), "signatures_ok": len(ok), "scan_complete": complete,
                    "fetch_failed": 0, "first_entry": 0, "add": 0, "rate_missing": 0,
                    "from_utc": C.utc(from_ts)}
+    st["all_transactions"] = [] if detail else None
+    if detail:
+        for x in win:
+            if x.get("err") is not None:
+                st["all_transactions"].append({"signature": x["signature"], "utc": C.utc(x.get("blockTime")),
+                                               "kind": "failed", "sol_delta": None, "mints": None})
     for x in ok:
         tx = got.get(x["signature"])
         if tx is None:
             st["fetch_failed"] += 1
             continue
+        if detail:
+            st["all_transactions"].append(describe_tx(tx, wallet))
         b = buy_of_wallet(rc, tx, wallet)
         if not b:
             continue
@@ -378,7 +403,17 @@ def main() -> int:
                     if t["signature"]})
     from_ours = parse_utc(a.ours_from)
     try:
-        ours, ostat = wallet_buys(rpc, rc, C.EXECUTOR_WALLET, from_ours)
+        ours, ostat = wallet_buys(rpc, rc, C.EXECUTOR_WALLET, from_ours, detail=True)
+        # Второй кошелёк аккаунта Bloom (docs/BLOOM_EXECUTOR_PLAN.md) -- только
+        # число подписей с того же момента: 1 запрос, ответ на «где сделки 0.2».
+        try:
+            side = rpc.signatures(BLOOM_SECOND_WALLET, limit=1000)
+            side_win = [x for x in side if (x.get("blockTime") or 0) >= from_ours]
+            ostat["second_bloom_wallet"] = {"address": BLOOM_SECOND_WALLET,
+                                            "signatures_since": len(side_win),
+                                            "last_utc": C.utc(side_win[0].get("blockTime")) if side_win else None}
+        except RuntimeError as exc:
+            ostat["second_bloom_wallet"] = {"address": BLOOM_SECOND_WALLET, "why_not": str(exc)[:120]}
         recon = reconcile(ours, journal)
         C.log(f"наши покупки по цепи с {a.ours_from}: {len(ours)} ({ostat}); сверка с журналом: "
               f"в журнале {recon['journal_total']}, из них найдено {len(recon['journal_found_on_chain'])}, "
@@ -566,6 +601,8 @@ def self_test() -> int:
     rb = safe_analyze(Boom({}), "t", sig0, wallet, mint, ours, sources=set(), known={})
     chk("сбой узла на сделке -- строка «нет данных», прогон идёт дальше",
         rb["sandwich"] == "нет данных" and "503" in rb["why_no_data"], rb)
+    d = describe_tx(ours, wallet)
+    chk("описание транзакции: покупка подписантом", d["kind"] == "buy" and d["signer"] is True, d)
     # сверка с журналом и классы размера
     rec = reconcile([{"signature": "S1"}, {"signature": "S3"}], {"S1": "live", "S2": "live"})
     chk("сверка: найдено S1, нет покупки S2, вне журнала S3",
