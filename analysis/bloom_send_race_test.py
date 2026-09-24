@@ -897,7 +897,9 @@ def напечатать_доклад(итог: dict, *, заголовок: str
             print(f"   {адрес[:12]}... n={стр['n']} сумма={стр['lamports'] / 1e9:.6f} SOL"
                   f"{' -- ' + стр['label'] if стр.get('label') else ' -- метки нет'}")
     print(f"потрачено (заявленный отток): {итог.get('spent_sol'):.6f} SOL из "
-          f"{ПРЕДЕЛ_РАСХОДА_SOL} SOL")
+          f"{ПРЕДЕЛ_РАСХОДА_SOL} SOL"
+          + (f"; по балансу кошелька {итог['spent_sol_fact']:.6f} SOL"
+              if итог.get("spent_sol_fact") is not None else ""))
     print(f"ИТОГ: {с.get('verdict')}")
     if итог.get("stopped_because"):
         print(f"остановка: {итог['stopped_because']}")
@@ -1741,6 +1743,13 @@ def main(argv=None) -> int:
                    каталог_живого=каталог_живого, ata_есть=(ata["accounts"] > 0),
                    минт=минт_адрес, предел_минут=a.max_minutes,
                    сессия_sender=отправитель)
+    # ЗАЯВЛЕННЫЙ ОТТОК ПРОТИВ ФАКТА. Предел считается по заявленному, но
+    # верить ему на слово нельзя: баланс до и после -- проверка самого учёта.
+    итог["balance_sol_start"] = баланс
+    итог["balance_sol_after_pairs"] = баланс_sol(rpc, кошелёк)
+    if итог["balance_sol_start"] and итог["balance_sol_after_pairs"]:
+        итог["spent_sol_fact"] = round(итог["balance_sol_start"]
+                                        - итог["balance_sol_after_pairs"], 9)
     # Сырые пары на диск СРАЗУ: дальше идут сеть (вердикты по цепи) и
     # продажа, и если там что-то упадёт, замер должен остаться.
     записать(путь, итог, ключ=ключ)
@@ -1762,6 +1771,7 @@ def main(argv=None) -> int:
         итог["sell"] = продать_всё(rpc, кошелёк=кошелёк, вход_sol=вход, живьём=True,
                                     минт=минт_адрес)
         print(f"продажа: {json.dumps({к: итог['sell'].get(к) for к in ('ok', 'why_not', 'signature', 'status', 'amount_raw', 'api', 'floor_pct')}, ensure_ascii=False)}")
+        итог["balance_sol_end"] = баланс_sol(rpc, кошелёк)
     поток.остановить()
     итог["stream"] = {"messages": поток.сообщений, "bytes": поток.байт,
                        "drops": поток.обрывов}
