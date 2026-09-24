@@ -1,5 +1,5 @@
 {
-  "built_utc": "2026-09-24T18:34:43Z",
+  "built_utc": "2026-09-24T18:53:33Z",
   "pairs": [
     {
       "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
@@ -41,9 +41,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
-          "gap_slots": 132560,
-          "why_not": "ближайшая сделка через 132560 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 133293,
+          "why_not": "котировка на входе и на выходе -- разные минты, процент между ними не считается"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход в SOL (So1111111111), выход в токен (HTmQz7My6Meh) -- это разные величины, процент между ними не считается",
+          "why_substitute_not": "котировка на входе и на выходе -- разные минты, процент между ними не считается"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
+        "gap_slots": 133293,
+        "why_not": "котировка на входе и на выходе -- разные минты, процент между ними не считается"
       },
       "place": {
         "slot_delta": 0,
@@ -114,6 +128,16 @@
             "total": -6.71
           }
         },
+        "signal_effective": {
+          "known": true,
+          "source": "наш пул",
+          "result_pct": 3.97,
+          "pool": "HGcAPeFhUQDdusFuBDEN52NYJYgasugw3w7vSa25jEgT",
+          "quote": "SOL",
+          "gap_slots": 0,
+          "gap_ok": true,
+          "substitute": false
+        },
         "result_sol": -0.005542774,
         "result_pct": -2.74
       },
@@ -161,9 +185,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "8f69bPFgsqecJZ13te6Wyf7AFqxM1gowaBuucB3Lb5nB",
-          "gap_slots": 196695,
-          "why_not": "ближайшая сделка через 196695 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 196724,
+          "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход и выход прошли через РАЗНЫЕ пулы: 8f69bPFgsqec против Az5SunH5tN7A -- цена одного пула и цена другого не сравниваются",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "8f69bPFgsqecJZ13te6Wyf7AFqxM1gowaBuucB3Lb5nB",
+        "gap_slots": 196724,
+        "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 1,
@@ -221,6 +259,13 @@
             "result_pct": -10.27
           }
         },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход и выход прошли через РАЗНЫЕ пулы: EHMMSGXJ3hcZ против 8f69bPFgsqec -- цена одного пула и цена другого не сравниваются",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
         "result_sol": -0.020746031,
         "result_pct": -10.27
       },
@@ -266,9 +311,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
-          "gap_slots": 91648,
-          "why_not": "ближайшая сделка через 91648 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 91678,
+          "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход в SOL (So1111111111), выход в токен (HTmQz7My6Meh) -- это разные величины, процент между ними не считается",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
+        "gap_slots": 91678,
+        "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 2,
@@ -339,6 +398,16 @@
             "total": -7.05
           }
         },
+        "signal_effective": {
+          "known": true,
+          "source": "наш пул",
+          "result_pct": -4.46,
+          "pool": "EhRDDJhuwmxoDtH2DLnNCJCA2vS4mfbjTK6a1auihLSB",
+          "quote": "SOL",
+          "gap_slots": 0,
+          "gap_ok": true,
+          "substitute": false
+        },
         "result_sol": -0.023442074,
         "result_pct": -11.51
       },
@@ -384,9 +453,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "2jgeBSxH9bZnbez1TXygHHNgibBgAZ4fHaEvFxT4SqfM",
-          "gap_slots": 92431,
-          "why_not": "ближайшая сделка через 92431 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 94747,
+          "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход в SOL (So1111111111), выход в токен (CARDSccUMFKo) -- это разные величины, процент между ними не считается",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "2jgeBSxH9bZnbez1TXygHHNgibBgAZ4fHaEvFxT4SqfM",
+        "gap_slots": 94747,
+        "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 2,
@@ -444,6 +527,13 @@
             "result_pct": -8.75
           }
         },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход и выход прошли через РАЗНЫЕ пулы: CUAhwfFSkU9k против Bw3DzikxVPDj -- цена одного пула и цена другого не сравниваются",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
         "result_sol": -0.017679097,
         "result_pct": -8.75
       },
@@ -491,9 +581,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "AG1EhPjsBrkxQWkViuLXF6pQnHwfr9f9sdNneeoykcEJ",
-          "gap_slots": 83070,
-          "why_not": "ближайшая сделка через 83070 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 83134,
+          "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "вход и выход прошли через РАЗНЫЕ пулы: B9b1o3tF61ce против DcpYAKLzwFV8 -- цена одного пула и цена другого не сравниваются",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "AG1EhPjsBrkxQWkViuLXF6pQnHwfr9f9sdNneeoykcEJ",
+        "gap_slots": 83134,
+        "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 1,
@@ -558,7 +662,20 @@
           "level": "пул источника",
           "pool": "4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71",
           "why_not": "слот нашего выхода неизвестен"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "подписи входа или выхода нет",
+          "why_substitute_not": "слот нашего выхода неизвестен"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71",
+        "why_not": "слот нашего выхода неизвестен"
       },
       "place": {
         "slot_delta": null,
@@ -624,6 +741,16 @@
             "total": -3.61
           }
         },
+        "signal_effective": {
+          "known": true,
+          "source": "наш пул",
+          "result_pct": 6.56,
+          "pool": "6qumFVGeQA45AerBh44q1nMvvy6t9JD4pHdHLy3LSSse",
+          "quote": "SOL",
+          "gap_slots": 0,
+          "gap_ok": true,
+          "substitute": false
+        },
         "result_sol": 0.005965657,
         "result_pct": 2.95
       },
@@ -665,9 +792,23 @@
           "known": false,
           "level": "пул источника",
           "pool": "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh",
-          "gap_slots": 59415,
-          "why_not": "ближайшая сделка через 59415 слотов после нашего выхода -- дальше допуска 8"
+          "gap_slots": 63652,
+          "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "подписи входа или выхода нет",
+          "why_substitute_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh",
+        "gap_slots": 63652,
+        "why_not": "курс на момент выхода: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 0,
@@ -736,7 +877,20 @@
           "level": "пул источника",
           "pool": "6irhZAAwDhi4L7w4oAqhZLuhY5QFt1EAS6PmmyevfH8L",
           "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "хранилище не встречается в счетах инструкций DEX",
+          "why_substitute_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "6irhZAAwDhi4L7w4oAqhZLuhY5QFt1EAS6PmmyevfH8L",
+        "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 0,
@@ -801,7 +955,20 @@
           "level": "пул источника",
           "pool": "D4RZKGc565MrZCpP3YX18ZpmEMveSHGmYZz21CrmzRQP",
           "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "подписи входа или выхода нет",
+          "why_substitute_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "D4RZKGc565MrZCpP3YX18ZpmEMveSHGmYZz21CrmzRQP",
+        "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": null,
@@ -865,7 +1032,20 @@
           "level": "пул источника",
           "pool": "G364gqHVSfL3SmKE8JrjgRpodS6P3H7dYD7wcNzkA9LJ",
           "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
+        },
+        "signal_effective": {
+          "known": false,
+          "source": null,
+          "substitute": null,
+          "why_own_not": "хранилище не встречается в счетах инструкций DEX",
+          "why_substitute_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
         }
+      },
+      "signal_replacement": {
+        "known": false,
+        "level": "пул источника",
+        "pool": "G364gqHVSfL3SmKE8JrjgRpodS6P3H7dYD7wcNzkA9LJ",
+        "why_not": "курс входа источника: хранилище не встречается в счетах инструкций DEX"
       },
       "place": {
         "slot_delta": 1,
