@@ -272,7 +272,11 @@ def сигнал_пула_источника(helius, *, минт: str, tx_ист
         return dict(если_нет, why_not=f"пул источника не выделить: {выбор.get('why_not')}")
     вх = PC.курс_по_пулу(tx_источника, минт, хранилище=адрес)
     if not вх.get("known"):
-        return dict(если_нет, pool=адрес, why_not=f"курс входа источника: {вх.get('why_not')}")
+        return dict(если_нет, pool=адрес,
+                     why_not=f"курс входа источника: {вх.get('why_not')}",
+                     diag={"vault_seen_at_all": вх.get("vault_seen_at_all"),
+                            "programs_seen": вх.get("programs_seen"),
+                            "programs_unknown_to_us": вх.get("programs_unknown_to_us")})
     if not слот_выхода:
         return dict(если_нет, pool=адрес, why_not="слот нашего выхода неизвестен")
     подписи = PC.подписи_пула(helius, адрес)
@@ -287,8 +291,15 @@ def сигнал_пула_источника(helius, *, минт: str, tx_ист
     tx_в = helius.транзакция(z.get("signature"))
     вых = PC.курс_по_пулу(tx_в or {}, минт, хранилище=адрес)
     if not вых.get("known"):
+        # Разбор отказа идёт наверх целиком: одной строки "хранилище не
+        # встречается в счетах инструкций DEX" мало, чтобы понять, чинить
+        # выбор хранилища или список программ DEX.
         return dict(если_нет, pool=адрес, gap_slots=разрыв,
-                     why_not=f"курс на момент выхода: {вых.get('why_not')}")
+                     why_not=f"курс на момент выхода: {вых.get('why_not')}",
+                     exit_signature=z.get("signature"), exit_slot=z.get("slot"),
+                     diag={"vault_seen_at_all": вых.get("vault_seen_at_all"),
+                            "programs_seen": вых.get("programs_seen"),
+                            "programs_unknown_to_us": вых.get("programs_unknown_to_us")})
     if вых.get("quote_mint") != вх.get("quote_mint"):
         return dict(если_нет, pool=адрес, gap_slots=разрыв,
                      why_not=("котировка на входе и на выходе -- разные минты, "
