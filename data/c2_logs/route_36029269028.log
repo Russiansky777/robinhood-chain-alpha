@@ -1,0 +1,18 @@
+токен: {"program_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "decimals": 6, "supply": "993465241428108", "mint_authority": null, "freeze_authority": null, "name": "RuneScape Gold", "symbol": "GP", "uri": "https://gateway.irys.xyz/Fjfok9wcUYoUr6cJtWY344WmLSCnbTApPHcg9WaRCULi", "extensions": ["metadataPointer", "transferFeeConfig", "tokenMetadata"]}
+пулы SOL/HTm: [{"pool": "8S2XFMPBNnUNBuzKTb1ZFC1B2DMJSRUFZQsbpSwFXhkx", "program": "Meteora DLMM", "sol_reserve": 6925.95396028, "htm_reserve": 2238984.578114, "tx_last_hour": 100, "tx_seen": 100}, {"pool": "FEHDrSrYrCrCyw8U6iVGM3p3GJxXwsXHrsoGVNTSjbAA", "program": "Meteora DLMM", "sol_reserve": 3682.806652862, "htm_reserve": 442015.352831, "tx_last_hour": 100, "tx_seen": 100}]
+Traceback (most recent call last):
+  File "/home/runner/work/robinhood-chain-alpha/robinhood-chain-alpha/analysis/c2_route_htm.py", line 249, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/runner/work/robinhood-chain-alpha/robinhood-chain-alpha/analysis/c2_route_htm.py", line 189, in main
+    va = simulate(rpc, b_full)
+         ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/robinhood-chain-alpha/robinhood-chain-alpha/analysis/c2_route_htm.py", line 75, in simulate
+    return ((rpc.call("simulateTransaction", [b64, opts]) or {}).get("value") or {})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/robinhood-chain-alpha/robinhood-chain-alpha/analysis/c2_common.py", line 181, in call
+    return super().call(method, params, url=url, attempts=attempts,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/robinhood-chain-alpha/robinhood-chain-alpha/analysis/solana_rpc_client.py", line 489, in call
+    raise RuntimeError(f"{method}: RPC error {str(body['error'])[:200]}")
+RuntimeError: simulateTransaction: RPC error {'code': -32602, 'message': 'base64 encoded solana_transaction::versioned::VersionedTransaction too large: 1780 bytes (max: encoded/raw 1644/1232)'}
