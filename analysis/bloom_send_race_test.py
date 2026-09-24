@@ -637,7 +637,8 @@ def подготовить_свою(rpc, сделки: list, *, лампорты
     "свежий" должно быть числом, а не словом.
     """
     из_ = {"ok": False, "why_not": None, "attempts": []}
-    хеш = blockhash or свежий_blockhash(rpc)
+    # Без подписи blockhash не нужен: он подставляется именно при подписи.
+    хеш = blockhash or (свежий_blockhash(rpc) if подписывать else "не нужен")
     if not хеш:
         из_["why_not"] = "blockhash не получен -- подписывать нечего"
         return из_
@@ -974,59 +975,127 @@ def продать_всё(rpc, *, кошелёк: str, вход_sol: float, жи
 
 # ------------------------------------------------------------------ разведка пула
 
-def найти_пулы(rpc, *, сколько_сделок: int = 40) -> dict:
-    """Пул SOL<->USDC, который наш сборщик умеет. Только чтение.
+def пулы_cpmm_из_транзакции(tx: dict) -> list:
+    """Пулы Raydium CPMM, затронутые транзакцией -- по САМОЙ инструкции.
 
-    Ищем не по памяти и не по списку адресов, а по цепи: берём последние
-    сделки программы Raydium CPMM и смотрим, в какой из них хранилище USDC
-    стоит против хранилища WSOL. Заодно видно, жив ли пул: сделки свежие.
+    Первая попытка искала пул по движению остатков (identify_pool), и на
+    самом ликвидном месте SOL/USDC это дало чужие хранилища: маршрут
+    агрегатора трогает несколько площадок в одной транзакции, и наибольшее
+    движение USDC оказалось не у CPMM, а у Whirlpool. Поэтому здесь читается
+    именно инструкция CPMM и её счета по раскладке swap_base_input:
+    6 -- хранилище входа, 7 -- хранилище выхода, 10 -- минт входа,
+    11 -- минт выхода.
     """
-    import c2_common as C  # noqa: PLC0415
     import c2_swap_build as B  # noqa: PLC0415
 
+    сообщение = ((tx or {}).get("transaction") or {}).get("message") or {}
+    наборы = list(сообщение.get("instructions") or [])
+    for г in (((tx or {}).get("meta") or {}).get("innerInstructions") or []):
+        наборы += list(г.get("instructions") or [])
+    из_: list = []
+    for и in наборы:
+        if not isinstance(и, dict) or и.get("programId") != B.CPMM:
+            continue
+        счета = и.get("accounts") or []
+        if len(счета) < 13 or not all(isinstance(с, str) for с in счета):
+            continue
+        минт_вх, минт_вых = счета[10], счета[11]
+        if {минт_вх, минт_вых} != {WSOL, USDC_MINT}:
+            continue
+        # Хранилище USDC -- то, что стоит на стороне минта USDC.
+        usdc_vault = счета[6] if минт_вх == USDC_MINT else счета[7]
+        wsol_vault = счета[7] if минт_вх == USDC_MINT else счета[6]
+        из_.append({"pool_state": счета[3] if len(счета) > 3 else None,
+                     "usdc_vault": usdc_vault, "wsol_vault": wsol_vault,
+                     "direction": ("usdc_in" if минт_вх == USDC_MINT
+                                    else "wsol_in")})
+    return из_
+
+
+def найти_пулы(rpc, *, сколько_сделок: int = 200, кандидатов: int = 3) -> dict:
+    """Пул SOL<->USDC у Raydium CPMM. Только чтение, ничего не тратит.
+
+    Ищем по цепи, а не по памяти: последние сделки программы CPMM, и в них --
+    инструкции самой CPMM с парой минтов WSOL/USDC. Для каждого найденного
+    пула считаем ДВЕ вещи, от которых зависит тест:
+      * резервы хранилищ -- "ликвидный" должно быть числом;
+      * сколько из последних 20 сделок пула годятся нам ШАБЛОНОМ, то есть
+        дают минимум по резервам. Пул, где шаблон не берётся, для нас
+        бесполезен, какой бы ликвидный он ни был.
+    """
     из_ = {"ok": False, "candidates": [], "scanned": 0, "why_not": None}
-    try:
-        подписи = rpc.call("getSignaturesForAddress", [B.CPMM, {"limit": сколько_сделок}])
-    except Exception as exc:  # noqa: BLE001
-        из_["why_not"] = f"getSignaturesForAddress: {type(exc).__name__}"
-        return из_
-    сигн = [з.get("signature") for з in (подписи or [])
-             if isinstance(з, dict) and not з.get("err") and з.get("signature")]
+    import c2_swap_build as B  # noqa: PLC0415
+
+    сигн: list = []
+    до = None
+    while len(сигн) < сколько_сделок:
+        параметры = {"limit": min(1000, сколько_сделок - len(сигн))}
+        if до:
+            параметры["before"] = до
+        try:
+            порция = rpc.call("getSignaturesForAddress", [B.CPMM, параметры])
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"getSignaturesForAddress: {type(exc).__name__}"
+            return из_
+        порция = [з for з in (порция or []) if isinstance(з, dict)]
+        if not порция:
+            break
+        до = порция[-1].get("signature")
+        сигн += [з.get("signature") for з in порция
+                  if not з.get("err") and з.get("signature")]
     тела = rpc.get_transactions(сигн, commitment="confirmed",
                                  maxSupportedTransactionVersion=0) if сигн else []
     по_хранилищу: dict = {}
-    for подпись, tx in zip(сигн, тела):
+    for tx in тела:
         if not isinstance(tx, dict):
             continue
         из_["scanned"] += 1
-        трейдер = первый_подписант(tx)
-        if not трейдер:
-            continue
-        пул = C.identify_pool(tx, трейдер, USDC_MINT)
-        if not пул.get("ok") or пул.get("quote_mint") != C.WSOL:
-            continue
-        строка = по_хранилищу.setdefault(пул["pool_vault"], {
-            "pool_vault": пул["pool_vault"], "pool_owner": пул.get("pool_owner"),
-            "quote_vault": пул.get("quote_vault"), "n": 0, "examples": []})
-        строка["n"] += 1
-        if len(строка["examples"]) < 3:
-            строка["examples"].append({"signature": подпись, "slot": tx.get("slot")})
-    # Резервы -- прямо из цепи: "ликвидный" должно быть числом.
-    for хранилище, строка in по_хранилищу.items():
-        for имя, счёт in (("usdc_vault_amount", хранилище),
-                           ("wsol_vault_amount", строка.get("quote_vault"))):
-            if not счёт:
-                continue
+        for пул in пулы_cpmm_из_транзакции(tx):
+            строка = по_хранилищу.setdefault(пул["usdc_vault"], {
+                "pool_vault": пул["usdc_vault"], "wsol_vault": пул["wsol_vault"],
+                "pool_state": пул["pool_state"], "n": 0, "wsol_in": 0})
+            строка["n"] += 1
+            if пул["direction"] == "wsol_in":
+                строка["wsol_in"] += 1
+    лучшие = sorted(по_хранилищу.values(), key=lambda с: -с["n"])[:кандидатов]
+    for строка in лучшие:
+        for имя, счёт in (("usdc_vault_amount", строка["pool_vault"]),
+                           ("wsol_vault_amount", строка.get("wsol_vault"))):
             try:
                 о = rpc.call("getTokenAccountBalance", [счёт])
                 строка[имя] = ((о or {}).get("value") or {}).get("uiAmountString")
             except Exception:  # noqa: BLE001
                 строка[имя] = None
-    из_["candidates"] = sorted(по_хранилищу.values(), key=lambda с: -с["n"])
-    из_["ok"] = bool(из_["candidates"])
+        # Годность ШАБЛОНОМ -- главный вопрос. Проверяем настоящей сборкой.
+        сделки = свежие_сделки_пула(rpc, строка["pool_vault"], сколько=20)
+        годных = 0
+        новейший = None
+        причины: dict = {}
+        for с in сделки:
+            подг = подготовить_свою(
+                rpc, [с], лампорты=int(РАЗМЕР_SOL * ЛАМПОРТОВ_В_SOL),
+                кошелёк=ST.EXECUTOR_WALLET, семя="probe", blockhash="1" * 43,
+                подписывать=False)
+            if подг.get("ok"):
+                годных += 1
+                if новейший is None:
+                    новейший = {"signature": с.get("signature"),
+                                 "slot": подг.get("template_slot"),
+                                 "age_s": (round(time.time() - подг["template_block_time"], 1)
+                                            if подг.get("template_block_time") else None),
+                                 "min_out": подг.get("min_out"),
+                                 "expected_out": подг.get("expected_out")}
+            else:
+                почему = str((подг.get("attempts") or [{}])[0].get("why_not")
+                              or подг.get("why_not"))[:80]
+                причины[почему] = причины.get(почему, 0) + 1
+        строка.update(trades_checked=len(сделки), templates_ok=годных,
+                       newest_template=новейший, refusals=причины)
+    из_["candidates"] = sorted(лучшие, key=lambda с: -(с.get("templates_ok") or 0))
+    из_["ok"] = any((с.get("templates_ok") or 0) > 0 for с in из_["candidates"])
     if not из_["ok"]:
-        из_["why_not"] = (f"среди {из_['scanned']} последних сделок CPMM пары "
-                           "USDC против WSOL нет")
+        из_["why_not"] = (f"среди {из_['scanned']} сделок CPMM пул SOL/USDC, дающий "
+                           "шаблон с минимумом по резервам, не нашёлся")
     return из_
 
 
@@ -1451,7 +1520,13 @@ def main(argv=None) -> int:
               f"пулов USDC/WSOL найдено: {len(пулы['candidates'])}")
         for к in пулы["candidates"]:
             print(f"   хранилище USDC {к['pool_vault']} сделок {к['n']} "
-                  f"USDC {к.get('usdc_vault_amount')} WSOL {к.get('wsol_vault_amount')}")
+                  f"(с SOL на входе {к.get('wsol_in')}) "
+                  f"USDC {к.get('usdc_vault_amount')} WSOL {к.get('wsol_vault_amount')} "
+                  f"шаблонов годных {к.get('templates_ok')}/{к.get('trades_checked')}")
+            if к.get("newest_template"):
+                print(f"      новейший шаблон: {json.dumps(к['newest_template'], ensure_ascii=False)}")
+            if к.get("refusals"):
+                print(f"      отказы: {json.dumps(к['refusals'], ensure_ascii=False)}")
         итог = {"mint": минт, "pools": пулы, "builds": []}
         хранилище = a.pool_vault or (пулы["candidates"][0]["pool_vault"]
                                       if пулы["candidates"] else "")
@@ -1987,7 +2062,39 @@ def self_test() -> int:
     chk("пол продажи -- 70 % от котировки (одно место, модуль продажи)",
         J.ПОЛ_ПРОЦЕНТОВ == 70, J.ПОЛ_ПРОЦЕНТОВ)
 
-    # -- 19. сборка B на НАСТОЯЩЕМ образце пула из репозитория
+    # -- 19. пул CPMM читается ИЗ ИНСТРУКЦИИ, а не по движению остатков
+    import c2_swap_build as B_  # noqa: PLC0415
+    счета = [f"счёт{i}" for i in range(13)]
+    счета[3] = "состояние_пула"
+    счета[6] = "хранилище_входа"
+    счета[7] = "хранилище_выхода"
+    счета[10] = WSOL
+    счета[11] = USDC_MINT
+    tx_cpmm = {"transaction": {"message": {"instructions": [
+        {"programId": B_.CPMM, "accounts": list(счета)}]}}}
+    найдены = пулы_cpmm_из_транзакции(tx_cpmm)
+    chk("покупка USDC за SOL: хранилище USDC -- выходное",
+        len(найдены) == 1 and найдены[0]["usdc_vault"] == "хранилище_выхода"
+        and найдены[0]["wsol_vault"] == "хранилище_входа"
+        and найдены[0]["direction"] == "wsol_in"
+        and найдены[0]["pool_state"] == "состояние_пула", найдены)
+    счета_обратно = list(счета)
+    счета_обратно[10], счета_обратно[11] = USDC_MINT, WSOL
+    обратно = пулы_cpmm_из_транзакции({"transaction": {"message": {"instructions": [
+        {"programId": B_.CPMM, "accounts": счета_обратно}]}}})
+    chk("продажа USDC: хранилище USDC -- входное",
+        обратно[0]["usdc_vault"] == "хранилище_входа"
+        and обратно[0]["direction"] == "usdc_in", обратно)
+    chk("чужая программа в пулы CPMM не попадает",
+        пулы_cpmm_из_транзакции({"transaction": {"message": {"instructions": [
+            {"programId": "ЧУЖАЯ", "accounts": list(счета)}]}}}) == [])
+    другая_пара = list(счета)
+    другая_пара[11] = "другой_минт"
+    chk("пара минтов не WSOL/USDC -- не наш пул",
+        пулы_cpmm_из_транзакции({"transaction": {"message": {"instructions": [
+            {"programId": B_.CPMM, "accounts": другая_пара}]}}}) == [])
+
+    # -- 20. сборка B на НАСТОЯЩЕМ образце пула из репозитория
     образец = None
     try:
         import c2_swap_build as B  # noqa: PLC0415
