@@ -2794,6 +2794,32 @@ def self_test() -> int:
             (s_м.get("route") or {}).get("intermediate_mints"))
         chk(f"{начало}: решение -- BUY", ок_м is True, (код_м, почему_м))
 
+    # 16в-4. ДВА СТЕНДОВЫХ случая, на которых владелец и увидел ложный
+    # INTERMEDIATE_ROUTE: прямая покупка на pump.fun (лишний минт источник
+    # только подписывал) и покупка через Jupiter (лишние минты -- ноги
+    # чужого агрегатора, к счетам источника отношения не имеют).
+    СТЕНД_ИСТОЧНИК = "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX"
+    СТЕНД_СЛУЧАИ = (
+        ("K6k7PzMs2BiM", "AC1vvvYcG3Kqq61EQNVmRojDaokJ4xbpnSE5sw3pump", 0.072),
+        ("fKySoSW4pXgj", "NeonTjSjsuo3rexg9o6vHuMXw62f9V7zvmu8M8Zut44", 0.07),
+    )
+    for начало, минт_с, трата_ожид in СТЕНД_СЛУЧАИ:
+        tx_с = найти_tx(начало)
+        chk(f"стендовый случай {начало} есть в файле регрессии", tx_с is not None)
+        if not tx_с:
+            continue
+        s_с = сигнал_из_транзакции(tx_с, СТЕНД_ИСТОЧНИК, подпись=начало,
+                                    слот=tx_с.get("slot"))
+        трата_с, _ = в_sol(s_с, КУРС_ТОГДА)
+        chk(f"{начало}: минт покупки тот самый", s_с.get("mint") == минт_с, s_с.get("mint"))
+        chk(f"{начало}: трата около {трата_ожид} SOL",
+            трата_с is not None and abs(трата_с - трата_ожид) < 0.005, трата_с)
+        chk(f"{начало}: промежуточных минтов нет",
+            not (s_с.get("route") or {}).get("via_intermediate"),
+            (s_с.get("route") or {}).get("intermediate_mints"))
+        ок_с, код_с, почему_с = фильтры_dbot(s_с, трата_с, порог_sol=0.05)
+        chk(f"{начало}: при пороге стенда 0.05 это BUY", ок_с is True, (код_с, почему_с))
+
     # 16г. падение разбора не рвёт подписку
     with tempfile.TemporaryDirectory() as d:
         stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
