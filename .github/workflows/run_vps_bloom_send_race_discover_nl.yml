@@ -1,0 +1,133 @@
+name: "Гонка отправок: разведка пула (только чтение, без денег)"
+
+# Первый шаг синтетического теста "своя отправка против Bloom". Денег НЕ
+# тратит вовсе: ищет по цепи пул SOL<->USDC, который умеет наш сборщик,
+# сверяет минт USDC с сетью (знаки после запятой и символ) и трижды собирает
+# покупку на 0.001 SOL, проверяя её симуляцией узла.
+#
+# Ключа кошелька здесь НЕТ намеренно: симуляции достаточно неподписанной
+# транзакции (sigVerify false, replaceRecentBlockhash true), а лишний ключ
+# рядом с чтением -- лишний риск.
+#
+# Запускается на своём раннере НА хосте, работа идёт через ssh по петле от
+# root: каталог состояния боевого детектора и env-файл принадлежат root.
+on:
+  workflow_dispatch:
+    inputs:
+      scan:
+        description: "сколько последних сделок CPMM просмотреть"
+        required: false
+        default: "60"
+      pool_vault:
+        description: "хранилище USDC пула (пусто -- выбрать самому)"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-send-race
+  cancel-in-progress: false
+
+env:
+  CHECKOUT: /home/bot/robinhood-chain-alpha
+  PYHOST: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: /tmp/bloom_send_race/discover.json
+
+jobs:
+  discover:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон прогона и самопроверки ДО хоста"
+        run: |
+          set -e
+          if python3 -c "import requests, solders, websockets" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/venv"
+            "$RUNNER_TEMP/venv/bin/pip" install -q requests solders websockets
+            PY="$RUNNER_TEMP/venv/bin/python"
+          fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          cd analysis
+          "$PY" bloom_send_race_test.py --self-test
+          "$PY" bloom_own_send.py --self-test
+          "$PY" bloom_api.py --self-test
+          "$PY" check_shell_ascii.py --self-test
+          python3 check_shell_ascii.py ../.github/workflows
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Код на хосте -- та же ветка, тот же коммит"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -e
+            sudo -u bot git -C $CHECKOUT fetch -q origin claude/nifty-sagan-r0polg
+            sudo -u bot git -C $CHECKOUT reset -q --hard origin/claude/nifty-sagan-r0polg
+            sudo -u bot git -C $CHECKOUT log -1 --oneline
+            $PYHOST -c 'import requests, solders; print(\"requests и solders есть\")'
+          "
+
+      - name: "Разведка: минт, пул, три сборки с симуляцией"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            install -d -m 755 /tmp/bloom_send_race
+            $PYHOST -u $CHECKOUT/analysis/bloom_send_race_test.py --discover \
+              --scan ${{ inputs.scan }} \
+              --pool-vault '${{ inputs.pool_vault }}' \
+              --out $OUT
+          " 2>&1 | tee /tmp/discover_log.txt
+
+      - name: "Забрать отчёт и убедиться, что ключей в нём нет"
+        run: |
+          set -e
+          mkdir -p data
+          ssh -n $SSH_OPTS root@127.0.0.1 "cat $OUT" > data/bloom_send_race_discover.json
+          python3 - <<'PY'
+          import json, pathlib, re, sys
+          п = pathlib.Path("data/bloom_send_race_discover.json")
+          т = п.read_text(encoding="utf-8", errors="replace")
+          if re.search(r"api-key=[A-Za-z0-9._-]{8,}", т) or "Bearer " in т:
+              print("в отчёте виден ключ"); sys.exit(1)
+          d = json.loads(т)
+          print("минт:", json.dumps(d.get("mint"), ensure_ascii=False))
+          print("пул:", d.get("pool_vault"))
+          for с in d.get("builds") or []:
+              print("сборка:", json.dumps(с, ensure_ascii=False))
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f data/bloom_send_race_discover.json ]; then
+            git add data/bloom_send_race_discover.json
+          fi
+          if git diff --cached --quiet; then echo "нечего коммитить"; exit 0; fi
+          git commit -m "Gonka otpravok: razvedka pula (tolko chtenie) [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
