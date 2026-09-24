@@ -361,8 +361,53 @@ def итог_продажи(tx: dict, wallet: str, mint: str) -> dict:
         return {"known": True, "ok": ошибка is None, "error_code": код,
                  "slot": tx.get("slot"),
                  "why_not": f"балансы не разобраны: {type(exc).__name__}"}
+    # sol_delta -- движение SOL по сделке, ОЧИЩЕННОЕ от комиссии сети (так
+    # же считает учёт: иначе своя комиссия выглядит как часть цены).
+    # sol_delta_net -- то, что реально осело на балансе. Оба числа нужны:
+    # первое сравнимо с ценой, второе -- с балансом.
+    комиссия = (мета.get("fee") or 0) / 1e9
     return {"known": True, "ok": ошибка is None, "error_code": код,
-             "slot": tx.get("slot"), "sol_delta": sol, "mint_delta_ui": минт_дельта}
+             "slot": tx.get("slot"), "sol_delta": sol,
+             "sol_delta_net": (round(sol - комиссия, 9) if isinstance(sol, (int, float))
+                                else None),
+             "fee_sol": комиссия, "mint_delta_ui": минт_дельта}
+
+
+def найти_закрывающую(wallet: str, mint: str, *, предел: int = 8,
+                       читатель_tx=None, подписи_фн=None) -> dict:
+    """Чем именно закрылась позиция, когда остаток стал нулём.
+
+    Основной выход стенда -- таймерный авто-ордер Bloom, и его подпись нам
+    НЕ сообщают: ответ /swap отдаёт подписи только по своему вызову. Поэтому
+    закрытие по нулевому остатку раньше проходило молча: позиция закрывалась
+    в журнале позиций, а владелец не получал ни строки. Ищем транзакцию по
+    цепи: последние подписи кошелька, первая, в которой остаток НАШЕГО минта
+    уменьшился -- она и закрыла позицию.
+    """
+    if подписи_фн is None:
+        def подписи_фн(адрес, лимит):  # noqa: E306
+            r = rpc_call("getSignaturesForAddress", [адрес, {"limit": лимит}])
+            return (r.get("result") or []) if r.get("ok") else []
+    строки = подписи_фн(wallet, предел) or []
+    осмотрено = []
+    for зап in строки:
+        подпись = (зап or {}).get("signature")
+        if not подпись:
+            continue
+        tx = читатель_tx(подпись) if читатель_tx else None
+        if not tx:
+            осмотрено.append({"signature": подпись, "why_not": "транзакция не прочитана"})
+            continue
+        итог = итог_продажи(tx, wallet, mint)
+        дельта = итог.get("mint_delta_ui")
+        if isinstance(дельта, (int, float)) and дельта < 0:
+            return {"found": True, "signature": подпись,
+                     "block_time": (зап or {}).get("blockTime"),
+                     "outcome": итог}
+        осмотрено.append({"signature": подпись, "mint_delta_ui": дельта})
+    return {"found": False, "checked": len(строки), "seen": осмотрено[:5],
+             "why_not": (f"среди последних {len(строки)} подписей кошелька нет "
+                          "транзакции, уменьшившей остаток этого минта")}
 
 
 class Seller:
@@ -408,6 +453,49 @@ class Seller:
                                      env_int("BLOOM_MAX_TX_VERSION", 1),
                                  "commitment": "confirmed"}])
         return r.get("result") if r.get("ok") else None
+
+    def доложить_закрытие(self, pos: dict, *, now: float,
+                           читатель_tx=None) -> dict:
+        """Строка о закрытии позиции: чем продано, за сколько секунд, сколько SOL.
+
+        Через что продано -- НЕ догадка: если закрывающая подпись совпала с
+        нашей последней попыткой, значит продал сторож; иначе продал таймерный
+        авто-ордер Bloom. Не нашли транзакцию -- так и сказано, без числа
+        вместо неизвестного.
+        """
+        cid = pos.get("client_order_id")
+        найдено = найти_закрывающую(EXECUTOR_WALLET, pos.get("mint"),
+                                     читатель_tx=читатель_tx or self.tx_читатель)
+        наши = set(pos.get("last_sell_signatures") or [])
+        if pos.get("jup_signature"):
+            наши.add(pos["jup_signature"])
+        подпись = найдено.get("signature")
+        если_наша = bool(подпись and подпись in наши)
+        через = ("сторож" if если_наша else "авто-ордер Bloom")
+        основа = pos.get("ts_accepted") or pos.get("ts_intent")
+        секунды = None
+        if найдено.get("block_time") and основа:
+            секунды = float(найдено["block_time"]) - float(основа)
+        elif основа:
+            секунды = now - float(основа)
+        sol = (найдено.get("outcome") or {}).get("sol_delta")
+        запись = {"client_order_id": cid, "mint": pos.get("mint"),
+                   "action": "позиция закрыта -- доклад", "via": через,
+                   "signature": подпись, "seconds": (round(секунды, 1) if секунды else None),
+                   "sol_delta": sol, "search": найдено}
+        self.log(запись)
+        self.state.update_position(cid, closed_via=через, closed_signature=подпись,
+                                    closed_sol_delta=sol,
+                                    closed_sol_net=(найдено.get("outcome") or {}).get(
+                                        "sol_delta_net"))
+        if self.оповещатель is not None and NT is not None:
+            # Уже доложенную нашу продажу второй строкой не повторяем.
+            уже = (если_наша and pos.get("last_sell_reported") == подпись)
+            if not уже:
+                self.оповещатель.послать(NT.строка_продажи(
+                    ok=True, код=None, через=через, секунды=секунды,
+                    sol_вернулось=sol, подпись=подпись))
+        return запись
 
     def доложить_прошлую_попытку(self, pos: dict, *, читатель_tx=None) -> dict:
         """Строка о ПРЕДЫДУЩЕЙ попытке продажи: успех или код ошибки.
@@ -494,6 +582,10 @@ class Seller:
                                             closed_reason="остаток ноль дважды подряд")
                 self.state.note_sell_outcome(sold=True)
                 итог.update(action="позиция закрыта", zero_streak=серия)
+                # СТРОКА ОБЯЗАТЕЛЬНА НА ЛЮБОЕ ЗАКРЫТИЕ. Позиция KMNO 24.09
+                # закрылась в 00:08:10 таймерным ордером Bloom -- и владелец
+                # не получил ни строки: эта ветка молчала.
+                self.доложить_закрытие(pos, now=now, читатель_tx=читатель_tx)
             else:
                 self.state.update_position(cid, zero_streak=серия)
                 итог.update(action="ноль первый раз -- ещё не закрываю",
@@ -850,6 +942,99 @@ def self_test() -> None:
         len(журнал.read_text(encoding="utf-8").splitlines()) == строк_после)
     chk("и причина отказа осталась в записи позиции",
         "узел молчит" in str(st.positions()["p3"].get("balance_read_why_not")))
+
+    # --- закрытие таймерным ордером Bloom: строка ОБЯЗАТЕЛЬНА
+    def tx_продажа_минта(минт, sol=0.00081):
+        def читатель(подпись):
+            бал = lambda raw, idx: {  # noqa: E731
+                "accountIndex": idx, "mint": минт, "owner": EXECUTOR_WALLET,
+                "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                "uiTokenAmount": {"amount": str(raw), "decimals": 6,
+                                   "uiAmount": raw / 1e6}}
+            if подпись == "ЧУЖАЯ_ДРУГОЙ_МИНТ":
+                return {"slot": 5, "meta": {"err": None, "fee": 5000,
+                        "preBalances": [10 ** 9], "postBalances": [10 ** 9],
+                        "preTokenBalances": [], "postTokenBalances": [],
+                        "innerInstructions": []},
+                        "transaction": {"message": {
+                            "accountKeys": [{"pubkey": EXECUTOR_WALLET}],
+                            "instructions": []}}}
+            return {"slot": 9, "meta": {
+                        "err": None, "fee": 5000,
+                        "preBalances": [10 ** 9],
+                        "postBalances": [10 ** 9 + int(sol * 1e9)],
+                        "preTokenBalances": [бал(1_000_000, 1)],
+                        "postTokenBalances": [бал(0, 1)],
+                        "innerInstructions": []},
+                    "transaction": {"message": {
+                        "accountKeys": [{"pubkey": EXECUTOR_WALLET}],
+                        "instructions": []}}}
+        return читатель
+
+    st.write_intent(client_order_id="pz", mint="MINTZ", source_sig="SZ", source_slot=11,
+                     sol_in=0.001, pool=None, program=None, taxed=None, tax_bps=None,
+                     mode="dry-run", sell_after_s=28.8)
+    st.update_position("pz", state="bought", ts_accepted=time.time() - 60)
+    посланное_з = []
+    s.оповещатель = type("О", (), {
+        "послать": lambda self_, текст: посланное_з.append(текст) or {"ok": True},
+        "статус": lambda self_: {"enabled": True}})()
+    подписи_кошелька = [{"signature": "ЧУЖАЯ_ДРУГОЙ_МИНТ", "blockTime": 1},
+                         {"signature": "ПРОДАЖА_ТАЙМЕРА", "blockTime": None}]
+    глоб_s = sys.modules[__name__].__dict__
+    старый_rpc2 = глоб_s["rpc_call"]
+    глоб_s["rpc_call"] = lambda метод, параметры, **kw: (
+        {"ok": True, "result": подписи_кошелька} if метод == "getSignaturesForAddress"
+        else {"ok": False, "why_not": "не нужно"})
+    try:
+        r = s.handle(st.positions()["pz"], balance_reader=читатель(0),
+                      читатель_tx=tx_продажа_минта("MINTZ"))
+        chk("первый ноль -- закрытия ещё нет", r["action"].startswith("ноль первый"))
+        chk("и строки о закрытии тоже нет", посланное_з == [], посланное_з)
+        r = s.handle(st.positions()["pz"], balance_reader=читатель(0),
+                      читатель_tx=tx_продажа_минта("MINTZ"))
+        chk("второй ноль -- позиция закрыта", r["action"] == "позиция закрыта", r)
+        chk("и строка о закрытии УШЛА", len(посланное_з) == 1, посланное_з)
+        chk("в строке сказано: через авто-ордер Bloom",
+            "авто-ордер Bloom" in посланное_з[0], посланное_з)
+        chk("и вернувшийся SOL -- числом из цепи (сделка, без комиссии сети)",
+            "+0.000815" in посланное_з[0], посланное_з)
+        поз_ч = st.positions()["pz"]
+        chk("а чистое движение баланса записано отдельно",
+            abs((поз_ч.get("closed_sol_net") or 0) - 0.00081) < 1e-9,
+            поз_ч.get("closed_sol_net"))
+        поз_з = st.positions()["pz"]
+        chk("чем закрыта -- записано в позицию",
+            поз_з.get("closed_via") == "авто-ордер Bloom"
+            and поз_з.get("closed_signature") == "ПРОДАЖА_ТАЙМЕРА", поз_з)
+
+        # закрывающая подпись -- НАША: значит продал сторож, а не Bloom
+        st.write_intent(client_order_id="pw", mint="MINTW", source_sig="SW",
+                         source_slot=12, sol_in=0.001, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode="dry-run", sell_after_s=28.8)
+        st.update_position("pw", state="selling", ts_accepted=time.time() - 60,
+                            last_sell_signatures=["ПРОДАЖА_ТАЙМЕРА"])
+        посланное_з.clear()
+        st.update_position("pw", zero_streak=1)
+        r = s.handle(st.positions()["pw"], balance_reader=читатель(0),
+                      читатель_tx=tx_продажа_минта("MINTW"))
+        chk("наша подпись -- в строке сторож, а не Bloom",
+            посланное_з and "через сторож" in посланное_з[0], посланное_з)
+
+        # транзакцию не нашли -- строка всё равно уходит, без выдуманных чисел
+        st.write_intent(client_order_id="pv", mint="MINTV", source_sig="SV",
+                         source_slot=13, sol_in=0.001, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode="dry-run", sell_after_s=28.8)
+        st.update_position("pv", state="bought", ts_accepted=time.time() - 60,
+                            zero_streak=1)
+        посланное_з.clear()
+        r = s.handle(st.positions()["pv"], balance_reader=читатель(0),
+                      читатель_tx=lambda подпись: None)
+        chk("подпись не найдена -- строка есть, а SOL не выдуман",
+            посланное_з and "SOL ?" in посланное_з[0], посланное_з)
+    finally:
+        глоб_s["rpc_call"] = старый_rpc2
+        s.оповещатель = None
 
     # --- итог прошлой попытки по цепи и строка о нём
     def tx_упавшая(подпись):
