@@ -697,6 +697,91 @@ def позиции_таблица(state: ST.ExecState) -> list:
     return строки
 
 
+def таблица_кругов(state: ST.ExecState, строки: list, место: dict) -> list:
+    """Полный круг по каждой боевой сделке: решение -> Bloom -> блок -> продажа.
+
+    Слово владельца: у сделок, сделанных ДО появления замера, поля должны
+    быть ПУСТЫМИ, а не нулевыми. Ноль здесь читался бы как "круг ноль
+    миллисекунд", а это неправда -- круга просто не мерили.
+
+    Что откуда:
+      bloom_ms          -- позиция, пишет исполнитель (решение -> ответ Bloom);
+      new_connections   -- позиция, сколько НОВЫХ соединений к Bloom
+                           понадобилось на эту покупку (прогрев работает,
+                           если ноль);
+      own_tx_seen_ms    -- позиция, решение -> наша транзакция в потоке;
+      bloom_to_seen_ms  -- позиция, ответ Bloom -> та же точка;
+      S+N и место       -- слоты позиции и отдельный прогон места в блоке;
+      продажа           -- журнал решений (секунды) и последний итог
+                           продажи (слот), закрытие -- позиция;
+      тень              -- журнал решений, запись stage=shadow по подписи
+                           источника.
+    """
+    тени = {}
+    закрытия = {}
+    for r in строки:
+        if r.get("stage") == "shadow" and r.get("signature"):
+            тени[r["signature"]] = r
+        if r.get("action") == "позиция закрыта -- доклад" and r.get("client_order_id"):
+            закрытия[r["client_order_id"]] = r
+    места = {}
+    for r in (место.get("rows") or []) if место.get("known") else []:
+        if r.get("client_order_id"):
+            места[r["client_order_id"]] = r
+        elif r.get("mint"):
+            места.setdefault(("минт", r["mint"]), r)
+
+    вых = []
+    for p_ in state.positions().values():
+        if not ST.is_real_mode(p_.get("mode")):
+            continue
+        cid = p_.get("client_order_id")
+        тень = тени.get(p_.get("source_sig")) or {}
+        закр = закрытия.get(cid) or {}
+        м = (места.get(cid) or места.get(("минт", p_.get("mint"))) or {})
+        итог = p_.get("last_sell_outcome") or {}
+        вых.append({
+            "client_order_id": cid,
+            "mint": p_.get("mint"),
+            "ts_intent_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                             time.gmtime(p_["ts_intent"]))
+                               if isinstance(p_.get("ts_intent"), (int, float)) else None),
+            "bloom_ms": p_.get("bloom_ms"),
+            "new_connections": p_.get("new_connections"),
+            "own_tx_seen_ms": p_.get("own_tx_seen_ms"),
+            "bloom_to_seen_ms": p_.get("bloom_to_seen_ms"),
+            "slot_delta": ((p_.get("our_slot") - p_.get("source_slot"))
+                            if isinstance(p_.get("our_slot"), int)
+                            and isinstance(p_.get("source_slot"), int) else None),
+            "block_index_delta": м.get("index_delta_same_block"),
+            "ahead_of_source": м.get("ahead_of_source"),
+            "crowd_between": (м.get("crowd_between") or {}).get("count")
+                              if isinstance(м.get("crowd_between"), dict)
+                              else м.get("crowd_between"),
+            "sell_after_s_plan": p_.get("sell_after_s"),
+            "sell_seconds": закр.get("seconds"),
+            "sell_slot": итог.get("slot"),
+            "closed_via": p_.get("closed_via"),
+            "chain_ok": p_.get("chain_ok"),
+            "closed_confirmed": p_.get("closed_confirmed"),
+            "sol_in": p_.get("sol_in"),
+            "sol_back_net": (p_.get("closed_sol_net")
+                              if p_.get("closed_sol_net") is not None
+                              else итог.get("sol_delta_net")),
+            # Тень -- пометка, торговля от неё не зависит ни в одном байте.
+            "shadow_route": тень.get("route"),
+            "shadow_would_pass": ((тень.get("sim_verdict") == "would_pass")
+                                   if тень.get("sim_verdict") else None),
+            "shadow_verdict": тень.get("sim_verdict"),
+            "shadow_why_not": тень.get("why_not"),
+            "shadow_build_ms": тень.get("build_ms"),
+            "would_skip_cap": тень.get("would_skip_cap"),
+            "cap_usd": тень.get("cap_usd"),
+        })
+    вых.sort(key=lambda r: str(r.get("ts_intent_utc") or ""))
+    return вых
+
+
 # ------------------------------------------------------------------ кредиты
 
 def кредиты(state: ST.ExecState) -> dict:
@@ -790,6 +875,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "found_by_code": найти_по_коду(строки, коды or ()),
         "found_by_mint": найти_по_минту(строки, минты or ()),
         "position_rows": позиции_таблица(state),
+        "circles_table": таблица_кругов(state, строки, замер_места()),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
     }
@@ -922,7 +1008,39 @@ def в_текст(о: dict) -> str:
     L.append(f"--- пары А/Б --- наших отправленных покупок {п['our_sent']} из "
              f"{п['gate_pairs']}; из них малым размером {п['small_size_pairs']}")
     L.append(f"  {п['note']}")
+    круги = о.get("circles_table") or []
+    L.append("")
+    L.append(f"--- таблица кругов --- сделок {len(круги)}; пустое поле значит "
+             "«не мерили», а не ноль")
+    for r in круги:
+        def ч(значение, единица=""):
+            return "-" if значение is None else f"{значение}{единица}"
+        L.append(f"  {ч(r.get('ts_intent_utc'))} {str(r.get('client_order_id'))[:8]} "
+                 f"минт {str(r.get('mint'))[:10]}")
+        L.append(f"      круги: bloom {ч(r.get('bloom_ms'), ' мс')}, новых "
+                 f"соединений {ч(r.get('new_connections'))}, наша тх в потоке "
+                 f"{ч(r.get('own_tx_seen_ms'), ' мс')} от решения и "
+                 f"{ч(r.get('bloom_to_seen_ms'), ' мс')} от ответа Bloom")
+        L.append(f"      блок: S+{ч(r.get('slot_delta'))}, место против "
+                 f"источника {ч(r.get('block_index_delta'))}, впереди "
+                 f"{ч(r.get('ahead_of_source'))}, толпа между "
+                 f"{ч(r.get('crowd_between'))}")
+        L.append(f"      продажа: план {ч(r.get('sell_after_s_plan'), ' с')}, факт "
+                 f"{ч(r.get('sell_seconds'), ' с')}, слот {ч(r.get('sell_slot'))}, "
+                 f"через {ч(r.get('closed_via'))}")
+        L.append(f"      итог: по цепи {ч(r.get('chain_ok'))}, продажа "
+                 f"подтверждена {ч(r.get('closed_confirmed'))}, вход "
+                 f"{ч(r.get('sol_in'))} SOL, вернулось чисто "
+                 f"{ч(r.get('sol_back_net'))} SOL")
+        тень_прошла = r.get("shadow_would_pass")
+        L.append(f"      тень: наша сборка прошла бы -- "
+                 f"{'да' if тень_прошла else ('нет' if тень_прошла is False else '-')}"
+                 f" ({ч(r.get('shadow_verdict'))}), маршрут "
+                 f"{ч(r.get('shadow_route'))}, сборка "
+                 f"{ч(r.get('shadow_build_ms'), ' мс')}, дорогая по "
+                 f"капитализации {ч(r.get('would_skip_cap'))}")
     поз = о["positions"]
+    L.append("")
     L.append(f"--- позиции --- live {поз['live']}, live-test {поз['live_test']}, "
              f"dry-run {поз['dry_run']} (не учитывается)")
     for r in о.get("position_rows") or []:
@@ -1284,6 +1402,44 @@ def self_test() -> None:
         chk("в таблице позиций одна настоящая", len(тб) == 1, тб)
         chk("в таблице видно, села ли покупка по цепи",
             "chain_ok" in тб[0] and "closed_confirmed" in тб[0], тб[0])
+
+        # --- ТАБЛИЦА КРУГОВ. Главное правило владельца: у старых сделок
+        # поля ПУСТЫЕ, а не нулевые -- ноль читался бы как "круг ноль мс".
+        круги = таблица_кругов(st, [], {"known": False})
+        chk("круг по старой сделке -- пустые поля, а не нули",
+            len(круги) == 1 and круги[0]["bloom_ms"] is None
+            and круги[0]["own_tx_seen_ms"] is None
+            and круги[0]["bloom_to_seen_ms"] is None
+            and круги[0]["new_connections"] is None, круги)
+        chk("а слоты, которые ЕСТЬ, в круге посчитаны",
+            круги[0]["slot_delta"] == 1, круги[0]["slot_delta"])
+        chk("тени по этой сделке не было -- так и сказано, а не «нет»",
+            круги[0]["shadow_would_pass"] is None
+            and круги[0]["shadow_verdict"] is None, круги[0])
+
+        реш_кр = [
+            {"stage": "shadow", "signature": "ПОДПИСЬ_ИСТОЧНИКА",
+             "sim_verdict": "would_pass", "route": "two_hop", "build_ms": 0.7,
+             "would_skip_cap": False, "cap_usd": 12345.0},
+            {"action": "позиция закрыта -- доклад", "client_order_id": "c",
+             "seconds": 29.1, "via": "авто-ордер Bloom"},
+        ]
+        место_кр = {"known": True, "rows": [{"client_order_id": "c",
+                                              "index_delta_same_block": -3,
+                                              "ahead_of_source": True,
+                                              "crowd_between": 2}]}
+        круги2 = таблица_кругов(st, реш_кр, место_кр)
+        chk("тень подцепилась по подписи источника",
+            круги2[0]["shadow_would_pass"] is True
+            and круги2[0]["shadow_route"] == "two_hop"
+            and круги2[0]["would_skip_cap"] is False, круги2[0])
+        chk("секунды продажи взяты из журнала, место -- из отдельного замера",
+            круги2[0]["sell_seconds"] == 29.1
+            and круги2[0]["block_index_delta"] == -3
+            and круги2[0]["crowd_between"] == 2, круги2[0])
+        текст_кр = в_текст(отчёт(state=st))
+        chk("таблица кругов печатается и пустое поле видно чертой",
+            "таблица кругов" in текст_кр and "не мерили" in текст_кр, текст_кр[:200])
 
         # УПАВШАЯ ПО ЦЕПИ ПОКУПКА: намерение 0.2 SOL не есть потраченные
         # 0.2 SOL. 24.09 по цепи ушла только комиссия.
