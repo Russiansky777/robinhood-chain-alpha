@@ -54,6 +54,11 @@ class TimeUp(Exception):
     pass
 
 
+def parse_utc(text: str) -> int:
+    import calendar  # noqa: PLC0415
+    return calendar.timegm(time.strptime(text, "%Y-%m-%dT%H:%M:%SZ"))
+
+
 def get_block(rpc, slot: int) -> dict | None:
     """Блок или None, если слот пропущен."""
     try:
@@ -224,22 +229,36 @@ def analyze_trade(rpc, kind: str, sig: str, wallet: str, mint: str | None, tx: d
     return row
 
 
-def dbot_buys(rpc, rc, wallet: str, days: float, now: int) -> tuple[list, dict]:
-    cutoff = now - int(days * 86400)
+def safe_analyze(rpc, kind, sig, wallet, mint, tx, *, sources, known) -> dict:
+    """Сбой узла на одной сделке -- строка с причиной, а не падение прогона.
+    Потолок кредитов и времени -- не ловятся: это останов."""
+    try:
+        return analyze_trade(rpc, kind, sig, wallet, mint, tx, sources=sources, known=known)
+    except RuntimeError as exc:
+        return {"kind": kind, "signature": sig, "wallet": wallet, "mint": mint,
+                "slot": (tx or {}).get("slot"), "block_time_utc": C.utc((tx or {}).get("blockTime")),
+                "sandwich": "нет данных", "why_no_data": f"узел: {str(exc)[:160]}"}
+
+
+def wallet_buys(rpc, rc, wallet: str, from_ts: int, max_pages: int = 40) -> tuple[list, dict]:
+    """Все покупки кошелька по цепи с from_ts: первый вход (classify_tx, без
+    порога) и докупки. Сделки, где курс стейбла не получен, -- в счётчик."""
     sigs, before, complete = [], None, False
-    for _ in range(40):
+    for _ in range(max_pages):
         page = rpc.signatures(wallet, before=before, limit=1000)
         sigs.extend(page)
-        if len(page) < 1000 or (page[-1].get("blockTime") or 0) < cutoff:
+        if len(page) < 1000 or (page[-1].get("blockTime") or 0) < from_ts:
             complete = True
             break
         before = page[-1]["signature"]
-    win = [s for s in sigs if s.get("blockTime") and s["blockTime"] >= cutoff and s.get("err") is None]
-    got = rpc.get_txs([s["signature"] for s in win])
-    out, st = [], {"signatures_ok": len(win), "scan_complete": complete, "fetch_failed": 0,
-                   "first_entry": 0, "add": 0, "rate_missing": 0}
-    for s in win:
-        tx = got.get(s["signature"])
+    win = [x for x in sigs if x.get("blockTime") and x["blockTime"] >= from_ts]
+    ok = [x for x in win if x.get("err") is None]
+    got = rpc.get_txs([x["signature"] for x in ok])
+    out, st = [], {"signatures": len(win), "signatures_ok": len(ok), "scan_complete": complete,
+                   "fetch_failed": 0, "first_entry": 0, "add": 0, "rate_missing": 0,
+                   "from_utc": C.utc(from_ts)}
+    for x in ok:
+        tx = got.get(x["signature"])
         if tx is None:
             st["fetch_failed"] += 1
             continue
@@ -249,10 +268,30 @@ def dbot_buys(rpc, rc, wallet: str, days: float, now: int) -> tuple[list, dict]:
         st[b["kind"]] += 1
         if b["kind"] == "rate_missing":
             continue
-        out.append({"signature": s["signature"], "mint": b["mint"], "tx": tx,
-                    "buy_kind": b["kind"]})
-    out.sort(key=lambda x: x["tx"].get("slot") or 0)
+        out.append({"signature": x["signature"], "mint": b["mint"], "tx": tx,
+                    "buy_kind": b["kind"], "spend_sol": b["spend_sol"]})
+    out.sort(key=lambda r: r["tx"].get("slot") or 0)
     return out, st
+
+
+def size_class(spend_sol: float | None) -> str:
+    """Класс размера по фактической трате (с комиссиями и рентой счёта)."""
+    if spend_sol is None:
+        return "нет данных"
+    if spend_sol < 0.01:
+        return "test_0.001"
+    if spend_sol < 0.12:
+        return "0.05"
+    return "0.2+"
+
+
+def reconcile(chain_buys: list, journal: dict) -> dict:
+    """Сверка покупок по цепи с копией журнала исполнителя {подпись: режим}."""
+    chain = {b["signature"] for b in chain_buys}
+    return {"journal_total": len(journal),
+            "journal_found_on_chain": sorted(s for s in journal if s in chain),
+            "journal_not_found_as_buy": sorted(s for s in journal if s not in chain),
+            "chain_not_in_journal": sorted(s for s in chain if s not in journal)}
 
 
 def summarize(rows: list) -> dict:
@@ -273,7 +312,8 @@ def summarize(rows: list) -> dict:
             "attackers": sorted(att.items(), key=lambda kv: -kv[1])}
 
 
-COLS = ["kind", "signature", "slot", "block_time_utc", "wallet", "mint", "spend_sol",
+COLS = ["kind", "journal_mode", "size_class", "buy_kind", "signature", "slot", "block_time_utc",
+        "wallet", "mint", "spend_sol",
         "index_in_block", "block_tx_count", "next_block_slot", "sandwich", "n_attackers",
         "attacker", "attacker_is_source", "attacker_known_as", "front_sig", "back_sig", "back_where",
         "attacker_entry_sol", "attacker_exit_sol", "attacker_entry_usd", "attacker_exit_usd",
@@ -299,6 +339,7 @@ def main() -> int:
     p.add_argument("--days", type=float, default=7.0)
     p.add_argument("--dbot-wallet", default=C.BATCH5_WALLET)
     p.add_argument("--skip-dbot", action="store_true")
+    p.add_argument("--ours-from", default=C.OURS_FROM_UTC)
     p.add_argument("--time-budget-s", type=int, default=7000)
     a = p.parse_args()
     if a.self_test:
@@ -331,32 +372,49 @@ def main() -> int:
             tasks_origin = "DBot GET живьём"
         except Exception as exc:  # noqa: BLE001
             tasks_origin = f"DBot GET не удался: {type(exc).__name__}"
-    rows, err = [], None
-    ours = C.executor_trades()
+    rows, err, ostat, dstat, recon = [], None, None, None, None
+    journal = {t["signature"]: "live" for t in C.executor_trades(mode="live") if t["signature"]}
+    journal.update({t["signature"]: "live-test" for t in C.executor_trades(mode="live-test")
+                    if t["signature"]})
+    from_ours = parse_utc(a.ours_from)
     try:
-        for t in ours:
-            r = analyze_trade(rpc, "ours_live", t["signature"], t["wallet"], t["mint"], None,
-                              sources=sources5, known=known)
-            r["journal_ts_intent_utc"] = t["ts_intent_utc"]
+        ours, ostat = wallet_buys(rpc, rc, C.EXECUTOR_WALLET, from_ours)
+        recon = reconcile(ours, journal)
+        C.log(f"наши покупки по цепи с {a.ours_from}: {len(ours)} ({ostat}); сверка с журналом: "
+              f"в журнале {recon['journal_total']}, из них найдено {len(recon['journal_found_on_chain'])}, "
+              f"по цепи вне журнала {len(recon['chain_not_in_journal'])}")
+        for b in ours:
+            r = safe_analyze(rpc, "ours", b["signature"], C.EXECUTOR_WALLET, b["mint"], b["tx"],
+                             sources=sources5, known=known)
+            r["journal_mode"] = journal.get(b["signature"], "нет в журнале репо")
+            r["size_class"] = size_class(b["spend_sol"])
+            r["buy_kind"] = b["buy_kind"]
             rows.append(r)
-            C.log(f"наша {t['ts_intent_utc']}: сэндвич {r['sandwich']} {r.get('why_no_data') or ''}")
-        dstat = None
+            C.log(f"наша {r['block_time_utc']} {r['size_class']}: сэндвич {r['sandwich']} "
+                  f"{r.get('why_no_data') or ''}")
         if not a.skip_dbot:
-            buys, dstat = dbot_buys(rpc, rc, a.dbot_wallet, a.days, now)
+            buys, dstat = wallet_buys(rpc, rc, a.dbot_wallet, now - int(a.days * 86400))
             C.log(f"DBot BATCH-5: покупок за {a.days} сут: {len(buys)} ({dstat})")
             for b in buys:
-                r = analyze_trade(rpc, f"dbot_batch5_{b['buy_kind']}", b["signature"], a.dbot_wallet,
-                                  b["mint"], b["tx"], sources=sources5, known=known)
+                r = safe_analyze(rpc, "dbot_batch5", b["signature"], a.dbot_wallet,
+                                 b["mint"], b["tx"], sources=sources5, known=known)
+                r["size_class"] = size_class(b["spend_sol"])
+                r["buy_kind"] = b["buy_kind"]
                 rows.append(r)
     except (C.BudgetExceeded, TimeUp) as exc:
         err = f"{type(exc).__name__}: {exc}"
-        dstat = locals().get("dstat")
-    ours_rows = [r for r in rows if r["kind"] == "ours_live"]
-    dbot_rows = [r for r in rows if r["kind"].startswith("dbot_")]
+    ours_rows = [r for r in rows if r["kind"] == "ours"]
+    dbot_rows = [r for r in rows if r["kind"] == "dbot_batch5"]
+    by_size = {}
+    for r in ours_rows:
+        by_size.setdefault(r.get("size_class"), []).append(r)
     meta = {"generated_utc": C.utc(time.time()), "window_days": a.days,
             "dbot_wallet": a.dbot_wallet, "dbot_scan": dstat, "tasks_origin": tasks_origin,
-            "ours_source": "data/bloom_seller_diag.json positions_rows mode=live",
-            "summary_ours": summarize(ours_rows), "summary_dbot_batch5": summarize(dbot_rows),
+            "ours_source": f"цепь: все покупки {C.EXECUTOR_WALLET} с {a.ours_from}",
+            "ours_scan": ostat, "journal_reconciliation": recon,
+            "summary_ours": summarize(ours_rows),
+            "summary_ours_by_size": {k: summarize(v) for k, v in sorted(by_size.items())},
+            "summary_dbot_batch5": summarize(dbot_rows),
             "summary_all": summarize(rows), "error": err,
             "credits_this_run": rpc.stats.get("кредитов"), "rpc_calls_by_method": rpc.calls_by_method,
             "c2_usage": C.c2_usage_report(), "elapsed_s": round(time.time() - t0, 1),
@@ -367,7 +425,7 @@ def main() -> int:
     paths = write_outputs(date, rows, meta)
     C.log(f"выгрузка: {paths}; кредитов за прогон {rpc.stats.get('кредитов')}; "
           f"C2 сегодня {C.c2_spent_today()}")
-    for name in ("summary_ours", "summary_dbot_batch5"):
+    for name in ("summary_ours", "summary_ours_by_size", "summary_dbot_batch5"):
         print(name, json.dumps(meta[name], ensure_ascii=False, default=str))
     return 0
 
@@ -502,6 +560,23 @@ def self_test() -> int:
     b = buy_of_wallet(rc, ours, wallet)
     chk("покупка задачи BATCH-3 на настоящей транзакции -- первый вход",
         b and b["kind"] == "first_entry" and b["mint"] == mint, b)
+    class Boom(FakeRpc):
+        def call(self, method, params, **kw):
+            raise RuntimeError("getBlock: HTTP 503")
+    rb = safe_analyze(Boom({}), "t", sig0, wallet, mint, ours, sources=set(), known={})
+    chk("сбой узла на сделке -- строка «нет данных», прогон идёт дальше",
+        rb["sandwich"] == "нет данных" and "503" in rb["why_no_data"], rb)
+    # сверка с журналом и классы размера
+    rec = reconcile([{"signature": "S1"}, {"signature": "S3"}], {"S1": "live", "S2": "live"})
+    chk("сверка: найдено S1, нет покупки S2, вне журнала S3",
+        rec["journal_found_on_chain"] == ["S1"] and rec["journal_not_found_as_buy"] == ["S2"]
+        and rec["chain_not_in_journal"] == ["S3"], rec)
+    chk("классы размера: 0.001 / 0.05 / 0.2",
+        [size_class(x) for x in (0.0012, 0.0571, 0.2051)] == ["test_0.001", "0.05", "0.2+"])
+    chk("журнал: 7 live и 7+ live-test подписей",
+        len(C.executor_trades(mode="live")) == 7 and len(C.executor_trades(mode="live-test")) >= 7)
+    chk("начало наших сделок -- 24.09 00:00Z", parse_utc(C.OURS_FROM_UTC) == 1790208000,
+        parse_utc(C.OURS_FROM_UTC))
     import tempfile  # noqa: PLC0415
     tmp = Path(tempfile.mkdtemp())
     paths = write_outputs("2099-01-01", [r, r3], {"x": 1}, tmp)

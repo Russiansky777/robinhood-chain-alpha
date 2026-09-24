@@ -65,6 +65,10 @@ RATE_SANE_MIN, RATE_SANE_MAX = 20.0, 2000.0
 EXECUTOR_WALLET = "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
 BATCH5_WALLET = "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv"
 LEADER_BEQV = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+# Известный быстрый копировщик (владелец, 24.09): бот через AKBot.
+# Инфраструктуру не разбираем -- только «купил ли тот же минт в S+0..S+3».
+FAST_COPIER_DT8 = "DT8hib8jY4CGJcmcqcinVGYh5zzVPZAV3iosdQF9a6jX"
+OURS_FROM_UTC = "2026-09-24T00:00:00Z"
 TASK_NAMES = ("BATCH-3", "BATCH-5")
 
 C2_DAILY_BUDGET = 100_000
@@ -625,28 +629,36 @@ class RateBook:
                     self.by_minute.setdefault(bt // 60, (r, "same_tx"))
             return r, "same_tx"
         if bt is None:
-            self.stats["missing"] += 1
+            with self.lock:
+                self.stats["missing"] += 1
             return None, "нет blockTime"
         with self.lock:
             hit = self.by_minute.get(bt // 60)
         if hit:
-            self.stats["cache"] += 1
+            with self.lock:
+                self.stats["cache"] += 1
             return hit[0], f"cache_minute:{hit[1]}"
         if self.rpc is None:
-            self.stats["missing"] += 1
+            with self.lock:
+                self.stats["missing"] += 1
             return None, "нет узла"
         sig = first_signature(tx)
         try:
             page = self.rpc.signatures(REF_SOL_USDC_POOL, before=sig, limit=8)
         except RuntimeError as exc:
-            self.stats["missing"] += 1
+            with self.lock:
+                self.stats["missing"] += 1
             return None, f"getSignaturesForAddress пула SOL/USDC: {str(exc)[:80]}"
+        tried = 0
         for s in page:
             if s.get("err") is not None:
                 continue
             sbt = s.get("blockTime")
             if sbt is None or sbt > bt or bt - sbt > 120:
                 continue
+            if tried >= 3:  # курс нужен только для порога 2 SOL: три попытки хватает
+                break
+            tried += 1
             try:
                 t2 = self.rpc.get_tx(s["signature"])
             except RuntimeError:
@@ -655,10 +667,10 @@ class RateBook:
             if r2 is not None:
                 with self.lock:
                     self.by_minute[bt // 60] = (r2, "ref_pool")
-                self.stats["ref_pool"] += 1
+                    self.stats["ref_pool"] += 1
                 return r2, f"ref_pool:{s['signature'][:16]}"
-            break  # одна попытка на сделку: курс нужен только для порога
-        self.stats["missing"] += 1
+        with self.lock:
+            self.stats["missing"] += 1
         return None, "в пуле SOL/USDC не нашлось свопа за 120 с до покупки"
 
 

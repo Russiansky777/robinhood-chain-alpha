@@ -49,6 +49,8 @@ CACHE_PATH = C.DATA / "c2_cache" / "crowd_cache.json"
 CACHE_VERSION = 1
 MAX_SIG_PAGES = 80          # 80 000 подписей на источник за окно -- выше честное «не выкачано»
 WINDOW_MAX_PAGES = 10       # 10 000 подписей на минт/хранилище за 60 с
+DT8_MAX_LAG = 3             # владелец: окно S+0..S+3 слота
+METHOD_VERSION = 2          # меняется -- кэш покупок пересчитывается
 CLASSIFY_BATCH = 100
 
 
@@ -87,39 +89,131 @@ def find_anchor(rpc, slot0: int, bt0: int, t_target: int) -> dict:
     raise RuntimeError(f"якорный блок после {C.utc(t_target)} не найден за 20 попыток")
 
 
-def sig_window(rpc, address: str, before: str, until: str) -> tuple[list, bool]:
+BLOCK_SIG_OPTS = {"transactionDetails": "signatures", "rewards": False,
+                  "maxSupportedTransactionVersion": C.TX_VERSION, "commitment": "finalized"}
+
+
+def block_signatures(rpc, slot: int) -> list | None:
+    """Подписи блока в порядке исполнения; None -- слот пропущен."""
+    try:
+        blk = rpc.call("getBlock", [slot, BLOCK_SIG_OPTS])
+    except RuntimeError as exc:
+        if C.is_skipped_slot_error(str(exc)):
+            return None
+        raise
+    return (blk or {}).get("signatures") or []
+
+
+def sig_window(rpc, address: str, before: str, slot0: int,
+               max_pages: int = WINDOW_MAX_PAGES) -> tuple[list, bool]:
+    """Подписи адреса от якоря назад, пока не пройдём слот slot0.
+
+    until= не используется: порядок подписей ВНУТРИ слота у узла может
+    быть не порядком исполнения (сортировка по подписи), и отсечка «после
+    покупки» в её же слоте делается по индексу из getBlock."""
     out, cur = [], before
-    for _ in range(WINDOW_MAX_PAGES):
-        page = rpc.signatures(address, before=cur, until=until, limit=1000)
+    for _ in range(max_pages):
+        page = rpc.signatures(address, before=cur, limit=1000)
         out.extend(page)
-        if len(page) < 1000:
+        if len(page) < 1000 or (page[-1].get("slot") or 0) < slot0:
             return out, True
         cur = page[-1]["signature"]
     return out, False
 
 
+def after_buy(lst: list, slot0: int, pos0: dict, idx_buy: int, t_max: int) -> list:
+    """Успешные транзакции строго после покупки (в её слоте -- по индексу
+    блока) и не позже t_max по blockTime. Порядок -- как у узла."""
+    out = []
+    for s in lst:
+        sl = s.get("slot")
+        if sl is None or sl < slot0:
+            continue
+        if sl == slot0:
+            p = pos0.get(s.get("signature"))
+            if p is None or p <= idx_buy:
+                continue
+        if s.get("err") is not None or s.get("blockTime") is None or s["blockTime"] > t_max:
+            continue
+        out.append(s)
+    return out
+
+
 # ------------------------------------------------------------ одна покупка
 
+def order_in_slot(rpc, slot: int, sigs: list, pos_cache: dict) -> dict:
+    """{подпись: индекс в блоке} для подписей одного слота (getBlock, 1 кредит)."""
+    if slot not in pos_cache:
+        bs = block_signatures(rpc, slot)
+        pos_cache[slot] = {x: i for i, x in enumerate(bs or [])}
+    return {x: pos_cache[slot].get(x) for x in sigs}
+
+
 def price_at(rpc, fetched: dict, vault_sigs: list, t_point: int, pool: dict,
-             buy_sig: str) -> dict:
-    """Цена последней сделки в пуле с blockTime <= t_point (vault_sigs --
-    от новых к старым, только успешные, только после покупки)."""
+             buy_sig: str, pos_cache: dict) -> dict:
+    """Цена ПОСЛЕДНЕЙ сделки в пуле с blockTime <= t_point.
+
+    Кандидаты -- от старших слотов к младшим; внутри слота порядок берётся
+    из getBlock, если в слоте больше одной транзакции пула."""
     cands = [s for s in vault_sigs if s["blockTime"] <= t_point]
-    for s in cands:
-        sig = s["signature"]
-        if sig not in fetched:
-            fetched.update(rpc.get_txs([sig]))
-        tx = fetched.get(sig)
-        if tx is None:
-            return {"price": None, "why": f"узел не отдал транзакцию пула {sig[:12]}"}
-        ev = C.pool_event(tx, pool)
-        if ev["kind"] == "swap":
-            return {"price": ev["price"], "sig": sig, "block_time": s["blockTime"],
-                    "last_trade_is_source": False}
-        if ev["kind"] == "removal":
-            return {"price": None, "why": f"ликвидность пула снята до точки ({sig[:12]})"}
-    return {"price": pool["price"], "sig": buy_sig, "block_time": None,
-            "last_trade_is_source": True}
+    slots = sorted({s["slot"] for s in cands}, reverse=True)
+    for sl in slots:
+        in_slot = [s["signature"] for s in cands if s["slot"] == sl]
+        need = [x for x in in_slot if x not in fetched]
+        if need:
+            fetched.update(rpc.get_txs(need))
+        if any(fetched.get(x) is None for x in in_slot):
+            return {"price": None, "why": f"узел не отдал транзакцию пула в слоте {sl}"}
+        if len(in_slot) > 1:
+            pos = order_in_slot(rpc, sl, in_slot, pos_cache)
+            if any(v is None for v in pos.values()):
+                return {"price": None, "why": f"нет порядка транзакций в слоте {sl}"}
+            in_slot.sort(key=lambda x: pos[x], reverse=True)
+        for x in in_slot:
+            ev = C.pool_event(fetched[x], pool)
+            if ev["kind"] == "swap":
+                return {"price": ev["price"], "sig": x, "slot": sl, "last_trade_is_source": False}
+            if ev["kind"] == "removal":
+                return {"price": None, "why": f"ликвидность пула снята до точки ({x[:12]})"}
+    return {"price": pool["price"], "sig": buy_sig, "slot": None, "last_trade_is_source": True}
+
+
+def dt8_check(rpc, anchor_sig: str, slot0: int, pos0: dict, idx_buy: int, mint: str,
+              pos_cache: dict, max_lag: int = DT8_MAX_LAG) -> dict:
+    """Купил ли DT8 тот же минт в слотах S+0..S+max_lag: по ЕГО истории
+    подписей (он есть в каждой своей транзакции), покупка = рост его
+    баланса минта. Его инфраструктура не разбирается."""
+    out = {"dt8": "нет данных", "dt8_why": None, "dt8_sig": None, "dt8_slot": None,
+           "dt8_lag_slots": None, "dt8_index_in_block": None, "dt8_before_source": None}
+    lst, ok = sig_window(rpc, C.FAST_COPIER_DT8, anchor_sig, slot0, max_pages=5)
+    if not ok:
+        out["dt8_why"] = "история DT8 в окне не выкачана (> 5000 подписей)"
+        return out
+    cands = [s for s in lst if s.get("err") is None and s.get("slot") is not None
+             and slot0 <= s["slot"] <= slot0 + max_lag]
+    if not cands:
+        out["dt8"] = "нет"
+        return out
+    got = rpc.get_txs([s["signature"] for s in cands])
+    if any(got.get(s["signature"]) is None for s in cands):
+        out["dt8_why"] = "узел не отдал транзакцию DT8"
+        return out
+    hits = [s for s in cands
+            if C.owner_mint_delta(got[s["signature"]], mint).get(C.FAST_COPIER_DT8, 0) > 0]
+    if not hits:
+        out["dt8"] = "нет"
+        return out
+    sl = min(s["slot"] for s in hits)
+    in_slot = [s["signature"] for s in hits if s["slot"] == sl]
+    pos = ({x: pos0.get(x) for x in in_slot} if sl == slot0
+           else order_in_slot(rpc, sl, in_slot, pos_cache))
+    known = [x for x in in_slot if pos.get(x) is not None]
+    first = min(known, key=lambda x: pos[x]) if known else in_slot[0]
+    out.update(dt8="да", dt8_sig=first, dt8_slot=sl, dt8_lag_slots=sl - slot0,
+               dt8_index_in_block=pos.get(first),
+               dt8_before_source=(sl == slot0 and pos.get(first) is not None
+                                  and pos[first] < idx_buy))
+    return out
 
 
 def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
@@ -129,6 +223,7 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
            "mint": mint, "spend_sol_equiv": round(ev["spend_sol_equiv"], 6),
            "stable_usd_spent": ev.get("stable_usd_spent"),
            "rate_usd_per_sol": ev.get("rate_usd_per_sol"), "rate_source": ev.get("rate_source"),
+           "index_in_block": None,
            "pool_vault": None, "pool_owner": None, "quote_mint": None, "split_route": None,
            "price_0": None, "price_30s": None, "price_30s_sig": None, "last_trade_is_source_30s": None,
            "growth_30s": None, "why_no_growth_30s": None,
@@ -136,52 +231,54 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
            "growth_60s": None, "why_no_growth_60s": None,
            "crowd_30s": None, "crowd_30s_copy_wallets": None, "crowd_30s_rule2": None,
            "why_no_crowd": None, "window_tx_30s": None, "window_tx_60s": None,
-           "anchor_slot": None}
-    if bt is None:
-        row["why_no_growth_30s"] = row["why_no_growth_60s"] = row["why_no_crowd"] = "нет blockTime"
+           "anchor_slot": None, "dt8": "нет данных", "dt8_why": None, "dt8_sig": None,
+           "dt8_slot": None, "dt8_lag_slots": None, "dt8_index_in_block": None,
+           "dt8_before_source": None}
+
+    def all_no(why):
+        for k in ("why_no_growth_30s", "why_no_growth_60s", "why_no_crowd"):
+            row[k] = row[k] or why
+        row["dt8_why"] = row["dt8_why"] or why
         return row
+    if bt is None:
+        return all_no("нет blockTime")
     pool = C.identify_pool(tx, source, mint)
     row.update(pool_vault=pool["pool_vault"], pool_owner=pool["pool_owner"],
                quote_mint=pool["quote_mint"], split_route=pool["split"],
                price_0=str(pool["price"]) if pool["price"] is not None else None)
-    anchor = find_anchor(rpc, slot, bt, bt + w2 + 1)
-    row["anchor_slot"] = anchor["slot"]
+    try:
+        sigs0 = block_signatures(rpc, slot)
+        if not sigs0 or sig not in sigs0:
+            return all_no("нет порядка транзакций в блоке покупки (getBlock)")
+        pos0 = {x: i for i, x in enumerate(sigs0)}
+        idx_buy = pos0[sig]
+        row["index_in_block"] = idx_buy
+        pos_cache = {slot: pos0}
+        anchor = find_anchor(rpc, slot, bt, bt + w2 + 1)
+        row["anchor_slot"] = anchor["slot"]
 
-    # Проверка семантики before= на живых данных: подпись якоря не про наш
-    # адрес, и узел обязан отсчитывать по её слоту. Делается один раз.
-    with probe["lock"]:
-        need_probe = pool["ok"] and probe.get("result") is None
-    if need_probe:
-        page = rpc.signatures(pool["pool_vault"], before=anchor["signature"], limit=1000)
-        found = any(s.get("signature") == sig for s in page)
-        slots = [s.get("slot") for s in page if s.get("slot") is not None]
-        verdict = ("ok" if found else
-                   ("inconclusive" if len(page) == 1000 and slots and min(slots) > slot else "FAIL"))
-        with probe["lock"]:
-            if probe.get("result") in (None, "inconclusive"):
-                probe["result"] = verdict
-                probe["detail"] = {"vault": pool["pool_vault"], "buy_sig": sig,
-                                   "anchor_slot": anchor["slot"], "returned": len(page),
-                                   "buy_found": found}
-        if verdict == "FAIL":
-            raise RuntimeError("семантика before= у узла не та: подпись покупки не найдена "
-                               "в истории хранилища до якоря -- окна считать нельзя")
+        # DT8 -- по его собственной истории, независимо от пула и толпы.
+        row.update(dt8_check(rpc, anchor["signature"], slot, pos0, idx_buy, mint, pos_cache))
 
-    mint_sigs, m_ok = sig_window(rpc, mint, anchor["signature"], sig)
-    vault_sigs, v_ok = (sig_window(rpc, pool["pool_vault"], anchor["signature"], sig)
-                        if pool["ok"] else ([], True))
+        mint_sigs, m_ok = sig_window(rpc, mint, anchor["signature"], slot)
+        vault_sigs, v_ok = (sig_window(rpc, pool["pool_vault"], anchor["signature"], slot)
+                            if pool["ok"] else ([], True))
+        # Проверка семантики before= на КАЖДОЙ покупке: подпись якоря не про
+        # наш адрес, и история хранилища до неё обязана содержать саму
+        # покупку -- хранилище в ней участвовало.
+        if pool["ok"] and v_ok:
+            found = any(s.get("signature") == sig for s in vault_sigs)
+            with probe["lock"]:
+                probe["checked"] = probe.get("checked", 0) + 1
+                probe["failed"] = probe.get("failed", 0) + (not found)
+            if not found:
+                return all_no("узел: история хранилища до якоря не содержит покупку "
+                              "(before= не по слоту) -- окно не доверенное")
+    except RuntimeError as exc:
+        return all_no(f"окно не построено: {str(exc)[:160]}")
 
-    def clean(lst):
-        out = []
-        for s in lst:
-            if s.get("err") is not None or s.get("blockTime") is None:
-                continue
-            if s.get("signature") == sig or (s.get("slot") or 0) < slot:
-                raise RuntimeError("until= отдал подпись до покупки -- окно считать нельзя")
-            if s["blockTime"] <= bt + w2:
-                out.append(s)
-        return out
-    mint_ok, vault_ok = clean(mint_sigs), clean(vault_sigs)
+    mint_ok = after_buy(mint_sigs, slot, pos0, idx_buy, bt + w2)
+    vault_ok = after_buy(vault_sigs, slot, pos0, idx_buy, bt + w2)
     union: dict = {}
     for s in mint_ok + vault_ok:
         union.setdefault(s["signature"], s)
@@ -191,7 +288,7 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
     fetched: dict = {}
 
     if not m_ok or not v_ok:
-        row["why_no_crowd"] = "окно не выкачано целиком (> 10 000 подписей)"
+        row["why_no_crowd"] = f"окно не выкачано целиком (> {WINDOW_MAX_PAGES * 1000} подписей)"
     elif len(in30) > cap:
         row["why_no_crowd"] = f"в окне 30 с {len(in30)} транзакций > предела {cap}"
     else:
@@ -217,7 +314,10 @@ def analyze_buy(rpc, source: str, ev: dict, tx: dict, *, w1: int, w2: int,
         return row
     p0 = pool["price"]
     for w, tag in ((w1, "30s"), (w2, "60s")):
-        pa = price_at(rpc, fetched, vault_ok, bt + w, pool, sig)
+        try:
+            pa = price_at(rpc, fetched, vault_ok, bt + w, pool, sig, pos_cache)
+        except RuntimeError as exc:
+            pa = {"price": None, "why": f"узел: {str(exc)[:120]}"}
         if pa.get("price") is None:
             row[f"why_no_growth_{tag}"] = pa.get("why")
             continue
@@ -255,6 +355,7 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
             todo = [s for s in ok if s not in cls]
         log_every = max(1, len(todo) // 10)
         buys_tx: dict = {}
+        local: dict = {}
         for i in range(0, len(todo), CLASSIFY_BATCH):
             part = todo[i:i + CLASSIFY_BATCH]
             got = rpc.get_txs(part)
@@ -273,14 +374,21 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
                         buys_tx[s] = tx
                 else:
                     rec = "m" if kind == "multi_mint_skipped" else "n"
+                # «Нет курса» в кэш не кладём: курс мог не отдаться разово,
+                # следующий прогон спросит снова.
+                unknown_rate = isinstance(rec, dict) and (rec["kind"] == "rate_missing"
+                                                          or rec.get("price_missing"))
                 with cache_lock:
-                    cls[s] = rec
-            if (i // CLASSIFY_BATCH) % max(1, log_every // CLASSIFY_BATCH or 1) == 0:
+                    if unknown_rate:
+                        local[s] = rec
+                    else:
+                        cls[s] = rec
+            if (i // CLASSIFY_BATCH) % max(1, log_every // CLASSIFY_BATCH) == 0:
                 C.log(f"{src.get('remark') or addr[:8]}: разобрано {min(i + CLASSIFY_BATCH, len(todo))}"
                       f"/{len(todo)} новых транзакций")
         buys = []
         for s in ok:
-            rec = cls.get(s)
+            rec = cls.get(s, local.get(s))
             if rec == "m":
                 out["n_multi_mint_skipped"] += 1
             if not isinstance(rec, dict):
@@ -298,7 +406,7 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
             s = ev["signature"]
             with cache_lock:
                 hit = cache["buys"].get(s)
-            if hit and hit.get("_w") == [w1, w2, cap]:
+            if hit and hit.get("_w") == [w1, w2, cap, METHOD_VERSION]:
                 out["trades"].append(hit)
                 continue
             tx = buys_tx.get(s) or rpc.get_txs([s]).get(s)
@@ -309,7 +417,7 @@ def scan_source(rpc, rc, src: dict, *, days: float, now: int, cache: dict, cache
                        "why_no_crowd": "узел не отдал транзакцию покупки"}
             else:
                 row = analyze_buy(rpc, addr, ev, tx, w1=w1, w2=w2, cap=cap, known=known, probe=probe)
-            row["_w"] = [w1, w2, cap]
+            row["_w"] = [w1, w2, cap, METHOD_VERSION]
             with cache_lock:
                 cache["buys"][s] = row
             out["trades"].append(row)
@@ -327,6 +435,9 @@ def aggregate(res: dict) -> dict:
     g30 = [t["growth_30s"] for t in tr if t.get("growth_30s") is not None]
     g60 = [t["growth_60s"] for t in tr if t.get("growth_60s") is not None]
     cr = [t["crowd_30s"] for t in tr if t.get("crowd_30s") is not None]
+    d8 = [t for t in tr if t.get("dt8") in ("да", "нет")]
+    d8_yes = [t for t in d8 if t.get("dt8") == "да"]
+    d8_lag = [t["dt8_lag_slots"] for t in d8_yes if t.get("dt8_lag_slots") is not None]
 
     def reasons(key):
         out: dict = {}
@@ -344,6 +455,9 @@ def aggregate(res: dict) -> dict:
         "growth_60s_median": round(C.median(g60), 4) if g60 else None,
         "share_x2_30s": round(sum(1 for g in g30 if g >= 2) / len(g30), 4) if g30 else None,
         "crowd_30s_median": C.median(cr) if cr else None,
+        "dt8_share": round(len(d8_yes) / len(d8), 4) if d8 else None,
+        "dt8_lag_median_slots": C.median(d8_lag) if d8_lag else None,
+        "n_dt8_checked": len(d8), "n_dt8_before_source": sum(1 for t in d8_yes if t.get("dt8_before_source")),
         "n_growth_30s": len(g30), "n_growth_60s": len(g60), "n_crowd_30s": len(cr),
         "no_growth_30s_reasons": reasons("why_no_growth_30s"),
         "no_crowd_reasons": reasons("why_no_crowd"),
@@ -358,16 +472,18 @@ def aggregate(res: dict) -> dict:
 
 
 AGG_COLS = ["task", "source", "remark", "trades_7d", "growth_30s_median", "growth_60s_median",
-            "share_x2_30s", "crowd_30s_median", "n_growth_30s", "n_growth_60s", "n_crowd_30s",
+            "share_x2_30s", "crowd_30s_median", "dt8_share", "dt8_lag_median_slots", "n_dt8_checked",
+            "n_dt8_before_source", "n_growth_30s", "n_growth_60s", "n_crowd_30s",
             "no_growth_30s_reasons", "no_crowd_reasons", "buys_rate_missing", "first_entries_lt2",
             "multi_mint_skipped", "n_signatures_window", "tx_fetch_failed", "scan_complete", "error"]
-TRADE_COLS = ["task", "source", "remark", "signature", "slot", "block_time_utc", "mint",
+TRADE_COLS = ["task", "source", "remark", "signature", "slot", "index_in_block", "block_time_utc", "mint",
               "spend_sol_equiv", "stable_usd_spent", "rate_usd_per_sol", "rate_source",
               "pool_vault", "pool_owner", "quote_mint", "split_route", "price_0",
               "price_30s", "growth_30s", "last_trade_is_source_30s", "why_no_growth_30s",
               "price_60s", "growth_60s", "last_trade_is_source_60s", "why_no_growth_60s",
               "crowd_30s", "crowd_30s_copy_wallets", "crowd_30s_rule2", "why_no_crowd",
-              "window_tx_30s", "window_tx_60s", "price_30s_sig", "price_60s_sig", "anchor_slot"]
+              "dt8", "dt8_slot", "dt8_lag_slots", "dt8_index_in_block", "dt8_before_source", "dt8_sig",
+              "dt8_why", "window_tx_30s", "window_tx_60s", "price_30s_sig", "price_60s_sig", "anchor_slot"]
 
 
 def sort_key(a: dict):
@@ -523,18 +639,19 @@ def main() -> int:
     save_cache(cache)
 
     agg = [aggregate(r) for r in results]
+    # Лидер -- всегда отдельной строкой и вне сортировки, даже если он в BATCH-5.
     leader_row = None
     if leader_src:
         leader_row = next((x for x in agg if x["source"] == C.LEADER_BEQV), None)
-        if leader_in is None:
-            agg = [x for x in agg if x["source"] != C.LEADER_BEQV]
+        agg = [x for x in agg if x["source"] != C.LEADER_BEQV]
     meta = {"generated_utc": C.utc(time.time()), "window_days": a.days,
             "window_from_utc": C.utc(now - int(a.days * 86400)), "window_to_utc": C.utc(now),
             "crowd_window_s": a.crowd_window_s, "window2_s": a.window2_s, "crowd_cap": a.crowd_cap,
             "sources_origin": "DBot GET /automation/follow_orders (живьём)",
             "n_sources_batch3_batch5": len(sources),
             "leader": C.LEADER_BEQV, "leader_in_batch": leader_in["task"] if leader_in else None,
-            "before_semantics_probe": {k: v for k, v in probe.items() if k != "lock"},
+            "before_semantics_check": {k: v for k, v in probe.items() if k != "lock"},
+            "fast_copier": C.FAST_COPIER_DT8, "fast_copier_window_slots": DT8_MAX_LAG,
             "rate_stats": book.stats, "rpc_stats": rpc.stats,
             "rpc_calls_by_method": rpc.calls_by_method,
             "credits_this_run": rpc.stats.get("кредитов"),
@@ -546,68 +663,61 @@ def main() -> int:
                 "price": "цена исполнения сделки в пуле источника: |дельта котировки|/|дельта минта| "
                          "по хранилищам; P30/P60 -- последняя сделка в пуле с blockTime <= T0+30/60",
                 "growth": "P/P0 в котировке пула, без пересчёта",
-                "crowd": "разные чужие кошельки, купившие минт в (T0, T0+30 с]"}}
+                "crowd": "разные чужие кошельки, купившие минт в (T0, T0+30 с]",
+                "dt8": "рост баланса минта у DT8hib8... в слотах S..S+3 (по его истории подписей); "
+                       "отставание = слот DT8 - слот источника"}}
     paths = write_outputs(date, agg, leader_row, meta, results)
     C.log(f"выгрузка: {paths}")
     C.log(f"кредитов за прогон: {rpc.stats.get('кредитов')}, C2 сегодня: {C.c2_spent_today()}")
     print("--- коротко (сортировка по share_x2_30s) ---")
-    for r in sorted(agg, key=sort_key) + ([leader_row] if leader_row and leader_in is None else []):
+    for r in sorted(agg, key=sort_key) + ([leader_row] if leader_row else []):
         print(f"{r['task']:<8} {str(r['remark'])[:14]:<14} n={r['trades_7d']} "
               f"g30={r['growth_30s_median']} g60={r['growth_60s_median']} "
-              f"x2={r['share_x2_30s']} crowd={r['crowd_30s_median']} ошибка={r['error']}")
+              f"x2={r['share_x2_30s']} crowd={r['crowd_30s_median']} dt8={r['dt8_share']}/"
+              f"{r['dt8_lag_median_slots']} ошибка={r['error']}")
     return 0
 
 
 # ------------------------------------------------------------ самопроверка
 
 class FakeRpc:
-    """Подставной узел: подписи и транзакции из словарей, блоки по слотам."""
+    """Подставной узел: блоки по слотам (подписи в порядке исполнения),
+    история адресов (от новых к старым), транзакции по подписи.
+    before= отсчитывается по СЛОТУ подписи, как у настоящего узла."""
 
     def __init__(self, blocks: dict, sigs_by_addr: dict, txs: dict) -> None:
         self.blocks, self.sigs_by_addr, self.txs = blocks, sigs_by_addr, txs
         self.calls: list = []
-        self.stats = {"кредитов": 0}
 
     def call(self, method, params, **kw):
         self.calls.append(method)
         if method == "getBlock":
-            s = params[0]
-            if s not in self.blocks:
+            if params[0] not in self.blocks:
                 raise RuntimeError("getBlock: RPC error {'code': -32007, 'message': 'skipped'}")
-            return self.blocks[s]
+            return self.blocks[params[0]]
         raise RuntimeError(f"нет {method}")
-
-    def signatures(self, address, *, before=None, until=None, limit=1000):
-        self.calls.append("getSignaturesForAddress")
-        lst = self.sigs_by_addr.get(address, [])   # от новых к старым
-        i0 = 0
-        if before:
-            bslot = self.slot_of(before)
-            i0 = next((i for i, s in enumerate(lst) if s["slot"] < bslot), len(lst))
-        out = []
-        for s in lst[i0:]:
-            if until and s["signature"] == until:
-                break
-            if until and s["slot"] < self.slot_of(until):
-                break
-            out.append(s)
-            if len(out) >= limit:
-                break
-        return out
 
     def slot_of(self, sig):
         for b_slot, b in self.blocks.items():
             if sig in (b.get("signatures") or []):
                 return b_slot
         for lst in self.sigs_by_addr.values():
-            for s in lst:
-                if s["signature"] == sig:
-                    return s["slot"]
+            for x in lst:
+                if x["signature"] == sig:
+                    return x["slot"]
         raise KeyError(sig)
+
+    def signatures(self, address, *, before=None, until=None, limit=1000):
+        self.calls.append("getSignaturesForAddress")
+        lst = self.sigs_by_addr.get(address, [])
+        if before:
+            bslot = self.slot_of(before)
+            lst = [x for x in lst if x["slot"] < bslot]
+        return lst[:limit]
 
     def get_txs(self, sigs):
         self.calls.append("getTransaction")
-        return {s: self.txs.get(s) for s in sigs}
+        return {x: self.txs.get(x) for x in sigs}
 
 
 def self_test() -> int:
@@ -617,17 +727,17 @@ def self_test() -> int:
         checks.append((name, bool(ok), got))
 
     txs = C.load_real_txs()
-    buy = next(t for s, t in txs.items() if s.startswith("2uPwpSAQ"))
+    buy = next(t for x, t in txs.items() if x.startswith("2uPwpSAQ"))
     src = "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu"
     mint = "87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp"
     pool = C.identify_pool(buy, src, mint)
     slot0, bt0, sig0 = buy["slot"], buy["blockTime"], C.first_signature(buy)
     vault, qv = pool["pool_vault"], pool["quote_vault"]
-    keys0 = C.account_keys(buy)
+    DT8 = C.FAST_COPIER_DT8
 
-    def later(sig, slot, bt, signer, d_vault, d_quote, buyer_gain=0, err=None, recv=None):
-        """Сделка в том же пуле: дельты хранилищ (сырые) + прирост покупателю."""
-        keys = [signer, vault, qv, "BUYER_ATA", "RECV_ATA"]
+    def later(sig, slot, bt, signer, d_vault, d_quote, buyer_gain=0, err=None, owner=None):
+        """Сделка в том же пуле: дельты хранилищ (сырые) + прирост минта."""
+        keys = [signer, vault, qv, "BUYER_ATA"]
         pre = [{"accountIndex": 1, "owner": pool["pool_owner"], "mint": mint,
                 "uiTokenAmount": {"amount": "1000000000000000", "decimals": 6}},
                {"accountIndex": 2, "owner": pool["pool_owner"], "mint": pool["quote_mint"],
@@ -637,113 +747,140 @@ def self_test() -> int:
                 {"accountIndex": 2, "owner": pool["pool_owner"], "mint": pool["quote_mint"],
                  "uiTokenAmount": {"amount": str(1000000000000 + d_quote), "decimals": 8}}]
         if buyer_gain:
-            owner = recv or signer
-            post.append({"accountIndex": 3 if not recv else 4, "owner": owner, "mint": mint,
+            post.append({"accountIndex": 3, "owner": owner or signer, "mint": mint,
                          "uiTokenAmount": {"amount": str(buyer_gain), "decimals": 6}})
         return {"slot": slot, "blockTime": bt,
                 "transaction": {"signatures": [sig], "message": {
                     "accountKeys": [{"pubkey": k, "signer": k == signer} for k in keys],
                     "instructions": [{"programId": "DEX", "accounts": [vault, qv]}]}},
-                "meta": {"err": err, "preBalances": [0] * 5, "postBalances": [0] * 5,
+                "meta": {"err": err, "preBalances": [0] * 4, "postBalances": [0] * 4,
                          "preTokenBalances": pre, "postTokenBalances": post,
                          "innerInstructions": []}}
-    # цена P0: 3061569e-8 / 162352420501e-6
     p0 = pool["price"]
-    # сделка через 10 с: покупка по цене ×2.5 от P0 (кошелёк A)
+
+    def q(mult, n_tok=1000):
+        return int(D(n_tok) * p0 * D(mult) * D(10) ** 8)
     dv = -1_000_000_000  # 1000 токенов
-    dq = int(D(1000) * p0 * D("2.5") * D(10) ** 8)
-    t_a = later("A" * 88, slot0 + 25, bt0 + 10, "WALLET_A", dv, dq, buyer_gain=1_000_000_000)
-    # через 20 с: покупка кошельком B, минт в другом пуле (вижу только по минту)
+    # в слоте покупки ДО неё -- чужая покупка: не толпа и не цена
+    t_pre = later("0" * 88, slot0, bt0, "WALLET_PRE", dv, q("0.5"), buyer_gain=1)
+    # в слоте покупки ПОСЛЕ неё -- DT8 покупает (S+0)
+    t_d8 = later("8" * 88, slot0, bt0, DT8, dv, q("1.1"), buyer_gain=1_000_000)
+    # через 10 с: покупка по цене x2.5 (кошелёк A)
+    t_a = later("A" * 88, slot0 + 25, bt0 + 10, "WALLET_A", dv, q("2.5"), buyer_gain=1_000_000_000)
+    # в том же слоте, что A, но РАНЬШЕ по блоку -- сделка x9 (не последняя)
+    t_a0 = later("a" * 88, slot0 + 25, bt0 + 10, "WALLET_A0", dv, q("9"), buyer_gain=1)
+    # через 20 с: покупка кошельком B в другом пуле (видна по минту)
     t_b = later("B" * 88, slot0 + 50, bt0 + 20, "WALLET_B", 0, 0, buyer_gain=5)
     # через 25 с: сам источник докупает -- в толпу не идёт
     t_s = later("C" * 88, slot0 + 62, bt0 + 25, src, 0, 0, buyer_gain=7)
-    # через 29 с: неуспешная транзакция -- мимо
-    t_f = later("D" * 88, slot0 + 72, bt0 + 29, "WALLET_F", dv, dq, buyer_gain=1, err={"x": 1})
-    # через 45 с: продажа по цене ×1.5
-    dq2 = int(D(1000) * p0 * D("1.5") * D(10) ** 8)
-    t_e = later("E" * 88, slot0 + 112, bt0 + 45, "WALLET_E", 1_000_000_000, -dq2)
+    # через 29 с: неуспешная -- мимо
+    t_f = later("D" * 88, slot0 + 72, bt0 + 29, "WALLET_F", dv, q("3"), buyer_gain=1, err={"x": 1})
+    # через 45 с: продажа по x1.5
+    t_e = later("E" * 88, slot0 + 112, bt0 + 45, "WALLET_E", 1_000_000_000, -q("1.5"))
     # через 70 с -- вне окна 60 с
-    t_g = later("G" * 88, slot0 + 175, bt0 + 70, "WALLET_G", dv, dq * 10, buyer_gain=1)
+    t_g = later("G" * 88, slot0 + 175, bt0 + 70, "WALLET_G", dv, q("20"), buyer_gain=1)
 
-    def s(t):
+    def sg(t):
         return {"signature": C.first_signature(t), "slot": t["slot"], "blockTime": t["blockTime"],
                 "err": t["meta"]["err"]}
     anchor_sig = "Z" * 88
-    blocks = {slot0: {"blockTime": bt0, "signatures": [sig0]},
-              # якорь: первая догадка slot0+157 пропущена, дальше -- рано, потом поздно
+    blocks = {slot0: {"blockTime": bt0, "signatures": ["0" * 88, sig0, "8" * 88]},
+              slot0 + 25: {"blockTime": bt0 + 10, "signatures": ["a" * 88, "A" * 88]},
+              # якорь: первая догадка пропущена, дальше рано, потом поздно
               slot0 + 158: {"blockTime": bt0 + 55, "signatures": ["Y" * 88]},
               slot0 + 185: {"blockTime": bt0 + 65, "signatures": ["X" * 88, anchor_sig]}}
-    vault_hist = [s(t_g), s(t_e), s(t_f), s(t_a), {"signature": sig0, "slot": slot0,
-                                                   "blockTime": bt0, "err": None}]
-    mint_hist = [s(t_g), s(t_f), s(t_s), s(t_b), s(t_a), {"signature": sig0, "slot": slot0,
-                                                           "blockTime": bt0, "err": None}]
-    fake = FakeRpc(blocks, {vault: vault_hist, mint: mint_hist},
-                   {C.first_signature(t): t for t in (t_a, t_b, t_s, t_f, t_e, t_g)})
-    # якорь
+    me = {"signature": sig0, "slot": slot0, "blockTime": bt0, "err": None}
+    # узел внутри слота отдаёт подписи НЕ в порядке исполнения (A раньше a)
+    vault_hist = [sg(t_g), sg(t_e), sg(t_f), sg(t_a), sg(t_a0), sg(t_d8), me, sg(t_pre)]
+    mint_hist = [sg(t_g), sg(t_f), sg(t_s), sg(t_b), sg(t_a), sg(t_a0), sg(t_d8), me, sg(t_pre)]
+    dt8_hist = [sg(t_d8)]
+    alltx = {C.first_signature(t): t for t in (t_pre, t_d8, t_a, t_a0, t_b, t_s, t_f, t_e, t_g)}
+    fake = FakeRpc(blocks, {vault: vault_hist, mint: mint_hist, DT8: dt8_hist}, alltx)
     an = find_anchor(fake, slot0, bt0, bt0 + 61)
     chk("якорь: пропущенный слот обойдён, взят блок с blockTime >= T0+61",
         an["slot"] == slot0 + 185 and an["signature"] == anchor_sig, an)
     ev = {"signature": sig0, "slot": slot0, "mint": mint, "spend_sol_equiv": 2.01,
           "stable_usd_spent": None, "rate_usd_per_sol": None, "rate_source": None}
-    probe = {"lock": threading.Lock(), "result": None}
+    probe = {"lock": threading.Lock()}
     row = analyze_buy(fake, src, ev, buy, w1=30, w2=60, cap=1500,
-                      known={"WALLET_B": "BATCH-9"}, probe=probe)
-    chk("проверка before= на хранилище пройдена", probe["result"] == "ok", probe)
-    chk("толпа 30 с = A и B (источник, неуспешная и поздние мимо)", row["crowd_30s"] == 2, row)
-    chk("копировщик задачи в толпе опознан", row["crowd_30s_copy_wallets"] == 1, row)
-    chk("рост к 30 с = ×2.5 по последней сделке пула (A)",
+                      known={"WALLET_B": "BATCH-9", DT8: "copier"}, probe=probe)
+    chk("проверка before= на покупке пройдена", probe.get("checked") == 1 and probe.get("failed") == 0, probe)
+    chk("индекс покупки в блоке -- из getBlock", row["index_in_block"] == 1, row["index_in_block"])
+    chk("толпа 30 с = DT8, A0, A, B (до покупки в её слоте, источник, неуспешная, поздние -- мимо)",
+        row["crowd_30s"] == 4, row)
+    chk("копировщики задач в толпе опознаны (B и DT8)", row["crowd_30s_copy_wallets"] == 2, row)
+    chk("рост к 30 с = x2.5: последняя в слоте по getBlock, а не по порядку узла",
         row["growth_30s"] is not None and abs(row["growth_30s"] - 2.5) < 1e-4, row["growth_30s"])
-    chk("рост к 60 с = ×1.5 (продажа E), сделка за окном не взята",
+    chk("рост к 60 с = x1.5 (продажа E), сделка за окном не взята",
         row["growth_60s"] is not None and abs(row["growth_60s"] - 1.5) < 1e-4, row["growth_60s"])
-    chk("в окне 30 с 3 успешные транзакции (A, B, докупка источника), в окне 60 с 4 (+E)",
-        row["window_tx_30s"] == 3 and row["window_tx_60s"] == 4, (row["window_tx_30s"], row["window_tx_60s"]))
+    chk("в окне 30 с 5 успешных после покупки, в 60 с 6",
+        row["window_tx_30s"] == 5 and row["window_tx_60s"] == 6, (row["window_tx_30s"], row["window_tx_60s"]))
+    chk("DT8: купил в S+0 после источника, место в блоке 2",
+        row["dt8"] == "да" and row["dt8_lag_slots"] == 0 and row["dt8_index_in_block"] == 2
+        and row["dt8_before_source"] is False, row)
     chk("котировка -- xStock, без пересчёта", str(row["quote_mint"]).startswith("Xsa62"))
 
-    # без сделок после источника: рост 1.0, помечено
-    fake2 = FakeRpc(blocks, {vault: [vault_hist[-1]], mint: [mint_hist[-1]]}, {})
-    row2 = analyze_buy(fake2, src, ev, buy, w1=30, w2=60, cap=1500, known={},
-                       probe={"lock": threading.Lock(), "result": "ok"})
+    # DT8 купил на S+4 -- вне окна; и DT8 в S+2 купил ДРУГОЙ минт -- не считается
+    t_d8_late = later("9" * 88, slot0 + 4, bt0 + 2, DT8, dv, q("1.2"), buyer_gain=5)
+    t_d8_other = later("7" * 88, slot0 + 2, bt0 + 1, DT8, 0, 0)
+    fake_b = FakeRpc(blocks, {vault: [me], mint: [me], DT8: [sg(t_d8_late), sg(t_d8_other)]},
+                     {C.first_signature(t_d8_late): t_d8_late, C.first_signature(t_d8_other): t_d8_other})
+    row_b = analyze_buy(fake_b, src, ev, buy, w1=30, w2=60, cap=1500, known={},
+                        probe={"lock": threading.Lock()})
+    chk("DT8 вне S+0..S+3 или с другим минтом -- «нет»", row_b["dt8"] == "нет", row_b)
     chk("без сделок после -- рост 1.0 и пометка «последняя сделка его»",
-        row2["growth_30s"] == 1.0 and row2["last_trade_is_source_30s"] is True
-        and row2["crowd_30s"] == 0, row2)
+        row_b["growth_30s"] == 1.0 and row_b["last_trade_is_source_30s"] is True
+        and row_b["crowd_30s"] == 0, row_b)
     # предел окна
     row3 = analyze_buy(fake, src, ev, buy, w1=30, w2=60, cap=2, known={},
-                       probe={"lock": threading.Lock(), "result": "ok"})
+                       probe={"lock": threading.Lock()})
     chk("окно больше предела -- «нет данных», не ноль",
         row3["crowd_30s"] is None and "предела" in (row3["why_no_crowd"] or ""), row3)
     # ликвидность снята до точки 60 с
     t_r = later("R" * 88, slot0 + 100, bt0 + 40, "MIGRATOR", -5_000_000_000, -1_000_000)
-    fake4 = FakeRpc(blocks, {vault: [s(t_r), s(t_a), vault_hist[-1]], mint: [s(t_a), mint_hist[-1]]},
+    fake4 = FakeRpc(blocks, {vault: [sg(t_r), sg(t_a), me], mint: [sg(t_a), me], DT8: []},
                     {C.first_signature(t): t for t in (t_a, t_r)})
     row4 = analyze_buy(fake4, src, ev, buy, w1=30, w2=60, cap=1500, known={},
-                       probe={"lock": threading.Lock(), "result": "ok"})
+                       probe={"lock": threading.Lock()})
     chk("снятие ликвидности до 60 с -- «нет данных» с причиной, 30 с посчитано",
         row4["growth_60s"] is None and "ликвидность" in (row4["why_no_growth_60s"] or "")
         and row4["growth_30s"] is not None, row4)
-    # пул не найден -- причина
-    ev_bad = dict(ev, mint="НЕТ_ТАКОГО")
-    row5 = analyze_buy(fake2, src, ev_bad, buy, w1=30, w2=60, cap=1500, known={},
-                       probe={"lock": threading.Lock(), "result": "ok"})
+    # узел отдаёт историю без покупки -- окно не доверенное
+    fake5 = FakeRpc(blocks, {vault: [sg(t_a), sg(t_pre)], mint: [sg(t_a)], DT8: []}, alltx)
+    pr5 = {"lock": threading.Lock()}
+    row5 = analyze_buy(fake5, src, ev, buy, w1=30, w2=60, cap=1500, known={}, probe=pr5)
+    chk("история хранилища без самой покупки -- «нет данных», счётчик сбоев",
+        row5["crowd_30s"] is None and "before=" in (row5["why_no_crowd"] or "")
+        and pr5.get("failed") == 1, (row5["why_no_crowd"], pr5))
+    # нет пула -- причина
+    row6 = analyze_buy(fake_b, src, dict(ev, mint="НЕТ_ТАКОГО"), buy, w1=30, w2=60, cap=1500,
+                       known={}, probe={"lock": threading.Lock()})
     chk("нет пула -- «нет данных: пул: ...»",
-        row5["growth_30s"] is None and (row5["why_no_growth_30s"] or "").startswith("пул:"), row5)
+        row6["growth_30s"] is None and (row6["why_no_growth_30s"] or "").startswith("пул:"), row6)
+    # покупки нет в блоке -- всё «нет данных»
+    blocks7 = dict(blocks)
+    blocks7[slot0] = {"blockTime": bt0, "signatures": ["0" * 88]}
+    row7 = analyze_buy(FakeRpc(blocks7, {}, {}), src, ev, buy, w1=30, w2=60, cap=1500, known={},
+                       probe={"lock": threading.Lock()})
+    chk("покупки нет в getBlock -- причина везде",
+        "порядка" in (row7["why_no_crowd"] or "") and row7["dt8"] == "нет данных", row7)
 
     # сводка и сортировка
     res = {"task": "BATCH-3", "address": src, "remark": "t", "sig_scan_complete": True,
-           "error": None, "n_tx_fetch_failed": 0,
-           "trades": [row, row2, row4, row5]}
+           "error": None, "n_tx_fetch_failed": 0, "trades": [row, row_b, row4, row6]}
     ag = aggregate(res)
     chk("trades_7d = число покупок", ag["trades_7d"] == 4, ag)
-    chk("share_x2_30s = 2 из 3 посчитанных (×2.5, ×1.0, ×2.5)", abs(ag["share_x2_30s"] - 2 / 3) < 1e-4, ag)
+    chk("share_x2_30s = 2 из 3 посчитанных (x2.5, x1.0, x2.5)", abs(ag["share_x2_30s"] - 2 / 3) < 1e-4, ag)
     chk("n_growth_30s = 3 (у сделки без пула роста нет)", ag["n_growth_30s"] == 3, ag)
-    chk("медиана роста 30 с по посчитанным", ag["growth_30s_median"] is not None, ag)
+    chk("DT8: доля 1 из 4 проверенных, отставание 0 слотов",
+        ag["dt8_share"] == 0.25 and ag["dt8_lag_median_slots"] == 0 and ag["n_dt8_checked"] == 4, ag)
     chk("причины «нет данных» перечислены", "пул:" in ag["no_growth_30s_reasons"], ag)
-    res_bad = dict(res, sig_scan_complete=False)
     chk("неполный скан -- число сделок не выдаётся за полное",
-        "неполно" in str(aggregate(res_bad)["trades_7d"]))
+        "неполно" in str(aggregate(dict(res, sig_scan_complete=False))["trades_7d"]))
     rows = sorted([ag, dict(ag, remark="z", share_x2_30s=None), dict(ag, remark="y", share_x2_30s=0.9)],
                   key=sort_key)
     chk("сортировка по share_x2_30s, «нет данных» в конце",
-        [r["share_x2_30s"] for r in rows][0] == 0.9 and rows[-1]["share_x2_30s"] is None,
+        rows[0]["share_x2_30s"] == 0.9 and rows[-1]["share_x2_30s"] is None,
         [r["share_x2_30s"] for r in rows])
     import tempfile  # noqa: PLC0415
     tmp = Path(tempfile.mkdtemp())
