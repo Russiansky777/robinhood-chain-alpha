@@ -287,11 +287,15 @@ def доклад(записи: list, разгонные: set, каналы: list
     # замере нет вовсе -- а вопрос "чего RabbitStream даёт сверх Yellowstone"
     # именно такой.
     из_["only_in"] = {}
-    for a2 in каналы:
+    # Канал без единого сообщения из сравнения выпадает: "100 % мимо него"
+    # означало бы потерю там, где канала просто нет в замере.
+    живые = [к for к in каналы
+              if any(к in е["t"] for е in все_события.values())]
+    for a2 in живые:
         всего_a = sum(1 for е in все_события.values() if a2 in е["t"])
         if not всего_a:
             continue
-        for b2 in каналы:
+        for b2 in живые:
             if a2 == b2:
                 continue
             только_a = sum(1 for е in все_события.values()
@@ -432,6 +436,10 @@ def self_test() -> None:
     chk("и в обратную сторону тоже",
         д5["only_in"][f"{КАНАЛ_WS}_not_in_{КАНАЛ_RABBIT}"]["only_in_a"] == 1,
         д5["only_in"])
+    д6 = доклад([{"t": 1.0, "channel": КАНАЛ_RABBIT, "signature": "X",
+                   "filter": "src0"}], set(), [КАНАЛ_WS, КАНАЛ_RABBIT])
+    chk("канал без сообщений в сравнение не берётся",
+        д6["only_in"] == {}, д6["only_in"])
     chk("раздел про Helius не печатается, когда его сообщений нет",
         "не дошло до Helius" not in человеку(
             доклад([{"t": 1.0, "channel": КАНАЛ_RABBIT, "signature": "X",
