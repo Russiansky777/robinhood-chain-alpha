@@ -483,6 +483,18 @@ def найти_подпись(строки: list, подписи: tuple) -> list
     return вых
 
 
+def найти_по_коду(строки: list, коды: tuple, *, предел: int = 12) -> list:
+    """Записи журнала с указанными кодами, целиком и свежие первыми.
+
+    Нужно, когда подписи неизвестны: разбор начинается с "покажи те решения,
+    которые владелец видел в Telegram", а не с угадывания подписей.
+    """
+    если = {c.upper() for c in коды if c}
+    вых = [r for r in строки if str(r.get("code") or "").upper() in если]
+    вых.sort(key=lambda r: str(r.get("ts_utc") or ""), reverse=True)
+    return вых[:предел]
+
+
 def позиции_таблица(state: ST.ExecState) -> list:
     """По каждой НАСТОЯЩЕЙ позиции: чем покупали, каким маршрутом, чем продавали.
 
@@ -568,7 +580,7 @@ def гейты(*, сверка: dict, позиции: dict, статус: dict |
 # ------------------------------------------------------------------- отчёт
 
 def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
-           найти: tuple = (),
+           найти: tuple = (), коды: tuple = (),
           записи_dbot: list | None = None, статус: dict | None = None,
           n_таблицы: int = 15, n_стенда: int = 10) -> dict:
     строки, счёт = читать_решения(state.decisions_path, since_ts=since_ts)
@@ -607,6 +619,7 @@ def отчёт(*, state: ST.ExecState, since_ts: float | None = None,
         "pairs": пары(строки, св),
         "positions": поз,
         "found_by_signature": найти_подпись(строки, найти or ()),
+        "found_by_code": найти_по_коду(строки, коды or ()),
         "position_rows": позиции_таблица(state),
         "credits": кредиты(state),
         "gates": гейты(сверка=св, позиции=поз, статус=статус),
@@ -755,6 +768,13 @@ def в_текст(о: dict) -> str:
                  + (f", остаток не читался: {r.get('balance_read_why_not')}"
                     if r.get("balance_read_why_not") else ""))
     L.append("")
+    по_коду = о.get("found_by_code") or []
+    if по_коду:
+        L.append("")
+        L.append(f"--- записи по искомым кодам: {len(по_коду)} ---")
+        for r in по_коду:
+            L.append(json.dumps(r, ensure_ascii=False)[:1600])
+        L.append("")
     нашлось = о.get("found_by_signature") or []
     if нашлось:
         L.append("")
@@ -1020,6 +1040,19 @@ def self_test() -> None:
             and тб[0]["buy_address"] == "POOLX", тб[0])
         chk("видно наш маршрут и метку расхождения",
             тб[0]["our_route_hops"] == 2 and "ROUTE_MISMATCH" in тб[0]["flags"], тб[0])
+        # поиск по коду: разбор начинается с того, что владелец видел
+        по_к = найти_по_коду([строка(code="INTERMEDIATE_ROUTE", ts_utc="2026-09-24T00:18:07Z"),
+                               строка(code="NOT_A_BUY", ts_utc="2026-09-24T00:16:53Z"),
+                               строка(code="INTERMEDIATE_ROUTE", ts_utc="2026-09-24T00:18:52Z")],
+                              ("intermediate_route",))
+        chk("поиск по коду находит оба решения и не путает регистр",
+            len(по_к) == 2, по_к)
+        chk("и свежие идут первыми",
+            по_к[0]["ts_utc"] > по_к[1]["ts_utc"], [r["ts_utc"] for r in по_к])
+        chk("предел выборки соблюдается",
+            len(найти_по_коду([строка(code="X") for _ in range(30)], ("X",),
+                               предел=5)) == 5)
+
         # поиск по подписи: сигнал был, решения нет -- это надо уметь показать
         нашлись = найти_подпись(
             [строка(signature="ПОДПИСЬ_A"), строка(signature="ПОДПИСЬ_B"),
@@ -1140,6 +1173,8 @@ def main() -> int:
     p.add_argument("--stand-rows", type=int, default=10,
                    help="сколько последних решений стенда печатать целиком")
     p.add_argument("--out", default=None, help="куда положить текст отчёта")
+    p.add_argument("--find-code", action="append", default=[],
+                   help="показать записи журнала с этим кодом целиком")
     p.add_argument("--find-sig", action="append", default=[],
                    help="показать записи журнала по подписи целиком (можно несколько)")
     a = p.parse_args()
@@ -1175,7 +1210,7 @@ def main() -> int:
 
     о = отчёт(state=state, since_ts=since_ts, записи_dbot=записи,
               статус=статус, n_таблицы=a.rows, n_стенда=a.stand_rows,
-              найти=tuple(a.find_sig or ()))
+              найти=tuple(a.find_sig or ()), коды=tuple(a.find_code or ()))
     текст = в_текст(о)
     print(текст)
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)

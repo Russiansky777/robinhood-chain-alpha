@@ -25,6 +25,10 @@ on:
         description: "какие задачи DBot сверять"
         required: false
         default: "BATCH-5,BATCH-3"
+      find_code:
+        description: "коды через запятую: показать записи журнала целиком"
+        required: false
+        default: ""
       find_sig:
         description: "подписи через запятую: показать записи журнала целиком"
         required: false
@@ -118,6 +122,11 @@ jobs:
         run: |
           set -e
           ARGS="--rows ${{ inputs.rows }} --stand-rows ${{ inputs.stand_rows }}"
+          if [ -n "${{ inputs.find_code }}" ]; then
+            for C in $(echo "${{ inputs.find_code }}" | tr ',' ' '); do
+              ARGS="$ARGS --find-code $C"
+            done
+          fi
           if [ -n "${{ inputs.find_sig }}" ]; then
             for S in $(echo "${{ inputs.find_sig }}" | tr ',' ' '); do
               ARGS="$ARGS --find-sig $S"
