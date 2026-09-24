@@ -1542,6 +1542,66 @@ def послать_итог(итог: dict) -> dict:
         return {"ok": False, "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
 
+def сверка_денег(rpc, *, кошелёк: str, минт: str, подписи: list) -> dict:
+    """Чего тест стоил ПО ЦЕПИ, а не по нашему учёту.
+
+    Заявленный отток считается до отправки и потому всегда приблизителен.
+    Здесь по каждой транзакции берутся настоящие дельты кошелька: лампорты
+    и токен. Сумма этих дельт и есть цена теста -- число, которое можно
+    показать владельцу, не ссылаясь на собственные оценки.
+    """
+    из_ = {"wallet": кошелёк, "mint": минт, "rows": [], "lamports_delta": 0,
+            "mint_delta": 0, "missing": []}
+    подписи = [с for с in подписи if с]
+    if not подписи:
+        return из_
+    тела = rpc.get_transactions(подписи, commitment="confirmed",
+                                 maxSupportedTransactionVersion=0)
+    for подпись, tx in zip(подписи, тела):
+        if not isinstance(tx, dict):
+            из_["missing"].append(подпись)
+            continue
+        мета = tx.get("meta") or {}
+        ключи = (((tx.get("transaction") or {}).get("message") or {})
+                  .get("accountKeys") or [])
+        место = None
+        for i, к in enumerate(ключи):
+            адрес = к.get("pubkey") if isinstance(к, dict) else к
+            if адрес == кошелёк:
+                место = i
+                break
+        дл = None
+        до = мета.get("preBalances") or []
+        после = мета.get("postBalances") or []
+        if место is not None and место < len(до) and место < len(после):
+            дл = после[место] - до[место]
+            из_["lamports_delta"] += дл
+        дт = дельта_минта(tx, кошелёк, минт)
+        из_["mint_delta"] += дт
+        из_["rows"].append({"signature": подпись, "slot": tx.get("slot"),
+                             "lamports_delta": дл, "mint_delta": дт,
+                             "fee": мета.get("fee"),
+                             "err": мета.get("err")})
+    из_["sol_delta"] = round(из_["lamports_delta"] / ЛАМПОРТОВ_В_SOL, 9)
+    return из_
+
+
+def подписи_отчёта(отчёт: dict) -> list:
+    """Все подписи прогона: обе стороны каждой пары, зонд и продажа."""
+    из_: list = []
+    for п in (отчёт.get("pairs") or []):
+        for сторона in ("a", "b"):
+            с = (п.get(сторона) or {}).get("signature")
+            if с:
+                из_.append(с)
+    для_зонда = ((отчёт.get("probe") or {}).get("response") or {}).get("signatures") or []
+    из_ += [с for с in для_зонда if с]
+    продажа = (отчёт.get("sell") or {}).get("signature")
+    if продажа:
+        из_.append(продажа)
+    return из_
+
+
 def напечатать_зонд(итог: dict) -> None:
     """Печать зонда. Отдельно от работы: печать не имеет права ронять прогон."""
     try:
@@ -1574,7 +1634,11 @@ def main(argv=None) -> int:
                      help="одна покупка у Bloom с auto_orders=[] и наблюдение")
     ap.add_argument("--run", action="store_true", help="пары")
     ap.add_argument("--sell-only", action="store_true",
-                     help="только продажа накопленного USDC")
+                     help="только продажа накопленного токена")
+    ap.add_argument("--audit", action="store_true",
+                     help="сверка денег по цепи: дельты кошелька по всем подписям")
+    ap.add_argument("--report", default="",
+                     help="отчёт прогона для сверки (json)")
     ap.add_argument("--pool-vault", default="",
                      help="хранилище токена выбранного пула (из разведки)")
     ap.add_argument("--mint", default="",
@@ -1604,6 +1668,42 @@ def main(argv=None) -> int:
     кошелёк = ST.EXECUTOR_WALLET
     каталог_живого = Path(a.live_state) if a.live_state else ST.state_dir()
     путь = Path(a.out)
+
+    if a.audit:
+        файлы = [Path(a.report)] if a.report else [
+            REPO_ROOT / "data" / "bloom_send_race_run.json",
+            REPO_ROOT / "data" / "bloom_send_race_probe.json"]
+        подписи: list = []
+        откуда: list = []
+        for ф in файлы:
+            try:
+                отчёт = json.loads(ф.read_text(encoding="utf-8"))
+            except Exception as exc:  # noqa: BLE001
+                откуда.append({"file": str(ф), "why_not": type(exc).__name__})
+                continue
+            свои = подписи_отчёта(отчёт) + подписи_отчёта(отчёт.get("probe") or {})
+            откуда.append({"file": str(ф), "signatures": len(свои)})
+            подписи += свои
+        минт_адрес = a.mint or USDC_MINT
+        сверка = сверка_денег(rpc, кошелёк=кошелёк, минт=минт_адрес,
+                               подписи=sorted(set(подписи)))
+        сверка["sources"] = откуда
+        сверка["balance_sol_now"] = баланс_sol(rpc, кошелёк)
+        сверка["mint_left"] = остаток_токена(rpc, кошелёк, минт_адрес)
+        записать(путь, {"audit": сверка, "credits": rpc.stats.get("кредитов")},
+                  ключ=ключ)
+        print(f"подписей сверено: {len(сверка['rows'])}, без ответа узла: "
+              f"{len(сверка['missing'])}")
+        print(f"дельта кошелька по цепи: {сверка['sol_delta']} SOL, "
+              f"токена {сверка['mint_delta']} сырых единиц")
+        print(f"баланс сейчас: {сверка['balance_sol_now']} SOL, "
+              f"токена осталось {сверка['mint_left'].get('amount_raw')}")
+        for с in сверка["rows"]:
+            print(f"   {с['signature'][:14]}... слот {с['slot']} "
+                  f"SOL {(с['lamports_delta'] or 0) / ЛАМПОРТОВ_В_SOL:+.6f} "
+                  f"токен {с['mint_delta']:+d}"
+                  + (f" ОШИБКА {с['err']}" if с.get("err") else ""))
+        return 0
 
     if a.discover:
         пулы = найти_пулы(rpc, сколько_сделок=a.scan, минт=a.mint)

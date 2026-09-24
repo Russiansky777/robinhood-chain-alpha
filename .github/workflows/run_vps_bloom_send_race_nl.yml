@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "probe -- одна покупка у Bloom; run -- пары; sell -- продажа"
+        description: "probe -- покупка у Bloom; run -- пары; sell -- продажа; audit -- сверка денег по цепи (без денег)"
         required: true
         default: "probe"
       live:
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -e
           case "${{ inputs.mode }}" in
-            probe|run|sell) echo "режим ${{ inputs.mode }}";;
+            probe|run|sell|audit) echo "режим ${{ inputs.mode }}";;
             *) echo "неизвестный режим"; exit 1;;
           esac
           echo "live=${{ inputs.live }}, own_send_live=${{ inputs.own_send_live }}"
@@ -169,6 +169,7 @@ jobs:
             probe) ARGS="--probe-bloom --watch-s $WATCH_S";;
             run)   ARGS="--run --pairs $PAIRS --max-minutes $MAX_MINUTES";;
             sell)  ARGS="--sell-only";;
+            audit) ARGS="--audit";;
           esac
           # Ни одного "test && cmd" при set -e: ложное условие в конце
           # списка И роняет весь шаг. Это уже стоило прогона.
