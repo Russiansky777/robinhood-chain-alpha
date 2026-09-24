@@ -32,6 +32,7 @@ import json
 import os
 import sqlite3
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -212,6 +213,9 @@ class ExecState:
         self.max_buys_per_mint = env_int("BLOOM_MAX_BUYS_PER_MINT", DEFAULT_MAX_BUYS_PER_MINT)
         self.seen_ttl_s = env_float("BLOOM_SEEN_TTL_S", DEFAULT_SEEN_TTL_S)
         self._db = None
+        # Соединения SQLite по потокам: см. db(). Делить одно соединение
+        # между потоками нельзя -- это уже стоило пропущенного сигнала.
+        self._потоковое = threading.local()
 
     # ------------------------------------------------------------- рубильник
 
@@ -270,16 +274,32 @@ class ExecState:
     # ----------------------------------------------------------------- дедуп
 
     def db(self) -> sqlite3.Connection:
-        if self._db is None:
-            self._db = sqlite3.connect(str(self.db_path), timeout=30)
-            self._db.execute("PRAGMA journal_mode=WAL")
-            self._db.execute("PRAGMA synchronous=FULL")
-            self._db.execute("CREATE TABLE IF NOT EXISTS seen "
-                              "(sig TEXT PRIMARY KEY, ts REAL, source TEXT)")
-            self._db.execute("CREATE TABLE IF NOT EXISTS mint_last "
-                              "(mint TEXT PRIMARY KEY, ts REAL, buys INTEGER)")
-            self._db.commit()
-        return self._db
+        """Соединение SQLite -- СВОЁ НА КАЖДЫЙ ПОТОК.
+
+        Цена ошибки измерена: детектор разбирает сообщения подписки в
+        asyncio.to_thread, то есть в разных рабочих потоках. Одно общее
+        соединение приводило к sqlite3.ProgrammingError "objects created in
+        a thread can only be used in that same thread" -- и это исключение
+        не просто теряло решение, а рвало подписку целиком. Ровно так 24.09
+        в 01:51:17 пропал сигнал п. 3 (покупка RED): решения в журнале нет,
+        покупки нет, строки в Telegram нет.
+
+        Одно соединение на поток безопасно: база в режиме WAL, а записи
+        короткие и с commit сразу.
+        """
+        conn = getattr(self._потоковое, "db", None)
+        if conn is None:
+            conn = sqlite3.connect(str(self.db_path), timeout=30)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=FULL")
+            conn.execute("CREATE TABLE IF NOT EXISTS seen "
+                          "(sig TEXT PRIMARY KEY, ts REAL, source TEXT)")
+            conn.execute("CREATE TABLE IF NOT EXISTS mint_last "
+                          "(mint TEXT PRIMARY KEY, ts REAL, buys INTEGER)")
+            conn.commit()
+            self._потоковое.db = conn
+            self._db = conn        # для совместимости со старым полем
+        return conn
 
     def seen_signature(self, sig: str) -> bool:
         row = self.db().execute("SELECT ts FROM seen WHERE sig=?", (sig,)).fetchone()
@@ -921,7 +941,31 @@ def self_test() -> None:
                st.decisions_path.read_text(encoding="utf-8").strip().split("\n")]
         chk("версия в записи решения",
             реш[0].get(SCHEMA_VERSION_KEY) == SCHEMA_VERSION, реш[0])
-        chk("кириллических ключей в записях нет",
+        # --- дедуп из ДВУХ потоков: именно это рвало подписку детектора
+    import concurrent.futures  # noqa: PLC0415
+    with tempfile.TemporaryDirectory() as d:
+        stп = ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+
+        def в_потоке(i):
+            stп.mark_signature(f"SIG{i}", "поток")
+            return stп.seen_signature(f"SIG{i}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as пул:
+            итоги = list(пул.map(в_потоке, range(8)))
+        chk("дедуп работает из нескольких потоков, а не падает ProgrammingError",
+            all(итоги) and len(итоги) == 8, итоги)
+        chk("и записи видны из главного потока",
+            all(stп.seen_signature(f"SIG{i}") for i in range(8)))
+
+        def минт_в_потоке(i):
+            stп.mark_mint_buy(f"MINT{i}", mode=MODE_LIVE)
+            return stп.mint_state(f"MINT{i}")[1]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as пул:
+            минты = list(пул.map(минт_в_потоке, range(6)))
+        chk("и отметка минтов тоже", all(x == 1 for x in минты), минты)
+
+    chk("кириллических ключей в записях нет",
             all(k.isascii() for r in строки + реш for k in r),
             [k for r in строки + реш for k in r if not k.isascii()])
 

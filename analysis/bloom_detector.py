@@ -56,6 +56,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -140,6 +141,7 @@ LAMPORT = 10 ** 9
 # Флаги -- не коды. Код один на решение, флагов может быть несколько, и
 # они не меняют решения: покупка по минту при отсутствии пула остаётся
 # покупкой, а расхождение маршрутов -- поводом для доклада, не для отказа.
+КОД_РАЗБОР_УПАЛ = "HANDLER_CRASHED"
 ФЛАГ_НЕТ_ПУЛА_SOL = "NO_SOL_POOL_IN_TX"
 ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ = "ROUTE_MISMATCH"
 РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
@@ -1047,6 +1049,10 @@ class Детектор:
         self.поколение = 0
         self.откуда_источники = "не задано"
         self.обрывов = 0
+        # Падения разбора отдельным счётчиком: обрыв подписки и падение на
+        # одном сообщении -- разные болезни, и лечатся по-разному.
+        self.сбоев_разбора = 0
+        self._последняя_тревога_разбора = 0.0
         self.способ: str | None = None
         self.старт = time.time()
         self.по_кодам: dict = {}
@@ -1112,6 +1118,7 @@ class Детектор:
         st["rpc_by_method"] = dict(self.helius.по_методам)
         st["session_credits"] = (getattr(self.helius.метр, "session_credits", None)
                                      if self.helius.метр else None)
+        st["handler_crashes"] = self.сбоев_разбора
         st["telegram"] = (self.оповещатель.статус() if self.оповещатель is not None
                            else {"enabled": False,
                                  "off_reason": "модуль оповещений не загружен"})
@@ -1157,6 +1164,45 @@ class Детектор:
         if self.баланс_sol is None or self.t_баланс is None:
             return None
         return self.баланс_sol if (time.time() - self.t_баланс) <= предел_с else None
+
+    async def обработать_бережно(self, подпись, слот, источник, способ, tx,
+                                  t_получено) -> dict | None:
+        """Разбор ОДНОГО сообщения так, чтобы оно не могло порвать подписку.
+
+        Цена ошибки измерена на живом стенде. 24.09 в 01:51:17 разбор упал с
+        sqlite3.ProgrammingError (одно соединение на все рабочие потоки
+        asyncio.to_thread), исключение вышло из цикла сообщений, подписка
+        оборвалась и переключилась на запасную -- а сигнал п. 3 (покупка
+        RED за 8 USDC) пропал целиком: ни решения в журнале, ни покупки, ни
+        строки в Telegram. Сама причина устранена в bloom_exec_state, но
+        живучесть не должна зависеть от того, устранена ли КАЖДАЯ причина:
+        одно плохое сообщение -- это одна потерянная запись и никогда не
+        потеря подписки.
+        """
+        try:
+            return await asyncio.to_thread(self.обработать, подпись, слот, источник,
+                                            способ, tx, t_получено)
+        except Exception as exc:  # noqa: BLE001
+            self.сбоев_разбора += 1
+            log.exception("разбор сообщения %s упал -- подписка продолжает работать",
+                          (подпись or "")[:12])
+            try:
+                self.состояние.log_decision({
+                    "stage": "handler_crashed", "signature": подпись,
+                    "source": источник, "via": способ, "slot": слот,
+                    "code": КОД_РАЗБОР_УПАЛ,
+                    "error": f"{type(exc).__name__}: {str(exc)[:300]}",
+                    "test_source": self.это_тестовый(источник or "")})
+            except Exception:  # noqa: BLE001
+                log.exception("и запись о падении разбора в журнал не легла")
+            if self.оповещатель is not None and NT is not None:
+                if (time.time() - self._последняя_тревога_разбора) > 60.0:
+                    self._последняя_тревога_разбора = time.time()
+                    self.оповещатель.послать(NT.строка_тревоги(
+                        КОД_РАЗБОР_УПАЛ,
+                        f"{type(exc).__name__} на {(подпись or '')[:10]} -- "
+                        "подписка жива, решение потеряно"))
+            return None
 
     def обработать(self, подпись: str, слот: int | None, источник: str | None,
                     как: str, tx: dict | None = None,
@@ -1483,17 +1529,17 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                         sig = val.get("signature")
                         слот = (res.get("context") or {}).get("slot")
                         if isinstance(sig, str) and SIG_RE.match(sig):
-                            await asyncio.to_thread(детектор.обработать, sig,
-                                                     слот if isinstance(слот, int) else None,
-                                                     источник, "logsSubscribe", None, t_получено)
+                            await детектор.обработать_бережно(
+                                sig, слот if isinstance(слот, int) else None,
+                                источник, "logsSubscribe", None, t_получено)
                         continue
                     sig, слот = подпись_и_слот(res)
                     tx = res.get("transaction") if isinstance(res.get("transaction"), dict) else None
                     if tx is not None and "meta" not in tx:
                         tx = None            # пришла форма без meta -- добираем по RPC
                     if sig:
-                        await asyncio.to_thread(детектор.обработать, sig, слот,
-                                                 источник, метод, tx, t_получено)
+                        await детектор.обработать_бережно(sig, слот, источник, метод,
+                                                           tx, t_получено)
                 backoff = 1.0
                 if детектор.поколение != поколение:
                     continue
@@ -2290,6 +2336,72 @@ def self_test() -> int:
             источник_пул=None)
         chk("узел не отдал нашу транзакцию -- сказано, а не выдумано",
             зап3.get("why_not") and зап3.get("our_pool") is None, зап3)
+
+    # 16в. ЖИВАЯ транзакция п. 3: разбор на настоящих данных
+    сырой_путь = REPO_ROOT / "data" / "bloom_tx_raw.json"
+    РЕД = "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x"
+    ФОМО = "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
+    try:
+        сырое = json.loads(сырой_путь.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        сырое = {}
+        chk("файл с живой транзакцией п. 3 читается", False, str(exc))
+    живая = None
+    for подпись, зап in (сырое or {}).items():
+        tx_ж = (зап or {}).get("tx") or {}
+        минты = {b.get("mint") for b in
+                 ((tx_ж.get("meta") or {}).get("postTokenBalances") or [])}
+        if РЕД in минты:
+            живая = (подпись, tx_ж)
+            break
+    if живая:
+        подпись_ж, tx_ж = живая
+        s_ж = сигнал_из_транзакции(tx_ж, ФОМО, подпись=подпись_ж,
+                                    слот=tx_ж.get("slot"))
+        chk("на живой транзакции п. 3 разбор видит покупку",
+            s_ж.get("kind") == "buy", s_ж.get("kind"))
+        chk("и минт -- именно RED, а не остаток прошлого токена",
+            s_ж.get("mint") == РЕД, s_ж.get("mint"))
+        chk("и трата -- 8 USDC",
+            s_ж.get("spend_mint") == USDC and abs((s_ж.get("spend_ui") or 0) - 8.0) < 1e-9,
+            (s_ж.get("spend_mint"), s_ж.get("spend_ui")))
+        chk("и это первый вход по этому минту", s_ж.get("first_entry") is True,
+            s_ж.get("first_entry"))
+        with tempfile.TemporaryDirectory() as d:
+            stж = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            # порог стенда 0.05 SOL-эквивалента, курс берём тот же, что в бою
+            r_ж = решение(s_ж, состояние=stж, трата_sol=0.069,
+                           баланс_sol=0.35, текущий_слот=tx_ж.get("slot"),
+                           порог_sol=0.05)
+            chk("решение по живой транзакции п. 3 -- BUY",
+                r_ж.get("action") == "buy" and r_ж.get("code") == КОД_КУПИТЬ,
+                (r_ж.get("action"), r_ж.get("code"), r_ж.get("reason")))
+
+    # 16г. падение разбора не рвёт подписку
+    with tempfile.TemporaryDirectory() as d:
+        stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+        детп = Детектор(источники={"SRC": "BATCH-5"}, состояние=stп,
+                         курс=КурсSOL(), режим="dry", helius=HeliusЗаглушка())
+
+        def падающий_разбор(*a, **k):
+            raise sqlite3.ProgrammingError("SQLite objects created in a thread")
+
+        детп.обработать = падающий_разбор
+        итог_п = asyncio.run(детп.обработать_бережно("ПОДПИСЬ_ПАДЕНИЯ", 1, "SRC",
+                                                      "transactionSubscribe", None,
+                                                      time.time()))
+        chk("падение разбора наружу не выходит", итог_п is None)
+        chk("и посчитано отдельным счётчиком", детп.сбоев_разбора == 1,
+            детп.сбоев_разбора)
+        записи_п = [json.loads(x) for x in
+                    stп.decisions_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        chk("и в журнале есть запись о падении с подписью",
+            any(z.get("code") == КОД_РАЗБОР_УПАЛ
+                and z.get("signature") == "ПОДПИСЬ_ПАДЕНИЯ" for z in записи_п),
+            записи_п[-1] if записи_п else None)
+        chk("и в признаке жизни виден счётчик падений",
+            детп.признак_жизни().get("handler_crashes") == 1,
+            детп.признак_жизни().get("handler_crashes"))
 
     # 17. свежесть баланса: протухший баланс -- это неизвестный баланс
     with tempfile.TemporaryDirectory() as d:
