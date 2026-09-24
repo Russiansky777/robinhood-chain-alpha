@@ -1,62 +1,81 @@
-записей журнала 79874, запусков службы 1, подписей 37575
-сообщения по каналам: grpc 37575, grpc2 37553, helius_ws 4623, rabbit_ams 0, rabbit_fra 0
+записей журнала 1420, запусков службы 1, подписей 593
+сообщения по каналам: grpc 117, grpc2 117, helius_ws 0, rabbit_ams 593, rabbit_fra 593
 все подписи:
-  grpc_vs_grpc2: пар 37553, первым grpc в 69.82 %, медиана 1.19 мс, p10 -3.67, p90 6.77, p95 8.67, p99 16.8
-  helius_ws_vs_grpc: пар 4623, первым helius_ws в 94.74 %, медиана 5.79 мс, p10 1.41, p90 16.49, p95 24.27, p99 102.94
-  helius_ws_vs_grpc2: пар 4623, первым helius_ws в 82.83 %, медиана 2.08 мс, p10 -0.75, p90 7.53, p95 9.47, p99 20.66
+  grpc2_vs_rabbit_ams: пар 117, первым grpc2 в 28.21 %, медиана -2.38 мс, p10 -8.36, p90 2.65, p95 9.99, p99 212.48
+  grpc2_vs_rabbit_fra: пар 117, первым grpc2 в 15.38 %, медиана -2.59 мс, p10 -8.37, p90 7.0, p95 38.37, p99 40.22
+  grpc_vs_grpc2: пар 117, первым grpc в 76.92 %, медиана 1.8 мс, p10 -1.77, p90 7.42, p95 10.67, p99 18.24
+  grpc_vs_rabbit_ams: пар 117, первым grpc в 57.26 %, медиана 0.67 мс, p10 -6.11, p90 6.82, p95 15.18, p99 217.59
+  grpc_vs_rabbit_fra: пар 117, первым grpc в 47.86 %, медиана -0.38 мс, p10 -5.95, p90 15.45, p95 37.78, p99 46.87
+  rabbit_ams_vs_rabbit_fra: пар 593, первым rabbit_ams в 48.90 %, медиана -0.23 мс, p10 -3.71, p90 4.47, p95 9.31, p99 39.66
 группа источники:
-  grpc_vs_grpc2: пар 185, первым grpc в 37.84 %, медиана -1.68 мс, p10 -6.44, p90 2.14, p95 3.18, p99 10.7
-  helius_ws_vs_grpc: пар 165, первым helius_ws в 92.73 %, медиана 5.18 мс, p10 1.45, p90 8.46, p95 16.87, p99 25.02
-  helius_ws_vs_grpc2: пар 165, первым helius_ws в 91.52 %, медиана 2.36 мс, p10 0.56, p90 6.61, p95 7.36, p99 12.04
+  grpc2_vs_rabbit_ams: пар 79, первым grpc2 в 34.18 %, медиана -1.09 мс, p10 -8.64, p90 2.64, p95 29.63, p99 214.47
+  grpc2_vs_rabbit_fra: пар 79, первым grpc2 в 16.46 %, медиана -3.29 мс, p10 -8.68, p90 37.67, p95 39.24, p99 40.85
+  grpc_vs_grpc2: пар 79, первым grpc в 72.15 %, медиана 1.05 мс, p10 -1.79, p90 5.72, p95 8.32, p99 15.56
+  grpc_vs_rabbit_ams: пар 79, первым grpc в 48.10 %, медиана -0.17 мс, p10 -5.95, p90 10.56, p95 33.19, p99 220.5
+  grpc_vs_rabbit_fra: пар 79, первым grpc в 35.44 %, медиана -2.43 мс, p10 -5.76, p90 34.68, p95 39.96, p99 49.02
+  rabbit_ams_vs_rabbit_fra: пар 86, первым rabbit_ams в 41.86 %, медиана -1.37 мс, p10 -9.09, p90 38.63, p95 40.59, p99 47.83
 группа разгонные:
-  grpc_vs_grpc2: пар 37368, первым grpc в 69.98 %, медиана 1.21 мс, p10 -3.62, p90 6.77, p95 8.69, p99 16.8
-  helius_ws_vs_grpc: пар 4458, первым helius_ws в 94.82 %, медиана 5.82 мс, p10 1.4, p90 16.8, p95 24.94, p99 103.04
-  helius_ws_vs_grpc2: пар 4458, первым helius_ws в 82.50 %, медиана 2.07 мс, p10 -0.76, p90 7.59, p95 9.54, p99 20.74
-совместная гонка: Helius + grpc
-  + grpc: общих подписей 4623, помощник первым в 5.26 %, выигрыш медиана 0.0 мс, p90 0.0, p95 0.39; видел один помощник: 32952, видел один Helius: 0
-  + grpc2: общих подписей 4623, помощник первым в 17.17 %, выигрыш медиана 0.0 мс, p90 0.75, p95 1.94; видел один помощник: 32930, видел один Helius: 0
-не дошло до Helius WS (упало или не вошло в блок):
-  grpc: 32952 из 37575 (87.70 %)
-  grpc2: 32930 из 37553 (87.69 %)
-  rabbit_ams: 0 из 0 (?)
-  rabbit_fra: 0 из 0 (?)
-обрывы: grpc 9 (_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC t), grpc2 93 (_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC t), helius_ws 21 (TimeoutError: )
+  grpc2_vs_rabbit_ams: пар 38, первым grpc2 в 15.79 %, медиана -4.1 мс, p10 -7.91, p90 1.78, p95 3.29, p99 5.58
+  grpc2_vs_rabbit_fra: пар 38, первым grpc2 в 13.16 %, медиана -1.56 мс, p10 -6.2, p90 0.34, p95 0.94, p99 2.78
+  grpc_vs_grpc2: пар 38, первым grpc в 86.84 %, медиана 5.71 мс, p10 -0.48, p90 9.85, p95 14.32, p99 26.09
+  grpc_vs_rabbit_ams: пар 38, первым grpc в 76.32 %, медиана 1.7 мс, p10 -6.08, p90 4.28, p95 14.47, p99 25.53
+  grpc_vs_rabbit_fra: пар 38, первым grpc в 73.68 %, медиана 3.99 мс, p10 -4.09, p90 9.61, p95 14.42, p99 25.8
+  rabbit_ams_vs_rabbit_fra: пар 507, первым rabbit_ams в 50.10 %, медиана 0.09 мс, p10 -3.48, p90 3.96, p95 7.16, p99 24.94
+чего один канал не видел у другого:
+  grpc2 мимо grpc: 0 из 117 (0.00 %)
+  grpc2 мимо helius_ws: 117 из 117 (100.00 %)
+  grpc2 мимо rabbit_ams: 0 из 117 (0.00 %)
+  grpc2 мимо rabbit_fra: 0 из 117 (0.00 %)
+  grpc мимо grpc2: 0 из 117 (0.00 %)
+  grpc мимо helius_ws: 117 из 117 (100.00 %)
+  grpc мимо rabbit_ams: 0 из 117 (0.00 %)
+  grpc мимо rabbit_fra: 0 из 117 (0.00 %)
+  rabbit_ams мимо grpc: 476 из 593 (80.27 %)
+  rabbit_ams мимо grpc2: 476 из 593 (80.27 %)
+  rabbit_ams мимо helius_ws: 593 из 593 (100.00 %)
+  rabbit_ams мимо rabbit_fra: 0 из 593 (0.00 %)
+  rabbit_fra мимо grpc: 476 из 593 (80.27 %)
+  rabbit_fra мимо grpc2: 476 из 593 (80.27 %)
+  rabbit_fra мимо helius_ws: 593 из 593 (100.00 %)
+  rabbit_fra мимо rabbit_ams: 0 из 593 (0.00 %)
+обрывов в журнале нет
 числа записаны: data/feed_race_report.json
 
 --- признак жизни зонда на момент доклада ---
 {
-  "utc": "2026-09-24T15:43:04Z",
-  "started_utc": "2026-09-24T14:44:59Z",
-  "uptime_s": 3485.1,
-  "channels": 3,
+  "utc": "2026-09-24T17:08:10Z",
+  "started_utc": "2026-09-24T16:10:08Z",
+  "uptime_s": 3481.5,
+  "channels": 4,
   "channel_names": [
-    "helius_ws",
     "grpc",
-    "grpc2"
+    "grpc2",
+    "rabbit_ams",
+    "rabbit_fra"
   ],
-  "addresses": 21,
-  "sources": 20,
+  "addresses": 19,
+  "sources": 18,
   "boosters": [
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8"
+    "F6NysrcWU5CCNbeZsQBtphLMMixrxib3RdL8aUVSeKZF"
   ],
-  "boosters_slot": 450059547,
+  "boosters_slot": 450078707,
   "boosters_rates_per_min": {
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0
+    "F6NysrcWU5CCNbeZsQBtphLMMixrxib3RdL8aUVSeKZF": 200.0
   },
-  "boosters_total_per_min": 500.0,
+  "boosters_total_per_min": 200.0,
   "boosters_target_per_min": 5.0,
   "boosters_band": [
     0.2,
-    50.0
+    90.0
   ],
-  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 500.0 транзакций в минуту",
+  "boosters_fallback": "в полосу 0.2-90.0 не попал никто; взят самый спокойный из измеренных: 200.0 транзакций в минуту",
   "boosters_rejected": {
-    "FVnv5qH7dsrBzEDwJ8dN2m9PFtKTBAQFtqWF3M9LpwMg": 3000.0,
-    "3KvsoNxgn64nsuHKPBHQJsguef3DgEkP2izE49k6CSAZ": 3000.0,
-    "CEwz7AauCmQG5vijHgLZ5ps4tHxGKBUcHuRrWmzHCkXH": 3000.0,
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0,
-    "327677XqTEwYxo8kaQxAJUWvUvzpVoSjiMXMc8u4wQS6": 3000.0,
-    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 3000.0
+    "BPaF9JM5Bet4oVxMWzcYpDca7PMm4A4uJJ1rL59M26VU": 3000.0,
+    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 1500.0,
+    "8JjVNyj65NyhCuit2n4xAPHaMJHvJsQarg23wFrhawAc": 3000.0,
+    "sp1nLqqjVZ1kTusFjJmHp1xHDpH6M4F7KXCr1iJ3xpX": 3000.0,
+    "oRC11nW8LAy2ynYgkef76nnpUCfsZdevQYj2zUrBVXF": 1500.0,
+    "8PwMKByRUaE1Xt5vkbEpGnuBrAMt1k1adg22hf8vDViA": 1000.0
   },
   "boosters_why_not": null,
   "grpc_target": {
@@ -71,52 +90,71 @@
       "tls": true,
       "auth_header": "x-token",
       "token_present": true
+    },
+    "rabbit_ams": {
+      "target": "rabbitstream.ams.shyft.to:443",
+      "tls": true,
+      "auth_header": "x-token",
+      "token_present": true
+    },
+    "rabbit_fra": {
+      "target": "rabbitstream.fra.shyft.to:443",
+      "tls": true,
+      "auth_header": "x-token",
+      "token_present": true
     }
   },
+  "helius_ws_enabled": false,
+  "helius_ws_why_not": "вторая подписка Helius выключена входом PROBE_HELIUS_WS=0: детектор важнее замера",
   "subscriptions": {
     "grpc": {
-      "requested": 21,
+      "requested": 19,
+      "connected": true,
+      "generation": 0
+    },
+    "rabbit_ams": {
+      "requested": 19,
       "connected": true,
       "generation": 0
     },
     "grpc2": {
-      "requested": 21,
+      "requested": 19,
       "connected": true,
       "generation": 0
     },
-    "helius_ws": {
-      "confirmed": 21,
-      "rejected": 0,
-      "requested": 21,
+    "rabbit_fra": {
+      "requested": 19,
+      "connected": true,
       "generation": 0
     }
   },
   "helius_credits": {
-    "spent_today": 9092,
+    "spent_today": 14,
     "limit": 300000,
-    "share": 0.0303,
-    "projected_daily": 225402,
+    "share": 0.0,
+    "projected_daily": 347,
     "threshold": 0.7,
     "projection_limit": 200000,
-    "window_s": 3600.0,
+    "window_s": 0.0,
     "window_cap": 30000,
-    "window_spent": 9078,
-    "in_window": true,
-    "window_left_s": 114.9,
-    "window_started_utc": "2026-09-24T14:44:59Z",
+    "window_spent": 0,
+    "in_window": false,
+    "window_left_s": 0.0,
+    "window_started_utc": "2026-09-24T16:10:08Z",
     "boosters_dropped": false,
     "drop_needed": false,
     "why": "",
     "service": "grpc_feed_probe",
-    "session": 9092,
+    "session": 14,
     "dropped_utc": null
   },
-  "addresses_now": 21,
+  "addresses_now": 19,
   "generation": 0,
   "threads_alive": {
-    "helius_ws": true,
     "grpc": true,
-    "grpc2": true
+    "grpc2": true,
+    "rabbit_ams": true,
+    "rabbit_fra": true
   },
   "failures": {
     "last": {},
@@ -126,107 +164,77 @@
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "helius_ws": 4518,
-      "grpc2": 4518,
-      "grpc": 4518
+      "grpc": 77,
+      "rabbit_ams": 83,
+      "grpc2": 77,
+      "rabbit_fra": 83
     },
     "duplicates": {},
     "unpaired_single_channel": {
       "helius_ws": 0,
       "grpc": 0,
-      "grpc2": 0
+      "grpc2": 0,
+      "rabbit_ams": 0,
+      "rabbit_fra": 0
     },
-    "by_channel": {
-      "grpc": {
-        "pairs": 4518,
-        "first_share": 0.0505,
-        "median_ms": -5.83,
-        "p10_ms": -16.78,
-        "p90_ms": -1.52,
-        "p95_ms": 0.24,
-        "mean_ms": -7.82
-      },
-      "grpc2": {
-        "pairs": 4518,
-        "first_share": 0.1722,
-        "median_ms": -2.08,
-        "p10_ms": -7.56,
-        "p90_ms": 0.75,
-        "p95_ms": 1.91,
-        "mean_ms": -2.49
-      }
-    },
-    "by_group": {
-      "источники": {
-        "grpc": {
-          "pairs": 96,
-          "first_share": 0.1042,
-          "median_ms": -5.05,
-          "p10_ms": -8.59,
-          "p90_ms": 0.47,
-          "p95_ms": 0.89,
-          "mean_ms": -2.73
-        },
-        "grpc2": {
-          "pairs": 96,
-          "first_share": 0.1354,
-          "median_ms": -1.95,
-          "p10_ms": -5.66,
-          "p90_ms": 0.84,
-          "p95_ms": 1.24,
-          "mean_ms": -1.22
-        }
-      },
-      "разгонные": {
-        "grpc": {
-          "pairs": 4422,
-          "first_share": 0.0493,
-          "median_ms": -5.84,
-          "p10_ms": -16.89,
-          "p90_ms": -1.56,
-          "p95_ms": -0.33,
-          "mean_ms": -7.93
-        },
-        "grpc2": {
-          "pairs": 4422,
-          "first_share": 0.173,
-          "median_ms": -2.08,
-          "p10_ms": -7.62,
-          "p90_ms": 0.75,
-          "p95_ms": 1.93,
-          "mean_ms": -2.52
-        }
-      }
-    },
+    "by_channel": {},
+    "by_group": {},
     "pairwise": {
-      "helius_ws_vs_grpc": {
-        "pairs": 4518,
-        "first_share": 0.9495,
-        "median_ms": 5.83,
-        "p10_ms": 1.52,
-        "p90_ms": 16.78,
-        "p95_ms": 24.53,
-        "mean_ms": 7.82
-      },
-      "helius_ws_vs_grpc2": {
-        "pairs": 4518,
-        "first_share": 0.8278,
-        "median_ms": 2.08,
-        "p10_ms": -0.75,
-        "p90_ms": 7.56,
-        "p95_ms": 9.5,
-        "mean_ms": 2.49
-      },
       "grpc_vs_grpc2": {
-        "pairs": 4518,
-        "first_share": 0.189,
-        "median_ms": -3.7,
-        "p10_ms": -11.61,
-        "p90_ms": 0.81,
-        "p95_ms": 1.81,
-        "mean_ms": -5.33
+        "pairs": 77,
+        "first_share": 0.7143,
+        "median_ms": 1.05,
+        "p10_ms": -1.77,
+        "p90_ms": 5.68,
+        "p95_ms": 8.3,
+        "mean_ms": 1.09
+      },
+      "grpc_vs_rabbit_ams": {
+        "pairs": 77,
+        "first_share": 0.4675,
+        "median_ms": -0.21,
+        "p10_ms": -5.79,
+        "p90_ms": 10.49,
+        "p95_ms": 14.57,
+        "mean_ms": 9.45
+      },
+      "grpc_vs_rabbit_fra": {
+        "pairs": 77,
+        "first_share": 0.3377,
+        "median_ms": -2.47,
+        "p10_ms": -5.57,
+        "p90_ms": 34.1,
+        "p95_ms": 39.84,
+        "mean_ms": 2.07
+      },
+      "grpc2_vs_rabbit_ams": {
+        "pairs": 77,
+        "first_share": 0.3377,
+        "median_ms": -1.7,
+        "p10_ms": -8.63,
+        "p90_ms": 2.53,
+        "p95_ms": 10.96,
+        "mean_ms": 8.36
+      },
+      "grpc2_vs_rabbit_fra": {
+        "pairs": 77,
+        "first_share": 0.1688,
+        "median_ms": -3.34,
+        "p10_ms": -8.5,
+        "p90_ms": 37.64,
+        "p95_ms": 39.22,
+        "mean_ms": 0.98
+      },
+      "rabbit_ams_vs_rabbit_fra": {
+        "pairs": 83,
+        "first_share": 0.4217,
+        "median_ms": -1.54,
+        "p10_ms": -9.91,
+        "p90_ms": 38.67,
+        "p95_ms": 40.94,
+        "mean_ms": -6.05
       }
     },
-    "pairs_total": 4518
+    "pairs_total": 83
   }
 }

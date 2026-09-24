@@ -1,242 +1,353 @@
 {
  "segments": 1,
- "records": 79874,
- "events": 37575,
+ "records": 1420,
+ "events": 593,
  "messages": {
-  "helius_ws": 4623,
-  "grpc": 37575,
-  "grpc2": 37553,
-  "rabbit_ams": 0,
-  "rabbit_fra": 0
+  "helius_ws": 0,
+  "grpc": 117,
+  "grpc2": 117,
+  "rabbit_ams": 593,
+  "rabbit_fra": 593
  },
  "pairwise": {
-  "helius_ws_vs_grpc": {
-   "pairs": 4623,
-   "first_share": 0.9474,
-   "median_ms": 5.79,
-   "p10_ms": 1.41,
-   "p90_ms": 16.49,
-   "p95_ms": 24.27,
-   "p99_ms": 102.94,
-   "mean_ms": 7.67
-  },
-  "helius_ws_vs_grpc2": {
-   "pairs": 4623,
-   "first_share": 0.8283,
-   "median_ms": 2.08,
-   "p10_ms": -0.75,
-   "p90_ms": 7.53,
-   "p95_ms": 9.47,
-   "p99_ms": 20.66,
-   "mean_ms": 2.42
-  },
   "grpc_vs_grpc2": {
-   "pairs": 37553,
-   "first_share": 0.6982,
-   "median_ms": 1.19,
-   "p10_ms": -3.67,
-   "p90_ms": 6.77,
-   "p95_ms": 8.67,
-   "p99_ms": 16.8,
-   "mean_ms": 1.64
+   "pairs": 117,
+   "first_share": 0.7692,
+   "median_ms": 1.8,
+   "p10_ms": -1.77,
+   "p90_ms": 7.42,
+   "p95_ms": 10.67,
+   "p99_ms": 18.24,
+   "mean_ms": 2.57
+  },
+  "grpc_vs_rabbit_ams": {
+   "pairs": 117,
+   "first_share": 0.5726,
+   "median_ms": 0.67,
+   "p10_ms": -6.11,
+   "p90_ms": 6.82,
+   "p95_ms": 15.18,
+   "p99_ms": 217.59,
+   "mean_ms": 6.9
+  },
+  "grpc_vs_rabbit_fra": {
+   "pairs": 117,
+   "first_share": 0.4786,
+   "median_ms": -0.38,
+   "p10_ms": -5.95,
+   "p90_ms": 15.45,
+   "p95_ms": 37.78,
+   "p99_ms": 46.87,
+   "mean_ms": 2.51
+  },
+  "grpc2_vs_rabbit_ams": {
+   "pairs": 117,
+   "first_share": 0.2821,
+   "median_ms": -2.38,
+   "p10_ms": -8.36,
+   "p90_ms": 2.65,
+   "p95_ms": 9.99,
+   "p99_ms": 212.48,
+   "mean_ms": 4.33
+  },
+  "grpc2_vs_rabbit_fra": {
+   "pairs": 117,
+   "first_share": 0.1538,
+   "median_ms": -2.59,
+   "p10_ms": -8.37,
+   "p90_ms": 7.0,
+   "p95_ms": 38.37,
+   "p99_ms": 40.22,
+   "mean_ms": -0.07
+  },
+  "rabbit_ams_vs_rabbit_fra": {
+   "pairs": 593,
+   "first_share": 0.489,
+   "median_ms": -0.23,
+   "p10_ms": -3.71,
+   "p90_ms": 4.47,
+   "p95_ms": 9.31,
+   "p99_ms": 39.66,
+   "mean_ms": -0.35
   }
  },
  "by_group": {
   "источники": {
-   "helius_ws_vs_grpc": {
-    "pairs": 165,
-    "first_share": 0.9273,
-    "median_ms": 5.18,
-    "p10_ms": 1.45,
-    "p90_ms": 8.46,
-    "p95_ms": 16.87,
-    "p99_ms": 25.02,
-    "mean_ms": 3.88
-   },
-   "helius_ws_vs_grpc2": {
-    "pairs": 165,
-    "first_share": 0.9152,
-    "median_ms": 2.36,
-    "p10_ms": 0.56,
-    "p90_ms": 6.61,
-    "p95_ms": 7.36,
-    "p99_ms": 12.04,
-    "mean_ms": 2.12
-   },
    "grpc_vs_grpc2": {
-    "pairs": 185,
-    "first_share": 0.3784,
-    "median_ms": -1.68,
-    "p10_ms": -6.44,
-    "p90_ms": 2.14,
-    "p95_ms": 3.18,
-    "p99_ms": 10.7,
-    "mean_ms": -1.61
+    "pairs": 79,
+    "first_share": 0.7215,
+    "median_ms": 1.05,
+    "p10_ms": -1.79,
+    "p90_ms": 5.72,
+    "p95_ms": 8.32,
+    "p99_ms": 15.56,
+    "mean_ms": 1.11
+   },
+   "grpc_vs_rabbit_ams": {
+    "pairs": 79,
+    "first_share": 0.481,
+    "median_ms": -0.17,
+    "p10_ms": -5.95,
+    "p90_ms": 10.56,
+    "p95_ms": 33.19,
+    "p99_ms": 220.5,
+    "mean_ms": 9.27
+   },
+   "grpc_vs_rabbit_fra": {
+    "pairs": 79,
+    "first_share": 0.3544,
+    "median_ms": -2.43,
+    "p10_ms": -5.76,
+    "p90_ms": 34.68,
+    "p95_ms": 39.96,
+    "p99_ms": 49.02,
+    "mean_ms": 2.04
+   },
+   "grpc2_vs_rabbit_ams": {
+    "pairs": 79,
+    "first_share": 0.3418,
+    "median_ms": -1.09,
+    "p10_ms": -8.64,
+    "p90_ms": 2.64,
+    "p95_ms": 29.63,
+    "p99_ms": 214.47,
+    "mean_ms": 8.17
+   },
+   "grpc2_vs_rabbit_fra": {
+    "pairs": 79,
+    "first_share": 0.1646,
+    "median_ms": -3.29,
+    "p10_ms": -8.68,
+    "p90_ms": 37.67,
+    "p95_ms": 39.24,
+    "p99_ms": 40.85,
+    "mean_ms": 0.93
+   },
+   "rabbit_ams_vs_rabbit_fra": {
+    "pairs": 86,
+    "first_share": 0.4186,
+    "median_ms": -1.37,
+    "p10_ms": -9.09,
+    "p90_ms": 38.63,
+    "p95_ms": 40.59,
+    "p99_ms": 47.83,
+    "mean_ms": -5.86
    },
    "messages": {
-    "helius_ws": 165,
-    "grpc": 185,
-    "grpc2": 185,
-    "rabbit_ams": 0,
-    "rabbit_fra": 0
+    "helius_ws": 0,
+    "grpc": 79,
+    "grpc2": 79,
+    "rabbit_ams": 86,
+    "rabbit_fra": 86
    }
   },
   "разгонные": {
-   "helius_ws_vs_grpc": {
-    "pairs": 4458,
-    "first_share": 0.9482,
-    "median_ms": 5.82,
-    "p10_ms": 1.4,
-    "p90_ms": 16.8,
-    "p95_ms": 24.94,
-    "p99_ms": 103.04,
-    "mean_ms": 7.81
-   },
-   "helius_ws_vs_grpc2": {
-    "pairs": 4458,
-    "first_share": 0.825,
-    "median_ms": 2.07,
-    "p10_ms": -0.76,
-    "p90_ms": 7.59,
-    "p95_ms": 9.54,
-    "p99_ms": 20.74,
-    "mean_ms": 2.43
-   },
    "grpc_vs_grpc2": {
-    "pairs": 37368,
-    "first_share": 0.6998,
-    "median_ms": 1.21,
-    "p10_ms": -3.62,
-    "p90_ms": 6.77,
-    "p95_ms": 8.69,
-    "p99_ms": 16.8,
-    "mean_ms": 1.65
+    "pairs": 38,
+    "first_share": 0.8684,
+    "median_ms": 5.71,
+    "p10_ms": -0.48,
+    "p90_ms": 9.85,
+    "p95_ms": 14.32,
+    "p99_ms": 26.09,
+    "mean_ms": 5.62
+   },
+   "grpc_vs_rabbit_ams": {
+    "pairs": 38,
+    "first_share": 0.7632,
+    "median_ms": 1.7,
+    "p10_ms": -6.08,
+    "p90_ms": 4.28,
+    "p95_ms": 14.47,
+    "p99_ms": 25.53,
+    "mean_ms": 1.96
+   },
+   "grpc_vs_rabbit_fra": {
+    "pairs": 38,
+    "first_share": 0.7368,
+    "median_ms": 3.99,
+    "p10_ms": -4.09,
+    "p90_ms": 9.61,
+    "p95_ms": 14.42,
+    "p99_ms": 25.8,
+    "mean_ms": 3.48
+   },
+   "grpc2_vs_rabbit_ams": {
+    "pairs": 38,
+    "first_share": 0.1579,
+    "median_ms": -4.1,
+    "p10_ms": -7.91,
+    "p90_ms": 1.78,
+    "p95_ms": 3.29,
+    "p99_ms": 5.58,
+    "mean_ms": -3.66
+   },
+   "grpc2_vs_rabbit_fra": {
+    "pairs": 38,
+    "first_share": 0.1316,
+    "median_ms": -1.56,
+    "p10_ms": -6.2,
+    "p90_ms": 0.34,
+    "p95_ms": 0.94,
+    "p99_ms": 2.78,
+    "mean_ms": -2.14
+   },
+   "rabbit_ams_vs_rabbit_fra": {
+    "pairs": 507,
+    "first_share": 0.501,
+    "median_ms": 0.09,
+    "p10_ms": -3.48,
+    "p90_ms": 3.96,
+    "p95_ms": 7.16,
+    "p99_ms": 24.94,
+    "mean_ms": 0.58
    },
    "messages": {
-    "helius_ws": 4458,
-    "grpc": 37390,
-    "grpc2": 37368,
-    "rabbit_ams": 0,
-    "rabbit_fra": 0
+    "helius_ws": 0,
+    "grpc": 38,
+    "grpc2": 38,
+    "rabbit_ams": 507,
+    "rabbit_fra": 507
    }
   }
  },
- "disconnects": {
-  "helius_ws": {
-   "count": 21,
-   "last": "TimeoutError: ",
-   "kinds": {
-    "TimeoutError": 21
-   }
-  },
-  "grpc": {
-   "count": 9,
-   "last": "_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC that terminated with:\n\tstatus = StatusCode.INVALID_ARGUMENT\n\tdetails = \"failed to create filter: Max amount of filters/data_slices reached, o",
-   "kinds": {
-    "_MultiThreadedRendezvous": 9
-   }
-  },
-  "grpc2": {
-   "count": 93,
-   "last": "_MultiThreadedRendezvous: <_MultiThreadedRendezvous of RPC that terminated with:\n\tstatus = StatusCode.INVALID_ARGUMENT\n\tdetails = \"failed to check filter: FiltersOverflow { max: 10 }\"\n\tdebug_error_str",
-   "kinds": {
-    "_MultiThreadedRendezvous": 93
-   }
-  }
- },
+ "disconnects": {},
  "not_seen_by_ws": {
   "grpc": {
-   "messages": 37575,
-   "not_in_ws": 32952,
-   "share": 0.877
+   "messages": 117,
+   "not_in_ws": 117,
+   "share": 1.0
   },
   "grpc2": {
-   "messages": 37553,
-   "not_in_ws": 32930,
-   "share": 0.8769
+   "messages": 117,
+   "not_in_ws": 117,
+   "share": 1.0
   },
   "rabbit_ams": {
-   "messages": 0,
-   "not_in_ws": 0,
-   "share": null
+   "messages": 593,
+   "not_in_ws": 593,
+   "share": 1.0
   },
   "rabbit_fra": {
-   "messages": 0,
-   "not_in_ws": 0,
-   "share": null
+   "messages": 593,
+   "not_in_ws": 593,
+   "share": 1.0
+  }
+ },
+ "only_in": {
+  "grpc_not_in_helius_ws": {
+   "messages": 117,
+   "only_in_a": 117,
+   "share": 1.0
+  },
+  "grpc_not_in_grpc2": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "grpc_not_in_rabbit_ams": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "grpc_not_in_rabbit_fra": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "grpc2_not_in_helius_ws": {
+   "messages": 117,
+   "only_in_a": 117,
+   "share": 1.0
+  },
+  "grpc2_not_in_grpc": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "grpc2_not_in_rabbit_ams": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "grpc2_not_in_rabbit_fra": {
+   "messages": 117,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "rabbit_ams_not_in_helius_ws": {
+   "messages": 593,
+   "only_in_a": 593,
+   "share": 1.0
+  },
+  "rabbit_ams_not_in_grpc": {
+   "messages": 593,
+   "only_in_a": 476,
+   "share": 0.8027
+  },
+  "rabbit_ams_not_in_grpc2": {
+   "messages": 593,
+   "only_in_a": 476,
+   "share": 0.8027
+  },
+  "rabbit_ams_not_in_rabbit_fra": {
+   "messages": 593,
+   "only_in_a": 0,
+   "share": 0.0
+  },
+  "rabbit_fra_not_in_helius_ws": {
+   "messages": 593,
+   "only_in_a": 593,
+   "share": 1.0
+  },
+  "rabbit_fra_not_in_grpc": {
+   "messages": 593,
+   "only_in_a": 476,
+   "share": 0.8027
+  },
+  "rabbit_fra_not_in_grpc2": {
+   "messages": 593,
+   "only_in_a": 476,
+   "share": 0.8027
+  },
+  "rabbit_fra_not_in_rabbit_ams": {
+   "messages": 593,
+   "only_in_a": 0,
+   "share": 0.0
   }
  },
  "combined": {
-  "best_helper": "grpc",
+  "best_helper": null,
   "all": {
    "grpc": {
     "base": "helius_ws",
     "helper": "grpc",
-    "both": 4623,
-    "only_helper_saw": 32952,
-    "only_base_saw": 0,
-    "gain_median_ms": 0.0,
-    "gain_p90_ms": 0.0,
-    "gain_p95_ms": 0.39,
-    "gain_p99_ms": 30.3,
-    "gain_mean_ms": 1.33,
-    "helper_first_share": 0.0526
+    "both": 0,
+    "only_helper_saw": 117,
+    "only_base_saw": 0
    },
    "grpc2": {
     "base": "helius_ws",
     "helper": "grpc2",
-    "both": 4623,
-    "only_helper_saw": 32930,
-    "only_base_saw": 0,
-    "gain_median_ms": 0.0,
-    "gain_p90_ms": 0.75,
-    "gain_p95_ms": 1.94,
-    "gain_p99_ms": 15.22,
-    "gain_mean_ms": 0.94,
-    "helper_first_share": 0.1717
+    "both": 0,
+    "only_helper_saw": 117,
+    "only_base_saw": 0
    },
    "rabbit_ams": {
     "base": "helius_ws",
     "helper": "rabbit_ams",
     "both": 0,
-    "only_helper_saw": 0,
-    "only_base_saw": 4623
+    "only_helper_saw": 593,
+    "only_base_saw": 0
    },
    "rabbit_fra": {
     "base": "helius_ws",
     "helper": "rabbit_fra",
     "both": 0,
-    "only_helper_saw": 0,
-    "only_base_saw": 4623
+    "only_helper_saw": 593,
+    "only_base_saw": 0
    }
   },
-  "best_by_group": {
-   "источники": {
-    "base": "helius_ws",
-    "helper": "grpc",
-    "both": 165,
-    "only_helper_saw": 20,
-    "only_base_saw": 0,
-    "gain_median_ms": 0.0,
-    "gain_p90_ms": 0.0,
-    "gain_p95_ms": 0.62,
-    "gain_p99_ms": 52.85,
-    "gain_mean_ms": 2.51,
-    "helper_first_share": 0.0727
-   },
-   "разгонные": {
-    "base": "helius_ws",
-    "helper": "grpc",
-    "both": 4458,
-    "only_helper_saw": 32932,
-    "only_base_saw": 0,
-    "gain_median_ms": 0.0,
-    "gain_p90_ms": 0.0,
-    "gain_p95_ms": 0.37,
-    "gain_p99_ms": 29.0,
-    "gain_mean_ms": 1.29,
-    "helper_first_share": 0.0518
-   }
-  }
+  "best_by_group": {}
  }
 }
