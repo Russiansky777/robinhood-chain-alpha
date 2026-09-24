@@ -1166,6 +1166,19 @@ class Детектор:
         # исключении -- см. bloom_notify.
         self.оповещатель = NT.Оповещатель() if NT is not None else None
 
+    def режим_денег(self) -> str:
+        """Режим, который решают ДЕНЬГИ, а не переменная окружения.
+
+        BLOOM_MODE описывает только журнал и в env прибит к "dry". Настоящие
+        покупки включает исполнитель, и пока его режим не попадал ни в признак
+        жизни, ни в строки решений, боевые записи читались как dry-run -- в
+        докладе они и складывались в раздел dry_run. Теперь режим берётся у
+        исполнителя, если он подключён.
+        """
+        исп = getattr(self, "исполнитель", None)
+        реж = getattr(исп, "mode", None) if исп is not None else None
+        return реж or self.режим
+
     def статус_путь(self) -> Path:
         return self.состояние.base / "detector_status.json"
 
@@ -1174,7 +1187,7 @@ class Детектор:
                "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                "updated_ts": time.time(),
                "alive_since_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.старт)),
-               "mode": self.режим,
+               "mode": self.режим_денег(),
                "sources": len(self.источники),
                "sources_from": self.откуда_источники,
                "sources_generation": self.поколение,
@@ -1365,7 +1378,7 @@ class Детектор:
         строка["rate_note"] = пояснение
         строка["rate_source"] = self.курс.источник
         строка["source_task"] = self.источники.get(источник)
-        строка["mode"] = self.режим
+        строка["mode"] = self.режим_денег()
         if строка.get("action") == "buy":
             self.к_покупке += 1
         код = строка.get("code") or "?"
@@ -2268,6 +2281,29 @@ def self_test() -> int:
         j3 = det3.признак_жизни()
         chk("без исполнителя это видно в признаке жизни",
             j3["executor_attached"] is False and "executor" not in j3, j3.get("executor"))
+
+        # 15d. режим называют деньги: BLOOM_MODE в env прибит к "dry", а
+        # покупки идут боевые. Если режим брать из env, боевые решения
+        # попадают в докладе в раздел dry_run -- то есть не видны совсем.
+        st4 = ST.ExecState(base=Path(d) / "s4", kill=Path(d) / "kill4")
+
+        class ИсполнительБоевой(ИсполнительЗаглушка):
+            mode = ST.MODE_LIVE
+
+        det4 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st4,
+                         helius=HeliusБезСети(), курс=КурсSOL(),
+                         режим="dry", исполнитель=ИсполнительБоевой())
+        det4.курс.значение, det4.курс.когда = 200.0, time.time()
+        det4.слот_сети, det4.t_слот = 100, time.time()
+        det4.баланс_sol, det4.t_баланс = 5.0, time.time()
+        chk("режим в признаке жизни -- боевой, а не из env",
+            det4.признак_жизни()["mode"] == ST.MODE_LIVE,
+            det4.признак_жизни()["mode"])
+        r4 = det4.обработать("ПОДПИСЬ_EX4", 100, "SRC", "тест", t_ок)
+        chk("режим в строке решения -- боевой",
+            r4.get("mode") == ST.MODE_LIVE, r4.get("mode"))
+        chk("без исполнителя режим остаётся из env",
+            det3.признак_жизни()["mode"] == "dry", det3.признак_жизни()["mode"])
 
     # 16. маршрут: промежуточный токен виден, прямой -- нет
     def tx_маршрут(хоп=(), минты_чужие=(), подписанные=()):
