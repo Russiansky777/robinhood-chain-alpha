@@ -39,6 +39,18 @@ on:
         description: "'nl' -- свой раннер на хосте (по умолчанию), 'cloud' -- запасной облачный путь по ssh"
         required: false
         default: "nl"
+      window_s:
+        description: "окно замера на полном ходу, секунд: в нём суточный прогноз не применяется"
+        required: false
+        default: "3600"
+      window_cap:
+        description: "потолок кредитов Helius НА ОКНО замера"
+        required: false
+        default: "30000"
+      projection_limit:
+        description: "после окна: потолок суточного прогноза, выше -- разгонные снимаются"
+        required: false
+        default: "200000"
 
 concurrency:
   group: feed-probe-deploy
@@ -145,6 +157,14 @@ jobs:
           LIMIT="${{ inputs.helius_daily_limit }}"
           case "$LIMIT" in ''|*[!0-9]*) echo "СБОЙ: предел кредитов не число: $LIMIT"; exit 1;; esac
           echo "потолок кредитов Helius у зонда: $LIMIT в сутки"
+          WINDOW_S="${{ inputs.window_s }}"
+          WINDOW_CAP="${{ inputs.window_cap }}"
+          PROJ_LIMIT="${{ inputs.projection_limit }}"
+          for V in "$WINDOW_S" "$WINDOW_CAP" "$PROJ_LIMIT"; do
+            case "$V" in ''|*[!0-9]*) echo "СБОЙ: окно/потолок не число: $V"; exit 1;; esac
+          done
+          echo "окно замера: $WINDOW_S с, потолок окна: $WINDOW_CAP кредитов,"
+          echo "после окна потолок прогноза: $PROJ_LIMIT в сутки"
           if [ -z "$GRPC_FEED_URL" ]; then
             echo "GRPC_FEED_URL не задан -- второй канал не включится"
           else
@@ -163,6 +183,9 @@ jobs:
             printf 'GRPC_FEED_TOKEN=%s\n' "$GRPC_FEED_TOKEN"
             printf 'GRPC_FEED_AUTH_HEADER=%s\n' "$HEADER"
             printf 'PROBE_HELIUS_DAILY_LIMIT=%s\n' "$LIMIT"
+            printf 'PROBE_WINDOW_S=%s\n' "$WINDOW_S"
+            printf 'PROBE_WINDOW_CAP=%s\n' "$WINDOW_CAP"
+            printf 'PROBE_PROJECTION_LIMIT=%s\n' "$PROJ_LIMIT"
             [ -n "$GRPC_FEED2_URL" ] && printf 'GRPC_FEED2_URL=%s\n' "$GRPC_FEED2_URL"
             [ -n "$GRPC_FEED2_TOKEN" ] && printf 'GRPC_FEED2_TOKEN=%s\n' "$GRPC_FEED2_TOKEN"
             true
