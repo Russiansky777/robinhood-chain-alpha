@@ -109,6 +109,7 @@ jobs:
           python analysis/c2_block_position.py --self-test
           python analysis/c2_route_htm.py --self-test
           python analysis/c2_groups.py --self-test
+          python analysis/c2_shadow_build.py --self-test
 
       - name: "Группы сделок задачи A (только чтение цепи)"
         if: env.C2_TASK == 'groups'
