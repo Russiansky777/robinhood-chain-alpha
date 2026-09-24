@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-24T08:12:07Z",
+  "built_utc": "2026-09-24T08:13:14Z",
   "since_ts": 1790233800.0,
   "journal": {
     "v1": 0,
@@ -275,7 +275,65 @@
     "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"
   },
   "found_by_signature": [],
-  "found_by_code": [],
+  "found_by_code": [
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-24T07:59:49Z",
+      "signature": "21thJLPhzBA6RUF14zoteZqLxKB4hNyLG8g4PYLvdVrLdriV2nyoarnPxgi1DeAGCXCJ6KM8j8E4rA5bJF7YwXpF",
+      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
+      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "slot": 449968061,
+      "kind": "buy",
+      "spend_sol_eq": null,
+      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "spend_ui": 1000.0,
+      "first_entry": false,
+      "dex_programs": [
+        "Pump AMM"
+      ],
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "route": {
+        "programs": [
+          "Pump AMM"
+        ],
+        "intermediate_mints": [],
+        "mints_in_route": 2,
+        "hops_by_mints": 1,
+        "dex_calls": 4,
+        "via_intermediate": false,
+        "intermediate_from": "промежуточных нет",
+        "authorized_only_mints": [],
+        "other_tx_mints": [],
+        "all_tx_mints": [
+          "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "So11111111111111111111111111111111111111112"
+        ]
+      },
+      "slot_lag": 0,
+      "action": "skip",
+      "code": "UNKNOWN_RATE",
+      "reason": "трата источника в стейблах, а курса SOL нет -- порог в SOL-эквиваленте не проверить",
+      "filter": "задача DBot",
+      "test_source": false,
+      "parse_ms": 0.61,
+      "gate_ms": 0.01,
+      "via": "transactionSubscribe",
+      "parsed_from": "PARSE_VIA_MSG",
+      "tx_version": 0,
+      "t_recv_ts": 1790236789.062149,
+      "t_recv_utc": "2026-09-24T07:59:49Z",
+      "t_decide_ts": 1790236789.062771,
+      "decide_latency_ms": 0.6,
+      "source_slot": 449968061,
+      "net_slot_at_decision": 449968061,
+      "net_slot_age_s": 0.095,
+      "rate_note": "курс SOL/USD недоступен",
+      "rate_source": "geckoterminal",
+      "source_task": "BATCH-5",
+      "mode": "live"
+    }
+  ],
   "found_by_mint": [],
   "position_rows": [
     {
@@ -700,11 +758,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 3244,
+          "кредитов": 3251,
           "бюджет": 60000,
-          "доля": 0.0541,
+          "доля": 0.0542,
           "группа": null,
-          "потрачено_по_бюджету": 3244,
+          "потрачено_по_бюджету": 3251,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -723,7 +781,7 @@
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 3285,
+      "всего_кредитов": 3292,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
