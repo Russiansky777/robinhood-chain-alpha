@@ -1,194 +1,123 @@
-active
-{
-  "utc": "2026-09-24T14:45:19Z",
-  "started_utc": "2026-09-24T14:44:59Z",
-  "uptime_s": 20.0,
-  "channels": 3,
-  "channel_names": [
-    "helius_ws",
-    "grpc",
-    "grpc2"
-  ],
-  "addresses": 21,
-  "sources": 20,
-  "boosters": [
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8"
-  ],
-  "boosters_slot": 450059547,
-  "boosters_rates_per_min": {
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0
-  },
-  "boosters_total_per_min": 500.0,
-  "boosters_target_per_min": 5.0,
-  "boosters_band": [
-    0.2,
-    50.0
-  ],
-  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 500.0 транзакций в минуту",
-  "boosters_rejected": {
-    "FVnv5qH7dsrBzEDwJ8dN2m9PFtKTBAQFtqWF3M9LpwMg": 3000.0,
-    "3KvsoNxgn64nsuHKPBHQJsguef3DgEkP2izE49k6CSAZ": 3000.0,
-    "CEwz7AauCmQG5vijHgLZ5ps4tHxGKBUcHuRrWmzHCkXH": 3000.0,
-    "Cr6vUmtz58dtsyDJX2GKbifgYf7zvwgPt9HyJvwMRLL8": 500.0,
-    "327677XqTEwYxo8kaQxAJUWvUvzpVoSjiMXMc8u4wQS6": 3000.0,
-    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 3000.0
-  },
-  "boosters_why_not": null,
-  "grpc_target": {
-    "grpc": {
-      "target": "grpc.ams.shyft.to:443",
-      "tls": true,
-      "auth_header": "x-token",
-      "token_present": true
-    },
-    "grpc2": {
-      "target": "beta-grpc.fra.shyft.to:443",
-      "tls": true,
-      "auth_header": "x-token",
-      "token_present": true
-    }
-  },
-  "subscriptions": {
-    "grpc": {
-      "requested": 21,
-      "connected": true,
-      "generation": 0
-    },
-    "grpc2": {
-      "requested": 21,
-      "connected": true,
-      "generation": 0
-    },
-    "helius_ws": {
-      "confirmed": 21,
-      "rejected": 0,
-      "requested": 21,
-      "generation": 0
-    }
-  },
-  "helius_credits": {
-    "spent_today": 136,
-    "limit": 300000,
-    "share": 0.0005,
-    "projected_daily": null,
-    "threshold": 0.7,
-    "projection_limit": 200000,
-    "window_s": 3600.0,
-    "window_cap": 30000,
-    "window_spent": 122,
-    "in_window": true,
-    "window_left_s": 3580.0,
-    "window_started_utc": "2026-09-24T14:44:59Z",
-    "boosters_dropped": false,
-    "drop_needed": false,
-    "why": "",
-    "service": "grpc_feed_probe",
-    "session": 136,
-    "dropped_utc": null
-  },
-  "addresses_now": 21,
-  "generation": 0,
-  "threads_alive": {
-    "helius_ws": true,
-    "grpc": true,
-    "grpc2": true
-  },
-  "failures": {
-    "last": {},
-    "count": {},
-    "first_utc": {}
-  },
-  "summary": {
-    "base": "helius_ws",
-    "messages": {
-      "helius_ws": 40,
-      "grpc2": 40,
-      "grpc": 40
-    },
-    "duplicates": {},
-    "unpaired_single_channel": {
-      "helius_ws": 0,
-      "grpc": 0,
-      "grpc2": 0
-    },
-    "by_channel": {
-      "grpc": {
-        "pairs": 40,
-        "first_share": 0.0,
-        "median_ms": -4.66,
-        "p10_ms": -6.48,
-        "p90_ms": -0.84,
-        "p95_ms": -0.7,
-        "mean_ms": -4.03
-      },
-      "grpc2": {
-        "pairs": 40,
-        "first_share": 0.225,
-        "median_ms": -0.98,
-        "p10_ms": -4.64,
-        "p90_ms": 0.77,
-        "p95_ms": 2.03,
-        "mean_ms": -1.26
-      }
-    },
-    "by_group": {
-      "разгонные": {
-        "grpc": {
-          "pairs": 40,
-          "first_share": 0.0,
-          "median_ms": -4.66,
-          "p10_ms": -6.48,
-          "p90_ms": -0.84,
-          "p95_ms": -0.7,
-          "mean_ms": -4.03
-        },
-        "grpc2": {
-          "pairs": 40,
-          "first_share": 0.225,
-          "median_ms": -0.98,
-          "p10_ms": -4.64,
-          "p90_ms": 0.77,
-          "p95_ms": 2.03,
-          "mean_ms": -1.26
-        }
-      }
-    },
-    "pairwise": {
-      "helius_ws_vs_grpc": {
-        "pairs": 40,
-        "first_share": 1.0,
-        "median_ms": 4.66,
-        "p10_ms": 0.84,
-        "p90_ms": 6.48,
-        "p95_ms": 7.0,
-        "mean_ms": 4.03
-      },
-      "helius_ws_vs_grpc2": {
-        "pairs": 40,
-        "first_share": 0.775,
-        "median_ms": 0.98,
-        "p10_ms": -0.77,
-        "p90_ms": 4.64,
-        "p95_ms": 4.93,
-        "mean_ms": 1.26
-      },
-      "grpc_vs_grpc2": {
-        "pairs": 40,
-        "first_share": 0.2,
-        "median_ms": -3.69,
-        "p10_ms": -5.87,
-        "p90_ms": 1.4,
-        "p95_ms": 1.57,
-        "mean_ms": -2.77
-      }
-    },
-    "pairs_total": 40
-  }
-}
+activating
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
+Sep 24 17:57:53 claude-nl python[498784]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+Sep 24 17:57:53 claude-nl python[498784]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/bloom_detector.py", line 1265, in загрузить_источники
+Sep 24 17:57:53 claude-nl python[498784]:     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
+Sep 24 17:57:53 claude-nl python[498784]:                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+Sep 24 17:57:53 claude-nl python[498784]:     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+Sep 24 17:57:53 claude-nl python[498784]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+Sep 24 17:57:53 claude-nl python[498784]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:53 claude-nl python[498784]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:53 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:53 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
+Sep 24 17:57:58 claude-nl systemd[1]: grpc-feed-probe.service: Scheduled restart job, restart counter is at 168.
+Sep 24 17:57:58 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 17:57:59 claude-nl python[498788]: DBOT_API_KEY не задан -- беру снимок источников из репозитория
+Sep 24 17:57:59 claude-nl python[498788]: Traceback (most recent call last):
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1664, in <module>
+Sep 24 17:57:59 claude-nl python[498788]:     raise SystemExit(main())
+Sep 24 17:57:59 claude-nl python[498788]:                      ^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1504, in main
+Sep 24 17:57:59 claude-nl python[498788]:     ист, откуда = BD.источники(задачи, Path(a.config))
+Sep 24 17:57:59 claude-nl python[498788]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
+Sep 24 17:57:59 claude-nl python[498788]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+Sep 24 17:57:59 claude-nl python[498788]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/bloom_detector.py", line 1265, in загрузить_источники
+Sep 24 17:57:59 claude-nl python[498788]:     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
+Sep 24 17:57:59 claude-nl python[498788]:                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+Sep 24 17:57:59 claude-nl python[498788]:     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+Sep 24 17:57:59 claude-nl python[498788]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+Sep 24 17:57:59 claude-nl python[498788]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:59 claude-nl python[498788]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:59 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:59 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
+
 --- журнал службы, последние 60 строк ---
-Sep 24 16:44:58 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
-Sep 24 16:44:58 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
-Sep 24 16:44:58 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
-Sep 24 16:44:58 claude-nl systemd[1]: grpc-feed-probe.service: Consumed 3.575s CPU time, 51.3M memory peak, 0B memory swap peak.
-Sep 24 16:44:58 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
-Sep 24 16:44:59 claude-nl python[485154]: зонд запущен: каналов 3, адресов 21 (источников 20, разгонных 1), откуда источники: DBot живьём + тестовых источников из окружения: 2
+Sep 24 17:57:43 claude-nl python[498776]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:43 claude-nl python[498776]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:43 claude-nl python[498776]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:43 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:43 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
+Sep 24 17:57:48 claude-nl systemd[1]: grpc-feed-probe.service: Scheduled restart job, restart counter is at 166.
+Sep 24 17:57:48 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 17:57:48 claude-nl python[498780]: DBOT_API_KEY не задан -- беру снимок источников из репозитория
+Sep 24 17:57:48 claude-nl python[498780]: Traceback (most recent call last):
+Sep 24 17:57:48 claude-nl python[498780]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1664, in <module>
+Sep 24 17:57:48 claude-nl python[498780]:     raise SystemExit(main())
+Sep 24 17:57:48 claude-nl python[498780]:                      ^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1504, in main
+Sep 24 17:57:48 claude-nl python[498780]:     ист, откуда = BD.источники(задачи, Path(a.config))
+Sep 24 17:57:48 claude-nl python[498780]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
+Sep 24 17:57:48 claude-nl python[498780]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+Sep 24 17:57:48 claude-nl python[498780]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]:   File "/home/bot/feed_probe/bloom_detector.py", line 1265, in загрузить_источники
+Sep 24 17:57:48 claude-nl python[498780]:     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
+Sep 24 17:57:48 claude-nl python[498780]:                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]:   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+Sep 24 17:57:48 claude-nl python[498780]:     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+Sep 24 17:57:48 claude-nl python[498780]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]:   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+Sep 24 17:57:48 claude-nl python[498780]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:48 claude-nl python[498780]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:48 claude-nl python[498780]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:48 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:48 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
+Sep 24 17:57:53 claude-nl systemd[1]: grpc-feed-probe.service: Scheduled restart job, restart counter is at 167.
+Sep 24 17:57:53 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 17:57:53 claude-nl python[498784]: DBOT_API_KEY не задан -- беру снимок источников из репозитория
+Sep 24 17:57:53 claude-nl python[498784]: Traceback (most recent call last):
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1664, in <module>
+Sep 24 17:57:53 claude-nl python[498784]:     raise SystemExit(main())
+Sep 24 17:57:53 claude-nl python[498784]:                      ^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1504, in main
+Sep 24 17:57:53 claude-nl python[498784]:     ист, откуда = BD.источники(задачи, Path(a.config))
+Sep 24 17:57:53 claude-nl python[498784]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
+Sep 24 17:57:53 claude-nl python[498784]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+Sep 24 17:57:53 claude-nl python[498784]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/home/bot/feed_probe/bloom_detector.py", line 1265, in загрузить_источники
+Sep 24 17:57:53 claude-nl python[498784]:     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
+Sep 24 17:57:53 claude-nl python[498784]:                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+Sep 24 17:57:53 claude-nl python[498784]:     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+Sep 24 17:57:53 claude-nl python[498784]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]:   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+Sep 24 17:57:53 claude-nl python[498784]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:53 claude-nl python[498784]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:53 claude-nl python[498784]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:53 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:53 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
+Sep 24 17:57:58 claude-nl systemd[1]: grpc-feed-probe.service: Scheduled restart job, restart counter is at 168.
+Sep 24 17:57:58 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 17:57:59 claude-nl python[498788]: DBOT_API_KEY не задан -- беру снимок источников из репозитория
+Sep 24 17:57:59 claude-nl python[498788]: Traceback (most recent call last):
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1664, in <module>
+Sep 24 17:57:59 claude-nl python[498788]:     raise SystemExit(main())
+Sep 24 17:57:59 claude-nl python[498788]:                      ^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1504, in main
+Sep 24 17:57:59 claude-nl python[498788]:     ист, откуда = BD.источники(задачи, Path(a.config))
+Sep 24 17:57:59 claude-nl python[498788]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
+Sep 24 17:57:59 claude-nl python[498788]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
+Sep 24 17:57:59 claude-nl python[498788]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/home/bot/feed_probe/bloom_detector.py", line 1265, in загрузить_источники
+Sep 24 17:57:59 claude-nl python[498788]:     return источники_из_конфига(json.loads(путь.read_text(encoding="utf-8")), задачи)
+Sep 24 17:57:59 claude-nl python[498788]:                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+Sep 24 17:57:59 claude-nl python[498788]:     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+Sep 24 17:57:59 claude-nl python[498788]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]:   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+Sep 24 17:57:59 claude-nl python[498788]:     return io.open(self, mode, buffering, encoding, errors, newline)
+Sep 24 17:57:59 claude-nl python[498788]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sep 24 17:57:59 claude-nl python[498788]: FileNotFoundError: [Errno 2] No such file or directory: '/home/bot/data/final/20260923T145755Z/konfig.json'
+Sep 24 17:57:59 claude-nl systemd[1]: grpc-feed-probe.service: Main process exited, code=exited, status=1/FAILURE
+Sep 24 17:57:59 claude-nl systemd[1]: grpc-feed-probe.service: Failed with result 'exit-code'.
