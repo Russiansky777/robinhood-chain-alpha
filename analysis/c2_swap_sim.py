@@ -85,8 +85,8 @@ def launchlab_check(rpc) -> dict:
     expected = D(bv["post"]) * a_eff / (D(qv["post"]) + a_eff)
     ours_min35 = int(expected * D("0.65"))
     logs = (ours.get("meta") or {}).get("logMessages") or []
-    left = next((int(l.split(":")[1]) for l in logs if l.startswith("Program log: Left:")), None)
-    right = next((int(l.split(":")[1]) for l in logs if l.startswith("Program log: Right:")), None)
+    left = next((int(l.rsplit(":", 1)[1]) for l in logs if l.startswith("Program log: Left:")), None)
+    right = next((int(l.rsplit(":", 1)[1]) for l in logs if l.startswith("Program log: Right:")), None)
     return {"ok": True, "our_ix": name, "our_amount_in_quote_raw": amount_in,
             "our_min_out_sent_raw": min_out, "share_fee_rate": share_fee,
             "log_left_raw": left, "log_right_raw": right,
