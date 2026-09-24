@@ -391,10 +391,20 @@ def _минты_источника(tx: dict, источник: str | None) -> tu
         for ins in пачка:
             if not isinstance(ins, dict):
                 continue
-            разбор = ins.get("parsed") or {}
+            # parsed бывает СТРОКОЙ, а не объектом: у разобранной инструкции
+            # memo разобранное значение -- сам текст заметки. 24.09 в
+            # 14:10:50Z на этом упал боевой разбор сигнала источника
+            # Beqv6dzT (AttributeError: 'str' object has no attribute 'get'),
+            # и решение было потеряно целиком. Ровно эта же форма уже ломала
+            # пересчёт цены пула, там её обошли -- а здесь нет.
+            разбор = ins.get("parsed")
+            if not isinstance(разбор, dict):
+                continue
             if разбор.get("type") != "transferChecked":
                 continue
-            info = разбор.get("info") or {}
+            info = разбор.get("info")
+            if not isinstance(info, dict):
+                continue
             if info.get("mint") and info.get("authority") == источник:
                 подписанные.add(info["mint"])
     return двигались, подписанные, все_минты
@@ -1183,7 +1193,15 @@ class Helius:
             return out                      # НЕ кешируем неудачу
         val = (r or {}).get("value") or {}
         out["token_program"] = val.get("owner")
-        info = (((val.get("data") or {}).get("parsed") or {}).get("info") or {})
+        # data при jsonParsed бывает СПИСКОМ ["<base64>", "base64"]: узел так
+        # отвечает, когда разобрать счёт нечем (адрес оказался не минтом).
+        # Конструкция (data or {}).get(...) на списке падает: непустой список
+        # истинен, и "or {}" его не подменяет.
+        данные = val.get("data")
+        разбор = данные.get("parsed") if isinstance(данные, dict) else None
+        info = разбор.get("info") if isinstance(разбор, dict) else None
+        if not isinstance(info, dict):
+            info = {}
         out["decimals"] = info.get("decimals")
         for e in info.get("extensions") or []:
             if isinstance(e, dict) and e.get("extension") == "transferFeeConfig":
@@ -2759,6 +2777,30 @@ def self_test() -> int:
         and s_служ["route"]["via_intermediate"] is False, s_служ["route"])
     chk("но он виден отдельным полем записи",
         s_служ["route"]["authorized_only_mints"] == ["СЛУЖЕБНЫЙ"], s_служ["route"])
+
+    # Инструкция memo: у неё parsed -- СТРОКА, а не объект. 24.09 в 14:10:50Z
+    # боевой разбор упал на этом целиком (AttributeError у 'str'), сигнал
+    # источника Beqv6dzT был потерян. Проверка повторяет ту форму дословно.
+    tx_memo = tx_маршрут()
+    tx_memo["transaction"]["message"]["instructions"].append(
+        {"programId": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+         "program": "spl-memo", "parsed": "заметка строкой, а не объектом"})
+    s_memo = сигнал_из_транзакции(tx_memo, "SRC", подпись="MEMO1")
+    chk("инструкция memo с parsed-строкой не роняет разбор сигнала",
+        s_memo is not None and "route" in s_memo, s_memo)
+    tx_memo2 = tx_маршрут(подписанные=["СЛУЖЕБНЫЙ"])
+    tx_memo2["meta"]["innerInstructions"].append(
+        {"index": 0, "instructions": [{"programId": "MemoSq4", "parsed": "строка"}]})
+    s_memo2 = сигнал_из_транзакции(tx_memo2, "SRC", подпись="MEMO2")
+    chk("memo во ВНУТРЕННИХ инструкциях тоже не роняет разбор",
+        s_memo2["route"]["authorized_only_mints"] == ["СЛУЖЕБНЫЙ"],
+        s_memo2["route"])
+    chk("и info-строка вместо объекта не роняет",
+        сигнал_из_транзакции(
+            (lambda t: (t["transaction"]["message"]["instructions"].append(
+                {"programId": "P", "parsed": {"type": "transferChecked",
+                                               "info": "строка"}}), t)[1])(
+                tx_маршрут()), "SRC", подпись="MEMO3") is not None)
 
     # чужой перевод с явным минтом -- не наш: authority не источник
     t_чуж = tx_маршрут()

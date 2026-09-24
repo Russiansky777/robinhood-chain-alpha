@@ -1,0 +1,91 @@
+name: "Переиграть потерянный сигнал (только чтение)"
+
+# Разбирает ОДНУ транзакцию источника тем же кодом, что и служба: какая
+# инструкция ломала разбор и какой была трата в SOL-эквиваленте против
+# порога входа. Ни одного ордера, на VPS не ходит.
+on:
+  workflow_dispatch:
+    inputs:
+      signature:
+        description: "подпись транзакции источника"
+        required: true
+      source:
+        description: "адрес источника"
+        required: true
+      out:
+        description: "куда положить разбор (пусто -- data/bloom_signal_replay.json)"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-signal-replay
+  cancel-in-progress: false
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Зависимости
+        run: pip install -q requests
+
+      - name: "Самопроверки"
+        run: |
+          set -e
+          python analysis/bloom_signal_replay.py --self-test
+
+      - name: "Разбор транзакции"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          OUT="${{ inputs.out }}"
+          [ -n "$OUT" ] || OUT=data/bloom_signal_replay.json
+          echo "OUT_PATH=$OUT" >> "$GITHUB_ENV"
+          mkdir -p "$(dirname "$OUT")"
+          python -u analysis/bloom_signal_replay.py \
+            --signature "${{ inputs.signature }}" \
+            --source "${{ inputs.source }}" \
+            --out "$OUT"
+
+      - name: "Ключа в разборе быть не должно"
+        if: always()
+        run: |
+          set -e
+          python - <<'PY'
+          import re, sys, os, pathlib
+          путь = pathlib.Path(os.environ.get("OUT_PATH") or "data/bloom_signal_replay.json")
+          if not путь.exists():
+              print("файла разбора нет"); sys.exit(0)
+          текст = путь.read_text(encoding="utf-8", errors="replace")
+          if re.search(r"api-key=[A-Za-z0-9._\-]{8,}", текст):
+              print("в разборе виден ключ"); sys.exit(1)
+          print("ключа в разборе нет")
+          PY
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_PATH" ] && git add "$OUT_PATH"
+          git add -A data/helius_usage 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Переигровка потерянного сигнала [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
