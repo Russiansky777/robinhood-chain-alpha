@@ -185,7 +185,12 @@ def разгонные_по_цепи(helius, *, сколько: int = 3, иск�
     try:
         блок = helius.call("getBlock", [цель, {
             "encoding": "jsonParsed", "transactionDetails": "accounts",
-            "rewards": False, "maxSupportedTransactionVersion": 0}])
+            "rewards": False,
+            # Потолок версии берётся из детектора, а не ставится нулём: в
+            # блоках уже встречаются транзакции версии 1, и на нуле узел
+            # отказывает целиком -- разгонные адреса не набрались вовсе
+            # (прогон 13:13Z, ошибка -32015).
+            "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}])
     except Exception as exc:  # noqa: BLE001
         return {"known": False, "why_not": f"getBlock {цель}: {type(exc).__name__}: {exc}"}
     счёт: dict = {}
@@ -446,6 +451,25 @@ def self_test() -> None:
         р["known"] and р["accounts"][0] == "БОТ" and "НАШ" not in р["accounts"],
         р)
     chk("и назван слот, из которого они взяты", р["slot"] == 970, р.get("slot"))
+
+    # Потолок версии транзакций в запросе блока должен быть НЕ нулевым:
+    # на нуле узел отказывает целиком (ошибка -32015), и разгонные адреса не
+    # набираются вовсе -- ровно это случилось на прогоне 13:13Z.
+    class HeliusВерсия:
+        def __init__(self):
+            self.потолок = None
+
+        def call(self, метод, параметры):
+            if метод == "getSlot":
+                return 1000
+            self.потолок = параметры[1].get("maxSupportedTransactionVersion")
+            return {"transactions": [{"transaction": {"accountKeys": [
+                {"pubkey": "БОТ", "signer": True}]}}]}
+
+    hv = HeliusВерсия()
+    разгонные_по_цепи(hv, сколько=1)
+    chk("потолок версии транзакций берётся из детектора, а не ноль",
+        hv.потолок == BD.ПОТОЛОК_ВЕРСИИ_TX and hv.потолок >= 1, hv.потолок)
 
     class HeliusМолчит:
         def call(self, *a, **kw):
