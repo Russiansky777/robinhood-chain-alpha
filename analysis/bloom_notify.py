@@ -43,6 +43,16 @@ def включено() -> bool:
     return (os.environ.get("BLOOM_TELEGRAM_LIVE_TEST", "0").strip() == "1")
 
 
+def боевые_тоже() -> bool:
+    """Слать ли строки по БОЕВЫМ источникам. По умолчанию нет.
+
+    Решение владельца при переходе на live: боевые события тоже слать. Но
+    включаться это должно явно: у боевых источников порядка 260 решений в
+    сутки, и включить такой поток побочным следствием деплоя нельзя.
+    """
+    return (os.environ.get("BLOOM_TELEGRAM_REAL", "0").strip() == "1")
+
+
 def настроен() -> tuple:
     токен = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
     чат = (os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
@@ -100,9 +110,12 @@ def строка_покупки(*, exec_row: dict, наш_слот: int | None,
     адрес = exec_row.get("buy_address")
     куда = (f"пул {кратко(адрес, 8)}" if вид == "pool" else "минт")
     if (isinstance(наш_слот, int) and isinstance(слот_источника, int)):
-        дельта = f"S+{наш_слот - слот_источника}"
+            # S+N -- ТОЛЬКО по цепи: слот посадки нашей транзакции против слота
+        # источника. В момент отправки слота посадки ещё нет, и писать его
+        # тогда значило бы выдавать намерение за факт.
+        дельта = f"S+{наш_слот - слот_источника} по цепи"
     else:
-        дельта = "S+?"
+        дельта = "S+? (посадка не подтверждена)"
     размер = (f"{float(размер_sol):.4f} SOL"
               if isinstance(размер_sol, (int, float)) else "размер ?")
     хвост = (" · " + ",".join(метки)) if метки else ""
@@ -244,13 +257,15 @@ def self_test() -> int:
                                       "buy_address": "5N9DdF1w1Q6tae"},
                             наш_слот=449836346, слот_источника=449836345,
                             размер_sol=0.001, метки=["ROUTE_MISMATCH"])
-        chk("в строке покупки есть S+1", "S+1" in b, b)
+        chk("в строке покупки есть S+1 и сказано, что по цепи",
+            "S+1 по цепи" in b, b)
         chk("и сказано, что покупали по пулу", "по пул" in b, b)
         chk("и метка расхождения маршрутов видна", "ROUTE_MISMATCH" in b, b)
         b2 = строка_покупки(exec_row={"exec_code": "SENT", "signatures": [],
                                        "buy_address_kind": "mint"},
                             наш_слот=None, слот_источника=1, размер_sol=None)
-        chk("неизвестный слот не выдумывается", "S+?" in b2, b2)
+        chk("неизвестный слот не выдумывается и помечен",
+            "S+? (посадка не подтверждена)" in b2, b2)
         chk("и неизвестный размер тоже", "размер ?" in b2, b2)
 
         p = строка_продажи(ok=False, код="ProgramFailedToComplete", через="сторож, минт",
@@ -303,6 +318,18 @@ def self_test() -> int:
         o4 = Оповещатель(отправитель=приёмник, в_фоне=False)
         r4 = o4.отправить("не должно уйти")
         chk("выключенные строки не отправляются", r4.get("skipped") is True, r4)
+        os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = "1"
+        было_боевые = os.environ.pop("BLOOM_TELEGRAM_REAL", None)
+        try:
+            chk("боевые источники по умолчанию молчат", боевые_тоже() is False)
+            os.environ["BLOOM_TELEGRAM_REAL"] = "1"
+            chk("и включаются отдельным выключателем", боевые_тоже() is True)
+        finally:
+            if было_боевые is None:
+                os.environ.pop("BLOOM_TELEGRAM_REAL", None)
+            else:
+                os.environ["BLOOM_TELEGRAM_REAL"] = было_боевые
+        os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = "0"
         chk("и это не считается сбоем", o4.статус()["failed"] == 0, o4.статус())
 
         os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = "1"

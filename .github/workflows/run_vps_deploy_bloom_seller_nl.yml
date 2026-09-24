@@ -170,6 +170,17 @@ jobs:
           # ломался на закрывающей метке с отступом.
           python3 analysis/bloom_key_match.py
 
+      - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
+        run: |
+          set -e
+          # Читаем только два значения и только их. Ключи не печатаются.
+          PREV=$(ssh -n $SSH_OPTS root@$HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL)=' $ENV_DIR/env || true")
+          LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
+          BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
+          echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS]"
+          echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
+          echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
+
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         env:
           BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
@@ -224,7 +235,16 @@ jobs:
             echo "BLOOM_SELL_AFTER_S=$SELL_AFTER_S"
             echo "BLOOM_MAX_OPEN=5"
             echo "BLOOM_DAILY_LOSS_SOL=1"
-            echo "BLOOM_BUY_SOL=0.2"
+            # Боевой флаг и размер боевой покупки ПЕРЕНОСЯТСЯ из прежнего env,
+            # а не задаются здесь. Этот шаг перезаписывает файл целиком, и без
+            # переноса любой деплой сторожа молча выключал бы боевые покупки и
+            # возвращал размер к 0.2 SOL -- то есть менял деньги на ровном
+            # месте. Значения читаются с хоста ДО перезаписи (см. шаг выше).
+            echo "BLOOM_BUY_SOL=${BUY_SOL_PREV:-0.05}"
+            if [ "${LIVE_BUY_PREV:-}" = "1" ]; then
+              echo "BLOOM_LIVE_BUY=1"
+              echo "BLOOM_TELEGRAM_REAL=1"
+            fi
           } > /tmp/bloom_env
           ssh $SSH_OPTS root@$HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env
           shred -u /tmp/bloom_env

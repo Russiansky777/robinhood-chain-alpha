@@ -47,6 +47,14 @@ on:
         description: "'1' -- строки о событиях стенда в Telegram (по умолчанию 1)"
         required: false
         default: "1"
+      live_buy:
+        description: "'1' -- ЖИВЫЕ покупки по РЕАЛЬНЫМ источникам (только по слову владельца)"
+        required: false
+        default: "0"
+      buy_sol:
+        description: "размер боевой покупки в SOL"
+        required: false
+        default: "0.05"
 
 concurrency:
   group: bloom-detector-deploy
@@ -179,13 +187,28 @@ jobs:
             # здесь только выключатель, и он переписывается на каждом деплое.
             sed -i '/^BLOOM_TELEGRAM_LIVE_TEST=/d' $ENV_DIR/env
             echo 'BLOOM_TELEGRAM_LIVE_TEST=${{ inputs.telegram_live_test }}' >> $ENV_DIR/env
-            # BLOOM_LIVE_BUY вычищается ВСЕГДА: боевые покупки по реальным
-            # источникам этот файл не включает ни при каких входных данных.
+            # Строки по БОЕВЫМ источникам идут вместе с боевыми покупками:
+            # включать поток в 260 решений в сутки, не включая покупки,
+            # смысла нет, а включать покупки без строк -- опасно.
+            sed -i '/^BLOOM_TELEGRAM_REAL=/d' $ENV_DIR/env
+            echo 'BLOOM_TELEGRAM_REAL=${{ inputs.live_buy }}' >> $ENV_DIR/env
+            # BLOOM_LIVE_BUY вычищается ВСЕГДА и включается ТОЛЬКО отдельным
+            # входом live_buy ниже: покупка по реальному источнику -- это
+            # настоящие деньги, и включаться она должна одним осознанным
+            # действием, а не побочным следствием любого деплоя.
             sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env
+            sed -i '/^BLOOM_BUY_SOL=/d' $ENV_DIR/env
+            echo 'BLOOM_BUY_SOL=${{ inputs.buy_sol }}' >> $ENV_DIR/env
             sed -i '/^BLOOM_LIVE_TEST=/d' $ENV_DIR/env
             chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
             ls -l $ENV_DIR/env
           "
+          if [ "${{ inputs.live_buy }}" = "1" ]; then
+            echo "БОЕВЫЕ ПОКУПКИ: включаю BLOOM_LIVE_BUY=1, размер ${{ inputs.buy_sol }} SOL"
+            ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_BUY=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+          else
+            echo "боевые покупки ВЫКЛЮЧЕНЫ: BLOOM_LIVE_BUY не задан"
+          fi
           if [ "${{ inputs.live_test }}" = "yes" ]; then
             echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
             ssh -n $SSH_OPTS root@$HOST "echo 'BLOOM_LIVE_TEST=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
