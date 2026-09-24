@@ -565,6 +565,36 @@ def пул_и_прямизна(tx: dict, *, минт: str, кошелёк: str |
              "candidates": пулы.get("candidates")}
 
 
+def рента_новых_счетов(tx: dict, кошелёк: str) -> float:
+    """Аренда токен-счетов, СОЗДАННЫХ в этой транзакции для кошелька, в SOL.
+
+    Зачем это отдельной величиной: при покупке за USDC источник всё равно
+    тратит нативный SOL -- на комиссию и на аренду нового ATA под купленный
+    токен. Если считать этот SOL тратой, покупка на 1000 USDC выглядит как
+    вход 0.007 SOL и не проходит порог. Комиссию из нативной дельты уже
+    вычитает балансы_кошелька; аренда считается здесь -- по факту, из роста
+    лампортов у самих новых счетов, а не по табличному значению 0.00203928.
+
+    Учитывается только УДЕРЖАННАЯ аренда: временный WSOL-счёт, закрытый в
+    той же транзакции, к концу имеет ноль и в сумму не попадает.
+    """
+    meta = (tx or {}).get("meta") or {}
+    pre_n = meta.get("preBalances") or []
+    post_n = meta.get("postBalances") or []
+    было = {b.get("accountIndex") for b in (meta.get("preTokenBalances") or [])
+             if isinstance(b, dict) and b.get("owner") == кошелёк}
+    рента = 0
+    for b in meta.get("postTokenBalances") or []:
+        if not isinstance(b, dict) or b.get("owner") != кошелёк:
+            continue
+        i = b.get("accountIndex")
+        if i in было or not isinstance(i, int):
+            continue
+        if i < len(pre_n) and i < len(post_n):
+            рента += max(0, int(post_n[i]) - int(pre_n[i]))
+    return рента / LAMPORT
+
+
 def сигнал_из_транзакции(tx: dict, источник: str, *, подпись: str,
                           слот: int | None = None) -> dict:
     """Чистый разбор: что именно сделал источник. Без сети и состояния."""
@@ -612,15 +642,32 @@ def сигнал_из_транзакции(tx: dict, источник: str, *, �
         сиг["first_entry"] = not з["in_pre"] or з["pre_raw"] == 0
         сиг["token_program"] = з.get("program")
         сиг["received_ui"] = з.get("delta_ui")
-        if sol_ушло > 0:
-            сиг["spend_mint"] = WSOL
-            сиг["spend_ui"] = sol_ушло
-            сиг["spend"] = sol_ушло          # уже в SOL
-        elif стабиль_ушло:
-            m2 = max(стабиль_ушло, key=lambda k: стабиль_ушло[k])
-            сиг["spend_mint"] = m2
-            сиг["spend_ui"] = стабиль_ушло[m2]
-            сиг["spend"] = None              # нужен курс
+        # Нативный SOL при покупке за стейбл уходит на комиссию и аренду
+        # нового ATA -- это не трата на вход. Комиссию вычли в
+        # балансы_кошелька, аренду вычитаем здесь, и обе величины остаются в
+        # записи: иначе "почему 0.007" не проверить.
+        рента = рента_новых_счетов(tx, источник)
+        sol_чистое = max(0.0, sol_ушло - рента)
+        сиг["sol_out_gross"] = sol_ушло or None
+        сиг["rent_new_accounts_sol"] = рента or None
+        кандидаты = dict(стабиль_ушло)
+        if sol_чистое > 0:
+            кандидаты[WSOL] = sol_чистое
+        сиг["spend_candidates"] = кандидаты or None
+        if кандидаты:
+            # Предварительный выбор -- без курса: одна нога берётся как есть,
+            # из нескольких SOL-нога выбирается только если стейблов нет.
+            # Окончательно ногу выбирает в_sol, по SOL-эквиваленту: ровно на
+            # этом месте раньше терялись покупки за USDC.
+            if WSOL in кандидаты and len(кандидаты) == 1:
+                сиг["spend_mint"] = WSOL
+                сиг["spend_ui"] = кандидаты[WSOL]
+                сиг["spend"] = кандидаты[WSOL]      # уже в SOL
+            else:
+                m2 = max(стабиль_ушло, key=lambda k: стабиль_ушло[k])
+                сиг["spend_mint"] = m2
+                сиг["spend_ui"] = стабиль_ушло[m2]
+                сиг["spend"] = None                  # нужен курс
         else:
             сиг["kind"] = "received"
             сиг["decide_reason"] = (
@@ -725,7 +772,41 @@ class КурсSOL:
 
 
 def в_sol(сигнал: dict, курс_usd: float | None) -> tuple[float | None, str]:
-    """Трата источника в SOL-эквиваленте. Возвращает (сумма, пояснение)."""
+    """Трата источника в SOL-эквиваленте. Возвращает (сумма, пояснение).
+
+    Если в транзакции ушли И стейблы, И нативный SOL, нога выбирается по
+    БОЛЬШЕМУ SOL-эквиваленту, а не по приоритету валюты. Так потерялись две
+    настоящие покупки: источник платил 1000 и 2317 USDC, а тратой считался
+    остаток нативного SOL (аренда нового ATA) -- 0.0067 и 0.00055 SOL. При
+    пороге 2 SOL обе ушли в TARGET_AMOUNT_OUT_OF_RANGE, а DBot их купил.
+
+    Побочная функция выбора: она же ставит spend_mint/spend_ui в сигнал,
+    чтобы в журнале стояла та нога, по которой принято решение.
+    """
+    канд = сигнал.get("spend_candidates") or {}
+    if len(канд) > 1:
+        sol_нога = float(канд.get(WSOL) or 0.0)
+        стейблы = {m: v for m, v in канд.items() if m in СТАБИЛЬНЫЕ}
+        if not курс_usd or курс_usd <= 0:
+            # Без курса большую ногу не назвать. Молча взять SOL-ногу нельзя:
+            # именно так покупка за стейбл и превращается в "вход 0.007".
+            return None, ("две ноги траты (SOL и стейбл), курса SOL/USD нет -- "
+                           "какая нога больше, не определить")
+        лучший_м = max(стейблы, key=lambda k: стейблы[k])
+        стейбл_sol = float(стейблы[лучший_м]) / float(курс_usd)
+        if стейбл_sol >= sol_нога:
+            сигнал["spend_mint"] = лучший_м
+            сигнал["spend_ui"] = стейблы[лучший_м]
+            сигнал["spend"] = None
+            return стейбл_sol, (f"две ноги: {sol_нога:.6f} SOL и "
+                                 f"{стейблы[лучший_м]:.6f} стейбла = "
+                                 f"{стейбл_sol:.6f} SOL по курсу "
+                                 f"{курс_usd:.2f} USD/SOL -- взята большая")
+        сигнал["spend_mint"] = WSOL
+        сигнал["spend_ui"] = sol_нога
+        сигнал["spend"] = sol_нога
+        return sol_нога, (f"две ноги: {sol_нога:.6f} SOL и "
+                           f"{стейбл_sol:.6f} SOL в стейбле -- взята большая")
     if сигнал.get("spend") is not None:
         return float(сигнал["spend"]), "трата в SOL/WSOL, курс не нужен"
     if сигнал.get("spend_mint") in СТАБИЛЬНЫЕ and сигнал.get("spend_ui"):
@@ -2571,15 +2652,29 @@ def self_test() -> int:
         chk("узел не отдал нашу транзакцию -- сказано, а не выдумано",
             зап3.get("why_not") and зап3.get("our_pool") is None, зап3)
 
-    # 16в. ЖИВАЯ транзакция п. 3: разбор на настоящих данных
-    сырой_путь = REPO_ROOT / "data" / "bloom_tx_raw.json"
+    # 16в. ЖИВЫЕ транзакции: разбор на настоящих данных.
+    #
+    # Файл РЕГРЕССИИ отдельный и постоянный. Раньше эти проверки читали
+    # data/bloom_tx_raw.json -- свалку последнего прогона разбора, которую
+    # каждый новый прогон перезаписывает. Регрессия при этом не падала, а
+    # ТИХО ПРОПАДАЛА: нужной транзакции в файле нет -- блок просто не
+    # выполнялся. Теперь случаи лежат в bloom_regression_txs.json, и их
+    # отсутствие -- провал самопроверки, а не тишина.
+    сырой_путь = REPO_ROOT / "data" / "bloom_regression_txs.json"
     РЕД = "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x"
     ФОМО = "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
     try:
         сырое = json.loads(сырой_путь.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         сырое = {}
-        chk("файл с живой транзакцией п. 3 читается", False, str(exc))
+        chk("файл живых случаев регрессии читается", False, str(exc))
+
+    def найти_tx(подпись_начало: str) -> dict | None:
+        for п, з in (сырое or {}).items():
+            if п.startswith(подпись_начало):
+                return ((з or {}).get("tx") or {}) or None
+        return None
+
     живая = None
     for подпись, зап in (сырое or {}).items():
         tx_ж = (зап or {}).get("tx") or {}
@@ -2588,6 +2683,7 @@ def self_test() -> int:
         if РЕД in минты:
             живая = (подпись, tx_ж)
             break
+    chk("живая транзакция п. 3 (RED) в файле регрессии есть", живая is not None)
     if живая:
         подпись_ж, tx_ж = живая
         s_ж = сигнал_из_транзакции(tx_ж, ФОМО, подпись=подпись_ж,
@@ -2610,6 +2706,93 @@ def self_test() -> int:
             chk("решение по живой транзакции п. 3 -- BUY",
                 r_ж.get("action") == "buy" and r_ж.get("code") == КОД_КУПИТЬ,
                 (r_ж.get("action"), r_ж.get("code"), r_ж.get("reason")))
+
+    # 16в-2. ЖИВЫЕ покупки за USDC, потерянные на пороге.
+    #
+    # Источник платил 1000 и 2317 USDC, но сам же платил комиссию и аренду
+    # нового ATA -- и тратой считался остаток нативного SOL: 0.0067 и
+    # 0.00055 SOL при пороге 2. Обе ушли в TARGET_AMOUNT_OUT_OF_RANGE, DBot
+    # их купил. Проверка идёт на настоящих ответах узла.
+    КУРС_ТОГДА = 115.16152492277841
+    ПОТЕРИ = (
+        ("2EwScfixkH1ZZ", "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+         "FLyzixQCC1osJxi3uhQAntuKvgDZ1pUAiDEobi8z9MNL", 1000.0, 8.68),
+        ("33Kvehwq4LDNk", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+         "CvUX4G2tzq7J3ECmNvWZLayZYV6KpgQp6SJ5K8Uvsu5g", 2317.0, 20.11),
+    )
+    for начало, источник_п, минт_п, usdc, sol_ожид in ПОТЕРИ:
+        tx_п = найти_tx(начало)
+        chk(f"живой случай {начало} есть в файле регрессии", tx_п is not None)
+        if not tx_п:
+            continue
+        s_п = сигнал_из_транзакции(tx_п, источник_п, подпись=начало,
+                                    слот=tx_п.get("slot"))
+        chk(f"{начало}: это покупка", s_п.get("kind") == "buy", s_п.get("kind"))
+        chk(f"{начало}: минт покупки узнан", s_п.get("mint") == минт_п, s_п.get("mint"))
+        трата_п, пояснение_п = в_sol(s_п, КУРС_ТОГДА)
+        chk(f"{начало}: тратой признан USDC, а не остаток SOL",
+            s_п.get("spend_mint") == USDC
+            and abs((s_п.get("spend_ui") or 0) - usdc) < 1e-6,
+            (s_п.get("spend_mint"), s_п.get("spend_ui"), пояснение_п))
+        chk(f"{начало}: SOL-эквивалент около {sol_ожид}",
+            трата_п is not None and abs(трата_п - sol_ожид) < 0.05, трата_п)
+        ок_п, код_п, почему_п = фильтры_dbot(s_п, трата_п, порог_sol=2.0)
+        chk(f"{начало}: при пороге 2 SOL это BUY, а не TARGET_AMOUNT_OUT_OF_RANGE",
+            ок_п is True, (код_п, почему_п))
+
+    # Аренда новых счетов вычитается по факту, а не по табличному значению.
+    tx_рента = найти_tx("2EwScfixkH1ZZ")
+    if tx_рента:
+        s_р = сигнал_из_транзакции(
+            tx_рента, "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+            подпись="2EwScfixkH1ZZ", слот=tx_рента.get("slot"))
+        chk("аренда нового счёта посчитана и вычтена из SOL-ноги",
+            (s_р.get("rent_new_accounts_sol") or 0) > 0
+            and (s_р.get("spend_candidates") or {}).get(WSOL, 0)
+                < (s_р.get("sol_out_gross") or 0),
+            (s_р.get("rent_new_accounts_sol"), s_р.get("sol_out_gross"),
+             (s_р.get("spend_candidates") or {}).get(WSOL)))
+
+    # Без курса две ноги не сравнить -- и молча брать SOL-ногу нельзя.
+    if tx_рента:
+        s_бк = сигнал_из_транзакции(
+            tx_рента, "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+            подпись="2EwScfixkH1ZZ", слот=tx_рента.get("slot"))
+        трата_бк, пояснение_бк = в_sol(s_бк, None)
+        chk("без курса две ноги -- честный отказ, а не SOL-нога",
+            трата_бк is None and "курса" in пояснение_бк, (трата_бк, пояснение_бк))
+        ок_бк, код_бк, _ = фильтры_dbot(s_бк, трата_бк, порог_sol=2.0)
+        chk("и код при этом -- отсутствие курса", код_бк == КОД_НЕТ_КУРСА, код_бк)
+
+    # 16в-3. ЖИВЫЕ пять покупок, срезанных СТАРЫМ правилом маршрута.
+    # Все пять -- покупки за USDC, где комиссию платил сторонний кошелёк, а
+    # лишние минты источник только ПОДПИСЫВАЛ. Новое правило их пропускает.
+    МАРШРУТЫ = (
+        ("3jYZjKVWjDuo", "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
+         "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt"),
+        ("2kLHjtpm2e43", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+         "DtYzXe9cR6b6ExReMCn5yHzvbS4nUQZ1GkBQDqQoSTNK"),
+        ("4kozkrJN8KVs", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+         "HpWGRTs5x2pmWrGKpD5cXpZhja1uuXbPBqf7kYo2mz86"),
+        ("5gojtrRZK57X", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+         "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4"),
+        ("2j46i2LVmm5M", "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+         "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4"),
+    )
+    for начало, источник_м, минт_м in МАРШРУТЫ:
+        tx_м = найти_tx(начало)
+        chk(f"живой случай маршрута {начало} есть в файле регрессии", tx_м is not None)
+        if not tx_м:
+            continue
+        s_м = сигнал_из_транзакции(tx_м, источник_м, подпись=начало,
+                                    слот=tx_м.get("slot"))
+        трата_м, _ = в_sol(s_м, КУРС_ТОГДА)
+        ок_м, код_м, почему_м = фильтры_dbot(s_м, трата_м, порог_sol=2.0)
+        chk(f"{начало}: минт покупки тот самый", s_м.get("mint") == минт_м, s_м.get("mint"))
+        chk(f"{начало}: промежуточных минтов по новому правилу нет",
+            not (s_м.get("route") or {}).get("via_intermediate"),
+            (s_м.get("route") or {}).get("intermediate_mints"))
+        chk(f"{начало}: решение -- BUY", ок_м is True, (код_м, почему_м))
 
     # 16г. падение разбора не рвёт подписку
     with tempfile.TemporaryDirectory() as d:
