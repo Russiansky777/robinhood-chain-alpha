@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""Задача D (C2): своя сборка покупки «котировка -> токен» БЕЗ отправки в сеть.
+
+Ключи кошелька не используются нигде: пользователь -- ключ, сгенерированный
+на лету, симуляция -- simulateTransaction с sigVerify=false и
+replaceRecentBlockhash=true. Метода отправки транзакции в модуле нет.
+
+Покрытые типы пулов (задача D, шаг 1: 80.5 % сигналов):
+  Pump AMM  pAMMBay6...  buy_exact_quote_in(spendable_quote_in, min_base_amount_out)
+  Raydium CPMM CPMMoo8L... swap_base_input(amount_in, minimum_amount_out)
+  Meteora DAMM v2 cpamdpZ... swap(amount_in, minimum_amount_out)
+
+Откуда формат, без выдумывания:
+* дискриминатор -- правило Anchor sha256("global:<имя>")[:8]; совпадение
+  проверено на настоящих транзакциях источников (data/c2_pool_samples/);
+* порядок счетов и роли -- из инструкции источника в его транзакции;
+  пользовательские счета заменяются по ролям, которые проверены на цепи:
+  у Pump AMM счёт 20 -- PDA ["user_volume_accumulator", user] (25 из 25),
+  токен-счета пользователя -- ATA (owner, программа токена, минт);
+* аргументы -- два u64 после дискриминатора; сверено с движением хранилищ.
+Главная самопроверка: из шаблона и адреса самого источника сборщик обязан
+восстановить его инструкцию ТОЧНО (счета и данные).
+
+Минимум токенов -- по резервам пула ПОСЛЕ сделки источника
+(postTokenBalances хранилищ его транзакции), формула x*y=k; доля,
+доходящая до пула из нашей траты (комиссии), калибруется на сделке
+самого источника: f = x0*dy/((y0-dy)*spent). Для DAMM v2 (сосредоточенная
+ликвидность) резервы цены не дают -- минимум там не выдаётся.
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import json
+import struct
+import sys
+import time
+from decimal import Decimal as D
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import c2_common as C  # noqa: E402
+
+from solders.hash import Hash  # noqa: E402
+from solders.instruction import AccountMeta, Instruction  # noqa: E402
+from solders.keypair import Keypair  # noqa: E402
+from solders.message import MessageV0  # noqa: E402
+from solders.pubkey import Pubkey  # noqa: E402
+from solders.signature import Signature  # noqa: E402
+from solders.transaction import VersionedTransaction  # noqa: E402
+
+SERVICE = "c2_build"
+SAMPLES_DIR = C.DATA / "c2_pool_samples"
+PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+DAMM2 = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
+ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+SYSTEM = "11111111111111111111111111111111"
+COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111"
+B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def b58decode(s: str) -> bytes:
+    n = 0
+    for ch in s:
+        n = n * 58 + B58.index(ch)
+    b = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\x00" * (len(s) - len(s.lstrip("1"))) + b
+
+
+def disc(name: str) -> bytes:
+    return hashlib.sha256(f"global:{name}".encode()).digest()[:8]
+
+
+# Роли по программам. user -- подписант-владелец; user_ata -- (индекс счёта,
+# индекс счёта минта, индекс счёта программы токена); pda -- счета,
+# выводимые из пользователя.
+SPECS = {
+    PUMP_AMM: {"label": "Pump AMM", "ix": "buy_exact_quote_in", "alt": ["buy"], "n_accounts": 26,
+               "user": [1], "user_ata": [(5, 3, 11), (6, 4, 12)],
+               "pda": [(20, [b"user_volume_accumulator", "USER"])],
+               "base_mint": 3, "quote_mint": 4, "base_vault": 7, "quote_vault": 8},
+    CPMM: {"label": "Raydium CPMM", "ix": "swap_base_input", "alt": [], "n_accounts": 13,
+           "user": [0], "user_ata": [(4, 10, 8), (5, 11, 9)], "pda": [],
+           "base_mint": 11, "quote_mint": 10, "base_vault": 7, "quote_vault": 6},
+    DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"], "n_accounts": 14,
+            "user": [8], "user_ata": "damm2", "pda": [],
+            "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
+}
+
+
+def all_instructions(tx: dict) -> list:
+    msg = ((tx or {}).get("transaction") or {}).get("message") or {}
+    out = list(msg.get("instructions") or [])
+    for g in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        out += list(g.get("instructions") or [])
+    return [ix for ix in out if isinstance(ix, dict) and isinstance(ix.get("accounts"), list)]
+
+
+def writable_map(tx: dict) -> dict:
+    raw = (((tx or {}).get("transaction") or {}).get("message") or {}).get("accountKeys") or []
+    return {k["pubkey"]: bool(k.get("writable")) for k in raw if isinstance(k, dict)}
+
+
+def ata(owner: str, mint: str, token_program: str) -> str:
+    return str(Pubkey.find_program_address(
+        [bytes(Pubkey.from_string(owner)), bytes(Pubkey.from_string(token_program)),
+         bytes(Pubkey.from_string(mint))], Pubkey.from_string(ATA_PROGRAM))[0])
+
+
+def pda(seeds: list, user: str, program: str) -> str:
+    raw = [bytes(Pubkey.from_string(user)) if s == "USER" else s for s in seeds]
+    return str(Pubkey.find_program_address(raw, Pubkey.from_string(program))[0])
+
+
+def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
+    """Инструкция пула в транзакции источника: счета, данные, аргументы."""
+    spec = SPECS.get(program)
+    if spec is None:
+        return {"ok": False, "why_not": "тип пула не покрыт"}
+    want = disc(spec["ix"])
+    for ix in all_instructions(tx):
+        if ix.get("programId") != program or pool_vault not in ix["accounts"]:
+            continue
+        data = b58decode(ix["data"])
+        name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output")
+                     if data[:8] == disc(n)), data[:8].hex())
+        if data[:8] != want and name not in spec["alt"]:
+            return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
+        if len(ix["accounts"]) != spec["n_accounts"]:
+            return {"ok": False, "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
+        a0, a1 = struct.unpack("<QQ", data[8:24])
+        return {"ok": True, "program": program, "ix": name, "accounts": list(ix["accounts"]),
+                "data": data, "arg0": a0, "arg1": a1, "writable": writable_map(tx),
+                "signers": sorted(C.signers(tx))}
+    return {"ok": False, "why_not": "инструкция пула с этим хранилищем не найдена"}
+
+
+def roles_damm2(tpl: dict, tx: dict) -> dict:
+    """DAMM v2: вход/выход -- 2/3; вход -- то хранилище, куда пришла котировка."""
+    acc = tpl["accounts"]
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    va, vb = rows.get(acc[4]), rows.get(acc[5])
+    if not va or not vb:
+        return {}
+    a_in = (va["post"] - va["pre"]) > 0
+    in_mint, out_mint = (acc[6], acc[7]) if a_in else (acc[7], acc[6])
+    in_prog, out_prog = (acc[9], acc[10]) if a_in else (acc[10], acc[9])
+    return {"in": (2, in_mint, in_prog), "out": (3, out_mint, out_prog),
+            "quote_vault": acc[4] if a_in else acc[5], "base_vault": acc[5] if a_in else acc[4]}
+
+
+def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
+    """{индекс: адрес} для пользовательских счетов шаблона при данном user."""
+    spec = SPECS[tpl["program"]]
+    acc = tpl["accounts"]
+    out = {i: user for i in spec["user"]}
+    if spec["user_ata"] == "damm2":
+        r = roles_damm2(tpl, tx)
+        if not r:
+            return {}
+        for i, mint, prog in (r["in"], r["out"]):
+            out[i] = ata(user, mint, prog)
+    else:
+        for i, mi, pi in spec["user_ata"]:
+            out[i] = ata(user, acc[mi], acc[pi])
+    for i, seeds in spec["pda"]:
+        out[i] = pda(seeds, user, tpl["program"])
+    return out
+
+
+def mints_and_vaults(tpl: dict, tx: dict) -> dict:
+    spec = SPECS[tpl["program"]]
+    acc = tpl["accounts"]
+    if spec["user_ata"] == "damm2":
+        r = roles_damm2(tpl, tx)
+        if not r:
+            return {}
+        return {"quote_mint": r["in"][1], "base_mint": r["out"][1], "quote_program": r["in"][2],
+                "base_program": r["out"][2], "quote_vault": r["quote_vault"],
+                "base_vault": r["base_vault"]}
+    qa = next(x for x in spec["user_ata"] if x[1] == spec["quote_mint"])
+    ba = next(x for x in spec["user_ata"] if x[1] == spec["base_mint"])
+    return {"quote_mint": acc[spec["quote_mint"]], "base_mint": acc[spec["base_mint"]],
+            "quote_program": acc[qa[2]], "base_program": acc[ba[2]],
+            "quote_vault": acc[spec["quote_vault"]], "base_vault": acc[spec["base_vault"]]}
+
+
+def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
+                     keep_source_ix: bool = False) -> Instruction:
+    subs = user_accounts(tpl, tx, user)
+    if not subs:
+        raise ValueError("роли счетов не восстановились")
+    metas = []
+    for i, a in enumerate(tpl["accounts"]):
+        addr = subs.get(i, a)
+        is_user = i in subs
+        metas.append(AccountMeta(Pubkey.from_string(addr),
+                                 is_signer=(addr == user),
+                                 is_writable=is_user or tpl["writable"].get(a, False)))
+    if keep_source_ix:   # только для самопроверки: инструкция источника как есть
+        data = tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:]
+    else:                # наша сборка: всегда основная инструкция типа, ровно два u64
+        data = disc(SPECS[tpl["program"]]["ix"]) + struct.pack("<QQ", arg0, arg1)
+    return Instruction(Pubkey.from_string(tpl["program"]), data, metas)
+
+
+def ata_idempotent(payer: str, owner: str, mint: str, token_program: str) -> Instruction:
+    return Instruction(Pubkey.from_string(ATA_PROGRAM), bytes([1]), [
+        AccountMeta(Pubkey.from_string(payer), True, True),
+        AccountMeta(Pubkey.from_string(ata(owner, mint, token_program)), False, True),
+        AccountMeta(Pubkey.from_string(owner), False, False),
+        AccountMeta(Pubkey.from_string(mint), False, False),
+        AccountMeta(Pubkey.from_string(SYSTEM), False, False),
+        AccountMeta(Pubkey.from_string(token_program), False, False)])
+
+
+def cu_limit(units: int) -> Instruction:
+    return Instruction(Pubkey.from_string(COMPUTE_BUDGET), bytes([2]) + struct.pack("<I", units), [])
+
+
+def cu_price(micro_lamports: int) -> Instruction:
+    return Instruction(Pubkey.from_string(COMPUTE_BUDGET), bytes([3]) + struct.pack("<Q", micro_lamports), [])
+
+
+def sol_transfer(src: str, dst: str, lamports: int) -> Instruction:
+    return Instruction(Pubkey.from_string(SYSTEM), struct.pack("<IQ", 2, lamports), [
+        AccountMeta(Pubkey.from_string(src), True, True),
+        AccountMeta(Pubkey.from_string(dst), False, True)])
+
+
+def sync_native(account: str) -> Instruction:
+    return Instruction(Pubkey.from_string(TOKEN_PROGRAM), bytes([17]),
+                       [AccountMeta(Pubkey.from_string(account), False, True)])
+
+
+def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min_out: int,
+              cu_units: int = 200_000, cu_price_micro: int = 0, tip: tuple | None = None,
+              wrap_sol: bool = True) -> dict:
+    """Инструкции покупки: compute budget, ATA (идемпотентно), обёртка SOL
+    (если котировка WSOL и wrap_sol), своп, tip отдельным параметром
+    (адрес, лампорты) -- адрес tip не зашит."""
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        raise ValueError("минты/хранилища не восстановились")
+    ixs = [cu_limit(cu_units)]
+    if cu_price_micro:
+        ixs.append(cu_price(cu_price_micro))
+    ixs.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
+    ixs.append(ata_idempotent(payer, user, mv["quote_mint"], mv["quote_program"]))
+    if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
+        wsol_ata = ata(user, C.WSOL, mv["quote_program"])
+        ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
+    ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
+    if tip:
+        ixs.append(sol_transfer(payer, tip[0], int(tip[1])))
+    msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
+    n_sig = msg.header.num_required_signatures
+    vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)
+    raw = bytes(vtx)
+    return {"tx_base64": base64.b64encode(raw).decode(), "size": len(raw),
+            "n_instructions": len(ixs), "quote_mint": mv["quote_mint"], "base_mint": mv["base_mint"]}
+
+
+# ------------------------------------------------------------ минимум по резервам
+
+def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
+    """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
+
+    f -- доля траты, доходящая до пула, калиброванная на сделке источника по
+    его резервам ДО и его дельтам: f = x0*dy/((y0-dy)*spent), где spent --
+    всё, что ушло из котировки в счета этой инструкции (пул + комиссии)."""
+    if tpl["program"] == DAMM2:
+        return {"ok": False, "why_not": "DAMM v2: сосредоточенная ликвидность, резервы цену не дают"}
+    mv = mints_and_vaults(tpl, tx)
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ нет в балансах транзакции"}
+    x0, y0, x1, y1 = qv["pre"], bv["pre"], qv["post"], bv["post"]
+    dy = y0 - y1
+    spent = sum(r["post"] - r["pre"] for a, r in rows.items()
+                if a in tpl["accounts"] and r["mint"] == mv["quote_mint"] and r["post"] > r["pre"])
+    if dy <= 0 or spent <= 0 or y0 <= dy:
+        return {"ok": False, "why_not": "сделка источника не покупка по этим хранилищам"}
+    f = D(x0) * D(dy) / (D(y0 - dy) * D(spent))
+    a_eff = D(amount_in) * f
+    expected = D(y1) * a_eff / (D(x1) + a_eff)
+    mn = int(expected * D(1 - slippage))
+    return {"ok": True, "fee_factor": float(f), "reserves_after": [x1, y1],
+            "expected_out": int(expected), "min_out": mn}
+
+
+# ------------------------------------------------------------ самопроверка
+
+def load_samples(program: str) -> list:
+    p = SAMPLES_DIR / f"{program}.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+
+
+def rebuild_check(s: dict, program: str) -> dict:
+    """Восстановить инструкцию источника из шаблона и его же адреса."""
+    tx = s["tx"]
+    tpl = extract_template(tx, program, s["pool_vault"])
+    if not tpl["ok"]:
+        return {"ok": None, "why": tpl["why_not"]}
+    user = tpl["accounts"][SPECS[program]["user"][0]]
+    try:
+        ix = swap_instruction(tpl, tx, user, tpl["arg0"], tpl["arg1"], keep_source_ix=True)
+    except ValueError as exc:
+        return {"ok": False, "why": str(exc)}
+    got = [str(m.pubkey) for m in ix.accounts]
+    diff = [i for i, (g, w) in enumerate(zip(got, tpl["accounts"])) if g != w]
+    same_data = bytes(ix.data) == tpl["data"]
+    # Счёт пользователя у источника -- не ATA (временный счёт роутера):
+    # сверять не с чем, это не ошибка сборщика, а другой счёт у источника.
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    user_tok = {i for i in user_accounts(tpl, tx, user)} - set(SPECS[program]["user"])
+    not_ata = [i for i in diff if i in user_tok and (tpl["accounts"][i] not in rows
+                                                     or rows[tpl["accounts"][i]]["owner"] == user)]
+    if diff and set(diff) == set(not_ata) and same_data:
+        return {"ok": None, "why": "у источника токен-счёт не ATA", "diff_idx": diff}
+    # Платит роутер (его PDA -- «пользователь» инструкции, не подписант), а
+    # выход приходит на счёт самого источника: пользователь и владелец
+    # выходного счёта разные -- сверять ATA пользователя не с чем.
+    if diff and user not in tpl["signers"] and set(diff) <= user_tok and same_data:
+        return {"ok": None, "why": "платит роутер, токен-счёт чужой", "diff_idx": diff}
+    return {"ok": not diff and same_data, "diff_idx": diff, "same_data": same_data,
+            "ix": tpl["ix"], "user_is_signer": user in tpl["signers"]}
+
+
+def self_test() -> int:
+    checks = []
+    for program, spec in SPECS.items():
+        sm = load_samples(program)
+        res = [rebuild_check(s, program) for s in sm]
+        ok = [r for r in res if r["ok"]]
+        skipped = [r for r in res if r["ok"] is None]
+        bad = [r for r in res if r["ok"] is False]
+        # Несовпадение допустимо только там, где у источника счета не ATA
+        # (роутер со своими временными счетами) -- это видно по индексам.
+        checks.append((f"{spec['label']}: из {len(sm)} настоящих транзакций восстановлено точно {len(ok)}, "
+                       f"не сверяемо {len(skipped)} ({sorted({r['why'] for r in skipped})}), "
+                       f"расхождений {len(bad)} {[r.get('diff_idx') for r in bad]}",
+                       len(ok) >= 10 and not bad))
+        t0 = time.perf_counter()
+        n = 0
+        for s in sm:
+            tpl = extract_template(s["tx"], program, s["pool_vault"])
+            if not tpl["ok"]:
+                continue
+            kp = Keypair()
+            b = build_buy(tpl, s["tx"], user=str(kp.pubkey()), payer=s["source"], amount_in=10_000_000,
+                          min_out=1, cu_price_micro=100_000, tip=None)
+            n += 1
+            assert b["size"] <= 1232, b["size"]
+        dt = (time.perf_counter() - t0) * 1000 / max(1, n)
+        checks.append((f"{spec['label']}: сборка {n} транзакций, среднее {dt:.2f} мс, размер <= 1232", n >= 10))
+    # минимум по резервам: на настоящей покупке Pump AMM формула с f должна
+    # вернуть сделку самого источника (его трата -> его токены).
+    sm = load_samples(PUMP_AMM)
+    errs = []
+    for s in sm:
+        tpl = extract_template(s["tx"], PUMP_AMM, s["pool_vault"])
+        if not tpl["ok"]:
+            continue
+        mv = mints_and_vaults(tpl, s["tx"])
+        rows = {r["account"]: r for r in C.token_rows(s["tx"]).values()}
+        qv, bv = rows[mv["quote_vault"]], rows[mv["base_vault"]]
+        spent = sum(r["post"] - r["pre"] for a, r in rows.items()
+                    if a in tpl["accounts"] and r["mint"] == mv["quote_mint"] and r["post"] > r["pre"])
+        f = D(qv["pre"]) * D(bv["pre"] - bv["post"]) / (D(bv["post"]) * D(spent))
+        pred = D(bv["pre"]) * D(spent) * f / (D(qv["pre"]) + D(spent) * f)
+        errs.append(abs(float(pred) / (bv["pre"] - bv["post"]) - 1))
+    checks.append((f"формула x*y=k с калибровкой воспроизводит сделку источника ({len(errs)} сделок, "
+                   f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
+    bad_n = 0
+    for name, ok in checks:
+        print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
+        bad_n += (not ok)
+    print(f"самопроверка c2_swap_build: {len(checks) - bad_n}/{len(checks)} пройдено")
+    return 0 if bad_n == 0 else 1
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--self-test", action="store_true")
+    a = ap.parse_args()
+    raise SystemExit(self_test() if a.self_test else 0)

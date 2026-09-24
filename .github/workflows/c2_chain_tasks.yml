@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "crowd | sandwich | both | selftest | probe | pools"
+        description: "crowd | sandwich | both | selftest | probe | pools | build"
         required: false
         default: "both"
       days:
@@ -75,7 +75,7 @@ jobs:
           python-version: "3.11"
 
       - name: "Зависимости"
-        run: pip install -q requests pyyaml
+        run: pip install -q requests pyyaml solders==0.29.0
 
       - name: "Параметры прогона (проверка по белому списку)"
         env:
@@ -104,6 +104,25 @@ jobs:
           python analysis/c2_commit.py --self-test
           python analysis/c2_tx_probe.py --self-test
           python analysis/c2_pool_programs.py --self-test
+          python analysis/c2_swap_build.py --self-test
+          python analysis/c2_swap_sim.py --self-test
+
+      - name: "Задача D: сборка покупки и simulateTransaction (без отправки)"
+        if: env.C2_TASK == 'build'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_swap_sim.py 2>&1 | tee "data/c2_logs/build_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит задачи D"
+        if: always() && env.C2_TASK == 'build'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python analysis/c2_commit.py -m "C2: задача D, симуляция сборки [automated]" "data/c2_swap_sim_*.json" "data/c2_logs/build_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача D, шаг 1: программы пулов сигналов (только чтение цепи)"
         if: env.C2_TASK == 'pools'
