@@ -1458,7 +1458,7 @@ def main(argv=None) -> int:
         if хранилище:
             итог["pool_vault"] = хранилище
             for круг in range(3):
-                сделки = свежие_сделки_пула(rpc, хранилище, сколько=6)
+                сделки = свежие_сделки_пула(rpc, хранилище, сколько=20)
                 подг = подготовить_свою(rpc, сделки,
                                          лампорты=int(РАЗМЕР_SOL * ЛАМПОРТОВ_В_SOL),
                                          кошелёк=кошелёк, семя=f"discover-{круг}",
@@ -1466,7 +1466,7 @@ def main(argv=None) -> int:
                 строка = {к: подг.get(к) for к in
                            ("ok", "why_not", "template_signature", "template_slot",
                             "pool_program", "min_out", "expected_out", "build_ms",
-                            "size", "signed")}
+                            "size", "signed", "attempts")}
                 if подг.get("ok"):
                     строка["simulate"] = симуляция(rpc, подг["tx_base64"])
                 итог["builds"].append(строка)
