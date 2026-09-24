@@ -1,6 +1,3 @@
---- исполнитель ---
-{
-  "schema_version": 2,
   "mode": "live",
   "live_buy_enabled": true,
   "live_test_enabled": true,
@@ -23,7 +20,10 @@
     "kill_switch": {
       "path": "/etc/bloom-executor/KILL",
       "active": false,
-      "why_not": ""
+      "why_not": "",
+      "telegram_path": "/home/bot/bloom_executor_live_data/KILL_BY_TELEGRAM",
+      "telegram_active": false,
+      "sell_stopped": false
     },
     "limits": {
       "max_open": 5,
@@ -58,17 +58,19 @@
     }
   }
 }
-        "utc": "2026-09-23T22:17:53Z",
-        "err": {
-          "InstructionError": [
-            4,
-            "ProgramFailedToComplete"
-          ]
-        }
+        },
+        "mints": [
+          "FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY"
+        ],
+        "why": "неудачная попытка выхода по нашей позиции: транзакция с ошибкой, платил наш кошелёк, в счетах наш минт"
       }
     ],
+    "unexplained": [],
     "explain_failures": [],
-    "unexplained_count": 5
+    "unexplained_count": 0,
+    "not_checked": [],
+    "not_checked_count": 0,
+    "explain_limit": 40
   },
   "stand_start": {
     "set": true,
@@ -80,7 +82,7 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 632,
+      "v2": 637,
       "unreadable": 0
     },
     "positions": {
@@ -91,19 +93,18 @@
     "mixed": false
   },
   "notes": [
-    "10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x)",
+    "15 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x), 3kArcaSPoWwo (4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump), qPcB5rNxtYqw (KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS), 2ZcRWqDoTBfm (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)",
     "у кошелька есть прежняя история: 11 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
     "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
   ],
   "blockers": [
-    "на кошельке 5 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни",
     "баланс 0.2424 SOL ниже порога 0.3"
   ],
   "clean": false,
-  "verdict": "старт заблокирован, причин 2"
+  "verdict": "старт заблокирован, причин 1"
 }
 --- коротко ---
-режим: live, вердикт: старт заблокирован, причин 2
+режим: live, вердикт: старт заблокирован, причин 1
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.242435052 SOL при пороге 0.3
 чужая активность: известно=True, свежих за 24.0 ч 15, прежних 11 (самая свежая 2026-09-23T19:46:12Z)
     свежая чужая: 2BMKe8NGuBdnxZdgbwTYGFGh6d8tHxPWYxwopG1TRqRBZD9y65mfM5jbetU7uSteBwU3jn6sNuDt2gDovoXQX8Pw 2026-09-24T09:41:27Z
@@ -113,8 +114,7 @@
     свежая чужая: 3pZQnAKittXJ8Q2r2XXpJcwXY2up8jH1LTpp2kARUkH5psd6W9GBMVznRu9ipLHTQ9UhqcBLNty6Qsk4aaaZEVWT 2026-09-24T02:12:30Z
 граница чужой активности: метка начала стенда (2026-09-23T20:50:35Z)
 позиции: dry-run 0, настоящих открытых 0
-  БЛОКЕР: на кошельке 5 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
   БЛОКЕР: баланс 0.2424 SOL ниже порога 0.3
-  примечание: 10 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x)
+  примечание: 15 свежих сделок объяснены как выходы по нашим позициям (авто-ордер Bloom, его подпись в ответе /swap не приходит): 2BMKe8NGuBdn (B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE), 2auzUyuEmMbA (AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ), 59c7uRPE3A98 (Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h), 2ZgNusHBpK15 (Atf7KaBLF257KQosBM2rCxhhdRfDtRNnpwmUH4bkrMMV), 3pZQnAKittXJ (87pa2UbBB2dhD4b7CHDPHzzKjrdrUtEcBHueXnVz6CJp), 5oKuiQK4t1Hn (AWmyzwUhSDNbz8qLAnyPDjce9EuQuSVRgj2M9xWFtzL9), 4fzGJF46ud9e (BVqb2eamVBmvLquyRfTfVUAdory9UNTVpe7madfMrMpE), 3RoMoincf2te (B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B), 5mgrKFNiZope (pkDFgCBnQi71DYjTe62k5T4UhoRguhjsCKqBPR3pump), 2YGLuEP86b1K (65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x), 3kArcaSPoWwo (4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump), qPcB5rNxtYqw (KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS), 2ZcRWqDoTBfm (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), 4wFuEBkspads (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY), NUJNjN16sEsY (FvhorDts9M8uJekzs3pBcYUPUjWtCTrGLhdv3ADHyeRY)
   примечание: у кошелька есть прежняя история: 11 сделок старше окна, самая свежая из них 2026-09-23T19:46:12Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
