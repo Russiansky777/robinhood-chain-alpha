@@ -644,7 +644,7 @@ class RateBook:
             return None, "нет узла"
         sig = first_signature(tx)
         try:
-            page = self.rpc.signatures(REF_SOL_USDC_POOL, before=sig, limit=8)
+            page = self.rpc.signatures(REF_SOL_USDC_POOL, before=sig, limit=20)
         except RuntimeError as exc:
             with self.lock:
                 self.stats["missing"] += 1
@@ -656,7 +656,7 @@ class RateBook:
             sbt = s.get("blockTime")
             if sbt is None or sbt > bt or bt - sbt > 120:
                 continue
-            if tried >= 3:  # курс нужен только для порога 2 SOL: три попытки хватает
+            if tried >= 5:  # курс нужен только для порога 2 SOL: пяти попыток хватает
                 break
             tried += 1
             try:
