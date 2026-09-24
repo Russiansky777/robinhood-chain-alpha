@@ -183,6 +183,32 @@ jobs:
             [ "$local_sum" = "$remote_sum" ] || { echo "СБОЙ: суммы не совпали для $f"; exit 1; }
           done
 
+      - name: "Данные для тени: метки пулов, котировочные пулы, образцы таблиц"
+        run: |
+          set -e
+          # Модули тени ищут данные по своему месту: REPO_ROOT это родитель
+          # каталога кода, то есть на хосте /home/bot, а данные -- в
+          # /home/bot/data. Без них тень собирается, но падает на метках
+          # пулов на КАЖДОМ сигнале, и это выглядит как "тень не работает".
+          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples"
+          for f in $DATA_FILES; do
+            [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
+          done
+          tar -czf /tmp/shadow_data.tgz $DATA_FILES
+          ssh $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            install -d -o bot -g bot -m 755 /home/bot/data
+            cat > /tmp/shadow_data.tgz
+            tar -xzf /tmp/shadow_data.tgz -C /home/bot
+            chown -R bot:bot /home/bot/data
+            rm -f /tmp/shadow_data.tgz
+          " < /tmp/shadow_data.tgz
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            ls -l /home/bot/data/c2_leg_pools_2026-09-24.json
+            ls /home/bot/data/c2_pool_samples | wc -l
+            ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
+          "
+
       - name: "Снимок задач как откат, если DBot недоступен"
         run: |
           set -e
