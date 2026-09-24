@@ -1,40 +1,37 @@
-=== Bloom: доклад 2026-09-24T09:11:39Z (формат 2) ===
-журнал: новых записей 575, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 548
-решений в окне: 27 -- боевые источники 27, стенд 0
+=== Bloom: доклад 2026-09-24T10:11:47Z (формат 2) ===
+журнал: новых записей 620, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 578
+решений в окне: 42 -- боевые источники 42, стенд 0
 по кодам (боевые источники):
-     19  SKIP_TARGET_INCREASE_POSITION
-      8  NOT_A_BUY
+     34  NOT_A_BUY
+      7  SKIP_TARGET_INCREASE_POSITION
+      1  BUY
 
 --- откуда разбор (группы не смешиваются) ---
-PARSE_VIA_MSG: решений 26, доля 0.963, к покупке 0
-    отставание слотов: {'n': 26, 'min': 0, 'median': 0.0, 'max': 0}
-    слот сети минус слот источника: {'n': 26, 'min': 0, 'median': 0.0, 'max': 0}
-    задержка решения, мс: {'n': 26, 'min': 0.3, 'median': 0.8, 'max': 2.6}
-PARSE_VIA_RPC: решений 1, доля 0.037, к покупке 0
-    отставание слотов: {'n': 1, 'min': 1, 'median': 1, 'max': 1}
-    слот сети минус слот источника: {'n': 1, 'min': 1, 'median': 1, 'max': 1}
-    задержка решения, мс: {'n': 1, 'min': 335.7, 'median': 335.7, 'max': 335.7}
+PARSE_VIA_RPC: решений 42, доля 1.0, к покупке 1
+    отставание слотов: {'n': 42, 'min': 1, 'median': 1.0, 'max': 3}
+    слот сети минус слот источника: {'n': 42, 'min': 1, 'median': 1.0, 'max': 3}
+    задержка решения, мс: {'n': 42, 'min': 235.7, 'median': 438.65, 'max': 833.0}
   примечание: PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота
 
 --- версия транзакции против пути разбора ---
-  версия 0: PARSE_VIA_MSG=25
-  версия legacy: PARSE_VIA_MSG=1, PARSE_VIA_RPC=1
-  вывод: весь медленный путь (1) идёт на транзакциях версии legacy -- гипотеза подтверждается
+  версия 0: PARSE_VIA_RPC=25
+  версия legacy: PARSE_VIA_RPC=17
+  вывод: медленный путь встречается на версиях ['0', 'legacy'] -- версия не единственная причина
 
 --- первые 10 решений: слоты и время ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
-m2CSNSuA6yP9wpxwGrnG  BATCH-5  449972631       2026-09-24T08:20:00Z 1.7         449972631  0.084      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-2wHEEapmpW8PJpwRgxp1  BATCH-3  449972964       2026-09-24T08:21:27Z 0.5         449972964  0.158      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-2rPPytJgG6rWqtmdJ6Du  BATCH-5  449974504       2026-09-24T08:28:15Z 0.6         449974504  0.041      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-62SfmcozHQpihe89y36K  BATCH-5  449974525       2026-09-24T08:28:20Z 0.6         449974525  0.103      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-4RgksQfUX7eAtwM7XeeX  BATCH-3  449974569       2026-09-24T08:28:32Z 1.0         449974569  0.235      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-3RobrXSaDQHCcKT1GTK2  BATCH-5  449974597       2026-09-24T08:28:39Z 0.8         449974597  0.187      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-63Jvhxc4rPXPmmu9TGgB  BATCH-5  449974905       2026-09-24T08:30:01Z 0.8         449974905  0.108      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-4fvZA2KkBJN6RmbAZwum  BATCH-5  449974918       2026-09-24T08:30:04Z 1.3         449974918  0.022      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-2dTh5VQ4B7MYc9TnZvPn  BATCH-5  449974929       2026-09-24T08:30:07Z 1.0         449974929  0.101      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
-4ziJLbE3uA5oXQ18GVor  BATCH-5  449975411       2026-09-24T08:32:14Z 0.9         449975411  0.078      0           PARSE_VIA_MSG  0       skip/SKIP_TARGET_INCREASE_POSITION
+5bYaXjUQREhh5Cm1CnZh  BATCH-5  449984301       2026-09-24T09:11:33Z 250.4       449984302  0.146      1           PARSE_VIA_RPC  legacy  skip/NOT_A_BUY
+3wVznCKGRTFyUg4bGrRs  BATCH-3  449984573       2026-09-24T09:12:45Z 260.9       449984574  0.155      1           PARSE_VIA_RPC  0       skip/NOT_A_BUY
+tBtedYYg9kk4bRVTM6Db  BATCH-5  449986131       2026-09-24T09:19:37Z 268.1       449986133  0.036      2           PARSE_VIA_RPC  legacy  skip/NOT_A_BUY
+3pQYbmFTbpHjkmtdFiVM  BATCH-5  449986457       2026-09-24T09:21:05Z 245.6       449986458  0.189      1           PARSE_VIA_RPC  0       skip/SKIP_TARGET_INCREASE_POSITION
+2H6qsfancPFWPPyTHBUG  BATCH-5  449986469       2026-09-24T09:21:08Z 451.3       449986471  0.019      2           PARSE_VIA_RPC  0       skip/SKIP_TARGET_INCREASE_POSITION
+52FLXjmQXXvwa2DQzYHg  BATCH-3  449986492       2026-09-24T09:21:15Z 502.2       449986494  0.151      2           PARSE_VIA_RPC  0       skip/NOT_A_BUY
+34qWBvbiGaqU4Jivw3uE  BATCH-3  449987400       2026-09-24T09:25:16Z 264.6       449987401  0.154      1           PARSE_VIA_RPC  legacy  skip/NOT_A_BUY
+2eTPmjc3DG3uZmuzE859  BATCH-3  449987908       2026-09-24T09:27:31Z 478.5       449987910  0.028      2           PARSE_VIA_RPC  legacy  skip/NOT_A_BUY
+3DYn5LKgq4WtH543w4vU  BATCH-3  449988271       2026-09-24T09:29:07Z 436.6       449988272  0.063      1           PARSE_VIA_RPC  0       skip/NOT_A_BUY
+45Sux6rYZ4tb9NMy3reN  BATCH-5  449988523       2026-09-24T09:30:13Z 458.4       449988524  0.237      1           PARSE_VIA_RPC  0       skip/NOT_A_BUY
 
---- маршруты наших покупок --- покупок 0, маршрут известен 0, многохоповых 0 (доля None), отброшено за промежуточный токен 0
+--- маршруты наших покупок --- покупок 1, маршрут известен 1, многохоповых 0 (доля 0.0), отброшено за промежуточный токен 0
 --- остановлено НАШИМ лимитом: 0 ---
 
 --- живая сверка с DBot (нарастающим итогом) ---
@@ -42,7 +39,7 @@ m2CSNSuA6yP9wpxwGrnG  BATCH-5  449972631       2026-09-24T08:20:00Z 1.7         
 
 --- пары А/Б --- наших отправленных покупок 0 из 50; из них малым размером 0
   пары с входом меньше 0.2 SOL идут в зачёт слотов, но не разницы результата: объёмы разные
---- позиции --- live {'count': 4, 'open': 0, 'spent_sol': 0.2}, live-test {'count': 8, 'open': 0, 'spent_sol': 0.008}, dry-run {'count': 0, 'open': 0, 'spent_sol': 0} (не учитывается)
+--- позиции --- live {'count': 5, 'open': 0, 'spent_sol': 0.25}, live-test {'count': 8, 'open': 0, 'spent_sol': 0.008}, dry-run {'count': 0, 'open': 0, 'spent_sol': 0} (не учитывается)
   позиция 1ad780af live-test/closed минт 65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x
       покупка: по mint 65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x, программа источника Orca Whirlpool
       наш маршрут: Meteora DLMM,Raydium CPMM, хопов 1, пул None (прямой: False), метки -
@@ -51,6 +48,11 @@ m2CSNSuA6yP9wpxwGrnG  BATCH-5  449972631       2026-09-24T08:20:00Z 1.7         
   позиция 27b4f0ca live-test/closed минт 4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump
       покупка: по mint 4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump, программа источника Pump AMM
       наш маршрут: Pump AMM, хопов 1, пул 31ZmTzEufRDBGKsJ7NicCkEKxtPQgAEMQvdbCuUfE6GX (прямой: True), метки -
+      закрыта: остаток ноль дважды подряд
+      продажа: чем пробовали -, попыток 0
+  позиция 4511406b live/closed минт B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE
+      покупка: по mint B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE, программа источника Meteora DLMM
+      наш маршрут: Raydium AMM v4,Orca Whirlpool,Raydium CPMM, хопов 1, пул None (прямой: False), метки -
       закрыта: остаток ноль дважды подряд
       продажа: чем пробовали -, попыток 0
   позиция 5b68bd6f live-test/closed минт B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B
@@ -107,11 +109,15 @@ m2CSNSuA6yP9wpxwGrnG  BATCH-5  449972631       2026-09-24T08:20:00Z 1.7         
 --- место в блоке относительно источника ---
   замера нет: замер не прочитан: FileNotFoundError
 
+
+--- записи по искомым кодам: 1 ---
+{"schema_version": 2, "ts_utc": "2026-09-24T09:40:58Z", "signature": "3Jb4mu4sSrNb5ZFwNaQa9dCYgCB8Ek7PtoJGGFZg5UuSAkuHZkX95wgJ5LQTuQJTwrQAQTBEvf8PmjcpdfN6dhuG", "source": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ", "mint": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE", "slot": 449990933, "kind": "buy", "spend_sol_eq": 22.16174528176443, "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "spend_ui": 2500.0, "first_entry": true, "dex_programs": ["Meteora DLMM", "Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Meteora DLMM", "Raydium CPMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 7, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": ["HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ"], "other_tx_mints": [], "all_tx_mints": ["B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ", "So11111111111111111111111111111111111111112"]}, "slot_lag": 1, "action": "buy", "code": "BUY", "reason": "фильтры задачи и наши лимиты пройдены", "test_source": false, "parse_ms": 499.55, "gate_ms": 3.2, "via": "logsSubscribe", "parsed_from": "PARSE_VIA_RPC", "tx_version": 0, "t_recv_ts": 1790242857.784524, "t_recv_utc": "2026-09-24T09:40:57Z", "t_decide_ts": 1790242858.287274, "decide_latency_ms": 502.7, "source_slot": 449990933, "net_slot_at_decision": 449990934, "net_slot_age_s": 0.247, "rate_note": "по курсу 112.81 USD/SOL", "rate_source": "geckoterminal", "sour
+
 --- гейты live на реальных источниках ---
-  [ДА ] executor_on_host: mode=live, sent=4, refused=0
+  [ДА ] executor_on_host: mode=live, sent=5, refused=0
   [НЕТ] reconciliation: signals=None, need=30, missed_buys=0, agreement=None
-  [НЕТ] balance: balance_sol=0.256813446, need=2.0
+  [НЕТ] balance: balance_sol=0.242435052, need=2.0
   [ДА ] test_call_full_circle: live_test_positions=8, still_open=0
 
 --- расход Helius ---
-{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 3635, "бюджет": 60000, "доля": 0.0606, "группа": null, "потрачено_по_бюджету": 3635, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 41, "бюджет": 15000, "доля": 0.0027, "группа": null, "потрачено_по_бюджету": 41, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 3676, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
+{"день": "2026-09-24", "осколков": 2, "службы": [{"служба": "bloom_detector", "кредитов": 4112, "бюджет": 60000, "доля": 0.0685, "группа": null, "потрачено_по_бюджету": 4112, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 45, "бюджет": 15000, "доля": 0.003, "группа": null, "потрачено_по_бюджету": 45, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 4157, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}

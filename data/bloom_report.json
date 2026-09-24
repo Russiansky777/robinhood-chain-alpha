@@ -1,70 +1,48 @@
 {
   "schema_version": 2,
-  "built_utc": "2026-09-24T09:11:39Z",
-  "since_ts": 1790237400.0,
+  "built_utc": "2026-09-24T10:11:47Z",
+  "since_ts": 1790241000.0,
   "journal": {
     "v1": 0,
     "unreadable": 0,
-    "before_since": 548,
-    "v2": 575
+    "before_since": 578,
+    "v2": 620
   },
   "decisions": {
-    "total": 27,
-    "real_sources": 27,
+    "total": 42,
+    "real_sources": 42,
     "test_source": 0,
     "by_code": {
-      "SKIP_TARGET_INCREASE_POSITION": 19,
-      "NOT_A_BUY": 8
+      "NOT_A_BUY": 34,
+      "SKIP_TARGET_INCREASE_POSITION": 7,
+      "BUY": 1
     },
     "by_code_test_source": {}
   },
   "parse_groups": {
-    "total": 27,
+    "total": 42,
     "by_group": {
-      "PARSE_VIA_MSG": {
-        "decisions": 26,
-        "share": 0.963,
-        "to_buy": 0,
-        "slot_lag": {
-          "n": 26,
-          "min": 0,
-          "median": 0.0,
-          "max": 0
-        },
-        "net_slot_minus_source": {
-          "n": 26,
-          "min": 0,
-          "median": 0.0,
-          "max": 0
-        },
-        "decide_latency_ms": {
-          "n": 26,
-          "min": 0.3,
-          "median": 0.8,
-          "max": 2.6
-        }
-      },
       "PARSE_VIA_RPC": {
-        "decisions": 1,
-        "share": 0.037,
-        "to_buy": 0,
+        "decisions": 42,
+        "share": 1.0,
+        "to_buy": 1,
         "slot_lag": {
-          "n": 1,
+          "n": 42,
           "min": 1,
-          "median": 1,
-          "max": 1
+          "median": 1.0,
+          "max": 3
         },
         "net_slot_minus_source": {
-          "n": 1,
+          "n": 42,
           "min": 1,
-          "median": 1,
-          "max": 1
+          "median": 1.0,
+          "max": 3
         },
         "decide_latency_ms": {
-          "n": 1,
-          "min": 335.7,
-          "median": 335.7,
-          "max": 335.7
+          "n": 42,
+          "min": 235.7,
+          "median": 438.65,
+          "max": 833.0
         }
       }
     },
@@ -72,43 +50,42 @@
   },
   "version_vs_parse": {
     "by_version": {
-      "0": {
-        "PARSE_VIA_MSG": 25
-      },
       "legacy": {
-        "PARSE_VIA_MSG": 1,
-        "PARSE_VIA_RPC": 1
+        "PARSE_VIA_RPC": 17
+      },
+      "0": {
+        "PARSE_VIA_RPC": 25
       }
     },
-    "verdict": "весь медленный путь (1) идёт на транзакциях версии legacy -- гипотеза подтверждается"
+    "verdict": "медленный путь встречается на версиях ['0', 'legacy'] -- версия не единственная причина"
   },
   "slot_table": [
     {
-      "signature": "m2CSNSuA6yP9wpxwGrnG",
+      "signature": "5bYaXjUQREhh5Cm1CnZh",
       "source_task": "BATCH-5",
-      "source_slot": 449972631,
-      "t_recv_utc": "2026-09-24T08:20:00Z",
-      "decide_latency_ms": 1.7,
-      "net_slot_at_decision": 449972631,
-      "net_slot_age_s": 0.084,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "source_slot": 449984301,
+      "t_recv_utc": "2026-09-24T09:11:33Z",
+      "decide_latency_ms": 250.4,
+      "net_slot_at_decision": 449984302,
+      "net_slot_age_s": 0.146,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "tx_version": "legacy",
+      "source": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+      "mint": null,
       "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
+      "code": "NOT_A_BUY"
     },
     {
-      "signature": "2wHEEapmpW8PJpwRgxp1",
+      "signature": "3wVznCKGRTFyUg4bGrRs",
       "source_task": "BATCH-3",
-      "source_slot": 449972964,
-      "t_recv_utc": "2026-09-24T08:21:27Z",
-      "decide_latency_ms": 0.5,
-      "net_slot_at_decision": 449972964,
-      "net_slot_age_s": 0.158,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "source_slot": 449984573,
+      "t_recv_utc": "2026-09-24T09:12:45Z",
+      "decide_latency_ms": 260.9,
+      "net_slot_at_decision": 449984574,
+      "net_slot_age_s": 0.155,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
       "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
       "mint": null,
@@ -116,15 +93,31 @@
       "code": "NOT_A_BUY"
     },
     {
-      "signature": "2rPPytJgG6rWqtmdJ6Du",
+      "signature": "tBtedYYg9kk4bRVTM6Db",
       "source_task": "BATCH-5",
-      "source_slot": 449974504,
-      "t_recv_utc": "2026-09-24T08:28:15Z",
-      "decide_latency_ms": 0.6,
-      "net_slot_at_decision": 449974504,
-      "net_slot_age_s": 0.041,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "source_slot": 449986131,
+      "t_recv_utc": "2026-09-24T09:19:37Z",
+      "decide_latency_ms": 268.1,
+      "net_slot_at_decision": 449986133,
+      "net_slot_age_s": 0.036,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
+      "tx_version": "legacy",
+      "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+      "mint": null,
+      "action": "skip",
+      "code": "NOT_A_BUY"
+    },
+    {
+      "signature": "3pQYbmFTbpHjkmtdFiVM",
+      "source_task": "BATCH-5",
+      "source_slot": 449986457,
+      "t_recv_utc": "2026-09-24T09:21:05Z",
+      "decide_latency_ms": 245.6,
+      "net_slot_at_decision": 449986458,
+      "net_slot_age_s": 0.189,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
       "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
       "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
@@ -132,15 +125,15 @@
       "code": "SKIP_TARGET_INCREASE_POSITION"
     },
     {
-      "signature": "62SfmcozHQpihe89y36K",
+      "signature": "2H6qsfancPFWPPyTHBUG",
       "source_task": "BATCH-5",
-      "source_slot": 449974525,
-      "t_recv_utc": "2026-09-24T08:28:20Z",
-      "decide_latency_ms": 0.6,
-      "net_slot_at_decision": 449974525,
-      "net_slot_age_s": 0.103,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "source_slot": 449986469,
+      "t_recv_utc": "2026-09-24T09:21:08Z",
+      "decide_latency_ms": 451.3,
+      "net_slot_at_decision": 449986471,
+      "net_slot_age_s": 0.019,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
       "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
       "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
@@ -148,15 +141,15 @@
       "code": "SKIP_TARGET_INCREASE_POSITION"
     },
     {
-      "signature": "4RgksQfUX7eAtwM7XeeX",
+      "signature": "52FLXjmQXXvwa2DQzYHg",
       "source_task": "BATCH-3",
-      "source_slot": 449974569,
-      "t_recv_utc": "2026-09-24T08:28:32Z",
-      "decide_latency_ms": 1.0,
-      "net_slot_at_decision": 449974569,
-      "net_slot_age_s": 0.235,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "source_slot": 449986492,
+      "t_recv_utc": "2026-09-24T09:21:15Z",
+      "decide_latency_ms": 502.2,
+      "net_slot_at_decision": 449986494,
+      "net_slot_age_s": 0.151,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
       "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
       "mint": null,
@@ -164,93 +157,77 @@
       "code": "NOT_A_BUY"
     },
     {
-      "signature": "3RobrXSaDQHCcKT1GTK2",
-      "source_task": "BATCH-5",
-      "source_slot": 449974597,
-      "t_recv_utc": "2026-09-24T08:28:39Z",
-      "decide_latency_ms": 0.8,
-      "net_slot_at_decision": 449974597,
-      "net_slot_age_s": 0.187,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "signature": "34qWBvbiGaqU4Jivw3uE",
+      "source_task": "BATCH-3",
+      "source_slot": 449987400,
+      "t_recv_utc": "2026-09-24T09:25:16Z",
+      "decide_latency_ms": 264.6,
+      "net_slot_at_decision": 449987401,
+      "net_slot_age_s": 0.154,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
+      "tx_version": "legacy",
+      "source": "8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq",
+      "mint": null,
       "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
+      "code": "NOT_A_BUY"
     },
     {
-      "signature": "63Jvhxc4rPXPmmu9TGgB",
-      "source_task": "BATCH-5",
-      "source_slot": 449974905,
-      "t_recv_utc": "2026-09-24T08:30:01Z",
-      "decide_latency_ms": 0.8,
-      "net_slot_at_decision": 449974905,
-      "net_slot_age_s": 0.108,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "signature": "2eTPmjc3DG3uZmuzE859",
+      "source_task": "BATCH-3",
+      "source_slot": 449987908,
+      "t_recv_utc": "2026-09-24T09:27:31Z",
+      "decide_latency_ms": 478.5,
+      "net_slot_at_decision": 449987910,
+      "net_slot_age_s": 0.028,
+      "slot_lag": 2,
+      "parsed_from": "PARSE_VIA_RPC",
+      "tx_version": "legacy",
+      "source": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+      "mint": null,
       "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
+      "code": "NOT_A_BUY"
     },
     {
-      "signature": "4fvZA2KkBJN6RmbAZwum",
-      "source_task": "BATCH-5",
-      "source_slot": 449974918,
-      "t_recv_utc": "2026-09-24T08:30:04Z",
-      "decide_latency_ms": 1.3,
-      "net_slot_at_decision": 449974918,
-      "net_slot_age_s": 0.022,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "signature": "3DYn5LKgq4WtH543w4vU",
+      "source_task": "BATCH-3",
+      "source_slot": 449988271,
+      "t_recv_utc": "2026-09-24T09:29:07Z",
+      "decide_latency_ms": 436.6,
+      "net_slot_at_decision": 449988272,
+      "net_slot_age_s": 0.063,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
-      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "source": "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y",
+      "mint": null,
       "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
+      "code": "NOT_A_BUY"
     },
     {
-      "signature": "2dTh5VQ4B7MYc9TnZvPn",
+      "signature": "45Sux6rYZ4tb9NMy3reN",
       "source_task": "BATCH-5",
-      "source_slot": 449974929,
-      "t_recv_utc": "2026-09-24T08:30:07Z",
-      "decide_latency_ms": 1.0,
-      "net_slot_at_decision": 449974929,
-      "net_slot_age_s": 0.101,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
+      "source_slot": 449988523,
+      "t_recv_utc": "2026-09-24T09:30:13Z",
+      "decide_latency_ms": 458.4,
+      "net_slot_at_decision": 449988524,
+      "net_slot_age_s": 0.237,
+      "slot_lag": 1,
+      "parsed_from": "PARSE_VIA_RPC",
       "tx_version": 0,
       "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
+      "mint": null,
       "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
-    },
-    {
-      "signature": "4ziJLbE3uA5oXQ18GVor",
-      "source_task": "BATCH-5",
-      "source_slot": 449975411,
-      "t_recv_utc": "2026-09-24T08:32:14Z",
-      "decide_latency_ms": 0.9,
-      "net_slot_at_decision": 449975411,
-      "net_slot_age_s": 0.078,
-      "slot_lag": 0,
-      "parsed_from": "PARSE_VIA_MSG",
-      "tx_version": 0,
-      "source": "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc",
-      "mint": "98kfF7rmsg1QDUEoCqNE7g7M1FdrTt92TEp2CLzypump",
-      "action": "skip",
-      "code": "SKIP_TARGET_INCREASE_POSITION"
+      "code": "NOT_A_BUY"
     }
   ],
   "stand_slot_table": [],
   "stand_rows": [],
   "routes": {
-    "buys": 0,
-    "route_known": 0,
+    "buys": 1,
+    "route_known": 1,
     "multihop": 0,
-    "multihop_share": null,
+    "multihop_share": 0.0,
     "skipped_intermediate": 0
   },
   "our_brakes": {
@@ -279,9 +256,9 @@
   },
   "positions": {
     "live": {
-      "count": 4,
+      "count": 5,
       "open": 0,
-      "spent_sol": 0.2
+      "spent_sol": 0.25
     },
     "live_test": {
       "count": 8,
@@ -297,7 +274,69 @@
     "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"
   },
   "found_by_signature": [],
-  "found_by_code": [],
+  "found_by_code": [
+    {
+      "schema_version": 2,
+      "ts_utc": "2026-09-24T09:40:58Z",
+      "signature": "3Jb4mu4sSrNb5ZFwNaQa9dCYgCB8Ek7PtoJGGFZg5UuSAkuHZkX95wgJ5LQTuQJTwrQAQTBEvf8PmjcpdfN6dhuG",
+      "source": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+      "mint": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
+      "slot": 449990933,
+      "kind": "buy",
+      "spend_sol_eq": 22.16174528176443,
+      "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "spend_ui": 2500.0,
+      "first_entry": true,
+      "dex_programs": [
+        "Meteora DLMM",
+        "Raydium CPMM"
+      ],
+      "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "route": {
+        "programs": [
+          "Meteora DLMM",
+          "Raydium CPMM"
+        ],
+        "intermediate_mints": [],
+        "mints_in_route": 2,
+        "hops_by_mints": 1,
+        "dex_calls": 7,
+        "via_intermediate": false,
+        "intermediate_from": "промежуточных нет",
+        "authorized_only_mints": [
+          "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ"
+        ],
+        "other_tx_mints": [],
+        "all_tx_mints": [
+          "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ",
+          "So11111111111111111111111111111111111111112"
+        ]
+      },
+      "slot_lag": 1,
+      "action": "buy",
+      "code": "BUY",
+      "reason": "фильтры задачи и наши лимиты пройдены",
+      "test_source": false,
+      "parse_ms": 499.55,
+      "gate_ms": 3.2,
+      "via": "logsSubscribe",
+      "parsed_from": "PARSE_VIA_RPC",
+      "tx_version": 0,
+      "t_recv_ts": 1790242857.784524,
+      "t_recv_utc": "2026-09-24T09:40:57Z",
+      "t_decide_ts": 1790242858.287274,
+      "decide_latency_ms": 502.7,
+      "source_slot": 449990933,
+      "net_slot_at_decision": 449990934,
+      "net_slot_age_s": 0.247,
+      "rate_note": "по курсу 112.81 USD/SOL",
+      "rate_source": "geckoterminal",
+      "source_task": "BATCH-5",
+      "mode": "live"
+    }
+  ],
   "found_by_mint": [],
   "position_rows": [
     {
@@ -354,6 +393,39 @@
       "our_pool": "31ZmTzEufRDBGKsJ7NicCkEKxtPQgAEMQvdbCuUfE6GX",
       "our_pool_direct": true,
       "our_route_programs": "Pump AMM",
+      "our_route_hops": 1,
+      "flags": "",
+      "sell_address_kinds": null,
+      "sell_attempts": null,
+      "unsold_reason": null,
+      "balance_read_why_not": null,
+      "jup_attempts": null,
+      "jup_signature": null,
+      "jup_why_not": null,
+      "jup_floor": null,
+      "closed_reason": "остаток ноль дважды подряд"
+    },
+    {
+      "client_order_id": "4511406b44cd4c079e47d0e4e545ceeb",
+      "mint": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
+      "mode": "live",
+      "state": "closed",
+      "our_signature": "36ErV9JvoETZDti2yCu1yjnDvQnWFsHxyD2W2hHf3NKxnpt1UWfACxdimJCvmHRBJVmWkXQE3Wqmstw7MRmSa9WQ",
+      "source_signature": "3Jb4mu4sSrNb5ZFwNaQa9dCYgCB8Ek7PtoJGGFZg5UuSAkuHZkX95wgJ5LQTuQJTwrQAQTBEvf8PmjcpdfN6dhuG",
+      "source_slot": 449990933,
+      "our_slot": 449990935,
+      "slot_delta": 2,
+      "sol_in": 0.05,
+      "sol_back": 0.043673286,
+      "sol_back_net": 0.042673286,
+      "closed_via": "авто-ордер Bloom",
+      "closed_signature": "2BMKe8NGuBdnxZdgbwTYGFGh6d8tHxPWYxwopG1TRqRBZD9y65mfM5jbetU7uSteBwU3jn6sNuDt2gDovoXQX8Pw",
+      "buy_address_kind": "mint",
+      "buy_address": "B4cqDdBWDf6hgy1rma8u4JpoTnoycDQyg33aR48mfFvE",
+      "source_program": "Meteora DLMM",
+      "our_pool": null,
+      "our_pool_direct": false,
+      "our_route_programs": "Raydium AMM v4,Orca Whirlpool,Raydium CPMM",
       "our_route_hops": 1,
       "flags": "",
       "sell_address_kinds": null,
@@ -722,11 +794,11 @@
       "службы": [
         {
           "служба": "bloom_detector",
-          "кредитов": 3635,
+          "кредитов": 4112,
           "бюджет": 60000,
-          "доля": 0.0606,
+          "доля": 0.0685,
           "группа": null,
-          "потрачено_по_бюджету": 3635,
+          "потрачено_по_бюджету": 4112,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
@@ -734,18 +806,18 @@
         },
         {
           "служба": "bloom_seller",
-          "кредитов": 41,
+          "кредитов": 45,
           "бюджет": 15000,
-          "доля": 0.0027,
+          "доля": 0.003,
           "группа": null,
-          "потрачено_по_бюджету": 41,
+          "потрачено_по_бюджету": 45,
           "выше_70": false,
           "выше_бюджета": false,
           "останавливать": false,
           "останов_запрещён_владельцем": true
         }
       ],
-      "всего_кредитов": 3676,
+      "всего_кредитов": 4157,
       "без_бюджета": [],
       "выше_70_процентов": [],
       "выше_бюджета": [],
@@ -757,7 +829,7 @@
     "executor_on_host": {
       "ok": true,
       "mode": "live",
-      "sent": 4,
+      "sent": 5,
       "refused": 0
     },
     "reconciliation": {
@@ -769,7 +841,7 @@
     },
     "balance": {
       "ok": false,
-      "balance_sol": 0.256813446,
+      "balance_sol": 0.242435052,
       "need": 2.0
     },
     "test_call_full_circle": {
