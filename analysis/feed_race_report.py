@@ -282,6 +282,23 @@ def доклад(записи: list, разгонные: set, каналы: list
         из_["not_seen_by_ws"][к] = {
             "messages": всего_к, "not_in_ws": без_ws,
             "share": (round(без_ws / всего_к, 4) if всего_к else None)}
+    # То же, но для ЛЮБОЙ пары каналов: сколько подписей канала A не видел
+    # канал B. Сравнение с одним только Helius не годится, когда его в
+    # замере нет вовсе -- а вопрос "чего RabbitStream даёт сверх Yellowstone"
+    # именно такой.
+    из_["only_in"] = {}
+    for a2 in каналы:
+        всего_a = sum(1 for е in все_события.values() if a2 in е["t"])
+        if not всего_a:
+            continue
+        for b2 in каналы:
+            if a2 == b2:
+                continue
+            только_a = sum(1 for е in все_события.values()
+                            if a2 in е["t"] and b2 not in е["t"])
+            из_["only_in"][f"{a2}_not_in_{b2}"] = {
+                "messages": всего_a, "only_in_a": только_a,
+                "share": round(только_a / всего_a, 4)}
     помощники = [к for к in каналы if к != КАНАЛ_WS]
     лучший = лучший_помощник(все_события, КАНАЛ_WS, помощники)
     из_["combined"] = {
@@ -407,6 +424,21 @@ def self_test() -> None:
     chk("сам Helius в эту долю не считается",
         КАНАЛ_WS not in д5["not_seen_by_ws"], д5["not_seen_by_ws"])
 
+    chk("доля 'мимо другого канала' считается для любой пары",
+        д5["only_in"][f"{КАНАЛ_RABBIT}_not_in_{КАНАЛ_WS}"]["only_in_a"] == 2
+        and abs(д5["only_in"][f"{КАНАЛ_RABBIT}_not_in_{КАНАЛ_WS}"]["share"]
+                 - 0.6667) < 0.001,
+        д5["only_in"])
+    chk("и в обратную сторону тоже",
+        д5["only_in"][f"{КАНАЛ_WS}_not_in_{КАНАЛ_RABBIT}"]["only_in_a"] == 1,
+        д5["only_in"])
+    chk("раздел про Helius не печатается, когда его сообщений нет",
+        "не дошло до Helius" not in человеку(
+            доклад([{"t": 1.0, "channel": КАНАЛ_RABBIT, "signature": "X",
+                      "filter": "src0"}], set(), [КАНАЛ_WS, КАНАЛ_RABBIT])),
+        человеку(доклад([{"t": 1.0, "channel": КАНАЛ_RABBIT, "signature": "X",
+                           "filter": "src0"}], set(), [КАНАЛ_WS, КАНАЛ_RABBIT])))
+
     print(f"самопроверка доклада по гонке: {всего[1]}/{всего[0]}"
            f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
     if всего[1] != всего[0]:
@@ -445,8 +477,15 @@ def человеку(д: dict) -> str:
                     f"p95 {с['gain_p95_ms']}; видел один помощник: "
                     f"{с['only_helper_saw']}, видел один Helius: "
                     f"{с['only_base_saw']}")
+    ои = д.get("only_in") or {}
+    if ои:
+        строки.append("чего один канал не видел у другого:")
+        for имя, ч in sorted(ои.items()):
+            a3, b3 = имя.split("_not_in_")
+            строки.append(f"  {a3} мимо {b3}: {ч['only_in_a']} из "
+                           f"{ч['messages']} ({ч['share'] * 100:.2f} %)")
     нв = д.get("not_seen_by_ws") or {}
-    if нв:
+    if нв and д.get("messages", {}).get(КАНАЛ_WS):
         строки.append("не дошло до Helius WS (упало или не вошло в блок):")
         for к, ч in sorted(нв.items()):
             доля = ("?" if ч["share"] is None else f"{ч['share'] * 100:.2f} %")
