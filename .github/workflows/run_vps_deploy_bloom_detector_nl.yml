@@ -101,13 +101,19 @@ jobs:
             echo "TARGET_HOST=127.0.0.1" >> "$GITHUB_ENV"
             echo "где выполняюсь: свой раннер на NL-хосте"
           fi
-          # Системный python3 на хосте может быть без requests: ставим не в
-          # систему, а во временное окружение прогона.
-          if python3 -c "import requests" 2>/dev/null; then
+          # Системный python3 на хосте может быть без requests и без solders:
+          # ставим не в систему, а во временное окружение прогона. solders
+          # нужен модулям тени -- без него самопроверка тени идёт мимо
+          # настоящего модуля и проверяет только заглушки.
+          if python3 -c "import requests, solders" 2>/dev/null; then
             echo "PY=python3" >> "$GITHUB_ENV"
           else
             python3 -m venv "$RUNNER_TEMP/selftest_venv"
             "$RUNNER_TEMP/selftest_venv/bin/pip" install -q requests
+            # solders -- не обязателен: без него тень просто выключена, и
+            # деплой торговли из-за замера падать не должен.
+            "$RUNNER_TEMP/selftest_venv/bin/pip" install -q solders \
+              || echo "ВНИМАНИЕ: solders не встал -- самопроверка тени пойдёт без модуля"
             echo "PY=$RUNNER_TEMP/selftest_venv/bin/python" >> "$GITHUB_ENV"
           fi
 
