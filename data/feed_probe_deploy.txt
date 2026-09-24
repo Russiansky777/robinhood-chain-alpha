@@ -1,7 +1,7 @@
 active
 {
-  "utc": "2026-09-24T16:08:34Z",
-  "started_utc": "2026-09-24T16:08:14Z",
+  "utc": "2026-09-24T16:10:28Z",
+  "started_utc": "2026-09-24T16:10:08Z",
   "uptime_s": 20.0,
   "channels": 4,
   "channel_names": [
@@ -10,29 +10,29 @@ active
     "rabbit_ams",
     "rabbit_fra"
   ],
-  "addresses": 18,
-  "sources": 17,
+  "addresses": 19,
+  "sources": 18,
   "boosters": [
-    "Hz7KY4XrZs7A5XHonoUwBhqarVZJCnm4ByDvQzcDr7sz"
+    "F6NysrcWU5CCNbeZsQBtphLMMixrxib3RdL8aUVSeKZF"
   ],
-  "boosters_slot": 450078274,
+  "boosters_slot": 450078707,
   "boosters_rates_per_min": {
-    "Hz7KY4XrZs7A5XHonoUwBhqarVZJCnm4ByDvQzcDr7sz": 166.67
+    "F6NysrcWU5CCNbeZsQBtphLMMixrxib3RdL8aUVSeKZF": 200.0
   },
-  "boosters_total_per_min": 166.67,
+  "boosters_total_per_min": 200.0,
   "boosters_target_per_min": 5.0,
   "boosters_band": [
     0.2,
     90.0
   ],
-  "boosters_fallback": "в полосу 0.2-90.0 не попал никто; взят самый спокойный из измеренных: 166.67 транзакций в минуту",
+  "boosters_fallback": "в полосу 0.2-90.0 не попал никто; взят самый спокойный из измеренных: 200.0 транзакций в минуту",
   "boosters_rejected": {
-    "BuekUk3YMmm7Agnb4ni1qMCmShVpeBTdQZYNyihyzr7u": 3000.0,
-    "HckQ93Xqjjo8mwt5pNPWvyCTZXQZ858rvzmm7ZRrZg9t": 3000.0,
-    "HojNihR9d9nC2HkbFM8dwi1T74RyPWtg52iPndTsE8nt": 3000.0,
-    "Hz7KY4XrZs7A5XHonoUwBhqarVZJCnm4ByDvQzcDr7sz": 166.67,
+    "BPaF9JM5Bet4oVxMWzcYpDca7PMm4A4uJJ1rL59M26VU": 3000.0,
+    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 1500.0,
+    "8JjVNyj65NyhCuit2n4xAPHaMJHvJsQarg23wFrhawAc": 3000.0,
     "sp1nLqqjVZ1kTusFjJmHp1xHDpH6M4F7KXCr1iJ3xpX": 3000.0,
-    "8z9FqZed5Pg9oPFdum5A9RBZvW8kk8aKxeidezfEH7mf": 3000.0
+    "oRC11nW8LAy2ynYgkef76nnpUCfsZdevQYj2zUrBVXF": 1500.0,
+    "8PwMKByRUaE1Xt5vkbEpGnuBrAMt1k1adg22hf8vDViA": 1000.0
   },
   "boosters_why_not": null,
   "grpc_target": {
@@ -65,22 +65,22 @@ active
   "helius_ws_why_not": "вторая подписка Helius выключена входом PROBE_HELIUS_WS=0: детектор важнее замера",
   "subscriptions": {
     "grpc": {
-      "requested": 18,
+      "requested": 19,
       "connected": true,
       "generation": 0
     },
     "rabbit_ams": {
-      "requested": 18,
+      "requested": 19,
       "connected": true,
       "generation": 0
     },
     "grpc2": {
-      "requested": 18,
+      "requested": 19,
       "connected": true,
       "generation": 0
     },
     "rabbit_fra": {
-      "requested": 18,
+      "requested": 19,
       "connected": true,
       "generation": 0
     }
@@ -97,7 +97,7 @@ active
     "window_spent": 0,
     "in_window": false,
     "window_left_s": 0.0,
-    "window_started_utc": "2026-09-24T16:08:14Z",
+    "window_started_utc": "2026-09-24T16:10:08Z",
     "boosters_dropped": false,
     "drop_needed": false,
     "why": "",
@@ -105,7 +105,7 @@ active
     "session": 14,
     "dropped_utc": null
   },
-  "addresses_now": 18,
+  "addresses_now": 19,
   "generation": 0,
   "threads_alive": {
     "grpc": true,
@@ -120,12 +120,7 @@ active
   },
   "summary": {
     "base": "helius_ws",
-    "messages": {
-      "rabbit_ams": 103,
-      "rabbit_fra": 103,
-      "grpc": 3,
-      "grpc2": 3
-    },
+    "messages": {},
     "duplicates": {},
     "unpaired_single_channel": {
       "helius_ws": 0,
@@ -136,72 +131,33 @@ active
     },
     "by_channel": {},
     "by_group": {},
-    "pairwise": {
-      "grpc_vs_grpc2": {
-        "pairs": 3,
-        "first_share": 1.0,
-        "median_ms": 2.77,
-        "p10_ms": 1.22,
-        "p90_ms": 5.58,
-        "p95_ms": 5.58,
-        "mean_ms": 3.19
-      },
-      "grpc_vs_rabbit_ams": {
-        "pairs": 3,
-        "first_share": 1.0,
-        "median_ms": 1.01,
-        "p10_ms": 0.17,
-        "p90_ms": 1.47,
-        "p95_ms": 1.47,
-        "mean_ms": 0.88
-      },
-      "grpc_vs_rabbit_fra": {
-        "pairs": 3,
-        "first_share": 1.0,
-        "median_ms": 0.43,
-        "p10_ms": 0.24,
-        "p90_ms": 3.84,
-        "p95_ms": 3.84,
-        "mean_ms": 1.5
-      },
-      "grpc2_vs_rabbit_ams": {
-        "pairs": 3,
-        "first_share": 0.0,
-        "median_ms": -2.6,
-        "p10_ms": -4.12,
-        "p90_ms": -0.21,
-        "p95_ms": -0.21,
-        "mean_ms": -2.31
-      },
-      "grpc2_vs_rabbit_fra": {
-        "pairs": 3,
-        "first_share": 0.0,
-        "median_ms": -1.74,
-        "p10_ms": -2.34,
-        "p90_ms": -0.99,
-        "p95_ms": -0.99,
-        "mean_ms": -1.69
-      },
-      "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 103,
-        "first_share": 0.5049,
-        "median_ms": 0.09,
-        "p10_ms": -3.28,
-        "p90_ms": 3.31,
-        "p95_ms": 4.06,
-        "mean_ms": -0.34
-      }
-    },
-    "pairs_total": 103
+    "pairwise": {},
+    "pairs_total": 0
   }
 }
+--- EnvironmentFile юнита и что в них видно ---
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/bloom-executor/env
+EnvironmentFile=-/etc/bloom-executor/feed_probe_env
+--- имена переменных в своём env зонда ---
+DBOT_API_KEY
+GRPC_FEED2_TOKEN
+GRPC_FEED2_URL
+GRPC_FEED3_URL
+GRPC_FEED4_URL
+GRPC_FEED_AUTH_HEADER
+GRPC_FEED_TOKEN
+GRPC_FEED_URL
+PROBE_HELIUS_DAILY_LIMIT
+PROBE_HELIUS_WS
+PROBE_PROJECTION_LIMIT
+PROBE_WINDOW_CAP
+PROBE_WINDOW_S
+--- есть ли DBOT_API_KEY в общем env ---
+0
+0
+
 --- журнал службы, последние 60 строк ---
-Sep 24 18:07:57 claude-nl python[499976]: Traceback (most recent call last):
-Sep 24 18:07:57 claude-nl python[499976]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1664, in <module>
-Sep 24 18:07:57 claude-nl python[499976]:     raise SystemExit(main())
-Sep 24 18:07:57 claude-nl python[499976]:                      ^^^^^^
-Sep 24 18:07:57 claude-nl python[499976]:   File "/home/bot/feed_probe/grpc_feed_probe.py", line 1504, in main
-Sep 24 18:07:57 claude-nl python[499976]:     ист, откуда = BD.источники(задачи, Path(a.config))
 Sep 24 18:07:57 claude-nl python[499976]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Sep 24 18:07:57 claude-nl python[499976]:   File "/home/bot/feed_probe/bloom_detector.py", line 1313, in источники
 Sep 24 18:07:57 claude-nl python[499976]:     ист, откуда = загрузить_источники(снимок, задачи), f"снимок {снимок.name}"
@@ -276,3 +232,9 @@ Sep 24 18:08:13 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд
 Sep 24 18:08:13 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
 Sep 24 18:08:13 claude-nl python[501324]: DBOT_API_KEY не задан -- беру снимок источников из репозитория
 Sep 24 18:08:14 claude-nl python[501324]: зонд запущен: каналов 4, адресов 18 (источников 17, разгонных 1), откуда источники: снимок konfig.json
+Sep 24 18:10:07 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
+Sep 24 18:10:07 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
+Sep 24 18:10:07 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 18:10:07 claude-nl systemd[1]: grpc-feed-probe.service: Consumed 1.530s CPU time, 49.8M memory peak, 0B memory swap peak.
+Sep 24 18:10:07 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 18:10:08 claude-nl python[502919]: зонд запущен: каналов 4, адресов 19 (источников 18, разгонных 1), откуда источники: DBot живьём
