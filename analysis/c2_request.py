@@ -16,10 +16,13 @@ import sys
 from pathlib import Path
 
 REQ = Path(__file__).resolve().parent.parent / "data" / "c2_requests" / "run.json"
-TASKS = ("crowd", "sandwich", "both", "selftest")
+TASKS = ("crowd", "sandwich", "both", "selftest", "probe")
 ADDR = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+SIG = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{80,90}$")
+UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 DEFAULTS = {"task": "both", "days": "7", "only": "", "limit_sources": "0", "workers": "4",
-            "time_budget_s": "15000", "crowd_cap": "1500"}
+            "time_budget_s": "15000", "crowd_cap": "1500",
+            "sigs": "", "mint": "", "from_utc": "", "to_utc": ""}
 
 
 def validate(raw: dict) -> dict:
@@ -41,6 +44,15 @@ def validate(raw: dict) -> dict:
         v[k] = str(n)
     v["days"] = str(days)
     v["only"] = ",".join(only)
+    sigs = [x.strip() for x in v["sigs"].split(",") if x.strip()]
+    if any(not SIG.match(x) for x in sigs) or len(sigs) > 10:
+        raise ValueError("sigs: до 10 подписей base58 через запятую")
+    v["sigs"] = ",".join(sigs)
+    if v["mint"] and not ADDR.match(v["mint"]):
+        raise ValueError("mint: base58-адрес")
+    for k in ("from_utc", "to_utc"):
+        if v[k] and not UTC.match(v[k]):
+            raise ValueError(f"{k}: формат 2026-09-24T14:10:00Z")
     return v
 
 
@@ -76,6 +88,14 @@ def self_test() -> int:
             checks.append((f"отклонено {bad}", False))
         except (ValueError, TypeError):
             checks.append((f"отклонено {list(bad)[0]}", True))
+    try:
+        validate({"task": "probe", "sigs": "abc;rm"})
+        checks.append(("отклонена кривая подпись", False))
+    except ValueError:
+        checks.append(("отклонена кривая подпись", True))
+    vp = validate({"task": "probe", "sigs": "5" * 88, "mint": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+                   "from_utc": "2026-09-24T14:10:00Z", "to_utc": "2026-09-24T14:12:00Z"})
+    checks.append(("заявка probe принята", vp["task"] == "probe" and vp["from_utc"].endswith("Z")))
     v = validate({"task": "crowd", "only": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"})
     checks.append(("адрес в only принят", v["only"].startswith("Beqv6")))
     checks.append(("имена переменных -- ASCII",
