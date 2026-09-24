@@ -1,0 +1,47 @@
+Warning: Permanently added '45.59.170.76' (ED25519) to the list of known hosts.
+=== curl ===
+curl 8.5.0 (x86_64-pc-linux-gnu) libcurl/8.5.0 OpenSSL/3.0.13 zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.7 libpsl/0.21.2 (+libidn2/2.3.7) libssh/0.10.6/openssl/zlib nghttp2/1.59.0 librtmp/2.3 OpenLDAP/2.6.10
+
+=== RTT до хоста Bloom (ICMP, может быть закрыт) ===
+--- eu.solana.bloombot.app ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4007ms
+rtt min/avg/max/mdev = 1.347/1.534/1.776/0.171 ms
+
+=== Bloom /ping: две пары запросов в ОДНОМ вызове curl ===
+пара 1 (первый запрос -- новое соединение, второй -- по тому же):
+  dns=0.000792 tcp=0.002329 tls=0.019851 ttfb=0.054813 total=0.054887 code=200 ver=2 new_conn=1
+  dns=0.000019 tcp=0.000000 tls=0.000000 ttfb=0.015449 total=0.015538 code=200 ver=2 new_conn=0
+пара 2 (первый запрос -- новое соединение, второй -- по тому же):
+  dns=0.000780 tcp=0.002414 tls=0.021463 ttfb=0.065100 total=0.065157 code=200 ver=2 new_conn=1
+  dns=0.000013 tcp=0.000000 tls=0.000000 ttfb=0.022594 total=0.022667 code=200 ver=2 new_conn=0
+пара 3 (первый запрос -- новое соединение, второй -- по тому же):
+  dns=0.000820 tcp=0.002453 tls=0.020523 ttfb=0.061062 total=0.061148 code=200 ver=2 new_conn=1
+  dns=0.000021 tcp=0.000000 tls=0.000000 ttfb=0.015955 total=0.016016 code=200 ver=2 new_conn=0
+
+=== Bloom: заголовки ответа про соединение (значения ключа не печатаются) ===
+HTTP/2 200 
+server: cloudflare
+
+=== Bloom: умеет ли HTTP/2 ===
+  http_version=2 code=200
+
+=== Helius RPC: getSlot дважды в одном вызове (URL НЕ печатается) ===
+пара 1:
+  dns=0.000901 tcp=0.002293 tls=0.020019 ttfb=0.043800 total=0.043875 code=200 ver=2 new_conn=1
+  dns=0.000023 tcp=0.000000 tls=0.000000 ttfb=0.009914 total=0.009968 code=200 ver=2 new_conn=0
+пара 2:
+  dns=0.000941 tcp=0.002684 tls=0.023939 ttfb=0.046280 total=0.046363 code=200 ver=2 new_conn=1
+  dns=0.000024 tcp=0.000000 tls=0.000000 ttfb=0.018548 total=0.018615 code=200 ver=2 new_conn=0
+пара 3:
+  dns=0.000732 tcp=0.002610 tls=0.020669 ttfb=0.052588 total=0.052678 code=200 ver=2 new_conn=1
+  dns=0.000058 tcp=0.000000 tls=0.000000 ttfb=0.014790 total=0.015073 code=200 ver=2 new_conn=0
+
+=== Helius: HTTP/2 ===
+  http_version=2 code=200
+
+=== Jupiter Swap V2: две котировки в одном вызове ===
+  dns=0.030418 tcp=0.032238 tls=0.052674 ttfb=0.193487 total=0.193594 code=200 ver=2 new_conn=1
+  dns=0.000016 tcp=0.000000 tls=0.000000 ttfb=0.129549 total=0.129613 code=200 ver=2 new_conn=0
+
+=== Jupiter: HTTP/2 ===
+  http_version=2 code=200
