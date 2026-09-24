@@ -2,11 +2,20 @@
  "state_dir": "/tmp/bloom_state",
  "heartbeat": {
   "schema_version": 2,
-  "updated_utc": "2026-09-24T00:05:55Z",
-  "updated_ts": 1790208355.8303432,
+  "updated_utc": "2026-09-24T00:21:10Z",
+  "updated_ts": 1790209270.8378198,
   "mode": "live",
-  "positions_in_cycle": 0,
-  "last_cycle": [],
+  "positions_in_cycle": 1,
+  "last_cycle": [
+   {
+    "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
+    "mint": "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
+    "action": "ждём срок таймерного ордера",
+    "why_not": null,
+    "balance_raw": null,
+    "attempt": null
+   }
+  ],
   "max_attempts": 2,
   "jupiter": {
    "enabled": true,
@@ -1336,6 +1345,128 @@
    "state": "closed",
    "zero_streak": 2,
    "closed_reason": "остаток ноль дважды подряд"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "state": "intent",
+   "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
+   "source_sig": "23SefhJsSQ79XfNSYzSzjptCZQSZNXyVtp4ZR7E5aWKmPEJCewrfyBGCZFRwYU8yxJC2GFaZujNtD6DsSFLMCqZh",
+   "source_slot": 449861101,
+   "sol_in": 0.001,
+   "pool": null,
+   "program": "Jupiter v6",
+   "taxed": null,
+   "tax_bps": null,
+   "mode": "live-test",
+   "sell_after_s": 28.8,
+   "ts_intent": 1790208425.5523856,
+   "ts_intent_utc": "2026-09-24T00:07:05Z",
+   "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "ts_update": 1790208425.6644115,
+   "ts_update_utc": "2026-09-24T00:07:05Z",
+   "state": "bought",
+   "order_id": "API-a3fd14c8-697f-44f2-beeb-3701d580b6f2",
+   "signatures": [
+    "4jPfUpVAWTd46yFaVHqKVxLkojPPA4YV7UN9JHaK2eh4HoFReZMUAbKzoyqY55TRkJTbBNnkEiFp5tNxyinxAbPE"
+   ],
+   "ts_accepted": 1790208425.664409,
+   "buy_address": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
+   "buy_address_kind": "mint",
+   "caveat": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "ts_update": 1790208425.7070224,
+   "ts_update_utc": "2026-09-24T00:07:05Z",
+   "taxed": false,
+   "tax_bps": null
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "ts_update": 1790208426.1464982,
+   "ts_update_utc": "2026-09-24T00:07:06Z",
+   "our_pool": null,
+   "our_pool_direct": false,
+   "our_route_programs": "Raydium AMM v4,Orca Whirlpool",
+   "our_route_hops": 1,
+   "our_slot": 449861103,
+   "flags": ""
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "ts_update": 1790208475.9102623,
+   "ts_update_utc": "2026-09-24T00:07:55Z",
+   "zero_streak": 1
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
+   "ts_update": 1790208490.8665917,
+   "ts_update_utc": "2026-09-24T00:08:10Z",
+   "state": "closed",
+   "zero_streak": 2,
+   "closed_reason": "остаток ноль дважды подряд"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
+   "state": "intent",
+   "mint": "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
+   "source_sig": "2r7o2xMzvhQKDT2EABSsCvUqF46jHCB94RfLHYViU3XRkKkWyKyGPjRvSE8jM6ETk4kTdJJnjGKggncEr2NUtga",
+   "source_slot": 449864246,
+   "sol_in": 0.001,
+   "pool": null,
+   "program": "Pump AMM",
+   "taxed": null,
+   "tax_bps": null,
+   "mode": "live-test",
+   "sell_after_s": 28.8,
+   "ts_intent": 1790209266.8163297,
+   "ts_intent_utc": "2026-09-24T00:21:06Z",
+   "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
+   "ts_update": 1790209266.9499025,
+   "ts_update_utc": "2026-09-24T00:21:06Z",
+   "state": "bought",
+   "order_id": "API-a4e8ab46-5f43-4029-a876-875d5342e278",
+   "signatures": [
+    "5Pf6CNG64mBCDdTyB8ZkhSpZ6fk64TU3xwxpnmBPayHh5KEAeRZbUVHq5FELy76532jygM6XHxGY2WsWQ4JyNpHV"
+   ],
+   "ts_accepted": 1790209266.9498992,
+   "buy_address": "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
+   "buy_address_kind": "mint",
+   "caveat": "200 не означает сделку: подписи отправленные, не подтверждённые, и массив может быть пустым"
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
+   "ts_update": 1790209266.996821,
+   "ts_update_utc": "2026-09-24T00:21:06Z",
+   "taxed": false,
+   "tax_bps": null
+  },
+  {
+   "schema_version": 2,
+   "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
+   "ts_update": 1790209267.4303563,
+   "ts_update_utc": "2026-09-24T00:21:07Z",
+   "our_pool": "31ZmTzEufRDBGKsJ7NicCkEKxtPQgAEMQvdbCuUfE6GX",
+   "our_pool_direct": true,
+   "our_route_programs": "Pump AMM",
+   "our_route_hops": 1,
+   "our_slot": 449864247,
+   "flags": ""
   }
  ],
  "positions_why_not": null,
@@ -1613,27 +1744,24 @@
  ],
  "detector_status": {
   "schema_version": 2,
-  "updated_utc": "2026-09-24T00:05:06Z",
-  "updated_ts": 1790208306.2824426,
-  "alive_since_utc": "2026-09-23T23:25:57Z",
+  "updated_utc": "2026-09-24T00:20:43Z",
+  "updated_ts": 1790209243.6318457,
+  "alive_since_utc": "2026-09-24T00:12:42Z",
   "mode": "dry",
   "sources": 19,
   "sources_from": "DBot живьём + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
-  "subscribe_drops": 2,
-  "signals_seen": 56,
-  "to_buy": 1,
+  "subscribe_drops": 0,
+  "signals_seen": 8,
+  "to_buy": 0,
   "by_code": {
-   "NOT_A_BUY": 33,
-   "TARGET_AMOUNT_OUT_OF_RANGE": 9,
-   "BUY": 1,
-   "SKIP_TARGET_INCREASE_POSITION": 7,
-   "INTERMEDIATE_ROUTE": 2,
-   "TOKEN_RECEIVED_NOT_BOUGHT": 1
+   "SKIP_TARGET_INCREASE_POSITION": 2,
+   "NOT_A_BUY": 3
   },
   "by_code_test_source": {
-   "NOT_A_BUY": 1
+   "NOT_A_BUY": 1,
+   "INTERMEDIATE_ROUTE": 2
   },
   "test_sources": [
    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
@@ -1643,38 +1771,35 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 115.37175641730185,
+  "rate_usd_sol": 115.40986495775721,
   "rate_fresh": true,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
   "kill_active": false,
   "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": 449860645,
-  "slot_notifications": 8851,
-  "net_slot_age_s": 0.21,
-  "balance_sol": 0.351619299,
-  "balance_age_s": 8.42,
-  "rpc_calls": 266,
+  "net_slot": 449864159,
+  "slot_notifications": 1803,
+  "net_slot_age_s": 0.1,
+  "balance_sol": 0.344620247,
+  "balance_age_s": 9.11,
+  "rpc_calls": 48,
   "rpc_by_method": {
-   "getBalance": 234,
-   "getAccountInfo": 1,
-   "getTransaction": 31
+   "getBalance": 48
   },
-  "session_credits": 302,
+  "session_credits": 52,
+  "handler_crashes": 0,
   "telegram": {
    "enabled": true,
    "configured": true,
-   "sent": 1,
+   "sent": 3,
    "failed": 0,
    "last_error": "",
    "off_reason": ""
   },
   "executor_attached": true,
-  "executed": 1,
-  "exec_by_code": {
-   "LIVE_TEST_SKIP_REAL_SOURCE": 1
-  },
+  "executed": 0,
+  "exec_by_code": {},
   "executor": {
    "schema_version": 2,
    "mode": "live-test",
@@ -1696,10 +1821,10 @@
   "credits_logged": true,
   "credits_log_error": "",
   "decide_latency_ms": {
-   "n": 54,
+   "n": 8,
    "median": 0.6,
-   "min": 0.3,
-   "max": 476.2
+   "min": 0.2,
+   "max": 1.9
   }
  }
 }
