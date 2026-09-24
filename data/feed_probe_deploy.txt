@@ -1,7 +1,7 @@
 active
 {
-  "utc": "2026-09-24T14:07:52Z",
-  "started_utc": "2026-09-24T14:07:32Z",
+  "utc": "2026-09-24T14:17:27Z",
+  "started_utc": "2026-09-24T14:17:07Z",
   "uptime_s": 20.0,
   "channels": 3,
   "channel_names": [
@@ -12,26 +12,26 @@ active
   "addresses": 21,
   "sources": 20,
   "boosters": [
-    "9GHvMeJ4ZWuAX6sDGscFL1TBMszx2EehnrcTVUy4MZJQ"
+    "HuBMeYW3aDn8BH65fo8xxbP4oiexyup8udzKyccgi8Ga"
   ],
-  "boosters_slot": 450051124,
+  "boosters_slot": 450053291,
   "boosters_rates_per_min": {
-    "9GHvMeJ4ZWuAX6sDGscFL1TBMszx2EehnrcTVUy4MZJQ": 214.29
+    "HuBMeYW3aDn8BH65fo8xxbP4oiexyup8udzKyccgi8Ga": 93.75
   },
-  "boosters_total_per_min": 214.29,
-  "boosters_target_per_min": 6.0,
+  "boosters_total_per_min": 93.75,
+  "boosters_target_per_min": 5.0,
   "boosters_band": [
     0.2,
-    60.0
+    50.0
   ],
-  "boosters_fallback": "в полосу 0.2-60.0 не попал никто; взят самый спокойный из измеренных: 214.29 транзакций в минуту",
+  "boosters_fallback": "в полосу 0.2-50.0 не попал никто; взят самый спокойный из измеренных: 93.75 транзакций в минуту",
   "boosters_rejected": {
-    "9GHvMeJ4ZWuAX6sDGscFL1TBMszx2EehnrcTVUy4MZJQ": 214.29,
-    "FGiEdzde7Fco2WLpNQMat299hUVoykJdaA5hxdmCzHiS": 375.0,
-    "9fa5wcqnAQqHyn58U1vHHLuZW5GXLcoho7hKT17jGJfZ": 375.0,
-    "omeg2wsojzB7tfyAxsFhp8npxHL8yxVnaf51poXCwSd": 214.29,
-    "5marvipGzf98hxnoJFXsZbGHSXcEQ3yRGJ4ps7D3V4ou": 214.29,
-    "3KNGMiXwhy2CAWVNpLoUt25sNngFnX1mZpaiEeVccBA6": 230.77
+    "83TSSS7qojPowqrrvH23mCrhEJjnJG2ygaf7FEq9ZgKC": 1500.0,
+    "oRC11nW8LAy2ynYgkef76nnpUCfsZdevQYj2zUrBVXF": 3000.0,
+    "CzYQ2kFnBxsNEt9Zy34vQ3n5fSDhvA4o4XaTnq1rLvyr": 1500.0,
+    "2VS1k5m7TVtjMzm5bEJcsFJYJJF4UDRyLSDqkxtuLvWh": 3000.0,
+    "stnkwFt5Ao6Kq9QqfuLchMHJDxBSD6sqeJfiqM3aAKr": 3000.0,
+    "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51": 1000.0
   },
   "boosters_why_not": null,
   "grpc_target": {
@@ -84,3 +84,64 @@ active
     "pairs_total": 0
   }
 }
+--- журнал службы, последние 60 строк ---
+Sep 24 16:03:20 claude-nl python[475997]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:03:20 claude-nl python[475997]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:03:20 claude-nl python[475997]: Exception in thread grpc:
+Sep 24 16:03:20 claude-nl python[475997]: Traceback (most recent call last):
+Sep 24 16:03:20 claude-nl python[475997]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:03:20 claude-nl python[475997]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:03:20 claude-nl python[475997]:     self.run()
+Sep 24 16:03:20 claude-nl python[475997]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:03:20 claude-nl python[475997]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:03:20 claude-nl python[475997]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:07:31 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
+Sep 24 16:07:31 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
+Sep 24 16:07:31 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:07:31 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:07:32 claude-nl python[477079]: Exception in thread helius_ws:
+Sep 24 16:07:32 claude-nl python[477079]: Exception in thread grpc:
+Sep 24 16:07:32 claude-nl python[477079]: Exception in thread grpc2:
+Sep 24 16:07:32 claude-nl python[477079]: Traceback (most recent call last):
+Sep 24 16:07:32 claude-nl python[477079]: Traceback (most recent call last):
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:07:32 claude-nl python[477079]: Traceback (most recent call last):
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:07:32 claude-nl python[477079]:     self.run()
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:07:32 claude-nl python[477079]:     self.run()
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:07:32 claude-nl python[477079]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:07:32 claude-nl python[477079]:     self.run()
+Sep 24 16:07:32 claude-nl python[477079]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:07:32 claude-nl python[477079]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:07:32 claude-nl python[477079]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:07:32 claude-nl python[477079]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:07:32 claude-nl python[477079]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:07:32 claude-nl python[477079]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:17:06 claude-nl systemd[1]: Stopping grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует)...
+Sep 24 16:17:06 claude-nl systemd[1]: grpc-feed-probe.service: Deactivated successfully.
+Sep 24 16:17:06 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:17:06 claude-nl systemd[1]: Started grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 24 16:17:07 claude-nl python[479033]: Exception in thread helius_ws:
+Sep 24 16:17:07 claude-nl python[479033]: Traceback (most recent call last):
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:17:07 claude-nl python[479033]:     self.run()
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:17:07 claude-nl python[479033]: Exception in thread grpc:
+Sep 24 16:17:07 claude-nl python[479033]: Traceback (most recent call last):
+Sep 24 16:17:07 claude-nl python[479033]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:17:07 claude-nl python[479033]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:17:07 claude-nl python[479033]:     self.run()
+Sep 24 16:17:07 claude-nl python[479033]: Exception in thread grpc2:
+Sep 24 16:17:07 claude-nl python[479033]: Traceback (most recent call last):
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:17:07 claude-nl python[479033]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:17:07 claude-nl python[479033]:     self.run()
+Sep 24 16:17:07 claude-nl python[479033]: TypeError: без_молчания() got multiple values for argument 'журнал'
+Sep 24 16:17:07 claude-nl python[479033]:   File "/usr/lib/python3.12/threading.py", line 1010, in run
+Sep 24 16:17:07 claude-nl python[479033]:     self._target(*self._args, **self._kwargs)
+Sep 24 16:17:07 claude-nl python[479033]: TypeError: без_молчания() got multiple values for argument 'журнал'
