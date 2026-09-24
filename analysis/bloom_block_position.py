@@ -141,6 +141,34 @@ def кто_купил_минт(блок: dict, минт: str, кошелёк: st
              "why_not": "покупки этого минта этим кошельком в блоке нет"}
 
 
+def покупатели_минта(helius, минт: str, слоты: list, *,
+                      известные: dict | None = None) -> dict:
+    """Кто покупал этот минт в этих слотах: индекс, кошелёк, чей он.
+
+    Нужно, когда известна только покупка DBot: источника в его записи нет,
+    а по цепи он находится сам -- это кошелёк, купивший тот же минт в том же
+    или предыдущем слоте. Заодно это и есть замер толпы на живом событии.
+    """
+    известные = известные or {}
+    строки = []
+    прочитано = 0
+    for слот in слоты:
+        б = блок_со_счетами(helius, слот)
+        if not б.get("known"):
+            строки.append({"slot": слот, "known": False, "why_not": б.get("why_not")})
+            continue
+        прочитано += 1
+        for i, t in enumerate(б["transactions"]):
+            владельцы = _вырос_минт(t, минт)
+            for вл in sorted(владельцы):
+                строки.append({"slot": слот, "index": i, "total": б["total"],
+                                "share": round(i / б["total"], 4),
+                                "owner": вл, "whose": известные.get(вл),
+                                "signature": _подпись(t)})
+    return {"mint": минт, "blocks_read": прочитано, "rows": строки,
+             "buyers": len({r.get("owner") for r in строки if r.get("owner")})}
+
+
 def место_относительно_источника(helius, *, минт: str, слот_источника: int,
                                   подпись_источника: str, слот_наш: int | None,
                                   подпись_наша: str | None,
@@ -324,6 +352,24 @@ def self_test() -> None:
         r3.get("source_why_not") and r3.get("source_index") is None, r3)
     chk("и толпа не считается нулём", "crowd_between" not in r3, r3.get("crowd_between"))
 
+    # Кто покупал минт в слотах: источник находится по цепи, когда в записи
+    # DBot его нет.
+    h4 = HeliusБлоки({100: блок_и, 101: {"known": True, "slot": 101, "total": 1,
+                                          "transactions": [tx("ДРУГАЯ", вырос=("ЕЩЁ",))]}})
+    п = покупатели_минта(h4, МИНТ, [100, 101],
+                          известные={"DBOTW": "BATCH-3"})
+    покупатели = {r["owner"] for r in п["rows"] if r.get("owner")}
+    chk("покупатели минта найдены по всем слотам",
+        покупатели == {"ЧУЖОЙ1", "SRC", "ЧУЖОЙ2", "DBOTW", "МЫ", "ЕЩЁ"}, покупатели)
+    chk("кошелёк DBot помечен своей задачей",
+        any(r.get("whose") == "BATCH-3" for r in п["rows"]), п["rows"][:3])
+    chk("неудачная транзакция в покупатели не попала",
+        all(r.get("signature") != "C" for r in п["rows"]))
+    chk("блоков прочитано два", п["blocks_read"] == 2, п["blocks_read"])
+    п_нет = покупатели_минта(HeliusБлоки({}), МИНТ, [100])
+    chk("нет блока -- строка с причиной, а не тишина",
+        п_нет["rows"] and п_нет["rows"][0].get("known") is False, п_нет)
+
     print(f"самопроверка места в блоке: {всего[1]}/{всего[0]}"
           f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")
     if всего[1] != всего[0]:
@@ -337,13 +383,42 @@ def main() -> int:
     p.add_argument("--out", default="data/bloom_block_position.json")
     p.add_argument("--limit", type=int, default=6,
                    help="сколько последних НАСТОЯЩИХ позиций замерить")
+    p.add_argument("--mint-buyers", default=None,
+                   help="режим разбора: кто покупал этот минт в указанных слотах")
+    p.add_argument("--slots", default=None,
+                   help="слоты через запятую или диапазон A-B (для --mint-buyers)")
     a = p.parse_args()
     if a.self_test:
         self_test()
         return 0
 
-    state = ST.ExecState(base=Path(a.state_dir)) if a.state_dir else ST.ExecState()
     helius = BD.Helius(служба="bloom_block_position")
+
+    if a.mint_buyers:
+        слоты = []
+        for часть in (a.slots or "").split(","):
+            часть = часть.strip()
+            if not часть:
+                continue
+            if "-" in часть:
+                с, по = часть.split("-", 1)
+                слоты.extend(range(int(с), int(по) + 1))
+            else:
+                слоты.append(int(часть))
+        if not слоты:
+            print("нужны --slots")
+            return 2
+        итог = покупатели_минта(helius, a.mint_buyers, слоты,
+                                 известные={v: k for k, v in
+                                             КОШЕЛЬКИ_DBOT_ПО_УМОЛЧАНИЮ.items()})
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        ST.atomic_write_json(Path(a.out), {
+            "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "mint_buyers": итог})
+        print(json.dumps(итог, ensure_ascii=False, indent=1)[:6000])
+        return 0
+
+    state = ST.ExecState(base=Path(a.state_dir)) if a.state_dir else ST.ExecState()
     свои = state.positions()
     позиции = [p for p in свои.values() if ST.is_real_mode(p.get("mode"))]
     позиции.sort(key=lambda p: float(p.get("ts_intent") or 0))

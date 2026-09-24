@@ -13,6 +13,14 @@ on:
         description: "сколько последних настоящих позиций замерить"
         required: false
         default: "6"
+      mint_buyers:
+        description: "разбор: кто покупал этот минт (пусто -- обычный замер)"
+        required: false
+        default: ""
+      slots:
+        description: "слоты для разбора: через запятую или A-B"
+        required: false
+        default: ""
 
 concurrency:
   group: bloom-block-position
@@ -64,17 +72,26 @@ jobs:
         run: |
           set -e
           pip install -q requests
-          python3 analysis/bloom_block_position.py \
-            --state-dir /tmp/bloom_state \
-            --limit ${{ inputs.limit }} \
-            --out data/bloom_block_position.json
+          if [ -n "${{ inputs.mint_buyers }}" ]; then
+            python3 analysis/bloom_block_position.py \
+              --mint-buyers "${{ inputs.mint_buyers }}" \
+              --slots "${{ inputs.slots }}" \
+              --out data/bloom_mint_buyers.json
+          else
+            python3 analysis/bloom_block_position.py \
+              --state-dir /tmp/bloom_state \
+              --limit ${{ inputs.limit }} \
+              --out data/bloom_block_position.json
+          fi
 
       - name: "Коммит замера"
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/bloom_block_position.json ] && git add data/bloom_block_position.json
+          for f in data/bloom_block_position.json data/bloom_mint_buyers.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Bloom: место в блоке относительно источника [automated]"
           for i in 1 2 3 4 5; do
