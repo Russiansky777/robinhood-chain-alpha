@@ -1,0 +1,156 @@
+name: "NL-хост: установить свой раннер GitHub Actions"
+
+# Зачем раннер на хосте. Сейчас каждый доклад и каждый деплой идут с бегунка
+# GitHub: журналы едут по SSH туда и обратно, ключ VPS лежит в секретах, а
+# любая проверка состояния стоит нескольких минут. Свой раннер на хосте
+# убирает пересылку: журнал читается локально, и прогон видит службу рядом.
+#
+# Что нужно от владельца ОДИН раз (без этого установка честно не пойдёт):
+#   * секрет GH_RUNNER_PAT -- токен с правом administration:write на репозиторий
+#     (тогда прогон сам возьмёт короткоживущий токен регистрации), ИЛИ
+#   * секрет GH_RUNNER_TOKEN -- токен регистрации из Settings -> Actions ->
+#     Runners -> New self-hosted runner (живёт один час).
+#
+# Раннер ставится ОТДЕЛЬНЫМ пользователем (не bot, не root): у него нет доступа
+# ни к ключу кошелька, ни к env служб. Метка -- nl-host.
+on:
+  workflow_dispatch:
+    inputs:
+      labels:
+        description: "метки раннера через запятую"
+        required: false
+        default: "nl-host,solana"
+      runner_user:
+        description: "системный пользователь для раннера"
+        required: false
+        default: "ghrunner"
+      remove:
+        description: "'yes' -- снять раннер и удалить службу"
+        required: false
+        default: "no"
+
+concurrency:
+  group: vps-gh-runner
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  RUNNER_VERSION: "2.321.0"
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Токен регистрации: из PAT или готовый из секрета"
+        env:
+          GH_RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
+          GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$GH_RUNNER_TOKEN" ]; then
+            echo "токен регистрации взят из секрета GH_RUNNER_TOKEN"
+            echo "::add-mask::$GH_RUNNER_TOKEN"
+            printf '%s' "$GH_RUNNER_TOKEN" > /tmp/reg_token
+          elif [ -n "$GH_RUNNER_PAT" ]; then
+            echo "беру короткоживущий токен регистрации через API по PAT"
+            КОД=$(curl -sS -o /tmp/reg.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $GH_RUNNER_PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runners/registration-token")
+            if [ "$КОД" != "201" ]; then
+              echo "СБОЙ: API вернул $КОД (нужно право administration:write на репозиторий)"
+              python3 -c "import json;print(json.load(open('/tmp/reg.json')).get('message','без сообщения'))" || true
+              exit 1
+            fi
+            python3 -c "import json;print(json.load(open('/tmp/reg.json'))['token'],end='')" > /tmp/reg_token
+            echo "::add-mask::$(cat /tmp/reg_token)"
+          else
+            echo "СБОЙ: нет ни GH_RUNNER_TOKEN, ни GH_RUNNER_PAT."
+            echo "Положите ОДИН из них в секреты репозитория:"
+            echo "  GH_RUNNER_TOKEN -- Settings -> Actions -> Runners -> New self-hosted runner (живёт 1 час)"
+            echo "  GH_RUNNER_PAT   -- токен с administration:write (прогон сам возьмёт токен регистрации)"
+            exit 1
+          fi
+          [ -s /tmp/reg_token ] || { echo "СБОЙ: токен регистрации пуст"; exit 1; }
+
+      - name: "Снять раннер (по входу remove=yes)"
+        if: ${{ inputs.remove == 'yes' }}
+        run: |
+          set -e
+          У="${{ inputs.runner_user }}"
+          ssh -n $SSH_OPTS root@$HOST "
+            systemctl stop 'actions.runner.*' 2>/dev/null || true
+            if [ -d /home/$У/actions-runner ]; then
+              cd /home/$У/actions-runner
+              sudo -u $У ./svc.sh uninstall 2>/dev/null || true
+            fi
+            echo 'служба раннера снята'"
+          echo "раннер снят; дальше прогон не идёт"
+
+      - name: "Установка раннера"
+        if: ${{ inputs.remove != 'yes' }}
+        run: |
+          set -e
+          У="${{ inputs.runner_user }}"
+          МЕТКИ="${{ inputs.labels }}"
+          # Пользователь без доступа к ключам служб: своя домашняя папка,
+          # никаких прав на /etc/bloom-executor и на кошелёк.
+          ssh -n $SSH_OPTS root@$HOST "
+            id -u $У >/dev/null 2>&1 || useradd -m -s /bin/bash $У
+            install -d -o $У -g $У -m 750 /home/$У/actions-runner
+            apt-get install -y --no-install-recommends curl tar >/dev/null 2>&1 || true
+            echo 'пользователь и каталог готовы'"
+          # Пакет раннера качается на ХОСТЕ: гнать 200 МБ через бегунок незачем.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            cd /home/$У/actions-runner
+            if [ ! -x ./config.sh ]; then
+              curl -sSL -o /tmp/runner.tar.gz \
+                https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
+              tar xzf /tmp/runner.tar.gz -C /home/$У/actions-runner
+              chown -R $У:$У /home/$У/actions-runner
+              rm -f /tmp/runner.tar.gz
+            fi
+            ./bin/installdependencies.sh >/dev/null 2>&1 || true
+            echo 'пакет раннера на месте'"
+          # Токен идёт через stdin: в аргументах он был бы виден в ps.
+          cat /tmp/reg_token | ssh $SSH_OPTS root@$HOST "
+            set -e
+            ТОКЕН=\$(cat)
+            cd /home/$У/actions-runner
+            sudo -u $У ./config.sh --unattended --replace \
+              --url https://github.com/${{ github.repository }} \
+              --token \$ТОКЕН --name nl-host --labels '$МЕТКИ' --work _work
+            ./svc.sh install $У
+            ./svc.sh start
+            sleep 3
+            systemctl is-active 'actions.runner.*' || true"
+
+      - name: "Проверка: раннер виден и активен"
+        if: ${{ inputs.remove != 'yes' }}
+        run: |
+          set -e
+          У="${{ inputs.runner_user }}"
+          ssh -n $SSH_OPTS root@$HOST "
+            systemctl list-units 'actions.runner.*' --no-legend | tee /tmp/runner_units
+            test -s /tmp/runner_units || { echo 'СБОЙ: службы раннера нет'; exit 1; }
+            grep -q ' active ' /tmp/runner_units || { echo 'СБОЙ: служба раннера не active'; exit 1; }
+            echo 'раннер активен'
+            ls -la /home/$У/actions-runner/.runner >/dev/null && echo 'регистрация на месте'"
+          echo "готово: метки ${{ inputs.labels }}"
