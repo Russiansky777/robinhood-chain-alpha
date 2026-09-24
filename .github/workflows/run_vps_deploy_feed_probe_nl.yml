@@ -266,6 +266,22 @@ jobs:
             fi
             cat $STATE_DIR/heartbeat.json" | tee data/feed_probe_deploy.txt
 
+      - name: "Хвост журнала службы"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          # Журнал нужен НЕ только при падении: 24.09 служба была активна,
+          # признак жизни обновлялся, а по всем трём каналам стоял ноль без
+          # единого отказа. Ответ на "почему" лежит только в журнале, и
+          # читать его перезапуском деплоя -- дорого. Пишем в тот же отчёт,
+          # его же проверяет шаг на токены.
+          {
+            echo ""
+            echo "--- журнал службы, последние 60 строк ---"
+          } >> data/feed_probe_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 60 --no-pager" \
+            2>&1 | tee -a data/feed_probe_deploy.txt
+
       - name: "Токенов в отчёте быть не должно"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
