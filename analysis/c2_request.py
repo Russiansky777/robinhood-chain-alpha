@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 REQ = Path(__file__).resolve().parent.parent / "data" / "c2_requests" / "run.json"
-TASKS = ("crowd", "sandwich", "both", "selftest", "probe", "pools", "build", "blockpos", "route", "groups")
+TASKS = ("crowd", "sandwich", "both", "selftest", "probe", "pools", "build", "blockpos", "route", "groups", "twohop")
 ADDR = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 SIG = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{80,90}$")
 UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")

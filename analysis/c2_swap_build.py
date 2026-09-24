@@ -58,6 +58,7 @@ CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 DAMM2 = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
 # Пулы, где направление задаётся тем, в какое хранилище пришла котировка:
 # индексы входа/выхода пользователя, хранилищ a/b, их минтов и программ токена.
 DYN = {
@@ -65,6 +66,12 @@ DYN = {
                                                     "mb": 7, "pa": 9, "pb": 10},
     "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": {"in": 4, "out": 5, "va": 2, "vb": 3, "ma": 6,
                                                     "mb": 7, "pa": 11, "pb": 12},
+    # Raydium CLMM swap_v2: 3/4 -- счета пользователя вход/выход, 5/6 --
+    # хранилища вход/выход, 11/12 -- их минты; программа токена у swap_v2
+    # общая парой (8 -- SPL, 9 -- Token-2022), своя у каждого минта берётся
+    # из балансов транзакции (programId).
+    "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": {"in": 3, "out": 4, "va": 5, "vb": 6, "ma": 11,
+                                                     "mb": 12, "pa": None, "pb": None},
 }
 ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -101,6 +108,9 @@ SPECS = {
                 "base_mint": 9, "quote_mint": 10, "base_vault": 7, "quote_vault": 8},
     DLMM: {"label": "Meteora DLMM", "ix": "swap2", "alt": [], "n_accounts": None, "min_accounts": 16,
            "user": [10], "user_ata": "dyn", "pda": [], "tail": True,
+           "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
+    CLMM: {"label": "Raydium CLMM", "ix": "swap_v2", "alt": [], "n_accounts": None, "min_accounts": 13,
+           "user": [0], "user_ata": "dyn", "pda": [], "tail": True,
            "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
     DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"], "n_accounts": 14,
             "user": [8], "user_ata": "dyn", "pda": [],
@@ -150,8 +160,13 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
                 len(ix["accounts"]) < (spec.get("min_accounts") or 0):
             return {"ok": False, "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
         a0, a1 = struct.unpack("<QQ", data[8:24])
-        if program == DLMM and name != spec["ix"]:
+        if program in (DLMM, CLMM) and name != spec["ix"]:
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
+        # CLMM: хвост -- sqrt_price_limit_x64 (u128) + is_base_input (bool).
+        # Хвост переносится в нашу сборку как есть, поэтому берём только
+        # «точный вход без ценового лимита».
+        if program == CLMM and data[24:] != bytes(16) + b"\x01":
+            return {"ok": False, "why_not": "у источника CLMM не «точный вход без лимита цены»"}
         return {"ok": True, "program": program, "ix": name, "accounts": list(ix["accounts"]),
                 "data": data, "arg0": a0, "arg1": a1, "writable": writable_map(tx),
                 "signers": sorted(C.signers(tx))}
@@ -168,7 +183,15 @@ def roles_damm2(tpl: dict, tx: dict) -> dict:
         return {}
     a_in = (va["post"] - va["pre"]) > 0
     in_mint, out_mint = (acc[k["ma"]], acc[k["mb"]]) if a_in else (acc[k["mb"]], acc[k["ma"]])
-    in_prog, out_prog = (acc[k["pa"]], acc[k["pb"]]) if a_in else (acc[k["pb"]], acc[k["pa"]])
+    if k["pa"] is None:
+        progs = {b["mint"]: b.get("programId") for side in ("preTokenBalances", "postTokenBalances")
+                 for b in ((tx.get("meta") or {}).get(side) or [])}
+        pa, pb = progs.get(acc[k["ma"]]), progs.get(acc[k["mb"]])
+        if not pa or not pb:
+            return {}
+    else:
+        pa, pb = acc[k["pa"]], acc[k["pb"]]
+    in_prog, out_prog = (pa, pb) if a_in else (pb, pa)
     return {"in": (k["in"], in_mint, in_prog), "out": (k["out"], out_mint, out_prog),
             "quote_vault": acc[k["va"]] if a_in else acc[k["vb"]],
             "base_vault": acc[k["vb"]] if a_in else acc[k["va"]]}
@@ -297,7 +320,7 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
     f -- доля траты, доходящая до пула, калиброванная на сделке источника по
     его резервам ДО и его дельтам: f = x0*dy/((y0-dy)*spent), где spent --
     всё, что ушло из котировки в счета этой инструкции (пул + комиссии)."""
-    if tpl["program"] in (DAMM2, DLMM):
+    if tpl["program"] in (DAMM2, DLMM, CLMM):
         return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
@@ -373,10 +396,11 @@ def launchlab_min_out(tx: dict, amount_in: int, slippage: float) -> dict:
 def load_samples(program: str) -> list:
     p = SAMPLES_DIR / f"{program}.json"
     own = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
-    if program != DLMM:
+    if program not in (DLMM, CLMM):
         return own
-    # DLMM встречается и как шаг чужих маршрутов (SOL -> xStock и т.п.) --
-    # эти инструкции тоже настоящие, берём их в проверку.
+    # DLMM и CLMM встречаются и как шаг чужих маршрутов (SOL -> xStock и т.п.)
+    # -- эти инструкции тоже настоящие, берём их в проверку.
+    n_min, ix_name, vi = (16, "swap2", 2) if program == DLMM else (13, "swap_v2", 5)
     seen = {(C.first_signature(x["tx"]), x["pool_vault"]) for x in own}
     extra = []
     for f in sorted(SAMPLES_DIR.glob("*.json")):
@@ -384,15 +408,15 @@ def load_samples(program: str) -> list:
             continue
         for x in json.loads(f.read_text(encoding="utf-8")):
             for ix in all_instructions(x["tx"]):
-                if ix.get("programId") != DLMM or len(ix["accounts"]) < 16:
+                if ix.get("programId") != program or len(ix["accounts"]) < n_min:
                     continue
-                if b58decode(ix["data"])[:8] != disc("swap2"):
+                if b58decode(ix["data"])[:8] != disc(ix_name):
                     continue
-                key = (C.first_signature(x["tx"]), ix["accounts"][2])
+                key = (C.first_signature(x["tx"]), ix["accounts"][vi])
                 if key in seen:
                     continue
                 seen.add(key)
-                extra.append({"tx": x["tx"], "pool_vault": ix["accounts"][2], "source": x["source"],
+                extra.append({"tx": x["tx"], "pool_vault": ix["accounts"][vi], "source": x["source"],
                               "mint": None, "quote_mint": None})
     return own + extra
 

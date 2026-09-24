@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos | route | groups"
+        description: "crowd | sandwich | both | selftest | probe | pools | build | blockpos | route | groups | twohop"
         required: false
         default: "both"
       days:
@@ -110,6 +110,7 @@ jobs:
           python analysis/c2_route_htm.py --self-test
           python analysis/c2_groups.py --self-test
           python analysis/c2_shadow_build.py --self-test
+          python analysis/c2_twohop.py --self-test
 
       - name: "Группы сделок задачи A (только чтение цепи)"
         if: env.C2_TASK == 'groups'
@@ -127,6 +128,23 @@ jobs:
           HELIUS_API: ${{ secrets.HELIUS_API }}
         run: |
           python analysis/c2_commit.py -m "C2: группы сделок задачи A [automated]" "data/c2_groups_*.json" "data/c2_logs/groups_*.log" "data/helius_usage/c2_*.json"
+
+      - name: "Два шага: кэш шаблонов и покрытие (симуляция, без отправки)"
+        if: env.C2_TASK == 'twohop'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -o pipefail
+          test -n "$HELIUS_API" || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data/c2_logs
+          python -u analysis/c2_twohop.py 2>&1 | tee "data/c2_logs/twohop_${GITHUB_RUN_ID}.log"
+
+      - name: "Коммит двух шагов"
+        if: always() && env.C2_TASK == 'twohop'
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          python analysis/c2_commit.py -m "C2: два шага, кэш шаблонов, покрытие [automated]" "data/c2_twohop_*.json" "data/c2_leg_pools_*.json" "data/c2_logs/twohop_*.log" "data/helius_usage/c2_*.json"
 
       - name: "Задача G: SOL -> HTm -> токен, симуляция (без отправки)"
         if: env.C2_TASK == 'route'
