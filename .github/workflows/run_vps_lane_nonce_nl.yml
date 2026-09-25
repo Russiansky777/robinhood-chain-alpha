@@ -1,0 +1,138 @@
+name: "Полоса: аккаунт долговечного nonce (проверить или создать)"
+
+# Владелец 25.09 (сводный промпт, пункт 3): "Nonce-вариант пула (по транзакции
+# на сервис, только его чаевые, один durable nonce) -- сегодня: он заодно
+# снимает проблему 1232 байт. Самопроверка: два варианта на одном nonce --
+# исполняется ровно один."
+#
+# ЧТО ЗДЕСЬ ДЕЛАЕТСЯ.
+#   mode=check  (по умолчанию) -- только посчитать адрес и прочитать цепь.
+#                Денег не тратит вовсе.
+#   mode=create -- СОЗДАТЬ аккаунт nonce кошельком полосы. Это деньги: рента
+#                около 0.00145 SOL (спрашивается у узла, а не берётся по
+#                памяти) плюс базовый тариф за подпись. Рента остаётся на
+#                аккаунте и вернётся, если аккаунт закрыть.
+#
+# Адрес аккаунта выводится из кошелька полосы и семени bloom-lane-nonce, то есть
+# воспроизводим: его можно посчитать заново и сверить, а не хранить в файле.
+# Ключ кошелька берётся из окружения службы на хосте и никуда не печатается.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "'check' -- только прочитать (по умолчанию), 'create' -- создать аккаунт nonce (тратит ренту)"
+        required: false
+        default: "check"
+
+concurrency:
+  group: lane-nonce
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  nonce:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО всякой цепи"
+        run: |
+          set -e
+          cd analysis
+          python3 lane_nonce.py --self-test | tail -1
+          python3 bloom_own_send.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль nonce на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/lane_nonce.py && chown bot:bot $CODE_DIR/lane_nonce.py && chmod 644 $CODE_DIR/lane_nonce.py" < analysis/lane_nonce.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $CODE_DIR/lane_nonce.py"
+
+      - name: "Адрес и состояние аккаунта nonce (только чтение)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              BLOOM_LANE_WALLET=\$BLOOM_LANE_WALLET \
+              PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python lane_nonce.py
+          " | tee data/lane_nonce_state.txt || echo "аккаунта nonce ещё нет (это ожидаемо до создания)"
+
+      - name: "СОЗДАТЬ аккаунт nonce (только по mode=create)"
+        if: ${{ inputs.mode == 'create' }}
+        run: |
+          set -e
+          # Ключ кошелька полосы лежит в окружении службы. Значение не
+          # печатается: наружу идёт адрес аккаунта, рента числом и подпись.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              BLOOM_LANE_WALLET=\$BLOOM_LANE_WALLET \
+              EXEC_WALLET_KEY=\$EXEC_WALLET_KEY \
+              BLOOM_WALLET_KEY=\$BLOOM_WALLET_KEY \
+              PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python lane_nonce.py --create
+          " | tee -a data/lane_nonce_state.txt
+
+      - name: "Записать адрес nonce в окружение службы (только после создания)"
+        if: ${{ inputs.mode == 'create' }}
+        run: |
+          set -e
+          # Адрес воспроизводим, но служба не должна считать его каждый раз:
+          # BLOOM_LANE_NONCE читается модулем полосы, и пустое значение
+          # означает, что вариант на nonce просто выключен.
+          # Два простых шага вместо одной хитрой строки: сначала узнаём кошелёк
+          # полосы с хоста, потом считаем адрес nonce локально. Вложенная
+          # подстановка внутри аргумента ssh -- ровно тот класс, на котором
+          # деплой падал трижды 25.09.
+          LANE_WALLET=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; printf %s \$BLOOM_LANE_WALLET")
+          [ -n "$LANE_WALLET" ] || { echo "СБОЙ: BLOOM_LANE_WALLET на хосте пуст"; exit 1; }
+          echo "кошелёк полосы: $LANE_WALLET"
+          NONCE=$(python3 analysis/lane_nonce.py --address-only --wallet "$LANE_WALLET" | python3 -c "import json,sys; print(json.loads(sys.stdin.read().strip().split(chr(10))[0])['address'])")
+          echo "адрес nonce: $NONCE"
+          printf 'BLOOM_LANE_NONCE=%s\n' "$NONCE" | ssh $SSH_OPTS root@$TARGET_HOST "
+            cat > /tmp/nonce_line
+            sed -i '/^BLOOM_LANE_NONCE=/d' $ENV_DIR/env
+            cat /tmp/nonce_line >> $ENV_DIR/env
+            shred -u /tmp/nonce_line
+            chmod 600 $ENV_DIR/env
+            grep -c '^BLOOM_LANE_NONCE=' $ENV_DIR/env"
+
+      - name: "Коммит состояния"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/lane_nonce_state.txt ] && git add data/lane_nonce_state.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Polosa: sostoyanie akkaunta nonce [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
