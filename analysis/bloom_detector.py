@@ -76,6 +76,15 @@ except Exception as _тень_exc:        # noqa: BLE001
     SB = None
     SHADOW_IMPORT_ERR = f"{type(_тень_exc).__name__}: {_тень_exc}"
 
+try:                                  # полоса своей отправки -- тоже не обязана
+    import bloom_own_send as OS        # noqa: E402
+    OWN_SEND_IMPORT_ERR = ""
+except Exception as _полоса_exc:      # noqa: BLE001
+    # Так же, как с тенью: причина живёт в переменной и уходит в признак
+    # жизни. "Полосы нет" без причины выглядит решением, а это поломка.
+    OS = None
+    OWN_SEND_IMPORT_ERR = f"{type(_полоса_exc).__name__}: {_полоса_exc}"
+
 
 class ПодменаТени:
     """Подменяет глобальное SB на время проверки и возвращает как было.
@@ -1438,6 +1447,25 @@ class Детектор:
         # по тому же типу -- иначе "пять из последних двадцати" выдавалось
         # бы за "пять подряд".
         self.тени_подряд: dict = {}
+        # ПОЛОСА СВОЕЙ ОТПРАВКИ. Собирает и подписывает покупку сама и
+        # отправляет её через Helius Sender рядом с покупкой Bloom. Включает
+        # BLOOM_OWN_SEND=1; отправляет только при BLOOM_OWN_SEND_LIVE=1, и
+        # этот рубильник проверяется В МОДУЛЕ, а не здесь: одна точка.
+        self.полоса_включена = (OS is not None
+                                 and ST.env_int("BLOOM_OWN_SEND", 0) == 1)
+        self.полос_путей = 0
+        self.полос_отправлено = 0
+        self.полос_по_стадиям: dict = {}
+        self.полос_последняя: dict = {}
+        self.полос_куплено_догнано = 0
+        # ТЁПЛЫЙ BLOCKHASH. getLatestBlockhash в горячем пути -- это круг до
+        # сети, то есть ровно то, что полоса и меряет. Обновляет отдельные
+        # часы (тёплый_хеш), а полоса берёт готовое значение и проверяет его
+        # возраст сама.
+        self.blockhash = None
+        self.blockhash_ts = None
+        self.blockhash_почему = "ещё не обновлялся"
+        self.blockhash_обновлений = 0
         # КЭШ ШАБЛОНОВ ПЕРВОГО ШАГА (SOL -> Q) для двухшаговой тени.
         # Сеть при создании не зовётся ни разу: шаблоны приходят из той же
         # подписки, что и сигналы, а ingest их только разбирает. Опрос узла
@@ -1668,6 +1696,26 @@ class Детектор:
                          "module_loaded": SB is not None,
                          "module_why_not": globals().get("SHADOW_IMPORT_ERR", ""),
                          "passed_in_row_by_pool": dict(self.тени_подряд)}
+        st["own_send"] = {
+            "enabled": self.полоса_включена,
+            "live": (OS is not None and OS.живьём()),
+            "module_loaded": OS is not None,
+            "module_why_not": globals().get("OWN_SEND_IMPORT_ERR", ""),
+            "paths": self.полос_путей, "sent": self.полос_отправлено,
+            "by_stage": dict(self.полос_по_стадиям),
+            "bought_backfilled": self.полос_куплено_догнано,
+            "blockhash_age_s": (round(time.time() - self.blockhash_ts, 1)
+                                 if self.blockhash_ts else None),
+            "blockhash_updates": self.blockhash_обновлений,
+            "blockhash_why_not": self.blockhash_почему,
+            "last": dict(self.полос_последняя),
+            "limits": ({"open": OS.ЛИМИТ_ОТКРЫТЫХ, "per_day": OS.ЛИМИТ_В_СУТКИ,
+                         "size_sol": OS.размер_sol(),
+                         "stop_failed_in_row": OS.СТОП_ПОДРЯД_УПАВШИХ,
+                         "stop_loss_sol": OS.СТОП_УБЫТОК_SOL}
+                        if OS is not None else {}),
+            "lane_state": (OS.состояние_полосы(self.состояние.positions())
+                            if OS is not None and self.полоса_включена else {})}
         st["leg_cache"] = self.признак_кэша_ног()
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
@@ -1867,6 +1915,11 @@ class Детектор:
             # строкой. Ставить её после отправки нельзя -- тогда она мерила
             # бы уже другое состояние пула.
             self.запустить_тень(строка, tx)
+            # ПОЛОСА СВОЕЙ ОТПРАВКИ -- тем же порядком: свой поток, до вызова
+            # Bloom. Сравнение "Bloom против нашей" честно только когда обе
+            # стороны стартуют от одного решения; поток отпускается сразу и
+            # Bloom его не ждёт.
+            self.запустить_полосу(строка, tx)
             try:
                 итог = self.исполнитель.execute(строка, balance_sol=self.свежий_баланс())
             except Exception as exc:  # noqa: BLE001
@@ -2322,6 +2375,273 @@ class Детектор:
         except Exception:  # noqa: BLE001
             log.exception("запись тени в журнал не легла")
 
+    # ------------------------------------------------------- полоса своей отправки
+
+    def обновить_blockhash(self) -> dict:
+        """Тёплый blockhash для полосы. ВНЕ горячего пути -- со своих часов.
+
+        Один getLatestBlockhash (1 кредит) на обновление и только когда
+        полоса включена. В горячем пути этот вызов стоил бы круг до сети --
+        то самое, что полоса и меряет.
+        """
+        if not self.полоса_включена:
+            self.blockhash_почему = "полоса выключена"
+            return {"ok": False, "why_not": self.blockhash_почему}
+        try:
+            о = self.helius.call("getLatestBlockhash", [{"commitment": "confirmed"}])
+            хеш = ((о or {}).get("value") or {}).get("blockhash")
+        except Exception as exc:  # noqa: BLE001
+            # Старый хеш НЕ стираем: он ещё может быть годен по возрасту, а
+            # проверку возраста делает сама полоса перед подписью.
+            self.blockhash_почему = f"{type(exc).__name__}: {str(exc)[:120]}"
+            return {"ok": False, "why_not": self.blockhash_почему}
+        if not хеш:
+            self.blockhash_почему = "узел не вернул blockhash"
+            return {"ok": False, "why_not": self.blockhash_почему}
+        self.blockhash = хеш
+        self.blockhash_ts = time.time()
+        self.blockhash_почему = ""
+        self.blockhash_обновлений += 1
+        return {"ok": True, "blockhash": хеш}
+
+    def запустить_полосу(self, строка: dict, tx: dict | None) -> None:
+        """Своя отправка -- в своём потоке и НЕ задерживая Bloom.
+
+        Поток отпускается сразу, как у тени. Исключение внутри не может ни
+        задержать Bloom, ни уронить детектор: оно уходит в журнал.
+        """
+        if OS is None or not self.полоса_включена:
+            return
+        try:
+            поток = threading.Thread(
+                target=self._полоса_внутри, args=(dict(строка), tx),
+                name="own-send", daemon=True)
+            поток.start()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("полоса не запустилась: %s", type(exc).__name__)
+
+    def _полоса_внутри(self, строка: dict, tx: dict | None) -> None:
+        t0 = time.time()
+        подпись_и = строка.get("signature") or ""
+        запись = {"stage": "own_send", "signature": подпись_и,
+                   "mint": строка.get("mint"), "source": строка.get("source")}
+        try:
+            рез = OS.провести(
+                tx_источника=tx or {}, источник=строка.get("source") or "",
+                минт=строка.get("mint") or "", состояние=self.состояние,
+                blockhash=self.blockhash, blockhash_ts=self.blockhash_ts,
+                проскальзывание=(float(self.исполнитель.slippage_pct) / 100.0
+                                  if self.исполнитель is not None else 0.35),
+                # КЛЮЧ ОПЕРАЦИИ -- от подписи источника, а не случайный: один
+                # сигнал даёт одну отправку, даже если сигнал придёт дважды.
+                ключ_операции=f"own-{подпись_и[:40]}",
+                источник_подпись=подпись_и,
+                источник_слот=строка.get("source_slot") or строка.get("slot"),
+                rpc_call=self.helius.call)
+            запись.update(рез or {})
+            self.полос_путей += 1
+            стадия = (рез or {}).get("stage") or "?"
+            self.полос_по_стадиям[стадия] = self.полос_по_стадиям.get(стадия, 0) + 1
+            if (рез or {}).get("sent"):
+                self.полос_отправлено += 1
+            self.полос_последняя = {
+                "stage": стадия, "ok": bool((рез or {}).get("ok")),
+                "why_not": (рез or {}).get("why_not"),
+                "signature": (рез or {}).get("signature"),
+                "pool_program": (рез or {}).get("pool_program"),
+                "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        except Exception as exc:  # noqa: BLE001
+            запись["why_not"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            self.полос_по_стадиям["crashed"] = (
+                self.полос_по_стадиям.get("crashed", 0) + 1)
+            log.exception("полоса упала на %s", подпись_и[:12])
+        запись["own_send_total_ms"] = round((time.time() - t0) * 1000.0, 2)
+        try:
+            self.состояние.log_decision(запись)
+        except Exception:  # noqa: BLE001
+            log.exception("запись полосы в журнал не легла")
+
+    def отметить_полосу_в_потоке(self, *, cid: str, поз: dict, подпись: str,
+                                  слот, tx, t_recv: float,
+                                  цепь_ок: bool | None = None) -> dict:
+        """Транзакция ПОЛОСЫ увидена в потоке: её круг и купленное количество.
+
+        Круг у полосы считается от ОТПРАВКИ (ts_sent), а не от ответа
+        площадки: у своей отправки ответа площадки нет вовсе, и сравнивать
+        надо путь "мы нажали -> видно в потоке" с чужим "Bloom ответил ->
+        видно в потоке".
+
+        Количество -- сырыми единицами из meta. Без него сторож продавать не
+        станет: продать весь остаток минта нельзя, там лежит и покупка Bloom.
+        """
+        поля: dict = {"own_tx_seen_ts": round(t_recv, 6), "own_tx_seen_slot": слот}
+        запись = {"stage": "lane_seen", "client_order_id": cid, "mint": поз.get("mint"),
+                   "signature": подпись, "slot": слот, "lane": ST.МЕТКА_ПОЛОСЫ}
+        отправлено_ts = поз.get("ts_sent")
+        if отправлено_ts:
+            поля["lane_send_to_seen_ms"] = round(
+                (t_recv - float(отправлено_ts)) * 1000.0, 2)
+            запись["lane_send_to_seen_ms"] = поля["lane_send_to_seen_ms"]
+        решение_ts = поз.get("ts_intent")
+        if решение_ts:
+            поля["own_tx_seen_ms"] = round((t_recv - float(решение_ts)) * 1000.0, 2)
+            запись["own_tx_seen_ms"] = поля["own_tx_seen_ms"]
+        куплено = OS.купленное_raw(tx or {}, ST.EXECUTOR_WALLET,
+                                    поз.get("mint") or "") if OS is not None else {}
+        if куплено.get("ok"):
+            поля["lane_bought_raw"] = куплено["raw"]
+            поля["chain_ok"] = True
+            запись["lane_bought_raw"] = куплено["raw"]
+        else:
+            # Замерная подписка часто приходит без meta: это НЕ повод писать
+            # ноль. Количество догонит пульс по подписи, а пока его нет,
+            # сторож продавать не станет -- и это правильно.
+            запись["lane_bought_why_not"] = куплено.get("why_not")
+            поля["lane_bought_why_not"] = куплено.get("why_not")
+            if куплено.get("chain_ok") is False:
+                поля["chain_ok"] = False
+            elif цепь_ок is not None:
+                # Вердикт цепи из meta известен и без количества: записать его
+                # надо, иначе серия упавших у полосы не считается.
+                поля["chain_ok"] = цепь_ок
+        try:
+            self.состояние.update_position(cid, **поля)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("круг полосы в позицию не записан: %s", type(exc).__name__)
+        try:
+            self.состояние.log_decision(запись)
+        except Exception:  # noqa: BLE001
+            log.exception("запись круга полосы в журнал не легла")
+        self.сообщить_пару(cid)
+        return запись
+
+    def догнать_купленное_полосы(self, *, предел: int = 3) -> dict:
+        """Количество, купленное полосой, там где потока не хватило.
+
+        ВНЕ горячего пути, с пульса: один getTransaction на позицию. Нужен,
+        потому что замерная подписка часто приходит без meta, а сторожу нужно
+        точное количество -- продавать остаток минта целиком нельзя.
+        """
+        итог = {"looked": 0, "filled": 0, "why_not": None}
+        if OS is None or not self.полоса_включена:
+            итог["why_not"] = "полоса выключена"
+            return итог
+        try:
+            позиции = self.состояние.lane_positions()
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"позиции не прочитаны ({type(exc).__name__})"
+            return итог
+        for поз in позиции:
+            if итог["looked"] >= предел:
+                break
+            if поз.get("lane_bought_raw") is not None:
+                continue
+            if поз.get("state") in (ST.STATE_CLOSED, "closed"):
+                continue
+            подпись = поз.get("lane_signature") or поз.get("lane_signature_local")
+            if not подпись:
+                continue
+            попыток = int(поз.get("lane_bought_tries") or 0)
+            if попыток >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                continue
+            итог["looked"] += 1
+            cid = поз.get("client_order_id")
+            try:
+                tx = self.helius.транзакция(подпись)
+            except Exception as exc:  # noqa: BLE001
+                tx = None
+                причина = f"{type(exc).__name__}: {str(exc)[:120]}"
+            else:
+                причина = "" if tx else "узел транзакции не отдал"
+            куплено = OS.купленное_raw(tx or {}, ST.EXECUTOR_WALLET,
+                                        поз.get("mint") or "")
+            поля = {"lane_bought_tries": попыток + 1}
+            if куплено.get("ok"):
+                поля["lane_bought_raw"] = куплено["raw"]
+                поля["chain_ok"] = True
+                итог["filled"] += 1
+                self.полос_куплено_догнано += 1
+            else:
+                поля["lane_bought_why_not"] = (причина or куплено.get("why_not"))
+                if куплено.get("chain_ok") is False:
+                    поля["chain_ok"] = False
+            try:
+                self.состояние.update_position(cid, **поля)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("количество полосы в позицию не легло: %s",
+                            type(exc).__name__)
+        return итог
+
+    def сообщить_пару(self, cid_полосы: str) -> dict:
+        """Пара "Bloom против нашей" -- строкой владельцу, один раз на пару.
+
+        Сравниваются ДВА замера одного и того же сигнала: когда в потоке
+        появилась покупка Bloom и когда -- наша. Раньше та, у которой
+        own_tx_seen_ts меньше. Пока второй половины пары нет, строка не
+        уходит: половина пары -- это не сравнение.
+        """
+        итог = {"sent": False, "why_not": None}
+        try:
+            позиции = self.состояние.positions() or {}
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"позиции не прочитаны ({type(exc).__name__})"
+            return итог
+        наша = позиции.get(cid_полосы) or {}
+        if наша.get("lane_pair_reported"):
+            итог["why_not"] = "пара уже доложена"
+            return итог
+        источник = наша.get("source_sig")
+        if not источник:
+            итог["why_not"] = "у позиции полосы нет подписи источника"
+            return итог
+        блум = None
+        for п in позиции.values():
+            if п.get("lane") or п.get("source_sig") != источник:
+                continue
+            if п.get("own_tx_seen_ts"):
+                блум = п
+                break
+        if блум is None:
+            итог["why_not"] = "покупки Bloom по этому сигналу в потоке ещё не видно"
+            return итог
+        if not наша.get("own_tx_seen_ts"):
+            итог["why_not"] = "нашей транзакции в потоке ещё не видно"
+            return итог
+        разница = round((float(блум["own_tx_seen_ts"])
+                          - float(наша["own_tx_seen_ts"])) * 1000.0, 2)
+        кто = "мы раньше" if разница > 0 else "Bloom раньше"
+        текст = (f"🏁 пара «Bloom против нашей» по {(источник or '')[:12]}\n"
+                  f"минт {(наша.get('mint') or '')[:12]}\n"
+                  f"наша: слот {наша.get('own_tx_seen_slot')}, "
+                  f"от отправки {наша.get('lane_send_to_seen_ms')} мс, "
+                  f"{(наша.get('lane_signature') or '')[:12]}\n"
+                  f"Bloom: слот {блум.get('own_tx_seen_slot')}, "
+                  f"от ответа {блум.get('bloom_to_seen_ms')} мс, "
+                  f"bloom_ms {блум.get('bloom_ms')}\n"
+                  f"{кто} на {abs(разница)} мс")
+        # Помечаем ДО отправки: вторая строка о той же паре хуже, чем ни
+        # одной, а Telegram может ответить ошибкой уже после доставки.
+        try:
+            self.состояние.update_position(cid_полосы, lane_pair_reported=True,
+                                            lane_pair_delta_ms=разница)
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"пометка пары не легла ({type(exc).__name__})"
+            return итог
+        self.состояние.log_decision({"stage": "lane_pair",
+                                      "client_order_id": cid_полосы,
+                                      "signature": источник,
+                                      "lane_pair_delta_ms": разница,
+                                      "lane_slot": наша.get("own_tx_seen_slot"),
+                                      "bloom_slot": блум.get("own_tx_seen_slot")})
+        if self.оповещатель is not None and NT is not None:
+            self.оповещатель.послать(текст)
+            итог["sent"] = True
+        else:
+            итог["why_not"] = "оповещатель не подключён"
+        итог["delta_ms"] = разница
+        итог["text"] = текст
+        return итог
+
     def отметить_нашу_транзакцию(self, подпись: str, слот, tx, t_recv: float):
         """Наша покупка увидена в потоке: считаем два круга в миллисекундах.
 
@@ -2342,6 +2662,14 @@ class Детектор:
                 if подпись in (п.get("signatures") or []):
                     поз, cid = п, к
                     break
+                # ПОЛОСА ПОДПИСЫВАЕТ САМА: её подпись лежит отдельным полем,
+                # а signatures заполняет только ответ Bloom. Без этой ветки
+                # своя же транзакция считалась бы "позиции нет" и её круг
+                # пропадал бы вместе с количеством для сторожа.
+                if подпись in (п.get("lane_signature"),
+                                п.get("lane_signature_local")):
+                    поз, cid = п, к
+                    break
         except Exception as exc:  # noqa: BLE001
             log.warning("позиции для замера круга не прочитаны: %s",
                         type(exc).__name__)
@@ -2359,6 +2687,13 @@ class Детектор:
             запись["why_not"] = "позиции с такой подписью нет: круг не от чего считать"
             self.состояние.log_decision(запись)
             return запись
+        # ПОЗИЦИЯ ПОЛОСЫ считается иначе: у неё нет ответа площадки, зато
+        # есть своя отправка и своё количество. Строку в журнал пишет сама
+        # ветка полосы -- два ряда на одно событие читать невозможно.
+        if поз.get("lane") == ST.МЕТКА_ПОЛОСЫ:
+            return self.отметить_полосу_в_потоке(
+                cid=cid, поз=поз, подпись=подпись, слот=слот, tx=tx,
+                t_recv=t_recv, цепь_ок=запись.get("chain_ok"))
         решение_ts = поз.get("ts_intent")
         ответ_ts = поз.get("ts_accepted")
         if решение_ts:
@@ -2760,6 +3095,13 @@ async def слушать(детектор: Детектор, ключ: str, *, �
 ПОВТОР_ТРЕВОГИ_ЗАПАСНОГО_S = ST.env_float("BLOOM_FALLBACK_ALARM_REPEAT_S", 120.0)
 
 ПУЛЬС_S = ST.env_float("BLOOM_DETECTOR_PULSE_S", 60.0)
+
+# КАК ЧАСТО ОБНОВЛЯТЬ ТЁПЛЫЙ BLOCKHASH. Сеть держит хеш около 150 слотов
+# (~60 с), а полоса не подписывает хешем старше 30 с (bloom_own_send). Пульс
+# в 60 с для этого не годится: половина сигналов пришлась бы на просроченный
+# хеш. Свои часы в 12 с дают 1 кредит каждые 12 с -- 7200 в сутки -- и только
+# когда полоса включена.
+ТЁПЛЫЙ_ХЕШ_S = ST.env_float("BLOOM_OWN_SEND_BH_S", 12.0)
 ОБНОВЛЕНИЕ_ИСТОЧНИКОВ_S = ST.env_float("BLOOM_SOURCES_REFRESH_S", 900.0)
 
 
@@ -2788,6 +3130,10 @@ async def биение(детектор: Детектор, стоп_через_s
             # Место в блоке -- туда же: один getBlock уровня signatures на
             # позицию, 1 кредит, и владелец видит место рядом с S+N.
             await asyncio.to_thread(детектор.догнать_место_в_блоке)
+            # Количество, купленное полосой, там где поток пришёл без meta.
+            # Сторож без него продавать не станет -- и правильно: остаток
+            # минта продавать целиком нельзя, там же покупка Bloom.
+            await asyncio.to_thread(детектор.догнать_купленное_полосы)
             # Тревога о запасном пути -- на пульсе: подписка в это время
             # занята сообщениями, а пульс как раз для таких проверок.
             детектор.проверить_запасной_путь()
@@ -2798,6 +3144,26 @@ async def биение(детектор: Детектор, стоп_через_s
             log.warning("признак жизни не записался: %s: %s",
                         type(exc).__name__, str(exc)[:160])
         await asyncio.sleep(ПУЛЬС_S)
+
+
+async def тёплый_хеш(детектор: Детектор, стоп_через_s: float | None = None) -> None:
+    """Часы тёплого blockhash для полосы своей отправки.
+
+    Отдельные часы, а не пульс: пульс раз в минуту, а хеш нужен свежее 30 с.
+    Полоса выключена -- часы не идут вовсе и кредитов не тратят.
+    """
+    if not детектор.полоса_включена:
+        return
+    дедлайн = (time.time() + стоп_через_s) if стоп_через_s else None
+    while True:
+        if дедлайн and time.time() > дедлайн:
+            return
+        try:
+            await asyncio.to_thread(детектор.обновить_blockhash)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("тёплый хеш не обновился: %s: %s",
+                        type(exc).__name__, str(exc)[:160])
+        await asyncio.sleep(ТЁПЛЫЙ_ХЕШ_S)
 
 
 async def часы_слотов(детектор: Детектор, ключ: str,
@@ -4129,6 +4495,281 @@ def self_test() -> int:
         chk("после проверок тени модуль на месте, как был",
             "SB" in globals(), "SB" in globals())
 
+        # ---- ПОЛОСА СВОЕЙ ОТПРАВКИ В ДЕТЕКТОРЕ ----
+        # Проверяем ровно то, что стоит денег: полоса не задерживает Bloom и
+        # не может его уронить; тёплый хеш не тратит кредитов, когда полоса
+        # выключена; своя подпись находит СВОЮ позицию; количество для
+        # сторожа берётся из цепи, а не из предположения.
+        print("модуль полосы: " + ("загружен" if OS is not None
+                                    else "НЕ загружен -- "
+                                         + (OWN_SEND_IMPORT_ERR
+                                            or "причина не записана")))
+        настоящая_полоса = globals().get("OS")
+        # СВОЁ состояние: позиции полосы в общем каталоге путали счёт
+        # следующим проверкам -- догон chain_ok считал их своими.
+        st_п = ST.ExecState(base=Path(d) / "lane_det", kill=Path(d) / "kill")
+
+        class ПолосаЗаглушка:
+            МЕТКА = ST.МЕТКА_ПОЛОСЫ
+            ЛИМИТ_ОТКРЫТЫХ = 1
+            ЛИМИТ_В_СУТКИ = 20
+            СТОП_ПОДРЯД_УПАВШИХ = 3
+            СТОП_УБЫТОК_SOL = 0.1
+            вызовы: list = []
+            задержка = 0.0
+            падать = False
+
+            @staticmethod
+            def живьём():
+                return False
+
+            @staticmethod
+            def размер_sol():
+                return 0.01
+
+            @staticmethod
+            def состояние_полосы(позиции, **кв):
+                return {"open": 0, "today": 0, "failed_in_row": 0, "pnl_sol": 0.0}
+
+            @staticmethod
+            def купленное_raw(tx, кошелёк, минт):
+                return настоящая_полоса.купленное_raw(tx, кошелёк, минт)
+
+            @staticmethod
+            def провести(**кв):
+                ПолосаЗаглушка.вызовы.append(кв)
+                if ПолосаЗаглушка.падать:
+                    raise RuntimeError("узел молчит")
+                if ПолосаЗаглушка.задержка:
+                    time.sleep(ПолосаЗаглушка.задержка)
+                return {"stage": "dry", "ok": True, "dry": True, "sent": False,
+                        "sim_verdict": "would_pass"}
+
+        было_имя_OS = "OS" in globals()
+        было_OS = globals().get("OS")
+        globals()["OS"] = ПолосаЗаглушка
+        try:
+            class HeliusСчётный:
+                вызовов = 0
+                хеш = "ХЕШ_УЗЛА"
+                падать = False
+                tx_ответ = None
+                # Признак жизни читает эти поля у настоящего узла.
+                по_методам: dict = {}
+                учёт_пишется = False
+                учёт_почему = "заглушка самопроверки"
+                метр = None
+
+                @staticmethod
+                def налог_минта(минт):
+                    return {"taxed": False, "tax_bps": 0}
+
+                def call(self, метод, параметры=None, **kw):
+                    HeliusСчётный.вызовов += 1
+                    if HeliusСчётный.падать:
+                        raise RuntimeError("узел молчит")
+                    if метод == "getLatestBlockhash":
+                        return {"value": {"blockhash": HeliusСчётный.хеш}}
+                    return None
+
+                def транзакция(self, подпись, **kw):
+                    return HeliusСчётный.tx_ответ
+
+            хел = HeliusСчётный()
+            детектор_пп = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_п,
+                                    курс=КурсSOL(), режим="dry", helius=хел)
+
+            # 1. ВЫКЛЮЧЕННАЯ ПОЛОСА: ни потока, ни кредита.
+            детектор_пп.полоса_включена = False
+            HeliusСчётный.вызовов = 0
+            ПолосаЗаглушка.вызовы.clear()
+            детектор_пп.запустить_полосу({"signature": "SP0", "mint": "M"}, {})
+            х0 = детектор_пп.обновить_blockhash()
+            chk("выключенная полоса не запускается и хеш не обновляет",
+                not ПолосаЗаглушка.вызовы and х0["ok"] is False
+                and HeliusСчётный.вызовов == 0,
+                (ПолосаЗаглушка.вызовы, х0, HeliusСчётный.вызовов))
+
+            # 2. ТЁПЛЫЙ ХЕШ: значение и время, а на ошибке узла старое не трём.
+            детектор_пп.полоса_включена = True
+            х1 = детектор_пп.обновить_blockhash()
+            chk("тёплый хеш обновлён и время записано",
+                х1["ok"] and детектор_пп.blockhash == "ХЕШ_УЗЛА"
+                and детектор_пп.blockhash_ts is not None, (х1, детектор_пп.blockhash))
+            HeliusСчётный.падать = True
+            х2 = детектор_пп.обновить_blockhash()
+            chk("узел молчит -- старый хеш НЕ стёрт, причина названа",
+                х2["ok"] is False and детектор_пп.blockhash == "ХЕШ_УЗЛА"
+                and детектор_пп.blockhash_почему, (х2, детектор_пп.blockhash))
+            HeliusСчётный.падать = False
+
+            # 3. ПОЛОСА НЕ ЗАДЕРЖИВАЕТ ГОРЯЧИЙ ПУТЬ и получает всё нужное.
+            ПолосаЗаглушка.вызовы.clear()
+            ПолосаЗаглушка.задержка = 0.35
+            t_до_п = time.time()
+            детектор_пп.запустить_полосу({"signature": "ПОДПИСЬ_ИСТОЧНИКА",
+                                          "mint": "MINTL", "source": "SRC",
+                                          "source_slot": 4242}, {"meta": {}})
+            прошло_п = time.time() - t_до_п
+            chk("полоса не задерживает горячий путь", прошло_п < 0.1, прошло_п)
+            for _ in range(80):
+                if детектор_пп.полос_путей:
+                    break
+                time.sleep(0.05)
+            зов = (ПолосаЗаглушка.вызовы or [{}])[0]
+            chk("полоса отработала в своём потоке и посчитана по стадии",
+                детектор_пп.полос_путей == 1
+                and детектор_пп.полос_по_стадиям.get("dry") == 1
+                and детектор_пп.полос_отправлено == 0,
+                (детектор_пп.полос_путей, детектор_пп.полос_по_стадиям))
+            chk("полосе переданы состояние, тёплый хеш с его временем, минт и слот",
+                зов.get("состояние") is st_п and зов.get("blockhash") == "ХЕШ_УЗЛА"
+                and зов.get("blockhash_ts") == детектор_пп.blockhash_ts
+                and зов.get("минт") == "MINTL"
+                and зов.get("источник_слот") == 4242, зов)
+            chk("ключ операции -- от подписи источника, а не случайный",
+                зов.get("ключ_операции") == "own-ПОДПИСЬ_ИСТОЧНИКА"
+                and зов.get("источник_подпись") == "ПОДПИСЬ_ИСТОЧНИКА", зов)
+            ПолосаЗаглушка.задержка = 0.0
+
+            # 4. ПАДЕНИЕ ПОЛОСЫ НЕ РОНЯЕТ ДЕТЕКТОР.
+            ПолосаЗаглушка.падать = True
+            детектор_пп.запустить_полосу({"signature": "SP2", "mint": "M"}, {})
+            for _ in range(80):
+                if детектор_пп.полос_по_стадиям.get("crashed"):
+                    break
+                time.sleep(0.05)
+            chk("падение полосы записано и детектор жив",
+                детектор_пп.полос_по_стадиям.get("crashed") == 1,
+                детектор_пп.полос_по_стадиям)
+            ПолосаЗаглушка.падать = False
+
+            # 5. СВОЯ ПОДПИСЬ НАХОДИТ СВОЮ ПОЗИЦИЮ, количество -- из цепи.
+            st_п.write_intent(client_order_id="lane1", mint="MINTL", source_sig="SL",
+                             source_slot=7, sol_in=0.01, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ)
+            т_п = st_п.positions()["lane1"]["ts_intent"]
+            st_п.update_position("lane1", state="bought",
+                                lane_signature="ПОДПИСЬ_ПОЛОСЫ",
+                                ts_sent=т_п + 0.05)
+            tx_полосы = {"meta": {"err": None, "preTokenBalances": [],
+                                   "postTokenBalances": [
+                                       {"accountIndex": 3,
+                                        "owner": ST.EXECUTOR_WALLET,
+                                        "mint": "MINTL",
+                                        "uiTokenAmount": {"amount": "8880000",
+                                                          "decimals": 6,
+                                                          "uiAmount": 8.88}}]}}
+            зп1 = детектор_пп.отметить_нашу_транзакцию(
+                "ПОДПИСЬ_ПОЛОСЫ", 950, tx_полосы, т_п + 0.35)
+            поз_л = st_п.positions()["lane1"]
+            chk("транзакция полосы нашлась по своей подписи и посчитана отдельно",
+                зп1.get("stage") == "lane_seen"
+                and abs(зп1.get("lane_send_to_seen_ms") - 300.0) < 5.0
+                and поз_л.get("bloom_to_seen_ms") is None, (зп1, поз_л))
+            chk("количество полосы записано СЫРЫМИ единицами и вердикт цепи тоже",
+                поз_л.get("lane_bought_raw") == 8_880_000
+                and поз_л.get("chain_ok") is True, поз_л)
+
+            # 6. БЕЗ meta количество не выдумывается, его добирает пульс.
+            st_п.write_intent(client_order_id="lane2", mint="MINTM", source_sig="SL2",
+                             source_slot=8, sol_in=0.01, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ)
+            st_п.update_position("lane2", state="bought",
+                                lane_signature="ПОДПИСЬ_ПОЛОСЫ_2",
+                                ts_sent=time.time())
+            детектор_пп.отметить_нашу_транзакцию(
+                "ПОДПИСЬ_ПОЛОСЫ_2", 951, {"meta": {"err": None}}, time.time())
+            chk("без своих балансов количество остаётся неизвестным, а не нулём",
+                st_п.positions()["lane2"].get("lane_bought_raw") is None
+                and st_п.positions()["lane2"].get("lane_bought_why_not"),
+                st_п.positions()["lane2"])
+            HeliusСчётный.tx_ответ = {"meta": {
+                "err": None, "preTokenBalances": [],
+                "postTokenBalances": [{"accountIndex": 3,
+                                       "owner": ST.EXECUTOR_WALLET,
+                                       "mint": "MINTM",
+                                       "uiTokenAmount": {"amount": "777",
+                                                         "decimals": 9,
+                                                         "uiAmount": 0.0}}]}}
+            догон = детектор_пп.догнать_купленное_полосы()
+            chk("пульс добрал количество по подписи",
+                догон["filled"] == 1
+                and st_п.positions()["lane2"].get("lane_bought_raw") == 777,
+                (догон, st_п.positions()["lane2"]))
+            # Догон не ходит дважды за уже известным количеством.
+            догон2 = детектор_пп.догнать_купленное_полосы()
+            chk("за известным количеством догон больше не ходит",
+                догон2["filled"] == 0, догон2)
+            # Узел молчит -- попытки считаются и не идут вечно.
+            HeliusСчётный.tx_ответ = None
+            st_п.write_intent(client_order_id="lane3", mint="MINTN", source_sig="SL3",
+                             source_slot=9, sol_in=0.01, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ)
+            st_п.update_position("lane3", state="bought",
+                                lane_signature="ПОДПИСЬ_ПОЛОСЫ_3")
+            for _ in range(ПОПЫТОК_МЕСТА_В_БЛОКЕ + 2):
+                детектор_пп.догнать_купленное_полосы()
+            chk("попытки догона количества ограничены и причина записана",
+                int(st_п.positions()["lane3"].get("lane_bought_tries") or 0)
+                == ПОПЫТОК_МЕСТА_В_БЛОКЕ
+                and st_п.positions()["lane3"].get("lane_bought_why_not"),
+                st_п.positions()["lane3"])
+
+            # 7. ПАРА "BLOOM ПРОТИВ НАШЕЙ" -- один раз и только когда есть обе.
+            куда_пара: list = []
+
+            class ОповещательПары:
+                def послать(self, текст, *, куда="main"):
+                    куда_пара.append((куда, текст))
+                    return {"ok": True}
+
+                def статус(self):
+                    return {"enabled": True}
+
+            детектор_пп.оповещатель = ОповещательПары()
+            пара_рано = детектор_пп.сообщить_пару("lane1")
+            chk("половина пары не докладывается",
+                пара_рано["sent"] is False and not куда_пара
+                and "Bloom" in (пара_рано["why_not"] or ""), пара_рано)
+            st_п.write_intent(client_order_id="bl1", mint="MINTL", source_sig="SL",
+                             source_slot=7, sol_in=0.2, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=28.8)
+            st_п.update_position("bl1", state="bought", signatures=["ПОДПИСЬ_BLOOM"],
+                                own_tx_seen_ts=т_п + 0.9, own_tx_seen_slot=951,
+                                bloom_to_seen_ms=520.0, bloom_ms=33.8)
+            пара = детектор_пп.сообщить_пару("lane1")
+            chk("пара доложена строкой в основной чат с разницей в мс",
+                пара["sent"] and len(куда_пара) == 1
+                and куда_пара[0][0] == "main"
+                and abs(пара["delta_ms"] - 550.0) < 20.0
+                and "мы раньше" in куда_пара[0][1], (пара, куда_пара))
+            пара2 = детектор_пп.сообщить_пару("lane1")
+            chk("вторая строка о той же паре не уходит",
+                пара2["sent"] is False and len(куда_пара) == 1, пара2)
+
+            # 8. ПРИЗНАК ЖИЗНИ показывает полосу числами, а не "включена".
+            жив = детектор_пп.признак_жизни()
+            chk("в признаке жизни у полосы стадии, пределы и возраст хеша",
+                жив["own_send"]["enabled"] is True
+                and жив["own_send"]["paths"] >= 1
+                and жив["own_send"]["limits"]["open"] == 1
+                and жив["own_send"]["blockhash_age_s"] is not None,
+                жив.get("own_send"))
+        finally:
+            if было_имя_OS:
+                globals()["OS"] = было_OS
+            else:
+                globals().pop("OS", None)
+        chk("после проверок полосы модуль на месте, как был",
+            "OS" in globals() and globals()["OS"] is настоящая_полоса,
+            ("OS" in globals(), globals().get("OS") is настоящая_полоса))
+
+
         # ---- ДОГОН chain_ok ОТЛОЖЕННЫМ getTransaction ----
         # Замерная подписка идёт с "failed": False, поэтому упавшая наша
         # транзакция по ней не придёт НИКОГДА, а уведомление часто приходит
@@ -5224,6 +5865,7 @@ def main() -> int:
                 asyncio.create_task(биение(детектор, a.seconds)),
                 asyncio.create_task(часы_слотов(детектор, helius.key, a.seconds)),
                 asyncio.create_task(часы_баланса(детектор, стоп_через_s=a.seconds)),
+                asyncio.create_task(тёплый_хеш(детектор, стоп_через_s=a.seconds)),
                 asyncio.create_task(обновлятель(детектор, задачи, Path(a.config))),
                 asyncio.create_task(слушать(детектор, helius.key, стоп_через_s=a.seconds)),
             ]
