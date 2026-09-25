@@ -84,7 +84,7 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 1150,
+      "v2": 1166,
       "unreadable": 0
     },
     "positions": {
@@ -113,19 +113,56 @@
     свежая чужая: 2UEBfKK88WBfYa319oyC1vbFnYb1ziJUapB9zw4coA37HXKKhuUCuLnBMnJS2bP3hAcY7mL9B11adWcRbEHgUzhA 2026-09-25T03:48:37Z
     свежая чужая: 2piXoN8qt6jKhGdV7T3RiyHr26PU8TWREDGMbNksUrjchZW9SFfpV5Z85NUosp98oc1HmNBWtbqP9hFxLaBzQAxa 2026-09-25T02:46:02Z
     свежая чужая: 3CFDA9pfajdup7L6WXPd9UJzYiDqDcc9im1RptXCmWeWkfkeQfABdbaJ2u8o4MSumYjgCcNfxusBNFhntFWwP7vz 2026-09-25T01:16:27Z
-граница чужой активности: окно (2026-09-24T13:44:26Z)
+граница чужой активности: окно (2026-09-24T14:03:48Z)
 позиции: dry-run 0, настоящих открытых 0
   БЛОКЕР: на кошельке 11 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
   примечание: 9 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 3Ncu6tYjh45r (571aBZbC7C227a79bAAA1YTHKrDYHZkcBpHPgvUcpump), 2UEBfKK88WBf (74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4), 2piXoN8qt6jK (C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21), 3CFDA9pfajdu (nDZknLvfFRp5rgUHdzTrQsmSY5NKzoavqdLjSHVpump), 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T13:44:29Z",
-  "updated_ts": 1790343869.6409695,
-  "alive_since_utc": "2026-09-25T13:44:29Z",
+  "updated_utc": "2026-09-25T14:03:51Z",
+  "updated_ts": 1790345031.5838885,
+  "alive_since_utc": "2026-09-25T14:03:51Z",
   "mode": "live",
-  "sources": 20,
-  "sources_from": "DBot живьём + тестовых источников из окружения: 2",
+  "sources": 80,
+  "source_groups": {
+    "file": "/home/bot/data/sources_2026-09-25.json",
+    "why_not": null,
+    "in_file": {
+      "lane_only": 38,
+      "speed_only": 22
+    },
+    "subscribed": {
+      "bloom_lane": 20,
+      "lane_only": 38,
+      "speed_only": 22
+    },
+    "policies": {
+      "bloom_lane": {
+        "lane_sol": 0.05,
+        "bloom_trades": true,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": null
+      },
+      "lane_only": {
+        "lane_sol": 0.05,
+        "bloom_trades": false,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": null
+      },
+      "speed_only": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "fanout": false,
+        "day_cap_sol": 0.2,
+        "stop_loss_sol": 0.15
+      }
+    }
+  },
+  "bloom_skipped_by_group": 0,
+  "sources_from": "DBot живьём + групп источников: 60 + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
@@ -141,7 +178,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 119.74635899478855,
+  "rate_usd_sol": 119.29920691031391,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -157,8 +194,8 @@
   "rpc_calls": 4,
   "rpc_by_method": {
     "getMultipleAccounts": 1,
-    "getLatestBlockhash": 1,
-    "getBalance": 2
+    "getBalance": 2,
+    "getLatestBlockhash": 1
   },
   "session_credits": 4,
   "handler_crashes": 0,
@@ -216,8 +253,8 @@
     "module_why_not": "",
     "passed_in_row_by_pool": {},
     "hour": {
-      "since_ts": 1790343869.3627539,
-      "since_utc": "2026-09-25T13:44:29Z",
+      "since_ts": 1790345031.336711,
+      "since_utc": "2026-09-25T14:03:51Z",
       "signals": 0,
       "built": 0,
       "sim_failed": 0,
@@ -226,7 +263,7 @@
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 33,
+    "credits_day": 34,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -258,12 +295,12 @@
       "why_not": null
     },
     "balance_sol": 0.6,
-    "balance_age_s": 0.0,
+    "balance_age_s": 0.1,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 0.1,
+    "blockhash_age_s": 0.0,
     "blockhash_updates": 1,
     "blockhash_why_not": "",
     "last": {},
@@ -273,10 +310,10 @@
     ],
     "limits": {
       "open": 1,
-      "per_day": 20,
-      "size_sol": 0.01,
-      "stop_failed_in_row": 3,
-      "stop_loss_sol": 0.1
+      "per_day": 50,
+      "size_sol": 0.05,
+      "stop_failed_in_row": 5,
+      "stop_loss_sol": 0.3
     },
     "lane_state": {
       "open": 0,
@@ -287,7 +324,9 @@
       "spend_sol": 5e-06,
       "uncountable_today": 0,
       "uncountable_why": [],
-      "total": 1
+      "total": 1,
+      "group": "деньги (все группы кроме скорости)",
+      "day_spend_sol": 0.010005
     },
     "control": {
       "enabled": true,
@@ -355,7 +394,7 @@
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-25T13:44:29Z",
+    "last_utc": "2026-09-25T14:03:51Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -383,6 +422,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-1150
+1890
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 539
