@@ -26,6 +26,10 @@ on:
         description: "сколько последних совпавших строк взять"
         required: false
         default: "40"
+      rotated:
+        description: "'yes' -- искать и в ротированных .gz (история за прошлые сутки)"
+        required: false
+        default: "no"
 
 concurrency:
   group: journal-grep-nl
@@ -87,9 +91,19 @@ jobs:
           # ionice есть не везде: если его нет, команда упала бы целиком и
           # выборка молча вышла бы пустой. Поэтому запускаем через nice, а
           # ionice добавляем только когда он есть.
+          # РОТАЦИЯ. На хосте стоит logrotate: в 22:00Z сутки уезжают в
+          # decisions.jsonl.1.gz, и текущий файл начинается заново. Искать
+          # только в текущем значит терять историю -- 25.09 это дало пустую
+          # выборку по подписи 21:07Z и выглядело как "записи нет".
+          ROT=""
+          [ "${{ inputs.rotated }}" = "yes" ] && ROT="yes"
           ssh -n $SSH_OPTS root@$HOST \
             "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
-             nice -n 15 \$ION grep -F $ARGS $SRC | tail -n ${{ inputs.limit }}" \
+             { nice -n 15 \$ION grep -F $ARGS $SRC; \
+               if [ -n \"$ROT\" ]; then \
+                 for G in $SRC.*.gz; do [ -e \"\$G\" ] || continue; \
+                   nice -n 15 \$ION zgrep -F $ARGS \"\$G\" || true; done; \
+               fi; } | tail -n ${{ inputs.limit }}" \
             > /tmp/jgrep/hits.jsonl && RC=0 || RC=$?
           # grep без совпадений отдаёт 1 -- это не сбой, это ответ "нет такого".
           # Любой другой код -- сбой, и он виден, а не съеден.
