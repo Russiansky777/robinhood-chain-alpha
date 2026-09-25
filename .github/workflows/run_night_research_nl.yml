@@ -26,6 +26,18 @@ on:
         description: "сколько наших транзакций смотреть в P2 для счёта чаевых (0 -- не смотреть)"
         required: false
         default: "0"
+      chain_toxic:
+        description: "'yes' -- добрать по цепи признаки B и объёмы копировщиков C3 (кредиты!)"
+        required: false
+        default: "no"
+      chain_leader:
+        description: "'yes' -- добрать по цепи выходы лидера (E) и кошельки площадки (G1)"
+        required: false
+        default: "no"
+      credit_limit:
+        description: "предел кредитов Helius на КАЖДЫЙ прогон по цепи"
+        required: false
+        default: "20000"
 
 concurrency:
   group: night-research
@@ -115,6 +127,29 @@ jobs:
             --state-dir /tmp/night_state --out data/night_p2.json \
             --max-history-tx "${{ inputs.chain_history }}" 2>&1 | tail -60
 
+      # ПРОГОНЫ ПО ЦЕПИ. Каждый со своим пределом кредитов и с continue-on-error:
+      # исследование не имеет права уронить сборку доклада, а доклад обязан
+      # выйти даже с половиной данных -- с честной пометкой, чего в нём нет.
+      - name: "B и C3 по цепи: признаки токсичности и объёмы копировщиков"
+        if: ${{ github.event.inputs.chain_toxic == 'yes' }}
+        continue-on-error: true
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
+          "$PY" analysis/night_toxic_signs.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --out data/night_toxic.json 2>&1 | tail -50
+
+      - name: "E и G1 по цепи: выходы лидера и кошельки площадки"
+        if: ${{ github.event.inputs.chain_leader == 'yes' }}
+        continue-on-error: true
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
+          "$PY" analysis/night_leader_stonkfun.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --state-dir /tmp/night_state             --out data/night_leader.json 2>&1 | tail -50
+
       - name: "Утренний доклад: файл и JSON"
         run: |
           set -e
@@ -128,7 +163,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/night_report.json data/night_p1.json data/night_p2.json docs/research_2026-09-25_edge.md; do
+          for f in data/night_report.json data/night_p1.json data/night_p2.json data/night_toxic.json data/night_leader.json docs/research_2026-09-25_edge.md; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
