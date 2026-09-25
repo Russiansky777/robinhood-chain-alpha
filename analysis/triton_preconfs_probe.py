@@ -356,6 +356,45 @@ def событие_в_строку(событие: dict, *, фид: str, рег�
     return из_
 
 
+# ИМЯ ГРУППЫ ПОЛЕЙ В ОБНОВЛЕНИИ. В preconfs.proto (сохранён в
+# data/docs/triton/preconfs.proto) у HarmonicUpdate и BamUpdate это
+# "oneof payload", а НЕ "update": первая версия зонда спрашивала "update" и
+# поток падал на первом же сообщении с ValueError, а прогон при этом выглядел
+# успешным (0 сообщений -- как будто фид молчит). Поэтому имя вынесено в
+# константу, а самопроверка сверяет её с сохранённым протоколом.
+ГРУППА_ОБНОВЛЕНИЯ = "payload"
+
+
+def событие_из_обновления(обновление, *, имя_результата=None) -> dict:
+    """Обновление gRPC -> та же форма, что у самопроверочного потока.
+
+    Отдельной функцией, потому что именно здесь ошибаются: имена полей у
+    Harmonic и BAM разные (seq и result против sequence, bundle_position и
+    node), и проверять это надо на заглушках, а не на оплаченном потоке.
+    """
+    вид = обновление.WhichOneof(ГРУППА_ОБНОВЛЕНИЯ) or "unknown"
+    из_: dict = {"kind": вид, "filters": list(getattr(обновление, "filters", []))}
+    if вид == "transaction":
+        т = обновление.transaction
+        из_["slot"] = getattr(т, "slot", None)
+        сырое = bytes(getattr(т, "transaction", b"") or b"")
+        из_["signature"] = _подпись_из_байтов(сырое) if сырое else None
+        # Harmonic: seq и result. BAM: sequence, bundle_position, node,
+        # is_revert_on_error. Спрашиваем только то, что у этого типа есть.
+        for поле in ("seq", "sequence", "bundle_position", "node",
+                      "is_revert_on_error", "region"):
+            if hasattr(т, поле):
+                из_[поле] = getattr(т, поле)
+        if hasattr(т, "result"):
+            из_["result"] = (имя_результата(т.result) if имя_результата
+                              else т.result)
+    elif вид in ("slot_start", "slot_end"):
+        из_["slot"] = getattr(getattr(обновление, вид), "slot", None)
+    elif вид == "clip":
+        из_["transactions"] = getattr(обновление.clip, "transactions", None)
+    return из_
+
+
 def слушать(*, поток, фид: str, регион: str, журнал=None, счёт: Счёт | None = None,
              сейчас_фн=None, признак_каждые: int = 200,
              признак_фн=None) -> dict:
@@ -690,6 +729,83 @@ def self_test() -> int:
         chk("рамки слота в сравнение не идут: это не транзакции",
             all(з["signature"] in ("A", "B") for з in св["rows"]), св["rows"])
 
+        # 6б. РАЗБОР ОБНОВЛЕНИЯ. Именно здесь зонд уже ошибся 25.09: он
+        # спрашивал oneof "update", а в протоколе он называется "payload", и
+        # поток падал на первом сообщении, выглядя как молчащий фид.
+        прото = Path("data/docs/triton/preconfs.proto")
+        if not прото.exists():
+            прото = Path("../data/docs/triton/preconfs.proto")
+        if прото.exists():
+            текст_прото = прото.read_text(encoding="utf-8")
+            chk("имя группы полей сверено с сохранённым протоколом",
+                f"oneof {ГРУППА_ОБНОВЛЕНИЯ}" in текст_прото
+                and "oneof update" not in текст_прото, ГРУППА_ОБНОВЛЕНИЯ)
+            chk("в протоколе есть поля Harmonic (seq, result) и BAM (sequence, node)",
+                all(п in текст_прото for п in ("uint64 seq", "ExecutionResult result",
+                                                "uint64 sequence", "string node")),
+                "")
+        else:
+            chk("протокол не скачан -- сверка имён пропущена", True, str(прото))
+
+        class ОбновлениеЗаглушка:
+            """Ведёт себя как сообщение protobuf: WhichOneof и поля."""
+
+            def __init__(self, вид, полезное, фильтры=()):
+                self._вид = вид
+                self.filters = list(фильтры)
+                setattr(self, вид, полезное)
+
+            def WhichOneof(self, имя):  # noqa: N802
+                return self._вид if имя == ГРУППА_ОБНОВЛЕНИЯ else None
+
+        class ТхH:
+            transaction = b""
+            slot = 321
+            seq = 4
+            result = 0
+            region = "ams"
+
+        class ТхB:
+            transaction = b""
+            slot = 654
+            sequence = 99
+            bundle_position = 1
+            node = "ams-node"
+            is_revert_on_error = False
+
+        сh = событие_из_обновления(
+            ОбновлениеЗаглушка("transaction", ТхH(), ["istochniki"]),
+            имя_результата=lambda з: "EXECUTION_RESULT_SUCCESS")
+        chk("Harmonic: слот, партия seq и результат разобраны",
+            сh["kind"] == "transaction" and сh["slot"] == 321
+            and сh["seq"] == 4 and сh["result"] == "EXECUTION_RESULT_SUCCESS"
+            and сh["filters"] == ["istochniki"], сh)
+        сb = событие_из_обновления(ОбновлениеЗаглушка("transaction", ТхB()))
+        chk("BAM: слот, sequence, позиция в бандле и узел разобраны",
+            сb["slot"] == 654 and сb["sequence"] == 99
+            and сb["bundle_position"] == 1 and сb["node"] == "ams-node", сb)
+        chk("у BAM нет ни seq, ни result -- и мы их не придумываем",
+            "seq" not in сb and "result" not in сb, сb)
+
+        class Слот:
+            slot = 777
+
+        сс = событие_из_обновления(ОбновлениеЗаглушка("slot_start", Слот()))
+        chk("рамка слота разобрана как рамка",
+            сс["kind"] == "slot_start" and сс["slot"] == 777, сс)
+
+        class Клип:
+            transactions = 5
+
+        ск = событие_из_обновления(ОбновлениеЗаглушка("clip", Клип()))
+        chk("clip разобран и число удержанных видно",
+            ск["kind"] == "clip" and ск["transactions"] == 5, ск)
+        chk("незнакомая группа не роняет разбор, а называется unknown",
+            событие_из_обновления(
+                ОбновлениеЗаглушка("ping", object()))["kind"] == "ping"
+            and событие_из_обновления(
+                ОбновлениеЗаглушка("что-то", object()))["kind"] == "что-то")
+
         # 7б. АДРЕСА ИСТОЧНИКОВ -- разбором детектора, без второго списка.
         сн = "data/final/20260923T145755Z/konfig.json"
         if not Path(сн).exists():
@@ -762,26 +878,11 @@ def _поток_grpc(*, фид: str, регион: str, аккаунты: list, 
 
     json_format.ParseDict(зп["request"], запрос)
     поток = служба.Subscribe(запрос, metadata=мета, timeout=таймаут_s)
+    имя_результата = None
+    if hasattr(preconfs_pb2, "ExecutionResult"):
+        имя_результата = preconfs_pb2.ExecutionResult.Name
     for обновление in поток:
-        вид = обновление.WhichOneof("update") or "unknown"
-        если = {"kind": {"transaction": "transaction", "slot_start": "slot_start",
-                          "slot_end": "slot_end", "clip": "clip",
-                          "ping": "ping"}.get(вид, вид)}
-        if вид == "transaction":
-            т = обновление.transaction
-            сырое = bytes(т.transaction)
-            если.update(slot=т.slot, filters=list(обновление.filters),
-                         signature=_подпись_из_байтов(сырое))
-            for поле in ("seq", "sequence", "bundle_position", "node"):
-                if hasattr(т, поле):
-                    если[поле] = getattr(т, поле)
-            if hasattr(т, "result"):
-                если["result"] = str(т.result)
-        elif вид in ("slot_start", "slot_end"):
-            если["slot"] = getattr(обновление, вид).slot
-        elif вид == "clip":
-            если["transactions"] = обновление.clip.transactions
-        yield если
+        yield событие_из_обновления(обновление, имя_результата=имя_результата)
 
 
 def _подпись_из_байтов(сырое: bytes) -> str | None:
@@ -917,6 +1018,14 @@ def main() -> int:
         снять_замок(а.state_dir)
     print(json.dumps({к: v for к, v in итог.items()}, ensure_ascii=False,
                       indent=2))
+    # ОБРЫВ -- ЭТО СБОЙ, А НЕ ТИШИНА ФИДА. 25.09 зонд упал на первом
+    # сообщении (спрашивал не то имя группы полей), прогон при этом был
+    # "успешным" с нулём сообщений, и это выглядело как молчащий фид. Предел
+    # владельца -- другое дело: он закрывает поток штатно.
+    почему = итог.get("stopped_why") or ""
+    if почему.startswith("поток оборвался"):
+        print(f"СБОЙ: {почему}")
+        return 1
     return 0
 
 
