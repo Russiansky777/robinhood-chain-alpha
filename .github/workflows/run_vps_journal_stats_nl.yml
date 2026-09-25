@@ -1,0 +1,86 @@
+name: "Журналы: сигналы, количество полосы, продажа -- только чтение"
+
+# Владелец 25.09 (вечер): три вопроса, на которые ответ лежит в журналах.
+#   1. Какая доля сигналов пришла добором через getTransaction, а не из
+#      сообщения подписки (это +1-2 слота), и почему.
+#   2. У скольких покупок полосы нет количества и что написано причиной.
+#   3. Продажа как второй конец круга: от срока до попытки, маршрут, комиссия.
+#
+# ПРОГОН ТОЛЬКО ЧИТАЕТ. Копии журналов с хоста на бегунок, разбор локальным
+# модулем analysis/journal_stats.py, таблицы в data/. Ни одной записи на хост,
+# ни одного обращения к цепи, ни одной покупки и продажи.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "окно по UTC, например 2026-09-25T00:00 (пусто -- весь журнал)"
+        required: false
+        default: ""
+
+concurrency:
+  group: journal-stats
+  cancel-in-progress: false
+
+env:
+  HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  stats:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Копии журналов с хоста (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p /tmp/journal_state
+          for f in decisions.jsonl positions.jsonl; do
+            ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/journal_state/$f"
+            echo "$f: $(wc -c < /tmp/journal_state/$f) байт, строк $(wc -l < /tmp/journal_state/$f)"
+          done
+
+      - name: "Счёт по журналам"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p data
+          python3 analysis/journal_stats.py \
+            --decisions /tmp/journal_state/decisions.jsonl \
+            --positions /tmp/journal_state/positions.jsonl \
+            --since '${{ inputs.since }}' \
+            --out-md data/journal_stats.md \
+            --out-json data/journal_stats.json | tail -60
+
+      - name: "Коммит таблиц"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/journal_stats.md data/journal_stats.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Zhurnaly: signaly, kolichestvo polosy, prodazha [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
