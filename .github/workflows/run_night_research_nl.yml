@@ -145,6 +145,7 @@ jobs:
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
           # Отправить этот шаг не может: BLOOM_OWN_SEND_LIVE выставляется в ноль
           # внутри самого сухого прогона, и это проверено самопроверкой модуля.
+          set +e
           # ПРОГОН ИДЁТ НА ХОСТЕ, А НЕ НА БЕГУНКЕ. Смысл сухого прогона -- узнать,
           # соберётся ли покупка ТАМ, где живёт служба: у бегунка системный
           # python3 без solders, и первый прогон 25.09 честно сказал "модули
@@ -152,7 +153,12 @@ jobs:
           ssh -n $SSH_OPTS root@127.0.0.1 "
             set -a; . /etc/bloom-executor/env; set +a
             BLOOM_OWN_SEND_LIVE=0 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/bloom_executor/bloom_own_send.py --dry-run-signature '${{ inputs.dry_lane_signature }}' --source '${{ inputs.dry_lane_source }}' --state-dir /home/bot/bloom_executor_live_data
-          " 2>&1 | tee data/lane_dry_run.txt | tail -40
+          " > data/lane_dry_run.txt 2>&1
+          RC=$?
+          # Код возврата -- в тот же файл: пустой вывод без кода не отличить от
+          # "ssh не дошёл" и от "python ничего не напечатал".
+          echo "rc=$RC" >> data/lane_dry_run.txt
+          cat data/lane_dry_run.txt
 
       # ПРОГОНЫ ПО ЦЕПИ. Каждый со своим пределом кредитов и с continue-on-error:
       # исследование не имеет права уронить сборку доклада, а доклад обязан
@@ -165,7 +171,12 @@ jobs:
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
-          "$PY" analysis/night_toxic_signs.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --out data/night_toxic.json 2>&1 | tail -50
+          # Кэш толпы лежит на ветке c2-hedge-analysis: тянем его прогоном, а не
+          # держим копию в этой ветке -- иначе два файла разойдутся молча.
+          git fetch -q origin claude/c2-hedge-analysis
+          git show origin/claude/c2-hedge-analysis:data/crowd_metric_2026-09-24.json > /tmp/night_state/crowd_metric.json
+          git show origin/claude/c2-hedge-analysis:data/c2_block_position_2026-09-24.json > /tmp/night_state/followers.json
+          "$PY" analysis/night_toxic_signs.py --chain --crowd /tmp/night_state/crowd_metric.json --followers /tmp/night_state/followers.json --credit-limit "${{ inputs.credit_limit }}" --out data/night_toxic.json 2>&1 | tail -50
 
       - name: "E и G1 по цепи: выходы лидера и кошельки площадки"
         if: ${{ github.event.inputs.chain_leader == 'yes' }}
@@ -175,7 +186,12 @@ jobs:
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
-          "$PY" analysis/night_leader_stonkfun.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --state-dir /tmp/night_state             --out data/night_leader.json 2>&1 | tail -50
+          # Кэш толпы лежит на ветке c2-hedge-analysis: тянем его прогоном, а не
+          # держим копию в этой ветке -- иначе два файла разойдутся молча.
+          git fetch -q origin claude/c2-hedge-analysis
+          git show origin/claude/c2-hedge-analysis:data/crowd_metric_2026-09-24.json > /tmp/night_state/crowd_metric.json
+          git show origin/claude/c2-hedge-analysis:data/c2_block_position_2026-09-24.json > /tmp/night_state/followers.json
+          "$PY" analysis/night_leader_stonkfun.py --chain --crowd /tmp/night_state/crowd_metric.json --credit-limit "${{ inputs.credit_limit }}" --state-dir /tmp/night_state --out data/night_leader.json 2>&1 | tail -50
 
       - name: "Утренний доклад: файл и JSON"
         run: |
