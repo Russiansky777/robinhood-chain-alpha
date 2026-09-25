@@ -1580,7 +1580,6 @@ class Детектор:
         # ТЕНЬ СИМУЛЯЦИИ. Считается отдельно от путей: она больше не гейт, и
         # её отказы -- материал для разбора, а не остановка сделки. Если
         # отказов много, а сделки идут -- это разговор о min_out, не о полосе.
-        self.контролей_видно = 0
         # Веер контролей по сервисам (З2 + пул отправителей): своя счётчик,
         # чтобы "контроль пары виден" и "контроль через Jito виден" не
         # складывались в одно число.
@@ -2026,7 +2025,6 @@ class Детектор:
             # и КТО ДОВОЗИТ БЫСТРЕЕ по цепи. Без этих строк в признаке жизни
             # веер контролей был бы расходом без видимого ответа.
             "control": ({"enabled": OS.контроль_включён(),
-                          "seen": self.контролей_видно,
                           "senders_seen": self.контролей_сервисов_видно,
                           "spent_today": (OS.расход_контроля(self.состояние)
                                            if OS is not None else None),
@@ -2035,7 +2033,13 @@ class Детектор:
                               "spend_sol_per_day": OS.ПОТОЛОК_РАСХОДА_КОНТРОЛЯ_SOL,
                               "per_sender_sol": OS.ПОТОЛОК_КОНТРОЛЯ_НА_СЕРВИС_SOL},
                           "by_sender": self.свод_контролей_сервисов()}
-                         if OS is not None else {})}
+                         if OS is not None else {}),
+            # БОЕВОЙ ПУЛ: включён ли и кто по факту довозил покупки полосы.
+            # Без этого "пул работает" пришлось бы принимать на слово.
+            "pool": ({"enabled": OS.пул_включён(),
+                       "tip_cap_sol": OS.ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL,
+                       "winners": self.свод_победителей_пула()}
+                      if OS is not None else {})}
         st["leg_cache"] = self.признак_кэша_ног()
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
@@ -3408,37 +3412,6 @@ class Детектор:
         итог["text"] = текст
         return итог
 
-    def отметить_контроль_в_потоке(self, *, cid: str, поз: dict, подпись: str,
-                                    слот, t_recv: float) -> dict:
-        """Контрольная транзакция пары увидена в потоке (З2).
-
-        Контроль -- это пустая транзакция, ушедшая тем же путём и с теми же
-        чаевыми в ту же миллисекунду, что и покупка. Сравнивать с покупкой
-        можно только одно и то же: от СВОЕЙ отправки до появления в подписке.
-        Слот считается смещением от слота источника -- S+0, S+1, S+2.
-        """
-        поля: dict = {"control_seen_ts": round(t_recv, 6),
-                       "control_seen_slot": слот}
-        отправлен = поз.get("control_ts_sent")
-        if отправлен:
-            поля["control_send_to_seen_ms"] = round(
-                (t_recv - float(отправлен)) * 1000.0, 2)
-        их = поз.get("source_slot")
-        if isinstance(их, int) and isinstance(слот, int):
-            поля["control_slot_offset"] = слот - их
-        запись = {"stage": "lane_control_seen", "client_order_id": cid,
-                   "signature": подпись, "slot": слот, "lane": ST.МЕТКА_ПОЛОСЫ,
-                   **поля}
-        try:
-            self.состояние.update_position(cid, **поля)
-        except Exception as exc:  # noqa: BLE001
-            запись["why_not"] = f"позиция не записана: {type(exc).__name__}"
-        self.состояние.log_decision(запись)
-        self.контролей_видно += 1
-        log.info("контроль пары виден: %s, от отправки %s мс, слот %s",
-                 (подпись or "")[:12], поля.get("control_send_to_seen_ms"), слот)
-        return запись
-
     def отметить_контроль_сервиса(self, *, cid: str, поз: dict, сервис: str,
                                    запись_сервиса: dict, подпись: str, слот,
                                    t_recv: float) -> dict:
@@ -3477,6 +3450,50 @@ class Детектор:
                  слот)
         return запись
 
+    @staticmethod
+    def лучший_контроль(поз: dict) -> dict:
+        """Самый быстрый контроль пары из веера -- как «нога сравнения».
+
+        Отдельного «основного» контроля больше нет (решение владельца 25.09), а
+        сравнивать покупку надо с ЧЕМ-ТО одним. Берём лучший путь: пустая
+        транзакция по самому быстрому из доступных путей -- это и есть нижняя
+        граница «сколько заняла бы дорога без пула».
+        """
+        видно = поз.get("control_senders_seen") or {}
+        лучший, лучшее = None, None
+        for сервис, з in видно.items():
+            if not isinstance(з, dict):
+                continue
+            мс = з.get("send_to_seen_ms")
+            if мс is None:
+                continue
+            if лучшее is None or float(мс) < лучшее:
+                лучшее, лучший = float(мс), (сервис, з)
+        if лучший is None:
+            return {}
+        сервис, з = лучший
+        return {"sender": сервис, "ms": лучшее, "slot": з.get("seen_slot"),
+                "block_index": з.get("block_index"),
+                "block_total": з.get("block_total")}
+
+    def свод_победителей_пула(self) -> dict:
+        """Кто по факту довёз покупку полосы -- по позициям, а не по обещаниям.
+
+        Победитель -- тот сервис, чей ответ пришёл первым; в цепь садится одна
+        и та же подпись, кто бы её ни довёз, поэтому это замер путей, а не
+        "кто купил".
+        """
+        из_: dict = {}
+        try:
+            позиции = self.состояние.positions() or {}
+        except Exception:  # noqa: BLE001
+            return из_
+        for п in позиции.values():
+            кто = п.get("lane_pool_winner")
+            if кто:
+                из_[кто] = int(из_.get(кто) or 0) + 1
+        return из_
+
     def свод_контролей_сервисов(self) -> dict:
         """Кто довозит быстрее -- по всем парам, что уже увидены.
 
@@ -3511,12 +3528,13 @@ class Детектор:
                                 if з["offsets"] else None)}
         return из_
 
-    def догнать_место_контроля(self, *, предел: int = 3) -> dict:
-        """Место КОНТРОЛЯ в блоке -- тем же одним getBlock, что и у покупки.
+    def догнать_места_контролей(self, *, предел: int = 3) -> dict:
+        """Место КАЖДОГО контроля веера в его блоке -- тем же одним getBlock.
 
-        Отдельным проходом, а не внутри места покупки: у контроля своя
-        подпись, свой слот и свои попытки, и смешивать их в одном поле
-        значило бы потерять половину пары.
+        Отдельным проходом, а не внутри места покупки: у каждого контроля своя
+        подпись, свой слот и свои попытки. Место нужно ровно за тем же, зачем у
+        покупки: "доехал раньше" и "сел раньше" -- разные вещи, и на второе
+        отвечает только место в блоке.
         """
         итог = {"looked": 0, "filled": 0, "gave_up": 0, "why_not": ""}
         try:
@@ -3526,20 +3544,19 @@ class Детектор:
             return итог
         кандидаты = []
         for cid, p_ in (позиции or {}).items():
-            if p_.get("control_block_index") is not None:
-                continue
-            if not p_.get("control_signature"):
-                continue
-            if int(p_.get("control_block_tries") or 0) >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
-                continue
-            слот = p_.get("control_seen_slot")
-            if not isinstance(слот, int):
-                continue
-            кандидаты.append((cid, p_["control_signature"], слот))
-        кандидаты.sort(key=lambda x: x[0])
-        for cid, подпись, слот in кандидаты[:предел]:
+            видно = p_.get("control_senders_seen") or {}
+            for сервис, з in видно.items():
+                if not isinstance(з, dict) or з.get("block_index") is not None:
+                    continue
+                if int(з.get("block_tries") or 0) >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                    continue
+                подпись, слот = з.get("signature"), з.get("seen_slot")
+                if not подпись or not isinstance(слот, int):
+                    continue
+                кандидаты.append((cid, сервис, подпись, слот))
+        кандидаты.sort(key=lambda x: (x[0], x[1]))
+        for cid, сервис, подпись, слот in кандидаты[:предел]:
             итог["looked"] += 1
-            попытки = int((позиции.get(cid) or {}).get("control_block_tries") or 0) + 1
             try:
                 import bloom_block_position as BP  # noqa: PLC0415
 
@@ -3547,20 +3564,23 @@ class Детектор:
             except Exception as exc:  # noqa: BLE001
                 м = {"known": False,
                      "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
-            поля = {"control_block_tries": попытки}
-            if м.get("known"):
-                поля.update(control_block_index=м.get("index"),
-                             control_block_total=м.get("total"))
-                итог["filled"] += 1
-            else:
-                поля["control_block_why_not"] = str(м.get("why_not") or "")[:200]
-                if попытки >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
-                    итог["gave_up"] += 1
             try:
-                self.состояние.update_position(cid, **поля)
+                свежие = (self.состояние.positions() or {}).get(cid) or {}
+                видно = dict(свежие.get("control_senders_seen") or {})
+                з = dict(видно.get(сервис) or {})
+                з["block_tries"] = int(з.get("block_tries") or 0) + 1
+                if м.get("known"):
+                    з.update(block_index=м.get("index"), block_total=м.get("total"))
+                    итог["filled"] += 1
+                else:
+                    з["block_why_not"] = str(м.get("why_not") or "")[:200]
+                    if з["block_tries"] >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                        итог["gave_up"] += 1
+                видно[сервис] = з
+                self.состояние.update_position(cid, control_senders_seen=видно)
             except Exception as exc:  # noqa: BLE001
-                log.warning("место контроля: позиция не записана (%s)",
-                            type(exc).__name__)
+                log.warning("место контроля %s: позиция не записана (%s)",
+                            сервис, type(exc).__name__)
         return итог
 
     def догнать_очередь_пары(self, *, предел: int = 1) -> dict:
@@ -3720,13 +3740,16 @@ class Детектор:
             "detect_ms": мс(сигнал, поз.get("ts_intent")),
             "build_sign_ms": мс(поз.get("ts_intent"), поз.get("ts_sent")),
             "deliver_ms": поз.get("lane_send_to_seen_ms"),
-            "control_deliver_ms": поз.get("control_send_to_seen_ms"),
+            # КОНТРОЛЬ -- лучший путь веера (самый быстрый сервис): именно он
+            # отвечает на вопрос "сколько заняла бы дорога без пула".
+            "control_deliver_ms": (self.лучший_контроль(поз) or {}).get("ms"),
+            "control_sender": (self.лучший_контроль(поз) or {}).get("sender"),
             "signal_to_seen_ms": мс(сигнал, поз.get("own_tx_seen_ts")),
             "our_slot": поз.get("own_tx_seen_slot"),
             "our_block_index": поз.get("block_index"),
             "our_block_total": поз.get("block_total"),
-            "control_slot": поз.get("control_seen_slot"),
-            "control_block_index": поз.get("control_block_index"),
+            "control_slot": (self.лучший_контроль(поз) or {}).get("slot"),
+            "control_block_index": (self.лучший_контроль(поз) or {}).get("block_index"),
             "slots_behind": None,
             "control_slots_behind": None,
             "note": ("момент посадки источника в мс нашему узлу неизвестен: "
@@ -3736,8 +3759,9 @@ class Детектор:
         if isinstance(их, int):
             if isinstance(поз.get("own_tx_seen_slot"), int):
                 из_["slots_behind"] = поз["own_tx_seen_slot"] - их
-            if isinstance(поз.get("control_seen_slot"), int):
-                из_["control_slots_behind"] = поз["control_seen_slot"] - их
+            слот_к = (self.лучший_контроль(поз) or {}).get("slot")
+            if isinstance(слот_к, int):
+                из_["control_slots_behind"] = слот_к - их
         return из_
 
     def свод_контролей(self, *, минимум_пар: int = 10) -> dict:
@@ -3755,7 +3779,7 @@ class Детектор:
             return итог
         пары = [p for p in позиции.values()
                 if p.get("lane") == ST.МЕТКА_ПОЛОСЫ
-                and p.get("control_send_to_seen_ms") is not None
+                and (self.лучший_контроль(p) or {}).get("ms") is not None
                 and p.get("lane_send_to_seen_ms") is not None]
         итог["pairs"] = len(пары)
         if len(пары) < минимум_пар:
@@ -3785,7 +3809,7 @@ class Детектор:
             return round(ряд[с] if len(ряд) % 2 else (ряд[с - 1] + ряд[с]) / 2, 2)
 
         покупка = медиана("lane_send_to_seen_ms")
-        контроль = медиана("control_send_to_seen_ms")
+        контроль = медиана_раскл("control_deliver_ms")
         разница = (None if покупка is None or контроль is None
                     else round(покупка - контроль, 2))
         вывод = "—"
@@ -3849,7 +3873,8 @@ class Детектор:
             return итог
         ждут = [cid for cid, п in позиции.items()
                 if п.get("lane") == ST.МЕТКА_ПОЛОСЫ
-                and п.get("control_seen_ts") and not п.get("control_pair_reported")]
+                and (п.get("control_senders_seen") or {})
+                and not п.get("control_pair_reported")]
         for cid in sorted(ждут)[:предел]:
             итог["looked"] += 1
             if (self.сообщить_контроль(cid) or {}).get("sent"):
@@ -3857,11 +3882,16 @@ class Детектор:
         return итог
 
     def сообщить_контроль(self, cid_полосы: str) -> dict:
-        """Строка пары С КОНТРОЛЕМ -- владельцу, один раз на пару (З2).
+        """Строка КОНТРОЛЕЙ ПО СЕРВИСАМ -- владельцу, один раз на пару.
 
-        Уходит, когда в потоке видны ОБЕ транзакции пары: покупка и контроль.
-        Половина пары ничего не отвечает на вопрос "плата или путь", а вторая
-        строка о той же паре хуже, чем ни одной.
+        Отвечает на вопрос владельца "кто довозит быстрее": одна и та же пустая
+        транзакция ушла в одну и ту же миллисекунду разными путями, и здесь
+        видно, у кого какой круг, какой слот и какое место в блоке. Рядом --
+        покупка полосы тем же способом счёта: от СВОЕЙ отправки до появления в
+        подписке; сравнивать можно только одно и то же.
+
+        Отдельного "основного" контроля больше нет (решение владельца 25.09:
+        Helius уже в веере), поэтому строка строится по вееру.
         """
         итог = {"sent": False, "why_not": None}
         try:
@@ -3875,77 +3905,104 @@ class Детектор:
         if not поз.get("own_tx_seen_ts"):
             итог["why_not"] = "покупки полосы в потоке ещё не видно"
             return итог
-        if not поз.get("control_seen_ts"):
-            если = поз.get("control_why_not")
-            итог["why_not"] = (f"контроль не ушёл: {если}" if если
-                                else "контроля в потоке ещё не видно")
+        видно = поз.get("control_senders_seen") or {}
+        отправлено = [з for з in (поз.get("control_services") or [])
+                       if (з or {}).get("sent")]
+        if not видно:
+            причины = "; ".join(f"{(з or {}).get('sender')}: {(з or {}).get('why_not')}"
+                                 for з in (поз.get("control_services") or [])
+                                 if (з or {}).get("why_not"))
+            итог["why_not"] = (f"контролей в потоке ещё не видно ({причины})"
+                                if причины else "контролей в потоке ещё не видно")
             return итог
-        # Ждём место в блоке, но не вечно: столько же попыток, сколько у
-        # самого догона. Исчерпаны -- шлём с прочерками, а не молчим.
+        # Ждём, пока увидим ВСЕ отправленные контроли и их места, но не вечно:
+        # попыток столько же, сколько у самого догона. Исчерпаны -- шлём с
+        # прочерками, а не молчим.
+        все_видны = len(видно) >= max(1, len(отправлено))
         мест_нет = (поз.get("block_index") is None
-                     or поз.get("control_block_index") is None)
-        попыток = min(int(поз.get("block_tries") or 0),
-                      int(поз.get("control_block_tries") or 0))
-        if мест_нет and попыток < ПОПЫТОК_МЕСТА_В_БЛОКЕ:
-            итог["why_not"] = "место в блоке ещё добирается"
+                     or any((з or {}).get("block_index") is None
+                            for з in видно.values()))
+        попыток = min([int(поз.get("block_tries") or 0)]
+                      + [int((з or {}).get("block_tries") or 0)
+                         for з in видно.values()])
+        if (not все_видны or мест_нет) and попыток < ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+            итог["why_not"] = ("ждём остальные контроли и места в блоке"
+                                if not все_видны else "место в блоке ещё добирается")
             return итог
 
         def нет(значение, единица=""):
             return "—" if значение is None else f"{значение}{единица}"
 
-        покупка_мс = поз.get("lane_send_to_seen_ms")
-        контроль_мс = поз.get("control_send_to_seen_ms")
-        разница = (None if покупка_мс is None or контроль_мс is None
-                    else round(float(покупка_мс) - float(контроль_мс), 2))
-        вывод = "—"
-        if разница is not None:
-            вывод = ("контроль быстрее покупки -- похоже на очередь к пулу"
-                      if разница > 0 else
-                      "контроль не быстрее покупки -- задержка в пути")
-
-        def смещение(поле_слота):
-            их, наш = поз.get("source_slot"), поз.get(поле_слота)
-            if not isinstance(их, int) or not isinstance(наш, int):
+        def смещение(слот):
+            их = поз.get("source_slot")
+            if not isinstance(их, int) or not isinstance(слот, int):
                 return "—"
-            return f"S+{наш - их}"
+            return f"S+{слот - их}"
 
-        текст = (f"🧪 контроль доставки по {(поз.get('source_sig') or '')[:12]}\n"
+        покупка_мс = поз.get("lane_send_to_seen_ms")
+        строки_сервисов = []
+        # Порядок -- по кругу доставки: первым тот, кто довёз быстрее. Это и
+        # есть ответ на вопрос владельца, и он должен читаться с первой строки.
+        def круг_сервиса(пара):
+            """Нет круга -- в конец списка: прочерк не имеет права выглядеть
+            самым быстрым."""
+            з = пара[1] if isinstance(пара[1], dict) else {}
+            мс = з.get("send_to_seen_ms")
+            return float(мс) if мс is not None else float("inf")
+
+        for сервис, з in sorted(видно.items(), key=круг_сервиса):
+            з = з or {}
+            строки_сервисов.append(
+                f"  {сервис}: {нет(з.get('send_to_seen_ms'), ' мс')}, "
+                f"{смещение(з.get('seen_slot'))}, место "
+                f"{нет(з.get('block_index'))}/{нет(з.get('block_total'))}")
+        не_дошли = [f"  {(з or {}).get('sender')}: не доехал ({(з or {}).get('why_not')})"
+                     for з in (поз.get("control_services") or [])
+                     if (з or {}).get("sent") and (з or {}).get("sender") not in видно]
+        быстрейший = None
+        круги = {с: (з or {}).get("send_to_seen_ms") for с, з in видно.items()
+                  if isinstance(з, dict) and (з or {}).get("send_to_seen_ms") is not None}
+        if круги:
+            быстрейший = min(круги, key=круги.get)
+        довёз = поз.get("lane_pool_winner")
+        текст = (f"🧪 контроли по сервисам по {(поз.get('source_sig') or '')[:12]}\n"
                   f"минт {(поз.get('mint') or '')[:12]}\n"
-                  f"покупка: {нет(покупка_мс, ' мс')} от отправки, "
-                  f"{смещение('own_tx_seen_slot')}, место "
-                  f"{нет(поз.get('block_index'))}/{нет(поз.get('block_total'))}\n"
-                  f"контроль: {нет(контроль_мс, ' мс')} от отправки, "
-                  f"{смещение('control_seen_slot')}, место "
-                  f"{нет(поз.get('control_block_index'))}/"
-                  f"{нет(поз.get('control_block_total'))}, "
-                  f"ушёл через {нет(поз.get('control_after_buy_ms'), ' мс')} после покупки\n"
-                  f"в пуле за наш слот {нет(поз.get('queue_pool_tx_slot'))} тх, "
-                  f"за следующий {нет(поз.get('queue_pool_tx_next_slot'))}; "
-                  f"приоритет мкл/CU: наш {нет(поз.get('queue_our_micro_per_cu'))}, "
-                  f"медиана {нет(поз.get('queue_micro_per_cu_median'))}, "
-                  f"90-й {нет(поз.get('queue_micro_per_cu_p90'))}\n"
-                  f"разница покупка минус контроль {нет(разница, ' мс')}: {вывод}")
+                  f"покупка полосы: {нет(покупка_мс, ' мс')} от отправки, "
+                  f"{смещение(поз.get('own_tx_seen_slot'))}, место "
+                  f"{нет(поз.get('block_index'))}/{нет(поз.get('block_total'))}"
+                  + (f", довёз {довёз}" if довёз else "") + "\n"
+                  + "\n".join(строки_сервисов + не_дошли)
+                  + (f"\nбыстрее всех довёз {быстрейший}" if быстрейший else "")
+                  + f"\nв пуле за наш слот {нет(поз.get('queue_pool_tx_slot'))} тх, "
+                    f"за следующий {нет(поз.get('queue_pool_tx_next_slot'))}; "
+                    f"приоритет мкл/CU: наш {нет(поз.get('queue_our_micro_per_cu'))}, "
+                    f"медиана {нет(поз.get('queue_micro_per_cu_median'))}, "
+                    f"90-й {нет(поз.get('queue_micro_per_cu_p90'))}")
         try:
             self.состояние.update_position(cid_полосы, control_pair_reported=True,
-                                            control_vs_buy_ms=разница)
+                                            control_fastest_sender=быстрейший)
         except Exception as exc:  # noqa: BLE001
             итог["why_not"] = f"пометка пары не легла ({type(exc).__name__})"
             return итог
         self.состояние.log_decision({"stage": "lane_control_pair",
                                       "client_order_id": cid_полосы,
                                       "signature": поз.get("source_sig"),
-                                      "control_vs_buy_ms": разница,
                                       "buy_send_to_seen_ms": покупка_мс,
-                                      "control_send_to_seen_ms": контроль_мс,
                                       "buy_slot": поз.get("own_tx_seen_slot"),
-                                      "control_slot": поз.get("control_seen_slot")})
+                                      "pool_winner": довёз,
+                                      "fastest_sender": быстрейший,
+                                      "by_sender": {с: {
+                                          "send_to_seen_ms": (з or {}).get("send_to_seen_ms"),
+                                          "slot": (з or {}).get("seen_slot"),
+                                          "block_index": (з or {}).get("block_index")}
+                                          for с, з in видно.items()}})
         if self.оповещатель is not None and NT is not None:
             self.оповещатель.послать(текст)
             итог["sent"] = True
         else:
             итог["why_not"] = "оповещатель не подключён"
         итог["text"] = текст
-        итог["delta_ms"] = разница
+        итог["fastest"] = быстрейший
         return итог
 
     def отметить_нашу_транзакцию(self, подпись: str, слот, tx, t_recv: float):
@@ -3976,17 +4033,12 @@ class Детектор:
                                 п.get("lane_signature_local")):
                     поз, cid = п, к
                     break
-                # КОНТРОЛЬ ДОСТАВКИ -- тоже наша транзакция, но НЕ покупка:
-                # у неё свой круг и свои поля. Считать её покупкой значило бы
-                # затереть замер покупки замером пустышки.
-                if подпись and подпись == п.get("control_signature"):
-                    зк = self.отметить_контроль_в_потоке(
-                        cid=к, поз=п, подпись=подпись, слот=слот, t_recv=t_recv)
-                    self.сообщить_контроль(к)
-                    return зк
-                # ВЕЕР ПО СЕРВИСАМ: у каждого отправителя своя подпись. Без
-                # этой ветки они считались бы покупкой, и замер покупки был бы
-                # затёрт замером пустышки -- ровно то, чего мы избегаем выше.
+                # КОНТРОЛИ ДОСТАВКИ -- тоже наши транзакции, но НЕ покупки:
+                # у каждой свой круг и свои поля, и считать их покупкой значило
+                # бы затереть замер покупки замером пустышки. Отдельного
+                # "основного" контроля больше нет (решение владельца 25.09:
+                # Helius уже в веере), поэтому ветка одна -- по вееру, где у
+                # каждого отправителя своя подпись.
                 свой = None
                 for зп in (п.get("control_services") or []):
                     if подпись and подпись == (зп or {}).get("signature"):
@@ -4584,7 +4636,7 @@ async def биение(детектор: Детектор, стоп_через_s
             # Место КОНТРОЛЯ в блоке и толпа в пуле -- вторая половина пары
             # З2. Без них строка пары уходит с прочерками, а вопрос "плата
             # или путь" остаётся без чисел.
-            await asyncio.to_thread(детектор.догнать_место_контроля)
+            await asyncio.to_thread(детектор.догнать_места_контролей)
             await asyncio.to_thread(детектор.догнать_очередь_пары)
             await asyncio.to_thread(детектор.догнать_место_источника)
             await asyncio.to_thread(детектор.досказать_контроли)
@@ -6405,9 +6457,15 @@ def self_test() -> int:
             ПОТОЛОК_КОНТРОЛЯ_НА_СЕРВИС_SOL = (
                 настоящая_полоса.ПОТОЛОК_КОНТРОЛЯ_НА_СЕРВИС_SOL)
 
+            ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL = настоящая_полоса.ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL
+
             @staticmethod
             def контроль_включён():
                 return настоящая_полоса.контроль_включён()
+
+            @staticmethod
+            def пул_включён():
+                return настоящая_полоса.пул_включён()
 
             @staticmethod
             def расход_контроля(состояние, **кв):
@@ -6728,51 +6786,16 @@ def self_test() -> int:
             chk("цена входа полосы взята из её количества (0.01 SOL / 8 880 000)",
                 "0.01 SOL за 8880000" in куда_пара[0][1], куда_пара[0][1])
 
-            # 7б. КОНТРОЛЬ ДОСТАВКИ (З2): своя транзакция пары, свои поля,
-            # своя строка. Путать её с покупкой нельзя: контроль пустой, и
-            # записанный как покупка он затёр бы замер покупки.
-            куда_пара.clear()
-            st_п.update_position("lane1", control_signature="ПОДПИСЬ_КОНТРОЛЯ",
-                                control_ts_sent=т_п + 0.06,
-                                control_after_buy_ms=3.4)
-            было_куплено = st_п.positions()["lane1"].get("lane_bought_raw")
-            зк = детектор_пп.отметить_нашу_транзакцию(
-                "ПОДПИСЬ_КОНТРОЛЯ", 950, {"meta": {"err": None}}, т_п + 0.20)
-            поз_к = st_п.positions()["lane1"]
-            chk("контроль опознан как контроль, а не как покупка",
-                зк.get("stage") == "lane_control_seen"
-                and abs(поз_к.get("control_send_to_seen_ms") - 140.0) < 5.0,
-                (зк, поз_к.get("control_send_to_seen_ms")))
-            chk("замер покупки контролем не затёрт",
-                поз_к.get("lane_bought_raw") == было_куплено
-                and abs(поз_к.get("lane_send_to_seen_ms") - 300.0) < 5.0,
-                (поз_к.get("lane_send_to_seen_ms"), поз_к.get("lane_bought_raw")))
-            chk("смещение слота контроля считается от слота источника",
-                поз_к.get("control_slot_offset") == 950 - 7, поз_к.get("control_slot_offset"))
-            chk("строка контроля НЕ уходит, пока места в блоке добираются",
-                not куда_пара, куда_пара)
-            st_п.update_position("lane1", block_index=93, block_total=1391,
-                                control_block_index=40, control_block_total=1391,
-                                queue_pool_tx_slot=7, queue_pool_tx_next_slot=4,
-                                queue_our_micro_per_cu=2500,
-                                queue_micro_per_cu_median=1800,
-                                queue_micro_per_cu_p90=9000)
-            ск = детектор_пп.сообщить_контроль("lane1")
-            chk("строка пары с контролем ушла в основной чат с обеими половинами",
-                ск["sent"] and len(куда_пара) == 1 and куда_пара[0][0] == "main"
-                and "контроль доставки" in куда_пара[0][1]
-                and "покупка:" in куда_пара[0][1] and "контроль:" in куда_пара[0][1],
-                (ск, куда_пара))
-            chk("разница покупка минус контроль посчитана и названа словами",
-                abs((ск.get("delta_ms") or 0) - 160.0) < 6.0
-                and "очередь к пулу" in куда_пара[0][1], ск)
-            chk("толпа в пуле и приоритеты в строке есть",
-                all(с in куда_пара[0][1] for с in ("в пуле за наш слот",
-                                                    "мкл/CU", "медиана", "90-й")),
-                куда_пара[0][1])
-            chk("вторая строка о той же паре с контролем не уходит",
-                детектор_пп.сообщить_контроль("lane1")["sent"] is False
-                and len(куда_пара) == 1, "")
+            # 7б. ОДИНОЧНОГО КОНТРОЛЯ БОЛЬШЕ НЕТ. Решение владельца 25.09:
+            # "убрать отдельный основной контроль через Helius -- он уже есть в
+            # веере, это дубль". Проверяем, что мёртвого пути не осталось: ни
+            # метода, ни ветки узнавания подписи "основного" контроля.
+            chk("метода одиночного контроля в детекторе нет",
+                not hasattr(детектор_пп, "отметить_контроль_в_потоке")
+                and not hasattr(детектор_пп, "догнать_место_контроля"), "")
+            рабочая_д = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+            chk("в рабочей части нет чтения control_signature",
+                'get("control_signature")' not in рабочая_д, "")
 
             # 7в. ВЕЕР КОНТРОЛЕЙ ПО СЕРВИСАМ: у каждого отправителя своя
             # подпись, свой круг и своя строка в своде. Это ответ на вопрос
@@ -6799,11 +6822,9 @@ def self_test() -> int:
             chk("смещение слота у каждого сервиса своё",
                 видно_в["jito"]["slot_offset"] == 949 - 7
                 and видно_в["blockrazor"]["slot_offset"] == 951 - 7, видно_в)
-            chk("веер НЕ затирает ни покупку, ни основной контроль",
-                abs(поз_в.get("lane_send_to_seen_ms") - 300.0) < 5.0
-                and abs(поз_в.get("control_send_to_seen_ms") - 140.0) < 5.0,
-                (поз_в.get("lane_send_to_seen_ms"),
-                 поз_в.get("control_send_to_seen_ms")))
+            chk("веер НЕ затирает замер покупки полосы",
+                abs(поз_в.get("lane_send_to_seen_ms") - 300.0) < 5.0,
+                поз_в.get("lane_send_to_seen_ms"))
             свод_в = детектор_пп.свод_контролей_сервисов()
             chk("свод по сервисам говорит, кто довёз быстрее",
                 свод_в["jito"]["deliver_ms_median"] < свод_в["blockrazor"]["deliver_ms_median"]
@@ -6812,8 +6833,57 @@ def self_test() -> int:
             chk("в признаке жизни виден веер и суточный расход контроля",
                 пж_в.get("senders_seen") == 2
                 and "jito" in (пж_в.get("by_sender") or {})
-                and (пж_в.get("limits") or {}).get("per_sender_sol") == 0.001,
+                and (пж_в.get("limits") or {}).get("per_sender_sol") == 0.001
+                and (пж_в.get("limits") or {}).get("spend_sol_per_day") == 0.1,
                 пж_в)
+
+            # СТРОКА ПАРЫ ПО СЕРВИСАМ (решение владельца 25.09: в строку --
+            # кто довёз, слот и место у Bloom и у полосы). Пока места в блоке
+            # не добраны, строка не уходит: прочерк вместо места читался бы как
+            # "сел первым".
+            куда_пара.clear()
+            chk("строка по сервисам НЕ уходит, пока места в блоке добираются",
+                детектор_пп.сообщить_контроль("lane1")["sent"] is False,
+                куда_пара)
+            видно_м = dict(поз_в.get("control_senders_seen") or {})
+            видно_м["jito"] = {**видно_м["jito"], "block_index": 12,
+                                "block_total": 1391}
+            видно_м["blockrazor"] = {**видно_м["blockrazor"], "block_index": 88,
+                                      "block_total": 1391}
+            st_п.update_position("lane1", control_senders_seen=видно_м,
+                                  block_index=93, block_total=1391,
+                                  lane_pool_winner="jito",
+                                  queue_pool_tx_slot=7, queue_pool_tx_next_slot=4,
+                                  queue_our_micro_per_cu=2500,
+                                  queue_micro_per_cu_median=1800,
+                                  queue_micro_per_cu_p90=9000)
+            ск = детектор_пп.сообщить_контроль("lane1")
+            chk("строка по сервисам ушла в основной чат",
+                ск["sent"] and len(куда_пара) == 1 and куда_пара[0][0] == "main"
+                and "контроли по сервисам" in куда_пара[0][1], (ск, куда_пара))
+            chk("в строке есть КТО ДОВЁЗ покупку полосы",
+                "довёз jito" in куда_пара[0][1], куда_пара[0][1])
+            chk("в строке есть круг, слот и место КАЖДОГО сервиса",
+                all(с in куда_пара[0][1] for с in ("jito:", "blockrazor:",
+                                                    "S+", "место 12/1391",
+                                                    "место 88/1391")),
+                куда_пара[0][1])
+            chk("первым в строке идёт тот, кто довёз быстрее",
+                куда_пара[0][1].index("jito:") < куда_пара[0][1].index("blockrazor:")
+                and "быстрее всех довёз jito" in куда_пара[0][1], куда_пара[0][1])
+            chk("место и слот покупки полосы в строке есть",
+                "покупка полосы:" in куда_пара[0][1]
+                and "место 93/1391" in куда_пара[0][1], куда_пара[0][1])
+            chk("толпа в пуле и приоритеты в строке есть",
+                all(с in куда_пара[0][1] for с in ("в пуле за наш слот",
+                                                    "мкл/CU", "медиана", "90-й")),
+                куда_пара[0][1])
+            chk("самый быстрый сервис записан в позицию",
+                (st_п.positions()["lane1"] or {}).get("control_fastest_sender")
+                == "jito", st_п.positions()["lane1"].get("control_fastest_sender"))
+            chk("вторая строка о той же паре не уходит",
+                детектор_пп.сообщить_контроль("lane1")["sent"] is False
+                and len(куда_пара) == 1, "")
 
             # 8. ПРИЗНАК ЖИЗНИ показывает полосу числами, а не "включена".
             жив = детектор_пп.признак_жизни()

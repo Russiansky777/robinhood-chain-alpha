@@ -225,16 +225,60 @@ def запасной_канал(решения: list, признак: dict) -> d
     return из_
 
 
+def лучший_контроль(поз: dict) -> dict:
+    """Самый быстрый контроль пары из веера по сервисам.
+
+    Отдельного "основного" контроля нет с 25.09 (решение владельца: Helius уже
+    в веере, это был дубль), поэтому нога сравнения -- лучший путь веера. Тот
+    же выбор, что в детекторе: два разных ответа на один вопрос были бы хуже,
+    чем один.
+    """
+    видно = поз.get("control_senders_seen") or {}
+    лучший, лучшее = None, None
+    for сервис, з in видно.items():
+        if not isinstance(з, dict) or з.get("send_to_seen_ms") is None:
+            continue
+        мс = float(з["send_to_seen_ms"])
+        if лучшее is None or мс < лучшее:
+            лучшее, лучший = мс, (сервис, з)
+    if лучший is None:
+        return {}
+    сервис, з = лучший
+    return {"sender": сервис, "ms": лучшее, "slot": з.get("seen_slot"),
+            "block_index": з.get("block_index"),
+            "block_total": з.get("block_total")}
+
+
+def свод_по_отправителям(позиции: dict) -> dict:
+    """Кто довозит быстрее -- медиана доставки по каждому сервису за ночь."""
+    по: dict = {}
+    for п in позиции.values():
+        for сервис, з in (п.get("control_senders_seen") or {}).items():
+            if not isinstance(з, dict) or з.get("send_to_seen_ms") is None:
+                continue
+            по.setdefault(сервис, []).append(float(з["send_to_seen_ms"]))
+    победители: dict = {}
+    for п in позиции.values():
+        кто = п.get("lane_pool_winner")
+        if кто:
+            победители[кто] = int(победители.get(кто) or 0) + 1
+    return {"by_sender": {с: {"n": len(р), "deliver_ms_median": _мед(р),
+                               "deliver_ms_best": round(min(р), 2)}
+                           for с, р in sorted(по.items())},
+            "pool_winners": победители}
+
+
 def контроли_доставки(позиции: dict, решения: list) -> dict:
     """З2: пары "покупка против пустого контроля" -- медианы и вывод.
 
     Вывод словами делается по ТОМУ ЖЕ правилу, что в детекторе: контроль
     заметно быстрее покупки -- дело в очереди к пулу; не быстрее -- в пути.
+    Контроль здесь -- ЛУЧШИЙ путь веера по сервисам.
     """
     пары = [п for п in позиции.values()
-            if п.get("lane") and п.get("control_send_to_seen_ms") is not None]
+            if п.get("lane") and (лучший_контроль(п) or {}).get("ms") is not None]
     покупки = [п.get("lane_send_to_seen_ms") for п in пары]
-    контроли = [п.get("control_send_to_seen_ms") for п in пары]
+    контроли = [лучший_контроль(п)["ms"] for п in пары]
     сводки = [р for р in решения if р.get("stage") == "lane_control_summary"]
     мп, мк = _мед(покупки), _мед(контроли)
     разница = (round(float(мп) - float(мк), 2)
@@ -247,15 +291,17 @@ def контроли_доставки(позиции: dict, решения: list
     return {"pairs": len(пары), "buy_deliver_ms_median": мп,
             "control_deliver_ms_median": мк, "delta_ms": разница,
             "verdict": вывод, "summaries_sent": len(сводки),
+            "senders": свод_по_отправителям(позиции),
             "rows": [{"cid": п.get("client_order_id"),
                        "buy_ms": п.get("lane_send_to_seen_ms"),
-                       "control_ms": п.get("control_send_to_seen_ms"),
+                       "control_ms": лучший_контроль(п).get("ms"),
+                       "control_sender": лучший_контроль(п).get("sender"),
                        "buy_slot": п.get("own_tx_seen_slot"),
-                       "control_slot": п.get("control_seen_slot"),
+                       "control_slot": лучший_контроль(п).get("slot"),
                        "buy_block_index": п.get("block_index"),
-                       "control_block_index": п.get("control_block_index"),
-                       "after_buy_ms": п.get("control_after_buy_ms"),
-                       "control_why_not": п.get("control_why_not")}
+                       "control_block_index": лучший_контроль(п).get("block_index"),
+                       "pool_winner": п.get("lane_pool_winner"),
+                       "tips_total_sol": п.get("lane_tips_total_sol")}
                       for п in sorted(пары, key=lambda x: x.get("ts_intent") or 0)]}
 
 
@@ -624,9 +670,24 @@ def в_текст(о: dict) -> str:
         "",
         (lambda з: f"**Контроль доставки (З2).** Пар с контролем {ч(з.get('pairs'))}; "
                     f"медиана доставки покупки {ч(з.get('buy_deliver_ms_median'), ' мс')}, "
-                    f"контроля {ч(з.get('control_deliver_ms_median'), ' мс')}; "
+                    f"контроля по лучшему пути {ч(з.get('control_deliver_ms_median'), ' мс')}; "
                     f"разница {ч(з.get('delta_ms'), ' мс')} -> {з.get('verdict') or '—'}."
                     )(о.get("controls") or {}),
+        # КТО ДОВОЗИТ БЫСТРЕЕ -- по каждому сервису и по факту посадки покупок.
+        # Это прямой вопрос владельца, и ответ на него должен стоять строкой, а
+        # не выводиться читателем из таблицы пар.
+        (lambda з: ("Кто довозит быстрее (медиана доставки пустой транзакции): "
+                     + (", ".join(
+                         f"{с} {ч((в or {}).get('deliver_ms_median'), ' мс')}"
+                         f" (n={ч((в or {}).get('n'))})"
+                         for с, в in ((з.get("by_sender") or {}).items()))
+                        or "данных пока нет")
+                     + ". Покупки полосы довозил: "
+                     + (", ".join(f"{с} x{n}" for с, n in
+                                   (з.get("pool_winners") or {}).items())
+                        or "ещё никто")
+                     + ".")
+                    )((о.get("controls") or {}).get("senders") or {}),
         "",
         f"**Тень.** Записей {ч(т.get('total'))}, по вердиктам: "
         f"{json.dumps(т.get('by_verdict') or {}, ensure_ascii=False)}. "
@@ -858,10 +919,17 @@ def self_test() -> int:
                     "block_total": 1000, "sol_in": 0.2, "closed_sol_net": 0.22},
             "b2": {"source_slot": 200, "our_slot": 202, "block_index": 100,
                     "block_total": 1000, "sol_in": 0.2, "closed_sol_net": 0.18},
+            # КОНТРОЛЬ -- ВЕЕРОМ ПО СЕРВИСАМ (одиночного больше нет с 25.09):
+            # лучший путь и есть нога сравнения, а победитель пула -- отдельно.
             "l1": {"lane": "own_send", "source_slot": 300, "own_tx_seen_slot": 301,
                     "block_index": 57, "block_total": 1059, "sol_in": 0.01,
-                    "closed_sol_net": 0.004, "control_send_to_seen_ms": 180.0,
-                    "lane_send_to_seen_ms": 700.0, "control_seen_slot": 301},
+                    "closed_sol_net": 0.004, "lane_send_to_seen_ms": 700.0,
+                    "lane_pool_winner": "jito", "lane_tips_total_sol": 0.003101,
+                    "control_senders_seen": {
+                        "jito": {"send_to_seen_ms": 180.0, "seen_slot": 301,
+                                  "block_index": 12, "block_total": 1059},
+                        "nozomi": {"send_to_seen_ms": 260.0, "seen_slot": 302,
+                                    "block_index": 40, "block_total": 1080}}},
             "l2": {"lane": "own_send", "source_slot": 400, "own_tx_seen_slot": 401,
                     "sol_in": 0.01, "result_uncountable": True},
         }
@@ -895,6 +963,15 @@ def self_test() -> int:
             ктр["pairs"] == 1 and ктр["buy_deliver_ms_median"] == 700.0
             and ктр["control_deliver_ms_median"] == 180.0
             and ктр["delta_ms"] == 520.0 and "ОЧЕРЕДЬ" in ктр["verdict"], ктр)
+        chk("нога сравнения -- ЛУЧШИЙ путь веера, и сервис назван",
+            ктр["rows"][0]["control_sender"] == "jito"
+            and ктр["rows"][0]["control_ms"] == 180.0, ктр["rows"][0])
+        chk("свод по отправителям: у каждого своя медиана",
+            ктр["senders"]["by_sender"]["jito"]["deliver_ms_median"] == 180.0
+            and ктр["senders"]["by_sender"]["nozomi"]["deliver_ms_median"] == 260.0,
+            ктр["senders"])
+        chk("кто довозил покупки -- отдельным счётом",
+            ктр["senders"]["pool_winners"] == {"jito": 1}, ктр["senders"])
         текст_н = в_текст({**собрать(state_dir=Path("/нет"), data_dir=Path("/нет"),
                                       since_utc="2026-09-25T00:00:00Z"),
                             "slots": сл, "chain_pnl": пнл, "fallback": зап,
