@@ -76,6 +76,13 @@ except Exception as _тень_exc:        # noqa: BLE001
     SB = None
     SHADOW_IMPORT_ERR = f"{type(_тень_exc).__name__}: {_тень_exc}"
 
+try:                                  # кривая цены -- для тени пропусков
+    import bloom_price_curve as PC     # noqa: E402
+    PRICE_CURVE_IMPORT_ERR = ""
+except Exception as _кривая_exc:      # noqa: BLE001
+    PC = None
+    PRICE_CURVE_IMPORT_ERR = f"{type(_кривая_exc).__name__}: {_кривая_exc}"
+
 try:                                  # налог по маршруту -- узкий фильтр владельца
     import bloom_route_tax as RT      # noqa: E402
     ROUTE_TAX_IMPORT_ERR = ""
@@ -1819,6 +1826,8 @@ class Детектор:
                          "credits_day": self.тень_кредитов_всего(),
                          "credits_write_why_not": self.тень_запись_почему}
         st["route_tax_filter"] = {
+            "price_curve_loaded": PC is not None,
+            "price_curve_why_not": globals().get("PRICE_CURVE_IMPORT_ERR", ""),
             "module_loaded": RT is not None,
             "module_why_not": globals().get("ROUTE_TAX_IMPORT_ERR", ""),
             "code": КОД_НАЛОГ_МАРШРУТА,
@@ -2865,6 +2874,107 @@ class Детектор:
                             type(exc).__name__)
         return итог
 
+    def _хвост_журнала(self, путь, *, байт: int = 1_500_000) -> list:
+        """Последние строки журнала. Читаем ХВОСТ, а не весь файл: журнал
+        решений растёт весь день, и вычитывать его целиком на каждом пульсе
+        значит тратить время процесса на то, что и так не нужно."""
+        try:
+            размер = путь.stat().st_size
+        except OSError:
+            return []
+        try:
+            with путь.open("rb") as f:
+                if размер > байт:
+                    f.seek(размер - байт)
+                    f.readline()          # первая строка может быть обрезана
+                куски = f.read().decode("utf-8", errors="replace")
+        except OSError:
+            return []
+        строки = []
+        for с in куски.split("\n"):
+            с = с.strip()
+            if not с:
+                continue
+            try:
+                строки.append(json.loads(с))
+            except ValueError:
+                continue
+        return строки
+
+    def догнать_цены_пропусков(self, *, предел: int = 2,
+                                минимум_возраст_s: float = 35.0) -> dict:
+        """ТЕНЬ ПРОПУСКОВ узкого фильтра: цена на S+1 и через 28.8 с.
+
+        Слово владельца 25.09: "По каждому пропуску тень: цена на S+1 по цепи и
+        через 28.8 с". Это единственный способ узнать, сберёг ли фильтр деньги
+        или отнял сделку -- по самому факту пропуска не видно ничего.
+
+        ВНЕ горячего пути, с пульса, и с пределом на круг: один пропуск стоит
+        около пяти вызовов (транзакция источника, подписи пула, две сделки).
+        """
+        итог = {"looked": 0, "measured": 0, "why_not": None}
+        if PC is None:
+            итог["why_not"] = "модуль кривой цены не загружен"
+            return итог
+        строки = self._хвост_журнала(self.состояние.decisions_path)
+        уже = {с.get("signature") for с in строки if с.get("stage") == "skip_price"}
+        сейчас = time.time()
+        пропуски = []
+        for с in строки:
+            if с.get("code") != КОД_НАЛОГ_МАРШРУТА or с.get("action") != "skip":
+                continue
+            подпись = с.get("signature")
+            if not подпись or подпись in уже:
+                continue
+            ts = с.get("ts") or с.get("ts_utc")
+            # Возраст берём по времени записи журнала: если его нет, считаем,
+            # что ждать больше нечего -- запись всё равно старая.
+            возраст = None
+            if isinstance(ts, (int, float)):
+                возраст = сейчас - float(ts)
+            if возраст is not None and возраст < минимум_возраст_s:
+                continue
+            пропуски.append(с)
+        for с in пропуски[:предел]:
+            итог["looked"] += 1
+            запись = {"stage": "skip_price", "signature": с.get("signature"),
+                       "mint": с.get("mint"), "source": с.get("source"),
+                       "skip_code": с.get("code"),
+                       "route_transfer_fee_bps": с.get("route_transfer_fee_bps")}
+            try:
+                tx_и = self.helius.транзакция(с.get("signature"))
+                if not tx_и:
+                    запись["why_not"] = "узел не отдал транзакцию источника"
+                else:
+                    вх = PC.цена_входа_источника(tx_и, с.get("mint") or "",
+                                                  кошелёк=с.get("source"))
+                    пул = (с.get("source_pool")
+                           or PC.пул_для_кривой(self.helius, минт=с.get("mint") or "",
+                                                 tx_источника=tx_и,
+                                                 кошелёк=с.get("source")))
+                    if not пул:
+                        запись["why_not"] = "пул для кривой не найден"
+                    else:
+                        кр = PC.кривая(
+                            self.helius, минт=с.get("mint") or "", пул=пул,
+                            слот_источника=int(с.get("slot") or 0),
+                            время_источника=(tx_и or {}).get("blockTime"),
+                            цена_входа=вх.get("price") if вх.get("known") else None,
+                            квота_входа=вх.get("quote") if вх.get("known") else None,
+                            точки_блоков=(1,), точки_секунд=(28.8,))
+                        запись["entry"] = {k: вх.get(k) for k in
+                                            ("known", "price", "quote", "why_not")}
+                        запись["points"] = кр.get("points")
+                        запись["pool"] = пул
+                        итог["measured"] += 1
+            except Exception as exc:  # noqa: BLE001
+                запись["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            try:
+                self.состояние.log_decision(запись)
+            except Exception:  # noqa: BLE001
+                log.exception("запись тени пропуска не легла")
+        return итог
+
     def сообщить_пару(self, cid_полосы: str) -> dict:
         """Пара "Bloom против нашей" -- строкой владельцу, один раз на пару.
 
@@ -3472,6 +3582,9 @@ async def биение(детектор: Детектор, стоп_через_s
             # Часовое окно тени: ноль собранных при трёх и более сигналах --
             # тревога владельцу и перезапуск ТЕНИ, детектор не трогаем.
             детектор.сводка_тени_за_час()
+            # Тень пропусков узкого фильтра: цена на S+1 и через 28.8 с.
+            # Предел на круг стоит в самом методе: пропуск стоит ~5 вызовов.
+            await asyncio.to_thread(детектор.догнать_цены_пропусков)
             # Тревога о запасном пути -- на пульсе: подписка в это время
             # занята сообщениями, а пульс как раз для таких проверок.
             детектор.проверить_запасной_путь()
@@ -4986,6 +5099,74 @@ def self_test() -> int:
             chk("и свои вызовы считаются поверх прежних",
                 детектор_ч2.тень_кредитов_всего() == 10,
                 детектор_ч2.тень_кредитов_всего())
+
+            # ---- ТЕНЬ ПРОПУСКОВ УЗКОГО ФИЛЬТРА (владелец 25.09, пункт 4) ----
+            # Без неё пропуск -- слово без числа: не видно, сберёг фильтр
+            # деньги или отнял сделку.
+            st_пр = ST.ExecState(base=Path(d) / "skips", kill=Path(d) / "kill")
+            st_пр.log_decision({"stage": "decision", "action": "skip",
+                                 "code": КОД_НАЛОГ_МАРШРУТА,
+                                 "signature": "ПОДПИСЬ_ПРОПУСКА",
+                                 "mint": "MINT_П", "source": "SRC",
+                                 "slot": 500, "source_pool": "ПУЛ_П",
+                                 "route_transfer_fee_bps": 800,
+                                 "ts": time.time() - 100})
+
+            class HeliusПропуск(HeliusДляТени):
+                def транзакция(self, подпись, **kw):
+                    return {"slot": 500, "blockTime": 1_790_000_000,
+                            "meta": {"err": None, "preTokenBalances": [],
+                                     "postTokenBalances": []}}
+
+            детектор_пр = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_пр,
+                                    курс=КурсSOL(), режим="dry",
+                                    helius=HeliusПропуск())
+            было_PC = globals().get("PC")
+            класс_кривой = type("КриваяЗаглушка", (), {
+                "цена_входа_источника": staticmethod(
+                    lambda tx, минт, **кв: {"known": True, "price": 1.0e-6,
+                                            "quote": WSOL}),
+                "пул_для_кривой": staticmethod(lambda *a, **кв: "ПУЛ_П"),
+                "кривая": staticmethod(lambda *a, **кв: {
+                    "known": True,
+                    "points": [{"point": "+1 блок", "known": True, "price": 1.1e-6,
+                                "vs_entry_pct": 10.0},
+                               {"point": "+28.8 с", "known": True, "price": 0.8e-6,
+                                "vs_entry_pct": -20.0}]})})
+            globals()["PC"] = класс_кривой
+            try:
+                итог_пр = детектор_пр.догнать_цены_пропусков()
+                строки_пр = [json.loads(с) for с in
+                              st_пр.decisions_path.read_text(encoding="utf-8")
+                              .strip().split("\n")]
+                тени_пр = [с for с in строки_пр if с.get("stage") == "skip_price"]
+                chk("тень пропуска посчитана и записана строкой",
+                    итог_пр["measured"] == 1 and len(тени_пр) == 1
+                    and тени_пр[0]["signature"] == "ПОДПИСЬ_ПРОПУСКА",
+                    (итог_пр, тени_пр))
+                chk("в тени пропуска есть точки S+1 и 28.8 с с процентом от входа",
+                    [т["point"] for т in тени_пр[0]["points"]] == ["+1 блок", "+28.8 с"]
+                    and тени_пр[0]["points"][1]["vs_entry_pct"] == -20.0,
+                    тени_пр[0].get("points"))
+                # Второй проход по тому же пропуску не должен считать заново:
+                # каждый лишний проход -- это кредиты за уже известное.
+                итог_пр2 = детектор_пр.догнать_цены_пропусков()
+                chk("уже измеренный пропуск второй раз не считается",
+                    итог_пр2["looked"] == 0, итог_пр2)
+                # Свежий пропуск (моложе 35 с) ещё не считается: 28.8 с не прошли.
+                st_пр.log_decision({"stage": "decision", "action": "skip",
+                                     "code": КОД_НАЛОГ_МАРШРУТА,
+                                     "signature": "ПОДПИСЬ_СВЕЖАЯ", "mint": "M2",
+                                     "source": "SRC", "slot": 501,
+                                     "ts": time.time()})
+                итог_пр3 = детектор_пр.догнать_цены_пропусков()
+                chk("свежий пропуск ждёт, пока пройдут 28.8 с",
+                    итог_пр3["looked"] == 0, итог_пр3)
+            finally:
+                if было_PC is None:
+                    globals().pop("PC", None)
+                else:
+                    globals()["PC"] = было_PC
         finally:
             подмена.вернуть()
         # На хосте без модуля тени SB есть и равно None. Подмена обязана
