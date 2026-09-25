@@ -60,6 +60,14 @@ on:
         description: "'1' -- второй путь выхода через Jupiter Ultra (нужен секрет EXEC_WALLET_KEY)"
         required: false
         default: "0"
+      keep_env:
+        description: "'yes' -- env на хосте НЕ трогать вовсе (доставить код и перезапустить)"
+        required: false
+        default: "no"
+      allow_lane_restart:
+        description: "'yes' -- перезапуск разрешён, если ВСЕ открытые позиции -- позиции полосы"
+        required: false
+        default: "no"
 
 concurrency:
   group: bloom-seller-deploy
@@ -213,7 +221,23 @@ jobs:
           # ломался на закрывающей метке с отступом.
           "$PY" analysis/bloom_key_match.py
 
+      - name: "Имена ключей env на хосте ДО правки (значения не печатаются)"
+        run: |
+          set -e
+          set -o pipefail
+          # Зачем это есть. Шаг записи env перезаписывает файл ЦЕЛИКОМ, а env
+          # у сторожа и детектора ОДИН. Так уже терялся ключ Jupiter V2, и так
+          # же потерялись бы кошелёк полосы, её ключ и ключи отправителей -- то
+          # есть деньги. Ниже имена сверяются после правки, и потеря ключа
+          # отменяет деплой с восстановлением из бэкапа. Печатаются только
+          # ИМЕНА: значения не печатаются никогда.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort -u" > "$RUNNER_TEMP/env_keys_before.txt"
+          echo "ключей в env до правки: $(wc -l < "$RUNNER_TEMP/env_keys_before.txt")"
+          cat "$RUNNER_TEMP/env_keys_before.txt" | tr "\n" " "
+          echo ""
+
       - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
+        if: ${{ github.event.inputs.keep_env != 'yes' }}
         run: |
           set -e
           # Читаем только два значения и только их. Ключи не печатаются.
@@ -248,6 +272,7 @@ jobs:
           echo "LOG_CHAT_PREV=$LG" >> $GITHUB_ENV
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
+        if: ${{ github.event.inputs.keep_env != 'yes' }}
         env:
           BLOOM_API_KEY: ${{ secrets.BLOOM_API_KEY }}
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
@@ -343,6 +368,30 @@ jobs:
           echo "строк в env на хосте:"
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $ENV_DIR/env; grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env"
 
+      - name: "ГЕЙТ: ни один ключ env не потерян правкой"
+        if: ${{ github.event.inputs.keep_env != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort -u" > "$RUNNER_TEMP/env_keys_after.txt"
+          LOST=$(comm -23 "$RUNNER_TEMP/env_keys_before.txt" "$RUNNER_TEMP/env_keys_after.txt" | tr "\n" " ")
+          if [ -n "$(echo "$LOST" | tr -d " ")" ]; then
+            echo "ДЕПЛОЙ ОТМЕНЁН: правка env потеряла ключи: $LOST"
+            # Возврат к известному состоянию, а не оставить полуфайл: бэкап
+            # сделан тем же шагом правки минутой раньше.
+            ssh -n $SSH_OPTS root@$TARGET_HOST "
+              set -e
+              newest=\$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -1)
+              [ -n \"\$newest\" ] || { echo 'бэкапа нет -- восстановить нечем'; exit 1; }
+              cp -a \"\$newest\" $ENV_DIR/env
+              chown root:root $ENV_DIR/env
+              chmod 600 $ENV_DIR/env
+              echo \"env восстановлен из \$newest\"
+            "
+            exit 1
+          fi
+          echo "гейт пройден: все ключи env на месте ($(wc -l < "$RUNNER_TEMP/env_keys_after.txt"))"
+
       - name: "Зависимость solders в venv хоста (только для пути Jupiter)"
         if: ${{ github.event.inputs.via_jupiter == '1' }}
         run: |
@@ -435,15 +484,17 @@ jobs:
           set -e
           # PYTHONPATH вместо sys.path.insert: иначе внутри команды ssh
           # пришлось бы вкладывать кавычки в кавычки и гейт молча ломался бы.
-          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; p=ExecState().open_positions(); print(len(p), sum(1 for x in p if x.get(\"mode\")==\"live-test\"))'" || echo "ОШИБКА ОШИБКА")
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c 'from bloom_exec_state import ExecState; p=ExecState().open_positions(); print(len(p), sum(1 for x in p if x.get(\"mode\")==\"live-test\"), sum(1 for x in p if x.get(\"lane\")))'" || echo "ОШИБКА ОШИБКА")
           OPEN=$(echo "$OUT" | awk "{print \$1}")
           LT=$(echo "$OUT" | awk "{print \$2}")
-          echo "открытых позиций: $OPEN, из них live-test: $LT"
+          LANE=$(echo "$OUT" | awk "{print \$3}")
+          echo "открытых позиций: $OPEN, из них live-test: $LT, полосы: $LANE"
           # Непрочитанное состояние -- это ЗАПРЕТ, а не исключение. Без этой
           # проверки сбой ssh давал "ОШИБКА ОШИБКА", числа совпадали, и
           # исключение для стенда срабатывало на неизвестном состоянии.
           case "$OPEN" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
           case "$LT" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
+          case "$LANE" in ''|*[!0-9]*) echo "перезапуск ОТМЕНЁН: состояние позиций не прочитано ($OUT)"; exit 1;; esac
           if [ "$OPEN" = "0" ]; then
             echo "гейт пройден: открытых позиций нет"
           elif [ "${{ github.event.inputs.allow_live_test_restart }}" = "yes" ] \
@@ -454,6 +505,15 @@ jobs:
             # которая её и закрывает. Боевая позиция таким исключением не
             # покрывается: там перезапуск ждёт закрытия.
             echo "гейт: исключение для стенда -- все $OPEN позиций в режиме live-test"
+          elif [ "${{ github.event.inputs.allow_lane_restart }}" = "yes" ] \
+                && [ "$LANE" != "0" ] && [ "$OPEN" = "$LANE" ]; then
+            # Исключение разрешено владельцем 25.09 для ПОЛОСЫ: её позиции
+            # стоят открытыми именно потому, что сторож их не продал, и ждать
+            # их закрытия значит не ставить правку, которая их и продаёт.
+            # Рамка та же, что у стенда: исключение работает ТОЛЬКО когда
+            # открыты одни позиции полосы. Боевая покупка Bloom среди них --
+            # и перезапуск снова ждёт закрытия.
+            echo "гейт: исключение для полосы -- все $OPEN открытых позиций её"
           else
             echo "перезапуск ОТМЕНЁН: открытых позиций $OPEN (live-test $LT)"
             exit 1
