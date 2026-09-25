@@ -3025,6 +3025,23 @@ class Детектор:
         self.blockhash_обновлений += 1
         return {"ok": True, "blockhash": хеш}
 
+    def обновить_нонс(self) -> dict:
+        """Тёплый nonce для полосы. ВНЕ горячего пути -- с тех же часов, что хеш.
+
+        Один getAccountInfo на обновление и только когда полоса включена и
+        вариант на nonce вообще используется. В горячем пути этот вызов стоил
+        круг до сети: замер 25.09 показал медиану 60.2 мс от решения до
+        отправки при сборке 0.57 мс, и остаток сидел именно здесь.
+        """
+        if OS is None or not self.полоса_включена:
+            return {"ok": False, "why_not": "полоса выключена"}
+        try:
+            if not OS.пул_нонсом_включён():
+                return {"ok": False, "why_not": "вариант на nonce выключен"}
+            return OS.обновить_тёплый_нонс(self.helius.call)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
     def свод_нонса(self) -> dict:
         """Состояние варианта пула на nonce: включён, аккаунт, висящий сдвиг."""
         try:
@@ -3036,6 +3053,9 @@ class Детектор:
             из_["pending_shift"] = bool(ож.get("pending"))
             из_["pending_why"] = ож.get("why")
             из_["shift_signature"] = ож.get("signature")
+            # ТЁПЛОЕ ЗНАЧЕНИЕ: есть ли, какого возраста, сколько раз путь взял
+            # его тёплым и сколько раз пришлось идти по сети.
+            из_["warm"] = OS.свод_тёплого_нонса()
             return из_
         except Exception as exc:  # noqa: BLE001
             return {"why_not": f"{type(exc).__name__}"}
@@ -4980,6 +5000,13 @@ async def тёплый_хеш(детектор: Детектор, стоп_че�
             await asyncio.to_thread(детектор.обновить_blockhash)
         except Exception as exc:  # noqa: BLE001
             log.warning("тёплый хеш не обновился: %s: %s",
+                        type(exc).__name__, str(exc)[:160])
+        # ТЁПЛЫЙ NONCE -- на тех же часах. Отдельные часы не нужны: и хеш, и
+        # nonce нужны свежими к моменту сделки, а не по своему расписанию.
+        try:
+            await asyncio.to_thread(детектор.обновить_нонс)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("тёплый nonce не обновился: %s: %s",
                         type(exc).__name__, str(exc)[:160])
         await asyncio.sleep(ТЁПЛЫЙ_ХЕШ_S)
 
