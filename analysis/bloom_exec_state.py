@@ -125,6 +125,10 @@ SCHEMA_VERSION_KEY = "schema_version"
 КОД_БАЛАНС = "INSUFFICIENT_BALANCE"
 STATE_CLOSED = "closed"
 
+# Разобранные ротированные журналы позиций: {путь: (время_правки, размер, dict)}.
+# Ротированный файл после ротации не меняется, поэтому кэш точен.
+_КЭШ_РОТАЦИИ: dict = {}
+
 
 def state_dir() -> Path:
     p = os.environ.get("BLOOM_STATE_DIR", "").strip()
@@ -462,9 +466,69 @@ class ExecState:
 
     # -------------------------------------------------------------- позиции
 
-    def positions(self) -> dict:
-        """Текущее состояние позиций -- ПЕРЕИГРОМ журнала, а не из памяти."""
+    def _ротированные_позиции(self) -> dict:
+        """Позиции из ПОСЛЕДНЕГО ротированного журнала, через кэш.
+
+        Найдено 25.09: на хосте стоит logrotate, и в 22:00Z сутки уезжают в
+        positions.jsonl.1.gz. Читая только текущий файл, состояние теряло
+        историю: в 22:25Z полоса показала "сделок сегодня 0" после 25 покупок
+        за вечер, а её суточные пределы (50 сделок, стопы -0.3/-0.5, потолок
+        расхода) считались по пустому журналу -- то есть стоп-лосс начинался
+        заново каждую полночь по хосту.
+
+        Берём ровно ОДИН, самый свежий ротированный файл: суточное окно им
+        закрывается целиком, а тянуть всю историю в каждый вызов нельзя --
+        positions() зовут гейты перед каждой сделкой. Разобранное держим в
+        кэше по (путь, время правки, размер): ротированный файл больше не
+        меняется, поэтому кэш точен, а не "почти точен".
+        """
+        свежий = None
+        try:
+            рот = sorted(self.base.glob(self.positions_path.name + ".*.gz"),
+                         key=lambda п: п.stat().st_mtime, reverse=True)
+            свежий = рот[0] if рот else None
+        except OSError:
+            return {}
+        if свежий is None:
+            return {}
+        try:
+            отметка = (str(свежий), свежий.stat().st_mtime, свежий.stat().st_size)
+        except OSError:
+            return {}
+        ранее = _КЭШ_РОТАЦИИ.get(отметка[0])
+        if ранее and ранее[0] == отметка[1] and ранее[1] == отметка[2]:
+            return ранее[2]
         out: dict = {}
+        try:
+            import gzip  # noqa: PLC0415
+
+            with gzip.open(свежий, "rt", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line.startswith("{"):
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except ValueError:
+                        continue
+                    cid = row.get("client_order_id")
+                    if not cid:
+                        continue
+                    out.setdefault(cid, {}).update(row)
+        except OSError:
+            return {}
+        _КЭШ_РОТАЦИИ[отметка[0]] = (отметка[1], отметка[2], out)
+        return out
+
+    def positions(self) -> dict:
+        """Текущее состояние позиций -- ПЕРЕИГРОМ журнала, а не из памяти.
+
+        Ротированный журнал читается ТОЖЕ и первым: строки текущего файла
+        новее и правят поля поверх него.
+        """
+        out: dict = {}
+        for cid, з in self._ротированные_позиции().items():
+            out.setdefault(cid, {}).update(з)
         if not self.positions_path.exists():
             return out
         with self.positions_path.open(encoding="utf-8") as f:
@@ -925,6 +989,24 @@ def self_test() -> None:
     st.kill_bloom_path.unlink()
     chk("снят -- покупки площадки снова разрешены",
         st.kill_bloom_active()[0] is False)
+
+    # --- РОТАЦИЯ ЖУРНАЛА НЕ ОБНУЛЯЕТ СОСТОЯНИЕ (найдено 25.09 в 22:25Z).
+    import gzip as _гз  # noqa: PLC0415
+
+    рот = ExecState(base=base / "rotate", kill=base / "rotate" / "НЕТ")
+    with _гз.open(рот.positions_path.parent / (рот.positions_path.name + ".1.gz"),
+                   "wt", encoding="utf-8") as ф:
+        ф.write(json.dumps({"client_order_id": "вчера", "state": STATE_CLOSED,
+                             "mint": "MV", "sol_in": 0.01,
+                             "lane": "own_send"}) + "\n")
+    рот.write_intent(client_order_id="сегодня", mint="MS", source_sig="SS",
+                      source_slot=2, sol_in=0.01, pool=None, program=None,
+                      taxed=None, tax_bps=None, mode=MODE_LIVE, sell_after_s=28.8)
+    поз_р = рот.positions()
+    chk("после ротации в состоянии видны и вчерашние, и сегодняшние позиции",
+        "вчера" in поз_р and "сегодня" in поз_р, sorted(поз_р))
+    chk("поля ротированной позиции разобраны, а не потеряны",
+        (поз_р.get("вчера") or {}).get("mint") == "MV", поз_р.get("вчера"))
 
     # --- СУТОЧНЫЙ СЧЁТ ИТОГА. Найдено 25.09: add_pnl не звал никто, и стоп по
     # дневному убытку не срабатывал никогда. Проверяем денежный путь целиком:
