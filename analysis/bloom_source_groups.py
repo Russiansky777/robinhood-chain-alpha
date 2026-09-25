@@ -168,8 +168,16 @@ def self_test() -> int:
     chk("по lane_only Bloom торгует и размер 0.05",
         политика("lane_only")["bloom_trades"] is True
         and политика("lane_only")["bloom_sol"] == 0.05, политика("lane_only"))
-    chk("по группе скорости Bloom не торгует",
-        политика("speed_only")["bloom_trades"] is False, политика("speed_only"))
+    # РЕШЕНИЕ ВЛАДЕЛЬЦА 25.09 (ночь): по группе скорости Bloom тоже торгует и
+    # берёт 0.01 -- ради пары на КАЖДОЙ покупке скорости. Порог входа источника
+    # у группы свой, 0.5 SOL, и он общий для Bloom и полосы.
+    chk("по группе скорости Bloom торгует и размер 0.01",
+        политика("speed_only")["bloom_trades"] is True
+        and политика("speed_only")["bloom_sol"] == 0.01,
+        политика("speed_only"))
+    chk("и порог входа у группы скорости 0.5 SOL -- один на Bloom и полосу",
+        политика("speed_only")["min_target_sol"] == 0.5,
+        политика("speed_only"))
     chk("у bloom_lane размер Bloom из окружения, а не из файла",
         политика("bloom_lane").get("bloom_sol") is None, политика("bloom_lane"))
     chk("веер идёт по полосной группе и НЕ идёт по скорости",
