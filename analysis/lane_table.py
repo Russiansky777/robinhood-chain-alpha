@@ -198,68 +198,14 @@ def проверить_по_цепи(ряды: list, позиции: dict, rpc_c
 )
 
 
-def блок(rpc_call, слот: int, кэш: dict) -> dict:
-    """Блок слота с составом транзакций. transactionDetails=accounts: приходят
-    подписи, счета и балансы токенов -- всё, что нужно для места и покупок, и
-    без тел инструкций, которые весили бы мегабайты."""
-    if слот in кэш:
-        return кэш[слот]
-    из_: dict = {"ok": False, "why_not": None, "txs": []}
-    try:
-        от = rpc_call("getBlock", [слот, {"encoding": "json",
-                                           "transactionDetails": "accounts",
-                                           "rewards": False,
-                                           "maxSupportedTransactionVersion": 0}])
-    except Exception as exc:  # noqa: BLE001
-        из_["why_not"] = f"узел не ответил: {type(exc).__name__}"
-        кэш[слот] = из_
-        return из_
-    if not isinstance(от, dict):
-        из_["why_not"] = "блока нет в ответе узла"
-        кэш[слот] = из_
-        return из_
-    из_["ok"] = True
-    из_["txs"] = от.get("transactions") or []
-    кэш[слот] = из_
-    return из_
+class _Узел:
+    """Переходник к bloom_block_position: там ждут объект с .call(метод, параметры)."""
 
+    def __init__(self, зов):
+        self._зов = зов
 
-def _место(блок_: dict, подпись: str) -> tuple:
-    """Место транзакции в блоке: (индекс с 0, всего). Нет подписи -- (None, всего)."""
-    всего = len(блок_.get("txs") or [])
-    if not подпись:
-        return None, всего
-    for и, т in enumerate(блок_.get("txs") or []):
-        подписи = ((т.get("transaction") or {}).get("signatures") or [])
-        if подпись in подписи:
-            return и, всего
-    return None, всего
-
-
-def _купил_минт(т: dict, минт: str, наши: tuple) -> bool:
-    """Чужая ПОКУПКА этого минта: у владельца не из наших остаток минта вырос.
-
-    Упавшие транзакции не считаются: покупки в них не было. Продажи тоже:
-    у продавца остаток падает, а не растёт.
-    """
-    мета = т.get("meta") or {}
-    if мета.get("err"):
-        return False
-    было: dict = {}
-    for б in (мета.get("preTokenBalances") or []):
-        if б.get("mint") == минт:
-            было[(б.get("owner"), б.get("accountIndex"))] = \
-                float(((б.get("uiTokenAmount") or {}).get("amount")) or 0)
-    for б in (мета.get("postTokenBalances") or []):
-        if б.get("mint") != минт:
-            continue
-        хозяин = б.get("owner")
-        if хозяин in наши:
-            continue
-        стало = float(((б.get("uiTokenAmount") or {}).get("amount")) or 0)
-        if стало > было.get((хозяин, б.get("accountIndex")), 0.0):
-            return True
-    return False
+    def call(self, метод, параметры):
+        return self._зов(метод, параметры)
 
 
 def разобрать_блоки(ряды: list, позиции: dict, rpc_call,
@@ -276,7 +222,16 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
     место в блоке (столбец таблицы) добирается из ТОГО ЖЕ блока по нашей севшей
     подписи, если детектор его не записал.
     """
+    import bloom_block_position as BP  # noqa: PLC0415
+
+    узел = _Узел(rpc_call)
     кэш: dict = {}
+
+    def блок(слот):
+        if слот not in кэш:
+            кэш[слот] = BP.блок_со_счетами(узел, слот)
+        return кэш[слот]
+
     for з in ряды:
         п = позиции.get(з["cid"]) or {}
         минт = п.get("mint")
@@ -288,34 +243,46 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
         if not isinstance(слот_и, int) or not подпись_и:
             з["s0"]["why_not"] = "слота или подписи источника в позиции нет"
         else:
-            б = блок(rpc_call, слот_и, кэш)
-            if not б.get("ok"):
+            б = блок(слот_и)
+            if not б.get("known"):
                 з["s0"]["why_not"] = б.get("why_not")
             else:
-                и, всего = _место(б, подпись_и)
-                з["s0"].update(source_index=и, source_total=всего)
+                и = BP.индекс_подписи(б, подпись_и)
+                з["s0"].update(source_index=и, source_total=б.get("total"))
                 if и is None:
                     з["s0"]["why_not"] = "подписи источника в этом блоке нет"
                 else:
-                    хвост = (б.get("txs") or [])[и + 1:]
-                    з["s0"]["after_source"] = len(хвост)
-                    покупки = sum(1 for т in хвост
-                                   if минт and _купил_минт(т, минт, наши))
-                    з["s0"]["foreign_buys_after"] = покупки
-                    з["s0"]["s0_possible"] = bool(покупки)
+                    з["s0"]["after_source"] = max(0, int(б.get("total") or 0) - и - 1)
+                    # Чужие покупки ТОГО ЖЕ минта после источника до конца
+                    # блока -- это и есть "S+0 был возможен". Свои адреса из
+                    # толпы исключены, иначе её подтверждала бы наша сделка.
+                    пк = BP.покупки_минта(б, минт, с_индекса=и, до_индекса=None,
+                                           свои=tuple(наши) + (подпись_и,))
+                    if пк.get("known"):
+                        з["s0"]["foreign_buys_after"] = пк.get("count")
+                        з["s0"]["s0_possible"] = bool(пк.get("count"))
+                        з["s0"]["examples"] = пк.get("examples")
+                    else:
+                        з["s0"]["why_not"] = пк.get("why_not")
         # НАШЕ МЕСТО В БЛОКЕ -- добор по цепи (задача владельца 25.09 п. 4).
         if з.get("block_index") is None:
             ц = з.get("chain") or {}
             наша_подпись = ц.get("signature") or п.get("lane_signature")
             наш_слот = ц.get("slot") or з.get("our_slot")
             if наша_подпись and isinstance(наш_слот, int):
-                бн = блок(rpc_call, наш_слот, кэш)
-                if бн.get("ok"):
-                    им, вс = _место(бн, наша_подпись)
+                бн = блок(наш_слот)
+                if бн.get("known"):
+                    им = BP.индекс_подписи(бн, наша_подпись)
                     if им is not None:
                         з["block_index"] = им
-                        з["block_total"] = вс
+                        з["block_total"] = бн.get("total")
                         з["block_index_from"] = "цепь"
+                        # Наш слот в таблице -- из цепи, если детектор не записал.
+                        if з.get("our_slot") is None:
+                            з["our_slot"] = наш_слот
+                            их = з.get("source_slot")
+                            if isinstance(их, int):
+                                з["slots_behind"] = наш_слот - их
     return ряды
 
 
