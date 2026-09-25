@@ -329,7 +329,8 @@ def sync_native(account: str) -> Instruction:
 
 def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min_out: int,
               cu_units: int = 200_000, cu_price_micro: int = 0, tip: tuple | None = None,
-              wrap_sol: bool = True, nonce: tuple | None = None) -> dict:
+              wrap_sol: bool = True, nonce: tuple | None = None,
+              tip_first: bool = False) -> dict:
     """Инструкции покупки: compute budget, ATA (идемпотентно), обёртка SOL
     (если котировка WSOL и wrap_sol), своп, tip отдельным параметром
     (адрес, лампорты) -- адрес tip не зашит.
@@ -354,7 +355,20 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
         wsol_ata = ata(user, C.WSOL, mv["quote_program"])
         ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
+    # ЧАЕВЫЕ ПЕРЕД СВОПОМ -- по требованию отправителя. 0slot в письме 25.09:
+    # "инструкцию чаевых ставить в начало транзакции" (он ищет её там). Ставим
+    # сразу после бюджета вычислений и nonce: раньше нельзя -- nonce обязан быть
+    # первой инструкцией по правилу системной программы.
+    def _чаевые_инструкции(tip_):
+        пары_ = (tip_ if isinstance(tip_, (list, tuple)) and tip_
+                 and isinstance(tip_[0], (list, tuple)) else [tip_])
+        return [sol_transfer(payer, а_, int(л_)) for а_, л_ in пары_]
+
+    if tip and tip_first:
+        ixs += _чаевые_инструкции(tip)
     ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
+    if tip and tip_first:
+        tip = None
     if tip:
         # ЧАЕВЫХ МОЖЕТ БЫТЬ НЕСКОЛЬКО. Боевой пул отправителей (слово
         # владельца 25.09) посылает ОДНУ подписанную покупку сразу всеми

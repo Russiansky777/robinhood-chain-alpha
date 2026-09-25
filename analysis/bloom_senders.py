@@ -32,6 +32,7 @@ import json
 import os
 import random
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -199,6 +200,152 @@ def подпись_из_ответа(имя: str, з: dict, ответ) -> tuple
 _ХВОСТ_ЗАПРОСА = re.compile(r"\?[^\s\"\']+")
 
 
+# ------------------------------------------------- тёплые соединения (keep-alive)
+
+# ЗАЧЕМ. Владелец 25.09: "Холодное соединение -- десятки миллисекунд на сделку".
+# Так и было: отправка звала requests.post напрямую, то есть на КАЖДУЮ отправку
+# поднималось новое соединение -- TCP-рукопожатие плюс TLS у всех, кроме 0slot
+# (у него HTTP). На пути сделки это чистая потеря места в блоке.
+#
+# ЧТО ТЕПЕРЬ. Одна сессия requests НА ОТПРАВИТЕЛЯ, живущая всё время работы
+# службы: пул соединений держит канал открытым, и вторая отправка идёт по уже
+# готовому. Сессия греется пингом раз в 20-30 с (слово владельца), потому что
+# сервер закрывает простаивающее соединение: 0slot прямо пишет про таймаут 65 с.
+#
+# ВОЗРАСТ СОЕДИНЕНИЯ -- В ПРИЗНАК ЖИЗНИ. Без него "соединение тёплое" остаётся
+# обещанием: по возрасту видно, поднималось ли оно заново.
+_СЕССИИ: dict = {}
+_ЗАМОК_СЕССИЙ = threading.Lock()
+ПЕРИОД_ПРОГРЕВА_S = 25.0
+# Сколько соединений держать на отправителя. Больше одного нужно веером: пять
+# контролей уходят одновременно, и на одном соединении они встанут в очередь.
+СОЕДИНЕНИЙ_НА_ОТПРАВИТЕЛЯ = 4
+
+
+def сессия(имя: str):
+    """Сессия requests этого отправителя. Одна на весь процесс.
+
+    Создаётся при первой надобности и живёт дальше. Возвращается вместе с
+    состоянием (когда создана, когда последний раз использована) -- это и есть
+    возраст соединения для признака жизни.
+    """
+    with _ЗАМОК_СЕССИЙ:
+        з = _СЕССИИ.get(имя)
+        if з is not None:
+            return з
+        try:
+            import requests  # noqa: PLC0415
+            from requests.adapters import HTTPAdapter  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "why_not": f"requests не загружен: {type(exc).__name__}"}
+        с = requests.Session()
+        # Повторов на уровне адаптера НЕТ намеренно: повтор отправки транзакции
+        # -- это возможная вторая покупка, и решать про повтор имеет право только
+        # денежный путь, а не сетевая библиотека.
+        адаптер = HTTPAdapter(pool_connections=СОЕДИНЕНИЙ_НА_ОТПРАВИТЕЛЯ,
+                              pool_maxsize=СОЕДИНЕНИЙ_НА_ОТПРАВИТЕЛЯ,
+                              max_retries=0)
+        с.mount("https://", адаптер)
+        с.mount("http://", адаптер)
+        с.headers.update({"Connection": "keep-alive"})
+        з = {"ok": True, "session": с, "created": time.time(), "used": None,
+              "pings_ok": 0, "pings_failed": 0, "last_ping": None,
+              "last_error": "", "reopened": 0}
+        _СЕССИИ[имя] = з
+        return з
+
+
+def состояние_соединений(путь: str | None = None) -> dict:
+    """Возраст соединения и счёт пингов по каждому отправителю -- в признак жизни."""
+    сейчас = time.time()
+    из_ = {}
+    with _ЗАМОК_СЕССИЙ:
+        для = dict(_СЕССИИ)
+    for имя, з in для.items():
+        из_[имя] = {
+            "age_s": (round(сейчас - з["created"], 1) if з.get("created") else None),
+            "last_use_s": (round(сейчас - з["used"], 1) if з.get("used") else None),
+            "last_ping_s": (round(сейчас - з["last_ping"], 1)
+                             if з.get("last_ping") else None),
+            "pings_ok": з.get("pings_ok"), "pings_failed": з.get("pings_failed"),
+            "reopened": з.get("reopened"),
+            "last_error": (з.get("last_error") or "")[:120],
+        }
+    # Подключённый отправитель БЕЗ сессии -- это отправитель, у которого
+    # соединение поднимется на первой же сделке. Такое надо видеть.
+    for имя in подключённые(путь):
+        из_.setdefault(имя, {"age_s": None, "note": "сессии ещё нет -- соединение "
+                                                     "поднимется на первой отправке"})
+    return из_
+
+
+def адрес_прогрева(имя: str, з: dict | None = None, путь: str | None = None) -> str:
+    """Куда стучаться для прогрева. Только то, что есть в реестре.
+
+    У 0slot документация прямо даёт /health (письмо 25.09). У остальных пути
+    проверки здоровья в сохранённой документации нет, поэтому греем САМУ точку
+    входа методом GET: соединение от этого открывается, а транзакция не уходит --
+    отправка бывает только POST со sendTransaction.
+    """
+    з = з if з is not None else ((реестр(путь) or {}).get(имя) or {})
+    url = (з.get("url") or "").rstrip("/")
+    if not url:
+        return ""
+    путь_здоровья = з.get("health_path")
+    return f"{url}{путь_здоровья}" if путь_здоровья else url
+
+
+def прогреть(имя: str, *, таймаут: float = 3.0, путь: str | None = None,
+              запрос=None) -> dict:
+    """Один пинг: открыть или подтвердить соединение. Ключ НЕ передаётся.
+
+    Прогрев не несёт ни транзакции, ни ключа: он нужен ровно для того, чтобы
+    соединение было открыто. Ответ сервера может быть любым (404 на GET -- тоже
+    ответ): важно, что канал жив.
+    """
+    из_ = {"sender": имя, "ok": False, "http": None, "ms": None, "why_not": None}
+    з_реестра = (реестр(путь) or {}).get(имя) or {}
+    адрес = адрес_прогрева(имя, з_реестра, путь)
+    if not адрес:
+        из_["why_not"] = f"у {имя} в реестре нет адреса точки входа"
+        return из_
+    с = сессия(имя)
+    if not с.get("ok"):
+        из_["why_not"] = с.get("why_not")
+        return из_
+    t0 = time.perf_counter()
+    try:
+        if запрос is None:
+            от = с["session"].get(адрес, timeout=таймаут)
+            код = от.status_code
+        else:
+            код = запрос(адрес, таймаут)
+    except Exception as exc:  # noqa: BLE001
+        с["pings_failed"] = с.get("pings_failed", 0) + 1
+        с["last_error"] = вычистить_секреты(f"{type(exc).__name__}: {exc}",
+                                             путь=путь)[:160]
+        из_["why_not"] = с["last_error"]
+        из_["ms"] = round((time.perf_counter() - t0) * 1000, 2)
+        return из_
+    с["pings_ok"] = с.get("pings_ok", 0) + 1
+    с["last_ping"] = time.time()
+    из_.update(ok=True, http=код,
+               ms=round((time.perf_counter() - t0) * 1000, 2))
+    return из_
+
+
+def прогреть_всех(*, путь: str | None = None, таймаут: float = 3.0,
+                   запрос=None) -> dict:
+    """Пинг КАЖДОМУ подключённому. Зовётся по расписанию, вне пути сделки."""
+    из_ = {"rows": [], "ok": 0, "failed": 0}
+    for имя in подключённые(путь):
+        с = прогреть(имя, таймаут=таймаут, путь=путь, запрос=запрос)
+        из_["rows"].append(с)
+        из_["ok" if с.get("ok") else "failed"] += 1
+    из_["connections"] = состояние_соединений(путь)
+    return из_
+
+
 def значения_ключей(путь: str | None = None) -> list:
     """Значения всех ключей отправителей из окружения -- чтобы их вычистить.
 
@@ -264,13 +411,24 @@ def отправить_через(имя: str, tx_base64: str, *, отправи
     t0 = time.perf_counter()
     try:
         if отправитель is None:
-            import requests  # noqa: PLC0415
+            # ТЁПЛОЕ СОЕДИНЕНИЕ, А НЕ НОВОЕ НА КАЖДУЮ СДЕЛКУ. requests.post
+            # поднимает соединение заново: TCP-рукопожатие плюс TLS -- десятки
+            # миллисекунд на пути сделки (слово владельца 25.09). Сессия
+            # отправителя живёт весь процесс и греется пингом.
+            с_сессия = сессия(имя)
+            if not с_сессия.get("ok"):
+                из_["why_not"] = с_сессия.get("why_not") or "сессия не создана"
+                return из_
 
             def отправитель(адрес, данные, заг, таймаут_):  # noqa: E306
-                r = requests.post(адрес, json=данные, headers=заг,
-                                  timeout=таймаут_)
+                r = с_сессия["session"].post(адрес, json=данные, headers=заг,
+                                              timeout=таймаут_)
                 return r.status_code, r.text
         код, текст = отправитель(url, тело, заголовки, таймаут)
+        # Отметка использования -- для возраста соединения в признаке жизни.
+        сесс = _СЕССИИ.get(имя)
+        if сесс is not None:
+            сесс["used"] = time.time()
     except Exception as exc:  # noqa: BLE001
         из_["send_ms"] = round((time.perf_counter() - t0) * 1000, 2)
         # Текст исключения может содержать адрес С КЛЮЧОМ в строке запроса.
@@ -353,7 +511,7 @@ def self_test() -> int:
         "amsterdam.mainnet.block-engine.jito.wtf" in (р["jito"]["url"] or "")
         and р["jito"]["url"].endswith("/api/v1/transactions"), р["jito"]["url"])
     chk("Jito не требует ключа, а 0slot и BlockRazor требуют",
-        р["jito"]["key_env"] is None and р["zeroslot"]["key_env"] == "ZEROSLOT_API_KEY"
+        р["jito"]["key_env"] is None and р["zeroslot"]["key_env"] == "ZEROX_API"
         and р["blockrazor"]["key_env"] == "BLOCKRAZOR_AUTH_TOKEN", "")
     chk("восемь счетов чаевых Jito -- ровно те, что в его документации",
         len(р["jito"]["tip_accounts"]) == 8
@@ -365,7 +523,7 @@ def self_test() -> int:
         минимум_чаевых("astralane") == 1_000_000, минимум_чаевых("astralane"))
 
     было = {}
-    for имя_п in ("ZEROSLOT_API_KEY", "BLOCKRAZOR_AUTH_TOKEN", "NOZOMI_API_KEY",
+    for имя_п in ("ZEROX_API", "BLOCKRAZOR_AUTH_TOKEN", "NOZOMI_API_KEY",
                    "ASTRALANE_API_KEY"):
         было[имя_п] = os.environ.pop(имя_п, None)
     try:
@@ -374,7 +532,7 @@ def self_test() -> int:
             связь["connected"] == ["helius", "jito"], связь["connected"])
         chk("у неподключённых названа причина и имя нужного секрета",
             all(н["why_not"] for н in связь["not_connected"])
-            and any(н.get("key_env") == "ZEROSLOT_API_KEY"
+            and any(н.get("key_env") == "ZEROX_API"
                     for н in связь["not_connected"]), связь["not_connected"])
         # NOZOMI. Адрес точки входа появился 25.09: Амстердам ams1 из
         # ОФИЦИАЛЬНОГО endpoints.json пакета nozomi-sdk (файл сохранён в
@@ -422,7 +580,7 @@ def self_test() -> int:
         chk("ключ не попадает ни в url отчёта, ни в саму запись результата",
             "СЕКРЕТ_BR" not in json.dumps(р2, ensure_ascii=False), р2)
 
-        os.environ["ZEROSLOT_API_KEY"] = "СЕКРЕТ_0S"
+        os.environ["ZEROX_API"] = "СЕКРЕТ_0S"
         зовы.clear()
         р3 = отправить_через("zeroslot", "CCCC", отправитель=сендер)
         chk("0slot: ключ идёт в строку запроса, а в отчёте адреса без него",
@@ -496,10 +654,86 @@ def self_test() -> int:
             вычистить_секреты("url: https://x.y/?api-key=секрет", ключи=[]))
         os.environ.pop("NOZOMI_API_KEY", None)
 
+        # --- ТЁПЛЫЕ СОЕДИНЕНИЯ (владелец 25.09: "холодное соединение --
+        # десятки миллисекунд на сделку"; чинить первым). Проверяем то, что
+        # решает скорость: сессия ОДНА и та же, отправка идёт через неё, пинг
+        # её держит, а возраст видно числом.
+        с1 = сессия("jito")
+        с2 = сессия("jito")
+        chk("сессия отправителя одна и та же, а не новая на каждый зов",
+            с1.get("ok") and с1 is с2, (с1.get("ok"), с1 is с2))
+        chk("у разных отправителей сессии РАЗНЫЕ",
+            сессия("helius") is not сессия("jito"), "")
+        # Отправка обязана идти ЧЕРЕЗ сессию: без этого всё остальное -- слова.
+        рабочая = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+        chk("в рабочей части нет requests.post напрямую -- только сессия",
+            "requests.post(" not in рабочая, "requests.post найден")
+        chk("сессия несёт заголовок keep-alive",
+            (с1["session"].headers.get("Connection") or "").lower() == "keep-alive",
+            с1["session"].headers.get("Connection"))
+        # Пинг: сети в самопроверке нет, поэтому запрос подменяем.
+        стук: list = []
+
+        def запрос_п(адрес, таймаут):
+            стук.append(адрес)
+            return 200
+
+        п1 = прогреть("jito", запрос=запрос_п)
+        chk("пинг идёт на точку входа отправителя и считается",
+            п1["ok"] and стук and стук[0].startswith("https://amsterdam"),
+            (п1, стук[:1]))
+        п2 = прогреть("zeroslot", запрос=запрос_п)
+        chk("у 0slot пинг идёт на /health из его письма",
+            п2["ok"] and стук[-1].endswith("/health")
+            and стук[-1].startswith("http://ams1.0slot.trade"), стук[-1:])
+        сост = состояние_соединений()
+        chk("возраст соединения и счёт пингов видны числами",
+            сост.get("jito", {}).get("age_s") is not None
+            and сост["jito"]["pings_ok"] >= 1, сост.get("jito"))
+        # Ошибка пинга не должна ронять прогрев: она считается и называется.
+        def запрос_рвётся(адрес, таймаут):
+            raise TimeoutError("сеть молчит")
+
+        п3 = прогреть("jito", запрос=запрос_рвётся)
+        chk("упавший пинг -- причина и счётчик, а не исключение наружу",
+            п3["ok"] is False and "TimeoutError" in (п3["why_not"] or "")
+            and состояние_соединений()["jito"]["pings_failed"] >= 1, п3)
+        все_п = прогреть_всех(запрос=запрос_п)
+        chk("прогрев обходит ВСЕХ подключённых",
+            все_п["ok"] >= 2 and len(все_п["rows"]) == len(подключённые()),
+            (все_п["ok"], len(все_п["rows"]), подключённые()))
+        chk("в прогреве есть состояние соединений по именам",
+            set(все_п["connections"]) >= set(подключённые()),
+            sorted(все_п["connections"]))
+
+        # --- 0SLOT ИЗ ПИСЬМА ВЛАДЕЛЬЦА 25.09. Это деньги: минимум чаевых,
+        # получатели и адрес точки входа.
+        р0 = реестр()["zeroslot"]
+        chk("0slot: точка входа по HTTP, Амстердам -- как в письме",
+            р0["url"] == "http://ams1.0slot.trade", р0["url"])
+        chk("0slot: минимум чаевых 0.001 SOL, а не 0.0001",
+            минимум_чаевых("zeroslot") == 1_000_000, минимум_чаевых("zeroslot"))
+        chk("0slot: ровно пять счетов чаевых из письма",
+            len(р0["tip_accounts"]) == 5
+            and "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4" in р0["tip_accounts"],
+            р0["tip_accounts"])
+        chk("0slot: адреса из примера кода (Eb2KpSC8) в списке НЕТ",
+            not any(а.startswith("Eb2KpSC8") for а in р0["tip_accounts"]),
+            р0["tip_accounts"])
+        chk("0slot: чаевые ставятся в начало транзакции",
+            р0.get("tip_first") is True, р0.get("tip_first"))
+        chk("0slot: темп 5 вызовов в секунду записан",
+            р0.get("rate_limit_rps") == 5, р0.get("rate_limit_rps"))
+        chk("0slot: известные ошибки названы по именам",
+            set(р0.get("errors_known") or {}) >= {"403 API key has expired",
+                                                   "403 Invalid method",
+                                                   "419 Rate limit exceeded"},
+            sorted(р0.get("errors_known") or {}))
+
         chk("неизвестный отправитель -- отказ, а не отправка куда попало",
             отправить_через("несуществующий", "GGGG",
                              отправитель=сендер)["ok"] is False, "")
-        os.environ.pop("ZEROSLOT_API_KEY", None)
+        os.environ.pop("ZEROX_API", None)
         chk("пропал секрет -- отправитель сразу неподключён",
             отправить_через("zeroslot", "HHHH", отправитель=сендер)["ok"] is False, "")
 

@@ -1,114 +1,142 @@
 {
-  "_описание": "Реестр отправителей транзакций. Все значения -- ИЗ СОХРАНЁННОЙ документации в data/docs/senders/ (её качает прогон run_sender_pool_docs_nl.yml с NL-хоста) или из уже работающего кода полосы. Ничего по памяти: у каждого адреса чаевых и каждого минимума есть цитата в data/sender_pool_candidates.json. Поле key_env -- имя секрета, который заводит ВЛАДЕЛЕЦ; пока секрета нет, отправитель считается неподключённым и в пул не идёт.",
-  "senders": {
-    "helius": {
-      "name": "Helius Sender",
-      "url": "http://ams-sender.helius-rpc.com/fast",
-      "url_note": "регион ams -- тот же, что у работающей полосы (BLOOM_SENDER_REGION)",
-      "format": "jsonrpc_sendTransaction",
-      "key_env": null,
-      "key_in": null,
-      "min_tip_lamports": 1000000,
-      "tip_accounts": [
-        "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
-        "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
-        "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
-        "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
-        "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
-        "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
-        "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
-        "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
-        "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
-        "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or"
-      ],
-      "docs": "data/docs/senders/helius_sender.html"
-    },
-    "jito": {
-      "name": "Jito Block Engine",
-      "url": "https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions",
-      "url_note": "Амстердам из таблицы регионов документации; Франкфурт -- frankfurt.mainnet.block-engine.jito.wtf",
-      "format": "jsonrpc_sendTransaction",
-      "key_env": null,
-      "key_in": null,
-      "min_tip_lamports": 1000,
-      "tip_accounts": [
-        "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
-        "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
-        "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
-        "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
-        "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
-        "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
-        "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
-        "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"
-      ],
-      "docs": "data/docs/senders/jito_low_latency_txn_send.html",
-      "note": "Ключ не нужен (UUID только для повышенных пределов). По З1 именно эти восемь адресов получают чаевые от тех, кто садится в S+0 впереди нас -- по 2 500-6 600 лампортов."
-    },
-    "zeroslot": {
-      "name": "0slot.trade",
-      "url": "https://de.0slot.trade",
-      "url_note": "Франкфурт de.0slot.trade и Амстердам ams.0slot.trade -- из таблицы регионов документации",
-      "format": "jsonrpc_sendTransaction",
-      "key_env": "ZEROSLOT_API_KEY",
-      "key_env_note": "секрета ещё нет (владелец 25.09: запрос в Discord). Проба без ключа 25.09 получила от сервера 403 'api-key does not exist' -- точка входа жива, ждём ключ",
-      "key_in": "query:api-key",
-      "min_tip_lamports": 100000,
-      "tip_accounts": [
-        "6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av",
-        "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
-        "7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK"
-      ],
-      "tip_accounts_note": "в документации их 21; здесь три первых -- полный список лежит в data/sender_pool_candidates.json",
-      "docs": "data/docs/senders/zeroslot_docs.html"
-    },
-    "blockrazor": {
-      "name": "BlockRazor",
-      "url": "http://amsterdam.solana.blockrazor.xyz:443/sendTransaction",
-      "url_note": "Амстердам и Франкфурт -- из таблицы точек входа документации",
-      "format": "blockrazor_sendTransaction",
-      "key_env": "BLOCKRAZOR_AUTH_TOKEN",
-      "key_in": "header:apikey",
-      "key_in_note": "ПОДТВЕРЖДЕНО 25.09 двумя источниками: в документации curl-пример прямо пишет --header 'apikey: $auth_token' (data/docs/senders/blockrazor_curl_example.md), и живая проба с секретом BLOCKRAZOR_AUTH_TOKEN прошла именно этим заголовком: сервер ответил про тело пробы ('illegal transaction'), а на всех остальных схемах и без ключа -- 403 'Authentication information is missing. Please provide a valid auth token'. Платный план не требуется: в документации сказано, что отправка транзакций не привязана к подписке, предел 3 запроса в секунду",
-      "min_tip_lamports": 100000,
-      "tip_accounts": [
-        "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
-        "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG",
-        "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22",
-        "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm"
-      ],
-      "tip_accounts_note": "в документации их 14; полный список -- в data/sender_pool_candidates.json",
-      "docs": "data/docs/senders/blockrazor_solana_priority_fee_and_tip.md"
-    },
-    "nozomi": {
-      "name": "Nozomi (Temporal)",
-      "url": "https://ams1.nozomi.temporal.xyz/",
-      "url_note": "Амстердам (region amsterdam, type direct) из ОФИЦИАЛЬНОГО endpoints.json пакета nozomi-sdk -- файл сохранён в data/docs/senders/nozomi_endpoints.json, скачан с raw.githubusercontent.com/temporalxyz/nozomi-sdk/main/endpoints.json, version 1, updated 2026-01-07. Франкфурт fra2., Лондон lon1. -- оттуда же. Путь запроса из документации: POST /?c=<YOUR_API_KEY>, Content-Type application/json, кодировка base64 задаётся явно",
-      "format": "jsonrpc_sendTransaction",
-      "key_env": "NOZOMI_API_KEY",
-      "key_in": "query:c",
-      "key_in_note": "параметр ?c=<ключ> -- так в документации (страница transaction-submission-json-rpc: 'Path /?c=<YOUR_API_KEY>') и так сказал владелец 25.09",
-      "min_tip_lamports": 1000000,
-      "min_tip_note": "0.001 SOL -- документация Nozomi: 'The default minimum tip is 0.001 SOL. Transactions that tip below the minimum are silently dropped: you will not receive an error'. Поэтому меньше минимума не платим никогда: это не экономия, а молча потерянная транзакция",
-      "tip_accounts": [
-        "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
-        "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",
-        "noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE"
-      ],
-      "tip_accounts_note": "в документации их 17; полный список -- в data/sender_pool_candidates.json",
-      "docs": "data/docs/senders/nozomi_tipping_and_faq.html"
-    },
-    "astralane": {
-      "name": "Astralane",
-      "url": "http://fr.gateway.astralane.io/iris",
-      "url_note": "fr -- Франкфурт, адрес из примера запроса документации",
-      "format": "jsonrpc_sendTransaction",
-      "key_env": "ASTRALANE_API_KEY",
-      "key_in": "query:api-key",
-      "key_in_note": "ПОДТВЕРЖДЕНО живой пробой 25.09: ключ ASTRALANE_API_KEY принят тремя схемами -- заголовок apikey, заголовок x-api-key и строка запроса api-key (сервер жалуется на тело пробы: 'failed to decode transaction only base64 is supported'); Authorization и запрос без ключа -- 401. Оставляем строку запроса: так написано в примере документации",
-      "min_tip_lamports": null,
-      "min_tip_note": "в скачанных страницах минимум числом не нашёлся: сказано только 'каждая транзакция должна содержать tip'. Пока минимум не подтверждён документацией, платим как Helius (0.001 SOL)",
-      "tip_accounts": ["astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm"],
-      "docs": "data/docs/senders/astralane_submit_transactions.html"
-    }
+ "_описание": "Реестр отправителей транзакций. Все значения -- ИЗ СОХРАНЁННОЙ документации в data/docs/senders/ (её качает прогон run_sender_pool_docs_nl.yml с NL-хоста) или из уже работающего кода полосы. Ничего по памяти: у каждого адреса чаевых и каждого минимума есть цитата в data/sender_pool_candidates.json. Поле key_env -- имя секрета, который заводит ВЛАДЕЛЕЦ; пока секрета нет, отправитель считается неподключённым и в пул не идёт.",
+ "senders": {
+  "helius": {
+   "name": "Helius Sender",
+   "url": "http://ams-sender.helius-rpc.com/fast",
+   "url_note": "регион ams -- тот же, что у работающей полосы (BLOOM_SENDER_REGION)",
+   "format": "jsonrpc_sendTransaction",
+   "key_env": null,
+   "key_in": null,
+   "min_tip_lamports": 1000000,
+   "tip_accounts": [
+    "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+    "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
+    "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
+    "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
+    "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
+    "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+    "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
+    "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+    "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+    "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or"
+   ],
+   "docs": "data/docs/senders/helius_sender.html"
+  },
+  "jito": {
+   "name": "Jito Block Engine",
+   "url": "https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions",
+   "url_note": "Амстердам из таблицы регионов документации; Франкфурт -- frankfurt.mainnet.block-engine.jito.wtf",
+   "format": "jsonrpc_sendTransaction",
+   "key_env": null,
+   "key_in": null,
+   "min_tip_lamports": 1000,
+   "tip_accounts": [
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+    "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+    "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+    "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+    "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+    "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"
+   ],
+   "docs": "data/docs/senders/jito_low_latency_txn_send.html",
+   "note": "Ключ не нужен (UUID только для повышенных пределов). По З1 именно эти восемь адресов получают чаевые от тех, кто садится в S+0 впереди нас -- по 2 500-6 600 лампортов."
+  },
+  "zeroslot": {
+   "name": "0slot.trade",
+   "url": "http://ams1.0slot.trade",
+   "url_note": "письмо 0slot 25.09: точки входа по HTTP, НЕ https -- 'так у них быстрее'. Основная ams1.0slot.trade (Амстердам), Франкфурт de1/de2.0slot.trade, Лондон lon1.0slot.trade",
+   "urls_by_region": {
+    "ams": "http://ams1.0slot.trade",
+    "fra": "http://de1.0slot.trade",
+    "fra2": "http://de2.0slot.trade",
+    "lon": "http://lon1.0slot.trade"
+   },
+   "format": "jsonrpc_sendTransaction",
+   "methods_allowed": [
+    "sendTransaction"
+   ],
+   "methods_note": "письмо 0slot: только sendTransaction, другой метод даёт 403 Invalid method",
+   "key_env": "ZEROX_API",
+   "key_env_note": "имя секрета дал владелец 25.09: ZEROX_API",
+   "key_in": "query:api-key",
+   "rate_limit_rps": 5,
+   "rate_limit_note": "письмо 0slot: не более 5 вызовов в секунду, при превышении 419 Rate limit exceeded",
+   "trial_note": "пробный период неделя с 25.09",
+   "min_tip_lamports": 1000000,
+   "min_tip_note": "письмо 0slot: чаевые НЕ МЕНЬШЕ 0.001 SOL (не 0.0001). Ниже минимума транзакция не обрабатывается",
+   "tip_first": true,
+   "tip_first_note": "письмо 0slot: инструкцию чаевых ставить в начало транзакции",
+   "tip_accounts": [
+    "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+    "FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe",
+    "ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13",
+    "6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK",
+    "Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr"
+   ],
+   "tip_accounts_note": "ровно пять счетов из письма 25.09. Адрес Eb2KpSC8 из их примера кода НЕ использовать -- слово владельца",
+   "health_path": "/health",
+   "keepalive_s": 65,
+   "keepalive_note": "письмо 0slot: таймаут соединения 65 с, есть /health -- держать соединение тёплым периодическим запросом",
+   "errors_known": {
+    "403 API key has expired": "ключ истёк",
+    "403 Invalid method": "метод не разрешён",
+    "419 Rate limit exceeded": "превышен темп 5 вызовов в секунду"
+   },
+   "docs": "data/docs/senders/zeroslot_docs.html"
+  },
+  "blockrazor": {
+   "name": "BlockRazor",
+   "url": "http://amsterdam.solana.blockrazor.xyz:443/sendTransaction",
+   "url_note": "Амстердам и Франкфурт -- из таблицы точек входа документации",
+   "format": "blockrazor_sendTransaction",
+   "key_env": "BLOCKRAZOR_AUTH_TOKEN",
+   "key_in": "header:apikey",
+   "key_in_note": "ПОДТВЕРЖДЕНО 25.09 двумя источниками: в документации curl-пример прямо пишет --header 'apikey: $auth_token' (data/docs/senders/blockrazor_curl_example.md), и живая проба с секретом BLOCKRAZOR_AUTH_TOKEN прошла именно этим заголовком: сервер ответил про тело пробы ('illegal transaction'), а на всех остальных схемах и без ключа -- 403 'Authentication information is missing. Please provide a valid auth token'. Платный план не требуется: в документации сказано, что отправка транзакций не привязана к подписке, предел 3 запроса в секунду",
+   "min_tip_lamports": 100000,
+   "tip_accounts": [
+    "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
+    "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG",
+    "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22",
+    "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm"
+   ],
+   "tip_accounts_note": "в документации их 14; полный список -- в data/sender_pool_candidates.json",
+   "docs": "data/docs/senders/blockrazor_solana_priority_fee_and_tip.md"
+  },
+  "nozomi": {
+   "name": "Nozomi (Temporal)",
+   "url": "https://ams1.nozomi.temporal.xyz/",
+   "url_note": "Амстердам (region amsterdam, type direct) из ОФИЦИАЛЬНОГО endpoints.json пакета nozomi-sdk -- файл сохранён в data/docs/senders/nozomi_endpoints.json, скачан с raw.githubusercontent.com/temporalxyz/nozomi-sdk/main/endpoints.json, version 1, updated 2026-01-07. Франкфурт fra2., Лондон lon1. -- оттуда же. Путь запроса из документации: POST /?c=<YOUR_API_KEY>, Content-Type application/json, кодировка base64 задаётся явно",
+   "format": "jsonrpc_sendTransaction",
+   "key_env": "NOZOMI_API_KEY",
+   "key_in": "query:c",
+   "key_in_note": "параметр ?c=<ключ> -- так в документации (страница transaction-submission-json-rpc: 'Path /?c=<YOUR_API_KEY>') и так сказал владелец 25.09",
+   "min_tip_lamports": 1000000,
+   "min_tip_note": "0.001 SOL -- документация Nozomi: 'The default minimum tip is 0.001 SOL. Transactions that tip below the minimum are silently dropped: you will not receive an error'. Поэтому меньше минимума не платим никогда: это не экономия, а молча потерянная транзакция",
+   "tip_accounts": [
+    "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
+    "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",
+    "noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE"
+   ],
+   "tip_accounts_note": "в документации их 17; полный список -- в data/sender_pool_candidates.json",
+   "docs": "data/docs/senders/nozomi_tipping_and_faq.html"
+  },
+  "astralane": {
+   "name": "Astralane",
+   "url": "http://fr.gateway.astralane.io/iris",
+   "url_note": "fr -- Франкфурт, адрес из примера запроса документации",
+   "format": "jsonrpc_sendTransaction",
+   "key_env": "ASTRALANE_API_KEY",
+   "key_in": "query:api-key",
+   "key_in_note": "ПОДТВЕРЖДЕНО живой пробой 25.09: ключ ASTRALANE_API_KEY принят тремя схемами -- заголовок apikey, заголовок x-api-key и строка запроса api-key (сервер жалуется на тело пробы: 'failed to decode transaction only base64 is supported'); Authorization и запрос без ключа -- 401. Оставляем строку запроса: так написано в примере документации",
+   "min_tip_lamports": null,
+   "min_tip_note": "в скачанных страницах минимум числом не нашёлся: сказано только 'каждая транзакция должна содержать tip'. Пока минимум не подтверждён документацией, платим как Helius (0.001 SOL)",
+   "tip_accounts": [
+    "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm"
+   ],
+   "docs": "data/docs/senders/astralane_submit_transactions.html"
   }
+ }
 }

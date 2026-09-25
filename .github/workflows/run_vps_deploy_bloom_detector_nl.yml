@@ -310,19 +310,19 @@ jobs:
         env:
           BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
           ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
-          ZEROSLOT_API_KEY: ${{ secrets.ZEROSLOT_API_KEY }}
+          ZEROX_API: ${{ secrets.ZEROX_API }}
           NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
         run: |
           set -e
           # ПУЛ ОТПРАВИТЕЛЕЙ (владелец 25.09). Имена секретов ровно те, что он
-          # завёл: BLOCKRAZOR_AUTH_TOKEN, ASTRALANE_API_KEY, NOZOMI_API_KEY;
-          # ZEROSLOT_API_KEY появится позже. Ключ, которого нет, в env не
+          # завёл: BLOCKRAZOR_AUTH_TOKEN, ASTRALANE_API_KEY, NOZOMI_API_KEY и
+          # ZEROX_API (0slot, имя дал владелец 25.09). Ключ, которого нет, в env не
           # пишется вовсе: без ключа отправитель считается неподключённым и в
           # пул не идёт -- это честнее, чем пустая переменная.
           #
           # Значение уезжает ТОЛЬКО через stdin: аргументы команды видны в ps,
           # а имя переменной в журнале прогона -- нет вреда.
-          for secret_name in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROSLOT_API_KEY NOZOMI_API_KEY; do
+          for secret_name in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
             secret_value="${!secret_name}"
             if [ -z "$secret_value" ]; then
               echo "$secret_name: не задан -- отправитель останется неподключённым"
