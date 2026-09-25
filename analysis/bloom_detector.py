@@ -4617,7 +4617,34 @@ async def обновлятель(детектор: Детектор, задач�
 
 # ------------------------------------------------------------ самопроверка
 
+def _врем_каталог():
+    """Временный каталог для самопроверки, который не падает на уборке.
+
+    Детектор держит фоновые потоки (часы баланса, разбор в потоке). Поток
+    может дописать файл в каталог состояния ровно в тот момент, когда
+    TemporaryDirectory его удаляет, и тогда уборка роняет процесс с
+    OSError "Directory not empty" ПОСЛЕ того, как все проверки прошли
+    (поймано 25.09 на каталоге s2). На хосте такой выход уронил бы гейт
+    самопроверок (`set -e`) при пройденных проверках -- то есть соврал бы.
+    Ошибку уборки глушим: каталог временный, его подчистит система; сами
+    проверки от этого не становятся слабее.
+    """
+    import tempfile as _tf  # noqa: PLC0415
+
+    try:
+        return _tf.TemporaryDirectory(ignore_cleanup_errors=True)
+    except TypeError:  # python до 3.10 такого ключа не знает
+        return _tf.TemporaryDirectory()
+
+
 def self_test() -> int:
+    # СТРАЖ САМОПРОВЕРОК -- ПЕРВОЙ СТРОКОЙ. 25.09 самопроверки, запущенные на
+    # хосте с боевым окружением, отправили строки с заглушками в БОЕВОЙ чат
+    # владельца. Теперь тест физически не может ни написать в боевой путь, ни
+    # выйти в сеть: страж падает исключением, а не предупреждает.
+    import selftest_guard as _SG  # noqa: PLC0415
+
+    _охрана = _SG.включить()
     проверки = []
 
     def chk(имя, ок, факт=""):
@@ -4853,7 +4880,7 @@ def self_test() -> int:
 
     # 13. решение с настоящим состоянием
     import tempfile  # noqa: PLC0415
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         r = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
         chk("решение -- покупка", r["action"] == "buy", r)
@@ -4886,7 +4913,7 @@ def self_test() -> int:
     chk("свежий курс отдаётся", к.получить() == 200.0, к.значение)
 
     # 15. признак жизни, поколение источников, откат на снимок
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         снимок = Path(d) / "konfig.json"
         снимок.write_text(json.dumps(конфиг, ensure_ascii=False), encoding="utf-8")
         было = os.environ.pop("DBOT_API_KEY", None)
@@ -4932,7 +4959,7 @@ def self_test() -> int:
     # 15b. ветка "решение -- покупка" в обработать(): именно она сломалась
     # молча при переводе ключей на ASCII, потому что её не покрывал ни один
     # тест. Сравнение шло со строкой, которую переименовали в другом месте.
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
 
         class HeliusЗаглушка(Helius):
@@ -5230,7 +5257,7 @@ def self_test() -> int:
     # теста весь стенд опирался бы на непроверенный код: покупка на 0.1
     # SOL у боевого источника должна отсекаться порогом 2, а у тестового --
     # проходить.
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         было = TEST_SOURCES
         globals()["TEST_SOURCES"] = ("ТЕСТ_ОДИН", "ТЕСТ_ДВА")
@@ -5306,7 +5333,7 @@ def self_test() -> int:
 
     # 15c. исполнитель подключён: решение о покупке доходит до него,
     # его падение НЕ валит детектор, а решение всё равно остаётся в журнале
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
 
         class ИсполнительЗаглушка:
@@ -5433,7 +5460,7 @@ def self_test() -> int:
 
     # И сквозная проверка: решение по покупке за стейбл при ПРОТУХШЕМ курсе --
     # покупка, а не UNKNOWN_RATE, и оговорка видна в записи.
-    with tempfile.TemporaryDirectory() as d_к:
+    with _врем_каталог() as d_к:
         st_к = ST.ExecState(base=Path(d_к) / "s", kill=Path(d_к) / "k")
 
         class HeliusТих(Helius):
@@ -5612,7 +5639,7 @@ def self_test() -> int:
         сигнал_из_транзакции(t_чуж, "SRC", подпись="M6")["route"]
         ["intermediate_mints"] == [])
 
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         r = решение(s_через, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=100)
         chk("маршрут через промежуточный -- пропуск", r["action"] == "skip", r)
@@ -5677,7 +5704,7 @@ def self_test() -> int:
     # И ГЛАВНОЕ: ID пула должен доехать ДО ИСПОЛНИТЕЛЯ. Он покупает по
     # decision["source_pool"], а не по сигналу, и именно на этом стыке поле
     # терялось -- восемь покупок стенда ушли по минту при найденном пуле.
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
         rп = решение(s_пул, состояние=stп, трата_sol=2.5, баланс_sol=3.0,
                       текущий_слот=100)
@@ -5766,7 +5793,7 @@ def self_test() -> int:
         без_метки["direct"] is False, без_метки)
 
     # метка расхождения маршрутов
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
 
         class HeliusНашаTx:
@@ -7431,7 +7458,7 @@ def self_test() -> int:
             (s_ж.get("spend_mint"), s_ж.get("spend_ui")))
         chk("и это первый вход по этому минту", s_ж.get("first_entry") is True,
             s_ж.get("first_entry"))
-        with tempfile.TemporaryDirectory() as d:
+        with _врем_каталог() as d:
             stж = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
             # порог стенда 0.05 SOL-эквивалента, курс берём тот же, что в бою
             r_ж = решение(s_ж, состояние=stж, трата_sol=0.069,
@@ -7562,7 +7589,7 @@ def self_test() -> int:
         chk(f"{начало}: при пороге стенда 0.05 это BUY", ок_с is True, (код_с, почему_с))
 
     # 16г. падение разбора не рвёт подписку
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
         детп = Детектор(источники={"SRC": "BATCH-5"}, состояние=stп,
                          курс=КурсSOL(), режим="dry", helius=HeliusЗаглушка())
@@ -7588,7 +7615,7 @@ def self_test() -> int:
             детп.признак_жизни().get("handler_crashes"))
 
     # 17. свежесть баланса: протухший баланс -- это неизвестный баланс
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         st = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "kill")
         det = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
                         helius=Helius(key="нет"), курс=КурсSOL(), режим="dry")
@@ -7600,7 +7627,7 @@ def self_test() -> int:
             det.свежий_баланс() is None, det.свежий_баланс())
 
     # 18. учёт кредитов пишется по службе и не роняет работу
-    with tempfile.TemporaryDirectory() as d:
+    with _врем_каталог() as d:
         было = os.environ.get("BLOOM_STATE_DIR")
         os.environ["BLOOM_STATE_DIR"] = str(Path(d) / "st")
         try:
@@ -7744,7 +7771,7 @@ def self_test() -> int:
         def транзакция(self, подпись, **кв):
             return None
 
-    with _tmp2.TemporaryDirectory() as врем_сл:
+    with _врем_каталог() as врем_сл:
         st_сл = ST.ExecState(base=Path(врем_сл) / "listen",
                               kill=Path(врем_сл) / "listen" / "НЕТ")
         д_сл = Детектор(источники={"SRCL": "BATCH-5"}, состояние=st_сл,
