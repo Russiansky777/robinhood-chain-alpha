@@ -16,6 +16,8 @@ blockrazor (BLOCKRAZOR_AUTH_TOKEN): ключ принят схемой header:ap
 
     query:api-key              http  403  ключ НЕ принят: сервер жалуется на ключ  {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
 
+    query:c                    http  403  ключ НЕ принят: сервер жалуется на ключ  {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
+
     БЕЗ КЛЮЧА                  http  403  ключ НЕ принят: сервер жалуется на ключ  {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
 
 astralane (ASTRALANE_API_KEY): ключ принят схемой header:apikey
@@ -25,7 +27,24 @@ astralane (ASTRALANE_API_KEY): ключ принят схемой header:apikey
     header:x-api-key           http  200  ключ принят: сервер жалуется на тело пробы, не на ключ  {"jsonrpc":"2.0","id":"проба","error":{"code":-32600,"message":"Invalid Request: invalid transaction \"failed to decode transaction only base64 is supported\""}
     query:apikey               http  401  ключ НЕ принят: сервер жалуется на ключ  
     query:api-key              http  200  ключ принят: сервер жалуется на тело пробы, не на ключ  {"jsonrpc":"2.0","id":"проба","error":{"code":-32600,"message":"Invalid Request: invalid transaction \"failed to decode transaction only base64 is supported\""}
+    query:c                    http  401  ключ НЕ принят: сервер жалуется на ключ  
     БЕЗ КЛЮЧА                  http  401  ключ НЕ принят: сервер жалуется на ключ  
+nozomi (NOZOMI_API_KEY): ключ принят схемой query:c
+    header:apikey              http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    header:Authorization       http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    header:Authorization:Bearer http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    header:x-api-key           http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    query:apikey               http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    query:api-key              http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
+    query:c                    http  200  ключ принят: сервер жалуется на тело пробы, не на ключ  {"jsonrpc":"2.0","error":{"code":-32001,"message":"Malformed transaction string"},"id":"проба"}
+    БЕЗ КЛЮЧА                  http  401  ключ НЕ принят: сервер жалуется на ключ  Unauthorized
+
 zeroslot (ZEROSLOT_API_KEY): секрета в окружении нет -- проба без ключа
     БЕЗ КЛЮЧА                  http  403  ключ НЕ принят: сервер жалуется на ключ  {"error":{"code":403,"message":"api-key does not exist"},"id":"1","jsonrpc":"2.0"}
 ```
