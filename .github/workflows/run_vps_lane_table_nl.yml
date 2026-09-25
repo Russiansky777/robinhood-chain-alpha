@@ -61,7 +61,8 @@ jobs:
             --positions /tmp/bloom_state/positions.jsonl \
             --since '${{ inputs.since }}' \
             --out-md data/lane_table.md \
-            --out-json data/lane_table.json | tail -40
+            --out-json data/lane_table.json \
+            --raw-json data/lane_table_raw.json | tail -40
 
       - name: "Коммит таблицы"
         if: always()
@@ -69,7 +70,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/lane_table.md data/lane_table.json 2>/dev/null || true
+          git add data/lane_table.md data/lane_table.json data/lane_table_raw.json 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Polosa: tablitsa pokupok (slot, mesto, kto dovyoz) [automated]"
           for i in 1 2 3 4 5; do

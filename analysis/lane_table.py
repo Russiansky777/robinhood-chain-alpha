@@ -130,6 +130,8 @@ def main() -> int:
     р.add_argument("--since", default="", help="только позиции с этого UTC, например 2026-09-25T15:13")
     р.add_argument("--out-md", default=None)
     р.add_argument("--out-json", default=None)
+    р.add_argument("--raw-json", default=None,
+                    help="полные записи позиций полосы окна (ключей в них нет)")
     а = р.parse_args()
     поз = позиции_из_журнала(а.positions)
     ряд = строки_таблицы(поз, с_utc=а.since)
@@ -142,6 +144,15 @@ def main() -> int:
             f"Позиций в журнале: {len(поз)}; покупок полосы в окне: {len(ряд)}.\n\n"
             + т + "\n", encoding="utf-8")
         print(f"записано: {а.out_md}")
+    if а.raw_json:
+        # ПОЛНЫЕ ЗАПИСИ -- для разбора, когда таблицы мало: почему unsold, что
+        # записал сторож, сколько купили. Ключей в позициях нет вовсе.
+        свои = {к: v for к, v in поз.items()
+                if v.get("lane") == "own_send"
+                and (not а.since or str(v.get("ts_intent_utc") or "") >= а.since)}
+        Path(а.raw_json).write_text(
+            json.dumps(свои, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"записано: {а.raw_json} ({len(свои)} позиций)")
     if а.out_json:
         Path(а.out_json).write_text(
             json.dumps({"since": а.since, "rows": ряд}, ensure_ascii=False, indent=2)
