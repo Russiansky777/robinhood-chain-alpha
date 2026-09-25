@@ -63,8 +63,16 @@ jobs:
           set -e
           set -o pipefail
           mkdir -p /tmp/bloom_state
-          ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/bloom_state/positions.jsonl
-          echo "positions.jsonl: $(wc -c < /tmp/bloom_state/positions.jsonl) байт, строк $(wc -l < /tmp/bloom_state/positions.jsonl)"
+          # РОТАЦИЯ. На хосте logrotate уводит сутки в positions.jsonl.1.gz в
+          # 22:00Z, и текущий файл начинается заново. Если брать только его,
+          # таблица за ночь теряет всё, что было до полуночи по хосту: 25.09 в
+          # 22:25Z это дало "покупок 2" вместо 24. Берём ротированные СНАЧАЛА
+          # (они старше), текущий -- последним: при свёртке по cid последняя
+          # строка правит поля, и порядок обязан быть хронологическим.
+          ssh -n $SSH_OPTS root@$HOST \
+            "for G in \$(ls -tr $STATE_DIR/positions.jsonl.*.gz 2>/dev/null); do zcat \"\$G\"; done; \
+             cat $STATE_DIR/positions.jsonl" > /tmp/bloom_state/positions.jsonl
+          echo "positions.jsonl (с ротированными): $(wc -c < /tmp/bloom_state/positions.jsonl) байт, строк $(wc -l < /tmp/bloom_state/positions.jsonl)"
 
       - name: "Питон с requests (на облачном бегунке его нет в системе)"
         run: |
