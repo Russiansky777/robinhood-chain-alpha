@@ -1,0 +1,171 @@
+name: "Пул отправителей: проба ключей (какую схему ждёт сервер)"
+
+# Владелец 25.09: "Секреты в GitHub, имена ровно такие: NOZOMI_API_KEY,
+# ASTRALANE_API_KEY, BLOCKRAZOR_AUTH_TOKEN... BlockRazor: проверь, какую схему
+# сервер ждёт для этого токена (заголовок apikey или auth token). Если ответ
+# 'нужен платный план' -- доложи текст ответа, не покупать... Если ключ не
+# принимается -- сообщи, какой и с каким ответом сервера."
+#
+# ДЕНЕГ ЭТО НЕ СТОИТ И СТОИТЬ НЕ МОЖЕТ. В тело запроса кладётся строка
+# "ETO_NE_TRANZAKTSIYA!!!": символа '!' нет ни в base64, ни в base58, поэтому
+# ни один сервер не превратит её в транзакцию. Подписи у пробы нет вовсе.
+# Самопроверка модуля проверяет именно это свойство, а не верит на слово.
+#
+# ГДЕ ВЫПОЛНЯЕТСЯ. Свой раннер стоит НА NL-хосте, и сеть у него хостовая:
+# use.temporal.xyz, 0slot.trade, blockrazor и gitbook из штаба недоступны
+# (403 от прокси), а отсюда доступны. Поэтому ssh не нужен -- всё делается
+# на самом раннере.
+#
+# КЛЮЧИ НАРУЖУ НЕ ВЫХОДЯТ. Значение вычищается из каждого ответа сервера
+# (включая регистровые варианты), адрес в отчёт идёт без строки запроса, а
+# перед коммитом отдельный шаг ИЩЕТ значение секрета в готовых файлах и роняет
+# прогон, если нашёл.
+on:
+  workflow_dispatch:
+    inputs:
+      senders:
+        description: "кого пробовать через запятую (blockrazor, astralane, zeroslot, nozomi)"
+        required: false
+        default: "blockrazor,astralane,zeroslot"
+      fetch_docs:
+        description: "'yes' -- дочитать недостающие страницы документации BlockRazor"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: sender-key-probe
+  cancel-in-progress: false
+
+env:
+  OUT_JSON: data/sender_key_probe.json
+  OUT_MD: docs/sender_key_probe.md
+  DOCS: data/docs/senders
+
+jobs:
+  probe:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон с requests (в системе его может не быть)"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/probe_venv"
+            "$RUNNER_TEMP/probe_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/probe_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Самопроверка пробы ДО любого запроса (сеть запрещена стражем)"
+        run: |
+          set -e
+          cd analysis
+          "$PY" sender_key_probe.py --self-test | tail -1
+          "$PY" bloom_senders.py --self-test | tail -1
+
+      - name: "Дочитать страницы документации BlockRazor (публичные, без ключа)"
+        if: ${{ inputs.fetch_docs == 'yes' }}
+        run: |
+          set -e
+          mkdir -p "$DOCS"
+          # Схему для HTTP в сохранённых страницах видно не было: пример с
+          # apikey -- из gRPC. Берём страницу примера curl и страницу про
+          # аутентификацию: если схема названа словами, это ответ из
+          # документации, а не из угадывания.
+          base=https://blockrazor.gitbook.io/blockrazor
+          cat > /tmp/br_docs.txt <<'LIST'
+          blockrazor_curl_example.md|/transaction-submission/transaction-sending/solana/send-transaction/request-example/curl.md
+          blockrazor_go_example.md|/transaction-submission/transaction-sending/solana/send-transaction/request-example/go.md
+          blockrazor_authentication_page.md|/get-started/authentication.md
+          LIST
+          while IFS='|' read -r name path; do
+            [ -n "$name" ] || continue
+            code=$(curl -sS -L --max-time 40 -o /tmp/brd.out -w '%{http_code}' "$base$path" || echo 000)
+            echo "$name -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              cp /tmp/brd.out "$DOCS/$name"
+              echo "  сохранено: $(wc -c < "$DOCS/$name") байт"
+            else
+              printf 'НЕ СКАЧАНО: %s (HTTP %s), время UTC %s\n' "$base$path" "$code" \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$DOCS/$name.why_not.txt"
+            fi
+            rm -f /tmp/brd.out
+          done < /tmp/br_docs.txt
+          # Если схема названа в тексте -- показываем строку как есть.
+          grep -i -n -m 20 -E 'apikey|authorization|auth token|header' \
+            "$DOCS"/blockrazor_curl_example.md "$DOCS"/blockrazor_go_example.md \
+            2>/dev/null | head -20 || echo "слов про заголовок в скачанном нет"
+
+      - name: "Проба ключей: какую схему принимает сервер"
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROSLOT_API_KEY: ${{ secrets.ZEROSLOT_API_KEY }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          # Какие секреты ВООБЩЕ заданы -- по именам, без значений: иначе
+          # "ключ не принят" не отличить от "ключа нет".
+          # Имена переменных оболочки -- только латиницей: bash иначе разбирает
+          # присваивание как команду (проверено 25.09 на прогоне рубильника).
+          for secret_name in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROSLOT_API_KEY NOZOMI_API_KEY; do
+            if [ -n "${!secret_name}" ]; then
+              echo "$secret_name: задан"
+            else
+              echo "$secret_name: НЕ задан"
+            fi
+          done
+          mkdir -p docs data
+          "$PY" analysis/sender_key_probe.py \
+            --senders '${{ inputs.senders }}' \
+            --registry data/senders.json \
+            --out "$OUT_JSON" --out-md "$OUT_MD"
+
+      - name: "ГЕЙТ: значения секретов не попали в файлы отчёта"
+        if: always()
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROSLOT_API_KEY: ${{ secrets.ZEROSLOT_API_KEY }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          # Ищем ЗНАЧЕНИЕ секрета в готовых файлах. Нашли -- файлы удаляем и
+          # роняем прогон: в репозиторий ключ не уедет даже ценой отчёта.
+          bad=0
+          for secret_name in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROSLOT_API_KEY NOZOMI_API_KEY; do
+            secret_value="${!secret_name}"
+            [ -n "$secret_value" ] || continue
+            for out_file in "$OUT_JSON" "$OUT_MD"; do
+              [ -f "$out_file" ] || continue
+              if grep -qF -- "$secret_value" "$out_file"; then
+                echo "СБОЙ: значение $secret_name найдено в $out_file -- удаляю файлы"
+                bad=1
+              fi
+            done
+          done
+          if [ "$bad" = "1" ]; then rm -f "$OUT_JSON" "$OUT_MD"; exit 1; fi
+          echo "ни одного значения секрета в отчёте нет"
+
+      - name: "Коммит отчёта и дочитанной документации"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$DOCS" "$OUT_JSON" "$OUT_MD" 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pul otpraviteley: proba klyuchey, otvety servera [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
