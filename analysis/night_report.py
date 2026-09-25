@@ -123,6 +123,142 @@ def боевое_полоса(позиции: dict) -> dict:
                       for п in sorted(свои, key=lambda x: x.get("ts_intent") or 0)]}
 
 
+def слоты_и_места(позиции: dict) -> dict:
+    """Доли S+0/S+1/S+2 и медиана места в блоке -- ПО КАЖДОМУ исполнителю.
+
+    Владелец просил это в ночном докладе отдельно по Bloom и по полосе: одна
+    общая доля спрятала бы разницу между покупкой за 0.2 SOL и замером за
+    0.01 SOL. Отставание считается от слота ИСТОЧНИКА -- он и есть ноль.
+    """
+    из_: dict = {}
+    for имя, отбор in (("bloom", lambda п: not п.get("lane")),
+                        ("lane", lambda п: bool(п.get("lane")))):
+        свои = [п for п in позиции.values() if отбор(п)]
+        отставания = []
+        места, доли_места = [], []
+        for п in свои:
+            их = п.get("source_slot")
+            наш = п.get("our_slot") or п.get("own_tx_seen_slot")
+            if isinstance(их, int) and isinstance(наш, int):
+                отставания.append(наш - их)
+            и, всего = п.get("block_index"), п.get("block_total")
+            if isinstance(и, int):
+                места.append(и)
+                if isinstance(всего, int) and всего > 0:
+                    доли_места.append(round(и / всего, 4))
+        сколько = len(отставания)
+
+        def доля(н):
+            if not сколько:
+                return None
+            if н == "3+":
+                return round(len([о for о in отставания if о >= 3]) / сколько, 4)
+            return round(len([о for о in отставания if о == н]) / сколько, 4)
+
+        из_[имя] = {"positions": len(свои), "with_slots": сколько,
+                    "share_s0": доля(0), "share_s1": доля(1), "share_s2": доля(2),
+                    "share_s3plus": доля("3+"),
+                    "slots_behind_median": _мед(отставания),
+                    "block_index_median": _мед(места),
+                    "block_share_median": _мед(доли_места),
+                    "with_block_place": len(места)}
+    return из_
+
+
+def итог_по_цепи(позиции: dict) -> dict:
+    """Итог в SOL и В ПРОЦЕНТАХ от вложенного -- по каждому исполнителю.
+
+    Проценты считаются от СУММЫ ВХОДОВ тех сделок, у которых итог известен:
+    делить известный итог на все входы значило бы разбавить его теми, чей
+    итог мы посчитать не смогли. Пары с пометкой "итог несчитаем" не идут ни
+    в числитель, ни в знаменатель -- и их число названо отдельно.
+    """
+    из_: dict = {}
+    for имя, отбор in (("bloom", lambda п: not п.get("lane")),
+                        ("lane", lambda п: bool(п.get("lane")))):
+        вход = итог = 0.0
+        считанных = несчитаемых = 0
+        for п in (x for x in позиции.values() if отбор(x)):
+            if п.get("result_uncountable"):
+                несчитаемых += 1
+                continue
+            вх = п.get("sol_in")
+            наз = (п.get("closed_sol_net")
+                   if п.get("closed_sol_net") is not None
+                   else (п.get("last_sell_outcome") or {}).get("sol_delta_net"))
+            if вх and наз is not None:
+                вход += float(вх)
+                итог += float(наз) - float(вх)
+                считанных += 1
+        из_[имя] = {"trades_counted": считанных, "uncountable": несчитаемых,
+                    "sol_in_total": round(вход, 9) if считанных else None,
+                    "pnl_sol": round(итог, 9) if считанных else None,
+                    "pnl_pct": (round(итог / вход * 100.0, 3)
+                                 if считанных and вход else None)}
+    return из_
+
+
+def запасной_канал(решения: list, признак: dict) -> dict:
+    """Сколько времени детектор жил на запасном logsSubscribe.
+
+    Два источника и оба честные: строки журнала решений (stage=ws_*, они
+    появились 25.09) и счётчики признака жизни. Если они расходятся -- в
+    докладе видно и то и другое, а не одно "правильное".
+    """
+    переходы = [р for р in решения if р.get("stage") == "ws_fallback"]
+    возвраты = [р for р in решения if р.get("stage") == "ws_return"]
+    обрывы = [р for р in решения if р.get("stage") == "ws_break"]
+    часы = [р for р in решения if р.get("stage") == "ws_hour"]
+    секунд = sum(float(в.get("fallback_seconds") or 0) for в in возвраты)
+    по_причинам: dict = {}
+    for о in обрывы:
+        к = о.get("reason") or "не названа"
+        по_причинам[к] = по_причинам.get(к, 0) + 1
+    доли_часов = [ч.get("share") for ч in часы if ч.get("share") is not None]
+    из_ = {"switches": len(переходы), "returns": len(возвраты),
+           "breaks": len(обрывы), "fallback_seconds": round(секунд, 1),
+           "by_reason": dict(sorted(по_причинам.items(), key=lambda п: -п[1])),
+           "hour_rows": len(часы),
+           "hour_share_max": (max(доли_часов) if доли_часов else None),
+           "hour_share_median": _мед(доли_часов)}
+    из_["heartbeat"] = (признак.get("fallback") or {}) if isinstance(признак, dict) else {}
+    return из_
+
+
+def контроли_доставки(позиции: dict, решения: list) -> dict:
+    """З2: пары "покупка против пустого контроля" -- медианы и вывод.
+
+    Вывод словами делается по ТОМУ ЖЕ правилу, что в детекторе: контроль
+    заметно быстрее покупки -- дело в очереди к пулу; не быстрее -- в пути.
+    """
+    пары = [п for п in позиции.values()
+            if п.get("lane") and п.get("control_send_to_seen_ms") is not None]
+    покупки = [п.get("lane_send_to_seen_ms") for п in пары]
+    контроли = [п.get("control_send_to_seen_ms") for п in пары]
+    сводки = [р for р in решения if р.get("stage") == "lane_control_summary"]
+    мп, мк = _мед(покупки), _мед(контроли)
+    разница = (round(float(мп) - float(мк), 2)
+                if мп is not None and мк is not None else None)
+    вывод = "—"
+    if разница is not None:
+        вывод = ("ОЧЕРЕДЬ К ПУЛУ: контроль садится заметно быстрее" if разница > 50
+                  else ("ПУТЬ: контроль не быстрее покупки" if разница <= 15
+                        else "ПОПОЛАМ: разница есть, но небольшая"))
+    return {"pairs": len(пары), "buy_deliver_ms_median": мп,
+            "control_deliver_ms_median": мк, "delta_ms": разница,
+            "verdict": вывод, "summaries_sent": len(сводки),
+            "rows": [{"cid": п.get("client_order_id"),
+                       "buy_ms": п.get("lane_send_to_seen_ms"),
+                       "control_ms": п.get("control_send_to_seen_ms"),
+                       "buy_slot": п.get("own_tx_seen_slot"),
+                       "control_slot": п.get("control_seen_slot"),
+                       "buy_block_index": п.get("block_index"),
+                       "control_block_index": п.get("control_block_index"),
+                       "after_buy_ms": п.get("control_after_buy_ms"),
+                       "control_why_not": п.get("control_why_not")}
+                      for п in sorted(пары, key=lambda x: x.get("ts_intent") or 0)]}
+
+
 def боевое_пары(позиции: dict) -> dict:
     """Пары "Bloom против нашей": кто раньше и на сколько."""
     пары = []
@@ -366,6 +502,12 @@ def собрать(*, state_dir: Path, data_dir: Path, since_utc: str) -> dict:
         "positions": len(позиции),
         "lane": боевое_полоса(позиции),
         "lane_attempts": боевое_полоса_попытки(решения),
+        # ПО КАЖДОМУ ИСПОЛНИТЕЛЮ отдельно (владелец, ночной доклад 25.09):
+        # доли S+0/S+1/S+2, медиана места в блоке и итог в SOL и процентах.
+        "slots": слоты_и_места(позиции),
+        "chain_pnl": итог_по_цепи(позиции),
+        "fallback": запасной_канал(решения, признак),
+        "controls": контроли_доставки(позиции, решения),
         "pairs": боевое_пары(позиции),
         "shadow": боевое_тень(решения),
         "skips": боевое_пропуски(решения),
@@ -448,6 +590,43 @@ def в_текст(о: dict) -> str:
         f"**Пары «Bloom против нашей».** Пар {ч(п.get('count'))}, из них мы раньше "
         f"{ч(п.get('we_were_earlier'))}; медиана разницы "
         f"{ч(п.get('delta_ms_median'), ' мс')} (плюс -- мы раньше).",
+        "",
+        # ПО КАЖДОМУ ИСПОЛНИТЕЛЮ: слоты, места и итог. Владелец просил именно
+        # так -- общая доля спрятала бы разницу между 0.2 SOL и 0.01 SOL.
+        "**Слоты и места в блоке.**",
+        ("| исполнитель | сделок со слотами | S+0 | S+1 | S+2 | S+3 и дальше | "
+          "медиана отставания | медиана места | медиана доли места |"),
+        "|---|---|---|---|---|---|---|---|---|",
+        *[f"| {имя} | {ч(з.get('with_slots'))} | {ч(з.get('share_s0'))} | "
+          f"{ч(з.get('share_s1'))} | {ч(з.get('share_s2'))} | "
+          f"{ч(з.get('share_s3plus'))} | {ч(з.get('slots_behind_median'))} | "
+          f"{ч(з.get('block_index_median'))} | {ч(з.get('block_share_median'))} |"
+          for имя, з in (о.get("slots") or {}).items()],
+        "",
+        "**Итог по цепи.**",
+        "| исполнитель | сделок в счёте | итог, SOL | итог, % от вложенного | "
+        "итог несчитаем |",
+        "|---|---|---|---|---|",
+        *[f"| {имя} | {ч(з.get('trades_counted'))} | {ч(з.get('pnl_sol'))} | "
+          f"{ч(з.get('pnl_pct'), ' %')} | {ч(з.get('uncountable'))} |"
+          for имя, з in (о.get("chain_pnl") or {}).items()],
+        "",
+        # ЗАПАСНОЙ КАНАЛ -- отдельной строкой: 25.09 он съедал 31 % времени.
+        (lambda з: f"**Запасной канал logsSubscribe.** Переходов {ч(з.get('switches'))}, "
+                    f"возвратов {ч(з.get('returns'))}, обрывов {ч(з.get('breaks'))}; "
+                    f"на запасном {ч(з.get('fallback_seconds'), ' с')}; "
+                    f"наибольшая доля за час {ч(з.get('hour_share_max'))}; "
+                    f"по причинам: "
+                    + (json.dumps(з.get("by_reason") or {}, ensure_ascii=False))
+                    + ". По счётчикам службы: "
+                    + json.dumps(з.get("heartbeat") or {}, ensure_ascii=False)[:300]
+                    + ".")(о.get("fallback") or {}),
+        "",
+        (lambda з: f"**Контроль доставки (З2).** Пар с контролем {ч(з.get('pairs'))}; "
+                    f"медиана доставки покупки {ч(з.get('buy_deliver_ms_median'), ' мс')}, "
+                    f"контроля {ч(з.get('control_deliver_ms_median'), ' мс')}; "
+                    f"разница {ч(з.get('delta_ms'), ' мс')} -> {з.get('verdict') or '—'}."
+                    )(о.get("controls") or {}),
         "",
         f"**Тень.** Записей {ч(т.get('total'))}, по вердиктам: "
         f"{json.dumps(т.get('by_verdict') or {}, ensure_ascii=False)}. "
@@ -671,6 +850,60 @@ def self_test() -> int:
         chk("в тексте есть все четыре раздела владельца",
             all(с in текст for с in ("## 1. Боевое", "P1 (тень против Bloom)",
                                       "Что из данных НЕ следует")), текст[:200])
+
+        # --- НОВЫЕ РАЗДЕЛЫ ДОКЛАДА (владелец, ночной доклад 25.09): слоты и места
+        # по каждому исполнителю, итог в процентах, запасной канал, контроли.
+        поз_сл = {
+            "b1": {"source_slot": 100, "our_slot": 100, "block_index": 500,
+                    "block_total": 1000, "sol_in": 0.2, "closed_sol_net": 0.22},
+            "b2": {"source_slot": 200, "our_slot": 202, "block_index": 100,
+                    "block_total": 1000, "sol_in": 0.2, "closed_sol_net": 0.18},
+            "l1": {"lane": "own_send", "source_slot": 300, "own_tx_seen_slot": 301,
+                    "block_index": 57, "block_total": 1059, "sol_in": 0.01,
+                    "closed_sol_net": 0.004, "control_send_to_seen_ms": 180.0,
+                    "lane_send_to_seen_ms": 700.0, "control_seen_slot": 301},
+            "l2": {"lane": "own_send", "source_slot": 400, "own_tx_seen_slot": 401,
+                    "sol_in": 0.01, "result_uncountable": True},
+        }
+        сл = слоты_и_места(поз_сл)
+        chk("доли слотов считаются отдельно по Bloom и по полосе",
+            сл["bloom"]["share_s0"] == 0.5 and сл["bloom"]["share_s2"] == 0.5
+            and сл["lane"]["share_s1"] == 1.0, сл)
+        chk("медиана места в блоке и его доли посчитаны",
+            сл["bloom"]["block_index_median"] == 300 and сл["lane"]["block_index_median"] == 57,
+            сл)
+        пнл = итог_по_цепи(поз_сл)
+        chk("итог в SOL и в процентах от вложенного, несчитаемые отдельно",
+            abs(пнл["bloom"]["pnl_sol"] - 0.0) < 1e-9
+            and пнл["bloom"]["pnl_pct"] == 0.0
+            and abs(пнл["lane"]["pnl_sol"] + 0.006) < 1e-9
+            and пнл["lane"]["uncountable"] == 1
+            and пнл["lane"]["trades_counted"] == 1, пнл)
+        chk("несчитаемая пара не попала ни в числитель, ни в знаменатель",
+            пнл["lane"]["sol_in_total"] == 0.01, пнл["lane"])
+        зап = запасной_канал([
+            {"stage": "ws_fallback"}, {"stage": "ws_return", "fallback_seconds": 130.0},
+            {"stage": "ws_break", "reason": "таймаут пинга (наша сторона ждала ответа)"},
+            {"stage": "ws_hour", "share": 0.2}, {"stage": "ws_hour", "share": 0.05},
+        ], {"fallback": {"switches_total": 1}})
+        chk("запасной канал: переходы, секунды, причины и наибольшая доля за час",
+            зап["switches"] == 1 and зап["fallback_seconds"] == 130.0
+            and зап["hour_share_max"] == 0.2
+            and зап["by_reason"]["таймаут пинга (наша сторона ждала ответа)"] == 1, зап)
+        ктр = контроли_доставки(поз_сл, [{"stage": "lane_control_summary"}])
+        chk("контроль доставки: медианы и вывод словами",
+            ктр["pairs"] == 1 and ктр["buy_deliver_ms_median"] == 700.0
+            and ктр["control_deliver_ms_median"] == 180.0
+            and ктр["delta_ms"] == 520.0 and "ОЧЕРЕДЬ" in ктр["verdict"], ктр)
+        текст_н = в_текст({**собрать(state_dir=Path("/нет"), data_dir=Path("/нет"),
+                                      since_utc="2026-09-25T00:00:00Z"),
+                            "slots": сл, "chain_pnl": пнл, "fallback": зап,
+                            "controls": ктр})
+        chk("новые разделы печатаются с числами",
+            all(с in текст_н for с in ("Слоты и места в блоке", "Итог по цепи",
+                                        "Запасной канал logsSubscribe",
+                                        "Контроль доставки (З2)", "ОЧЕРЕДЬ")),
+            текст_н[:200])
         chk("прочерк в тексте стоит там, где числа нет",
             "—" in в_текст(собрать(state_dir=дата, data_dir=дата,
                                     since_utc="2026-09-24T00:00:00Z")), "")
