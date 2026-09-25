@@ -120,7 +120,8 @@ def в_цели(з: dict, голова: int = 100) -> str:
     return f"нет (S+{о})"
 
 
-def проверить_по_цепи(ряды: list, позиции: dict, rpc_call) -> list:
+def проверить_по_цепи(ряды: list, позиции: dict, rpc_call,
+                       кошелёк: str | None = None) -> list:
     """Что с этими покупками В ЦЕПИ: села ли подпись и держим ли токен.
 
     ЗАЧЕМ. Позиция в состоянии unsold без полей цепи (нет chain_ok, нет слота,
@@ -163,7 +164,11 @@ def проверить_по_цепи(ряды: list, позиции: dict, rpc_c
                                status=зн.get("confirmationStatus"))
         # ДЕРЖИМ ЛИ ТОКЕН. Это и есть ответ "лежат ли деньги в минте".
         минт = п.get("mint")
-        кош = п.get("wallet") or п.get("lane_wallet")
+        # КОШЕЛЁК ПОЛОСЫ ЗАДАЁТСЯ СНАРУЖИ. В поле wallet записи позиции лежит
+        # адрес ИСПОЛНИТЕЛЯ (его пишет write_intent всем позициям подряд), и
+        # проверка токенов по нему смотрела не тот кошелёк: получалось "токенов
+        # 0, счетов 0" при живой покупке.
+        кош = кошелёк or п.get("lane_wallet") or п.get("wallet")
         if минт and кош:
             try:
                 тк = rpc_call("getTokenAccountsByOwner",
@@ -215,6 +220,8 @@ def main() -> int:
     р.add_argument("--since", default="", help="только позиции с этого UTC, например 2026-09-25T15:13")
     р.add_argument("--out-md", default=None)
     р.add_argument("--out-json", default=None)
+    р.add_argument("--wallet", default=None,
+                    help="кошелёк полосы для проверки токенов (в позиции лежит адрес исполнителя)")
     р.add_argument("--chain", action="store_true",
                     help="проверить по цепи: села ли подпись и держим ли токен")
     р.add_argument("--raw-json", default=None,
@@ -231,7 +238,7 @@ def main() -> int:
             от = клиент.call(метод, параметры)
             return от.get("result") if isinstance(от, dict) and "result" in от else от
 
-        ряд = проверить_по_цепи(ряд, поз, зов)
+        ряд = проверить_по_цепи(ряд, поз, зов, кошелёк=а.wallet)
     т = таблица(ряд)
     print(f"позиций в журнале: {len(поз)}, покупок полосы в окне: {len(ряд)}")
     print(т)

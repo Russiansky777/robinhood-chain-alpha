@@ -476,7 +476,8 @@ class ExecState:
                       program: str | None, taxed: bool | None, tax_bps: int | None,
                       mode: str, sell_after_s: float,
                       lane: str | None = None,
-                      lane_group: str | None = None) -> dict:
+                      lane_group: str | None = None,
+                      lane_wallet: str | None = None) -> dict:
         """Намерение купить -- НА ДИСК ДО отправки запроса.
 
         Если запрос уйдёт и служба упадёт до записи ответа, позиция всё
@@ -490,7 +491,12 @@ class ExecState:
                 "sell_after_s": sell_after_s,
                 "ts_intent": time.time(),
                 "ts_intent_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "wallet": EXECUTOR_WALLET}
+                # КОШЕЛЁК ПОЗИЦИИ. У покупок Bloom это кошелёк исполнителя, у
+                # полосы -- её СВОЙ кошелёк, если он задан. Писать всем подряд
+                # адрес исполнителя значит врать в записи: разбор по цепи
+                # (токены, баланс) пойдёт не по тому кошельку -- так и вышло
+                # 25.09 при проверке трёх покупок полосы.
+                "wallet": (lane_wallet or EXECUTOR_WALLET)}
         # Метка полосы пишется ТОЛЬКО когда она есть: у покупок Bloom поля
         # lane нет вовсе, и сравнение p.get("lane") == МЕТКА_ПОЛОСЫ у них
         # ложно без всяких оговорок.
