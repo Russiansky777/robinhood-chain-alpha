@@ -75,7 +75,7 @@ jobs:
             set -a; . $ENV_DIR/env; set +a
             cd $CODE_DIR
             sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
-              BLOOM_LANE_WALLET=\$BLOOM_LANE_WALLET \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
               PYTHONPATH=$CODE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python lane_nonce.py
           " | tee data/lane_nonce_state.txt || echo "аккаунта nonce ещё нет (это ожидаемо до создания)"
@@ -90,7 +90,8 @@ jobs:
             set -a; . $ENV_DIR/env; set +a
             cd $CODE_DIR
             sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
-              BLOOM_LANE_WALLET=\$BLOOM_LANE_WALLET \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
+              OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
               EXEC_WALLET_KEY=\$EXEC_WALLET_KEY \
               BLOOM_WALLET_KEY=\$BLOOM_WALLET_KEY \
               PYTHONPATH=$CODE_DIR \
@@ -108,8 +109,8 @@ jobs:
           # полосы с хоста, потом считаем адрес nonce локально. Вложенная
           # подстановка внутри аргумента ssh -- ровно тот класс, на котором
           # деплой падал трижды 25.09.
-          LANE_WALLET=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; printf %s \$BLOOM_LANE_WALLET")
-          [ -n "$LANE_WALLET" ] || { echo "СБОЙ: BLOOM_LANE_WALLET на хосте пуст"; exit 1; }
+          LANE_WALLET=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; printf %s \$OWN_SEND_WALLET")
+          [ -n "$LANE_WALLET" ] || { echo "СБОЙ: OWN_SEND_WALLET на хосте пуст"; exit 1; }
           echo "кошелёк полосы: $LANE_WALLET"
           NONCE=$(python3 analysis/lane_nonce.py --address-only --wallet "$LANE_WALLET" | python3 -c "import json,sys; print(json.loads(sys.stdin.read().strip().split(chr(10))[0])['address'])")
           echo "адрес nonce: $NONCE"
