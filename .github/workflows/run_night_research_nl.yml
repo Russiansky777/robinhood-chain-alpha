@@ -42,6 +42,10 @@ on:
         description: "'yes' -- добрать по цепи выходы лидера (E) и кошельки площадки (G1)"
         required: false
         default: "no"
+      exit_max_tx:
+        description: "skolko tranzaktsiy lidera smotret v E (1 -- prakticheski otklyuchit, chtoby kredity dostalis G1)"
+        required: false
+        default: ""
       credit_limit:
         description: "предел кредитов Helius на КАЖДЫЙ прогон по цепи"
         required: false
@@ -191,7 +195,7 @@ jobs:
           git fetch -q origin claude/c2-hedge-analysis
           git show origin/claude/c2-hedge-analysis:data/crowd_metric_2026-09-24.json > /tmp/night_state/crowd_metric.json
           git show origin/claude/c2-hedge-analysis:data/c2_block_position_2026-09-24.json > /tmp/night_state/followers.json
-          "$PY" analysis/night_leader_stonkfun.py --chain --crowd /tmp/night_state/crowd_metric.json --credit-limit "${{ inputs.credit_limit }}" --state-dir /tmp/night_state --out data/night_leader.json 2>&1 | tail -50
+          "$PY" analysis/night_leader_stonkfun.py --chain --crowd /tmp/night_state/crowd_metric.json --credit-limit "${{ inputs.credit_limit }}" --state-dir /tmp/night_state ${{ inputs.exit_max_tx != '' && format('--exit-max-tx {0}', inputs.exit_max_tx) || '' }} --out data/night_leader.json 2>&1 | tail -50
 
       - name: "Утренний доклад: файл и JSON"
         run: |
