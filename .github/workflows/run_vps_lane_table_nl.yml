@@ -4,8 +4,14 @@ name: "Полоса: таблица покупок (слот, место, кто
 # источника, место в блоке, кто довёз, время от сигнала до посадки. Таблицей."
 #
 # ПРОГОН ТОЛЬКО ЧИТАЕТ. Копия журнала позиций с хоста, разбор локальным модулем
-# analysis/lane_table.py, таблица в data/. Ни одной записи на хост, ни одной
-# покупки, ни одного обращения к DBot.
+# analysis/lane_table.py, таблица в data/ и (по входу) одним сообщением в
+# Telegram. Ни одной записи на хост, ни одной покупки, ни одного обращения к
+# DBot.
+#
+# ИДЁТ С ОБЛАЧНОГО БЕГУНКА, а не со своего на хосте. Причина простая: свой
+# бегунок занимают долгие замеры (зонд BAM держит его два часа), и часовая
+# таблица вставала бы в очередь за ними. Хост читается по внешнему адресу тем
+# же ключом VPS_SSH_KEY.
 on:
   workflow_dispatch:
     inputs:
@@ -13,18 +19,26 @@ on:
         description: "только покупки с этого UTC (например 2026-09-25T15:13)"
         required: false
         default: ""
+      telegram:
+        description: "'yes' -- послать таблицу в основной чат владельца (по умолчанию yes)"
+        required: false
+        default: "yes"
+      telegram_rows:
+        description: "сколько последних покупок в сообщении Telegram"
+        required: false
+        default: "12"
 
 concurrency:
   group: lane-table
   cancel-in-progress: false
 
 env:
-  HOST: 127.0.0.1
+  HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
 
 jobs:
   table:
-    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
@@ -52,9 +66,22 @@ jobs:
           ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/bloom_state/positions.jsonl
           echo "positions.jsonl: $(wc -c < /tmp/bloom_state/positions.jsonl) байт, строк $(wc -l < /tmp/bloom_state/positions.jsonl)"
 
+      - name: "Питон с requests (на облачном бегунке его нет в системе)"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/tbl_venv"
+            "$RUNNER_TEMP/tbl_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/tbl_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
       - name: "Таблица покупок полосы"
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           set -e
           set -o pipefail
@@ -63,12 +90,17 @@ jobs:
           # адрес ИСПОЛНИТЕЛЯ, и проверка токенов по нему смотрит не туда.
           LANE_WALLET=$(ssh -n $SSH_OPTS root@$HOST "set -a; . /etc/bloom-executor/env; set +a; printf %s \$OWN_SEND_WALLET")
           echo "кошелёк полосы: $LANE_WALLET"
-          python3 analysis/lane_table.py \
+          TG=""
+          if [ "${{ inputs.telegram }}" = "yes" ]; then
+            [ -n "$TELEGRAM_BOT_TOKEN" ] || { echo "СБОЙ: TELEGRAM_BOT_TOKEN пуст, а таблицу просили в чат"; exit 1; }
+            TG="--telegram --telegram-rows ${{ inputs.telegram_rows }}"
+          fi
+          "$PY" analysis/lane_table.py \
             --positions /tmp/bloom_state/positions.jsonl \
             --since '${{ inputs.since }}' --chain --wallet "$LANE_WALLET" \
             --out-md data/lane_table.md \
             --out-json data/lane_table.json \
-            --raw-json data/lane_table_raw.json | tail -40
+            --raw-json data/lane_table_raw.json $TG | tail -45
 
       - name: "Коммит таблицы"
         if: always()

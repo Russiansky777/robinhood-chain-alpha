@@ -105,7 +105,12 @@ def _токен_словами(з: dict) -> str:
     return f"{ц['token_ui']} (счетов {ц.get('token_accounts')})"
 
 
-def в_цели(з: dict, голова: int = 100) -> str:
+# ГОЛОВА БЛОКА -- одно написание на репозиторий: цель владельца 25.09 это
+# "S+0 в любом месте ИЛИ голова S+1 (место <= 100)".
+ГОЛОВА_БЛОКА = 100
+
+
+def в_цели(з: dict, голова: int = ГОЛОВА_БЛОКА) -> str:
     """Цель владельца 25.09: S+0 в любом месте ИЛИ голова S+1 (место <= 100)."""
     о = з.get("slots_behind")
     м = з.get("block_index")
@@ -337,6 +342,84 @@ def таблица(ряд: list) -> str:
     return "\n".join(ряды)
 
 
+def сводка(ряды: list, голова: int = ГОЛОВА_БЛОКА) -> dict:
+    """Числа для сводки: доля S+0, доля в цели, по отправителям.
+
+    Владелец 25.09 (вечер): "При 30 сделках -- сводка: доля S+0, доля «в цели»,
+    по отправителям". Доли считаются от СУДИМЫХ сделок: покупка, у которой слот
+    неизвестен, в знаменатель не идёт -- иначе доля падала бы от незнания, а не
+    от медленной доставки.
+    """
+    судимых = [з for з in ряды if з.get("slots_behind") is not None]
+    s0 = [з for з in судимых if з["slots_behind"] == 0]
+    в_цель = [з for з in судимых
+              if з["slots_behind"] == 0
+              or (з["slots_behind"] == 1 and isinstance(з.get("block_index"), int)
+                  and з["block_index"] <= голова)]
+    по_отправителям: dict = {}
+    for з in ряды:
+        кто = з.get("winner") or "неизвестно"
+        д = по_отправителям.setdefault(кто, {"всего": 0, "s0": 0, "в_цели": 0})
+        д["всего"] += 1
+        if з.get("slots_behind") == 0:
+            д["s0"] += 1
+        if з in в_цель:
+            д["в_цели"] += 1
+    возможен = [з for з in ряды if (з.get("s0") or {}).get("s0_possible") is True]
+    return {"покупок": len(ряды), "судимых": len(судимых),
+             "s0": len(s0), "в_цели": len(в_цель),
+             "доля_s0": (round(len(s0) / len(судимых), 4) if судимых else None),
+             "доля_в_цели": (round(len(в_цель) / len(судимых), 4) if судимых else None),
+             "s0_был_возможен": len(возможен),
+             "по_отправителям": по_отправителям}
+
+
+def строка_телеграма(ряды: list, *, с_utc: str = "", строк: int = 12) -> str:
+    """Таблица полосы одним сообщением. Ключей в тексте нет и быть не может.
+
+    Telegram режет сообщение по 4096 знаков, поэтому в текст идут ПОСЛЕДНИЕ
+    строк покупок, а сколько осталось за кадром -- сказано числом: тихо
+    обрезанная таблица читалась бы как полная.
+    """
+    с = сводка(ряды)
+    из_ = [f"ПОЛОСА: покупок {с['покупок']} с {с_utc or 'начала журнала'}"]
+    if с["судимых"]:
+        из_.append(
+            f"S+0 {с['s0']}/{с['судимых']} ({(с['доля_s0'] or 0) * 100:.0f} %), "
+            f"в цели {с['в_цели']}/{с['судимых']} "
+            f"({(с['доля_в_цели'] or 0) * 100:.0f} %), "
+            f"S+0 был возможен у {с['s0_был_возможен']}")
+    else:
+        из_.append("судимых покупок нет: слот относительно источника неизвестен")
+    if с["по_отправителям"]:
+        части = [f"{к}: {v['всего']} (S+0 {v['s0']}, в цели {v['в_цели']})"
+                 for к, v in sorted(с["по_отправителям"].items(),
+                                     key=lambda x: -x[1]["всего"])]
+        из_.append("кто довёз -- " + "; ".join(части))
+    хвост = ряды[-строк:]
+    пропущено = len(ряды) - len(хвост)
+    if пропущено > 0:
+        из_.append(f"ниже последние {len(хвост)} из {len(ряды)}, "
+                   f"остальные {пропущено} -- в data/lane_table.md")
+    for з in хвост:
+        с0 = з.get("s0") or {}
+        место_и = (f"{с0['source_index']}/{с0['source_total']}"
+                   if с0.get("source_index") is not None else "-")
+        наше = (f"{з['block_index']}/{з['block_total']}"
+                if з.get("block_index") is not None else "-")
+        возм = ("да" if с0.get("s0_possible") is True else
+                 ("нет" if с0.get("s0_possible") is False else "-"))
+        чужих = с0.get("foreign_buys_after")
+        sn = (f"S+{з['slots_behind']}" if з.get("slots_behind") is not None else "S+?")
+        из_.append(
+            f"{str(з.get('utc') or '')[11:19]} {з.get('group') or '-'} "
+            f"{з.get('size_sol')} {з.get('mint')} {sn} "
+            f"место {наше} · источник {место_и} · S+0 возможен: {возм}"
+            + (f"({чужих})" if isinstance(чужих, int) else "")
+            + f" · довёз {з.get('winner') or '-'} · {з.get('state') or '-'}")
+    return "\n".join(из_)
+
+
 def main() -> int:
     import argparse
 
@@ -351,6 +434,10 @@ def main() -> int:
                     help="не читать блоки: без места источника и без S+0")
     р.add_argument("--chain", action="store_true",
                     help="проверить по цепи: села ли подпись и держим ли токен")
+    р.add_argument("--telegram", action="store_true",
+                    help="послать таблицу в основной чат владельца (нужен TELEGRAM_BOT_TOKEN)")
+    р.add_argument("--telegram-rows", type=int, default=12,
+                    help="сколько последних покупок в сообщении")
     р.add_argument("--raw-json", default=None,
                     help="полные записи позиций полосы окна (ключей в них нет)")
     а = р.parse_args()
@@ -390,8 +477,21 @@ def main() -> int:
         print(f"записано: {а.raw_json} ({len(свои)} позиций)")
     if а.out_json:
         Path(а.out_json).write_text(
-            json.dumps({"since": а.since, "rows": ряд}, ensure_ascii=False, indent=2)
+            json.dumps({"since": а.since, "rows": ряд,
+                         "summary": сводка(ряд)}, ensure_ascii=False, indent=2)
             + "\n", encoding="utf-8")
+    if а.telegram:
+        текст = строка_телеграма(ряд, с_utc=а.since, строк=а.telegram_rows)
+        print("--- в Telegram ---")
+        print(текст)
+        import bloom_notify as NT  # noqa: PLC0415
+
+        о = NT.Оповещатель(в_фоне=False)
+        р_от = о.послать(текст)
+        print(f"Telegram: {'послано' if р_от.get('ok') else 'НЕ послано'} "
+              f"{р_от.get('why_not') or ''}")
+        if not р_от.get("ok"):
+            return 1
     return 0
 
 
