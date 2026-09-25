@@ -1,0 +1,107 @@
+name: "Разбор 10:46Z: рубильник продаж, открытые позиции, токены на кошельках"
+
+# ПРОИСШЕСТВИЕ 25.09 10:46:56-57Z. Гейт снятия рубильника полосы запускал
+# самопроверки НА ХОСТЕ через `set -a; . /etc/bloom-executor/env`, то есть с
+# боевым окружением. У сторожа продаж оповещатель создаётся в конструкторе из
+# окружения (bloom_seller.py: NT.Оповещатель()), поэтому строки самопроверки с
+# заглушками (MINT1, ПОДПИСЬ_*, "рубильник продаж включён") ушли в БОЕВОЙ чат.
+#
+# Здесь -- разбор боевого состояния и возврат к норме. Вся работа делается
+# одним модулем репозитория (analysis/incident_1046_probe.py), который
+# передаётся на хост через stdin: так в YAML нет ни одной строки питона, и
+# логика проверяется самопроверкой, а не глазами.
+#
+# Только чтение, кроме одного шага снятия -- и он снимает рубильник продаж
+# ТОЛЬКО если его содержимое дословно тестовое.
+on:
+  workflow_dispatch:
+    inputs:
+      snyat_test_kill:
+        description: "'yes' -- снять рубильник продаж, ЕСЛИ его содержимое тестовое (иначе не трогать)"
+        required: false
+        default: "no"
+      telegram_note:
+        description: "'yes' -- отправить в боевой чат строку 'сообщения 10:46:56-57Z тестовые'"
+        required: false
+        default: "no"
+
+concurrency:
+  group: sell-kill-probe-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin/python
+
+jobs:
+  probe:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора ДО обращения к хосту"
+        run: |
+          set -e
+          python3 analysis/incident_1046_probe.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Файлы рубильников на хосте (сырой взгляд, без питона)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "ls -l $ENV_DIR/KILL_SELL $ENV_DIR/KILL $STATE_DIR/KILL_SELL_BY_TELEGRAM $STATE_DIR/KILL_OWN_SEND 2>&1 || true"
+
+      - name: "Разбор состояния (только чтение)"
+        if: ${{ inputs.snyat_test_kill != 'yes' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          ssh $SSH_OPTS root@127.0.0.1 "set -a; . $ENV_DIR/env; set +a; \
+            HELIUS_API_KEY='$HELIUS_API_KEY' $VENV -" \
+            < analysis/incident_1046_probe.py
+
+      - name: "Разбор состояния и снятие ТЕСТОВОГО рубильника продаж"
+        if: ${{ inputs.snyat_test_kill == 'yes' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          ssh $SSH_OPTS root@127.0.0.1 "set -a; . $ENV_DIR/env; set +a; \
+            HELIUS_API_KEY='$HELIUS_API_KEY' $VENV - --snyat-test-kill" \
+            < analysis/incident_1046_probe.py
+
+      - name: "Одна строка в боевой чат: те сообщения были тестовые"
+        if: ${{ inputs.telegram_note == 'yes' }}
+        run: |
+          set -e
+          # ТОКЕН ОСТАЁТСЯ НА ХОСТЕ: читается внутри удалённой оболочки из
+          # /etc/bloom-executor/env, в журнал прогона идёт только код ответа.
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then
+              echo 'Telegram не настроен на хосте -- строка не ушла'; exit 0
+            fi
+            code=\$(curl -s -o /tmp/tg_note.out -w '%{http_code}' \
+              -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
+              --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
+              --data-urlencode text='сообщения 10:46:56-57Z с MINT*/ПОДПИСЬ_* -- тестовые, реальных сделок за ними нет')
+            echo \"telegram http \$code\"
+            head -c 200 /tmp/tg_note.out; echo
+            rm -f /tmp/tg_note.out"
