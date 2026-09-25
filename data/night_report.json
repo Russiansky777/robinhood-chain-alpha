@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-09-25T05:24:40Z",
+  "generated_utc": "2026-09-25T06:10:58Z",
   "since_utc": "2026-09-24T00:00:00Z",
   "state_dir": "/tmp/night_state",
-  "decisions_rows": 855,
+  "decisions_rows": 895,
   "positions": 35,
   "lane": {
     "positions": 1,
@@ -68,10 +68,10 @@
     ]
   },
   "shadow": {
-    "total": 86,
+    "total": 95,
     "by_verdict": {
-      "would_pass": 23,
-      "нет вердикта": 63
+      "would_pass": 27,
+      "нет вердикта": 68
     },
     "not_built_reasons": {
       "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 50,
@@ -79,17 +79,17 @@
       "пул: неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, So1111)": 1,
       "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 3,
       "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1,
-      "котировка не SOL: шаблона SOL -> Q в кэше нет": 3
+      "котировка не SOL: шаблона SOL -> Q в кэше нет": 8
     },
     "build_ms_median": 0.84,
     "sim_ms_median": 15.9
   },
   "skips": {
-    "count": 1,
+    "count": 2,
     "shadow_measured": 0,
     "saved_better": 0,
     "lost_better": 0,
-    "unknown": 1,
+    "unknown": 2,
     "saved_sol_estimate": null,
     "assumed_size_sol": 0.2,
     "rows": [
@@ -106,20 +106,32 @@
         "price_s1_pct": null,
         "price_288_pct": null,
         "shadow_why_not": null
+      },
+      {
+        "signature": "52JQ9yMEvDAcn3vocrtVQ1D793KUeGSToyzVoFAvUeZdyczGVtK5eNjpsCWJEfSvxxcYiaH77TR7EnmiJFG6zgqP",
+        "mint": "DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP",
+        "source": "6F91X5t8af1yRHALkwf8EStEn6mKYvsW8zpLiVpfYr38",
+        "route_fee_bps": 200,
+        "token_fee_bps": 100,
+        "transfers_of_token": 2,
+        "taxed_intermediates": [],
+        "price_s1_pct": null,
+        "price_288_pct": null,
+        "shadow_why_not": null
       }
     ]
   },
   "decisions": {
     "buys": 10,
     "by_code": {
-      "NOT_A_BUY": 206,
-      "SKIP_TARGET_INCREASE_POSITION": 107,
+      "NOT_A_BUY": 217,
+      "SKIP_TARGET_INCREASE_POSITION": 115,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 106,
       "TARGET_AMOUNT_OUT_OF_RANGE": 105,
-      "TOKEN_RECEIVED_NOT_BOUGHT": 96,
       "BUY": 10,
       "SKIPPED_DUP_MINT": 2,
-      "THRESHOLD_EDGE": 1,
-      "SKIP_TAXED_ROUTE": 1
+      "SKIP_TAXED_ROUTE": 2,
+      "THRESHOLD_EDGE": 1
     }
   },
   "closed_breakdown": {
@@ -690,7 +702,7 @@
     ]
   },
   "heartbeat": {
-    "updated_utc": "2026-09-25T05:24:24Z",
+    "updated_utc": "2026-09-25T06:10:37Z",
     "own_send": {
       "enabled": true,
       "live": true,
@@ -704,8 +716,8 @@
         "sent": 1
       },
       "bought_backfilled": 0,
-      "blockhash_age_s": 0.9,
-      "blockhash_updates": 332,
+      "blockhash_age_s": 8.0,
+      "blockhash_updates": 562,
       "blockhash_why_not": "",
       "last": {
         "stage": "sent",
@@ -736,28 +748,30 @@
     },
     "shadow": {
       "enabled": true,
-      "built": 4,
-      "would_pass": 3,
+      "built": 13,
+      "would_pass": 7,
       "over_cap": 0,
       "failed": 0,
       "module_loaded": true,
       "module_why_not": "",
       "passed_in_row_by_pool": {
-        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 1,
-        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 1
+        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 5,
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0
       },
       "hour": {
         "since_ts": 1790313503.2594202,
         "since_utc": "2026-09-25T05:18:23Z",
-        "signals": 0,
-        "built": 0,
+        "signals": 9,
+        "built": 4,
         "sim_failed": 0,
-        "not_built": {},
+        "not_built": {
+          "котировка не SOL: шаблона SOL -> Q в кэше нет": 5
+        },
         "crashed": 0
       },
       "restarts": 0,
       "last_restart_utc": "",
-      "credits_day": 22,
+      "credits_day": 26,
       "credits_write_why_not": ""
     },
     "route_tax_filter": {
@@ -766,8 +780,58 @@
       "module_loaded": true,
       "module_why_not": "",
       "code": "SKIP_TAXED_ROUTE",
-      "skipped": 0,
+      "skipped": 1,
       "skipped_test": 0
+    },
+    "leg_cache": {
+      "enabled": true,
+      "pools": 4,
+      "templates": {
+        "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx": {
+          "age_s": 2221.7,
+          "flipped": false,
+          "sig": "3AExZhmFQf18NSyTgTzgS7JuCEyskrK4hJQCFfeG1jMkftKdwtUFMZ1CnGRiERjUeKARjbLospjfYq9h9i3GuGs7"
+        },
+        "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ": {
+          "age_s": 2232.3,
+          "flipped": false,
+          "sig": "2DoYu1HXg9xNtzBGRYfQLMKt3Kc2TScEUv6Vnuw2brPLmx4jw1iaJkZgRo4J6tVK3P86poxLCYdQ6RfQZN5HWUkq"
+        },
+        "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh": {
+          "age_s": 2249.6,
+          "flipped": false,
+          "sig": "5VHLb9M3oXY5w8MDpp3yCh3bA8kcDVjZgNTvmtKk5FhgnaSHXR6JRXpdFGeBVzshuCNC6ydABmbmVzdgqYhwwaSk"
+        },
+        "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3": {
+          "age_s": 2238.5,
+          "flipped": true,
+          "sig": "3s9rDCTHhP1DNBwcPQgH4bzYp9kw7mhDuQDfupHBHp1nokQ44PwLjyJBp3VAoA4X1vEdBws167S7M7PhzsUS4CMG"
+        }
+      },
+      "fed": 41080,
+      "no_tx": 0,
+      "failed": 0,
+      "luts": 611,
+      "luts_pending": 0,
+      "luts_warmed": 32,
+      "warm_why_not": "",
+      "luts_topped_up": 579,
+      "top_up_why_not": "",
+      "bytes": 975088457,
+      "credits": 18600,
+      "credits_day": 30000,
+      "credits_before_start": 11400,
+      "credits_write_why_not": "",
+      "credit_budget": 30000,
+      "dropped": true,
+      "dropped_why": "бюджет замера на сутки исчерпан: 30000 кредитов из 30000 (в этом процессе 18600 за 929 МБ)",
+      "ingest_stats": {
+        "шаблона нет": 48,
+        "новый шаблон": 1488,
+        "не своп / счета не зависят от цены -- шаблон подтверждён": 38325,
+        "новый шаблон (из продажи, перевёрнут)": 1230,
+        "своп без шаблона -- шаблон не подтверждён": 17
+      }
     },
     "credits_day": null,
     "telegram": {
@@ -795,7 +859,7 @@
     "subscribe_main_path": true
   },
   "seller": {
-    "updated_utc": "2026-09-25T05:24:26Z",
+    "updated_utc": "2026-09-25T06:10:56Z",
     "mode": "live",
     "jupiter": {
       "enabled": true,
@@ -816,7 +880,7 @@
   "research": {
     "p1": {
       "ok": true,
-      "built_utc": "2026-09-25T05:24:40Z",
+      "built_utc": "2026-09-25T06:10:58Z",
       "pickaxe": {
         "ok": true,
         "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
