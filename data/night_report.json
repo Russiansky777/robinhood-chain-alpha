@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-09-25T02:57:37Z",
+  "generated_utc": "2026-09-25T03:10:51Z",
   "since_utc": "2026-09-24T00:00:00Z",
   "state_dir": "/tmp/night_state",
-  "decisions_rows": 599,
+  "decisions_rows": 638,
   "positions": 32,
   "lane": {
     "positions": 0,
@@ -31,38 +31,57 @@
     "rows": []
   },
   "shadow": {
-    "total": 50,
+    "total": 66,
     "by_verdict": {
-      "would_pass": 14,
-      "нет вердикта": 36
+      "would_pass": 16,
+      "нет вердикта": 50
     },
     "not_built_reasons": {
-      "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 34,
-      "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 2
+      "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 41,
+      "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 5,
+      "пул: неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, So1111)": 1,
+      "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 2,
+      "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1
     },
-    "build_ms_median": 0.79,
-    "sim_ms_median": 15.1
+    "build_ms_median": 0.84,
+    "sim_ms_median": 15.55
   },
   "skips": {
-    "count": 0,
+    "count": 1,
     "shadow_measured": 0,
     "saved_better": 0,
     "lost_better": 0,
-    "unknown": 0,
+    "unknown": 1,
     "saved_sol_estimate": null,
     "assumed_size_sol": 0.2,
-    "rows": []
+    "rows": [
+      {
+        "signature": "243msjfwNcvEQUPtzYkPU1NbXWR2j4BWmjrumrdunsxKES2CPJJMWmyeF9WJVYHkPPNtVmg9tCGCmhQ9ukzd2xoU",
+        "mint": "2Y5yqeadyaupzhKyn6WbBGZ99UWAZHaHmCYi9EuZDRTM",
+        "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "route_fee_bps": 600,
+        "token_fee_bps": 0,
+        "transfers_of_token": 2,
+        "taxed_intermediates": [
+          "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ"
+        ],
+        "price_s1_pct": null,
+        "price_288_pct": null,
+        "shadow_why_not": "TypeError: пул_для_кривой() got an unexpected keyword argument 'кошелёк'"
+      }
+    ]
   },
   "decisions": {
     "buys": 8,
     "by_code": {
-      "NOT_A_BUY": 146,
-      "TARGET_AMOUNT_OUT_OF_RANGE": 97,
-      "SKIP_TARGET_INCREASE_POSITION": 82,
+      "NOT_A_BUY": 152,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 101,
+      "SKIP_TARGET_INCREASE_POSITION": 93,
       "TOKEN_RECEIVED_NOT_BOUGHT": 68,
       "BUY": 8,
       "SKIPPED_DUP_MINT": 2,
-      "THRESHOLD_EDGE": 1
+      "THRESHOLD_EDGE": 1,
+      "SKIP_TAXED_ROUTE": 1
     }
   },
   "closed_breakdown": {
@@ -593,7 +612,7 @@
     ]
   },
   "heartbeat": {
-    "updated_utc": "2026-09-25T02:57:17Z",
+    "updated_utc": "2026-09-25T03:02:19Z",
     "own_send": {
       "enabled": true,
       "live": true,
@@ -603,8 +622,8 @@
       "sent": 0,
       "by_stage": {},
       "bought_backfilled": 0,
-      "blockhash_age_s": 11.9,
-      "blockhash_updates": 20,
+      "blockhash_age_s": 0.9,
+      "blockhash_updates": 46,
       "blockhash_why_not": "",
       "last": {},
       "lane_kill": [
@@ -628,30 +647,37 @@
     },
     "shadow": {
       "enabled": true,
-      "built": 2,
-      "would_pass": 1,
+      "built": 19,
+      "would_pass": 2,
       "over_cap": 0,
       "failed": 0,
       "module_loaded": true,
       "module_why_not": "",
       "passed_in_row_by_pool": {
         "gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 0,
-        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 1
+        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 2,
+        "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
+        "QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 0,
+        "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 0
       },
       "hour": {
         "since_ts": 1790304797.0276778,
         "since_utc": "2026-09-25T02:53:17Z",
-        "signals": 2,
-        "built": 1,
+        "signals": 19,
+        "built": 2,
         "sim_failed": 0,
         "not_built": {
-          "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 1
+          "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 4,
+          "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 9,
+          "пул: неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, So1111)": 1,
+          "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 2,
+          "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1
         },
         "crashed": 0
       },
       "restarts": 0,
       "last_restart_utc": "",
-      "credits_day": 12,
+      "credits_day": 13,
       "credits_write_why_not": ""
     },
     "route_tax_filter": {
@@ -660,7 +686,7 @@
       "module_loaded": true,
       "module_why_not": "",
       "code": "SKIP_TAXED_ROUTE",
-      "skipped": 0,
+      "skipped": 1,
       "skipped_test": 0
     },
     "credits_day": null,
@@ -689,7 +715,7 @@
     "subscribe_main_path": true
   },
   "seller": {
-    "updated_utc": "2026-09-25T02:57:28Z",
+    "updated_utc": "2026-09-25T03:02:58Z",
     "mode": "live",
     "jupiter": {
       "enabled": true,
@@ -16611,12 +16637,12 @@
     },
     "toxic": {
       "schema_version": 1,
-      "generated_utc": "2026-09-25T02:34:57Z",
+      "generated_utc": "2026-09-25T03:10:51Z",
       "inputs": {
-        "crowd_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
-        "followers_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/c2_block_position_2026-09-24.json",
-        "tax_catalog_file": "/home/user/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
-        "tax_groups_file": "/home/user/robinhood-chain-alpha/data/solana_tax_groups.json",
+        "crowd_file": "/tmp/night_state/crowd_metric.json",
+        "followers_file": "/tmp/night_state/followers.json",
+        "tax_catalog_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
+        "tax_groups_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_tax_groups.json",
         "n_trades": 346,
         "n_unique_mints": 273,
         "n_unique_pools": 285,
@@ -16980,8 +17006,173 @@
         },
         "chain_run": {
           "requested": true,
-          "ran": false,
-          "why_not": "--chain задан, но HELIUS_API_KEY/HELIUS_API не установлен в этом окружении -- цепь не читается, кэш-часть отчёта посчитана как обычно"
+          "ran": true,
+          "credit_limit": 8000,
+          "credits_used": 4186,
+          "stopped_at_stage": null,
+          "stages": {
+            "a_mint_accountinfo": {
+              "n_total": 273,
+              "n_done": 273,
+              "credits_used_cumulative": 273
+            },
+            "b_top10_holders": {
+              "n_total": 273,
+              "n_done": 273,
+              "credits_used_cumulative": 546
+            },
+            "c_mint_age": {
+              "n_total": 273,
+              "n_done": 273,
+              "credits_used_cumulative": 1864
+            },
+            "c_pool_age": {
+              "n_total": 285,
+              "n_done": 285,
+              "credits_used_cumulative": 3155
+            },
+            "d_slot_crowd": {
+              "n_total": 346,
+              "n_done": 346,
+              "credits_used_cumulative": 3847
+            },
+            "e_follower_tx": {
+              "n_total": 339,
+              "n_done": 339,
+              "credits_used_cumulative": 4186
+            }
+          },
+          "groups_from_chain": {
+            "mint_authority": {
+              "mint_authority_revoked": {
+                "n_total": 343,
+                "n_known_growth": 309,
+                "mean_growth_pct": 65.634,
+                "median_growth_pct": 39.374
+              },
+              "mint_authority_active": {
+                "n_total": 3,
+                "n_known_growth": 2,
+                "mean_growth_pct": 15.55,
+                "median_growth_pct": 15.55
+              }
+            },
+            "freeze_authority": {
+              "freeze_authority_revoked": {
+                "n_total": 346,
+                "n_known_growth": 311,
+                "mean_growth_pct": 65.311,
+                "median_growth_pct": 39.299
+              }
+            },
+            "tax_authority": {
+              "tax_authority_active": {
+                "n_total": 199,
+                "n_known_growth": 184,
+                "mean_growth_pct": 84.418,
+                "median_growth_pct": 56.316
+              },
+              "unknown": {
+                "n_total": 137,
+                "n_known_growth": 117,
+                "mean_growth_pct": 35.308,
+                "median_growth_pct": 18.07
+              },
+              "tax_authority_revoked": {
+                "n_total": 10,
+                "n_known_growth": 10,
+                "mean_growth_pct": 64.786,
+                "median_growth_pct": 46.907
+              }
+            },
+            "taxable_full_with_chain": {
+              "taxable_mint": {
+                "n_total": 209,
+                "n_known_growth": 194,
+                "mean_growth_pct": 83.406,
+                "median_growth_pct": 54.804
+              },
+              "non_taxable_mint": {
+                "n_total": 137,
+                "n_known_growth": 117,
+                "mean_growth_pct": 35.308,
+                "median_growth_pct": 18.07
+              }
+            },
+            "top10_holder_share": {
+              "top10_lt_median": {
+                "n_total": 187,
+                "n_known_growth": 173,
+                "mean_growth_pct": 68.142,
+                "median_growth_pct": 35.727
+              },
+              "top10_ge_median": {
+                "n_total": 159,
+                "n_known_growth": 138,
+                "mean_growth_pct": 61.763,
+                "median_growth_pct": 42.842
+              }
+            },
+            "token_age": {
+              "unknown": {
+                "n_total": 323,
+                "n_known_growth": 291,
+                "mean_growth_pct": 64.291,
+                "median_growth_pct": 37.915
+              },
+              "token_older_than_median": {
+                "n_total": 12,
+                "n_known_growth": 11,
+                "mean_growth_pct": 132.14,
+                "median_growth_pct": 71.703
+              },
+              "token_newer_than_median": {
+                "n_total": 11,
+                "n_known_growth": 9,
+                "mean_growth_pct": 16.635,
+                "median_growth_pct": 31.441
+              }
+            },
+            "pool_age": {
+              "unknown": {
+                "n_total": 285,
+                "n_known_growth": 269,
+                "mean_growth_pct": 60.034,
+                "median_growth_pct": 34.169
+              },
+              "pool_older_than_median": {
+                "n_total": 31,
+                "n_known_growth": 23,
+                "mean_growth_pct": 161.912,
+                "median_growth_pct": 83.679
+              },
+              "pool_newer_than_median": {
+                "n_total": 30,
+                "n_known_growth": 19,
+                "mean_growth_pct": 23.094,
+                "median_growth_pct": 18.819
+              }
+            },
+            "slot_crowd_exact": {
+              "slot_crowd_lt_median": {
+                "n_total": 162,
+                "n_known_growth": 149,
+                "mean_growth_pct": 55.885,
+                "median_growth_pct": 21.627
+              },
+              "slot_crowd_ge_median": {
+                "n_total": 184,
+                "n_known_growth": 162,
+                "mean_growth_pct": 73.982,
+                "median_growth_pct": 52.63
+              }
+            }
+          },
+          "groups_below_threshold_including_chain": {
+            "threshold_pct": -5.0,
+            "min_n": 10,
+            "matches": []
+          }
         }
       },
       "task_c1_source_as_exit": {
@@ -17259,7 +17450,25 @@
           },
           "note": "низкий total_fee_lamports_cv_all при высоком разбросе cu_price_micro_cv_all говорит в пользу фиксированной СУММЫ платы (не привязанной к тому, что менял cu_price при разном cu_limit); высокий total_fee_lamports_cv_all -- против фиксированной суммы, но БЕЗ объёма нельзя отличить 'пропорционально объёму' от 'зависит от чего-то ещё (загрузка сети, конкуренция за слот)'. Наблюдение по числам этого прогона, не готовый ответ владельцу."
         },
-        "fee_vs_volume_from_chain": null
+        "fee_vs_volume_from_chain": {
+          "n_follower_rows": 339,
+          "n_no_tx": 0,
+          "n_no_volume": 18,
+          "n_pairs_used": 321,
+          "why_no_volume_reasons": {
+            "часть платежа в USDC/USDT, курса SOL/USD в followers[] нет -- не переводится в SOL-экв": 18
+          },
+          "linreg_fee_on_volume": {
+            "n": 321,
+            "slope": 163941550.52567443,
+            "intercept": -421577463.90472746,
+            "r": 0.5470302659740759,
+            "why_not": null
+          },
+          "fee_lamports_cv": 4.374,
+          "verdict": "похоже на плату, ПРОПОРЦИОНАЛЬНУЮ объёму: корреляция r=0.55, наклон=163941551 лампорт на 1 SOL объёма",
+          "verdict_rule": "|r|>=0.5 -> пропорционально; иначе cv<=0.3 -> фиксированно; иначе неоднозначно"
+        }
       },
       "task_c4_manipulation": {
         "tax_hike": {

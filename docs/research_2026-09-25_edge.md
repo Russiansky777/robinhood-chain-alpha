@@ -1,16 +1,16 @@
-# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T02:57:37Z)
+# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T03:10:51Z)
 
 ## 1. Боевое
 
-**Решения по сигналам.** Покупок 8; по кодам: {"NOT_A_BUY": 146, "TARGET_AMOUNT_OUT_OF_RANGE": 97, "SKIP_TARGET_INCREASE_POSITION": 82, "TOKEN_RECEIVED_NOT_BOUGHT": 68, "BUY": 8, "SKIPPED_DUP_MINT": 2, "THRESHOLD_EDGE": 1}. Полоса идёт только там, где мы покупаем, поэтому её тишина объясняется этой строкой.
+**Решения по сигналам.** Покупок 8; по кодам: {"NOT_A_BUY": 152, "TARGET_AMOUNT_OUT_OF_RANGE": 101, "SKIP_TARGET_INCREASE_POSITION": 93, "TOKEN_RECEIVED_NOT_BOUGHT": 68, "BUY": 8, "SKIPPED_DUP_MINT": 2, "THRESHOLD_EDGE": 1, "SKIP_TAXED_ROUTE": 1}. Полоса идёт только там, где мы покупаем, поэтому её тишина объясняется этой строкой.
 
 **Полоса своей отправки.** Путей 0, отправлено 0, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 0, закрыто 0, UNSOLD 0. Итог по закрытым: — (по 0 сделкам). Медиана от отправки до появления в потоке: —.
 
 **Пары «Bloom против нашей».** Пар 0, из них мы раньше 0; медиана разницы — (плюс -- мы раньше).
 
-**Тень.** Записей 50, по вердиктам: {"would_pass": 14, "нет вердикта": 36}. Медиана сборки 0.79 мс, симуляции 15.1 мс.
+**Тень.** Записей 66, по вердиктам: {"would_pass": 16, "нет вердикта": 50}. Медиана сборки 0.84 мс, симуляции 15.55 мс.
 
-**Узкий фильтр по налогу маршрута.** Пропусков 0, тень измерила 0: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 0 (фильтр отнял), неизвестна в 0. Оценка сбережённого при размере 0.2 SOL: —.
+**Узкий фильтр по налогу маршрута.** Пропусков 1, тень измерила 0: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 0 (фильтр отнял), неизвестна в 1. Оценка сбережённого при размере 0.2 SOL: —.
 
 **Разложение закрытых сделок с 2026-09-24T00:00:00Z.** Сделок 26, сумма итога 0.018196572 SOL, медиана -0.0 SOL. По каждой сделке в JSON: налог в SOL (и откуда взята ставка), комиссия Bloom, чаевые обработчику, приоритет, комиссия сети и остаток. Комиссия пула НЕ посчитана: ставки bps по программе пула нет ни в кэше, ни в репозитории, поэтому остаток -- это ход цены минус комиссия пула.
 
@@ -463,12 +463,12 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
 ```json
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-25T02:34:57Z",
+  "generated_utc": "2026-09-25T03:10:51Z",
   "inputs": {
-    "crowd_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
-    "followers_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/c2_block_position_2026-09-24.json",
-    "tax_catalog_file": "/home/user/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
-    "tax_groups_file": "/home/user/robinhood-chain-alpha/data/solana_tax_groups.json",
+    "crowd_file": "/tmp/night_state/crowd_metric.json",
+    "followers_file": "/tmp/night_state/followers.json",
+    "tax_catalog_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
+    "tax_groups_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_tax_groups.json",
     "n_trades": 346,
     "n_unique_mints": 273,
     "n_unique_pools": 285,
@@ -611,7 +611,9 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
       "n_unique_pools": 285,
       "age_max_pages": 5,
       "rows_credits": {
-        "getTransaction_refetch_route_and_exact
+        "getTransaction_refetch_route_and_exact_pool_depth": 346,
+        "getAccountInfo_mint_authority_tax_max_fee": 273,
+        "getTokenLarg
 ```
 
 ## E/F/G (лидер, GP, StonkFun)

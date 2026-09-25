@@ -1,11 +1,11 @@
 {
  "schema_version": 1,
- "generated_utc": "2026-09-25T02:34:57Z",
+ "generated_utc": "2026-09-25T03:10:51Z",
  "inputs": {
-  "crowd_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
-  "followers_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/c2_block_position_2026-09-24.json",
-  "tax_catalog_file": "/home/user/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
-  "tax_groups_file": "/home/user/robinhood-chain-alpha/data/solana_tax_groups.json",
+  "crowd_file": "/tmp/night_state/crowd_metric.json",
+  "followers_file": "/tmp/night_state/followers.json",
+  "tax_catalog_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_transfer_fee_audit.json",
+  "tax_groups_file": "/home/ghrunner/actions-runner/_work/robinhood-chain-alpha/robinhood-chain-alpha/data/solana_tax_groups.json",
   "n_trades": 346,
   "n_unique_mints": 273,
   "n_unique_pools": 285,
@@ -369,8 +369,173 @@
   },
   "chain_run": {
    "requested": true,
-   "ran": false,
-   "why_not": "--chain задан, но HELIUS_API_KEY/HELIUS_API не установлен в этом окружении -- цепь не читается, кэш-часть отчёта посчитана как обычно"
+   "ran": true,
+   "credit_limit": 8000,
+   "credits_used": 4186,
+   "stopped_at_stage": null,
+   "stages": {
+    "a_mint_accountinfo": {
+     "n_total": 273,
+     "n_done": 273,
+     "credits_used_cumulative": 273
+    },
+    "b_top10_holders": {
+     "n_total": 273,
+     "n_done": 273,
+     "credits_used_cumulative": 546
+    },
+    "c_mint_age": {
+     "n_total": 273,
+     "n_done": 273,
+     "credits_used_cumulative": 1864
+    },
+    "c_pool_age": {
+     "n_total": 285,
+     "n_done": 285,
+     "credits_used_cumulative": 3155
+    },
+    "d_slot_crowd": {
+     "n_total": 346,
+     "n_done": 346,
+     "credits_used_cumulative": 3847
+    },
+    "e_follower_tx": {
+     "n_total": 339,
+     "n_done": 339,
+     "credits_used_cumulative": 4186
+    }
+   },
+   "groups_from_chain": {
+    "mint_authority": {
+     "mint_authority_revoked": {
+      "n_total": 343,
+      "n_known_growth": 309,
+      "mean_growth_pct": 65.634,
+      "median_growth_pct": 39.374
+     },
+     "mint_authority_active": {
+      "n_total": 3,
+      "n_known_growth": 2,
+      "mean_growth_pct": 15.55,
+      "median_growth_pct": 15.55
+     }
+    },
+    "freeze_authority": {
+     "freeze_authority_revoked": {
+      "n_total": 346,
+      "n_known_growth": 311,
+      "mean_growth_pct": 65.311,
+      "median_growth_pct": 39.299
+     }
+    },
+    "tax_authority": {
+     "tax_authority_active": {
+      "n_total": 199,
+      "n_known_growth": 184,
+      "mean_growth_pct": 84.418,
+      "median_growth_pct": 56.316
+     },
+     "unknown": {
+      "n_total": 137,
+      "n_known_growth": 117,
+      "mean_growth_pct": 35.308,
+      "median_growth_pct": 18.07
+     },
+     "tax_authority_revoked": {
+      "n_total": 10,
+      "n_known_growth": 10,
+      "mean_growth_pct": 64.786,
+      "median_growth_pct": 46.907
+     }
+    },
+    "taxable_full_with_chain": {
+     "taxable_mint": {
+      "n_total": 209,
+      "n_known_growth": 194,
+      "mean_growth_pct": 83.406,
+      "median_growth_pct": 54.804
+     },
+     "non_taxable_mint": {
+      "n_total": 137,
+      "n_known_growth": 117,
+      "mean_growth_pct": 35.308,
+      "median_growth_pct": 18.07
+     }
+    },
+    "top10_holder_share": {
+     "top10_lt_median": {
+      "n_total": 187,
+      "n_known_growth": 173,
+      "mean_growth_pct": 68.142,
+      "median_growth_pct": 35.727
+     },
+     "top10_ge_median": {
+      "n_total": 159,
+      "n_known_growth": 138,
+      "mean_growth_pct": 61.763,
+      "median_growth_pct": 42.842
+     }
+    },
+    "token_age": {
+     "unknown": {
+      "n_total": 323,
+      "n_known_growth": 291,
+      "mean_growth_pct": 64.291,
+      "median_growth_pct": 37.915
+     },
+     "token_older_than_median": {
+      "n_total": 12,
+      "n_known_growth": 11,
+      "mean_growth_pct": 132.14,
+      "median_growth_pct": 71.703
+     },
+     "token_newer_than_median": {
+      "n_total": 11,
+      "n_known_growth": 9,
+      "mean_growth_pct": 16.635,
+      "median_growth_pct": 31.441
+     }
+    },
+    "pool_age": {
+     "unknown": {
+      "n_total": 285,
+      "n_known_growth": 269,
+      "mean_growth_pct": 60.034,
+      "median_growth_pct": 34.169
+     },
+     "pool_older_than_median": {
+      "n_total": 31,
+      "n_known_growth": 23,
+      "mean_growth_pct": 161.912,
+      "median_growth_pct": 83.679
+     },
+     "pool_newer_than_median": {
+      "n_total": 30,
+      "n_known_growth": 19,
+      "mean_growth_pct": 23.094,
+      "median_growth_pct": 18.819
+     }
+    },
+    "slot_crowd_exact": {
+     "slot_crowd_lt_median": {
+      "n_total": 162,
+      "n_known_growth": 149,
+      "mean_growth_pct": 55.885,
+      "median_growth_pct": 21.627
+     },
+     "slot_crowd_ge_median": {
+      "n_total": 184,
+      "n_known_growth": 162,
+      "mean_growth_pct": 73.982,
+      "median_growth_pct": 52.63
+     }
+    }
+   },
+   "groups_below_threshold_including_chain": {
+    "threshold_pct": -5.0,
+    "min_n": 10,
+    "matches": []
+   }
   }
  },
  "task_c1_source_as_exit": {
@@ -648,7 +813,25 @@
    },
    "note": "низкий total_fee_lamports_cv_all при высоком разбросе cu_price_micro_cv_all говорит в пользу фиксированной СУММЫ платы (не привязанной к тому, что менял cu_price при разном cu_limit); высокий total_fee_lamports_cv_all -- против фиксированной суммы, но БЕЗ объёма нельзя отличить 'пропорционально объёму' от 'зависит от чего-то ещё (загрузка сети, конкуренция за слот)'. Наблюдение по числам этого прогона, не готовый ответ владельцу."
   },
-  "fee_vs_volume_from_chain": null
+  "fee_vs_volume_from_chain": {
+   "n_follower_rows": 339,
+   "n_no_tx": 0,
+   "n_no_volume": 18,
+   "n_pairs_used": 321,
+   "why_no_volume_reasons": {
+    "часть платежа в USDC/USDT, курса SOL/USD в followers[] нет -- не переводится в SOL-экв": 18
+   },
+   "linreg_fee_on_volume": {
+    "n": 321,
+    "slope": 163941550.52567443,
+    "intercept": -421577463.90472746,
+    "r": 0.5470302659740759,
+    "why_not": null
+   },
+   "fee_lamports_cv": 4.374,
+   "verdict": "похоже на плату, ПРОПОРЦИОНАЛЬНУЮ объёму: корреляция r=0.55, наклон=163941551 лампорт на 1 SOL объёма",
+   "verdict_rule": "|r|>=0.5 -> пропорционально; иначе cv<=0.3 -> фиксированно; иначе неоднозначно"
+  }
  },
  "task_c4_manipulation": {
   "tax_hike": {
