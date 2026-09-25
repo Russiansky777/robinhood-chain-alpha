@@ -1,10 +1,11 @@
-# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T05:22:56Z)
+# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T05:24:40Z)
 
 ## 1. Боевое
 
 **Решения по сигналам.** Покупок 10; по кодам: {"NOT_A_BUY": 206, "SKIP_TARGET_INCREASE_POSITION": 107, "TARGET_AMOUNT_OUT_OF_RANGE": 105, "TOKEN_RECEIVED_NOT_BOUGHT": 96, "BUY": 10, "SKIPPED_DUP_MINT": 2, "THRESHOLD_EDGE": 1, "SKIP_TAXED_ROUTE": 1}.
 
 **Полоса своей отправки.** Путей 5, отправлено 1, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 1, закрыто 1, UNSOLD 0. Итог по закрытым: — (по 0 сделкам). Медиана от отправки до появления в потоке: 781.09 мс.
+**ПОЛОСА ОСТАНОВЛЕНА РУБИЛЬНИКОМ.** полоса остановлена: 2026-09-25T05:18:48Z raskhozhdenie ucheta ostatka: polosa kupila 3453513816 raw minta 571aBZbC, a k prodazhe ostatok minta byl 0 -- avtoprodazha Bloom cherez 28.8 s prodala ves balans koshelka vmeste s nashimi tokenami; itog polosy poschitat nechem. Bez vladeltsa ne chinit. Снимать -- только владельцу; Bloom, сторож продаж и тень работают.
 Где путь останавливался: build -- 3, sent -- 1, lane_seen -- 1. Причины: котировка пула не SOL -- полоса только одношаговая (3).
 
 **Пары «Bloom против нашей».** Пар 1, из них мы раньше 0; медиана разницы -11.4 мс (плюс -- мы раньше).
@@ -344,7 +345,7 @@ Bloom, сторож продаж и тень работают как раньш�
 ```json
 {
   "ok": true,
-  "built_utc": "2026-09-25T05:22:56Z",
+  "built_utc": "2026-09-25T05:24:40Z",
   "pickaxe": {
     "ok": true,
     "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
