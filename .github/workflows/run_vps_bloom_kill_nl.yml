@@ -1,0 +1,164 @@
+name: "Bloom: рубильник покупок KILL (status/set/clear), прогоном а не деплоем"
+
+# ЗАЧЕМ. 25.09 ночью нашлось, что суточный стоп Bloom не срабатывает никогда:
+# гейт в bloom_exec_state.py:748 сверяет realized_sol с BLOOM_DAILY_LOSS_SOL, а
+# писать realized_sol умеет только add_pnl, которую в боевом коде не зовёт
+# никто (вызовы есть лишь в самопроверке того же модуля). Значит счёт всегда
+# 0.0 и предел не выполняется. До утренней починки учёта ночной стоп держится
+# руками, и владелец 25.09 велел: "KILL на покупки Bloom прогоном, не
+# деплоем". Этот прогон и есть тот рычаг.
+#
+# ЧТО ДЕЛАЕТ. Пишет (или убирает) ОДИН файл -- /etc/bloom-executor/KILL. Служб
+# не касается: ни рестарта, ни записи env, ни деплоя кода. Продажи НЕ
+# останавливаются: KILL_SELL этот прогон не трогает вовсе, иначе купленное
+# осталось бы висеть.
+#
+# ЧЕСТНОЕ ПРЕДУПРЕЖДЕНИЕ. Файл KILL -- общий запрет НОВЫХ ПОКУПОК, и полоса
+# своей отправки сверяется с ним тоже (bloom_own_send.py:1323, 2359, 2477
+# зовут состояние.kill_active() раньше своего KILL_OWN_SEND). Поэтому
+# mode=set останавливает и Bloom, и полосу. Отдельного выключателя только для
+# Bloom в коде нет -- он появится утром вместе с починкой учёта. Владельцу это
+# сказано словами 25.09.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "status -- посмотреть; set -- запретить новые покупки; clear -- снять запрет"
+        required: true
+        default: "status"
+      reason:
+        description: "почему (обязательно для set и clear; попадёт в файл и в журнал прогона)"
+        required: false
+        default: ""
+      telegram:
+        description: "'yes' -- строка владельцу в основной чат (для mode=set)"
+        required: false
+        default: "no"
+      confirm:
+        description: "для mode=clear: ровно SNYAT -- иначе снятие не делается"
+        required: false
+        default: ""
+
+concurrency:
+  group: bloom-kill-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  bloom_kill:
+    # Облачный бегунок: свой бегунок стоит на боевом хосте и бывает занят
+    # долгими замерами, а рубильник ждать не может.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Что сейчас с рубильниками (оба файла и мнение службы)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST "
+            F=$ENV_DIR/KILL
+            T=$STATE_DIR/KILL_BY_TELEGRAM
+            if [ -f \"\$F\" ]; then printf 'KILL СТОИТ: '; head -c 400 \"\$F\"; echo; else echo 'KILL нет'; fi
+            if [ -f \"\$T\" ]; then printf 'KILL_BY_TELEGRAM СТОИТ: '; head -c 400 \"\$T\"; echo; else echo 'KILL_BY_TELEGRAM нет'; fi
+            echo '--- продажи (этот прогон их не трогает) ---'
+            if [ -f $ENV_DIR/KILL_SELL ]; then echo 'KILL_SELL стоит'; else echo 'KILL_SELL нет: продажи разрешены'; fi
+            echo '--- что видит служба ---'
+            grep -m1 '\"kill_active\"' $STATE_DIR/detector_status.json || echo 'в признаке жизни строки kill_active нет'"
+
+      - name: "set: запретить новые покупки"
+        if: ${{ inputs.mode == 'set' }}
+        run: |
+          set -e
+          # Причина обязательна: файл без пояснения не даст утром понять, из-за
+          # чего встали. Имена переменных только латиницей.
+          reason_text='${{ inputs.reason }}'
+          [ -n "$reason_text" ] || { echo "СБОЙ: для mode=set нужна причина"; exit 1; }
+          # Первая причина НЕ затирается: важна та, из-за которой встали впервые.
+          ssh -n $SSH_OPTS root@$HOST "
+            F=$ENV_DIR/KILL
+            if [ -f \"\$F\" ]; then
+              printf 'рубильник уже стоял, первую причину не трогаем: '; head -c 400 \"\$F\"; echo
+            else
+              printf '%s %s\n' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$reason_text\" > \"\$F\"
+              chmod 644 \"\$F\"
+              printf 'поставлен: '; head -c 400 \"\$F\"; echo
+            fi"
+
+      - name: "clear: гейт -- подтверждение словом и причина"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          confirm_word='${{ inputs.confirm }}'
+          reason_text='${{ inputs.reason }}'
+          [ "$confirm_word" = "SNYAT" ] || { echo "СБОЙ: для mode=clear нужно confirm=SNYAT"; exit 1; }
+          [ -n "$reason_text" ] || { echo "СБОЙ: для mode=clear нужна причина"; exit 1; }
+          echo "подтверждение принято, причина снятия: $reason_text"
+
+      - name: "clear: снять запрет (прежняя причина сохраняется рядом)"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          reason_text='${{ inputs.reason }}'
+          ssh -n $SSH_OPTS root@$HOST "
+            F=$ENV_DIR/KILL
+            if [ ! -f \"\$F\" ]; then echo 'KILL и не стоял -- снимать нечего'; exit 0; fi
+            cp -a \"\$F\" \"\$F.snyat.\$(date -u +%Y%m%dT%H%M%SZ)\"
+            printf 'снимаю, прежняя причина: '; head -c 400 \"\$F\"; echo
+            rm -f \"\$F\"
+            echo 'KILL снят, причина снятия: $reason_text'
+            ls -l $ENV_DIR/KILL* 2>/dev/null || echo 'файлов KILL больше нет'"
+
+      - name: "Строка владельцу в Telegram (для set, по запросу)"
+        if: ${{ inputs.mode == 'set' && inputs.telegram == 'yes' }}
+        run: |
+          set -e
+          # ТОКЕН ОСТАЁТСЯ НА ХОСТЕ: берётся из /etc/bloom-executor/env уже
+          # внутри удалённой оболочки, в журнал прогона попадает только имя.
+          reason_text='${{ inputs.reason }}'
+          ssh -n $SSH_OPTS root@$HOST "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then
+              echo 'Telegram не настроен на хосте -- строка не ушла'; exit 0
+            fi
+            code=\$(curl -s -o /tmp/tg_bloom_kill.out -w '%{http_code}' \
+              -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
+              --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
+              --data-urlencode text='СТОП: новые покупки Bloom запрещены (файл KILL). Причина: $reason_text Продажи продолжаются. Полоса тоже встала: она сверяется с тем же файлом. Снять: прогон run_vps_bloom_kill_nl.yml mode=clear confirm=SNYAT.')
+            echo \"telegram http \$code\"
+            head -c 200 /tmp/tg_bloom_kill.out; echo
+            rm -f /tmp/tg_bloom_kill.out"
+
+      - name: "Служба видит рубильник так же, как файл на диске"
+        if: ${{ always() && inputs.mode != 'status' }}
+        run: |
+          set -e
+          # Признак жизни пишется раз в пульс: ждём до 40 с. Файл на диске и
+          # мнение службы обязаны совпадать, иначе рубильник не рубильник.
+          mode_now='${{ inputs.mode }}'
+          for i in 1 2 3 4 5 6 7 8; do
+            out=$(ssh -n $SSH_OPTS root@$HOST "grep -m1 '\"kill_active\"' $STATE_DIR/detector_status.json || true")
+            echo "пульс: $out"
+            case "$mode_now" in
+              set)   case "$out" in *true*)  echo "служба видит запрет"; exit 0 ;; esac ;;
+              clear) case "$out" in *false*) echo "служба видит разрешение"; exit 0 ;; esac ;;
+            esac
+            sleep 5
+          done
+          echo "СБОЙ: за 40 с признак жизни не подтвердил состояние рубильника"
+          exit 1
