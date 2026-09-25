@@ -164,6 +164,11 @@ jobs:
         run: |
           set -e
           mkdir -p "$OUT_DIR"
+          # КАТАЛОГ РАСХОДА -- ПОСТОЯННЫЙ, а не RUNNER_TEMP: временный каталог
+          # прогона стирается между прогонами, и суточный предел владельца
+          # обнулялся бы при каждом запуске, то есть 5 000 сообщений можно было
+          # бы потратить сколько угодно раз за сутки.
+          mkdir -p "$HOME/.triton_state"
           stamp=$(date -u +%Y%m%dT%H%M%SZ)
           cd analysis
           PYTHONPATH="$PROTO_DIR:$PWD" "$PY" triton_preconfs_probe.py \
@@ -172,7 +177,7 @@ jobs:
             --seconds '${{ inputs.seconds }}' \
             --out "../$OUT_DIR/preconfs_${{ inputs.feed }}_$stamp.jsonl" \
             --status "../$OUT_DIR/probe_status.json" \
-            --state-dir "$RUNNER_TEMP" 2>&1 | tail -40
+            --state-dir "$HOME/.triton_state" 2>&1 | tail -40
           echo "TRITON_LOG=$OUT_DIR/preconfs_${{ inputs.feed }}_$stamp.jsonl" >> "$GITHUB_ENV"
 
       - name: "Отчёт: опережает ли preconf нашу подписку"
