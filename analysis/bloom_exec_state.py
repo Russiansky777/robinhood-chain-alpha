@@ -213,6 +213,10 @@ class ExecState:
         # покупки при этом решает первый рубильник. Нужен раздельно, потому
         # что "перестань продавать" и "перестань торговать" -- разные приказы.
         self.kill_sell_path = self.base / "KILL_SELL_BY_TELEGRAM"
+        # РУБИЛЬНИК ТОЛЬКО ПОЛОСЫ своей отправки. Слово владельца 25.09:
+        # любая денежная странность -- KILL полосы, а Bloom и тень продолжают.
+        # Отдельный файл именно поэтому: общий рубильник остановил бы всё.
+        self.kill_lane_path = self.base / "KILL_OWN_SEND"
         self.positions_path = self.base / "positions.jsonl"
         self.decisions_path = self.base / "decisions.jsonl"
         self.api_path = self.base / "api_calls.jsonl"
@@ -278,6 +282,43 @@ class ExecState:
         except Exception as exc:  # noqa: BLE001
             return True, (f"проверка запрета продаж не удалась ({type(exc).__name__}) -- "
                            "считаем запретом")
+
+    def lane_kill_active(self) -> tuple[bool, str]:
+        """Запрет ТОЛЬКО полосе своей отправки. Неясность -- запрет.
+
+        Ставится службой при денежной странности и снимается ЧЕЛОВЕКОМ:
+        сама себя полоса не разблокирует. Общий рубильник и запрет продаж
+        живут отдельно -- останавливать Bloom из-за замера нельзя.
+        """
+        try:
+            if self.kill_lane_path.exists():
+                try:
+                    причина = self.kill_lane_path.read_text(encoding="utf-8").strip()[:300]
+                except OSError:
+                    причина = "(файл не читается -- всё равно запрет)"
+                return True, f"полоса остановлена: {причина or 'без пояснения'}"
+            return False, ""
+        except Exception as exc:  # noqa: BLE001
+            return True, (f"проверка рубильника полосы не удалась "
+                           f"({type(exc).__name__}) -- считаем запретом")
+
+    def set_lane_kill(self, причина: str) -> dict:
+        """Остановить полосу и записать, почему. Повторный вызов не затирает
+        первую причину: важна та, из-за которой остановились."""
+        из_ = {"ok": False, "already": False, "why": причина}
+        try:
+            if self.kill_lane_path.exists():
+                из_.update(ok=True, already=True)
+                return из_
+            self.kill_lane_path.write_text(
+                f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} {причина}\n",
+                encoding="utf-8")
+            из_["ok"] = True
+        except Exception as exc:  # noqa: BLE001
+            # Не смогли записать -- это само по себе странность, и молчать о
+            # ней нельзя: причина уходит наружу вызывающему.
+            из_["error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+        return из_
 
     def kill_readable(self, path: Path | None = None) -> tuple[bool, str]:
         """Виден ли путь рубильника ТОМУ, кто спрашивает.
@@ -888,6 +929,27 @@ def self_test() -> None:
         and int(stп.counters().get("unsold_streak", 0)) == 1, stп.counters())
     chk("позиции полосы видны отдельным списком",
         len(stп.lane_positions()) == stп.max_open, len(stп.lane_positions()))
+    # РУБИЛЬНИК ТОЛЬКО ПОЛОСЫ. Он обязан останавливать полосу и НЕ трогать
+    # Bloom: цена ошибки в обе стороны -- либо замер продолжает тратить деньги
+    # при странности, либо из-за замера встаёт боевая торговля.
+    chk("полоса не остановлена, пока файла нет", stп.lane_kill_active()[0] is False,
+        stп.lane_kill_active())
+    пост = stп.set_lane_kill("сумма выше предела: проверка")
+    chk("рубильник полосы поставлен и причина записана",
+        пост.get("ok") and stп.lane_kill_active()[0] is True
+        and "сумма выше предела" in stп.lane_kill_active()[1],
+        (пост, stп.lane_kill_active()))
+    chk("общий рубильник и запрет продаж при этом не тронуты",
+        stп.kill_active()[0] is False and stп.sell_kill_active()[0] is False,
+        (stп.kill_active(), stп.sell_kill_active()))
+    ok_пк, почему_пк = stп.can_open(mint="MNEW4", source_sig="SNEW4", balance_sol=1.0)
+    chk("и торговля Bloom из-за остановленной полосы не встала", ok_пк is True,
+        почему_пк)
+    второй = stп.set_lane_kill("другая причина")
+    chk("повторная остановка не затирает первую причину",
+        второй.get("already") is True
+        and "сумма выше предела" in stп.lane_kill_active()[1],
+        stп.lane_kill_active())
 
     # покупок на минт и кулдаун
     st6 = ExecState(base=base / "state6", kill=kill)
