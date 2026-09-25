@@ -1,0 +1,85 @@
+name: "I.7: время нашей линии и стороны Bloom по журналу (только чтение)"
+
+# ЗАЧЕМ. Владелец 25.09: "время нашей линии в режиме nonce по журналу: от
+# решения до отправки первого варианта, медиана и p90" и отдельно "медиана
+# решение -> запрос к Bloom до и после". Оба числа считаются ТОЛЬКО по
+# журналу позиций: ни одной покупки, ни одного обращения в цепь.
+#
+# Ротация учтена: logrotate уводит сутки в positions.jsonl.1.gz в 22:00Z, и
+# без склейки замер видел бы только последние минуты.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "только покупки с этого UTC (например 2026-09-25T18:00)"
+        required: false
+        default: ""
+      rows:
+        description: "сколько последних строк печатать"
+        required: false
+        default: "25"
+
+concurrency:
+  group: lane-timing-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Копия журнала позиций с ротированными (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p /tmp/bloom_state
+          ssh -n $SSH_OPTS root@$HOST \
+            "for G in \$(ls -tr $STATE_DIR/positions.jsonl.*.gz 2>/dev/null); do zcat \"\$G\"; done; \
+             cat $STATE_DIR/positions.jsonl" > /tmp/bloom_state/positions.jsonl
+          echo "строк: $(wc -l < /tmp/bloom_state/positions.jsonl), байт: $(wc -c < /tmp/bloom_state/positions.jsonl)"
+
+      - name: "Замер времени линии"
+        run: |
+          set -e
+          python3 analysis/lane_timing.py \
+            --positions /tmp/bloom_state/positions.jsonl \
+            --since "${{ inputs.since }}" \
+            --rows "${{ inputs.rows }}" \
+            --out data/lane_timing.json
+
+      - name: "Коммит замера"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/lane_timing.json ] && git add data/lane_timing.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "I.7: время линии полосы и стороны Bloom [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
