@@ -273,6 +273,8 @@ class Счёт:
             self.клипов += 1
         elif вид == "reconnected":
             self.переподключений += 1
+        elif вид == "stream_error":
+            self.обрывов = getattr(self, "обрывов", 0) + 1
         # ЗАПИСЬ РАСХОДА -- по ходу, а не в конце: прогон могут убить, а
         # потраченные слоты и сообщения от этого потраченными быть не
         # перестанут. Раз в 50 событий -- чтобы не писать файл на каждое.
@@ -302,6 +304,7 @@ class Счёт:
                 "slots": self.слотов, "slots_day": self.всего_слотов(),
                 "day": self.день, "clips": self.клипов,
                 "reconnects": self.переподключений,
+                "stream_errors": getattr(self, "обрывов", 0),
                 "elapsed_s": self.прошло_s(сейчас),
                 "limit_messages": self.предел_сообщений,
                 "limit_slots": self.предел_слотов,
@@ -370,6 +373,11 @@ def событие_в_строку(событие: dict, *, фид: str, рег�
         из_["clipped"] = событие.get("transactions")
     elif вид == "reconnected":
         из_["attempts"] = событие.get("attempts")
+    elif вид == "stream_error":
+        # ПРИЧИНА ОБРЫВА -- В ЖУРНАЛ. Без неё окно выглядит непрерывным, а оно
+        # рвалось, и доля времени "в эфире" выходит завышенной.
+        из_["code"] = событие.get("code")
+        из_["details"] = событие.get("details")
     return из_
 
 
@@ -1044,12 +1052,40 @@ def _поток_grpc(*, фид: str, регион: str, аккаунты: list, 
     from google.protobuf import json_format  # noqa: PLC0415
 
     json_format.ParseDict(зп["request"], запрос)
-    поток = служба.Subscribe(запрос, metadata=мета, timeout=таймаут_s)
     имя_результата = None
     if hasattr(preconfs_pb2, "ExecutionResult"):
         имя_результата = preconfs_pb2.ExecutionResult.Name
-    for обновление in поток:
-        yield событие_из_обновления(обновление, имя_результата=имя_результата)
+    # ПОТОК НАДО ДЕРЖАТЬ, А НЕ ОТКРЫТЬ ОДИН РАЗ. Замерено 25.09: окно Harmonic
+    # ams, запрошенное на 7200 с, сервер закрыл через 690 с БЕЗ ошибки -- итератор
+    # просто кончился, и зонд вышел, отдав 11 минут вместо двух часов. Поэтому
+    # подписка переоткрывается, пока у окна остаётся время; каждое
+    # переподключение -- событие в журнале, чтобы окно не выглядело непрерывным,
+    # когда оно рвалось.
+    начало = time.time()
+    попыток = 0
+    while True:
+        осталось = таймаут_s - (time.time() - начало)
+        if осталось <= 5:
+            return
+        поток = служба.Subscribe(запрос, metadata=мета, timeout=осталось)
+        try:
+            for обновление in поток:
+                yield событие_из_обновления(обновление,
+                                             имя_результата=имя_результата)
+        except grpc.RpcError as exc:
+            код = exc.code().name if exc.code() else "?"
+            # Отказ подписки -- это НЕ обрыв связи: переподключаться к тому, что
+            # нам не отдают, значит платить за попытки. Такие коды закрывают
+            # зонд честно.
+            if код in ("UNAUTHENTICATED", "PERMISSION_DENIED",
+                        "RESOURCE_EXHAUSTED", "INVALID_ARGUMENT"):
+                raise
+            yield {"kind": "stream_error", "code": код,
+                    "details": str(exc.details())[:200]}
+        попыток += 1
+        if попыток > 200:
+            return
+        yield {"kind": "reconnected", "attempts": попыток}
 
 
 def _подпись_из_байтов(сырое: bytes) -> str | None:
