@@ -1,0 +1,101 @@
+name: "Разбор сделки по цепи: что было в пуле между покупкой и продажей"
+
+# Вопрос владельца 25.09 по сделке 571aBZbC (-61 % за 28.8 с): что произошло
+# по цепи между нашей покупкой и продажей. Только чтение: getSignaturesForAddress
+# по ПУЛУ и getTransaction на каждую подпись в окне. Ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "минт сделки"
+        required: true
+      pool:
+        description: "адрес пула (из записи решения, поле source_pool)"
+        required: true
+      source_signature:
+        description: "подпись покупки источника -- от неё отсчитывается окно"
+        required: true
+      source_slot:
+        description: "слот покупки источника"
+        required: true
+      our_wallet:
+        description: "наш кошелёк (чтобы подписать строки 'мы')"
+        required: false
+        default: "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+      source_wallet:
+        description: "кошелёк источника"
+        required: false
+        default: ""
+      window_slots:
+        description: "сколько слотов после источника смотреть (120 ~ 48 с)"
+        required: false
+        default: "120"
+      max_tx:
+        description: "предел getTransaction (он же предел кредитов на разбор)"
+        required: false
+        default: "60"
+
+concurrency:
+  group: trade-forensics
+  cancel-in-progress: false
+
+jobs:
+  forensics:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО обращений в цепь"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/forensics_venv"
+            "$RUNNER_TEMP/forensics_venv/bin/pip" install -q requests
+            PY="$RUNNER_TEMP/forensics_venv/bin/python"
+          fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          "$PY" analysis/night_trade_forensics.py --self-test
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- разбор невозможен"; exit 1; }
+          mkdir -p data docs
+          "$PY" analysis/night_trade_forensics.py \
+            --mint '${{ inputs.mint }}' \
+            --pool '${{ inputs.pool }}' \
+            --source-signature '${{ inputs.source_signature }}' \
+            --source-slot '${{ inputs.source_slot }}' \
+            --our-wallet '${{ inputs.our_wallet }}' \
+            --source-wallet '${{ inputs.source_wallet }}' \
+            --window-slots '${{ inputs.window_slots }}' \
+            --max-tx '${{ inputs.max_tx }}' \
+            --out data/trade_forensics.json \
+            --out-md docs/trade_forensics.md 2>&1 | tail -80
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/trade_forensics.json docs/trade_forensics.md; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Razbor sdelki po tsepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
