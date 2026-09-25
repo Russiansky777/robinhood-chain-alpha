@@ -1,29 +1,70 @@
-=== NL-хост, живучесть служб, 2026-09-25T12:27:51Z ===
+=== NL-хост, живучесть служб, 2026-09-25T14:23:36Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Wed 2026-09-23 13:29:56 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 14:53:45 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Fri 2026-09-25 06:18:11 CEST
-bloom-detector: active=active enabled=enabled restarts=0 since=Fri 2026-09-25 14:01:56 CEST
+bloom-detector: active=active enabled=enabled restarts=0 since=Fri 2026-09-25 16:03:50 CEST
 grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 18:10:07 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-25T12:27:04Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-25T14:22:57Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T12:27:04Z",
-  "updated_ts": 1790339224.4374793,
-  "alive_since_utc": "2026-09-25T12:01:56Z",
+  "updated_utc": "2026-09-25T14:22:57Z",
+  "updated_ts": 1790346177.8658319,
+  "alive_since_utc": "2026-09-25T14:03:51Z",
   "mode": "live",
-  "sources": 20,
-  "sources_from": "DBot живьём + тестовых источников из окружения: 2",
+  "sources": 80,
+  "source_groups": {
+    "file": "/home/bot/data/sources_2026-09-25.json",
+    "why_not": null,
+    "in_file": {
+      "lane_only": 38,
+      "speed_only": 22
+    },
+    "subscribed": {
+      "bloom_lane": 20,
+      "lane_only": 38,
+      "speed_only": 22
+    },
+    "policies": {
+      "bloom_lane": {
+        "lane_sol": 0.05,
+        "bloom_trades": true,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": null
+      },
+      "lane_only": {
+        "lane_sol": 0.05,
+        "bloom_trades": false,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": null
+      },
+      "speed_only": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "fanout": false,
+        "day_cap_sol": 0.2,
+        "stop_loss_sol": 0.15
+      }
+    }
+  },
+  "bloom_skipped_by_group": 0,
+  "sources_from": "DBot живьём + групп источников: 60 + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 10,
+  "signals_seen": 53649,
   "to_buy": 0,
   "by_code": {
-    "TOKEN_RECEIVED_NOT_BOUGHT": 5,
-    "NOT_A_BUY": 3,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 2
+    "TOKEN_RECEIVED_NOT_BOUGHT": 8595,
+    "NOT_A_BUY": 43108,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 1489,
+    "STALE": 326,
+    "THRESHOLD_EDGE": 10,
+    "SKIP_TARGET_INCREASE_POSITION": 105,
+    "AMBIGUOUS_TX": 16
   },
   "by_code_test_source": {},
   "test_sources": [
@@ -34,26 +75,27 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 119.79855396441741,
+  "rate_usd_sol": 120.04807710268693,
   "rate_fresh": true,
-  "rate_stale_used": 0,
+  "rate_stale_used": 438,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
   "kill_active": false,
   "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": 450352435,
-  "slot_notifications": 5632,
-  "net_slot_age_s": 0.19,
+  "net_slot": 450378400,
+  "slot_notifications": 4219,
+  "net_slot_age_s": 0.07,
   "balance_sol": 1.967823914,
-  "balance_age_s": 9.68,
-  "rpc_calls": 429,
+  "balance_age_s": 9.73,
+  "rpc_calls": 863,
   "rpc_by_method": {
-    "getMultipleAccounts": 3,
-    "getBalance": 300,
-    "getLatestBlockhash": 126
+    "getMultipleAccounts": 450,
+    "getBalance": 228,
+    "getLatestBlockhash": 96,
+    "simulateTransaction": 89
   },
-  "session_credits": 433,
+  "session_credits": 43879,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -95,159 +137,63 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 749,
+    "silent_ticks": 0,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 2,
-    "would_pass": 0,
+    "built": 1617,
+    "would_pass": 89,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
     "passed_in_row_by_pool": {
-      "gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 0
+      "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH": 0,
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 1,
+      "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 0,
+      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 2,
+      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 0,
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0,
+      "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
+      "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": 0,
+      "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": 0,
+      "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch": 0,
+      "swapFpHZwjELNnjvThjajtiVmkz3yPQEHjLtka2fwHW": 0,
+      "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": 0,
+      "riptK81hDxhe5pW5jSzSM9iRA8azgEgLJ4dXkPtBS7j": 0,
+      "9H6tua7jkLhdm3w8BvgpTn5LZNU7g4ZynDmCiNN3q6Rp": 0,
+      "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2": 0,
+      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
+      "ZERor4xhbUycZ6gb9ntrhqscUcZmAbQDjEAtCf4hbZY": 0,
+      "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP": 0,
+      "gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 0,
+      "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 0,
+      "pegVkBpfR9GFi5Jaa9YXAHACyM9CzCNvhc5bf8GWNyW": 0,
+      "swapNyd8XiQwJ6ianp9snpu4brUqFxadzvHebnAXjJZ": 0,
+      "HpNfyc2Saw7RKkQd8nEL4khUcuPhQ7WwY1B2qjx8jxFq": 0,
+      "BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p": 0,
+      "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi": 0
     },
     "hour": {
-      "since_ts": 1790337716.652734,
-      "since_utc": "2026-09-25T12:01:56Z",
-      "signals": 2,
-      "built": 0,
+      "since_ts": 1790345031.336711,
+      "since_utc": "2026-09-25T14:03:51Z",
+      "signals": 1617,
+      "built": 89,
       "sim_failed": 0,
       "not_built": {
-        "пул: неоднозначная котировка: 3 встречных счетов (EPjFWd, So1111)": 1,
-        "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 1
-      },
-      "crashed": 0
-    },
-    "restarts": 0,
-    "last_restart_utc": "",
-    "credits_day": 29,
-    "credits_write_why_not": ""
-  },
-  "route_tax_filter": {
-    "price_curve_loaded": true,
-    "price_curve_why_not": "",
-    "module_loaded": true,
-    "module_why_not": "",
-    "code": "SKIP_TAXED_ROUTE",
-    "skipped": 0,
-    "skipped_test": 0
-  },
-  "own_send": {
-    "enabled": true,
-    "live": true,
-    "module_loaded": true,
-    "module_why_not": "",
-    "paths": 0,
-    "starts": 0,
-    "threads_alive": 0,
-    "sent": 0,
-    "by_stage": {},
-    "bought_backfilled": 0,
-    "wallet": "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w",
-    "own_wallet": true,
-    "wallet_ready": {
-      "wallet": "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w",
-      "own_wallet": true,
-      "ok": true,
-      "why_not": null
-    },
-    "balance_sol": 0.1,
-    "balance_age_s": 9.7,
-    "sim_shadow": {
-      "done": 0,
-      "would_fail": 0
-    },
-    "blockhash_age_s": 4.6,
-    "blockhash_updates": 126,
-    "blockhash_why_not": "",
-    "last": {},
-    "lane_kill": [
-      false,
-      ""
-    ],
-    "limits": {
-      "open": 1,
-      "per_day": 20,
-      "size_sol": 0.01,
-      "stop_failed_in_row": 3,
-      "stop_loss_sol": 0.1
-    },
-    "lane_state": {
-      "open": 0,
-      "today": 1,
-      "failed_in_row": 0,
-      "pnl_sol": 0.0,
-      "uncountable_today": 0,
-      "uncountable_why": [],
-      "total": 1
-    },
-    "control": {
-      "enabled": true,
-      "seen": 0,
-      "senders_seen": 0,
-      "spent_today": {
-        "day": "20260925",
-        "n": 0,
-        "signals": 0,
-        "spent_lamports": 0,
-        "why_not": null,
-        "spent_sol": 0.0
-      },
-      "limits": {
-        "signals_per_day": 20,
-        "spend_sol_per_day": 0.05,
-        "per_sender_sol": 0.001
-      },
-      "by_sender": {}
-    }
-  },
-  "leg_cache": {
-    "enabled": true,
-    "pools": 4,
-    "templates": {},
-    "fed": 0,
-    "no_tx": 0,
-    "failed": 0,
-    "luts": 32,
-    "luts_pending": 0,
-    "luts_warmed": 32,
-    "warm_why_not": "",
-    "luts_topped_up": 0,
-    "top_up_why_not": "",
-    "bytes": 0,
-    "credits": 0,
-    "credits_day": 30000,
-    "credits_before_start": 30000,
-    "credits_write_why_not": "",
-    "credit_budget": 30000,
-    "dropped": true,
-    "dropped_why": "бюджет замера на сутки уже исчерпан до старта: 30000 из 30000",
-    "ingest_stats": {}
-  },
-  "telegram_commands": {
-    "enabled": true,
-    "why_not": "",
-    "accepted": 0,
-    "from_strangers": 0,
-    "errors": 0,
-    "last_error": "",
-    "last_command": "",
-    "last_command_utc": "",
-    "offset": 396350741,
-    "seen_chats": {}
-  },
-  "bloom_keepalive": {
-    "enabled": true,
- 
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-25T12:27:56Z):
+        "тип пула не покрыт сборщиком: TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH": 49,
+        "пул: в транзакции нет хранилища минта с движением против трейдера": 796,
+        "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 92,
+        "котировка не SOL: шаблона SOL -> Q в кэше нет": 246,
+        "шаблон: у источника CLMM не «точный вход без лимита цены»": 48,
+    
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-25T14:23:42Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T12:27:56Z",
-  "updated_ts": 1790339276.9636912,
+  "updated_utc": "2026-09-25T14:23:42Z",
+  "updated_ts": 1790346222.0199962,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -306,18 +252,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-25T12:27:48Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-25T14:22:48Z):
 {
-  "updated_utc": "2026-09-25T12:27:48Z",
-  "uptime_s": 84842.4,
+  "updated_utc": "2026-09-25T14:22:48Z",
+  "uptime_s": 91742.6,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
-    {
-      "utc": "2026-09-24T16:14:00Z",
-      "method": "logsSubscribe",
-      "acked": 18,
-      "of": 18
-    },
     {
       "utc": "2026-09-24T16:42:30Z",
       "method": "logsSubscribe",
@@ -371,35 +311,41 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
       "method": "logsSubscribe",
       "acked": 18,
       "of": 18
+    },
+    {
+      "utc": "2026-09-25T14:14:55Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
     }
   ],
   "источников": 18,
-  "событий_записано": 1314,
-  "дублей_пропущено": 20,
-  "неудачных_пропущено": 156,
-  "переподключений_tx": 12,
+  "событий_записано": 1412,
+  "дублей_пропущено": 27,
+  "неудачных_пропущено": 170,
+  "переподключений_tx": 13,
   "причины_разрыва_tx": {
-    "ConnectionClosedError: no close frame received or sent": 12
+    "ConnectionClosedError: no close frame received or sent": 13
   },
-  "слепое_время_с": 12.9,
+  "слепое_время_с": 14.0,
   "слепое_время_доля": 0.00015,
   "переподключений_slot": 13,
-  "slot_уведомлений": 317668,
-  "текущий_слот": 450352601,
-  "последнее_событие_utc": "2026-09-25T12:25:34Z",
+  "slot_уведомлений": 343419,
+  "текущий_слот": 450378364,
+  "последнее_событие_utc": "2026-09-25T14:22:46Z",
   "часы": {
-    "checked_at_utc": "2026-09-25T11:53:47Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Fri 2026-09-25 13:53:47 CEST\nRTCTimeUSec=Fri 2026-09-25 13:53:47 CEST",
+    "checked_at_utc": "2026-09-25T13:53:47Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Fri 2026-09-25 15:53:47 CEST\nRTCTimeUSec=Fri 2026-09-25 15:53:47 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-25T12:28:00Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-25T14:23:38Z):
 {
-  "utc": "2026-09-25T12:28:00Z",
+  "utc": "2026-09-25T14:23:38Z",
   "started_utc": "2026-09-24T16:10:08Z",
-  "uptime_s": 73071.2,
+  "uptime_s": 80009.1,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -486,7 +432,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
     "spent_today": 14,
     "limit": 300000,
     "share": 0.0,
-    "projected_daily": 16,
+    "projected_daily": 15,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 0.0,
@@ -529,10 +475,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "grpc": 1056,
-      "rabbit_ams": 1189,
-      "grpc2": 1056,
-      "rabbit_fra": 1188
+      "grpc": 1154,
+      "rabbit_ams": 1301,
+      "grpc2": 1154,
+      "rabbit_fra": 1300
     },
     "duplicates": {
       "rabbit_fra": 1,
@@ -549,129 +495,181 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Thu 2026-09-24 1
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 31,
-        "first_share": 0.8387,
-        "median_ms": 1.76,
-        "p10_ms": -0.71,
-        "p90_ms": 6.48,
-        "p95_ms": 7.43,
-        "mean_ms": 2.64
+        "pairs": 42,
+        "first_share": 0.8095,
+        "median_ms": 2.35,
+        "p10_ms": -1.44,
+        "p90_ms": 5.96,
+        "p95_ms": 6.51,
+        "mean_ms": 2.31
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 31,
-        "first_share": 0.7419,
-        "median_ms": 2.11,
-        "p10_ms": -5.52,
-        "p90_ms": 3.71,
-        "p95_ms": 4.65,
-        "mean_ms": 14.05
+        "pairs": 42,
+        "first_share": 0.7619,
+        "median_ms": 1.12,
+        "p10_ms": -3.35,
+        "p90_ms": 6.15,
+        "p95_ms": 211.66,
+        "mean_ms": 20.15
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 31,
-        "first_share": 0.4516,
-        "median_ms": -0.68,
-        "p10_ms": -5.86,
-        "p90_ms": 4.11,
-        "p95_ms": 4.75,
-        "mean_ms": -0.21
+        "pairs": 42,
+        "first_share": 0.381,
+        "median_ms": -1.3,
+        "p10_ms": -4.35,
+        "p90_ms": 3.41,
+        "p95_ms": 4.5,
+        "mean_ms": -0.85
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 31,
-        "first_share": 0.4194,
-        "median_ms": -1.35,
-        "p10_ms": -6.65,
-        "p90_ms": 2.61,
-        "p95_ms": 3.38,
-        "mean_ms": 11.41
+        "pairs": 42,
+        "first_share": 0.3571,
+        "median_ms": -2.14,
+        "p10_ms": -6.63,
+        "p90_ms": 2.27,
+        "p95_ms": 209.0,
+        "mean_ms": 17.84
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 31,
-        "first_share": 0.0645,
-        "median_ms": -2.41,
-        "p10_ms": -5.33,
-        "p90_ms": -0.75,
-        "p95_ms": -0.37,
-        "mean_ms": -2.85
+        "pairs": 42,
+        "first_share": 0.0714,
+        "median_ms": -3.3,
+        "p10_ms": -5.03,
+        "p90_ms": -1.94,
+        "p95_ms": 2.31,
+        "mean_ms": -3.16
       },
       "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 37,
-        "first_share": 0.4054,
-        "median_ms": -1.53,
-        "p10_ms": -4.96,
-        "p90_ms": 2.67,
-        "p95_ms": 3.58,
-        "mean_ms": -17.93
+        "pairs": 49,
+        "first_share": 0.3878,
+        "median_ms": -2.05,
+        "p10_ms": -4.83,
+        "p90_ms": 1.81,
+        "p95_ms": 4.08,
+        "mean_ms": -18.2
       }
     },
-    "pairs_total": 37
+    "pairs_total": 49
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 1054 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 56926 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: 539 строк
-/home/bot/dbot_detect_probe/events.jsonl: 7756 строк
+/home/bot/dbot_detect_probe/events.jsonl: 7854 строк
 
 --- решения детектора по кодам ---
-всего решений: 1054
+всего решений: 56935
 первое: "ts_utc": "2026-09-24T22:01:00Z"
-последнее: "ts_utc": "2026-09-25T12:25:34Z"
+последнее: "ts_utc": "2026-09-25T14:23:48Z"
 по кодам:
-    311 NOT_A_BUY
-    156 TOKEN_RECEIVED_NOT_BOUGHT
-    118 SKIP_TARGET_INCREASE_POSITION
-    108 TARGET_AMOUNT_OUT_OF_RANGE
+  43592 NOT_A_BUY
+   9077 TOKEN_RECEIVED_NOT_BOUGHT
+   1651 TARGET_AMOUNT_OUT_OF_RANGE
+    326 STALE
+    237 SKIP_TARGET_INCREASE_POSITION
      83 OWN_TX_SEEN
+     17 AMBIGUOUS_TX
+     11 THRESHOLD_EDGE
      10 BUY
       3 SKIP_TAXED_ROUTE
       2 SKIPPED_DUP_MINT
-      1 THRESHOLD_EDGE
 по задачам источника:
-    433 BATCH-5
-    272 BATCH-3
-      4 TEST
-забран bloom_detector.json (6528 байт)
+  54073 speed_only
+    493 BATCH-5
+    305 BATCH-3
+     56 lane_only
+      9 TEST
+забран bloom_detector.json (6760 байт)
 забран bloom_seller.json (3743 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 63390 кредитов, бюджет 150000, доля 0.4226
+  bloom_detector: 109465 кредитов, бюджет 150000, доля 0.7298  ВЫШЕ 70% (останов запрещён владельцем -- только доклад)
   bloom_seller: 47 кредитов, бюджет 15000, доля 0.0031
   c2_own_send_dry: 1 кредитов, бюджет НЕ ЗАДАН ВЛАДЕЛЬЦЕМ
-  ВСЕГО за 2026-09-25: 63438 кредитов
+  ВСЕГО за 2026-09-25: 109513 кредитов
   без бюджета: c2_own_send_dry -- порог назовёт владелец
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 9 с (свежий)
-/home/bot/bloom_executor_live_data/seller_heartbeat.json: 3 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 26 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 4 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 1 с (свежий)
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 2 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 11 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 1 с (свежий)
 
---- сбои за последние 60 минут ---
+--- сбои за последние 45 минут ---
 --- сторож продаж: UNSOLD и автопауза ---
 журнала продаж нет
 
 --- журнал детектора (ключи вычищены) ---
-Sep 25 13:53:53 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
-Sep 25 13:53:53 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
-Sep 25 13:53:53 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 25 13:53:53 claude-nl systemd[1]: bloom-detector.service: Consumed 6.701s CPU time, 121.0M memory peak, 0B memory swap peak.
-Sep 25 13:53:53 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 25 13:53:53 claude-nl python[696538]: 2026-09-25 13:53:53,973 INFO исполнитель подключён, режим live
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,086 INFO таблицы адресов прогреты: 32 из 32 запрошенных
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,119 INFO прогрев соединения к Bloom: раз в 20 с
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,120 INFO команды Telegram: слушаю
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,120 INFO источников: 20 (BATCH-3, BATCH-5, TEST), откуда: DBot живьём + тестовых источников из окружения: 2
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,264 INFO slotSubscribe подтверждён (подписка 10471100)
-Sep 25 13:53:54 claude-nl python[696538]: 2026-09-25 13:53:54,296 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 22
-Sep 25 14:01:56 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
-Sep 25 14:01:56 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
-Sep 25 14:01:56 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 25 14:01:56 claude-nl systemd[1]: bloom-detector.service: Consumed 2.433s CPU time, 94.9M memory peak, 0B memory swap peak.
-Sep 25 14:01:56 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,649 INFO исполнитель подключён, режим live
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,752 INFO прогрев соединения к Bloom: раз в 20 с
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,753 INFO команды Telegram: слушаю
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,753 INFO источников: 20 (BATCH-3, BATCH-5, TEST), откуда: DBot живьём + тестовых источников из окружения: 2
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,769 INFO таблицы адресов прогреты: 32 из 32 запрошенных
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,893 INFO slotSubscribe подтверждён (подписка 10500002)
-Sep 25 14:01:56 claude-nl python[701208]: 2026-09-25 14:01:56,902 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 22
+Sep 25 15:44:28 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Sep 25 15:44:28 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Sep 25 15:44:28 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 25 15:44:28 claude-nl systemd[1]: bloom-detector.service: Consumed 25.616s CPU time, 125.1M memory peak, 0B memory swap peak.
+Sep 25 15:44:29 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,358 INFO исполнитель подключён, режим live
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,451 INFO прогрев соединения к Bloom: раз в 20 с
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,452 INFO команды Telegram: слушаю
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,452 INFO источников: 20 (BATCH-3, BATCH-5, TEST), откуда: DBot живьём + тестовых источников из окружения: 2
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,476 INFO таблицы адресов прогреты: 32 из 32 запрошенных
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,613 INFO slotSubscribe подтверждён (подписка 11167752)
+Sep 25 15:44:29 claude-nl python[723151]: 2026-09-25 15:44:29,640 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 22
+Sep 25 16:03:50 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Sep 25 16:03:50 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Sep 25 16:03:50 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 25 16:03:50 claude-nl systemd[1]: bloom-detector.service: Consumed 5.350s CPU time, 113.4M memory peak, 0B memory swap peak.
+Sep 25 16:03:50 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,333 INFO исполнитель подключён, режим live
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,431 INFO прогрев соединения к Bloom: раз в 20 с
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,432 INFO команды Telegram: слушаю
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,432 INFO источников: 80 (BATCH-3, BATCH-5, TEST, lane_only, speed_only), откуда: DBot живьём + групп источников: 60 + тестовых источников из окружения: 2
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,463 INFO таблицы адресов прогреты: 32 из 32 запрошенных
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,582 INFO slotSubscribe подтверждён (подписка 11244555)
+Sep 25 16:03:51 claude-nl python[730792]: 2026-09-25 16:03:51,583 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 82
+Sep 25 16:10:23 claude-nl python[730792]: 2026-09-25 16:10:23,209 WARNING часы слотов оборвались (ConnectionClosedError: no close frame received or sent) -- переподключение через 1 с
+Sep 25 16:10:24 claude-nl python[730792]: 2026-09-25 16:10:24,269 INFO slotSubscribe подтверждён (подписка 11274510)
+Sep 25 16:12:06 claude-nl python[730792]: 2026-09-25 16:12:06,128 WARNING часы слотов оборвались (ConnectionClosedError: no close frame received or sent) -- переподключение через 1 с
+Sep 25 16:12:07 claude-nl python[730792]: 2026-09-25 16:12:07,203 INFO slotSubscribe подтверждён (подписка 11152357)
+Sep 25 16:13:17 claude-nl python[730792]: 2026-09-25 16:13:17,076 WARNING часы слотов оборвались (ConnectionClosedError: no close frame received or sent) -- переподключение через 1 с
+Sep 25 16:13:18 claude-nl python[730792]: 2026-09-25 16:13:18,151 INFO slotSubscribe подтверждён (подписка 11228354)
+
+--- последние 40 решений ---
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "5ZePbxoGEvYWyxzw21QkoRjcFED8gyejbxadFox4GNpsxNCrBM5XtJsTo64YTJUzEopXpQmTSBv78TTxwkhmTiMk", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "2zCo6bUowJMvr89ajxuWsPadAqJ2F9akCkxumNsSdgsL", "slot": 450378626, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Meteora DLMM", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Meteora DLMM", "Raydium CPMM"], "intermediate_mints": ["BjthYsyHKCMkEhFoNcANF4VVU4UPTLQjLxiH7jXjQdjS"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 4, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["2zCo6bUowJMvr89ajxuWsPadAqJ2F9akCkxumNsSdgsL", "BjthYsyHKCMkEhFoNcANF4VVU4UPTLQjLxiH7jXjQdjS", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool": "CJi8QBok22jwLA2eTWE6kif7hz1Fkz1HPYLoEYQhoHUK", "source_pool_candidates": [{"address": "CJi8QBok22jwLA2eTWE6kif7hz1Fkz1HPYLoEYQhoHUK", "with_wsol": true, "dex_programs": ["Meteora DLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 2.101642, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.23, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.221114, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.222362, "decide_latency_ms": 1.2, "source_slot": 450378626, "net_slot_at_decision": 450378626, "net_slot_age_s": 0.111, "rate_note": "трата не определена", "rate_age_s": 2.3, "rate_state": "курс свежий (2 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "x4nLMMJbtk8ypZDi3DPiqLwY2JYrxtUpjAnnqDsyczvQj97pbYKHuALpxUCCpAJRzjzLD6gxhw8J68RUdp5jERH", "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq", "mint": "GqUi4QApDfK8LvVAHvUwKpRQ5CMZqFuE7mht9cGLnviK", "slot": 450378627, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "token_program": null, "route": null, "native_delta_sol": 0.003223416, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.61, "gate_ms": 0.04, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.467079, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.46773, "decide_latency_ms": 0.7, "source_slot": 450378627, "net_slot_at_decision": 450378627, "net_slot_age_s": 0.102, "rate_note": "трата не определена", "rate_age_s": 2.6, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "4v5HVMYRP9tKQn6N4ZhcmjPXYoTSChGUTqCdu8eATxVMEYgRRrwCbkNEpZ6yR1i8A9To1HASG6jrVriAYJRCn4YY", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "slot": 450378627, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CLMM", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Raydium CLMM", "Raydium CPMM"], "intermediate_mints": ["F9PvspnWkP3hSLaYxQb2LvFRBgyrLVhdUJ5q39tZZPbC"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "F9PvspnWkP3hSLaYxQb2LvFRBgyrLVhdUJ5q39tZZPbC"]}, "source_pool_candidates": [{"address": "7s6U1SZJEiKGpeyDYN6KpT1SJbrLQpmBrHjXznPa1ZEr", "with_wsol": false, "dex_programs": ["Raydium CLMM", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "AqfwQ6tvFZqN4AQZAWgYQXVJ7JNVF9T2vGMt5VWHAPQS", "with_wsol": false, "dex_programs": ["Raydium CLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 7.453378474, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.37, "gate_ms": 0.01, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.47194, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.472325, "decide_latency_ms": 0.4, "source_slot": 450378627, "net_slot_at_decision": 450378627, "net_slot_age_s": 0.107, "rate_note": "трата не определена", "rate_age_s": 2.6, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "2vQDYvRPPypeTed7LgQLyaEuzAfwBsMiw2etxpfaZNkCeqoYuULFKqNRF8DoHTUk3xEXtQjz3cFywspRArngjYpZ", "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq", "mint": null, "slot": 450378627, "kind": "other", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": [], "token_program": null, "route": null, "native_delta_sol": 0.00151384, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "ни один некотировочный минт не изменился", "filter": "задача DBot", "test_source": false, "parse_ms": 0.4, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": "legacy", "t_recv_ts": 1790346240.506185, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.506607, "decide_latency_ms": 0.4, "source_slot": 450378627, "net_slot_at_decision": 450378627, "net_slot_age_s": 0.141, "rate_note": "трата не определена", "rate_age_s": 2.6, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "37Tq2hJRKJWk67sbBDAtJ2443Yh6cWJ8AztMPjR9ojLyhcNAVxq7TCUWV7PsxbCNwQuncrxJax2a9JXgRojFJtCG", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "8eMjbEgwqqBRLoHPFct6d5PRJeDuMD8d4AMhQKFYQceU", "slot": 450378628, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.23, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.662615, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.662877, "decide_latency_ms": 0.3, "source_slot": 450378628, "net_slot_at_decision": 450378628, "net_slot_age_s": 0.037, "rate_note": "трата не определена", "rate_age_s": 2.8, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "bKNcRTysSsTkpztZvHyB9h3LCcz7NRxS83CffxxdMGT4JsJNRZBaP1enzqUUkYJoXk5eduUB3VnvRbYuAKZQeD7", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "slot": 450378628, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": ["AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "3KAXs9Qhz1wPE5bXKx65iZAPv2WUaabuitnTxseuMoyj", "with_wsol": true, "dex_programs": ["Jupiter v6"], "rejected": null}, {"address": "3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 73.03830039, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.19, "gate_ms": 0.06, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.805223, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.806478, "decide_latency_ms": 1.3, "source_slot": 450378628, "net_slot_at_decision": 450378628, "net_slot_age_s": 0.181, "rate_note": "трата не определена", "rate_age_s": 2.9, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "2FJ8BanPdWKijgNGxAcEnWfKrYgWgZyjfB5xpG2m7Dw97wPerzGJyeLvvwMTna7KzE7Cy1xd8Eaob8myisCAyR7U", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "9NiHcbT8EohKJid1RdU3232tATmM1CvYemTeCP5iwro", "slot": 450378628, "kind": "buy", "spend_sol_eq": 0.005051715, "spend_mint": "So11111111111111111111111111111111111111112", "spend_ui": 0.005051715, "first_entry": false, "dex_programs": ["Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Raydium CPMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 1, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["9NiHcbT8EohKJid1RdU3232tATmM1CvYemTeCP5iwro", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": true, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "spend_candidates": {"So11111111111111111111111111111111111111112": 0.005051715}, "sol_out_gross": 0.005051715, "native_delta_sol": 0.0, "received_ui": 1845.93435, "slot_lag": 0, "action": "skip", "code": "TARGET_AMOUNT_OUT_OF_RANGE", "reason": "вход источника 0.005 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.3 % от порога)", "filter": "задача DBot", "test_source": false, "parse_ms": 0.39, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.830446, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.83086, "decide_latency_ms": 0.4, "source_slot": 450378628, "net_slot_at_decision": 450378628, "net_slot_age_s": 0.205, "rate_note": "трата в SOL/WSOL, курс не нужен", "rate_age_s": 3.0, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "stage": "shadow", "signature": "2FJ8BanPdWKijgNGxAcEnWfKrYgWgZyjfB5xpG2m7Dw97wPerzGJyeLvvwMTna7KzE7Cy1xd8Eaob8myisCAyR7U", "mint": "9NiHcbT8EohKJid1RdU3232tATmM1CvYemTeCP5iwro", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "ok": false, "pool_program": null, "pool_label": null, "quote_mint": null, "supported": false, "build_ms": null, "sim_ms": null, "sim_verdict": null, "sim_err": null, "sim_units": null, "sim_logs_tail": null, "min_out": null, "expected_out": null, "min_out_method": null, "why_not": "пул: в транзакции нет хранилища минта с движением против трейдера", "route": "one_hop", "cap_usd": null, "would_skip_cap": null, "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL", "shadow_total_ms": 0.07, "shadow_credits_day": 127}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "8got7HVHX3yNaiwctXkgpeLWgUsNvQc7pKJCEV9Gmr2SgE5SV8m47E279eLN4dz8PoEQ1BHVQ6TmuxnxGRXnU1Q", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "CwdDBaBhbK95JS7Hk4BHsv8VG2Ej5XSgVRMe1uiUsM2x", "slot": 450378629, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM"], "intermediate_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 1, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "CwdDBaBhbK95JS7Hk4BHsv8VG2Ej5XSgVRMe1uiUsM2x"]}, "source_pool_candidates": [{"address": "5aLY85pyxiuX3fd4RgM3Yc1e3MAL6b7UgaZz6MS3JUfG", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 13193250.784952, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.38, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": "legacy", "t_recv_ts": 1790346240.921479, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.921878, "decide_latency_ms": 0.4, "source_slot": 450378629, "net_slot_at_decision": 450378629, "net_slot_age_s": 0.042, "rate_note": "трата не определена", "rate_age_s": 3.0, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:00Z", "signature": "2HgvEsBefz9MVqCmZHbxGFdmcPQpwzihJdvZ5b5mqujjThbS7DVickS1ZunRfXkixHi3dkPaLUHx72kSsCHe6Sar", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "A4nT9WTd3jJkDhCKJU7E4TF75dFohE81mMYDEP38YfoF", "slot": 450378629, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["A4nT9WTd3jJkDhCKJU7E4TF75dFohE81mMYDEP38YfoF", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112", "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 842795.20819, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.9, "gate_ms": 0.04, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346240.928517, "t_recv_utc": "2026-09-25T14:24:00Z", "t_decide_ts": 1790346240.929456, "decide_latency_ms": 0.9, "source_slot": 450378629, "net_slot_at_decision": 450378629, "net_slot_age_s": 0.05, "rate_note": "трата не определена", "rate_age_s": 3.1, "rate_state": "курс свежий (3 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:01Z", "signature": "2govmLU1yn1hahfuq6tMJfMZEzr5SLten1K2iDGLLGxeknhNqWoy6zj1gBD7H3PafbNQtgubWLDBpUsEsYtGDAQR", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7", "slot": 450378631, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM"], "intermediate_mints": ["A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 1, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7"]}, "source_pool_candidates": [{"address": "59rzcjuEeYuTGWgdY2R3zrWg6Dwg3DvZMycb92EF4zW5", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 1014.641261, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.82, "gate_ms": 0.04, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346241.477939, "t_recv_utc": "2026-09-25T14:24:01Z", "t_decide_ts": 1790346241.478795, "decide_latency_ms": 0.9, "source_slot": 450378631, "net_slot_at_decision": 450378631, "net_slot_age_s": 0.087, "rate_note": "трата не определена", "rate_age_s": 3.6, "rate_state": "курс свежий (4 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:01Z", "signature": "3ZLy6MeKBdQJ2W3R818b9CP5jB1jhT1sBEBr6LgXGN57tBNp9RZkHTnunV8AE18UKFhALRGEzMd5GU4PzaKdWXcV", "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq", "mint": null, "slot": 450378631, "kind": "other", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": [], "token_program": null, "route": null, "native_delta_sol": 0.0015748, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "ни один некотировочный минт не изменился", "filter": "задача DBot", "test_source": false, "parse_ms": 0.29, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": "legacy", "t_recv_ts": 1790346241.528469, "t_recv_utc": "2026-09-25T14:24:01Z", "t_decide_ts": 1790346241.528785, "decide_latency_ms": 0.3, "source_slot": 450378631, "net_slot_at_decision": 450378631, "net_slot_age_s": 0.137, "rate_note": "трата не определена", "rate_age_s": 3.7, "rate_state": "курс свежий (4 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:01Z", "signature": "4G77q83pv1hodfsx7pkT5S3jUPt49iBmMNAh2F1Rok24TBRRptGk9opCSXmVvaS9q8SDDbB6JLQa24hBgQA1DxxH", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "ATqKVVa4h5WqjAMqJdG3mjtWXsW5SshyyUY7dXdvSvRs", "slot": 450378631, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Meteora DLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Meteora DLMM"], "intermediate_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 4, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["ATqKVVa4h5WqjAMqJdG3mjtWXsW5SshyyUY7dXdvSvRs", "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "575QMmDJRScYurxzo4jJ9NFiymc4mczgJpPjdfUp2h74", "with_wsol": false, "dex_programs": ["Raydium CPMM", "Meteora DLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 27355.564289, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.69, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 1, "t_recv_ts": 1790346241.573534, "t_recv_utc": "2026-09-25T14:24:01Z", "t_decide_ts": 1790346241.575245, "decide_latency_ms": 1.7, "source_slot": 450378631, "net_slot_at_decision": 450378631, "net_slot_age_s": 0.183, "rate_note": "трата не определена", "rate_age_s": 3.7, "rate_state": "курс свежий (4 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:01Z", "signature": "3PruQ2mFWbuLMPPjwgXho24conea3iM8fcyh5pUFxjvoUJdtP5MyN1uiqP1SLjzfFPp2e3JRNMTpRStwn2ATpacd", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "D1YZZg9dBZ7AbfknZVbaeVLto36eySwoFYEVhZrD4F4n", "slot": 450378633, "kind": "buy", "spend_sol_eq": 2.873283975, "spend_mint": "So11111111111111111111111111111111111111112", "spend_ui": 2.873283975, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 9, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["D1YZZg9dBZ7AbfknZVbaeVLto36eySwoFYEVhZrD4F4n", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "rejected": null}, {"address": "6TmYTscrayJqAygf8AeYk8hamNr7wkKedtnv8PNs1RGM", "with_wsol": true, "dex_programs": ["Jupiter v6", "Meteora DLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "J3itJ4AxEWCdE82gFjuENgvAW4Ny9k2bJL9yF3zRseTh", "with_wsol": false, "dex_programs": ["Jupiter v6", "Meteora DLMM"], "rejected": null}], "pool_why_not": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно", "flags": ["NO_SOL_POOL_IN_TX"], "spend_candidates": {"So11111111111111111111111111111111111111112": 2.873283975}, "sol_out_gross": 2.873283975, "native_delta_sol": 0.0, "received_ui": 42436.303593, "slot_lag": 0, "action": "skip", "code": "SKIP_TARGET_INCREASE_POSITION", "reason": "источник докупает уже имеющийся токен (skipTargetIncreasePosition=true)", "filter": "задача DBot", "test_source": false, "parse_ms": 0.68, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346241.9968, "t_recv_utc": "2026-09-25T14:24:01Z", "t_decide_ts": 1790346241.997512, "decide_latency_ms": 0.7, "source_slot": 450378633, "net_slot_at_decision": 450378633, "net_slot_age_s": 0.073, "rate_note": "трата в SOL/WSOL, курс не нужен", "rate_age_s": 4.1, "rate_state": "курс свежий (4 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:01Z", "stage": "shadow", "signature": "3PruQ2mFWbuLMPPjwgXho24conea3iM8fcyh5pUFxjvoUJdtP5MyN1uiqP1SLjzfFPp2e3JRNMTpRStwn2ATpacd", "mint": "D1YZZg9dBZ7AbfknZVbaeVLto36eySwoFYEVhZrD4F4n", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "ok": false, "pool_program": null, "pool_label": null, "quote_mint": null, "supported": false, "build_ms": null, "sim_ms": null, "sim_verdict": null, "sim_err": null, "sim_units": null, "sim_logs_tail": null, "min_out": null, "expected_out": null, "min_out_method": null, "why_not": "пул: в транзакции нет хранилища минта с движением против трейдера", "route": "one_hop", "cap_usd": null, "would_skip_cap": null, "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL", "shadow_total_ms": 0.08, "shadow_credits_day": 127}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "4TdYzHa3FZB4WyQozoBgB3HAKoeYJGJk7ZRSqp1x5ErtpUFad6Mzjr7zgcX25WjTjtP4AGfiAkbvREERsYU9JBNL", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", "slot": 450378635, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.34, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 1, "t_recv_ts": 1790346242.413744, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.414109, "decide_latency_ms": 0.4, "source_slot": 450378635, "net_slot_at_decision": 450378635, "net_slot_age_s": 0.084, "rate_note": "трата не определена", "rate_age_s": 4.5, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "2pdBuiHX6VJhNzD1Nw93ZpT8Au6ZjzfXi9EqveeQQGcst6kcJwEQ5TqmQomXWnTUnJJDH4zCVjEKVFN9y9Q1a2wR", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi", "slot": 450378636, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": ["5NEPihpLPdLwgHBTLAyCn9zHjCUKs9RGZ3xoaKHgVrim"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["5NEPihpLPdLwgHBTLAyCn9zHjCUKs9RGZ3xoaKHgVrim", "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi", "So11111111111111111111111111111111111111112"]}, "source_pool": "9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8", "source_pool_candidates": [{"address": "9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 102.969043, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.42, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.593954, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.594391, "decide_latency_ms": 0.4, "source_slot": 450378636, "net_slot_at_decision": 450378636, "net_slot_age_s": 0.016, "rate_note": "трата не определена", "rate_age_s": 4.7, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "poLexhKVHWmKSozxt7hSZ6gy1BosxgR3KMZ7ryPRS4gPNYSmR86MmiUyRcZuPWL9mzCqGeHQzAV2CvRw81EPL2V", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "DEms4dyc6hkJpwH9Xn4PKEh1DSLheXbLu4xkUUJgC21j", "slot": 450378636, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["BABANGA4JE7Kkam4nTrALAwAVgsNJUuFJnnkF7S16BZp"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BABANGA4JE7Kkam4nTrALAwAVgsNJUuFJnnkF7S16BZp", "DEms4dyc6hkJpwH9Xn4PKEh1DSLheXbLu4xkUUJgC21j", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "C7thjAy5Aau9wnN5fRrauqwYEtHWX79gMh6kBQfkF1CZ", "with_wsol": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 126201.321875, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.47, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.642761, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.643255, "decide_latency_ms": 0.5, "source_slot": 450378636, "net_slot_at_decision": 450378636, "net_slot_age_s": 0.065, "rate_note": "трата не определена", "rate_age_s": 4.8, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "2LGBED4zKeFakkm2fPUgoANozax5ZfMqvjbPMU9AsKH4VYBTz957FnyV3xStDwFV5UJEJ26iaZezL8oSUYxWsReD", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "FiyPnPU7nPgx73A94pntqUPhyfBPhMM54u25DWMzTwkH", "slot": 450378636, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["C1MHyoTJpRTeS9AQCyspNVu2EWAYCZwmJ1jNkEArFP1f"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["C1MHyoTJpRTeS9AQCyspNVu2EWAYCZwmJ1jNkEArFP1f", "FiyPnPU7nPgx73A94pntqUPhyfBPhMM54u25DWMzTwkH", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 87405.718433, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.29, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.732755, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.734065, "decide_latency_ms": 1.3, "source_slot": 450378636, "net_slot_at_decision": 450378636, "net_slot_age_s": 0.156, "rate_note": "трата не определена", "rate_age_s": 4.9, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "4FFmiE4JVJ1UD2nSGHbvhR1H85cPiMHSSqAvxZMSF3rVv1VH3LqtBcjGYpkXYp4T9xRQ8kHsaFymhbsesW4BpsJJ", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "6kNNgyrdvjkRC8eRGQqx5sLfZG2jTmg3NCFmkX2hYP4j", "slot": 450378636, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Orca Whirlpool", "Meteora DLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Jupiter v6", "Raydium CPMM", "Orca Whirlpool", "Meteora DLMM"], "intermediate_mints": ["J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 7, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["6kNNgyrdvjkRC8eRGQqx5sLfZG2jTmg3NCFmkX2hYP4j", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", "So11111111111111111111111111111111111111112"]}, "source_pool": "9Shcf6xbZyVddgE2Uunon8ooptxk6TPRBJFskhGjXSD1", "source_pool_candidates": [{"address": "9Shcf6xbZyVddgE2Uunon8ooptxk6TPRBJFskhGjXSD1", "with_wsol": true, "dex_programs": ["Jupiter v6", "Meteora DLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 26854.45, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.57, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.738291, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.738883, "decide_latency_ms": 0.6, "source_slot": 450378636, "net_slot_at_decision": 450378636, "net_slot_age_s": 0.161, "rate_note": "трата не определена", "rate_age_s": 4.9, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "2z4e2dzh1R2cvyE4AwW8AJkZfDxCoVQWUFu4U9F6jh1qdPJbrAL8d5TLt75Lsh2LZzyg9ZQJ9BEhZzPp5Fnc957J", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "8eMjbEgwqqBRLoHPFct6d5PRJeDuMD8d4AMhQKFYQceU", "slot": 450378636, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "8eMjbEgwqqBRLoHPFct6d5PRJeDuMD8d4AMhQKFYQceU", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"]}, "source_pool_candidates": [{"address": "FUNDduJTA7XcckKHKfAoEnnhuSud2JUCUZv6opWEjrBU", "with_wsol": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 526.344346, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.46, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.792774, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.79325, "decide_latency_ms": 0.5, "source_slot": 450378636, "net_slot_at_decision": 450378636, "net_slot_age_s": 0.215, "rate_note": "трата не определена", "rate_age_s": 4.9, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "5oq8gtjBvDQKjuRRYf2ZXZjrqMpjhaqp6jXDABUyNrftZQwLVWiBq2Y9bXan36UHtHFZVvv7hGvASuk1UJqHoJtY", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "rxczFZFvzksquCazjtv9vtEBYW7q4SwiqXkzBcw8NFW", "slot": 450378637, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.33, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.869854, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.870212, "decide_latency_ms": 0.4, "source_slot": 450378637, "net_slot_at_decision": 450378637, "net_slot_age_s": 0.049, "rate_note": "трата не определена", "rate_age_s": 5.0, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:02Z", "signature": "2JDNyuL9aZkCHYyh1MhbBdhXt9UhLEjbWCesnsorub27cmwmEU9ivWtKFLSzEyw1A5i1b5v4smxuY3LhqjH5fngt", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "slot": 450378637, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": ["FVbxaZtT5crMVkzttKbwojcoSZKfcbYmyRittduLMyPb"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "FVbxaZtT5crMVkzttKbwojcoSZKfcbYmyRittduLMyPb"]}, "source_pool_candidates": [{"address": "9vXcgYPxsNuUmAhRSzaDz5fSTkxSaqx9R22K2iuTne8a", "with_wsol": false, "dex_programs": ["Jupiter v6"], "rejected": null}, {"address": "CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 757.284304296, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.96, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346242.98986, "t_recv_utc": "2026-09-25T14:24:02Z", "t_decide_ts": 1790346242.991835, "decide_latency_ms": 2.0, "source_slot": 450378637, "net_slot_at_decision": 450378637, "net_slot_age_s": 0.171, "rate_note": "трата не определена", "rate_age_s": 5.1, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "qJ9MQpvgMpeXmXh4SF7KKPuco6Dj4r73RwYg6rqppNNUWxoAtX1GQCCqyFvX6mDkkxS372m2CfAoj414CPLVhkN", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "2sztT8K9Xu3cfp6WTEEB44Hdibmj3Pv6G2pWGM1vqzXP", "slot": 450378638, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["2sztT8K9Xu3cfp6WTEEB44Hdibmj3Pv6G2pWGM1vqzXP", "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool": "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn", "source_pool_candidates": [{"address": "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn", "with_wsol": true, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 15369.560309, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.48, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.194263, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.195759, "decide_latency_ms": 1.5, "source_slot": 450378638, "net_slot_at_decision": 450378638, "net_slot_age_s": 0.138, "rate_note": "трата не определена", "rate_age_s": 5.3, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "2MWMrjzaWeMHR58DoyuwhuffZvAJTbc7dxzhLLiE7FYW3p2T1UkQjMPUrBeGSFPyrARihkqvDxjJee9F93KRe3Ms", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", "slot": 450378638, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.4, "gate_ms": 0.08, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 1, "t_recv_ts": 1790346243.213306, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.21378, "decide_latency_ms": 0.5, "source_slot": 450378638, "net_slot_at_decision": 450378638, "net_slot_age_s": 0.156, "rate_note": "трата не определена", "rate_age_s": 5.3, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "2DdtKWVXxijeg5mHjNaeFEvqUCp5yfhq4S98ebhzJUFrSq3jJgt4iVn2urnpxNYjnGGr4H6UAJwBzurTZfi8NQqH", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx", "slot": 450378638, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": ["7Qy2cXpdj4Fu2DUPVWdN3oogM3JSwLUV2LZaKVgVcPZh"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["7Qy2cXpdj4Fu2DUPVWdN3oogM3JSwLUV2LZaKVgVcPZh", "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx"]}, "source_pool_candidates": [{"address": "6DoWvrcHSvdDq7XfufMb6BtcQHCYiquv6uWreRCaN1uU", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 5.0, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.39, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.24268, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.243092, "decide_latency_ms": 0.4, "source_slot": 450378638, "net_slot_at_decision": 450378638, "net_slot_age_s": 0.186, "rate_note": "трата не определена", "rate_age_s": 5.4, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "3CED9m5Tz2K6kSTdPW2LXZtbsk3AfGWzYYrsPyThGzmvmyAQEbpZGj72xenkyN1rshdFYCef4CN6kiqcoDKMNHcN", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "E7BkWx1mP1DwAy4pRXxV7PCZRZpwerYqEQmKsKLWNXJH", "slot": 450378639, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.43, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.346214, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.346671, "decide_latency_ms": 0.5, "source_slot": 450378639, "net_slot_at_decision": 450378639, "net_slot_age_s": 0.032, "rate_note": "трата не определена", "rate_age_s": 5.5, "rate_state": "курс свежий (5 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "4Wzi7qSfi5GEQ24XgGz5mogNYxL2tU7UfiXPHuwtj3ZsrYk3on9apHs61p1B1JDyi6nzXqkbzAAaAe1UZBKdPH2a", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "4G5YDqDvwgwSS3nLPDGDpGuetbG7rZYzNSBb1U4Tqbzi", "slot": 450378639, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.36, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": "legacy", "t_recv_ts": 1790346243.422118, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.422498, "decide_latency_ms": 0.4, "source_slot": 450378639, "net_slot_at_decision": 450378639, "net_slot_age_s": 0.108, "rate_note": "трата не определена", "rate_age_s": 5.5, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "5ubC9wtQnLxM3dsv4eckpGMEsjQFB7s7zMvSLpeNnzbBZj9koTjHbij1ui12Yu3Qky5CPHQmvwyxfebMx5zUL4g5", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "slot": 450378639, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CPMM", "Meteora DLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Raydium CPMM", "Meteora DLMM"], "intermediate_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 7, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "FLGxNEGZUiqkHgNokWEdDB7hzEveBefzS3bgf2K3N5nZ", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 3535585.119505, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.75, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.513104, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.513869, "decide_latency_ms": 0.8, "source_slot": 450378639, "net_slot_at_decision": 450378639, "net_slot_age_s": 0.199, "rate_note": "трата не определена", "rate_age_s": 5.6, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "46YkxyU3FNBuKuKHzaJNU9XdMe2BNegbpAYC9ouoGMd2GNxZh9yhJAapY5MFqkrgBpHRmPLCQXkhjk3AnqdDfELw", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "slot": 450378640, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Raydium CLMM", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Raydium CLMM", "Raydium CPMM"], "intermediate_mints": ["F9PvspnWkP3hSLaYxQb2LvFRBgyrLVhdUJ5q39tZZPbC"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "F9PvspnWkP3hSLaYxQb2LvFRBgyrLVhdUJ5q39tZZPbC"]}, "source_pool_candidates": [{"address": "6XYBYVdb5Gzegx8SbnKqxooM1DgLqvRCucH77NfPf6wb", "with_wsol": false, "dex_programs": ["Raydium CLMM", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "AqfwQ6tvFZqN4AQZAWgYQXVJ7JNVF9T2vGMt5VWHAPQS", "with_wsol": false, "dex_programs": ["Raydium CLMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 127.65821648, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.72, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.74659, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.748323, "decide_latency_ms": 1.7, "source_slot": 450378640, "net_slot_at_decision": 450378640, "net_slot_age_s": 0.034, "rate_note": "трата не определена", "rate_age_s": 5.9, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "3L7KEWmPja915a9ojFbvusfuVP1URAy9mLyCrsat5RHjrSuh774SwWBPNyDEQ7un4FhBhoLLk3A28UitpQk5V58W", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "slot": 450378640, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "intermediate_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 6, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "7n7pt4DkNZrLkxmUfpFCvpK91EaznNqXMwSryijPWwUf", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Meteora DLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 493775.597492, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.74, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.757038, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.757811, "decide_latency_ms": 0.8, "source_slot": 450378640, "net_slot_at_decision": 450378640, "net_slot_age_s": 0.043, "rate_note": "трата не определена", "rate_age_s": 5.9, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:03Z", "signature": "P8Ac4zKcrGU5ZyugHmNHDGbgXiup9r6FZZ53YsHuodcDnaiE3Asz3bzDpB7Q1hZRQPtsmQMpeY6oRTCVDhExorJ", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ", "slot": 450378640, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": ["7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 4, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7", "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ", "So11111111111111111111111111111111111111112"]}, "source_pool": "4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71", "source_pool_candidates": [{"address": "4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 41.98624, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.7, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346243.769678, "t_recv_utc": "2026-09-25T14:24:03Z", "t_decide_ts": 1790346243.770401, "decide_latency_ms": 0.7, "source_slot": 450378640, "net_slot_at_decision": 450378640, "net_slot_age_s": 0.056, "rate_note": "трата не определена", "rate_age_s": 5.9, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "4EXDZHRCK2zDUA3Uf5Pfg54V6v7ufpQMype75GVvanMBmmw6WniwEcjShBRE5ZkGzfVKuXXetFX5ozvjgmyfKuTi", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "slot": 450378641, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Raydium CLMM"], "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "route": {"programs": ["Jupiter v6", "Raydium CPMM", "Raydium CLMM"], "intermediate_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 4, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy", "EN74JUrqLk4s88fwXXZPctzT8c3Dbrr3Uwa6JbNT8LDt", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "9KT3fzBs9ca6w932vvsbDUAWDSx96ZKiFK57yEKw6d5M", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM", "Raydium CLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 1113404.032592, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.74, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346244.008126, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.008889, "decide_latency_ms": 0.8, "source_slot": 450378641, "net_slot_at_decision": 450378641, "net_slot_age_s": 0.046, "rate_note": "трата не определена", "rate_age_s": 6.1, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "2mFsRrPySsTB8zWqZawju2PaAWMw8saH8thLpcm7kkHYdRZGLmodmPGVDx1Eot8LRq8DFUYLM1WXZDcnHAkj3ccb", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", "slot": 450378641, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Orca Whirlpool", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Orca Whirlpool", "Raydium CPMM"], "intermediate_mints": ["CmTFnmtW19nCEz5QGmV7ojqhVKaXJVsPwR6t4QvCGiBd"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", "CmTFnmtW19nCEz5QGmV7ojqhVKaXJVsPwR6t4QvCGiBd", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "J5jzvT22u1Mt6de4gkBhEsTSTjBfYS7A6aF5jzu9ihkC", "with_wsol": false, "dex_programs": ["Orca Whirlpool"], "rejected": null}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "native_delta_sol": 0.0, "received_ui": 64.054142, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 1.27, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346244.043921, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.045217, "decide_latency_ms": 1.3, "source_slot": 450378641, "net_slot_at_decision": 450378641, "net_slot_age_s": 0.082, "rate_note": "трата не определена", "rate_age_s": 6.2, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "5fL9tT4BFwWCLhH6q25DvatGB8kc8CjYsyADN7HTZotyRE9WEzkp9rvRWyg4Ndj8v7fuW2ieKsnyNaLSomb9AETf", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "rxczFZFvzksquCazjtv9vtEBYW7q4SwiqXkzBcw8NFW", "slot": 450378642, "kind": "buy", "spend_sol_eq": 0.04829957, "spend_mint": "So11111111111111111111111111111111111111112", "spend_ui": 0.04829957, "first_entry": false, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Raydium CPMM", "Raydium CLMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 2, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": [], "other_tx_mints": ["4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"], "all_tx_mints": ["4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", "So11111111111111111111111111111111111111112", "rxczFZFvzksquCazjtv9vtEBYW7q4SwiqXkzBcw8NFW"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": true, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "ProCXqRcXJjoUd1RNoo28bSizAA6EEqt9wURZYPDc5u", "with_wsol": true, "dex_programs": ["Raydium CPMM", "Raydium CLMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "spend_candidates": {"So11111111111111111111111111111111111111112": 0.04829957}, "sol_out_gross": 0.04829957, "native_delta_sol": 0.0, "received_ui": 1312.215762133, "slot_lag": 0, "action": "skip", "code": "TARGET_AMOUNT_OUT_OF_RANGE", "reason": "вход источника 0.048 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.4 % от порога)", "filter": "задача DBot", "test_source": false, "parse_ms": 48.5, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346244.269715, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.318253, "decide_latency_ms": 48.5, "source_slot": 450378642, "net_slot_at_decision": 450378642, "net_slot_age_s": 0.104, "rate_note": "трата в SOL/WSOL, курс не нужен", "rate_age_s": 6.4, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "2n3DunW7nkZeZkQwB5q6Ms7fKfvU4eLCJw1DdnKRf5Q5F8CuLVPLfMiaT1qiMi5utVJAFjZJMtfAs7jV4jN5gBmw", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", "slot": 450378642, "kind": "sell", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": null, "dex_programs": ["Raydium CPMM"], "token_program": null, "route": null, "native_delta_sol": 0.0, "slot_lag": 0, "action": "skip", "code": "NOT_A_BUY", "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки", "filter": "задача DBot", "test_source": false, "parse_ms": 0.42, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 1, "t_recv_ts": 1790346244.320596, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.321033, "decide_latency_ms": 0.4, "source_slot": 450378642, "net_slot_at_decision": 450378642, "net_slot_age_s": 0.107, "rate_note": "трата не определена", "rate_age_s": 6.4, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "stage": "shadow", "signature": "5fL9tT4BFwWCLhH6q25DvatGB8kc8CjYsyADN7HTZotyRE9WEzkp9rvRWyg4Ndj8v7fuW2ieKsnyNaLSomb9AETf", "mint": "rxczFZFvzksquCazjtv9vtEBYW7q4SwiqXkzBcw8NFW", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "ok": false, "pool_program": null, "pool_label": null, "quote_mint": null, "supported": false, "build_ms": null, "sim_ms": null, "sim_verdict": null, "sim_err": null, "sim_units": null, "sim_logs_tail": null, "min_out": null, "expected_out": null, "min_out_method": null, "why_not": "пул: в транзакции нет хранилища минта с движением против трейдера", "route": "one_hop", "cap_usd": null, "would_skip_cap": null, "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL", "shadow_total_ms": 0.08, "shadow_credits_day": 127}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "96Go7orVF3qmm4YmZjYDE7P5bsf2vhsZbLorRbG8ETk6FRfuACUk3vWGjPbxdzoA9D5n4GTTuaypg3CiYJUK2GY", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "E7BkWx1mP1DwAy4pRXxV7PCZRZpwerYqEQmKsKLWNXJH", "slot": 450378642, "kind": "buy", "spend_sol_eq": 0.029483147, "spend_mint": "So11111111111111111111111111111111111111112", "spend_ui": 0.029483147, "first_entry": false, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Jupiter v6", "Raydium CPMM"], "intermediate_mints": [], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": false, "intermediate_from": "промежуточных нет", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["E7BkWx1mP1DwAy4pRXxV7PCZRZpwerYqEQmKsKLWNXJH", "So11111111111111111111111111111111111111112"]}, "source_pool_candidates": [{"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": true, "dex_programs": ["Jupiter v6", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "pool_why_not": "ни один кандидат не парный к WSOL или все отклонены", "flags": ["NO_SOL_POOL_IN_TX"], "spend_candidates": {"So11111111111111111111111111111111111111112": 0.029483147}, "sol_out_gross": 0.029483147, "native_delta_sol": 0.0, "received_ui": 261513835.807434, "slot_lag": 0, "action": "skip", "code": "TARGET_AMOUNT_OUT_OF_RANGE", "reason": "вход источника 0.029 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.5 % от порога)", "filter": "задача DBot", "test_source": false, "parse_ms": 0.38, "gate_ms": 0.03, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 0, "t_recv_ts": 1790346244.369613, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.37002, "decide_latency_ms": 0.4, "source_slot": 450378642, "net_slot_at_decision": 450378642, "net_slot_age_s": 0.156, "rate_note": "трата в SOL/WSOL, курс не нужен", "rate_age_s": 6.5, "rate_state": "курс свежий (6 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "stage": "shadow", "signature": "96Go7orVF3qmm4YmZjYDE7P5bsf2vhsZbLorRbG8ETk6FRfuACUk3vWGjPbxdzoA9D5n4GTTuaypg3CiYJUK2GY", "mint": "E7BkWx1mP1DwAy4pRXxV7PCZRZpwerYqEQmKsKLWNXJH", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "ok": false, "pool_program": null, "pool_label": null, "quote_mint": null, "supported": false, "build_ms": null, "sim_ms": null, "sim_verdict": null, "sim_err": null, "sim_units": null, "sim_logs_tail": null, "min_out": null, "expected_out": null, "min_out_method": null, "why_not": "пул: в транзакции нет хранилища минта с движением против трейдера", "route": "one_hop", "cap_usd": null, "would_skip_cap": null, "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL", "shadow_total_ms": 0.08, "shadow_credits_day": 127}
+{"schema_version": 2, "ts_utc": "2026-09-25T14:24:04Z", "signature": "5vRZmw8zRiVn8nD2ryTsa3QrYHATYDe22JruMxHeCv5U6SiJqE6MkUxeNZdWXDho9EPBCtCZociNPseCcDTbcVff", "source": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "mint": "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", "slot": 450378643, "kind": "received", "spend_sol_eq": null, "spend_mint": null, "spend_ui": null, "first_entry": false, "dex_programs": ["Pump AMM", "Raydium CPMM"], "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "route": {"programs": ["Pump AMM", "Raydium CPMM"], "intermediate_mints": ["BgTku6PSkG1umx46LBr3Ci2REcKNKcdndrN6Y4xiYAjP"], "mints_in_route": 2, "hops_by_mints": 1, "dex_calls": 3, "via_intermediate": true, "intermediate_from": "движение на счетах источника", "authorized_only_mints": [], "other_tx_mints": [], "all_tx_mints": ["2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", "BgTku6PSkG1umx46LBr3Ci2REcKNKcdndrN6Y4xiYAjP", "So11111111111111111111111111111111111111112"]}, "source_pool": "9qKxzRejsV6Bp2zkefXWCbGvg61c3hHei7ShXJ4FythA", "source_pool_candidates": [{"address": "9qKxzRejsV6Bp2zkefXWCbGvg61c3hHei7ShXJ4FythA", "with_wsol": true, "dex_programs": ["Pump AMM"], "rejected": null}, {"address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL", "with_wsol": false, "dex_programs": ["Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}, {"address": "LionX7R69tL1EEcpRkJ9jRuwV7bi4jFoKmZZnxiVK6y", "with_wsol": true, "dex_programs": ["Pump AMM", "Raydium CPMM"], "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"}], "native_delta_sol": 0.0, "received_ui": 2.036155, "slot_lag": 0, "action": "skip", "code": "TOKEN_RECEIVED_NOT_BOUGHT", "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего", "filter": "задача DBot", "test_source": false, "parse_ms": 0.55, "gate_ms": 0.02, "via": "transactionSubscribe", "parsed_from": "PARSE_VIA_MSG", "tx_version": 1, "t_recv_ts": 1790346244.547676, "t_recv_utc": "2026-09-25T14:24:04Z", "t_decide_ts": 1790346244.548253, "decide_latency_ms": 0.6, "source_slot": 450378643, "net_slot_at_decision": 450378643, "net_slot_age_s": 0.108, "rate_note": "трата не определена", "rate_age_s": 6.7, "rate_state": "курс свежий (7 с)", "rate_source": "geckoterminal", "source_task": "speed_only", "mode": "live"}
