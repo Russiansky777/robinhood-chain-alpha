@@ -1736,6 +1736,34 @@ def self_test() -> int:
     chk("на пустой транзакции сборка отказывает словами, а не падает",
         пусто_сб["ok"] is False and пусто_сб["why_not"], пусто_сб)
 
+    # --- СУХОЙ ПРОГОН НЕ МОЖЕТ ОТПРАВИТЬ. Он нужен, чтобы проверить сборку на
+    # настоящей транзакции ДО первой живой отправки, и цена ошибки тут -- та
+    # самая настоящая покупка. Проверяем не обещание, а код: флаг живой
+    # отправки выставляется в ноль внутри функции.
+    исходник = Path(__file__).read_text(encoding="utf-8")
+    # rsplit, а не split: имя функции встречается и в этой самой проверке, и
+    # первый кусок был бы куском самопроверки, а не рабочего кода.
+    тело_сухого = исходник.rsplit("def сухой_прогон", 1)[1].split("def main")[0]
+    chk("сухой прогон сам выставляет BLOOM_OWN_SEND_LIVE в ноль",
+        'os.environ["BLOOM_OWN_SEND_LIVE"] = "0"' in тело_сухого, "")
+    chk("в сухом прогоне нет ни отправителя, ни адреса Sender",
+        "отправитель" not in тело_сухого and "helius-rpc.com/fast" not in тело_сухого,
+        "")
+    было_live4 = os.environ.get("BLOOM_OWN_SEND_LIVE")
+    os.environ["BLOOM_OWN_SEND_LIVE"] = "1"
+    try:
+        # Даже при живом флаге в окружении путь сухого прогона обязан
+        # оказаться нежилым: проверяем через сам провести() с выключенным
+        # флагом, как это делает сухой прогон.
+        os.environ["BLOOM_OWN_SEND_LIVE"] = "0"
+        chk("при выключенном флаге живьём() ложно -- отправка невозможна",
+            живьём() is False, живьём())
+    finally:
+        if было_live4 is None:
+            os.environ.pop("BLOOM_OWN_SEND_LIVE", None)
+        else:
+            os.environ["BLOOM_OWN_SEND_LIVE"] = было_live4
+
     # --- В МОДУЛЕ НЕТ ВТОРОГО ПУТИ ОТПРАВКИ. Считаем только рабочую часть,
     # до самопроверки: в самой самопроверке имя метода встречается в
     # ожиданиях, и это не второй путь.
@@ -1751,5 +1779,69 @@ def self_test() -> int:
     return 0 if всего[1] == всего[0] else 1
 
 
+def сухой_прогон(подпись: str, *, источник: str, каталог: str,
+                 минт: str | None = None) -> int:
+    """СУХОЙ прогон полосы на НАСТОЯЩЕЙ транзакции источника: сборка и симуляция.
+
+    Зачем он есть. Первая живая отправка полосы случится на первом же боевом
+    сигнале, и узнать до неё, соберётся ли покупка на этом хосте с этими
+    данными, больше негде: самопроверка работает на синтетике. Этот прогон
+    берёт транзакцию источника из цепи, проходит путь до симуляции и печатает
+    стадию -- и НИЧЕГО не отправляет.
+
+    Отправить он не может по построению: BLOOM_OWN_SEND_LIVE выставляется в
+    ноль ЗДЕСЬ, до вызова, и в окружении прогона живой флаг не действует.
+    Полагаться на то, что "мы же не просили отправлять", нельзя: цена ошибки
+    -- настоящая покупка на настоящие деньги.
+    """
+    os.environ["BLOOM_OWN_SEND_LIVE"] = "0"
+    os.environ.setdefault("BLOOM_OWN_SEND", "1")
+    import bloom_detector as BD  # noqa: PLC0415
+
+    узел = BD.Helius(служба="c2_own_send_dry")
+    состояние = ST.ExecState(base=Path(каталог)) if каталог else None
+    tx = узел.транзакция(подпись)
+    if not tx:
+        print(json.dumps({"ok": False,
+                           "why_not": "узел не отдал транзакцию источника",
+                           "signature": подпись}, ensure_ascii=False, indent=2))
+        return 1
+    сиг_минт = минт
+    if not сиг_минт:
+        сиг = BD.сигнал_из_транзакции(tx, источник, подпись=подпись,
+                                       слот=tx.get("slot"))
+        сиг_минт = сиг.get("mint")
+    рез = провести(tx_источника=tx, источник=источник, минт=сиг_минт or "",
+                   состояние=состояние, rpc_call=узел.call,
+                   ключ_операции=f"dry-{подпись[:32]}",
+                   источник_подпись=подпись, источник_слот=tx.get("slot"))
+    рез["live_flag"] = живьём()
+    рез["mint_used"] = сиг_минт
+    print(json.dumps(рез, ensure_ascii=False, indent=2))
+    return 0 if рез.get("stage") in ("dry", "sim", "build") else 1
+
+
+def main() -> int:
+    import argparse  # noqa: PLC0415
+
+    p = argparse.ArgumentParser(description="полоса своей отправки")
+    p.add_argument("--self-test", action="store_true")
+    p.add_argument("--dry-run-signature", default="",
+                    help="подпись транзакции источника: сборка и симуляция, БЕЗ отправки")
+    p.add_argument("--source", default="", help="кошелёк источника этой сделки")
+    p.add_argument("--mint", default="", help="минт покупки (иначе определим по транзакции)")
+    p.add_argument("--state-dir", default="", help="каталог состояния службы")
+    a = p.parse_args()
+    if a.self_test:
+        return self_test()
+    if a.dry_run_signature:
+        if not a.source:
+            print("для сухого прогона нужен --source: без него неизвестно, чьи балансы смотреть")
+            return 2
+        return сухой_прогон(a.dry_run_signature, источник=a.source,
+                             каталог=a.state_dir, минт=a.mint or None)
+    return 0
+
+
 if __name__ == "__main__":
-    raise SystemExit(self_test() if "--self-test" in sys.argv else 0)
+    raise SystemExit(main())
