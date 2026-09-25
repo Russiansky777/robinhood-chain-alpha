@@ -1,0 +1,221 @@
+name: "Triton preconfs: зонд (только замер, детектор не трогаем)"
+
+# Владелец 25.09: "TRITON PRECONFS -- ЗОНД, как с Shyft: только измерение,
+# детектор не трогать... Регионы: только ams (fra -- если ams недоступен).
+# Фильтр: account_include = адреса наших источников... BAM: поток открыт
+# постоянно. Предел 5 000 сообщений в сутки, дальше закрыть и доложить.
+# Harmonic: тестовое окно -- один поток, регион ams, 2 часа в активное время...
+# Жёсткий предел: закрыть при 20 000 оплаченных слотов (~$30) или по истечении
+# 2 часов, что раньше... BAM и Harmonic одновременно в двух потоках не держать."
+# 25.09 отдельно: "TRITON_X_TOKEN положен в секреты (проект mainnet-shared)".
+#
+# ЧТО ЗДЕСЬ ПРОИСХОДИТ.
+#   1. Самопроверка зонда (сеть запрещена стражем самопроверок).
+#   2. Протокол берётся ИЗ ПЕРВОИСТОЧНИКА: preconfs.proto из репозитория
+#      rpcpool/preconfs-client, из него генерируются питоновские стабы. Ни
+#      одного поля по памяти.
+#   3. GetVersion -- дёшево и сразу: он требует того же x-token и говорит,
+#      какая точка присутствия ответила. Не прошёл -- дальше не идём.
+#   4. Поток с пределами владельца. Расход считается ЗА СУТКИ и переживает
+#      перезапуск; счётчики -- в признак жизни зонда.
+#   5. Отчёт: сравнение с тем, что видел детектор (по подписям из журнала
+#      решений) -- медиана, p90, доля, где preconf раньше, покрытие.
+#
+# ДЕТЕКТОР НЕ ТРОГАЕТСЯ ВОВСЕ: зонд -- отдельный процесс, отдельный журнал,
+# отдельный каталог состояния. Ни покупок, ни подписей, ни отправок.
+on:
+  workflow_dispatch:
+    inputs:
+      feed:
+        description: "'bam' (по умолчанию) или 'harmonic' -- одновременно нельзя"
+        required: false
+        default: "bam"
+      region:
+        description: "регион фида: ams (по слову владельца), fra -- если ams недоступен"
+        required: false
+        default: "ams"
+      seconds:
+        description: "сколько держать поток, секунд (harmonic: не больше 7200)"
+        required: false
+        default: "900"
+      version_only:
+        description: "'yes' -- только GetVersion: проверить токен и точку присутствия, поток не открывать"
+        required: false
+        default: "no"
+      report_only:
+        description: "'yes' -- только отчёт по уже собранному журналу зонда"
+        required: false
+        default: "no"
+
+concurrency:
+  group: triton-preconfs
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PROTO_URL: https://raw.githubusercontent.com/rpcpool/preconfs-client/main/preconfs-proto/proto/preconfs.proto
+  OUT_DIR: data/triton
+
+jobs:
+  probe:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 150
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка зонда ДО любой сети"
+        run: |
+          set -e
+          cd analysis
+          python3 triton_preconfs_probe.py --self-test | tail -1
+
+      - name: "Секрет заведён или нет (значение не печатается)"
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$TRITON_X_TOKEN" ]; then
+            echo "TRITON_X_TOKEN: задан, длина $(printf '%s' "$TRITON_X_TOKEN" | wc -c)"
+          else
+            echo "СБОЙ: TRITON_X_TOKEN не задан -- зонд не пойдёт"; exit 1
+          fi
+
+      - name: "Протокол из первоисточника и стабы gRPC"
+        if: ${{ inputs.report_only != 'yes' }}
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/preconfs"
+          code=$(curl -sS -L --max-time 40 -o "$RUNNER_TEMP/preconfs/preconfs.proto" \
+            -w '%{http_code}' "$PROTO_URL" || echo 000)
+          echo "preconfs.proto -> HTTP $code"
+          [ "$code" = "200" ] || { echo "СБОЙ: протокол не скачался"; exit 1; }
+          head -20 "$RUNNER_TEMP/preconfs/preconfs.proto"
+          python3 -m venv "$RUNNER_TEMP/triton_venv"
+          "$RUNNER_TEMP/triton_venv/bin/pip" install -q grpcio grpcio-tools protobuf solders
+          "$RUNNER_TEMP/triton_venv/bin/python" -m grpc_tools.protoc \
+            -I "$RUNNER_TEMP/preconfs" \
+            --python_out="$RUNNER_TEMP/preconfs" \
+            --grpc_python_out="$RUNNER_TEMP/preconfs" \
+            "$RUNNER_TEMP/preconfs/preconfs.proto"
+          ls -l "$RUNNER_TEMP/preconfs"
+          echo "PY=$RUNNER_TEMP/triton_venv/bin/python" >> "$GITHUB_ENV"
+          echo "PROTO_DIR=$RUNNER_TEMP/preconfs" >> "$GITHUB_ENV"
+
+      - name: "Адреса наших источников (разбором детектора, только чтение)"
+        if: ${{ inputs.report_only != 'yes' }}
+        run: |
+          set -e
+          mkdir -p "$OUT_DIR"
+          # Источники берутся ИЗ СНИМКА задач, который уже лежит в
+          # репозитории, и РАЗБОРОМ ДЕТЕКТОРА (bloom_detector.загрузить_источники):
+          # второй разбор того же снимка означал бы два списка источников,
+          # которые когда-нибудь разойдутся молча. DBot здесь не спрашивается
+          # вовсе, и ни одна задача там не меняется.
+          python3 analysis/triton_preconfs_probe.py \
+            --accounts-from-snapshot data/final/20260923T145755Z/konfig.json \
+            --accounts-out "$OUT_DIR/accounts.txt" --tasks 'BATCH-5,BATCH-3'
+          echo "адресов источников: $(wc -l < "$OUT_DIR/accounts.txt")"
+          [ -s "$OUT_DIR/accounts.txt" ] || { echo "СБОЙ: адресов источников нет"; exit 1; }
+
+      - name: "GetVersion: токен принят и какая точка присутствия ответила"
+        if: ${{ inputs.report_only != 'yes' }}
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          # Скрипт пишется файлом, а не heredoc в нулевой колонке: терминатор
+          # heredoc обязан стоять в нулевой колонке и ломает YAML (проверено
+          # 25.09 на этом же прогоне).
+          cat > "$RUNNER_TEMP/getversion.py" <<'PYEOF'
+          import os
+          import sys
+
+          sys.path.insert(0, os.environ["PROTO_DIR"])
+          import grpc
+          import preconfs_pb2
+          import preconfs_pb2_grpc
+
+          канал = grpc.secure_channel("preconfs.rpcpool.com:443",
+                                      grpc.ssl_channel_credentials())
+          мета = (("x-token", os.environ["TRITON_X_TOKEN"]),)
+          for имя, стаб in (("Harmonic", preconfs_pb2_grpc.HarmonicStub),
+                            ("BAM", preconfs_pb2_grpc.BAMStub)):
+              try:
+                  в = стаб(канал).GetVersion(preconfs_pb2.VersionRequest(),
+                                             metadata=мета, timeout=25)
+                  print(f"{имя}: версия {в.version}, точка присутствия {в.region}")
+              except grpc.RpcError as exc:
+                  # Слова сервера дословно: "x-token not entitled to this feed"
+                  # -- это ответ про подписку, и владельцу нужен он, а не наш
+                  # пересказ.
+                  print(f"{имя}: отказ {exc.code().name}: {exc.details()}")
+          PYEOF
+          "$PY" "$RUNNER_TEMP/getversion.py"
+
+      - name: "Поток с пределами владельца"
+        if: ${{ inputs.report_only != 'yes' && inputs.version_only != 'yes' }}
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          mkdir -p "$OUT_DIR"
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          cd analysis
+          PYTHONPATH="$PROTO_DIR:$PWD" "$PY" triton_preconfs_probe.py \
+            --feed '${{ inputs.feed }}' --region '${{ inputs.region }}' \
+            --accounts-file "../$OUT_DIR/accounts.txt" \
+            --seconds '${{ inputs.seconds }}' \
+            --out "../$OUT_DIR/preconfs_${{ inputs.feed }}_$stamp.jsonl" \
+            --status "../$OUT_DIR/probe_status.json" \
+            --state-dir "$RUNNER_TEMP" 2>&1 | tail -40
+          echo "TRITON_LOG=$OUT_DIR/preconfs_${{ inputs.feed }}_$stamp.jsonl" >> "$GITHUB_ENV"
+
+      - name: "Отчёт: опережает ли preconf нашу подписку"
+        if: ${{ always() }}
+        run: |
+          set -e
+          # Журнал решений детектора читается с хоста ТОЛЬКО на чтение и
+          # только строки с подписями: сравнивать надо то, что видел сам
+          # детектор, а не то, что мы думаем о его скорости.
+          mkdir -p "$OUT_DIR"
+          if [ -n "${{ secrets.VPS_SSH_KEY }}" ]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_key
+            chmod 600 ~/.ssh/vps_key
+            ssh -n -i ~/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new root@127.0.0.1 \
+              "tail -20000 $STATE_DIR/decisions.jsonl" > "$OUT_DIR/decisions_tail.jsonl" || true
+            echo "строк журнала решений: $(wc -l < "$OUT_DIR/decisions_tail.jsonl" 2>/dev/null || echo 0)"
+          fi
+          log_file="${TRITON_LOG:-}"
+          if [ -z "$log_file" ]; then
+            log_file=$(ls -t "$OUT_DIR"/preconfs_*.jsonl 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$log_file" ] || [ ! -s "$log_file" ]; then
+            echo "журнала зонда ещё нет -- отчёта не будет"; exit 0
+          fi
+          python3 analysis/triton_preconfs_probe.py \
+            --report-log "$log_file" \
+            --report-decisions "$OUT_DIR/decisions_tail.jsonl" \
+            --report-out "$OUT_DIR/preconfs_report.json"
+
+      - name: "Коммит журнала зонда и отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT_DIR" 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Triton preconfs: zhurnal zonda i otchyot [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
