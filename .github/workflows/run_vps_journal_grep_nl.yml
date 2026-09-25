@@ -76,9 +76,21 @@ jobs:
           mkdir -p /tmp/jgrep
           # nice/ionice: детектор на этом же хосте торгует, и замер не должен
           # его тормозить. Вывод идёт потоком сразу в файл на бегунке.
+          # Сначала ФАКТ о файле: есть ли он и какого размера. Без этого пустая
+          # выборка читается как "совпадений нет", хотя причина может быть в
+          # пути или в том, что журнал переехал.
+          ssh -n $SSH_OPTS root@$HOST "ls -l $SRC; wc -l < $SRC"
+          # ionice есть не везде: если его нет, команда упала бы целиком и
+          # выборка молча вышла бы пустой. Поэтому запускаем через nice, а
+          # ionice добавляем только когда он есть.
           ssh -n $SSH_OPTS root@$HOST \
-            "nice -n 15 ionice -c3 grep -F $ARGS $SRC | tail -n ${{ inputs.limit }}" \
-            > /tmp/jgrep/hits.jsonl || true
+            "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
+             nice -n 15 \$ION grep -F $ARGS $SRC | tail -n ${{ inputs.limit }}" \
+            > /tmp/jgrep/hits.jsonl && RC=0 || RC=$?
+          # grep без совпадений отдаёт 1 -- это не сбой, это ответ "нет такого".
+          # Любой другой код -- сбой, и он виден, а не съеден.
+          echo "выборка завершилась кодом $RC"
+          case "$RC" in 0|1) ;; *) echo "СБОЙ выборки"; exit "$RC" ;; esac
           echo "совпало строк: $(wc -l < /tmp/jgrep/hits.jsonl)"
           echo "байт: $(wc -c < /tmp/jgrep/hits.jsonl)"
 
