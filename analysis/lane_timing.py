@@ -100,6 +100,38 @@ def ряды(поз: dict, *, с_utc: str = "") -> list:
     return sorted(из_, key=lambda з: з["utc"])
 
 
+def ряды_bloom(поз: dict, *, с_utc: str = "") -> list:
+    """Сторона BLOOM: решение -> ответ площадки, по тем же покупкам.
+
+    В позиции лежат два времени, посчитанных живым кодом:
+      own_tx_seen_ms  -- от НАШЕГО решения до того, как мы увидели покупку в
+                         потоке;
+      bloom_to_seen_ms -- от ОТВЕТА Bloom до того же события.
+    Разница и есть "решение -> ответ Bloom": сколько прошло от решения до
+    момента, когда площадка сказала "принял". Ничего не достраиваем: нет
+    любого из двух полей -- строки нет.
+    """
+    из_ = []
+    for cid, п in поз.items():
+        if п.get("lane") == МЕТКА:
+            continue
+        когда = str(п.get("ts_intent_utc") or "")
+        if с_utc and когда and когда < с_utc:
+            continue
+        видно = п.get("own_tx_seen_ms")
+        от_ответа = п.get("bloom_to_seen_ms")
+        if видно is None or от_ответа is None:
+            continue
+        из_.append({
+            "cid": cid, "utc": когда, "группа": п.get("source_task") or "",
+            "решение_ответ_мс": round(float(видно) - float(от_ответа), 2),
+            "решение_видно_мс": round(float(видно), 2),
+            "ответ_видно_мс": round(float(от_ответа), 2),
+            "sol_in": п.get("sol_in"),
+        })
+    return sorted(из_, key=lambda з: з["utc"])
+
+
 def p(значения: list, доля: float):
     if not значения:
         return None
@@ -145,13 +177,26 @@ def main() -> int:
     поз = позиции(а.positions)
     ряд = ряды(поз, с_utc=а.since)
     св = сводка(ряд)
+    ряд_б = ряды_bloom(поз, с_utc=а.since)
+    зн_б = [з["решение_ответ_мс"] for з in ряд_б]
+    св_б = ({"покупок": len(ряд_б),
+              "решение_ответ_мс": {"n": len(зн_б),
+                                    "медиана": round(statistics.median(зн_б), 2),
+                                    "p90": p(зн_б, 0.9),
+                                    "мин": round(min(зн_б), 2),
+                                    "макс": round(max(зн_б), 2)}}
+             if зн_б else {"покупок": 0, "решение_ответ_мс": None})
     Path(а.out).parent.mkdir(parents=True, exist_ok=True)
     Path(а.out).write_text(
-        json.dumps({"since": а.since, "сводка": св, "ряды": ряд},
+        json.dumps({"since": а.since, "сводка": св, "ряды": ряд,
+                    "сводка_bloom": св_б, "ряды_bloom": ряд_б},
                    ensure_ascii=False, indent=1), encoding="utf-8")
 
-    print(f"позиций в журналах: {len(поз)}; покупок полосы со временем: {len(ряд)}")
+    print(f"позиций в журналах: {len(поз)}; покупок полосы со временем: {len(ряд)}; "
+           f"покупок Bloom со временем: {len(ряд_б)}")
     print(json.dumps(св, ensure_ascii=False, indent=1))
+    print("сторона Bloom (решение -> ответ площадки):")
+    print(json.dumps(св_б, ensure_ascii=False, indent=1))
     print()
     print("| время | группа | режим | решение→отправка, мс | сборка, мс | "
           "остаток, мс | вариантов | остаток/вариант, мс | отправка, мс |")
