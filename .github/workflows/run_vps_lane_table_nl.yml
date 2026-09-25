@@ -59,9 +59,13 @@ jobs:
           set -e
           set -o pipefail
           mkdir -p data
+          # Кошелёк полосы берём с хоста: в записях позиций в поле wallet лежит
+          # адрес ИСПОЛНИТЕЛЯ, и проверка токенов по нему смотрит не туда.
+          LANE_WALLET=$(ssh -n $SSH_OPTS root@$HOST "set -a; . /etc/bloom-executor/env; set +a; printf %s \$OWN_SEND_WALLET")
+          echo "кошелёк полосы: $LANE_WALLET"
           python3 analysis/lane_table.py \
             --positions /tmp/bloom_state/positions.jsonl \
-            --since '${{ inputs.since }}' --chain \
+            --since '${{ inputs.since }}' --chain --wallet "$LANE_WALLET" \
             --out-md data/lane_table.md \
             --out-json data/lane_table.json \
             --raw-json data/lane_table_raw.json | tail -40
