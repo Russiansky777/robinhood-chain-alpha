@@ -1,5 +1,3 @@
-  "mode": "live",
-  "live_buy_enabled": true,
   "live_test_enabled": false,
   "dry_run": false,
   "bump_sol": 0.005,
@@ -36,8 +34,10 @@
       "mint_cooldown_s": 900.0,
       "max_buys_per_mint": 2
     },
-    "open_positions": 0,
-    "open_mints": [],
+    "open_positions": 1,
+    "open_mints": [
+      "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ"
+    ],
     "counters": {
       "api_error_streak": 0,
       "unsold_streak": 0
@@ -51,15 +51,13 @@
     },
     "bloom_request_budget": {
       "limit_week": 10000,
-      "remaining_week": 9941,
+      "remaining_week": 9940,
       "stop_at": 0.8,
-      "spent_share": 0.0059,
+      "spent_share": 0.006,
       "stop": false
     }
   }
 }
-          "b1oomGGqPKGD6errbyfbVMBuzSC8WtAAYo8MwNafWW1",
-          "11111111111111111111111111111111",
           "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
           "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
           "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
@@ -69,7 +67,7 @@
       }
     ],
     "explain_failures": [],
-    "unexplained_count": 16,
+    "unexplained_count": 15,
     "not_checked": [],
     "not_checked_count": 0,
     "explain_limit": 40
@@ -84,45 +82,47 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 385,
+      "v2": 395,
       "unreadable": 0
     },
     "positions": {
       "v1": 0,
-      "v2": 478,
+      "v2": 484,
       "unreadable": 0
     },
     "mixed": false
   },
   "notes": [
-    "4 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)",
+    "5 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)",
     "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
   ],
   "blockers": [
-    "на кошельке 16 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни"
+    "открыто 1 настоящих позиций -- сначала должны закрыться",
+    "на кошельке 15 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни"
   ],
   "clean": false,
-  "verdict": "старт заблокирован, причин 1"
+  "verdict": "старт заблокирован, причин 2"
 }
 --- коротко ---
-режим: live, вердикт: старт заблокирован, причин 1
-кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 2.093737897 SOL при пороге 0.3
-чужая активность: известно=True, свежих за 24.0 ч 36, прежних 0 (самая свежая None)
+режим: live, вердикт: старт заблокирован, причин 2
+кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 2.073591207 SOL при пороге 0.3
+чужая активность: известно=True, свежих за 24.0 ч 35, прежних 0 (самая свежая None)
+    свежая чужая: 49Erjz6DvdVixFv383WKdhGEpvPFCrs1T3i9iZMrDHYYv1y1UQxsBkpaEPLhxo8SieDC9k834o4YGnReggR7CJwA 2026-09-25T01:08:31Z
     свежая чужая: 5UQf1VAnWoEqawMkpjibvMD4sdPXtp2E8vw11Ur3p9Xehw5vQiqJt8QT2ZTMEWNAK82fqLzjvfxiyAtRKMPFL5bs 2026-09-25T01:02:20Z
     свежая чужая: 5rRTEWrUb6NkhpLcVsx9xE19g7Vr4BTvRkeSbex2vaVcPaAgXfhhTZYkVJB9Q1Gtd1T8dPsx5d1ddbPRzBNK7u3R 2026-09-25T00:47:03Z
     свежая чужая: e2w3Jn9PaoVrDDmJ7kC388H9VbdqaZNCjedWqk35J1KVKtVJ12SZfjdR9vuHPPS4zYQVYDSsjoQ9zqMSVjuikjA 2026-09-25T00:32:21Z
     свежая чужая: 5PaEanbq1r853ura5LQoEk53357HbZ4kp8K37c8VJS3PKY9xVUJC1Sm6eXRjQEVz3mwEWyAaVYo9x8JHvxeVcPs7 2026-09-25T00:04:52Z
-    свежая чужая: 4wiothyEcNM6gVCpbLp6obQG6XJvXYBeuL46iBtSugVXozJFVJkhE6fXpqBcH2HwNqiZy4QTq842yPg2Gizfakmb 2026-09-24T23:36:20Z
-граница чужой активности: окно (2026-09-24T01:04:39Z)
-позиции: dry-run 0, настоящих открытых 0
-  БЛОКЕР: на кошельке 16 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
-  примечание: 4 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)
+граница чужой активности: окно (2026-09-24T01:08:44Z)
+позиции: dry-run 0, настоящих открытых 1
+  БЛОКЕР: открыто 1 настоящих позиций -- сначала должны закрыться
+  БЛОКЕР: на кошельке 15 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
+  примечание: 5 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T01:04:42Z",
-  "updated_ts": 1790298282.160474,
-  "alive_since_utc": "2026-09-25T01:04:41Z",
+  "updated_utc": "2026-09-25T01:08:46Z",
+  "updated_ts": 1790298526.5026627,
+  "alive_since_utc": "2026-09-25T01:08:46Z",
   "mode": "live",
   "sources": 20,
   "sources_from": "DBot живьём + тестовых источников из окружения: 2",
@@ -141,7 +141,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 117.5888589877461,
+  "rate_usd_sol": 117.52315513212325,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -152,13 +152,14 @@
   "net_slot": null,
   "slot_notifications": 0,
   "net_slot_age_s": null,
-  "balance_sol": 2.093737897,
-  "balance_age_s": 0.01,
-  "rpc_calls": 1,
+  "balance_sol": 2.073591207,
+  "balance_age_s": 0.06,
+  "rpc_calls": 2,
   "rpc_by_method": {
-    "getBalance": 1
+    "getBalance": 1,
+    "getLatestBlockhash": 1
   },
-  "session_credits": 1,
+  "session_credits": 2,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -199,20 +200,32 @@
     "passed_in_row_by_pool": {}
   },
   "own_send": {
-    "enabled": false,
+    "enabled": true,
     "live": false,
-    "module_loaded": false,
-    "module_why_not": "ModuleNotFoundError: No module named 'bloom_own_send'",
+    "module_loaded": true,
+    "module_why_not": "",
     "paths": 0,
     "sent": 0,
     "by_stage": {},
     "bought_backfilled": 0,
-    "blockhash_age_s": null,
-    "blockhash_updates": 0,
-    "blockhash_why_not": "ещё не обновлялся",
+    "blockhash_age_s": 0.1,
+    "blockhash_updates": 1,
+    "blockhash_why_not": "",
     "last": {},
-    "limits": {},
-    "lane_state": {}
+    "limits": {
+      "open": 1,
+      "per_day": 20,
+      "size_sol": 0.01,
+      "stop_failed_in_row": 3,
+      "stop_loss_sol": 0.1
+    },
+    "lane_state": {
+      "open": 0,
+      "today": 0,
+      "failed_in_row": 0,
+      "pnl_sol": 0.0,
+      "total": 0
+    }
   },
   "leg_cache": {
     "enabled": false,
@@ -237,7 +250,7 @@
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-25T01:04:42Z",
+    "last_utc": "2026-09-25T01:08:46Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -265,6 +278,6 @@
   "credits_log_error": "",
   "decide_latency_ms": null
 }--- решений в журнале ---
-386
+396
 --- позиций в журнале (должно быть 0: покупать нечем) ---
-478
+489
