@@ -3,15 +3,8 @@
 Ответы сервера дословно, значения ключей вычищены.
 
 ```
-blockrazor (BLOCKRAZOR_AUTH_TOKEN): НИ ОДНА схема не принята. header:apikey -> http 500: {"signature":"","error":"rpc error: code = Unknown desc = illegal transaction"}
- | header:Authorization -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
- | header:Authorization:Bearer -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
- | header:x-api-key -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
- | query:apikey -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
- | query:api-key -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
- | БЕЗ КЛЮЧА -> http 403: {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
-
-    header:apikey              http  500  непонятно: ответ не про ключ и не про тело  {"signature":"","error":"rpc error: code = Unknown desc = illegal transaction"}
+blockrazor (BLOCKRAZOR_AUTH_TOKEN): ключ принят схемой header:apikey
+    header:apikey              http  500  ключ принят: сервер жалуется на тело пробы, не на ключ  {"signature":"","error":"rpc error: code = Unknown desc = illegal transaction"}
 
     header:Authorization       http  403  ключ НЕ принят: сервер жалуется на ключ  {"signature":"","error":"error: Authentication information is missing. Please provide a valid auth token"}
 
