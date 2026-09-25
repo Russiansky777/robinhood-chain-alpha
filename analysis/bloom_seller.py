@@ -60,7 +60,7 @@ try:
 except ImportError:  # pragma: no cover
     JUP = None
 from bloom_exec_state import (  # noqa: E402
-    EXECUTOR_WALLET, STATE_CLOSED, ExecState, append_jsonl_fsync)
+    EXECUTOR_WALLET, STATE_CLOSED, МЕТКА_ПОЛОСЫ, ExecState, append_jsonl_fsync)
 
 PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 HELIUS_RPC = "https://mainnet.helius-rpc.com"
@@ -75,6 +75,12 @@ DEFAULT_LOOP_EVERY_S = 15.0
 DEFAULT_DUST_RAW = 1000           # меньше -- крошка, продавать нечего
 DEFAULT_PRIORITY_FEE = 0.001
 DEFAULT_PROCESSOR_TIP = 0.001
+
+# СКОЛЬКО ЖДЁМ КОЛИЧЕСТВО, КУПЛЕННОЕ ПОЛОСОЙ. Его добирает пульс детектора
+# одним getTransaction. Пока количества нет, продавать нечего: остаток минта
+# продать нельзя -- в нём лежит и покупка Bloom на 0.2 SOL. Не дождались --
+# UNSOLD и доклад владельцу, а не продажа наугад.
+DEFAULT_LANE_AMOUNT_WAIT_S = 300.0
 
 
 def env_float(name: str, default: float) -> float:
@@ -296,6 +302,23 @@ def due_for_watch(pos: dict, *, grace_s: float, now: float | None = None) -> boo
     return now >= (float(основа) + срок + grace_s)
 
 
+def срок_полосы(pos: dict, *, now: float | None = None) -> bool:
+    """Пора ли продавать позицию ПОЛОСЫ своей отправки.
+
+    Срок считается от НАШЕЙ отправки и БЕЗ запаса: авто-ордера Bloom у полосы
+    нет вовсе, значит после срока ждать нечего. Сам срок -- 28.8 с, как у
+    боевых покупок: сравнение полосы с Bloom честно только на одинаковом
+    горизонте.
+    """
+    now = now if now is not None else time.time()
+    if pos.get("state") == STATE_CLOSED:
+        return False
+    основа = pos.get("ts_sent") or pos.get("ts_accepted") or pos.get("ts_intent")
+    if not основа:
+        return True          # непонятно когда -- значит смотреть сейчас
+    return now >= (float(основа) + float(pos.get("sell_after_s") or 0.0))
+
+
 ПРЕДЕЛ_НЕУДАЧ = env_int("BLOOM_SELL_MAX_ATTEMPTS", 2)
 
 
@@ -434,6 +457,10 @@ class Seller:
         self.dust_raw = env_int("BLOOM_DUST_RAW", DEFAULT_DUST_RAW)
         self.предел_неудач = env_int("BLOOM_SELL_MAX_ATTEMPTS", ПРЕДЕЛ_НЕУДАЧ)
         self.жалоба_каждые_s = env_float("BLOOM_SELL_COMPLAIN_EVERY_S", 60.0)
+        # Сколько ждём количество, купленное полосой, прежде чем признать
+        # позицию UNSOLD. Продавать без него нельзя: см. DEFAULT_LANE_*.
+        self.ждать_количество_s = env_float("BLOOM_LANE_AMOUNT_WAIT_S",
+                                             DEFAULT_LANE_AMOUNT_WAIT_S)
         self._жалобы: dict = {}
         self.оповещатель = NT.Оповещатель() if NT is not None else None
         # Путь через Jupiter -- отдельным выключателем: он требует ключа
@@ -603,6 +630,13 @@ class Seller:
         mint = pos.get("mint")
         итог = {"client_order_id": cid, "mint": mint, "state_before": pos.get("state")}
 
+        # ПОЛОСА СВОЕЙ ОТПРАВКИ -- отдельной ветвью. У неё нет авто-ордера
+        # Bloom и нет права на весь остаток минта: путь Bloom ниже остаётся
+        # байт в байт таким, каким был.
+        if pos.get("lane") == МЕТКА_ПОЛОСЫ:
+            return self.обработать_полосу(pos, now=now, balance_reader=balance_reader,
+                                           читатель_tx=читатель_tx)
+
         if not due_for_watch(pos, grace_s=self.grace_s, now=now):
             итог["action"] = "ждём срок таймерного ордера"
             return итог
@@ -764,7 +798,168 @@ class Seller:
         self.log(итог)
         return итог
 
-    def продать_через_jupiter(self, pos: dict, *, bal: dict, now: float) -> dict:
+    def обработать_полосу(self, pos: dict, *, now: float,
+                           balance_reader=token_balance_raw,
+                           читатель_tx=None) -> dict:
+        """Позиция ПОЛОСЫ своей отправки. Три отличия от пути Bloom, и все про деньги:
+
+        1) срок -- от нашей отправки и без запаса: авто-ордера Bloom у полосы
+           нет, ждать его нечего;
+        2) продаётся РОВНО количество, купленное полосой (lane_bought_raw), и
+           никогда весь остаток минта: в остатке лежит покупка Bloom на 0.2
+           SOL, и продать её здесь значило бы закрыть чужую позицию;
+        3) путь один -- Jupiter Swap V2 с запасным Ultra и полом 70 %; неудача
+           ведёт к UNSOLD со СВОИМ счётчиком полосы, который торговлю Bloom не
+           останавливает.
+
+        Закрывается позиция полосы подтверждённой СВОЕЙ продажей, а не нулевым
+        остатком минта: остаток общий с Bloom, и по нему о полосе судить нельзя.
+        """
+        читатель_tx = читатель_tx if читатель_tx is not None else self.tx_читатель
+        cid = pos.get("client_order_id")
+        mint = pos.get("mint")
+        итог = {"client_order_id": cid, "mint": mint, "lane": МЕТКА_ПОЛОСЫ,
+                 "state_before": pos.get("state"),
+                 "lane_bought_raw": pos.get("lane_bought_raw")}
+        if not срок_полосы(pos, now=now):
+            итог["action"] = "ждём срок продажи полосы"
+            return итог
+
+        # ИТОГ ПРОШЛОЙ ПОПЫТКИ -- по цепи. Он же и закрывает позицию: своя
+        # продажа села -- позиция закрыта своим результатом.
+        исход = pos.get("last_sell_outcome") or {}
+        if pos.get("last_sell_signatures"):
+            свежий = self.доложить_прошлую_попытку(pos, читатель_tx=читатель_tx)
+            if not свежий.get("skipped"):
+                исход = свежий
+        if исход.get("known") and исход.get("ok"):
+            self.state.update_position(
+                cid, state=STATE_CLOSED, ts_closed=now,
+                closed_reason="продажа полосы подтверждена по цепи",
+                closed_sol_net=исход.get("sol_delta_net"))
+            self.state.note_sell_outcome(sold=True, lane=МЕТКА_ПОЛОСЫ)
+            итог.update(action="позиция полосы закрыта подтверждённой продажей",
+                         outcome=исход)
+            self.log(итог)
+            return итог
+
+        убит, почему = kill_sell_active(self.state)
+        if убит:
+            итог.update(action="продажа запрещена рубильником продаж", why_not=почему)
+            if self.оповещатель is not None and NT is not None:
+                self.оповещатель.послать(NT.строка_тревоги("рубильник продаж", почему))
+            self.log(итог)
+            return итог
+
+        # КОЛИЧЕСТВО. Без него продавать НЕЧЕГО: весь остаток минта продать
+        # нельзя. Пока не истёк срок ожидания -- ждём догон с пульса.
+        куплено = pos.get("lane_bought_raw")
+        if not isinstance(куплено, int) or куплено <= 0:
+            основа = (pos.get("ts_sent") or pos.get("ts_accepted")
+                       or pos.get("ts_intent"))
+            ждём = (now - float(основа)) if основа else None
+            if ждём is not None and ждём < self.ждать_количество_s:
+                итог.update(action="ждём количество, купленное полосой",
+                             waited_s=round(ждём, 1),
+                             why_not=pos.get("lane_bought_why_not"))
+                return итог
+            return self._полоса_unsold(
+                pos, now=now, итог=итог,
+                причина=("количество, купленное полосой, неизвестно -- остаток "
+                          "минта продавать нельзя: в нём покупка Bloom"))
+
+        bal = balance_reader(EXECUTOR_WALLET, mint)
+        if not bal.get("ok"):
+            итог.update(action="остаток не прочитан -- ничего не делаем",
+                         why_not=bal.get("why_not"))
+            self.state.update_position(
+                cid, balance_read_failed_at=now,
+                balance_read_why_not=str(bal.get("why_not"))[:300])
+            прошло = now - float(self._жалобы.get(cid) or 0.0)
+            if прошло >= self.жалоба_каждые_s:
+                self._жалобы[cid] = now
+                self.log(итог)
+            return итог
+        остаток = int(bal.get("raw") or 0)
+        итог["balance_raw"] = остаток
+        количество = min(куплено, остаток)
+        итог["lane_amount_raw"] = количество
+        if количество < self.dust_raw:
+            # Токена меньше, чем порог крошки: либо его уже продал путь Bloom
+            # (он выходит всем остатком), либо покупка не села. И то и другое
+            # -- не продажа полосы и не её UNSOLD.
+            self.state.update_position(
+                cid, state=STATE_CLOSED, ts_closed=now,
+                closed_reason=(f"продавать нечего: купленное полосой {куплено}, "
+                                f"остаток минта {остаток}, порог крошки "
+                                f"{self.dust_raw}"))
+            итог["action"] = "позиция полосы закрыта -- продавать нечего"
+            self.log(итог)
+            return итог
+
+        попыток = int(pos.get("jup_attempts") or 0)
+        if попыток >= self.предел_неудач:
+            return self._полоса_unsold(
+                pos, now=now, итог=итог, остаток=остаток,
+                причина=f"{попыток} попыток Jupiter подряд без продажи")
+        последняя = pos.get("ts_jup_attempt")
+        if попыток and последняя and (now - float(последняя)) < self.retry_every_s:
+            итог["action"] = (f"пауза между попытками полосы: прошло "
+                               f"{now - float(последняя):.0f} с из "
+                               f"{self.retry_every_s:.0f}")
+            return итог
+        if JUP is None or not self.jupiter_включён:
+            итог.update(action="полосе продавать нечем: путь Jupiter выключен",
+                         why_not=("BLOOM_SELL_VIA_JUPITER не равен 1"
+                                   if JUP is not None
+                                   else "модуль продажи через Jupiter не загружен"))
+            self.log(итог)
+            return итог
+
+        r = self.продать_через_jupiter(pos, bal=bal, now=now,
+                                       количество_raw=количество)
+        итог["jupiter"] = r
+        if r.get("ok"):
+            self.state.update_position(cid, state="selling",
+                                        ts_last_sell_attempt=now,
+                                        sell_address_kind="jupiter")
+            итог["action"] = "продажа полосы отправлена"
+            return итог
+        итог["action"] = "Jupiter полосе не продал"
+        if попыток + 1 >= self.предел_неудач:
+            # Предел исчерпан этой же попыткой: доклад владельцу сейчас, а не
+            # кругом позже.
+            return self._полоса_unsold(
+                pos, now=now, итог=итог, остаток=остаток,
+                причина=(f"{попыток + 1} попыток Jupiter подряд без продажи: "
+                          f"{r.get('why_not')}"))
+        return итог
+
+    def _полоса_unsold(self, pos: dict, *, now: float, итог: dict, причина: str,
+                        остаток: int | None = None) -> dict:
+        """UNSOLD полосы: доклад владельцу и СВОЙ счётчик.
+
+        Счётчик именно свой: три непроданных позиции полосы по 0.01 SOL не
+        имеют права остановить торговлю Bloom на 0.2 SOL.
+        """
+        cid = pos.get("client_order_id")
+        if pos.get("state") != "unsold":
+            self.state.update_position(cid, state="unsold", unsold_since=now,
+                                        unsold_reason=причина)
+            self.state.note_sell_outcome(sold=False, lane=МЕТКА_ПОЛОСЫ)
+            if self.оповещатель is not None and NT is not None:
+                self.оповещатель.послать(NT.строка_тревоги(
+                    "UNSOLD полосы",
+                    f"{причина}; минт {pos.get('mint')}, купленное "
+                    f"{pos.get('lane_bought_raw')}, остаток {остаток}"))
+            self.log({**итог, "action": "UNSOLD полосы, доклад владельцу",
+                       "why_not": причина})
+        итог.update(action="UNSOLD полосы -- ждём владельца", why_not=причина)
+        return итог
+
+
+    def продать_через_jupiter(self, pos: dict, *, bal: dict, now: float,
+                               количество_raw: int | None = None) -> dict:
         """Продажа через Ultra с полом по выходу. Одна попытка на позицию.
 
         Одна -- намеренно: если Ultra отказала или котировка ниже границы, то
@@ -774,10 +969,18 @@ class Seller:
         cid = pos.get("client_order_id")
         if JUP is None:
             return {"ok": False, "why_not": "модуль продажи через Jupiter не загружен"}
-        r = JUP.продать(mint=pos.get("mint"), amount_raw=int(bal.get("raw") or 0),
+        остаток = int(bal.get("raw") or 0)
+        # КОЛИЧЕСТВО. По умолчанию весь остаток минта -- так работает выход
+        # позиции Bloom. Полоса передаёт своё количество явно и никогда не
+        # продаёт больше: в остатке лежит покупка Bloom на 0.2 SOL. Потолок
+        # остатка стоит и здесь: продать больше, чем есть, значит потратить
+        # подпись и приоритет на транзакцию, которую сеть отвергнет.
+        сколько = остаток if количество_raw is None else min(int(количество_raw), остаток)
+        r = JUP.продать(mint=pos.get("mint"), amount_raw=сколько,
                          taker=EXECUTOR_WALLET, вход_sol=pos.get("sol_in"),
                          живьём=self.live)
-        поля = {"jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
+        поля = {"jup_amount_raw": сколько,
+                 "jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
                  "ts_jup_attempt": now,
                  "jup_floor": (r.get("floor") or {}).get("checks"),
                  # Каким путём шли и каким вышло -- в позицию. Без этого по
@@ -904,15 +1107,31 @@ class Seller:
         план = []
         for p in self.state.open_positions():
             bal = balance_reader(EXECUTOR_WALLET, p.get("mint"))
+            полоса = p.get("lane") == МЕТКА_ПОЛОСЫ
+            срок = (срок_полосы(p) if полоса
+                     else due_for_watch(p, grace_s=self.grace_s))
+            # У полосы к продаже РОВНО купленное ею, а не весь остаток минта.
+            куплено = p.get("lane_bought_raw") if полоса else None
+            сколько = (min(int(куплено), int(bal.get("raw") or 0))
+                        if полоса and isinstance(куплено, int) and bal.get("ok")
+                        else (int(bal.get("raw") or 0) if bal.get("ok") else None))
             план.append({
                 "client_order_id": p.get("client_order_id"), "mint": p.get("mint"),
                 "state": p.get("state"),
+                "lane": p.get("lane"),
                 "balance_raw": bal.get("raw") if bal.get("ok") else None,
                 "balance_read": bool(bal.get("ok")),
-                "due": due_for_watch(p, grace_s=self.grace_s),
-                "would_sell": bool(bal.get("ok") and int(bal.get("raw") or 0) >= self.dust_raw
-                                   and due_for_watch(p, grace_s=self.grace_s)),
-                "with_what": f"/swap Sell 100 % slippage {self.slippage} auto_orders []",
+                "lane_bought_raw": куплено,
+                "amount_raw": сколько,
+                "due": срок,
+                "would_sell": bool(сколько is not None and сколько >= self.dust_raw
+                                   and срок
+                                   and (not полоса
+                                        or (isinstance(куплено, int) and куплено > 0))),
+                "with_what": ("Jupiter Swap V2 (запасной Ultra), пол 70 %, "
+                               "количество -- купленное полосой" if полоса
+                               else f"/swap Sell 100 % slippage {self.slippage} "
+                                     "auto_orders []"),
             })
         return {"mode": "live" if self.live else "dry-run",
                  "kill_buy": self.state.kill_active(),
@@ -1406,6 +1625,178 @@ def self_test() -> None:
     chk("и серия непроданных выросла",
         int(st.counters().get("unsold_streak", 0)) >= 2,
         st.counters().get("unsold_streak"))
+
+    # --- ПОЛОСА СВОЕЙ ОТПРАВКИ. Проверяем то, что стоит денег: количество
+    # (ровно купленное полосой, никогда весь остаток минта -- в нём покупка
+    # Bloom на 0.2 SOL), срок без запаса, свой счётчик UNSOLD и закрытие
+    # позиции подтверждённой СВОЕЙ продажей.
+    st_л = ExecState(base=база / "lane_sell", kill=база / "НЕТ_РУБИЛЬНИКА")
+
+    def полосу_в_состояние(cid, минт, *, куплено=None, отправлено_назад=100.0,
+                            вход=0.01, поля=None):
+        st_л.write_intent(client_order_id=cid, mint=минт, source_sig=f"S{cid}",
+                           source_slot=1, sol_in=вход, pool=None, program=None,
+                           taxed=None, tax_bps=None, mode="live", sell_after_s=28.8,
+                           lane=МЕТКА_ПОЛОСЫ)
+        обн = {"state": "bought", "lane_signature": f"ПОДПИСЬ_{cid}",
+                "ts_sent": time.time() - отправлено_назад}
+        if куплено is not None:
+            обн["lane_bought_raw"] = куплено
+        обн.update(поля or {})
+        st_л.update_position(cid, **обн)
+        return st_л.positions()[cid]
+
+    было_вкл_л = os.environ.get("BLOOM_SELL_VIA_JUPITER")
+    os.environ["BLOOM_SELL_VIA_JUPITER"] = "1"
+    import bloom_jupiter_sell as JL  # noqa: PLC0415
+    старый_л = JL.продать
+    try:
+        sl = Seller(state=st_л, live=False, api=api)
+        зовы: list = []
+        JL.продать = lambda **kw: (зовы.append(kw) or
+                                    {"ok": True, "signature": "ПОДПИСЬ_ПОЛОСЫ_JUP",
+                                     "api_used": "swap_v2",
+                                     "floor": {"checks": {"out_amount": 11_000_000}}})
+
+        # 1. СРОК. До 28.8 с от отправки полоса не продаёт, и запас Bloom к
+        # ней не применяется: авто-ордера у неё нет.
+        рано = полосу_в_состояние("l_рано", "MINT_L1", куплено=1_000_000,
+                                   отправлено_назад=10.0)
+        r_рано = sl.handle(рано, balance_reader=читатель(50_000_000))
+        chk("до срока полоса не продаёт", зовы == []
+            and r_рано["action"] == "ждём срок продажи полосы", r_рано)
+        почти = полосу_в_состояние("l_почти", "MINT_L2", куплено=1_000_000,
+                                    отправлено_назад=29.0)
+        r_почти = sl.handle(почти, balance_reader=читатель(50_000_000))
+        chk("через 28.8 с полоса продаёт БЕЗ запаса сторожа",
+            r_почти["action"] == "продажа полосы отправлена" and len(зовы) == 1,
+            (r_почти, зовы))
+
+        # 2. КОЛИЧЕСТВО -- РОВНО КУПЛЕННОЕ ПОЛОСОЙ, а не весь остаток.
+        chk("в Jupiter ушло количество полосы, а не остаток минта",
+            зовы[0]["amount_raw"] == 1_000_000
+            and зовы[0]["вход_sol"] == 0.01, зовы[0])
+        chk("и это же количество записано в позицию",
+            st_л.positions()["l_почти"].get("jup_amount_raw") == 1_000_000
+            and st_л.positions()["l_почти"].get("state") == "selling",
+            st_л.positions()["l_почти"])
+
+        # 3. ОСТАТОК МЕНЬШЕ КУПЛЕННОГО -- продаём остаток, не больше.
+        зовы.clear()
+        мало = полосу_в_состояние("l_мало", "MINT_L3", куплено=5_000_000)
+        r_мало = sl.handle(мало, balance_reader=читатель(2_000_000))
+        chk("продать больше, чем есть, полоса не пытается",
+            зовы and зовы[0]["amount_raw"] == 2_000_000, зовы)
+
+        # 4. ОСТАТКА ПРАКТИЧЕСКИ НЕТ -- позиция закрыта, но это НЕ UNSOLD:
+        # токен мог уже продать путь Bloom, он выходит всем остатком.
+        зовы.clear()
+        пусто = полосу_в_состояние("l_пусто", "MINT_L4", куплено=5_000_000)
+        было_серии = int(st_л.counters().get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}", 0))
+        r_пусто = sl.handle(пусто, balance_reader=читатель(10))
+        chk("остатка нет -- позиция закрыта без продажи и без UNSOLD",
+            зовы == [] and st_л.positions()["l_пусто"].get("state") == STATE_CLOSED
+            and int(st_л.counters().get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}", 0))
+            == было_серии, (r_пусто, st_л.positions()["l_пусто"].get("state")))
+
+        # 5. КОЛИЧЕСТВА НЕТ. Пока идёт срок ожидания -- ждём догон с пульса;
+        # после -- UNSOLD, и НИКОГДА продажа остатка минта.
+        зовы.clear()
+        без_числа = полосу_в_состояние("l_ждём", "MINT_L5", куплено=None,
+                                        отправлено_назад=60.0,
+                                        поля={"lane_bought_why_not": "узел молчит"})
+        r_ждём = sl.handle(без_числа, balance_reader=читатель(50_000_000))
+        chk("без количества полоса ждёт догон и ничего не продаёт",
+            зовы == [] and "ждём количество" in r_ждём["action"], r_ждём)
+        просрочено = полосу_в_состояние(
+            "l_нет_числа", "MINT_L6", куплено=None,
+            отправлено_назад=sl.ждать_количество_s + 10.0)
+        было_блум = int(st_л.counters().get("unsold_streak", 0))
+        r_нет = sl.handle(просрочено, balance_reader=читатель(50_000_000))
+        chk("количество так и не пришло -- UNSOLD, а не продажа остатка минта",
+            зовы == [] and st_л.positions()["l_нет_числа"].get("state") == "unsold"
+            and "остаток минта продавать нельзя" in (r_нет.get("why_not") or ""),
+            r_нет)
+        chk("UNSOLD полосы поднял СВОЙ счётчик, а счётчик Bloom не тронул",
+            int(st_л.counters().get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}", 0)) >= 1
+            and int(st_л.counters().get("unsold_streak", 0)) == было_блум,
+            st_л.counters())
+
+        # 6. РУБИЛЬНИК ПРОДАЖ останавливает и полосу.
+        зовы.clear()
+        под_килл = полосу_в_состояние("l_kill", "MINT_L7", куплено=1_000_000)
+        st_л.kill_sell_path.write_text("стоп продажам", encoding="utf-8")
+        r_kill = sl.handle(под_килл, balance_reader=читатель(50_000_000))
+        chk("рубильник продаж останавливает полосу до всякой продажи",
+            зовы == [] and "рубильник" in r_kill["action"], r_kill)
+        st_л.kill_sell_path.unlink()
+
+        # 7. ПРЕДЕЛ ПОПЫТОК -- UNSOLD в тот же круг, а не кругом позже.
+        зовы.clear()
+        JL.продать = lambda **kw: (зовы.append(kw) or
+                                    {"ok": False, "why_not": "Ultra отказала",
+                                     "api_tried": "swap_v2,ultra"})
+        отказ = полосу_в_состояние("l_отказ", "MINT_L8", куплено=1_000_000,
+                                    поля={"jup_attempts": sl.предел_неудач - 1,
+                                          "ts_jup_attempt": time.time() - 100})
+        r_отказ = sl.handle(отказ, balance_reader=читатель(50_000_000))
+        chk("последняя неудачная попытка сразу даёт UNSOLD с причиной",
+            len(зовы) == 1
+            and st_л.positions()["l_отказ"].get("state") == "unsold"
+            and "Ultra отказала" in (r_отказ.get("why_not") or ""), r_отказ)
+
+        # 8. СВОЯ ПРОДАЖА СЕЛА -- позиция закрыта СВОИМ результатом, а не по
+        # нулевому остатку минта: остаток общий с Bloom.
+        зовы.clear()
+        села = полосу_в_состояние(
+            "l_села", "MINT_L9", куплено=1_000_000,
+            поля={"state": "selling", "last_sell_signatures": ["ПРОДАЖА_ПОЛОСЫ"],
+                  "jup_attempts": 1, "ts_jup_attempt": time.time() - 100})
+
+        def читатель_продажи(подпись):
+            return {"slot": 5, "meta": {
+                "err": None, "fee": 5000,
+                "preBalances": [1_000_000_000], "postBalances": [1_011_000_000],
+                "preTokenBalances": [], "postTokenBalances": [],
+                "logMessages": []}, "transaction": {"message": {
+                    "accountKeys": [{"pubkey": EXECUTOR_WALLET, "signer": True}]}}}
+
+        r_села = sl.handle(села, balance_reader=читатель(50_000_000),
+                           читатель_tx=читатель_продажи)
+        поз_села = st_л.positions()["l_села"]
+        chk("подтверждённая продажа полосы закрывает её позицию своим итогом",
+            зовы == [] and поз_села.get("state") == STATE_CLOSED
+            and поз_села.get("closed_sol_net") is not None
+            and "подтверждена" in (поз_села.get("closed_reason") or ""),
+            (r_села.get("action"), поз_села.get("closed_reason"),
+             поз_села.get("closed_sol_net")))
+        chk("и удачная продажа полосы обнулила её счётчик непроданных",
+            int(st_л.counters().get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}", 0)) == 0,
+            st_л.counters())
+
+        # 9. ПУТЬ JUPITER ВЫКЛЮЧЕН -- полоса не продаёт и говорит почему.
+        зовы.clear()
+        os.environ["BLOOM_SELL_VIA_JUPITER"] = "0"
+        sl2 = Seller(state=st_л, live=False, api=api)
+        выкл = полосу_в_состояние("l_выкл", "MINT_LA", куплено=1_000_000)
+        r_выкл = sl2.handle(выкл, balance_reader=читатель(50_000_000))
+        chk("без пути Jupiter полоса не продаёт и причина названа",
+            зовы == [] and "продавать нечем" in r_выкл["action"], r_выкл)
+        os.environ["BLOOM_SELL_VIA_JUPITER"] = "1"
+
+        # 10. check_only честно показывает полосу: количество и чем продаём.
+        план_л = sl.check_only(balance_reader=читатель(50_000_000))
+        ряд = [з for з in план_л["plan"] if з["client_order_id"] == "l_рано"]
+        chk("в плане у позиции полосы своё количество и путь Jupiter",
+            ряд and ряд[0]["amount_raw"] == 1_000_000
+            and "Jupiter" in ряд[0]["with_what"] and ряд[0]["lane"] == МЕТКА_ПОЛОСЫ,
+            ряд)
+    finally:
+        JL.продать = старый_л
+        if было_вкл_л is None:
+            os.environ.pop("BLOOM_SELL_VIA_JUPITER", None)
+        else:
+            os.environ["BLOOM_SELL_VIA_JUPITER"] = было_вкл_л
 
     # --- тело продажи, которое сторож реально отправляет
     body = build_sell_body(address="MINT3", percent=100, slippage_pct=40.0,

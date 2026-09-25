@@ -596,11 +596,20 @@ def позиции_срез(state: ST.ExecState) -> dict:
                 "failed_on_chain": len(упало),
                 "intent_sol_failed": round(sum(вход(x) for x in упало), 6),
                 "spent_sol": round(sum(вход(x) for x in села), 6)}
-    return {"live": срез(lambda x: x.get("mode") == ST.MODE_LIVE),
-            "live_test": срез(lambda x: x.get("mode") == ST.MODE_LIVE_TEST),
+    # ПОЛОСА СВОЕЙ ОТПРАВКИ -- ОТДЕЛЬНЫМ РАЗДЕЛОМ. Её сделки по 0.01 SOL
+    # нельзя складывать с боевыми по 0.2 SOL: в разделе live тогда растёт
+    # число сделок и потраченное, а читается это как торговля Bloom.
+    return {"live": срез(lambda x: x.get("mode") == ST.MODE_LIVE
+                          and not x.get("lane")),
+            "live_test": срез(lambda x: x.get("mode") == ST.MODE_LIVE_TEST
+                               and not x.get("lane")),
+            "lane": срез(lambda x: x.get("lane") == ST.МЕТКА_ПОЛОСЫ),
             "dry_run": срез(lambda x: not ST.is_real_mode(x.get("mode"))),
-            "open_real": len(state.open_positions()),
-            "note": "позиции dry-run не учитываются ни в гейтах, ни в парах А/Б"}
+            "open_real": len(state.open_positions(lane=None)),
+            "open_lane": len(state.open_positions(lane=ST.МЕТКА_ПОЛОСЫ)),
+            "note": ("позиции dry-run не учитываются ни в гейтах, ни в парах "
+                      "А/Б; раздел lane -- полоса своей отправки, её сделки в "
+                      "live не входят")}
 
 
 def найти_подпись(строки: list, подписи: tuple) -> list:
@@ -729,6 +738,10 @@ def итог_группы_только_мы(state: ST.ExecState, сверка: d
         return если_нет
     по_минту = {}
     for p_ in state.positions().values():
+        # Позиция ПОЛОСЫ на том же минте не имеет права подменить боевую:
+        # вход у них разный (0.01 против 0.2 SOL), и процент вышел бы чужой.
+        if p_.get("lane"):
+            continue
         if ST.is_real_mode(p_.get("mode")) and p_.get("mint"):
             по_минту.setdefault(p_["mint"], p_)
     проценты, сумма_sol = [], 0.0
@@ -835,6 +848,14 @@ def таблица_кругов(state: ST.ExecState, строки: list, мес�
             "block_total": p_.get("block_total"),
             "block_share": p_.get("block_share"),
             "block_why_not": p_.get("block_why_not"),
+            # ПОЛОСА СВОЕЙ ОТПРАВКИ. Пусто в этих полях -- покупка Bloom.
+            # Своя отправка меряется от ОТПРАВКИ (у неё нет ответа площадки),
+            # поэтому её число стоит отдельным столбцом, а не в
+            # bloom_to_seen_ms: сложить их значило бы сравнить разные пути.
+            "lane": p_.get("lane"),
+            "lane_send_to_seen_ms": p_.get("lane_send_to_seen_ms"),
+            "lane_bought_raw": p_.get("lane_bought_raw"),
+            "lane_pair_delta_ms": p_.get("lane_pair_delta_ms"),
             "sell_after_s_plan": p_.get("sell_after_s"),
             "sell_seconds": закр.get("seconds"),
             "sell_slot": итог.get("slot"),
@@ -1618,6 +1639,38 @@ def self_test() -> None:
                         "closed_reason": "покупка упала по цепи: ExceededSlippage",
                         ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
         ]) + "\n", encoding="utf-8")
+        # --- ПОЛОСА СВОЕЙ ОТПРАВКИ В ДОКЛАДЕ. Её сделки нельзя складывать с
+        # боевыми: вход 0.01 против 0.2 SOL, и в разделе live это читалось бы
+        # как торговля Bloom.
+        было_позиции = st.positions_path.read_text(encoding="utf-8")
+        st.positions_path.write_text(было_позиции + "\n".join([
+            json.dumps({"client_order_id": "lane_r", "state": "bought",
+                        "mode": ST.MODE_LIVE, "sol_in": 0.01, "mint": "MINTX",
+                        "lane": ST.МЕТКА_ПОЛОСЫ, "chain_ok": True,
+                        "lane_bought_raw": 8880000,
+                        "lane_send_to_seen_ms": 120.5,
+                        "lane_pair_delta_ms": 430.2,
+                        ST.SCHEMA_VERSION_KEY: 2}, ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        поз_л = позиции_срез(st)
+        chk("полоса в докладе -- своим разделом, в live её траты не идут",
+            поз_л["lane"]["count"] == 1 and поз_л["lane"]["spent_sol"] == 0.01
+            and поз_л["live"]["count"] == 0, (поз_л["lane"], поз_л["live"]))
+        chk("открытые полосы считаются отдельно от боевых",
+            поз_л["open_lane"] == 1, (поз_л["open_lane"], поз_л["open_real"]))
+        круги_л = таблица_кругов(st, [], {"known": False})
+        ряд_л = [р for р in круги_л if р["client_order_id"] == "lane_r"]
+        chk("в таблице кругов у полосы своя метка и свои числа",
+            ряд_л and ряд_л[0]["lane"] == ST.МЕТКА_ПОЛОСЫ
+            and ряд_л[0]["lane_send_to_seen_ms"] == 120.5
+            and ряд_л[0]["lane_bought_raw"] == 8880000
+            and ряд_л[0]["bloom_to_seen_ms"] is None, ряд_л)
+        ряд_б = [р for р in круги_л if р["client_order_id"] == "c"]
+        chk("у покупки Bloom поля полосы пустые, а не нулевые",
+            ряд_б and ряд_б[0]["lane"] is None
+            and ряд_б[0]["lane_send_to_seen_ms"] is None, ряд_б)
+        st.positions_path.write_text(было_позиции, encoding="utf-8")
+
         поз3 = позиции_срез(st)
         chk("упавшая покупка не попадает в потраченное",
             поз3["live_test"]["spent_sol"] == 0.001, поз3["live_test"])
