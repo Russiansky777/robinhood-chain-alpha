@@ -65,7 +65,8 @@ def main() -> None:
       "прогон не ходил ни разу: всё посчитано по уже сохранённым в репозитории "
       "чтениям цепи. Сырые данные лежат рядом с выводом: "
       "`data/a2_model_vs_chain.json`, `data/a2_a1a3.json`, "
-      "`data/a2_crowd_metric_2026-09-24.json`, `data/a2_followers_exec_markup.json`.")
+      "`data/a2_crowd_metric_2026-09-24.json`, `data/a2_followers_exec_markup.json`. "
+      "Учёт кредитов и что именно потребовало бы сети — `data/a2_credits.json`.")
     A("")
     A("## Коротко")
     A("")

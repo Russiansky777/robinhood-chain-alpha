@@ -135,8 +135,13 @@ def создать(rpc_call, *, секрет: str | None = None, наш: str | N
     # Ключ -- одним разборщиком на репозиторий (dbot_rescue), и его текст
     # исключений наружу не идёт: в нём может оказаться сам секрет.
     try:
+        # КЛЮЧ ИМЕННО КОШЕЛЬКА ПОЛОСЫ и в том же порядке, что у модуля полосы:
+        # OWN_SEND_WALLET_KEY первым. Ключ исполнителя -- только откат для
+        # старого случая "полоса на кошельке исполнителя"; подписать им nonce
+        # кошелька полосы нельзя, и проверка ниже это поймает.
         кп = load_rescue_keypair(секрет if секрет is not None
-                                 else (os.environ.get("EXEC_WALLET_KEY")
+                                 else (os.environ.get("OWN_SEND_WALLET_KEY")
+                                        or os.environ.get("EXEC_WALLET_KEY")
                                         or os.environ.get("BLOOM_WALLET_KEY")))
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"ключ не разобран: {type(exc).__name__}"
