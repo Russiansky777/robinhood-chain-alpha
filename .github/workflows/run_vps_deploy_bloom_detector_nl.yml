@@ -269,6 +269,27 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/konfig_snapshot.json && chown bot:bot $CODE_DIR/konfig_snapshot.json && chmod 644 $CODE_DIR/konfig_snapshot.json" < "$SNAP"
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -c < $CODE_DIR/konfig_snapshot.json"
 
+      - name: "ДИАГНОСТИКА env: кто мы на хосте и что с файлом (только чтение)"
+        run: |
+          set -e
+          # 25.09 деплой упал на "sed: can't read /etc/bloom-executor/env:
+          # Permission denied" -- при том что ПРЕДЫДУЩИЙ шаг тот же файл правил
+          # успешно. Догадки тут бесполезны: печатаем факты -- под кем мы на
+          # хосте, права каталога и файла, расширенные атрибуты и состояние
+          # файловой системы. Только чтение, ни одной правки.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            echo \"кто я: \$(id -un) (uid \$(id -u))\"
+            ls -ldn $ENV_DIR || true
+            ls -ln $ENV_DIR/ || true
+            lsattr -d $ENV_DIR 2>&1 | head -2 || true
+            lsattr $ENV_DIR/env 2>&1 | head -2 || true
+            findmnt -no TARGET,FSTYPE,OPTIONS --target $ENV_DIR || true
+            df -h $ENV_DIR | tail -1 || true
+            echo 'проба чтения:'; head -c 1 $ENV_DIR/env >/dev/null && echo 'читается' || echo 'НЕ читается'
+            echo 'проба записи во временный файл того же каталога:'
+            (touch $ENV_DIR/.proba_zapisi && echo 'каталог пишется' && rm -f $ENV_DIR/.proba_zapisi) || echo 'каталог НЕ пишется'
+          "
+
       - name: "env: ключи отправителей пула (значения только через stdin)"
         env:
           BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
