@@ -91,6 +91,10 @@ on:
         description: "'1' -- КОНТРОЛЬ ДОСТАВКИ (З2): с каждой покупкой полосы уходит пустая транзакция через КАЖДЫЙ подключённый сервис (~0.0031 SOL за сигнал на пятерых, пределы 20 сигналов и 0.1 SOL в сутки)"
         required: false
         default: "0"
+      pool_nonce:
+        description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
+        required: false
+        default: "0"
       pool_send:
         description: "'1' -- БОЕВОЙ ПУЛ шаг 1: одна подписанная покупка уходит ВСЕМИ подключёнными сервисами, чаевые всем <= 0.005 SOL на сделку (включено по решению владельца 25.09)"
         required: false
@@ -425,6 +429,12 @@ jobs:
             # Проверку на оба случая ставит analysis/check_workflow_quotes.py.
             sed -i '/^BLOOM_POOL_SEND=/d' $ENV_DIR/env
             echo 'BLOOM_POOL_SEND=${{ inputs.pool_send }}' >> $ENV_DIR/env
+            # ВАРИАНТ НА ДОЛГОВЕЧНОМ NONCE (шаг 2). Отдельный рубильник: это
+            # другой путь денег -- N подписанных транзакций вместо одной, и
+            # решает, какая села, цепь. Без адреса аккаунта nonce в окружении
+            # он не включается вовсе, даже если здесь стоит единица.
+            sed -i '/^BLOOM_POOL_NONCE=/d' $ENV_DIR/env
+            echo 'BLOOM_POOL_NONCE=${{ inputs.pool_nonce }}' >> $ENV_DIR/env
             echo 'BLOOM_OWN_SEND=${{ inputs.own_send }}' >> $ENV_DIR/env
             echo 'BLOOM_OWN_SEND_SOL=${{ inputs.own_send_sol }}' >> $ENV_DIR/env
             echo 'BLOOM_SENDER_REGION=${{ inputs.sender_region }}' >> $ENV_DIR/env
