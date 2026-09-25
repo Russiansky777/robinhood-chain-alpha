@@ -1,0 +1,121 @@
+name: "Triton preconfs: скачать документацию и проверить доступность (только чтение)"
+
+# Владелец 25.09: "TRITON PRECONFS -- ЗОНД, как с Shyft: только измерение,
+# детектор не трогать. Документация:
+# https://docs.triton.one/chains/solana/preconfirmations-grpc
+# Endpoint https://preconfs.rpcpool.com, заголовок x-token -- секрет
+# TRITON_X_TOKEN... Регионы: только ams (fra -- если ams недоступен)."
+#
+# ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. Зонд писать по памяти нельзя: протокол gRPC,
+# названия полей и имена регионов должны прийти из документации, а не из
+# головы. У штаба сеть закрыта (403 от прокси), у своего раннера на NL-хосте
+# открыта -- страницы качает он.
+#
+# ЗДЕСЬ НЕТ НИ ОДНОГО ПОТОКА И НИ ОДНОГО ОПЛАЧЕННОГО СЛОТА: только
+# публичные страницы документации и проверка, что точка входа отвечает.
+# Значение секрета не печатается -- только "задан/не задан".
+on:
+  workflow_dispatch:
+    inputs:
+      extra_url:
+        description: "дополнительная ссылка документации (если владелец пришлёт свою)"
+        required: false
+        default: ""
+
+concurrency:
+  group: triton-docs
+  cancel-in-progress: false
+
+env:
+  DOCS: data/docs/triton
+  PRECONFS: https://preconfs.rpcpool.com
+
+jobs:
+  docs:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Секрет заведён или нет (значение не печатается)"
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$TRITON_X_TOKEN" ]; then
+            echo "TRITON_X_TOKEN: задан (длина $(printf '%s' "$TRITON_X_TOKEN" | wc -c) символов)"
+          else
+            echo "TRITON_X_TOKEN: НЕ задан -- зонд без него не пойдёт, нужен секрет от владельца"
+          fi
+
+      - name: "Страницы документации"
+        run: |
+          set -e
+          mkdir -p "$DOCS"
+          cat > /tmp/triton_docs.txt <<'LIST'
+          preconfirmations_grpc.html|https://docs.triton.one/chains/solana/preconfirmations-grpc
+          preconfirmations_grpc.md|https://docs.triton.one/chains/solana/preconfirmations-grpc.md
+          triton_llms.txt|https://docs.triton.one/llms.txt
+          LIST
+          if [ -n "${{ inputs.extra_url }}" ]; then
+            echo "extra_page.html|${{ inputs.extra_url }}" >> /tmp/triton_docs.txt
+          fi
+          while IFS='|' read -r name url; do
+            [ -n "$name" ] || continue
+            code=$(curl -sS -L --max-time 40 -o /tmp/td.out -w '%{http_code}' "$url" || echo 000)
+            echo "$name -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              cp /tmp/td.out "$DOCS/$name"
+              echo "  сохранено: $(wc -c < "$DOCS/$name") байт"
+            else
+              printf 'НЕ СКАЧАНО: %s (HTTP %s), время UTC %s\n' "$url" "$code" \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$DOCS/$name.why_not.txt"
+            fi
+            rm -f /tmp/td.out
+          done < /tmp/triton_docs.txt
+
+      - name: "Что в документации сказано про регионы, x-token и поля потока"
+        run: |
+          set -e
+          # Печатаем СТРОКИ ДОКУМЕНТАЦИИ как есть: дальше зонд пишется по ним.
+          for f in "$DOCS"/preconfirmations_grpc.md "$DOCS"/preconfirmations_grpc.html; do
+            [ -f "$f" ] || continue
+            echo "=== $f ==="
+            grep -o -i -E '.{0,120}(x-token|ams|fra|amsterdam|frankfurt|account_include|preconf|proto|bam|harmonic|slot).{0,120}' "$f" \
+              | sed 's/<[^>]*>//g' | sort -u | head -60
+          done
+
+      - name: "Точка входа отвечает (без потока, без оплаченных слотов)"
+        run: |
+          set -e
+          # Только факт достижимости: gRPC по HTTP/2 на обычный GET ответит
+          # кодом, а не потоком. Ни одного сообщения потока здесь не читается.
+          code=$(curl -sS -o /tmp/pc.out -w '%{http_code}' --max-time 20 "$PRECONFS" || echo 000)
+          echo "$PRECONFS -> HTTP $code"
+          head -c 300 /tmp/pc.out; echo
+          rm -f /tmp/pc.out
+          for region in ams fra; do
+            host="$region.$(echo "$PRECONFS" | sed 's#https://##')"
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$host" || echo 000)
+            echo "https://$host -> HTTP $code"
+          done
+
+      - name: "Коммит документации"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$DOCS" 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Triton preconfs: dokumentatsiya zonda [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
