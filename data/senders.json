@@ -65,8 +65,9 @@
       "url": "http://amsterdam.solana.blockrazor.xyz:443/sendTransaction",
       "url_note": "Амстердам и Франкфурт -- из таблицы точек входа документации",
       "format": "blockrazor_sendTransaction",
-      "key_env": "BLOCKRAZOR_API_KEY",
+      "key_env": "BLOCKRAZOR_AUTH_TOKEN",
       "key_in": "header:apikey",
+      "key_in_note": "заголовок apikey -- из примера gRPC в документации (meta.add('apikey', authKey)); для HTTP схема подтверждается пробой analysis/sender_key_probe.py, её ответ -- в docs/sender_key_probe.md",
       "min_tip_lamports": 100000,
       "tip_accounts": [
         "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
