@@ -1,0 +1,189 @@
+{
+  "generated_utc": "2026-09-25",
+  "decision": "Сводный промпт владельца 25.09 15:45 Madrid, пункты 1.1 и 1.2. Полоса слушает всех; Bloom торгует ТОЛЬКО по BATCH-3/5, которые приходят из DBot живьём и в этот файл не вписаны нарочно: два списка разошлись бы молча.",
+  "sources_s0_data": "data/solana_entry_log_offsets_cache.json (block_buyers: ключ slot:mint входа источника, значит его покупатели -- ровно S+0); служебные адреса исключены по data/solana_fast_buyers_services.json",
+  "groups": {
+    "bloom_lane": {
+      "lane_sol": 0.05,
+      "bloom_trades": true,
+      "fanout": true,
+      "note": "BATCH-3/5 плюс лидер: Bloom торгует 0.2 SOL, полоса 0.05 SOL (пункты 2 и 3). Адресов здесь нет нарочно -- они приходят из DBot живьём; это группа по умолчанию для всякого источника, которого нет в других группах.",
+      "addresses": {}
+    },
+    "lane_only": {
+      "lane_sol": 0.05,
+      "bloom_trades": false,
+      "fanout": true,
+      "note": "Пункт 1.1: 38 активных кошельков реестра, которых детектор ещё не слушал. Полоса мерит слот, место и кто довёз; в деньги входят с меткой группы.",
+      "credits_rule": "потолок детектора 300 000 кредитов в сутки; при 70 % снять BATCH-1 и BATCH-4 -- у них почти нет крупных покупок",
+      "drop_first_at_70pct": [
+        "BATCH-1",
+        "BATCH-4"
+      ],
+      "addresses": {
+        "2heJbC32Tpfcb3nbUb5ER61K11FGZVfVGtVnDm6LDogF": "BATCH-1",
+        "HDixbrzwwLXczhDBk1JVrurPQsuLE8FUKnW2pucSXN3o": "BATCH-1",
+        "5FGoPPj1nL8LCnfVnpTmreqQtqLuMXXAwuS1uahMrp8V": "BATCH-1",
+        "4ugDhHJ8XDXAeABmrNmGffFaLbJb9BkPyiFGVSV9ocwo": "BATCH-1",
+        "2yXwy5Dsa1XtEXcsrkFVRJeyuWD3qKkMN3pP3p5VTW3V": "BATCH-1",
+        "H2QSGECp13sFLJgdTsDtayX3dk18Dm6sQMSQKcew7Xzk": "BATCH-1",
+        "jrbGz3zoBJfptXF967xp6h5TBRV55ArvGeWxTQVs5Ux": "BATCH-1",
+        "2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8": "BATCH-1",
+        "J9WiAZKf8JnCkHFL8fLCCXdEgdoLjLRqU2EGsDjdqYga": "BATCH-1",
+        "8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr": "BATCH-1",
+        "F5hkYsi8JxjyA2JHN5CA7MbnnhWubkXB2ZQB7Gkaxqs6": "BATCH-2",
+        "DCeH3aCsstGUSxQqS72VBZwTydoor1nQ6dWaxrgGQk39": "BATCH-2",
+        "GFRjGNXY8JrGSPC46inqrH4XPdUFMDLkE1oNm1nXiPsJ": "BATCH-2",
+        "7iPPqPyrqcmfenRs4xZ72ab4pyuUofXB5YaQB83WJmT9": "BATCH-2",
+        "7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H": "BATCH-2",
+        "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": "BATCH-2",
+        "8RCEq8RrBJ1G6eji9vZqjtjQgkDjUHMysPtynZENWo7S": "BATCH-2",
+        "5dB6rj9CoXMLQCAymoC5UXCb1LtFjbM5rbut3MNuj9Q": "BATCH-2",
+        "33vFB2rtG9FDpJReNaJrBF4RZgri5HTVo5gSxP1XfVCr": "BATCH-2",
+        "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": "BATCH-4",
+        "EURKJdQmbP2GqSBssKuhgLKz2XEwhUXnHL2oYd4eejMm": "BATCH-4",
+        "9mLaswxfkdjWcbfmotYRfBVSEfUddmbfebKEaNggfsSR": "BATCH-4",
+        "29omQei1ywcRzHMYXx3iEEgfZ7ccqB7TpwL3q4s3RWe3": "BATCH-4",
+        "5eiXSFxmZKKo8V6qTw72SBskCZa7ok8jyqutsvtCuE1i": "BATCH-4",
+        "5VRgqb2qbVqaWVGsM2k1b2bnPJk7up2xYbn4ziEjFgNt": "BATCH-6",
+        "FWSPXhQAD57hXJBNsWRkYupwQ4grQrr75JiWM6CqzHva": "BATCH-6",
+        "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": "BATCH-6",
+        "FF6vsaUcp4s95Q5NNm7VZ7deZU6gBU2vZmaiyQ36Ymrc": "BATCH-6",
+        "6MwHc79vgWXeMVyZwgQ13bqqudRNCYkvjmgQzc294g8M": "BATCH-6",
+        "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact": "BATCH-6",
+        "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ": "BATCH-7",
+        "AUYLj5kLGUadmhn8kM91KnTJYfHiXGzcQ7TViP8uLLQv": "BATCH-7",
+        "DPAghrNgkW4m5HMBL3kVsiCm9ywhrBtCutc6tSSvicx8": "BATCH-7",
+        "Dw3LY8NnG3BB1EEXCNJwAKtVoEE7faEYiygYNHfFPNb1": "BATCH-7",
+        "BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN": "BATCH-7",
+        "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": "BATCH-7",
+        "AMcHYqUj4HPUdkDkEatguugNSmKaQTdvxzexzqsXDU4r": "BATCH-7",
+        "B6e9vDURyhMsnHDVZQTDLDz1cvW298SpET5LeaLcA9sn": "BATCH-7"
+      }
+    },
+    "speed_only": {
+      "lane_sol": 0.01,
+      "bloom_trades": false,
+      "fanout": false,
+      "day_cap_sol": 0.2,
+      "stop_loss_sol": 0.15,
+      "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 0.2 SOL в сутки (покупки плюс чаевые), стоп при -0.15 SOL.",
+      "by_signal": [
+        {
+          "address": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "7xPDo97sb5Ueb7zuR1k4A7PBW5hLwhPGsPzj1nA8J7PQ",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "ABNaeejNKoKa6Vd5SYyP8wgX8kkMYKtc7HGNWdFVi1PP",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "7XFo82igqSfBjb6SXJigbkhdFGFmVrh46zj3rvCPBK9n",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "CbtBvpGhqX7kJ6eXkNWcy7ES9B7xK2HTfbpMqLojCRd5",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "HtuYE3nYd7y9vxqiUjZdjTscGiFKt5JCcjD41vFwuebT",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "7PFdKg9HgcjXh9fodFp6BCSGxqXcDSHAizotW6umE7aN",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+          "why": "снят по сигналу, не за налог"
+        },
+        {
+          "address": "57aiHCweKvWmAspN26FVV6kKLY8opJGYgw5iN3nPESk9",
+          "why": "снят по сигналу, не за налог"
+        }
+      ],
+      "snipers": [
+        {
+          "address": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+          "s0_hits": 23,
+          "why": "назван владельцем прямо"
+        },
+        {
+          "address": "GUiSJYdAs5nyPcTkyZbnnEsL4R6VJKzemcUQgnHWBCgq",
+          "s0_hits": 1,
+          "why": "назван владельцем прямо"
+        },
+        {
+          "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+          "s0_hits": 138,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
+          "s0_hits": 49,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
+          "s0_hits": 45,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "58ZGdqxCnHSALS1Pa2JP3Vr2KsoAZ3HTv6szfoZBuwy1",
+          "s0_hits": 44,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
+          "s0_hits": 39,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
+          "s0_hits": 38,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
+          "s0_hits": 35,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
+          "s0_hits": 31,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        }
+      ]
+    }
+  },
+  "not_added": [
+    {
+      "prefix": "Et9jbvxv",
+      "why": "налоговый маршрут (слово владельца)"
+    },
+    {
+      "prefix": "BMgsHTvc",
+      "why": "налоговый маршрут (слово владельца)"
+    },
+    {
+      "prefix": "DmopudSG",
+      "why": "налоговый маршрут (слово владельца)"
+    }
+  ]
+}

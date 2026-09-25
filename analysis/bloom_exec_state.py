@@ -475,7 +475,8 @@ class ExecState:
                       source_slot: int | None, sol_in: float, pool: str | None,
                       program: str | None, taxed: bool | None, tax_bps: int | None,
                       mode: str, sell_after_s: float,
-                      lane: str | None = None) -> dict:
+                      lane: str | None = None,
+                      lane_group: str | None = None) -> dict:
         """Намерение купить -- НА ДИСК ДО отправки запроса.
 
         Если запрос уйдёт и служба упадёт до записи ответа, позиция всё
@@ -495,6 +496,11 @@ class ExecState:
         # ложно без всяких оговорок.
         if lane:
             row["lane"] = lane
+        # ГРУППА ИСТОЧНИКА (решение владельца 25.09): по ней считаются деньги
+        # полосы -- у группы скорости свой потолок и свой стоп, и в общий итог
+        # её сделки не идут. Пишется только когда есть, как и метка полосы.
+        if lane_group:
+            row["lane_group"] = lane_group
         append_jsonl_fsync(self.positions_path, row)
         return row
 
