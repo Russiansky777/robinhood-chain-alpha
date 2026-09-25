@@ -87,6 +87,10 @@ on:
         description: "регион Helius Sender для полосы: ams, fra, lon, ewr, slc, sg, tyo"
         required: false
         default: "ams"
+      lane_control:
+        description: "'1' -- КОНТРОЛЬ ДОСТАВКИ (З2): с каждой покупкой полосы уходит пустая транзакция тем же путём (0.002005 SOL за штуку, пределы 20/сутки и 0.03 SOL)"
+        required: false
+        default: "0"
 
 concurrency:
   group: bloom-detector-deploy
@@ -315,6 +319,11 @@ jobs:
             # рубильник BLOOM_OWN_SEND_LIVE, он вычищается ВСЕГДА и пишется
             # ниже отдельным шагом: своя покупка -- настоящие деньги.
             sed -i '/^BLOOM_OWN_SEND=/d; /^BLOOM_OWN_SEND_LIVE=/d; /^BLOOM_OWN_SEND_SOL=/d; /^BLOOM_SENDER_REGION=/d' $ENV_DIR/env
+            # КОНТРОЛЬ ДОСТАВКИ (З2). Вычищается ВСЕГДА и пишется только по
+            # входу: пустая транзакция стоит 0.002005 SOL за штуку, и
+            # включаться она должна осознанно, а не по инерции деплоя.
+            sed -i '/^BLOOM_LANE_CONTROL=/d' $ENV_DIR/env
+            echo 'BLOOM_LANE_CONTROL=${{ inputs.lane_control }}' >> $ENV_DIR/env
             echo 'BLOOM_OWN_SEND=${{ inputs.own_send }}' >> $ENV_DIR/env
             echo 'BLOOM_OWN_SEND_SOL=${{ inputs.own_send_sol }}' >> $ENV_DIR/env
             echo 'BLOOM_SENDER_REGION=${{ inputs.sender_region }}' >> $ENV_DIR/env
