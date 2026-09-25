@@ -240,6 +240,12 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
         з["s0"] = {"source_index": None, "source_total": None,
                     "after_source": None, "foreign_buys_after": None,
                     "s0_possible": None, "why_not": None}
+        # МЕСТО ИСТОЧНИКА ИЗ ЖУРНАЛА, если детектор его уже записал: лишний
+        # getBlock на то, что и так известно, -- зря потраченные кредиты.
+        if isinstance(п.get("source_block_index"), int):
+            з["s0"].update(source_index=п["source_block_index"],
+                            source_total=п.get("source_block_total"),
+                            source_index_from="журнал")
         if not isinstance(слот_и, int) or not подпись_и:
             з["s0"]["why_not"] = "слота или подписи источника в позиции нет"
         else:
@@ -247,8 +253,12 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
             if not б.get("known"):
                 з["s0"]["why_not"] = б.get("why_not")
             else:
-                и = BP.индекс_подписи(б, подпись_и)
-                з["s0"].update(source_index=и, source_total=б.get("total"))
+                и = (з["s0"].get("source_index")
+                      if з["s0"].get("source_index_from") == "журнал"
+                      else BP.индекс_подписи(б, подпись_и))
+                з["s0"].update(source_index=и,
+                                source_total=(з["s0"].get("source_total")
+                                               or б.get("total")))
                 if и is None:
                     з["s0"]["why_not"] = "подписи источника в этом блоке нет"
                 else:
