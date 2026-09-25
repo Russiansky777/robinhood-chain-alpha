@@ -356,6 +356,30 @@ jobs:
                 exit 1
               fi
             fi
+            # КОШЕЛЁК ПОЛОСЫ (решение владельца 25.09: у полосы свой кошелёк,
+            # свои 0.1 SOL, отдельный учёт). Гейт живой отправки: адрес и ключ
+            # обязаны быть заданы И СОГЛАСОВАНЫ между собой. Несогласованность
+            # значит подпись не тем кошельком -- сеть отвергнет транзакцию,
+            # потратив приоритет и чаевые, и замер выйдет ложным.
+            # Проверяет сам модуль полосы на хосте: значение ключа никуда не
+            # выводится, наружу идёт только адрес и слово "да/нет".
+            LANE_READY=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
+              set -a; . $ENV_DIR/env; set +a
+              PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python -c \
+                'import json, bloom_own_send as O; г=O.кошелёк_готов(); print(json.dumps({\"wallet\": г.get(\"wallet\"), \"own\": г.get(\"own_wallet\"), \"ok\": г.get(\"ok\"), \"why_not\": г.get(\"why_not\")}, ensure_ascii=False))'
+            ") || LANE_READY=""
+            echo "кошелёк полосы: $LANE_READY"
+            case "$LANE_READY" in
+              *'"own": true'*'"ok": true'*) echo "адрес и ключ полосы согласованы" ;;
+              *)
+                echo "ВНИМАНИЕ: кошелёк полосы не готов (см. строку выше)."
+                echo "Создаётся прогоном run_vps_lane_wallet_nl.yml с mode=create."
+                if [ "${{ inputs.own_send_live }}" = "1" ]; then
+                  echo "СБОЙ: живая отправка полосы без согласованного своего кошелька запрещена."
+                  exit 1
+                fi
+                ;;
+            esac
           fi
           if [ "${{ inputs.live_test }}" = "yes" ]; then
             echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
