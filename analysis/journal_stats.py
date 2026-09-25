@@ -200,26 +200,36 @@ def тень(решения, с_utc: str = "") -> dict:
     Считается по строкам stage=shadow: маршрут в поле route, удача сборки -- в
     would_pass (сама тень НИЧЕГО не отправляет, поэтому "собрала бы").
     """
-    свод = {"rows": 0, "by_route": {}, "would_pass": 0,
-             "would_pass_by_route": {}, "not_built": {}, "two_hop": 0,
-             "two_hop_would_pass": 0}
+    свод = {"rows": 0, "by_route": {}, "built": 0, "built_by_route": {},
+             "would_pass": 0, "would_pass_by_route": {}, "not_built": {},
+             "two_hop": 0, "two_hop_built": 0, "two_hop_would_pass": 0}
     for з in решения:
         if з.get("stage") != "shadow" or not _в_окне(з, с_utc):
             continue
         свод["rows"] += 1
         маршрут = str(з.get("route") or "не указан")
         свод["by_route"][маршрут] = свод["by_route"].get(маршрут, 0) + 1
-        удача = bool(з.get("would_pass"))
-        if удача:
+        # ДВА РАЗНЫХ СОБЫТИЯ, и путать их нельзя: "собралась" -- тень построила
+        # транзакцию (ok и tx_base64), "прошла бы" -- симуляция узла ответила
+        # would_pass. Имена полей взяты из самой записи тени, а не придуманы.
+        собрана = bool(з.get("ok")) and bool(з.get("tx_base64"))
+        прошла = (з.get("sim_verdict") == "would_pass")
+        if собрана:
+            свод["built"] += 1
+            свод["built_by_route"][маршрут] = \
+                свод["built_by_route"].get(маршрут, 0) + 1
+        if прошла:
             свод["would_pass"] += 1
             свод["would_pass_by_route"][маршрут] = \
                 свод["would_pass_by_route"].get(маршрут, 0) + 1
-        elif з.get("why_not"):
+        if not собрана and з.get("why_not"):
             почему = str(з.get("why_not"))[:80]
             свод["not_built"][почему] = свод["not_built"].get(почему, 0) + 1
         if маршрут == "two_hop":
             свод["two_hop"] += 1
-            if удача:
+            if собрана:
+                свод["two_hop_built"] += 1
+            if прошла:
                 свод["two_hop_would_pass"] += 1
     свод["share_two_hop"] = (round(свод["two_hop"] / свод["rows"], 4)
                               if свод["rows"] else None)
@@ -263,14 +273,17 @@ def доклад(о: dict) -> str:
     if not тн.get("rows"):
         т.append("Строк stage=shadow в окне нет.\n")
     else:
-        т.append(f"Строк тени: {тн['rows']}; собралось бы {тн['would_pass']}. "
+        т.append(f"Строк тени: {тн['rows']}; собралась тень у {тн['built']}, "
+                 f"симуляция сказала would_pass у {тн['would_pass']}. "
                  f"Двухшаговым маршрутом {тн['two_hop']}"
-                 + (f" ({(тн['share_two_hop'] or 0) * 100:.1f} %)"
+                 + (f" ({(тн['share_two_hop'] or 0) * 100:.2f} %)"
                     if тн.get("share_two_hop") is not None else "")
-                 + f", из них собралось бы {тн['two_hop_would_pass']}.\n")
+                 + f", из них собралось {тн['two_hop_built']}, прошло бы "
+                 f"{тн['two_hop_would_pass']}.\n")
         if тн.get("by_route"):
             т.append("По маршрутам: " + ", ".join(
-                f"{к}={v} (собралось бы {тн['would_pass_by_route'].get(к, 0)})"
+                f"{к}={v} (собралось {тн['built_by_route'].get(к, 0)}, "
+                f"прошло бы {тн['would_pass_by_route'].get(к, 0)})"
                 for к, v in sorted(тн["by_route"].items(), key=lambda x: -x[1])) + "\n")
         if тн.get("not_built"):
             топ = sorted(тн["not_built"].items(), key=lambda x: -x[1])[:5]
