@@ -192,6 +192,40 @@ def продажи(поз: dict, с_utc: str = "") -> dict:
     return свод
 
 
+def тень(решения, с_utc: str = "") -> dict:
+    """Двухшаговая тень по журналу: сколько сигналов пошло каким маршрутом.
+
+    Поручение владельца: "сколько сигналов пошло двухшаговым маршрутом (записи
+    stage=shadow с route=two_hop) и сколько из них тень собрала бы успешно".
+    Считается по строкам stage=shadow: маршрут в поле route, удача сборки -- в
+    would_pass (сама тень НИЧЕГО не отправляет, поэтому "собрала бы").
+    """
+    свод = {"rows": 0, "by_route": {}, "would_pass": 0,
+             "would_pass_by_route": {}, "not_built": {}, "two_hop": 0,
+             "two_hop_would_pass": 0}
+    for з in решения:
+        if з.get("stage") != "shadow" or not _в_окне(з, с_utc):
+            continue
+        свод["rows"] += 1
+        маршрут = str(з.get("route") or "не указан")
+        свод["by_route"][маршрут] = свод["by_route"].get(маршрут, 0) + 1
+        удача = bool(з.get("would_pass"))
+        if удача:
+            свод["would_pass"] += 1
+            свод["would_pass_by_route"][маршрут] = \
+                свод["would_pass_by_route"].get(маршрут, 0) + 1
+        elif з.get("why_not"):
+            почему = str(з.get("why_not"))[:80]
+            свод["not_built"][почему] = свод["not_built"].get(почему, 0) + 1
+        if маршрут == "two_hop":
+            свод["two_hop"] += 1
+            if удача:
+                свод["two_hop_would_pass"] += 1
+    свод["share_two_hop"] = (round(свод["two_hop"] / свод["rows"], 4)
+                              if свод["rows"] else None)
+    return свод
+
+
 def доклад(о: dict) -> str:
     и, к, п = о["signals"], о["lane_amount"], о["sells"]
     т = []
@@ -224,6 +258,25 @@ def доклад(о: dict) -> str:
     if к["tries"]:
         т.append(f"\nПопыток добора количества: медиана "
                  f"{statistics.median(к['tries'])}, максимум {max(к['tries'])}.")
+    тн = о.get("shadow") or {}
+    т.append("\n## 2а. Двухшаговая тень: маршруты сигналов\n")
+    if not тн.get("rows"):
+        т.append("Строк stage=shadow в окне нет.\n")
+    else:
+        т.append(f"Строк тени: {тн['rows']}; собралось бы {тн['would_pass']}. "
+                 f"Двухшаговым маршрутом {тн['two_hop']}"
+                 + (f" ({(тн['share_two_hop'] or 0) * 100:.1f} %)"
+                    if тн.get("share_two_hop") is not None else "")
+                 + f", из них собралось бы {тн['two_hop_would_pass']}.\n")
+        if тн.get("by_route"):
+            т.append("По маршрутам: " + ", ".join(
+                f"{к}={v} (собралось бы {тн['would_pass_by_route'].get(к, 0)})"
+                for к, v in sorted(тн["by_route"].items(), key=lambda x: -x[1])) + "\n")
+        if тн.get("not_built"):
+            топ = sorted(тн["not_built"].items(), key=lambda x: -x[1])[:5]
+            т.append("\nПочему не собралось: "
+                     + "; ".join(f"{n}x {п}" for п, n in топ) + "\n")
+
     т.append("\n## 3. Продажа: от срока до попытки, маршрут, комиссия\n")
     if not п["rows"]:
         т.append("Подтверждённых продаж в окне нет.\n")
@@ -268,9 +321,12 @@ def main() -> int:
     а = р.parse_args()
     поз = позиции(а.positions)
     сигналы = откуда_сигналы(поток(а.decisions), а.since)
+    # ВТОРОЙ ПРОХОД ПО ТОМУ ЖЕ ФАЙЛУ, а не список в памяти: журнал решений на
+    # хосте измеряется сотнями мегабайт.
+    тень_свод = тень(поток(а.decisions), а.since)
     о = {"since": а.since,
           "decisions_rows": сигналы.get("rows"), "positions": len(поз),
-          "signals": сигналы,
+          "signals": сигналы, "shadow": тень_свод,
           "lane_amount": количество_полосы(поз, а.since),
           "sells": продажи(поз, а.since)}
     т = доклад(о)

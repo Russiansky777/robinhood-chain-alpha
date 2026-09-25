@@ -16,18 +16,25 @@ on:
         description: "окно по UTC, например 2026-09-25T00:00 (пусто -- весь журнал)"
         required: false
         default: ""
+      only:
+        description: "'all' -- сигналы и тень (по умолчанию), 'shadow' -- только строки тени"
+        required: false
+        default: "all"
 
 concurrency:
   group: journal-stats
   cancel-in-progress: false
 
 env:
-  HOST: 127.0.0.1
+  HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
 
 jobs:
   stats:
-    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    # ОБЛАЧНЫЙ БЕГУНОК: свой на хосте занимают долгие замеры (зонд BAM держит
+    # его два часа), и разбор журналов вставал бы в очередь за ними. Модулю
+    # нужна только стандартная библиотека, сеть не нужна вовсе.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
@@ -58,11 +65,24 @@ jobs:
           # 25.09). Отсев идёт grep-ом на хосте -- потоком, без памяти, -- и
           # берёт только строки с parsed_from за нужный день. Точное окно всё
           # равно проверяет модуль по полю ts_utc.
+          # ДВА ДНЯ, А НЕ ОДИН: окно может начинаться вчера (например сутки
+          # замера тени с 24.09 18:49). Отсев по дню -- это надмножество, точное
+          # окно всё равно проверяет модуль по полю ts_utc.
           DAY=$(printf %s "${{ inputs.since }}" | cut -c1-10)
           [ -n "$DAY" ] || DAY=$(date -u +%Y-%m-%d)
-          echo "день отсева: $DAY"
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "дни отсева: $DAY и $TODAY"
+          # ЧТО ОТСЕИВАЕМ. Строки сигналов (parsed_from) за сутки -- это сотни
+          # мегабайт, и когда нужна только тень, тащить их незачем: при
+          # only=shadow берутся лишь строки со словом shadow.
+          if [ "${{ inputs.only }}" = "shadow" ]; then
+            PICK=shadow
+          else
+            PICK='parsed_from|shadow'
+          fi
+          echo "отбор строк: $PICK"
           ssh -n $SSH_OPTS root@$HOST "wc -c < $STATE_DIR/decisions.jsonl; wc -l < $STATE_DIR/decisions.jsonl"
-          ssh -n $SSH_OPTS root@$HOST "grep -F parsed_from $STATE_DIR/decisions.jsonl | grep -F $DAY || true" > /tmp/journal_state/decisions.jsonl
+          ssh -n $SSH_OPTS root@$HOST "grep -E '$PICK' $STATE_DIR/decisions.jsonl | grep -E '$DAY|$TODAY' || true" > /tmp/journal_state/decisions.jsonl
           ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/journal_state/positions.jsonl
           for f in decisions.jsonl positions.jsonl; do
             echo "$f: $(wc -c < /tmp/journal_state/$f) байт, строк $(wc -l < /tmp/journal_state/$f)"
