@@ -22,6 +22,10 @@ on:
         description: "почему остановлена (для mode=set; попадёт в файл и в признак жизни)"
         required: false
         default: ""
+      telegram:
+        description: "'yes' -- отправить строку владельцу в основной чат (для mode=set)"
+        required: false
+        default: "no"
 
 concurrency:
   group: lane-kill-nl
@@ -83,6 +87,30 @@ jobs:
               printf '%s %s\n' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$reason_text\" > \"\$F\"
               printf 'поставлен: '; head -c 400 \"\$F\"; echo
             fi"
+
+      - name: "Строка владельцу в Telegram (по запросу)"
+        if: ${{ inputs.mode == 'set' && inputs.telegram == 'yes' }}
+        run: |
+          set -e
+          # ТОКЕН ОСТАЁТСЯ НА ХОСТЕ. Он берётся из /etc/bloom-executor/env уже
+          # внутри удалённой оболочки, поэтому в журнал прогона попадает только
+          # имя переменной, а не значение. В ответе API токена нет.
+          # Правило владельца: денежная странность -- строка в Telegram, а не
+          # молчание; когда рубильник ставит сама служба, строку посылает она,
+          # а когда снаружи -- вот этот шаг.
+          reason_text='${{ inputs.reason }}'
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . /etc/bloom-executor/env; set +a
+            if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then
+              echo 'Telegram не настроен на хосте -- строка не ушла'; exit 0
+            fi
+            code=\$(curl -s -o /tmp/tg_lane_kill.out -w '%{http_code}' \
+              -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
+              --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
+              --data-urlencode text='ТРЕВОГА: полоса своей отправки ОСТАНОВЛЕНА. Причина: $reason_text Снимать только владельцу.')
+            echo \"telegram http \$code\"
+            head -c 200 /tmp/tg_lane_kill.out; echo
+            rm -f /tmp/tg_lane_kill.out"
 
       - name: "Служба видит рубильник (признак жизни)"
         if: ${{ always() }}
