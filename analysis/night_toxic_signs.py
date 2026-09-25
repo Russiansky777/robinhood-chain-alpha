@@ -3,18 +3,37 @@
 манипуляций -- ТОЛЬКО чтение и счёт по уже собранному кэшу, ни одной
 транзакции, ни одного ключа.
 
-Почему один файл и что он НЕ делает.
+Почему один файл и что он делает БЕЗ ключа и С ключом.
 
-Файл не ходит в сеть сам по себе и не тянет HELIUS_API_KEY -- в контейнере
-его нет. Всё, что требует цепи (mint/freeze authority, налог по маршруту,
-топ-10 держателей, возраст минта и пула, толпа В КОНКРЕТНОМ слоте, глубина
-пула на момент сделки), оформлено как функция, принимающая `rpc_call`
-(callable(method: str, params: list) -> результат JSON-RPC, тот же формат,
-что отдаёт узел: для getAccountInfo -- {"context":..,"value":..},
-для getSignaturesForAddress/getTokenLargestAccounts -- список/{"value":[]}).
-Самопроверка подставляет вместо rpc_call обычную функцию замыкания над
-словарём -- сети не видно вовсе. Боевого прогона этих функций в этом
-контейнере не было и не будет: ниже везде, где нужна цепь, посчитано
+Признаки цепи (mint/freeze authority, налог по маршруту, топ-10 держателей,
+возраст минта и пула, толпа В КОНКРЕТНОМ слоте) оформлены как функции,
+принимающие `rpc_call` (callable(method: str, params: list) -> результат
+JSON-RPC, тот же формат, что отдаёт узел: для getAccountInfo --
+{"context":..,"value":..}, для getSignaturesForAddress/getTokenLargestAccounts
+-- список/{"value":[]}). Эти функции и самопроверка (--self-test) сети не
+видят вовсе -- вместо rpc_call подставляется обычная функция-замыкание над
+словарём, поэтому проверяются они всегда, независимо от того, есть ключ или
+нет.
+
+Флаг --chain включает боевое чтение цепи через analysis/c2_common.C2Rpc
+(служба "c2_night_toxic_signs" -- общий суточный потолок C2, тот же, что у
+остальных c2_* задач). Ключа HELIUS_API_KEY/HELIUS_API в ЭТОМ контейнере нет
+-- здесь --chain честно откажет с понятным сообщением и ненулевым кодом
+возврата, но НЕ упадёт и НЕ испортит уже посчитанный кэш-отчёт; прогон с
+ключом делается на NL-хосте. Своя защита от переплаты -- --credit-limit
+(по умолчанию 20000): предел на ОДИН прогон --chain, ПОВЕРХ суточного
+потолка C2 (200000, общий на все c2_* службы, его проверяет и останавливает
+сам C2Rpc/c2_common.BudgetExceeded). Шаги идут от дешёвого/ценного к
+дорогому (см. run_full_chain_pass): (a) getAccountInfo по минтам -- налог,
+потолок, mint/freeze authority, отозвано ли право менять налог; (b)
+getTokenLargestAccounts -- топ-10 держателей; (c) getSignaturesForAddress --
+возраст минта и пула, с потолком страниц; (d) getBlock x2 -- толпа в слоте
+источника S и S+1; (e) getTransaction по followers[] -- объём копировщика
+для C3. Остановка на любом шаге (свой предел, суточный потолок C2, сбой
+узла) сохраняет всё, что уже собрано, и пишет причину -- частичный
+результат, а не крах.
+
+Без --chain (или без ключа) везде, где данные нужны из цепи, посчитано
 СКОЛЬКО ЭТО СТОИЛО БЫ (тариф Helius Developer, см. analysis/solana_rpc_client.py:
 обычный вызов -- 1 кредит, getProgramAccounts -- 10; здесь второе не
 используется), а не выдуман результат.
@@ -43,6 +62,7 @@
 
 --self-test: >= 20 проверок на синтетике (без сети и без чтения кэша).
 Запуск на кэше: --crowd/--followers путь + --out (по умолчанию data/).
+Запуск с цепью (нужен ключ): те же флаги + --chain [--credit-limit N].
 """
 from __future__ import annotations
 
@@ -57,15 +77,26 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA = REPO_ROOT / "data"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import c2_common as C2  # noqa: E402  -- только для --chain: C2Rpc (суточный потолок C2,
+                        # темп, повторы) и BudgetExceeded. Импорт безопасен без ключа и
+                        # без сети (проверено: C2.RC.helius_key() при отсутствии
+                        # HELIUS_API_KEY/HELIUS_API просто возвращает пустую строку) --
+                        # поэтому self-test и кэш-режим по-прежнему не трогают сеть.
+
 # ------------------------------------------------------------ тариф Helius
-# Переписано из analysis/solana_rpc_client.py (docs.helius.dev), а не
-# импортировано: этот файл нарочно не тянет ничего из c2_*/solana_rpc_client,
-# чтобы посчитанная тут цена не зависела от суточного бюджета C2 и не могла
-# случайно потратить чужую квоту.
+# Числа ниже -- копия тарифа из analysis/solana_rpc_client.py (docs.helius.dev),
+# используется в оценках стоимости прогона БЕЗ --chain (estimate_b_credit_cost,
+# c1_requirements), чтобы эти оценки не зависели от того, создан ли уже
+# C2Rpc. С --chain реальный счётчик кредитов -- rpc.stats["кредитов"] самого
+# C2Rpc (c2_common/solana_rpc_client), не эти константы.
 CREDITS_DEFAULT = 1          # обычный вызов: getAccountInfo, getTransaction,
                               # getBlock, getSignaturesForAddress,
                               # getTokenLargestAccounts -- все по 1
 CREDITS_GET_PROGRAM_ACCOUNTS = 10  # не используется ни одной функцией ниже
+
+DEFAULT_CREDIT_LIMIT = 20_000  # свой предел на ОДИН прогон --chain, поверх
+                                # суточного потолка C2 (200000, общий на все c2_*)
 
 WSOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -74,9 +105,10 @@ STABLES = (USDC, USDT)
 
 # Пулы вида x*y=k, где остаток хранилища -- это и есть резерв (спот_после
 # из задачи A по ним и посчитан). Независимая копия того же списка, что в
-# c2_followers_growth.py -- см. её комментарий: сам источник (c2_crowd_metric.py)
-# на этой ветке не живёт как импортируемый модуль, а плодить зависимость
-# на файл с префиксом c2_ здесь нарочно не стали (см. докстрока модуля).
+# c2_followers_growth.py: сам источник (c2_crowd_metric.py) на этой ветке не
+# живёт как импортируемый модуль, поэтому список продублирован, а не
+# импортирован оттуда (c2_common теперь и так импортирован -- см. выше -- но
+# именно ЭТОТ словарь у него не лежит).
 RESERVE_SPOT_PROGRAMS = {
     "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": "Pump AMM",
     "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": "Raydium CPMM",
@@ -137,6 +169,31 @@ def quantile(xs: list, q: float) -> float | None:
     lo, hi = int(pos), min(int(pos) + 1, len(xs) - 1)
     frac = pos - lo
     return xs[lo] + (xs[hi] - xs[lo]) * frac
+
+
+def linreg(xs: list, ys: list) -> dict:
+    """Наклон/пересечение/корреляция Пирсона обычной прямой ys ~ a + b*xs,
+    без numpy (n маленькое -- прогонов, где это было бы медленно, тут нет).
+    n < 2 или xs без разброса (varx == 0, все x одинаковы) -> slope/r = None,
+    а не ZeroDivisionError -- честное "недостаточно данных для наклона"."""
+    pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
+    n = len(pairs)
+    if n < 2:
+        return {"n": n, "slope": None, "intercept": None, "r": None,
+                "why_not": f"меньше 2 пар (n={n})"}
+    mx = sum(x for x, _ in pairs) / n
+    my = sum(y for _, y in pairs) / n
+    cov = sum((x - mx) * (y - my) for x, y in pairs)
+    varx = sum((x - mx) ** 2 for x, _ in pairs)
+    vary = sum((y - my) ** 2 for _, y in pairs)
+    if varx == 0:
+        return {"n": n, "slope": None, "intercept": None, "r": None,
+                "why_not": "все x одинаковы -- наклон не определён"}
+    slope = cov / varx
+    intercept = my - slope * mx
+    r = (cov / (varx * vary) ** 0.5) if vary > 0 else None
+    return {"n": n, "slope": slope, "intercept": intercept, "r": r,
+            "why_not": None if r is not None else "все y одинаковы -- корреляция не определена"}
 
 
 # ============================================================ загрузка кэша
@@ -554,6 +611,286 @@ def estimate_b_credit_cost(n_trades: int, n_unique_mints: int, n_unique_pools: i
     }
 
 
+# ============================================================ B+C3: оркестрация --chain
+
+def _run_stage(rpc, stage_name: str, items: list, worker, *, credit_limit: int, used0: int) -> tuple:
+    """Один этап (a/b/c/d/e): по каждому item -- worker(item) -> (ключ, значение).
+    Перед КАЖДЫМ item проверяется свой предел credit_limit (поверх used0 --
+    сколько rpc уже потратил ДО этого прогона --chain, чтобы предел был на
+    ОДИН запуск модуля, а не на всё время жизни rpc). Суточный потолок C2
+    проверяет сам C2Rpc и на превышении бросает c2_common.BudgetExceeded --
+    здесь это ловится и превращается в чистую остановку с причиной, а не в
+    падение всего прогона; всё, что успело обработаться ДО остановки,
+    возвращается как есть."""
+    results: dict = {}
+    for item in items:
+        if rpc.stats.get("кредитов", 0) - used0 >= credit_limit:
+            return results, (f"свой предел {credit_limit} кредитов исчерпан на этапе "
+                             f"{stage_name} ({len(results)} из {len(items)} обработано)")
+        try:
+            key, value = worker(item)
+        except C2.BudgetExceeded as exc:
+            return results, f"суточный потолок C2 исчерпан на этапе {stage_name}: {exc}"
+        results[key] = value
+    return results, None
+
+
+def follower_volume(tx: dict | None, wallet: str) -> tuple:
+    """Объём копировщика в SOL-экв по ЕГО СОБСТВЕННЫМ балансам счёта --
+    тем же методом, что и задача A/F (c2_common.quote_spend: SOL+WSOL+USDC/
+    курс). followers[] курса SOL/USD не хранит вовсе, поэтому чисто-стейбл-
+    платёж остаётся "неизвестно", а не переводится по случайному курсу."""
+    if tx is None:
+        return None, "getTransaction не отдал транзакцию (узел промолчал или подпись устарела)"
+    s = C2.quote_spend(tx, wallet)
+    if s["usd"] > 0:
+        return None, "часть платежа в USDC/USDT, курса SOL/USD в followers[] нет -- не переводится в SOL-экв"
+    if s["sol"] <= 0 and s["wsol"] <= 0:
+        return None, "платёж не найден ни в SOL, ни в WSOL на счетах кошелька"
+    return float(s["sol"] + s["wsol"]), None
+
+
+def run_full_chain_pass(rpc, trades: list, followers: list, tax_catalog: dict, *,
+                        credit_limit: int, age_max_pages: int) -> dict:
+    """Все шаги --chain, строго по порядку (a)->(b)->(c: минт, затем пул)->
+    (d)->(e), с ОДНИМ общим бюджетом credit_limit на весь прогон (не по
+    штуке на каждый этап): остановка на любом шаге сохраняет всё, что уже
+    собрано на предыдущих, и не трогает более дорогие ещё не начатые шаги --
+    поэтому порядок дешёвого/ценного важен сам по себе, отдельного deadline
+    по времени здесь нет (в отличие от c2_followers_growth.py: работа тут не
+    по блокам вперёд, а по конечному списку минтов/пулов/сделок)."""
+    used0 = rpc.stats.get("кредитов", 0)
+    all_mints = sorted({t["mint"] for t in trades if t.get("mint")})
+    all_pools = sorted({t["pool_vault"] for t in trades if t.get("pool_vault")})
+    mint_ref_bt: dict = {}
+    pool_ref_bt: dict = {}
+    for t in trades:
+        bt = t.get("block_time")
+        if bt is None:
+            continue
+        if t.get("mint"):
+            mint_ref_bt[t["mint"]] = min(bt, mint_ref_bt.get(t["mint"], bt))
+        if t.get("pool_vault"):
+            pool_ref_bt[t["pool_vault"]] = min(bt, pool_ref_bt.get(t["pool_vault"], bt))
+
+    out = {"stages": {}, "stopped_at_stage": None, "credit_limit": credit_limit,
+          "mint_info": {}, "top10": {}, "mint_age": {}, "pool_age": {},
+          "slot_crowd": {}, "follower_tx": {}}
+
+    def record(name, results, why_not, total_items):
+        out["stages"][name] = {"n_total": total_items, "n_done": len(results),
+                               "credits_used_cumulative": rpc.stats.get("кредитов", 0) - used0}
+        if why_not:
+            out["stopped_at_stage"] = why_not
+        return why_not
+
+    # (a) getAccountInfo -- налог/потолок/mint&freeze authority/отозвана ли смена налога
+    mint_info, why = _run_stage(rpc, "a_mint_accountinfo", all_mints,
+                                lambda m: (m, mint_chain_info(rpc.call, m)),
+                                credit_limit=credit_limit, used0=used0)
+    out["mint_info"] = mint_info
+    if record("a_mint_accountinfo", mint_info, why, len(all_mints)):
+        return out
+
+    # (b) getTokenLargestAccounts -- топ-10 держателей (supply -- из шага (a))
+    top10, why = _run_stage(
+        rpc, "b_top10_holders", all_mints,
+        lambda m: (m, top10_holder_share(rpc.call, m, (mint_info.get(m) or {}).get("supply_raw"))),
+        credit_limit=credit_limit, used0=used0)
+    out["top10"] = top10
+    if record("b_top10_holders", top10, why, len(all_mints)):
+        return out
+
+    # (в) возраст -- сначала минты, потом пулы (тот же порядок, что назвал владелец)
+    mint_age, why = _run_stage(
+        rpc, "c_mint_age", all_mints,
+        lambda m: (m, address_age(rpc.call, m, reference_block_time=mint_ref_bt.get(m),
+                                  max_pages=age_max_pages)),
+        credit_limit=credit_limit, used0=used0)
+    out["mint_age"] = mint_age
+    if record("c_mint_age", mint_age, why, len(all_mints)):
+        return out
+
+    pool_age, why = _run_stage(
+        rpc, "c_pool_age", all_pools,
+        lambda p: (p, address_age(rpc.call, p, reference_block_time=pool_ref_bt.get(p),
+                                  max_pages=age_max_pages)),
+        credit_limit=credit_limit, used0=used0)
+    out["pool_age"] = pool_age
+    if record("c_pool_age", pool_age, why, len(all_pools)):
+        return out
+
+    # (г) толпа в слоте S и S+1 -- по каждой сделке, у которой есть слот/минт/источник
+    trades_for_slot = [t for t in trades if t.get("slot") is not None and t.get("mint")
+                      and t.get("_source_address") and t.get("signature")]
+    slot_c, why = _run_stage(
+        rpc, "d_slot_crowd", trades_for_slot,
+        lambda t: (t["signature"], slot_crowd(rpc.call, t["slot"], t["mint"], t["_source_address"])),
+        credit_limit=credit_limit, used0=used0)
+    out["slot_crowd"] = slot_c
+    if record("d_slot_crowd", slot_c, why, len(trades_for_slot)):
+        return out
+
+    # (e) C3: объём копировщика -- getTransaction на каждую подпись followers[]
+    # (rpc.get_tx -- готовый метод c2_common.C2Rpc с правильными опциями
+    # jsonParsed/maxSupportedTransactionVersion/finalized, тот же, что и в
+    # остальных c2_* задачах; тестовый двойник rpc в self_test его тоже даёт)
+    follower_sigs = sorted({f["signature"] for f in followers if f.get("signature")})
+    tx_by_sig, why = _run_stage(rpc, "e_follower_tx", follower_sigs,
+                                lambda sig: (sig, rpc.get_tx(sig)),
+                                credit_limit=credit_limit, used0=used0)
+    out["follower_tx"] = tx_by_sig
+    record("e_follower_tx", tx_by_sig, why, len(follower_sigs))
+    return out
+
+
+def build_chain_groups(trades: list, chain: dict) -> dict:
+    """Группировка по признакам, добытым --chain (а не кэшем): расширяет
+    build_b_groups теми же гарантиями (ни одна сделка не теряется, деление
+    на пустую группу не падает) на mint/freeze/tax authority, топ-10
+    держателей, возраст минта/пула, точную толпу в слоте S/S+1. Сделка, чей
+    минт/пул не попал в chain (остановка по бюджету раньше) -- unknown, а не
+    исключается."""
+    mint_info = chain.get("mint_info") or {}
+    top10 = chain.get("top10") or {}
+    mint_age = chain.get("mint_age") or {}
+    pool_age = chain.get("pool_age") or {}
+    slot_crowd_by_sig = chain.get("slot_crowd") or {}
+
+    def mi(t):
+        info = mint_info.get(t.get("mint"))
+        return info if info and info.get("ok") else None
+
+    def mint_auth_bucket(t):
+        info = mi(t)
+        return None if info is None else (
+            "mint_authority_revoked" if info["mint_authority_revoked"] else "mint_authority_active")
+
+    def freeze_auth_bucket(t):
+        info = mi(t)
+        return None if info is None else (
+            "freeze_authority_revoked" if info["freeze_authority_revoked"] else "freeze_authority_active")
+
+    def tax_auth_bucket(t):
+        info = mi(t)
+        if info is None or not info.get("is_taxable"):
+            return None
+        return "tax_authority_revoked" if info["tax_authority_revoked"] else "tax_authority_active"
+
+    def taxable_full_bucket(t):
+        info = mi(t)
+        return None if info is None else ("taxable_mint" if info["is_taxable"] else "non_taxable_mint")
+
+    top10_vals = [v["top10_share"] for v in top10.values() if v.get("ok")]
+    top10_med = median(top10_vals) or 0.0
+
+    def top10_bucket(t):
+        info = top10.get(t.get("mint"))
+        if not info or not info.get("ok"):
+            return None
+        return "top10_ge_median" if info["top10_share"] >= top10_med else "top10_lt_median"
+
+    def age_med(ages):
+        vals = [v["age_seconds"] for v in ages.values() if v.get("ok") and v.get("age_seconds") is not None]
+        return median(vals) or 0.0
+
+    mint_age_med = age_med(mint_age)
+    pool_age_med = age_med(pool_age)
+
+    def mint_age_bucket(t):
+        info = mint_age.get(t.get("mint"))
+        if not info or not info.get("ok") or info.get("age_seconds") is None:
+            return None
+        return "token_older_than_median" if info["age_seconds"] >= mint_age_med else "token_newer_than_median"
+
+    def pool_age_bucket(t):
+        info = pool_age.get(t.get("pool_vault"))
+        if not info or not info.get("ok") or info.get("age_seconds") is None:
+            return None
+        return "pool_older_than_median" if info["age_seconds"] >= pool_age_med else "pool_newer_than_median"
+
+    slot_totals = []
+    for sc in slot_crowd_by_sig.values():
+        s0, s1 = sc.get("slot_source") or {}, sc.get("slot_source_plus_1") or {}
+        if s0.get("ok") and s1.get("ok"):
+            slot_totals.append(s0["n_buyers"] + s1["n_buyers"])
+    slot_med = median(slot_totals) or 0.0
+
+    def slot_bucket(t):
+        sc = slot_crowd_by_sig.get(t.get("signature"))
+        if not sc:
+            return None
+        s0, s1 = sc.get("slot_source") or {}, sc.get("slot_source_plus_1") or {}
+        if not (s0.get("ok") and s1.get("ok")):
+            return None
+        total = s0["n_buyers"] + s1["n_buyers"]
+        return "slot_crowd_ge_median" if total >= slot_med else "slot_crowd_lt_median"
+
+    return {
+        "mint_authority": group_by_feature(trades, mint_auth_bucket),
+        "freeze_authority": group_by_feature(trades, freeze_auth_bucket),
+        "tax_authority": group_by_feature(trades, tax_auth_bucket),
+        "taxable_full_with_chain": group_by_feature(trades, taxable_full_bucket),
+        "top10_holder_share": group_by_feature(trades, top10_bucket),
+        "token_age": group_by_feature(trades, mint_age_bucket),
+        "pool_age": group_by_feature(trades, pool_age_bucket),
+        "slot_crowd_exact": group_by_feature(trades, slot_bucket),
+    }
+
+
+def fee_vs_volume_answer(followers: list, tx_by_sig: dict) -> dict:
+    """Прямой ответ на "платят фиксированно или пропорционально объёму" --
+    числом: наклон и корреляция Пирсона (linreg) платы (priority+tip) от
+    объёма копировщика (follower_volume), плюс разброс платы (cv) для
+    сравнения с прежним суррогатом (fee_model_hypothesis в кэш-режиме).
+    Порог для словесного вывода -- ЯВНОЕ решение (|r|>=0.5 -- заметная
+    линейная связь с объёмом по общепринятой грубой шкале корреляций),
+    не универсальный закон; число рядом с выводом всегда есть."""
+    pairs, n_no_tx, n_no_volume = [], 0, 0
+    reasons_no_volume: dict = {}
+    for f in followers:
+        sig = f.get("signature")
+        tx = tx_by_sig.get(sig)
+        if sig not in tx_by_sig or tx is None:
+            n_no_tx += 1
+            continue
+        vol, why = follower_volume(tx, f.get("wallet"))
+        if vol is None:
+            n_no_volume += 1
+            reasons_no_volume[why] = reasons_no_volume.get(why, 0) + 1
+            continue
+        fee = (f.get("priority_lamports") or 0) + (f.get("tip_lamports") or 0)
+        pairs.append((vol, fee))
+    vols = [v for v, _ in pairs]
+    fees = [x for _, x in pairs]
+    lr = linreg(vols, fees)
+    fee_dispersion = cv(fees)
+    # r бывает None по ДВУМ разным причинам: мало пар (см. n<5 ниже -- уже
+    # недостаточно данных) или плата/объём БЕЗ разброса (linreg.why_not) --
+    # второе, при n>=5, само по себе сильный довод "плата не меняется", а не
+    # "неизвестно", поэтому r=None не отправляется в "недостаточно пар" сразу.
+    if lr["n"] < 5:
+        verdict = f"недостаточно пар объём+плата для вывода (n={lr['n']})"
+    elif lr["r"] is not None and abs(lr["r"]) >= 0.5:
+        verdict = (f"похоже на плату, ПРОПОРЦИОНАЛЬНУЮ объёму: корреляция r={lr['r']:.2f}, "
+                  f"наклон={lr['slope']:.0f} лампорт на 1 SOL объёма")
+    elif fee_dispersion is not None and fee_dispersion <= 0.3:
+        r_str = f"{lr['r']:.2f}" if lr["r"] is not None else "не определена (плата без разброса)"
+        verdict = (f"похоже на ФИКСИРОВАННУЮ плату: разброс платы низкий (cv={fee_dispersion:.2f}), "
+                  f"связь с объёмом слабая (r={r_str})")
+    else:
+        r_str = f"{lr['r']:.2f}" if lr["r"] is not None else "не определена"
+        verdict = (f"неоднозначно: связь с объёмом слабая (r={r_str}), но плата не держится "
+                  f"на одном уровне (cv={fee_dispersion}) -- зависит от чего-то ещё "
+                  "(загрузка сети, конкуренция за слот), не только от объёма или фиксированной суммы")
+    return {
+        "n_follower_rows": len(followers), "n_no_tx": n_no_tx, "n_no_volume": n_no_volume,
+        "n_pairs_used": len(pairs), "why_no_volume_reasons": reasons_no_volume,
+        "linreg_fee_on_volume": lr, "fee_lamports_cv": fee_dispersion, "verdict": verdict,
+        "verdict_rule": "|r|>=0.5 -> пропорционально; иначе cv<=0.3 -> фиксированно; иначе неоднозначно",
+    }
+
+
 # ============================================================ C1: источник как выход
 
 def c1_requirements(sources_meta: list, *, empirical_credits_per_window: float | None = None) -> dict:
@@ -816,6 +1153,17 @@ def circular_wash_note() -> dict:
 
 # ============================================================ сборка отчёта
 
+def chain_key_or_refusal() -> tuple:
+    """Ключ Helius или честный отказ -- без ключа --chain НЕ падает, а
+    возвращает причину, которую main()/build_report() кладут в отчёт как
+    есть (кэш-часть при этом уже посчитана и не портится)."""
+    key = C2.RC.helius_key()[0]
+    if not key:
+        return "", ("--chain задан, но HELIUS_API_KEY/HELIUS_API не установлен в этом окружении -- "
+                    "цепь не читается, кэш-часть отчёта посчитана как обычно")
+    return key, None
+
+
 def build_report(args) -> dict:
     crowd_path = Path(args.crowd)
     followers_path = Path(args.followers)
@@ -849,6 +1197,33 @@ def build_report(args) -> dict:
 
     followers = fw["followers"]
     hike_mints = tax_hike_mints(tax_catalog)
+
+    chain_section = {"requested": bool(getattr(args, "chain", False)), "ran": False}
+    c3_chain_fee_answer = None
+    if chain_section["requested"]:
+        key, refusal = chain_key_or_refusal()
+        if refusal:
+            chain_section["why_not"] = refusal
+        else:
+            rpc = C2.C2Rpc("c2_night_toxic_signs", key=key)
+            chain_raw = run_full_chain_pass(rpc, trades, followers, tax_catalog,
+                                            credit_limit=args.credit_limit,
+                                            age_max_pages=args.age_max_pages)
+            chain_groups = build_chain_groups(trades, chain_raw)
+            combined_groups = dict(b_groups)
+            combined_groups.update(chain_groups)
+            toxic_all = flag_toxic_groups(combined_groups, threshold_pct=args.threshold_pct,
+                                          min_n=args.min_n)
+            c3_chain_fee_answer = fee_vs_volume_answer(followers, chain_raw.get("follower_tx") or {})
+            chain_section.update({
+                "ran": True, "credit_limit": args.credit_limit,
+                "credits_used": rpc.stats.get("кредитов", 0),
+                "stopped_at_stage": chain_raw.get("stopped_at_stage"),
+                "stages": chain_raw.get("stages"),
+                "groups_from_chain": chain_groups,
+                "groups_below_threshold_including_chain": {
+                    "threshold_pct": args.threshold_pct, "min_n": args.min_n, "matches": toxic_all},
+            })
 
     report = {
         "schema_version": 1,
@@ -899,6 +1274,7 @@ def build_report(args) -> dict:
             "groups_mean_growth_with_vs_without": b_groups,
             "groups_below_threshold": {"threshold_pct": args.threshold_pct, "min_n": args.min_n,
                                        "matches": toxic},
+            "chain_run": chain_section,
         },
         "task_c1_source_as_exit": c1_requirements(sources_meta, empirical_credits_per_window=empirical_anchor),
         "task_c3_snipers": {
@@ -906,6 +1282,7 @@ def build_report(args) -> dict:
             "top_wallets_by_frequency": followers_frequency(followers)[:15],
             "named_snipers": named_sniper_report(followers, NAMED_SNIPERS),
             "fee_model_hypothesis": fee_model_hypothesis(followers),
+            "fee_vs_volume_from_chain": c3_chain_fee_answer,
         },
         "task_c4_manipulation": {
             "tax_hike": {
@@ -940,6 +1317,23 @@ def print_summary(report: dict) -> None:
     print(f"\nполный прогон B-признаков цепи (верхняя граница): "
           f"{cc['total_credits_upper_bound']} кредитов на {cc['n_trades']} сигналов")
 
+    cr = tb.get("chain_run") or {}
+    if cr.get("requested"):
+        if not cr.get("ran"):
+            print(f"\n--chain запрошен, но не выполнен: {cr.get('why_not')}")
+        else:
+            print(f"\n--chain выполнен: {cr['credits_used']} кредитов "
+                  f"(предел {cr['credit_limit']}), остановка: {cr.get('stopped_at_stage') or 'нет -- дошли до конца'}")
+            for name, g in (cr.get("groups_from_chain") or {}).items():
+                for gk, v in g.items():
+                    m = "-" if v["mean_growth_pct"] is None else f"{v['mean_growth_pct']:.2f}"
+                    print(f"  {name[:22]:22} {gk[:28]:28} n_total={v['n_total']:5} "
+                          f"n_growth={v['n_known_growth']:5} mean%={m}")
+            matches2 = cr["groups_below_threshold_including_chain"]["matches"]
+            print(f"  групп со средним ниже порога (кэш+цепь вместе): {len(matches2)}")
+            for m in matches2:
+                print(f"    {m['feature']} / {m['group']}: n={m['n_known_growth']} mean={m['mean_growth_pct']:.2f}%")
+
     print("\n=== Задача C1: источник как выход ===")
     c1 = report["task_c1_source_as_exit"]
     print(f"шаги 1-2 (список продаж): {c1['total_credits_steps_1_2']} кредитов "
@@ -958,6 +1352,10 @@ def print_summary(report: dict) -> None:
             print(f"  {addr[:10]}: найден {r['n_appearances']} раз, tip_median={r['tip_lamports_median']}")
         else:
             print(f"  {addr[:10]}: {r['why_not']}")
+    fv = c3.get("fee_vs_volume_from_chain")
+    if fv:
+        print(f"  объём копировщика (--chain): {fv['n_pairs_used']} пар из {fv['n_follower_rows']} строк")
+        print(f"  вердикт: {fv['verdict']}")
 
     print("\n=== Задача C4: манипуляции ===")
     c4 = report["task_c4_manipulation"]
@@ -982,6 +1380,11 @@ def main() -> int:
     ap.add_argument("--age-max-pages", type=int, default=AGE_DEFAULT_MAX_PAGES)
     ap.add_argument("--threshold-pct", type=float, default=-5.0)
     ap.add_argument("--min-n", type=int, default=10)
+    ap.add_argument("--chain", action="store_true",
+                    help="дочитать B(в/г)+C3-объём по цепи через c2_common.C2Rpc "
+                         "(нужен HELIUS_API_KEY/HELIUS_API; в этом контейнере его нет)")
+    ap.add_argument("--credit-limit", type=int, default=DEFAULT_CREDIT_LIMIT,
+                    help="свой предел кредитов на ОДИН прогон --chain, поверх суточного потолка C2")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
@@ -1005,6 +1408,9 @@ def main() -> int:
     out_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     print_summary(report)
     print(f"\nотчёт: {out_path}")
+    cr = report["task_b_toxic_features"].get("chain_run") or {}
+    if cr.get("requested") and not cr.get("ran"):
+        print(f"ВНИМАНИЕ: {cr.get('why_not')}", file=sys.stderr)
     return 0
 
 
@@ -1251,6 +1657,187 @@ def self_test() -> int:
         c1["step2_classify_non_buy_signatures_credits_upper_bound"] == (1500 + 500) - (20 + 5), c1)
     chk("c1_requirements: эмпирический якорь передаётся в отчёт как есть, не пересчитывается",
         c1["step3_empirical_credits_per_sell_window"] == 222.2, c1)
+
+    # ---------- 30-33: linreg ----------
+    lr_perfect = linreg([1, 2, 3, 4], [3, 5, 7, 9])  # y = 2x+1
+    chk("linreg: идеальная прямая -> наклон/пересечение/r верны",
+        lr_perfect["slope"] is not None and abs(lr_perfect["slope"] - 2) < 1e-9
+        and abs(lr_perfect["intercept"] - 1) < 1e-9 and abs(lr_perfect["r"] - 1.0) < 1e-9, lr_perfect)
+    lr_flat_y = linreg([1, 2, 3, 4], [5, 5, 5, 5])
+    chk("linreg: y без разброса -> r=None с причиной, не ZeroDivisionError",
+        lr_flat_y["r"] is None and bool(lr_flat_y["why_not"]), lr_flat_y)
+    lr_short = linreg([1], [1])
+    chk("linreg: меньше 2 пар -> известная причина, не исключение",
+        lr_short["slope"] is None and "меньше 2" in lr_short["why_not"], lr_short)
+    lr_flat_x = linreg([5, 5, 5], [1, 2, 3])
+    chk("linreg: x без разброса (varx=0) -> наклон не определён, не деление на 0",
+        lr_flat_x["slope"] is None and bool(lr_flat_x["why_not"]), lr_flat_x)
+
+    # ---------- 34-37: follower_volume (через настоящий c2_common.quote_spend) ----------
+    def mk_spend_tx(wallet, *, sol_spent=0, wsol_spent=0, usdc_spent=0):
+        keys = [wallet, "WSOL_ACC", "USDC_ACC"]
+        pre_l = [1_000_000_000, 0, 0]
+        post_l = [1_000_000_000 - sol_spent, 0, 0]
+        pre_t, post_t = [], []
+        if wsol_spent:
+            pre_t.append({"accountIndex": 1, "owner": wallet, "mint": WSOL,
+                          "uiTokenAmount": {"amount": str(int(wsol_spent * 1e9)), "decimals": 9}})
+            post_t.append({"accountIndex": 1, "owner": wallet, "mint": WSOL,
+                           "uiTokenAmount": {"amount": "0", "decimals": 9}})
+        if usdc_spent:
+            pre_t.append({"accountIndex": 2, "owner": wallet, "mint": USDC,
+                          "uiTokenAmount": {"amount": str(int(usdc_spent * 1e6)), "decimals": 6}})
+            post_t.append({"accountIndex": 2, "owner": wallet, "mint": USDC,
+                           "uiTokenAmount": {"amount": "0", "decimals": 6}})
+        return {"transaction": {"accountKeys": keys},
+               "meta": {"preBalances": pre_l, "postBalances": post_l,
+                       "preTokenBalances": pre_t, "postTokenBalances": post_t}}
+
+    vol_none, why_none = follower_volume(None, "W")
+    chk("follower_volume: нет транзакции -> None + причина, не исключение", vol_none is None and bool(why_none))
+    vol_sol, _ = follower_volume(mk_spend_tx("W", sol_spent=2_000_000_000), "W")
+    chk("follower_volume: трата в SOL -- считается через c2_common.quote_spend",
+        vol_sol is not None and abs(vol_sol - 2.0) < 1e-6, vol_sol)
+    vol_wsol, _ = follower_volume(mk_spend_tx("W", wsol_spent=1.5), "W")
+    chk("follower_volume: трата в WSOL -- тоже считается", vol_wsol is not None and abs(vol_wsol - 1.5) < 1e-6, vol_wsol)
+    vol_usd, why_usd = follower_volume(mk_spend_tx("W", usdc_spent=100), "W")
+    chk("follower_volume: чистый USDC без курса -> неизвестно, а не пересчитано наугад",
+        vol_usd is None and "курс" in why_usd, (vol_usd, why_usd))
+
+    # ---------- 38-40: fee_vs_volume_answer ----------
+    followers_prop = [{"signature": f"S{i}", "wallet": f"W{i}",
+                       "priority_lamports": i * 1_000_000, "tip_lamports": 0} for i in range(1, 7)]
+    tx_prop = {f"S{i}": mk_spend_tx(f"W{i}", sol_spent=int(i * 1_000_000_000)) for i in range(1, 7)}
+    fv_prop = fee_vs_volume_answer(followers_prop, tx_prop)
+    chk("fee_vs_volume_answer: плата растёт вместе с объёмом -> вердикт 'пропорционально'",
+        "ПРОПОРЦИОНАЛЬНУЮ" in fv_prop["verdict"] and fv_prop["linreg_fee_on_volume"]["r"] > 0.9, fv_prop)
+
+    followers_fixed = [{"signature": f"F{i}", "wallet": f"WF{i}",
+                        "priority_lamports": 1_000_000, "tip_lamports": 0} for i in range(1, 8)]
+    tx_fixed = {f"F{i}": mk_spend_tx(f"WF{i}", sol_spent=int((1 + (i % 3)) * 1_000_000_000))
+               for i in range(1, 8)}
+    fv_fixed = fee_vs_volume_answer(followers_fixed, tx_fixed)
+    chk("fee_vs_volume_answer: плата одна и та же при разном объёме -> вердикт 'фиксированную'",
+        "ФИКСИРОВАННУЮ" in fv_fixed["verdict"], fv_fixed)
+
+    fv_empty = fee_vs_volume_answer([{"signature": "Z1", "wallet": "WZ", "priority_lamports": 1}], {})
+    chk("fee_vs_volume_answer: нет транзакций вовсе -> 'недостаточно пар', не исключение",
+        "недостаточно" in fv_empty["verdict"] and fv_empty["n_pairs_used"] == 0, fv_empty)
+
+    # ---------- 41-46: оркестрация --chain на поддельном C2Rpc ----------
+    class _FakeChainRpc:
+        """Двойник c2_common.C2Rpc для self-test -- без сети, без ключа.
+        credits_cap имитирует ЧУЖОЙ суточный потолок C2 (не наш --credit-limit),
+        чтобы отдельно проверить, что c2_common.BudgetExceeded тоже
+        останавливает прогон чисто, а не роняет его."""
+
+        def __init__(self, *, mint_infos=None, top10s=None, sig_pages=None, blocks=None,
+                    txs=None, credits_cap=None):
+            self.stats = {"кредитов": 0}
+            self.mint_infos = mint_infos or {}
+            self.top10s = top10s or {}
+            self.sig_pages = sig_pages or {}
+            self.blocks = blocks or {}
+            self.txs = txs or {}
+            self.credits_cap = credits_cap
+
+        def _charge(self):
+            if self.credits_cap is not None and self.stats["кредитов"] >= self.credits_cap:
+                raise C2.BudgetExceeded("симулированный суточный потолок C2 (тест)")
+            self.stats["кредитов"] += 1
+
+        def call(self, method, params):
+            self._charge()
+            if method == "getAccountInfo":
+                return self.mint_infos.get(params[0])
+            if method == "getTokenLargestAccounts":
+                return self.top10s.get(params[0])
+            if method == "getSignaturesForAddress":
+                pages = self.sig_pages.get(params[0]) or []
+                before = (params[1] or {}).get("before")
+                idx = 0
+                if before is not None:
+                    idx = len(pages)
+                    for i, pg in enumerate(pages):
+                        if pg and pg[-1]["signature"] == before:
+                            idx = i + 1
+                            break
+                return pages[idx] if idx < len(pages) else []
+            if method == "getBlock":
+                return self.blocks.get(params[0])
+            raise AssertionError(f"неожиданный метод {method} (тест)")
+
+        def get_tx(self, sig):
+            return self.txs.get(sig)
+
+    def mk_ai(bps=None, mint_auth=None, freeze_auth=None, supply="1000"):
+        info = {"decimals": 6, "supply": supply, "mintAuthority": mint_auth, "freezeAuthority": freeze_auth,
+               "extensions": []}
+        if bps is not None:
+            info["extensions"] = [{"extension": "transferFeeConfig", "state": {
+                "transferFeeConfigAuthority": None,
+                "newerTransferFee": {"transferFeeBasisPoints": bps, "maximumFee": 999},
+                "olderTransferFee": {"transferFeeBasisPoints": bps}}}]
+        return {"value": {"owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+                          "data": {"parsed": {"info": info}}}}
+
+    one_trade = [{"signature": "SIG1", "slot": 500, "mint": "MINTA", "pool_vault": "POOLA",
+                 "block_time": 1000, "growth_30s": 1.2, "_source_address": "SRC1"}]
+    one_follower = [{"signature": "FSIG1", "wallet": "FW1", "priority_lamports": 10, "tip_lamports": 0}]
+    fake_rpc = _FakeChainRpc(
+        mint_infos={"MINTA": mk_ai(bps=300, mint_auth=None, freeze_auth=None)},
+        top10s={"MINTA": {"value": [{"amount": "100"}] * 10}},
+        sig_pages={
+            "MINTA": [[{"signature": "OLDEST_MINTA", "slot": 1, "blockTime": 100}]],
+            "POOLA": [[{"signature": "OLDEST_POOLA", "slot": 2, "blockTime": 200}]],
+        },
+        blocks={500: {"transactions": []}, 501: {"transactions": []}},
+        txs={"FSIG1": mk_spend_tx("FW1", sol_spent=1_000_000_000)},
+    )
+    full = run_full_chain_pass(fake_rpc, one_trade, one_follower, {}, credit_limit=1000, age_max_pages=3)
+    chk("run_full_chain_pass: полный прогон без остановки -- все этапы дошли до конца",
+        full["stopped_at_stage"] is None and set(full["stages"]) ==
+        {"a_mint_accountinfo", "b_top10_holders", "c_mint_age", "c_pool_age", "d_slot_crowd", "e_follower_tx"},
+        full["stages"])
+    chk("run_full_chain_pass: (a) минт разобран -- налог/authority видны",
+        full["mint_info"]["MINTA"]["ok"] and full["mint_info"]["MINTA"]["tax_bps"] == 300, full["mint_info"])
+    chk("run_full_chain_pass: (e) объём копировщика дочитан", full["follower_tx"].get("FSIG1") is not None)
+
+    fake_rpc_stop = _FakeChainRpc(mint_infos={"MINTA": mk_ai(bps=300)},
+                                  top10s={"MINTA": {"value": [{"amount": "1"}]}},
+                                  sig_pages={}, blocks={}, txs={})
+    full_stopped = run_full_chain_pass(fake_rpc_stop, one_trade, one_follower, {},
+                                       credit_limit=1, age_max_pages=3)
+    chk("run_full_chain_pass: свой предел в 1 кредит -- этап (a) отработал, этап (b) уже не начат "
+        "(0 из 1, дальше по цепочке (в)/(г)/(e) вообще не запускались)",
+        full_stopped["stopped_at_stage"] is not None
+        and full_stopped["stages"]["a_mint_accountinfo"]["n_done"] == 1
+        and full_stopped["stages"]["b_top10_holders"]["n_done"] == 0
+        and set(full_stopped["stages"]) == {"a_mint_accountinfo", "b_top10_holders"},
+        full_stopped["stages"])
+
+    fake_rpc_budget = _FakeChainRpc(mint_infos={"MINTA": mk_ai(bps=300)}, credits_cap=0)
+    full_budget = run_full_chain_pass(fake_rpc_budget, one_trade, one_follower, {},
+                                      credit_limit=1000, age_max_pages=3)
+    chk("run_full_chain_pass: суточный потолок C2 (BudgetExceeded) ловится чисто, не падает наружу",
+        full_budget["stopped_at_stage"] is not None and "суточный потолок C2" in full_budget["stopped_at_stage"],
+        full_budget["stopped_at_stage"])
+
+    # ---------- 47: build_chain_groups не теряет сделки без chain-данных ----------
+    trades_mixed = [{"signature": "S1", "mint": "MINTA", "pool_vault": "POOLA", "growth_30s": 1.1},
+                    {"signature": "S2", "mint": "MINT_NO_CHAIN_DATA", "pool_vault": "POOL_X", "growth_30s": 0.9}]
+    chain_partial = {"mint_info": {"MINTA": mint_chain_info(lambda m, p: mk_ai(bps=300, mint_auth=None), "MINTA")}}
+    cg = build_chain_groups(trades_mixed, chain_partial)
+    chk("build_chain_groups: не теряет сделку, у которой нет chain-данных (уходит в unknown)",
+        sum(v["n_total"] for v in cg["mint_authority"].values()) == len(trades_mixed), cg["mint_authority"])
+    chk("build_chain_groups: mint_authority_revoked виден у минта, где authority=None",
+        "mint_authority_revoked" in cg["mint_authority"] and
+        cg["mint_authority"]["mint_authority_revoked"]["n_total"] == 1, cg["mint_authority"])
+
+    # ---------- 48: chain_key_or_refusal -- в ЭТОМ контейнере ключа нет ----------
+    key_now, refusal_now = chain_key_or_refusal()
+    chk("chain_key_or_refusal: в этом контейнере ключа нет -> честный отказ, не пустая тишина",
+        key_now == "" and refusal_now is not None and "HELIUS" in refusal_now, refusal_now)
 
     bad = 0
     for name, ok, got in checks:

@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "generated_utc": "2026-09-25T01:50:32Z",
+ "generated_utc": "2026-09-25T02:34:57Z",
  "inputs": {
   "crowd_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
   "followers_file": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/c2_block_position_2026-09-24.json",
@@ -366,6 +366,11 @@
    "threshold_pct": -5.0,
    "min_n": 10,
    "matches": []
+  },
+  "chain_run": {
+   "requested": true,
+   "ran": false,
+   "why_not": "--chain задан, но HELIUS_API_KEY/HELIUS_API не установлен в этом окружении -- цепь не читается, кэш-часть отчёта посчитана как обычно"
   }
  },
  "task_c1_source_as_exit": {
@@ -642,7 +647,8 @@
     "credits_for_this_run": 339
    },
    "note": "низкий total_fee_lamports_cv_all при высоком разбросе cu_price_micro_cv_all говорит в пользу фиксированной СУММЫ платы (не привязанной к тому, что менял cu_price при разном cu_limit); высокий total_fee_lamports_cv_all -- против фиксированной суммы, но БЕЗ объёма нельзя отличить 'пропорционально объёму' от 'зависит от чего-то ещё (загрузка сети, конкуренция за слот)'. Наблюдение по числам этого прогона, не готовый ответ владельцу."
-  }
+  },
+  "fee_vs_volume_from_chain": null
  },
  "task_c4_manipulation": {
   "tax_hike": {
