@@ -85,8 +85,8 @@ USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 
 SEED = 20260925                 # дата ночи; фиксирован ради воспроизводимости
 N_BOOT = 2000                   # задача просит не меньше 2000
-ГОРИЗОНТЫ = ("t28_8", "t10s", "t60s", "t5m", "до_первой_продажи_источника")
-ВХОДЫ = ("i_сразу_за_источником", "ii_голова_S_plus_1", "iii_голова_S_plus_2")
+ГОРИЗОНТЫ = ("t28_8", "t10s", "t60s", "t5m", "until_source_first_sell")
+ВХОДЫ = ("entry_i_immediate", "entry_ii_s_plus_1", "entry_iii_s_plus_2")
 ПОРОГ_ИСТОЧНИКА_ДЛЯ_РАЗБИВКИ = 3  # то же число, что "порог_источника" в
                                    # data/solana_tax_groups.json -- не выдумано,
                                    # взято из уже принятого в репозитории решения
@@ -219,7 +219,7 @@ def build_signal(raw: dict, minty: dict, depth_by_quote: dict) -> dict:
         "quote_tax_known": q_known, "quote_taxable": q_taxable, "quote_tax_bps": q_bps,
         "leg_pool_sol_depth": None if quote_is_sol else depth_by_quote.get(quote_mint),
         "hops_proxy": hops_proxy(quote_mint, raw.get("split_route")),
-        "плохая_серия": "неизвестно",
+        "bad_streak": "unknown",
     }
 
 
@@ -227,7 +227,7 @@ def аннотировать_серию(signals: list, окно_ч: float = 24.0
                         порог_доля: float = 0.5) -> list:
     """"Плохая серия источника за 24ч": доля ПРЕДЫДУЩИХ (по времени) сделок
     того же источника за 24 ч перед текущей, где growth_30s<1 (а если его
-    нет -- growth_60s<1). Меньше мин_историй таких сделок -- "неизвестно"
+    нет -- growth_60s<1). Меньше мин_историй таких сделок -- "unknown"
     (недостаточно истории, это не "хорошая серия"). Порог "большинство"
     (0.5) и окно 24ч -- определение из формулировки владельца, а не
     подобранное на обучающей половине число, поэтому утечки данных
@@ -240,7 +240,7 @@ def аннотировать_серию(signals: list, окно_ч: float = 24.0
         for i, s in enumerate(lst):
             t0 = s.get("block_time")
             if t0 is None:
-                s["плохая_серия"] = "неизвестно"
+                s["bad_streak"] = "unknown"
                 continue
             history = [h for h in lst[:i] if h.get("block_time") is not None
                        and 0 <= t0 - h["block_time"] <= окно_ч * 3600]
@@ -251,9 +251,9 @@ def аннотировать_серию(signals: list, окно_ч: float = 24.0
 
             исходы = [x for x in (лузер(h) for h in history) if x is not None]
             if len(исходы) < мин_историй:
-                s["плохая_серия"] = "неизвестно"
+                s["bad_streak"] = "unknown"
             else:
-                s["плохая_серия"] = "да" if (sum(исходы) / len(исходы)) > порог_доля else "нет"
+                s["bad_streak"] = "yes" if (sum(исходы) / len(исходы)) > порог_доля else "no"
     return signals
 
 
@@ -278,7 +278,7 @@ def horizon_growth(sig: dict, horizon: str) -> tuple[float | None, str | None]:
         return None, "в кэше нет цены на 10 с (только точки 0/30/60 с) -- не интерполируется"
     if horizon == "t5m":
         return None, "в кэше нет цены на 5 мин (только точки 0/30/60 с) -- не интерполируется"
-    if horizon == "до_первой_продажи_источника":
+    if horizon == "until_source_first_sell":
         return None, "в кэше нет времени/цены первой продажи источника (только его покупки)"
     raise ValueError(horizon)
 
@@ -336,7 +336,7 @@ def compute_a1(signals: list) -> list:
         row = {"signature": sig["signature"], "source": sig["source_remark"],
                "source_address": sig["source_address"], "block_time": sig.get("block_time"),
                "block_time_utc": sig["block_time_utc"], "mint": sig["mint"],
-               "entry_price_spot_after": entry, "нет_spot_after": entry is None}
+               "entry_price_spot_after": entry, "no_spot_after": entry is None}
         for horizon in ГОРИЗОНТЫ:
             growth, why = horizon_growth(sig, horizon)
             if growth is None:
@@ -356,14 +356,14 @@ def compute_a1(signals: list) -> list:
 def свод(rows: list, horizon: str) -> dict:
     vals = [r[horizon]["net_sol"] for r in rows if r[horizon]["net_sol"] is not None]
     if not vals:
-        return {"сделок": 0, "сделок_без_цифры": len(rows), "среднее_sol": None,
-                "медиана_sol": None, "доля_в_плюс": None, "сумма_sol": None}
+        return {"n_trades": 0, "n_missing": len(rows), "mean_sol": None,
+                "median_sol": None, "share_positive": None, "sum_sol": None}
     плюс = sum(1 for v in vals if v > 0)
-    return {"сделок": len(vals), "сделок_без_цифры": len(rows) - len(vals),
-            "среднее_sol": round(sum(vals) / len(vals), 6),
-            "медиана_sol": round(statistics.median(vals), 6),
-            "доля_в_плюс": round(плюс / len(vals), 4),
-            "сумма_sol": round(sum(vals), 6)}
+    return {"n_trades": len(vals), "n_missing": len(rows) - len(vals),
+            "mean_sol": round(sum(vals) / len(vals), 6),
+            "median_sol": round(statistics.median(vals), 6),
+            "share_positive": round(плюс / len(vals), 4),
+            "sum_sol": round(sum(vals), 6)}
 
 
 def без_n_лучших(rows: list, horizon: str, n: int) -> list:
@@ -377,7 +377,7 @@ def бутстрэп_среднего(rows: list, horizon: str, n_boot: int = N_
     воспроизводимости при том же входе (проверяется в self_test)."""
     vals = [r[horizon]["net_sol"] for r in rows if r[horizon]["net_sol"] is not None]
     if len(vals) < 2:
-        return {"почему": "меньше двух сделок с известным результатом -- интервал не строится"}
+        return {"why_not": "меньше двух сделок с известным результатом -- интервал не строится"}
     rnd = random.Random(seed)
     n = len(vals)
     средние = []
@@ -387,15 +387,15 @@ def бутстрэп_среднего(rows: list, horizon: str, n_boot: int = N_
     lo = средние[int(0.025 * n_boot)]
     hi = средние[int(0.975 * n_boot) - 1]
     факт = sum(vals) / n
-    return {"сделок": n, "среднее_sol": round(факт, 6),
-            "интервал_95_низ_sol": round(lo, 6), "интервал_95_верх_sol": round(hi, 6),
-            "выборок": n_boot, "сид": seed, "ноль_внутри_интервала": bool(lo <= 0 <= hi)}
+    return {"n_trades": n, "mean_sol": round(факт, 6),
+            "ci95_lo_sol": round(lo, 6), "ci95_hi_sol": round(hi, 6),
+            "n_boot": n_boot, "seed": seed, "zero_inside_ci": bool(lo <= 0 <= hi)}
 
 
 def вывод_по_интервалу(boot: dict) -> str:
-    if "почему" in boot:
-        return f"недостаточно данных: {boot['почему']}"
-    lo, hi = boot["интервал_95_низ_sol"], boot["интервал_95_верх_sol"]
+    if "why_not" in boot:
+        return f"недостаточно данных: {boot['why_not']}"
+    lo, hi = boot["ci95_lo_sol"], boot["ci95_hi_sol"]
     if lo > 0:
         return "край есть"
     if hi < 0:
@@ -416,11 +416,11 @@ def split_half(signals: list, mid: float) -> tuple[list, list]:
 
 def a3_block(rows: list, horizon: str) -> dict:
     return {
-        "все": свод(rows, horizon),
-        "бутстрэп_среднего": бутстрэп_среднего(rows, horizon),
-        "вывод": вывод_по_интервалу(бутстрэп_среднего(rows, horizon)),
-        "без_3_лучших": свод(без_n_лучших(rows, horizon, 3), horizon),
-        "без_5_лучших": свод(без_n_лучших(rows, horizon, 5), horizon),
+        "all": свод(rows, horizon),
+        "bootstrap_mean": бутстрэп_среднего(rows, horizon),
+        "verdict": вывод_по_интервалу(бутстрэп_среднего(rows, horizon)),
+        "excl_top3": свод(без_n_лучших(rows, horizon, 3), horizon),
+        "excl_top5": свод(без_n_лучших(rows, horizon, 5), horizon),
     }
 
 
@@ -430,28 +430,61 @@ def compute_a3(rows: list, rows_by_half: tuple[list, list] | None) -> dict:
         block = a3_block(rows, horizon)
         if rows_by_half is not None:
             first_rows, second_rows = rows_by_half
-            block["первая_половина_окна"] = свод(first_rows, horizon)
-            block["первая_половина_бутстрэп"] = бутстрэп_среднего(first_rows, horizon)
-            block["вторая_половина_окна"] = свод(second_rows, horizon)
-            block["вторая_половина_бутстрэп"] = бутстрэп_среднего(second_rows, horizon)
+            block["first_half_window"] = свод(first_rows, horizon)
+            block["first_half_bootstrap"] = бутстрэп_среднего(first_rows, horizon)
+            block["second_half_window"] = свод(second_rows, horizon)
+            block["second_half_bootstrap"] = бутстрэп_среднего(second_rows, horizon)
         out[horizon] = {вход: block for вход in ВХОДЫ}
     return out
 
 
-def compute_a3_by_source(rows: list) -> dict:
+_ИТОГ_ВСЕ_КЛЮЧИ_В_ASCII = {
+    "сделок": "n_trades", "доля_в_плюс": "share_positive",
+    "в_плюсе_после_налога": "n_positive_after_tax", "в_плюсе_без_налога": "n_positive_pre_tax",
+    "перевёрнуто_налогом": "n_flipped_by_tax", "медиана_сигнала_pct": "median_signal_pct",
+    "среднее_сигнала_pct": "mean_signal_pct", "вложено_sol": "invested_sol",
+    "результат_по_цепи_sol": "onchain_result_sol", "налогов_sol": "tax_sol",
+    "результат_без_налога_sol": "result_without_tax_sol",
+    "сделок_с_неполным_налогом": "n_trades_incomplete_tax",
+}
+
+
+def итог_все_в_ascii(d: dict | None) -> dict | None:
+    """data/solana_tax_groups.json -- отдельный, уже существующий в репозитории
+    файл со своими (кириллическими) ключами; это ЕГО схема, не моя, и трогать
+    её незачем. Но перекладывая его "итог_все" в СВОЙ вывод (сверка -- налог
+    по этому же 7-дневному кэшу уже кем-то посчитан независимо), ключи нужно
+    перевести в ASCII, как и весь остальной вывод этого модуля."""
+    if not d:
+        return None
+    return {_ИТОГ_ВСЕ_КЛЮЧИ_В_ASCII.get(k, k): v for k, v in d.items()}
+
+
+def compute_a3_by_source(rows: list) -> list:
+    """Список записей {"source": ..., "t28_8": свод, "t60s": свод} -- СПИСОК, а не
+    словарь по имени источника: remark источника -- значение из чужих данных
+    (DBot), а не наш выбор, и как ключ JSON его лучше не использовать (см.
+    требование "ключи JSON только ASCII" -- как значение поля кириллица не
+    запрещена, а как ключ рисковала бы). Источники с < порога сделок
+    (ПОРОГ_ИСТОЧНИКА_ДЛЯ_РАЗБИВКИ, то же число, что и в
+    data/solana_tax_groups.json) сведены в одну строку "other_sources_lt_N",
+    чтобы не показывать статистику на 1-2 сделках как будто это надёжная
+    оценка источника."""
     by_src: dict = {}
     for r in rows:
         by_src.setdefault(r["source"], []).append(r)
-    out = {}
+    out = []
     прочие = []
     for src, lst in by_src.items():
         if len(lst) >= ПОРОГ_ИСТОЧНИКА_ДЛЯ_РАЗБИВКИ:
-            out[src] = {h: свод(lst, h) for h in ("t28_8", "t60s")}
+            out.append({"source": src, "n_trades_raw": len(lst),
+                        "t28_8": свод(lst, "t28_8"), "t60s": свод(lst, "t60s")})
         else:
             прочие.extend(lst)
     if прочие:
-        out["прочие_источники_lt_" + str(ПОРОГ_ИСТОЧНИКА_ДЛЯ_РАЗБИВКИ) + "_сделок"] = \
-            {h: свод(прочие, h) for h in ("t28_8", "t60s")}
+        out.append({"source": f"other_sources_lt_{ПОРОГ_ИСТОЧНИКА_ДЛЯ_РАЗБИВКИ}_trades",
+                    "n_trades_raw": len(прочие),
+                    "t28_8": свод(прочие, "t28_8"), "t60s": свод(прочие, "t60s")})
     return out
 
 
@@ -459,55 +492,55 @@ def compute_a3_by_source(rows: list) -> dict:
 
 def правило_налог_gt0(sig: dict) -> str:
     if not sig["target_tax_known"]:
-        return "неизвестно"
-    return "отсечь" if sig["target_taxable"] else "оставить"
+        return "unknown"
+    return "cut" if sig["target_taxable"] else "keep"
 
 
 def правило_налог_gt100bps(sig: dict) -> str:
     if not sig["target_tax_known"]:
-        return "неизвестно"
+        return "unknown"
     if not sig["target_taxable"]:
-        return "оставить"
-    return "отсечь" if (sig["target_tax_bps"] or 0) > 100 else "оставить"
+        return "keep"
+    return "cut" if (sig["target_tax_bps"] or 0) > 100 else "keep"
 
 
 def правило_налоговый_промежуточный(sig: dict) -> str:
     if sig["quote_is_sol"]:
-        return "оставить"
+        return "keep"
     if not sig["quote_tax_known"]:
-        return "неизвестно"
-    return "отсечь" if sig["quote_taxable"] else "оставить"
+        return "unknown"
+    return "cut" if sig["quote_taxable"] else "keep"
 
 
 def правило_маршрут_ge3_proxy(sig: dict) -> str:
-    return "отсечь" if sig["hops_proxy"] >= 3 else "оставить"
+    return "cut" if sig["hops_proxy"] >= 3 else "keep"
 
 
 def правило_котировка_не_sol(sig: dict) -> str:
-    return "отсечь" if not sig["quote_is_sol"] else "оставить"
+    return "cut" if not sig["quote_is_sol"] else "keep"
 
 
 def правило_покупка_lt(порог_sol: float):
     def rule(sig):
         v = sig["spend_sol_equiv"]
-        return "неизвестно" if v is None else ("отсечь" if v < порог_sol else "оставить")
+        return "unknown" if v is None else ("cut" if v < порог_sol else "keep")
     rule.__name__ = f"покупка_источника_lt_{порог_sol}_sol"
     return rule
 
 
 def правило_возраст(_sig: dict) -> str:
     # Нет поля времени создания минта НИ В ОДНОМ переданном кэше -- честно
-    # "неизвестно" всегда, а не выдуманная дата. Правило числится в отчёте,
+    # "unknown" всегда, а не выдуманная дата. Правило числится в отчёте,
     # но не может быть ни рекомендовано, ни отклонено по этим данным.
-    return "неизвестно"
+    return "unknown"
 
 
 def правило_толпа_gt(порог: float | None):
     def rule(sig):
         if порог is None:
-            return "неизвестно"
+            return "unknown"
         v = sig["crowd_30s"]
-        return "неизвестно" if v is None else ("отсечь" if v > порог else "оставить")
+        return "unknown" if v is None else ("cut" if v > порог else "keep")
     rule.__name__ = f"толпа_gt_{порог}"
     return rule
 
@@ -515,31 +548,31 @@ def правило_толпа_gt(порог: float | None):
 def правило_глубина_lt(доля_M: float | None):
     def rule(sig):
         if доля_M is None or sig["quote_is_sol"]:
-            return "неизвестно"
+            return "unknown"
         depth, v = sig["leg_pool_sol_depth"], sig["spend_sol_equiv"]
         if not depth or v is None:
-            return "неизвестно"
-        return "отсечь" if (v / depth) < доля_M else "оставить"
+            return "unknown"
+        return "cut" if (v / depth) < доля_M else "keep"
     rule.__name__ = f"глубина_lt_{доля_M}_proxy"
     return rule
 
 
 def правило_плохая_серия(sig: dict) -> str:
-    return {"да": "отсечь", "нет": "оставить"}.get(sig.get("плохая_серия"), "неизвестно")
+    return {"yes": "cut", "no": "keep"}.get(sig.get("bad_streak"), "unknown")
 
 
 def AND(rule_a, rule_b, name: str):
     def rule(sig):
         a, b = rule_a(sig), rule_b(sig)
-        if a == "неизвестно" or b == "неизвестно":
-            return "неизвестно"
-        return "отсечь" if (a == "отсечь" and b == "отсечь") else "оставить"
+        if a == "unknown" or b == "unknown":
+            return "unknown"
+        return "cut" if (a == "cut" and b == "cut") else "keep"
     rule.__name__ = name
     return rule
 
 
 def применить_правило(signals: list, rule) -> dict:
-    группы = {"отсечь": [], "оставить": [], "неизвестно": []}
+    группы = {"cut": [], "keep": [], "unknown": []}
     for s in signals:
         группы[rule(s)].append(s)
     return группы
@@ -547,19 +580,19 @@ def применить_правило(signals: list, rule) -> dict:
 
 def d_rule_report(name: str, rule, train: list, test: list, rows_by_sig: dict,
                    horizon: str = "t28_8") -> dict:
-    out = {"правило": name}
-    for half_name, half in (("обучение_1_половина", train), ("проверка_2_половина", test)):
+    out = {"rule": name}
+    for half_name, half in (("train_first_half", train), ("test_second_half", test)):
         группы = применить_правило(half, rule)
-        отсеч_rows = [rows_by_sig[s["signature"]] for s in группы["отсечь"] if s["signature"] in rows_by_sig]
-        остав_rows = [rows_by_sig[s["signature"]] for s in группы["оставить"] if s["signature"] in rows_by_sig]
+        отсеч_rows = [rows_by_sig[s["signature"]] for s in группы["cut"] if s["signature"] in rows_by_sig]
+        остав_rows = [rows_by_sig[s["signature"]] for s in группы["keep"] if s["signature"] in rows_by_sig]
         out[half_name] = {
-            "n_отсечь": len(группы["отсечь"]), "n_оставить": len(группы["оставить"]),
-            "n_неизвестно": len(группы["неизвестно"]),
-            "результат_отсечённых": свод(отсеч_rows, horizon),
-            "результат_оставленных": свод(остав_rows, horizon),
-            "бутстрэп_оставленных": бутстрэп_среднего(остав_rows, horizon),
-            "оставленные_без_3_лучших": свод(без_n_лучших(остав_rows, horizon, 3), horizon),
-            "оставленные_без_5_лучших": свод(без_n_лучших(остав_rows, horizon, 5), horizon),
+            "n_cut": len(группы["cut"]), "n_keep": len(группы["keep"]),
+            "n_unknown": len(группы["unknown"]),
+            "cut_result": свод(отсеч_rows, horizon),
+            "keep_result": свод(остав_rows, horizon),
+            "keep_bootstrap": бутстрэп_среднего(остав_rows, horizon),
+            "keep_excl_top3": свод(без_n_лучших(остав_rows, horizon, 3), horizon),
+            "keep_excl_top5": свод(без_n_лучших(остав_rows, horizon, 5), horizon),
         }
     return out
 
@@ -582,36 +615,36 @@ def строить_правила(train: list) -> list:
     порог_глубины = statistics.median(train_depth_ratio) if train_depth_ratio else None
 
     одиночные = [
-        ("налог_токена_gt0", правило_налог_gt0),
-        ("налог_токена_gt100bps", правило_налог_gt100bps),
-        ("налоговый_промежуточный_минт", правило_налоговый_промежуточный),
-        ("маршрут_ge3_шагов_proxy", правило_маршрут_ge3_proxy),
-        ("котировка_не_sol", правило_котировка_не_sol),
-        ("покупка_источника_lt_2_sol", правило_покупка_lt(2.0)),
-        ("покупка_источника_lt_5_sol", правило_покупка_lt(5.0)),
-        ("покупка_источника_lt_10_sol", правило_покупка_lt(10.0)),
-        ("возраст_токена_lt_10min", правило_возраст),
-        ("возраст_токена_lt_1h", правило_возраст),
-        (f"толпа_gt_train_median_{порог_толпы}", правило_толпа_gt(порог_толпы)),
-        (f"глубина_lt_train_median_{порог_глубины}_proxy", правило_глубина_lt(порог_глубины)),
-        ("плохая_серия_источника_24ч", правило_плохая_серия),
+        ("tax_gt0", правило_налог_gt0),
+        ("tax_gt100bps", правило_налог_gt100bps),
+        ("taxed_intermediate_mint", правило_налоговый_промежуточный),
+        ("route_ge3_hops_proxy", правило_маршрут_ge3_proxy),
+        ("quote_not_sol", правило_котировка_не_sol),
+        ("source_buy_lt_2_sol", правило_покупка_lt(2.0)),
+        ("source_buy_lt_5_sol", правило_покупка_lt(5.0)),
+        ("source_buy_lt_10_sol", правило_покупка_lt(10.0)),
+        ("token_age_lt_10min", правило_возраст),
+        ("token_age_lt_1h", правило_возраст),
+        (f"crowd_gt_train_median_{порог_толпы}", правило_толпа_gt(порог_толпы)),
+        (f"depth_lt_train_median_{порог_глубины}_proxy", правило_глубина_lt(порог_глубины)),
+        ("source_bad_streak_24h", правило_плохая_серия),
     ]
     by_name = dict(одиночные)
     пары = [
-        ("пара_налог_gt0_И_покупка_lt5", AND(by_name["налог_токена_gt0"],
-                                              by_name["покупка_источника_lt_5_sol"],
-                                              "пара_налог_gt0_И_покупка_lt5")),
-        ("пара_налог_gt0_И_толпа", AND(by_name["налог_токена_gt0"],
-                                        by_name[f"толпа_gt_train_median_{порог_толпы}"],
-                                        "пара_налог_gt0_И_толпа")),
-        ("пара_маршрут_ge3_И_котировка_не_sol", AND(by_name["маршрут_ge3_шагов_proxy"],
-                                                     by_name["котировка_не_sol"],
-                                                     "пара_маршрут_ge3_И_котировка_не_sol")),
-        ("пара_налог_gt0_И_плохая_серия", AND(by_name["налог_токена_gt0"],
-                                               by_name["плохая_серия_источника_24ч"],
-                                               "пара_налог_gt0_И_плохая_серия")),
+        ("pair_tax_gt0_and_buy_lt5", AND(by_name["tax_gt0"],
+                                              by_name["source_buy_lt_5_sol"],
+                                              "pair_tax_gt0_and_buy_lt5")),
+        ("pair_tax_gt0_and_crowd", AND(by_name["tax_gt0"],
+                                        by_name[f"crowd_gt_train_median_{порог_толпы}"],
+                                        "pair_tax_gt0_and_crowd")),
+        ("pair_route_ge3_and_quote_not_sol", AND(by_name["route_ge3_hops_proxy"],
+                                                     by_name["quote_not_sol"],
+                                                     "pair_route_ge3_and_quote_not_sol")),
+        ("pair_tax_gt0_and_bad_streak", AND(by_name["tax_gt0"],
+                                               by_name["source_bad_streak_24h"],
+                                               "pair_tax_gt0_and_bad_streak")),
     ]
-    return одиночные, пары, {"порог_толпы_crowd_30s": порог_толпы, "порог_глубины_доля": порог_глубины}
+    return одиночные, пары, {"crowd_threshold_crowd_30s": порог_толпы, "pool_depth_threshold_ratio": порог_глубины}
 
 
 # --------------------------------------------------------------------- self-test
@@ -656,7 +689,7 @@ def self_test() -> int:
     chk("t10s всегда missing -- в кэше такой точки нет", g10 is None and "10 с" in why10)
     g5m, why5m = horizon_growth(sig_taxed, "t5m")
     chk("t5m всегда missing", g5m is None and "5 мин" in why5m)
-    gsell, whysell = horizon_growth(sig_taxed, "до_первой_продажи_источника")
+    gsell, whysell = horizon_growth(sig_taxed, "until_source_first_sell")
     chk("до первой продажи источника -- всегда missing", gsell is None and "продаж" in whysell)
 
     # ---- 4. net_pnl_sol: издержки один раз, не дважды ------------------------
@@ -684,43 +717,43 @@ def self_test() -> int:
         net_full_loss == -1.0)
 
     # ---- 5. правила D --------------------------------------------------------
-    chk("налог>0 отсекает известный налоговый", правило_налог_gt0(sig_taxed) == "отсечь")
-    chk("налог>0 не режет обычный (известный без налога)", правило_налог_gt0(sig_clean) == "оставить")
-    chk("налог>0 на неизвестном -> неизвестно, не отсечь", правило_налог_gt0(sig_unknown) == "неизвестно")
+    chk("налог>0 отсекает известный налоговый", правило_налог_gt0(sig_taxed) == "cut")
+    chk("налог>0 не режет обычный (известный без налога)", правило_налог_gt0(sig_clean) == "keep")
+    chk("налог>0 на неизвестном -> неизвестно, не отсечь", правило_налог_gt0(sig_unknown) == "unknown")
     sig_low_bps = build_signal(dict(raw_taxed, mint="LOW"), {"LOW": {"таксируемый": True,
                                                                        "ставка_комиссии_bps": 50}}, depth)
-    chk(">100bps не режет 50bps", правило_налог_gt100bps(sig_low_bps) == "оставить")
-    chk(">100bps режет 300bps", правило_налог_gt100bps(sig_taxed) == "отсечь")
+    chk(">100bps не режет 50bps", правило_налог_gt100bps(sig_low_bps) == "keep")
+    chk(">100bps режет 300bps", правило_налог_gt100bps(sig_taxed) == "cut")
     r5 = правило_покупка_lt(5.0)
-    chk("покупка<5: 3 SOL -> отсечь", r5(dict(sig_clean, spend_sol_equiv=3.0)) == "отсечь")
-    chk("покупка<5: 10 SOL -> оставить", r5(dict(sig_clean, spend_sol_equiv=10.0)) == "оставить")
-    chk("покупка<5: нет данных -> неизвестно", r5(dict(sig_clean, spend_sol_equiv=None)) == "неизвестно")
-    chk("котировка не SOL: WSOL -> оставить", правило_котировка_не_sol(sig_clean) == "оставить")
+    chk("покупка<5: 3 SOL -> отсечь", r5(dict(sig_clean, spend_sol_equiv=3.0)) == "cut")
+    chk("покупка<5: 10 SOL -> оставить", r5(dict(sig_clean, spend_sol_equiv=10.0)) == "keep")
+    chk("покупка<5: нет данных -> неизвестно", r5(dict(sig_clean, spend_sol_equiv=None)) == "unknown")
+    chk("котировка не SOL: WSOL -> оставить", правило_котировка_не_sol(sig_clean) == "keep")
     sig_other_quote = build_signal(dict(raw_taxed, quote_mint="QUOTE1", mint="CLEAN"), minty, depth)
-    chk("котировка не SOL: чужой минт -> отсечь", правило_котировка_не_sol(sig_other_quote) == "отсечь")
+    chk("котировка не SOL: чужой минт -> отсечь", правило_котировка_не_sol(sig_other_quote) == "cut")
     rc = правило_толпа_gt(50.0)
-    chk("толпа>50: 80 -> отсечь", rc(dict(sig_clean, crowd_30s=80)) == "отсечь")
-    chk("толпа>50: 10 -> оставить", rc(dict(sig_clean, crowd_30s=10)) == "оставить")
-    chk("толпа: нет данных -> неизвестно", rc(dict(sig_clean, crowd_30s=None)) == "неизвестно")
-    chk("возраст токена: нет данных -> всегда неизвестно", правило_возраст(sig_clean) == "неизвестно")
+    chk("толпа>50: 80 -> отсечь", rc(dict(sig_clean, crowd_30s=80)) == "cut")
+    chk("толпа>50: 10 -> оставить", rc(dict(sig_clean, crowd_30s=10)) == "keep")
+    chk("толпа: нет данных -> неизвестно", rc(dict(sig_clean, crowd_30s=None)) == "unknown")
+    chk("возраст токена: нет данных -> всегда неизвестно", правило_возраст(sig_clean) == "unknown")
     rd = правило_глубина_lt(0.01)
     small_buy = dict(sig_other_quote, spend_sol_equiv=0.5, leg_pool_sol_depth=100.0)
     big_buy = dict(sig_other_quote, spend_sol_equiv=5.0, leg_pool_sol_depth=100.0)
-    chk("глубина<1%: покупка 0.5% -> отсечь", rd(small_buy) == "отсечь")
-    chk("глубина<1%: покупка 5% -> оставить", rd(big_buy) == "оставить")
+    chk("глубина<1%: покупка 0.5% -> отсечь", rd(small_buy) == "cut")
+    chk("глубина<1%: покупка 5% -> оставить", rd(big_buy) == "keep")
     chk("глубина: quote_is_sol -> неизвестно (данных по глубине для SOL-пула нет)",
-        rd(sig_clean) == "неизвестно")
+        rd(sig_clean) == "unknown")
     chk("глубина: нет данных о depth -> неизвестно",
-        rd(dict(sig_other_quote, leg_pool_sol_depth=None, spend_sol_equiv=1.0)) == "неизвестно")
+        rd(dict(sig_other_quote, leg_pool_sol_depth=None, spend_sol_equiv=1.0)) == "unknown")
 
     and_rule = AND(правило_налог_gt0, r5, "и")
     both_cut = dict(sig_taxed, spend_sol_equiv=1.0)
-    chk("AND: оба отсекают -> отсечь", and_rule(both_cut) == "отсечь")
+    chk("AND: оба отсекают -> отсечь", and_rule(both_cut) == "cut")
     one_unknown = dict(sig_unknown, spend_sol_equiv=1.0)
     chk("AND: один неизвестен -> неизвестно (не оставить и не отсечь)",
-        and_rule(one_unknown) == "неизвестно")
+        and_rule(one_unknown) == "unknown")
     only_one_cuts = dict(sig_taxed, spend_sol_equiv=10.0)
-    chk("AND: отсекает только один -> оставить", and_rule(only_one_cuts) == "оставить")
+    chk("AND: отсекает только один -> оставить", and_rule(only_one_cuts) == "keep")
 
     # ---- 6. плохая серия источника -------------------------------------------
     def T(sig_id, bt, g30):
@@ -728,55 +761,55 @@ def self_test() -> int:
                 "growth_30s": g30, "growth_60s": None}
     seq = [T("a", 0, 0.8), T("b", 3600, 0.7), T("c", 7200, 1.5)]
     аннотировать_серию(list(seq))
-    chk("первая сделка источника -- неизвестно (нет истории)", seq[0]["плохая_серия"] == "неизвестно")
+    chk("первая сделка источника -- неизвестно (нет истории)", seq[0]["bad_streak"] == "unknown")
     chk("вторая -- всё ещё неизвестно (мин_историй=2, есть только 1)",
-        seq[1]["плохая_серия"] == "неизвестно")
+        seq[1]["bad_streak"] == "unknown")
     chk("третья: 2 предыдущих убыточные (100%) -> да",
-        seq[2]["плохая_серия"] == "да", seq[2])
+        seq[2]["bad_streak"] == "yes", seq[2])
     seq2 = [T("a", 0, 1.5), T("b", 3600, 1.4), T("c", 7200, 0.5)]
     аннотировать_серию(list(seq2))
-    chk("2 предыдущих в плюс -> нет (не большинство проигрышей)", seq2[2]["плохая_серия"] == "нет")
+    chk("2 предыдущих в плюс -> нет (не большинство проигрышей)", seq2[2]["bad_streak"] == "no")
     seq3 = [T("a", 0, 0.5), T("b", 200000, 1.5)]  # больше 24ч между сделками
     аннотировать_серию(list(seq3))
     chk("предыдущая сделка старше 24ч -> не считается (неизвестно)",
-        seq3[1]["плохая_серия"] == "неизвестно")
+        seq3[1]["bad_streak"] == "unknown")
 
     # ---- 7. свод / без_n_лучших / бутстрэп -----------------------------------
     def R(net):
         return {"h": {"net_sol": net, "missing": net is None, "why_not": None}}
     rows_stat = [R(1.0), R(0.5), R(0.2), R(-0.1), R(-0.2), R(-0.3)]
     s = свод(rows_stat, "h")
-    chk("свод: сумма", abs(s["сумма_sol"] - 1.1) < 1e-9, s)
-    chk("свод: доля в плюс = половина", s["доля_в_плюс"] == 0.5)
-    chk("свод: среднее", abs(s["среднее_sol"] - 1.1 / 6) < 1e-6, s["среднее_sol"])
-    chk("свод: медиана", abs(s["медиана_sol"] - 0.05) < 1e-9, s["медиана_sol"])
-    chk("без_1_лучших убирает 1.0", свод(без_n_лучших(rows_stat, "h", 1), "h")["сумма_sol"] == 0.1)
-    chk("без_3_лучших уходит в минус", свод(без_n_лучших(rows_stat, "h", 3), "h")["сумма_sol"] < 0)
-    chk("пустой список -> сделок=0, не крах", свод([], "h")["сделок"] == 0)
+    chk("свод: сумма", abs(s["sum_sol"] - 1.1) < 1e-9, s)
+    chk("свод: доля в плюс = половина", s["share_positive"] == 0.5)
+    chk("свод: среднее", abs(s["mean_sol"] - 1.1 / 6) < 1e-6, s["mean_sol"])
+    chk("свод: медиана", abs(s["median_sol"] - 0.05) < 1e-9, s["median_sol"])
+    chk("без_1_лучших убирает 1.0", свод(без_n_лучших(rows_stat, "h", 1), "h")["sum_sol"] == 0.1)
+    chk("без_3_лучших уходит в минус", свод(без_n_лучших(rows_stat, "h", 3), "h")["sum_sol"] < 0)
+    chk("пустой список -> сделок=0, не крах", свод([], "h")["n_trades"] == 0)
     rows_missing = [R(1.0), {"h": {"net_sol": None, "missing": True, "why_not": "x"}}]
     s_missing = свод(rows_missing, "h")
-    chk("missing не превращается в 0 в среднем", s_missing["сделок"] == 1 and s_missing["сделок_без_цифры"] == 1)
+    chk("missing не превращается в 0 в среднем", s_missing["n_trades"] == 1 and s_missing["n_missing"] == 1)
 
     b1 = бутстрэп_среднего(rows_stat, "h", n_boot=2000)
     b2 = бутстрэп_среднего(rows_stat, "h", n_boot=2000)
     chk("бутстрэп воспроизводим при одном сиде (2000 повторов)",
-        b1["интервал_95_низ_sol"] == b2["интервал_95_низ_sol"]
-        and b1["интервал_95_верх_sol"] == b2["интервал_95_верх_sol"])
+        b1["ci95_lo_sol"] == b2["ci95_lo_sol"]
+        and b1["ci95_hi_sol"] == b2["ci95_hi_sol"])
     b3 = бутстрэп_среднего(rows_stat, "h", n_boot=2000, seed=SEED + 1)
     chk("другой сид -- другой интервал (иначе он не случайный)",
-        b3["интервал_95_низ_sol"] != b1["интервал_95_низ_sol"])
-    chk("низ интервала не выше верха", b1["интервал_95_низ_sol"] <= b1["интервал_95_верх_sol"])
+        b3["ci95_lo_sol"] != b1["ci95_lo_sol"])
+    chk("низ интервала не выше верха", b1["ci95_lo_sol"] <= b1["ci95_hi_sol"])
     b_empty = бутстрэп_среднего([], "h")
-    chk("бутстрэп на пустом входе -- честный отказ, не крах", "почему" in b_empty)
+    chk("бутстрэп на пустом входе -- честный отказ, не крах", "why_not" in b_empty)
     b_one = бутстрэп_среднего([R(1.0)], "h")
-    chk("бутстрэп на одной сделке -- честный отказ", "почему" in b_one)
-    chk("вывод по интервалу: явный плюс", вывод_по_интервалу({"интервал_95_низ_sol": 0.1,
-                                                                "интервал_95_верх_sol": 0.2}) == "край есть")
+    chk("бутстрэп на одной сделке -- честный отказ", "why_not" in b_one)
+    chk("вывод по интервалу: явный плюс", вывод_по_интервалу({"ci95_lo_sol": 0.1,
+                                                                "ci95_hi_sol": 0.2}) == "край есть")
     chk("вывод по интервалу: явный минус",
-        вывод_по_интервалу({"интервал_95_низ_sol": -0.2, "интервал_95_верх_sol": -0.1})
+        вывод_по_интервалу({"ci95_lo_sol": -0.2, "ci95_hi_sol": -0.1})
         == "края нет (статистически ниже нуля)")
     chk("вывод по интервалу: ноль внутри",
-        вывод_по_интервалу({"интервал_95_низ_sol": -0.1, "интервал_95_верх_sol": 0.1})
+        вывод_по_интервалу({"ci95_lo_sol": -0.1, "ci95_hi_sol": 0.1})
         == "не отличимо от нуля")
 
     # ---- 8. пустой вход целиком (compute_a1 / загрузка) ----------------------
@@ -831,7 +864,7 @@ def main() -> int:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(json.dumps({
             "schema_version": 1, "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "входные_файлы": {"crowd": args.crowd}, "ошибка": "пустой или отсутствующий вход --crowd",
+            "input_files": {"crowd": args.crowd}, "ошибка": "пустой или отсутствующий вход --crowd",
         }, ensure_ascii=False, indent=1), encoding="utf-8")
         return 2
 
@@ -856,7 +889,7 @@ def main() -> int:
     a3_src = compute_a3_by_source(rows)
 
     одиночные, пары, пороги = строить_правила(train)
-    d_report = {"пороги_подобранные_на_первой_половине": пороги}
+    d_report = {"thresholds_fit_on_first_half": пороги}
     for name, rule in одиночные:
         d_report[name] = d_rule_report(name, rule, train, test, rows_by_sig)
     for name, rule in пары:
@@ -869,12 +902,12 @@ def main() -> int:
         "schema_version": 1,
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "elapsed_s": round(time.time() - t0, 2),
-        "входные_файлы": {"crowd": args.crowd, "tax_groups": args.tax_groups,
+        "input_files": {"crowd": args.crowd, "tax_groups": args.tax_groups,
                             "transfer_fee_audit": args.transfer_fee_audit, "leg_pools": args.leg_pools},
-        "окно": meta,
-        "n_сигналов_всего": len(signals),
-        "n_с_известным_net_на_28_8с": n_full_30, "n_с_известным_net_на_60с": n_full_60,
-        "ЧЕСТНЫЕ_ОГОВОРКИ": [
+        "window": meta,
+        "n_signals_total": len(signals),
+        "n_with_known_net_t28_8": n_full_30, "n_with_known_net_t60s": n_full_60,
+        "HONEST_CAVEATS": [
             "Входы (i)/(ii)/(iii) численно совпадают: единственная реальная цена "
             "после источника в кэше -- spot_after; цены на границе слотов S+1/S+2 "
             "нет, интерполяция запрещена условием задачи. См. докстринг модуля.",
@@ -900,11 +933,12 @@ def main() -> int:
             "SOL, а не пула самого таргет-минта), не измеренные величины; см. "
             "hops_proxy/leg_pool_sol_depth в докстрингах.",
         ],
+        "A1_signals": rows,
         "A3": a3,
-        "A3_по_источникам": a3_src,
-        "D_правила": d_report,
-        "справочно_налоговые_группы_из_репозитория": {
-            "итог_все_сделки_из_solana_tax_groups": tax_groups.get("итог_все"),
+        "A3_by_source": a3_src,
+        "D_rules": d_report,
+        "reference_tax_groups_from_repo": {
+            "overall_all_trades_from_solana_tax_groups": итог_все_в_ascii(tax_groups.get("итог_все")),
         },
     }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -914,7 +948,7 @@ def main() -> int:
           f"на 60с: {n_full_60}")
     for horizon in ("t28_8", "t60s"):
         blk = a3[horizon][ВХОДЫ[0]]
-        print(f"[{horizon}] все: {blk['все']}; вывод: {blk['вывод']}")
+        print(f"[{horizon}] все: {blk['all']}; вывод: {blk['verdict']}")
     print(f"-> {args.out}")
     return 0
 

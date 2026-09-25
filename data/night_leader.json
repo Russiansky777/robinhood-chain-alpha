@@ -1,0 +1,668 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-09-25T02:00:49Z",
+  "inputs": {
+    "crowd_cache": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
+    "state_dir": null,
+    "audit": "data/solana_transfer_fee_audit.json",
+    "tax_groups": "data/solana_tax_groups.json",
+    "bloom_report": "data/bloom_report.json",
+    "santa_autopsy": "data/solana_santa_trade_autopsy.json",
+    "mint_extensions_cache": "data/solana_buyer_200/prior/current/solana_three_check/metadata_accounts.json"
+  },
+  "constraints": {
+    "read_only": true,
+    "no_trades": true,
+    "helius_key_in_container": false,
+    "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py)"
+  },
+  "task_e_leader": {
+    "ok": true,
+    "leader": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+    "leader_meta": {
+      "task": "BATCH-5",
+      "remark": "pointfarmcap",
+      "n_trades": 127,
+      "window_from_utc": "2026-09-17T16:02:53Z",
+      "window_to_utc": "2026-09-24T16:02:53Z",
+      "window_days": 7.0,
+      "n_signatures_window": 6662,
+      "crowd_cache_generated_utc": "2026-09-24T16:24:26Z"
+    },
+    "groups_n": {
+      "tax": 47,
+      "normal": 10,
+      "unknown": 70
+    },
+    "groups": {
+      "tax": {
+        "entry_size": {
+          "n": 47,
+          "n_with_size": 47,
+          "median_sol": 17.770794,
+          "mean_sol": 25.820391
+        },
+        "price_proxy_30_60s": {
+          "median_growth_30s": 1.640115,
+          "median_growth_60s": 1.571861,
+          "median_growth_after_30s": 1.439146,
+          "n_growth_30s": 45,
+          "growth_after_30s_is_not_pnl": true
+        }
+      },
+      "normal": {
+        "entry_size": {
+          "n": 10,
+          "n_with_size": 10,
+          "median_sol": 37.645745,
+          "mean_sol": 39.018757
+        },
+        "price_proxy_30_60s": {
+          "median_growth_30s": 1.444717,
+          "median_growth_60s": 1.334965,
+          "median_growth_after_30s": 1.240814,
+          "n_growth_30s": 10,
+          "growth_after_30s_is_not_pnl": true
+        }
+      },
+      "unknown": {
+        "entry_size": {
+          "n": 70,
+          "n_with_size": 70,
+          "median_sol": 7.445012,
+          "mean_sol": 8.993396
+        },
+        "price_proxy_30_60s": {
+          "median_growth_30s": 1.898878,
+          "median_growth_60s": 2.017641,
+          "median_growth_after_30s": 1.819884,
+          "n_growth_30s": 67,
+          "growth_after_30s_is_not_pnl": true
+        }
+      }
+    },
+    "hypothesis_size_bigger_on_normal": {
+      "ok": true,
+      "median_size_tax_sol": 17.770794,
+      "median_size_normal_sol": 37.645745,
+      "normal_bigger": true,
+      "diff_pct_of_tax": 111.840535,
+      "profit_part_confirmed": false,
+      "profit_part_why_not": "нужен итог ЗАКРЫТОЙ сделки лидера (вход/выход в SOL-экв после налога) -- выходов в кэше толпы нет, см. exit_reconstruction"
+    },
+    "pickaxe": {
+      "ok": true,
+      "n_prior_confirmed_entries": 3,
+      "prior_entries": [
+        {
+          "signature": "3yEeBVUMg4QJhQJHuiprLuHKUHzGg7EpNtNMeMkK4qQ5ZqoftiAbRaHvwFpAxM3xLfyKSe3iexCtk4MWjT4bvZk2",
+          "block_time_utc": "2026-09-22T01:26:34Z",
+          "spend_sol_equiv": 4.252569
+        },
+        {
+          "signature": "JVjCgJQ1sR2GAA8h6DWwe7HMPskoxAR7roMoYWNELLxiHChsQKMrakHGVkKThad6c152E4mBYFQGXyxeNATRaan",
+          "block_time_utc": "2026-09-23T00:55:49Z",
+          "spend_sol_equiv": 8.412632
+        },
+        {
+          "signature": "3VCvVA97A7jKzSW47W51wXxZ8XxgrH1Z9keiEEDb8aSfuYJkTTLkke545qrxakCTBM6ryzenGoj2EbGWg3yGpET8",
+          "block_time_utc": "2026-09-23T20:21:40Z",
+          "spend_sol_equiv": 6.671219
+        }
+      ],
+      "verdict": "повторный заход (минимум 4-й цикл): по методике кэша каждая запись -- первый вход, т.е. между ними были полные продажи",
+      "caveat": "кэш -- окно 17.09-24.09; событие владельца (2Nm7Ef1Q..., ~2026-09-25T00:31:00Z) вне этого окна и само по себе в trades не попадает (кэш собран ДО него); момент(ы) продажи между входами кэш не показывает -- это уже требует rpc_call (см. compute_leader_exits)"
+    },
+    "exit_reconstruction": {
+      "ok": false,
+      "why_not": "нет rpc_call -- см. LEADER_EXIT_RECIPE и estimate_exit_credit_cost",
+      "trades": [],
+      "recipe": {
+        "why_not_in_cache": "кэш толпы строился под первый вход (classify_tx, >=2 SOL-экв); продажи в его методику не входили вовсе.",
+        "steps": [
+          "1) getSignaturesForAddress(лидер, {before, limit<=1000}) постранично назад, пока не дойдём до подписи самой ранней нужной покупки (until=её подпись) -- это ЕДИНСТВЕННЫЙ способ получить полный список подписей кошелька между покупкой и 'сейчас', т.к. API отдаёт только 'before', не 'after'.",
+          "2) getTransaction(jsonParsed) на КАЖДУЮ подпись из этого списка -- заранее неизвестно, какая из них продажа нужного минта, decode нужен на все.",
+          "3) На каждой tx: c2_common.owner_mint_delta(tx, mint)[лидер] < 0 -- это и есть продажа; c2_common.quote_spend(tx, лидер) (со знаком наоборот -- см. quote_received ниже) даёт SOL/WSOL/USD назад, c2_common.identify_pool(tx, лидер, mint, side='sell') -- пул и цену исполнения.",
+          "4) held_seconds = блок продажи - блок покупки; итог_sol = получено - потрачено (оба уже по цепи, т.е. УЖЕ после комиссии на перевод, если минт таксируемый -- отдельно вычитать налог не нужно)."
+        ],
+        "crowd_at_exit_credit_note": "это ОТДЕЛЬНЫЙ, более дорогой шаг (getSignaturesForAddress + getTransaction на активность ПУЛА/минта в [выход, выход+30/60с]) -- см. credit_estimate.tier2"
+      },
+      "credit_estimate_7d": {
+        "tier1_find_exit_and_price": {
+          "n_signatures_estimate": 6662,
+          "getSignaturesForAddress_credits": 7,
+          "getTransaction_credits": 6662,
+          "total_credits": 6669,
+          "number_source": "leader_row.n_signatures_window из --crowd кэша, масштабировано на 7 дн."
+        },
+        "tier2_crowd_at_exit_estimate": {
+          "sum_window_tx_30s_at_entry_actual": 42719,
+          "meaning": "это РЕАЛЬНО потраченные вызовы на толпу ПРИ ВХОДЕ (уже оплачены, видны в c2_usage прогона, построившего --crowd) -- ориентир порядка величины для толпы ПРИ ВЫХОДЕ, НЕ прогноз: на выходе хайп обычно спадает, но по факту это не измерено.",
+          "caveat": "может быть меньше (спад хайпа) или сравнимо -- без прогона неизвестно"
+        },
+        "c2_daily_budget": 200000,
+        "conclusion": "Tier 1 дёшев (единицы процентов суточного бюджета C2) и достаточен для самого вопроса 'где именно плюс'; Tier 2 дороже на порядок и нужен только если понадобится толпа на выходе, а не сам итог сделки."
+      },
+      "credit_estimate_14d": {
+        "tier1_find_exit_and_price": {
+          "n_signatures_estimate": 13324,
+          "getSignaturesForAddress_credits": 14,
+          "getTransaction_credits": 13324,
+          "total_credits": 13338,
+          "number_source": "leader_row.n_signatures_window из --crowd кэша, масштабировано на 14 дн."
+        },
+        "tier2_crowd_at_exit_estimate": {
+          "sum_window_tx_30s_at_entry_actual": 42719,
+          "meaning": "это РЕАЛЬНО потраченные вызовы на толпу ПРИ ВХОДЕ (уже оплачены, видны в c2_usage прогона, построившего --crowd) -- ориентир порядка величины для толпы ПРИ ВЫХОДЕ, НЕ прогноз: на выходе хайп обычно спадает, но по факту это не измерено.",
+          "caveat": "может быть меньше (спад хайпа) или сравнимо -- без прогона неизвестно"
+        },
+        "c2_daily_budget": 200000,
+        "conclusion": "Tier 1 дёшев (единицы процентов суточного бюджета C2) и достаточен для самого вопроса 'где именно плюс'; Tier 2 дороже на порядок и нужен только если понадобится толпа на выходе, а не сам итог сделки."
+      }
+    }
+  },
+  "task_f_our_gp_trades": {
+    "ok": true,
+    "gp_mint": "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ",
+    "gp_intermediate_summary_from_audit": {
+      "ok": true,
+      "source_file": "data/solana_transfer_fee_audit.json",
+      "collected_utc": "2026-09-23T21:23:59Z",
+      "trades": 11,
+      "sum_onchain_sol": 20.552317,
+      "withheld_sol": 0.942814,
+      "transfers": 61,
+      "no_rate": 0,
+      "ticker": "GP",
+      "name": "RuneScape Gold",
+      "fee_bps": 300,
+      "token_program": "Token-2022"
+    },
+    "route_trades": [
+      {
+        "task": "BATCH-7",
+        "source": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+        "source_remark": "dreamloader",
+        "wallet": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
+        "target_mint": "EwwbPUhP8EYf2i7GJQYn7NFVMFKa8ucNYLc6zaR6mhpu",
+        "buy_signature": "4hc3ue1mnZUjXw51CdDZB9s4rtw6Kt7DEA26DdXXPBWpPfg84DxTnfQ4R64yVMa5uZoV9i7244R6t8JhNbjQTxeo",
+        "sell_signature": "4JaM2iV5f4bzMNwbjJY3L44W1T6JMYc59xW4HnGbT9cCesfFqomNZZbiXz6XMtHFpnG17pFrfUQgKAUD85A3H2hQ",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 0.5133546,
+        "sol_out": 0.794486384,
+        "net_sol": 0.281131784,
+        "tax_withheld_sol": 0.119743225,
+        "tax_pct_of_stake": 23.325636,
+        "held_seconds": 38,
+        "gross_pct_signal": 54.7637,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-6",
+        "source": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
+        "source_remark": "",
+        "wallet": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
+        "target_mint": "99Wee3vRCy8mRwqe5e3BLUAiBcBJfQDfsfS7K5SjZXKM",
+        "buy_signature": "58QCV4kME4tEDZpzpdNVu18nW6kUcqcDRvu6N7JmSSx6xhD887j3uZr5VLUnu6sb97okjkmZumo2xLfH6Xk5G22v",
+        "sell_signature": "36FFzrsfFqSBh1zC8VfKK9YaGfLCYiiE3tEDbbQSDQfBkwMzN7fMArygk4oSiuNrd2tNCZKE55hwjRGjvRk3Ndn5",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 0.5133546,
+        "sol_out": 0.361533633,
+        "net_sol": -0.151820967,
+        "tax_withheld_sol": 0.079392774,
+        "tax_pct_of_stake": 15.465484,
+        "held_seconds": 34,
+        "gross_pct_signal": -29.5743,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-6",
+        "source": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
+        "source_remark": "",
+        "wallet": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
+        "target_mint": "8f9E3iCyYff8QVienqkc8CsAzPuAPP7AWyxGVu6cy91n",
+        "buy_signature": "5wTdeYdbtGqTzPAoqVb2QpnJ1Y3W9P87jgyUBEW8mp2peZ2hUrh9qPBGX8GcCNYb4KVt5gNBVX1qBcZNxd1pC3oh",
+        "sell_signature": "HWBJjdkUPgtxBpCJKwiMTstoccPo6YbCazfzoafVQ3Gdz1wZhjoiszxniyXcRtuiLrGJraPWRVF9uQXwvj3xSBF",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 5,
+        "sol_in": 0.5117798,
+        "sol_out": 0.436049553,
+        "net_sol": -0.075730247,
+        "tax_withheld_sol": 0.086099484,
+        "tax_pct_of_stake": 16.823541,
+        "held_seconds": 37,
+        "gross_pct_signal": -14.7974,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-6",
+        "source": "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact",
+        "source_remark": "xiaorenwu",
+        "wallet": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
+        "target_mint": "CASs9vMniGPtsnnKrV9uziBHA7JU5dS9MQY15WsRqVfx",
+        "buy_signature": "46uyLUkS9aqjXhPQMaqy8TBNRDv3Abauskns4rZeawELimukkiALFUFVxHS8MXBFdxWqgAQZW96gF8DPnd981Qys",
+        "sell_signature": "4EAJvnmpPJhxeuL6dtiSdxbJZ7jygGWEDzgM7ZTgPQWEeEQwU7ang8PMELieYBQXNyPqfbsVcFT6KBfTorEzeDah",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 5,
+        "sol_in": 0.5117798,
+        "sol_out": 0.442878459,
+        "net_sol": -0.068901341,
+        "tax_withheld_sol": 0.058590418,
+        "tax_pct_of_stake": 11.448365,
+        "held_seconds": 36,
+        "gross_pct_signal": -13.4631,
+        "tax_incomplete_no_rate": true,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-4",
+        "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+        "source_remark": "N_Xk9o",
+        "wallet": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
+        "target_mint": "FcYSxP7zD3jJL8jrLyUd7KGDfjyx1apbjxD5gZhT3LWU",
+        "buy_signature": "65zVaMB32Wc3WjCDaCMNmpaVHdz8Rn1dg5DuYeWJo5LxSC6Su1RZbnEP1zrHnNs1MUG1HZtw3KHut9hr9fRtBc9F",
+        "sell_signature": "4b7YLL1VYoZE2g4SKZ6tscjEAXpEo5xqiPe1qPsLTDByKhg8uv815ZMY2K4ZXrfjRGygZBBRsZoxJ4nJkhhufixU",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 5,
+        "sol_in": 0.5133546,
+        "sol_out": 0.481228278,
+        "net_sol": -0.032126322,
+        "tax_withheld_sol": 0.070048005,
+        "tax_pct_of_stake": 13.64515,
+        "held_seconds": 36,
+        "gross_pct_signal": -6.2581,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-4",
+        "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+        "source_remark": "N_Xk9o",
+        "wallet": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
+        "target_mint": "CASs9vMniGPtsnnKrV9uziBHA7JU5dS9MQY15WsRqVfx",
+        "buy_signature": "3Xfg39PBN3HvU66tMTi3vTtCKHzehoBtgPYtp2o4Wb4amYvW1kgzPPBLK6SBSEySoXSAqMy4nASpfUusCxsNgbBN",
+        "sell_signature": "4JPsqM4udHzTpwSsnBVB3c5vJrSj36Vk7saSQUULx7m5dUkiT9rNyTNPfTXDmUWCQJosckvsstZPZY2wM5v4QZjU",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 0.5117798,
+        "sol_out": 0.42556665,
+        "net_sol": -0.08621315,
+        "tax_withheld_sol": 0.085311836,
+        "tax_pct_of_stake": 16.669637,
+        "held_seconds": 33,
+        "gross_pct_signal": -16.8458,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "BATCH-3",
+        "source": "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN",
+        "source_remark": "AviFelman",
+        "wallet": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
+        "target_mint": "AisM5uhzVWD5nLWT5Tg93UxWcHHXCv91N14fSj332ttj",
+        "buy_signature": "4kN2cgqxko6HDwNqFxmpm4wPG5EdTwKeDd9XSAqy4iuiZCUnfX4krsnbrRC9iu65jG2f8SkawZzWFwdqL7QkS6wa",
+        "sell_signature": "3qjnL5ktScRktkRx1WRwiVpw9a8d5XSneDuYDGZv73eUYDHeHMjcHuvRUczh9dDgdku5Vqt2ngXw6VvB6YeLCRnu",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 5,
+        "sol_in": 0.2025998,
+        "sol_out": 0.889802867,
+        "net_sol": 0.687203067,
+        "tax_withheld_sol": 0.010939839,
+        "tax_pct_of_stake": 5.399728,
+        "held_seconds": 35,
+        "gross_pct_signal": 339.1924,
+        "tax_incomplete_no_rate": true,
+        "leader_crowd_at_entry": null,
+        "leader_crowd_why_not": "источник строки -- не Beqv6, кэш толпы по нему не строился"
+      },
+      {
+        "task": "pointfarmcap",
+        "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "source_remark": null,
+        "wallet": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
+        "target_mint": "7nTAA8U8kAD7t8Z1W9g6DXNTfMf4YYg2PzV9PiNRWaas",
+        "buy_signature": "bUR8Bfw55ZWQmYbYEdn5bDJBLqZTdpXAZnnntbQSYehG6kt3K7TWLHQjvvhcZrQReeAKAj3tjieqs2CrWoMJ9Ve",
+        "sell_signature": "2rwhzNZHwqzs5V9HGAJkG3MUKRMghAzsPfswtCcLPbT7u8myv8FMrCHHurFGHfdmehC4DzaqDbC6BT4XV8im5Usk",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 1.5215798,
+        "sol_out": 0.907646836,
+        "net_sol": -0.613932964,
+        "tax_withheld_sol": 0.131534201,
+        "tax_pct_of_stake": 8.644581,
+        "held_seconds": 37,
+        "gross_pct_signal": -40.3484,
+        "tax_incomplete_no_rate": true,
+        "leader_crowd_at_entry": [
+          {
+            "crowd_30s": 40,
+            "growth_30s": 1.392995,
+            "spend_sol_equiv": 7.491945,
+            "block_time_utc": "2026-09-21T01:12:42Z"
+          }
+        ],
+        "leader_crowd_why_not": null,
+        "leader_crowd_ambiguous": false
+      },
+      {
+        "task": "pointfarmcap",
+        "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "source_remark": null,
+        "wallet": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
+        "target_mint": "DupFBba8HP6DpYX9XpLn6uhdYnnEXXUUiAhWitGQc8qN",
+        "buy_signature": "239hr2T9WgHSLNe2bBf6WauGXC85pfkNJiAtUVmNXRCibFntxJgytM5yc4u1xgLFeEFY61Drh7jLMSkyPwUL45eJ",
+        "sell_signature": "3uf9nwF9dA1y3ahC9wHkzDUESFHQ8WY9U9jFV6MyMASEknMmpasBuoN63eFDNQSwK6PsPYrLENzEuUZftm6zoBZ3",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 5,
+        "sol_in": 2.0231546,
+        "sol_out": 1.674521195,
+        "net_sol": -0.348633405,
+        "tax_withheld_sol": 0.337067424,
+        "tax_pct_of_stake": 16.660488,
+        "held_seconds": 35,
+        "gross_pct_signal": -17.2322,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": [
+          {
+            "crowd_30s": 39,
+            "growth_30s": 1.214608,
+            "spend_sol_equiv": 7.378721,
+            "block_time_utc": "2026-09-23T02:10:49Z"
+          }
+        ],
+        "leader_crowd_why_not": null,
+        "leader_crowd_ambiguous": false
+      },
+      {
+        "task": "pointfarmcap",
+        "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "source_remark": null,
+        "wallet": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
+        "target_mint": "3w1T8HXSZ2axXv3YPXFGWdLRMYRVNBGcntuJRM7vC7Da",
+        "buy_signature": "5FHjLhFmU5F3guKXM2eXfscKMB8x7utWpVAtFTpi1D5byG6wQ8WqSc5ygwEUqz5qZDRMHmPRr1ohUeKAwuDaSVH7",
+        "sell_signature": "3TXceUeMzFyFmthi3JKPgWfrFcR1ac3b5Paipqes7tjVTbBD8JagM2FTpDdeJev1gjxGq5Jk9hjoZhcCAzPSKsYS",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 2.0215798,
+        "sol_out": 1.548777886,
+        "net_sol": -0.472801914,
+        "tax_withheld_sol": 0.133469299,
+        "tax_pct_of_stake": 6.602228,
+        "held_seconds": 33,
+        "gross_pct_signal": -23.3877,
+        "tax_incomplete_no_rate": true,
+        "leader_crowd_at_entry": [
+          {
+            "crowd_30s": 86,
+            "growth_30s": 2.002976,
+            "spend_sol_equiv": 3.226375,
+            "block_time_utc": "2026-09-18T05:42:03Z"
+          },
+          {
+            "crowd_30s": 19,
+            "growth_30s": 1.378749,
+            "spend_sol_equiv": 25.296393,
+            "block_time_utc": "2026-09-23T05:51:51Z"
+          }
+        ],
+        "leader_crowd_why_not": null,
+        "leader_crowd_ambiguous": true
+      },
+      {
+        "task": "pointfarmcap",
+        "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+        "source_remark": null,
+        "wallet": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
+        "target_mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
+        "buy_signature": "3LDstzbddt923pr8An42vCqxbaJJxgiSFUvij2Uo9kg8nGXfZGtycUkDb2o88q1ViYAgRTRV5MozfT3mEoqaF9Ru",
+        "sell_signature": "3Tcs6C4R5yNBAp4PLipqYyCSSQXcqxQw3hqxCtYFny9doQZNJrhtws3jaKheQnd96PWB9UMfhBS9fw2fR1A1Mqj1",
+        "n_transfers_target": 2,
+        "n_transfers_gp": 6,
+        "sol_in": 2.0215798,
+        "sol_out": 1.723928502,
+        "net_sol": -0.297651298,
+        "tax_withheld_sol": 0.341021363,
+        "tax_pct_of_stake": 16.869053,
+        "held_seconds": 32,
+        "gross_pct_signal": -14.7237,
+        "tax_incomplete_no_rate": false,
+        "leader_crowd_at_entry": [
+          {
+            "crowd_30s": 149,
+            "growth_30s": 2.216165,
+            "spend_sol_equiv": 19.516433,
+            "block_time_utc": "2026-09-18T05:08:24Z"
+          },
+          {
+            "crowd_30s": 25,
+            "growth_30s": 1.106828,
+            "spend_sol_equiv": 8.54133,
+            "block_time_utc": "2026-09-23T12:38:01Z"
+          }
+        ],
+        "leader_crowd_why_not": null,
+        "leader_crowd_ambiguous": true
+      }
+    ],
+    "group_summary": {
+      "n": 11,
+      "n_with_net_sol": 11,
+      "median_tax_pct_of_stake": 15.465484,
+      "mean_tax_pct_of_stake": 13.777626,
+      "n_positive_net_sol": 2,
+      "share_positive": 0.181818,
+      "median_net_sol": -0.086213,
+      "sum_net_sol": -1.179477,
+      "times_price_move_covered_tax": "2 из 11 -- это ровно случаи, где движение цены с запасом перекрыло и налог GP, и налог целевого токена, и любую просадку пула (net_sol уже посчитан по цепи ПОСЛЕ всех вычетов)"
+    },
+    "route_asymmetry_all_intermediate_from_repo": {
+      "trades": 16,
+      "share_profitable": 0.25,
+      "profitable_after_tax": 4,
+      "profitable_without_tax": 8,
+      "flipped_by_tax": 4,
+      "median_signal_pct": -12.8711,
+      "mean_signal_pct": -1.5006,
+      "invested_sol": 17.271067,
+      "onchain_result_sol": -0.56139,
+      "taxes_sol": 1.897994,
+      "result_without_tax_sol": 1.336604,
+      "trades_incomplete_tax": 5
+    },
+    "post_pickaxe_candidate": {
+      "ok": true,
+      "source_file": "data/bloom_report.json (built_utc=2026-09-25T01:19:06Z)",
+      "pickaxe_row": {
+        "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
+        "sol_in": 0.2,
+        "sol_back_net": 0.169971707,
+        "our_slot": 450191591,
+        "note": "наша сделка на PICKAXE самого была УБЫТОЧНОЙ (-15.0%), это отдельно от 'сильно плюсовой' сделки ПОСЛЕ неё"
+      },
+      "candidate": {
+        "mint": "7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7",
+        "sol_in": 0.2,
+        "sol_back_net": 0.369811661,
+        "net_pct": 84.905831,
+        "our_slot": 450194887,
+        "our_signature": "3SJB3GZL7U1sj2RuEYBPrcERpDHDX1jG5AaPx9WtxsxqgkbE3Kz1qcYNtuFrGy2ci7o4AjVWMVYMpTB39TYxsDFC"
+      },
+      "gp_route_confirmed": false,
+      "why_not_gp_route_confirmed": "минт кандидата отсутствует в data/solana_transfer_fee_audit.json (собран 23.09 21:23Z, кандидат -- из окна ПОСЛЕ этого) и не найден ни в одном локальном кэше сырых транзакций репозитория; нужен getTransaction(candidate.our_signature) и разбор переводов по инструкциям -- 1 вызов, 1 кредит"
+    },
+    "bloom_fee_note": {
+      "tracked_separately": false,
+      "why": "в data/solana_transfer_fee_audit.json явно оговорено: 'gross_pct' (сигнал) НЕ равен результату по цепи, т.к. в цепь уже включены комиссия сети, чаевые и комиссия площадки -- т.е. любая комиссия Bloom/DBot уже НЕВЫЧТЕНА из sol_in/sol_out ОТДЕЛЬНОЙ строкой, а сидит внутри разницы между ними.",
+      "how_to_get_separately": "getTransaction по buy/sell подписям -> meta.fee (лампорты, сетевая комиссия+приоритет) виден по цепи напрямую; комиссия самого DBot/Bloom как отдельная величина по цепи не видна вообще (она внутри их роутинга) -- нужны их же логи, не RPC.",
+      "cost": "1 getTransaction на сделку (уже нужен для net_sol) -- отдельного вызова не требует"
+    },
+    "state_dir_journals": {
+      "ok": false,
+      "why_not": "не передан --state-dir (по умолчанию /home/bot/bloom_executor_live_data -- в этом контейнере такого каталога нет)"
+    }
+  },
+  "task_g_stonkfun": {
+    "g1_authorities": {
+      "named_mints": {
+        "SANTA": {
+          "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
+          "checked": false,
+          "why_not": "нет ни в локальном кэше, ни rpc_call для свежего чтения"
+        },
+        "CRACKER": {
+          "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
+          "checked": true,
+          "symbol": "CRACKER",
+          "has_transfer_fee_config": true,
+          "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+          "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+          "withheld_amount_raw": 1693854633662,
+          "decimals": 6
+        },
+        "PURPLE": {
+          "mint": "MYQZzuiiRyy38hY8X7KQN8XyE67y2GYWs63cqjDjgLs",
+          "checked": false,
+          "why_not": "нет ни в локальном кэше, ни rpc_call для свежего чтения"
+        },
+        "RED": {
+          "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
+          "checked": false,
+          "why_not": "нет ни в локальном кэше, ни rpc_call для свежего чтения"
+        },
+        "GP": {
+          "mint": "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ",
+          "checked": true,
+          "symbol": "GP",
+          "has_transfer_fee_config": true,
+          "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+          "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+          "withheld_amount_raw": 1149928481040,
+          "decimals": 6
+        },
+        "PICKAXE": {
+          "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
+          "checked": false,
+          "why_not": "нет ни в локальном кэше, ни rpc_call для свежего чтения"
+        }
+      },
+      "share": {
+        "n_checked": 2,
+        "common_authority_guess": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+        "n_same_authority": 2,
+        "share_same_authority": 1.0
+      },
+      "fetch_meta": {
+        "fetched_fresh": 0,
+        "credits_spent": 0,
+        "why_not_missing": "4 минтов не в кэше: нужен rpc_call (getMultipleAccounts, ~1 кредит(ов))"
+      },
+      "all_147_tax_mints_check": {
+        "done": false,
+        "why_not": "не запрошено rpc_call в этом прогоне",
+        "cost_if_rpc_call_given": "getMultipleAccounts батчами по 100 -> ceil(147/100)=2 вызова = 2 кредита (дёшево, окупает точную долю по ВСЕМ 147 таксируемым минтам, а не по 6 именованным)"
+      }
+    },
+    "g2_price_impact": {
+      "real_example_n1": {
+        "ok": true,
+        "source_file": "data/solana_santa_trade_autopsy.json",
+        "collected_utc": "2026-09-23T13:27:02Z",
+        "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
+        "our_result_pct": -14.719,
+        "n_collector_events_in_window": 1,
+        "collector_events": [
+          {
+            "wallet": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+            "direction": "покупка",
+            "tokens": 34193.410728,
+            "sol": null,
+            "price": null,
+            "slot": 449705660,
+            "time_utc": "2026-09-23T12:38:12Z",
+            "signature": "2EXDfjDJp7CEVvPHLZ9S9yH25ov5pWdj9TGz42DL1LKxgBMYKunHq3Lx9k7bV6sG2m1xfH8WHpBmwbFjYRPnKQgH",
+            "pool_key": null,
+            "program": null,
+            "pool_price_after": null,
+            "pool_price_before": null
+          }
+        ],
+        "note": "событие коллектора здесь -- через ~10с ПОСЛЕ нашей ПОКУПКИ (не через 28.8с и не после продажи); направление 'покупка' у коллектора, пул/сумма в SOL не декодированы ('программа': не определена в источнике) -- это n=1, не подтверждает и не опровергает G2 в общем виде, только показывает, что коллектор активен рядом с нашими окнами",
+        "n1_caveat": true
+      },
+      "recipe": {
+        "steps": [
+          "getTransaction(подпись_покупки) -> blockTime покупки",
+          "getSignaturesForAddress(владелец_пула_или_минт, {'limit':200}) в окне [blockTime, blockTime+28.8с]",
+          "getTransaction на кандидатов в окне -> c2_common.identify_pool/pool_event, фильтр: продавец == известный коллектор (withdraw_authority минта)",
+          "цена до/после его продажи по тем же хранилищам -> сдвиг цены против нас в %"
+        ],
+        "window_s": 28.8,
+        "cost_per_trade": "порядка 1 (buy tx) + ~1-3 (страницы подписей) + до ~50 (кандидаты в окне) кредитов -- на 11 GP-маршрутов это <= ~600 кредитов, дёшево"
+      }
+    },
+    "g3_leader_rewards": {
+      "ok": false,
+      "why_not": "локально НИ В ОДНОМ кэше репозитория нет перевода коллектор -> Beqv6 (проверено текстовым поиском адреса лидера рядом с известным коллектором 5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD -- совпадений нет); раздача держателям происходит в ПАРНОМ активе (GLDx для GP и т.п.), а не в GP/SOL, поэтому её вообще нельзя увидеть в кэше толпы (там только сделки в SOL-экв по DEX)",
+      "recipe": [
+        "getSignaturesForAddress(коллектор, {limit:1000}) постранично за 7-14 дней",
+        "getTransaction на каждую -> owner_mint_delta по ПАРНОМУ активу (не GP): рост баланса Beqv6 без встречной траты с его стороны = раздача",
+        "сумма таких раздач / итог Beqv6 по таксируемым монетам (из exit_reconstruction) = доля"
+      ],
+      "cost": "той же формы, что compute_leader_exits, но по кошельку коллектора, а не лидера -- отдельная оценка нужна после того, как известно, сколько у коллектора подписей за окно"
+    },
+    "external_sources": {
+      "sources_and_method": "WebFetch на все три адреса заблокирован прокси окружения (EGRESS_BLOCKED: gp.gold, www.datawallet.com, bitquery.io) -- проверено вызовом, не предположено. Ниже -- результат WebSearch (индексированные фрагменты страниц), а НЕ дословная выгрузка HTML: это пересказ/цитаты поисковой выдачи по заявленному URL, не подтверждённые прямым чтением страницы этим прогоном. Числа ниже -- то, что вернул поиск, не наша агрегация по цепи.",
+      "gp.gold": {
+        "url": "https://gp.gold/",
+        "method": "websearch_not_webfetch",
+        "quotes": [
+          "Each GP transfer incurs a 3% tax, with accumulated fees periodically converted by StonkFun and distributed proportionally to eligible holders in the form of GLDx.",
+          "GP, inspired by the in-game currency of the RuneScape game, is paired with tokenized gold GLDx."
+        ],
+        "confirmed_onchain": "3% (300 bps) и Token-2022/transferFeeConfig на GP -- подтверждено НЕЗАВИСИМО по цепи (data/solana_buyer_200/.../metadata_accounts.json)"
+      },
+      "datawallet.com": {
+        "url": "https://www.datawallet.com/crypto/stonk-fun-explained",
+        "method": "websearch_not_webfetch",
+        "quotes": [
+          "A reward coin carries a 1% or 3% Token-2022 transfer tax on every transfer, on any venue. StonkFun's collector harvests it, sells it for the quote asset and pays every wallet holding at least $20, pro rata.",
+          "The tax is harvested, sold for the quote asset and paid to every wallet holding at least $20, pro rata, with holders receiving 97.5% and operations receiving 2.5%."
+        ]
+      },
+      "bitquery.io": {
+        "url": "https://bitquery.io/investigations/is-stonkfun-dumping-on-holders",
+        "method": "websearch_not_webfetch",
+        "quotes": [
+          "StonkFun charges a 1% or 3% tax every time a reward coin moves, with one wallet collecting it in the coin itself, selling it, and paying holders in whatever the coin trades against. The selling is the tax at work, and it still hurts.",
+          "The wallet that viral posts called a fee drain sold $56.3M of StonkFun coins in 30 days, but paid $56.2M back out to holders over the same 30 days, in each coin's pair asset.",
+          "On some of the busiest coins the tax has taken more than half the supply and sold it into the pool. 160 coins lost more than half their supply this way.",
+          "at least $1.41M of the reward money went to wallets tied to StonkFun instead."
+        ]
+      }
+    },
+    "g4_verdict": {
+      "numbers": {
+        "share_profitable_no_tax_direct_route": 0.4311,
+        "share_profitable_taxed_direct_route": 0.3333,
+        "flipped_by_tax_group_b": 23,
+        "share_profitable_gp_route": 0.181818,
+        "n_gp_route": 11,
+        "median_tax_pct_of_stake_gp_route": 15.465484
+      },
+      "verdict": "копировать С УСЛОВИЕМ, не вслепую: (1) прямой маршрут БЕЗ комиссии -- обычные условия, копировать; (2) прямой маршрут С комиссией (группа б) -- доля в плюс уже ниже (33.3% против 43.1%), и часть сделок (23 из 183) перевёрнута налогом из плюса в минус -- копировать только если независимый сигнал роста явно выше типичного; (3) маршрут ЧЕРЕЗ GP (двойной налог: GP + целевой минт) -- на имеющихся 11 сделках доля в плюс всего 18.2%, медианный налог 15.5% от ставки -- это САМАЯ дорогая по налогу и слабая по результату группа из всех измеренных; копировать только когда ожидаемый рост цены явно выше ~15% (медианный налог группы), иначе структурно проигрышно ещё до учёта проскальзывания.",
+      "external_sources_confirm": "Bitquery: на самых 'горячих' 160 монетах налог продал в пул >50% предложения; коллектор в среднем возвращает держателям почти всё собранное (56.2 из 56.3M за 30д), но $1.41M ушло в кошельки площадки, а не держателям -- т.е. постоянное давление продажи структурно реально, а не выдумано нами по 11 сделкам.",
+      "small_sample_caveat": "маршрут-через-GP посчитан на 11 наших закрытых сделках -- реальное число, но малое; расширять выводы на все будущие GP-сделки нужно осторожно."
+    }
+  }
+}
