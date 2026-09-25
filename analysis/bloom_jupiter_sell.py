@@ -273,7 +273,7 @@ def план_путей() -> dict:
 
 def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: float | None,
              живьём: bool, ордер_фн=None, исполнить_фн=None,
-             подписать_фн=None) -> dict:
+             подписать_фн=None, секрет: str | None = None) -> dict:
     """Один проход продажи через Ultra. Функции подменяются в самопроверке.
 
     Порядок намеренно такой: ордер -> ПРОВЕРКА ПОЛА -> подпись -> отправка.
@@ -316,12 +316,20 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
     # котировки и пола) ни ключ, ни solders не требуются вовсе, и падать на
     # их отсутствии этот путь не имеет права.
     if подписать_фн is None and живьём:
-        есть, почему = ключ_есть()
-        if not есть:
-            итог["why_not"] = почему
-            шаги.append({"step": "key", "ok": False, "why_not": почему})
+        # СЕКРЕТ МОЖЕТ БЫТЬ СВОЙ. У полосы отдельный кошелёк (решение владельца
+        # 25.09), и продавать её позицию надо ЕГО ключом. Ключ окружения
+        # остаётся путём по умолчанию для позиций Bloom.
+        if секрет is not None and not str(секрет).strip():
+            итог["why_not"] = "передан пустой секрет -- подписывать нельзя"
+            шаги.append({"step": "key", "ok": False, "why_not": итог["why_not"]})
             return итог
-        свой = ключ_от_нашего_кошелька(taker)
+        if секрет is None:
+            есть, почему = ключ_есть()
+            if not есть:
+                итог["why_not"] = почему
+                шаги.append({"step": "key", "ok": False, "why_not": почему})
+                return итог
+        свой = ключ_от_нашего_кошелька(taker, секрет)
         шаги.append({"step": "key", "ok": bool(свой.get("ok")),
                       "pubkey": свой.get("pubkey"), "why_not": свой.get("why_not")})
         if not свой.get("ok"):
@@ -331,7 +339,9 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
             load_rescue_keypair, sign_versioned_b64)
 
         def подписать_фн(tx_b64):  # noqa: E306
-            return sign_versioned_b64(tx_b64, load_rescue_keypair(ключ_сырой()))
+            return sign_versioned_b64(
+                tx_b64, load_rescue_keypair(секрет if секрет is not None
+                                             else ключ_сырой()))
 
     if пути:
         order = None
@@ -725,7 +735,30 @@ def self_test() -> int:
         if было_путь is not None:
             os.environ["BLOOM_JUP_API"] = было_путь
 
+    # ОТДЕЛЬНЫЙ СЕКРЕТ (кошелёк полосы). Проверка та же, что у ключа
+    # окружения: несовпадение адреса -- запрет, а не предупреждение.
+    было_имя = os.environ.get("EXEC_WALLET_KEY")
+    try:
+        os.environ.pop("EXEC_WALLET_KEY", None)
+        пустой = продать(mint="M", amount_raw=1, taker="W", вход_sol=0.001,
+                          живьём=True, секрет="   ")
+        chk("пустой переданный секрет -- отказ до всякой сети",
+            пустой["ok"] is False and "пустой секрет" in (пустой["why_not"] or ""),
+            пустой.get("why_not"))
+        чужой = продать(mint="M", amount_raw=1, taker="ЧУЖОЙ_КОШЕЛЁК",
+                         вход_sol=0.001, живьём=True, секрет="[1,2,3]")
+        chk("переданный секрет тоже сверяется с taker",
+            чужой["ok"] is False
+            and any(ш.get("step") == "key" and not ш.get("ok")
+                    for ш in (чужой.get("steps") or [])),
+            чужой.get("why_not"))
+    finally:
+        if было_имя is not None:
+            os.environ["EXEC_WALLET_KEY"] = было_имя
+
     тело = src.split("def self_test")[0]
+    chk("секрет полосы доходит до подписи, а не подменяется ключом окружения",
+        "секрет if секрет is not None" in тело)
     chk("секрет ключа в текст ошибок не подставляется",
         "type(exc).__name__" in тело.split("def публичный_ключ")[1].split("def ")[0])
     chk("подпись строго после проверки пола",
