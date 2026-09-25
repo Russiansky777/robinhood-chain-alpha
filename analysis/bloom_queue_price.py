@@ -1629,6 +1629,16 @@ def main() -> int:
             else float(a.since)
     покупки = покупки_из_позиций(состояние.positions(), с_даты_ts=с_даты,
                                   режим_боевой=ST.is_real_mode)
+    # КАКИМ ПУТЁМ ПРИШЁЛ СИГНАЛ -- из журнала решений того же каталога.
+    # Вопрос владельца: был ли детектор на запасном канале в момент сигнала.
+    пути = {}
+    файл_решений = Path(a.state_dir or ".") / "decisions.jsonl"
+    if файл_решений.exists():
+        пути = путь_сигналов(файл_решений.read_text(encoding="utf-8",
+                                                      errors="replace").split("\n"))
+        print(f"путей сигналов из журнала решений: {len(пути)}")
+    else:
+        print(f"журнала решений нет ({файл_решений}) -- путь сигнала неизвестен")
     причины: dict = {}
     for р in покупки:
         if р["skip_why_not"]:
@@ -1656,6 +1666,7 @@ def main() -> int:
                  "why_not": f"{type(exc).__name__}: {str(exc)[:200]}"}
         и["client_order_id"] = р["client_order_id"]
         и["lane"] = р.get("lane")
+        и["via"] = пути.get(р.get("source_signature"))
         итоги.append(и)
         print(f"  {р['client_order_id']}: "
               + (и.get("why_not") or
@@ -1668,6 +1679,7 @@ def main() -> int:
             "trades": итоги, "summary": с, "verdict_z1": вердикт(с),
             "s0_riders": соседи,
             "source_share": свод_доли_источника(итоги),
+            "fallback_effect": влияние_запасного(итоги),
             "our_constant_ms": (a.our_constant_ms if a.our_constant_ms > 0 else None),
             "credits_used": getattr(rpc, "used", None),
             "cost_plan": цена}
@@ -1746,7 +1758,21 @@ def в_таблицу(итог: dict) -> str:
     # подписке" по полосе, если она в данных есть. Не замерили -- прочерк, а
     # не подставленное число.
     расход = итог.get("our_constant_ms")
+    зап = итог.get("fallback_effect") or {}
+    хвост_зап = ""
+    if зап.get("n_known_path"):
+        хвост_зап = "\n".join([
+            "", "### Запасной канал и слот", "",
+            f"* покупок с известным путём: {зап['n_known_path']} "
+            f"(основной {зап['n_main']}, запасной {зап['n_fallback']}, "
+            f"путь неизвестен у {зап.get('n_unknown_path')})",
+            f"* доля S+0 на основном пути: {зап.get('share_s0_main')}, "
+            f"на запасном: {зап.get('share_s0_fallback')}",
+            f"* медиана отставания по слотам: основной "
+            f"{зап.get('slots_behind_median_main')}, запасной "
+            f"{зап.get('slots_behind_median_fallback')}", ""])
     хвост = (таблица_доли(итог.get("source_share") or {}, наш_расход_мс=расход)
+             + хвост_зап
              + таблица_соседей(итог.get("s0_riders") or {}))
     return "\n".join(строки) + "\n" + хвост
 
