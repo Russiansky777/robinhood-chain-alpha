@@ -67,6 +67,14 @@ WEEK_STOP_AT = 0.80
 
 STATES_OPEN = ("intent", "bought", "selling", "unsold")
 
+# МЕТКА ПОЛОСЫ СВОЕЙ ОТПРАВКИ. Одна на весь репозиторий: по ней позиции
+# полосы отделяются от покупок Bloom ВЕЗДЕ -- в лимите открытых, в запрете
+# повторной покупки минта, в серии непроданных и в продаже. Слово владельца
+# 25.09: полоса не должна ни занимать место Bloom, ни блокировать ему минт,
+# ни останавливать его своим UNSOLD. Два разных написания этой метки в двух
+# файлах означали бы, что где-то разделение молча не работает.
+МЕТКА_ПОЛОСЫ = "own_send"
+
 # Три режима позиции. Разделение не косметическое:
 #   dry-run   -- позиции существуют только в журнале, за ними НЕТ сделок.
 #                Они не учитываются НИГДЕ: ни в can_open, ни у сторожа, ни
@@ -385,17 +393,33 @@ class ExecState:
                 cur.update(row)
         return out
 
-    def open_positions(self, *, include_dry: bool = False) -> list:
-        """Открытые позиции. По умолчанию БЕЗ dry-run.
+    def open_positions(self, *, include_dry: bool = False,
+                        lane: str | None = "any") -> list:
+        """Открытые позиции. По умолчанию БЕЗ dry-run и ВСЕ полосы.
 
         include_dry=True нужен только отчётам, которые честно показывают
-        оба раздела. Всё, что принимает решения -- гейт, сторож, сверка --
-        зовёт без него.
+        оба раздела.
+
+        lane задаёт, чьи позиции нужны:
+          "any"            -- все (поведение как было; отчёты и сверка);
+          None             -- только покупки Bloom, без полосы своей отправки;
+          МЕТКА_ПОЛОСЫ     -- только позиции полосы.
+        Гейт покупок Bloom обязан звать с lane=None: иначе одна позиция
+        полосы на 0.01 SOL съедала бы место боевой покупки на 0.2 SOL.
         """
         out = [p for p in self.positions().values() if p.get("state") in STATES_OPEN]
-        if include_dry:
+        if not include_dry:
+            out = [p for p in out if is_real_mode(p.get("mode"))]
+        if lane == "any":
             return out
-        return [p for p in out if is_real_mode(p.get("mode"))]
+        if lane is None:
+            return [p for p in out if not p.get("lane")]
+        return [p for p in out if p.get("lane") == lane]
+
+    def lane_positions(self, *, lane: str = МЕТКА_ПОЛОСЫ) -> list:
+        """Все позиции полосы, включая закрытые: пределы полосы считаются по
+        суткам, а не по открытым."""
+        return [p for p in self.positions().values() if p.get("lane") == lane]
 
     def dry_positions(self) -> list:
         """Позиции dry-run отдельным списком: для отчёта и для откладывания
@@ -409,7 +433,8 @@ class ExecState:
     def write_intent(self, *, client_order_id: str, mint: str, source_sig: str,
                       source_slot: int | None, sol_in: float, pool: str | None,
                       program: str | None, taxed: bool | None, tax_bps: int | None,
-                      mode: str, sell_after_s: float) -> dict:
+                      mode: str, sell_after_s: float,
+                      lane: str | None = None) -> dict:
         """Намерение купить -- НА ДИСК ДО отправки запроса.
 
         Если запрос уйдёт и служба упадёт до записи ответа, позиция всё
@@ -424,6 +449,11 @@ class ExecState:
                 "ts_intent": time.time(),
                 "ts_intent_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "wallet": EXECUTOR_WALLET}
+        # Метка полосы пишется ТОЛЬКО когда она есть: у покупок Bloom поля
+        # lane нет вовсе, и сравнение p.get("lane") == МЕТКА_ПОЛОСЫ у них
+        # ложно без всяких оговорок.
+        if lane:
+            row["lane"] = lane
         append_jsonl_fsync(self.positions_path, row)
         return row
 
@@ -477,9 +507,20 @@ class ExecState:
         self.save_counters(c)
         return c
 
-    def note_sell_outcome(self, *, sold: bool) -> dict:
+    def note_sell_outcome(self, *, sold: bool, lane: str | None = None) -> dict:
+        """Итог продажи в счётчики. У полосы СВОЙ счётчик.
+
+        Слово владельца 25.09: UNSOLD полосы не останавливает Bloom. Полоса
+        покупает на 0.01 SOL по своему решению, и её непроданный остаток не
+        повод закрывать торговлю на 0.2 SOL. Счётчик полосы всё равно ведётся:
+        он виден в докладе и в пределах полосы.
+        """
         c = self.counters()
-        c["unsold_streak"] = 0 if sold else int(c.get("unsold_streak", 0)) + 1
+        if lane:
+            ключ = f"unsold_streak_{lane}"
+            c[ключ] = 0 if sold else int(c.get(ключ, 0)) + 1
+        else:
+            c["unsold_streak"] = 0 if sold else int(c.get("unsold_streak", 0)) + 1
         self.save_counters(c)
         return c
 
@@ -604,7 +645,10 @@ class ExecState:
                             f"{wb['spent_share'] * 100:.0f}% при пороге "
                             f"{WEEK_STOP_AT * 100:.0f}%"), КОД_БЮДЖЕТ_НЕДЕЛИ
 
-        открытые = self.open_positions()
+        # ТОЛЬКО ПОКУПКИ BLOOM. Позиции полосы своей отправки здесь не
+        # считаются ни в лимите, ни в запрете по минту: слово владельца
+        # 25.09. Иначе замер на 0.01 SOL закрывал бы боевую покупку на 0.2.
+        открытые = self.open_positions(lane=None)
         if self.max_open <= 0:
             return False, "лимит открытых позиций задан как 0 -- торговля запрещена", КОД_ЛИМИТ_ОТКРЫТЫХ
         if len(открытые) >= self.max_open:
@@ -799,6 +843,51 @@ def self_test() -> None:
     ok, почему8 = st5.can_open(mint="SAME", source_sig="SB", balance_sol=1.0)
     chk("вторая позиция по тому же минту запрещена",
         ok is False and "уже есть открытая позиция" in почему8, почему8)
+
+    # ---- ПОЛОСА СВОЕЙ ОТПРАВКИ ОТДЕЛЕНА ОТ BLOOM (владелец 25.09) ----
+    # Цена ошибки прямая: позиция полосы на 0.01 SOL не имеет права ни занять
+    # место боевой покупки на 0.2 SOL, ни закрыть ей минт, ни остановить
+    # торговлю своим UNSOLD.
+    stп = ExecState(base=base / "state_lane", kill=kill)
+    for i in range(stп.max_open):
+        stп.write_intent(client_order_id=f"l{i}", mint=f"LM{i}", source_sig=f"LS{i}",
+                          source_slot=i, sol_in=0.01, pool=None, program=None,
+                          taxed=None, tax_bps=None, mode=MODE_LIVE,
+                          sell_after_s=28.8, lane=МЕТКА_ПОЛОСЫ)
+    ok_п, почему_п = stп.can_open(mint="MNEW", source_sig="SNEW", balance_sol=1.0)
+    chk("позиции полосы НЕ занимают лимит открытых у Bloom", ok_п is True,
+        почему_п)
+    chk("метка полосы записана в позицию",
+        stп.positions()["l0"].get("lane") == МЕТКА_ПОЛОСЫ,
+        stп.positions()["l0"].get("lane"))
+    chk("у покупки Bloom поля lane нет вовсе",
+        "lane" not in st5.positions()["a"], st5.positions()["a"].get("lane"))
+    ok_м, почему_м = stп.can_open(mint="LM0", source_sig="SNEW2", balance_sol=1.0)
+    chk("минт, купленный полосой, для Bloom НЕ заблокирован", ok_м is True, почему_м)
+    chk("фильтр открытых по полосе разделяет их",
+        len(stп.open_positions(lane=None)) == 0
+        and len(stп.open_positions(lane=МЕТКА_ПОЛОСЫ)) == stп.max_open
+        and len(stп.open_positions()) == stп.max_open,
+        (len(stп.open_positions(lane=None)),
+         len(stп.open_positions(lane=МЕТКА_ПОЛОСЫ))))
+    # UNSOLD полосы не поднимает счётчик Bloom, но свой -- поднимает.
+    for _ in range(stп.unsold_streak_max):
+        stп.note_sell_outcome(sold=False, lane=МЕТКА_ПОЛОСЫ)
+    ok_у, почему_у = stп.can_open(mint="MNEW3", source_sig="SNEW3", balance_sol=1.0)
+    chk("три UNSOLD полосы подряд НЕ ставят Bloom на автопаузу", ok_у is True,
+        почему_у)
+    chk("а свой счётчик полосы вырос",
+        int(stп.counters().get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}", 0))
+        == stп.unsold_streak_max, stп.counters())
+    stп.note_sell_outcome(sold=False)
+    chk("UNSOLD Bloom по-прежнему считается своим счётчиком",
+        int(stп.counters().get("unsold_streak", 0)) == 1, stп.counters())
+    chk("успешная продажа полосы обнуляет только её счётчик",
+        (stп.note_sell_outcome(sold=True, lane=МЕТКА_ПОЛОСЫ)
+         .get(f"unsold_streak_{МЕТКА_ПОЛОСЫ}") == 0)
+        and int(stп.counters().get("unsold_streak", 0)) == 1, stп.counters())
+    chk("позиции полосы видны отдельным списком",
+        len(stп.lane_positions()) == stп.max_open, len(stп.lane_positions()))
 
     # покупок на минт и кулдаун
     st6 = ExecState(base=base / "state6", kill=kill)
