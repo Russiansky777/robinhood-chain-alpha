@@ -209,6 +209,14 @@ class ExecState:
         # Telegram через него не сработала бы вовсе. Этот путь служба пишет
         # сама, и он honoured так же строго: любой из двух файлов -- запрет.
         self.kill_tg_path = self.base / "KILL_BY_TELEGRAM"
+        # РУБИЛЬНИК ТОЛЬКО BLOOM (слово владельца 25.09: "два отдельных файла
+        # KILL: Bloom и полоса"). Общий KILL глушит ВСЁ, включая полосу: она
+        # сверяется с ним раньше своего KILL_OWN_SEND. Чтобы остановить одну
+        # площадку и не трогать полосу, нужен свой файл -- вот он. Лежит рядом
+        # с общим, в каталоге env, и читается так же строго.
+        self.kill_bloom_path = Path(
+            os.environ.get("BLOOM_KILL_BUY_FILE")
+            or (self.kill_path.parent / "KILL_BLOOM"))
         # Отдельный рубильник ТОЛЬКО на продажу: сторож перестаёт продавать,
         # покупки при этом решает первый рубильник. Нужен раздельно, потому
         # что "перестань продавать" и "перестань торговать" -- разные приказы.
@@ -262,6 +270,27 @@ class ExecState:
         except Exception as exc:  # noqa: BLE001
             return True, (f"проверка рубильника не удалась ({type(exc).__name__}) -- "
                            "торговля запрещена, потому что неясность трактуется как запрет")
+
+    def kill_bloom_active(self) -> tuple[bool, str]:
+        """Запрет покупок ТОЛЬКО через Bloom. Полосы не касается.
+
+        Та же строгость, что у общего: файл есть -> запрет, ошибка проверки ->
+        запрет. Полоса этот файл не читает вовсе -- в том и смысл: остановить
+        площадку, не останавливая свою отправку.
+        """
+        try:
+            if self.kill_bloom_path.exists():
+                try:
+                    причина = self.kill_bloom_path.read_text(
+                        encoding="utf-8").strip()[:200]
+                except OSError:
+                    причина = "(файл не читается -- всё равно запрет)"
+                return True, (f"рубильник Bloom включён: {причина or 'без пояснения'}")
+            return False, ""
+        except Exception as exc:  # noqa: BLE001
+            return True, (f"проверка рубильника Bloom не удалась "
+                           f"({type(exc).__name__}) -- покупки через площадку "
+                           "запрещены: неясность трактуется как запрет")
 
     def sell_kill_active(self) -> tuple[bool, str]:
         """Запрет ТОЛЬКО на продажу. Та же строгость: неясность -- запрет.
@@ -536,8 +565,44 @@ class ExecState:
                 "ts_update": time.time(),
                 "ts_update_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 **поля}
+        # СУТОЧНЫЙ СЧЁТ -- ЗДЕСЬ, А НЕ У ВЫЗЫВАЮЩЕГО. Найдено 25.09: гейт
+        # дневного убытка сверял realized_sol с BLOOM_DAILY_LOSS_SOL, а писать
+        # realized_sol умела только add_pnl, которую в боевом коде не звал
+        # никто -- счёт всегда оставался 0.0 и стоп не срабатывал НИКОГДА.
+        # Точка учёта одна и стоит там, где позиция закрывается: любой путь
+        # (Bloom, полоса, продажа по остатку) проходит через update_position.
+        учтено = self._учесть_закрытие(client_order_id, поля)
+        if учтено:
+            row.update(учтено)
         append_jsonl_fsync(self.positions_path, row)
         return row
+
+    def _учесть_закрытие(self, cid: str, поля: dict) -> dict:
+        """Записать итог закрытой позиции в суточный счёт. РОВНО ОДИН РАЗ.
+
+        Повторный учёт был бы хуже отсутствия: стоп сработал бы по выдуманному
+        убытку. Защита -- отметка в самой позиции (pnl_counted) плюс проверка
+        уже учтённых по журналу, чтобы перезапуск службы не посчитал дважды.
+        """
+        if str(поля.get("state") or "") != STATE_CLOSED:
+            return {}
+        чисто = поля.get("closed_sol_net")
+        if чисто is None:
+            return {}
+        try:
+            прежние = self.positions().get(cid) or {}
+        except Exception:  # noqa: BLE001
+            прежние = {}
+        if прежние.get("pnl_counted"):
+            return {}
+        try:
+            self.add_pnl(realized_sol=float(чисто), sells=1)
+        except Exception as exc:  # noqa: BLE001
+            # Счёт не должен ронять закрытие позиции: позиция закрыта по цепи,
+            # и это факт. Но молчать тоже нельзя -- причина уходит в запись.
+            return {"pnl_counted": False,
+                    "pnl_count_why_not": f"{type(exc).__name__}"}
+        return {"pnl_counted": True, "pnl_counted_sol": round(float(чисто), 9)}
 
     def log_decision(self, row: dict) -> None:
         append_jsonl_fsync(self.decisions_path,
@@ -696,6 +761,12 @@ class ExecState:
         убит, почему = self.kill_active()
         if убит:
             return False, почему, КОД_РУБИЛЬНИК
+        # ОТДЕЛЬНЫЙ РУБИЛЬНИК BLOOM. Этот гейт спрашивает только путь площадки:
+        # полоса ходит своей дверью (можно_ещё в bloom_own_send) и файла
+        # KILL_BLOOM не читает вовсе.
+        убит_б, почему_б = self.kill_bloom_active()
+        if убит_б:
+            return False, почему_б, КОД_РУБИЛЬНИК
 
         c = self.counters()
         if c.get("corrupt"):
@@ -771,7 +842,9 @@ class ExecState:
             "kill_switch": {"path": str(self.kill_path), "active": убит, "why_not": почему,
                              "telegram_path": str(self.kill_tg_path),
                              "telegram_active": self.kill_tg_path.exists(),
-                             "sell_stopped": self.sell_kill_active()[0]},
+                             "sell_stopped": self.sell_kill_active()[0],
+                             "bloom_path": str(self.kill_bloom_path),
+                             "bloom_active": self.kill_bloom_active()[0]},
             "limits": {"max_open": self.max_open,
                         "daily_loss_sol": self.daily_loss_sol,
                         "buy_sol": self.buy_sol,
@@ -831,6 +904,58 @@ def self_test() -> None:
     chk("и он виден в отчёте состояния",
         st.report()["kill_switch"]["sell_stopped"] is True, st.report()["kill_switch"])
     st.kill_sell_path.unlink()
+
+    # --- РУБИЛЬНИК ТОЛЬКО BLOOM (слово владельца 25.09: два отдельных файла).
+    chk("без файла Bloom покупки площадки разрешены",
+        st.kill_bloom_active()[0] is False)
+    st.kill_bloom_path.write_text("стоп только Bloom", encoding="utf-8")
+    убит_б, почему_б = st.kill_bloom_active()
+    chk("рубильник Bloom включается своим файлом",
+        убит_б is True and "рубильник Bloom" in почему_б, почему_б)
+    ок_б, почему_гейт, код_б = st.can_open_detailed(
+        balance_sol=10.0, mint="MB", source_sig="SB")
+    chk("и гейт покупок площадки его слушает",
+        ок_б is False and код_б == КОД_РУБИЛЬНИК, (ок_б, код_б, почему_гейт))
+    chk("а ОБЩИЙ рубильник при этом не включён -- полоса не остановлена",
+        st.kill_active()[0] is False, st.kill_active())
+    chk("оба рубильника видны в отчёте",
+        st.report()["kill_switch"]["bloom_active"] is True
+        and st.report()["kill_switch"]["active"] is False,
+        st.report()["kill_switch"])
+    st.kill_bloom_path.unlink()
+    chk("снят -- покупки площадки снова разрешены",
+        st.kill_bloom_active()[0] is False)
+
+    # --- СУТОЧНЫЙ СЧЁТ ИТОГА. Найдено 25.09: add_pnl не звал никто, и стоп по
+    # дневному убытку не срабатывал никогда. Проверяем денежный путь целиком:
+    # закрытая с убытком позиция -> счёт вырос -> гейт закрылся; и что повтор
+    # той же записи счёт НЕ удваивает.
+    сч = ExecState(base=base / "pnl_gate", kill=base / "pnl_gate" / "НЕТ")
+    сч.daily_loss_sol = 0.05
+    сч.write_intent(client_order_id="p1", mint="M1", source_sig="S1",
+                    source_slot=1, sol_in=0.01, pool=None, program=None,
+                    taxed=None, tax_bps=None, mode=MODE_LIVE, sell_after_s=28.8)
+    chk("до закрытия суточный итог нулевой", сч.pnl()["realized_sol"] == 0.0)
+    ок_до, _, _ = сч.can_open_detailed(balance_sol=10.0, mint="M9", source_sig="S9")
+    chk("и гейт покупок открыт", ок_до is True)
+    стр = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=-0.06,
+                              closed_reason="самопроверка: продажа в минус")
+    chk("закрытие с убытком учтено ровно один раз",
+        стр.get("pnl_counted") is True
+        and abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
+    ок_после, почему_п, код_п = сч.can_open_detailed(
+        balance_sol=10.0, mint="M9", source_sig="S9")
+    chk("после убытка гейт закрыт дневным лимитом",
+        ок_после is False and код_п == КОД_ДНЕВНОЙ_УБЫТОК, (код_п, почему_п))
+    стр2 = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=-0.06,
+                               closed_reason="повтор той же записи")
+    chk("повторная запись того же закрытия счёт НЕ удваивает",
+        стр2.get("pnl_counted") is not True
+        and abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
+    сч.update_position("p2", state=STATE_CLOSED,
+                        closed_reason="закрыта без числа итога")
+    chk("закрытие без числа итога счёт не трогает",
+        abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
 
     class БросаетПриПроверке:
         """Путь, проверка которого падает: права, битый монтаж, что угодно."""
