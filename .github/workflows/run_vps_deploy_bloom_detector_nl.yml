@@ -71,6 +71,22 @@ on:
         description: "бюджет замера двухшаговой тени, кредитов Helius (замер ~10 000 в час)"
         required: false
         default: "30000"
+      own_send:
+        description: "'1' -- полоса СВОЕЙ отправки: собирать и подписывать покупку самим (сборка и симуляция; без own_send_live не отправляет)"
+        required: false
+        default: "0"
+      own_send_live:
+        description: "'1' -- полоса ОТПРАВЛЯЕТ свои покупки в сеть (настоящие деньги, 0.01 SOL; только по слову владельца)"
+        required: false
+        default: "0"
+      own_send_sol:
+        description: "размер сделки полосы в SOL (предел в коде 0.05)"
+        required: false
+        default: "0.01"
+      sender_region:
+        description: "регион Helius Sender для полосы: ams, fra, lon, ewr, slc, sg, tyo"
+        required: false
+        default: "ams"
 
 concurrency:
   group: bloom-detector-deploy
@@ -289,6 +305,14 @@ jobs:
             # входом live_buy ниже: покупка по реальному источнику -- это
             # настоящие деньги, и включаться она должна одним осознанным
             # действием, а не побочным следствием любого деплоя.
+            # ПОЛОСА СВОЕЙ ОТПРАВКИ. Сборка и симуляция от BLOOM_OWN_SEND=1
+            # ничего не стоят и ничего не отправляют. Отправка -- отдельный
+            # рубильник BLOOM_OWN_SEND_LIVE, он вычищается ВСЕГДА и пишется
+            # ниже отдельным шагом: своя покупка -- настоящие деньги.
+            sed -i '/^BLOOM_OWN_SEND=/d; /^BLOOM_OWN_SEND_LIVE=/d; /^BLOOM_OWN_SEND_SOL=/d; /^BLOOM_SENDER_REGION=/d' $ENV_DIR/env
+            echo 'BLOOM_OWN_SEND=${{ inputs.own_send }}' >> $ENV_DIR/env
+            echo 'BLOOM_OWN_SEND_SOL=${{ inputs.own_send_sol }}' >> $ENV_DIR/env
+            echo 'BLOOM_SENDER_REGION=${{ inputs.sender_region }}' >> $ENV_DIR/env
             sed -i '/^BLOOM_LIVE_BUY=/d' $ENV_DIR/env
             sed -i '/^BLOOM_BUY_SOL=/d' $ENV_DIR/env
             echo 'BLOOM_BUY_SOL=${{ inputs.buy_sol }}' >> $ENV_DIR/env
@@ -301,6 +325,32 @@ jobs:
             ssh -n $SSH_OPTS root@$TARGET_HOST "echo 'BLOOM_LIVE_BUY=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
           else
             echo "боевые покупки ВЫКЛЮЧЕНЫ: BLOOM_LIVE_BUY не задан"
+          fi
+          if [ "${{ inputs.own_send_live }}" = "1" ]; then
+            if [ "${{ inputs.own_send }}" != "1" ]; then
+              echo "СБОЙ: own_send_live=1 при own_send=0 -- отправлять было бы нечему."
+              exit 1
+            fi
+            echo "ПОЛОСА ОТПРАВЛЯЕТ ЖИВЬЁМ: BLOOM_OWN_SEND_LIVE=1, размер ${{ inputs.own_send_sol }} SOL"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "echo 'BLOOM_OWN_SEND_LIVE=1' >> $ENV_DIR/env && chmod 600 $ENV_DIR/env"
+          else
+            echo "полоса НЕ отправляет: BLOOM_OWN_SEND_LIVE не задан (сборка и симуляция идут)"
+          fi
+          if [ "${{ inputs.own_send }}" = "1" ]; then
+            # Ключ кошелька нужен полосе для подписи. Он лежит в общем
+            # env-файле, его пишет деплой сторожа при via_jupiter=1. Без него
+            # полоса дойдёт до подписи и честно откажет, но узнать об этом
+            # лучше здесь, а не в бою.
+            if ssh -n $SSH_OPTS root@$TARGET_HOST "grep -qE '^(EXEC_WALLET_KEY|BLOOM_WALLET_KEY)=.' $ENV_DIR/env"; then
+              echo "ключ кошелька в env есть (значение не читаем и не печатаем)"
+            else
+              echo "ВНИМАНИЕ: ключа кошелька в env нет -- полоса не сможет подписать."
+              echo "Ставится деплоем сторожа с via_jupiter=1 (секрет EXEC_WALLET_KEY)."
+              if [ "${{ inputs.own_send_live }}" = "1" ]; then
+                echo "СБОЙ: живая отправка без ключа невозможна."
+                exit 1
+              fi
+            fi
           fi
           if [ "${{ inputs.live_test }}" = "yes" ]; then
             echo "РЕЖИМ СТЕНДА: включаю BLOOM_LIVE_TEST=1 (покупки только по тестовому источнику)"
