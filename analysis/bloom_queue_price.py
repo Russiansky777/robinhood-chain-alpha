@@ -147,6 +147,101 @@ def сторона(t: dict, минт: str) -> str | None:
     return "покупка" if крупнейший[1] > 0 else "продажа"
 
 
+def торговец(t: dict, минт: str) -> dict:
+    """Кто здесь торгует и что у него было ДО этой транзакции.
+
+    Торговец -- подписант с наибольшим по модулю движением минта. Его остаток
+    ДО сделки отвечает на вопрос владельца "реакция на источник или
+    независимая толпа": нулевой (или отсутствующий) остаток до покупки значит,
+    что кошелёк купил этот токен ВПЕРВЫЕ -- то есть приехал на событие. Уже
+    ненулевой остаток значит, что он этим токеном торгует и до нас.
+
+    Ни одного вызова сети: всё берётся из pre/postTokenBalances блока.
+    """
+    мета = t.get("meta") or {}
+    подписанты = _подписанты(t)
+    было: dict = {}
+    стало: dict = {}
+    for где, куда in (("preTokenBalances", было), ("postTokenBalances", стало)):
+        for б in (мета.get(где) or []):
+            if not isinstance(б, dict) or б.get("mint") != минт or not б.get("owner"):
+                continue
+            try:
+                сырое = int((б.get("uiTokenAmount") or {}).get("amount") or 0)
+            except (TypeError, ValueError):
+                continue
+            куда[б["owner"]] = куда.get(б["owner"], 0) + сырое
+    дельты = {в: стало.get(в, 0) - было.get(в, 0)
+              for в in set(было) | set(стало)}
+    свои = {в: д for в, д in дельты.items() if в in подписанты and д}
+    if not свои:
+        return {"wallet": None, "delta": None, "held_before": None,
+                "first_buy": None, "why_not": "ни один подписант минт не двигал"}
+    кош = max(свои.items(), key=lambda п: abs(п[1]))[0]
+    до = было.get(кош, 0)
+    return {"wallet": кош, "delta": свои[кош], "held_before": до,
+            # ПЕРВАЯ ПОКУПКА -- только когда это покупка: у продажи остаток до
+            # неё по определению был, и "первой покупкой" её называть нельзя.
+            "first_buy": (свои[кош] > 0 and до == 0), "why_not": None}
+
+
+def долговременный_nonce(t: dict) -> bool:
+    """Идёт ли транзакция с долговременным nonce.
+
+    Признак однозначный: ПЕРВАЯ инструкция -- AdvanceNonceAccount системной
+    программы (в jsonParsed это parsed.type == "advanceNonce", без парсера --
+    код 4 в данных). Такой транзакции не нужен свежий blockhash: её можно
+    подписать заранее и держать наготове -- ровно то, что делает тот, кто
+    хочет уехать в первом же блоке.
+    """
+    инструкции = (((t.get("transaction") or {}).get("message") or {})
+                  .get("instructions") or [])
+    if not инструкции:
+        return False
+    первая = инструкции[0] or {}
+    разобрано = (первая.get("parsed") or {})
+    if isinstance(разобрано, dict) and разобрано.get("type") in (
+            "advanceNonce", "advanceNonceAccount"):
+        return True
+    if первая.get("programId") == "11111111111111111111111111111111" and первая.get("data"):
+        try:
+            сырое = CF.b58decode(первая["data"])
+        except (ValueError, IndexError):
+            return False
+        return len(сырое) >= 4 and сырое[:4] == b"\x04\x00\x00\x00"
+    return False
+
+
+def чаевые_блока_по_индексу(транзакции: list, *, чаевые_адреса: set) -> dict:
+    """Индекс транзакции -> множество счетов чаевых, которым она платила.
+
+    Нужно для признака бандла: бандл едет подряд и платит одному и тому же
+    получателю чаевых, поэтому сосед по индексу с тем же адресом чаевых --
+    это единственный признак бандла, который виден из блока. Признак
+    вероятностный, и назван он именно так.
+    """
+    из_: dict = {}
+    for и, t in enumerate(транзакции):
+        куда = set()
+        for _, получатель, лам in CF.sol_transfers(t):
+            if получатель in чаевые_адреса and лам > 0:
+                куда.add(получатель)
+        if куда:
+            из_[и] = куда
+    return из_
+
+
+def похоже_на_бандл(по_индексу: dict, индекс: int) -> bool:
+    """Сосед по индексу платит тому же счёту чаевых -- похоже на бандл."""
+    свои = по_индексу.get(индекс)
+    if not свои:
+        return False
+    for рядом in (индекс - 1, индекс + 1):
+        if свои & (по_индексу.get(рядом) or set()):
+            return True
+    return False
+
+
 def плата_транзакции(t: dict, *, чаевые_адреса: set) -> dict:
     """Приоритет, чаевые и их сумма -- в лампортах, по фактам транзакции."""
     cb = CF.compute_budget(t)
@@ -223,17 +318,24 @@ def очередь_пула(б: dict, *, минт: str, адреса_пула: s
         return {"known": False, "why_not": б.get("why_not"), "rows": []}
     транзакции = б.get("transactions") or []
     чаевые = адреса_чаевых_блока(транзакции, известные=известные_чаевые)
+    по_индексу = чаевые_блока_по_индексу(транзакции, чаевые_адреса=чаевые["all"])
     строки = []
     for и, t in enumerate(транзакции):
         ключи = set(_ключи(t))
         if адреса_пула and not (ключи & адреса_пула):
             continue
         мета = t.get("meta") or {}
+        торг = торговец(t, минт)
         строка = {"index": и, "signature": _подпись(t),
                   "slot": б.get("slot"), "total_in_block": len(транзакции),
                   "failed": мета.get("err") is not None,
                   "side": сторона(t, минт),
-                  "payer": (_ключи(t) or [None])[0]}
+                  "payer": (_ключи(t) or [None])[0],
+                  "trader": торг.get("wallet"),
+                  "held_before": торг.get("held_before"),
+                  "first_buy_of_mint": торг.get("first_buy"),
+                  "durable_nonce": долговременный_nonce(t),
+                  "bundle_like": похоже_на_бандл(по_индексу, и)}
         строка.update(плата_транзакции(t, чаевые_адреса=чаевые["all"]))
         строка["tip_labels"] = {а: метка_чаевых(а, известные=известные_чаевые,
                                                 по_частоте=чаевые["by_frequency"])
@@ -371,11 +473,15 @@ def итог_по_покупке(*, наша_подпись: str, наш_сло�
                s0_after_source_cheaper_than_us=len(дешевле_нас),
                s0_reachable_without_overpay=bool(дешевле_нас),
                s0_pay=свод_плат(за_источником),
-               s0_rows=[{к: с.get(к) for к in ("index", "signature", "side",
-                                                "pay_lamports", "pay_sol",
-                                                "tips_lamports",
-                                                "cu_price_micro_declared")}
-                        for с in за_источником[:20]])
+               # ВСЕ строки, а не двадцать: именно по ним считается, кто эти
+               # севшие дешевле нас (вопрос владельца от 25.09).
+               s0_rows=[{к: с.get(к) for к in
+                          ("index", "signature", "side", "pay_lamports",
+                           "pay_sol", "tips_lamports", "tips", "tip_labels",
+                           "cu_price_micro_declared", "paid_micro_per_cu_consumed",
+                           "trader", "payer", "held_before", "first_buy_of_mint",
+                           "durable_nonce", "bundle_like")}
+                        for с in за_источником])
     return из_
 
 
@@ -579,6 +685,199 @@ def покупки_из_позиций(позиции: dict, *, с_даты_ts: 
     из_.sort(key=lambda р: float(р.get("ts_intent") or 0))
     return из_
 
+
+# ------------------------------------------- кто садится в S+0 за источником
+
+def свод_соседей(итоги: list, *, наша_плата_по_сделке: bool = True) -> dict:
+    """Кто эти транзакции, что садятся в S+0 за источником ДЕШЕВЛЕ нас.
+
+    Три вопроса владельца от 25.09 и ответы на них ровно по цепи:
+
+      а) РЕАКЦИЯ ИЛИ ТОЛПА. Реакция -- кошелёк купил этот токен впервые
+         (остаток до сделки ноль): он приехал на событие. Толпа -- остаток
+         был, то есть токеном он торгует и без нас. Ни одного лишнего
+         вызова: остаток до сделки лежит в той же meta блока.
+      б) ЧЕМ ДОСТАВЛЕНЫ. Получатели чаевых по частоте (с меткой только там,
+         где источник известен -- имена ускорителей не придумываются),
+         долговременный nonce, признак бандла (сосед по индексу платит тому
+         же счёту чаевых).
+      в) КТО РЕГУЛЯРНО. Кошельки, попавшие в S+0 за источником на нескольких
+         НАШИХ сделках: число попаданий, доля от наших сделок и их плата.
+
+    Считается ТОЛЬКО по тем строкам, что дешевле нашей платы на той же
+    сделке: вопрос был именно про них.
+    """
+    строки = []
+    for и in итоги:
+        if not и.get("known"):
+            continue
+        наша = и.get("our_pay_lamports")
+        for с in (и.get("s0_rows") or []):
+            плата = с.get("pay_lamports")
+            if плата is None or с.get("failed"):
+                continue
+            if наша_плата_по_сделке and наша is not None and плата >= наша:
+                continue
+            строки.append({**с, "trade": и.get("client_order_id"),
+                            "mint": и.get("mint"),
+                            "source_signature": и.get("source_signature")})
+    из_: dict = {"n_rows": len(строки), "n_trades": len(
+        {с["trade"] for с in строки if с.get("trade")})}
+    if not строки:
+        из_["why_not"] = "дешевле нас в S+0 никого не нашлось"
+        return из_
+
+    # --- а) реакция или толпа
+    реакция = [с for с in строки if с.get("first_buy_of_mint") is True]
+    толпа = [с for с in строки if с.get("first_buy_of_mint") is False]
+    неясно = [с for с in строки if с.get("first_buy_of_mint") is None]
+    из_["who"] = {
+        "reaction_first_buy": len(реакция),
+        "crowd_held_before": len(толпа),
+        "unknown": len(неясно),
+        "share_reaction": round(len(реакция) / len(строки), 4),
+        "share_crowd": round(len(толпа) / len(строки), 4),
+        "note": ("реакция -- остаток минта до сделки ноль (купил впервые); "
+                  "толпа -- остаток был; неясно -- подписант минт не двигал "
+                  "(сбор платы, маршрут через посредника)")}
+    покупки = [с for с in строки if с.get("side") == "покупка"]
+    продажи = [с for с in строки if с.get("side") == "продажа"]
+    из_["who"].update(buys=len(покупки), sells=len(продажи),
+                      side_unknown=len(строки) - len(покупки) - len(продажи))
+
+    # --- б) чем доставлены
+    по_получателю: dict = {}
+    метки: dict = {}
+    без_чаевых = 0
+    for с in строки:
+        чае = с.get("tips") or {}
+        if not чае:
+            без_чаевых += 1
+            continue
+        for адрес, лам in чае.items():
+            з = по_получателю.setdefault(адрес, {"n": 0, "lamports": 0})
+            з["n"] += 1
+            з["lamports"] += int(лам or 0)
+            метка = (с.get("tip_labels") or {}).get(адрес)
+            if метка:
+                метки[адрес] = метка
+    доставка = sorted(
+        ({"tip_account": а, "label": метки.get(а),
+          "n": з["n"], "share": round(з["n"] / len(строки), 4),
+          "lamports_total": з["lamports"],
+          "lamports_median_per_tx": int(з["lamports"] / з["n"])}
+         for а, з in по_получателю.items()),
+        key=lambda р: -р["n"])
+    из_["delivery"] = {
+        "tip_accounts": доставка,
+        "no_tip": без_чаевых,
+        "share_no_tip": round(без_чаевых / len(строки), 4),
+        "durable_nonce": sum(1 for с in строки if с.get("durable_nonce")),
+        "bundle_like": sum(1 for с in строки if с.get("bundle_like")),
+        "note": ("метка ставится только там, где источник адреса известен; "
+                  "неопознанный адрес так и остаётся адресом. Бандл -- признак "
+                  "вероятностный: сосед по индексу платит тому же счёту чаевых")}
+
+    # --- в) кто регулярно
+    по_кошельку: dict = {}
+    сделок_всего = len({и.get("client_order_id") for и in итоги if и.get("known")})
+    for с in строки:
+        кош = с.get("trader") or с.get("payer")
+        if not кош:
+            continue
+        з = по_кошельку.setdefault(кош, {"hits": 0, "trades": set(), "pays": [],
+                                          "first_buys": 0, "nonce": 0,
+                                          "bundle": 0, "tips": {}})
+        з["hits"] += 1
+        if с.get("trade"):
+            з["trades"].add(с["trade"])
+        if с.get("pay_lamports") is not None:
+            з["pays"].append(с["pay_lamports"])
+        if с.get("first_buy_of_mint") is True:
+            з["first_buys"] += 1
+        if с.get("durable_nonce"):
+            з["nonce"] += 1
+        if с.get("bundle_like"):
+            з["bundle"] += 1
+        for а in (с.get("tips") or {}):
+            з["tips"][а] = з["tips"].get(а, 0) + 1
+    регулярные = []
+    for кош, з in по_кошельку.items():
+        платы = sorted(з["pays"])
+        регулярные.append({
+            "wallet": кош, "hits": з["hits"], "trades": len(з["trades"]),
+            "share_of_our_trades": (round(len(з["trades"]) / сделок_всего, 4)
+                                     if сделок_всего else None),
+            "pay_median_lamports": (платы[len(платы) // 2] if платы else None),
+            "pay_min_lamports": (платы[0] if платы else None),
+            "first_buys": з["first_buys"], "durable_nonce": з["nonce"],
+            "bundle_like": з["bundle"],
+            "tip_accounts": sorted(з["tips"], key=lambda а: -з["tips"][а])[:3]})
+    регулярные.sort(key=lambda р: (-р["trades"], -р["hits"]))
+    из_["wallets"] = {
+        "n_unique": len(регулярные),
+        # ПОРОГ ВЛАДЕЛЬЦА: три и более раза за неделю. Наше окно -- ровно те
+        # сделки, что разобраны, и оно названо числом, а не словом "неделя".
+        "regular_threshold_trades": 3,
+        "regular": [р for р in регулярные if р["trades"] >= 3],
+        "top": регулярные[:25],
+        "our_trades_in_window": сделок_всего}
+    return из_
+
+
+def таблица_соседей(с: dict) -> str:
+    """Ответ на "кто эти 313" таблицами. Пусто -- так и сказано словами."""
+    if not с or not с.get("n_rows"):
+        причина = (с or {}).get("why_not") or "нет данных"
+        return f"\n## Кто садится в S+0 дешевле нас\n\n{причина}\n"
+    кто = с.get("who") or {}
+    дост = с.get("delivery") or {}
+    кош = с.get("wallets") or {}
+    строки = ["", "## Кто садится в S+0 за источником ДЕШЕВЛЕ нас", "",
+              f"Разобрано {с['n_rows']} транзакций на {с['n_trades']} наших сделках.",
+              "", "### а) реакция на источник или независимая толпа", "",
+              "| что | сколько | доля |", "|---|---|---|",
+              f"| реакция (купил минт ВПЕРВЫЕ) | {кто.get('reaction_first_buy')} | "
+              f"{кто.get('share_reaction')} |",
+              f"| толпа (остаток минта уже был) | {кто.get('crowd_held_before')} | "
+              f"{кто.get('share_crowd')} |",
+              f"| неясно (подписант минт не двигал) | {кто.get('unknown')} | — |",
+              f"| из них покупки / продажи | {кто.get('buys')} / {кто.get('sells')} | — |",
+              "", f"_{кто.get('note')}_", "",
+              "### б) чем доставлены", "",
+              "| счёт чаевых | метка | транзакций | доля | лампортов на транзакцию |",
+              "|---|---|---|---|---|"]
+    for р in (дост.get("tip_accounts") or [])[:15]:
+        строки.append(f"| `{р['tip_account']}` | {р.get('label') or '— (адрес без метки)'} | "
+                      f"{р['n']} | {р['share']} | {р['lamports_median_per_tx']} |")
+    строки += [f"| без чаевых вовсе | — | {дост.get('no_tip')} | "
+               f"{дост.get('share_no_tip')} | 0 |", "",
+               f"* долговременный nonce: {дост.get('durable_nonce')} из {с['n_rows']}",
+               f"* похоже на бандл (сосед платит тому же счёту): {дост.get('bundle_like')}",
+               "", f"_{дост.get('note')}_", "",
+               "### в) кто попадает в S+0 регулярно", "",
+               f"Уникальных кошельков: {кош.get('n_unique')}. Порог регулярности: "
+               f"{кош.get('regular_threshold_trades')} и более НАШИХ сделок из "
+               f"{кош.get('our_trades_in_window')}.", "",
+               "| кошелёк | наших сделок | попаданий | доля | плата, медиана | "
+               "первых покупок | nonce | бандл | счета чаевых |",
+               "|---|---|---|---|---|---|---|---|---|"]
+    ряд = (кош.get("regular") or самые_частые(кош))
+    for р in ряд[:25]:
+        строки.append(f"| `{р['wallet']}` | {р['trades']} | {р['hits']} | "
+                      f"{р['share_of_our_trades']} | {р['pay_median_lamports']} | "
+                      f"{р['first_buys']} | {р['durable_nonce']} | {р['bundle_like']} | "
+                      + ", ".join(f"`{а[:8]}`" for а in (р.get('tip_accounts') or []))
+                      + " |")
+    if not (кош.get("regular") or []):
+        строки.append("")
+        строки.append("_Регулярных (>= 3 наших сделок) нет: показаны самые частые._")
+    return "\n".join(строки) + "\n"
+
+
+def самые_частые(кош: dict) -> list:
+    """Если регулярных нет, показываем самых частых -- но говорим об этом."""
+    return кош.get("top") or []
 
 # ------------------------------------------------------------ самопроверка
 
@@ -815,6 +1114,75 @@ def self_test() -> int:
         окупаемость(плата_sol=0.002, выигрыш_доля=0.0)["breakeven_size_sol"] is None,
         "")
 
+    # --- КТО САДИТСЯ В S+0 ДЕШЕВЛЕ НАС (вопрос владельца 25.09).
+    def строка_s0(*, подпись, плата, первая=None, nonce=False, бандл=False,
+                   кошелёк="W", чае=None, сторона_="покупка", упала=False):
+        return {"signature": подпись, "pay_lamports": плата, "failed": упала,
+                "first_buy_of_mint": первая, "durable_nonce": nonce,
+                "bundle_like": бандл, "trader": кошелёк, "payer": кошелёк,
+                "side": сторона_, "tips": dict(чае or {}),
+                "tip_labels": {а: ("tip Helius Sender / Jito (список репозитория)"
+                                    if а == TIP else None) for а in (чае or {})}}
+
+    сделки_с = [
+        {"known": True, "client_order_id": "t1", "mint": "M1",
+         "our_pay_lamports": 1_000_000, "source_signature": "S1", "s0_rows": [
+             строка_s0(подпись="a1", плата=1_000, первая=True, кошелёк="БЫСТРЫЙ",
+                        чае={TIP: 1_000}),
+             строка_s0(подпись="a2", плата=2_000, первая=False, кошелёк="ТОЛПА1"),
+             строка_s0(подпись="a3", плата=5_000_000, первая=True, кошелёк="ДОРОГОЙ"),
+             строка_s0(подпись="a4", плата=100, упала=True, кошелёк="УПАЛА"),
+         ]},
+        {"known": True, "client_order_id": "t2", "mint": "M2",
+         "our_pay_lamports": 1_000_000, "source_signature": "S2", "s0_rows": [
+             строка_s0(подпись="b1", плата=1_500, первая=True, кошелёк="БЫСТРЫЙ",
+                        nonce=True, бандл=True, чае={TIP: 2_000}),
+             строка_s0(подпись="b2", плата=900, первая=None, кошелёк="НЕЯСНО",
+                        сторона_=None),
+         ]},
+        {"known": True, "client_order_id": "t3", "mint": "M3",
+         "our_pay_lamports": 1_000_000, "source_signature": "S3", "s0_rows": [
+             строка_s0(подпись="c1", плата=1_200, первая=True, кошелёк="БЫСТРЫЙ",
+                        чае={TIP: 1_500}),
+         ]},
+        {"known": False, "client_order_id": "t4", "why_not": "нет места"},
+    ]
+    сс = свод_соседей(сделки_с)
+    chk("в разбор идут только те, кто ДЕШЕВЛЕ нас, и только севшие",
+        сс["n_rows"] == 5 and сс["n_trades"] == 3, сс)
+    chk("реакция и толпа разделены по остатку минта ДО сделки",
+        сс["who"]["reaction_first_buy"] == 3
+        and сс["who"]["crowd_held_before"] == 1
+        and сс["who"]["unknown"] == 1
+        and сс["who"]["share_reaction"] == 0.6, сс["who"])
+    chk("получатели чаевых сведены по частоте и с меткой там, где она известна",
+        сс["delivery"]["tip_accounts"][0]["tip_account"] == TIP
+        and сс["delivery"]["tip_accounts"][0]["n"] == 3
+        and "Helius" in (сс["delivery"]["tip_accounts"][0]["label"] or ""),
+        сс["delivery"]["tip_accounts"])
+    chk("без чаевых считается отдельно, а не приписывается кому-то",
+        сс["delivery"]["no_tip"] == 2, сс["delivery"])
+    chk("долговременный nonce и признак бандла считаются",
+        сс["delivery"]["durable_nonce"] == 1
+        and сс["delivery"]["bundle_like"] == 1, сс["delivery"])
+    chk("регулярный кошелёк найден по числу НАШИХ сделок, а не попаданий",
+        [р["wallet"] for р in сс["wallets"]["regular"]] == ["БЫСТРЫЙ"]
+        and сс["wallets"]["regular"][0]["trades"] == 3
+        and сс["wallets"]["regular"][0]["share_of_our_trades"] == 1.0,
+        сс["wallets"]["regular"])
+    chk("у регулярного кошелька видна его плата и способ доставки",
+        сс["wallets"]["regular"][0]["pay_median_lamports"] == 1_200
+        and сс["wallets"]["regular"][0]["durable_nonce"] == 1
+        and сс["wallets"]["regular"][0]["tip_accounts"] == [TIP],
+        сс["wallets"]["regular"][0])
+    chk("таблица соседей печатается и называет обе части ответа",
+        all(к in таблица_соседей(сс) for к in
+            ("реакция", "толпа", "счёт чаевых", "долговременный nonce",
+             "регулярно")), таблица_соседей(сс)[:200])
+    chk("пустой свод говорит словами, а не пустой таблицей",
+        "нет данных" in таблица_соседей({}) or "никого" in таблица_соседей(
+            свод_соседей([])), таблица_соседей(свод_соседей([])))
+
     # --- ЦЕНА ПРОГОНА В КРЕДИТАХ.
     chk("цена прогона названа до запуска: 3 кредита на покупку",
         стоимость_прогона(10)["total_credits"] == 30
@@ -928,8 +1296,10 @@ def main() -> int:
                  f"перед нами дешевле {и.get('ahead_cheaper')}, дороже "
                  f"{и.get('ahead_dearer')}, плата {и.get('our_pay_sol')} SOL"))
     с = сводка(итоги)
+    соседи = свод_соседей(итоги)
     итог = {"generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "trades": итоги, "summary": с, "verdict_z1": вердикт(с),
+            "s0_riders": соседи,
             "credits_used": getattr(rpc, "used", None),
             "cost_plan": цена}
     if a.gain_fraction > 0 and с.get("s0_pay_median_of_medians"):
@@ -1003,7 +1373,8 @@ def в_таблицу(итог: dict) -> str:
                           f"{р['extra_pay_sol']} | {р['net_sol']} | "
                           f"{'да' if р['pays_off'] else 'нет'} |")
         строки += ["", f"Окупается начиная с {п.get('breakeven_size_sol')} SOL на сделку."]
-    return "\n".join(строки) + "\n"
+    хвост = таблица_соседей(итог.get("s0_riders") or {})
+    return "\n".join(строки) + "\n" + хвост
 
 
 if __name__ == "__main__":
