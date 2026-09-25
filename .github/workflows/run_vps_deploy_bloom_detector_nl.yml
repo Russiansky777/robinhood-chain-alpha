@@ -212,7 +212,7 @@ jobs:
           # Без них полоса не подписывает, а без самого модуля детектор
           # честно пишет ModuleNotFoundError в признак жизни -- ровно это и
           # случилось в прогоне 36080386872.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py; do
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -229,7 +229,12 @@ jobs:
           # каталога кода, то есть на хосте /home/bot, а данные -- в
           # /home/bot/data. Без них тень собирается, но падает на метках
           # пулов на КАЖДОМ сигнале, и это выглядит как "тень не работает".
-          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples"
+          # data/senders.json -- реестр отправителей пула (адреса чаевых и
+          # минимумы ИЗ ИХ ДОКУМЕНТАЦИИ). Модуль ищет его как
+          # <родитель каталога кода>/data/senders.json, то есть на хосте
+          # /home/bot/data/senders.json. Без файла подключённых отправителей
+          # нет вовсе, и веер контролей пуст.
+          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples data/senders.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -249,6 +254,7 @@ jobs:
             ls -l /home/bot/data/c2_leg_pools_2026-09-24.json
             ls /home/bot/data/c2_pool_samples | wc -l
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
+            ls -l /home/bot/data/senders.json
           "
 
       - name: "Снимок задач как откат, если DBot недоступен"
@@ -258,6 +264,44 @@ jobs:
           [ -s "$SNAP" ] || { echo "СБОЙ: нет снимка $SNAP"; exit 1; }
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/konfig_snapshot.json && chown bot:bot $CODE_DIR/konfig_snapshot.json && chmod 644 $CODE_DIR/konfig_snapshot.json" < "$SNAP"
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -c < $CODE_DIR/konfig_snapshot.json"
+
+      - name: "env: ключи отправителей пула (значения только через stdin)"
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROSLOT_API_KEY: ${{ secrets.ZEROSLOT_API_KEY }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          # ПУЛ ОТПРАВИТЕЛЕЙ (владелец 25.09). Имена секретов ровно те, что он
+          # завёл: BLOCKRAZOR_AUTH_TOKEN, ASTRALANE_API_KEY, NOZOMI_API_KEY;
+          # ZEROSLOT_API_KEY появится позже. Ключ, которого нет, в env не
+          # пишется вовсе: без ключа отправитель считается неподключённым и в
+          # пул не идёт -- это честнее, чем пустая переменная.
+          #
+          # Значение уезжает ТОЛЬКО через stdin: аргументы команды видны в ps,
+          # а имя переменной в журнале прогона -- нет вреда.
+          for secret_name in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROSLOT_API_KEY NOZOMI_API_KEY; do
+            secret_value="${!secret_name}"
+            if [ -z "$secret_value" ]; then
+              echo "$secret_name: не задан -- отправитель останется неподключённым"
+              ssh -n $SSH_OPTS root@$TARGET_HOST "sed -i '/^$secret_name=/d' $ENV_DIR/env"
+              continue
+            fi
+            printf '%s=%s\n' "$secret_name" "$secret_value" | ssh $SSH_OPTS root@$TARGET_HOST "
+              cat > /tmp/sender_line
+              sed -i '/^$secret_name=/d' $ENV_DIR/env
+              cat /tmp/sender_line >> $ENV_DIR/env
+              shred -u /tmp/sender_line
+              chmod 600 $ENV_DIR/env"
+            echo "$secret_name: записан в окружение службы"
+          done
+          # Кто в итоге подключён -- по именам, без значений.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import json, bloom_senders as S; print(json.dumps(S.состояние_пула(), ensure_ascii=False)[:600])'" || \
+            echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
       - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
         env:
