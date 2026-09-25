@@ -61,12 +61,23 @@
       "lane_sol": 0.01,
       "bloom_trades": false,
       "fanout": false,
-      "day_cap_sol": 0.2,
-      "stop_loss_sol": 0.15,
+      "day_cap_sol": 1.0,
+      "stop_loss_sol": 0.5,
       "min_target_sol": 0.5,
-      "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 0.2 SOL в сутки (покупки плюс чаевые), стоп при -0.15 SOL.",
-      "credits_rule": "сокращено до 8 адресов с наибольшим числом попаданий в S+0 по слову владельца: прогноз расхода детектора с 80 источниками был ~1.2 млн кредитов в сутки против потолка 300 000",
-      "by_signal": [],
+      "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 1 SOL в сутки (покупки плюс чаевые), стоп при -0.5 SOL. Цель -- 30+ покупок в час.",
+      "credits_rule": "30 адресов с наибольшим числом попаданий в S+0 (только подписанты, не наши) по слову владельца 25.09 вечером; расход детектора после снятия двух авторити пулов ~5 150 кредитов в час, прогноз ~124 000 в сутки против потолка 1 000 000",
+      "by_signal": [
+        {
+          "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+          "why": "снят по сигналу, не за налог",
+          "s0_hits": 10
+        },
+        {
+          "address": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
+          "why": "снят по сигналу, не за налог",
+          "s0_hits": 9
+        }
+      ],
       "snipers": [
         {
           "address": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
@@ -107,23 +118,128 @@
           "address": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
           "s0_hits": 20,
           "why": "из сохранённых данных З1: попаданий в S+0"
-        }
-      ],
-      "dropped_by_credits": [
+        },
         {
           "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
           "s0_hits": 20,
           "why": "из сохранённых данных З1: попаданий в S+0"
         },
         {
-          "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 10
+          "address": "HAJZFnZ9M89qxAsEeifSpaa1UcgN9cW9cs3bSSHCG56q",
+          "s0_hits": 20,
+          "why": "из сохранённых данных З1: попаданий в S+0"
         },
         {
-          "address": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 9
+          "address": "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB",
+          "s0_hits": 19,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "D1wfmvGq5B4mG7bKeFMHnKetUaSe2XU41jZ5oyEdkpNS",
+          "s0_hits": 19,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "GZi5tmvZePF3rqWyGJf3wtNaninFKbCWanYjAr736xU3",
+          "s0_hits": 19,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "B5RLgxWXWoQbZL2znRoU9TgznSxwLD9iQcHw3sGAFFT7",
+          "s0_hits": 18,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "FjUJgFT3YFxnVMFDm24k1C31jV6VJCfSpviz2kPWPLMH",
+          "s0_hits": 18,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "HPiAxtK5UGhaNTjNPqDn9WijfQhZ6YEqgHc5MeLZUiba",
+          "s0_hits": 16,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "HBZB1948Uj543GHimHx2pfjFP4uchRxQnR3nGF1ZPhRs",
+          "s0_hits": 15,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
+          "s0_hits": 14,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "4bkq7rLkyVYCdGozmnYKq931qPXXsUrV6LdXnFqZuLQ9",
+          "s0_hits": 13,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "6Ka3hMVvY3LXtKqvFoT3rrxiFw9ponrZLcBBdTUGwtdB",
+          "s0_hits": 13,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "BtUgRpMLXPNPiBUZXnsfxZ8MdVPqWe5YRXeLj6mhQtd2",
+          "s0_hits": 13,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "J2QQwDNYHZtW5HvYS2UPRAo4JjAU2HfLmHNocfHLE7Ru",
+          "s0_hits": 13,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "7txcAXw9t7jRiW93tt6mbJ7cDA5EUSiVSRRfPyzH1DMa",
+          "s0_hits": 12,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+          "s0_hits": 12,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "5shjncQujYtwC6exTGNFqAV3jNkSmsWcw7xtV9YJzsXw",
+          "s0_hits": 11,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "7BsVR8tuCzQzwctHbaDurMzXn8CitCSfm9yCQiuHEuFm",
+          "s0_hits": 11,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+          "s0_hits": 11,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "CkUZV387xnoGpF7wC2moMa6mPmAgCvTT4pWgzq4M9fCD",
+          "s0_hits": 10,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        }
+      ],
+      "dropped_by_credits": [
+        {
+          "address": "HEWMZfYQhaoVqfiWjwMafQ9QZNjSXNMmSzHhYyFDBE4T",
+          "s0_hits": 9,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "23pV3a97bH3pKczjipwKiekzXg2Qt4vtebbYmUtBQ2vm",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "2UVpJNXzpRhbuiRy1URAufVi7d3T9oULzXMB781EzvRG",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
         },
         {
           "address": "7PFdKg9HgcjXh9fodFp6BCSGxqXcDSHAizotW6umE7aN",
@@ -131,9 +247,89 @@
           "s0_hits": 8
         },
         {
+          "address": "8bFgY633V5ajtEsQSUrbNBvzzdyq7hU8QLG2mDS5h7Nn",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "DkjAAsupnGvcW8d7X3W1dkJd3z6jZbWfDcJSdZLsCMAS",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "EmgYnyQh4pVD7hN1x6rLzVwxYqZBFktUTqoQF3Wbmqib",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "GJ9DCuNZHpeevsZbaJYUCioz2SJbssoWCzSaLu3mgg8C",
+          "s0_hits": 8,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "6GXvS2Rg7WzKMdxEKb6q4wJUjmdpTbyHmjTf2Z5xftAj",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "92MDrZqegrdMmpsrBBREeEWa6Es7ZF3nhdCCtsJeSA4b",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "9AjgLrVdiMe9tjhXKJun7MZiP4fYY2EB7sXYTS5jqnwg",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
           "address": "ABNaeejNKoKa6Vd5SYyP8wgX8kkMYKtc7HGNWdFVi1PP",
           "why": "снят по сигналу, не за налог",
           "s0_hits": 7
+        },
+        {
+          "address": "AUt8xSEq4FcFLL9ksAyu2RNoeMQLZzRsLjR8cNDXoKq5",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "D8pBNrTqzgr6FNWg5umqXcG32UkiBYr5vR71GTRMfujZ",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "DLRHqWeY4YXBVzHZCfvKbhBueNi65B9tz4W5jdMV6mZu",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "DijCeWfMjfSC6DcK8foDF2GTaahcTunk27hVGEhuKf6g",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "E5bJMgr1on8o7AQ96g419pWHXsTYyXaW6o864yge6FHZ",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "FgBLLBjtosuHQTbK2fnEfMHR82vmMeD63ga9wW5HAyrH",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "Ft5ydGUTNLK7tvCbXr6sTpQDYSHP9mUPXKgV2CXyvJhq",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "H6W8xzyeCHvy5iUn6hx3YaYqKKH3gUsspNYLLjQuKYu5",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "HZow7oewntFwaEU741jEkAGeedD9yzdKddgwgqRXxpqq",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
         },
         {
           "address": "HtuYE3nYd7y9vxqiUjZdjTscGiFKt5JCcjD41vFwuebT",
@@ -141,9 +337,74 @@
           "s0_hits": 7
         },
         {
+          "address": "XyKoe6LFwGHqb79yD3WmdZs8o9kAbxNvsi65V95D1ce",
+          "s0_hits": 7,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "2PEiPSv7CuhCYXTsVYDP6xP5L1DJN3YFQkh8xem6y6KN",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "3p1icgC7VUBak5ygYvAbAH7UTxr7dh2mY3ddRN7q7AZL",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "5yv2wLZQVQXQeMhNcYA7WFEWqNCQLGRuQhZJoMbUdiMm",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "61XtN5uz3isP9roMuRexTDAQrhhya2fD966B77VGrRY5",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "65nLueCtRkZb8SZgM4RmGDRFbYymWsDaqjxVN9Urdpr1",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
           "address": "7xPDo97sb5Ueb7zuR1k4A7PBW5hLwhPGsPzj1nA8J7PQ",
           "why": "снят по сигналу, не за налог",
           "s0_hits": 6
+        },
+        {
+          "address": "9dSdnmzURP3q2mAH9yUcuj6Qw3rFbAvTzXpRnWstdmaG",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "AL9QWtUeWTw1mvFmxtwk5mVCzjhKWyH8VBgKK7TXFGVz",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "AWWw36mNfwQQTxsEqHhqzrHa7963jCjHLrVCsUyiKPwn",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "AtEgWr4VRRRT4AYKwHLvSPxAL27DVJTinwQSwf4iHjqt",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "BqjYFq61KLHuDv8uXdUkyohZRxjbu2rPCWnWfYiuUzG1",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "Cn362o4GxMmnv7sZ3tARftDCLfxfUzz62e3K31vscuH5",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
+        },
+        {
+          "address": "CniQFXs6XUsaJm6KJYo7oKVhxqzv5ikpRwTibaTbJ3GU",
+          "s0_hits": 6,
+          "why": "из сохранённых данных З1: попаданий в S+0"
         },
         {
           "address": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
