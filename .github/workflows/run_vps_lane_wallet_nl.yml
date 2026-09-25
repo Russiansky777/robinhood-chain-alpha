@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "status -- показать адрес и баланс; create -- создать ключ, если его ещё нет"
+        description: "status -- показать адрес и баланс; create -- создать ключ, если его ещё нет; compact -- переписать ключ без пробелов (значение не меняется)"
         required: true
         default: "status"
 
@@ -78,7 +78,11 @@ jobs:
               # ФОРМАТ -- JSON-массив байт: ровно его понимает единственный
               # разборщик ключей репозитория (dbot_rescue.load_rescue_keypair),
               # и он не требует base58 в окружении хоста.
-              секрет = json.dumps(list(bytes(kp)))
+              # БЕЗ ПРОБЕЛОВ. Этот файл читают и как EnvironmentFile systemd, и
+              # оболочкой через `. env`: значение с пробелами оболочка рвёт на
+              # слова, и "160," становится командой (проверено 25.09, ошибка
+              # "line 45: 160,: command not found").
+              секрет = json.dumps(list(bytes(kp)), separators=(",", ":"))
               адрес = str(kp.pubkey())
               # Дописываем ОДНОЙ операцией и не трогаем остальные строки.
               # ПЕРЕВОД СТРОКИ ПЕРЕД ДОПИСЫВАНИЕМ: если файл кончался без него,
@@ -94,6 +98,30 @@ jobs:
               print("создан новый ключ полосы")
           elif MODE == "create" and если_есть:
               print("ключ полосы уже есть -- НЕ перезаписываю (это были бы потерянные деньги)")
+          elif MODE == "compact" and ключ:
+              # ТО ЖЕ ЗНАЧЕНИЕ, другая запись: пробелы убираются, чтобы файл
+              # читался и оболочкой. Ключ при этом не меняется -- проверяем это
+              # сравнением публичного адреса ДО и ПОСЛЕ.
+              было = (Keypair.from_bytes(bytes(json.loads(ключ)))
+                      if ключ.strip().startswith("[") else
+                      Keypair.from_base58_string(ключ.strip()))
+              плотный = (json.dumps(list(bytes(было)), separators=(",", ":"))
+                          if ключ.strip().startswith("[") else ключ.strip())
+              if плотный != ключ:
+                  новые = []
+                  for с in строки:
+                      новые.append(f"OWN_SEND_WALLET_KEY={плотный}"
+                                    if с.startswith("OWN_SEND_WALLET_KEY=") else с)
+                  ENV.write_text("\n".join(новые), encoding="utf-8")
+                  ENV.chmod(0o600)
+                  ключ = плотный
+                  стало = (Keypair.from_bytes(bytes(json.loads(плотный)))
+                            if плотный.startswith("[") else
+                            Keypair.from_base58_string(плотный))
+                  print("ключ переписан без пробелов, адрес не изменился: "
+                        + str(str(стало.pubkey()) == str(было.pubkey())))
+              else:
+                  print("ключ уже без пробелов -- ничего не меняю")
 
           # СВЕРКА: ключ из окружения обязан давать тот адрес, что записан
           # рядом. Иначе служба подпишет не тот кошелёк.
