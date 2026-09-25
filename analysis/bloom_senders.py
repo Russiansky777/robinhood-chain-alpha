@@ -318,8 +318,17 @@ def self_test() -> int:
             all(н["why_not"] for н in связь["not_connected"])
             and any(н.get("key_env") == "ZEROSLOT_API_KEY"
                     for н in связь["not_connected"]), связь["not_connected"])
-        chk("Nozomi не подключается вовсе: адреса точки входа в EU нет",
-            any(н["sender"] == "nozomi" and "точка входа" in (н["why_not"] or "")
+        # NOZOMI. Адрес точки входа появился 25.09: Амстердам ams1 из
+        # ОФИЦИАЛЬНОГО endpoints.json пакета nozomi-sdk (файл сохранён в
+        # data/docs/senders/nozomi_endpoints.json). Без секрета он всё равно
+        # не подключён -- и причина названа именно секретом, а не адресом.
+        nz = (реестр().get("nozomi") or {})
+        chk("у Nozomi точка входа -- Амстердам из его же endpoints.json",
+            nz.get("url") == "https://ams1.nozomi.temporal.xyz/", nz.get("url"))
+        chk("ключ Nozomi идёт параметром ?c= -- как в его документации",
+            nz.get("key_in") == "query:c", nz.get("key_in"))
+        chk("без секрета Nozomi не подключён, и причина -- секрет",
+            any(н["sender"] == "nozomi" and "NOZOMI_API_KEY" in (н["why_not"] or "")
                 for н in связь["not_connected"]), связь["not_connected"])
 
         # --- ОТПРАВКА. Проверяем то, что стоит денег: адрес, тело, ключ,

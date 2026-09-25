@@ -81,12 +81,14 @@
     },
     "nozomi": {
       "name": "Nozomi (Temporal)",
-      "url": null,
-      "url_note": "точка входа в EU в скачанных страницах не нашлась -- страница регионов дочитывается отдельным прогоном; без адреса отправитель не подключается",
+      "url": "https://ams1.nozomi.temporal.xyz/",
+      "url_note": "Амстердам (region amsterdam, type direct) из ОФИЦИАЛЬНОГО endpoints.json пакета nozomi-sdk -- файл сохранён в data/docs/senders/nozomi_endpoints.json, скачан с raw.githubusercontent.com/temporalxyz/nozomi-sdk/main/endpoints.json, version 1, updated 2026-01-07. Франкфурт fra2., Лондон lon1. -- оттуда же. Путь запроса из документации: POST /?c=<YOUR_API_KEY>, Content-Type application/json, кодировка base64 задаётся явно",
       "format": "jsonrpc_sendTransaction",
       "key_env": "NOZOMI_API_KEY",
       "key_in": "query:c",
+      "key_in_note": "параметр ?c=<ключ> -- так в документации (страница transaction-submission-json-rpc: 'Path /?c=<YOUR_API_KEY>') и так сказал владелец 25.09",
       "min_tip_lamports": 1000000,
+      "min_tip_note": "0.001 SOL -- документация Nozomi: 'The default minimum tip is 0.001 SOL. Transactions that tip below the minimum are silently dropped: you will not receive an error'. Поэтому меньше минимума не платим никогда: это не экономия, а молча потерянная транзакция",
       "tip_accounts": [
         "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
         "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",

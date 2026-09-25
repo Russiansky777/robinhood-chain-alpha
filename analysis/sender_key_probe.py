@@ -58,6 +58,8 @@ except ImportError:  # модуль зовут и из корня репозит
     "header:x-api-key",
     "query:apikey",
     "query:api-key",
+    # Nozomi: "Path /?c=<YOUR_API_KEY>" -- его документация и слово владельца.
+    "query:c",
     "БЕЗ КЛЮЧА",
 )
 
@@ -440,15 +442,35 @@ def self_test() -> int:
         chk("если пускают без ключа -- так и сказано",
             итог3["key_needed"] is False, итог3["key_needed"])
 
-        # 10. Nozomi без адреса: проба не идёт и причина -- из реестра.
-        итог4 = пробы_сервиса("nozomi", пауза=0,
-                               окружение={"NOZOMI_API_KEY": КЛЮЧ},
-                               отправитель=lambda а, д, з, т: (200, "{}"))
+        # 10. Отправитель БЕЗ адреса точки входа: проба не идёт вовсе и
+        # причина берётся из реестра, а не придумывается. Реестр для этой
+        # проверки свой: у настоящих отправителей адреса есть (у Nozomi он
+        # появился 25.09 -- Амстердам из его endpoints.json).
+        import json as _jт  # noqa: PLC0415
+        import tempfile as _tт  # noqa: PLC0415
+
+        with _tт.TemporaryDirectory() as _вр:
+            _путь = f"{_вр}/senders_test.json"
+            with open(_путь, "w", encoding="utf-8") as _ф:
+                _jт.dump({"senders": {"безадреса": {
+                    "name": "Без адреса", "url": None,
+                    "url_note": "точка входа неизвестна -- не подключаем",
+                    "format": "jsonrpc_sendTransaction",
+                    "key_env": "TEST_KEY", "key_in": "query:c",
+                    "min_tip_lamports": 1000, "tip_accounts": []}}}, _ф)
+            итог4 = пробы_сервиса("безадреса", пауза=0, путь=_путь,
+                                   окружение={"TEST_KEY": КЛЮЧ},
+                                   отправитель=lambda а, д, з, т: (200, "{}"))
         chk("без адреса точки входа проба не идёт", итог4["rows"] == [],
             итог4["rows"])
         chk("и причина -- та самая, что в реестре",
-            "точка входа" in (итог4["why_not"] or "")
-            or "адрес" in (итог4["why_not"] or ""), итог4["why_not"])
+            "точка входа" in (итог4["why_not"] or ""), итог4["why_not"])
+        SND.реестр(заново=True)  # вернуть боевой реестр после подменного
+        chk("у Nozomi в боевом реестре есть Амстердам и параметр ?c=",
+            (SND.реестр().get("nozomi") or {}).get("url")
+            == "https://ams1.nozomi.temporal.xyz/"
+            and (SND.реестр().get("nozomi") or {}).get("key_in") == "query:c",
+            (SND.реестр().get("nozomi") or {}).get("url"))
         chk("платный план в своде докладывается словами сервера",
             "НУЖЕН ПЛАТНЫЙ ПЛАН" in свод([пробы_сервиса(
                 "blockrazor", пауза=0,
