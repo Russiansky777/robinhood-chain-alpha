@@ -334,12 +334,15 @@ LEADER_EXIT_RECIPE = {
     "why_not_in_cache": "кэш толпы строился под первый вход (classify_tx, >=2 SOL-экв); "
                          "продажи в его методику не входили вовсе.",
     "steps": [
-        "1) getSignaturesForAddress(лидер, {before, limit<=1000}) постранично назад, "
-        "пока не дойдём до подписи самой ранней нужной покупки (until=её подпись) -- "
-        "это ЕДИНСТВЕННЫЙ способ получить полный список подписей кошелька между покупкой и 'сейчас', "
-        "т.к. API отдаёт только 'before', не 'after'.",
-        "2) getTransaction(jsonParsed) на КАЖДУЮ подпись из этого списка -- заранее неизвестно, "
-        "какая из них продажа нужного минта, decode нужен на все.",
+        "1) getTransaction(покупка) -- из её pre/postTokenBalances и accountKeys берётся АДРЕС "
+        "токен-счёта лидера по этому минту (из покупки, а не через getTokenAccountsByOwner: "
+        "после полной продажи счёт закрывают, и по владельцу его уже не найти).",
+        "2) getSignaturesForAddress(токен-счёт, {until: подпись покупки, limit<=1000}) -- "
+        "только то, что позже покупки и только по этому минту. Так отпадает просмотр всех "
+        "подписей кошелька: прогон 25.09 по кошельку съел 20 000 кредитов и дал негодную "
+        "стыковку (удержание 3-8 суток в семидневном окне).",
+        "2а) getTransaction(jsonParsed) на кандидатов ЭТОГО счёта от старых к новым -- "
+        "до первой продажи; обычно это единицы вызовов на сделку.",
         "3) На каждой tx: c2_common.owner_mint_delta(tx, mint)[лидер] < 0 -- это и есть продажа; "
         "c2_common.quote_spend(tx, лидер) (со знаком наоборот -- см. quote_received ниже) даёт SOL/WSOL/USD "
         "назад, c2_common.identify_pool(tx, лидер, mint, side='sell') -- пул и цену исполнения.",
@@ -367,23 +370,31 @@ def estimate_exit_credit_cost(meta: dict, trades: list, days: int = 14) -> dict:
     """Оценка кредитов по РЕАЛЬНЫМ числам уже готового кэша толпы, а не
     с потолка. Формула -- 1 кредит на обычный вызов/getTransaction
     (см. CREDIT_DEFAULT, тариф в analysis/solana_rpc_client.py)."""
+    # ОЦЕНКА ПО НОВОМУ АЛГОРИТМУ (стыковка по токен-счёту минта): на сделку
+    # одна getTransaction покупки, одна getSignaturesForAddress счёта и
+    # getTransaction на кандидатов этого счёта. Прежняя оценка считала обход
+    # ВСЕХ подписей кошелька -- она и объясняет, почему прогон 25.09 упёрся в
+    # 20 000 кредитов, восстановив шесть сделок.
+    n_trades = len(trades)
+    КАНДИДАТОВ_НА_СДЕЛКУ = 4   # покупка, продажа и пара переводов -- с запасом
+    tier1 = {
+        "n_trades": n_trades,
+        "per_trade_calls": 1 + 1 + КАНДИДАТОВ_НА_СДЕЛКУ,
+        "total_credits": n_trades * (2 + КАНДИДАТОВ_НА_СДЕЛКУ) * CREDIT_DEFAULT,
+        "number_source": "число сделок из --crowd кэша; на сделку: getTransaction покупки + "
+                          "getSignaturesForAddress токен-счёта + до %d getTransaction кандидатов"
+                          % КАНДИДАТОВ_НА_СДЕЛКУ,
+        "days_note": "окно %d дн. цену не меняет: считается по сделкам кэша, а не по "
+                      "подписям кошелька" % days,
+    }
     n_sig_window_7d = meta.get("n_signatures_window")
     window_days = meta.get("window_days") or 7
     scale = days / window_days if window_days else 1.0
-    tier1 = None
     if isinstance(n_sig_window_7d, (int, float)) and n_sig_window_7d > 0:
-        n_sig = n_sig_window_7d * scale
-        pages = max(1, -(-int(n_sig) // 1000))  # ceil
-        tier1 = {
-            "n_signatures_estimate": round(n_sig),
-            "getSignaturesForAddress_credits": pages * CREDIT_DEFAULT,
-            "getTransaction_credits": round(n_sig) * CREDIT_DEFAULT,
-            "total_credits": pages * CREDIT_DEFAULT + round(n_sig) * CREDIT_DEFAULT,
-            "number_source": "leader_row.n_signatures_window из --crowd кэша, "
-                              "масштабировано на %d дн." % days,
-        }
-    else:
-        tier1 = {"why_not": "в кэше нет n_signatures_window -- оценка невозможна без него"}
+        # Для сравнения: во что обошёлся бы прежний обход всего кошелька.
+        n_sig = round(n_sig_window_7d * scale)
+        tier1["old_wallet_scan_credits"] = (
+            max(1, -(-n_sig // 1000)) * CREDIT_DEFAULT + n_sig * CREDIT_DEFAULT)
     crowd_30s = [t.get("window_tx_30s") for t in trades if t.get("window_tx_30s") is not None]
     tier2_note = None
     if crowd_30s:
@@ -402,72 +413,125 @@ def estimate_exit_credit_cost(meta: dict, trades: list, days: int = 14) -> dict:
                           "понадобится толпа на выходе, а не сам итог сделки."}
 
 
+def хранилище_владельца(tx: dict, owner: str, mint: str) -> str | None:
+    """Адрес токен-счёта владельца по этому минту -- из счетов САМОЙ покупки.
+
+    Почему из покупки, а не через getTokenAccountsByOwner: после полной
+    продажи счёт закрывают, и по владельцу его уже не найти -- а в покупке
+    он точно есть. Индекс счёта берётся из pre/postTokenBalances, адрес --
+    из accountKeys по этому индексу.
+    """
+    ключи = C2.account_keys(tx or {})
+    мета = (tx or {}).get("meta") or {}
+    for поле in ("postTokenBalances", "preTokenBalances"):
+        for б in (мета.get(поле) or []):
+            if б.get("owner") == owner and б.get("mint") == mint:
+                i = б.get("accountIndex")
+                if isinstance(i, int) and 0 <= i < len(ключи):
+                    return ключи[i]
+    return None
+
+
 def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
-                          page_limit: int = 1000, max_pages: int = 60,
+                          sig_limit: int = 1000,
                           max_tx: int | None = None) -> dict:
     """Реальная реализация LEADER_EXIT_RECIPE. Без rpc_call -- честный
     отказ, а не пустой список (пустой список неотличим от "выходов не
     было", а это не так).
 
-    Два независимых предела на дороже часть (getTransaction на КАЖДУЮ
-    подпись окна): свой `max_tx` (--exit-max-tx, "досюда и хватит") и
-    CreditLimitExceeded от переданного rpc_call (BudgetedRpc). Оба -- НЕ
-    исключение наружу, а честный частичный результат: обработанные сделки
-    остаются с найденным выходом, необработанные -- с точной причиной
-    (частичный ответ лучше отсутствующего, как просил владелец)."""
+    СТЫКОВКА ИДЁТ ПО ТОКЕН-СЧЁТУ МИНТА, а не по всем подписям кошелька.
+    Прежняя версия брала подписи лидера целиком и просматривала каждую
+    getTransaction подряд, пока не встретит продажу нужного минта: на
+    прогоне 25.09 это съело 20 000 кредитов, восстановило 6 "закрытых
+    сделок" и выдало удержание 685 тыс. -- 1.69 млн слотов, то есть 3-8
+    суток в семидневном окне. Такие числа означали не долгое держание, а
+    неверную стыковку: до настоящей продажи проход просто не доходил.
+
+    Теперь на сделку: одна getTransaction (покупка -- из неё берётся адрес
+    токен-счёта), одна getSignaturesForAddress ЭТОГО счёта с until=подпись
+    покупки (то есть только то, что позже покупки и только по этому минту),
+    и getTransaction на несколько кандидатов до первой продажи. Порядок --
+    от старых к новым, поэтому найденная продажа и есть ПЕРВАЯ.
+
+    Два независимых предела на дорогую часть: свой `max_tx`
+    (--exit-max-tx, "досюда и хватит") и CreditLimitExceeded от переданного
+    rpc_call (BudgetedRpc). Оба -- НЕ исключение наружу, а честный
+    частичный результат: обработанные сделки остаются с найденным выходом,
+    необработанные -- с точной причиной.
+    """
     if rpc_call is None:
         return {"ok": False, "why_not": "нет rpc_call -- см. LEADER_EXIT_RECIPE и estimate_exit_credit_cost",
                 "trades": []}
     if not trades:
         return {"ok": False, "why_not": "пустой список сделок лидера -- нечего закрывать", "trades": []}
-    earliest_sig = min(trades, key=lambda t: t.get("block_time") or 0).get("signature")
-    sigs: list = []
-    before = None
-    stopped_reason: str | None = None
-    for _ in range(max_pages):
-        params = [leader, {"limit": page_limit, "commitment": "finalized"}]
-        if before:
-            params[1]["before"] = before
-        try:
-            page = rpc_call("getSignaturesForAddress", params) or []
-        except CreditLimitExceeded as exc:
-            stopped_reason = str(exc)
-            break
-        if not page:
-            break
-        sigs.extend(page)
-        before = page[-1].get("signature")
-        if any(p.get("signature") == earliest_sig for p in page):
-            break
-    sigs.sort(key=lambda s: s.get("slot") or 0)  # старые -> новые, для прохода вперёд от покупки
-    index_of = {s["signature"]: i for i, s in enumerate(sigs) if s.get("signature")}
-    results = []
+    ПАРАМ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
+                 "commitment": "finalized"}
+    results: list = []
     tx_calls_used = 0
+    sig_calls_used = 0
+    sigs_seen = 0
+    stopped_reason: str | None = None
+
+    def взять_tx(подпись: str):
+        """getTransaction с обоими пределами. Возвращает (tx, причина_стопа)."""
+        nonlocal tx_calls_used
+        if max_tx is not None and tx_calls_used >= max_tx:
+            return None, f"достигнут предел --exit-max-tx={max_tx} (getTransaction-вызовов)"
+        try:
+            tx = rpc_call("getTransaction", [подпись, dict(ПАРАМ_TX)])
+        except CreditLimitExceeded as exc:
+            return None, str(exc)
+        tx_calls_used += 1
+        return tx, None
+
     for t in trades:
         sig, mint = t.get("signature"), t.get("mint")
         if stopped_reason:
             results.append({"signature": sig, "mint": mint, "ok": False,
                              "why_not": f"не дошли -- {stopped_reason}"})
             continue
-        start = index_of.get(sig)
-        if start is None:
+        if not sig or not mint:
             results.append({"signature": sig, "mint": mint, "ok": False,
-                             "why_not": "подпись входа не попала в собранное окно подписей кошелька"})
+                             "why_not": "в записи кэша нет подписи или минта"})
             continue
+        покупка, стоп = взять_tx(sig)
+        if стоп:
+            stopped_reason = стоп
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": f"остановлено на этой сделке -- {стоп}"})
+            continue
+        if not покупка:
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": "узел не отдал транзакцию покупки"})
+            continue
+        хран = хранилище_владельца(покупка, leader, mint)
+        if not хран:
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": "в покупке нет токен-счёта лидера по этому минту"})
+            continue
+        try:
+            страница = rpc_call("getSignaturesForAddress",
+                                 [хран, {"limit": sig_limit, "until": sig,
+                                          "commitment": "finalized"}]) or []
+            sig_calls_used += 1
+        except CreditLimitExceeded as exc:
+            stopped_reason = str(exc)
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": f"остановлено на этой сделке -- {stopped_reason}"})
+            continue
+        sigs_seen += len(страница)
+        # От старых к новым: первая найденная продажа и есть первая продажа.
+        кандидаты = sorted(страница, key=lambda x: x.get("slot") or 0)
         found = None
-        for j in range(start + 1, len(sigs)):
-            s = sigs[j]
+        for s in кандидаты:
             if s.get("err") is not None:
                 continue
-            if max_tx is not None and tx_calls_used >= max_tx:
-                stopped_reason = f"достигнут предел --exit-max-tx={max_tx} (getTransaction-вызовов)"
-                break
-            try:
-                tx = rpc_call("getTransaction", [s["signature"], {"encoding": "jsonParsed",
-                              "maxSupportedTransactionVersion": 1, "commitment": "finalized"}])
-                tx_calls_used += 1
-            except CreditLimitExceeded as exc:
-                stopped_reason = str(exc)
+            подпись_к = s.get("signature")
+            if not подпись_к or подпись_к == sig:
+                continue
+            tx, стоп = взять_tx(подпись_к)
+            if стоп:
+                stopped_reason = стоп
                 break
             if not tx:
                 continue
@@ -475,10 +539,11 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
             if delta is not None and delta < 0:
                 recv = quote_received(tx, leader)
                 pool = C2.identify_pool(tx, leader, mint, side="sell")
-                found = {"exit_signature": s["signature"], "exit_slot": s.get("slot"),
-                         "sol_received": r6(recv["sol"] + recv["wsol"]),
-                         "pool_ok": pool.get("ok"), "pool_why_not": pool.get("why_not"),
-                         "price": str(pool.get("price")) if pool.get("price") is not None else None}
+                found = {"exit_signature": подпись_к, "exit_slot": s.get("slot"),
+                          "sol_received": r6(recv["sol"] + recv["wsol"]),
+                          "pool_ok": pool.get("ok"), "pool_why_not": pool.get("why_not"),
+                          "price": str(pool.get("price")) if pool.get("price") is not None else None,
+                          "vault": хран, "candidates_seen": len(кандидаты)}
                 break
         if found:
             in_sol = t.get("spend_sol_equiv")
@@ -493,9 +558,14 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
                              "why_not": f"остановлено на этой сделке -- {stopped_reason}"})
         else:
             results.append({"signature": sig, "mint": mint, "ok": False,
-                             "why_not": "выход не найден в собранном окне подписей (ещё держит или окно короче)"})
-    return {"ok": True, "n_signatures_fetched": len(sigs), "n_getTransaction_calls": tx_calls_used,
-            "partial": stopped_reason is not None, "stopped_reason": stopped_reason, "trades": results}
+                             "vault": хран, "candidates_seen": len(кандидаты),
+                             "why_not": ("продажи этого минта после покупки нет "
+                                          "(ещё держит, либо вышел не продажей)")})
+    return {"ok": True, "n_signatures_fetched": sigs_seen,
+            "n_getSignatures_calls": sig_calls_used,
+            "n_getTransaction_calls": tx_calls_used,
+            "partial": stopped_reason is not None, "stopped_reason": stopped_reason,
+            "trades": results}
 
 
 def exit_group_summary(exit_trades: list, tax_index: dict) -> dict:
@@ -1273,23 +1343,52 @@ def self_test() -> int:
     buy_sig, sell_sig = "BUYSIG" + "1" * 82, "SELLSIG" + "2" * 81
     leader_w = "LEADERWALLETXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     entry = [{"signature": buy_sig, "mint": "MNT111", "slot": 10, "spend_sol_equiv": 2.0, "block_time": 1}]
-    sig_pages = {None: [{"signature": sell_sig, "slot": 11, "err": None},
-                        {"signature": buy_sig, "slot": 10, "err": None}]}
-    sell_tx2 = mk(["POOLV", "POOLOWN", leader_w],
-                  [tb(0, "POOLOWN", "MNT111", 0), tb(2, leader_w, "MNT111", 500_000)],
-                  [tb(0, "POOLOWN", "MNT111", 500_000), tb(2, leader_w, "MNT111", 0)],
-                  pre_l=[0, 0, 3_000_000_000], post_l=[0, 0, 3_400_000_000], sg=(leader_w,))
+    # СТЫКОВКА ПО ТОКЕН-СЧЁТУ: подписи спрашиваются у счёта минта, а не у
+    # кошелька, и с until=подпись покупки. Заглушка это и проверяет: если
+    # код вернётся к обходу кошелька, обращение придёт не на тот адрес.
+    ВАУЛТ = "LEADERVAULTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    buy_tx2 = mk(["POOLV", "POOLOWN", leader_w, ВАУЛТ],
+                 [tb(0, "POOLOWN", "MNT111", 1_000_000), tb(3, leader_w, "MNT111", 0)],
+                 [tb(0, "POOLOWN", "MNT111", 500_000), tb(3, leader_w, "MNT111", 500_000)],
+                 pre_l=[0, 0, 3_400_000_000, 0], post_l=[0, 0, 3_000_000_000, 0],
+                 sg=(leader_w,))
+    sell_tx2 = mk(["POOLV", "POOLOWN", leader_w, ВАУЛТ],
+                  [tb(0, "POOLOWN", "MNT111", 0), tb(3, leader_w, "MNT111", 500_000)],
+                  [tb(0, "POOLOWN", "MNT111", 500_000), tb(3, leader_w, "MNT111", 0)],
+                  pre_l=[0, 0, 3_000_000_000, 0], post_l=[0, 0, 3_400_000_000, 0],
+                  sg=(leader_w,))
+    спросили: list = []
 
     def fake_rpc(method, params):
         if method == "getSignaturesForAddress":
-            return sig_pages.get(params[1].get("before"), [])
+            спросили.append((params[0], (params[1] or {}).get("until")))
+            if params[0] != ВАУЛТ:
+                return []
+            return [{"signature": sell_sig, "slot": 11, "err": None}]
         if method == "getTransaction":
-            return sell_tx2 if params[0] == sell_sig else None
+            return {buy_sig: buy_tx2, sell_sig: sell_tx2}.get(params[0])
         raise AssertionError(f"неожиданный метод {method}")
 
     res = compute_leader_exits(fake_rpc, entry, leader=leader_w)
     chk("compute_leader_exits: синтетика находит выход и sol_received≈0.4",
         res["ok"] and res["trades"][0]["ok"] and abs(res["trades"][0]["sol_received"] - 0.4) < 1e-6, res)
+    chk("compute_leader_exits: подписи спрошены у ТОКЕН-СЧЁТА минта и только после покупки",
+        спросили == [(ВАУЛТ, buy_sig)], спросили)
+    chk("compute_leader_exits: адрес счёта и число кандидатов записаны в итог",
+        res["trades"][0].get("vault") == ВАУЛТ
+        and res["trades"][0].get("candidates_seen") == 1
+        and res["n_getTransaction_calls"] == 2, res["trades"][0])
+    chk("compute_leader_exits: удержание считается по слотам покупки и продажи",
+        res["trades"][0].get("held_slots") == 1, res["trades"][0])
+    # Продажи нет вовсе -- это НЕ "выход не найден в окне подписей", а честное
+    # "ещё держит либо вышел не продажей", и это разные утверждения.
+    держит = compute_leader_exits(
+        lambda m, p: (buy_tx2 if m == "getTransaction" and p[0] == buy_sig else
+                      ([] if m == "getSignaturesForAddress" else None)),
+        entry, leader=leader_w)
+    chk("compute_leader_exits: нет продаж по счёту -> ok=False с причиной 'ещё держит'",
+        держит["ok"] and держит["trades"][0]["ok"] is False
+        and "ещё держит" in держит["trades"][0]["why_not"], держит["trades"][0])
 
     # load_state_dir_journals: несуществующий каталог -- честный why_not, не исключение.
     st_missing = load_state_dir_journals(Path("/nonexistent/path/for/self_test_only_xyz"))
