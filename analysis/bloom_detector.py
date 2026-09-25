@@ -1563,6 +1563,9 @@ class Детектор:
         # этот рубильник проверяется В МОДУЛЕ, а не здесь: одна точка.
         self.полоса_включена = (OS is not None
                                  and ST.env_int("BLOOM_OWN_SEND", 0) == 1)
+        # Проверка модуля места в блоке: считается один раз, см.
+        # признак_места_в_блоке.
+        self._место_модуль: dict | None = None
         self.полос_путей = 0
         # ЗАПУСКОВ и ПУТЕЙ -- разные числа, и разница между ними и есть ответ
         # на вопрос "почему полоса молчит". Путь считается ПОСЛЕ возврата
@@ -1815,6 +1818,7 @@ class Детектор:
         # было, но никто на него не смотрел.
         st["chain_ok_backfilled"] = self.chain_ok_догнано
         st["block_position_backfilled"] = self.мест_в_блоке_догнано
+        st["block_position"] = self.признак_места_в_блоке()
         st["fallback_seconds"] = (round(time.time() - self.запасной_путь_с, 1)
                                    if self.запасной_путь_с else 0)
         st["fallback_window_s"] = ОКНО_ЗАПАСНОГО_S
@@ -2519,7 +2523,10 @@ class Детектор:
 
                 м = BP.место_по_подписям(self.helius, слот, подпись)
             except Exception as exc:  # noqa: BLE001
-                м = {"known": False, "why_not": f"{type(exc).__name__}"}
+                # С ИМЕНЕМ: одно слово "ModuleNotFoundError" в позиции не
+                # говорит, какого модуля не хватило, и починить по нему нечего.
+                м = {"known": False,
+                     "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
             поля = {"block_tries": попытки, "block_slot": слот,
                      "block_slot_from": откуда}
             if м.get("known"):
@@ -2538,6 +2545,24 @@ class Детектор:
                 log.warning("место в блоке: позиция не записана (%s)",
                             type(exc).__name__)
         return итог
+
+    def признак_места_в_блоке(self) -> dict:
+        """Грузится ли модуль места в блоке ВООБЩЕ -- с именем недостающего.
+
+        Ночь 25.09: в позициях стояло "block_why_not: ModuleNotFoundError"
+        без имени, и починить по такой записи было нечего. Проверка один раз
+        на процесс (результат запоминается) и попадает в признак жизни, то
+        есть видна и в отчёте деплоя, ещё до первой покупки.
+        """
+        if self._место_модуль is None:
+            try:
+                import bloom_block_position as BP  # noqa: PLC0415,F401
+                self._место_модуль = {"module_loaded": True, "why_not": ""}
+            except Exception as exc:  # noqa: BLE001
+                self._место_модуль = {
+                    "module_loaded": False,
+                    "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
+        return dict(self._место_модуль)
 
     def догрузить_таблицы_ног(self) -> None:
         """Таблицы адресов, накопленные ingest. ВНЕ горячего пути.
@@ -6141,6 +6166,12 @@ def self_test() -> int:
             and h_м.вызовов_getblock == 1, h_м.вызовов_getblock)
         chk("догнано видно в признаке жизни",
             детектор_м.признак_жизни().get("block_position_backfilled") == 1)
+        chk("модуль места в блоке назван в признаке жизни с причиной, а не одним словом",
+            isinstance(детектор_м.признак_жизни().get("block_position"), dict)
+            and "module_loaded" in детектор_м.признак_жизни()["block_position"]
+            and (детектор_м.признак_жизни()["block_position"]["module_loaded"]
+                 or ":" in детектор_м.признак_жизни()["block_position"]["why_not"]),
+            детектор_м.признак_жизни().get("block_position"))
         st_м.write_intent(client_order_id="m2", mint="МИНТ2", source_sig="S2",
                            source_slot=6000, sol_in=0.2, pool="POOL", program=None,
                            taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
