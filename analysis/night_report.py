@@ -170,17 +170,29 @@ def боевое_тень(решения: list) -> dict:
             "sim_ms_median": _мед([р.get("sim_ms") for р in тени])}
 
 
+# Метка полосы в записи журнала. ЕДИНСТВЕННЫЙ надёжный признак: поле stage в
+# записи полосы затирается стадией самой провести() ("build", "sim", "send"),
+# и отбор по stage == "own_send" давал НОЛЬ путей при двух настоящих попытках
+# в ночь 25.09 -- то есть доклад прятал ровно то, что должен был показать.
+МЕТКА_ПОЛОСЫ = "own_send"
+
+
+def полосные(решения: list) -> list:
+    """Записи полосы: по метке lane, а не по затираемому stage."""
+    return [р for р in решения
+            if р.get("lane") == МЕТКА_ПОЛОСЫ or р.get("stage") == МЕТКА_ПОЛОСЫ]
+
+
 def боевое_полоса_попытки(решения: list) -> dict:
     """Путь полосы по журналу: где она останавливалась."""
-    свои = [р for р in решения if р.get("stage") == "own_send"]
+    свои = полосные(решения)
     по_стадиям: dict = {}
     причины: dict = {}
     for р in свои:
-        с = р.get("stage_own") or р.get("stage2") or р.get("stage") or "?"
-        # В записи полосы её собственная стадия лежит в поле stage провести(),
-        # которое пишется поверх "own_send" при слиянии; читаем оба имени.
-        с = р.get("stage_of_lane") or р.get("lane_stage") or р.get("stage_own") or \
-            р.get("stage_result") or р.get("stage_final") or р.get("stage_lane") or с
+        # Стадия -- то, что положила провести(): build / sim / send / dry.
+        с = р.get("stage") or "?"
+        if с == МЕТКА_ПОЛОСЫ:
+            с = "начало (стадия не записана)"
         по_стадиям[с] = по_стадиям.get(с, 0) + 1
         if р.get("why_not"):
             причины[str(р["why_not"])[:90]] = причины.get(str(р["why_not"])[:90], 0) + 1
@@ -397,6 +409,15 @@ def в_текст(о: dict) -> str:
         f"(по {ч(л.get('pnl_counted_trades'))} сделкам). "
         f"Медиана от отправки до появления в потоке: "
         f"{ч(л.get('send_to_seen_ms_median'), ' мс')}.",
+        # ПОЧЕМУ путь не дошёл до отправки -- словами из журнала. Без этого
+        # "путей 2, отправлено 0" выглядит как поломка, хотя это может быть
+        # честный отказ (например, котировка пула не SOL).
+        ("Где путь останавливался: "
+          + (", ".join(f"{к} -- {в}" for к, в in
+                        (поп.get("by_stage") or {}).items()) or "—")
+          + ". Причины: "
+          + ("; ".join(f"{к} ({в})" for к, в in
+                       (поп.get("why_not") or {}).items()) or "—") + "."),
         "",
         f"**Пары «Bloom против нашей».** Пар {ч(п.get('count'))}, из них мы раньше "
         f"{ч(п.get('we_were_earlier'))}; медиана разницы "
@@ -510,6 +531,12 @@ def self_test() -> int:
             {"stage": "own_send", "sent": True, "sim_ms": 60.0, "send_ms": 30.0},
             {"stage": "own_send", "sent": False, "code": "SKIP_SIM_FAIL",
              "why_not": "симуляция не прошла: slippage"},
+            # ТАК ЗАПИСЬ ВЫГЛЯДИТ НА ХОСТЕ: stage затёрт стадией провести(),
+            # а полосу выдаёт только поле lane. Ровно эта запись и была
+            # невидима в ночь 25.09.
+            {"stage": "build", "lane": "own_send", "sent": False,
+             "why_not": "котировка пула не SOL -- полоса только одношаговая",
+             "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"},
             {"action": "skip", "code": "SKIP_TAXED_ROUTE", "signature": "ПРОПУСК1",
              "mint": "MINTP", "route_transfer_fee_bps": 900,
              "token_fee_bps": 300, "route_transfers_of_token": 2},
@@ -539,8 +566,13 @@ def self_test() -> int:
             о["shadow"]["by_verdict"].get("would_pass") == 1
             and о["shadow"]["not_built_reasons"], о["shadow"])
         chk("путь полосы: отправки и отказы по симуляции",
-            о["lane_attempts"]["paths"] == 2 and о["lane_attempts"]["sent"] == 1
+            о["lane_attempts"]["paths"] == 3 and о["lane_attempts"]["sent"] == 1
             and о["lane_attempts"]["skip_sim_fail"] == 1, о["lane_attempts"])
+        chk("запись полосы с затёртым stage видна по метке lane",
+            о["lane_attempts"]["by_stage"].get("build") == 1
+            and any("котировка пула не SOL" in к
+                    for к in о["lane_attempts"]["why_not"]),
+            о["lane_attempts"])
         chk("пропуск и его тень связаны по подписи",
             о["skips"]["count"] == 1 and о["skips"]["shadow_measured"] == 1
             and о["skips"]["rows"][0]["price_288_pct"] == -15.0, о["skips"])
