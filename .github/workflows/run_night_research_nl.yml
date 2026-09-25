@@ -171,7 +171,12 @@ jobs:
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
-          "$PY" analysis/night_toxic_signs.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --out data/night_toxic.json 2>&1 | tail -50
+          # Кэш толпы лежит на ветке c2-hedge-analysis: тянем его прогоном, а не
+          # держим копию в этой ветке -- иначе два файла разойдутся молча.
+          git fetch -q origin claude/c2-hedge-analysis
+          git show origin/claude/c2-hedge-analysis:data/crowd_metric_2026-09-24.json > /tmp/night_state/crowd_metric.json
+          git show origin/claude/c2-hedge-analysis:data/c2_block_position_2026-09-24.json > /tmp/night_state/followers.json
+          "$PY" analysis/night_toxic_signs.py --chain --crowd /tmp/night_state/crowd_metric.json --followers /tmp/night_state/followers.json --credit-limit "${{ inputs.credit_limit }}" --out data/night_toxic.json 2>&1 | tail -50
 
       - name: "E и G1 по цепи: выходы лидера и кошельки площадки"
         if: ${{ github.event.inputs.chain_leader == 'yes' }}
@@ -181,7 +186,12 @@ jobs:
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
-          "$PY" analysis/night_leader_stonkfun.py --chain             --credit-limit "${{ inputs.credit_limit }}"             --state-dir /tmp/night_state             --out data/night_leader.json 2>&1 | tail -50
+          # Кэш толпы лежит на ветке c2-hedge-analysis: тянем его прогоном, а не
+          # держим копию в этой ветке -- иначе два файла разойдутся молча.
+          git fetch -q origin claude/c2-hedge-analysis
+          git show origin/claude/c2-hedge-analysis:data/crowd_metric_2026-09-24.json > /tmp/night_state/crowd_metric.json
+          git show origin/claude/c2-hedge-analysis:data/c2_block_position_2026-09-24.json > /tmp/night_state/followers.json
+          "$PY" analysis/night_leader_stonkfun.py --chain --crowd /tmp/night_state/crowd_metric.json --credit-limit "${{ inputs.credit_limit }}" --state-dir /tmp/night_state --out data/night_leader.json 2>&1 | tail -50
 
       - name: "Утренний доклад: файл и JSON"
         run: |
