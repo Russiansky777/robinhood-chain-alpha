@@ -447,6 +447,11 @@ def отправить(tx_base64: str, *, состояние=None, ключ_оп
         return из_
     if isinstance(ответ, dict) and ответ.get("error"):
         из_["why_not"] = f"Sender отказал: {json.dumps(ответ['error'], ensure_ascii=False)[:200]}"
+        # ОТКАЗ ОПРЕДЕЛЁННЫЙ: узел разобрал транзакцию и отверг её -- в цепь
+        # она не попала. Только на таком отказе бронь можно закрывать. Все
+        # прочие неудачи (сеть, не-JSON, 200 без подписи) неопределённы:
+        # транзакция могла уйти, и закрывать бронь по ним нельзя.
+        из_["definite_refusal"] = True
         return из_
     # УСПЕХ -- ЭТО HTTP 200 И ПОДПИСЬ В ОТВЕТЕ. Без подписи мы не знаем, что
     # ушло, и считать такую отправку удачной значит потом искать в цепи то,
@@ -533,6 +538,186 @@ def можно_отправлять(позиции: dict, *, kill: bool = False,
         почему = (f"убыток полосы за сутки {с['pnl_sol']} SOL при пороге "
                    f"-{СТОП_УБЫТОК_SOL}")
     return {"ok": почему is None, "why_not": почему, "state": с}
+
+
+# ------------------------------------------------------------------ весь путь
+
+# СРОК ГОДНОСТИ ТЁПЛОГО BLOCKHASH. Сеть держит хеш около 150 слотов (~60 с).
+# Тёплый хеш обновляет пульс детектора; просроченным подписывать нельзя --
+# транзакция уйдёт, сеть её отбросит, и замер выйдет ложным: "не доехало"
+# вместо "доехало медленно". Держим запас вдвое.
+СРОК_BLOCKHASH_S = 30.0
+
+
+def провести(*, tx_источника: dict, источник: str, минт: str, состояние,
+              blockhash: str | None = None, blockhash_ts: float | None = None,
+              лампорты: int | None = None, проскальзывание: float = 0.35,
+              ключ_операции: str | None = None,
+              источник_подпись: str | None = None,
+              источник_слот: int | None = None,
+              отправитель=None, rpc_call=None, секрет: str | None = None,
+              сейчас: float | None = None) -> dict:
+    """Весь путь полосы на один сигнал: сборка -> (симуляция | подпись и отправка).
+
+    Одна точка входа нарочно. У полосы три шага, и каждый из них умеет
+    отказать; если их вызывать по отдельности из детектора, порядок и
+    причины отказа расползутся по вызывающим, а это деньги. Здесь же и
+    стадия отказа называется словом: по ней видно, где полоса стоит.
+
+    БЕЗ BLOOM_OWN_SEND_LIVE=1 доходит только до симуляции: ни подписи, ни
+    отправки. Пределы и рубильник проверяются дважды -- дёшево здесь (чтобы
+    не собирать зря) и обязательно внутри отправить() под замком, где
+    делается бронь.
+    """
+    сейчас = сейчас if сейчас is not None else time.time()
+    из_ = {"stage": "off", "ok": False, "sent": False, "dry": None,
+            "why_not": None, "lane": МЕТКА, "mint": минт,
+            "source_sig": источник_подпись, "cid": None, "signature": None}
+    if not включена():
+        из_["why_not"] = "полоса выключена (BLOOM_OWN_SEND не равен 1)"
+        return из_
+    лампорты = (лампорты if isinstance(лампорты, int)
+                else int(round(размер_sol() * ЛАМПОРТОВ_В_SOL)))
+    из_["lamports"] = лампорты
+    из_["size_sol"] = лампорты / ЛАМПОРТОВ_В_SOL
+
+    # ПРЕДВАРИТЕЛЬНЫЙ ГЕЙТ. Не заменяет тот, что внутри отправить(): он там
+    # под замком и с бронью. Здесь только чтобы не тратить сеть на сборку,
+    # когда полоса всё равно закрыта.
+    из_["stage"] = "gate"
+    if состояние is None:
+        из_["why_not"] = "состояние не передано -- пределы полосы проверить нечем"
+        return из_
+    убит, почему_kill = состояние.kill_active()
+    if убит:
+        из_["why_not"] = f"рубильник: {почему_kill}"
+        из_["kill"] = True
+        return из_
+    try:
+        гейт = можно_отправлять(состояние.positions(), сейчас=сейчас)
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"позиции не прочитаны ({type(exc).__name__})"
+        return из_
+    из_["lane_state"] = гейт.get("state")
+    if not гейт.get("ok"):
+        из_["why_not"] = f"предел полосы: {гейт.get('why_not')}"
+        return из_
+
+    # СБОРКА. Дёшево и безопасно: ни ключа, ни подписи, ни отправки.
+    из_["stage"] = "build"
+    сб = собрать(tx_источника=tx_источника or {}, источник=источник or "",
+                 минт=минт or "", наш_кошелёк=ST.EXECUTOR_WALLET,
+                 лампорты=лампорты, проскальзывание=проскальзывание,
+                 семя=источник_подпись or ключ_операции)
+    из_.update(pool_program=сб.get("pool_program"), min_out=сб.get("min_out"),
+               expected_out=сб.get("expected_out"), build_ms=сб.get("build_ms"),
+               size=сб.get("size"), tip_account=сб.get("tip_account"))
+    if not сб.get("ok"):
+        из_["why_not"] = сб.get("why_not")
+        return из_
+
+    # СИМУЛЯЦИЯ. В нежилом режиме это и есть конец пути: владелец смотрит
+    # три боевых сигнала подряд со сборкой и симуляцией прежде, чем полоса
+    # начнёт отправлять. Симуляция идёт по НЕПОДПИСАННОЙ транзакции:
+    # sigVerify=false, blockhash подставляет узел.
+    if not живьём():
+        из_.update(stage="dry", dry=True)
+        if rpc_call is None:
+            из_["why_not"] = "живая отправка выключена; симулировать нечем (нет узла)"
+            return из_
+        try:
+            _, _, SB, _ = _модули()
+            знач = (rpc_call("simulateTransaction",
+                            [сб["tx_base64"], SB.SIM_OPTS]) or {}).get("value") or {}
+            из_.update(SB.classify_sim(знач))
+            из_["ok"] = из_.get("sim_verdict") == "would_pass"
+            из_["why_not"] = (None if из_["ok"]
+                              else f"симуляция: {из_.get('sim_verdict')}")
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"симуляция: {type(exc).__name__}: {str(exc)[:160]}"
+        return из_
+
+    # ПОДПИСЬ. Тёплый blockhash обязан быть свежим: просроченным подписывать
+    # бессмысленно, сеть такую транзакцию отбросит.
+    из_["stage"] = "blockhash"
+    if not blockhash:
+        из_["why_not"] = "тёплого blockhash нет -- подписывать нечем"
+        return из_
+    возраст = (сейчас - float(blockhash_ts)) if blockhash_ts else None
+    из_["blockhash_age_s"] = round(возраст, 2) if возраст is not None else None
+    if возраст is not None and возраст > СРОК_BLOCKHASH_S:
+        из_["why_not"] = (f"тёплый blockhash старше {СРОК_BLOCKHASH_S} с "
+                          f"(возраст {из_['blockhash_age_s']} с) -- сеть отбросит")
+        return из_
+    из_["stage"] = "sign"
+    t_подпись = time.perf_counter()
+    пд = подписать(сб["tx_base64"], blockhash=blockhash,
+                   ожидаемый_кошелёк=ST.EXECUTOR_WALLET, секрет=секрет)
+    из_["sign_ms"] = round((time.perf_counter() - t_подпись) * 1000, 2)
+    if not пд.get("ok"):
+        из_["why_not"] = пд.get("why_not")
+        return из_
+    из_["signature"] = пд.get("signature")
+
+    # ОТПРАВКА. Пределы, рубильник и бронь -- внутри, под замком.
+    из_["stage"] = "send"
+    о = отправить(пд["tx_base64"], состояние=состояние,
+                  ключ_операции=ключ_операции, минт=минт, лампорты=лампорты,
+                  источник_подпись=источник_подпись, источник_слот=источник_слот,
+                  отправитель=отправитель, сейчас=сейчас)
+    из_.update(sent=bool(о.get("sent")), http=о.get("http"),
+               send_ms=о.get("send_ms"), cid=о.get("cid"),
+               duplicate=о.get("duplicate"))
+    if о.get("lane_state") is not None:
+        из_["lane_state"] = о.get("lane_state")
+    if о.get("ok"):
+        из_.update(stage="sent", ok=True, dry=False)
+        # Подпись из ответа Sender и наша сходятся по построению: мы её сами
+        # и считали. Если вдруг нет -- это не успех, а расхождение, и в
+        # позиции должны лежать обе.
+        из_["signature_sender"] = о.get("result")
+        try:
+            состояние.update_position(
+                о.get("cid"), state="bought", lane=МЕТКА,
+                lane_signature=о.get("result") or пд.get("signature"),
+                lane_signature_local=пд.get("signature"),
+                ts_sent=сейчас, ts_accepted=time.time(),
+                pool=None, program=сб.get("pool_program"),
+                lane_min_out=сб.get("min_out"),
+                lane_expected_out=сб.get("expected_out"),
+                lane_send_ms=о.get("send_ms"), lane_build_ms=сб.get("build_ms"),
+                lane_tip_account=сб.get("tip_account"))
+        except Exception as exc:  # noqa: BLE001
+            # Отправка уже состоялась: молчать нельзя, но и "не ok" ставить
+            # поздно -- деньги ушли. Причина идёт в отчёт отдельным полем.
+            из_["position_update_why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+        return из_
+
+    из_["why_not"] = о.get("why_not")
+    if о.get("kill"):
+        из_["kill"] = True
+    # БРОНЬ ПОСЛЕ НЕУДАЧИ. Закрываем её ТОЛЬКО на определённом отказе узла:
+    # он разобрал транзакцию и отверг её, в цепи её нет. Любая другая
+    # неудача (сеть молчит, ответ не JSON, 200 без подписи) неопределённа --
+    # транзакция могла уйти, и бронь обязана остаться открытой, иначе сторож
+    # не узнает о токене, который у нас на руках.
+    if о.get("cid"):
+        try:
+            if о.get("definite_refusal"):
+                состояние.update_position(
+                    о["cid"], state=ST.STATE_CLOSED, lane=МЕТКА,
+                    close_reason="sender_refused", chain_ok=False,
+                    why_not=str(о.get("why_not"))[:300])
+                из_["reservation"] = "closed"
+            else:
+                состояние.update_position(
+                    о["cid"], lane=МЕТКА, lane_send_ambiguous=True,
+                    lane_signature_local=пд.get("signature"),
+                    why_not=str(о.get("why_not"))[:300])
+                из_["reservation"] = "open_ambiguous"
+        except Exception as exc:  # noqa: BLE001
+            из_["position_update_why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    return из_
 
 
 # ------------------------------------------------------------------ самопроверка
@@ -1006,6 +1191,194 @@ def self_test() -> int:
         забыть_отправленные()
         for имя_пер, знач in (("BLOOM_OWN_SEND", было_вкл2),
                               ("BLOOM_OWN_SEND_LIVE", было_live2)):
+            if знач is None:
+                os.environ.pop(имя_пер, None)
+            else:
+                os.environ[имя_пер] = знач
+
+    # --- ВЕСЬ ПУТЬ: провести(). Порядок шагов и есть защита денег: сборка
+    # без ключа, симуляция вместо отправки без рубильника, подпись только на
+    # свежем хеше, отправка только через гейт с бронью. Сборка и подпись тут
+    # подменены заглушками: настоящие проверены выше, а ключа на машине
+    # самопроверки нет и быть не должно.
+    было_вкл3 = os.environ.get("BLOOM_OWN_SEND")
+    было_live3 = os.environ.get("BLOOM_OWN_SEND_LIVE")
+    было_собрать = globals()["собрать"]
+    было_подписать = globals()["подписать"]
+    try:
+        with _tmp.TemporaryDirectory() as врем3:
+            врем3 = Path(врем3)
+
+            def сост3(имя):
+                return ST.ExecState(base=врем3 / имя, kill=врем3 / имя / "НЕТ")
+
+            шаги: list = []
+            отказ_сборки = {"да": False}
+
+            def сборка_заглушка(**кв):
+                шаги.append("собрать")
+                if отказ_сборки["да"]:
+                    return {"ok": False, "why_not": "тип пула вне полосы: WHIRL",
+                            "pool_program": "WHIRL"}
+                return {"ok": True, "tx_base64": "СОБРАНО", "pool_program": "PUMP",
+                        "min_out": 12345, "expected_out": 23456, "build_ms": 1.0,
+                        "size": 700, "tip_account": TIP_ACCOUNTS[0]}
+
+            def подпись_заглушка(tx, **кв):
+                шаги.append("подписать")
+                return {"ok": True, "signature": "НАША_ПОДПИСЬ",
+                        "tx_base64": "ПОДПИСАНО"}
+
+            globals()["собрать"] = сборка_заглушка
+            globals()["подписать"] = подпись_заглушка
+            ушло3: list = []
+
+            def сендер3(url, данные, таймаут):
+                ушло3.append(данные)
+                return 200, json.dumps({"jsonrpc": "2.0", "result": "ПОДПИСЬ_СЕТИ"})
+
+            def узел_ок(метод, параметры):
+                шаги.append(метод)
+                return {"value": {"err": None, "logs": ["Program log: ok"],
+                                  "unitsConsumed": 90_000}}
+
+            def провести_на(с, **кв):
+                return провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                                минт=МИНТ_П, состояние=с, отправитель=сендер3,
+                                rpc_call=узел_ок, **кв)
+
+            # 1. Выключенная полоса не доходит даже до сборки.
+            os.environ.pop("BLOOM_OWN_SEND", None)
+            os.environ.pop("BLOOM_OWN_SEND_LIVE", None)
+            шаги.clear()
+            п_выкл = провести_на(сост3("off"), ключ_операции="П1")
+            chk("выключенная полоса: стадия off, ни сборки, ни сети",
+                п_выкл["stage"] == "off" and not шаги and not ушло3, п_выкл)
+
+            # 2. БЕЗ ЖИВОГО РУБИЛЬНИКА -- только сборка и симуляция.
+            os.environ["BLOOM_OWN_SEND"] = "1"
+            шаги.clear()
+            сс3 = сост3("dry")
+            п_сух = провести_на(сс3, ключ_операции="П2")
+            chk("без BLOOM_OWN_SEND_LIVE путь кончается симуляцией",
+                п_сух["stage"] == "dry" and п_сух["dry"] is True
+                and п_сух["ok"] is True
+                and п_сух.get("sim_verdict") == "would_pass"
+                and "подписать" not in шаги and not ушло3, п_сух)
+            chk("в сухом режиме позиция полосы не пишется",
+                сс3.lane_positions() == [], сс3.lane_positions())
+
+            # 3. РУБИЛЬНИК -- до сборки: тратить сеть на сборку уже нельзя.
+            шаги.clear()
+            ск3 = сост3("kill3")
+            ск3.kill_tg_path.write_text("стоп", encoding="utf-8")
+            п_килл = провести_на(ск3, ключ_операции="П3")
+            chk("KILL останавливает путь на гейте, до сборки",
+                п_килл["stage"] == "gate" and п_килл.get("kill") is True
+                and not шаги, п_килл)
+
+            # 4. Закрытый предел -- тоже до сборки.
+            шаги.clear()
+            сп3 = сост3("lim3")
+            сп3.write_intent(client_order_id="занято", mint="ЧТО-ТО", source_sig="S",
+                             source_slot=1, sol_in=0.01, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=СРОК_ПРОДАЖИ_S, lane=МЕТКА)
+            п_пред = провести_на(сп3, ключ_операции="П4")
+            chk("закрытый предел полосы останавливает путь до сборки",
+                п_пред["stage"] == "gate" and not шаги
+                and "предел полосы" in (п_пред["why_not"] or ""), п_пред)
+
+            # 5. Чужой тип пула: сборка отказала -- ни подписи, ни позиции.
+            отказ_сборки["да"] = True
+            шаги.clear()
+            сб3 = сост3("nopool")
+            п_пул = провести_на(сб3, ключ_операции="П5")
+            chk("чужой тип пула: отказ на сборке, подписи нет",
+                п_пул["stage"] == "build" and "вне полосы" in (п_пул["why_not"] or "")
+                and "подписать" not in шаги and сб3.lane_positions() == [], п_пул)
+            отказ_сборки["да"] = False
+
+            # 6. ЖИВОЙ РЕЖИМ БЕЗ ХЕША И С ПРОСРОЧЕННЫМ ХЕШЕМ -- подписи нет.
+            os.environ["BLOOM_OWN_SEND_LIVE"] = "1"
+            шаги.clear()
+            сх3 = сост3("bh")
+            п_нет_bh = провести_на(сх3, ключ_операции="П6")
+            п_стар = провести_на(сх3, ключ_операции="П7", blockhash="ХЕШ",
+                                 blockhash_ts=time.time() - СРОК_BLOCKHASH_S - 5)
+            chk("без тёплого хеша и с просроченным хешем подписи нет и сети нет",
+                п_нет_bh["stage"] == "blockhash" and п_стар["stage"] == "blockhash"
+                and "старше" in (п_стар["why_not"] or "")
+                and "подписать" not in шаги and not ушло3, (п_нет_bh, п_стар))
+            chk("отказ по хешу брони не оставляет",
+                сх3.lane_positions() == [], сх3.lane_positions())
+
+            # 7. ЧЕСТНЫЙ ЖИВОЙ ПУТЬ: одна отправка, позиция bought с подписью.
+            забыть_отправленные()
+            шаги.clear()
+            ушло3.clear()
+            сж3 = сост3("live")
+            п_жив = провести_на(сж3, ключ_операции="П8", blockhash="ХЕШ",
+                                blockhash_ts=time.time(), источник_подпись="ИСТ8",
+                                источник_слот=999)
+            п_жив_поз = (сж3.lane_positions() or [{}])[0]
+            chk("живой путь: подпись, одна отправка, позиция bought с меткой",
+                п_жив["ok"] and п_жив["stage"] == "sent" and len(ушло3) == 1
+                and п_жив_поз.get("state") == "bought"
+                and п_жив_поз.get("lane") == МЕТКА
+                and п_жив_поз.get("lane_signature") == "ПОДПИСЬ_СЕТИ"
+                and п_жив_поз.get("lane_min_out") == 12345
+                and п_жив_поз.get("mint") == МИНТ_П
+                and п_жив["cid"] == "lane-П8", (п_жив, п_жив_поз))
+
+            # 8. ОПРЕДЕЛЁННЫЙ ОТКАЗ УЗЛА -- бронь закрывается: в цепи её нет.
+            забыть_отправленные()
+            ушло3.clear()
+            со3 = сост3("refused")
+
+            def сендер_отказ(url, данные, таймаут):
+                ушло3.append(данные)
+                return 200, json.dumps({"jsonrpc": "2.0",
+                                        "error": {"code": -32002,
+                                                  "message": "blockhash not found"}})
+
+            п_отк = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                             минт=МИНТ_П, состояние=со3, отправитель=сендер_отказ,
+                             rpc_call=узел_ок, ключ_операции="П9",
+                             blockhash="ХЕШ", blockhash_ts=time.time())
+            поз_отк = (со3.lane_positions() or [{}])[0]
+            chk("определённый отказ узла: бронь закрыта, не висит на стороже",
+                п_отк["ok"] is False and п_отк.get("reservation") == "closed"
+                and поз_отк.get("state") == ST.STATE_CLOSED
+                and поз_отк.get("chain_ok") is False, (п_отк, поз_отк))
+
+            # 9. НЕОПРЕДЕЛЁННАЯ НЕУДАЧА -- бронь ОСТАЁТСЯ: транзакция могла
+            # уйти, и сторож обязан о ней знать.
+            забыть_отправленные()
+            ушло3.clear()
+            сн3 = сост3("ambig")
+
+            def сендер_молчит(url, данные, таймаут):
+                ушло3.append(данные)
+                raise TimeoutError("сеть молчит")
+
+            п_нео = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                             минт=МИНТ_П, состояние=сн3, отправитель=сендер_молчит,
+                             rpc_call=узел_ок, ключ_операции="П10",
+                             blockhash="ХЕШ", blockhash_ts=time.time())
+            поз_нео = (сн3.lane_positions() or [{}])[0]
+            chk("неопределённая неудача: бронь открыта и помечена",
+                п_нео["ok"] is False and п_нео.get("reservation") == "open_ambiguous"
+                and поз_нео.get("state") == "intent"
+                and поз_нео.get("lane_send_ambiguous") is True
+                and поз_нео.get("lane_signature_local") == "НАША_ПОДПИСЬ",
+                (п_нео, поз_нео))
+    finally:
+        globals()["собрать"] = было_собрать
+        globals()["подписать"] = было_подписать
+        забыть_отправленные()
+        for имя_пер, знач in (("BLOOM_OWN_SEND", было_вкл3),
+                              ("BLOOM_OWN_SEND_LIVE", было_live3)):
             if знач is None:
                 os.environ.pop(имя_пер, None)
             else:
