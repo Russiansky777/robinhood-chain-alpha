@@ -371,7 +371,27 @@ class ExecState:
         conn = getattr(self._потоковое, "db", None)
         if conn is None:
             conn = sqlite3.connect(str(self.db_path), timeout=30)
-            conn.execute("PRAGMA journal_mode=WAL")
+            # РЕЖИМ WAL СТАВИТСЯ ОДИН РАЗ НА ФАЙЛ и в файле остаётся. Перевод
+            # режима требует момента без чужой записи, и timeout соединения на
+            # него не распространяется: восемь потоков, поднимающих соединения
+            # разом, получали "database is locked" ровно на этой строке --
+            # самопроверка так упала на облачном бегунке 25.09 в 16:46Z.
+            # Поэтому режим сперва читается, ставится только при расхождении и
+            # с короткими повторами. Тихо работать без WAL нельзя: он и есть
+            # причина, по которой соединение на поток безопасно.
+            try:
+                режим = (conn.execute("PRAGMA journal_mode").fetchone() or [""])[0]
+            except sqlite3.Error:
+                режим = ""
+            if str(режим).lower() != "wal":
+                for попытка in range(6):
+                    try:
+                        conn.execute("PRAGMA journal_mode=WAL")
+                        break
+                    except sqlite3.OperationalError:
+                        if попытка == 5:
+                            raise
+                        time.sleep(0.05 * (попытка + 1))
             conn.execute("PRAGMA synchronous=FULL")
             conn.execute("CREATE TABLE IF NOT EXISTS seen "
                           "(sig TEXT PRIMARY KEY, ts REAL, source TEXT)")
