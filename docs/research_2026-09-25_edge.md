@@ -1,14 +1,14 @@
-# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T02:33:29Z)
+# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T02:51:30Z)
 
 ## 1. Боевое
 
-**Решения по сигналам.** Покупок 7; по кодам: {"NOT_A_BUY": 137, "TARGET_AMOUNT_OUT_OF_RANGE": 94, "SKIP_TARGET_INCREASE_POSITION": 74, "TOKEN_RECEIVED_NOT_BOUGHT": 68, "BUY": 7, "SKIPPED_DUP_MINT": 2, "THRESHOLD_EDGE": 1}. Полоса идёт только там, где мы покупаем, поэтому её тишина объясняется этой строкой.
+**Решения по сигналам.** Покупок 7; по кодам: {"NOT_A_BUY": 137, "TARGET_AMOUNT_OUT_OF_RANGE": 94, "SKIP_TARGET_INCREASE_POSITION": 76, "TOKEN_RECEIVED_NOT_BOUGHT": 68, "BUY": 7, "SKIPPED_DUP_MINT": 2, "THRESHOLD_EDGE": 1}. Полоса идёт только там, где мы покупаем, поэтому её тишина объясняется этой строкой.
 
 **Полоса своей отправки.** Путей 0, отправлено 0, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 0, закрыто 0, UNSOLD 0. Итог по закрытым: — (по 0 сделкам). Медиана от отправки до появления в потоке: —.
 
 **Пары «Bloom против нашей».** Пар 0, из них мы раньше 0; медиана разницы — (плюс -- мы раньше).
 
-**Тень.** Записей 38, по вердиктам: {"would_pass": 11, "нет вердикта": 27}. Медиана сборки 0.72 мс, симуляции 15.2 мс.
+**Тень.** Записей 40, по вердиктам: {"would_pass": 12, "нет вердикта": 28}. Медиана сборки 0.74 мс, симуляции 15.1 мс.
 
 **Узкий фильтр по налогу маршрута.** Пропусков 0, тень измерила 0: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 0 (фильтр отнял), неизвестна в 0. Оценка сбережённого при размере 0.2 SOL: —.
 
@@ -132,7 +132,7 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
 ```json
 {
   "ok": true,
-  "built_utc": "2026-09-25T02:24:07Z",
+  "built_utc": "2026-09-25T02:36:16Z",
   "pickaxe": {
     "ok": true,
     "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
@@ -618,10 +618,10 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
 ```json
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-25T02:00:49Z",
+  "generated_utc": "2026-09-25T02:51:30Z",
   "inputs": {
-    "crowd_cache": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
-    "state_dir": null,
+    "crowd_cache": "/tmp/night_state/crowd_metric.json",
+    "state_dir": "/tmp/night_state",
     "audit": "data/solana_transfer_fee_audit.json",
     "tax_groups": "data/solana_tax_groups.json",
     "bloom_report": "data/bloom_report.json",
@@ -631,8 +631,19 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
   "constraints": {
     "read_only": true,
     "no_trades": true,
-    "helius_key_in_container": false,
-    "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py)"
+    "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py); --chain строит его через c2_common.C2Rpc с потолком кредитов"
+  },
+  "chain": {
+    "ok": true,
+    "service": "c2_night_leader_stonkfun",
+    "key_env": "HELIUS_API_KEY",
+    "local_credit_limit": 20000,
+    "owner_stop_fraction": 0.7,
+    "owner_stop_credits": 140000,
+    "c2_daily_budget": 200000,
+    "credits_used": 20000,
+    "calls_used": 20000,
+    "stopped_reason": "локальный предел --credit-limit=20000 исчерпан (потрачено этим прогоном 20000, нужно ещё 1)"
   },
   "task_e_leader": {
     "ok": true,
@@ -724,12 +735,7 @@ Raydium CPMM +79.7 % (170) против Pump AMM +34.8 % (68); толпа выш
         },
         {
           "signature": "3VCvVA97A7jKzSW47W51wXxZ8XxgrH1Z9keiEEDb8aSfuYJkTTLkke545qrxakCTBM6ryzenGoj2EbGWg3yGpET8",
-          "block_time_utc": "2026-09-23T20:21:40Z",
-          "spend_sol_equiv": 6.671219
-        }
-      ],
-      "verdict": "повторный заход (минимум 4-й цикл): по методике кэша каждая запись -- первый вход, т.е. между ними были полные продажи",
-      "caveat": "кэш -- окно 17.09-24.09; событие владельца (2Nm7Ef1Q..., ~2026-09-25T00:31:00Z) вне этого о
+  
 ```
 
 ## Что из данных НЕ следует
