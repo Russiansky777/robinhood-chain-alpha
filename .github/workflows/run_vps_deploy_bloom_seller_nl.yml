@@ -217,7 +217,7 @@ jobs:
         run: |
           set -e
           # Читаем только два значения и только их. Ключи не печатаются.
-          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID|JUPITER_API_KEY)=' $ENV_DIR/env || true")
+          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID|JUPITER_API_KEY|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION)=' $ENV_DIR/env || true")
           LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
           BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
           LG=$(echo "$PREV" | sed -n 's/^TELEGRAM_LOG_CHAT_ID=//p' | tail -1)
@@ -229,6 +229,19 @@ jobs:
           echo "прежний JUPITER_API_KEY: длина ${#JK}"
           echo "::add-mask::$JK"
           echo "JUP_KEY_PREV=$JK" >> $GITHUB_ENV
+          # ПОЛОСА СВОЕЙ ОТПРАВКИ. Её настройки ставит деплой детектора, а
+          # этот шаг перезаписывает env ЦЕЛИКОМ: без переноса любой деплой
+          # сторожа молча выключал бы полосу -- то есть менял поведение денег
+          # на ровном месте. Та же ошибка уже стоила ключа Jupiter V2.
+          OS_ON=$(echo "$PREV" | sed -n 's/^BLOOM_OWN_SEND=//p' | tail -1)
+          OS_LIVE=$(echo "$PREV" | sed -n 's/^BLOOM_OWN_SEND_LIVE=//p' | tail -1)
+          OS_SOL=$(echo "$PREV" | sed -n 's/^BLOOM_OWN_SEND_SOL=//p' | tail -1)
+          OS_REG=$(echo "$PREV" | sed -n 's/^BLOOM_SENDER_REGION=//p' | tail -1)
+          echo "прежняя полоса: BLOOM_OWN_SEND=[$OS_ON], LIVE=[$OS_LIVE], размер=[$OS_SOL], регион=[$OS_REG]"
+          echo "OWN_SEND_PREV=$OS_ON" >> $GITHUB_ENV
+          echo "OWN_SEND_LIVE_PREV=$OS_LIVE" >> $GITHUB_ENV
+          echo "OWN_SEND_SOL_PREV=$OS_SOL" >> $GITHUB_ENV
+          echo "SENDER_REGION_PREV=$OS_REG" >> $GITHUB_ENV
           echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS], журнальный чат=[$LG]"
           echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
           echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
@@ -311,6 +324,18 @@ jobs:
             if [ "${LIVE_BUY_PREV:-}" = "1" ]; then
               echo "BLOOM_LIVE_BUY=1"
               echo "BLOOM_TELEGRAM_REAL=1"
+            fi
+            # Настройки полосы своей отправки -- ПЕРЕНОСОМ с хоста. Пусто --
+            # значит полосы там не было, и включать её деплой сторожа не
+            # вправе: её включает отдельное решение владельца в деплое
+            # детектора.
+            if [ "${OWN_SEND_PREV:-}" = "1" ]; then
+              echo "BLOOM_OWN_SEND=1"
+              [ -n "${OWN_SEND_SOL_PREV:-}" ] && echo "BLOOM_OWN_SEND_SOL=$OWN_SEND_SOL_PREV"
+              [ -n "${SENDER_REGION_PREV:-}" ] && echo "BLOOM_SENDER_REGION=$SENDER_REGION_PREV"
+              if [ "${OWN_SEND_LIVE_PREV:-}" = "1" ]; then
+                echo "BLOOM_OWN_SEND_LIVE=1"
+              fi
             fi
           } > /tmp/bloom_env
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $ENV_DIR/env && chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env && ls -l $ENV_DIR/env" < /tmp/bloom_env

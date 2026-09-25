@@ -5841,6 +5841,27 @@ def main() -> int:
                            "rate_failures": курс.отказы,
                            "slot": helius.слот(),
                            "kill_switch": состояние.kill_active(),
+                           # ПОЛОСА СВОЕЙ ОТПРАВКИ -- в проверке перед
+                           # запуском: по журналу деплоя должно быть видно, в
+                           # каком она состоянии и есть ли ключ для подписи.
+                           # Значение ключа не печатается и не читается --
+                           # только факт его наличия.
+                           "own_send": {
+                               "enabled": детектор.полоса_включена,
+                               "live": (OS is not None and OS.живьём()),
+                               "module_loaded": OS is not None,
+                               "module_why_not": globals().get("OWN_SEND_IMPORT_ERR", ""),
+                               "size_sol": (OS.размер_sol() if OS is not None else None),
+                               "sender": (OS.адрес_сендера() if OS is not None else None),
+                               "key_present": bool(
+                                   os.environ.get("EXEC_WALLET_KEY")
+                                   or os.environ.get("BLOOM_WALLET_KEY")),
+                               "limits": ({"open": OS.ЛИМИТ_ОТКРЫТЫХ,
+                                            "per_day": OS.ЛИМИТ_В_СУТКИ,
+                                            "stop_failed_in_row": OS.СТОП_ПОДРЯД_УПАВШИХ,
+                                            "stop_loss_sol": OS.СТОП_УБЫТОК_SOL,
+                                            "ceiling_sol": OS.ПОТОЛОК_РАЗМЕРА_SOL}
+                                           if OS is not None else {})},
                            "heartbeat_path": str(детектор.статус_путь())},
                           ensure_ascii=False, indent=2))
         return 0
