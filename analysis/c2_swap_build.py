@@ -296,6 +296,32 @@ def sol_transfer(src: str, dst: str, lamports: int) -> Instruction:
         AccountMeta(Pubkey.from_string(dst), False, True)])
 
 
+# СЛУЖЕБНЫЕ АДРЕСА, нужные долговечному nonce. RecentBlockhashes -- зашитый
+# системный аккаунт (SysvarRecentB1ockHashes11111111111111111111), он обязателен
+# в инструкции AdvanceNonceAccount по описанию системной программы Solana.
+SYSVAR_RECENT_BLOCKHASHES = "SysvarRecentB1ockHashes11111111111111111111"
+
+
+def advance_nonce(nonce_account: str, authority: str) -> Instruction:
+    """AdvanceNonceAccount: код 4 системной программы, три аккаунта по порядку.
+
+    ЗАЧЕМ ОНА. Долговечный nonce даёт то, чего не даёт обычный blockhash: ДВЕ
+    РАЗНЫЕ транзакции с одним и тем же nonce не могут исполниться обе -- первая
+    его сдвигает, вторая становится недействительной. Это и есть замок пула по
+    варианту с отдельной транзакцией на каждого отправителя: у каждого свои
+    чаевые (значит пакет меньше и предел 1232 байта не жмёт), а купить можно
+    только один раз.
+
+    Инструкция обязана быть ПЕРВОЙ в транзакции, а recent_blockhash сообщения --
+    это хеш, сохранённый в самом аккаунте nonce. Оба условия -- требования
+    системной программы, а не наш выбор.
+    """
+    return Instruction(Pubkey.from_string(SYSTEM), struct.pack("<I", 4), [
+        AccountMeta(Pubkey.from_string(nonce_account), False, True),
+        AccountMeta(Pubkey.from_string(SYSVAR_RECENT_BLOCKHASHES), False, False),
+        AccountMeta(Pubkey.from_string(authority), True, False)])
+
+
 def sync_native(account: str) -> Instruction:
     return Instruction(Pubkey.from_string(TOKEN_PROGRAM), bytes([17]),
                        [AccountMeta(Pubkey.from_string(account), False, True)])
@@ -303,14 +329,24 @@ def sync_native(account: str) -> Instruction:
 
 def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min_out: int,
               cu_units: int = 200_000, cu_price_micro: int = 0, tip: tuple | None = None,
-              wrap_sol: bool = True) -> dict:
+              wrap_sol: bool = True, nonce: tuple | None = None) -> dict:
     """Инструкции покупки: compute budget, ATA (идемпотентно), обёртка SOL
     (если котировка WSOL и wrap_sol), своп, tip отдельным параметром
-    (адрес, лампорты) -- адрес tip не зашит."""
+    (адрес, лампорты) -- адрес tip не зашит.
+
+    nonce=(аккаунт, распорядитель) добавляет AdvanceNonceAccount ПЕРВОЙ
+    инструкцией: так делается вариант пула, где на каждого отправителя своя
+    транзакция со своими чаевыми, а исполниться может только одна.
+    """
     mv = mints_and_vaults(tpl, tx)
     if not mv:
         raise ValueError("минты/хранилища не восстановились")
-    ixs = [cu_limit(cu_units)]
+    ixs = []
+    if nonce:
+        # ПЕРВОЙ -- и никак иначе: системная программа принимает
+        # AdvanceNonceAccount только как первую инструкцию транзакции.
+        ixs.append(advance_nonce(str(nonce[0]), str(nonce[1])))
+    ixs.append(cu_limit(cu_units))
     if cu_price_micro:
         ixs.append(cu_price(cu_price_micro))
     ixs.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
