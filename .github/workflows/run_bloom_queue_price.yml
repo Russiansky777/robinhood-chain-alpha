@@ -1,0 +1,120 @@
+name: "З1: кто стоял перед нами (цена места в блоке)"
+
+# Вопрос владельца 25.09: наше отставание (700 мс, S+1) -- это ПЛАТА (очередь
+# к горячему пулу) или ПУТЬ И СКОРОСТЬ. Здесь считается только та половина,
+# что видна в цепи и не стоит ни одной отправки: кто стоял перед нами в нашем
+# блоке и сколько он заплатил.
+#
+# ТОЛЬКО ЧТЕНИЕ. Два getBlock и один getTransaction на покупку -- три кредита.
+# Ни одной подписи, ни одной отправки: в модуле физически нет вызова отправки,
+# и это проверяет его же самопроверка.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "покупки не раньше этой даты (ГГГГ-ММ-ДД)"
+        required: false
+        default: "2026-09-24"
+      max_trades:
+        description: "предел разбираемых покупок (цена = 3 кредита на покупку)"
+        required: false
+        default: "40"
+      credit_limit:
+        description: "жёсткий предел кредитов на прогон"
+        required: false
+        default: "400"
+      gain_fraction:
+        description: "замеренный выигрыш входа в S+0 долей цены (0 -- таблицу окупаемости не строить)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: bloom-queue-price
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  queue_price:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО обращений в цепь"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/qp_venv"
+            "$RUNNER_TEMP/qp_venv/bin/pip" install -q requests
+            PY="$RUNNER_TEMP/qp_venv/bin/python"
+          fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          "$PY" analysis/bloom_queue_price.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Копия позиций с хоста (только чтение)"
+        run: |
+          set -e
+          mkdir -p /tmp/bloom_state
+          for f in positions.jsonl decisions.jsonl; do
+            if ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/$f"; then
+              ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/bloom_state/$f"
+              echo "$f: $(wc -c < /tmp/bloom_state/$f) байт"
+            else
+              echo "$f: нет или пуст на хосте"
+            fi
+          done
+
+      - name: "Разбор очереди по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          BLOOM_STATE_DIR: /tmp/bloom_state
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- разбор невозможен"; exit 1; }
+          mkdir -p data docs
+          "$PY" analysis/bloom_queue_price.py \
+            --state-dir /tmp/bloom_state \
+            --since '${{ inputs.since }}' \
+            --max-trades '${{ inputs.max_trades }}' \
+            --credit-limit '${{ inputs.credit_limit }}' \
+            --gain-fraction '${{ inputs.gain_fraction }}' \
+            --out data/queue_price.json \
+            --out-md docs/queue_price.md 2>&1 | tail -80
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/queue_price.json docs/queue_price.md; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Z1: kto stoyal pered nami (tsena mesta) [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
