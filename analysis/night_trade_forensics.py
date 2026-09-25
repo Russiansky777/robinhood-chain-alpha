@@ -94,7 +94,7 @@ def имя(адрес: str | None, известные: dict) -> str:
 def разобрать(rpc_call, *, минт: str, пул: str, подпись_источника: str,
                слот_источника: int, известные: dict | None = None,
                окно_слотов: int = 120, max_tx: int = 60,
-               page_limit: int = 200) -> dict:
+               page_limit: int = 200, max_pages: int = 12) -> dict:
     """Таблица событий пула после покупки источника.
 
     Без rpc_call -- честный отказ: пустая таблица неотличима от "ничего не
@@ -104,13 +104,43 @@ def разобрать(rpc_call, *, минт: str, пул: str, подпись_�
         return {"ok": False, "why_not": "нет rpc_call -- цепь не читалась", "rows": []}
     известные = dict(известные or {})
     известные.setdefault(BLOOM_FEE, "сбор Bloom")
-    try:
-        страница = rpc_call("getSignaturesForAddress",
-                             [пул, {"limit": page_limit, "until": подпись_источника,
-                                     "commitment": "finalized"}]) or []
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "why_not": f"подписи пула не получены: {type(exc).__name__}: {exc}",
-                "rows": []}
+    # ПОСТРАНИЧНО НАЗАД. API отдаёт подписи ТОЛЬКО от новых к старым и только
+    # с курсором `before`; `until` лишь говорит, где остановиться. Если у пула
+    # с момента нашей покупки прошло больше, чем помещается на страницу, одна
+    # страница вернёт самые свежие -- и наше окно в неё не попадёт вовсе.
+    # Ровно это и случилось на первом прогоне: 0 подписей в окне при живом пуле.
+    страница: list = []
+    видели: set = set()
+    before = None
+    страниц = 0
+    for _ in range(max_pages):
+        try:
+            кусок = rpc_call("getSignaturesForAddress",
+                              [пул, {"limit": page_limit, "until": подпись_источника,
+                                      **({"before": before} if before else {}),
+                                      "commitment": "finalized"}]) or []
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False,
+                     "why_not": f"подписи пула не получены: {type(exc).__name__}: {exc}",
+                     "rows": []}
+        страниц += 1
+        if not кусок:
+            break
+        # ДЕДУПЛИКАЦИЯ И ЗАЩИТА ОТ ТОПТАНИЯ НА МЕСТЕ: если узел вернул ту же
+        # страницу (курсор не сдвинулся), дальше идти незачем -- иначе одна и
+        # та же сделка попадёт в таблицу столько раз, сколько было страниц.
+        новых = [с for с in кусок if с.get("signature") not in видели]
+        for с in новых:
+            видели.add(с.get("signature"))
+        страница.extend(новых)
+        следующий = кусок[-1].get("signature")
+        if not новых or следующий == before:
+            break
+        before = следующий
+        самый_старый = кусок[-1].get("slot")
+        # Дошли до окна -- дальше назад идти незачем.
+        if isinstance(самый_старый, int) and самый_старый <= слот_источника:
+            break
     кандидаты = sorted((с for с in страница if с.get("signature")),
                         key=lambda x: x.get("slot") or 0)
     в_окне = [с for с in кандидаты
@@ -157,6 +187,12 @@ def разобрать(rpc_call, *, минт: str, пул: str, подпись_�
         })
     из_ = {"ok": True, "pool": пул, "mint": минт,
             "source_signature": подпись_источника, "source_slot": слот_источника,
+            # ВСЕГО подписей отдано узлом и сколько из них попало в окно -- две
+            # разные величины: "ноль в окне" при сотнях отданных означает, что
+            # окно не то, а не что в пуле было тихо.
+            "n_signatures_total": len(кандидаты), "n_pages": страниц,
+            "oldest_slot_seen": (кандидаты[0].get("slot") if кандидаты else None),
+            "newest_slot_seen": (кандидаты[-1].get("slot") if кандидаты else None),
             "n_signatures_window": len(в_окне), "n_getTransaction": вызовов,
             "partial": оборван is not None, "stopped_reason": оборван,
             "rows": строки}
@@ -275,6 +311,8 @@ def self_test() -> int:
     из_ = разобрать(rpc, минт=МИНТ, пул=ПУЛ, подпись_источника="SRC",
                      слот_источника=10, окно_слотов=5,
                      известные={ТРЕЙДЕР: "источник"})
+    chk("повторная страница не задваивает строки (курсор не сдвинулся)",
+        из_["n_signatures_total"] == 3 and из_["n_pages"] <= 2, из_["n_pages"])
     chk("подписи спрошены у ПУЛА и только после покупки источника",
         вызовы[0][0] == "getSignaturesForAddress" and вызовы[0][1][0] == ПУЛ, вызовы[0])
     chk("за окно слотов не выходим (999 отброшен)",
