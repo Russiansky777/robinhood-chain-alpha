@@ -1,0 +1,84 @@
+name: "NL-хост: поднять свой бегунок (облачный путь, только служба бегунка)"
+
+# ЗАЧЕМ. Свой бегунок стоит НА боевом хосте, и прогоны чтения журналов, BAM и
+# утренний доклад прибиты к нему. 25.09 в 16:23Z разбор журнала решений съел
+# память (файл 635 МБ читался в память -- моя ошибка), бегунок получил
+# shutdown, и с 16:27Z ни один прогон на nl-host не стартовал. Этот прогон --
+# путь обратно: он идёт с ОБЛАЧНОГО бегунка по внешнему адресу и трогает
+# ТОЛЬКО службу бегунка. Разрешение владельца 25.09 (вечер).
+#
+# Чего этот прогон НЕ делает: не трогает bloom-detector, bloom-seller и любые
+# другие службы, не пишет env, не читает журналы, не обращается к цепи, не
+# покупает и не продаёт.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "'status' -- только показать (по умолчанию), 'restart' -- перезапустить бегунок"
+        required: false
+        default: "status"
+
+concurrency:
+  group: nl-runner-restart
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Что с бегунком, памятью и диском"
+        run: |
+          set -e
+          echo '--- служба бегунка ---'
+          ssh -n $SSH_OPTS root@$HOST 'systemctl list-units --all --no-legend --type=service | grep -i actions.runner || echo NET_SLUZHBY_BEGUNKA'
+          echo '--- память и диск ---'
+          ssh -n $SSH_OPTS root@$HOST 'free -m | head -2; df -h / /tmp | tail -3'
+          echo '--- боевые службы (только смотрим) ---'
+          ssh -n $SSH_OPTS root@$HOST 'systemctl is-active bloom-detector bloom-seller dbot-sold-guard || true'
+          echo '--- OOM в журнале ядра за два часа ---'
+          ssh -n $SSH_OPTS root@$HOST 'journalctl --since -120min --no-pager | grep -ci oom-kill || true'
+          echo '--- копии журналов, оставшиеся в /tmp от упавшего прогона ---'
+          ssh -n $SSH_OPTS root@$HOST 'du -sh /tmp/journal_state /tmp/night_state /tmp/bloom_state 2>/dev/null || echo net_kopiy'
+
+      - name: "Убрать копии журналов с диска хоста"
+        if: ${{ github.event.inputs.action == 'restart' }}
+        run: |
+          set -e
+          # Упавший по OOM прогон оставил копию журнала решений в /tmp хоста --
+          # это занятый диск у службы, которая на этот диск пишет.
+          ssh -n $SSH_OPTS root@$HOST 'rm -rf /tmp/journal_state; df -h /tmp | tail -1'
+
+      - name: "Перезапуск бегунка (по явному входу)"
+        if: ${{ github.event.inputs.action == 'restart' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST 'set -e
+            u=$(systemctl list-units --all --no-legend --type=service | grep -io "actions\.runner[^ ]*\.service" | head -1)
+            if [ -z "$u" ]; then echo "службы бегунка нет в systemd -- перезапускать нечего"; exit 1; fi
+            echo "служба бегунка: $u"
+            systemctl restart "$u"
+            sleep 6
+            systemctl is-active "$u"'
+          echo "служба бегунка перезапущена"
+
+      - name: "Боевые службы не тронуты -- проверка после"
+        if: ${{ github.event.inputs.action == 'restart' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$HOST 'systemctl is-active bloom-detector bloom-seller'
+          echo "детектор и сторож живы"
