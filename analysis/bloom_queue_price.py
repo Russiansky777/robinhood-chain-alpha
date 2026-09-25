@@ -80,9 +80,62 @@ def _tip_список() -> tuple:
         return ()
 
 
+# РЕЕСТР СЧЕТОВ ЧАЕВЫХ ИЗ СОХРАНЁННОЙ ДОКУМЕНТАЦИИ. Имена сервисов берутся
+# только оттуда: файл data/sender_pool_candidates.json собирает
+# sender_pool_docs.py из страниц, скачанных прогоном на хосте. Нет файла --
+# нет и имён: адрес остаётся адресом.
+ФАЙЛ_РЕЕСТРА_ЧАЕВЫХ = "data/sender_pool_candidates.json"
+_РЕЕСТР: dict | None = None
+ИМЕНА_СЕРВИСОВ = {"helius": "Helius Sender", "jito": "Jito",
+                   "nozomi": "Nozomi (Temporal)", "zeroslot": "0slot.trade",
+                   "blockrazor": "BlockRazor", "astralane": "Astralane"}
+
+
+def реестр_чаевых(путь: str | None = None) -> dict:
+    """Адрес -> имя сервиса, по СОХРАНЁННОЙ документации. Кэшируется."""
+    global _РЕЕСТР  # noqa: PLW0603
+    if _РЕЕСТР is not None and путь is None:
+        return _РЕЕСТР
+    из_: dict = {}
+    п = Path(путь or ФАЙЛ_РЕЕСТРА_ЧАЕВЫХ)
+    if not п.is_absolute():
+        # Модуль запускают и из analysis/, и из корня репозитория.
+        для_поиска = [п, Path(__file__).resolve().parent.parent / п]
+    else:
+        для_поиска = [п]
+    for кандидат in для_поиска:
+        if not кандидат.exists():
+            continue
+        try:
+            данные = json.loads(кандидат.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        for сервис, з in (данные.get("by_service") or {}).items():
+            имя = ИМЕНА_СЕРВИСОВ.get(сервис, сервис)
+            for адрес in (з.get("tip_addresses") or {}):
+                # ОДИН АДРЕС -- ОДИН СЕРВИС. Пересечение означало бы, что мы
+                # не знаем, чей он, и тогда честнее назвать оба.
+                if адрес in из_ and имя not in из_[адрес]:
+                    из_[адрес] = f"{из_[адрес]} / {имя}"
+                else:
+                    из_.setdefault(адрес, имя)
+        break
+    if путь is None:
+        _РЕЕСТР = из_
+    return из_
+
+
 def метка_чаевых(адрес: str, *, известные: tuple = (), по_частоте: set | None = None):
     """Чей это счёт чаевых. Придумывать названия ускорителей нельзя: адрес
-    без метки честнее метки без источника."""
+    без метки честнее метки без источника.
+
+    Порядок источников: сохранённая документация сервисов (там имя), список
+    репозитория (там только "Sender/Jito", без разделения), частота в блоке
+    (там вообще не имя, а поведение).
+    """
+    по_документации = реестр_чаевых().get(адрес)
+    if по_документации:
+        return f"{по_документации} (по документации сервиса)"
     if адрес in tuple(известные or ()):
         return "tip Helius Sender / Jito (список репозитория)"
     if по_частоте and адрес in по_частоте:
@@ -1244,6 +1297,21 @@ def self_test() -> int:
         "РЕДКИЙ" not in ч["by_frequency"], ч["by_frequency"])
     chk("известный список чаевых остаётся в списке всегда",
         TIP in ч["all"], sorted(ч["all"]))
+    # РЕЕСТР ИЗ ДОКУМЕНТАЦИИ: имя сервиса берётся оттуда, а не из памяти.
+    import tempfile as _tmpр  # noqa: PLC0415
+    with _tmpр.TemporaryDirectory() as врем_р:
+        файл_р = Path(врем_р) / "candidates.json"
+        файл_р.write_text(json.dumps({"by_service": {
+            "jito": {"tip_addresses": {"96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5": "цитата"}},
+            "blockrazor": {"tip_addresses": {"FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9": "цитата"}},
+        }}, ensure_ascii=False), encoding="utf-8")
+        р = реестр_чаевых(str(файл_р))
+        chk("реестр читает адреса из сохранённой документации с именем сервиса",
+            р.get("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5") == "Jito"
+            and р.get("FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9") == "BlockRazor",
+            р)
+        chk("нет файла -- нет и имён, а не выдуманные",
+            реестр_чаевых(str(Path(врем_р) / "нет.json")) == {}, "")
     chk("метка неопознанного адреса не выдумывается",
         метка_чаевых("НЕЗНАКОМЫЙ", известные=(TIP,), по_частоте=set()) is None
         and "Helius" in (метка_чаевых(TIP, известные=(TIP,)) or ""), "")
