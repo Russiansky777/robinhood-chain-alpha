@@ -1,5 +1,3 @@
-  "live_buy_enabled": true,
-  "live_test_enabled": false,
   "dry_run": false,
   "bump_sol": 0.005,
   "buy_sol": 0.2,
@@ -12,7 +10,7 @@
   "refused": 0,
   "last_error": "",
   "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-  "pending_in_journal": 149,
+  "pending_in_journal": 1,
   "state": {
     "schema_version": 2,
     "state_dir": "/home/bot/bloom_executor_live_data",
@@ -40,7 +38,9 @@
     "counters": {
       "api_error_streak": 0,
       "unsold_streak": 0,
-      "unsold_streak_own_send": 0
+      "unsold_streak_own_send": 0,
+      "api_error_last_code": "INTERNAL_ERROR",
+      "api_error_last_ts": 1790372260.3826444
     },
     "day_pnl": {
       "realized_sol": 0.0,
@@ -51,78 +51,39 @@
     },
     "bloom_request_budget": {
       "limit_week": 10000,
-      "remaining_week": 9930,
+      "remaining_week": 9831,
       "stop_at": 0.8,
-      "spent_share": 0.007,
+      "spent_share": 0.0169,
       "stop": false
     }
   }
 }
-          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-          "11111111111111111111111111111111",
-          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-          "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
-          "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
-          "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-        ],
-        "why_not": "подписано нашим ключом, в журнале решений и позиций не значится"
-      }
-    ],
-    "explain_failures": [],
-    "unexplained_count": 6,
-    "not_checked": [],
-    "not_checked_count": 0,
-    "explain_limit": 40
-  },
-  "stand_start": {
-    "set": true,
-    "path": "/home/bot/bloom_executor_live_data/stand_start.json",
-    "stand_start_ts": 1790196635.113487,
-    "stand_start_utc": "2026-09-23T20:50:35Z",
-    "note": "начало стенда, подтверждено владельцем"
-  },
-  "journal": {
-    "decisions": {
-      "v1": 0,
-      "v2": 445434,
-      "unreadable": 0
-    },
-    "positions": {
-      "v1": 0,
-      "v2": 1174,
-      "unreadable": 0
-    },
-    "mixed": false
-  },
-  "notes": [
-    "14 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 2Kh2FVQgLfbq (G4PZQ4tTMjeNQfrSyMUMXN919NTeKA8hXUEzjRmr9btr), 7t4FTvaNEYyE (9CM4keb9D9uVD3uBJwrUemAs4PYZbi1HcuyjTuuzn9Ui), 46WejkcVBZPS (2yyQGySj9G17M8G8maRTmahcnf6MxkdJYe5SdyRapump), 53CqPqKX2RAa (sh3nQze56RGQFBxr3FZidbbVNVh2oUctgt2sGP4pump), 5Tc9171KPvTR (DkWKDMVMMDMcrUw7hQFVW8wiEJ8wXa3zm5DYMaJWkZ9s), 3Ncu6tYjh45r (571aBZbC7C227a79bAAA1YTHKrDYHZkcBpHPgvUcpump), 2UEBfKK88WBf (74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4), 2piXoN8qt6jK (C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21), 3CFDA9pfajdu (nDZknLvfFRp5rgUHdzTrQsmSY5NKzoavqdLjSHVpump), 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)",
-    "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
-  ],
-  "blockers": [
-    "на кошельке 6 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни"
-  ],
-  "clean": false,
-  "verdict": "старт заблокирован, причин 1"
-}
---- коротко ---
-режим: live, вердикт: старт заблокирован, причин 1
-кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 1.981063307 SOL при пороге 0.3
-чужая активность: известно=True, свежих за 24.0 ч 25, прежних 0 (самая свежая None)
-    свежая чужая: 2Kh2FVQgLfbqNueCjUAgAH5ZGZohyYKK2Ut5cj5uXKiTZCGgB9P1d4TPmGpd7smJRo3iUsNVztcwr3wq9t2Pb4Rc 2026-09-25T19:45:05Z
-    свежая чужая: 7t4FTvaNEYyECPMLPAKs6G3ie8wwSw6ddK4gFmyfAtFxvFSkyPoLGv2NySABH4yN2m2pxfmbS8xrAWuR4oSZ3b1 2026-09-25T17:38:59Z
-    свежая чужая: 46WejkcVBZPSKbBWnLssVUj8F5FGFwfEhT8nC9JLNznJ6RNW7rb1ByvzymfiQz8kPfcbfTFVvRSePhcDXqGREoWQ 2026-09-25T16:49:28Z
-    свежая чужая: 53CqPqKX2RAaxDbxYBQiwbcUUxG2DT3iVd2528WvAUa9UHzgW7htU9e2SLRqHrDbYksxo25mNjySkDibUXMUK7Pr 2026-09-25T16:32:39Z
-    свежая чужая: 5Tc9171KPvTR2wk6ZdGsFDVNZKR22C7SgbmY8m48e9121QHFdCBEcStrzFr34RM9ThrQcFjVLHuPczAUMX4wVtSC 2026-09-25T15:50:43Z
-граница чужой активности: окно (2026-09-24T20:06:19Z)
-позиции: dry-run 0, настоящих открытых 0
-  БЛОКЕР: на кошельке 6 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
-  примечание: 14 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 2Kh2FVQgLfbq (G4PZQ4tTMjeNQfrSyMUMXN919NTeKA8hXUEzjRmr9btr), 7t4FTvaNEYyE (9CM4keb9D9uVD3uBJwrUemAs4PYZbi1HcuyjTuuzn9Ui), 46WejkcVBZPS (2yyQGySj9G17M8G8maRTmahcnf6MxkdJYe5SdyRapump), 53CqPqKX2RAa (sh3nQze56RGQFBxr3FZidbbVNVh2oUctgt2sGP4pump), 5Tc9171KPvTR (DkWKDMVMMDMcrUw7hQFVW8wiEJ8wXa3zm5DYMaJWkZ9s), 3Ncu6tYjh45r (571aBZbC7C227a79bAAA1YTHKrDYHZkcBpHPgvUcpump), 2UEBfKK88WBf (74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4), 2piXoN8qt6jK (C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21), 3CFDA9pfajdu (nDZknLvfFRp5rgUHdzTrQsmSY5NKzoavqdLjSHVpump), 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)
-  примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
+Traceback (most recent call last):
+  File "/home/bot/bloom_executor/bloom_reconcile.py", line 1013, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/bot/bloom_executor/bloom_reconcile.py", line 981, in main
+    сводка = reconcile(state, mode=mode, helius=helius,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bot/bloom_executor/bloom_reconcile.py", line 392, in reconcile
+    ours = our_signatures(state)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bot/bloom_executor/bloom_reconcile.py", line 146, in our_signatures
+    out |= _подписи_из_файла(путь)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bot/bloom_executor/bloom_reconcile.py", line 120, in _подписи_из_файла
+    текст = путь.read_text(encoding="utf-8")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1030, in read_text
+    return f.read()
+           ^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T20:06:44Z",
-  "updated_ts": 1790366804.2579541,
-  "alive_since_utc": "2026-09-25T20:06:32Z",
+  "updated_utc": "2026-09-25T23:20:50Z",
+  "updated_ts": 1790378450.6999016,
+  "alive_since_utc": "2026-09-25T23:20:40Z",
   "mode": "live",
   "sources": 85,
   "source_groups": {
@@ -172,14 +133,14 @@
       "astralane": {
         "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.1,
+        "last_ping_s": 0.2,
         "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 0.1,
+        "age_s": 0.2,
         "last_use_s": null,
         "last_ping_s": 0.1,
         "pings_ok": 1,
@@ -236,13 +197,9 @@
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 6,
+  "signals_seen": 0,
   "to_buy": 0,
-  "by_code": {
-    "NOT_A_BUY": 3,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 2,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 1
-  },
+  "by_code": {},
   "by_code_test_source": {},
   "test_sources": [
     "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
@@ -252,7 +209,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 121.93797943436225,
+  "rate_usd_sol": 122.32574681345548,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -260,20 +217,19 @@
   "kill_readable": true,
   "kill_active": false,
   "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": 450455241,
-  "slot_notifications": 43,
-  "net_slot_age_s": 0.24,
-  "balance_sol": 1.981063307,
-  "balance_age_s": 1.11,
-  "rpc_calls": 69,
+  "net_slot": 450498802,
+  "slot_notifications": 39,
+  "net_slot_age_s": 0.26,
+  "balance_sol": 1.365586764,
+  "balance_age_s": 0.46,
+  "rpc_calls": 66,
   "rpc_by_method": {
     "getLatestBlockhash": 1,
     "getBalance": 4,
-    "getTransaction": 60,
-    "getMultipleAccounts": 2,
-    "simulateTransaction": 2
+    "getAccountInfo": 1,
+    "getTransaction": 60
   },
-  "session_credits": 73,
+  "session_credits": 66,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -281,7 +237,7 @@
     "sent": 0,
     "failed": 0,
     "last_error": "",
-    "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "off_reason": "",
     "log_configured": false,
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
@@ -315,33 +271,31 @@
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 3,
+    "silent_ticks": 5,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 2,
-    "would_pass": 2,
+    "built": 0,
+    "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
-    "passed_in_row_by_pool": {
-      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 2
-    },
+    "passed_in_row_by_pool": {},
     "hour": {
-      "since_ts": 1790366792.822576,
-      "since_utc": "2026-09-25T20:06:32Z",
-      "signals": 2,
-      "built": 2,
+      "since_ts": 1790378440.0116484,
+      "since_utc": "2026-09-25T23:20:40Z",
+      "signals": 0,
+      "built": 0,
       "sim_failed": 0,
       "not_built": {},
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 1331,
+    "credits_day": 0,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -372,13 +326,13 @@
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 0.558764212,
-    "balance_age_s": 1.1,
+    "balance_sol": 0.456146959,
+    "balance_age_s": 0.5,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 11.2,
+    "blockhash_age_s": 10.5,
     "blockhash_updates": 1,
     "blockhash_why_not": "",
     "last": {},
@@ -396,33 +350,28 @@
     "lane_state": {
       "open": 0,
       "stuck": 0,
-      "today": 5,
+      "today": 0,
       "failed_in_row": 0,
-      "pnl_sol": -0.008025,
+      "pnl_sol": 0.0,
       "pnl_trade_sol": 0.0,
-      "spend_sol": 0.008025,
-      "uncountable_today": 4,
-      "uncountable_why": [
-        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
-      ],
-      "total": 5,
+      "spend_sol": 0.0,
+      "uncountable_today": 0,
+      "uncountable_why": [],
+      "total": 0,
       "group": "деньги (все группы кроме скорости)",
-      "day_turnover_sol": 0.218025,
-      "day_spend_sol": 0.008025
+      "day_turnover_sol": 0,
+      "day_spend_sol": 0.0
     },
     "control": {
       "enabled": true,
       "senders_seen": 0,
       "spent_today": {
         "day": "20260925",
-        "n": 24,
-        "signals": 4,
-        "spent_lamports": 16524000,
+        "n": 36,
+        "signals": 6,
+        "spent_lamports": 24786000,
         "why_not": null,
-        "spent_sol": 0.016524
+        "spent_sol": 0.024786
       },
       "limits": {
         "signals_per_day": 20,
@@ -435,12 +384,9 @@
       "enabled": true,
       "tip_cap_sol": 0.005,
       "winners": {
-        "blockrazor": 4,
-        "jito": 1,
-        "astralane": 14,
-        "helius": 8,
-        "zeroslot": 6,
-        "nozomi": 3
+        "blockrazor": 1,
+        "nozomi": 4,
+        "astralane": 4
       }
     },
     "pool_nonce": {
@@ -450,7 +396,16 @@
       "wait_s": 3.2,
       "pending_shift": false,
       "pending_why": null,
-      "shift_signature": null
+      "shift_signature": null,
+      "warm": {
+        "есть": true,
+        "возраст_с": 10.48,
+        "почему": "",
+        "обновлений": 1,
+        "взят_тёплым": 0,
+        "взят_по_сети": 0,
+        "срок_с": 30.0
+      }
     }
   },
   "leg_cache": {
@@ -476,7 +431,7 @@
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-25T20:06:32Z",
+    "last_utc": "2026-09-25T23:20:40Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -502,13 +457,8 @@
   },
   "credits_logged": true,
   "credits_log_error": "",
-  "decide_latency_ms": {
-    "n": 6,
-    "median": 0.6,
-    "min": 0.2,
-    "max": 22.3
-  }
+  "decide_latency_ms": null
 }--- решений в журнале ---
-445476
+2643
 --- позиций в журнале (должно быть 0: покупать нечем) ---
-1179
+416
