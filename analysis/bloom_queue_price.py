@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import time
@@ -58,9 +59,11 @@ import c2_followers_growth as CF  # noqa: E402
 # приоритет. Значение сетевое, не наше: 5000 лампортов за подпись.
 ТАРИФ_ПОДПИСИ_ЛАМПОРТЫ = 5000
 ЛАМПОРТОВ_В_SOL = 1_000_000_000
-# Уровень версий транзакций: legacy и v0. Без этого узел отказывает на
-# блоках, где есть версионные транзакции, а они есть почти во всех.
-ПОТОЛОК_ВЕРСИИ_TX = 0
+# Уровень версий транзакций. Узел отказывает на целом блоке, если в нём
+# есть транзакция версии выше заявленной: первый прогон 25.09 получил
+# "Transaction version (1) is not supported" и не разобрал ни одного блока.
+# Значение то же, что у детектора (BLOOM_MAX_TX_VERSION, по умолчанию 1).
+ПОТОЛОК_ВЕРСИИ_TX = int((os.environ.get("BLOOM_MAX_TX_VERSION") or "1").strip() or 1)
 # Порог опознания счёта чаевых ПО ЧАСТОТЕ: столько разных плательщиков
 # должно заплатить одному адресу в одном блоке. Тот же приём и тот же порог,
 # что в c2_followers_growth (TIP_MIN_WALLETS).
@@ -534,7 +537,8 @@ def стоимость_прогона(n_покупок: int, *, транзакц
             "what": "2 x getBlock (S+0 и наш слот) + 1 x getTransaction нашей покупки"}
 
 
-def покупки_из_позиций(позиции: dict, *, с_даты_ts: float | None = None) -> list:
+def покупки_из_позиций(позиции: dict, *, с_даты_ts: float | None = None,
+                        режим_боевой=None) -> list:
     """Наши покупки из позиций: и Bloom, и полоса, одним списком.
 
     Берётся только то, у чего есть ПОДПИСЬ НАШЕЙ транзакции и слот: без них
@@ -543,14 +547,22 @@ def покупки_из_позиций(позиции: dict, *, с_даты_ts: 
     """
     из_ = []
     for cid, п in (позиции or {}).items():
-        подпись = (п.get("lane_signature") or п.get("lane_signature_local")
-                   or п.get("our_tx_signature") or п.get("signature"))
-        слот = (п.get("own_tx_seen_slot") or п.get("our_tx_slot")
-                or п.get("slot"))
+        # ИМЕНА ПОЛЕЙ -- ТЕ ЖЕ, ЧТО У ДОГОНА МЕСТА В БЛОКЕ в детекторе.
+        # У покупки Bloom подпись приходит списком от площадки (signatures),
+        # у полосы лежит своим полем: своя отправка через площадку не идёт.
+        подписи = п.get("signatures") or []
+        подпись = (подписи[0] if подписи else
+                    (п.get("lane_signature") or п.get("lane_signature_local")))
+        слот = п.get("our_slot") or п.get("own_tx_seen_slot")
         ts = п.get("ts_intent") or п.get("ts_sent")
         if с_даты_ts and ts and float(ts) < float(с_даты_ts):
             continue
         если_нет = []
+        # СУХИЕ И СТЕНДОВЫЕ ПОЗИЦИИ В РАЗБОР НЕ ИДУТ: у них нет транзакции в
+        # цепи вовсе, и считать их "покупками без места в блоке" значило бы
+        # разбавить доли а/б/в тишиной.
+        if режим_боевой is not None and not режим_боевой(п.get("mode")):
+            если_нет.append(f"режим не боевой: {п.get('mode')!r}")
         if not подпись:
             если_нет.append("нет подписи нашей транзакции")
         if не_задан(слот):
@@ -813,11 +825,16 @@ def self_test() -> int:
     поз = {"c1": {"mint": "M1", "lane": "own_send", "lane_signature": "L1",
                    "own_tx_seen_slot": 10, "source_sig": "S1", "source_slot": 9,
                    "ts_intent": 100.0},
-            "c2": {"mint": "M2", "our_tx_signature": "B1", "our_tx_slot": 20,
+            "c2": {"mint": "M2", "signatures": ["B1"], "our_slot": 20,
                    "source_sig": "S2", "source_slot": 19, "ts_intent": 200.0},
             "c3": {"mint": "M3", "source_sig": "S3", "source_slot": 30,
                    "ts_intent": 300.0}}
     список = покупки_из_позиций(поз)
+    chk("сухая позиция в разбор не идёт и причина названа",
+        "режим не боевой" in покупки_из_позиций(
+            {"d1": {"mint": "M", "signatures": ["X"], "our_slot": 1,
+                     "source_sig": "S", "source_slot": 1, "mode": "dry"}},
+            режим_боевой=lambda м: м == "live")[0]["skip_why_not"], "")
     chk("в список попадают и полоса, и Bloom, по времени",
         [р["client_order_id"] for р in список] == ["c1", "c2", "c3"], список)
     chk("у покупки без подписи и слота названа причина, а не тишина",
@@ -875,7 +892,14 @@ def main() -> int:
     if a.since:
         с_даты = time.mktime(time.strptime(a.since, "%Y-%m-%d")) if len(a.since) == 10 \
             else float(a.since)
-    покупки = покупки_из_позиций(состояние.positions(), с_даты_ts=с_даты)
+    покупки = покупки_из_позиций(состояние.positions(), с_даты_ts=с_даты,
+                                  режим_боевой=ST.is_real_mode)
+    причины: dict = {}
+    for р in покупки:
+        if р["skip_why_not"]:
+            причины[р["skip_why_not"]] = причины.get(р["skip_why_not"], 0) + 1
+    for почему, сколько in sorted(причины.items(), key=lambda п: -п[1]):
+        print(f"  пропущено {сколько}: {почему}")
     годные = [р for р in покупки if not р["skip_why_not"]][:a.max_trades]
     цена = стоимость_прогона(len(годные))
     print(f"покупок всего {len(покупки)}, годных для разбора {len(годные)}, "
