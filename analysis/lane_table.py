@@ -84,6 +84,27 @@ def строки_таблицы(позиции: dict, *, с_utc: str = "", ме�
     return ряд
 
 
+def _цепь_словами(з: dict) -> str:
+    ц = з.get("chain") or {}
+    if not ц:
+        return "не проверяли"
+    if ц.get("why_not"):
+        return str(ц["why_not"])[:60]
+    if ц.get("landed") is True:
+        хвост = f", ошибка {ц['err']}" if ц.get("err") else ""
+        return f"села {str(ц.get('signature'))[:12]} в слоте {ц.get('slot')}{хвост}"
+    if ц.get("landed") is False:
+        return f"не села ни одна из {ц.get('checked')} подписей"
+    return "—"
+
+
+def _токен_словами(з: dict) -> str:
+    ц = з.get("chain") or {}
+    if ц.get("token_ui") is None:
+        return "—"
+    return f"{ц['token_ui']} (счетов {ц.get('token_accounts')})"
+
+
 def в_цели(з: dict, голова: int = 100) -> str:
     """Цель владельца 25.09: S+0 в любом месте ИЛИ голова S+1 (место <= 100)."""
     о = з.get("slots_behind")
@@ -99,11 +120,75 @@ def в_цели(з: dict, голова: int = 100) -> str:
     return f"нет (S+{о})"
 
 
+def проверить_по_цепи(ряды: list, позиции: dict, rpc_call) -> list:
+    """Что с этими покупками В ЦЕПИ: села ли подпись и держим ли токен.
+
+    ЗАЧЕМ. Позиция в состоянии unsold без полей цепи (нет chain_ok, нет слота,
+    нет купленного количества) значит одно из двух: либо транзакция не села
+    вовсе -- и тогда терять нечего, кроме чаевых, -- либо она села, а мы её не
+    узнали, и на кошельке полосы лежит токен, который никто не продаёт. Разница
+    в деньгах, и решает её только цепь.
+    """
+    for з in ряды:
+        п = позиции.get(з["cid"]) or {}
+        кандидаты = [к for к in (п.get("lane_pool_candidates") or []) if к]
+        если_одна = п.get("lane_signature")
+        if если_одна and если_одна not in кандидаты:
+            кандидаты.append(если_одна)
+        з["chain"] = {"checked": len(кандидаты), "landed": None, "signature": None,
+                       "slot": None, "err": None, "token_ui": None,
+                       "token_accounts": 0, "why_not": None}
+        if not кандидаты:
+            з["chain"]["why_not"] = "подписей в позиции нет"
+            continue
+        try:
+            от = rpc_call("getSignatureStatuses",
+                           [кандидаты, {"searchTransactionHistory": True}])
+        except Exception as exc:  # noqa: BLE001
+            з["chain"]["why_not"] = f"узел не ответил: {type(exc).__name__}"
+            continue
+        значения = ((от or {}).get("value") or [])
+        села = None
+        for подпись, зн in zip(кандидаты, значения):
+            if зн and зн.get("slot") is not None:
+                села = (подпись, зн)
+                break
+        if села is None:
+            з["chain"]["landed"] = False
+        else:
+            подпись, зн = села
+            з["chain"].update(landed=True, signature=подпись, slot=зн.get("slot"),
+                               err=json.dumps(зн.get("err"), ensure_ascii=False)
+                               if зн.get("err") else None,
+                               status=зн.get("confirmationStatus"))
+        # ДЕРЖИМ ЛИ ТОКЕН. Это и есть ответ "лежат ли деньги в минте".
+        минт = п.get("mint")
+        кош = п.get("wallet") or п.get("lane_wallet")
+        if минт and кош:
+            try:
+                тк = rpc_call("getTokenAccountsByOwner",
+                               [кош, {"mint": минт},
+                                {"encoding": "jsonParsed", "commitment": "confirmed"}])
+                счета = ((тк or {}).get("value") or [])
+                з["chain"]["token_accounts"] = len(счета)
+                сумма = 0.0
+                for с in счета:
+                    инфо = (((с.get("account") or {}).get("data") or {})
+                            .get("parsed") or {}).get("info") or {}
+                    сумма += float(((инфо.get("tokenAmount") or {})
+                                     .get("uiAmount")) or 0.0)
+                з["chain"]["token_ui"] = сумма
+            except Exception as exc:  # noqa: BLE001
+                з["chain"]["why_not"] = (з["chain"].get("why_not") or "") + \
+                                         f" токены не прочитаны: {type(exc).__name__}"
+    return ряды
+
+
 def таблица(ряд: list) -> str:
     ряды = ["| время UTC | группа | минт | размер SOL | слот источника | наш слот | "
              "S+N | место в блоке | кто довёз | режим | от сигнала до появления, мс | "
-             "от отправки, мс | в цели | состояние | чаевые SOL |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "от отправки, мс | в цели | состояние | чаевые SOL | по цепи | токен на кошельке |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
 
     def ч(з):
         return "—" if з is None or з == "" else str(з)
@@ -118,7 +203,7 @@ def таблица(ряд: list) -> str:
             f"{место} | {ч(з['winner'])} | {ч(з['mode'])} | {ч(з['from_signal_ms'])} | "
             f"{ч(з['send_to_seen_ms'])} | {в_цели(з)} | "
             f"{ч(з['state'])}{' (цепь ok)' if з.get('chain_ok') else ''} | "
-            f"{ч(з['tips_sol'])} |")
+            f"{ч(з['tips_sol'])} | {_цепь_словами(з)} | {_токен_словами(з)} |")
     return "\n".join(ряды)
 
 
@@ -130,11 +215,23 @@ def main() -> int:
     р.add_argument("--since", default="", help="только позиции с этого UTC, например 2026-09-25T15:13")
     р.add_argument("--out-md", default=None)
     р.add_argument("--out-json", default=None)
+    р.add_argument("--chain", action="store_true",
+                    help="проверить по цепи: села ли подпись и держим ли токен")
     р.add_argument("--raw-json", default=None,
                     help="полные записи позиций полосы окна (ключей в них нет)")
     а = р.parse_args()
     поз = позиции_из_журнала(а.positions)
     ряд = строки_таблицы(поз, с_utc=а.since)
+    if а.chain:
+        import solana_rpc_client as RPC  # noqa: PLC0415
+
+        клиент = RPC.SolanaRpc(service="lane_table")
+
+        def зов(метод, параметры):
+            от = клиент.call(метод, параметры)
+            return от.get("result") if isinstance(от, dict) and "result" in от else от
+
+        ряд = проверить_по_цепи(ряд, поз, зов)
     т = таблица(ряд)
     print(f"позиций в журнале: {len(поз)}, покупок полосы в окне: {len(ряд)}")
     print(т)

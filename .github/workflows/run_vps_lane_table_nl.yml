@@ -53,13 +53,15 @@ jobs:
           echo "positions.jsonl: $(wc -c < /tmp/bloom_state/positions.jsonl) байт, строк $(wc -l < /tmp/bloom_state/positions.jsonl)"
 
       - name: "Таблица покупок полосы"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
           set -e
           set -o pipefail
           mkdir -p data
           python3 analysis/lane_table.py \
             --positions /tmp/bloom_state/positions.jsonl \
-            --since '${{ inputs.since }}' \
+            --since '${{ inputs.since }}' --chain \
             --out-md data/lane_table.md \
             --out-json data/lane_table.json \
             --raw-json data/lane_table_raw.json | tail -40
