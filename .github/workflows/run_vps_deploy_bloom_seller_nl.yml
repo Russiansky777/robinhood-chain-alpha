@@ -217,10 +217,18 @@ jobs:
         run: |
           set -e
           # Читаем только два значения и только их. Ключи не печатаются.
-          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID)=' $ENV_DIR/env || true")
+          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID|JUPITER_API_KEY)=' $ENV_DIR/env || true")
           LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
           BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
           LG=$(echo "$PREV" | sed -n 's/^TELEGRAM_LOG_CHAT_ID=//p' | tail -1)
+          # Ключ Jupiter V2: этот шаг перезаписывает env ЦЕЛИКОМ, и ключ,
+          # положенный отдельным прогоном, стирался молча -- путь продажи
+          # возвращался на Ultra, и признак жизни об этом не говорил.
+          # Длина, не значение: значение в журнал не идёт.
+          JK=$(echo "$PREV" | sed -n 's/^JUPITER_API_KEY=//p' | tail -1)
+          echo "прежний JUPITER_API_KEY: длина ${#JK}"
+          echo "::add-mask::$JK"
+          echo "JUP_KEY_PREV=$JK" >> $GITHUB_ENV
           echo "прежний BLOOM_LIVE_BUY=[$LB], BLOOM_BUY_SOL=[$BS], журнальный чат=[$LG]"
           echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
           echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
@@ -233,6 +241,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_LOG_CHAT_ID: ${{ github.event.inputs.telegram_log_chat_id || env.LOG_CHAT_PREV }}
+          JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY || env.JUP_KEY_PREV }}
           LIVE_SELL: ${{ github.event.inputs.live_sell || '0' }}
           SELL_AFTER_S: ${{ github.event.inputs.sell_after_s || '28.8' }}
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
@@ -270,6 +279,12 @@ jobs:
             # должно. В логи он не попадает -- пишется через переменную.
             echo "BLOOM_SELL_VIA_JUPITER=$VIA_JUPITER"
             if [ "$VIA_JUPITER" = "1" ]; then echo "EXEC_WALLET_KEY=$EXEC_WALLET_KEY"; fi
+            # Ключ Swap V2. Есть ключ -> путь swap-v2, Ultra запасной; нет
+            # ключа -> Ultra. Пустым его писать нельзя: пустая строка в env
+            # означала бы "ключ есть", а он пустой.
+            if [ -n "$JUPITER_API_KEY" ]; then
+              echo "JUPITER_API_KEY=$JUPITER_API_KEY"
+            fi
             echo "BLOOM_JUP_FLOOR_PCT=70"
             echo "BLOOM_JUP_MIN_QUOTE_PCT=30"
             echo "BLOOM_LIVE_SELL=$LIVE_SELL"
