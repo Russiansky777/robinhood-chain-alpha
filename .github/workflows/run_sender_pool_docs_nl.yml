@@ -1,0 +1,112 @@
+name: "Пул отправителей: скачать документацию кандидатов (только чтение)"
+
+# Владелец 25.09: "По документации каждого: адрес в EU, нужен ли ключ,
+# минимальные чаевые и tip-счета (в data/docs/, НЕ ПО ПАМЯТИ)".
+#
+# ЗАЧЕМ ОТДЕЛЬНЫЙ ПРОГОН НА ХОСТЕ. У штаба сеть закрыта политикой окружения:
+# use.temporal.xyz, 0slot.trade, astralane.gitbook.io и docs.helius.dev
+# недоступны вовсе (403 от прокси). У NL-хоста сеть открыта -- он и так
+# каждый день говорит с Helius Sender. Поэтому страницы качает хост, а
+# разбирает их уже модуль в репозитории: так в разборе лежит то, что
+# написано в документации, а не то, что кто-то помнит.
+#
+# Ни одного секрета здесь не нужно: это публичные страницы.
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "пусто -- все; иначе имя сервиса: helius, nozomi, zeroslot, blockrazor, astralane, jito"
+        required: false
+        default: ""
+
+concurrency:
+  group: sender-pool-docs
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  OUT: data/docs/senders
+
+jobs:
+  docs:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Скачать страницы документации с хоста"
+        run: |
+          set -e
+          mkdir -p "$OUT"
+          only='${{ inputs.only }}'
+          # СПИСОК ССЫЛОК -- ТОЛЬКО НАЙДЕННЫЕ, а не угаданные. Каждая строка:
+          # сервис|имя файла|ссылка. Порядок сохраняется в отчёте.
+          cat > /tmp/sender_docs_list.txt <<'LIST'
+          helius|helius_sender.html|https://docs.helius.dev/sending-transactions/sender
+          nozomi|nozomi_transaction_submission.html|https://use.temporal.xyz/nozomi/transaction-submission
+          nozomi|nozomi_tipping_and_faq.html|https://use.temporal.xyz/nozomi/tipping-and-faq
+          nozomi|nozomi_json_rpc.html|https://use.temporal.xyz/nozomi/transaction-submission-json-rpc
+          zeroslot|zeroslot_docs.html|https://0slot.trade/docs.php
+          blockrazor|blockrazor_js_example.html|https://blockrazor.gitbook.io/blockrazor/solana/send-transaction/js
+          astralane|astralane_submit_transactions.html|https://astralane.gitbook.io/docs/low-latency/submit-transactions
+          astralane|astralane_quickstart.html|https://astralane.gitbook.io/docs/low-latency/quickstart
+          astralane|astralane_tip_refunds.html|https://astralane.gitbook.io/docs/low-latency/submit-transactions/tip-refunds
+          jito|jito_low_latency_txn_send.html|https://docs.jito.wtf/lowlatencytxnsend/
+          LIST
+          while IFS='|' read -r svc name url; do
+            [ -n "$svc" ] || continue
+            if [ -n "$only" ] && [ "$only" != "$svc" ]; then continue; fi
+            # Качает ХОСТ: у него сеть открыта. Код ответа печатаем всегда --
+            # пустой файл без кода потом не отличить от "страница пустая".
+            code=$(ssh -n $SSH_OPTS root@$HOST "curl -sS -L --max-time 40 -o /tmp/sd.out -w '%{http_code}' '$url' || echo 000")
+            echo "$svc $name -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              ssh -n $SSH_OPTS root@$HOST "cat /tmp/sd.out" > "$OUT/$name"
+              echo "  сохранено: $(wc -c < "$OUT/$name") байт"
+            else
+              printf 'НЕ СКАЧАНО: %s (HTTP %s), время UTC %s\n' "$url" "$code" \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/$name.why_not.txt"
+            fi
+            ssh -n $SSH_OPTS root@$HOST "rm -f /tmp/sd.out"
+          done < /tmp/sender_docs_list.txt
+          ls -l "$OUT"
+
+      - name: "Разбор: адреса чаевых, минимумы, ключи"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then PY=python3; else PY=python3; fi
+          "$PY" analysis/sender_pool_docs.py --self-test
+          "$PY" analysis/sender_pool_docs.py --docs-dir "$OUT" \
+            --out data/sender_pool_candidates.json \
+            --out-md docs/sender_pool_candidates.md 2>&1 | tail -60
+
+      - name: "Коммит документации и разбора"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/docs/senders docs/sender_pool_candidates.md data/sender_pool_candidates.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pul otpraviteley: dokumentatsiya kandidatov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
