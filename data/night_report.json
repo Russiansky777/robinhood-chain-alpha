@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-09-25T02:04:22Z",
+  "generated_utc": "2026-09-25T02:24:07Z",
   "since_utc": "2026-09-24T00:00:00Z",
   "state_dir": "/tmp/night_state",
-  "decisions_rows": 481,
+  "decisions_rows": 523,
   "positions": 31,
   "lane": {
     "positions": 0,
@@ -31,16 +31,16 @@
     "rows": []
   },
   "shadow": {
-    "total": 19,
+    "total": 29,
     "by_verdict": {
-      "would_pass": 7,
-      "нет вердикта": 12
+      "would_pass": 8,
+      "нет вердикта": 21
     },
     "not_built_reasons": {
-      "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 12
+      "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 21
     },
-    "build_ms_median": 0.76,
-    "sim_ms_median": 13.7
+    "build_ms_median": 0.73,
+    "sim_ms_median": 14.35
   },
   "skips": {
     "count": 0,
@@ -51,6 +51,18 @@
     "saved_sol_estimate": null,
     "assumed_size_sol": 0.2,
     "rows": []
+  },
+  "decisions": {
+    "buys": 7,
+    "by_code": {
+      "NOT_A_BUY": 118,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 90,
+      "SKIP_TARGET_INCREASE_POSITION": 69,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 68,
+      "BUY": 7,
+      "SKIPPED_DUP_MINT": 2,
+      "THRESHOLD_EDGE": 1
+    }
   },
   "closed_breakdown": {
     "count": 25,
@@ -65,13 +77,17 @@
         "sol_in": 0.001,
         "sol_back_net": -0.001207455,
         "result_sol": -0.002207455,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 3e-05,
         "bloom_fee_sol": 2.2075e-05,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": 0.00181462,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.00184462,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "fccb81b2654f4082bdc7a22659c8bdd1",
@@ -82,12 +98,16 @@
         "sol_back_net": -0.00095024,
         "result_sol": -0.00195024,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 1.9502e-05,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.002069262,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "5b68bd6f7faa4493b2e40b36b9f67f03",
@@ -98,12 +118,16 @@
         "sol_back_net": -0.002503138,
         "result_sol": -0.003503138,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 3.5031e-05,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.000531893,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "8657d4f891814466834277b6e628be7a",
@@ -114,12 +138,16 @@
         "sol_back_net": -0.001218734,
         "result_sol": -0.002218734,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 2.2187e-05,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.001803453,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "9d4b422989754e4d8e3d391199c1c25f",
@@ -130,12 +158,16 @@
         "sol_back_net": -0.001038022,
         "result_sol": -0.002038022,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 2.038e-05,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.001982358,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "d5af7ba5a4a54144a46e438db04522c4",
@@ -145,13 +177,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.042255689,
         "result_sol": -0.007744311,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0015,
         "bloom_fee_sol": 0.000922557,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.002821754,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.001321754,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "70213ddb0eb84abd8cb087ab691538c8",
@@ -161,13 +197,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.052067338,
         "result_sol": 0.002067338,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0015,
         "bloom_fee_sol": 0.001020673,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": 0.007088011,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.008588011,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "fd3ef73b617541a8a5d9decc9ad1e526",
@@ -177,13 +217,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.049978605,
         "result_sol": -2.1395e-05,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0015,
         "bloom_fee_sol": 0.000999786,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": 0.004978391,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.006478391,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "eaf97bfca7a24775bb1b58bd986ff53e",
@@ -193,13 +237,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.044625306,
         "result_sol": -0.005374694,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 100,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0005,
         "bloom_fee_sol": 0.000946253,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.000428441,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 7.1559e-05,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "4511406b44cd4c079e47d0e4e545ceeb",
@@ -209,13 +257,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.042673286,
         "result_sol": -0.007326714,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0015,
         "bloom_fee_sol": 0.000926733,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.002399981,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.000899981,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "f8e1fa83a99c4c68afc568ceeff5ac1a",
@@ -225,13 +277,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.049013315,
         "result_sol": -0.000986685,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 100,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0005,
         "bloom_fee_sol": 0.000990133,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": 0.004003448,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.004503448,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "d73ef5727f854173979d2e176d191585",
@@ -241,13 +297,17 @@
         "sol_in": 0.05,
         "sol_back_net": 0.043994182,
         "result_sol": -0.006005818,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 100,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.0005,
         "bloom_fee_sol": 0.000939942,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.001065876,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.000565876,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "0f1fc260a5104c8baad39af2d2815506",
@@ -257,13 +317,17 @@
         "sol_in": 0.2,
         "sol_back_net": 0.180285064,
         "result_sol": -0.019714936,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 100,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.002,
         "bloom_fee_sol": 0.003802851,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.011912085,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.009912085,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "568e9daf669f4f0486bab5ff25cf9bee",
@@ -274,12 +338,16 @@
         "sol_back_net": 0.165161817,
         "result_sol": -0.034838183,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.003651618,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": -0.027186565,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "c3e9882942c34c9f9977340b01106268",
@@ -290,12 +358,16 @@
         "sol_back_net": 0.204771024,
         "result_sol": 0.004771024,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.00404771,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.012818734,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "6c36e5fcaafe4dd3ac64913d16ee598e",
@@ -305,13 +377,17 @@
         "sol_in": 0.2,
         "sol_back_net": 0.185912493,
         "result_sol": -0.014087507,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.006,
         "bloom_fee_sol": 0.003859125,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.006228382,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.000228382,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "2472a4f45fd443c8a1fa739bc611d416",
@@ -322,12 +398,16 @@
         "sol_back_net": 0.185744725,
         "result_sol": -0.014255275,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.003857447,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": -0.006397828,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "6d188ddcd47645d789c96095376aee56",
@@ -338,12 +418,16 @@
         "sol_back_net": 0.201388785,
         "result_sol": 0.001388785,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.004013888,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.009402673,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "9326f38495d7448ebd943e4bcfd2e819",
@@ -353,13 +437,17 @@
         "sol_in": 0.2,
         "sol_back_net": 0.219853283,
         "result_sol": 0.019853283,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.006,
         "bloom_fee_sol": 0.004198533,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": 0.028051816,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.034051816,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "2e2656e1c4ce4c898686a86c5c741fd1",
@@ -370,12 +458,16 @@
         "sol_back_net": 0.197313361,
         "result_sol": -0.002686639,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.003973134,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.005286495,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "7b11a2d6f2284e50a6d9e275f9e2b824",
@@ -385,13 +477,17 @@
         "sol_in": 0.2,
         "sol_back_net": 0.169971707,
         "result_sol": -0.030028293,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.006,
         "bloom_fee_sol": 0.003699717,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.022328576,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": -0.016328576,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "479c1420b13d4231bd89024177df5949",
@@ -402,12 +498,16 @@
         "sol_back_net": 0.369811661,
         "result_sol": 0.169811661,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.005698117,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.179509778,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "c59762d7b631413b82cf3a340ef64238",
@@ -418,12 +518,16 @@
         "sol_back_net": 0.2073318,
         "result_sol": 0.0073318,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.004073318,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.015405118,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       },
       {
         "cid": "bc581ef4d66f48b4b44a4ddbc7ac4b39",
@@ -433,13 +537,17 @@
         "sol_in": 0.2,
         "sol_back_net": 0.18683019,
         "result_sol": -0.01316981,
-        "route_fee_bps": null,
-        "tax_sol": null,
+        "route_fee_bps": 300,
+        "fee_bps_source": "token_only",
+        "tax_sol": 0.006,
         "bloom_fee_sol": 0.003868302,
-        "priority_and_tips_sol": 0.004,
-        "residual_sol": -0.005301508,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.000698492,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       },
       {
         "cid": "52b37d39546c4af283815264c9762dff",
@@ -450,17 +558,21 @@
         "sol_back_net": 0.202927743,
         "result_sol": 0.002927743,
         "route_fee_bps": null,
+        "fee_bps_source": null,
         "tax_sol": null,
         "bloom_fee_sol": 0.004029277,
-        "priority_and_tips_sol": 0.004,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
         "residual_sol": 0.01095702,
         "residual_is_price_move": false,
-        "why_not": "налог по маршруту не посчитан -- остаток не только цена"
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула; налог не известен вовсе"
       }
     ]
   },
   "heartbeat": {
-    "updated_utc": "2026-09-25T02:03:57Z",
+    "updated_utc": "2026-09-25T02:23:49Z",
     "own_send": {
       "enabled": true,
       "live": true,
@@ -470,8 +582,8 @@
       "sent": 0,
       "by_stage": {},
       "bought_backfilled": 0,
-      "blockhash_age_s": 2.0,
-      "blockhash_updates": 86,
+      "blockhash_age_s": 12.0,
+      "blockhash_updates": 40,
       "blockhash_why_not": "",
       "last": {},
       "lane_kill": [
@@ -495,31 +607,25 @@
     },
     "shadow": {
       "enabled": true,
-      "built": 12,
-      "would_pass": 5,
+      "built": 0,
+      "would_pass": 0,
       "over_cap": 0,
       "failed": 0,
       "module_loaded": true,
       "module_why_not": "",
-      "passed_in_row_by_pool": {
-        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 5,
-        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
-        "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0
-      },
+      "passed_in_row_by_pool": {},
       "hour": {
-        "since_ts": 1790300814.0559523,
-        "since_utc": "2026-09-25T01:46:54Z",
-        "signals": 12,
-        "built": 5,
+        "since_ts": 1790302548.5207105,
+        "since_utc": "2026-09-25T02:15:48Z",
+        "signals": 0,
+        "built": 0,
         "sim_failed": 0,
-        "not_built": {
-          "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 7
-        },
+        "not_built": {},
         "crashed": 0
       },
       "restarts": 0,
       "last_restart_utc": "",
-      "credits_day": 5,
+      "credits_day": 6,
       "credits_write_why_not": ""
     },
     "route_tax_filter": {
@@ -557,7 +663,7 @@
     "subscribe_main_path": true
   },
   "seller": {
-    "updated_utc": "2026-09-25T02:04:13Z",
+    "updated_utc": "2026-09-25T02:23:58Z",
     "mode": "live",
     "jupiter": {
       "enabled": true,
@@ -578,7 +684,7 @@
   "research": {
     "p1": {
       "ok": true,
-      "built_utc": "2026-09-25T02:04:22Z",
+      "built_utc": "2026-09-25T02:24:07Z",
       "pickaxe": {
         "ok": true,
         "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
