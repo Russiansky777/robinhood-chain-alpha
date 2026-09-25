@@ -821,6 +821,20 @@ def таблица_кругов(state: ST.ExecState, строки: list, мес�
             "crowd_between": (м.get("crowd_between") or {}).get("count")
                               if isinstance(м.get("crowd_between"), dict)
                               else м.get("crowd_between"),
+            # ПЛОЩАДКА И ЧИСЛО ШАГОВ МАРШРУТА BLOOM. Владелец 25.09 спросил
+            # их рядом с кругами: без них непонятно, сравниваем ли мы
+            # одинаковые сделки. Пишутся разбором нашей покупки.
+            "pool_programs": p_.get("our_route_programs"),
+            "route_hops": p_.get("our_route_hops"),
+            "pool_direct": p_.get("our_pool_direct"),
+            # АБСОЛЮТНОЕ МЕСТО В БЛОКЕ. Его добирает сам детектор на пульсе
+            # (один getBlock уровня signatures), поэтому берётся из позиции, а
+            # не из отдельного прогона. Пусто -- значит ещё не добрано или
+            # блок недоступен, а не "первое место".
+            "block_index": p_.get("block_index"),
+            "block_total": p_.get("block_total"),
+            "block_share": p_.get("block_share"),
+            "block_why_not": p_.get("block_why_not"),
             "sell_after_s_plan": p_.get("sell_after_s"),
             "sell_seconds": закр.get("seconds"),
             "sell_slot": итог.get("slot"),
@@ -1102,6 +1116,15 @@ def в_текст(о: dict) -> str:
                  f"источника {ч(r.get('block_index_delta'))}, впереди "
                  f"{ч(r.get('ahead_of_source'))}, толпа между "
                  f"{ч(r.get('crowd_between'))}")
+        # Площадка, шаги и абсолютное место -- отдельной строкой: по ним
+        # видно, сравнимы ли сделки между собой и с синтетическим тестом.
+        доля = r.get("block_share")
+        L.append(f"      маршрут: площадка {ч(r.get('pool_programs'))}, шагов "
+                 f"{ч(r.get('route_hops'))}, напрямую {ч(r.get('pool_direct'))}"
+                 f" · место в блоке {ч(r.get('block_index'))} из "
+                 f"{ч(r.get('block_total'))}"
+                 + (f" (доля {доля})" if доля is not None else "")
+                 + (f" · {r['block_why_not']}" if r.get("block_why_not") else ""))
         L.append(f"      продажа: план {ч(r.get('sell_after_s_plan'), ' с')}, факт "
                  f"{ч(r.get('sell_seconds'), ' с')}, слот {ч(r.get('sell_slot'))}, "
                  f"через {ч(r.get('closed_via'))}")
@@ -1527,9 +1550,32 @@ def self_test() -> None:
             круги2[0]["sell_seconds"] == 29.1
             and круги2[0]["block_index_delta"] == -3
             and круги2[0]["crowd_between"] == 2, круги2[0])
+        # ---- ПЛОЩАДКА, ШАГИ И АБСОЛЮТНОЕ МЕСТО (владелец 25.09) ----
+        # Без них непонятно, сравнимы ли боевые сделки с синтетическим тестом:
+        # у теста был один шаг на Pump AMM, а Bloom водит и через DLMM.
+        chk("площадка и число шагов маршрута Bloom в круге",
+            круги2[0]["pool_programs"] == "Raydium CLMM,Raydium CPMM"
+            and круги2[0]["route_hops"] == 2, круги2[0])
+        chk("места в блоке ещё нет -- поле пустое, а не нулевое",
+            круги2[0]["block_index"] is None and круги2[0]["block_total"] is None
+            and круги2[0]["block_share"] is None, круги2[0])
+        st.update_position("c", block_index=187, block_total=1204,
+                            block_share=0.1553)
+        круги3 = таблица_кругов(st, реш_кр, место_кр)
+        chk("добранное место в блоке попадает в круг",
+            круги3[0]["block_index"] == 187 and круги3[0]["block_total"] == 1204
+            and круги3[0]["block_share"] == 0.1553, круги3[0])
+        st.update_position("c", block_why_not="нашей подписи в этом блоке нет")
+        круги4 = таблица_кругов(st, реш_кр, место_кр)
+        chk("причина, по которой места нет, тоже видна",
+            круги4[0]["block_why_not"] == "нашей подписи в этом блоке нет",
+            круги4[0].get("block_why_not"))
         текст_кр = в_текст(отчёт(state=st))
         chk("таблица кругов печатается и пустое поле видно чертой",
             "таблица кругов" in текст_кр and "не мерили" in текст_кр, текст_кр[:200])
+        chk("строка маршрута и места печатается",
+            "маршрут: площадка" in текст_кр and "место в блоке" in текст_кр,
+            [с for с in текст_кр.split("\n") if "маршрут:" in с][:1])
 
         # --- ИТОГ ГРУППЫ "ТОЛЬКО МЫ" считается по позициям, а не по журналу:
         # журнал говорит, что мы хотели купить, а сколько вернулось -- знает
