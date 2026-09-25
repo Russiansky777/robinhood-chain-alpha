@@ -48,6 +48,36 @@ def позиции_из_журнала(путь: str) -> dict:
     return из_
 
 
+def пара_bloom(позиции: dict, подпись_источника: str | None,
+                метка: str = "own_send") -> dict:
+    """Покупка BLOOM по ТОМУ ЖЕ сигналу, что и наша покупка полосы.
+
+    Владелец 25.09 (вечер): "В часовую таблицу -- столбец «пара»: слот и место
+    Bloom рядом с нашими". Пара ищется по подписи источника: у позиции Bloom
+    метки полосы нет вовсе, а source_sig у обеих один. Ничего не достраиваем:
+    нет пары -- так и сказано словами.
+    """
+    из_ = {"есть": False, "slot": None, "slots_behind": None,
+            "block_index": None, "block_total": None, "sol_in": None,
+            "state": None, "signature": None}
+    if not подпись_источника:
+        return из_
+    for п in (позиции or {}).values():
+        if п.get("lane") == метка or п.get("source_sig") != подпись_источника:
+            continue
+        слот = п.get("own_tx_seen_slot") or п.get("our_slot")
+        их = п.get("source_slot")
+        подписи = п.get("signatures") or []
+        из_.update(
+            есть=True, slot=слот, sol_in=п.get("sol_in"), state=п.get("state"),
+            block_index=п.get("block_index"), block_total=п.get("block_total"),
+            signature=(подписи[0] if подписи else None),
+            slots_behind=((слот - их) if isinstance(слот, int)
+                           and isinstance(их, int) else None))
+        return из_
+    return из_
+
+
 def строки_таблицы(позиции: dict, *, с_utc: str = "", метка: str = "own_send") -> list:
     ряд = []
     for cid, п in позиции.items():
@@ -79,6 +109,9 @@ def строки_таблицы(позиции: dict, *, с_utc: str = "", ме�
             "accepted_first": (п.get("lane_signature_accepted_first") or "")[:16],
             "tips_sol": п.get("lane_tips_total_sol"),
             "uncountable": п.get("result_uncountable"),
+            # ПАРА: покупка Bloom по тому же сигналу -- ради неё Bloom и
+            # включён на 38 кошельках lane_only (решение владельца 25.09).
+            "pair": пара_bloom(позиции, п.get("source_sig"), метка),
         })
     ряд.sort(key=lambda з: з["utc"])
     return ряд
@@ -279,6 +312,17 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
                         з["s0"]["examples"] = пк.get("examples")
                     else:
                         з["s0"]["why_not"] = пк.get("why_not")
+        # МЕСТО BLOOM В ЕГО БЛОКЕ -- тем же блоком, если детектор не записал.
+        пара = з.get("pair") or {}
+        if пара.get("есть") and пара.get("block_index") is None \
+                and пара.get("signature") and isinstance(пара.get("slot"), int):
+            бб = блок(пара["slot"])
+            if бб.get("known"):
+                иб = BP.индекс_подписи(бб, пара["signature"])
+                if иб is not None:
+                    пара["block_index"] = иб
+                    пара["block_total"] = бб.get("total")
+                    пара["block_index_from"] = "цепь"
         # НАШЕ МЕСТО В БЛОКЕ -- добор по цепи (задача владельца 25.09 п. 4).
         if з.get("block_index") is None:
             ц = з.get("chain") or {}
@@ -301,6 +345,18 @@ def разобрать_блоки(ряды: list, позиции: dict, rpc_call
     return ряды
 
 
+def _пара_словами(з: dict) -> str:
+    """Пара Bloom одной клеткой: S+N и место, или прямо сказано, что пары нет."""
+    п = з.get("pair") or {}
+    if not п.get("есть"):
+        return "Bloom не покупал"
+    sn = (f"S+{п['slots_behind']}" if п.get("slots_behind") is not None else "S+?")
+    место = (f"{п['block_index']}/{п['block_total']}"
+             if п.get("block_index") is not None else "место -")
+    размер = (f", {п['sol_in']} SOL" if п.get("sol_in") else "")
+    return f"{sn}, {место}{размер}"
+
+
 def _s0_словами(з: dict) -> tuple:
     """Две клетки таблицы: место источника и "S+0 был возможен"."""
     с = з.get("s0") or {}
@@ -319,10 +375,11 @@ def _s0_словами(з: dict) -> tuple:
 
 def таблица(ряд: list) -> str:
     ряды = ["| время UTC | группа | минт | размер SOL | слот источника | место источника | "
-             "наш слот | S+N | место в блоке | S+0 был возможен | кто довёз | режим | "
+             "наш слот | S+N | место в блоке | S+0 был возможен | "
+             "пара Bloom (S+N, место) | кто довёз | режим | "
              "от сигнала до появления, мс | от отправки, мс | в цели | состояние | "
              "чаевые SOL | по цепи | токен на кошельке |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
 
     def ч(з):
         return "—" if з is None or з == "" else str(з)
@@ -335,7 +392,8 @@ def таблица(ряд: list) -> str:
             f"| {ч(з['utc'])} | {ч(з['group'])} | {ч(з['mint'])} | {ч(з['size_sol'])} | "
             f"{ч(з['source_slot'])} | {место_и} | {ч(з['our_slot'])} | "
             f"{('S+' + str(з['slots_behind'])) if з['slots_behind'] is not None else '—'} | "
-            f"{место} | {был_s0} | {ч(з['winner'])} | {ч(з['mode'])} | {ч(з['from_signal_ms'])} | "
+            f"{место} | {был_s0} | {_пара_словами(з)} | "
+            f"{ч(з['winner'])} | {ч(з['mode'])} | {ч(з['from_signal_ms'])} | "
             f"{ч(з['send_to_seen_ms'])} | {в_цели(з)} | "
             f"{ч(з['state'])}{' (цепь ok)' if з.get('chain_ok') else ''} | "
             f"{ч(з['tips_sol'])} | {_цепь_словами(з)} | {_токен_словами(з)} |")
@@ -416,7 +474,8 @@ def строка_телеграма(ряды: list, *, с_utc: str = "", стр�
             f"{з.get('size_sol')} {з.get('mint')} {sn} "
             f"место {наше} · источник {место_и} · S+0 возможен: {возм}"
             + (f"({чужих})" if isinstance(чужих, int) else "")
-            + f" · довёз {з.get('winner') or '-'} · {з.get('state') or '-'}")
+            + f" · довёз {з.get('winner') or '-'} · {з.get('state') or '-'}"
+            + f" · пара Bloom: {_пара_словами(з)}")
     return "\n".join(из_)
 
 
