@@ -95,6 +95,10 @@ on:
         description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
         required: false
         default: "0"
+      keep_env:
+        description: "'yes' -- env на хосте НЕ трогать вовсе (доставить код и перезапустить)"
+        required: false
+        default: "no"
       pool_send:
         description: "'1' -- БОЕВОЙ ПУЛ шаг 1: одна подписанная покупка уходит ВСЕМИ подключёнными сервисами, чаевые всем <= 0.005 SOL на сделку (включено по решению владельца 25.09)"
         required: false
@@ -311,6 +315,7 @@ jobs:
           "
 
       - name: "env: ключи отправителей пула (значения только через stdin)"
+        if: ${{ github.event.inputs.keep_env != 'yes' }}
         env:
           BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
           ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
@@ -349,6 +354,7 @@ jobs:
             echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
       - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
+        if: ${{ github.event.inputs.keep_env != 'yes' }}
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
