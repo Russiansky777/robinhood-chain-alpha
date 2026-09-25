@@ -249,6 +249,12 @@ def боевое_пропуски(решения: list) -> dict:
                         "taxed_intermediates": р.get("route_taxed_intermediates"),
                         "price_s1_pct": (точки.get("+1 блок") or {}).get("vs_entry_pct"),
                         "price_288_pct": pct,
+                        # ПОЧЕМУ цены нет -- по каждой точке отдельно. "Неизвестна"
+                        # без причины выглядит как поломка замера, а на деле это
+                        # чаще всего честный отказ: у пропущенных токенов пул
+                        # настолько тонкий, что сделки в нужной точке просто нет.
+                        "price_s1_why_not": (точки.get("+1 блок") or {}).get("why_not"),
+                        "price_288_why_not": через.get("why_not"),
                         "shadow_why_not": т.get("why_not")})
     # СБЕРЕЖЁННОЕ В SOL. Считается только по тем пропускам, где тень
     # измерила цену: остальные идут в "неизвестно", а не в ноль.
@@ -464,6 +470,15 @@ def в_текст(о: dict) -> str:
         f"в {ч(пр.get('lost_better'))} (фильтр отнял), неизвестна в "
         f"{ч(пр.get('unknown'))}. Оценка сбережённого при размере "
         f"{ч(пр.get('assumed_size_sol'))} SOL: {ч(пр.get('saved_sol_estimate'), ' SOL')}.",
+        # Причины "неизвестно" -- словами, по 28.8 с. Это ответ на вопрос
+        # "фильтр сберёг или отнял": если цены нет, потому что пул не торговался,
+        # то отнимать было нечего.
+        ("Почему цена неизвестна: "
+          + ("; ".join(sorted({str(с.get("price_288_why_not"))
+                                for с in (пр.get("rows") or [])
+                                if с.get("price_288_pct") is None
+                                and с.get("price_288_why_not")})) or "—") + "."),
+
         "",
         f"**Разложение закрытых сделок с {о.get('since_utc')}.** Сделок "
         f"{ч(зак.get('count'))}, сумма итога {ч(зак.get('result_sol_sum'), ' SOL')}, "
@@ -573,6 +588,14 @@ def self_test() -> int:
             {"stage": "skip_price", "signature": "ПРОПУСК1",
              "points": [{"point": "+1 блок", "known": True, "vs_entry_pct": 2.0},
                         {"point": "+28.8 с", "known": True, "vs_entry_pct": -15.0}]},
+            # Второй пропуск: цена НЕ измерена, и причина -- по точке.
+            {"action": "skip", "code": "SKIP_TAXED_ROUTE", "signature": "ПРОПУСК2",
+             "mint": "MINTP2", "route_transfer_fee_bps": 600},
+            {"stage": "skip_price", "signature": "ПРОПУСК2",
+             "points": [{"point": "+1 блок", "known": False,
+                         "why_not": "ближайшая сделка через 6 слотов после цели -- дальше допуска 2"},
+                        {"point": "+28.8 с", "known": False,
+                         "why_not": "сделок на эту точку и позже нет"}]},
         ]
         (сост / "decisions.jsonl").write_text(
             "\n".join(json.dumps(р, ensure_ascii=False) for р in решения) + "\n",
@@ -608,8 +631,11 @@ def self_test() -> int:
             and any("котировка пула не SOL" in к
                     for к in о["lane_attempts"]["why_not"]),
             о["lane_attempts"])
+        chk("причина 'цены нет' лежит в строке пропуска по точке 28.8 с",
+            any(с.get("price_288_why_not") == "сделок на эту точку и позже нет"
+                for с in о["skips"]["rows"]), о["skips"]["rows"])
         chk("пропуск и его тень связаны по подписи",
-            о["skips"]["count"] == 1 and о["skips"]["shadow_measured"] == 1
+            о["skips"]["count"] == 2 and о["skips"]["shadow_measured"] == 1
             and о["skips"]["rows"][0]["price_288_pct"] == -15.0, о["skips"])
         chk("сбережённое считается только по измеренным пропускам",
             abs((о["skips"]["saved_sol_estimate"] or 0) - 0.03) < 1e-9,
@@ -634,6 +660,8 @@ def self_test() -> int:
             all((о["research"][к] or {}).get("missing")
                 for к in ("p1", "p2", "edge", "toxic", "leader")), о["research"])
         текст = в_текст(о)
+        chk("причина 'цены нет' названа и в тексте доклада",
+            "сделок на эту точку и позже нет" in текст, текст[:1500])
         chk("кэш ног и его цена названы в тексте",
             "Кэш ног двухшаговой тени: включён" in текст
             and "кредитов 9964 из 30000" in текст, текст[:900])
