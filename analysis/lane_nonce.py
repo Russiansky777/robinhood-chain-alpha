@@ -224,6 +224,18 @@ def self_test() -> int:
     chk("аккаунт уже есть -- создание не повторяется",
         уже["ok"] and уже.get("already") is True, уже)
 
+    # ИМЯ КЛАССА КЛИЕНТА RPC -- проверяем прямо здесь. 25.09 прогон создания
+    # nonce упал на RPC.SolanaRPCClient (такого класса нет), а выглядел
+    # успешным: падение спрятал tee в конвейере шага.
+    try:
+        import solana_rpc_client as RPCп  # noqa: PLC0415
+
+        chk("класс клиента RPC называется так, как мы его зовём",
+            hasattr(RPCп, "SolanaRpc"),
+            [и for и in dir(RPCп) if "Rpc" in и or "RPC" in и])
+    except Exception as exc:  # noqa: BLE001
+        chk("модуль клиента RPC загружается", False, type(exc).__name__)
+
     плохо = [(и, ф) for и, ок, ф in проверки if not ок]
     for имя, ок, факт in проверки:
         print(f"  [{'ok  ' if ок else 'СБОЙ'}] {имя}"
@@ -253,9 +265,18 @@ def main() -> int:
         return 0 if адр.get("ok") else 1
     import solana_rpc_client as RPC  # noqa: PLC0415
 
-    клиент = RPC.SolanaRPCClient(service="lane_nonce")
+    # Класс тот же, что у детектора и полосы: SolanaRpc. Имя проверяется здесь
+    # же, а не на хосте: 25.09 прогон создания nonce упал на неверном имени
+    # класса, и это выглядело как успех прогона (падение спрятал tee).
+    клиент = RPC.SolanaRpc(service="lane_nonce")
+
     def зов(метод, параметры):
-        return клиент.call(метод, параметры)
+        от = клиент.call(метод, параметры)
+        # call() отдаёт тело ответа; result вынимаем так же, как это делают
+        # остальные модули.
+        if isinstance(от, dict) and "result" in от:
+            return от["result"]
+        return от
 
     с = состояние(зов, адрес=адр.get("address"))
     print(json.dumps(с, ensure_ascii=False))

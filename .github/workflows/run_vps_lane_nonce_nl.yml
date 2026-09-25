@@ -62,6 +62,20 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      - name: "Вычистить негодное значение BLOOM_LANE_NONCE из окружения"
+        run: |
+          set -e
+          # 25.09 в окружение службы уехало BLOOM_LANE_NONCE=None: адрес считал
+          # системный python бегунка, у которого нет solders. Такая строка
+          # выглядит настройкой, а на деле выключает вариант пула молча. Чистим
+          # всё, что не похоже на base58-адрес, в любом режиме прогона.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            BEFORE=\$(grep -c '^BLOOM_LANE_NONCE=' $ENV_DIR/env || true)
+            sed -i '/^BLOOM_LANE_NONCE=$/d; /^BLOOM_LANE_NONCE=None$/d; /^BLOOM_LANE_NONCE=none$/d' $ENV_DIR/env
+            AFTER=\$(grep -c '^BLOOM_LANE_NONCE=' $ENV_DIR/env || true)
+            printf 'строк BLOOM_LANE_NONCE: было %s, стало %s\n' \"\$BEFORE\" \"\$AFTER\"
+            chmod 600 $ENV_DIR/env"
+
       - name: "Доставить модуль nonce на хост"
         run: |
           set -e
@@ -71,6 +85,10 @@ jobs:
       - name: "Адрес и состояние аккаунта nonce (только чтение)"
         run: |
           set -e
+          # pipefail ОБЯЗАТЕЛЕН: без него падение python прячется за успехом tee,
+          # и прогон выглядит удачным при неработающем шаге -- именно так 25.09
+          # "успешный" прогон не создал аккаунт nonce.
+          set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             cd $CODE_DIR
@@ -84,6 +102,7 @@ jobs:
         if: ${{ inputs.mode == 'create' }}
         run: |
           set -e
+          set -o pipefail
           # Ключ кошелька полосы лежит в окружении службы. Значение не
           # печатается: наружу идёт адрес аккаунта, рента числом и подпись.
           ssh -n $SSH_OPTS root@$TARGET_HOST "
@@ -112,8 +131,33 @@ jobs:
           LANE_WALLET=$(ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; printf %s \$OWN_SEND_WALLET")
           [ -n "$LANE_WALLET" ] || { echo "СБОЙ: OWN_SEND_WALLET на хосте пуст"; exit 1; }
           echo "кошелёк полосы: $LANE_WALLET"
-          NONCE=$(python3 analysis/lane_nonce.py --address-only --wallet "$LANE_WALLET" | python3 -c "import json,sys; print(json.loads(sys.stdin.read().strip().split(chr(10))[0])['address'])")
+          # АДРЕС СЧИТАЕТ ВЕНВ ХОСТА: у системного python3 на бегунке нет
+          # solders, и 25.09 из-за этого в окружение службы уехало
+          # BLOOM_LANE_NONCE=None. Считать адрес там, где есть чем считать.
+          NONCE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR
+            OWN_SEND_WALLET=$LANE_WALLET PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python lane_nonce.py --address-only \
+              | head -1" | python3 -c "import json,sys; print((json.loads(sys.stdin.read().strip()) or {}).get('address') or '')")
           echo "адрес nonce: $NONCE"
+          # ПУСТО ИЛИ НЕ BASE58 -- В ОКРУЖЕНИЕ НЕ ПИШЕМ ВОВСЕ: строка
+          # BLOOM_LANE_NONCE=None хуже отсутствующей, она выглядит настройкой.
+          case "$NONCE" in
+            "" | None | none) echo "СБОЙ: адрес nonce не посчитан"; exit 1 ;;
+          esac
+          printf %s "$NONCE" | grep -qE '^[1-9A-HJ-NP-Za-km-z]{32,44}$' \
+            || { echo "СБОЙ: адрес nonce не base58: $NONCE"; exit 1; }
+          # И ГЛАВНОЕ: аккаунт на цепи обязан БЫТЬ аккаунтом nonce. Записать
+          # адрес, на котором ничего нет, значит включить вариант пула в
+          # никуда: транзакции ушли бы недействительными, потратив чаевые.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python lane_nonce.py" \
+            | tail -1 | grep -q '"is_nonce": true' \
+            || { echo "СБОЙ: на адресе $NONCE аккаунта nonce нет -- в окружение не пишу"; exit 1; }
           printf 'BLOOM_LANE_NONCE=%s\n' "$NONCE" | ssh $SSH_OPTS root@$TARGET_HOST "
             cat > /tmp/nonce_line
             sed -i '/^BLOOM_LANE_NONCE=/d' $ENV_DIR/env
