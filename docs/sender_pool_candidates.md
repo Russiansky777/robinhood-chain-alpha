@@ -2,9 +2,15 @@
 
 Всё ниже -- из страниц, сохранённых в `data/docs/senders/`. Ничего по памяти: у каждого значения есть цитата в `data/sender_pool_candidates.json`.
 
+## Что скачать не удалось
+
+* `astralane_regions.html.why_not.txt`: НЕ СКАЧАНО: https://astralane.gitbook.io/docs/low-latency/regions (HTTP 404), время UTC 2026-09-25T10:37:53Z
+* `nozomi_llms.txt.why_not.txt`: НЕ СКАЧАНО: https://use.temporal.xyz/nozomi/llms.txt (HTTP 404), время UTC 2026-09-25T10:37:45Z
+* `nozomi_regions.html.why_not.txt`: НЕ СКАЧАНО: https://use.temporal.xyz/nozomi/regions-and-endpoints (HTTP 404), время UTC 2026-09-25T10:37:44Z
+
 | сервис | страниц | нужен ключ | минимум чаевых (из текста) | счетов чаевых | точки входа в EU |
 |---|---|---|---|---|---|
-| Astralane | 3 | да | не нашлось | 1 | не нашлось |
+| Astralane | 4 | да | не нашлось | 1 | не нашлось |
 | BlockRazor | 5 | да | 100000 лампортов | 14 | 9 |
 | Helius Sender | 1 | да | 5000 лампортов, 1000000 лампортов | 11 | 9 |
 | Jito (нужен для опознания чужих чаевых) | 1 | да | 1000 лампортов, 300000000 лампортов, 700000000 лампортов, 1000000000 лампортов | 8 | 6 |
@@ -13,15 +19,15 @@
 
 ## Astralane
 
-Страницы: `astralane_quickstart.html`, `astralane_submit_transactions.html`, `astralane_tip_refunds.html`
+Страницы: `astralane_quickstart.html`, `astralane_send_v2.html`, `astralane_submit_transactions.html`, `astralane_tip_refunds.html`
 
 Счета чаевых (1):
 * `astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm`
 
 Ключ -- цитаты:
-* api-key: «only change is to add an instruction to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean»
-* api key: «ion to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean Optional , To set mev protect, de»
-* api-key: «via swqos, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encod»
+* api-key: «as Content-Type : text/plain Txn should be in Base64 encoded Compulsory to add api-key and method in URI params Send request on endpoint /iris2 URI Params Para»
+* api-key: «in URI params Send request on endpoint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Manda»
+* api key: «oint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Mandatory , to set method mev-protect B»
 
 Про чужие чаевые и минимум -- цитаты:
 * jito tip: «the segregation in validators as JITO validators and normal ones, traders are often conflicted between spending more on jito tips vs more in priority fees. Durable nonces offer a way to mitigate this issue. Our sendIdeal RPC method accepts»

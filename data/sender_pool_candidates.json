@@ -14,6 +14,40 @@
       "foreign_tips": []
     },
     {
+      "file": "astralane_send_v2.html",
+      "service": "astralane",
+      "bytes": 591534,
+      "tip_addresses": [],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "api-key",
+            "quote": "as Content-Type : text/plain Txn should be in Base64 encoded Compulsory to add api-key and method in URI params Send request on endpoint /iris2 URI Params Para"
+          },
+          {
+            "what": "api-key",
+            "quote": "in URI params Send request on endpoint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Manda"
+          },
+          {
+            "what": "api key",
+            "quote": "oint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Mandatory , to set method mev-protect B"
+          },
+          {
+            "what": "api-key",
+            "quote": "saction Send Batch Copy curl --location 'https://lim.gateway.astralane.io/iris2?api-key=APIKEY&method=sendTransaction' \\ --header 'Content-Type: text/plain' \\"
+          },
+          {
+            "what": "APIKEY",
+            "quote": "Send Batch Copy curl --location 'https://lim.gateway.astralane.io/iris2?api-key=APIKEY&method=sendTransaction' \\ --header 'Content-Type: text/plain' \\ --dat"
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
       "file": "astralane_submit_transactions.html",
       "service": "astralane",
       "bytes": 935168,
@@ -1093,11 +1127,25 @@
       "foreign_tips": []
     }
   ],
-  "not_downloaded": [],
+  "not_downloaded": [
+    {
+      "file": "astralane_regions.html.why_not.txt",
+      "why_not": "НЕ СКАЧАНО: https://astralane.gitbook.io/docs/low-latency/regions (HTTP 404), время UTC 2026-09-25T10:37:53Z"
+    },
+    {
+      "file": "nozomi_llms.txt.why_not.txt",
+      "why_not": "НЕ СКАЧАНО: https://use.temporal.xyz/nozomi/llms.txt (HTTP 404), время UTC 2026-09-25T10:37:45Z"
+    },
+    {
+      "file": "nozomi_regions.html.why_not.txt",
+      "why_not": "НЕ СКАЧАНО: https://use.temporal.xyz/nozomi/regions-and-endpoints (HTTP 404), время UTC 2026-09-25T10:37:44Z"
+    }
+  ],
   "by_service": {
     "astralane": {
       "pages": [
         "astralane_quickstart.html",
+        "astralane_send_v2.html",
         "astralane_submit_transactions.html",
         "astralane_tip_refunds.html"
       ],
@@ -1120,23 +1168,23 @@
       "key_evidence": [
         {
           "what": "api-key",
-          "quote": "only change is to add an instruction to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean"
+          "quote": "as Content-Type : text/plain Txn should be in Base64 encoded Compulsory to add api-key and method in URI params Send request on endpoint /iris2 URI Params Para"
+        },
+        {
+          "what": "api-key",
+          "quote": "in URI params Send request on endpoint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Manda"
         },
         {
           "what": "api key",
-          "quote": "ion to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean Optional , To set mev protect, de"
+          "quote": "oint /iris2 URI Params Param Type Description api-key String Mandatory , to set api key for authentication method String Mandatory , to set method mev-protect B"
         },
         {
           "what": "api-key",
-          "quote": "via swqos, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encod"
+          "quote": "saction Send Batch Copy curl --location 'https://lim.gateway.astralane.io/iris2?api-key=APIKEY&method=sendTransaction' \\ --header 'Content-Type: text/plain' \\"
         },
         {
           "what": "APIKEY",
-          "quote": "s, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encoded Trans"
-        },
-        {
-          "what": "api-key",
-          "quote": "we also provide a managed service for this, We create a nonce account for each api-key you use and you can query them using our getNonce rpc call. Follow the b"
+          "quote": "Send Batch Copy curl --location 'https://lim.gateway.astralane.io/iris2?api-key=APIKEY&method=sendTransaction' \\ --header 'Content-Type: text/plain' \\ --dat"
         }
       ]
     },
