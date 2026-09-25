@@ -1,0 +1,95 @@
+name: "Почему рвётся подписка: причины обрывов и доля времени на запасном"
+
+# Владелец 25.09: "уведомления о переходе на запасной logsSubscribe идут в
+# Telegram постоянно. Две задачи, причина важнее шума". Это -- про причину.
+#
+# ТОЛЬКО ЧТЕНИЕ. С хоста берутся строки журнала службы (journalctl) и журнал
+# решений; ни одной отправки, ни одного секрета сверх ключа SSH.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "за какое время брать журнал службы (для journalctl --since)"
+        required: false
+        default: "24 hours ago"
+
+concurrency:
+  group: ws-breaks-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SVC: bloom-detector
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  ws_breaks:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора ДО чтения журнала"
+        run: |
+          set -e
+          python3 analysis/bloom_ws_breaks.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Строки журнала службы и журнал решений с хоста"
+        run: |
+          set -e
+          mkdir -p data
+          # ТОЛЬКО НУЖНЫЕ СТРОКИ. Весь журнал за сутки -- это десятки мегабайт
+          # сигналов; нам нужны обрывы, переходы и возвраты. Формат вывода --
+          # short-iso-precise, чтобы время в строке разбиралось как есть.
+          ssh -n $SSH_OPTS root@$HOST "journalctl -u $SVC --since '${{ inputs.since }}' \
+              --no-pager -o cat | grep -E 'оборвалась|запасной|возвращаюсь|РАБОТАЕТ' || true" \
+            > data/ws_breaks_log.txt
+          echo "строк журнала: $(wc -l < data/ws_breaks_log.txt)"
+          if ssh -n $SSH_OPTS root@$HOST "test -s $STATE_DIR/decisions.jsonl"; then
+            ssh -n $SSH_OPTS root@$HOST "grep -E '\"ws_(break|fallback|return|hour)\"' $STATE_DIR/decisions.jsonl | tail -2000 || true" \
+              > data/ws_breaks_decisions.jsonl
+            echo "строк решений ws_*: $(wc -l < data/ws_breaks_decisions.jsonl)"
+          else
+            echo "журнала решений на хосте нет"
+          fi
+
+      - name: "Разбор: причины, длительности, доля"
+        run: |
+          set -e
+          python3 analysis/bloom_ws_breaks.py \
+            --log data/ws_breaks_log.txt \
+            --decisions data/ws_breaks_decisions.jsonl \
+            --out data/ws_breaks.json --out-md docs/ws_breaks.md 2>&1 | tail -40
+
+      - name: "Коммит разбора"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/ws_breaks.json docs/ws_breaks.md data/ws_breaks_log.txt; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pochemu rvetsya podpiska: prichiny obryvov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
