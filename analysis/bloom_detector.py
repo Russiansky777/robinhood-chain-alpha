@@ -2087,7 +2087,12 @@ class Детектор:
             "pool": ({"enabled": OS.пул_включён(),
                        "tip_cap_sol": OS.ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL,
                        "winners": self.свод_победителей_пула()}
-                      if OS is not None else {})}
+                      if OS is not None else {}),
+            # ВАРИАНТ НА ДОЛГОВЕЧНОМ NONCE (шаг 2): включён ли, какой аккаунт,
+            # и главное -- не висит ли неподтверждённый сдвиг. Висящий сдвиг
+            # закрывает покупки на этом nonce, и это должно быть видно числом, а
+            # не выясняться по журналу.
+            "pool_nonce": (self.свод_нонса() if OS is not None else {})}
         st["leg_cache"] = self.признак_кэша_ног()
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
@@ -2998,6 +3003,21 @@ class Детектор:
         self.blockhash_почему = ""
         self.blockhash_обновлений += 1
         return {"ok": True, "blockhash": хеш}
+
+    def свод_нонса(self) -> dict:
+        """Состояние варианта пула на nonce: включён, аккаунт, висящий сдвиг."""
+        try:
+            из_ = {"enabled": OS.пул_нонсом_включён(),
+                    "account": OS.нонс_аккаунт() or None,
+                    "wait_slots": OS.СЛОТОВ_ЖДЁМ_ВАРИАНТЫ,
+                    "wait_s": OS.ожидание_вариантов_s()}
+            ож = OS.нонс_ожидает(self.состояние)
+            из_["pending_shift"] = bool(ож.get("pending"))
+            из_["pending_why"] = ож.get("why")
+            из_["shift_signature"] = ож.get("signature")
+            return из_
+        except Exception as exc:  # noqa: BLE001
+            return {"why_not": f"{type(exc).__name__}"}
 
     def свод_соединений(self) -> dict:
         """Возраст соединений и счёт пингов -- как их видит пул отправителей."""
