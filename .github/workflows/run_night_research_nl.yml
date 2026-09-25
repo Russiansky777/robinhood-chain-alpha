@@ -152,7 +152,7 @@ jobs:
           ssh -n $SSH_OPTS root@127.0.0.1 "
             set -a; . /etc/bloom-executor/env; set +a
             BLOOM_OWN_SEND_LIVE=0 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/bloom_executor/bloom_own_send.py --dry-run-signature '${{ inputs.dry_lane_signature }}' --source '${{ inputs.dry_lane_source }}' --state-dir /home/bot/bloom_executor_live_data
-          " 2>&1 | tail -40
+          " 2>&1 | tee data/lane_dry_run.txt | tail -40
 
       # ПРОГОНЫ ПО ЦЕПИ. Каждый со своим пределом кредитов и с continue-on-error:
       # исследование не имеет права уронить сборку доклада, а доклад обязан
@@ -190,7 +190,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in data/night_report.json data/night_p1.json data/night_p2.json data/night_toxic.json data/night_leader.json docs/research_2026-09-25_edge.md; do
+          for f in data/night_report.json data/night_p1.json data/night_p2.json data/night_toxic.json data/night_leader.json data/lane_dry_run.txt docs/research_2026-09-25_edge.md; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
