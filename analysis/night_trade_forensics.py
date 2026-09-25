@@ -251,6 +251,64 @@ def в_таблицу(из_: dict) -> str:
     return "\n".join([шапка] + ряды)
 
 
+def продажи_кошелька(rpc_call, *, кошелёк: str, минт: str,
+                      подпись_покупки: str, max_tx: int = 10) -> dict:
+    """Продавал ли ЭТОТ кошелёк этот минт после своей покупки.
+
+    Таблица по пулу отвечает "что было в пуле", но при 4881 транзакции в окне
+    отдельного участника в выборке может не оказаться вовсе -- и молчание там
+    ничего не значит. Здесь спрашивается адресно: токен-счёт кошелька по
+    этому минту (из самой покупки, счёт может быть уже закрыт) и его подписи
+    после покупки. 2-3 кредита на ответ.
+    """
+    if rpc_call is None:
+        return {"ok": False, "why_not": "нет rpc_call"}
+    from night_leader_stonkfun import хранилище_владельца  # noqa: PLC0415
+
+    try:
+        покупка = rpc_call("getTransaction",
+                            [подпись_покупки, {"encoding": "jsonParsed",
+                                                "maxSupportedTransactionVersion": 1,
+                                                "commitment": "finalized"}])
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"покупка не получена: {type(exc).__name__}"}
+    хран = хранилище_владельца(покупка or {}, кошелёк, минт)
+    if not хран:
+        return {"ok": False, "why_not": "в покупке нет токен-счёта этого кошелька по минту"}
+    try:
+        подписи = rpc_call("getSignaturesForAddress",
+                            [хран, {"limit": 100, "until": подпись_покупки,
+                                     "commitment": "finalized"}]) or []
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"подписи счёта не получены: {type(exc).__name__}"}
+    строки = []
+    for с in sorted(подписи, key=lambda x: x.get("slot") or 0)[:max_tx]:
+        if с.get("err") is not None:
+            continue
+        try:
+            tx = rpc_call("getTransaction",
+                           [с["signature"], {"encoding": "jsonParsed",
+                                              "maxSupportedTransactionVersion": 1,
+                                              "commitment": "finalized"}])
+        except Exception as exc:  # noqa: BLE001
+            строки.append({"signature": с.get("signature"), "why_not": str(exc)[:80]})
+            break
+        if not tx:
+            continue
+        д = (C2.owner_mint_delta(tx, минт) or {}).get(кошелёк)
+        квота = C2.quote_spend(tx, кошелёк) or {}
+        строки.append({"signature": с.get("signature"), "slot": с.get("slot"),
+                        "block_time": с.get("blockTime"),
+                        "mint_delta": str(д) if д is not None else None,
+                        "side": ("продажа" if (д is not None and float(д) < 0)
+                                  else "покупка" if д is not None else "—"),
+                        "sol_spent": r6(квота.get("sol"))})
+    продажи = [с for с in строки if с.get("side") == "продажа"]
+    return {"ok": True, "vault": хран, "n_signatures": len(подписи),
+            "rows": строки, "n_sells": len(продажи),
+            "first_sell_slot": (продажи[0].get("slot") if продажи else None)}
+
+
 # ------------------------------------------------------------- самопроверка
 
 def self_test() -> int:
@@ -338,6 +396,41 @@ def self_test() -> int:
     chk("таблица собирается и содержит подпись",
         "| слот |" in в_таблицу(из_) and "BBBBBBBB" in в_таблицу(из_), в_таблицу(из_)[:200])
 
+    # ПРОДАЖИ КОНКРЕТНОГО КОШЕЛЬКА -- адресно, а не выборкой по пулу.
+    ВАУЛТ = "VAULT"
+
+    def бал_счёта(owner, минт, ui, idx):
+        return бал(owner, минт, ui, idx)
+
+    покупка_тx = {"slot": 9, "blockTime": 99,
+                   "transaction": {"signatures": ["P" * 88],
+                                    "message": {"accountKeys": [
+                                        {"pubkey": ТРЕЙДЕР, "signer": True},
+                                        {"pubkey": ВАУЛТ, "signer": False}],
+                                        "instructions": []}},
+                   "meta": {"err": None, "preBalances": [0, 0], "postBalances": [0, 0],
+                             "preTokenBalances": [бал_счёта(ТРЕЙДЕР, МИНТ, 0.0, 1)],
+                             "postTokenBalances": [бал_счёта(ТРЕЙДЕР, МИНТ, 100.0, 1)],
+                             "innerInstructions": []}}
+    спрошено: list = []
+
+    def rpc_кошелёк(method, params):
+        спрошено.append((method, params[0]))
+        if method == "getTransaction" and params[0] == "BUY":
+            return покупка_тx
+        if method == "getSignaturesForAddress":
+            assert params[1].get("until") == "BUY", params
+            return [{"signature": "S1" + "y" * 80, "slot": 15, "err": None}]
+        return продажа
+
+    прод = продажи_кошелька(rpc_кошелёк, кошелёк=ТРЕЙДЕР, минт=МИНТ,
+                             подпись_покупки="BUY")
+    chk("продажи кошелька: спрошен ЕГО токен-счёт из покупки",
+        прод["ok"] and прод["vault"] == ВАУЛТ
+        and ("getSignaturesForAddress", ВАУЛТ) in спрошено, (прод, спрошено))
+    chk("продажа кошелька распознана по знаку дельты",
+        прод["n_sells"] == 1 and прод["rows"][0]["side"] == "продажа", прод)
+
     без = разобрать(None, минт=МИНТ, пул=ПУЛ, подпись_источника="SRC", слот_источника=1)
     chk("без rpc_call -- честный отказ, а не пустая таблица",
         без["ok"] is False and "rpc_call" in (без["why_not"] or ""), без)
@@ -403,9 +496,16 @@ def main() -> int:
                      слот_источника=a.source_slot,
                      известные=известные, окно_слотов=a.window_slots,
                      max_tx=a.max_tx, max_pages=a.max_pages)
+    # АДРЕСНО: продавал ли источник свой же токен в этом окне. В выборке по
+    # пулу его может не быть просто потому, что в окне тысячи транзакций.
+    if a.source_wallet:
+        из_["source_sells"] = продажи_кошелька(
+            rpc, кошелёк=a.source_wallet, минт=a.mint,
+            подпись_покупки=a.source_signature)
     из_["chain_credits_used"] = getattr(rpc, "used", None)
     текст = в_таблицу(из_)
-    print(json.dumps(из_["summary"] if из_.get("ok") else из_, ensure_ascii=False, indent=1))
+    print(json.dumps({k: v for k, v in из_.items() if k != "rows"}
+                      if из_.get("ok") else из_, ensure_ascii=False, indent=1))
     print(текст)
     if a.out:
         Path(a.out).write_text(json.dumps(из_, ensure_ascii=False, indent=1),
