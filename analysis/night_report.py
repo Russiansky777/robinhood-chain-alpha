@@ -30,9 +30,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Издержки на сторону, как их задал владелец и как они стоят в env службы.
 # Здесь они нужны только для РАЗЛОЖЕНИЯ итога, а не для торговли: менять
 # торговые параметры этот модуль не вправе.
-КОМИССИЯ_BLOOM_ДОЛЯ = 0.01          # 1 % на сторону
-ПРИОРИТЕТ_SOL = 0.001
-ЧАЕВЫЕ_SOL = 0.001
+КОМИССИЯ_BLOOM_ДОЛЯ = 0.01          # 1 % от траты на сторону
+ПРИОРИТЕТ_SOL = 0.001               # приоритет валидатору, в комиссии транзакции
+ЧАЕВЫЕ_ОБРАБОТЧИКУ_SOL = 0.001      # processor_tip, уходит вместе с комиссией Bloom
+
+# ОТКУДА ИЗВЕСТНО, ЧТО ЭТО ИМЕННО ТАК. В нашей покупке PICKAXE (сверка P2 по
+# цепи) один перевод на 0.00297688 SOL ушёл на B1dozJAUae1MfexMMoCzrLtTd4JKfJTHLrRfUQswQG5m
+# -- это ровно 1 % от фактической траты 0.19769 SOL плюс processor_tip 0.001.
+# То есть комиссия площадки и чаевые обработчику идут ОДНИМ переводом, а
+# приоритет валидатору живёт отдельно, в комиссии транзакции. Складывать их в
+# одну строку нельзя: тогда 0.001 чаевых посчитались бы дважды.
+СБОРЩИК_BLOOM = "B1dozJAUae1MfexMMoCzrLtTd4JKfJTHLrRfUQswQG5m"
 
 
 def читать_jsonl(путь: Path, *, байт: int | None = None) -> list:
@@ -269,27 +277,48 @@ def разложение_закрытых(позиции: dict, *, с_utc: str =
             continue
         вх, наз = float(вх), float(наз)
         итог = наз - вх
-        налог_bps = (п.get("our_route_transfer_fee_bps")
-                     if п.get("our_route_transfer_fee_bps") is not None
-                     else п.get("route_transfer_fee_bps"))
+        # НАЛОГ. Лучшее из того, что есть: сначала налог по НАШЕМУ маршруту
+        # (считается с 25.09), потом по маршруту источника, и только потом --
+        # налог самого токена из признака позиции. Третий вариант меньше
+        # первого, если маршрут передавал токен дважды, и в записи прямо
+        # сказано, какой источник взят: иначе по таблице нельзя понять, чего в
+        # ней не хватает.
+        налог_bps = п.get("our_route_transfer_fee_bps")
+        откуда_налог = "our_route"
+        if налог_bps is None:
+            налог_bps = п.get("route_transfer_fee_bps")
+            откуда_налог = "source_route"
+        if налог_bps is None:
+            налог_bps = п.get("tax_bps")
+            откуда_налог = "token_only"
+        if налог_bps is None:
+            откуда_налог = None
         налог_sol = (вх * float(налог_bps) / 10_000.0
                      if isinstance(налог_bps, (int, float)) else None)
-        комиссия_bloom = round(вх * КОМИССИЯ_BLOOM_ДОЛЯ + abs(наз) * КОМИССИЯ_BLOOM_ДОЛЯ, 9)
-        приоритет = (ПРИОРИТЕТ_SOL + ЧАЕВЫЕ_SOL) * 2
-        известные = комиссия_bloom + приоритет + (налог_sol or 0.0)
+        комиссия_bloom = round((вх + abs(наз)) * КОМИССИЯ_BLOOM_ДОЛЯ, 9)
+        чаевые = ЧАЕВЫЕ_ОБРАБОТЧИКУ_SOL * 2
+        приоритет = ПРИОРИТЕТ_SOL * 2
+        сеть = (п.get("last_sell_outcome") or {}).get("fee_sol")
+        известные = (комиссия_bloom + чаевые + приоритет + (налог_sol or 0.0))
         строки.append({
             "cid": п.get("client_order_id"), "mint": п.get("mint"),
             "lane": п.get("lane"), "ts_utc": когда,
             "sol_in": round(вх, 9), "sol_back_net": round(наз, 9),
             "result_sol": round(итог, 9),
-            "route_fee_bps": налог_bps,
+            "route_fee_bps": налог_bps, "fee_bps_source": откуда_налог,
             "tax_sol": round(налог_sol, 9) if налог_sol is not None else None,
             "bloom_fee_sol": комиссия_bloom,
-            "priority_and_tips_sol": round(приоритет, 9),
+            "processor_tips_sol": round(чаевые, 9),
+            "priority_sol": round(приоритет, 9),
+            "network_fee_sol": сеть,
+            "pool_fee_sol": None,
             "residual_sol": round(итог + известные, 9),
-            "residual_is_price_move": налог_sol is not None,
-            "why_not": None if налог_sol is not None
-                        else "налог по маршруту не посчитан -- остаток не только цена"})
+            "residual_is_price_move": False,
+            "why_not": ("комиссия пула не посчитана (ставки bps по программе пула "
+                         "нет ни в кэше, ни в репозитории), поэтому остаток -- это "
+                         "ход цены МИНУС комиссия пула"
+                         + ("" if налог_sol is not None
+                            else "; налог не известен вовсе"))})
     return {"count": len(строки),
             "result_sol_sum": round(sum(с["result_sol"] for с in строки), 9)
                                if строки else None,
@@ -388,8 +417,10 @@ def в_текст(о: dict) -> str:
         f"**Разложение закрытых сделок с {о.get('since_utc')}.** Сделок "
         f"{ч(зак.get('count'))}, сумма итога {ч(зак.get('result_sol_sum'), ' SOL')}, "
         f"медиана {ч(зак.get('result_sol_median'), ' SOL')}. По каждой сделке в JSON: "
-        "налог по маршруту в SOL, комиссия Bloom, приоритет и чаевые, остаток "
-        "(ход цены).",
+        "налог в SOL (и откуда взята ставка), комиссия Bloom, чаевые "
+        "обработчику, приоритет, комиссия сети и остаток. Комиссия пула НЕ "
+        "посчитана: ставки bps по программе пула нет ни в кэше, ни в "
+        "репозитории, поэтому остаток -- это ход цены минус комиссия пула.",
         "",
     ]
     for имя, ключ in (("P1 (тень против Bloom)", "p1"), ("P2 (сверка по цепи)", "p2"),
@@ -507,8 +538,17 @@ def self_test() -> int:
         строка_bloom = [с for с in о["closed_breakdown"]["rows"] if с["cid"] == "b1"][0]
         chk("налог по маршруту переведён в SOL по входу сделки",
             abs(строка_bloom["tax_sol"] - 0.2 * 0.03) < 1e-9, строка_bloom)
-        chk("остаток назван ходом цены только когда налог известен",
-            строка_bloom["residual_is_price_move"] is True, строка_bloom)
+        chk("источник ставки налога назван в записи",
+            строка_bloom["fee_bps_source"] == "our_route", строка_bloom)
+        chk("чаевые обработчику и приоритет стоят РАЗНЫМИ строками",
+            abs(строка_bloom["processor_tips_sol"] - 0.002) < 1e-12
+            and abs(строка_bloom["priority_sol"] - 0.002) < 1e-12, строка_bloom)
+        chk("комиссия пула честно не посчитана и это сказано",
+            строка_bloom["pool_fee_sol"] is None
+            and "комиссия пула не посчитана" in (строка_bloom["why_not"] or ""),
+            строка_bloom["why_not"])
+        chk("остаток ходом цены не называется: в нём сидит комиссия пула",
+            строка_bloom["residual_is_price_move"] is False, строка_bloom)
         chk("исследование отсутствует -- так и сказано, без нулей",
             all((о["research"][к] or {}).get("missing")
                 for к in ("p1", "p2", "edge", "toxic", "leader")), о["research"])
