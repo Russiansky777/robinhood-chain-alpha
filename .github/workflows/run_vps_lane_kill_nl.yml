@@ -1,0 +1,99 @@
+name: "Полоса своей отправки: поставить KILL_OWN_SEND (status/set)"
+
+# Рубильник ТОЛЬКО полосы своей отправки. Bloom, сторож продаж и тень
+# продолжают работать: останавливать боевое из-за замера нельзя.
+#
+# Зачем отдельный прогон: файл KILL_OWN_SEND лежит в каталоге состояния на
+# хосте, и до сих пор его умела ставить только сама служба (при денежной
+# странности). Тот же рычаг нужен снаружи -- иначе единственным способом
+# остановить полосу был деплой с own_send_live=0, а он молча отменяется
+# следующим деплоем с own_send_live=1.
+#
+# СНЯТИЯ ЗАПРЕТА ЗДЕСЬ НЕТ НАМЕРЕННО. Полоса сама себя не разблокирует, и
+# прогон тоже не должен: снимать -- отдельным действием по слову владельца.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "status -- только посмотреть; set -- остановить полосу"
+        required: true
+        default: "status"
+      reason:
+        description: "почему остановлена (для mode=set; попадёт в файл и в признак жизни)"
+        required: false
+        default: ""
+
+concurrency:
+  group: lane-kill-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  lane_kill:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Что сейчас с рубильником"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            F=$STATE_DIR/KILL_OWN_SEND
+            if [ -f \"\$F\" ]; then
+              printf 'рубильник СТОИТ, содержимое: '; head -c 400 \"\$F\"; echo
+            else
+              echo 'рубильника нет: полоса не остановлена этим файлом'
+            fi"
+
+      - name: "set: остановить полосу"
+        if: ${{ inputs.mode == 'set' }}
+        run: |
+          set -e
+          # Причина обязательна: файл без пояснения не даст утром понять, из-за
+          # чего встали. Имена переменных только латиницей -- bash иначе
+          # разбирает присваивание как команду (проверено 11:24Z).
+          reason_text='${{ inputs.reason }}'
+          [ -n "$reason_text" ] || { echo "СБОЙ: для mode=set нужна причина"; exit 1; }
+          # Первая причина НЕ затирается -- ровно как в set_lane_kill службы:
+          # важна та, из-за которой остановились в первый раз.
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            F=$STATE_DIR/KILL_OWN_SEND
+            if [ -f \"\$F\" ]; then
+              printf 'рубильник уже стоял, первую причину не трогаем: '; head -c 400 \"\$F\"; echo
+            else
+              printf '%s %s\n' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$reason_text\" > \"\$F\"
+              printf 'поставлен: '; head -c 400 \"\$F\"; echo
+            fi"
+
+      - name: "Служба видит рубильник (признак жизни)"
+        if: ${{ always() }}
+        run: |
+          set -e
+          # Признак жизни пишется раз в пульс: ждём до 40 с и печатаем lane_kill
+          # так, как его видит САМА служба. Файл на диске и мнение службы
+          # обязаны совпадать, иначе рубильник не рубильник.
+          for i in 1 2 3 4 5 6 7 8; do
+            out=$(ssh -n $SSH_OPTS root@127.0.0.1 "grep -A4 '\"lane_kill\"' $STATE_DIR/detector_status.json || true")
+            echo "$out"
+            case "$out" in *true*) break ;; esac
+            sleep 5
+          done
