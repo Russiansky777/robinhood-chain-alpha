@@ -3043,7 +3043,16 @@ class Детектор:
                                             ("known", "price", "quote", "why_not")}
                         запись["points"] = кр.get("points")
                         запись["pool"] = пул
-                        итог["measured"] += 1
+                        запись["curve_known"] = кр.get("known")
+                        # ИЗМЕРЕНО -- только если точки есть. Кривая может
+                        # честно отказать (нет сделок пула у цели, узел молчит),
+                        # и тогда её причину надо ЗАПИСАТЬ: 25.09 она терялась,
+                        # и в докладе стояло "неизвестна" без слова почему.
+                        if кр.get("points"):
+                            итог["measured"] += 1
+                        else:
+                            запись["why_not"] = str(
+                                кр.get("why_not") or "кривая не дала точек")[:160]
             except Exception as exc:  # noqa: BLE001
                 запись["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
             try:
@@ -5344,6 +5353,28 @@ def self_test() -> int:
                 итог_пт = детектор_пр.догнать_цены_пропусков()
                 chk("после трёх неудач пропуск больше не пробуется",
                     итог_пт["looked"] == 0, итог_пт)
+                # Кривая отказала -- причина обязана лежать в записи, и
+                # "измерено" при этом не растёт.
+                класс_кривой.кривая = staticmethod(
+                    lambda *a, **кв: {"known": False,
+                                       "why_not": "сделок пула у цели нет"})
+                st_пр.log_decision({"stage": "decision", "action": "skip",
+                                     "code": КОД_НАЛОГ_МАРШРУТА,
+                                     "signature": "ПОДПИСЬ_БЕЗ_ТОЧЕК", "mint": "M6",
+                                     "source": "SRC", "slot": 505,
+                                     "ts": time.time() - 100})
+                итог_бт = детектор_пр.догнать_цены_пропусков()
+                строки_бт = [json.loads(с) for с in
+                              st_пр.decisions_path.read_text(encoding="utf-8")
+                              .strip().split("\n")]
+                тень_бт = [с for с in строки_бт
+                            if с.get("stage") == "skip_price"
+                            and с.get("signature") == "ПОДПИСЬ_БЕЗ_ТОЧЕК"]
+                chk("отказ кривой записан причиной и не считается измерением",
+                    итог_бт["looked"] == 1 and итог_бт["measured"] == 0
+                    and len(тень_бт) == 1
+                    and "сделок пула" in (тень_бт[0].get("why_not") or ""),
+                    (итог_бт, тень_бт))
             finally:
                 if было_PC is None:
                     globals().pop("PC", None)
