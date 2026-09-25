@@ -1,9 +1,9 @@
 {
-  "generated_utc": "2026-09-25T03:38:03Z",
+  "generated_utc": "2026-09-25T04:11:21Z",
   "since_utc": "2026-09-24T00:00:00Z",
   "state_dir": "/tmp/night_state",
-  "decisions_rows": 712,
-  "positions": 32,
+  "decisions_rows": 777,
+  "positions": 33,
   "lane": {
     "positions": 0,
     "sent": 0,
@@ -16,14 +16,14 @@
     "rows": []
   },
   "lane_attempts": {
-    "paths": 2,
+    "paths": 3,
     "sent": 0,
     "skip_sim_fail": 0,
     "by_stage": {
-      "build": 2
+      "build": 3
     },
     "why_not": {
-      "котировка пула не SOL -- полоса только одношаговая": 2
+      "котировка пула не SOL -- полоса только одношаговая": 3
     },
     "sim_ms_median": null,
     "send_ms_median": null
@@ -35,19 +35,20 @@
     "rows": []
   },
   "shadow": {
-    "total": 79,
+    "total": 82,
     "by_verdict": {
-      "would_pass": 19,
-      "нет вердикта": 60
+      "would_pass": 20,
+      "нет вердикта": 62
     },
     "not_built_reasons": {
       "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 50,
       "тип пула не покрыт сборщиком: gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr": 5,
       "пул: неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, So1111)": 1,
       "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 3,
-      "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1
+      "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1,
+      "котировка не SOL: шаблона SOL -> Q в кэше нет": 2
     },
-    "build_ms_median": 0.82,
+    "build_ms_median": 0.84,
     "sim_ms_median": 15.9
   },
   "skips": {
@@ -71,26 +72,26 @@
         ],
         "price_s1_pct": null,
         "price_288_pct": null,
-        "shadow_why_not": "TypeError: пул_для_кривой() got an unexpected keyword argument 'кошелёк'"
+        "shadow_why_not": null
       }
     ]
   },
   "decisions": {
-    "buys": 8,
+    "buys": 9,
     "by_code": {
-      "NOT_A_BUY": 168,
-      "TARGET_AMOUNT_OUT_OF_RANGE": 104,
-      "SKIP_TARGET_INCREASE_POSITION": 103,
-      "TOKEN_RECEIVED_NOT_BOUGHT": 80,
-      "BUY": 8,
+      "NOT_A_BUY": 172,
+      "TARGET_AMOUNT_OUT_OF_RANGE": 105,
+      "SKIP_TARGET_INCREASE_POSITION": 104,
+      "TOKEN_RECEIVED_NOT_BOUGHT": 88,
+      "BUY": 9,
       "SKIPPED_DUP_MINT": 2,
       "THRESHOLD_EDGE": 1,
       "SKIP_TAXED_ROUTE": 1
     }
   },
   "closed_breakdown": {
-    "count": 26,
-    "result_sol_sum": 0.018196572,
+    "count": 27,
+    "result_sol_sum": 0.093732973,
     "result_sol_median": -0.0,
     "rows": [
       {
@@ -612,11 +613,31 @@
         "residual_sol": -0.008015185,
         "residual_is_price_move": false,
         "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
+      },
+      {
+        "cid": "63bf63a082d44ea1b6758f85a7e21ff1",
+        "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
+        "lane": null,
+        "ts_utc": "2026-09-25T03:48:08Z",
+        "sol_in": 0.2,
+        "sol_back_net": 0.275536401,
+        "result_sol": 0.075536401,
+        "route_fee_bps": 100,
+        "fee_bps_source": "our_route",
+        "tax_sol": 0.002,
+        "bloom_fee_sol": 0.004755364,
+        "processor_tips_sol": 0.002,
+        "priority_sol": 0.002,
+        "network_fee_sol": null,
+        "pool_fee_sol": null,
+        "residual_sol": 0.086291765,
+        "residual_is_price_move": false,
+        "why_not": "комиссия пула не посчитана (ставки bps по программе пула нет ни в кэше, ни в репозитории), поэтому остаток -- это ход цены МИНУС комиссия пула"
       }
     ]
   },
   "heartbeat": {
-    "updated_utc": "2026-09-25T03:37:55Z",
+    "updated_utc": "2026-09-25T04:10:27Z",
     "own_send": {
       "enabled": true,
       "live": true,
@@ -628,8 +649,8 @@
       "sent": 0,
       "by_stage": {},
       "bought_backfilled": 0,
-      "blockhash_age_s": 0.1,
-      "blockhash_updates": 6,
+      "blockhash_age_s": 2.5,
+      "blockhash_updates": 106,
       "blockhash_why_not": "",
       "last": {},
       "lane_kill": [
@@ -661,8 +682,8 @@
       "module_why_not": "",
       "passed_in_row_by_pool": {},
       "hour": {
-        "since_ts": 1790307415.0214343,
-        "since_utc": "2026-09-25T03:36:55Z",
+        "since_ts": 1790308163.4632194,
+        "since_utc": "2026-09-25T03:49:23Z",
         "signals": 0,
         "built": 0,
         "sim_failed": 0,
@@ -671,7 +692,7 @@
       },
       "restarts": 0,
       "last_restart_utc": "",
-      "credits_day": 17,
+      "credits_day": 19,
       "credits_write_why_not": ""
     },
     "route_tax_filter": {
@@ -709,7 +730,7 @@
     "subscribe_main_path": true
   },
   "seller": {
-    "updated_utc": "2026-09-25T03:37:58Z",
+    "updated_utc": "2026-09-25T04:11:13Z",
     "mode": "live",
     "jupiter": {
       "enabled": true,
@@ -730,7 +751,7 @@
   "research": {
     "p1": {
       "ok": true,
-      "built_utc": "2026-09-25T03:38:03Z",
+      "built_utc": "2026-09-25T04:11:21Z",
       "pickaxe": {
         "ok": true,
         "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
@@ -767,9 +788,9 @@
         "shadow_why_not": null,
         "excluded_not_bloom_lane_or_dry": 0,
         "excluded_before_since": 1,
-        "total_bloom_trades": 31,
+        "total_bloom_trades": 32,
         "collected": 2,
-        "collected_share": 0.0645,
+        "collected_share": 0.0625,
         "with_diff_pct": 0,
         "median_diff_pct": null
       },
@@ -1638,6 +1659,34 @@
           "shadow_why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
           "route_agrees_with_bloom": null,
           "bloom_bought_raw": 153837956619,
+          "diff_pct": null,
+          "verdict_ours": null,
+          "pct_note": "тень посчитана без комиссии Bloom и без налога токена на перевод -- Bloom bought_raw их уже несёт, поэтому diff_pct показывает разницу С УЧЁТОМ них, а не чистую разницу цены пула"
+        },
+        {
+          "client_order_id": "63bf63a082d44ea1b6758f85a7e21ff1",
+          "mint": "74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4",
+          "ts_intent_utc": "2026-09-25T03:48:08Z",
+          "source_sig": "cWNLBTxXMsFxzQpAwJUmnPH4HXndymu68yv7sYWLdsmTpTnoKmfbHkRPuUzwLBfKT4sbZHfCFco9ELmzaTUtJEH",
+          "bloom_signature": "5qnik9njCMHpXSQQdaY2wqT8E4LTR73e5FHAKYcmMVCycL4DoyAEVoXbCVaKNjhvnQhFR4q4qvF9y5fvbuB18yfm",
+          "chain_ok": true,
+          "bloom_route": {
+            "programs": "Orca Whirlpool,Raydium CPMM",
+            "direct": false,
+            "hops_by_mints": 1
+          },
+          "collected": false,
+          "why_not": "котировка не SOL: шаблона SOL -> Q в кэше нет",
+          "shadow_route": "one_hop",
+          "shadow_pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "shadow_pool_label": "Raydium CPMM",
+          "shadow_sim_verdict": null,
+          "shadow_build_ms": null,
+          "shadow_expected_out_raw": null,
+          "shadow_min_out_raw": null,
+          "shadow_why_not": "котировка не SOL: шаблона SOL -> Q в кэше нет",
+          "route_agrees_with_bloom": null,
+          "bloom_bought_raw": 205560808200,
           "diff_pct": null,
           "verdict_ours": null,
           "pct_note": "тень посчитана без комиссии Bloom и без налога токена на перевод -- Bloom bought_raw их уже несёт, поэтому diff_pct показывает разницу С УЧЁТОМ них, а не чистую разницу цены пула"
