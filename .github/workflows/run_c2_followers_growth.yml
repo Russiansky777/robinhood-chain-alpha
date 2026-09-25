@@ -1,0 +1,124 @@
+name: "C2: рост после первых копировщиков (только чтение)"
+
+# Задача F (C2): по покупкам двух лидеров (Beqv6.../Fvkc2..., список из
+# задачи A -- data/crowd_metric_<дата>.json) первые 5 покупателей того же
+# минта после каждой сделки: слот, место в блоке, объём, сдвиг цены; для
+# первых двух -- priority fee, лимит CU, чаевые, отношение платы к объёму;
+# итог -- медианы объёмов и рост цены через 30 с от цены ПОСЛЕ 2-го
+# копировщика (не источника). См. docstring analysis/c2_followers_growth.py.
+#
+# Только чтение: getBlock/getTransaction/getSignaturesForAddress через
+# c2_common.C2Rpc (служба c2_followers_growth). Ни одной подписи, ни
+# одного sendTransaction, ни одного POST в торговые API. Владелец дал час
+# на прогон -- отсюда --max-minutes (по умолчанию 55) и запас в
+# timeout-minutes самого задания.
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "адреса источников через запятую (пусто -- оба: Beqv6.../Fvkc2...)"
+        required: false
+        default: ""
+      limit:
+        description: "сколько сделок источника взять (0 -- все из задачи A)"
+        required: false
+        default: "0"
+      max_minutes:
+        description: "жёсткий предел прогона в минутах (владелец: не дольше часа)"
+        required: false
+        default: "55"
+      scan_blocks_cap:
+        description: "сколько блоков вперёд от источника сканировать на одну сделку"
+        required: false
+        default: "60"
+      crowd_metric_json:
+        description: "файл задачи A (пусто -- последний data/crowd_metric_*.json)"
+        required: false
+        default: ""
+
+concurrency:
+  group: c2-followers-growth
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 70
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон прогона и самопроверка ДО обращений в цепь"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/venv"
+            "$RUNNER_TEMP/venv/bin/pip" install -q requests
+            PY="$RUNNER_TEMP/venv/bin/python"
+          fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          "$PY" analysis/c2_followers_growth.py --self-test
+
+      - name: "Прогон по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СТОП: секрет HELIUS_API пуст"; exit 1; }
+          mkdir -p data
+          ARGS=(--limit "${{ inputs.limit }}" --max-minutes "${{ inputs.max_minutes }}"
+                --scan-blocks-cap "${{ inputs.scan_blocks_cap }}")
+          if [ -n "${{ inputs.sources }}" ]; then
+            ARGS+=(--sources "${{ inputs.sources }}")
+          fi
+          if [ -n "${{ inputs.crowd_metric_json }}" ]; then
+            ARGS+=(--crowd-metric-json "${{ inputs.crowd_metric_json }}")
+          fi
+          "$PY" analysis/c2_followers_growth.py "${ARGS[@]}"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          shopt -s nullglob
+          FILES=(data/c2_followers_growth_*.json)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "отчёта нет -- прогон не дошёл до записи файла"
+            exit 0
+          fi
+          python3 - "${FILES[@]}" <<'PY'
+          import re, sys, pathlib
+          плохо = []
+          for путь in sys.argv[1:]:
+              текст = pathlib.Path(путь).read_text(encoding="utf-8", errors="replace")
+              if re.search(r"api-key=[A-Za-z0-9._-]{8,}", текст) or "Bearer " in текст:
+                  плохо.append(путь)
+          if плохо:
+              print("в отчёте виден ключ:", плохо)
+              sys.exit(1)
+          print("ключей в отчёте нет")
+          PY
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          shopt -s nullglob
+          FILES=(data/c2_followers_growth_*.json)
+          if [ ${#FILES[@]} -gt 0 ]; then
+            git add "${FILES[@]}"
+          fi
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "C2: рост после первых копировщиков, отчёт [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
