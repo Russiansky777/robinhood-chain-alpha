@@ -1580,10 +1580,16 @@ class Детектор:
         # ТЕНЬ СИМУЛЯЦИИ. Считается отдельно от путей: она больше не гейт, и
         # её отказы -- материал для разбора, а не остановка сделки. Если
         # отказов много, а сделки идут -- это разговор о min_out, не о полосе.
-        # Веер контролей по сервисам (З2 + пул отправителей): своя счётчик,
+        # Веер контролей по сервисам (З2 + пул отправителей): свой счётчик,
         # чтобы "контроль пары виден" и "контроль через Jito виден" не
         # складывались в одно число.
         self.контролей_сервисов_видно = 0
+        # ЗАМОК НА СЛОВАРЬ КОНТРОЛЕЙ. Его пишут ДВЕ ветки: узнавание подписи в
+        # потоке (из потока разбора) и догон места в блоке (из пульса), и обе
+        # пишут словарь ЦЕЛИКОМ. Без замка догон, прочитавший словарь до
+        # появления нового сервиса, затёр бы его замер: деньги на этот контроль
+        # уже потрачены, а строка пары вышла бы без него.
+        self.замок_контролей = threading.Lock()
         self.полос_тень_сим = 0
         self.полос_тень_сим_отказов = 0
         # БАЛАНС КОШЕЛЬКА ПОЛОСЫ -- отдельный от баланса исполнителя (решение
@@ -3425,7 +3431,6 @@ class Детектор:
         Пишется в отдельное поле позиции: путать это с основным контролем
         (Helius Sender на пути полосы) нельзя -- у него своя строка в паре.
         """
-        видно = dict(поз.get("control_senders_seen") or {})
         поля_с: dict = {"seen_ts": round(t_recv, 6), "seen_slot": слот,
                          "signature": подпись}
         отправлен = (запись_сервиса or {}).get("ts_sent")
@@ -3435,12 +3440,17 @@ class Детектор:
         их = поз.get("source_slot")
         if isinstance(их, int) and isinstance(слот, int):
             поля_с["slot_offset"] = слот - их
-        видно[сервис] = поля_с
         запись = {"stage": "lane_control_sender_seen", "client_order_id": cid,
                    "sender": сервис, "signature": подпись, "slot": слот,
                    "lane": ST.МЕТКА_ПОЛОСЫ, **поля_с}
         try:
-            self.состояние.update_position(cid, control_senders_seen=видно)
+            # ПОД ЗАМКОМ И ПО СВЕЖЕЙ ПОЗИЦИИ: словарь пишется целиком, а рядом
+            # его пишет догон места в блоке.
+            with self.замок_контролей:
+                свежая = (self.состояние.positions() or {}).get(cid) or поз
+                видно = dict(свежая.get("control_senders_seen") or {})
+                видно[сервис] = {**(видно.get(сервис) or {}), **поля_с}
+                self.состояние.update_position(cid, control_senders_seen=видно)
         except Exception as exc:  # noqa: BLE001
             запись["why_not"] = f"позиция не записана: {type(exc).__name__}"
         self.состояние.log_decision(запись)
@@ -3565,19 +3575,22 @@ class Детектор:
                 м = {"known": False,
                      "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
             try:
-                свежие = (self.состояние.positions() or {}).get(cid) or {}
-                видно = dict(свежие.get("control_senders_seen") or {})
-                з = dict(видно.get(сервис) or {})
-                з["block_tries"] = int(з.get("block_tries") or 0) + 1
-                if м.get("known"):
-                    з.update(block_index=м.get("index"), block_total=м.get("total"))
-                    итог["filled"] += 1
-                else:
-                    з["block_why_not"] = str(м.get("why_not") or "")[:200]
-                    if з["block_tries"] >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
-                        итог["gave_up"] += 1
-                видно[сервис] = з
-                self.состояние.update_position(cid, control_senders_seen=видно)
+                with self.замок_контролей:
+                    свежие = (self.состояние.positions() or {}).get(cid) or {}
+                    видно = dict(свежие.get("control_senders_seen") or {})
+                    з = dict(видно.get(сервис) or {})
+                    з["block_tries"] = int(з.get("block_tries") or 0) + 1
+                    if м.get("known"):
+                        з.update(block_index=м.get("index"),
+                                  block_total=м.get("total"))
+                        итог["filled"] += 1
+                    else:
+                        з["block_why_not"] = str(м.get("why_not") or "")[:200]
+                        if з["block_tries"] >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                            итог["gave_up"] += 1
+                    видно[сервис] = з
+                    self.состояние.update_position(cid,
+                                                    control_senders_seen=видно)
             except Exception as exc:  # noqa: BLE001
                 log.warning("место контроля %s: позиция не записана (%s)",
                             сервис, type(exc).__name__)
@@ -6884,6 +6897,31 @@ def self_test() -> int:
             chk("вторая строка о той же паре не уходит",
                 детектор_пп.сообщить_контроль("lane1")["sent"] is False
                 and len(куда_пара) == 1, "")
+
+            # ПАРАЛЛЕЛЬНАЯ ЗАПИСЬ НЕ ТЕРЯЕТ ЗАМЕР. Словарь контролей пишут две
+            # ветки целиком (узнавание подписи и догон места), и без замка одна
+            # затирала бы другую: деньги на контроль потрачены, а замера нет.
+            видно_до = dict(поз_в.get("control_senders_seen") or {})
+            st_п.update_position("lane1", control_services=[
+                *(поз_в.get("control_services") or []),
+                {"sender": "astralane", "signature": "ПОДПИСЬ_AST",
+                 "ts_sent": т_п + 0.06, "sent": True},
+                {"sender": "nozomi", "signature": "ПОДПИСЬ_NOZ",
+                 "ts_sent": т_п + 0.06, "sent": True}])
+            потоки_к = [threading.Thread(
+                target=детектор_пп.отметить_нашу_транзакцию,
+                args=(подпись_к, слот_к, {"meta": {"err": None}}, т_п + 0.30))
+                for подпись_к, слот_к in (("ПОДПИСЬ_AST", 952),
+                                           ("ПОДПИСЬ_NOZ", 953))]
+            for п_к in потоки_к:
+                п_к.start()
+            for п_к in потоки_к:
+                п_к.join(timeout=10)
+            видно_после = (st_п.positions()["lane1"] or {}).get("control_senders_seen") or {}
+            chk("параллельные записи контролей не теряют друг друга",
+                set(видно_после) == set(видно_до) | {"astralane", "nozomi"},
+                sorted(видно_после))
+
 
             # 8. ПРИЗНАК ЖИЗНИ показывает полосу числами, а не "включена".
             жив = детектор_пп.признак_жизни()
