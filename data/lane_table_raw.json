@@ -1062,7 +1062,7 @@
   "lane-own-4VatQyxN4f6Y6RDno4MUCnqaErf4EFKjCjii2J97": {
     "schema_version": 2,
     "client_order_id": "lane-own-4VatQyxN4f6Y6RDno4MUCnqaErf4EFKjCjii2J97",
-    "state": "bought",
+    "state": "closed",
     "mint": "GgsSaetRZNCuP9HEWjbojtVWByRWFxpr93S1wtGFpump",
     "source_sig": "4VatQyxN4f6Y6RDno4MUCnqaErf4EFKjCjii2J97fAQjCrMvZXhMFydUiA6LyobDmh1U7M6xQb35nCxRbNzdy3Da",
     "source_slot": 450418345,
@@ -1074,8 +1074,8 @@
     "wallet": "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w",
     "lane": "own_send",
     "lane_group": "speed_only",
-    "ts_update": 1790357042.1630423,
-    "ts_update_utc": "2026-09-25T17:24:02Z",
+    "ts_update": 1790357220.6249647,
+    "ts_update_utc": "2026-09-25T17:27:00Z",
     "source_block_tries": 2,
     "source_block_why_not": "getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 450418345'}",
     "lane_signature": "4tEFyTUtfyS7pV1opyFMnLNCSPnTh7SyNu9qBwSWLD5rhuKTUfSPPXnAWJ6tZtmoJaaJ5ApeH2h2HKqSzPqb1XCr",
@@ -1120,9 +1120,59 @@
     "lane_pool_nonce": "7b6Ag2fdBd7TktrnnuceUvGvv9TpfaoTek3rbwdaxPyp",
     "lane_tips_total_sol": 0.001,
     "signal_recv_ts": 1790356895.059863,
-    "lane_bought_tries": 2,
+    "lane_bought_tries": 3,
     "lane_bought_why_not": "узел транзакции не отдал",
     "source_block_index": 272,
-    "source_block_total": 1266
+    "source_block_total": 1266,
+    "result_uncountable": true,
+    "result_uncountable_why": "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька полосы",
+    "result_uncountable_ts": 1790357205.560302,
+    "jup_amount_raw": 10851609906,
+    "jup_any_quote": true,
+    "jup_attempts": 1,
+    "ts_jup_attempt": 1790357205.556075,
+    "jup_floor": {
+      "out_amount": 38396886,
+      "threshold": 26877820,
+      "floor_needed": 26877820,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+        "known": true,
+        "bytes_len": 712,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 383.97,
+      "entry_lamports": 10000000
+    },
+    "jup_api": "swap-v2",
+    "jup_api_used": "swap-v2",
+    "jup_api_tried": [
+      "swap-v2"
+    ],
+    "jup_signature": "4KwpYMQ2Ha3NampMYdLn9L32tkjeRk3JFbLgHkNMUgyMw9CCjsfofat2KPqFTMZkByvnmmhKqGit3PH3To1LQkS5",
+    "last_sell_signatures": [
+      "4KwpYMQ2Ha3NampMYdLn9L32tkjeRk3JFbLgHkNMUgyMw9CCjsfofat2KPqFTMZkByvnmmhKqGit3PH3To1LQkS5"
+    ],
+    "sell_address_kind": "jupiter",
+    "ts_last_sell_attempt": 1790357205.556075,
+    "last_sell_reported": "4KwpYMQ2Ha3NampMYdLn9L32tkjeRk3JFbLgHkNMUgyMw9CCjsfofat2KPqFTMZkByvnmmhKqGit3PH3To1LQkS5",
+    "last_sell_outcome": {
+      "known": true,
+      "ok": true,
+      "error_code": null,
+      "slot": 450419497,
+      "sol_delta": 0.039441737,
+      "sol_delta_net": 0.039430686,
+      "fee_sol": 1.1051e-05,
+      "mint_delta_ui": -10851.609906
+    },
+    "ts_closed": 1790357220.55617,
+    "closed_reason": "продажа полосы подтверждена по цепи",
+    "closed_sol_net": 0.039430686
   }
 }
