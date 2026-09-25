@@ -47,13 +47,24 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
-      - name: "Копии журналов с хоста (только чтение)"
+      - name: "Копии журналов с хоста (только чтение, с отсевом на хосте)"
         run: |
           set -e
           set -o pipefail
           mkdir -p /tmp/journal_state
+          # ЖУРНАЛ РЕШЕНИЙ НЕ КОПИРУЕТСЯ ЦЕЛИКОМ. На хосте он 635 МБ и 439
+          # тысяч строк: копия целиком заняла бы столько же на диске хоста, а
+          # разбор её в память убил прогон по OOM на боевом хосте (16:23Z
+          # 25.09). Отсев идёт grep-ом на хосте -- потоком, без памяти, -- и
+          # берёт только строки с parsed_from за нужный день. Точное окно всё
+          # равно проверяет модуль по полю ts_utc.
+          DAY=$(printf %s "${{ inputs.since }}" | cut -c1-10)
+          [ -n "$DAY" ] || DAY=$(date -u +%Y-%m-%d)
+          echo "день отсева: $DAY"
+          ssh -n $SSH_OPTS root@$HOST "wc -c < $STATE_DIR/decisions.jsonl; wc -l < $STATE_DIR/decisions.jsonl"
+          ssh -n $SSH_OPTS root@$HOST "grep -F parsed_from $STATE_DIR/decisions.jsonl | grep -F $DAY || true" > /tmp/journal_state/decisions.jsonl
+          ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/journal_state/positions.jsonl
           for f in decisions.jsonl positions.jsonl; do
-            ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/$f" > "/tmp/journal_state/$f"
             echo "$f: $(wc -c < /tmp/journal_state/$f) байт, строк $(wc -l < /tmp/journal_state/$f)"
           done
 
@@ -68,6 +79,16 @@ jobs:
             --since '${{ inputs.since }}' \
             --out-md data/journal_stats.md \
             --out-json data/journal_stats.json | tail -60
+
+      - name: "Уборка копий журналов с диска хоста"
+        if: always()
+        run: |
+          set -e
+          # Бегунок стоит НА хосте, и /tmp здесь -- диск боевого хоста.
+          # Оставленная копия журнала это занятый диск у службы, которая на
+          # этот диск пишет.
+          rm -rf /tmp/journal_state
+          df -h /tmp | tail -1
 
       - name: "Коммит таблиц"
         if: always()
