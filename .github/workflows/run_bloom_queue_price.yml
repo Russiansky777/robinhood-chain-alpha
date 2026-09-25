@@ -23,6 +23,10 @@ on:
         description: "жёсткий предел кредитов на прогон"
         required: false
         default: "400"
+      our_constant_ms:
+        description: "замеренная доставка полосы (отправка -> видно в подписке), мс: для таблицы 'во сколько надо уложиться'. 0 -- прочерк"
+        required: false
+        default: "0"
       gain_fraction:
         description: "замеренный выигрыш входа в S+0 долей цены (0 -- таблицу окупаемости не строить)"
         required: false
@@ -98,6 +102,7 @@ jobs:
             --max-trades '${{ inputs.max_trades }}' \
             --credit-limit '${{ inputs.credit_limit }}' \
             --gain-fraction '${{ inputs.gain_fraction }}' \
+            --our-constant-ms '${{ inputs.our_constant_ms }}' \
             --out data/queue_price.json \
             --out-md docs/queue_price.md 2>&1 | tail -80
 

@@ -3420,6 +3420,199 @@ class Детектор:
                             type(exc).__name__)
         return итог
 
+    def догнать_место_источника(self, *, предел: int = 3) -> dict:
+        """Место ИСТОЧНИКА в его блоке -- один getBlock уровня подписей.
+
+        Владелец 25.09: в разложении доставки нужен и момент посадки
+        источника -- слот и место. Слот у нас есть с самого сигнала, места не
+        было: без него не видно, сел ли источник в начале своего блока или в
+        конце, а это половина ответа на вопрос "сколько мы ждали слот".
+        """
+        итог = {"looked": 0, "filled": 0, "why_not": ""}
+        try:
+            позиции = self.состояние.positions()
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"{type(exc).__name__}"
+            return итог
+        кандидаты = []
+        for cid, p_ in (позиции or {}).items():
+            if p_.get("lane") != ST.МЕТКА_ПОЛОСЫ:
+                continue
+            if p_.get("source_block_index") is not None:
+                continue
+            if int(p_.get("source_block_tries") or 0) >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                continue
+            подпись, слот = p_.get("source_sig"), p_.get("source_slot")
+            if not подпись or not isinstance(слот, int):
+                continue
+            кандидаты.append((cid, подпись, слот))
+        кандидаты.sort(key=lambda x: x[0])
+        for cid, подпись, слот in кандидаты[:предел]:
+            итог["looked"] += 1
+            попытки = int((позиции.get(cid) or {}).get("source_block_tries") or 0) + 1
+            try:
+                import bloom_block_position as BP  # noqa: PLC0415
+
+                м = BP.место_по_подписям(self.helius, слот, подпись)
+            except Exception as exc:  # noqa: BLE001
+                м = {"known": False,
+                     "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
+            поля = {"source_block_tries": попытки}
+            if м.get("known"):
+                поля.update(source_block_index=м.get("index"),
+                             source_block_total=м.get("total"))
+                итог["filled"] += 1
+            else:
+                поля["source_block_why_not"] = str(м.get("why_not") or "")[:200]
+            try:
+                self.состояние.update_position(cid, **поля)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("место источника: позиция не записана (%s)",
+                            type(exc).__name__)
+        return итог
+
+    def разложение_пары(self, поз: dict) -> dict:
+        """Разложение "источник сел -> мы сели" на измеримые куски (З2).
+
+        ЧЕСТНО О ГРАНИЦАХ. Момент посадки источника в миллисекундах нашему
+        узлу неизвестен: подписка отдаёт транзакцию уже после того, как слот
+        обработан, и вычесть одно из другого нельзя. Поэтому у источника мы
+        знаем СЛОТ и МЕСТО в блоке, а время раскладываем от той точки,
+        которая у нас есть по своим часам, -- от прихода сигнала на наш узел:
+
+          * обнаружение -- приход сигнала -> наше решение;
+          * сборка и подпись -- решение -> отправка;
+          * доставка -- отправка -> наша транзакция видна в подписке;
+          * то же для контроля: он ушёл тем же путём и без касания пула;
+          * ожидание слота -- разница слотов и мест в блоках.
+        """
+        def мс(а, б):
+            if not а or not б:
+                return None
+            return round((float(б) - float(а)) * 1000.0, 2)
+
+        сигнал = поз.get("signal_recv_ts")
+        из_ = {
+            "source_slot": поз.get("source_slot"),
+            "source_block_index": поз.get("source_block_index"),
+            "source_block_total": поз.get("source_block_total"),
+            "detect_ms": мс(сигнал, поз.get("ts_intent")),
+            "build_sign_ms": мс(поз.get("ts_intent"), поз.get("ts_sent")),
+            "deliver_ms": поз.get("lane_send_to_seen_ms"),
+            "control_deliver_ms": поз.get("control_send_to_seen_ms"),
+            "signal_to_seen_ms": мс(сигнал, поз.get("own_tx_seen_ts")),
+            "our_slot": поз.get("own_tx_seen_slot"),
+            "our_block_index": поз.get("block_index"),
+            "our_block_total": поз.get("block_total"),
+            "control_slot": поз.get("control_seen_slot"),
+            "control_block_index": поз.get("control_block_index"),
+            "slots_behind": None,
+            "control_slots_behind": None,
+            "note": ("момент посадки источника в мс нашему узлу неизвестен: "
+                      "у него известны слот и место в блоке"),
+        }
+        их = поз.get("source_slot")
+        if isinstance(их, int):
+            if isinstance(поз.get("own_tx_seen_slot"), int):
+                из_["slots_behind"] = поз["own_tx_seen_slot"] - их
+            if isinstance(поз.get("control_seen_slot"), int):
+                из_["control_slots_behind"] = поз["control_seen_slot"] - их
+        return из_
+
+    def свод_контролей(self, *, минимум_пар: int = 10) -> dict:
+        """Итог по десяти и более парам с контролем -- медианами (З2).
+
+        Один раз на каждые `минимум_пар`: доложили десять -- считаем и шлём,
+        дальше копим следующие. Медиана, а не среднее: один выброс в путь на
+        секунду не должен перекрасить вывод.
+        """
+        итог = {"sent": False, "pairs": 0, "why_not": None}
+        try:
+            позиции = self.состояние.positions() or {}
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"позиции не прочитаны ({type(exc).__name__})"
+            return итог
+        пары = [p for p in позиции.values()
+                if p.get("lane") == ST.МЕТКА_ПОЛОСЫ
+                and p.get("control_send_to_seen_ms") is not None
+                and p.get("lane_send_to_seen_ms") is not None]
+        итог["pairs"] = len(пары)
+        if len(пары) < минимум_пар:
+            итог["why_not"] = (f"пар с контролем {len(пары)} из {минимум_пар} -- "
+                                "рано считать")
+            return итог
+        уже = int((self.состояние.counters() or {}).get(
+            "lane_control_summary_at", 0) or 0)
+        if len(пары) < уже + минимум_пар:
+            итог["why_not"] = f"итог по {уже} парам уже доложен"
+            return итог
+
+        def медиана(поле):
+            ряд = sorted(float(p[поле]) for p in пары if p.get(поле) is not None)
+            if not ряд:
+                return None
+            с = len(ряд) // 2
+            return round(ряд[с] if len(ряд) % 2 else (ряд[с - 1] + ряд[с]) / 2, 2)
+
+        раскл = [self.разложение_пары(p) for p in пары]
+
+        def медиана_раскл(поле):
+            ряд = sorted(float(р[поле]) for р in раскл if р.get(поле) is not None)
+            if not ряд:
+                return None
+            с = len(ряд) // 2
+            return round(ряд[с] if len(ряд) % 2 else (ряд[с - 1] + ряд[с]) / 2, 2)
+
+        покупка = медиана("lane_send_to_seen_ms")
+        контроль = медиана("control_send_to_seen_ms")
+        разница = (None if покупка is None or контроль is None
+                    else round(покупка - контроль, 2))
+        вывод = "—"
+        if разница is not None:
+            вывод = ("ОЧЕРЕДЬ К ПУЛУ: контроль садится заметно быстрее покупки"
+                      if разница > 50 else
+                      ("ПУТЬ: контроль не быстрее покупки -- задержка не в пуле"
+                       if разница <= 15 else
+                       "ПОПОЛАМ: разница есть, но небольшая"))
+        итог.update(
+            buy_deliver_ms_median=покупка, control_deliver_ms_median=контроль,
+            delta_ms=разница, verdict=вывод,
+            detect_ms_median=медиана_раскл("detect_ms"),
+            build_sign_ms_median=медиана_раскл("build_sign_ms"),
+            signal_to_seen_ms_median=медиана_раскл("signal_to_seen_ms"),
+            slots_behind_median=медиана_раскл("slots_behind"))
+        текст = (f"📊 контроль доставки: итог по {len(пары)} парам\n"
+                  f"доставка покупки, медиана {покупка} мс\n"
+                  f"доставка контроля, медиана {контроль} мс\n"
+                  f"разница {разница} мс -> {вывод}\n"
+                  f"обнаружение (приход сигнала -> решение) {итог['detect_ms_median']} мс\n"
+                  f"сборка и подпись {итог['build_sign_ms_median']} мс\n"
+                  f"от прихода сигнала до нашей посадки {итог['signal_to_seen_ms_median']} мс\n"
+                  f"отставание по слотам, медиана {итог['slots_behind_median']}")
+        try:
+            с = self.состояние.counters() or {}
+            с["lane_control_summary_at"] = len(пары)
+            self.состояние.save_counters(с)
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"пометка итога не легла ({type(exc).__name__})"
+            return итог
+        self.состояние.log_decision({"stage": "lane_control_summary",
+                                      "pairs": len(пары), **{
+                                          к: итог.get(к) for к in
+                                          ("buy_deliver_ms_median",
+                                           "control_deliver_ms_median", "delta_ms",
+                                           "verdict", "detect_ms_median",
+                                           "build_sign_ms_median",
+                                           "signal_to_seen_ms_median",
+                                           "slots_behind_median")}})
+        if self.оповещатель is not None and NT is not None:
+            self.оповещатель.послать(текст)
+            итог["sent"] = True
+        else:
+            итог["why_not"] = "оповещатель не подключён"
+        итог["text"] = текст
+        return итог
+
     def досказать_контроли(self, *, предел: int = 5) -> dict:
         """Строки пар с контролем, которые в момент посадки были неполны.
 
@@ -4079,7 +4272,9 @@ async def биение(детектор: Детектор, стоп_через_s
             # или путь" остаётся без чисел.
             await asyncio.to_thread(детектор.догнать_место_контроля)
             await asyncio.to_thread(детектор.догнать_очередь_пары)
+            await asyncio.to_thread(детектор.догнать_место_источника)
             await asyncio.to_thread(детектор.досказать_контроли)
+            детектор.свод_контролей()
             # Часовое окно тени: ноль собранных при трёх и более сигналах --
             # тревога владельцу и перезапуск ТЕНИ, детектор не трогаем.
             детектор.сводка_тени_за_час()
