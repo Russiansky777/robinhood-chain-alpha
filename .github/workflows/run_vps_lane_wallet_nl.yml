@@ -1,0 +1,137 @@
+name: "Полоса: отдельный кошелёк (создать ключ на хосте / показать адрес)"
+
+# Слово владельца 25.09: "Сгенерируй на хосте новый ключ, положи в секрет
+# OWN_SEND_WALLET_KEY, в чат -- только публичный адрес".
+#
+# ЧТО ЗДЕСЬ ВАЖНО ПРО КЛЮЧ:
+#   * ключ создаётся НА ХОСТЕ и пишется прямо в /etc/bloom-executor/env
+#     (там же лежит ключ исполнителя, права 600, владелец root);
+#   * в журнал прогона, в чат и в репозиторий уходит ТОЛЬКО публичный адрес;
+#   * повторный запуск НЕ перезаписывает существующий ключ: перезапись
+#     означала бы потерю доступа к деньгам на прежнем адресе.
+#
+# Секрет репозитория этим прогоном не создаётся: у штаба нет доступа на запись
+# секретов GitHub. Если владельцу нужна копия в секрете -- он вставляет её сам,
+# значение ключа для этого нигде не печатается.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "status -- показать адрес и баланс; create -- создать ключ, если его ещё нет"
+        required: true
+        default: "status"
+
+concurrency:
+  group: lane-wallet-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin/python
+
+jobs:
+  lane_wallet:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Скрипт на хост (значение ключа наружу не выходит)"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@127.0.0.1 'cat > /tmp/lane_wallet_create.py'  <<'PY'
+          import json, os, pathlib, sys
+          from solders.keypair import Keypair
+
+          ENV = pathlib.Path("/etc/bloom-executor/env")
+          MODE = os.environ.get("LANE_WALLET_MODE", "status")
+          текст = ENV.read_text(encoding="utf-8") if ENV.exists() else ""
+          строки = текст.split("\n")
+
+          def значение(имя):
+              for с in строки:
+                  if с.startswith(имя + "="):
+                      return с.split("=", 1)[1].strip()
+              return None
+
+          ключ = значение("OWN_SEND_WALLET_KEY")
+          адрес = значение("OWN_SEND_WALLET")
+          если_есть = bool(ключ)
+          if MODE == "create" and not если_есть:
+              kp = Keypair()
+              # ФОРМАТ -- JSON-массив байт: ровно его понимает единственный
+              # разборщик ключей репозитория (dbot_rescue.load_rescue_keypair),
+              # и он не требует base58 в окружении хоста.
+              секрет = json.dumps(list(bytes(kp)))
+              адрес = str(kp.pubkey())
+              # Дописываем ОДНОЙ операцией и не трогаем остальные строки.
+              # ПЕРЕВОД СТРОКИ ПЕРЕД ДОПИСЫВАНИЕМ: если файл кончался без него,
+              # наша строка склеилась бы с последней -- и служба потеряла бы
+              # сразу две переменные окружения.
+              with ENV.open("a", encoding="utf-8") as f:
+                  if текст and not текст.endswith("\n"):
+                      f.write("\n")
+                  f.write(f"OWN_SEND_WALLET={адрес}\n")
+                  f.write(f"OWN_SEND_WALLET_KEY={секрет}\n")
+              ENV.chmod(0o600)
+              ключ = секрет
+              print("создан новый ключ полосы")
+          elif MODE == "create" and если_есть:
+              print("ключ полосы уже есть -- НЕ перезаписываю (это были бы потерянные деньги)")
+
+          # СВЕРКА: ключ из окружения обязан давать тот адрес, что записан
+          # рядом. Иначе служба подпишет не тот кошелёк.
+          сверка = None
+          if ключ:
+              try:
+                  kp2 = (Keypair.from_bytes(bytes(json.loads(ключ)))
+                         if ключ.strip().startswith("[")
+                         else Keypair.from_base58_string(ключ.strip()))
+                  сверка = str(kp2.pubkey()) == (адрес or "")
+              except Exception as exc:
+                  сверка = f"ключ не разобрался: {type(exc).__name__}"
+          print(json.dumps({"есть_ключ": bool(ключ), "адрес": адрес,
+                            "ключ_даёт_этот_адрес": сверка,
+                            "прав_на_env": oct(ENV.stat().st_mode & 0o777) if ENV.exists() else None},
+                           ensure_ascii=False))
+          PY
+          echo "скрипт доставлен"
+
+      - name: "Создать или показать"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@127.0.0.1 "LANE_WALLET_MODE='${{ inputs.mode }}' $VENV /tmp/lane_wallet_create.py; rc=\$?; rm -f /tmp/lane_wallet_create.py; exit \$rc"
+
+      - name: "Баланс адреса полосы (только чтение)"
+        if: always()
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          # Баланс спрашивается с ХОСТА его же ключом Helius из окружения: это
+          # один вызов getBalance, и он не трогает ни одного секрета сверх
+          # того, что уже есть в службе.
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -z \"\$OWN_SEND_WALLET\" ]; then echo 'адреса полосы ещё нет'; exit 0; fi
+            echo \"адрес полосы: \$OWN_SEND_WALLET\"
+            curl -s -X POST \"https://mainnet.helius-rpc.com/?api-key=\$HELIUS_API_KEY\" \
+              -H 'Content-Type: application/json' \
+              -d \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"getBalance\\\",\\\"params\\\":[\\\"\$OWN_SEND_WALLET\\\"]}\" \
+              | head -c 300; echo"
