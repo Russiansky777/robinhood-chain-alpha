@@ -852,6 +852,15 @@ def таблица_кругов(state: ST.ExecState, строки: list, мес�
             # Своя отправка меряется от ОТПРАВКИ (у неё нет ответа площадки),
             # поэтому её число стоит отдельным столбцом, а не в
             # bloom_to_seen_ms: сложить их значило бы сравнить разные пути.
+            # НАЛОГ ПО МАРШРУТУ (владелец 25.09, пункт 3). Два числа рядом:
+            # что видел фильтр ДО покупки (по маршруту источника) и что взяли
+            # с нас по факту (по нашей транзакции). Пусто -- значит не
+            # посчитано, а не "налога нет".
+            "route_transfer_fee_bps": p_.get("route_transfer_fee_bps"),
+            "our_route_transfer_fee_bps": p_.get("our_route_transfer_fee_bps"),
+            "our_route_transfers_of_token": p_.get("our_route_transfers_of_token"),
+            "token_fee_bps": p_.get("tax_bps") if p_.get("tax_bps") is not None
+                              else p_.get("our_token_fee_bps"),
             "lane": p_.get("lane"),
             "lane_send_to_seen_ms": p_.get("lane_send_to_seen_ms"),
             "lane_bought_raw": p_.get("lane_bought_raw"),

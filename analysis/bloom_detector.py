@@ -3216,6 +3216,23 @@ class Детектор:
         ошибка_цепи = мета.get("err")
         запись["chain_ok"] = ошибка_цепи is None
         запись["our_slot"] = tx.get("slot")
+        # НАЛОГ ПО НАШЕМУ МАРШРУТУ (слово владельца 25.09, пункт 3). До покупки
+        # фильтр считал маршрут ИСТОЧНИКА -- иначе было нечего считать. Здесь
+        # видно, каким маршрутом пошли МЫ и сколько налога взяли с нас. Разница
+        # между этими двумя числами и есть то, чего фильтр знать не мог.
+        if RT is not None:
+            try:
+                свой = RT.налог_маршрута(tx, минт, self.helius.налог_минта,
+                                          откуда="ours")
+                запись["our_route_transfer_fee_bps"] = свой.get("route_transfer_fee_bps")
+                запись["our_route_transfers_of_token"] = свой.get("transfers_of_token")
+                запись["our_route_taxed_intermediates"] = [
+                    з.get("mint") for з in (свой.get("taxed_intermediates") or [])]
+                запись["our_token_fee_bps"] = свой.get("token_fee_bps")
+                if свой.get("why_not"):
+                    запись["our_route_tax_why_not"] = свой["why_not"]
+            except Exception as exc:  # noqa: BLE001
+                запись["our_route_tax_why_not"] = f"{type(exc).__name__}"
         if ошибка_цепи is not None:
             запись["code"] = КОД_ПОКУПКА_УПАЛА
             запись["chain_err"] = ошибка_цепи
@@ -3280,7 +3297,11 @@ class Детектор:
             # отправки. Ошибка цепи выше уже вернула управление, значит сюда
             # приходят только транзакции с meta.err == null.
             self.состояние.update_position(
-                cid, chain_ok=True, our_pool=наш["pool"],
+                cid,
+                our_route_transfer_fee_bps=запись.get("our_route_transfer_fee_bps"),
+                our_route_transfers_of_token=запись.get("our_route_transfers_of_token"),
+                our_token_fee_bps=запись.get("our_token_fee_bps"),
+                chain_ok=True, our_pool=наш["pool"],
                 our_pool_direct=наш["direct"],
                 our_route_programs=",".join(наш["route"].get("programs") or []),
                 our_route_hops=наш["route"].get("hops_by_mints"),
