@@ -9,23 +9,38 @@ name: "Полоса своей отправки: поставить KILL_OWN_SEN
 # остановить полосу был деплой с own_send_live=0, а он молча отменяется
 # следующим деплоем с own_send_live=1.
 #
-# СНЯТИЯ ЗАПРЕТА ЗДЕСЬ НЕТ НАМЕРЕННО. Полоса сама себя не разблокирует, и
-# прогон тоже не должен: снимать -- отдельным действием по слову владельца.
+# СНЯТИЕ (mode=clear) ДОБАВЛЕНО 25.09 ПО ПРЯМОМУ РАЗРЕШЕНИЮ ВЛАДЕЛЬЦА: "снять
+# KILL_OWN_SEND -- причина 571aBZbC по новому правилу это итог несчитаем, не
+# утечка". Полоса по-прежнему сама себя не разблокирует. Снятие требует трёх
+# вещей сразу, и каждую проверяет сам прогон:
+#   * подтверждения словом (confirm = SNYAT) -- чтобы снятие не случилось
+#     "заодно" с просмотром;
+#   * ПРОЙДЕННЫХ самопроверок полосы и сторожа НА ХОСТЕ и согласованного
+#     кошелька полосы (ключ даёт именно тот адрес) -- в том же прогоне, до
+#     снятия;
+#   * причины словами, которая уходит в журнал прогона.
+# Не прошла хоть одна -- файл не трогается. Прежняя причина не исчезает: она
+# уезжает в файл рядом с отметкой времени, иначе разбор потом не найдёт, из-за
+# чего вставали.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "status -- только посмотреть; set -- остановить полосу"
+        description: "status -- посмотреть; set -- остановить полосу; clear -- снять (после самопроверок)"
         required: true
         default: "status"
       reason:
-        description: "почему остановлена (для mode=set; попадёт в файл и в признак жизни)"
+        description: "почему остановлена или почему снимаем (попадёт в файл и в журнал прогона)"
         required: false
         default: ""
       telegram:
         description: "'yes' -- отправить строку владельцу в основной чат (для mode=set)"
         required: false
         default: "no"
+      confirm:
+        description: "для mode=clear: ровно SNYAT -- иначе снятие не делается"
+        required: false
+        default: ""
 
 concurrency:
   group: lane-kill-nl
@@ -34,6 +49,8 @@ concurrency:
 env:
   HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin/python
 
 jobs:
   lane_kill:
@@ -88,6 +105,60 @@ jobs:
               printf 'поставлен: '; head -c 400 \"\$F\"; echo
             fi"
 
+      - name: "clear: гейт 1 -- подтверждение словом и причина"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          confirm_word='${{ inputs.confirm }}'
+          reason_text='${{ inputs.reason }}'
+          [ "$confirm_word" = "SNYAT" ] || { echo "СБОЙ: для mode=clear нужно confirm=SNYAT"; exit 1; }
+          [ -n "$reason_text" ] || { echo "СБОЙ: для mode=clear нужна причина"; exit 1; }
+          echo "подтверждение принято, причина: $reason_text"
+
+      - name: "clear: гейт 2 -- самопроверки полосы и сторожа НА ХОСТЕ"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          # Самопроверки ТОГО кода, что лежит на хосте, а не того, что в
+          # репозитории: снимаем рубильник с работающей службы, и проверять
+          # надо её. `set -e` внутри удалённой оболочки роняет шаг, если
+          # самопроверка вернула не ноль.
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            cd $CODE_DIR
+            $VENV bloom_own_send.py --self-test | tail -1
+            $VENV bloom_seller.py --self-test | tail -1"
+
+      - name: "clear: гейт 3 -- ключ полосы даёт именно её адрес"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          # Значение ключа наружу не выходит: печатается адрес и слово да/нет.
+          LANE_READY=$(ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . /etc/bloom-executor/env; set +a
+            cd $CODE_DIR
+            $VENV -c 'import json, bloom_own_send as O; g=O.кошелёк_готов(); print(json.dumps({\"wallet\": g.get(\"wallet\"), \"own\": g.get(\"own_wallet\"), \"ok\": g.get(\"ok\"), \"why_not\": g.get(\"why_not\")}, ensure_ascii=False))'")
+          echo "кошелёк полосы: $LANE_READY"
+          case "$LANE_READY" in
+            *'"own": true'*'"ok": true'*) echo "адрес и ключ полосы согласованы" ;;
+            *) echo "СБОЙ: кошелёк полосы не готов -- рубильник не снимаю"; exit 1 ;;
+          esac
+
+      - name: "clear: снять рубильник (прежняя причина сохраняется)"
+        if: ${{ inputs.mode == 'clear' }}
+        run: |
+          set -e
+          reason_text='${{ inputs.reason }}'
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            F=$STATE_DIR/KILL_OWN_SEND
+            if [ ! -f \"\$F\" ]; then echo 'рубильника и не было -- снимать нечего'; exit 0; fi
+            cp -a \"\$F\" \"\$F.snyat.\$(date -u +%Y%m%dT%H%M%SZ)\"
+            printf 'снимаю, прежняя причина: '; head -c 400 \"\$F\"; echo
+            rm -f \"\$F\"
+            echo 'рубильник снят, причина снятия: $reason_text'
+            ls -l \$(dirname \"\$F\")/KILL_OWN_SEND* 2>/dev/null || echo 'файла KILL_OWN_SEND больше нет'"
+
       - name: "Строка владельцу в Telegram (по запросу)"
         if: ${{ inputs.mode == 'set' && inputs.telegram == 'yes' }}
         run: |
@@ -119,9 +190,16 @@ jobs:
           # Признак жизни пишется раз в пульс: ждём до 40 с и печатаем lane_kill
           # так, как его видит САМА служба. Файл на диске и мнение службы
           # обязаны совпадать, иначе рубильник не рубильник.
+          # ЖДЁМ РАЗНОГО В ЗАВИСИМОСТИ ОТ РЕЖИМА: после set служба обязана
+          # увидеть рубильник (true), после clear -- перестать его видеть
+          # (false). Одинаковое ожидание врало бы в одном из двух случаев.
+          mode_now='${{ inputs.mode }}'
           for i in 1 2 3 4 5 6 7 8; do
             out=$(ssh -n $SSH_OPTS root@127.0.0.1 "grep -A4 '\"lane_kill\"' $STATE_DIR/detector_status.json || true")
             echo "$out"
-            case "$out" in *true*) break ;; esac
+            case "$mode_now" in
+              clear) case "$out" in *false*) echo "служба больше не видит рубильник"; break ;; esac ;;
+              *) case "$out" in *true*) break ;; esac ;;
+            esac
             sleep 5
           done
