@@ -84,7 +84,7 @@
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 66305,
+      "v2": 186902,
       "unreadable": 0
     },
     "positions": {
@@ -113,29 +113,29 @@
     свежая чужая: 2UEBfKK88WBfYa319oyC1vbFnYb1ziJUapB9zw4coA37HXKKhuUCuLnBMnJS2bP3hAcY7mL9B11adWcRbEHgUzhA 2026-09-25T03:48:37Z
     свежая чужая: 2piXoN8qt6jKhGdV7T3RiyHr26PU8TWREDGMbNksUrjchZW9SFfpV5Z85NUosp98oc1HmNBWtbqP9hFxLaBzQAxa 2026-09-25T02:46:02Z
     свежая чужая: 3CFDA9pfajdup7L6WXPd9UJzYiDqDcc9im1RptXCmWeWkfkeQfABdbaJ2u8o4MSumYjgCcNfxusBNFhntFWwP7vz 2026-09-25T01:16:27Z
-граница чужой активности: окно (2026-09-24T14:30:06Z)
+граница чужой активности: окно (2026-09-24T14:44:19Z)
 позиции: dry-run 0, настоящих открытых 0
   БЛОКЕР: на кошельке 11 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
   примечание: 9 свежих сделок: выход по нашей позиции: остаток нашего минта уменьшился, подпись авто-ордера Bloom нам не сообщается -- 3Ncu6tYjh45r (571aBZbC7C227a79bAAA1YTHKrDYHZkcBpHPgvUcpump), 2UEBfKK88WBf (74sHNXtVDHZVw4ADktjGFHPzNycV8iHvfHLPp6QZPdT4), 2piXoN8qt6jK (C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21), 3CFDA9pfajdu (nDZknLvfFRp5rgUHdzTrQsmSY5NKzoavqdLjSHVpump), 49Erjz6DvdVi (HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ), 5UQf1VAnWoEq (2Ngvnnkwrwq5u4RYV5WYKJ2wiQoEkKaVCc4LuuhYSTNK), 5rRTEWrUb6Nk (7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7), e2w3Jn9PaoVr (6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu), 5PaEanbq1r85 (8Lj2cdk5VgqFEpcaXHoaxYSbQrpgceaK7p4B25WqBkyT)
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-25T14:30:10Z",
-  "updated_ts": 1790346610.361005,
-  "alive_since_utc": "2026-09-25T14:30:10Z",
+  "updated_utc": "2026-09-25T14:44:25Z",
+  "updated_ts": 1790347465.1274207,
+  "alive_since_utc": "2026-09-25T14:44:24Z",
   "mode": "live",
-  "sources": 80,
+  "sources": 66,
   "source_groups": {
     "file": "/home/bot/data/sources_2026-09-25.json",
     "why_not": null,
     "in_file": {
       "lane_only": 38,
-      "speed_only": 22
+      "speed_only": 8
     },
     "subscribed": {
       "bloom_lane": 20,
       "lane_only": 38,
-      "speed_only": 22
+      "speed_only": 8
     },
     "policies": {
       "bloom_lane": {
@@ -160,18 +160,85 @@
         "fanout": false,
         "day_cap_sol": 0.2,
         "stop_loss_sol": 0.15,
-        "min_target_sol": null
+        "min_target_sol": 0.5
       }
     }
   },
+  "sender_connections": {
+    "by_sender": {
+      "astralane": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "blockrazor": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "helius": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "jito": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "nozomi": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.0,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "zeroslot": {
+        "age_s": 0.0,
+        "last_use_s": null,
+        "last_ping_s": 0.0,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      }
+    },
+    "warm_period_s": 25.0,
+    "last_warm_s": 0.2,
+    "last_warm": {
+      "ok": 6,
+      "failed": 0
+    }
+  },
   "bloom_skipped_by_group": 0,
-  "sources_from": "DBot живьём + групп источников: 60 + тестовых источников из окружения: 2",
+  "sources_from": "DBot живьём + групп источников: 46 + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 0,
+  "signals_seen": 9,
   "to_buy": 0,
-  "by_code": {},
+  "by_code": {
+    "NOT_A_BUY": 8,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 1
+  },
   "by_code_test_source": {},
   "test_sources": [
     "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
@@ -181,7 +248,7 @@
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 119.8833060767935,
+  "rate_usd_sol": 119.82950348419618,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -193,14 +260,15 @@
   "slot_notifications": 0,
   "net_slot_age_s": null,
   "balance_sol": 1.967823914,
-  "balance_age_s": 0.07,
-  "rpc_calls": 4,
+  "balance_age_s": 0.17,
+  "rpc_calls": 6,
   "rpc_by_method": {
-    "getMultipleAccounts": 1,
+    "getMultipleAccounts": 2,
+    "getLatestBlockhash": 1,
     "getBalance": 2,
-    "getLatestBlockhash": 1
+    "simulateTransaction": 1
   },
-  "session_credits": 4,
+  "session_credits": 14,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -208,7 +276,7 @@
     "sent": 0,
     "failed": 0,
     "last_error": "",
-    "off_reason": "",
+    "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "log_configured": false,
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
@@ -256,9 +324,9 @@
     "module_why_not": "",
     "passed_in_row_by_pool": {},
     "hour": {
-      "since_ts": 1790346610.0839477,
-      "since_utc": "2026-09-25T14:30:10Z",
-      "signals": 0,
+      "since_ts": 1790347464.7652502,
+      "since_utc": "2026-09-25T14:44:24Z",
+      "signals": 1,
       "built": 0,
       "sim_failed": 0,
       "not_built": {},
@@ -266,7 +334,7 @@
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 140,
+    "credits_day": 269,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -297,13 +365,13 @@
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 0.6,
-    "balance_age_s": 0.0,
+    "balance_sol": 0.59893836,
+    "balance_age_s": 0.1,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 0.0,
+    "blockhash_age_s": 0.2,
     "blockhash_updates": 1,
     "blockhash_why_not": "",
     "last": {},
@@ -397,7 +465,7 @@
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-25T14:30:10Z",
+    "last_utc": "2026-09-25T14:44:24Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -423,8 +491,13 @@
   },
   "credits_logged": true,
   "credits_log_error": "",
-  "decide_latency_ms": null
+  "decide_latency_ms": {
+    "n": 9,
+    "median": 0.4,
+    "min": 0.2,
+    "max": 21.5
+  }
 }--- решений в журнале ---
-69782
+190831
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 539
