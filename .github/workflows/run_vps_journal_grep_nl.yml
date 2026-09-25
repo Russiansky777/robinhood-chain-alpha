@@ -1,0 +1,131 @@
+name: "Журнал решений: выборка по строкам (только чтение, потоком)"
+
+# ЗАЧЕМ. Журнал решений на хосте 635 МБ, и почти каждый ночной расчёт упирается
+# в один вопрос: "покажи записи по этой подписи / этому минту / этому окну".
+# Читать его в память нельзя -- 25.09 в 16:23Z это уже съело хост и уронило
+# бегунок. Здесь чтение ТОЛЬКО потоком: grep -F по фиксированным строкам на
+# хосте под nice/ionice, наружу уходят только совпавшие строки.
+#
+# Только чтение: ни одной записи на хост, ни одного обращения к цепи, ни одной
+# покупки. Службы не трогаются.
+on:
+  workflow_dispatch:
+    inputs:
+      patterns:
+        description: "фиксированные строки через запятую (подпись, минт, адрес)"
+        required: true
+      file:
+        description: "'decisions' (по умолчанию) или 'positions'"
+        required: false
+        default: "decisions"
+      fields:
+        description: "какие ключи печатать через запятую (пусто -- запись целиком)"
+        required: false
+        default: ""
+      limit:
+        description: "сколько последних совпавших строк взять"
+        required: false
+        default: "40"
+
+concurrency:
+  group: journal-grep-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  grep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Выборка потоком с хоста"
+        run: |
+          set -e
+          set -o pipefail
+          case "${{ inputs.file }}" in
+            positions) SRC="$STATE_DIR/positions.jsonl" ;;
+            *)         SRC="$STATE_DIR/decisions.jsonl" ;;
+          esac
+          # Образцы -- ФИКСИРОВАННЫЕ строки (grep -F): подпись или адрес не
+          # регулярное выражение, и толковать их как образец значит искать не
+          # то. Каждый образец уходит отдельным -e.
+          ARGS=""
+          for P in $(echo "${{ inputs.patterns }}" | tr ',' ' '); do
+            [ -n "$P" ] && ARGS="$ARGS -e $P"
+          done
+          [ -n "$ARGS" ] || { echo "СБОЙ: образцов нет"; exit 1; }
+          mkdir -p /tmp/jgrep
+          # nice/ionice: детектор на этом же хосте торгует, и замер не должен
+          # его тормозить. Вывод идёт потоком сразу в файл на бегунке.
+          ssh -n $SSH_OPTS root@$HOST \
+            "nice -n 15 ionice -c3 grep -F $ARGS $SRC | tail -n ${{ inputs.limit }}" \
+            > /tmp/jgrep/hits.jsonl || true
+          echo "совпало строк: $(wc -l < /tmp/jgrep/hits.jsonl)"
+          echo "байт: $(wc -c < /tmp/jgrep/hits.jsonl)"
+
+      - name: "Печать и файл"
+        env:
+          FIELDS: ${{ inputs.fields }}
+          PATTERNS: ${{ inputs.patterns }}
+          SRCFILE: ${{ inputs.file }}
+        run: |
+          set -e
+          python3 - <<'PY'
+          import json, pathlib, os
+          поля = [п.strip() for п in os.environ.get("FIELDS", "").split(",") if п.strip()]
+          строки = []
+          путь = pathlib.Path("/tmp/jgrep/hits.jsonl")
+          for s in путь.read_text(encoding="utf-8", errors="replace").splitlines():
+              s = s.strip()
+              if not s.startswith("{"):
+                  continue
+              try:
+                  з = json.loads(s)
+              except json.JSONDecodeError:
+                  continue
+              строки.append({к: з.get(к) for к in поля} if поля else з)
+          pathlib.Path("data").mkdir(exist_ok=True)
+          pathlib.Path("data/journal_grep.json").write_text(
+              json.dumps({"patterns": os.environ.get("PATTERNS", ""),
+                          "file": os.environ.get("SRCFILE", ""),
+                          "rows": строки}, ensure_ascii=False, indent=1),
+              encoding="utf-8")
+          print(f"записей разобрано: {len(строки)}")
+          for з in строки[-40:]:
+              print(json.dumps(з, ensure_ascii=False)[:1200])
+          PY
+
+      - name: "Коммит выборки"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/journal_grep.json ] && git add data/journal_grep.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Журнал: выборка по строкам [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
