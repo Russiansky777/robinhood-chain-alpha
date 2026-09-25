@@ -35,25 +35,33 @@ from pathlib import Path
 ЧЕРЕЗ_RPC = "PARSE_VIA_RPC"
 
 
-def строки(путь: str) -> list:
+def поток(путь: str):
+    """Строки журнала ПО ОДНОЙ. Файл решений на хосте -- 635 МБ и 439 тысяч
+    строк; read_text на нём съел память бегунка, и прогон убило OOM прямо на
+    боевом хосте. Журналы читаются только потоком и только так."""
     п = Path(путь)
     if not п.exists():
-        return []
-    из_ = []
-    for с in п.read_text(encoding="utf-8", errors="replace").split("\n"):
-        с = с.strip()
-        if not с.startswith("{"):
-            continue
-        try:
-            из_.append(json.loads(с))
-        except ValueError:
-            continue
-    return из_
+        return
+    with п.open(encoding="utf-8", errors="replace") as ф:
+        for с in ф:
+            с = с.strip()
+            if not с.startswith("{"):
+                continue
+            try:
+                yield json.loads(с)
+            except ValueError:
+                continue
+
+
+def строки(путь: str) -> list:
+    """Список -- только для маленьких журналов (позиции). Для решений
+    пользоваться поток()."""
+    return list(поток(путь))
 
 
 def позиции(путь: str) -> dict:
     из_: dict = {}
-    for з in строки(путь):
+    for з in поток(путь):
         cid = з.get("client_order_id")
         if not cid:
             continue
@@ -66,7 +74,7 @@ def _в_окне(з: dict, с_utc: str) -> bool:
     return (not с_utc) or (bool(когда) and когда >= с_utc)
 
 
-def откуда_сигналы(решения: list, с_utc: str = "") -> dict:
+def откуда_сигналы(решения, с_utc: str = "") -> dict:
     """П. 1: доля разбора через getTransaction против разбора из сообщения."""
     свод = {"rows": 0, "msg": 0, "rpc": 0, "not_fetched": 0,
              "by_hour": {}, "by_source_rpc": {}, "by_group_rpc": {},
@@ -258,15 +266,16 @@ def main() -> int:
     р.add_argument("--out-md", default=None)
     р.add_argument("--out-json", default=None)
     а = р.parse_args()
-    реш = строки(а.decisions)
     поз = позиции(а.positions)
+    сигналы = откуда_сигналы(поток(а.decisions), а.since)
     о = {"since": а.since,
-          "decisions_rows": len(реш), "positions": len(поз),
-          "signals": откуда_сигналы(реш, а.since),
+          "decisions_rows": сигналы.get("rows"), "positions": len(поз),
+          "signals": сигналы,
           "lane_amount": количество_полосы(поз, а.since),
           "sells": продажи(поз, а.since)}
     т = доклад(о)
-    print(f"строк решений: {len(реш)}, позиций: {len(поз)}")
+    print(f"строк решений с parsed_from: {сигналы.get('rows')}, "
+           f"позиций: {len(поз)}")
     print(т)
     if а.out_md:
         Path(а.out_md).write_text(
