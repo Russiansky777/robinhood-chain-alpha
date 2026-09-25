@@ -76,6 +76,18 @@ except Exception as _тень_exc:        # noqa: BLE001
     SB = None
     SHADOW_IMPORT_ERR = f"{type(_тень_exc).__name__}: {_тень_exc}"
 
+try:                                  # налог по маршруту -- узкий фильтр владельца
+    import bloom_route_tax as RT      # noqa: E402
+    ROUTE_TAX_IMPORT_ERR = ""
+except Exception as _налог_exc:       # noqa: BLE001
+    # Модуля нет -- фильтр не работает, и это НЕ тихое событие: причина идёт в
+    # признак жизни и в лог при старте. Покупки при этом идут как до фильтра,
+    # то есть как всю прошлую неделю: молча останавливать торговлю из-за
+    # отсутствующего файла хуже, чем молча не фильтровать, но знать об этом
+    # владелец обязан.
+    RT = None
+    ROUTE_TAX_IMPORT_ERR = f"{type(_налог_exc).__name__}: {_налог_exc}"
+
 try:                                  # полоса своей отправки -- тоже не обязана
     import bloom_own_send as OS        # noqa: E402
     OWN_SEND_IMPORT_ERR = ""
@@ -203,6 +215,11 @@ LAMPORT = 10 ** 9
 # засечь, через сколько от решения наша покупка появляется в потоке
 # processed, и тем самым измерить путь Bloom от ответа до включения.
 КОД_НАША_ТРАНЗАКЦИЯ = "OWN_TX_SEEN"
+# УЗКИЙ БОЕВОЙ ФИЛЬТР ПО НАЛОГУ МАРШРУТА (слово владельца 25.09). Режет и
+# покупку Bloom, и полосу: налог берётся на каждой передаче, и маршрут через
+# налоговую промежуточную монету съедает сделку целиком. Пример владельца --
+# PICKAXE: WSOL->USDC->GLDx->GP->PICKAXE, GP передан дважды, -5.9 %.
+КОД_НАЛОГ_МАРШРУТА = RT.КОД_ПРОПУСКА if RT is not None else "SKIP_TAXED_ROUTE"
 ФЛАГ_НЕТ_ПУЛА_SOL = "NO_SOL_POOL_IN_TX"
 ФЛАГ_МАРШРУТ_РАЗОШЁЛСЯ = "ROUTE_MISMATCH"
 РАЗБОР_ИЗ_СООБЩЕНИЯ = "PARSE_VIA_MSG"
@@ -1045,6 +1062,35 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
                         "filter": "наш лимит", "dbot_бы_купил": True})
         return строка
 
+    # НАЛОГ ПО МАРШРУТУ. Разбор кладёт в сигнал детектор (ему нужны
+    # транзакция и узел), а здесь только решение -- чтобы функция осталась
+    # чистой и проверяемой. Нет разбора -- нет и фильтра: молча считать
+    # "налога нет" нельзя, поэтому в записи остаётся причина.
+    нал = сигнал.get("route_tax") or {}
+    фил = сигнал.get("route_tax_filter") or {}
+    if нал:
+        строка["route_transfer_fee_bps"] = нал.get("route_transfer_fee_bps")
+        строка["token_fee_bps"] = нал.get("token_fee_bps")
+        строка["route_transfers_of_token"] = нал.get("transfers_of_token")
+        строка["route_taxed_intermediates"] = [
+            з.get("mint") for з in (нал.get("taxed_intermediates") or [])]
+        строка["route_tax_from"] = нал.get("route_from")
+        if нал.get("why_not"):
+            строка["route_tax_why_not"] = нал["why_not"]
+    if сигнал.get("route_tax_ms") is not None:
+        строка["route_tax_ms"] = сигнал["route_tax_ms"]
+    if сигнал.get("route_tax_batch"):
+        строка["route_tax_mints_asked"] = (сигнал["route_tax_batch"] or {}).get("asked")
+    if фил:
+        строка["would_skip_fee"] = bool(фил.get("would_skip_fee"))
+        if фил.get("reason") and not фил.get("skip"):
+            строка["route_tax_note"] = фил["reason"]
+    if фил.get("skip"):
+        строка.update({"action": "skip", "code": КОД_НАЛОГ_МАРШРУТА,
+                        "reason": фил.get("reason"),
+                        "filter": "наш лимит", "dbot_бы_купил": True})
+        return строка
+
     можно, почему, код2 = состояние.can_open_detailed(
         mint=сигнал["mint"], source_sig=сигнал["signature"], balance_sol=баланс_sol)
     if not можно:
@@ -1244,6 +1290,63 @@ class Helius:
             return None
         v = (r or {}).get("value") if isinstance(r, dict) else r
         return (int(v) / LAMPORT) if isinstance(v, int) else None
+
+    @staticmethod
+    def _налог_из_счёта(минт: str, val: dict) -> dict:
+        """Разбор ОДНОГО счёта минта. Один разбор на оба пути -- одиночный
+        getAccountInfo и пакетный getMultipleAccounts: два разных понимания
+        одного расширения означали бы два разных налога у одного токена."""
+        out = {"mint": минт, "token_program": None, "fee_bps": None,
+                "taxed": None}
+        val = val or {}
+        out["token_program"] = val.get("owner")
+        данные = val.get("data")
+        разбор = данные.get("parsed") if isinstance(данные, dict) else None
+        info = разбор.get("info") if isinstance(разбор, dict) else None
+        if not isinstance(info, dict):
+            info = {}
+        out["decimals"] = info.get("decimals")
+        for e in info.get("extensions") or []:
+            if isinstance(e, dict) and e.get("extension") == "transferFeeConfig":
+                st = (e.get("state") or {})
+                out["fee_bps"] = (st.get("newerTransferFee") or {}).get("transferFeeBasisPoints")
+                out["max_fee"] = (st.get("newerTransferFee") or {}).get("maximumFee")
+                out["fee_authority"] = st.get("transferFeeConfigAuthority")
+                out["withdraw_authority"] = st.get("withdrawWithheldAuthority")
+        out["taxed"] = bool(out.get("fee_bps"))
+        return out
+
+    def налоги_минтов(self, минты: list) -> dict:
+        """Налоги СРАЗУ ПО НЕСКОЛЬКИМ минтам -- одним запросом.
+
+        Зачем пакет: фильтр по налогу маршрута стоит ПЕРЕД покупкой, а
+        getAccountInfo на каждый минт -- это круг до сети на каждый. Три минта
+        в маршруте превратились бы в три круга и в треть секунды задержки
+        перед покупкой; getMultipleAccounts берёт их за один круг. Кеш общий с
+        налог_минта: спрашиваем только то, чего в нём нет.
+        """
+        итог = {"asked": 0, "got": 0, "why_not": None, "ms": None}
+        новые = [м for м in (минты or []) if м and м not in self._кеш_минтов]
+        if not новые:
+            return итог
+        итог["asked"] = len(новые)
+        t0 = time.perf_counter()
+        try:
+            r = self.call("getMultipleAccounts",
+                          [новые, {"encoding": "jsonParsed"}])
+        except RuntimeError as exc:
+            итог["why_not"] = str(exc)[:160]
+            итог["ms"] = round((time.perf_counter() - t0) * 1000, 2)
+            return итог
+        значения = (r or {}).get("value") or []
+        for минт, val in zip(новые, значения):
+            # Счёт может не разобраться (адрес не минт) -- тогда кешируем то,
+            # что вышло: ставка None, и потребитель увидит "налог не прочитан",
+            # а не ноль.
+            self._кеш_минтов[минт] = self._налог_из_счёта(минт, val or {})
+            итог["got"] += 1
+        итог["ms"] = round((time.perf_counter() - t0) * 1000, 2)
+        return итог
 
     def налог_минта(self, минт: str) -> dict:
         """Программа токена и ставка комиссии на перевод. Кеш на процесс:
@@ -1696,6 +1799,12 @@ class Детектор:
                          "module_loaded": SB is not None,
                          "module_why_not": globals().get("SHADOW_IMPORT_ERR", ""),
                          "passed_in_row_by_pool": dict(self.тени_подряд)}
+        st["route_tax_filter"] = {
+            "module_loaded": RT is not None,
+            "module_why_not": globals().get("ROUTE_TAX_IMPORT_ERR", ""),
+            "code": КОД_НАЛОГ_МАРШРУТА,
+            "skipped": self.по_кодам.get(КОД_НАЛОГ_МАРШРУТА, 0),
+            "skipped_test": self.по_кодам_теста.get(КОД_НАЛОГ_МАРШРУТА, 0)}
         st["own_send"] = {
             "enabled": self.полоса_включена,
             "live": (OS is not None and OS.живьём()),
@@ -1850,6 +1959,31 @@ class Детектор:
             return строка
 
         сиг = сигнал_из_транзакции(tx, источник, подпись=подпись, слот=слот)
+        # НАЛОГ ПО МАРШРУТУ -- ДО РЕШЕНИЯ, потому что он это решение и меняет
+        # (узкий фильтр владельца 25.09). Цена честная и названа числом в
+        # записи: один getMultipleAccounts на все минты маршрута, которых нет
+        # в кеше. Одиночные getAccountInfo дали бы круг до сети на каждый минт
+        # -- именно это когда-то стояло между решением и отправкой и было
+        # оттуда убрано. Считаем ТОЛЬКО для сигналов-покупок: на остальных
+        # это были бы кредиты и задержка без решения.
+        if RT is not None and сиг.get("kind") == "buy" and сиг.get("mint"):
+            t_налог = time.perf_counter()
+            try:
+                передачи = RT.передачи_по_минтам(tx)
+                минты_маршрута = [м for м in (передачи.get("by_mint") or {})
+                                   if м not in RT.КОТИРОВОЧНЫЕ_ВСЕ]
+                пакет = self.helius.налоги_минтов(минты_маршрута)
+                сиг["route_tax"] = RT.налог_маршрута(
+                    tx, сиг["mint"], self.helius.налог_минта, откуда="source")
+                сиг["route_tax_filter"] = RT.фильтр_маршрута(сиг["route_tax"])
+                сиг["route_tax_batch"] = пакет
+            except Exception as exc:  # noqa: BLE001
+                # Фильтр не смог посчитать -- покупка НЕ отменяется, но причина
+                # идёт в запись: молча считать "налога нет" нельзя.
+                сиг["route_tax"] = {"why_not": f"{type(exc).__name__}: {str(exc)[:160]}",
+                                     "route_from": "source"}
+                сиг["route_tax_filter"] = {}
+            сиг["route_tax_ms"] = round((time.perf_counter() - t_налог) * 1000, 2)
         t_разбор = time.time()
         # Курс и баланс берутся из фоновых кешей: в горячем пути ни одного
         # обращения к сети, иначе замер задержки мерил бы нашу же сеть.
@@ -3635,8 +3769,116 @@ def self_test() -> int:
         r = det.обработать("ПОДПИСЬ_ОК", 100, "SRC", "тест", t_ок)
         chk("решение о покупке доходит до ветки покупки",
             r["action"] == "buy", r.get("action"))
+        # Налог минта спрашивается ДВАЖДЫ только у заглушки: у настоящего узла
+        # второй вопрос попадает в кеш минтов и кредита не стоит. Первый
+        # вопрос -- фильтр по налогу маршрута ДО решения, второй -- признак
+        # токена в запись ПОСЛЕ отправки ордера.
         chk("налог минта спрошен именно в этой ветке",
-            h.спрошено == ["MINT_OK"], h.спрошено)
+            h.спрошено and set(h.спрошено) == {"MINT_OK"}, h.спрошено)
+        chk("налог маршрута посчитан до решения и его цена названа числом",
+            r.get("route_transfer_fee_bps") is not None
+            and r.get("route_tax_ms") is not None
+            and r.get("route_tax_from") == "source",
+            (r.get("route_transfer_fee_bps"), r.get("route_tax_ms")))
+        # ---- УЗКИЙ ФИЛЬТР ПО НАЛОГУ МАРШРУТА (владелец 25.09) ----
+        # Цена ошибки прямая: пропустим PICKAXE-подобный маршрут -- потеряем
+        # около 6 % на налоге; зарежем налоговый токен с прямым пулом к SOL --
+        # потеряем сделки, которые владелец велел покупать.
+        class HeliusНалоги(Helius):
+            налоги = {"MINT_ЧИСТЫЙ": 0, "MINT_НАЛОГ": 250, "ПРОМЕЖ_НАЛОГ": 300}
+
+            def __init__(self):
+                super().__init__(key="нет", служба="")
+                self.пакетов = 0
+
+            def налоги_минтов(self, минты):
+                self.пакетов += 1
+                return {"asked": len(минты or []), "got": len(минты or []),
+                        "ms": 1.0, "why_not": None}
+
+            def налог_минта(self, минт):
+                bps = HeliusНалоги.налоги.get(минт, 0)
+                return {"mint": минт, "taxed": bool(bps), "fee_bps": bps}
+
+        def передача_т(минт):
+            return {"programId": TOKEN_CLASSIC,
+                     "parsed": {"type": "transferChecked",
+                                 "info": {"mint": минт, "authority": "SRC"}}}
+
+        def tx_с_передачами(минт_покупки, передачи, *, промеж=()):
+            т = tx(pre=[бал(USDC, 600_000000)],
+                    post=[бал(USDC, 0), бал(минт_покупки, 5_000000, idx=2)])
+            т["meta"]["innerInstructions"] = [{"instructions": передачи}]
+            return т
+
+        st_ф = ST.ExecState(base=Path(d) / "filter", kill=Path(d) / "kill")
+        hф = HeliusНалоги()
+        detф = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_ф, helius=hф,
+                         курс=КурсSOL(), режим="dry")
+        detф.курс.значение, detф.курс.когда = 200.0, time.time()
+        detф.слот_сети, detф.t_слот = 100, time.time()
+        detф.баланс_sol, detф.t_баланс = 5.0, time.time()
+
+        # PICKAXE-подобный случай: налоговый промежуточный и двойная передача.
+        t_пик = tx_с_передачами("MINT_НАЛОГ", [
+            передача_т(WSOL), передача_т(USDC), передача_т("ПРОМЕЖ_НАЛОГ"),
+            передача_т("MINT_НАЛОГ"), передача_т("MINT_НАЛОГ")])
+        r_пик = detф.обработать("ПОДПИСЬ_ПИК", 100, "SRC", "тест", t_пик)
+        chk("маршрут с налоговым промежуточным и двойной передачей режется",
+            r_пик.get("action") == "skip" and r_пик.get("code") == КОД_НАЛОГ_МАРШРУТА,
+            (r_пик.get("action"), r_пик.get("code"), r_пик.get("reason")))
+        chk("в записи пропуска есть налог маршрута, налог токена и число передач",
+            r_пик.get("route_transfer_fee_bps") == 300 + 250 * 2
+            and r_пик.get("token_fee_bps") == 250
+            and r_пик.get("route_transfers_of_token") == 2
+            and r_пик.get("route_taxed_intermediates") == ["ПРОМЕЖ_НАЛОГ"]
+            and r_пик.get("would_skip_fee") is True, r_пик)
+        chk("пропуск помечен как НАШ лимит: DBot такого фильтра не имеет",
+            r_пик.get("filter") == "наш лимит" and r_пик.get("dbot_бы_купил") is True,
+            (r_пик.get("filter"), r_пик.get("dbot_бы_купил")))
+        chk("налоги маршрута спрошены ОДНИМ пакетом, а не по одному",
+            hф.пакетов == 1, hф.пакетов)
+
+        # Налоговый токен с прямым пулом к SOL -- покупаем (слово владельца).
+        t_прям = tx_с_передачами("MINT_НАЛОГ", [передача_т(WSOL),
+                                                 передача_т("MINT_НАЛОГ")])
+        r_прям = detф.обработать("ПОДПИСЬ_ПРЯМ", 100, "SRC", "тест", t_прям)
+        chk("налоговый токен с прямым пулом к SOL проходит фильтр",
+            r_прям.get("action") == "buy", (r_прям.get("action"), r_прям.get("reason")))
+        chk("и налог у него всё равно помечен в записи",
+            r_прям.get("would_skip_fee") is True
+            and r_прям.get("token_fee_bps") == 250
+            and "по слову владельца" in (r_прям.get("route_tax_note") or ""),
+            (r_прям.get("would_skip_fee"), r_прям.get("route_tax_note")))
+
+        # Чистый токен одной передачей -- покупаем без пометок.
+        t_чист = tx_с_передачами("MINT_ЧИСТЫЙ", [передача_т(WSOL),
+                                                  передача_т("MINT_ЧИСТЫЙ")])
+        r_чист = detф.обработать("ПОДПИСЬ_ЧИСТ", 100, "SRC", "тест", t_чист)
+        chk("токен без налога покупается и пометки не получает",
+            r_чист.get("action") == "buy"
+            and r_чист.get("would_skip_fee") is False
+            and r_чист.get("route_transfer_fee_bps") == 0, r_чист)
+
+        # Налог не прочитался -- покупку НЕ отменяем, но причину пишем.
+        class HeliusБезНалогов(HeliusНалоги):
+            def налог_минта(self, минт):
+                raise RuntimeError("узел молчит")
+
+        detф2 = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_ф,
+                          helius=HeliusБезНалогов(), курс=КурсSOL(), режим="dry")
+        detф2.курс.значение, detф2.курс.когда = 200.0, time.time()
+        detф2.слот_сети, detф2.t_слот = 100, time.time()
+        detф2.баланс_sol, detф2.t_баланс = 5.0, time.time()
+        r_нет = detф2.обработать("ПОДПИСЬ_НЕТ_НАЛОГА", 100, "SRC", "тест",
+                                  tx_с_передачами("MINT_ЧИСТЫЙ2",
+                                                   [передача_т(WSOL),
+                                                    передача_т("MINT_ЧИСТЫЙ2")]))
+        chk("налог не прочитан -- покупка не отменяется, причина в записи",
+            r_нет.get("action") == "buy" and r_нет.get("route_tax_why_not"),
+            (r_нет.get("action"), r_нет.get("route_tax_why_not")))
+
+
         chk("признак налога попал в запись",
             r.get("taxed") is True and r.get("tax_bps") == 300, r.get("taxed"))
         chk("счётчик к покупке вырос", det.к_покупке == 1, det.к_покупке)
