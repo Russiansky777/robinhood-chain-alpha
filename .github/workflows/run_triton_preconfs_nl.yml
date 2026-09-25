@@ -46,6 +46,14 @@ on:
         description: "'yes' -- только отчёт по уже собранному журналу зонда"
         required: false
         default: "no"
+      accounts_override:
+        description: "адреса для фильтра через запятую вместо наших источников (контроль фильтра)"
+        required: false
+        default: ""
+      limit_messages:
+        description: "предел сообщений на этот прогон (пусто -- суточный 5000)"
+        required: false
+        default: ""
 
 concurrency:
   group: triton-preconfs
@@ -116,9 +124,18 @@ jobs:
           # второй разбор того же снимка означал бы два списка источников,
           # которые когда-нибудь разойдутся молча. DBot здесь не спрашивается
           # вовсе, и ни одна задача там не меняется.
-          python3 analysis/triton_preconfs_probe.py \
-            --accounts-from-snapshot data/final/20260923T145755Z/konfig.json \
-            --accounts-out "$OUT_DIR/accounts.txt" --tasks 'BATCH-5,BATCH-3'
+          # КОНТРОЛЬ ФИЛЬТРА (владелец 25.09 вечером): вместо наших источников
+          # можно подставить любой адрес -- например программу Pump AMM, чтобы
+          # увидеть, есть ли поток вообще. Тогда снимок задач не читается вовсе.
+          if [ -n "${{ inputs.accounts_override }}" ]; then
+            printf '%s\n' "${{ inputs.accounts_override }}" | tr ',' '\n' \
+              | sed '/^$/d' > "$OUT_DIR/accounts.txt"
+            echo "КОНТРОЛЬ ФИЛЬТРА: адреса заданы входом, не снимком задач"
+          else
+            python3 analysis/triton_preconfs_probe.py \
+              --accounts-from-snapshot data/final/20260923T145755Z/konfig.json \
+              --accounts-out "$OUT_DIR/accounts.txt" --tasks 'BATCH-5,BATCH-3'
+          fi
           echo "адресов источников: $(wc -l < "$OUT_DIR/accounts.txt")"
           [ -s "$OUT_DIR/accounts.txt" ] || { echo "СБОЙ: адресов источников нет"; exit 1; }
 
@@ -175,6 +192,7 @@ jobs:
             --feed '${{ inputs.feed }}' --region '${{ inputs.region }}' \
             --accounts-file "../$OUT_DIR/accounts.txt" \
             --seconds '${{ inputs.seconds }}' \
+            ${{ inputs.limit_messages && format('--limit-messages {0}', inputs.limit_messages) || '' }} \
             --out "../$OUT_DIR/preconfs_${{ inputs.feed }}_$stamp.jsonl" \
             --status "../$OUT_DIR/probe_status.json" \
             --state-dir "$HOME/.triton_state" 2>&1 | tail -40

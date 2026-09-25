@@ -1128,6 +1128,10 @@ def main() -> int:
     р.add_argument("--accounts-out", default=None,
                     help="только выписать адреса источников в файл и выйти")
     р.add_argument("--tasks", default="BATCH-5,BATCH-3")
+    р.add_argument("--limit-messages", type=int, default=None,
+                    help=("предел сообщений НА ЭТОТ ПРОГОН вместо суточного "
+                          "(контрольная проверка фильтра: владелец 25.09 "
+                          "просил потолок 20 000 на пять минут)"))
     р.add_argument("--seconds", type=float, default=None,
                     help="сколько держать поток (по умолчанию -- предел фида)")
     р.add_argument("--out", default=None, help="журнал зонда, jsonl")
@@ -1210,6 +1214,7 @@ def main() -> int:
         print(f"СБОЙ: {замок['why_not']}")
         return 1
     счёт = Счёт(фид=а.feed, окно_s=(а.seconds if а.seconds else None),
+                 предел_сообщений=а.limit_messages,
                  каталог=а.state_dir)
     путь_признака = а.status
 
