@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-25T02:00:49Z",
+  "generated_utc": "2026-09-25T02:32:49Z",
   "inputs": {
     "crowd_cache": "/tmp/claude-0/-home-user-robinhood-chain-alpha/1766891f-706e-5008-a349-9de1fb730381/scratchpad/c2/crowd_metric_2026-09-24.json",
     "state_dir": null,
@@ -13,8 +13,11 @@
   "constraints": {
     "read_only": true,
     "no_trades": true,
-    "helius_key_in_container": false,
-    "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py)"
+    "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py); --chain строит его через c2_common.C2Rpc с потолком кредитов"
+  },
+  "chain": {
+    "ok": false,
+    "why_not": "--chain не передан -- офлайн-режим на кэше/локальных файлах"
   },
   "task_e_leader": {
     "ok": true,
@@ -557,20 +560,26 @@
         }
       },
       "share": {
-        "n_checked": 2,
+        "n_checked": 3,
         "common_authority_guess": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
-        "n_same_authority": 2,
-        "share_same_authority": 1.0
+        "n_same_authority": 3,
+        "share_same_authority": 1.0,
+        "why_not": null
       },
       "fetch_meta": {
         "fetched_fresh": 0,
         "credits_spent": 0,
-        "why_not_missing": "4 минтов не в кэше: нужен rpc_call (getMultipleAccounts, ~1 кредит(ов))"
+        "why_not_missing": "146 минтов не в кэше: нужен rpc_call (getMultipleAccounts, ~2 кредит(ов))"
       },
       "all_147_tax_mints_check": {
         "done": false,
-        "why_not": "не запрошено rpc_call в этом прогоне",
-        "cost_if_rpc_call_given": "getMultipleAccounts батчами по 100 -> ceil(147/100)=2 вызова = 2 кредита (дёшево, окупает точную долю по ВСЕМ 147 таксируемым минтам, а не по 6 именованным)"
+        "n_total_tax_mints_in_index": 147,
+        "n_mints_requested": 148,
+        "n_checked": 3,
+        "common_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
+        "share_with_common_authority": 1.0,
+        "why_not": "не передан --chain (или нет ключа) -- см. g1_authorities.fetch_meta",
+        "cost_if_rpc_call_given": "getMultipleAccounts батчами по 100 -> ceil(148/100)=2 вызова(ов) -- дёшево, окупает точную долю по ВСЕМ таксируемым минтам, а не по 6 именованным"
       }
     },
     "g2_price_impact": {

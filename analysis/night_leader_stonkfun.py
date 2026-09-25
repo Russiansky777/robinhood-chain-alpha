@@ -82,6 +82,84 @@ CREDIT_GET_PROGRAM_ACCOUNTS = 10
 # G2: окно "покупка -> продажа", которое просил проверить владелец.
 G2_WINDOW_S = 28.8
 
+# --chain: суточная квота C2 общая на ВСЕ службы c2_* (см. C2Rpc.check_budget
+# в analysis/c2_common.py), а владелец на ЭТО исследование выделил не более
+# 70% от неё -- остальное нужно другим ночным задачам. В отличие от
+# STOP_AT_WARN=False в solana_rpc_client.py (там 70% -- только сигнал,
+# "не гасить самим"), здесь владелец явно велел ОСТАНОВИТЬСЯ, а не доложить
+# и продолжить -- поэтому это жёсткий стоп, а не предупреждение.
+OWNER_RESEARCH_BUDGET = 200_000
+OWNER_STOP_FRACTION = 0.70
+CHAIN_SERVICE_NAME = "c2_night_leader_stonkfun"
+
+
+class CreditLimitExceeded(Exception):
+    """НЕ RuntimeError и не C2.BudgetExceeded: свой, более ранний предел
+    (--credit-limit прогона ИЛИ 70% общей суточной квоты владельца).
+    Отдельный класс -- чтобы вызывающий код (compute_leader_exits,
+    get_mint_fee_authorities) мог поймать ИМЕННО остановку по кредитам и
+    честно завершиться частичным результатом, не путая её со сбоем сети
+    (RuntimeError) и не давая ей утонуть в общем except."""
+
+
+class BudgetedRpc:
+    """rpc_call с ДВУМЯ пределами поверх C2Rpc: локальным (--credit-limit
+    на этот прогон) и владельческим (не более OWNER_STOP_FRACTION общей
+    суточной квоты C2 -- проверяется по РЕАЛЬНОМУ расходу всех служб c2_*
+    на диске (C2.c2_spent_today), а не только этим прогоном, иначе можно
+    было бы съесть чужой запас, ничего не нарушив локально).
+
+    Cчёт кредитов -- по тарифу analysis/solana_rpc_client.py (RC.credits_for):
+    1 за обычный вызов/getTransaction, 10 -- за getProgramAccounts. Считаем
+    ДО отправки запроса (пессимистично: сорвавшийся вызов всё равно уходил
+    в сеть и мог быть учтён провайдером)."""
+
+    def __init__(self, c2rpc, local_limit: int) -> None:
+        self.rpc = c2rpc
+        self.local_limit = local_limit
+        self.used = 0
+        self.calls = 0
+        self.stopped_reason: str | None = None
+
+    def __call__(self, method: str, params: list):
+        if self.stopped_reason:
+            raise CreditLimitExceeded(self.stopped_reason)
+        n = C2.RC.credits_for(method)
+        if self.used + n > self.local_limit:
+            self.stopped_reason = (f"локальный предел --credit-limit={self.local_limit} исчерпан "
+                                    f"(потрачено этим прогоном {self.used}, нужно ещё {n})")
+            raise CreditLimitExceeded(self.stopped_reason)
+        owner_cap = int(OWNER_RESEARCH_BUDGET * OWNER_STOP_FRACTION)
+        spent_shared = C2.c2_spent_today(self.rpc.meter.base)
+        if spent_shared + n > owner_cap:
+            self.stopped_reason = (f"70% суточной квоты C2 ({owner_cap} из {OWNER_RESEARCH_BUDGET}) было бы "
+                                    f"превышено (сейчас всеми c2_-службами потрачено {spent_shared}) -- "
+                                    "владелец велел останавливаться здесь, не только докладывать")
+            raise CreditLimitExceeded(self.stopped_reason)
+        result = self.rpc.call(method, params)
+        self.used += n
+        self.calls += 1
+        return result
+
+
+def resolve_chain_rpc(chain: bool, credit_limit: int, *, usage_dir: Path | None = None):
+    """Собрать rpc_call для --chain или честно отказать. Без ключа -- НЕ
+    исключение, а обычный отрицательный результат (why_not), как и просил
+    владелец."""
+    if not chain:
+        return None, {"ok": False, "why_not": "--chain не передан -- офлайн-режим на кэше/локальных файлах"}
+    key, key_name = C2.RC.helius_key()
+    if not key:
+        return None, {"ok": False, "why_not": "нет HELIUS_API_KEY/HELIUS_API в окружении -- "
+                                               "цепь недоступна (ключ не найден ни под одним из двух имён)"}
+    rpc = C2.C2Rpc(CHAIN_SERVICE_NAME, key=key, usage_dir=usage_dir or C2.RC.USAGE_DIR)
+    budgeted = BudgetedRpc(rpc, local_limit=credit_limit)
+    return budgeted, {"ok": True, "service": CHAIN_SERVICE_NAME, "key_env": key_name,
+                       "local_credit_limit": credit_limit,
+                       "owner_stop_fraction": OWNER_STOP_FRACTION,
+                       "owner_stop_credits": int(OWNER_RESEARCH_BUDGET * OWNER_STOP_FRACTION),
+                       "c2_daily_budget": OWNER_RESEARCH_BUDGET}
+
 
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S', time.gmtime())}Z] {msg}", flush=True)
@@ -325,24 +403,36 @@ def estimate_exit_credit_cost(meta: dict, trades: list, days: int = 14) -> dict:
 
 
 def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
-                          page_limit: int = 1000, max_pages: int = 60) -> dict:
+                          page_limit: int = 1000, max_pages: int = 60,
+                          max_tx: int | None = None) -> dict:
     """Реальная реализация LEADER_EXIT_RECIPE. Без rpc_call -- честный
     отказ, а не пустой список (пустой список неотличим от "выходов не
-    было", а это не так)."""
+    было", а это не так).
+
+    Два независимых предела на дороже часть (getTransaction на КАЖДУЮ
+    подпись окна): свой `max_tx` (--exit-max-tx, "досюда и хватит") и
+    CreditLimitExceeded от переданного rpc_call (BudgetedRpc). Оба -- НЕ
+    исключение наружу, а честный частичный результат: обработанные сделки
+    остаются с найденным выходом, необработанные -- с точной причиной
+    (частичный ответ лучше отсутствующего, как просил владелец)."""
     if rpc_call is None:
         return {"ok": False, "why_not": "нет rpc_call -- см. LEADER_EXIT_RECIPE и estimate_exit_credit_cost",
                 "trades": []}
     if not trades:
         return {"ok": False, "why_not": "пустой список сделок лидера -- нечего закрывать", "trades": []}
-    by_sig = {t["signature"]: t for t in trades if t.get("signature")}
     earliest_sig = min(trades, key=lambda t: t.get("block_time") or 0).get("signature")
     sigs: list = []
     before = None
+    stopped_reason: str | None = None
     for _ in range(max_pages):
         params = [leader, {"limit": page_limit, "commitment": "finalized"}]
         if before:
             params[1]["before"] = before
-        page = rpc_call("getSignaturesForAddress", params) or []
+        try:
+            page = rpc_call("getSignaturesForAddress", params) or []
+        except CreditLimitExceeded as exc:
+            stopped_reason = str(exc)
+            break
         if not page:
             break
         sigs.extend(page)
@@ -352,8 +442,13 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
     sigs.sort(key=lambda s: s.get("slot") or 0)  # старые -> новые, для прохода вперёд от покупки
     index_of = {s["signature"]: i for i, s in enumerate(sigs) if s.get("signature")}
     results = []
+    tx_calls_used = 0
     for t in trades:
         sig, mint = t.get("signature"), t.get("mint")
+        if stopped_reason:
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": f"не дошли -- {stopped_reason}"})
+            continue
         start = index_of.get(sig)
         if start is None:
             results.append({"signature": sig, "mint": mint, "ok": False,
@@ -364,8 +459,16 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
             s = sigs[j]
             if s.get("err") is not None:
                 continue
-            tx = rpc_call("getTransaction", [s["signature"], {"encoding": "jsonParsed",
-                          "maxSupportedTransactionVersion": 1, "commitment": "finalized"}])
+            if max_tx is not None and tx_calls_used >= max_tx:
+                stopped_reason = f"достигнут предел --exit-max-tx={max_tx} (getTransaction-вызовов)"
+                break
+            try:
+                tx = rpc_call("getTransaction", [s["signature"], {"encoding": "jsonParsed",
+                              "maxSupportedTransactionVersion": 1, "commitment": "finalized"}])
+                tx_calls_used += 1
+            except CreditLimitExceeded as exc:
+                stopped_reason = str(exc)
+                break
             if not tx:
                 continue
             delta = C2.owner_mint_delta(tx, mint).get(leader)
@@ -385,13 +488,40 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
                           "net_sol": r6(out_sol - in_sol) if (in_sol is not None and out_sol is not None) else None,
                           "held_slots": found["exit_slot"] - t.get("slot") if found.get("exit_slot") and t.get("slot") else None})
             results.append(found)
+        elif stopped_reason:
+            results.append({"signature": sig, "mint": mint, "ok": False,
+                             "why_not": f"остановлено на этой сделке -- {stopped_reason}"})
         else:
             results.append({"signature": sig, "mint": mint, "ok": False,
                              "why_not": "выход не найден в собранном окне подписей (ещё держит или окно короче)"})
-    return {"ok": True, "n_signatures_fetched": len(sigs), "trades": results}
+    return {"ok": True, "n_signatures_fetched": len(sigs), "n_getTransaction_calls": tx_calls_used,
+            "partial": stopped_reason is not None, "stopped_reason": stopped_reason, "trades": results}
 
 
-def run_task_e(crowd_path: Path, tax_index: dict, rpc_call=None) -> dict:
+def exit_group_summary(exit_trades: list, tax_index: dict) -> dict:
+    """Итог ПОСЛЕ налогов (net_sol по цепи, а не сигнал) по группам
+    налоговый/обычный -- прямой ответ на вопрос владельца "на какой группе
+    он делает плюс". Группа -- по тому же classify_group (по данным
+    минта), что и на входе, чтобы граница E была ОДНОЙ и той же величиной
+    по обе стороны сделки."""
+    by_group: dict = {"tax": [], "normal": [], "unknown": []}
+    for r in exit_trades:
+        if not r.get("ok"):
+            continue
+        by_group[classify_group(r.get("mint"), tax_index)].append(r)
+    out = {}
+    for g, rows in by_group.items():
+        net = [r["net_sol"] for r in rows if r.get("net_sol") is not None]
+        held = [r["held_slots"] for r in rows if r.get("held_slots") is not None]
+        n_pos = sum(1 for x in net if x > 0)
+        out[g] = {"n_closed": len(rows), "n_with_net_sol": len(net),
+                  "median_net_sol": r6(median(net)), "mean_net_sol": r6(mean(net)),
+                  "n_positive": n_pos, "share_positive": r6(n_pos / len(net)) if net else None,
+                  "median_held_slots": r6(median(held))}
+    return out
+
+
+def run_task_e(crowd_path: Path, tax_index: dict, rpc_call=None, exit_max_tx: int | None = None) -> dict:
     loaded = load_leader_entries(crowd_path)
     if not loaded.get("ok"):
         return {"ok": False, "why_not": loaded.get("why_not")}
@@ -400,7 +530,16 @@ def run_task_e(crowd_path: Path, tax_index: dict, rpc_call=None) -> dict:
     group_report = {}
     for g in ("tax", "normal", "unknown"):
         group_report[g] = {"entry_size": size_stats(groups[g]), "price_proxy_30_60s": proxy_growth_stats(groups[g])}
-    exits = compute_leader_exits(rpc_call, trades, leader=LEADER_BEQV)
+    exits = compute_leader_exits(rpc_call, trades, leader=LEADER_BEQV, max_tx=exit_max_tx)
+    if exits.get("ok"):
+        exit_block = {**exits, "group_summary_after_tax": exit_group_summary(exits["trades"], tax_index)}
+    else:
+        exit_block = {**exits, "recipe": LEADER_EXIT_RECIPE,
+                      "credit_estimate_7d": estimate_exit_credit_cost(meta, trades, days=7),
+                      "credit_estimate_14d": estimate_exit_credit_cost(meta, trades, days=14)}
+    if isinstance(rpc_call, BudgetedRpc):
+        exit_block["chain_credits_used"] = rpc_call.used
+        exit_block["chain_calls_used"] = rpc_call.calls
     return {
         "ok": True,
         "leader": LEADER_BEQV,
@@ -409,11 +548,7 @@ def run_task_e(crowd_path: Path, tax_index: dict, rpc_call=None) -> dict:
         "groups": group_report,
         "hypothesis_size_bigger_on_normal": hypothesis_size_bigger_on_normal(groups),
         "pickaxe": pickaxe_history(trades),
-        "exit_reconstruction": exits if exits.get("ok") else {
-            **exits, "recipe": LEADER_EXIT_RECIPE,
-            "credit_estimate_7d": estimate_exit_credit_cost(meta, trades, days=7),
-            "credit_estimate_14d": estimate_exit_credit_cost(meta, trades, days=14),
-        },
+        "exit_reconstruction": exit_block,
     }
 
 
@@ -709,7 +844,11 @@ def load_cached_mint_extensions(path: Path = MINT_EXT_CACHE_PATH) -> dict:
 def get_mint_fee_authorities(rpc_call, mints: list, cached: dict | None = None) -> dict:
     """Слить локальный кэш с чтением по rpc_call для минтов, которых там
     нет. getMultipleAccounts -- 1 кредит за ВЫЗОВ (не за счёт в нём,
-    см. тариф в шапке файла), поэтому батчим по 100."""
+    см. тариф в шапке файла), поэтому батчим по 100.
+
+    CreditLimitExceeded от rpc_call (BudgetedRpc) -- честная остановка на
+    достигнутом чанке: минты позже в списке помечены why_not с точной
+    причиной, уже разобранные (и кэш) в `by_mint` остаются как есть."""
     cached = dict(cached or {})
     missing = [m for m in mints if m not in cached]
     if not missing:
@@ -723,15 +862,28 @@ def get_mint_fee_authorities(rpc_call, mints: list, cached: dict | None = None) 
                                     f"(getMultipleAccounts, ~{-(-len(missing)//100)} кредит(ов))"}
     out = dict(cached)
     credits = 0
+    fetched = 0
+    stopped_reason: str | None = None
     for i in range(0, len(missing), 100):
         chunk = missing[i:i + 100]
-        res = rpc_call("getMultipleAccounts", [chunk, {"encoding": "jsonParsed"}]) or {}
+        try:
+            res = rpc_call("getMultipleAccounts", [chunk, {"encoding": "jsonParsed"}]) or {}
+        except CreditLimitExceeded as exc:
+            stopped_reason = str(exc)
+            for m in chunk:
+                out[m] = {"why_not": f"не запрошено -- {stopped_reason}"}
+            break
         credits += CREDIT_DEFAULT
+        fetched += len(chunk)
         values = res.get("value") if isinstance(res, dict) else res
         for mint, v in zip(chunk, values or []):
             parsed = parse_mint_extensions_value(v)
             out[mint] = parsed or {"why_not": "счёт не Token-2022 минт с расширениями или не найден"}
-    return {"by_mint": out, "fetched_fresh": len(missing), "credits_spent": credits}
+    result = {"by_mint": out, "fetched_fresh": fetched, "credits_spent": credits}
+    if stopped_reason:
+        result["partial"] = True
+        result["stopped_reason"] = stopped_reason
+    return result
 
 
 def g1_named_mints_report(cached_ext: dict) -> dict:
@@ -751,19 +903,57 @@ def g1_named_mints_report(cached_ext: dict) -> dict:
     return out
 
 
-def authority_share(named_report: dict) -> dict:
-    """Доля минтов с ПОДТВЕРЖДЁННЫМ (проверенным локально или по rpc_call)
-    общим коллектором -- знаменатель ТОЛЬКО по проверенным, иначе непроверенные
-    молча считались бы "не тот кошелёк"."""
-    checked = [v for v in named_report.values() if v.get("checked") and v.get("has_transfer_fee_config")]
+def common_authority_stats(infos: list) -> dict:
+    """Доля минтов с ПОДТВЕРЖДЁННЫМ общим коллектором среди ЛЮБОГО набора
+    разборов getMultipleAccounts (именованных шести или всех налоговых) --
+    знаменатель ТОЛЬКО по реально проверенным (has_transfer_fee_config),
+    иначе непроверенные молча считались бы "не тот кошелёк". Пустой
+    список -- честный why_not, без деления на 0."""
+    checked = [v for v in infos if isinstance(v, dict) and v.get("has_transfer_fee_config")]
     if not checked:
         return {"n_checked": 0, "share_same_authority": None,
-                "why_not": "ни один минт из списка не проверен локально -- см. checked=false выше"}
+                "why_not": "ни один минт из набора не проверен (нет в кэше и нет rpc_call)"}
     authorities = [v.get("withdraw_authority") for v in checked]
     common = statistics.mode(authorities) if authorities else None
     n_same = sum(1 for a in authorities if a == common)
     return {"n_checked": len(checked), "common_authority_guess": common,
             "n_same_authority": n_same, "share_same_authority": r6(n_same / len(checked))}
+
+
+def authority_share(named_report: dict) -> dict:
+    """То же самое, но по именованному отчёту ({"SANTA": {...}, ...}) --
+    "checked" там не нужен отдельно: у непроверенных записей просто нет
+    ключа has_transfer_fee_config, common_authority_stats их и так отсеет."""
+    return common_authority_stats(list(named_report.values()))
+
+
+def all_taxed_mints(tax_index: dict) -> list:
+    """Все минты с taxed=True в индексе (147 на момент сбора audit'а) --
+    ТОЛЬКО из данных, не с потолка."""
+    return sorted(m for m, info in tax_index.items() if isinstance(info, dict) and info.get("taxed"))
+
+
+def g1_full_check(rpc_call, tax_index: dict, cached_ext: dict) -> dict:
+    """G1 ЦЕЛИКОМ: ВСЕ таксируемые минты нашего индекса + шесть именованных
+    владельцем (PICKAXE в индекс как таксируемый не попал -- добавлен явно,
+    иначе его бы не проверили вовсе, а владелец спрашивал именно про него).
+    getMultipleAccounts батчами по 100 -- на ~150 минтов это 2 вызова."""
+    taxed = all_taxed_mints(tax_index)
+    mints = sorted(set(taxed) | set(NAMED_TAX_MINTS.values()))
+    merged = get_mint_fee_authorities(rpc_call, mints, cached=cached_ext)
+    stats = common_authority_stats(list(merged["by_mint"].values()))
+    named = g1_named_mints_report(merged["by_mint"])
+    return {
+        "n_total_tax_mints_in_index": len(taxed),
+        "n_mints_requested": len(mints),
+        "n_checked": stats["n_checked"],
+        "common_authority": stats.get("common_authority_guess"),
+        "n_with_common_authority": stats.get("n_same_authority"),
+        "share_with_common_authority": stats.get("share_same_authority"),
+        "why_not": stats.get("why_not"),
+        "named_mints": named,
+        "fetch_meta": {k: v for k, v in merged.items() if k != "by_mint"},
+    }
 
 
 def translate_santa_event(t: dict) -> dict:
@@ -915,26 +1105,39 @@ def g4_verdict(task_f: dict, tax_groups: dict) -> dict:
     }
 
 
-def run_task_g(task_f: dict, rpc_call=None) -> dict:
+def run_task_g(task_f: dict, tax_index: dict, rpc_call=None) -> dict:
     cached_ext = load_cached_mint_extensions()
     if "__error__" in cached_ext:
         cached_ext = {}
-    mints_needed = list(NAMED_TAX_MINTS.values())
-    merged = get_mint_fee_authorities(rpc_call, mints_needed, cached=cached_ext)
-    named = g1_named_mints_report(merged["by_mint"])
+    full = g1_full_check(rpc_call, tax_index, cached_ext)
     tax_groups = _safe_read(TAX_GROUPS_PATH)
+    all_check = {
+        "done": rpc_call is not None,
+        "n_total_tax_mints_in_index": full["n_total_tax_mints_in_index"],
+        "n_mints_requested": full["n_mints_requested"],
+        "n_checked": full["n_checked"],
+        "common_authority": full["common_authority"],
+        "share_with_common_authority": full["share_with_common_authority"],
+    }
+    if rpc_call is None:
+        all_check["why_not"] = "не передан --chain (или нет ключа) -- см. g1_authorities.fetch_meta"
+        all_check["cost_if_rpc_call_given"] = ("getMultipleAccounts батчами по 100 -> "
+            f"ceil({full['n_mints_requested']}/100)={-(-full['n_mints_requested'] // 100)} "
+            "вызова(ов) -- дёшево, окупает точную долю по ВСЕМ таксируемым минтам, а не по 6 именованным")
+    elif full.get("fetch_meta", {}).get("partial"):
+        all_check["partial"] = True
+        all_check["stopped_reason"] = full["fetch_meta"].get("stopped_reason")
+    if isinstance(rpc_call, BudgetedRpc):
+        all_check["chain_credits_used"] = rpc_call.used
     return {
         "g1_authorities": {
-            "named_mints": named,
-            "share": authority_share(named),
-            "fetch_meta": {k: v for k, v in merged.items() if k != "by_mint"},
-            "all_147_tax_mints_check": {
-                "done": False,
-                "why_not": "не запрошено rpc_call в этом прогоне",
-                "cost_if_rpc_call_given": "getMultipleAccounts батчами по 100 -> ceil(147/100)=2 "
-                                           "вызова = 2 кредита (дёшево, окупает точную долю по ВСЕМ "
-                                           "147 таксируемым минтам, а не по 6 именованным)",
-            },
+            "named_mints": full["named_mints"],
+            "share": {"n_checked": full["n_checked"], "common_authority_guess": full["common_authority"],
+                      "n_same_authority": full["n_with_common_authority"],
+                      "share_same_authority": full["share_with_common_authority"],
+                      "why_not": full.get("why_not")},
+            "fetch_meta": full["fetch_meta"],
+            "all_147_tax_mints_check": all_check,
         },
         "g2_price_impact": {"real_example_n1": g2_santa_autopsy_example(), "recipe": g2_recipe()},
         "g3_leader_rewards": g3_leader_rewards(),
@@ -956,13 +1159,14 @@ def _assert_ascii_keys(obj, path="$"):
             _assert_ascii_keys(v, f"{path}[{i}]")
 
 
-def build_report(crowd_path: Path, state_dir: Path | None, rpc_call=None) -> dict:
+def build_report(crowd_path: Path, state_dir: Path | None, rpc_call=None, *,
+                  exit_max_tx: int | None = None, chain_status: dict | None = None) -> dict:
     tax_index = load_tax_index()
-    task_e = run_task_e(crowd_path, tax_index, rpc_call=rpc_call)
+    task_e = run_task_e(crowd_path, tax_index, rpc_call=rpc_call, exit_max_tx=exit_max_tx)
     leader_trades = task_e.get("leader_meta") and (load_leader_entries(crowd_path).get("trades") or [])
     task_f = run_task_f(leader_trades or [])
     task_f["state_dir_journals"] = load_state_dir_journals(state_dir)
-    task_g = run_task_g(task_f, rpc_call=rpc_call)
+    task_g = run_task_g(task_f, tax_index, rpc_call=rpc_call)
     report = {
         "schema_version": 1,
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -972,12 +1176,17 @@ def build_report(crowd_path: Path, state_dir: Path | None, rpc_call=None) -> dic
                    "bloom_report": str(BLOOM_REPORT_PATH.relative_to(REPO_ROOT)),
                    "santa_autopsy": str(SANTA_AUTOPSY_PATH.relative_to(REPO_ROOT)),
                    "mint_extensions_cache": str(MINT_EXT_CACHE_PATH.relative_to(REPO_ROOT))},
-        "constraints": {"read_only": True, "no_trades": True, "helius_key_in_container": False,
-                        "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py)"},
+        "constraints": {"read_only": True, "no_trades": True,
+                        "chain_reads_via": "rpc_call, передаваемый вызывающим (см. c2_shadow_build.py); "
+                                           "--chain строит его через c2_common.C2Rpc с потолком кредитов"},
+        "chain": chain_status or {"ok": False, "why_not": "--chain не передан -- офлайн-режим на кэше/локальных файлах"},
         "task_e_leader": task_e,
         "task_f_our_gp_trades": task_f,
         "task_g_stonkfun": task_g,
     }
+    if isinstance(rpc_call, BudgetedRpc):
+        report["chain"] = {**report["chain"], "credits_used": rpc_call.used, "calls_used": rpc_call.calls,
+                           "stopped_reason": rpc_call.stopped_reason}
     return report
 
 
@@ -1178,6 +1387,151 @@ def self_test() -> int:
             and ext.get(GP_MINT, {}).get("withdraw_authority") == ext.get(NAMED_TAX_MINTS["CRACKER"], {}).get("withdraw_authority"),
             {"gp": ext.get(GP_MINT), "cracker": ext.get(NAMED_TAX_MINTS["CRACKER"])})
 
+    # --chain: common_authority_stats -- пустой набор не делит на 0.
+    cas_empty = common_authority_stats([])
+    chk("common_authority_stats: пустой набор -> n_checked=0, why_not, без деления на 0",
+        cas_empty["n_checked"] == 0 and cas_empty["share_same_authority"] is None, cas_empty)
+    cas_ok = common_authority_stats([{"has_transfer_fee_config": True, "withdraw_authority": "Z"},
+                                     {"has_transfer_fee_config": True, "withdraw_authority": "Z"},
+                                     {"why_not": "не проверено"}])
+    chk("common_authority_stats: непроверенные (без has_transfer_fee_config) не портят долю",
+        cas_ok["n_checked"] == 2 and cas_ok["share_same_authority"] == 1.0, cas_ok)
+
+    # get_mint_fee_authorities: CreditLimitExceeded посреди чанков -- частичный, честный результат.
+    def rpc_limit_on_second_chunk(method, params):
+        if method != "getMultipleAccounts":
+            raise AssertionError(method)
+        if params[0][0] == "M100":
+            raise CreditLimitExceeded("тестовый стоп на втором чанке")
+        return {"value": [synth_value for _ in params[0]]}
+
+    many_mints = [f"M{i}" for i in range(150)]  # >100 -- гарантированно 2 чанка
+    gm3 = get_mint_fee_authorities(rpc_limit_on_second_chunk, many_mints, cached={})
+    chk("get_mint_fee_authorities: CreditLimitExceeded на 2-м чанке -> partial, 1-й чанк разобран",
+        gm3.get("partial") is True and gm3["credits_spent"] == 1
+        and gm3["by_mint"]["M0"].get("mint") == "GPMINT111"
+        and "тестовый стоп" in gm3["by_mint"]["M100"]["why_not"], gm3)
+
+    # g1_full_check: сквозной синтетический прогон (свой tax_index, свой rpc_call).
+    synth_tax_index = {"TAXMINT1": {"taxed": True}, "TAXMINT2": {"taxed": True}, "NOTAX": {"taxed": False}}
+    orig_named2 = NAMED_TAX_MINTS
+    NAMED_TAX_MINTS = {"GPTEST": "TAXMINT1", "PICKTEST": "PICKMINT_NOT_IN_INDEX"}
+    try:
+        def rpc_g1(method, params):
+            assert method == "getMultipleAccounts"
+            return {"value": [synth_value if p in ("TAXMINT1", "TAXMINT2") else None for p in params[0]]}
+        g1 = g1_full_check(rpc_g1, synth_tax_index, cached_ext={})
+    finally:
+        NAMED_TAX_MINTS = orig_named2
+    chk("g1_full_check: PICKAXE-подобный минт вне индекса всё равно запрошен явно",
+        g1["n_mints_requested"] == 3 and g1["n_total_tax_mints_in_index"] == 2, g1)
+    chk("g1_full_check: доля общего кошелька по реально проверенным = 1.0 (у обоих один и тот же AUTH1)",
+        g1["n_checked"] == 2 and g1["share_with_common_authority"] == 1.0, g1)
+
+    # compute_leader_exits: --exit-max-tx=0 -- останов ДО первого getTransaction, честно, не падение.
+    def rpc_never_tx(method, params):
+        if method == "getSignaturesForAddress":
+            return sig_pages.get(params[1].get("before"), [])
+        raise AssertionError(f"getTransaction не должен звонить при exit_max_tx=0: {method}")
+
+    res_capped = compute_leader_exits(rpc_never_tx, entry, leader=leader_w, max_tx=0)
+    chk("compute_leader_exits: --exit-max-tx=0 -> partial, честная причина, без единого getTransaction",
+        res_capped["ok"] and res_capped["partial"] is True and res_capped["n_getTransaction_calls"] == 0
+        and "exit-max-tx" in res_capped["trades"][0]["why_not"], res_capped)
+
+    # compute_leader_exits: CreditLimitExceeded на getTransaction -- частичный результат, не исключение наружу.
+    def rpc_credit_stop(method, params):
+        if method == "getSignaturesForAddress":
+            return sig_pages.get(params[1].get("before"), [])
+        raise CreditLimitExceeded("тестовый стоп на getTransaction")
+
+    res_stopped = compute_leader_exits(rpc_credit_stop, entry, leader=leader_w)
+    chk("compute_leader_exits: CreditLimitExceeded -> partial=True, причина в trades, не наружу",
+        res_stopped["ok"] and res_stopped["partial"] is True
+        and "тестовый стоп" in res_stopped["trades"][0]["why_not"], res_stopped)
+
+    # exit_group_summary: пустая группа не делит на 0, группировка по данным.
+    exits_synth = [{"ok": True, "mint": "AAA111", "net_sol": 1.0, "held_slots": 10},
+                   {"ok": True, "mint": "AAA111", "net_sol": -0.5, "held_slots": 20},
+                   {"ok": True, "mint": "BBB222", "net_sol": 2.0, "held_slots": 5},
+                   {"ok": False, "mint": "AAA111", "why_not": "не в счёт"}]
+    egs = exit_group_summary(exits_synth, tax_idx)
+    chk("exit_group_summary: tax(2 закрытых, 1 в плюс), normal(1 закрытая, в плюс), unknown(0)",
+        egs["tax"]["n_closed"] == 2 and egs["tax"]["n_positive"] == 1
+        and egs["normal"]["n_closed"] == 1 and egs["normal"]["share_positive"] == 1.0
+        and egs["unknown"]["n_closed"] == 0 and egs["unknown"]["share_positive"] is None, egs)
+
+    # BudgetedRpc: локальный --credit-limit стопорит ДО реального вызова.
+    class _FakeC2RpcForTest:
+        def __init__(self, base):
+            self.meter = type("_M", (), {"base": base})()
+            self.calls = []
+
+        def call(self, method, params):
+            self.calls.append((method, params))
+            return {"ok": True}
+
+    tmp_budget = Path(tempfile.mkdtemp())
+    fake_rpc_obj = _FakeC2RpcForTest(tmp_budget)
+    brpc = BudgetedRpc(fake_rpc_obj, local_limit=2)
+    brpc("getTransaction", ["a"])
+    brpc("getTransaction", ["b"])
+    try:
+        brpc("getTransaction", ["c"])
+        chk("BudgetedRpc: локальный --credit-limit стопорит", False)
+    except CreditLimitExceeded:
+        chk("BudgetedRpc: локальный --credit-limit стопорит (2 прошли, 3-й -- нет)",
+            brpc.used == 2 and len(fake_rpc_obj.calls) == 2)
+    # Повторный вызов после стопа -- та же причина, без повторной попытки достучаться до узла.
+    try:
+        brpc("getTransaction", ["d"])
+        chk("BudgetedRpc: после остановки повторный вызов тоже отказывает", False)
+    except CreditLimitExceeded:
+        chk("BudgetedRpc: после остановки повторный вызов тоже отказывает, без нового обращения к узлу",
+            len(fake_rpc_obj.calls) == 2)
+
+    # BudgetedRpc: владельческий стоп на 70% ОБЩЕЙ суточной квоты C2 (все службы c2_*, не только эта).
+    # Расход "чужой" службы записан статически на диск -- фейковый rpc сам ничего не пишет в учёт
+    # (в отличие от настоящего C2Rpc), поэтому порог должен быть уже исчерпан ДО первого вызова.
+    tmp_owner = Path(tempfile.mkdtemp())
+    at_cap = int(OWNER_RESEARCH_BUDGET * OWNER_STOP_FRACTION)  # ровно порог -- уже занят другой службой
+    (tmp_owner / "c2_other_service.json").write_text(
+        json.dumps({"дни": {C2.today_utc(): {"c2_other_service": {"кредитов_за_день": at_cap}}}}),
+        encoding="utf-8")
+    fake_rpc_obj2 = _FakeC2RpcForTest(tmp_owner)
+    brpc2 = BudgetedRpc(fake_rpc_obj2, local_limit=1_000_000)  # локальный предел заведомо не мешает
+    try:
+        brpc2("getTransaction", ["a"])
+        chk("BudgetedRpc: 70%-порог общей суточной квоты C2 срабатывает", False)
+    except CreditLimitExceeded as exc:
+        chk("BudgetedRpc: 70%-порог общей суточной квоты C2 срабатывает раньше локального предела "
+            "(чужая служба уже заняла порог, наш вызов -- 0 успешных)",
+            "70%" in str(exc) and len(fake_rpc_obj2.calls) == 0, str(exc))
+    chk("BudgetedRpc: c2_spent_today видит чужую службу (не только свою)",
+        C2.c2_spent_today(tmp_owner) == at_cap, C2.c2_spent_today(tmp_owner))
+
+    # resolve_chain_rpc: без ключа (как в ЭТОМ контейнере) -- честный отказ, не исключение.
+    no_key_rpc, no_key_status = resolve_chain_rpc(True, 20_000, usage_dir=Path(tempfile.mkdtemp()))
+    chk("resolve_chain_rpc: --chain без ключа в окружении -> ok=False, rpc_call=None, без падения",
+        no_key_rpc is None and no_key_status["ok"] is False, no_key_status)
+    off_rpc, off_status = resolve_chain_rpc(False, 20_000)
+    chk("resolve_chain_rpc: без --chain -> офлайн, ok=False с понятной причиной",
+        off_rpc is None and off_status["ok"] is False, off_status)
+    # С поддельным ключом (только для этой проверки схемы, без единого сетевого вызова) -- строится BudgetedRpc.
+    import os as _os
+    _old_env = _os.environ.get("HELIUS_API_KEY")
+    _os.environ["HELIUS_API_KEY"] = "test_key_self_test_only"
+    try:
+        with_key_rpc, with_key_status = resolve_chain_rpc(True, 12_345, usage_dir=Path(tempfile.mkdtemp()))
+    finally:
+        if _old_env is None:
+            _os.environ.pop("HELIUS_API_KEY", None)
+        else:
+            _os.environ["HELIUS_API_KEY"] = _old_env
+    chk("resolve_chain_rpc: с ключом в окружении -> BudgetedRpc собран, ни одного сетевого вызова не сделано",
+        isinstance(with_key_rpc, BudgetedRpc) and with_key_status["ok"] is True
+        and with_key_status["local_credit_limit"] == 12_345, with_key_status)
+
     # Итоговый отчёт целиком на синтетическом кэше толпы -- пайплайн не падает, ключи ASCII.
     tmp2 = Path(tempfile.mkdtemp())
     crowd_fixture = {
@@ -1189,20 +1543,41 @@ def self_test() -> int:
     crowd_path = tmp2 / "crowd.json"
     crowd_path.write_text(json.dumps(crowd_fixture, ensure_ascii=False), encoding="utf-8")
     report = build_report(crowd_path, None, rpc_call=None)
-    chk("build_report: собирается целиком без исключений на синтетическом кэше",
+    chk("build_report: собирается целиком без исключений на синтетическом кэше (офлайн)",
         report.get("task_e_leader", {}).get("ok") is True)
-    try:
-        _assert_ascii_keys(report)
-        ascii_ok = True
-    except AssertionError as exc:
-        ascii_ok = False
-        print("   не-ASCII ключ:", exc)
-    chk("итоговый отчёт: ВСЕ ключи JSON только ASCII", ascii_ok)
-    try:
-        json.dumps(report, ensure_ascii=False)
-        chk("итоговый отчёт сериализуется в JSON без исключений", True)
-    except (TypeError, ValueError) as exc:
-        chk("итоговый отчёт сериализуется в JSON без исключений", False, str(exc))
+
+    # Тот же пайплайн, но с рабочим (не BudgetedRpc, обычной функцией) rpc_call -- сквозной --chain путь
+    # без сети: getTransaction ничего не находит (честно "выход не найден"), getMultipleAccounts отвечает
+    # None на всё (частный случай "минт не Token-2022/не найден" из parse_mint_extensions_value).
+    def fake_rpc_pipeline(method, params):
+        if method == "getSignaturesForAddress":
+            return [{"signature": "s4", "slot": 400, "err": None}, {"signature": "s3", "slot": 300, "err": None},
+                    {"signature": "s2", "slot": 200, "err": None}, {"signature": "s1", "slot": 100, "err": None}]
+        if method == "getTransaction":
+            return None
+        if method == "getMultipleAccounts":
+            return {"value": [None for _ in params[0]]}
+        raise AssertionError(f"неожиданный метод в сквозном тесте: {method}")
+
+    report2 = build_report(crowd_path, None, rpc_call=fake_rpc_pipeline,
+                           chain_status={"ok": True, "service": "self_test_fake"})
+    chk("build_report (--chain, синтетика): exit_reconstruction реально выполнен (ok=True)",
+        report2["task_e_leader"]["exit_reconstruction"]["ok"] is True, report2["task_e_leader"]["exit_reconstruction"])
+    chk("build_report (--chain, синтетика): G1 'целиком' помечен done=True",
+        report2["task_g_stonkfun"]["g1_authorities"]["all_147_tax_mints_check"]["done"] is True)
+    for rep_to_check, label in ((report, "офлайн"), (report2, "--chain синтетика")):
+        try:
+            _assert_ascii_keys(rep_to_check)
+            ascii_ok = True
+        except AssertionError as exc:
+            ascii_ok = False
+            print("   не-ASCII ключ:", exc)
+        chk(f"итоговый отчёт ({label}): ВСЕ ключи JSON только ASCII", ascii_ok)
+        try:
+            json.dumps(rep_to_check, ensure_ascii=False)
+            chk(f"итоговый отчёт ({label}): сериализуется в JSON без исключений", True)
+        except (TypeError, ValueError) as exc:
+            chk(f"итоговый отчёт ({label}): сериализуется в JSON без исключений", False, str(exc))
 
     bad = 0
     for name, ok, got in checks:
@@ -1219,6 +1594,15 @@ def main() -> int:
     ap.add_argument("--state-dir", type=Path, default=None,
                     help="каталог журналов исполнителя (positions.jsonl/decisions.jsonl); "
                          "по умолчанию не передаётся -- в контейнере такого каталога нет")
+    ap.add_argument("--chain", action="store_true",
+                    help="читать цепь по-настоящему через c2_common.C2Rpc (нужен HELIUS_API_KEY/HELIUS_API "
+                         "в окружении хоста); без флага -- офлайн-режим на кэше и локальных файлах")
+    ap.add_argument("--credit-limit", type=int, default=20_000,
+                    help="локальный предел кредитов на ЭТОТ прогон (по умолчанию 20000); "
+                         "независимо от него прогон также не превысит 70%% общей суточной квоты C2")
+    ap.add_argument("--exit-max-tx", type=int, default=None,
+                    help="потолок числа getTransaction-вызовов в реконструкции выходов лидера (E); "
+                         "по умолчанию не ограничен отдельно -- только --credit-limit и 70%% квоты")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
 
@@ -1228,11 +1612,16 @@ def main() -> int:
     if not args.crowd or not args.out:
         ap.error("нужны --crowd и --out (или --self-test)")
 
+    rpc_call, chain_status = resolve_chain_rpc(args.chain, args.credit_limit)
+    if args.chain:
+        log(f"--chain: {chain_status}")
+
     log(f"читаю кэш толпы {args.crowd}")
-    report = build_report(args.crowd, args.state_dir, rpc_call=None)
+    report = build_report(args.crowd, args.state_dir, rpc_call=rpc_call,
+                          exit_max_tx=args.exit_max_tx, chain_status=chain_status)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    log(f"записано {args.out}")
+    log(f"записано {args.out}" + (f" (кредитов потрачено: {rpc_call.used})" if isinstance(rpc_call, BudgetedRpc) else ""))
     return 0
 
 
