@@ -82,6 +82,11 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Отправка в чат у оповещателя закрыта общим выключателем: без него
+          # он молчит совсем (и первый прогон таблицы честно сказал об этом
+          # словами). Здесь выключатель ставится ТОЛЬКО для этого прогона --
+          # на хосте он свой, и деплой его не касается.
+          BLOOM_TELEGRAM_LIVE_TEST: "1"
         run: |
           set -e
           set -o pipefail
