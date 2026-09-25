@@ -43,7 +43,11 @@ def файл() -> str:
 ГРУППА_ПО_УМОЛЧАНИЮ = "bloom_lane"
 # Политика группы, которой нет в файле: так ведут себя BATCH-3/5 и лидер.
 ПОЛИТИКА_ПО_УМОЛЧАНИЮ = {"lane_sol": None, "bloom_trades": True, "fanout": True,
-                          "day_cap_sol": None, "stop_loss_sol": None}
+                          "day_cap_sol": None, "stop_loss_sol": None,
+                          # Порог входа источника: None значит общий порог
+                          # детектора (BLOOM_MIN_TARGET_SOL, сейчас 2 SOL --
+                          # столько же стоит в задачах DBot у владельца).
+                          "min_target_sol": None}
 _КЭШ: dict | None = None
 
 
@@ -83,6 +87,7 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
             "fanout": bool(г.get("fanout")),
             "day_cap_sol": г.get("day_cap_sol"),
             "stop_loss_sol": г.get("stop_loss_sol"),
+            "min_target_sol": г.get("min_target_sol"),
         }
         # Адреса лежат двумя видами: словарь {адрес: партия} и списки
         # объектов с полем address. Оба читаем, третий вид не изобретаем.
