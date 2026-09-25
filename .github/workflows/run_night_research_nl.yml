@@ -1,0 +1,141 @@
+name: "Ночь 25.09: исследование и утренний доклад (только чтение)"
+
+# Слово владельца 25.09: утром нужен файл docs/research_2026-09-25_edge.md с
+# боевой частью, таблицами P1 и P2 и ответами на четыре вопроса.
+#
+# Только чтение: журналы копируются с хоста на бегунок, ни одна служба не
+# трогается, ни один ордер не уходит. Цепь читается через c2_* с общим
+# суточным потолком (analysis/c2_common.C2_DAILY_BUDGET), и в логе прогона
+# видно, сколько кредитов ушло.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "с какого времени считать боевое, UTC"
+        required: false
+        default: "2026-09-24T00:00:00Z"
+      p1:
+        description: "'yes' -- тень против Bloom по истории (журналы, без цепи)"
+        required: false
+        default: "yes"
+      p2:
+        description: "'yes' -- сверка по цепи сделки PICKAXE (getBlock, ~5 кредитов)"
+        required: false
+        default: "yes"
+      chain_history:
+        description: "сколько наших транзакций смотреть в P2 для счёта чаевых (0 -- не смотреть)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: night-research
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  research:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО всякого чтения цепи"
+        run: |
+          set -e
+          # Python бегунка может быть без requests: ставим во временное
+          # окружение прогона, а не в систему (PEP 668).
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/night_venv"
+            "$RUNNER_TEMP/night_venv/bin/pip" install -q requests
+            PY="$RUNNER_TEMP/night_venv/bin/python"
+            echo "PY=$PY" >> "$GITHUB_ENV"
+          fi
+          cd analysis
+          "$PY" night_report.py --self-test
+          "$PY" night_p1_shadow_vs_bloom.py --self-test
+          "$PY" night_p2_chain_pickaxe.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "VPS_SSH_KEY не задан"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "Копия журналов с хоста (только чтение)"
+        run: |
+          set -e
+          mkdir -p /tmp/night_state
+          for f in decisions.jsonl positions.jsonl detector_status.json seller_heartbeat.json; do
+            if ssh -n $SSH_OPTS root@127.0.0.1 "test -s $STATE_DIR/$f"; then
+              ssh -n $SSH_OPTS root@127.0.0.1 "cat $STATE_DIR/$f" > "/tmp/night_state/$f"
+              echo "$f: $(wc -c < /tmp/night_state/$f) байт"
+            else
+              echo "$f: нет или пуст на хосте"
+            fi
+          done
+          # Признак жизни детектора лежит под именем detector_status.json, а
+          # доклад ищет bloom_detector_heartbeat.json: связываем, а не
+          # переписываем модуль под путь одного хоста.
+          if [ -s /tmp/night_state/detector_status.json ]; then
+            cp /tmp/night_state/detector_status.json /tmp/night_state/bloom_detector_heartbeat.json
+          fi
+          ls -l /tmp/night_state
+
+      - name: "P1: тень против Bloom по истории"
+        if: ${{ github.event.inputs.p1 != 'no' }}
+        run: |
+          set -e
+          "$PY" analysis/night_p1_shadow_vs_bloom.py \
+            --state-dir /tmp/night_state --since "${{ inputs.since }}" \
+            --out data/night_p1.json 2>&1 | tail -40
+
+      - name: "P2: сверка по цепи сделки PICKAXE"
+        if: ${{ github.event.inputs.p2 != 'no' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- P2 пропущен"; exit 0; }
+          "$PY" analysis/night_p2_chain_pickaxe.py \
+            --state-dir /tmp/night_state --out data/night_p2.json \
+            --max-history-tx "${{ inputs.chain_history }}" 2>&1 | tail -60
+
+      - name: "Утренний доклад: файл и JSON"
+        run: |
+          set -e
+          "$PY" analysis/night_report.py --state-dir /tmp/night_state \
+            --data-dir data --since "${{ inputs.since }}" \
+            --out-json data/night_report.json \
+            --out-md docs/research_2026-09-25_edge.md 2>&1 | tail -80
+
+      - name: "Коммит доклада"
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/night_report.json data/night_p1.json data/night_p2.json docs/research_2026-09-25_edge.md; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Noch 25.09: issledovanie i utrenniy doklad [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
