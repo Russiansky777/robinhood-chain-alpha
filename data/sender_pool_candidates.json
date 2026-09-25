@@ -1,6 +1,89 @@
 {
   "pages": [
     {
+      "file": "astralane_quickstart.html",
+      "service": "astralane",
+      "bytes": 429001,
+      "tip_addresses": [],
+      "minimums": [],
+      "key": {
+        "needed": false,
+        "evidence": []
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
+      "file": "astralane_submit_transactions.html",
+      "service": "astralane",
+      "bytes": 935168,
+      "tip_addresses": [
+        {
+          "address": "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+          "quote": "32600, \"message\": \"Error message\" } } Copy const TIP: Pubkey = pubkey!(\"astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm\"); // Use tip wallet depending on re"
+        }
+      ],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "api-key",
+            "quote": "only change is to add an instruction to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean"
+          },
+          {
+            "what": "api key",
+            "quote": "ion to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean Optional , To set mev protect, de"
+          },
+          {
+            "what": "api-key",
+            "quote": "via swqos, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encod"
+          },
+          {
+            "what": "APIKEY",
+            "quote": "s, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encoded Trans"
+          },
+          {
+            "what": "api-key",
+            "quote": "we also provide a managed service for this, We create a nonce account for each api-key you use and you can query them using our getNonce rpc call. Follow the b"
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": [
+        {
+          "what": "jito tip",
+          "quote": "the segregation in validators as JITO validators and normal ones, traders are often conflicted between spending more on jito tips vs more in priority fees. Durable nonces offer a way to mitigate this issue. Our sendIdeal RPC method accepts"
+        },
+        {
+          "what": "must include a valid tip",
+          "quote": "n string[] Yes Array of base64-encoded serialized transactions. Maximum batch size is 25 transactions. Each transaction must include a valid tip. object No Optional configuration object. Configuration Object Field Type Default Description m"
+        }
+      ]
+    },
+    {
+      "file": "astralane_tip_refunds.html",
+      "service": "astralane",
+      "bytes": 442606,
+      "tip_addresses": [],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "API key",
+            "quote": "hreds, topOfBlock, etc) Tracking Rebates Rebates are tracked based on your Iris API key provided by us. You can use the API key to fetch and check the rebates y"
+          },
+          {
+            "what": "API key",
+            "quote": "Rebates are tracked based on your Iris API key provided by us. You can use the API key to fetch and check the rebates you are eligible for in our platform (cur"
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
       "file": "blockrazor_authentication.md",
       "service": "blockrazor",
       "bytes": 715,
@@ -24,6 +107,92 @@
         ]
       },
       "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
+      "file": "blockrazor_js_example.html",
+      "service": "blockrazor",
+      "bytes": 956062,
+      "tip_addresses": [
+        {
+          "address": "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm",
+          "quote": "0 ; // Tip amount const tipAmount = 100_000 ; const tipAccounts = [ \" Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3J"
+        },
+        {
+          "address": "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
+          "quote": "const tipAccounts = [ \" Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN"
+        },
+        {
+          "address": "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG",
+          "quote": "dFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9Vpb"
+        },
+        {
+          "address": "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22",
+          "quote": "JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZ"
+        },
+        {
+          "address": "68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o",
+          "quote": "N6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9"
+        },
+        {
+          "address": "4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9",
+          "quote": "bzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqV"
+        },
+        {
+          "address": "B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM",
+          "quote": "Zmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM \" , \" 5jA59cXMKQqZAVdtopv8q3yyw9S"
+        },
+        {
+          "address": "5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf",
+          "quote": "9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM \" , \" 5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf \" , \" 5YktoWygr1Bp9wiS1xtMtUki1Pe"
+        },
+        {
+          "address": "BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6",
+          "quote": "5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t"
+        },
+        {
+          "address": "Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq",
+          "quote": "Fk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815s"
+        },
+        {
+          "address": "AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S",
+          "quote": "VbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S\", ]; const client = new serve"
+        }
+      ],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "Auth Token",
+            "quote": "ish English Get Started Overview Supported Chains Start for Free Pricing Obtain Auth Token Use Cases Streams Overview Public Mempool Private Mempool Block Strea"
+          },
+          {
+            "what": "API key",
+            "quote": "is no longer bound to the subscription plan, with rate limit default to 3 TPS. API key could be required from Authentication . If you need to increase the TPS"
+          },
+          {
+            "what": "apikey",
+            "quote": "timeout : 10000 , headers : { ' Content-Type ' : ' application/json ' , ' apikey ' : authKey , }, httpAgent : new ( require ( ' http ' ) . Agent )( {"
+          },
+          {
+            "what": "apikey",
+            "quote": "g('[get health] response:', response); }); } (async () => { meta.add('apikey', authKey); // Initial health check (establish connection) await pi"
+          }
+        ]
+      },
+      "eu_endpoints": [
+        {
+          "url": "http://frankfurt.solana.blockrazor.xyz:443/sendTransaction",
+          "quote": "ration Constants ------------------ // BlockRazor relay endpoint address const httpEndpoint = \" http://frankfurt.solana.blockrazor.xyz:443/sendTransaction \" ; const healthEndpoint = \" http://fra",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://frankfurt.solana.blockrazor.xyz:443/health",
+          "quote": "point = \" http://frankfurt.solana.blockrazor.xyz:443/sendTransaction \" ; const healthEndpoint = \" http://frankfurt.solana.blockrazor.xyz:443/health \" ; // Replace with your Solana RPC endpoint c",
+          "region_from": "ссылка"
+        }
+      ],
       "foreign_tips": []
     },
     {
@@ -175,32 +344,825 @@
       },
       "eu_endpoints": [],
       "foreign_tips": []
+    },
+    {
+      "file": "helius_sender.html",
+      "service": "helius",
+      "bytes": 856572,
+      "tip_addresses": [
+        {
+          "address": "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+          "quote": "m '@solana/web3.js' ; import bs58 from 'bs58' ; const TIP_ACCOUNTS = [ \"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcT"
+        },
+        {
+          "address": "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
+          "quote": "const TIP_ACCOUNTS = [ \"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ\" , \"9bnz4RShgq1hAnLnZbP8kbgBg1kEm"
+        },
+        {
+          "address": "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
+          "quote": "89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ\" , \"9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta\" // ... more tip accounts availab"
+        },
+        {
+          "address": "signTransactionMessageWithSigners",
+          "quote": "actionMessageLifetimeUsingBlockhash , appendTransactionMessageInstruction , signTransactionMessageWithSigners , lamports , getBase64EncodedWireTransacti"
+        },
+        {
+          "address": "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
+          "quote": "PgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ 9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta 5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjik"
+        },
+        {
+          "address": "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
+          "quote": "LnZbP8kbgBg1kEmcJBYQq3gQbmnSta 5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuC"
+        },
+        {
+          "address": "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+          "quote": "FRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNN"
+        },
+        {
+          "address": "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
+          "quote": "cqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy"
+        },
+        {
+          "address": "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+          "quote": "jRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hs"
+        },
+        {
+          "address": "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+          "quote": "fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey 4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw"
+        },
+        {
+          "address": "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or",
+          "quote": "U33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey 4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or ​ Why both are required Tip"
+        }
+      ],
+      "minimums": [
+        {
+          "raw": "0.000005\nSOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "block — tip more to land first. The cost-optimized SWQOS-only tier remains at 0.000005 SOL. Helius Sender is a specialized service for ultra-low latency tra"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "Tier Routing Minimum tip Tip buffer Best for Sender Max All high-speed pathways 0.001 SOL Yes Highly contested transactions and bundles needing the fastest land"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "QOS path 0.000005 SOL No Cost-optimized trading on one fast path Tips between 0.000005 SOL and 0.001 SOL are accepted but do not enter the priority tip buffer"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "SOL No Cost-optimized trading on one fast path Tips between 0.000005 SOL and 0.001 SOL are accepted but do not enter the priority tip buffer — they are sent"
+        },
+        {
+          "raw": "at least 0.001\nSOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "s through fewer pathways. To get buffer priority and every routing pathway, tip at least 0.001 SOL. Sender Max (fastest landing) Routed across every pathway a"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": ". random () * TIP_ACCOUNTS . length )]), amount: lamports ( 1_000_000 n ), // 0.001 SOL }), m ) ); const signedTx = await signTransactionMessageWi"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "thways (Helius, Jito, Harmonic, Rakurai, etc.) simultaneously Required tip: A 0.001 SOL tip enters the priority tip buffer and uses every routing pathway. See"
+        },
+        {
+          "raw": "minimum 0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "rements Mandatory requirements : Every Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priori"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "ry Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priority fee. skipPreflight is optional —"
+        },
+        {
+          "raw": "Minimum 0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "tip and a priority fee : Tip : A SOL transfer to a designated tip account. Minimum 0.001 SOL for Sender Max, or 0.000005 SOL for SWQOS-only. Priority fee"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "SOL transfer to a designated tip account. Minimum 0.001 SOL for Sender Max, or 0.000005 SOL for SWQOS-only. Priority fee : Compute unit pricing via ComputeBu"
+        }
+      ],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "API Key",
+            "quote": "plans, including the free tier, and doesn’t consume any API credits. 2 Get Your API Key Go to the API Keys section and copy your key. Use this for getting block"
+          },
+          {
+            "what": "API Key",
+            "quote": "he free tier, and doesn’t consume any API credits. 2 Get Your API Key Go to the API Keys section and copy your key. Use this for getting blockhashes and transac"
+          },
+          {
+            "what": "api-key",
+            "quote": "ng > { const connection = new Connection ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : { blockhash } } = await connectio"
+          },
+          {
+            "what": "API_KEY",
+            "quote": "t connection = new Connection ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : { blockhash } } = await connection . getLatest"
+          },
+          {
+            "what": "api-key",
+            "quote": "etch blockhash const rpc = createSolanaRpc ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : blockhash } = await rpc . getLatestBl"
+          }
+        ]
+      },
+      "eu_endpoints": [
+        {
+          "url": "http://lon-sender.helius-rpc.com/fast",
+          "quote": "/slc-sender.helius-rpc.com/fast # Salt Lake City http://ewr-sender.helius-rpc.com/fast # Newark http://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/fast",
+          "quote": "http://ewr-sender.helius-rpc.com/fast # Newark http://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt http://ams-sender.helius-rpc.com/fast # Amsterda",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/fast",
+          "quote": "ttp://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt http://ams-sender.helius-rpc.com/fast # Amsterdam http://sg-sender.helius-rpc.com/fast # Singapore",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://lon-sender.helius-rpc.com/ping",
+          "quote": "/slc-sender.helius-rpc.com/ping # Salt Lake City http://ewr-sender.helius-rpc.com/ping # Newark http://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/ping",
+          "quote": "http://ewr-sender.helius-rpc.com/ping # Newark http://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt http://ams-sender.helius-rpc.com/ping # Amsterda",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/ping",
+          "quote": "ttp://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt http://ams-sender.helius-rpc.com/ping # Amsterdam http://sg-sender.helius-rpc.com/ping # Singapore",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://ewr-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://ams-sender.helius-rpc.com",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://ams-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://sg-sender.helius-rpc.com/",
+          "region_from": "ссылка"
+        }
+      ],
+      "foreign_tips": [
+        {
+          "what": "must include a tip",
+          "quote": "or speed — Sender also supports preflight checks ​ Requirements Mandatory requirements : Every Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priority fee. skipPrefli"
+        }
+      ]
+    },
+    {
+      "file": "jito_low_latency_txn_send.html",
+      "service": "jito",
+      "bytes": 90079,
+      "tip_addresses": [
+        {
+          "address": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "quote": "ngs. Response Example  { \"jsonrpc\" : \"2.0\" , \"result\" : [ \"96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD4"
+        },
+        {
+          "address": "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+          "quote": ": \"2.0\" , \"result\" : [ \"96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEM"
+        },
+        {
+          "address": "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+          "quote": "QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSok"
+        },
+        {
+          "address": "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+          "quote": "wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee"
+        },
+        {
+          "address": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+          "quote": "Qqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh\" , \"ADuUkR4vqLUMWXxW9gh6D6L8pMSaw"
+        },
+        {
+          "address": "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+          "quote": "2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh\" , \"ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt\" , \"DttWaMuVvTiduZRnguLF7jNxTgiMB"
+        },
+        {
+          "address": "jitodontfront111111111114511111111111111123",
+          "quote": "que variation of jitodontfront for your application [note: use your own pubkey] jitodontfront111111111114511111111111111123 , jitodontfront111111111111234565432"
+        },
+        {
+          "address": "jitodontfront111111111111234565432123456782",
+          "quote": "ation [note: use your own pubkey] jitodontfront111111111114511111111111111123 , jitodontfront111111111111234565432123456782 , etc. This solution works with Ji"
+        }
+      ],
+      "minimums": [
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "ith providing MEV protection. Please note that Jito enforces a minimum tip of 1000 lamports for bundles. During high-demand periods, this minimum tip might no"
+        },
+        {
+          "raw": "0.7 SOL",
+          "lamports": 700000000,
+          "sol": 0.7,
+          "quote": "a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total F"
+        },
+        {
+          "raw": "0.3 SOL",
+          "lamports": 300000000,
+          "sol": 0.3,
+          "quote": "e and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using"
+        },
+        {
+          "raw": "1.0 SOL",
+          "lamports": 1000000000,
+          "sol": 1.0,
+          "quote": "OL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using sendTransaction: You would allocate 0.7 SOL as th"
+        },
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "Tip Amount  Q: How to know how much to set a tip? The minimum tips is 1000 lamports Bundle Landing  Q: My bundle/transaction is not landing,"
+        },
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "hin the last 5 minutes through getInflightBundleStatuses . The minimum tip is 1000 lamports, but if you’re targeting a highly competitive MEV opportunity, you"
+        }
+      ],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "Authorization",
+            "quote": "Rate Limits Default Limits Rate Limit Operation Exceeding Limits Authorization Issues Custom Rate Limit Request Troubleshooting Priorit"
+          },
+          {
+            "what": "API key",
+            "quote": "lowing when authenticating with a URL using a UUID: Header Field: Include the API key in the x-jito-auth header. Example: x-jito-auth: <uuid> Query Paramet"
+          },
+          {
+            "what": "API key",
+            "quote": "-jito-auth header. Example: x-jito-auth: <uuid> Query Parameter: Include the API key as a query parameter. Example: api/v1/transactions?uuid=<uuid>"
+          },
+          {
+            "what": "Authorization",
+            "quote": "ate limit is exceeded? 429 or rate limit error indicating what you hit. Authorization Issues  Q: What happens if I see The supplied pubkey is not aut"
+          }
+        ]
+      },
+      "eu_endpoints": [
+        {
+          "url": "https://mainnet.block-engine.jito.wtf",
+          "quote": "red region: Location Block Engine URL Shred Receiver NTP Server 🌍 🌎 🌏 Mainnet https://mainnet.block-engine.jito.wtf - - 🇳🇱 Amsterdam https://amsterdam.mainnet.block-eng",
+          "region_from": "текст рядом"
+        },
+        {
+          "url": "https://amsterdam.mainnet.block-engine.jito.wtf",
+          "quote": "NTP Server 🌍 🌎 🌏 Mainnet https://mainnet.block-engine.jito.wtf - - 🇳🇱 Amsterdam https://amsterdam.mainnet.block-engine.jito.wtf 74.118.140.240:1002 ntp.amsterdam.jito.wtf 🇮",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://dublin.mainnet.block-engine.jito.wtf",
+          "quote": "terdam.mainnet.block-engine.jito.wtf 74.118.140.240:1002 ntp.amsterdam.jito.wtf 🇮🇪 Dublin https://dublin.mainnet.block-engine.jito.wtf 64.130.61.8:1002 ntp.dublin.jito.wtf 🇩🇪 Frankfu",
+          "region_from": "текст рядом"
+        },
+        {
+          "url": "https://frankfurt.mainnet.block-engine.jito.wtf",
+          "quote": "://dublin.mainnet.block-engine.jito.wtf 64.130.61.8:1002 ntp.dublin.jito.wtf 🇩🇪 Frankfurt https://frankfurt.mainnet.block-engine.jito.wtf 64.130.50.14:1002 ntp.frankfurt.jito.wtf 🇬🇧",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://london.mainnet.block-engine.jito.wtf",
+          "quote": "rankfurt.mainnet.block-engine.jito.wtf 64.130.50.14:1002 ntp.frankfurt.jito.wtf 🇬🇧 London https://london.mainnet.block-engine.jito.wtf 64.130.46.153:1002 ntp.london.jito.wtf 🇺🇸 New Y",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://ny.mainnet.block-engine.jito.wtf",
+          "quote": "//london.mainnet.block-engine.jito.wtf 64.130.46.153:1002 ntp.london.jito.wtf 🇺🇸 New York https://ny.mainnet.block-engine.jito.wtf 141.98.216.96:1002 ntp.dallas.jito.wtf 🇺🇸 Salt Lake",
+          "region_from": "текст рядом"
+        }
+      ],
+      "foreign_tips": [
+        {
+          "what": "Jito tip",
+          "quote": "ht not be sufficient to successfully navigate the auction, so it’s crucial to set both a priority fee and an additional Jito tip to optimize your transaction’s chances. Please see Tip Amounts For cost efficiency, you can enable revert pro"
+        },
+        {
+          "what": "jito tip",
+          "quote": " sendTransaction  When using sendTransaction , it is recommended to use a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total"
+        },
+        {
+          "what": "Jito Tip",
+          "quote": "it is recommended to use a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using sendTransaction: Y"
+        },
+        {
+          "what": "Jito tip",
+          "quote": "ee : 1.0 SOL So, when using sendTransaction: You would allocate 0.7 SOL as the priority fee. And 0.3 SOL as the Jito tip. sendBundle  When using sendBundle , only the Jito tip matters. 💸 Get Tip Information "
+        },
+        {
+          "what": "Jito tip",
+          "quote": "cate 0.7 SOL as the priority fee. And 0.3 SOL as the Jito tip. sendBundle  When using sendBundle , only the Jito tip matters. 💸 Get Tip Information  REST API endpoint showing most recent tip amounts:  curl https"
+        }
+      ]
+    },
+    {
+      "file": "nozomi_json_rpc.html",
+      "service": "nozomi",
+      "bytes": 478463,
+      "tip_addresses": [],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "API_KEY",
+            "quote": "PC URL with the Nozomi endpoint. Request Field Value Method POST Path /?c=<YOUR_API_KEY> Content-Type application/json Encoding base64 (must be specified) Impor"
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
+      "file": "nozomi_tipping_and_faq.html",
+      "service": "nozomi",
+      "bytes": 550556,
+      "tip_addresses": [
+        {
+          "address": "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
+          "quote": "ip account ; an unrecognized address will not be credited as a tip. # Address 1 TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYn"
+        },
+        {
+          "address": "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",
+          "quote": "be credited as a tip. # Address 1 TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUy"
+        },
+        {
+          "address": "noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE",
+          "quote": "9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRH"
+        },
+        {
+          "address": "noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo",
+          "quote": "PqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNir"
+        },
+        {
+          "address": "noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ",
+          "quote": "KknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86L"
+        },
+        {
+          "address": "nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L",
+          "quote": "u1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g"
+        },
+        {
+          "address": "nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z",
+          "quote": "6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP"
+        },
+        {
+          "address": "nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu",
+          "quote": "bLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkyd"
+        },
+        {
+          "address": "noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7",
+          "quote": "qwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ"
+        },
+        {
+          "address": "nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP",
+          "quote": "Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6"
+        },
+        {
+          "address": "nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P",
+          "quote": "8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdU"
+        },
+        {
+          "address": "nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge",
+          "quote": "D3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv"
+        },
+        {
+          "address": "nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3",
+          "quote": "6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5"
+        },
+        {
+          "address": "nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ",
+          "quote": "3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosW"
+        },
+        {
+          "address": "nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk",
+          "quote": "W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC"
+        },
+        {
+          "address": "nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne",
+          "quote": "4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne 17 nozxNBgWohjR75vdspfxR5H9ceC7XXH99"
+        },
+        {
+          "address": "nozxNBgWohjR75vdspfxR5H9ceC7XXH99xpxhVGt3Bb",
+          "quote": "w2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne 17 nozxNBgWohjR75vdspfxR5H9ceC7XXH99xpxhVGt3Bb Private Tip Addresses Dedicated (pri"
+        }
+      ],
+      "minimums": [
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "sfer instruction to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you w"
+        }
+      ],
+      "key": {
+        "needed": false,
+        "evidence": []
+      },
+      "eu_endpoints": [],
+      "foreign_tips": [
+        {
+          "what": "must include a tip",
+          "quote": "llms.txt . This page is also available as Markdown . Copy On this page Nozomi Tipping Overview Every Nozomi transaction must include a tip: a standard Solana system transfer instruction to one of the Nozomi tip addresses. The default minimu"
+        },
+        {
+          "what": "tip below the minimum",
+          "quote": "ystem transfer instruction to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you will not receive an error. If you are seeing transactions disappear wit"
+        },
+        {
+          "what": "silently drop",
+          "quote": "to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you will not receive an error. If you are seeing transactions disappear with no response, check your"
+        }
+      ]
+    },
+    {
+      "file": "nozomi_transaction_submission.html",
+      "service": "nozomi",
+      "bytes": 478463,
+      "tip_addresses": [],
+      "minimums": [],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "API_KEY",
+            "quote": "PC URL with the Nozomi endpoint. Request Field Value Method POST Path /?c=<YOUR_API_KEY> Content-Type application/json Encoding base64 (must be specified) Impor"
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
+    },
+    {
+      "file": "zeroslot_docs.html",
+      "service": "zeroslot",
+      "bytes": 30290,
+      "tip_addresses": [
+        {
+          "address": "6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av",
+          "quote": "amount greater than or equal to 0.001 SOL to any of the following accounts: 6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av (0slot_dot_trade.sol) 4HiwLEP2Bzq"
+        },
+        {
+          "address": "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+          "quote": "counts: 6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av (0slot_dot_trade.sol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3"
+        },
+        {
+          "address": "7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK",
+          "quote": "ol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB"
+        },
+        {
+          "address": "8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws",
+          "quote": "ol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5"
+        },
+        {
+          "address": "6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9",
+          "quote": "ol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgN"
+        },
+        {
+          "address": "TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p",
+          "quote": "ol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQ"
+        },
+        {
+          "address": "D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf",
+          "quote": "sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFic"
+        },
+        {
+          "address": "GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE",
+          "quote": "ol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr"
+        },
+        {
+          "address": "Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE",
+          "quote": "ol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjM"
+        },
+        {
+          "address": "4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS",
+          "quote": "ol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD"
+        },
+        {
+          "address": "3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt",
+          "quote": "ol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol)"
+        },
+        {
+          "address": "DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t",
+          "quote": "com/0slot_trade TG: https://t.me/kurt0slot More tip accounts: DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ"
+        },
+        {
+          "address": "HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c",
+          "quote": "DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZ"
+        },
+        {
+          "address": "7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd",
+          "quote": "ol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEW"
+        },
+        {
+          "address": "J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw",
+          "quote": "ol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQ"
+        },
+        {
+          "address": "8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ",
+          "quote": "ol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpS"
+        },
+        {
+          "address": "Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3",
+          "quote": "ol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ"
+        },
+        {
+          "address": "FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe",
+          "quote": "ol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEj"
+        },
+        {
+          "address": "ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13",
+          "quote": "ol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG5"
+        },
+        {
+          "address": "6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK",
+          "quote": "ol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2b"
+        },
+        {
+          "address": "Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr",
+          "quote": "l) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.sol)"
+        }
+      ],
+      "minimums": [
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "nti-MEV Anti-MEV Anti-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "ti-MEV Anti-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are ac"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "i-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are according to y"
+        },
+        {
+          "raw": "0.0001 SOL",
+          "lamports": 100000,
+          "sol": 0.0001,
+          "quote": "-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are according to your data, Pl"
+        },
+        {
+          "raw": "15.sol",
+          "lamports": 15000000000,
+          "sol": 15.0,
+          "quote": "ot_trade.sol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol"
+        },
+        {
+          "raw": "16.sol",
+          "lamports": 16000000000,
+          "sol": 16.0,
+          "quote": "de_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol"
+        },
+        {
+          "raw": "17.sol",
+          "lamports": 17000000000,
+          "sol": 17.0,
+          "quote": "de_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol"
+        },
+        {
+          "raw": "18.sol",
+          "lamports": 18000000000,
+          "sol": 18.0,
+          "quote": "de_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol)"
+        },
+        {
+          "raw": "19.sol",
+          "lamports": 19000000000,
+          "sol": 19.0,
+          "quote": "ade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol"
+        },
+        {
+          "raw": "20.sol",
+          "lamports": 20000000000,
+          "sol": 20.0,
+          "quote": "de_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol"
+        },
+        {
+          "raw": "21.sol",
+          "lamports": 21000000000,
+          "sol": 21.0,
+          "quote": "de_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol"
+        },
+        {
+          "raw": "22.sol",
+          "lamports": 22000000000,
+          "sol": 22.0,
+          "quote": "de_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol"
+        },
+        {
+          "raw": "23.sol",
+          "lamports": 23000000000,
+          "sol": 23.0,
+          "quote": "de_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol"
+        },
+        {
+          "raw": "24.sol",
+          "lamports": 24000000000,
+          "sol": 24.0,
+          "quote": "de_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol) Example for cmd: curl curl -X POST 'https://ny.0slot.t"
+        },
+        {
+          "raw": "1.sol",
+          "lamports": 1000000000,
+          "sol": 1.0,
+          "quote": "ccounts: DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol)"
+        },
+        {
+          "raw": "2.sol",
+          "lamports": 2000000000,
+          "sol": 2.0,
+          "quote": "de_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol)"
+        },
+        {
+          "raw": "6.sol",
+          "lamports": 6000000000,
+          "sol": 6.0,
+          "quote": "de_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol)"
+        },
+        {
+          "raw": "7.sol",
+          "lamports": 7000000000,
+          "sol": 7.0,
+          "quote": "de_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol)"
+        },
+        {
+          "raw": "8.sol",
+          "lamports": 8000000000,
+          "sol": 8.0,
+          "quote": "de_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol)"
+        },
+        {
+          "raw": "3.sol",
+          "lamports": 3000000000,
+          "sol": 3.0,
+          "quote": "de_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol)"
+        },
+        {
+          "raw": "5.sol",
+          "lamports": 5000000000,
+          "sol": 5.0,
+          "quote": "de_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol)"
+        },
+        {
+          "raw": "9.sol",
+          "lamports": 9000000000,
+          "sol": 9.0,
+          "quote": "de_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol"
+        },
+        {
+          "raw": "10.sol",
+          "lamports": 10000000000,
+          "sol": 10.0,
+          "quote": "de_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.so"
+        },
+        {
+          "raw": "12.sol",
+          "lamports": 12000000000,
+          "sol": 12.0,
+          "quote": "e_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.sol)"
+        }
+      ],
+      "key": {
+        "needed": true,
+        "evidence": [
+          {
+            "what": "api-key",
+            "quote": "l) Example for cmd: curl curl -X POST 'https://ny.0slot.trade?api-key=YOUR_API_KEY' \\ -H 'Content-Type: application/json' \\ -d '{ \"jsonrpc\":"
+          },
+          {
+            "what": "API_KEY",
+            "quote": "Example for cmd: curl curl -X POST 'https://ny.0slot.trade?api-key=YOUR_API_KEY' \\ -H 'Content-Type: application/json' \\ -d '{ \"jsonrpc\": \"2.0\", \"id\":"
+          },
+          {
+            "what": "API Key",
+            "quote": "btain the servers that best suits your needs. Special Error Codes API Key Expired {\"id\":\"1\",\"jsonrpc\":\"2.0\",\"error\":{\"code\":403,\"message\":\"api-k"
+          },
+          {
+            "what": "api-key",
+            "quote": "API Key Expired {\"id\":\"1\",\"jsonrpc\":\"2.0\",\"error\":{\"code\":403,\"message\":\"api-key has expired\"}} Non-sendTransaction Method {\"id\":\"1\",\"jsonrpc\":\"2.0\""
+          }
+        ]
+      },
+      "eu_endpoints": [],
+      "foreign_tips": []
     }
   ],
   "not_downloaded": [],
   "by_service": {
+    "astralane": {
+      "pages": [
+        "astralane_quickstart.html",
+        "astralane_submit_transactions.html",
+        "astralane_tip_refunds.html"
+      ],
+      "tip_addresses": {
+        "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm": "32600, \"message\": \"Error message\" } } Copy const TIP: Pubkey = pubkey!(\"astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm\"); // Use tip wallet depending on re"
+      },
+      "minimums": [],
+      "eu_endpoints": [],
+      "key_needed": true,
+      "foreign_tips": [
+        {
+          "what": "jito tip",
+          "quote": "the segregation in validators as JITO validators and normal ones, traders are often conflicted between spending more on jito tips vs more in priority fees. Durable nonces offer a way to mitigate this issue. Our sendIdeal RPC method accepts"
+        },
+        {
+          "what": "must include a valid tip",
+          "quote": "n string[] Yes Array of base64-encoded serialized transactions. Maximum batch size is 25 transactions. Each transaction must include a valid tip. object No Optional configuration object. Configuration Object Field Type Default Description m"
+        }
+      ],
+      "key_evidence": [
+        {
+          "what": "api-key",
+          "quote": "only change is to add an instruction to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean"
+        },
+        {
+          "what": "api key",
+          "quote": "ion to tip. URI Params Param Type Description api-key String Mandatory , to set api key for authentication mev-protect Boolean Optional , To set mev protect, de"
+        },
+        {
+          "what": "api-key",
+          "quote": "via swqos, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encod"
+        },
+        {
+          "what": "APIKEY",
+          "quote": "s, default is false Example : Copy https://fr.gateway.astralane.io/iris?api-key=APIKEY&mev-protect=true JSON-RPC params Parameter Type Description Encoded Trans"
+        },
+        {
+          "what": "api-key",
+          "quote": "we also provide a managed service for this, We create a nonce account for each api-key you use and you can query them using our getNonce rpc call. Follow the b"
+        }
+      ]
+    },
     "blockrazor": {
       "pages": [
         "blockrazor_authentication.md",
+        "blockrazor_js_example.html",
         "blockrazor_solana_endpoint.md",
         "blockrazor_solana_priority_fee_and_tip.md",
         "blockrazor_solana_send_transaction.md"
       ],
       "tip_addresses": {
-        "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9": "-fee-stream/solana/get-transactionfee.md). The account to receive Tip is: ``` \"FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9\", \"6No2i3aawzHsjtThw81iq1EXPJN6rh8e",
-        "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG": "ccount to receive Tip is: ``` \"FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9\", \"6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG\", \"A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6",
-        "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22": "CuMVnENaM3JGVuGWNyCAxRJcFpg9\", \"6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG\", \"A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22\", \"Gywj98ophM7GmkDdaWs4isqZnDdFCW7B",
-        "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm": "w81iq1EXPJN6rh8eSJCLaYZfKDTG\", \"A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22\", \"Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm\", \"68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7",
-        "68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o": "Aj3TJiN9VpbzMUq6E4kEvf5mUT22\", \"Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm\", \"68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o\", \"4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQ",
-        "4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9": "aWs4isqZnDdFCW7B46TXmKfvyqSm\", \"68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o\", \"4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9\", \"B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQ",
-        "B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM": "hmTXgRJjCiZmw1L7Huy4HNpnxJ3o\", \"4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9\", \"B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM\", \"5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3",
-        "5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf": "JBuyWzBK3g9gWMUQdTZP2kiW31V9\", \"B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM\", \"5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf\", \"5YktoWygr1Bp9wiS1xtMtUki1PeYuuzu",
+        "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm": "0 ; // Tip amount const tipAmount = 100_000 ; const tipAccounts = [ \" Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3J",
+        "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9": "const tipAccounts = [ \" Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN",
+        "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG": "dFCW7B46TXmKfvyqSm \" , \" FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9Vpb",
+        "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22": "JGVuGWNyCAxRJcFpg9 \" , \" 6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZ",
+        "68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o": "N6rh8eSJCLaYZfKDTG \" , \" A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9",
+        "4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9": "bzMUq6E4kEvf5mUT22 \" , \" 68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqV",
+        "B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM": "Zmw1L7Huy4HNpnxJ3o \" , \" 4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM \" , \" 5jA59cXMKQqZAVdtopv8q3yyw9S",
+        "5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf": "9gWMUQdTZP2kiW31V9 \" , \" B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM \" , \" 5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf \" , \" 5YktoWygr1Bp9wiS1xtMtUki1Pe",
+        "BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6": "5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t",
+        "Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq": "Fk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815s",
+        "AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S": "VbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S\", ]; const client = new serve",
         "5YktoWygr1Bp9wiS1xtMtUki1PeYuuzuCF98tqwYxf61": "Sdtemzk5TqVuaWGQnowGaCBt8GyM\", \"5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf\", \"5YktoWygr1Bp9wiS1xtMtUki1PeYuuzuCF98tqwYxf61\", \"295Avbam4qGShBYK7E9H5Ldew4B3WyJG",
         "295Avbam4qGShBYK7E9H5Ldew4B3WyJGmgmXfiWdeeyV": "opv8q3yyw9SYfiE3vUCbt7p8MfVf\", \"5YktoWygr1Bp9wiS1xtMtUki1PeYuuzuCF98tqwYxf61\", \"295Avbam4qGShBYK7E9H5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7",
-        "EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK": "1xtMtUki1PeYuuzuCF98tqwYxf61\", \"295Avbam4qGShBYK7E9H5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe",
-        "BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6": "7E9H5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48",
-        "Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq": "mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815sMa",
-        "AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S": "xtpBVbRaUTKixjBe3oagkPFKtoy6\", \"Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq\", \"AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S\", ``` {% hint style=\"info\" %} To a"
+        "EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK": "1xtMtUki1PeYuuzuCF98tqwYxf61\", \"295Avbam4qGShBYK7E9H5Ldew4B3WyJGmgmXfiWdeeyV\", \"EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK\", \"BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe"
       },
       "minimums": [
         {
@@ -217,6 +1179,16 @@
         }
       ],
       "eu_endpoints": [
+        {
+          "url": "http://frankfurt.solana.blockrazor.xyz:443/sendTransaction",
+          "quote": "ration Constants ------------------ // BlockRazor relay endpoint address const httpEndpoint = \" http://frankfurt.solana.blockrazor.xyz:443/sendTransaction \" ; const healthEndpoint = \" http://fra",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://frankfurt.solana.blockrazor.xyz:443/health",
+          "quote": "point = \" http://frankfurt.solana.blockrazor.xyz:443/sendTransaction \" ; const healthEndpoint = \" http://frankfurt.solana.blockrazor.xyz:443/health \" ; // Replace with your Solana RPC endpoint c",
+          "region_from": "ссылка"
+        },
         {
           "url": "http://frankfurt.solana.blockrazor.xyz:443",
           "quote": "--- # Solana Transaction Sending Endpoint {% tabs %} {% tab title=\"HTTP\" %} Region URL Frankfurt http://frankfurt.solana.blockrazor.xyz:443 Frankfurt http://frankfurt-allnodes.solana.blockrazor.xyz",
@@ -267,6 +1239,545 @@
         {
           "what": "auth token",
           "quote": "reate an account {% endstep %} {% step %} **Log in** Log in and obtain the auth token in the home page {% endstep %} {% endstepper %}"
+        }
+      ]
+    },
+    "helius": {
+      "pages": [
+        "helius_sender.html"
+      ],
+      "tip_addresses": {
+        "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE": "m '@solana/web3.js' ; import bs58 from 'bs58' ; const TIP_ACCOUNTS = [ \"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcT",
+        "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ": "const TIP_ACCOUNTS = [ \"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ\" , \"9bnz4RShgq1hAnLnZbP8kbgBg1kEm",
+        "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta": "89gB6ENTeHBXCAi87NhDEE\" , \"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ\" , \"9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta\" // ... more tip accounts availab",
+        "signTransactionMessageWithSigners": "actionMessageLifetimeUsingBlockhash , appendTransactionMessageInstruction , signTransactionMessageWithSigners , lamports , getBase64EncodedWireTransacti",
+        "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn": "PgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ 9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta 5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjik",
+        "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD": "LnZbP8kbgBg1kEmcJBYQq3gQbmnSta 5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuC",
+        "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ": "FRsXkoAAdsPHBJwRfBht4DXox3xkwn 2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNN",
+        "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF": "cqCyrYsaPVdAnFoJjiksCXJ7hfEYgD 2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy",
+        "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT": "jRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hs",
+        "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey": "fHQnMMCDTQDbkManefNNhweYk5WkcF 3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey 4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw",
+        "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or": "U33jtzozcJ29yJuaLJTy2jFdzUY8bT 4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey 4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or ​ Why both are required Tip"
+      },
+      "minimums": [
+        {
+          "raw": "0.000005\nSOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "block — tip more to land first. The cost-optimized SWQOS-only tier remains at 0.000005 SOL. Helius Sender is a specialized service for ultra-low latency tra"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "Tier Routing Minimum tip Tip buffer Best for Sender Max All high-speed pathways 0.001 SOL Yes Highly contested transactions and bundles needing the fastest land"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "QOS path 0.000005 SOL No Cost-optimized trading on one fast path Tips between 0.000005 SOL and 0.001 SOL are accepted but do not enter the priority tip buffer"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "SOL No Cost-optimized trading on one fast path Tips between 0.000005 SOL and 0.001 SOL are accepted but do not enter the priority tip buffer — they are sent"
+        },
+        {
+          "raw": "at least 0.001\nSOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "s through fewer pathways. To get buffer priority and every routing pathway, tip at least 0.001 SOL. Sender Max (fastest landing) Routed across every pathway a"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": ". random () * TIP_ACCOUNTS . length )]), amount: lamports ( 1_000_000 n ), // 0.001 SOL }), m ) ); const signedTx = await signTransactionMessageWi"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "thways (Helius, Jito, Harmonic, Rakurai, etc.) simultaneously Required tip: A 0.001 SOL tip enters the priority tip buffer and uses every routing pathway. See"
+        },
+        {
+          "raw": "minimum 0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "rements Mandatory requirements : Every Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priori"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "ry Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priority fee. skipPreflight is optional —"
+        },
+        {
+          "raw": "Minimum 0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "tip and a priority fee : Tip : A SOL transfer to a designated tip account. Minimum 0.001 SOL for Sender Max, or 0.000005 SOL for SWQOS-only. Priority fee"
+        },
+        {
+          "raw": "0.000005 SOL",
+          "lamports": 5000,
+          "sol": 5e-06,
+          "quote": "SOL transfer to a designated tip account. Minimum 0.001 SOL for Sender Max, or 0.000005 SOL for SWQOS-only. Priority fee : Compute unit pricing via ComputeBu"
+        }
+      ],
+      "eu_endpoints": [
+        {
+          "url": "http://lon-sender.helius-rpc.com/fast",
+          "quote": "/slc-sender.helius-rpc.com/fast # Salt Lake City http://ewr-sender.helius-rpc.com/fast # Newark http://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/fast",
+          "quote": "http://ewr-sender.helius-rpc.com/fast # Newark http://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt http://ams-sender.helius-rpc.com/fast # Amsterda",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/fast",
+          "quote": "ttp://lon-sender.helius-rpc.com/fast # London http://fra-sender.helius-rpc.com/fast # Frankfurt http://ams-sender.helius-rpc.com/fast # Amsterdam http://sg-sender.helius-rpc.com/fast # Singapore",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://lon-sender.helius-rpc.com/ping",
+          "quote": "/slc-sender.helius-rpc.com/ping # Salt Lake City http://ewr-sender.helius-rpc.com/ping # Newark http://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/ping",
+          "quote": "http://ewr-sender.helius-rpc.com/ping # Newark http://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt http://ams-sender.helius-rpc.com/ping # Amsterda",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/ping",
+          "quote": "ttp://lon-sender.helius-rpc.com/ping # London http://fra-sender.helius-rpc.com/ping # Frankfurt http://ams-sender.helius-rpc.com/ping # Amsterdam http://sg-sender.helius-rpc.com/ping # Singapore",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://ewr-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://lon-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://ams-sender.helius-rpc.com",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "http://ams-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY",
+          "quote": "t?api-key=YOUR_SENDER_API_KEY http://fra-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://ams-sender.helius-rpc.com/fast?api-key=YOUR_SENDER_API_KEY http://sg-sender.helius-rpc.com/",
+          "region_from": "ссылка"
+        }
+      ],
+      "key_needed": true,
+      "foreign_tips": [
+        {
+          "what": "must include a tip",
+          "quote": "or speed — Sender also supports preflight checks ​ Requirements Mandatory requirements : Every Sender transaction must include a tip (minimum 0.001 SOL for Sender Max , or 0.000005 SOL for SWQOS-only ) and a priority fee. skipPrefli"
+        }
+      ],
+      "key_evidence": [
+        {
+          "what": "API Key",
+          "quote": "plans, including the free tier, and doesn’t consume any API credits. 2 Get Your API Key Go to the API Keys section and copy your key. Use this for getting block"
+        },
+        {
+          "what": "API Key",
+          "quote": "he free tier, and doesn’t consume any API credits. 2 Get Your API Key Go to the API Keys section and copy your key. Use this for getting blockhashes and transac"
+        },
+        {
+          "what": "api-key",
+          "quote": "ng > { const connection = new Connection ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : { blockhash } } = await connectio"
+        },
+        {
+          "what": "API_KEY",
+          "quote": "t connection = new Connection ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : { blockhash } } = await connection . getLatest"
+        },
+        {
+          "what": "api-key",
+          "quote": "etch blockhash const rpc = createSolanaRpc ( 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY' ); const { value : blockhash } = await rpc . getLatestBl"
+        }
+      ]
+    },
+    "jito": {
+      "pages": [
+        "jito_low_latency_txn_send.html"
+      ],
+      "tip_addresses": {
+        "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5": "ngs. Response Example  { \"jsonrpc\" : \"2.0\" , \"result\" : [ \"96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD4",
+        "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe": ": \"2.0\" , \"result\" : [ \"96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEM",
+        "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY": "QiEV5fGqZNyN9nmNhvrZU5\" , \"HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSok",
+        "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49": "wVV8bD44PvwucfZ2bU7gRe\" , \"Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee",
+        "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh": "Qqf4uEMzpKw6QNghXLvLkY\" , \"ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh\" , \"ADuUkR4vqLUMWXxW9gh6D6L8pMSaw",
+        "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt": "2DTLSokTSzL1zt6iGPaS49\" , \"DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh\" , \"ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt\" , \"DttWaMuVvTiduZRnguLF7jNxTgiMB",
+        "jitodontfront111111111114511111111111111123": "que variation of jitodontfront for your application [note: use your own pubkey] jitodontfront111111111114511111111111111123 , jitodontfront111111111111234565432",
+        "jitodontfront111111111111234565432123456782": "ation [note: use your own pubkey] jitodontfront111111111114511111111111111123 , jitodontfront111111111111234565432123456782 , etc. This solution works with Ji"
+      },
+      "minimums": [
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "ith providing MEV protection. Please note that Jito enforces a minimum tip of 1000 lamports for bundles. During high-demand periods, this minimum tip might no"
+        },
+        {
+          "raw": "0.7 SOL",
+          "lamports": 700000000,
+          "sol": 0.7,
+          "quote": "a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total F"
+        },
+        {
+          "raw": "0.3 SOL",
+          "lamports": 300000000,
+          "sol": 0.3,
+          "quote": "e and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using"
+        },
+        {
+          "raw": "1.0 SOL",
+          "lamports": 1000000000,
+          "sol": 1.0,
+          "quote": "OL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using sendTransaction: You would allocate 0.7 SOL as th"
+        },
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "Tip Amount  Q: How to know how much to set a tip? The minimum tips is 1000 lamports Bundle Landing  Q: My bundle/transaction is not landing,"
+        },
+        {
+          "raw": "1000 lamports",
+          "lamports": 1000,
+          "sol": 1e-06,
+          "quote": "hin the last 5 minutes through getInflightBundleStatuses . The minimum tip is 1000 lamports, but if you’re targeting a highly competitive MEV opportunity, you"
+        }
+      ],
+      "eu_endpoints": [
+        {
+          "url": "https://mainnet.block-engine.jito.wtf",
+          "quote": "red region: Location Block Engine URL Shred Receiver NTP Server 🌍 🌎 🌏 Mainnet https://mainnet.block-engine.jito.wtf - - 🇳🇱 Amsterdam https://amsterdam.mainnet.block-eng",
+          "region_from": "текст рядом"
+        },
+        {
+          "url": "https://amsterdam.mainnet.block-engine.jito.wtf",
+          "quote": "NTP Server 🌍 🌎 🌏 Mainnet https://mainnet.block-engine.jito.wtf - - 🇳🇱 Amsterdam https://amsterdam.mainnet.block-engine.jito.wtf 74.118.140.240:1002 ntp.amsterdam.jito.wtf 🇮",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://dublin.mainnet.block-engine.jito.wtf",
+          "quote": "terdam.mainnet.block-engine.jito.wtf 74.118.140.240:1002 ntp.amsterdam.jito.wtf 🇮🇪 Dublin https://dublin.mainnet.block-engine.jito.wtf 64.130.61.8:1002 ntp.dublin.jito.wtf 🇩🇪 Frankfu",
+          "region_from": "текст рядом"
+        },
+        {
+          "url": "https://frankfurt.mainnet.block-engine.jito.wtf",
+          "quote": "://dublin.mainnet.block-engine.jito.wtf 64.130.61.8:1002 ntp.dublin.jito.wtf 🇩🇪 Frankfurt https://frankfurt.mainnet.block-engine.jito.wtf 64.130.50.14:1002 ntp.frankfurt.jito.wtf 🇬🇧",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://london.mainnet.block-engine.jito.wtf",
+          "quote": "rankfurt.mainnet.block-engine.jito.wtf 64.130.50.14:1002 ntp.frankfurt.jito.wtf 🇬🇧 London https://london.mainnet.block-engine.jito.wtf 64.130.46.153:1002 ntp.london.jito.wtf 🇺🇸 New Y",
+          "region_from": "ссылка"
+        },
+        {
+          "url": "https://ny.mainnet.block-engine.jito.wtf",
+          "quote": "//london.mainnet.block-engine.jito.wtf 64.130.46.153:1002 ntp.london.jito.wtf 🇺🇸 New York https://ny.mainnet.block-engine.jito.wtf 141.98.216.96:1002 ntp.dallas.jito.wtf 🇺🇸 Salt Lake",
+          "region_from": "текст рядом"
+        }
+      ],
+      "key_needed": true,
+      "foreign_tips": [
+        {
+          "what": "Jito tip",
+          "quote": "ht not be sufficient to successfully navigate the auction, so it’s crucial to set both a priority fee and an additional Jito tip to optimize your transaction’s chances. Please see Tip Amounts For cost efficiency, you can enable revert pro"
+        },
+        {
+          "what": "jito tip",
+          "quote": " sendTransaction  When using sendTransaction , it is recommended to use a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total"
+        },
+        {
+          "what": "Jito Tip",
+          "quote": "it is recommended to use a 70/30 split between priority fee and jito tip(e.g.): Priority Fee ( 70 % ): 0.7 SOL + Jito Tip ( 30 % ): 0.3 SOL =========================== Total Fee : 1.0 SOL So, when using sendTransaction: Y"
+        },
+        {
+          "what": "Jito tip",
+          "quote": "ee : 1.0 SOL So, when using sendTransaction: You would allocate 0.7 SOL as the priority fee. And 0.3 SOL as the Jito tip. sendBundle  When using sendBundle , only the Jito tip matters. 💸 Get Tip Information "
+        },
+        {
+          "what": "Jito tip",
+          "quote": "cate 0.7 SOL as the priority fee. And 0.3 SOL as the Jito tip. sendBundle  When using sendBundle , only the Jito tip matters. 💸 Get Tip Information  REST API endpoint showing most recent tip amounts:  curl https"
+        }
+      ],
+      "key_evidence": [
+        {
+          "what": "Authorization",
+          "quote": "Rate Limits Default Limits Rate Limit Operation Exceeding Limits Authorization Issues Custom Rate Limit Request Troubleshooting Priorit"
+        },
+        {
+          "what": "API key",
+          "quote": "lowing when authenticating with a URL using a UUID: Header Field: Include the API key in the x-jito-auth header. Example: x-jito-auth: <uuid> Query Paramet"
+        },
+        {
+          "what": "API key",
+          "quote": "-jito-auth header. Example: x-jito-auth: <uuid> Query Parameter: Include the API key as a query parameter. Example: api/v1/transactions?uuid=<uuid>"
+        },
+        {
+          "what": "Authorization",
+          "quote": "ate limit is exceeded? 429 or rate limit error indicating what you hit. Authorization Issues  Q: What happens if I see The supplied pubkey is not aut"
+        }
+      ]
+    },
+    "nozomi": {
+      "pages": [
+        "nozomi_json_rpc.html",
+        "nozomi_tipping_and_faq.html",
+        "nozomi_transaction_submission.html"
+      ],
+      "tip_addresses": {
+        "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq": "ip account ; an unrecognized address will not be credited as a tip. # Address 1 TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYn",
+        "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4": "be credited as a tip. # Address 1 TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUy",
+        "noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE": "9EKF53Jd6KpHxgL47uWLcpFArU1Fanq 2 noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRH",
+        "noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo": "PqiSPkkugaJDkJscPuRhYnSpbi8UvC4 3 noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNir",
+        "noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ": "KknefHji8L1mPgimezaiUyCHYMDv1GE 4 noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86L",
+        "nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L": "u1V7cutCpwxNiSovEwLdRHPwmgCGDNo 5 noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g",
+        "nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z": "6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ 6 nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP",
+        "nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu": "bLTFVZzoNZCwjh3yUtW86LoUyqsBu4L 7 nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkyd",
+        "noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7": "qwVuwPAW4aaGqempx4PU6g6D9CJMv7Z 8 nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ",
+        "nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP": "Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu 9 noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6",
+        "nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P": "8wcQVCEw6kDrXkPdKkydGJGNXGvL7 10 nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdU",
+        "nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge": "D3qigrCG2UoKxZttxzZ85pvAQVrbP 11 nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv",
+        "nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3": "6pvEdAh1JoC2CQGZdU6HbNP1v2p6P 12 nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5",
+        "nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ": "3BiT4WCodYCUFeQvcdUkM7MqhKqge 13 nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosW",
+        "nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk": "W8dkbt9gnUaMs52PdAv5byipnadq3 14 nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC",
+        "nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne": "4mJmGCYjKZTnE9RbdY5AP46iQgbPJ 15 nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne 17 nozxNBgWohjR75vdspfxR5H9ceC7XXH99",
+        "nozxNBgWohjR75vdspfxR5H9ceC7XXH99xpxhVGt3Bb": "w2fpzDhhWbW355fzosWSzrrMYB1Qk 16 nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne 17 nozxNBgWohjR75vdspfxR5H9ceC7XXH99xpxhVGt3Bb Private Tip Addresses Dedicated (pri"
+      },
+      "minimums": [
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "sfer instruction to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you w"
+        }
+      ],
+      "eu_endpoints": [],
+      "key_needed": true,
+      "foreign_tips": [
+        {
+          "what": "must include a tip",
+          "quote": "llms.txt . This page is also available as Markdown . Copy On this page Nozomi Tipping Overview Every Nozomi transaction must include a tip: a standard Solana system transfer instruction to one of the Nozomi tip addresses. The default minimu"
+        },
+        {
+          "what": "tip below the minimum",
+          "quote": "ystem transfer instruction to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you will not receive an error. If you are seeing transactions disappear wit"
+        },
+        {
+          "what": "silently drop",
+          "quote": "to one of the Nozomi tip addresses. The default minimum tip is 0.001 SOL . Transactions that tip below the minimum are silently dropped : you will not receive an error. If you are seeing transactions disappear with no response, check your"
+        }
+      ],
+      "key_evidence": [
+        {
+          "what": "API_KEY",
+          "quote": "PC URL with the Nozomi endpoint. Request Field Value Method POST Path /?c=<YOUR_API_KEY> Content-Type application/json Encoding base64 (must be specified) Impor"
+        }
+      ]
+    },
+    "zeroslot": {
+      "pages": [
+        "zeroslot_docs.html"
+      ],
+      "tip_addresses": {
+        "6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av": "amount greater than or equal to 0.001 SOL to any of the following accounts: 6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av (0slot_dot_trade.sol) 4HiwLEP2Bzq",
+        "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4": "counts: 6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av (0slot_dot_trade.sol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3",
+        "7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK": "ol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB",
+        "8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws": "ol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5",
+        "6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9": "ol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgN",
+        "TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p": "ol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQ",
+        "D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf": "sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFic",
+        "GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE": "ol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr",
+        "Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE": "ol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjM",
+        "4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS": "ol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD",
+        "3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt": "ol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol)",
+        "DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t": "com/0slot_trade TG: https://t.me/kurt0slot More tip accounts: DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ",
+        "HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c": "DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZ",
+        "7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd": "ol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEW",
+        "J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw": "ol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQ",
+        "8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ": "ol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpS",
+        "Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3": "ol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ",
+        "FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe": "ol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEj",
+        "ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13": "ol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG5",
+        "6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK": "ol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2b",
+        "Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr": "l) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.sol)"
+      },
+      "minimums": [
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "nti-MEV Anti-MEV Anti-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "ti-MEV Anti-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are ac"
+        },
+        {
+          "raw": "0.001 SOL",
+          "lamports": 1000000,
+          "sol": 0.001,
+          "quote": "i-MEV Anti-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are according to y"
+        },
+        {
+          "raw": "0.0001 SOL",
+          "lamports": 100000,
+          "sol": 0.0001,
+          "quote": "-MEV Anti-MEV Transaction Tip 0.001 SOL 0.001 SOL 0.001 SOL 0.0001 SOL Note: The above free plans are according to your data, Pl"
+        },
+        {
+          "raw": "15.sol",
+          "lamports": 15000000000,
+          "sol": 15.0,
+          "quote": "ot_trade.sol) 4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol"
+        },
+        {
+          "raw": "16.sol",
+          "lamports": 16000000000,
+          "sol": 16.0,
+          "quote": "de_tip15.sol) 7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol"
+        },
+        {
+          "raw": "17.sol",
+          "lamports": 17000000000,
+          "sol": 17.0,
+          "quote": "de_tip16.sol) 8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol"
+        },
+        {
+          "raw": "18.sol",
+          "lamports": 18000000000,
+          "sol": 18.0,
+          "quote": "de_tip17.sol) 6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol)"
+        },
+        {
+          "raw": "19.sol",
+          "lamports": 19000000000,
+          "sol": 19.0,
+          "quote": "ade_tip18.sol) TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol"
+        },
+        {
+          "raw": "20.sol",
+          "lamports": 20000000000,
+          "sol": 20.0,
+          "quote": "de_tip19.sol) D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol"
+        },
+        {
+          "raw": "21.sol",
+          "lamports": 21000000000,
+          "sol": 21.0,
+          "quote": "de_tip20.sol) GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol"
+        },
+        {
+          "raw": "22.sol",
+          "lamports": 22000000000,
+          "sol": 22.0,
+          "quote": "de_tip21.sol) Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol"
+        },
+        {
+          "raw": "23.sol",
+          "lamports": 23000000000,
+          "sol": 23.0,
+          "quote": "de_tip22.sol) 4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol"
+        },
+        {
+          "raw": "24.sol",
+          "lamports": 24000000000,
+          "sol": 24.0,
+          "quote": "de_tip23.sol) 3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol) Example for cmd: curl curl -X POST 'https://ny.0slot.t"
+        },
+        {
+          "raw": "1.sol",
+          "lamports": 1000000000,
+          "sol": 1.0,
+          "quote": "ccounts: DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol)"
+        },
+        {
+          "raw": "2.sol",
+          "lamports": 2000000000,
+          "sol": 2.0,
+          "quote": "de_tip1.sol) HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol)"
+        },
+        {
+          "raw": "6.sol",
+          "lamports": 6000000000,
+          "sol": 6.0,
+          "quote": "de_tip2.sol) 7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol)"
+        },
+        {
+          "raw": "7.sol",
+          "lamports": 7000000000,
+          "sol": 7.0,
+          "quote": "de_tip6.sol) J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol)"
+        },
+        {
+          "raw": "8.sol",
+          "lamports": 8000000000,
+          "sol": 8.0,
+          "quote": "de_tip7.sol) 8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol)"
+        },
+        {
+          "raw": "3.sol",
+          "lamports": 3000000000,
+          "sol": 3.0,
+          "quote": "de_tip8.sol) Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol)"
+        },
+        {
+          "raw": "5.sol",
+          "lamports": 5000000000,
+          "sol": 5.0,
+          "quote": "de_tip3.sol) FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol)"
+        },
+        {
+          "raw": "9.sol",
+          "lamports": 9000000000,
+          "sol": 9.0,
+          "quote": "de_tip5.sol) ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol"
+        },
+        {
+          "raw": "10.sol",
+          "lamports": 10000000000,
+          "sol": 10.0,
+          "quote": "de_tip9.sol) 6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.so"
+        },
+        {
+          "raw": "12.sol",
+          "lamports": 12000000000,
+          "sol": 12.0,
+          "quote": "e_tip10.sol) Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.sol)"
+        }
+      ],
+      "eu_endpoints": [],
+      "key_needed": true,
+      "foreign_tips": [],
+      "key_evidence": [
+        {
+          "what": "api-key",
+          "quote": "l) Example for cmd: curl curl -X POST 'https://ny.0slot.trade?api-key=YOUR_API_KEY' \\ -H 'Content-Type: application/json' \\ -d '{ \"jsonrpc\":"
+        },
+        {
+          "what": "API_KEY",
+          "quote": "Example for cmd: curl curl -X POST 'https://ny.0slot.trade?api-key=YOUR_API_KEY' \\ -H 'Content-Type: application/json' \\ -d '{ \"jsonrpc\": \"2.0\", \"id\":"
+        },
+        {
+          "what": "API Key",
+          "quote": "btain the servers that best suits your needs. Special Error Codes API Key Expired {\"id\":\"1\",\"jsonrpc\":\"2.0\",\"error\":{\"code\":403,\"message\":\"api-k"
+        },
+        {
+          "what": "api-key",
+          "quote": "API Key Expired {\"id\":\"1\",\"jsonrpc\":\"2.0\",\"error\":{\"code\":403,\"message\":\"api-key has expired\"}} Non-sendTransaction Method {\"id\":\"1\",\"jsonrpc\":\"2.0\""
         }
       ]
     }

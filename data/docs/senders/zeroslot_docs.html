@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-T53JFFQ0NF"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-T53JFFQ0NF');
+</script>    
+
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+ <link rel="icon" type="image/png" href="./icon/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="./icon/favicon.svg" />
+  <link rel="shortcut icon" href="./icon/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="MyWebSite" />
+  <link rel="manifest" href="./icon/site.webmanifest" />
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>0slot - Even Faster Solana Transactions </title>
+    <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary: #10b981;
+      --dark: #111827;
+      --light: #f9fafb;
+      --gray: #6b7280;
+      --gray-light: #e5e7eb;
+      --gray-dark: #374151;
+      --bg-gradient: linear-gradient(135deg, rgba(99, 102, 241, 0.8), rgba(79, 70, 229, 0.9));
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --radius: 0.5rem;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--dark);
+      background-color: var(--light);
+      line-height: 1.6;
+    }
+
+    
+    .hcontainer {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+        /* 全屏导航栏 */
+          /* Header styles */
+    header {
+      background-color: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow-sm);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+    
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+    }
+    
+    .logo-text {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(to right, var(--primary), var(--primary-dark));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    
+    .nav {
+      display: flex;
+      align-items: center;
+    }
+    
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      margin-right: 2rem;
+    }
+    
+    .nav-links a {
+      text-decoration: none;
+      color: var(--gray-dark);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    
+    .nav-links a:hover {
+      color: var(--primary);
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      font-weight: 500;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      text-decoration: none;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+    }
+    
+    .btn-secondary {
+      background-color: white;
+      color: var(--dark);
+      border: 1px solid var(--gray-light);
+    }
+    
+    .btn-secondary:hover {
+      background-color: var(--gray-light);
+      transform: translateY(-1px);
+    }
+    
+    .mobile-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.5rem;
+    }
+
+        /* 主体内容布局 */
+        .container {
+            display: flex;
+            margin: 100px auto;
+            max-width: 1480px;
+            padding: 0 20px;
+        }
+
+        /* 左侧书签区域 */
+        .sidebar {
+            width: 280px;
+            position: sticky;
+            top: 100px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            padding: 25px;
+            margin-right: 30px;
+            height: fit-content;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .sidebar h3 {
+            color: #3f51b5;
+            margin-bottom: 20px;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin: 12px 0;
+        }
+
+        .sidebar a {
+            text-decoration: none;
+            color: #616161;
+            display: block;
+            padding: 10px 15px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #3f51b5;
+            color: white;
+            transform: translateX(5px);
+        }
+
+        /* 右侧内容区域 */
+        .content {
+            flex: 1;
+            background: #f9fafb; /* 柔和的对比色 */
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .section {
+            margin-bottom: 60px;
+            scroll-margin-top: 90px;
+        }
+
+        .section h2 {
+            color: #3f51b5;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3f51b5;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 10px 0;
+        }
+
+        .chart {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .chart img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                position: static;
+                margin: 0 0 30px 0;
+            }
+
+            .content {
+                margin-left: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 0 15px;
+            }
+
+            .nav-links {
+                gap: 20px;
+            }
+
+            .logo {
+                font-size: 24px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+		
+.price-table {
+    border: 1px solid #fff;
+    margin: 20px 0;
+}
+
+.table-row {
+    display: flex;
+    border-bottom: 1px solid #eee;
+}
+
+.table-row.header {
+    background-color: #3f51a0;
+    color: white;
+    font-weight: bold;
+}
+
+.table-cell {
+    flex: 1;
+    padding: 12px;
+    min-width: 120px;
+    border-right: 1px solid #fff;
+}
+
+.table-cell:first-child {
+    flex: 0 0 200px;
+     
+    font-weight: 500;
+}
+
+/* NEW徽章样式 */
+.new-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    margin-left: 5px;
+    vertical-align: top;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+    color: white;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .price-table {
+        overflow-x: auto;
+    }
+    
+    .table-row {
+        min-width: 700px;
+    }
+}	
+
+
+
+      .code-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        pre {
+            background-color: black;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            tab-size: 4;
+        }
+        .copy-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background-color: #45a049;
+        }
+
+ /* Mobile menu */
+    .mobile-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: white;
+      z-index: 2000;
+      padding: 2rem;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .mobile-menu.open {
+      transform: translateX(0);
+    }
+
+    .mobile-menu-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .mobile-menu-links {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+
+    .mobile-menu-links a {
+      font-size: 1.25rem;
+      text-decoration: none;
+      color: var(--gray-dark);
+      font-weight: 500;
+    }
+
+    .mobile-menu-links .btn {
+      margin-top: 1rem;
+      width: 100%;
+    }
+
+        /* Hidden content (for SEO & wallet addresses) */
+    .hidden-content {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+      
+      .mobile-toggle {
+        display: block;
+      }
+    }
+
+    </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="hcontainer">
+      <div class="header-inner">
+        <a href="/#" class="logo">
+		<img style="height: 48px;" src="./icon/logo-b.png" alt="0slot logo">
+        </a>
+        <div class="nav">
+          <div class="nav-links">
+            <a href="/#features">Features</a>
+            <a href="/#comparison">Benchmark</a>
+            <a href="/#pricing">Pricing</a>
+            <a href="/#contact">Contact</a>
+
+            <a href="tools.html">Tools</a>
+            <a href="docs.php">Documentation</a>
+          </div>
+          <a href="/#contact" class="btn btn-primary">Sign In</a>
+        </div>
+        <button class="mobile-toggle" aria-label="Open menu">≡</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu">
+    <button class="mobile-menu-close" aria-label="Close menu">✕</button>
+    <div class="mobile-menu-links">
+      <a href="/#features">Features</a>
+      <a href="/#comparison">Benchmark</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#contact">Contact</a>
+      <a href="tools.html">Tools</a>
+      <a href="docs.php">Documentation</a>
+      <a href="/#contact" class="btn btn-primary">Sign In</a>
+    </div>
+  </div>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>Documentation</h3>
+            <ul>
+                <li><a href="#feature1" class="active">What's 0slot?</a></li>
+                <li><a href="#feature2">Pricing & Rate Limits</a></li>
+                <li><a href="#feature3">Quickstart</a></li>                
+                <li><a href="#feature4">0slot Cookbook</a></li>
+				<li><a href="#feature5">Anti-MEV Support</a></li>
+				<li><a href="#feature6">Contact</a></li>
+               
+            
+            </ul>
+        </aside>
+
+        <main class="content">
+            <section id="feature1" class="section">
+                <h2>What's 0slot?</h2>
+                <div class="feature-grid">
+               
+				
+
+                <div style="max-width: 1200px; margin: 0 auto; padding: 2rem 6%; background: transparent;">
+    <h1 style="font-size: 2.5rem; color: #2D3748; font-weight: 700; margin-bottom: 1.5rem; line-height: 1.2;">
+        Welcome to <span style="color: #2563EB;">0slot</span>
+    </h1>
+    
+    <p style="font-size: 1.125rem; color: #4A5568; line-height: 1.6; margin-bottom: 1.5rem;">
+        The Premium Solana Transaction Acceleration Service. Built by traders, for traders.
+    </p>
+
+    <div style="border-left: 4px solid #2563EB; padding-left: 1.5rem; margin: 2rem 0;">
+        <p style="font-size: 1rem; color: #718096; line-height: 1.7; margin-bottom: 1.5rem;">
+            As active Solana traders ourselves, we've personally felt the frustration of transaction delays and execution failures. Our team doesn't just understand Solana transactions - we operate several of the top-performing arbitrage bots on the network.
+        </p>
+    </div>
+
+    <div style="display: grid; gap: 1.5rem;">
+        <p style="font-size: 1rem; color: #4A5568; line-height: 1.7;">
+            This hands-on expertise means we've mastered the art and science of transaction execution, optimization, and timing. We built 0slot after experiencing these pain points firsthand – not just to solve our own challenges, but to empower the entire trading community with the same advantages we developed for our own operations.
+        </p>
+        
+        <p style="font-size: 1rem; color: #4A5568; line-height: 1.7;">
+            We leverage this specialized knowledge to ensure your trades land with exceptional speed and reliability. Let us handle the technical complexities of transaction delivery so you can focus on what matters most - making better trading decisions.
+        </p>
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1.5rem; background-color: #F8FAFC; border-radius: 8px;">
+        <p style="font-size: 1.25rem; color: #2563EB; font-style: italic; text-align: right; margin: 0;">
+            From traders, for traders (源自交易者，服务交易者) - that's the 0slot promise.
+        </p>
+    </div>
+
+    <style>
+        @media (max-width: 768px) {
+            div[style*="max-width: 1200px"] {
+                padding: 1rem 4% !important;
+            }
+            h1[style*="font-size: 2.5rem"] {
+                font-size: 2rem !important;
+            }
+            p[style*="font-size: 1.125rem"] {
+                font-size: 1rem !important;
+            }
+            div[style*="border-left: 4px"] {
+                padding-left: 1rem !important;
+                margin: 1.5rem 0 !important;
+            }
+        }
+    </style>
+</div>
+
+
+                </div>
+            </section>
+
+            <section id="feature2" class="section">
+                <h2>Pricing & Rate Limits</h2>
+                <div class="feature-grid">
+<div class="price-table">
+    <!-- 表头行 -->
+    <div class="table-row header">
+        <div class="table-cell">Plan</div>
+        <div class="table-cell">Trial (first week)</div>
+        <div class="table-cell">Entry</div>
+        <div class="table-cell">Intermediate</div>
+        <div class="table-cell">Advanced</div>
+    </div>
+    
+    <!-- 数据行（示例数据） -->
+    <div class="table-row">
+        <div class="table-cell">Billed per month</div>
+        <div class="table-cell">$0</div>
+        <div class="table-cell">Free! <span class="new-badge">NEW</span></div>
+        <div class="table-cell">Free! <span class="new-badge">NEW</span></div>
+        <div class="table-cell">Free! <span class="new-badge">NEW</span></div>
+        
+    </div>
+    
+    <div class="table-row">
+        <div class="table-cell">Billed annually</div>
+        <div class="table-cell">$0</div>
+        <div class="table-cell">Free!</div>
+        <div class="table-cell">Free!</div>
+        <div class="table-cell">Free!</div>
+    </div>
+    
+    <div class="table-row">
+        <div class="table-cell">TPS</div>
+        <div class="table-cell">5 TPS</div>
+        <div class="table-cell">5 TPS</div>
+        <div class="table-cell">20 TPS</div>
+        <div class="table-cell">50 TPS</div>
+    </div>
+    
+    <div class="table-row">
+        <div class="table-cell">SWQoS</div>
+        <div class="table-cell">Dedicated SWQoS</div>
+        <div class="table-cell">Dedicated SWQoS</div>
+        <div class="table-cell">Dedicated SWQoS</div>
+        <div class="table-cell">Dedicated SWQoS</div>
+        
+    </div>
+    
+    <!--div class="table-row">
+        <div class="table-cell">Anti-MEV</div>
+        <div class="table-cell">Anti-MEV</div>
+        <div class="table-cell">Anti-MEV</div>
+        <div class="table-cell">Anti-MEV</div>
+        <div class="table-cell">Anti-MEV</div>
+        
+    </div-->
+    
+    <div class="table-row">
+        <div class="table-cell">Transaction Tip</div>
+        <div class="table-cell">0.001 SOL</div>
+        <div class="table-cell">0.001 SOL</div>
+        <div class="table-cell">0.001 SOL</div>
+        <div class="table-cell" style="color: red;font-weight: bold;">0.0001 SOL</div>
+       
+    </div>
+    <br/>
+    <div style="margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-left: 4px solid #0ea5e9; border-radius: 4px;">
+        <p style="margin: 0; color: #0369a1; font-size: 16px; line-height: 1.5;">
+            <strong>Note:</strong> The above free plans are according to your data, Please contact sales for more information.
+        </p>
+    </div>
+</div>
+				
+				
+                </div>
+            </section>
+
+            <section id="feature3" class="section">
+                <h2>Quickstart</h2>
+                <div class="feature-grid">
+
+
+<div class="staked-conn-docs">
+  <style>
+    .staked-conn-docs {
+		overflow-x: auto;
+    }
+   
+    .note-box {    
+      padding: 15px;
+      margin: 15px 0;
+	  overflow-x: auto;
+    }
+    ul {
+      margin-left: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    code {
+      color:white;
+	  font-size:18px;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 15px 0;
+    }
+    .account-list {
+      columns: 1;
+      list-style: square;
+      padding-left: 0;
+	  margin-left:20px;
+    }
+  </style>
+
+  <h3>staked_conn</h3>
+  <div class="note-box">
+    <p>The usage of the staked_conn interface is similar to the RPC interface, primarily providing the sendTransaction method, which directly connects to our validator node.</p>
+    
+    <p>When calling the sendTransaction method of staked_conn, please note the following:</p>
+    <ul>
+      <li>A maximum of 5 calls per second is allowed</li>
+      <li>You need to transfer an amount greater than or equal to 0.001 SOL to any of the following accounts:
+        <ul class="account-list">
+          <li>6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av (0slot_dot_trade.sol)</li>
+          <li>4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4(0slot_dot_trade_tip15.sol)</li>
+          <li>7toBU3inhmrARGngC7z6SjyP85HgGMmCTEwGNRAcYnEK(0slot_dot_trade_tip16.sol)</li>
+          <li>8mR3wB1nh4D6J9RUCugxUpc6ya8w38LPxZ3ZjcBhgzws(0slot_dot_trade_tip17.sol)</li>
+          <li>6SiVU5WEwqfFapRuYCndomztEwDjvS5xgtEof3PLEGm9(0slot_dot_trade_tip18.sol)</li>
+          <li>TpdxgNJBWZRL8UXF5mrEsyWxDWx9HQexA9P1eTWQ42p(0slot_dot_trade_tip19.sol)</li>
+          <li>D8f3WkQu6dCF33cZxuAsrKHrGsqGP2yvAHf8mX6RXnwf(0slot_dot_trade_tip20.sol)</li>
+          <li>GQPFicsy3P3NXxB5piJohoxACqTvWE9fKpLgdsMduoHE(0slot_dot_trade_tip21.sol)</li>
+          <li>Ey2JEr8hDkgN8qKJGrLf2yFjRhW7rab99HVxwi5rcvJE(0slot_dot_trade_tip22.sol)</li>
+          <li>4iUgjMT8q2hNZnLuhpqZ1QtiV8deFPy2ajvvjEpKKgsS(0slot_dot_trade_tip23.sol)</li>
+          <li>3Rz8uD83QsU8wKvZbgWAPvCNDU6Fy8TSZTMcPm3RB6zt(0slot_dot_trade_tip24.sol)</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <h3>Example for cmd: curl</h3>
+  <div class="note-box">
+<pre>
+<code>
+curl -X POST 'https://ny.0slot.trade?api-key=YOUR_API_KEY' \
+-H 'Content-Type: application/json' \
+-d '{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "sendTransaction",
+  "params": [
+    "&lt;base64_encoded_tx&gt;",
+    { "encoding": "base64" }
+  ]
+}'
+</code>
+</pre> 
+<p>
+For better performance and faster speeds, you can test and select the most suitable IP to use:
+<div class="simple-server-list">
+  <style>
+    .simple-server-list ul {
+      margin: 15px 0;
+      padding: 0;
+      list-style: none;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      max-width: 300px;
+	  background-color: black;
+    }
+    .simple-server-list li {
+      padding: 10px 15px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .simple-server-list li:last-child {
+      border-bottom: none;
+    }
+    .server-location {
+      color: white;
+      font-weight: bold;
+	  font-size: 1.2em;
+    }
+    .server-ip {
+      color: white;
+      font-family: monospace;
+      font-size: 1.2em;
+	  font-weight: bold;
+    }
+  </style>
+
+  <ul>
+    <li>
+      <span class="server-location">New York</span>
+      <span class="server-ip">ny.0slot.trade</span>
+    </li>
+    <li>
+      <span class="server-location">Frankfurt</span>
+      <span class="server-ip">de.0slot.trade</span>
+    </li>
+    <li>
+      <span class="server-location">Amsterdam</span>
+      <span class="server-ip">ams.0slot.trade</span>
+    </li>
+    <li>
+      <span class="server-location">Tokyo</span>
+      <span class="server-ip">jp.0slot.trade</span>
+    </li>
+    <li>
+      <span class="server-location">Los Angeles</span>
+      <span class="server-ip">la.0slot.trade</span>
+    </li>
+  </ul>
+</div>
+
+You can also contact our sales or technical support team to obtain the servers that best suits your needs.
+
+</p>  
+  </div>
+  
+  
+  <h3>Special Error Codes</h3>
+  <div class="note-box">
+    <p><strong>API Key Expired</strong></p>
+    <pre><code>{"id":"1","jsonrpc":"2.0","error":{"code":403,"message":"api-key has expired"}}</code></pre>
+
+    <p><strong>Non-sendTransaction Method</strong></p>
+    <pre><code>{"id":"1","jsonrpc":"2.0","error":{"code":403,"message":"only support sendTransaction method"}}</code></pre>
+
+    <p><strong>Rate Limit Exceeded</strong></p>
+    <pre><code>{"id":"1","jsonrpc":"2.0","error":{"code":419,"message":"rate limit exceeded"}}</code></pre>
+  </div>
+
+  <h3>Example</h3>
+  <div class="note-box">
+    <p>Add an instruction to the Transaction (preferably inserted at the beginning):</p>
+    <pre><code>transaction.addInstruction(SystemProgram.transfer(fromPublicKey, '6fQaVhYZA4w3MBSXjJ81Vf6W1EDYeUPXpgVQ6UQyU1Av', 1000000));</code></pre>
+  </div>
+  <ul class="account-list">
+    <li><a href="downloads/example.zip" style="color: #007BFF;">Here are some code examples for your reference.</a></li>
+  </ul>
+  <p style="margin-top: 20px;">We hope the above information helps you better understand and use the staked_conn interface. If you have any questions, please feel free to contact our support team.</p>
+</div>				
+														
+    </div>
+</section>
+
+            <section id="feature4" class="section">
+                <h2>0slot Cookbook</h2>
+                <div class="feature-grid">
+<div style="padding: 5px; ">
+    <h3 style="color: #333;">Here are the articles answering common technical questions about accessing and using the 0slot service. If you have the same issues or encounter similar problems, please read them carefully.</h3>
+    <ul class="account-list">
+		<li><a href="cookbook/how-to-start.html" style="color: #007BFF;">How to start with 0slot?</a></li>
+    <li><a href="cookbook/simpler-faster.html" style="color:#007BFF;">New Feature: Simpler, Faster Transaction Submission</a></li>
+    <li><a href="cookbook/binary-tx.html" style="color:#007BFF;">Binary-Tx: A Faster Way for Tx Submission</a></li>
+    <!-- <li><a href="cookbook/comparison-and-recommendation.html" style="color:rgb(246, 6, 6);">Comparison and Recommendation of the Three Transaction Submission Methods</a></li> -->
+		<li><a href="cookbook/test-speed.html" style="color: #007BFF;">How to Test Speeds of Different Server Nodes?</a></li>
+		<li><a href="cookbook/keep-alive.html" style="color: #007BFF;">Optimizing Network Request Performance Using HTTP Keep-Alive Mechanism</a></li>
+		<li><a href="cookbook/durable-nonce.html" style="color: #007BFF;">Using Durable Nonce to Send the Same Transaction to Multiple Landing Services</a></li> 
+		<!--li><a href="https://github.com/0slot-trade/cookbook/blob/main/shredstream.md" style="color: #007BFF;">Introduction to 0slot ShredStream</a></li--!>
+		<li><a href="cookbook/sandwich-mitigation.html" style="color: #007BFF;">A Simple Method for Sandwich Mitigation ( Known as Anti-Mev )</a></li>
+		
+		</ul> 	
+					</div>
+                </div>
+            </section>
+
+    <section id="feature5" class="section">
+                <h2>Anti-MEV Support</h2>
+                <div class="feature-grid">
+<div style="padding: 5px; ">
+    <h3 style="color: #333;">
+	0slot has achieved the industry's best level in mitigating sandwich attacks. For detailed information, please refer to the following document, which will guide you on how to minimize the risk of being targeted by sandwich attacks.</h3>
+    <ul class="account-list">
+		<li><a href="cookbook/anti-mev-on-0slot.html" style="color: #007BFF;">Anti-MEV on 0slot</a></li>			
+    </ul> 	
+</div>
+                </div>
+            </section>
+
+
+            <section id="feature6" class="section">
+                <h2>Contact</h2>
+                <div class="feature-grid">
+<div style="background-color: #f9f9f9; padding: 5px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <h3 style="color: #333;">If you want to <span style="color: red;font-weight: bold;">create a free account, contact sales</span>, or <span style="color: red;font-weight: bold;">have any inquiries</span>, please contact us via Discord or X:</h3>
+    <!--p style="color: #666; margin: 5px 0;">Email: <a href="mailto:contact@nextblock.io" style="color: #007BFF;">contact@nextblock.io</a></p>
+    <p style="color: #666; margin: 5px 0;">Telegram: <a href="https://t.me/nextblocksol" target="_blank" style="color: #007BFF;">t.me/nextblocksol</a></p-->
+    <p style="color: #666; margin: 5px 0;">Discord: <a href="https://discord.gg/6MNPeRbG" style="color: #007BFF;">https://discord.gg/6MNPeRbG</a></p>
+    <p style="color: #666; margin: 5px 0;">X: <a href="https://x.com/0slot_trade" style="color: #007BFF;">https://x.com/0slot_trade</a></p>
+    <p style="color: #666; margin: 5px 0;">TG: <a href="https://t.me/kurt0slot" style="color: #007BFF;">https://t.me/kurt0slot</a></p>    
+</div>
+                </div>
+            </section>
+			
+            <h3>More tip accounts:</h3>    
+			 <div style="overflow-x: auto;">
+            <ul class="account-list">
+                <li>DiTmWENJsHQdawVUUKnUXkconcpW4Jv52TnMWhkncF6t (0slot_dot_trade_tip1.sol)</li>
+                <li>HRyRhQ86t3H4aAtgvHVpUJmw64BDrb61gRiKcdKUXs5c (0slot_dot_trade_tip2.sol)</li>
+                <li>7y4whZmw388w1ggjToDLSBLv47drw5SUXcLk6jtmwixd (0slot_dot_trade_tip6.sol)</li>
+                <li>J9BMEWFbCBEjtQ1fG5Lo9kouX1HfrKQxeUxetwXrifBw (0slot_dot_trade_tip7.sol)</li>
+                <li>8U1JPQh3mVQ4F5jwRdFTBzvNRQaYFQppHQYoH38DJGSQ (0slot_dot_trade_tip8.sol)</li>
+                <li>Eb2KpSC8uMt9GmzyAEm5Eb1AAAgTjRaXWFjKyFXHZxF3 (0slot_dot_trade_tip3.sol)</li>
+                <li>FCjUJZ1qozm1e8romw216qyfQMaaWKxWsuySnumVCCNe (0slot_dot_trade_tip5.sol)</li>
+                <li>ENxTEjSQ1YabmUpXAdCgevnHQ9MHdLv8tzFiuiYJqa13 (0slot_dot_trade_tip9.sol)</li>
+                <li>6rYLG55Q9RpsPGvqdPNJs4z5WTxJVatMB8zV3WJhs5EK (0slot_dot_trade_tip10.sol)</li>
+                <li>Cix2bHfqPcKcM233mzxbLk14kSggUUiz2A87fJtGivXr (0slot_dot_trade_tip12.sol)</li>
+             </ul>   
+               </div>       
+        </main>
+    </div>
+
+    <script>
+        // 增强版交互功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 平滑滚动
+            document.querySelectorAll('.sidebar a').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    
+                    document.querySelectorAll('.sidebar a').forEach(link => {
+                        link.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                });
+            });
+
+            // 自动激活当前可见区域
+            
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        document.querySelectorAll('.sidebar a').forEach(link => {
+                            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+                        });
+                    }
+                });
+            }, { threshold: 0.5 });
+            
+
+            document.querySelectorAll('.section').forEach(section => {
+                observer.observe(section);
+            });
+
+            // 图片懒加载
+            const lazyImages = document.querySelectorAll('img[data-src]');
+            const imgObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.getAttribute('data-src');
+                        imgObserver.unobserve(img);
+                    }
+                });
+            });
+
+            lazyImages.forEach(img => {
+                imgObserver.observe(img);
+            });
+        });
+
+        // Mobile menu toggle
+    const mobileToggle = document.querySelector('.mobile-toggle');
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const mobileClose = document.querySelector('.mobile-menu-close');
+    const mobileLinks = document.querySelectorAll('.mobile-menu-links a');
+    
+    mobileToggle.addEventListener('click', () => {
+      mobileMenu.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+    
+    mobileClose.addEventListener('click', () => {
+      mobileMenu.classList.remove('open');
+      document.body.style.overflow = '';
+    });
+    
+    mobileLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        document.body.style.overflow = '';
+      });
+    });
+    </script>
+</body>
+</html>
