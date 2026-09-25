@@ -94,7 +94,7 @@ def имя(адрес: str | None, известные: dict) -> str:
 def разобрать(rpc_call, *, минт: str, пул: str, подпись_источника: str,
                слот_источника: int, известные: dict | None = None,
                окно_слотов: int = 120, max_tx: int = 60,
-               page_limit: int = 200, max_pages: int = 12) -> dict:
+               page_limit: int = 1000, max_pages: int = 40) -> dict:
     """Таблица событий пула после покупки источника.
 
     Без rpc_call -- честный отказ: пустая таблица неотличима от "ничего не
@@ -146,6 +146,15 @@ def разобрать(rpc_call, *, минт: str, пул: str, подпись_�
     в_окне = [с for с in кандидаты
               if isinstance(с.get("slot"), int)
               and с["slot"] <= слот_источника + окно_слотов]
+    # ПУЛ МОЖЕТ БЫТЬ ОГНЕМЁТОМ. У 571aBZbC в окне сотни транзакций, и читать
+    # их все -- сотни кредитов. Берём КРАЯ окна: начало (сразу после нашей
+    # покупки, там и происходит обвал) и конец (перед продажей). Пропущенная
+    # середина названа числом, а не спрятана.
+    пропущено = 0
+    if len(в_окне) > max_tx:
+        половина = max(1, max_tx // 2)
+        пропущено = len(в_окне) - 2 * половина
+        в_окне = в_окне[:половина] + в_окне[-половина:]
     строки = []
     вызовов = 0
     оборван = None
@@ -193,7 +202,9 @@ def разобрать(rpc_call, *, минт: str, пул: str, подпись_�
             "n_signatures_total": len(кандидаты), "n_pages": страниц,
             "oldest_slot_seen": (кандидаты[0].get("slot") if кандидаты else None),
             "newest_slot_seen": (кандидаты[-1].get("slot") if кандидаты else None),
-            "n_signatures_window": len(в_окне), "n_getTransaction": вызовов,
+            "n_signatures_window": len(в_окне) + пропущено,
+            "n_skipped_middle": пропущено,
+            "n_getTransaction": вызовов,
             "partial": оборван is not None, "stopped_reason": оборван,
             "rows": строки}
     из_["summary"] = сводка(строки, известные)
@@ -335,6 +346,23 @@ def self_test() -> int:
                         слот_источника=10, окно_слотов=5, max_tx=1)
     chk("предел --max-tx помечает отчёт частичным",
         предел["partial"] is True and len(предел["rows"]) == 1, предел)
+    # КРАЯ ОКНА: при переполнении берём начало и конец, а пропущенное называем
+    # числом. Иначе в busy-пуле таблица молча покажет только начало.
+    много = [{"signature": f"S{i:02d}" + "x" * 80, "slot": 11 + i, "err": None}
+             for i in range(10)]
+
+    def rpc_много(method, params):
+        if method == "getSignaturesForAddress":
+            return много if not params[1].get("before") else []
+        return продажа
+
+    края = разобрать(rpc_много, минт=МИНТ, пул=ПУЛ, подпись_источника="SRC",
+                      слот_источника=10, окно_слотов=100, max_tx=4)
+    chk("края окна: взяты первые и последние, середина названа числом",
+        len(края["rows"]) == 4 and края["n_skipped_middle"] == 6
+        and края["rows"][0]["slot"] == 11 and края["rows"][-1]["slot"] == 20,
+        {"rows": [с["slot"] for с in края["rows"]],
+         "skipped": края["n_skipped_middle"]})
 
     print(f"самопроверка разбора сделки: {всего[1]}/{всего[0]} пройдено")
     return 0 if всего[0] == всего[1] else 1
@@ -351,6 +379,7 @@ def main() -> int:
     p.add_argument("--source-wallet", default="")
     p.add_argument("--window-slots", type=int, default=120)
     p.add_argument("--max-tx", type=int, default=60)
+    p.add_argument("--max-pages", type=int, default=40)
     p.add_argument("--credit-limit", type=int, default=300)
     p.add_argument("--out")
     p.add_argument("--out-md")
@@ -373,7 +402,7 @@ def main() -> int:
                      подпись_источника=a.source_signature,
                      слот_источника=a.source_slot,
                      известные=известные, окно_слотов=a.window_slots,
-                     max_tx=a.max_tx)
+                     max_tx=a.max_tx, max_pages=a.max_pages)
     из_["chain_credits_used"] = getattr(rpc, "used", None)
     текст = в_таблицу(из_)
     print(json.dumps(из_["summary"] if из_.get("ok") else из_, ensure_ascii=False, indent=1))
