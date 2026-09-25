@@ -672,25 +672,40 @@ def провести(*, tx_источника: dict, источник: str, ми
         из_["why_not"] = сб.get("why_not")
         return из_
 
-    # СИМУЛЯЦИЯ. В нежилом режиме это и есть конец пути: владелец смотрит
-    # три боевых сигнала подряд со сборкой и симуляцией прежде, чем полоса
-    # начнёт отправлять. Симуляция идёт по НЕПОДПИСАННОЙ транзакции:
-    # sigVerify=false, blockhash подставляет узел.
+    # СИМУЛЯЦИЯ -- ПЕРЕД КАЖДОЙ ОТПРАВКОЙ, а не только в нежилом режиме.
+    # Слово владельца 25.09: "сборка -> симуляция -> отправка, только если
+    # симуляция прошла; иначе SKIP_SIM_FAIL с причиной". Цена этого решения
+    # честная: один круг до узла (около 50-150 мс) прибавляется к НАШЕЙ
+    # стороне, и в паре с Bloom мы этим временем платим за то, чтобы не
+    # отправлять покупку, которая упадёт. Симуляция идёт по НЕПОДПИСАННОЙ
+    # транзакции: sigVerify=false, blockhash подставляет узел.
+    из_["stage"] = "sim"
+    if rpc_call is None:
+        # БЕЗ СИМУЛЯЦИИ НЕ ОТПРАВЛЯЕМ. Это не осторожность, а правило
+        # владельца: отправка без симуляции запрещена в обоих режимах.
+        из_["why_not"] = "симулировать нечем (узел не передан) -- отправка отменена"
+        из_["code"] = "SKIP_SIM_FAIL"
+        return из_
+    t_сим = time.perf_counter()
+    try:
+        _, _, SB, _ = _модули()
+        знач = (rpc_call("simulateTransaction",
+                        [сб["tx_base64"], SB.SIM_OPTS]) or {}).get("value") or {}
+        из_.update(SB.classify_sim(знач))
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"симуляция: {type(exc).__name__}: {str(exc)[:160]}"
+        из_["code"] = "SKIP_SIM_FAIL"
+        из_["sim_ms"] = round((time.perf_counter() - t_сим) * 1000, 2)
+        return из_
+    из_["sim_ms"] = round((time.perf_counter() - t_сим) * 1000, 2)
+    прошла = из_.get("sim_verdict") == "would_pass"
+    if not прошла:
+        из_["why_not"] = f"симуляция не прошла: {из_.get('sim_verdict')}"
+        из_["code"] = "SKIP_SIM_FAIL"
+        return из_
     if not живьём():
-        из_.update(stage="dry", dry=True)
-        if rpc_call is None:
-            из_["why_not"] = "живая отправка выключена; симулировать нечем (нет узла)"
-            return из_
-        try:
-            _, _, SB, _ = _модули()
-            знач = (rpc_call("simulateTransaction",
-                            [сб["tx_base64"], SB.SIM_OPTS]) or {}).get("value") or {}
-            из_.update(SB.classify_sim(знач))
-            из_["ok"] = из_.get("sim_verdict") == "would_pass"
-            из_["why_not"] = (None if из_["ok"]
-                              else f"симуляция: {из_.get('sim_verdict')}")
-        except Exception as exc:  # noqa: BLE001
-            из_["why_not"] = f"симуляция: {type(exc).__name__}: {str(exc)[:160]}"
+        # Нежилой режим: дальше подписи нет и денег нет.
+        из_.update(stage="dry", dry=True, ok=True)
         return из_
 
     # ПОДПИСЬ. Тёплый blockhash обязан быть свежим: просроченным подписывать
@@ -1076,6 +1091,87 @@ def self_test() -> int:
         os.environ.pop("BLOOM_OWN_SEND", None)
     else:
         os.environ["BLOOM_OWN_SEND"] = было_вкл
+
+    # --- ПОЛУЧАТЕЛИ ДЕНЕГ. Слово владельца: пул, наши счета и чаевые ТОЛЬКО
+    # на счета Sender из data/docs/. Проверяем оба конца: что список адресов
+    # совпадает со снятой страницей документации (а не выдуман), и что сборка
+    # передаёт в покупку именно наш кошелёк и адрес из этого списка.
+    страница = Path(__file__).resolve().parent.parent / "data" / "docs" / "helius_sender_max.md"
+    if страница.exists():
+        текст_стр = страница.read_text(encoding="utf-8", errors="replace")
+        нет_в_странице = [а for а in TIP_ACCOUNTS if а not in текст_стр]
+        chk("все десять tip-адресов есть в снятой странице Sender Max",
+            not нет_в_странице, нет_в_странице)
+    else:
+        chk("страница Sender Max на месте (без неё адреса нечем сверить)",
+            False, str(страница))
+    семена = [f"ПОДПИСЬ_{и}" for и in range(300)]
+    chk("чаевые уходят ТОЛЬКО на адреса из этого списка",
+        all(выбрать_чаевые(с) in TIP_ACCOUNTS for с in семена), "")
+
+    class МодулиСЗахватом:
+        собрано: dict = {}
+
+        class B:
+            PUMP_AMM = "PUMP"
+            CPMM = "CPMM"
+
+            @staticmethod
+            def extract_template(*a, **kw):
+                return {"ok": True, "program": "PUMP"}
+
+            @staticmethod
+            def mints_and_vaults(*a, **kw):
+                return {"quote_mint": "So11111111111111111111111111111111111111112"}
+
+            @staticmethod
+            def min_out_from_reserves(*a, **kw):
+                return {"ok": True, "min_out": 777_000, "expected_out": 1_000_000}
+
+            @staticmethod
+            def build_buy(tpl, tx, **kw):
+                МодулиСЗахватом.собрано = dict(kw)
+                return {"tx_base64": "СОБРАНО", "size": 700,
+                        "quote_mint": "So11111111111111111111111111111111111111112"}
+
+        class C:
+            WSOL = "So11111111111111111111111111111111111111112"
+
+            @staticmethod
+            def identify_pool(*a, **kw):
+                return {"ok": True, "pool_vault": "ХРАНИЛИЩЕ_ПУЛА",
+                        "quote_mint": "So11111111111111111111111111111111111111112"}
+
+        class PP:
+            @staticmethod
+            def pool_program(*a, **kw):
+                return {"pool_program": "PUMP"}
+
+        class SB:
+            @staticmethod
+            def _labels():
+                return {}
+
+    было_модули2 = globals()["_модули"]
+    globals()["_модули"] = lambda: (МодулиСЗахватом.C, МодулиСЗахватом.PP,
+                                     МодулиСЗахватом.SB, МодулиСЗахватом.B)
+    try:
+        сб_п = собрать(tx_источника={"meta": {}}, источник="SRC", минт="МИНТ",
+                        наш_кошелёк=ST.EXECUTOR_WALLET, лампорты=10_000_000,
+                        семя="ПОДПИСЬ_ПОЛУЧАТЕЛЕЙ")
+        зхв = МодулиСЗахватом.собрано
+        chk("покупка собирается НА НАШ кошелёк и платит с него же",
+            сб_п["ok"] and зхв.get("user") == ST.EXECUTOR_WALLET
+            and зхв.get("payer") == ST.EXECUTOR_WALLET, зхв)
+        chk("сумма и минимум уходят в сборку ровно те, что посчитаны",
+            зхв.get("amount_in") == 10_000_000 and зхв.get("min_out") == 777_000
+            and сб_п["min_out"] == 777_000, (зхв.get("amount_in"), зхв.get("min_out")))
+        chk("чаевые -- на адрес Sender из списка и на документированную сумму",
+            isinstance(зхв.get("tip"), tuple) and зхв["tip"][0] in TIP_ACCOUNTS
+            and зхв["tip"][1] >= int(TIP_MIN_SOL * ЛАМПОРТОВ_В_SOL)
+            and сб_п["tip_account"] == зхв["tip"][0], зхв.get("tip"))
+    finally:
+        globals()["_модули"] = было_модули2
 
     # --- СКОЛЬКО КУПИЛА ПОЛОСА. Ровно это количество сторож потом продаёт:
     # ошибка здесь -- это проданное не своё или недопроданное своё.
@@ -1496,6 +1592,73 @@ def self_test() -> int:
                 and поз_нео.get("lane_send_ambiguous") is True
                 and поз_нео.get("lane_signature_local") == "НАША_ПОДПИСЬ",
                 (п_нео, поз_нео))
+            # 11. СИМУЛЯЦИЯ -- ГЕЙТ ПЕРЕД ОТПРАВКОЙ (слово владельца 25.09).
+            # Упала симуляция -- денег нет: ни подписи, ни отправки, ни брони.
+            забыть_отправленные()
+            шаги.clear()
+            ушло3.clear()
+            сим = сост3("simfail")
+
+            def узел_падение(метод, параметры):
+                шаги.append(метод)
+                return {"value": {"err": {"InstructionError": [3, {"Custom": 6001}]},
+                                  "logs": ["Program log: slippage exceeded"],
+                                  "unitsConsumed": 40_000}}
+
+            п_сим = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                             минт=МИНТ_П, состояние=сим, отправитель=сендер3,
+                             rpc_call=узел_падение, ключ_операции="П11",
+                             blockhash="ХЕШ", blockhash_ts=time.time())
+            chk("симуляция не прошла: SKIP_SIM_FAIL, ни подписи, ни отправки, ни брони",
+                п_сим["ok"] is False and п_сим["stage"] == "sim"
+                and п_сим.get("code") == "SKIP_SIM_FAIL"
+                and "подписать" not in шаги and not ушло3
+                and сим.lane_positions() == [], (п_сим, шаги))
+
+            # 12. НЕТ УЗЛА -- НЕТ СИМУЛЯЦИИ -- НЕТ ОТПРАВКИ.
+            забыть_отправленные()
+            шаги.clear()
+            без_узла = сост3("nonode")
+            п_бу = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                            минт=МИНТ_П, состояние=без_узла, отправитель=сендер3,
+                            rpc_call=None, ключ_операции="П12",
+                            blockhash="ХЕШ", blockhash_ts=time.time())
+            chk("без узла симуляции нет, значит и отправки нет",
+                п_бу["ok"] is False and п_бу.get("code") == "SKIP_SIM_FAIL"
+                and "подписать" not in шаги and not ушло3, п_бу)
+
+            # 13. УПАЛ САМ ВЫЗОВ СИМУЛЯЦИИ -- тоже SKIP_SIM_FAIL, а не отправка.
+            забыть_отправленные()
+            шаги.clear()
+            сбой = сост3("simcrash")
+
+            def узел_рвётся(метод, параметры):
+                шаги.append(метод)
+                raise TimeoutError("узел молчит")
+
+            п_сб = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                            минт=МИНТ_П, состояние=сбой, отправитель=сендер3,
+                            rpc_call=узел_рвётся, ключ_операции="П13",
+                            blockhash="ХЕШ", blockhash_ts=time.time())
+            chk("обрыв узла на симуляции -- отказ, а не отправка вслепую",
+                п_сб["ok"] is False and п_сб.get("code") == "SKIP_SIM_FAIL"
+                and "TimeoutError" in (п_сб["why_not"] or "")
+                and not ушло3, п_сб)
+
+            # 14. СИМУЛЯЦИЯ ИДЁТ ДО ПОДПИСИ, а не после: ключ не трогаем,
+            # пока не знаем, что покупка вообще проходит.
+            забыть_отправленные()
+            шаги.clear()
+            ушло3.clear()
+            порядок = сост3("order")
+            п_пор = провести(tx_источника={"meta": {}}, источник="ИСТОЧНИК",
+                             минт=МИНТ_П, состояние=порядок, отправитель=сендер3,
+                             rpc_call=узел_ок, ключ_операции="П14",
+                             blockhash="ХЕШ", blockhash_ts=time.time())
+            chk("порядок шагов: сборка, симуляция, подпись, отправка",
+                п_пор["ok"] and шаги == ["собрать", "simulateTransaction", "подписать"]
+                and len(ушло3) == 1 and п_пор.get("sim_ms") is not None,
+                (шаги, п_пор.get("sim_ms")))
     finally:
         globals()["собрать"] = было_собрать
         globals()["подписать"] = было_подписать
