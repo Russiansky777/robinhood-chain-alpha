@@ -145,7 +145,14 @@ jobs:
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- шаг пропущен"; exit 0; }
           # Отправить этот шаг не может: BLOOM_OWN_SEND_LIVE выставляется в ноль
           # внутри самого сухого прогона, и это проверено самопроверкой модуля.
-          "$PY" analysis/bloom_own_send.py             --dry-run-signature "${{ inputs.dry_lane_signature }}"             --source "${{ inputs.dry_lane_source }}"             --state-dir /tmp/night_state 2>&1 | tail -40
+          # ПРОГОН ИДЁТ НА ХОСТЕ, А НЕ НА БЕГУНКЕ. Смысл сухого прогона -- узнать,
+          # соберётся ли покупка ТАМ, где живёт служба: у бегунка системный
+          # python3 без solders, и первый прогон 25.09 честно сказал "модули
+          # сборки не загружены" именно про это, а не про данные.
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -a; . /etc/bloom-executor/env; set +a
+            BLOOM_OWN_SEND_LIVE=0 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/bloom_executor/bloom_own_send.py --dry-run-signature '${{ inputs.dry_lane_signature }}' --source '${{ inputs.dry_lane_source }}' --state-dir /home/bot/bloom_executor_live_data
+          " 2>&1 | tail -40
 
       # ПРОГОНЫ ПО ЦЕПИ. Каждый со своим пределом кредитов и с continue-on-error:
       # исследование не имеет права уронить сборку доклада, а доклад обязан
