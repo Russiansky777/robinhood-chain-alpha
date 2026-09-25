@@ -296,7 +296,7 @@ def self_test() -> int:
         and р["jito"]["url"].endswith("/api/v1/transactions"), р["jito"]["url"])
     chk("Jito не требует ключа, а 0slot и BlockRazor требуют",
         р["jito"]["key_env"] is None and р["zeroslot"]["key_env"] == "ZEROSLOT_API_KEY"
-        and р["blockrazor"]["key_env"] == "BLOCKRAZOR_API_KEY", "")
+        and р["blockrazor"]["key_env"] == "BLOCKRAZOR_AUTH_TOKEN", "")
     chk("восемь счетов чаевых Jito -- ровно те, что в его документации",
         len(р["jito"]["tip_accounts"]) == 8
         and "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5" in р["jito"]["tip_accounts"],
@@ -307,7 +307,7 @@ def self_test() -> int:
         минимум_чаевых("astralane") == 1_000_000, минимум_чаевых("astralane"))
 
     было = {}
-    for имя_п in ("ZEROSLOT_API_KEY", "BLOCKRAZOR_API_KEY", "NOZOMI_API_KEY",
+    for имя_п in ("ZEROSLOT_API_KEY", "BLOCKRAZOR_AUTH_TOKEN", "NOZOMI_API_KEY",
                    "ASTRALANE_API_KEY"):
         было[имя_п] = os.environ.pop(имя_п, None)
     try:
@@ -338,7 +338,7 @@ def self_test() -> int:
         chk("Jito: подпись из ответа и адрес без ключа в отчёте",
             р1["signature"] == "ПОДПИСЬ_СЕТИ" and "?" not in р1["url"], р1)
 
-        os.environ["BLOCKRAZOR_API_KEY"] = "СЕКРЕТ_BR"
+        os.environ["BLOCKRAZOR_AUTH_TOKEN"] = "СЕКРЕТ_BR"
         зовы.clear()
 
         def сендер_br(адрес, данные, заг, таймаут):
@@ -391,7 +391,7 @@ def self_test() -> int:
             отправить_через("zeroslot", "HHHH", отправитель=сендер)["ok"] is False, "")
 
         # --- ВСЕМИ СРАЗУ. Один байт, одна подпись, параллельно.
-        os.environ["BLOCKRAZOR_API_KEY"] = "СЕКРЕТ_BR"
+        os.environ["BLOCKRAZOR_AUTH_TOKEN"] = "СЕКРЕТ_BR"
         порядок: list = []
 
         def сендер_медленный(адрес, данные, заг, таймаут):
@@ -425,7 +425,7 @@ def self_test() -> int:
                 os.environ.pop(имя_п, None)
             else:
                 os.environ[имя_п] = знач
-        os.environ.pop("BLOCKRAZOR_API_KEY", None)
+        os.environ.pop("BLOCKRAZOR_AUTH_TOKEN", None)
 
     # --- СЧЁТ ЧАЕВЫХ: только из реестра, и разный от сделки к сделке.
     chk("счёт чаевых берётся из реестра этого отправителя",

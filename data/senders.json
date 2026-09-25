@@ -50,6 +50,7 @@
       "url_note": "Франкфурт de.0slot.trade и Амстердам ams.0slot.trade -- из таблицы регионов документации",
       "format": "jsonrpc_sendTransaction",
       "key_env": "ZEROSLOT_API_KEY",
+      "key_env_note": "секрета ещё нет (владелец 25.09: запрос в Discord). Проба без ключа 25.09 получила от сервера 403 'api-key does not exist' -- точка входа жива, ждём ключ",
       "key_in": "query:api-key",
       "min_tip_lamports": 100000,
       "tip_accounts": [
@@ -67,7 +68,7 @@
       "format": "blockrazor_sendTransaction",
       "key_env": "BLOCKRAZOR_AUTH_TOKEN",
       "key_in": "header:apikey",
-      "key_in_note": "заголовок apikey -- из примера gRPC в документации (meta.add('apikey', authKey)); для HTTP схема подтверждается пробой analysis/sender_key_probe.py, её ответ -- в docs/sender_key_probe.md",
+      "key_in_note": "ПОДТВЕРЖДЕНО 25.09 двумя источниками: в документации curl-пример прямо пишет --header 'apikey: $auth_token' (data/docs/senders/blockrazor_curl_example.md), и живая проба с секретом BLOCKRAZOR_AUTH_TOKEN прошла именно этим заголовком: сервер ответил про тело пробы ('illegal transaction'), а на всех остальных схемах и без ключа -- 403 'Authentication information is missing. Please provide a valid auth token'. Платный план не требуется: в документации сказано, что отправка транзакций не привязана к подписке, предел 3 запроса в секунду",
       "min_tip_lamports": 100000,
       "tip_accounts": [
         "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
@@ -101,6 +102,7 @@
       "format": "jsonrpc_sendTransaction",
       "key_env": "ASTRALANE_API_KEY",
       "key_in": "query:api-key",
+      "key_in_note": "ПОДТВЕРЖДЕНО живой пробой 25.09: ключ ASTRALANE_API_KEY принят тремя схемами -- заголовок apikey, заголовок x-api-key и строка запроса api-key (сервер жалуется на тело пробы: 'failed to decode transaction only base64 is supported'); Authorization и запрос без ключа -- 401. Оставляем строку запроса: так написано в примере документации",
       "min_tip_lamports": null,
       "min_tip_note": "в скачанных страницах минимум числом не нашёлся: сказано только 'каждая транзакция должна содержать tip'. Пока минимум не подтверждён документацией, платим как Helius (0.001 SOL)",
       "tip_accounts": ["astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm"],

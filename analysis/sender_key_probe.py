@@ -74,16 +74,16 @@ except ImportError:  # модуль зовут и из корня репозит
 СЛОВА_ПЛАНА = ("subscription", "upgrade your", "paid plan", "purchase",
                 "billing", "payment required", "buy a plan", "plan required",
                 "insufficient balance", "no active plan", "trial expired")
-# Слова про ТЕЛО намеренно узкие. Одного слова "transaction" мало: сервер
-# охотно повторяет в ошибке и свой путь (/sendTransaction), и имя метода, и
-# тогда отказ по ключу выглядел бы как жалоба на тело (поймано самопроверкой).
-СЛОВА_ТРАНЗАКЦИИ = ("base64", "base58", "decode", "deserial", "encoding",
-                     "signature verification", "sanitize", "invalid param",
-                     "invalid request", "parse error", "failed to parse",
-                     "malformed", "invalid transaction", "bad transaction",
-                     "transaction is ", "transaction format",
-                     "transaction too", "empty transaction",
-                     "unsupported transaction")
+# Слова про ТЕЛО. Сюда входит и просто "transaction": BlockRazor на принятый
+# ключ отвечает "rpc error: code = Unknown desc = illegal transaction", то есть
+# ровно жалобой на тело, и узкий список это пропускал (поймано живой пробой
+# 25.09). Опасность обратная -- сервер повторяет в отказе свой путь
+# /sendTransaction; она снята порядком в вердикт_ответа: слова про КЛЮЧ
+# сильнее слов про тело.
+СЛОВА_ТРАНЗАКЦИИ = ("transaction", "base64", "base58", "decode", "deserial",
+                     "encoding", "signature verification", "sanitize",
+                     "invalid param", "invalid request", "parse error",
+                     "failed to parse", "malformed")
 
 ВЕРДИКТ_ПРИНЯТ = "ключ принят: сервер жалуется на тело пробы, не на ключ"
 ВЕРДИКТ_НЕ_ПРИНЯТ = "ключ НЕ принят: сервер жалуется на ключ"
@@ -165,7 +165,11 @@ def вердикт_ответа(код, текст: str) -> str:
         return ВЕРДИКТ_ПЛАН
     про_ключ = any(с in низ for с in СЛОВА_КЛЮЧА)
     про_тело = any(с in низ for с in СЛОВА_ТРАНЗАКЦИИ)
-    if про_ключ and not про_тело:
+    # ПОРЯДОК: слова про ключ сильнее. Сервер часто повторяет в отказе свой
+    # путь (/sendTransaction) или имя метода, и без этого порядка отказ по
+    # ключу читался бы как жалоба на тело. Наоборот не бывает: жалуясь на
+    # тело, сервер не пишет "authentication missing".
+    if про_ключ:
         return ВЕРДИКТ_НЕ_ПРИНЯТ
     if про_тело:
         return ВЕРДИКТ_ПРИНЯТ
@@ -365,6 +369,25 @@ def self_test() -> int:
             вердикт_ответа(500, "internal") == ВЕРДИКТ_НЕПОНЯТНО)
         chk("200 на битое тело -- всё равно не отказ по ключу",
             вердикт_ответа(200, "{}") == ВЕРДИКТ_ПРИНЯТ)
+        # ЖИВЫЕ ОТВЕТЫ 25.09 -- эталон, а не выдумка: строки из
+        # docs/sender_key_probe.md, прогон run_sender_key_probe_nl.
+        chk("BlockRazor: illegal transaction -- ключ ПРИНЯТ",
+            вердикт_ответа(500, '{"signature":"","error":"rpc error: code = '
+                            'Unknown desc = illegal transaction"}')
+            == ВЕРДИКТ_ПРИНЯТ)
+        chk("BlockRazor: auth token missing -- ключ НЕ принят",
+            вердикт_ответа(403, '{"signature":"","error":"error: '
+                            'Authentication information is missing. Please '
+                            'provide a valid auth token"}')
+            == ВЕРДИКТ_НЕ_ПРИНЯТ)
+        chk("Astralane: failed to decode transaction -- ключ ПРИНЯТ",
+            вердикт_ответа(200, '{"error":{"code":-32600,"message":"Invalid '
+                            'Request: invalid transaction \\"failed to decode '
+                            'transaction only base64 is supported\\""}}')
+            == ВЕРДИКТ_ПРИНЯТ)
+        chk("0slot без ключа: api-key does not exist -- ключ НЕ принят",
+            вердикт_ответа(403, '{"error":{"code":403,"message":"api-key does '
+                            'not exist"}}') == ВЕРДИКТ_НЕ_ПРИНЯТ)
 
         # 6. Сеть упала -- это не "ключ не принят".
         def падает(а, д, з, т):
