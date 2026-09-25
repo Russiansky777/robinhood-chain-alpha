@@ -365,9 +365,13 @@ def собрать(*, state_dir: Path, data_dir: Path, since_utc: str) -> dict:
         "skips": боевое_пропуски(решения),
         "decisions": решения_по_кодам(решения),
         "closed_breakdown": разложение_закрытых(позиции, с_utc=since_utc),
+        # leg_cache -- состояние и ЦЕНА двухшагового замера. Решение владельца
+        # про двухшаговый маршрут полосы опирается именно на этот замер,
+        # поэтому его числа обязаны быть в докладе, а не только на хосте.
         "heartbeat": {k: признак.get(k) for k in
                        ("updated_utc", "own_send", "shadow", "route_tax_filter",
-                        "credits_day", "telegram", "subscribe_main_path")},
+                        "leg_cache", "credits_day", "telegram",
+                        "subscribe_main_path")},
         "seller": {k: сторож.get(k) for k in
                     ("updated_utc", "mode", "jupiter", "positions_in_cycle")},
         "research": {
@@ -394,6 +398,7 @@ def в_текст(о: dict) -> str:
     реш = о.get("decisions") or {}
     # РУБИЛЬНИК ПОЛОСЫ -- в текст, а не только в JSON. Остановленная полоса
     # без этой строки читается как "полоса просто молчит", а это разные вещи.
+    ноги = (о.get("heartbeat") or {}).get("leg_cache") or {}
     рубильник = ((о.get("heartbeat") or {}).get("own_send") or {}).get("lane_kill")
     полоса_стоит = bool(рубильник and рубильник[0])
     причина_стопа = (рубильник[1] if (рубильник and len(рубильник) > 1) else "") or ""
@@ -442,6 +447,16 @@ def в_текст(о: dict) -> str:
         f"{json.dumps(т.get('by_verdict') or {}, ensure_ascii=False)}. "
         f"Медиана сборки {ч(т.get('build_ms_median'), ' мс')}, "
         f"симуляции {ч(т.get('sim_ms_median'), ' мс')}.",
+        # КЭШ НОГ -- условие двухшагового замера И его цена. Без этой строки
+        # "тень не собрала" и "замер выключен по бюджету" читаются одинаково.
+        ("Кэш ног двухшаговой тени: "
+          + ("включён" if ноги.get("enabled") else "выключен")
+          + f", котировочных пулов {ч(ноги.get('pools'))}, "
+          + f"шаблонов {len(ноги.get('templates') or {})}, "
+          + f"скормлено {ч(ноги.get('fed'))}, кредитов {ч(ноги.get('credits'))} "
+          + f"из {ч(ноги.get('credit_budget'))}"
+          + (f"; выключен: {ноги.get('off_reason')}" if ноги.get("off_reason") else "")
+          + "."),
         "",
         f"**Узкий фильтр по налогу маршрута.** Пропусков {ч(пр.get('count'))}, "
         f"тень измерила {ч(пр.get('shadow_measured'))}: цена через 28.8 с была "
@@ -565,7 +580,10 @@ def self_test() -> int:
         (сост / "bloom_detector_heartbeat.json").write_text(
             json.dumps({"updated_utc": "2026-09-25T02:00:00Z",
                         "own_send": {"live": True,
-                                      "lane_kill": [True, "полоса остановлена: расхождение учёта"]}},
+                                      "lane_kill": [True, "полоса остановлена: расхождение учёта"]},
+                        "leg_cache": {"enabled": True, "pools": 4, "fed": 1000,
+                                       "templates": {"Q1": {}}, "credits": 9964,
+                                       "credit_budget": 30000}},
                        ensure_ascii=False),
             encoding="utf-8")
         о = собрать(state_dir=сост, data_dir=дата, since_utc="2026-09-24T00:00:00Z")
@@ -616,6 +634,9 @@ def self_test() -> int:
             all((о["research"][к] or {}).get("missing")
                 for к in ("p1", "p2", "edge", "toxic", "leader")), о["research"])
         текст = в_текст(о)
+        chk("кэш ног и его цена названы в тексте",
+            "Кэш ног двухшаговой тени: включён" in текст
+            and "кредитов 9964 из 30000" in текст, текст[:900])
         chk("остановленная полоса названа в ТЕКСТЕ доклада, а не только в JSON",
             "ПОЛОСА ОСТАНОВЛЕНА РУБИЛЬНИКОМ" in текст
             and "расхождение учёта" in текст, текст[:400])
