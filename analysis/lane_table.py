@@ -189,11 +189,158 @@ def проверить_по_цепи(ряды: list, позиции: dict, rpc_c
     return ряды
 
 
+# НАШИ АДРЕСА. Покупки с них -- не "чужие": ни наш кошелёк полосы, ни кошелёк
+# исполнителя, ни кошельки задач DBot в счёт чужих покупок идти не должны,
+# иначе "S+0 был возможен" подтверждался бы нашей же сделкой.
+НАШИ_АДРЕСА = (
+    "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w",   # кошелёк полосы
+    "4s87ZkKLXRGRFPWLHmCMXKqmKrUJCLXbfKMDYtLcTLkC",   # кошелёк исполнителя (Bloom)
+)
+
+
+def блок(rpc_call, слот: int, кэш: dict) -> dict:
+    """Блок слота с составом транзакций. transactionDetails=accounts: приходят
+    подписи, счета и балансы токенов -- всё, что нужно для места и покупок, и
+    без тел инструкций, которые весили бы мегабайты."""
+    if слот in кэш:
+        return кэш[слот]
+    из_: dict = {"ok": False, "why_not": None, "txs": []}
+    try:
+        от = rpc_call("getBlock", [слот, {"encoding": "json",
+                                           "transactionDetails": "accounts",
+                                           "rewards": False,
+                                           "maxSupportedTransactionVersion": 0}])
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"узел не ответил: {type(exc).__name__}"
+        кэш[слот] = из_
+        return из_
+    if not isinstance(от, dict):
+        из_["why_not"] = "блока нет в ответе узла"
+        кэш[слот] = из_
+        return из_
+    из_["ok"] = True
+    из_["txs"] = от.get("transactions") or []
+    кэш[слот] = из_
+    return из_
+
+
+def _место(блок_: dict, подпись: str) -> tuple:
+    """Место транзакции в блоке: (индекс с 0, всего). Нет подписи -- (None, всего)."""
+    всего = len(блок_.get("txs") or [])
+    if not подпись:
+        return None, всего
+    for и, т in enumerate(блок_.get("txs") or []):
+        подписи = ((т.get("transaction") or {}).get("signatures") or [])
+        if подпись in подписи:
+            return и, всего
+    return None, всего
+
+
+def _купил_минт(т: dict, минт: str, наши: tuple) -> bool:
+    """Чужая ПОКУПКА этого минта: у владельца не из наших остаток минта вырос.
+
+    Упавшие транзакции не считаются: покупки в них не было. Продажи тоже:
+    у продавца остаток падает, а не растёт.
+    """
+    мета = т.get("meta") or {}
+    if мета.get("err"):
+        return False
+    было: dict = {}
+    for б in (мета.get("preTokenBalances") or []):
+        if б.get("mint") == минт:
+            было[(б.get("owner"), б.get("accountIndex"))] = \
+                float(((б.get("uiTokenAmount") or {}).get("amount")) or 0)
+    for б in (мета.get("postTokenBalances") or []):
+        if б.get("mint") != минт:
+            continue
+        хозяин = б.get("owner")
+        if хозяин in наши:
+            continue
+        стало = float(((б.get("uiTokenAmount") or {}).get("amount")) or 0)
+        if стало > было.get((хозяин, б.get("accountIndex")), 0.0):
+            return True
+    return False
+
+
+def разобрать_блоки(ряды: list, позиции: dict, rpc_call,
+                     наши: tuple = НАШИ_АДРЕСА) -> list:
+    """Место источника в его блоке и чужие покупки того же токена в S+0.
+
+    Владелец 25.09: "место источника в его блоке (индекс / всего) и сколько
+    чужих покупок того же токена село в S+0 после источника. Столбец «S+0 был
+    возможен»: да, если после источника в его слоте сели чужие. Без этого «S+1»
+    не читается."
+
+    Читается ровно то, что в блоке: индекс источника, сколько транзакций стоит
+    после него и сколько из них -- покупки нашего минта чужими кошельками. Наше
+    место в блоке (столбец таблицы) добирается из ТОГО ЖЕ блока по нашей севшей
+    подписи, если детектор его не записал.
+    """
+    кэш: dict = {}
+    for з in ряды:
+        п = позиции.get(з["cid"]) or {}
+        минт = п.get("mint")
+        слот_и = п.get("source_slot")
+        подпись_и = п.get("source_sig")
+        з["s0"] = {"source_index": None, "source_total": None,
+                    "after_source": None, "foreign_buys_after": None,
+                    "s0_possible": None, "why_not": None}
+        if not isinstance(слот_и, int) or not подпись_и:
+            з["s0"]["why_not"] = "слота или подписи источника в позиции нет"
+        else:
+            б = блок(rpc_call, слот_и, кэш)
+            if not б.get("ok"):
+                з["s0"]["why_not"] = б.get("why_not")
+            else:
+                и, всего = _место(б, подпись_и)
+                з["s0"].update(source_index=и, source_total=всего)
+                if и is None:
+                    з["s0"]["why_not"] = "подписи источника в этом блоке нет"
+                else:
+                    хвост = (б.get("txs") or [])[и + 1:]
+                    з["s0"]["after_source"] = len(хвост)
+                    покупки = sum(1 for т in хвост
+                                   if минт and _купил_минт(т, минт, наши))
+                    з["s0"]["foreign_buys_after"] = покупки
+                    з["s0"]["s0_possible"] = bool(покупки)
+        # НАШЕ МЕСТО В БЛОКЕ -- добор по цепи (задача владельца 25.09 п. 4).
+        if з.get("block_index") is None:
+            ц = з.get("chain") or {}
+            наша_подпись = ц.get("signature") or п.get("lane_signature")
+            наш_слот = ц.get("slot") or з.get("our_slot")
+            if наша_подпись and isinstance(наш_слот, int):
+                бн = блок(rpc_call, наш_слот, кэш)
+                if бн.get("ok"):
+                    им, вс = _место(бн, наша_подпись)
+                    if им is not None:
+                        з["block_index"] = им
+                        з["block_total"] = вс
+                        з["block_index_from"] = "цепь"
+    return ряды
+
+
+def _s0_словами(з: dict) -> tuple:
+    """Две клетки таблицы: место источника и "S+0 был возможен"."""
+    с = з.get("s0") or {}
+    if с.get("source_index") is None:
+        причина = с.get("why_not") or "не смотрели"
+        return "—", str(причина)[:40]
+    место = f"{с['source_index']}/{с['source_total']}"
+    if с.get("s0_possible") is None:
+        return место, "—"
+    к = с.get("foreign_buys_after")
+    п = с.get("after_source")
+    if с["s0_possible"]:
+        return место, f"ДА ({к} чужих покупок после, всего tx после {п})"
+    return место, f"нет (0 чужих покупок, всего tx после {п})"
+
+
 def таблица(ряд: list) -> str:
-    ряды = ["| время UTC | группа | минт | размер SOL | слот источника | наш слот | "
-             "S+N | место в блоке | кто довёз | режим | от сигнала до появления, мс | "
-             "от отправки, мс | в цели | состояние | чаевые SOL | по цепи | токен на кошельке |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    ряды = ["| время UTC | группа | минт | размер SOL | слот источника | место источника | "
+             "наш слот | S+N | место в блоке | S+0 был возможен | кто довёз | режим | "
+             "от сигнала до появления, мс | от отправки, мс | в цели | состояние | "
+             "чаевые SOL | по цепи | токен на кошельке |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
 
     def ч(з):
         return "—" if з is None or з == "" else str(з)
@@ -201,11 +348,12 @@ def таблица(ряд: list) -> str:
     for з in ряд:
         место = (f"{з['block_index']}/{з['block_total']}"
                  if з.get("block_index") is not None else "—")
+        место_и, был_s0 = _s0_словами(з)
         ряды.append(
             f"| {ч(з['utc'])} | {ч(з['group'])} | {ч(з['mint'])} | {ч(з['size_sol'])} | "
-            f"{ч(з['source_slot'])} | {ч(з['our_slot'])} | "
+            f"{ч(з['source_slot'])} | {место_и} | {ч(з['our_slot'])} | "
             f"{('S+' + str(з['slots_behind'])) if з['slots_behind'] is not None else '—'} | "
-            f"{место} | {ч(з['winner'])} | {ч(з['mode'])} | {ч(з['from_signal_ms'])} | "
+            f"{место} | {был_s0} | {ч(з['winner'])} | {ч(з['mode'])} | {ч(з['from_signal_ms'])} | "
             f"{ч(з['send_to_seen_ms'])} | {в_цели(з)} | "
             f"{ч(з['state'])}{' (цепь ok)' if з.get('chain_ok') else ''} | "
             f"{ч(з['tips_sol'])} | {_цепь_словами(з)} | {_токен_словами(з)} |")
@@ -222,6 +370,8 @@ def main() -> int:
     р.add_argument("--out-json", default=None)
     р.add_argument("--wallet", default=None,
                     help="кошелёк полосы для проверки токенов (в позиции лежит адрес исполнителя)")
+    р.add_argument("--no-blocks", action="store_true",
+                    help="не читать блоки: без места источника и без S+0")
     р.add_argument("--chain", action="store_true",
                     help="проверить по цепи: села ли подпись и держим ли токен")
     р.add_argument("--raw-json", default=None,
@@ -239,6 +389,10 @@ def main() -> int:
             return от.get("result") if isinstance(от, dict) and "result" in от else от
 
         ряд = проверить_по_цепи(ряд, поз, зов, кошелёк=а.wallet)
+        if not а.no_blocks:
+            # МЕСТО ИСТОЧНИКА И ЧУЖИЕ ПОКУПКИ В S+0 (задача владельца 25.09).
+            # Блок берётся составом без тел инструкций, по одному разу на слот.
+            ряд = разобрать_блоки(ряд, поз, зов)
     т = таблица(ряд)
     print(f"позиций в журнале: {len(поз)}, покупок полосы в окне: {len(ряд)}")
     print(т)
