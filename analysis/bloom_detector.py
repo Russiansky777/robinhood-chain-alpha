@@ -1474,6 +1474,7 @@ class Детектор:
         self.ног_кредитов_путь = self.состояние.base / "leg_cache_credits.json"
         self.ног_кредитов_ранее = 0
         self.ног_запись_почему = ""
+        self.мест_в_блоке_догнано = 0
         self.ног_кредитов_день = ST.day_key()[0]
         self._прочитать_кредиты_ног()
         if self.тень_включена and ST.env_int("BLOOM_SHADOW_LEGS", 1) == 1:
@@ -1655,6 +1656,7 @@ class Детектор:
         # и по признаку жизни это было незаметно: поле subscribe_method там
         # было, но никто на него не смотрел.
         st["chain_ok_backfilled"] = self.chain_ok_догнано
+        st["block_position_backfilled"] = self.мест_в_блоке_догнано
         st["fallback_seconds"] = (round(time.time() - self.запасной_путь_с, 1)
                                    if self.запасной_путь_с else 0)
         st["fallback_window_s"] = ОКНО_ЗАПАСНОГО_S
@@ -2135,6 +2137,76 @@ class Детектор:
                 self.chain_ok_догнано += 1
             except Exception as exc:  # noqa: BLE001
                 log.warning("догон chain_ok: позиция не записана (%s)",
+                            type(exc).__name__)
+        return итог
+
+    def догнать_место_в_блоке(self, *, предел: int = 3) -> dict:
+        """Место нашей покупки в блоке -- отложенно, вне горячего пути.
+
+        Зачем в детекторе, а не отдельным разбором: владелец спрашивает место
+        рядом с bloom_ms и S+N по КАЖДОЙ боевой покупке, и считать его потом
+        вручную значит каждый раз вспоминать, какие покупки уже посчитаны.
+        Один getBlock уровня signatures на позицию -- это 1 кредит и ответ в
+        десятки раз меньше, чем с счетами.
+
+        Считаем по слоту, в котором транзакция СЕЛА (our_slot из разбора
+        покупки), а не по слоту замерной подписки: processed может отличаться
+        от окончательного. Если our_slot нет, берём own_tx_seen_slot и
+        помечаем, откуда взяли.
+
+        Попытки ограничены: блок мог уйти из доступных узлу, и долбить его
+        вечно незачем.
+        """
+        итог = {"looked": 0, "filled": 0, "gave_up": 0, "why_not": ""}
+        try:
+            позиции = self.состояние.positions()
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"{type(exc).__name__}"
+            return итог
+        кандидаты = []
+        for cid, p_ in (позиции or {}).items():
+            if p_.get("block_index") is not None:
+                continue
+            if not ST.is_real_mode(p_.get("mode")):
+                continue
+            if int(p_.get("block_tries") or 0) >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                continue
+            подписи = p_.get("signatures") or []
+            подпись = подписи[0] if подписи else None
+            слот = p_.get("our_slot") or p_.get("own_tx_seen_slot")
+            откуда = ("our_slot" if p_.get("our_slot") else "own_tx_seen_slot")
+            if not подпись or not isinstance(слот, int):
+                continue
+            кандидаты.append((cid, подпись, слот, откуда))
+        кандидаты.sort(key=lambda x: x[0])
+        for cid, подпись, слот, откуда in кандидаты[:предел]:
+            итог["looked"] += 1
+            попытки = int((позиции.get(cid) or {}).get("block_tries") or 0) + 1
+            try:
+                # Импорт ЛЕНИВЫЙ и намеренно: bloom_block_position импортирует
+                # сам детектор (ему нужен потолок версии транзакции), и
+                # обычный импорт сверху дал бы круг.
+                import bloom_block_position as BP  # noqa: PLC0415
+
+                м = BP.место_по_подписям(self.helius, слот, подпись)
+            except Exception as exc:  # noqa: BLE001
+                м = {"known": False, "why_not": f"{type(exc).__name__}"}
+            поля = {"block_tries": попытки, "block_slot": слот,
+                     "block_slot_from": откуда}
+            if м.get("known"):
+                поля.update(block_index=м.get("index"),
+                             block_total=м.get("total"),
+                             block_share=м.get("share"))
+                итог["filled"] += 1
+                self.мест_в_блоке_догнано += 1
+            else:
+                поля["block_why_not"] = str(м.get("why_not") or "")[:200]
+                if попытки >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
+                    итог["gave_up"] += 1
+            try:
+                self.состояние.update_position(cid, **поля)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("место в блоке: позиция не записана (%s)",
                             type(exc).__name__)
         return итог
 
@@ -2681,6 +2753,10 @@ async def слушать(детектор: Детектор, ключ: str, *, �
 
 # Как часто сводка решений в основной чат. Слово владельца: раз в час.
 СВОДКА_КАЖДЫЕ_S = ST.env_float("BLOOM_SUMMARY_EVERY_S", 3600.0)
+
+# Сколько раз пробуем добрать место в блоке. Блок может уйти из доступных
+# узлу, и вечно его дёргать незачем -- в отчёте останется причина.
+ПОПЫТОК_МЕСТА_В_БЛОКЕ = ST.env_int("BLOOM_BLOCK_POS_TRIES", 3)
 ПОВТОР_ТРЕВОГИ_ЗАПАСНОГО_S = ST.env_float("BLOOM_FALLBACK_ALARM_REPEAT_S", 120.0)
 
 ПУЛЬС_S = ST.env_float("BLOOM_DETECTOR_PULSE_S", 60.0)
@@ -2709,6 +2785,9 @@ async def биение(детектор: Детектор, стоп_через_s
             await asyncio.to_thread(детектор.догрузить_таблицы_ног)
             # Вердикт по цепи у позиций, где его нет. Тоже вне горячего пути.
             await asyncio.to_thread(детектор.догнать_chain_ok)
+            # Место в блоке -- туда же: один getBlock уровня signatures на
+            # позицию, 1 кредит, и владелец видит место рядом с S+N.
+            await asyncio.to_thread(детектор.догнать_место_в_блоке)
             # Тревога о запасном пути -- на пульсе: подписка в это время
             # занята сообщениями, а пульс как раз для таких проверок.
             детектор.проверить_запасной_путь()
@@ -4459,6 +4538,110 @@ def self_test() -> int:
         chk("признак жизни показывает цену замера и почему он выключен",
             ж_б.get("credits") == 4 and ж_б.get("dropped") is True
             and ж_б.get("credit_budget") == 4 and ж_б.get("dropped_why"), ж_б)
+        # ---- МЕСТО В БЛОКЕ ДОБИРАЕТСЯ САМ ДЕТЕКТОР, ВНЕ ГОРЯЧЕГО ПУТИ ----
+        # Владелец 25.09 просит место рядом с bloom_ms и S+N по каждой боевой
+        # покупке. В горячем пути это сеть, поэтому догон на пульсе.
+        class HeliusБлокПодписи:
+            """Узел, который умеет только getBlock уровня signatures."""
+
+            def __init__(self, блоки, падать=False):
+                self.блоки = блоки
+                self.падать = падать
+                self.вызовов_getblock = 0
+                # Признак жизни читает эти поля у настоящего узла.
+                self.вызовов = 0
+                self.по_методам: dict = {}
+                self.учёт_пишется = False
+                self.учёт_почему = "заглушка самопроверки"
+                self.метр = None
+
+            def транзакция(self, подпись, **kw):
+                return None
+
+            def налог_минта(self, минт):
+                return {"taxed": False, "tax_bps": 0}
+
+            def call(self, метод, параметры, **kw):
+                if метод != "getBlock":
+                    raise RuntimeError(f"в этом узле есть только getBlock, не {метод}")
+                self.вызовов_getblock += 1
+                self.вызовов += 1
+                if self.падать:
+                    raise RuntimeError("узел молчит")
+                return self.блоки.get(параметры[0])
+
+        st_м = ST.ExecState(base=Path(d) / "mesta", kill=Path(d) / "net_kill")
+        h_м = HeliusБлокПодписи({
+            5001: {"signatures": ["чужая1", "чужая2", "НАША", "чужая3", "чужая4"]}})
+        детектор_м = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_м,
+                               курс=КурсSOL(), режим="dry", helius=h_м)
+        st_м.write_intent(client_order_id="m1", mint="МИНТ", source_sig="S1",
+                           source_slot=5000, sol_in=0.2, pool="POOL", program=None,
+                           taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                           sell_after_s=28.8)
+        st_м.update_position("m1", signatures=["НАША"], our_slot=5001)
+        итог_м = детектор_м.догнать_место_в_блоке()
+        поз_м = st_м.positions()["m1"]
+        chk("место в блоке добрано: индекс, всего, доля",
+            итог_м["filled"] == 1 and поз_м.get("block_index") == 2
+            and поз_м.get("block_total") == 5 and поз_м.get("block_share") == 0.4,
+            (итог_м, {к: поз_м.get(к) for к in
+                       ("block_index", "block_total", "block_share")}))
+        chk("слот взят из our_slot и это записано",
+            поз_м.get("block_slot") == 5001
+            and поз_м.get("block_slot_from") == "our_slot", поз_м.get("block_slot_from"))
+        chk("второй круг ту же позицию не перечитывает",
+            детектор_м.догнать_место_в_блоке()["looked"] == 0
+            and h_м.вызовов_getblock == 1, h_м.вызовов_getblock)
+        chk("догнано видно в признаке жизни",
+            детектор_м.признак_жизни().get("block_position_backfilled") == 1)
+        st_м.write_intent(client_order_id="m2", mint="МИНТ2", source_sig="S2",
+                           source_slot=6000, sol_in=0.2, pool="POOL", program=None,
+                           taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                           sell_after_s=28.8)
+        st_м.update_position("m2", signatures=["НЕТ_В_БЛОКЕ"], our_slot=5001)
+        детектор_м.догнать_место_в_блоке()
+        поз_м2 = st_м.positions()["m2"]
+        chk("подписи в блоке нет -- причина и попытка, а не выдуманное место",
+            поз_м2.get("block_index") is None and поз_м2.get("block_tries") == 1
+            and "нет" in (поз_м2.get("block_why_not") or ""), поз_м2.get("block_why_not"))
+        for _ in range(ПОПЫТОК_МЕСТА_В_БЛОКЕ + 2):
+            детектор_м.догнать_место_в_блоке()
+        chk("после предела попыток позиция больше не дёргается",
+            st_м.positions()["m2"].get("block_tries") == ПОПЫТОК_МЕСТА_В_БЛОКЕ,
+            st_м.positions()["m2"].get("block_tries"))
+        st_м.write_intent(client_order_id="m3", mint="МИНТ3", source_sig="S3",
+                           source_slot=7000, sol_in=0.2, pool="POOL", program=None,
+                           taxed=None, tax_bps=None, mode="dry-run",
+                           sell_after_s=28.8)
+        st_м.update_position("m3", signatures=["НАША3"], our_slot=5001)
+        было_вызовов = h_м.вызовов_getblock
+        детектор_м.догнать_место_в_блоке()
+        chk("позиция dry-run узел не тратит",
+            h_м.вызовов_getblock == было_вызовов, h_м.вызовов_getblock)
+        st_м.write_intent(client_order_id="m4", mint="МИНТ4", source_sig="S4",
+                           source_slot=8000, sol_in=0.2, pool="POOL", program=None,
+                           taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                           sell_after_s=28.8)
+        st_м.update_position("m4", signatures=["ХВОСТ"], own_tx_seen_slot=5001)
+        детектор_м.догнать_место_в_блоке()
+        chk("без our_slot берём слот замерной подписки и помечаем откуда",
+            st_м.positions()["m4"].get("block_slot_from") == "own_tx_seen_slot",
+            st_м.positions()["m4"].get("block_slot_from"))
+        h_тихий = HeliusБлокПодписи({}, падать=True)
+        детектор_т = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_м,
+                               курс=КурсSOL(), режим="dry", helius=h_тихий)
+        st_м.write_intent(client_order_id="m5", mint="МИНТ5", source_sig="S5",
+                           source_slot=9000, sol_in=0.2, pool="POOL", program=None,
+                           taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                           sell_after_s=28.8)
+        st_м.update_position("m5", signatures=["НАША5"], our_slot=9001)
+        детектор_т.догнать_место_в_блоке()
+        chk("молчание узла не пишет место и не роняет службу",
+            st_м.positions()["m5"].get("block_index") is None
+            and st_м.positions()["m5"].get("block_why_not"),
+            st_м.positions()["m5"].get("block_why_not"))
+
         # ---- БЮДЖЕТ ЗАМЕРА ДЕРЖИТСЯ ЗА СУТКИ, А НЕ ЗА ПРОЦЕСС ----
         # Цена ошибки измерена 24.09: счёт жил в памяти, каждый перезапуск
         # выдавал замеру новые 100 000 кредитов, и за сутки детектор истратил

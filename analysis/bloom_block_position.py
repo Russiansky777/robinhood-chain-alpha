@@ -63,6 +63,49 @@ def блок_со_счетами(helius, слот: int) -> dict:
     return {"known": True, "slot": слот, "transactions": tx, "total": len(tx)}
 
 
+def место_по_подписям(helius, слот: int, подпись: str) -> dict:
+    """Место подписи в блоке -- САМЫМ ДЕШЁВЫМ запросом.
+
+    transactionDetails="signatures" отдаёт только список подписей, и для
+    "какой мы по счёту в блоке" этого достаточно. Уровень "accounts" нужен
+    другому разбору (кто ещё купил тот же минт), а здесь он означал бы
+    несколько мегабайт ответа на блок в 1200 транзакций -- при догоне по
+    каждой боевой покупке это лишний вес на ровном месте.
+
+    Возвращает известное или причину. Молчание узла НЕ превращается в ноль:
+    место 0 -- это первая транзакция блока, и путать её с "не знаем" нельзя.
+    """
+    из_ = {"known": False, "slot": слот, "index": None, "total": None,
+            "share": None, "why_not": None}
+    if not isinstance(слот, int):
+        из_["why_not"] = "слот не задан"
+        return из_
+    if not подпись:
+        из_["why_not"] = "подпись не задана"
+        return из_
+    try:
+        блок = helius.call("getBlock", [слот, {
+            "encoding": "json", "transactionDetails": "signatures",
+            "rewards": False, "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}])
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"getBlock не отдался: {type(exc).__name__}: {str(exc)[:120]}"
+        return из_
+    подписи = (блок or {}).get("signatures")
+    if not подписи:
+        из_["why_not"] = "в ответе getBlock нет подписей"
+        return из_
+    всего = len(подписи)
+    из_["total"] = всего
+    try:
+        и = подписи.index(подпись)
+    except ValueError:
+        из_["why_not"] = "нашей подписи в этом блоке нет"
+        return из_
+    из_.update(known=True, index=и,
+                share=(round(и / всего, 4) if всего else None))
+    return из_
+
+
 def _подпись(t: dict) -> str | None:
     подписи = ((t or {}).get("transaction") or {}).get("signatures") or []
     return подписи[0] if подписи else None
@@ -425,6 +468,40 @@ def self_test() -> None:
     п_нет = покупатели_минта(HeliusБлоки({}), МИНТ, [100])
     chk("нет блока -- строка с причиной, а не тишина",
         п_нет["rows"] and п_нет["rows"][0].get("known") is False, п_нет)
+
+    # ---- ДЕШЁВОЕ МЕСТО В БЛОКЕ: только подписи ----
+    class HeliusПодписи:
+        def __init__(self, блоки, падать=False):
+            self.блоки = блоки
+            self.падать = падать
+            self.запросы = []
+
+        def call(self, метод, параметры, **kw):
+            self.запросы.append((метод, параметры))
+            if self.падать:
+                raise RuntimeError("узел молчит")
+            return self.блоки.get(параметры[0])
+
+    h_п = HeliusПодписи({77: {"signatures": ["чужая1", "наша", "чужая2", "чужая3"]}})
+    м = место_по_подписям(h_п, 77, "наша")
+    chk("место по подписям: индекс, всего и доля",
+        м["known"] is True and м["index"] == 1 and м["total"] == 4
+        and м["share"] == 0.25, м)
+    chk("запрос идёт уровнем signatures, а не accounts",
+        h_п.запросы[0][1][1]["transactionDetails"] == "signatures",
+        h_п.запросы[0][1][1])
+    нет_нас = место_по_подписям(h_п, 77, "посторонняя")
+    chk("нашей подписи в блоке нет -- причина, а не индекс",
+        нет_нас["known"] is False and "нет" in нет_нас["why_not"]
+        and нет_нас["index"] is None and нет_нас["total"] == 4, нет_нас)
+    chk("первая транзакция блока -- это индекс 0, а не 'не знаем'",
+        место_по_подписям(h_п, 77, "чужая1")["index"] == 0)
+    chk("молчание узла не превращается в место",
+        место_по_подписям(HeliusПодписи({}, падать=True), 77, "наша")["known"] is False)
+    chk("нет слота -- нет запроса",
+        место_по_подписям(h_п, None, "наша")["known"] is False)
+    chk("нет подписи -- нет запроса",
+        место_по_подписям(h_п, 77, "")["known"] is False)
 
     print(f"самопроверка места в блоке: {всего[1]}/{всего[0]}"
           f"{' пройдено' if всего[1] == всего[0] else ' ПРОВАЛ'}")

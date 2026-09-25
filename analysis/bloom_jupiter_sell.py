@@ -247,6 +247,30 @@ def ключ_от_нашего_кошелька(ожидаемый: str, сек�
                           f"{ожидаемый} -- подписывать нельзя")}
 
 
+def план_путей() -> dict:
+    """Какими путями пойдёт продажа и почему. Ничего не делает и не зовёт сеть.
+
+    Правило выбора живёт ЗДЕСЬ и только здесь: и продажа, и признак жизни
+    сторожа спрашивают его одной функцией. Два места с одним правилом
+    однажды разойдутся, и разойдутся они в деньгах.
+    """
+    try:
+        from dbot_rescue import jup_v2_key_present  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"plan": ["ultra"],
+                "why": f"общий клиент не загружен ({type(exc).__name__})"}
+    путь = (os.environ.get("BLOOM_JUP_API") or "").strip().lower()
+    есть_ключ, почему_нет_ключа = jup_v2_key_present()
+    if путь == "ultra":
+        return {"plan": ["ultra"], "why": "выбран вход BLOOM_JUP_API=ultra"}
+    if путь in ("v2", "swap-v2", "swapv2"):
+        return {"plan": ["swap-v2", "ultra"],
+                "why": "выбран вход BLOOM_JUP_API=v2, Ultra запасной"}
+    if есть_ключ:
+        return {"plan": ["swap-v2", "ultra"], "why": "ключ V2 есть, Ultra запасной"}
+    return {"plan": ["ultra"], "why": почему_нет_ключа or "ключа V2 нет"}
+
+
 def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: float | None,
              живьём: bool, ордер_фн=None, исполнить_фн=None,
              подписать_фн=None) -> dict:
@@ -259,32 +283,34 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
     шаги: list = []
     итог = {"ok": False, "steps": шаги, "mint": mint, "amount_raw": amount_raw}
 
+    пути: list = []
     if ордер_фн is None or исполнить_фн is None:
         # Клиент один на весь репозиторий -- в dbot_rescue. Второй копии быть
         # не должно: расхождение двух клиентов по полю порога стоило бы денег.
         #
         # Путь по умолчанию -- Swap V2 (Ultra по документации больше не
-        # развивают, а lite-api уходит). Ultra остаётся запасным на случай,
-        # когда ключа V2 нет: терять выход из-за отсутствия ключа нельзя.
+        # развивают, а lite-api уходит). Ultra -- ЗАПАСНОЙ, и запасной он не
+        # на словах: раньше путь выбирался ОДИН раз до сети, и 401 по ключу,
+        # 429 или 5xx от api.jup.ag означали не переход на Ultra, а потерянный
+        # выход и позицию в UNSOLD. Теперь при отказе на ЗАКАЗЕ пробуется
+        # второй путь. Заказ -- единственное безопасное место для отката:
+        # ничего не подписано и ничего не отправлено. После подписи и отправки
+        # откат запрещён -- транзакция могла уйти в сеть.
         from dbot_rescue import (  # noqa: PLC0415
-            jup_v2_key_present, swap_v2_execute, swap_v2_order,
-            ultra_execute, ultra_order)
-        путь = (os.environ.get("BLOOM_JUP_API") or "").strip().lower()
-        есть_ключ, почему_нет_ключа = jup_v2_key_present()
-        if путь == "ultra":
-            выбран, о_фн, и_фн = "ultra", ultra_order, ultra_execute
-        elif путь in ("v2", "swap-v2", "swapv2"):
-            выбран, о_фн, и_фн = "swap-v2", swap_v2_order, swap_v2_execute
-        elif есть_ключ:
-            выбран, о_фн, и_фн = "swap-v2", swap_v2_order, swap_v2_execute
-        else:
-            выбран, о_фн, и_фн = "ultra", ultra_order, ultra_execute
-        ордер_фн = ордер_фн or о_фн
-        исполнить_фн = исполнить_фн or и_фн
-        итог["api"] = выбран
-        шаги.append({"step": "api", "ok": True, "api": выбран,
-                      "why_not": (None if выбран == "swap-v2" else почему_нет_ключа
-                                   or "выбран вход BLOOM_JUP_API=ultra")})
+            swap_v2_execute, swap_v2_order, ultra_execute, ultra_order)
+        # Правило выбора -- в план_путей(), одно на весь модуль.
+        план = план_путей()
+        почему_путь = план["why"]
+        ФУНКЦИИ = {"swap-v2": (swap_v2_order, swap_v2_execute),
+                    "ultra": (ultra_order, ultra_execute)}
+        пути = [(имя, *ФУНКЦИИ[имя]) for имя in план["plan"] if имя in ФУНКЦИИ]
+        итог["api_plan"] = [имя for имя, _, _ in пути]
+        # api -- ОСНОВНОЙ путь плана. Это имя читают уже написанные разборы,
+        # и менять его смысл нельзя; какой путь дал заказ на самом деле,
+        # говорит api_used.
+        итог["api"] = пути[0][0]
+        шаги.append({"step": "api", "ok": True, "api": пути[0][0],
+                      "plan": итог["api_plan"], "why_not": почему_путь})
 
     # Подпись нужна ТОЛЬКО для живой отправки: при живьём=False (проверка
     # котировки и пола) ни ключ, ни solders не требуются вовсе, и падать на
@@ -307,15 +333,46 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
         def подписать_фн(tx_b64):  # noqa: E306
             return sign_versioned_b64(tx_b64, load_rescue_keypair(ключ_сырой()))
 
-    order = ордер_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
-    шаги.append({"step": "order", "ok": not order.get("ошибка"),
-                  "why_not": order.get("ошибка"),
-                  "out_amount": order.get("outAmount"),
-                  "threshold": order.get("otherAmountThreshold"),
-                  "router": order.get("router")})
-    if order.get("ошибка"):
-        итог["why_not"] = f"Ultra не дала ордер: {order['ошибка']}"
-        return итог
+    if пути:
+        order = None
+        отказы: list = []
+        пробовали: list = []
+        for имя, о_фн, и_фн in пути:
+            пробовали.append(имя)
+            order = о_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
+            шаги.append({"step": "order", "api": имя,
+                          "ok": not order.get("ошибка"),
+                          "why_not": order.get("ошибка"),
+                          "out_amount": order.get("outAmount"),
+                          "threshold": order.get("otherAmountThreshold"),
+                          "router": order.get("router")})
+            if not order.get("ошибка"):
+                итог["api_used"] = имя
+                исполнить_фн = и_фн
+                break
+            отказы.append(f"{имя}: {order['ошибка']}")
+        else:
+            # Ни один путь не дал заказ. Имя пути в причине обязательно:
+            # прежний текст всегда говорил "Ultra", каким бы путь ни был, и
+            # по журналу было не понять, что вообще пробовали.
+            итог["why_not"] = "заказ не дал ни один путь: " + "; ".join(отказы)
+            итог["api_tried"] = list(пробовали)
+            return итог
+        итог["api_tried"] = list(пробовали)
+        if итог["api_used"] != итог["api"]:
+            шаги.append({"step": "api_fallback", "ok": True,
+                          "api": итог["api_used"],
+                          "why_not": "; ".join(отказы)})
+    else:
+        order = ордер_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
+        шаги.append({"step": "order", "ok": not order.get("ошибка"),
+                      "why_not": order.get("ошибка"),
+                      "out_amount": order.get("outAmount"),
+                      "threshold": order.get("otherAmountThreshold"),
+                      "router": order.get("router")})
+        if order.get("ошибка"):
+            итог["why_not"] = f"заказ не вышел: {order['ошибка']}"
+            return итог
 
     проверка = проверить_пол(order, вход_sol=вход_sol)
     шаги.append({"step": "floor", **проверка})
@@ -561,6 +618,105 @@ def self_test() -> int:
             r_н.get("api") == "ultra", r_н.get("api"))
         chk("и выбор пути виден в шагах записи",
             any(ш.get("step") == "api" for ш in (r_н.get("steps") or [])), r_н.get("steps"))
+
+        # План и сама продажа обязаны говорить одно: правило одно.
+        for окружение, ожидание in (({}, ["ultra"]),
+                                     ({"JUPITER_API_KEY": "К"}, ["swap-v2", "ultra"]),
+                                     ({"JUPITER_API_KEY": "К", "BLOOM_JUP_API": "ultra"},
+                                      ["ultra"]),
+                                     ({"BLOOM_JUP_API": "v2"}, ["swap-v2", "ultra"])):
+            os.environ.pop("JUPITER_API_KEY", None)
+            os.environ.pop("BLOOM_JUP_API", None)
+            os.environ.update(окружение)
+            п = план_путей()
+            r_п = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                           живьём=False)
+            chk(f"план и продажа согласны при {окружение or 'пустом окружении'}",
+                п["plan"] == ожидание and r_п.get("api_plan") == ожидание,
+                (п["plan"], r_п.get("api_plan")))
+
+        # ---- ULTRA -- ЗАПАСНОЙ НА ДЕЛЕ, А НЕ НА СЛОВАХ (владелец 25.09) ----
+        # Прежде путь выбирался ОДИН раз до сети: 401 по ключу, 429 или 5xx
+        # от api.jup.ag означали не переход на Ultra, а потерянный выход и
+        # позицию в UNSOLD. Проверяем именно откат -- и его границу.
+        os.environ.pop("BLOOM_JUP_API", None)
+        os.environ["JUPITER_API_KEY"] = "КЛЮЧ"
+        import dbot_rescue as DR2  # noqa: PLC0415
+        было_v2, было_ultra = DR2.swap_v2_order, DR2.ultra_order
+        было_v2_и, было_ultra_и = DR2.swap_v2_execute, DR2.ultra_execute
+        звали: list = []
+        try:
+            def v2_падает(mint, amount_raw, taker, **kw):
+                звали.append("v2")
+                return {"ошибка": "http=401 unauthorized"}
+
+            def ultra_даёт(mint, amount_raw, taker, **kw):
+                звали.append("ultra")
+                return {"transaction": "AAA", "requestId": "r1",
+                         "outAmount": "1000", "otherAmountThreshold": "900",
+                         "swapMode": "ExactIn", "router": "jupiterz"}
+
+            DR2.swap_v2_order = v2_падает
+            DR2.ultra_order = ultra_даёт
+            r_о = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                           живьём=False)
+            chk("V2 отказал на заказе -- заказ взят у Ultra",
+                r_о.get("ok") is True and r_о.get("api") == "swap-v2"
+                and r_о.get("api_used") == "ultra"
+                and r_о.get("api_tried") == ["swap-v2", "ultra"],
+                {к: r_о.get(к) for к in ("ok", "api", "api_used", "api_tried")})
+            chk("порядок путей соблюдён: сначала V2, потом Ultra",
+                звали == ["v2", "ultra"], звали)
+            chk("откат виден отдельным шагом с причиной",
+                any(ш.get("step") == "api_fallback" and "401" in (ш.get("why_not") or "")
+                    for ш in (r_о.get("steps") or [])), r_о.get("steps"))
+
+            звали.clear()
+            DR2.ultra_order = lambda mint, amount_raw, taker, **kw: (
+                звали.append("ultra") or {"ошибка": "http=500"})
+            r_оба = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                             живьём=False)
+            chk("отказали оба пути -- причина называет ОБА, а не 'Ultra'",
+                r_оба.get("ok") is False and "swap-v2" in r_оба["why_not"]
+                and "ultra" in r_оба["why_not"] and "401" in r_оба["why_not"],
+                r_оба.get("why_not"))
+            chk("и попытки перечислены", r_оба.get("api_tried") == ["swap-v2", "ultra"],
+                r_оба.get("api_tried"))
+
+            # ГРАНИЦА ОТКАТА. После подписи и отправки откат ЗАПРЕЩЁН:
+            # транзакция могла уйти в сеть, и второй путь означал бы вторую
+            # продажу. Проверяем, что на отказе ОТПРАВКИ второй путь не зовётся.
+            звали.clear()
+            отправок: list = []
+            DR2.swap_v2_order = lambda mint, amount_raw, taker, **kw: (
+                звали.append("v2") or {"transaction": "AAA", "requestId": "r1",
+                                        "outAmount": "1000",
+                                        "otherAmountThreshold": "900",
+                                        "swapMode": "ExactIn"})
+            DR2.ultra_order = lambda mint, amount_raw, taker, **kw: (
+                звали.append("ultra") or {"transaction": "BBB", "requestId": "r2",
+                                           "outAmount": "1000",
+                                           "otherAmountThreshold": "900",
+                                           "swapMode": "ExactIn"})
+
+            def v2_отправка_падает(signed, request_id, **kw):
+                отправок.append(("v2", request_id))
+                return {"ошибка": "http=503 на отправке"}
+
+            def ultra_отправка(signed, request_id, **kw):
+                отправок.append(("ultra", request_id))
+                return {"signature": "ПОДПИСЬ", "status": "Success"}
+
+            DR2.swap_v2_execute = v2_отправка_падает
+            DR2.ultra_execute = ultra_отправка
+            r_отпр = продать(mint="М", amount_raw=100, taker="Т", вход_sol=None,
+                              живьём=True, подписать_фн=lambda tx: "ПОДПИСАННАЯ")
+            chk("отказ ОТПРАВКИ второй путь не зовёт -- иначе это вторая продажа",
+                r_отпр.get("ok") is False and отправок == [("v2", "r1")]
+                and звали == ["v2"], (отправок, звали, r_отпр.get("why_not")))
+        finally:
+            DR2.swap_v2_order, DR2.ultra_order = было_v2, было_ultra
+            DR2.swap_v2_execute, DR2.ultra_execute = было_v2_и, было_ultra_и
     finally:
         os.environ.pop("JUPITER_API_KEY", None)
         os.environ.pop("BLOOM_JUP_API", None)

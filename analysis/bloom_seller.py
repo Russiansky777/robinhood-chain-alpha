@@ -780,6 +780,12 @@ class Seller:
         поля = {"jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
                  "ts_jup_attempt": now,
                  "jup_floor": (r.get("floor") or {}).get("checks"),
+                 # Каким путём шли и каким вышло -- в позицию. Без этого по
+                 # журналу не отличить продажу через Swap V2 от продажи через
+                 # Ultra: тексты отказов у них одинаковые.
+                 "jup_api": r.get("api"),
+                 "jup_api_used": r.get("api_used"),
+                 "jup_api_tried": r.get("api_tried"),
                  "jup_why_not": r.get("why_not")}
         if r.get("signature"):
             поля["jup_signature"] = r["signature"]
@@ -797,10 +803,21 @@ class Seller:
             вышло = порог.get("out_amount")
             self.оповещатель.послать(NT.строка_продажи(
                 ok=bool(r.get("ok")), код=r.get("why_not"),
-                через="Jupiter Ultra", секунды=секунды,
+                через=f"Jupiter {r.get('api_used') or r.get('api') or '?'}",
+                секунды=секунды,
                 sol_вернулось=(float(вышло) / 1e9 if вышло else None),
                 подпись=r.get("signature")))
         return r
+
+    def _план_путей_для_признака(self) -> dict:
+        """План путей Jupiter для признака жизни. Ни сети, ни решений."""
+        if JUP is None or not hasattr(JUP, "план_путей"):
+            return {"api_plan": None, "api_why": "модуль продажи не загружен"}
+        try:
+            п = JUP.план_путей()
+            return {"api_plan": п.get("plan"), "api_why": п.get("why")}
+        except Exception as exc:  # noqa: BLE001
+            return {"api_plan": None, "api_why": f"{type(exc).__name__}"}
 
     def heartbeat(self, итог: dict) -> None:
         """Признак жизни на диск каждый круг.
@@ -847,7 +864,13 @@ class Seller:
                          "key_why_not": self.jupiter_ключ.get("why_not"),
                          "floor_pct": (JUP.ПОЛ_ПРОЦЕНТОВ if JUP is not None else None),
                          "min_quote_share_pct": (JUP.МИН_ДОЛЯ_ОТ_ВХОДА
-                                                  if JUP is not None else None)},
+                                                  if JUP is not None else None),
+                         # КАКИМ ПУТЁМ ПОЙДЁТ ПРОДАЖА -- видно СРАЗУ, без
+                         # ожидания сделки. Раньше признак жизни об этом
+                         # молчал, и "сторож продаёт через V2" нельзя было ни
+                         # подтвердить, ни опровергнуть: ключ мог быть стёрт
+                         # деплоем, а путь молча вернуться на Ultra.
+                         **self._план_путей_для_признака()},
             "slippage_pct": self.slippage,
             "grace_s": self.grace_s,
             "give_up_after_s": self.give_up_after_s,
