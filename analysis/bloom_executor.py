@@ -192,8 +192,15 @@ class Executor:
 
     # ------------------------------------------------------------ покупка
 
-    def execute(self, decision: dict, *, balance_sol: float | None) -> dict:
-        """Исполнить решение детектора. Возвращает запись о попытке."""
+    def execute(self, decision: dict, *, balance_sol: float | None,
+                amount_sol: float | None = None) -> dict:
+        """Исполнить решение детектора. Возвращает запись о попытке.
+
+        amount_sol -- размер ИМЕННО ЭТОЙ покупки. Решение владельца 25.09
+        (вечер): по 38 кошелькам lane_only Bloom берёт 0.05 SOL, а на BATCH-3/5
+        остаётся 0.2. Размер приходит снаружи по группе источника, а не меняет
+        self.buy_sol: иначе одна группа молча переписывала бы размер другой.
+        """
         out = {"client_order_id": None, "mint": decision.get("mint"),
                "source_sig": decision.get("signature"),
                "exec_code": None, "reason": "", "live": live_buy_enabled(),
@@ -245,6 +252,8 @@ class Executor:
         # в транзакции нашёлся владелец хранилищ пары токен/WSOL, и помечает
         # NO_SOL_POOL_IN_TX, когда такого владельца нет (пул к USDC, RFQ,
         # маршрут без видимого пула).
+        размер_sol = float(self.buy_sol if amount_sol is None else amount_sol)
+        out["buy_sol"] = размер_sol
         адрес = (decision.get("source_pool") or "").strip() or mint
         вид_адреса = "pool" if адрес != mint else "mint"
         out["buy_address"] = адрес
@@ -252,7 +261,7 @@ class Executor:
         if decision.get("pool_why_not"):
             out["pool_why_not"] = decision.get("pool_why_not")
         try:
-            body = self.build_body(mint, address=адрес)
+            body = self.build_body(mint, address=адрес, amount_sol=размер_sol)
             API.validate_swap_body(body)
         except API.BloomRefusal as exc:
             self.refused += 1
@@ -268,7 +277,7 @@ class Executor:
         route = decision.get("route") or {}
         self.state.write_intent(
             client_order_id=cid, mint=mint, source_sig=sig,
-            source_slot=decision.get("source_slot"), sol_in=self.buy_sol,
+            source_slot=decision.get("source_slot"), sol_in=размер_sol,
             pool=(адрес if вид_адреса == "pool" else None),
             program=(route.get("programs") or [None])[0],
             taxed=decision.get("taxed"), tax_bps=decision.get("tax_bps"),
@@ -310,7 +319,7 @@ class Executor:
         #   * срок авто-ордера 28.8 не принят как целое -> заменить на 29.
         # Решение владельца: первый живой вызов идёт с 28.8, и только при
         # INVALID_REQUEST -- 29.
-        сумма_тек = self.buy_sol
+        сумма_тек = размер_sol
         срок_тек = self.sell_after_s
         адрес_тек = адрес
         поднимали = False
@@ -389,7 +398,7 @@ class Executor:
                     signatures=res.get("signatures") or [],
                     ts_accepted=time.time(), sol_in=сумма_тек,
                     sell_after_s=срок_тек,
-                    bumped_from_sol=(self.buy_sol if поднимали else None),
+                    bumped_from_sol=(размер_sol if поднимали else None),
                     target_from_s=(self.sell_after_s if правили_срок else None),
                     bloom_ms=res.get("bloom_ms"), ts_sent=res.get("sent_ts"),
                 # Сколько НОВЫХ соединений открылось за время POST:
@@ -560,6 +569,31 @@ def self_test() -> int:
         chk("налог минта перенесён в позицию",
             одна.get("taxed") is True and одна.get("tax_bps") == 300, одна)
         chk("срок продажи записан", одна.get("sell_after_s") == 28.8)
+        chk("размер покупки без amount_sol -- свой, из настроек",
+            одна.get("sol_in") == ex.buy_sol, (одна.get("sol_in"), ex.buy_sol))
+
+        # РАЗМЕР ПОКУПКИ ПО ГРУППЕ ИСТОЧНИКА -- ЭТО ДЕНЬГИ (решение владельца
+        # 25.09 вечером: по lane_only Bloom берёт 0.05, на BATCH-3/5 остаётся
+        # 0.2). Размер, потерянный между детектором и телом запроса, купил бы
+        # на 0.2 там, где владелец разрешил 0.05.
+        сессия2 = СессияЗаглушка([])
+        api2 = API.BloomApi("КЛЮЧ", dry_run=True, state=st, session=сессия2)
+        ex2 = Executor(state=st, api=api2, buy_sol=0.2)
+        r2 = ex2.execute({**решение_buy, "mint": "MINT_РАЗМЕР",
+                           "signature": "SIG_РАЗМЕР"},
+                          balance_sol=5.0, amount_sol=0.05)
+        поз2 = [п for п in st.positions().values() if п.get("mint") == "MINT_РАЗМЕР"]
+        chk("переданный размер записан в позицию, а не свой 0.2",
+            r2.get("buy_sol") == 0.05 and поз2 and поз2[0].get("sol_in") == 0.05,
+            (r2.get("buy_sol"), поз2[0].get("sol_in") if поз2 else None))
+        # Сумма в теле Bloom -- СТРОКА (так требует их клиент), поэтому
+        # сравнение числом, а не текстом: "0.05" и 0.05 это одно и то же число.
+        chk("и в теле запроса стоит он же",
+            float(ex2.build_body("MINT_РАЗМЕР", amount_sol=0.05)["wallets"][0]
+                   ["amount"]) == 0.05,
+            ex2.build_body("MINT_РАЗМЕР", amount_sol=0.05)["wallets"][0]["amount"])
+        chk("свой размер исполнителя при этом не изменился",
+            ex2.buy_sol == 0.2, ex2.buy_sol)
         chk("подпись помечена виденной", st.seen_signature("SIG1"))
         _, покупок = st.mint_state("MINT1")
         chk("в dry-run покупка по минту НЕ учитывается: иначе придуманная "
@@ -567,7 +601,9 @@ def self_test() -> int:
         chk("режим позиции -- dry-run", одна.get("mode") == ST.MODE_DRY, одна.get("mode"))
         chk("dry-run позиция не считается открытой",
             st.open_positions() == [], st.open_positions())
-        chk("но видна в разделе dry-run", len(st.dry_positions()) == 1)
+        # Позиций dry-run теперь две: своя и та, что проверяет размер по группе.
+        chk("но видна в разделе dry-run", len(st.dry_positions()) == 2,
+            len(st.dry_positions()))
         chk("все ключи позиции латинские",
             all(k.isascii() for k in одна), [k for k in одна if not k.isascii()])
 

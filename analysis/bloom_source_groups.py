@@ -43,6 +43,11 @@ def файл() -> str:
 ГРУППА_ПО_УМОЛЧАНИЮ = "bloom_lane"
 # Политика группы, которой нет в файле: так ведут себя BATCH-3/5 и лидер.
 ПОЛИТИКА_ПО_УМОЛЧАНИЮ = {"lane_sol": None, "bloom_trades": True, "fanout": True,
+                          # Размер покупки BLOOM по этой группе. None значит
+                          # общий размер из окружения (BLOOM_BUY_SOL, у владельца
+                          # 0.2 на BATCH-3/5). Решение владельца 25.09 вечером:
+                          # по 38 кошелькам lane_only Bloom берёт 0.05.
+                          "bloom_sol": None,
                           "day_cap_sol": None, "stop_loss_sol": None,
                           # Порог входа источника: None значит общий порог
                           # детектора (BLOOM_MIN_TARGET_SOL, сейчас 2 SOL --
@@ -84,6 +89,7 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
         из_["политики"][имя] = {
             "lane_sol": г.get("lane_sol"),
             "bloom_trades": bool(г.get("bloom_trades")),
+            "bloom_sol": г.get("bloom_sol"),
             "fanout": bool(г.get("fanout")),
             "day_cap_sol": г.get("day_cap_sol"),
             "stop_loss_sol": г.get("stop_loss_sol"),
@@ -156,9 +162,16 @@ def self_test() -> int:
         политика("lane_only")["lane_sol"] == 0.05, политика("lane_only"))
     chk("размер группы скорости 0.01 SOL",
         политика("speed_only")["lane_sol"] == 0.01, политика("speed_only"))
-    chk("Bloom не торгует ни по одной из новых групп",
-        политика("lane_only")["bloom_trades"] is False
-        and политика("speed_only")["bloom_trades"] is False, "")
+    # РЕШЕНИЕ ВЛАДЕЛЬЦА 25.09 (вечер): по lane_only Bloom ТОРГУЕТ и берёт
+    # 0.05 SOL -- ради пар "Bloom против полосы" на одних сигналах. По группе
+    # скорости Bloom не торгует по-прежнему.
+    chk("по lane_only Bloom торгует и размер 0.05",
+        политика("lane_only")["bloom_trades"] is True
+        and политика("lane_only")["bloom_sol"] == 0.05, политика("lane_only"))
+    chk("по группе скорости Bloom не торгует",
+        политика("speed_only")["bloom_trades"] is False, политика("speed_only"))
+    chk("у bloom_lane размер Bloom из окружения, а не из файла",
+        политика("bloom_lane").get("bloom_sol") is None, политика("bloom_lane"))
     chk("веер идёт по полосной группе и НЕ идёт по скорости",
         политика("lane_only")["fanout"] is True
         and политика("speed_only")["fanout"] is False, "")

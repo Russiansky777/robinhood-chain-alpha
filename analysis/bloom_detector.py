@@ -1662,7 +1662,15 @@ class Детектор:
         # и при перерасходе выключать надо именно замер.
         self.ног_байт = 0
         self.ног_кредитов = 0
-        self.ног_бюджет = ST.env_int("BLOOM_SHADOW_LEGS_CREDITS", 30000)
+        # ЗАМЕР ДВУХШАГОВОЙ ТЕНИ СНЯТ (решение владельца 25.09 вечером):
+        # "двухшаговую тень снять (кэш ног выключить, бюджет 0) -- 2 сигнала из
+        # 41 977 за сутки, замер не нужен". Снят В КОДЕ, а не в окружении:
+        # деплой идёт с keep_env=yes, env не трогается, и иначе замер вернулся
+        # бы сам после полуночи с новой суточной квотой. Вернуть можно одной
+        # переменной BLOOM_SHADOW_LEGS_OFF=0, ничего больше не правя.
+        self.кэш_ног_снят = ST.env_int("BLOOM_SHADOW_LEGS_OFF", 1) == 1
+        self.ног_бюджет = (0 if self.кэш_ног_снят
+                            else ST.env_int("BLOOM_SHADOW_LEGS_CREDITS", 30000))
         self.ног_отключён = False
         self.ног_отключён_почему = ""
         # СЧЁТ ЗАМЕРА -- ЗА СУТКИ, А НЕ ЗА ПРОЦЕСС. Цена ошибки измерена
@@ -1691,7 +1699,11 @@ class Детектор:
         self.тень_кредитов_день = ST.day_key()[0]
         self.тень_запись_почему = ""
         self._прочитать_кредиты_тени()
-        if self.тень_включена and ST.env_int("BLOOM_SHADOW_LEGS", 1) == 1:
+        if self.кэш_ног_снят:
+            self.кэш_ног_почему = ("замер двухшаговой тени снят словом владельца "
+                                    "25.09: 2 сигнала из 41 977 за сутки "
+                                    "(BLOOM_SHADOW_LEGS_OFF=0 включает обратно)")
+        elif self.тень_включена and ST.env_int("BLOOM_SHADOW_LEGS", 1) == 1:
             try:
                 пулы = SB.load_leg_pools()
                 self.кэш_ног = SB.LegCache(пулы, self.helius.call)
@@ -2351,7 +2363,9 @@ class Детектор:
         if строка.get("action") == "buy" and self.исполнитель is not None \
                 and торгует_bloom:
             try:
-                итог = self.исполнитель.execute(строка, balance_sol=self.свежий_баланс())
+                итог = self.исполнитель.execute(
+                    строка, balance_sol=self.свежий_баланс(),
+                    amount_sol=self.размер_bloom(строка.get("source")))
             except Exception as exc:  # noqa: BLE001
                 # Падение исполнителя не должно валить детектор: он и дальше
                 # обязан слушать источники и вести журнал.
@@ -2577,8 +2591,15 @@ class Детектор:
                 import c2_shadow_build as SB2  # noqa: PLC0415
                 SB = SB2
             if self.кэш_ног is not None:
-                пулы = SB.load_leg_pools()
-                self.кэш_ног = SB.LegCache(пулы, self._вызов_тени)
+                # ЗАМЕР СНЯТ -- кэш ног не пересобираем, а гасим: иначе
+                # перезапуск тени возвращал бы снятый замер обратно. Функция
+                # обязана вернуть словарь, поэтому здесь не return, а гашение.
+                if self.кэш_ног_снят:
+                    self.кэш_ног = None
+                    self.кэш_ног_адреса = {}
+                else:
+                    пулы = SB.load_leg_pools()
+                    self.кэш_ног = SB.LegCache(пулы, self._вызов_тени)
             self.тень_включена = SB is not None and ST.env_int("BLOOM_SHADOW", 1) == 1
             self.тень_перезапусков += 1
             self.тень_последний_перезапуск = time.strftime(
@@ -3094,6 +3115,23 @@ class Детектор:
             return bool(SG.политика(SG.группа(источник)).get("bloom_trades", True))
         except Exception:  # noqa: BLE001
             return True
+
+    def размер_bloom(self, источник: str | None) -> float | None:
+        """Сколько SOL берёт BLOOM по этому источнику. None -- размер из окружения.
+
+        Решение владельца 25.09 (вечер): "Bloom включить на 38 источников
+        lane_only с размером 0.05 SOL (на BATCH-3/5 остаётся 0.2)". Размер
+        приходит из файла групп (bloom_sol) и передаётся исполнителю на ОДНУ
+        покупку -- его собственный buy_sol при этом не меняется, иначе одна
+        группа молча переписала бы размер другой.
+        """
+        try:
+            import bloom_source_groups as SG  # noqa: PLC0415
+
+            з = SG.политика(SG.группа(источник)).get("bloom_sol")
+            return float(з) if з else None
+        except Exception:  # noqa: BLE001
+            return None
 
     def запустить_полосу(self, строка: dict, tx: dict | None) -> None:
         """Своя отправка -- в своём потоке и НЕ задерживая Bloom.
@@ -5801,8 +5839,13 @@ def self_test() -> int:
                 self.вызовы = []
                 self.падать = падать
 
-            def execute(self, решение, *, balance_sol):
+            def execute(self, решение, *, balance_sol, amount_sol=None):
+                # amount_sol -- размер покупки по группе источника: заглушка
+                # запоминает его, чтобы проверить, что 0.05 по lane_only
+                # доходит до исполнителя, а не теряется по дороге.
                 self.вызовы.append((решение.get("signature"), balance_sol))
+                self.размеры = getattr(self, "размеры", [])
+                self.размеры.append(amount_sol)
                 if self.падать:
                     raise RuntimeError("притворное падение исполнителя")
                 return {"exec_code": "DRY_RUN", "reason": "заглушка"}
@@ -5887,13 +5930,30 @@ def self_test() -> int:
             chk("и по источнику скорости Bloom не позван",
                 р_с["action"] == "buy" and зовы_с_ == [] and не_зван_с == 1,
                 (р_с.get("action"), зовы_с_, не_зван_с))
-            р_б, зовы_б_, не_зван_б, _ = одна_группа(
+            р_б, зовы_б_, не_зван_б, д_б = одна_группа(
                 "bloom_lane", {"lane_sol": 0.05, "bloom_trades": True,
                                 "fanout": True, "addresses": {"SRC": "BATCH-5"}},
                 "MINT_ГР3", "ПОДПИСЬ_ГР3")
             chk("а там, где торговать разрешено, Bloom позван как раньше",
                 [з[0] for з in зовы_б_] == ["ПОДПИСЬ_ГР3"] and не_зван_б == 0,
                 (зовы_б_, не_зван_б, р_б.get("code")))
+            chk("по bloom_lane размер Bloom не навязан: берётся из окружения",
+                д_б.размер_bloom("SRC") is None, д_б.размер_bloom("SRC"))
+
+            # РАЗМЕР BLOOM ПО ГРУППЕ -- ЭТО ДЕНЬГИ (решение владельца 25.09
+            # вечером): по lane_only Bloom торгует и берёт 0.05, а не 0.2.
+            # Проверяется и то, что Bloom позван, и то, что размер дошёл до
+            # исполнителя: размер, потерянный по дороге, купил бы на 0.2.
+            р_л2, зовы_л2, не_зван_л2, д_л2 = одна_группа(
+                "lane_only", {"lane_sol": 0.05, "bloom_trades": True,
+                               "bloom_sol": 0.05, "fanout": True,
+                               "addresses": {"SRC": "BATCH-1"}},
+                "MINT_ГР4", "ПОДПИСЬ_ГР4")
+            chk("по lane_only Bloom позван, когда торговать разрешено",
+                [з[0] for з in зовы_л2] == ["ПОДПИСЬ_ГР4"] and не_зван_л2 == 0,
+                (зовы_л2, не_зван_л2, р_л2.get("code")))
+            chk("и размер 0.05 дошёл до исполнителя, а не 0.2",
+                д_л2.размер_bloom("SRC") == 0.05, д_л2.размер_bloom("SRC"))
 
             # ПОРОГ ВХОДА ПО ГРУППЕ. Это деньги: порог решает, покупаем мы по
             # этому сигналу или нет. Без своего порога у новых групп полоса на
@@ -6276,7 +6336,7 @@ def self_test() -> int:
             def __init__(self):
                 self.видел = []
 
-            def execute(self, решение_вх, *, balance_sol):
+            def execute(self, решение_вх, *, balance_sol, amount_sol=None):
                 self.видел.append(решение_вх.get("source_pool"))
                 return {"exec_code": "DRY_RUN", "reason": "заглушка"}
 
@@ -7678,8 +7738,28 @@ def self_test() -> int:
         # solders). Создание кэша проверяется только там, где модуль есть, а
         # вот РАЗВОДКА уведомлений -- всегда, на подставном кэше: она наша и
         # от чужого модуля зависеть не должна.
+        # ЗАМЕР ДВУХШАГОВОЙ ТЕНИ СНЯТ ПО УМОЛЧАНИЮ (решение владельца 25.09
+        # вечером: 2 сигнала из 41 977 за сутки). Это и проверяется первым: по
+        # умолчанию кэша ног нет, бюджет 0, а причина названа словами.
+        chk("по умолчанию замер двухшаговой тени снят, и сказано почему",
+            детектор_к.кэш_ног is None and детектор_к.ног_бюджет == 0
+            and "снят словом владельца" in детектор_к.кэш_ног_почему,
+            (детектор_к.кэш_ног, детектор_к.ног_бюджет,
+             детектор_к.кэш_ног_почему))
+        # А САМ МЕХАНИЗМ ЖИВ и включается одной переменной: проверяем его при
+        # BLOOM_SHADOW_LEGS_OFF=0, чтобы снятие замера не стало потерей кода.
+        было_снят = os.environ.get("BLOOM_SHADOW_LEGS_OFF")
+        os.environ["BLOOM_SHADOW_LEGS_OFF"] = "0"
+        try:
+            детектор_к = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
+                                   курс=КурсSOL(), режим="dry", helius=h_к)
+        finally:
+            if было_снят is None:
+                os.environ.pop("BLOOM_SHADOW_LEGS_OFF", None)
+            else:
+                os.environ["BLOOM_SHADOW_LEGS_OFF"] = было_снят
         if SB is not None:
-            chk("кэш шаблонов первого шага поднялся",
+            chk("кэш шаблонов первого шага поднялся при включённом замере",
                 детектор_к.кэш_ног is not None, детектор_к.кэш_ног_почему)
             chk("в кэше ровно четыре котировки, как назвал владелец",
                 детектор_к.кэш_ног is not None
@@ -7981,7 +8061,11 @@ def self_test() -> int:
             детектор_б.ног_кредитов_путь.read_text(encoding="utf-8")
             if детектор_б.ног_кредитов_путь.exists() else "файла нет")
         было_env = os.environ.get("BLOOM_SHADOW_LEGS_CREDITS")
+        было_снят2 = os.environ.get("BLOOM_SHADOW_LEGS_OFF")
         os.environ["BLOOM_SHADOW_LEGS_CREDITS"] = "4"
+        # Бюджет проверяется при ВКЛЮЧЁННОМ замере: снятый замер держит бюджет
+        # нулём, и проверять на нём переживание квоты было бы проверкой снятия.
+        os.environ["BLOOM_SHADOW_LEGS_OFF"] = "0"
         try:
             детектор_в = Детектор(источники={"SRC": "BATCH-5"}, состояние=st,
                                    курс=КурсSOL(), режим="dry", helius=h_к)
@@ -8025,6 +8109,10 @@ def self_test() -> int:
                 os.environ.pop("BLOOM_SHADOW_LEGS_CREDITS", None)
             else:
                 os.environ["BLOOM_SHADOW_LEGS_CREDITS"] = было_env
+            if было_снят2 is None:
+                os.environ.pop("BLOOM_SHADOW_LEGS_OFF", None)
+            else:
+                os.environ["BLOOM_SHADOW_LEGS_OFF"] = было_снят2
             try:
                 детектор_б.ног_кредитов_путь.unlink()
             except FileNotFoundError:
