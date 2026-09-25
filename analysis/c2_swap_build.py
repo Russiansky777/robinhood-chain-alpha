@@ -320,7 +320,16 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
         ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
     ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
     if tip:
-        ixs.append(sol_transfer(payer, tip[0], int(tip[1])))
+        # ЧАЕВЫХ МОЖЕТ БЫТЬ НЕСКОЛЬКО. Боевой пул отправителей (слово
+        # владельца 25.09) посылает ОДНУ подписанную покупку сразу всеми
+        # сервисами, а каждый сервис проверяет СВОИ чаевые и ниже своего
+        # минимума молча отбрасывает транзакцию. Поэтому tip -- это либо пара
+        # (адрес, лампорты), либо список таких пар; проверка суммы и списка
+        # получателей -- у вызывающего (bloom_own_send), здесь только сборка.
+        пары = (tip if isinstance(tip, (list, tuple))
+                and tip and isinstance(tip[0], (list, tuple)) else [tip])
+        for адрес_ч, лам_ч in пары:
+            ixs.append(sol_transfer(payer, адрес_ч, int(лам_ч)))
     msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
     n_sig = msg.header.num_required_signatures
     vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)
