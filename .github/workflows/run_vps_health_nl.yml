@@ -94,7 +94,12 @@ jobs:
                      /home/bot/grpc_feed_probe_data/heartbeat.json; do
               if [ -s \"\$f\" ]; then
                 printf '%s (изменён %s):\n' \"\$f\" \"\$(date -u -r \"\$f\" +%Y-%m-%dT%H:%M:%SZ)\"
-                head -c 6000 \"\$f\"; echo
+                # 24 000 знаков, а не 6 000: признак жизни детектора вырос, и
+                # на 6 000 он обрывался ровно перед блоком own_send -- то есть
+                # перед пределами полосы, её кошельком, пулом и nonce. Для
+                # доклада по гейту нужен весь файл, а ключей в нём нет (это
+                # проверяет отдельный шаг ниже).
+                head -c 24000 \"\$f\"; echo
               else
                 echo \"\$f: нет или пуст\"
               fi
@@ -199,10 +204,16 @@ jobs:
           } >> data/vps_health_nl.txt
           # Решения: коды сбоев за окно. Журнал построчный JSON, поэтому
           # отбор grep-ом -- по коду, а окно -- по метке времени в строке.
+          # ОТБОР ПО ВРЕМЕНИ, а не только по коду: без него шаг печатал
+          # строки любой давности под заголовком "за последние N минут" --
+          # то есть заголовок врал. Граница считается НА ХОСТЕ его же часами.
+          CUTOFF=$(ssh -n $SSH_OPTS root@$HOST "date -u -d '-${{ inputs.diag_min }} min' +%Y-%m-%dT%H:%M:%SZ")
+          echo "граница окна: $CUTOFF"
           ssh -n $SSH_OPTS root@$HOST "
             F=/home/bot/bloom_executor_live_data/decisions.jsonl
             if [ -s \"\$F\" ]; then
-              grep -E 'HANDLER_CRASHED|UNSOLD|AUTO_PAUSE' \"\$F\" | tail -n 20
+              FOUND=\$(grep -E 'HANDLER_CRASHED|UNSOLD|AUTO_PAUSE' \"\$F\" | awk -v c='$CUTOFF' 'match(\$0, /\"ts_utc\": ?\"[^\"]*\"/) { t = substr(\$0, RSTART, RLENGTH); gsub(/.*\"ts_utc\": ?\"/, \"\", t); gsub(/\".*/, \"\", t); if (t >= c) print }' | tail -n 20)
+              if [ -n \"\$FOUND\" ]; then echo \"\$FOUND\"; else echo 'сбоев в окне нет'; fi
             else
               echo 'журнал решений пуст'
             fi
