@@ -1,7 +1,7 @@
-=== NL-хост: почему перезагрузился, снято 2026-09-26T04:58:18Z ===
+=== NL-хост: почему перезагрузился, снято 2026-09-26T04:59:58Z ===
 --- сейчас и с какого времени работает ---
-2026-09-26T04:58:20Z
-up 3 weeks, 1 day, 12 hours, 30 minutes
+2026-09-26T05:00:00Z
+up 3 weeks, 1 day, 12 hours, 32 minutes
          system boot  2026-09-03 18:27
 --- последние загрузки и выключения ---
 reboot   system boot  6.8.0-71-generic Thu Sep  3 18:27   still running
@@ -11,7 +11,7 @@ wtmp begins Thu Sep  3 18:27:40 2026
 wtmp begins Thu Sep  3 18:27:40 2026
 --- список загрузок systemd ---
 IDX BOOT ID                          FIRST ENTRY                  LAST ENTRY
-  0 ec7fbedc0b724fad9fa2ad7911d2fd48 Thu 2026-09-03 18:27:41 CEST Sat 2026-09-26 06:58:19 CEST
+  0 ec7fbedc0b724fad9fa2ad7911d2fd48 Thu 2026-09-03 18:27:41 CEST Sat 2026-09-26 06:59:59 CEST
 --- хвост ПРЕДЫДУЩЕЙ загрузки: что было перед выключением ---
 --- ядро этой загрузки, первые строки ---
 Sep 03 18:27:41 ubuntu kernel: Linux version 6.8.0-71-generic (buildd@lcy02-amd64-053) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #71-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 22 16:52:38 UTC 2025 (Ubuntu 6.8.0-71.71-generic 6.8.12)
@@ -63,8 +63,68 @@ enabled
 2026-09-26 06:53:39,624 INFO Packages that will be upgraded: curl libcurl3t64-gnutls libcurl4t64 libexpat1 libexpat1-dev
 2026-09-26 06:53:39,624 INFO Writing dpkg log to /var/log/unattended-upgrades/unattended-upgrades-dpkg.log
 2026-09-26 06:54:03,174 INFO All upgrades installed
+--- КТО остановил службы: строки самого systemd (без вывода служб) ---
+== bloom-detector
+Sep 26 06:53:45 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Sep 26 06:53:45 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 26 06:53:45 claude-nl systemd[1]: bloom-detector.service: Consumed 3min 5.231s CPU time, 150.6M memory peak, 0B memory swap peak.
+Sep 26 06:53:45 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+== bloom-seller
+Sep 26 06:53:43 claude-nl systemd[1]: Stopping bloom-seller.service - Bloom sell guard (dry-run by default)...
+Sep 26 06:53:43 claude-nl systemd[1]: bloom-seller.service: Deactivated successfully.
+Sep 26 06:53:43 claude-nl systemd[1]: Stopped bloom-seller.service - Bloom sell guard (dry-run by default).
+Sep 26 06:53:43 claude-nl systemd[1]: bloom-seller.service: Consumed 41.921s CPU time, 36.9M memory peak, 0B memory swap peak.
+Sep 26 06:53:43 claude-nl systemd[1]: Started bloom-seller.service - Bloom sell guard (dry-run by default).
+Sep 26 06:53:45 claude-nl systemd[1]: Stopping bloom-seller.service - Bloom sell guard (dry-run by default)...
+Sep 26 06:53:45 claude-nl systemd[1]: bloom-seller.service: Deactivated successfully.
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped bloom-seller.service - Bloom sell guard (dry-run by default).
+Sep 26 06:53:45 claude-nl systemd[1]: Started bloom-seller.service - Bloom sell guard (dry-run by default).
+--- бегунок GitHub: что с ним было ---
+  actions.runner.Russiansky777-robinhood-chain-alpha.nl-host.service loaded    active   running GitHub Actions Runner (Russiansky777-robinhood-chain-alpha.nl-host)
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped dbot-detect-probe.service - DBot detect probe (Helius websocket, измерение задержки обнаружения).
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped grpc-feed-probe.service - Зонд гонки потоков: gRPC против Helius WS (не торгует).
+Sep 26 06:53:45 claude-nl systemd[1]: Stopping ModemManager.service - Modem Manager...
+Sep 26 06:53:45 claude-nl systemd[1]: Stopped ModemManager.service - Modem Manager.
+Sep 26 06:53:46 claude-nl systemd[1]: Stopping polkit.service - Authorization Manager...
+Sep 26 06:53:46 claude-nl systemd[1]: Stopped polkit.service - Authorization Manager.
+Sep 26 06:53:46 claude-nl systemd[1]: Stopped fail2ban.service - Fail2Ban Service.
+Sep 26 06:54:01 claude-nl runsvc.sh[1219228]: Runner listener exited with error code 0
+Sep 26 06:54:01 claude-nl runsvc.sh[1219228]: Runner listener exit with 0 return code, stop the service, no retry needed.
+Sep 26 06:54:01 claude-nl systemd[1]: actions.runner.Russiansky777-robinhood-chain-alpha.nl-host.service: Deactivated successfully.
+Sep 26 06:54:01 claude-nl systemd[1]: Stopped actions.runner.Russiansky777-robinhood-chain-alpha.nl-host.service - GitHub Actions Runner (Russiansky777-robinhood-chain-alpha.nl-host).
+Sep 26 06:54:01 claude-nl systemd[1]: actions.runner.Russiansky777-robinhood-chain-alpha.nl-host.service: Consumed 5min 1.328s CPU time, 884.8M memory peak, 0B memory swap peak.
+Sep 26 06:54:01 claude-nl systemd[1]: Started actions.runner.Russiansky777-robinhood-chain-alpha.nl-host.service - GitHub Actions Runner (Russiansky777-robinhood-chain-alpha.nl-host).
+Sep 26 06:54:01 claude-nl runsvc.sh[1311304]: Starting Runner listener with startup type: service
+Sep 26 06:55:31 claude-nl systemd[1]: Stopping user@0.service - User Manager for UID 0...
+Sep 26 06:55:31 claude-nl systemd[1311470]: Stopping gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+Sep 26 06:55:32 claude-nl systemd[1]: Stopped user@0.service - User Manager for UID 0.
+Sep 26 06:55:32 claude-nl systemd[1]: Stopping user-runtime-dir@0.service - User Runtime Directory /run/user/0...
+Sep 26 06:55:32 claude-nl systemd[1]: Stopped user-runtime-dir@0.service - User Runtime Directory /run/user/0.
+Sep 26 06:58:33 claude-nl systemd[1]: Stopping user@0.service - User Manager for UID 0...
+Sep 26 06:58:33 claude-nl systemd[1312312]: Stopping gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+Sep 26 06:58:33 claude-nl systemd[1]: Stopped user@0.service - User Manager for UID 0.
+Sep 26 06:58:33 claude-nl systemd[1]: Stopping user-runtime-dir@0.service - User Runtime Directory /run/user/0...
+Sep 26 06:58:33 claude-nl systemd[1]: Stopped user-runtime-dir@0.service - User Runtime Directory /run/user/0.
+--- входы и sudo в это окно ---
+2026-09-26T06:55:19.135180+02:00 claude-nl sshd[1312070]: Accepted publickey for root from 20.171.123.132 port 34843 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
+2026-09-26T06:55:19.136718+02:00 claude-nl sshd[1312070]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T06:55:21.222617+02:00 claude-nl sshd[1312119]: Accepted publickey for root from 20.171.123.132 port 34841 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
+2026-09-26T06:55:21.223919+02:00 claude-nl sshd[1312119]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T06:56:01.843016+02:00 claude-nl CRON[1312200]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T06:57:01.662770+02:00 claude-nl CRON[1312217]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T06:57:01.663159+02:00 claude-nl CRON[1312218]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T06:58:01.666926+02:00 claude-nl CRON[1312279]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T06:58:19.651177+02:00 claude-nl sshd[1312306]: Accepted publickey for root from 52.190.182.112 port 62469 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
+2026-09-26T06:58:19.652426+02:00 claude-nl sshd[1312306]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T06:58:19.687523+02:00 claude-nl (systemd): pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T06:59:00.500514+02:00 claude-nl CRON[1312461]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T06:59:59.618168+02:00 claude-nl sshd[1312500]: Accepted publickey for root from 172.212.165.177 port 49164 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
+2026-09-26T06:59:59.619491+02:00 claude-nl sshd[1312500]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T06:59:59.654078+02:00 claude-nl (systemd): pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)
 --- память и OOM в этой загрузке ---
                total        used        free      shared  buff/cache   available
-Mem:            3916         727         264          17        3212        3188
+Mem:            3916         763         186          17        3253        3152
 Swap:              0           0           0
 1
