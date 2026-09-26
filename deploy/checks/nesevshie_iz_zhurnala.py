@@ -25,7 +25,11 @@ import time
         "lane_tips_total_sol", "lane_priority_lamports", "pnl_counted",
         "pnl_counted_sol", "pnl_counted_spend_sol", "closed_reason",
         "closed_sol_net", "lane_buy_native_sol", "lane_buy_fee_sol",
-        "lane_send_ambiguous", "why_not")
+        "lane_send_ambiguous", "why_not",
+        # ВРЕМЯ ОТВЕТА BLOOM пишется В ПОЗИЦИЮ (bloom_executor.py:301), а не в
+        # журнал вызовов API: прогон 15:33Z искал его в api_calls.jsonl (544
+        # строки, ни одной с этим полем) и честно вернул ноль ответов.
+        "bloom_ms", "ts_sent", "new_connections")
 
 
 def строки(путь):
@@ -69,7 +73,11 @@ def main() -> int:
             по_cid.setdefault(cid, {}).update({к: v for к, v in з.items()
                                                if к in ПОЛЯ and v is not None})
     сделки = []
+    мс_позиций = []
     for cid, п in по_cid.items():
+        if float(п.get("ts_intent") or 0) >= порог and isinstance(
+                п.get("bloom_ms"), (int, float)):
+            мс_позиций.append(float(п["bloom_ms"]))
         if not п.get("lane"):
             continue
         if float(п.get("ts_intent") or 0) < порог:
@@ -100,6 +108,7 @@ def main() -> int:
             if isinstance(зн, (int, float)):
                 мс.append(float(зн))
     итог = {"с": а.since_utc, "сделок_полосы": len(сделки),
+            "bloom_ms_iz_pozicij": sorted(мс_позиций),
             "файлы_api": [os.path.basename(п) for п in пути_api],
             "строк_api_всего": всего_строк,
             "bloom_ms": sorted(мс), "сделки": сделки}
