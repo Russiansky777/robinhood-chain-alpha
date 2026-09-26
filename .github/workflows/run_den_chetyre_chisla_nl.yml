@@ -19,6 +19,10 @@ on:
         description: "сколько несчитаемых смотреть по цепи"
         required: false
         default: "20"
+      skolko_bloom:
+        description: "сколько сделок площадки смотреть для комиссии Bloom"
+        required: false
+        default: "40"
 
 concurrency:
   group: den-chetyre-chisla
@@ -62,7 +66,9 @@ jobs:
             set -o pipefail
             nice -n 15 python3 /tmp/den_chetyre_chisla.py --zhurnal \
               --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' \
-              --skolko '${{ inputs.skolko }}' --out /tmp/den_chisla_zhurnal.json
+              --skolko '${{ inputs.skolko }}' \
+              --skolko-bloom '${{ inputs.skolko_bloom }}' \
+              --out /tmp/den_chisla_zhurnal.json
             rc=\$?; rm -f /tmp/den_chetyre_chisla.py; exit \$rc"
           ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/den_chisla_zhurnal.json" > /tmp/den_chisla_zhurnal.json
           ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/den_chisla_zhurnal.json"
@@ -76,6 +82,7 @@ jobs:
           [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
           python3 deploy/checks/den_chetyre_chisla.py --cep \
             --vhod /tmp/den_chisla_zhurnal.json --skolko '${{ inputs.skolko }}' \
+            --skolko-bloom '${{ inputs.skolko_bloom }}' \
             --out "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
