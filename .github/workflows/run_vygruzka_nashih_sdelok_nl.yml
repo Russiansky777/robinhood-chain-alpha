@@ -1,0 +1,92 @@
+name: "Выгрузка наших сделок с хоста для второй сессии (только чтение)"
+
+# ЗАЧЕМ (слово владельца 26.09, между пунктами): вторая сессия читает наши
+# сделки ЧЕРЕЗ GIT, а не с хоста. Нужен один файл с 24.09 по сейчас: по
+# позиции -- кошелёк, группа, адрес источника, подпись источника, слот входа,
+# наша севшая подпись покупки и подпись продажи, вход/возврат/расход в SOL,
+# итог и причина закрытия.
+#
+# Только чтение. Ни ордеров, ни записи на хост: скрипт кладётся в /tmp,
+# читает журналы потоком и удаляется.
+#
+# КЛЮЧЕЙ И URL В ФАЙЛЕ БЫТЬ НЕ ДОЛЖНО: скрипт гонит каждую строку через
+# вычистку, а шаг "Проверка файла" отказывается коммитить, если в нём всё
+# равно нашлось http:// или api-key. Один такой случай 26.09 уже был.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени брать сделки"
+        required: false
+        default: "2026-09-24T00:00:00Z"
+
+concurrency:
+  group: vygruzka-nashih-sdelok-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  REPO_ROOT: /home/bot/robinhood-chain-alpha
+  OUT: data/podbivka/nashi_sdelki_host.json
+
+jobs:
+  vygruzka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка выгрузки (денежный путь: подписи, суммы, итог, вычистка)"
+        run: python3 deploy/checks/vygruzka_nashih_sdelok.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Сделки из журнала потоком"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/vygruzka_nashih_sdelok.py" < deploy/checks/vygruzka_nashih_sdelok.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            nice -n 15 python3 /tmp/vygruzka_nashih_sdelok.py \
+              --state-dir '$STATE_DIR' --repo-root '$REPO_ROOT' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --out /tmp/nashi_sdelki_host.json
+            rc=\$?; rm -f /tmp/vygruzka_nashih_sdelok.py; exit \$rc"
+          install -d data/podbivka
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nashi_sdelki_host.json" > "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/nashi_sdelki_host.json"
+          wc -c "$OUT"
+
+      - name: "Проверка файла: числа на месте, ключей и URL нет"
+        run: python3 deploy/checks/vygruzka_nashih_sdelok.py --proverit "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Vygruzka nashih sdelok s hosta dlya vtoroy sessii [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
