@@ -164,6 +164,9 @@ def main() -> None:
     ap.add_argument("--a2", default=str(DATA / "a2_model_vs_chain.json"))
     ap.add_argument("--followers", default=str(DATA / "a2_followers_exec_markup.json"))
     ap.add_argument("--out", default=str(DEFAULT_OUT))
+    ap.add_argument("--mint-fill", default="",
+                    help="добор налогового статуса минтов (data/a2_mint_tax_fill.json); "
+                         "приоритет у исходного аудита")
     args = ap.parse_args()
     t0 = time.time()
 
@@ -174,7 +177,20 @@ def main() -> None:
     if not crowd:
         raise SystemExit(f"нет кэша толпы {args.crowd}")
     aud = A.load_json(DATA / "solana_transfer_fee_audit.json") or {}
-    minty = aud.get("минты") or {}
+    minty = dict(aud.get("минты") or {})
+    # ДОБОР налогового статуса (II.8). Аудит 23.09 знает только минты НАШИХ
+    # сделок, а в кэше толпы их больше: 107 сигналов из 346 были непосчитаны
+    # ровно потому, что минта нет в справочнике. Добор ложится ПОД аудит:
+    # измеренное 23.09 не перезаписывается, добавляются только отсутствующие.
+    добор_счёт = 0
+    if args.mint_fill:
+        доб = A.load_json(args.mint_fill) or {}
+        for м, з in (доб.get("минты") or {}).items():
+            if м not in minty and з.get("программа_токена_id"):
+                minty[м] = з
+                добор_счёт += 1
+        print(f"добор минтов: в справочник добавлено {добор_счёт} "
+              f"из {len(доб.get('минты') or {})}")
     leg = A.load_json(DATA / "c2_leg_pools_2026-09-24.json") or {}
     depth = {k: v.get("sol_depth") for k, v in (leg.get("pools") or {}).items()
              if isinstance(v, dict)}
@@ -270,6 +286,8 @@ def main() -> None:
         "источники": {"кэш_толпы": args.crowd, "A2": args.a2,
                       "наценка_чужих": args.followers,
                       "аудит_налога": "data/solana_transfer_fee_audit.json",
+                      "добор_налога": args.mint_fill or "не применялся",
+                      "минтов_добрано": добор_счёт,
                       "глубина_ног": "data/c2_leg_pools_2026-09-24.json"},
         "окно": {k: crowd.get(k) for k in ("window_from_utc", "window_to_utc", "window_days")},
         "размер_sol": РАЗМЕР_SOL,
