@@ -1,5 +1,5 @@
 {
- "utc": "2026-09-26T12:55:25Z",
+ "utc": "2026-09-26T13:01:13Z",
  "окно": {
   "с": "2026-09-18T00:00:00Z",
   "до": "2026-09-26T00:00:00Z"
@@ -19,27 +19,900 @@
     "ok": false,
     "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: invalid type: map, expected a string'}"
    }
-  ]
+  ],
+  "листается": false,
+  "почему_не_годится": "метод отвечает только на один параметр-адрес: ни окна, ни страниц задать нельзя"
  },
  "порог_задачи_sol": 2.0,
  "по_источнику": {
   "leader": {
    "адрес": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
    "записей_журнала": 37,
-   "путь_по_цепи": "getTransactionsForAddress",
-   "подписей_в_окне": 0,
-   "страниц_подписей": 0,
-   "транзакций_посмотрено": 0,
-   "не_покупок": 0,
-   "покрытие_окна": null,
-   "узел_не_отдал": null,
-   "покупок_источника": 0,
-   "совпало": 0,
-   "источник_без_нас": 0,
-   "мы_без_источника": 37,
+   "путь_по_цепи": "getSignaturesForAddress + пакетные getTransaction",
+   "подписей_в_окне": 6585,
+   "страниц_подписей": 8,
+   "транзакций_посмотрено": 6585,
+   "не_покупок": 5956,
+   "покрытие_окна": 1.0,
+   "узел_не_отдал": 540,
+   "покупок_источника": 89,
+   "совпало": 2,
+   "источник_без_нас": 87,
+   "мы_без_источника": 35,
    "предел_уперся": false,
-   "why_not_подписи": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":100,\"maxSupportedTransactionVer",
-   "список_источник_без_нас": [],
+   "why_not_подписи": null,
+   "список_источник_без_нас": [
+    {
+     "signature": "4acZMvYjJoCZ7txNjJrYtjCM53aZRD3CoLtyV7W8EF3qTjgfLs1FWChDEdUo4ipMwe886gq5s4uxok5xEjG5bdqj",
+     "slot": 450407563,
+     "blockTime": 1790354005,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 89987323478,
+     "utc": "2026-09-25T16:33:25Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2GzvBDRsXq3bPiSJkHbvNTyJWk5g4Rcv3z7Ly8F4TNXt2zfdVYstFspW6nTn1FimkxNzmHjeqgsPnEmT4zh59gZD",
+     "slot": 450407432,
+     "blockTime": 1790353970,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1513675490,
+     "utc": "2026-09-25T16:32:50Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4GAqCx8FDdyQbEu91y4wTKE25jaX2aVZwmS9SNUSfjWe4kyHVQQrnjh4FBoZF8JsZddjJrGwsXqSz8r2DxAtnu1Z",
+     "slot": 450225298,
+     "blockTime": 1790305336,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 86840732703,
+     "utc": "2026-09-25T03:02:16Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "44BkmqJkAR1J5D7PQCHTr3GiRMB2HWBRPn2hpLyoGgS7ApUvEuRHXUvwfvstHicLtF7sJmTK4zmhRyCLwK3PGQFp",
+     "slot": 450225209,
+     "blockTime": 1790305313,
+     "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1850997552436,
+     "utc": "2026-09-25T03:01:53Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3TKGGnDn2p47Mb4KaYbZ6mS8Bq22fd6WspwkmXGW1mqTCnbzEVzRT3msaSTMButeBNfVYMUxfanY5PK7qHtxeKLN",
+     "slot": 450194809,
+     "blockTime": 1790297174,
+     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 144283668433,
+     "utc": "2026-09-25T00:46:14Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4QXMQBPT3oKYLFveuxFBenAbhnLzRZw8RvKdkEbB2JsGTeFcKDBc63RsMinNuSYREHnkq75rB3DnkZ82w3u5pTfs",
+     "slot": 450074489,
+     "blockTime": 1790265047,
+     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1123781942689,
+     "utc": "2026-09-24T15:50:47Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "dVEeTpBzSTjo2vCT39MpjxPsv4JPgHV4NaCErepKaEF3mvxQwHGzbpGKtexXdtQJjGPzgUGjxo2J22jdrW8Hhzn",
+     "slot": 450066874,
+     "blockTime": 1790263015,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 723885314,
+     "utc": "2026-09-24T15:16:55Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3egBxswdzyhJnnMe7ubTVwMr6M9ani5jqUikTCs4kXx9tcaxbcWzmmgznnu8mqKbyQJEvzBpJ7p5VasZn71DNJRg",
+     "slot": 450051862,
+     "blockTime": 1790259007,
+     "mint": "5MhscascCnJJNsPAsbEFtBMW6VanEmdyEcCx7v9172rS",
+     "sol_out": 0.00055084,
+     "tokens_raw": 53655259432694,
+     "utc": "2026-09-24T14:10:07Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "55povDnweDjMCX4NTjXzBUF1m6DbjerHSANnEGQATw6ucGFpP2kucj4nVdmqEyitaUaxx1G5npRYNKr84VFRBYsC",
+     "slot": 450044753,
+     "blockTime": 1790257109,
+     "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
+     "sol_out": 0.00055084,
+     "tokens_raw": 206909497988,
+     "utc": "2026-09-24T13:38:29Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "61UuNWbXkCR4JYdZjXLitV9eS3BtuV2h1F4q8RUcbiF5jM2CKJgAwZ2qf4JXNML1S4THho89q6GfkVUVxyxBa6H6",
+     "slot": 450032152,
+     "blockTime": 1790253763,
+     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1239692824335,
+     "utc": "2026-09-24T12:42:43Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3NnkxWBsniaUwVoUXh1BRJgzecccQKUj3ux3P9XJSAnTeTRD4PZ3DPNMQ3JdDTvsJaM1ebRGvg3jBiKRhzHhDLWk",
+     "slot": 450009056,
+     "blockTime": 1790247657,
+     "mint": "FTjYFyQLRX34RmfX1Xxh1VUJe9c2H8WFr7XophMa55g4",
+     "sol_out": 0.00055084,
+     "tokens_raw": 531002421950,
+     "utc": "2026-09-24T11:00:57Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3NNWq9ENTtJZPisCrRGywMgwj59Hor5N26wZT3wva7E1cSDydrckH8YQ3s6voxnjNsMqEaSLzQ9US26me62ftAh1",
+     "slot": 449924048,
+     "blockTime": 1790225124,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 82908033293,
+     "utc": "2026-09-24T04:45:24Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "MydsxHEmGhvnREM4MiMddzRfkLxZDWrLW6dXNEUc4ugYux1aq7xorFbARCQEeiyNzgKLScEZkUfyVDMaRhqT36M",
+     "slot": 449924046,
+     "blockTime": 1790225124,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 83083357903,
+     "utc": "2026-09-24T04:45:24Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "24j2Uo5kF4PEiuY3TXsrN9YBMARygXBdLJue3gY4VZ5fcec8GarAvTJvionDTPCCB2rDUU65Zxevvy7s6XRiDgTy",
+     "slot": 449924046,
+     "blockTime": 1790225124,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 83255510141,
+     "utc": "2026-09-24T04:45:24Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5LLhmiAT1RShWdsUCHtxnGBuADe4gAVghsipsGaNskZC5CgzLxZ678y67VFvggR5zFaZGnEL1EhN1jTh6GegLUZm",
+     "slot": 449923429,
+     "blockTime": 1790224963,
+     "mint": "CASs9vMniGPtsnnKrV9uziBHA7JU5dS9MQY15WsRqVfx",
+     "sol_out": 0.00055084,
+     "tokens_raw": 25514241369,
+     "utc": "2026-09-24T04:42:43Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5VdMejWsnPZcg9FyFudApVz5UkC17LpPbqkhN2mUSC3qM8YepLhYnjAu8jUTr8tN22t9rUiYg9rNDhPyzy6bCka3",
+     "slot": 449923378,
+     "blockTime": 1790224950,
+     "mint": "FTjYFyQLRX34RmfX1Xxh1VUJe9c2H8WFr7XophMa55g4",
+     "sol_out": 0.00055084,
+     "tokens_raw": 77257413300,
+     "utc": "2026-09-24T04:42:30Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2LHPpCqEQbkSkm2Hk2JgA2unsPaku64C1uQmCnRkwh95v3oJKV2faEnTuJM7HM6FLT8sf3HvXPkJpBnRG7TPrktk",
+     "slot": 449899215,
+     "blockTime": 1790218550,
+     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 715620836039,
+     "utc": "2026-09-24T02:55:50Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "35uz5JsXbYr2558747yzUFjoabGsH9216PHv9bGK8LQZnWMHHL69v8A35B3HQmmazbd5hyazZsuPwSqGyyKJRRtA",
+     "slot": 449887600,
+     "blockTime": 1790215466,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 80394908817,
+     "utc": "2026-09-24T02:04:26Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3ySaezYHv9QXmyMyw3eq6EJaPHPY9vKssYxWX6y4H6uYsfzuoXtrEeLF3KzL4X2zj4FbEf5ehRrmEiLMWfx7Ka93",
+     "slot": 449875675,
+     "blockTime": 1790212301,
+     "mint": "21UpvT3s4rMhYGvoB4cxsZzNr5GmYss4PV12cTr82thy",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3336203471080,
+     "utc": "2026-09-24T01:11:41Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2pkfNvQ1qgd4quX5yosQPDnFk1mE97Dav8LPUWzUHszEJ5c6jdTmXF5vDhZXfKrkqnigykhqmDwNp8rZaVqRvRQp",
+     "slot": 449875476,
+     "blockTime": 1790212249,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 85174311349,
+     "utc": "2026-09-24T01:10:49Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2R8ByA9weBZuZdsVjg5UnkB7jQyDV4xURdei8ZPX3PSWX2LSxSDT5M2FVyRh7zVLMKv83MvY13qHXQJCJ9TfSYMP",
+     "slot": 449875368,
+     "blockTime": 1790212219,
+     "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 8849884188,
+     "utc": "2026-09-24T01:10:19Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5TFxAfvnVBnDDxFyQPaWfst2sa4HjY1grRCpEY1AiorAxWLgAPzGpyrCunVWegVtHmvuPw3bmdh37dszRvFVZnzB",
+     "slot": 449872056,
+     "blockTime": 1790211338,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.000550832,
+     "tokens_raw": 135950475491,
+     "utc": "2026-09-24T00:55:38Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5ArbKS2AxY6fq5RoVHbiuK3JjJ6h3DZCkUED3NDE75DQfePrp8Qi4eU7Q5TAsvt3znpT1aGbqdroqLG3LqJJQDRg",
+     "slot": 449852229,
+     "blockTime": 1790206071,
+     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 281676651681,
+     "utc": "2026-09-23T23:27:51Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "vPNh656hAKkvMfu39ScTt9A5YDCdP1NFsHMfTTan62dLfmWaBaYnU9BQYcei888QQj515BFGutWmoRbPPGqGBib",
+     "slot": 449828433,
+     "blockTime": 1790199750,
+     "mint": "21UpvT3s4rMhYGvoB4cxsZzNr5GmYss4PV12cTr82thy",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2932369024740,
+     "utc": "2026-09-23T21:42:30Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2Asw8NsUrxf15UMM4UAYuK6eNyqgPZwKuyqpdPYgXHPGdBLax6grxT37Z1pNEAaYh7FgQyo8tzAXVWhGwzJJmnuQ",
+     "slot": 449810290,
+     "blockTime": 1790194934,
+     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 925901507130,
+     "utc": "2026-09-23T20:22:14Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2paabjrTji3ZAnWXcdGqARnCbc6CpvmeED791SckVBXLedLTVgjSoCiKRqkdmKNro6LPMoB4PJsthdTarW2E9RYx",
+     "slot": 449806407,
+     "blockTime": 1790193903,
+     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1559867628788,
+     "utc": "2026-09-23T20:05:03Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4z64UaZSk3Cn1GxgM3TTawhMer2k6qLBzJXVFKz6L8YrMNQ8hMhN1SVik4nGz5tEK7PBtwb8eZwoRTLxbVBCn2c1",
+     "slot": 449775401,
+     "blockTime": 1790185679,
+     "mint": "B6f5Gc88ADwbtv5xKcmL68nspKAHJ7Vmei3QTm8nQok9",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2226377140175,
+     "utc": "2026-09-23T17:47:59Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "59UunfEJMScNwiQHFm4pkqdFP36mqtG6FwJBKgXbCLmdtYkbDJz5Y9qTdQgLFyT8EbfB3LqM4MKUhyGQHSpXuggT",
+     "slot": 449766605,
+     "blockTime": 1790183329,
+     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 838361144804,
+     "utc": "2026-09-23T17:08:49Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5UZL2Ey4uvRinKDkQR9arwG1gbW3tkEHKT5aemmqpoQyFaxdZWm44QcrwgoxRm4ai4DRiKHDoY9nKhUjjCSrVWEj",
+     "slot": 449766544,
+     "blockTime": 1790183313,
+     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2047306146678,
+     "utc": "2026-09-23T17:08:33Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2XUcQV4emccQSPgYHuBBegedw6guCGbPztgfMASmJdkRNcKnvgqQVivLye3X9FPfaFhbTeVnEiMhWYj5k5s2NEzj",
+     "slot": 449759153,
+     "blockTime": 1790181345,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 114830332483,
+     "utc": "2026-09-23T16:35:45Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2Zo3ZNYf3saqPeX19CtbXu4Ne7T2ts6fe6B4sLBuwqWMfV4zZvqKmeW6cceJ3aEFsEXdT5ALmkNiCYq4zSXivfFk",
+     "slot": 449720236,
+     "blockTime": 1790170955,
+     "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2756876845006,
+     "utc": "2026-09-23T13:42:35Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3WREczD7see67ftMXX8zcBZGWBxjHndQUoKQ8s7pLQ7wByAEPg8M9wGpYHm7u7VtiSDbC2jDY9mwV5h6SdbBCRaH",
+     "slot": 449614256,
+     "blockTime": 1790142899,
+     "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1268905760930,
+     "utc": "2026-09-23T05:54:59Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "dUusWty8rtbiz6XhS5MHqYA7er8phyf4RSs8rEyGAWR3t3kkqLqamoZZ8hVq2PyrxgwAMs1g2iSfNM7yXDfJbQ4",
+     "slot": 449603733,
+     "blockTime": 1790140106,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3306474764770,
+     "utc": "2026-09-23T05:08:26Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3B7TsdPhy1Z8TXoTLBysNx2dnwN9TXHhEcoxdwm1Um8gH4MWJtMPNcXEyH7WDxGdTRTHyZMEbrBdwptTZYGj4LKP",
+     "slot": 449590433,
+     "blockTime": 1790136574,
+     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
+     "sol_out": 0.00055084,
+     "tokens_raw": 792366221182,
+     "utc": "2026-09-23T04:09:34Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5qb5XtjhsEarWq7tHwrqTKcacuNxsZeKAUoPHiKjC1yoBk9MNFsJtSfR6D87BWjCXi6bPUhU9obYVgtFK7z3YqUH",
+     "slot": 449582957,
+     "blockTime": 1790134596,
+     "mint": "6wUEFWYBvSTV685mk6Kb4xDpE8q6MvTveUJ3DN5Hn8Ui",
+     "sol_out": 0.00055084,
+     "tokens_raw": 13817377003092,
+     "utc": "2026-09-23T03:36:36Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3rSnSojb8W2RWZ7NHsD1k2HAo4Vja1ja8pKMdknHe8N64F8ZX7XavF5LRWpR7xAhEWdthRgrfr1HjLRsJYRoouZb",
+     "slot": 449582775,
+     "blockTime": 1790134548,
+     "mint": "6wUEFWYBvSTV685mk6Kb4xDpE8q6MvTveUJ3DN5Hn8Ui",
+     "sol_out": 0.00055084,
+     "tokens_raw": 27025205879816,
+     "utc": "2026-09-23T03:35:48Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4NvzFCTrLk82XPRYEEB5FyQhY9sCSKzQ7rywtpKKSkGhqy7VT5o68HQ3hwZodrMwCZZR2hhX1g3rrFJ2j7jUZdsz",
+     "slot": 449579225,
+     "blockTime": 1790133609,
+     "mint": "MYQZzuiiRyy38hY8X7KQN8XyE67y2GYWs63cqjDjgLs",
+     "sol_out": 0.00055084,
+     "tokens_raw": 13474424344868,
+     "utc": "2026-09-23T03:20:09Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2Hskw3aTZNcgz83uW8XAhf9QcS4jZk95cxxmEADViH8ergGdGuYB8TFExNNXJuhUrjU9E1mvCVr7LifiEBr1gCfd",
+     "slot": 449571174,
+     "blockTime": 1790131478,
+     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3815892166680,
+     "utc": "2026-09-23T02:44:38Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "SQRQkwPPkafxmVt8oCavvFd68qsPnQt8jzLH3tnd2TucG6Ktbszwe66B5winwmo93ZkkLwXySTkGrhbky7zVGHb",
+     "slot": 449566331,
+     "blockTime": 1790130192,
+     "mint": "5RXEzhbfmAtEHaPo7qkHk6ThLEXEKzxszEmaY2R1Bydz",
+     "sol_out": 0.00055084,
+     "tokens_raw": 420771952071,
+     "utc": "2026-09-23T02:23:12Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3ni7FChjLGrPeSdjjPSAefipbM4xzLmPe9fJUcZ4Frq2FNa5w5p8Vpv4wao2m3voA3G3Yqb1dn3a8tVuTDkdh4hg",
+     "slot": 449564465,
+     "blockTime": 1790129697,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 360115696064,
+     "utc": "2026-09-23T02:14:57Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "25ChycMKh37wchLXhk31mYAZf1T1HuTJ7xdXzuz3e6c1je59MXQHfG345UPYBpuvTEqfWMTMNUEJc7GgodFLaUKJ",
+     "slot": 449564423,
+     "blockTime": 1790129686,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 376735816743,
+     "utc": "2026-09-23T02:14:46Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5rzqJ4Uj4V7A1LKQt98JuJa9MNSPoPUcm6i1gK8pBZAUUY1ttHzx3GSSrapcDafw8Npe1EvVGfbEGSq2B8s4PjBx",
+     "slot": 449564405,
+     "blockTime": 1790129682,
+     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
+     "sol_out": 0.00055084,
+     "tokens_raw": 371312912768,
+     "utc": "2026-09-23T02:14:42Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2FCHBaxXfX358jf2PAJsbKsoftCa1XzUWLXjYAPi7D7sWPWNW1PSfpskgmKRPKQTkUKiukMYK8VW4Gvz9tffbaAb",
+     "slot": 449544354,
+     "blockTime": 1790124356,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1830307570,
+     "utc": "2026-09-23T00:45:56Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4o8XAZfRR8kNKWLjE43JcvK5E5yW4dVVDGQa77jgP3iyCRj56HVXSM2qQManWRHS7qWdSkKuLo7te2tfWKGMeUbY",
+     "slot": 449544340,
+     "blockTime": 1790124353,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2289936832,
+     "utc": "2026-09-23T00:45:53Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4i8eXsXCcNFeC64ePy5w6XHHCzknBKHuPcnpuCXoeeWspcp5n9mbzLLNk3KajyYSrj9EMAVtv3PiyxnkH8LpyoFM",
+     "slot": 449530768,
+     "blockTime": 1790120757,
+     "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
+     "sol_out": 0.00055084,
+     "tokens_raw": 27104918240,
+     "utc": "2026-09-22T23:45:57Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "wfoxqVB2F6j2gCHbX57jfGbaKENUDJunxfX8wSLKTo1VK7w8Rput2A7zitzXDW1dnF5EmdPBZXFw9sDemQv9qNP",
+     "slot": 449527325,
+     "blockTime": 1790119841,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1790397989,
+     "utc": "2026-09-22T23:30:41Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5V5KzzCZKomHNmBL4Mbt22s4nLhe7gGbPieeJ8yVxWSw7CJp3H7Wds2HKwPFr78HDefPoQ8yB5S9B64wMcJytLef",
+     "slot": 449519849,
+     "blockTime": 1790117843,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 6282033507,
+     "utc": "2026-09-22T22:57:23Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5k7Q194mxwG12xAN2QB6fTwWcBYrRijwg1FxLo6QaxUpgQ623pFLFd4Q7bTozG7uDNYv3THirfgLFUpMro1PxrEx",
+     "slot": 449518130,
+     "blockTime": 1790117380,
+     "mint": "9ni8ZTUidhLWyRF1Uch8BAEEVETMZxtcdupSGim4Mcrj",
+     "sol_out": 0.00055084,
+     "tokens_raw": 26932147627258,
+     "utc": "2026-09-22T22:49:40Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "31djVfXigwtXYKQBFf11GyrDwyo9dteWAVrQjh1Py4yctv8qMXwSX764wj2ug8mc6EQN3CvxTS9bkMkxTDPkHY8j",
+     "slot": 449514117,
+     "blockTime": 1790116311,
+     "mint": "HunmXDXMNQYVoDnUL6PNnSYEtFaTZA2WzGh1HJTW7aoV",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3470943664047,
+     "utc": "2026-09-22T22:31:51Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2qELfxqyoVAxqQsi9JZWkP8q3zn4nkwhsDeuAPF4oUBwRUufeTVpsS45YWHToLYME9W3TtjzEincyr4yg9zd5d5B",
+     "slot": 449496895,
+     "blockTime": 1790111715,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.0484e-05,
+     "tokens_raw": 40151012991156,
+     "utc": "2026-09-22T21:15:15Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3fj1fQEwYiNtFxxNJf2SC53QoVdYYwXconJaGHtpUv31JGtedHuoSjXeCUHx18bYniYFqMQaKU3FryASDfSUdock",
+     "slot": 449491864,
+     "blockTime": 1790110369,
+     "mint": "J1GRFyyw7AkGMDEqn3YF6A4LE3BQrmzMM1XpnKkTymLC",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1603288874861,
+     "utc": "2026-09-22T20:52:49Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2b3rbUxtAM4xgQPMjbDi8Qo5fFSnvuRSuyjLuPGJJXUCSEfxYx6zxJsrEFSVRBp9Bc8tmfgUwCWXGQ6Hc3pgGxU1",
+     "slot": 449490117,
+     "blockTime": 1790109901,
+     "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
+     "sol_out": 0.00055084,
+     "tokens_raw": 266220994513908,
+     "utc": "2026-09-22T20:45:01Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2WR82Tt32qGFtr9tH3Sd3YzFQivAAVoss9KTEEq1PDK3fzW8UFCpwLhMozzJ88KrzcKkVjjL8xhCTNJyGHxYcFfo",
+     "slot": 449490055,
+     "blockTime": 1790109885,
+     "mint": "DtUntDyWcRpzTVt8JiW8fXvUt3WDGGw6kdiD7fjNMFzJ",
+     "sol_out": 0.00055084,
+     "tokens_raw": 6299726026495,
+     "utc": "2026-09-22T20:44:45Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4NhryCDwtP2xw9eZUSm3edgeUunomV4Thwmn7RyQ2eZNSonGohjeEBzhyCzsW13CcpPDHaLCrBY3QeSGV3ke2jdX",
+     "slot": 449490009,
+     "blockTime": 1790109872,
+     "mint": "D21NoqVeYvyrjnZ5to43pHF5xoKUwY7BSjcgsM6Uoebw",
+     "sol_out": 0.00055084,
+     "tokens_raw": 5022353762742,
+     "utc": "2026-09-22T20:44:32Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "z41VhNaDiyhHZtHCVRVFFHpgGbAjwwjWnK3G6X74YwYzyLZeVT8m2QDmZn6NDcEoVnnfHgd2VQ63RJc2pdJ4fLZ",
+     "slot": 449487997,
+     "blockTime": 1790109335,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.0849e-05,
+     "tokens_raw": 917199756665,
+     "utc": "2026-09-22T20:35:35Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5wU7QM3mb2sC2cN1qiGLYN2Tb5GtD5jkggJRPEawMavaV5zu4DzdHLrC3zwF7P9DeVTHxSxa1dPJK8nwQEANZerA",
+     "slot": 449487863,
+     "blockTime": 1790109299,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.0561e-05,
+     "tokens_raw": 1064251672732,
+     "utc": "2026-09-22T20:34:59Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "yNXrTqRWY1xm18gjrZ3T4ntmNYJVoqmkWokZdCHQHE6sHhiTja8QeAvtW67rxyTm4N6gQa12o3Vt5dfsZwcYC8b",
+     "slot": 449487562,
+     "blockTime": 1790109219,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 928038243,
+     "utc": "2026-09-22T20:33:39Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "268sSZ793wy2FdTnariCHrxRFdwtJXr23YWgR6Hr4ThYBtAvU8JkYYZ4yhFCUKMTcTibapfb4iAY2qJyCrjtV8RD",
+     "slot": 449485511,
+     "blockTime": 1790108667,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.1286e-05,
+     "tokens_raw": 888005274250,
+     "utc": "2026-09-22T20:24:27Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3nAaHU2pcnfMNB9d2FcQMAtHzvNXxqnFFwrj3MoszJ3dk2rCqMAu2WYi38GoviBXsok5YKYAExXn3nSHiLx8UM5F",
+     "slot": 449485412,
+     "blockTime": 1790108641,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.0858e-05,
+     "tokens_raw": 1081219827751,
+     "utc": "2026-09-22T20:24:01Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "4gCAx9oKxgPmX462EvR3HzgxMbqJwFH9dtL6CZecGJY9DnN9NGJhRAiaGsRfBJ3QhpdNTLyzn6zEMuXV2QJfdSWK",
+     "slot": 449485363,
+     "blockTime": 1790108628,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.2003e-05,
+     "tokens_raw": 1208621447921,
+     "utc": "2026-09-22T20:23:48Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "62ij3XGQQ32YfvnnkruTd7A4GGo8UfhggusW4zu338qE5kA9kCKrDG8NsvbCEErLW7LMNuuH7RXcvAbbAhpx6ZQx",
+     "slot": 449485185,
+     "blockTime": 1790108579,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.053e-05,
+     "tokens_raw": 1096125504775,
+     "utc": "2026-09-22T20:22:59Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "31dj8Ax6KCHqMtS7ukjuoC2SseLaUfaXughYtSe2kobXPrVdi5VznrXY39ruUJZg6xBRmXLhU1FFotTyLeEr5HKg",
+     "slot": 449485137,
+     "blockTime": 1790108566,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.2418e-05,
+     "tokens_raw": 1272624677856,
+     "utc": "2026-09-22T20:22:46Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3mTSs3C1mYtVFVVmgQ3tUdCDyF2sCNQ3zpsB2Lhs56w7eXuXHDba9tQi1uv8vzahuC4BwizSFh1dLt3dh6ZTE3uF",
+     "slot": 449485098,
+     "blockTime": 1790108555,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 1.4893e-05,
+     "tokens_raw": 1390358443990,
+     "utc": "2026-09-22T20:22:35Z",
+     "почему": "покупка источника 0.0000 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3rtxHyVCJqGGxqVM4q1htGXxH6445EtWcv19cgwdoKSLUAUz3n2GnFe3L9u6szSyWairEcPBwKugPsmKsgFeUZGS",
+     "slot": 449463899,
+     "blockTime": 1790102891,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 337001942,
+     "utc": "2026-09-22T18:48:11Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "6p9Li2PvGQR4pt8hbebctnsv3fd99o2HrwjoYAgNUv2zh4jZjMnDtojWK87HDxozCZTSWAXEJCx9nGTPSaaMycm",
+     "slot": 449462085,
+     "blockTime": 1790102405,
+     "mint": "4wgANxxQdujYTTLHz1YK9V3YiN7KSEAkr9eqK4fPGdQN",
+     "sol_out": 0.001589002,
+     "tokens_raw": 45368408107513,
+     "utc": "2026-09-22T18:40:05Z",
+     "почему": "покупка источника 0.0016 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "PryAe45BALMmzBy5qpEQsa9ekrPdLx6iZDDSuBtdhRMBJSiVia6zdPrx2oCfP9pXPJKPyYZKBdgi86mXTmfHzEy",
+     "slot": 449460321,
+     "blockTime": 1790101933,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.422440477,
+     "tokens_raw": 49633730,
+     "utc": "2026-09-22T18:32:13Z",
+     "почему": "покупка источника 0.4224 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "GKLEBTHjm4hNoir7dRXkaPvddko9RpK67AUzvD5FxWXwMeU39rLAr2PFaqUHkZySyxtvyHojZhGk8UiiPCJiE4f",
+     "slot": 449174339,
+     "blockTime": 1790025572,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 3.614381683,
+     "tokens_raw": 429384297,
+     "utc": "2026-09-21T21:19:32Z",
+     "почему": "не восстановить по данным журнала: решения детектора DBot нам не отдаёт"
+    },
+    {
+     "signature": "2FQu2DKukj4s2CEbVPHYzN5WtpX1BRLnNE9M33x7rNpQvqen3RAfP4MQC2ikEkW9rqs9Ciem1624LtQT53YQShd4",
+     "slot": 449079764,
+     "blockTime": 1790000223,
+     "mint": "FPPGF5RNgCvNzqrRqWrkgkL4YQhzqKMNVtD1kWk1ooqg",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2604516400820,
+     "utc": "2026-09-21T14:17:03Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5TJmgxadS8QFdu3rHUKESYTxdJaNi7yFDsujArmaWGrjLXZ1E3g16upLCCYi7zpNKrcDnH18oW1drE3L8aL8UR6w",
+     "slot": 449041013,
+     "blockTime": 1789989865,
+     "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3541046648652,
+     "utc": "2026-09-21T11:24:25Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3mLtZboxZdZjm73VEffBm9Vwjz7JfQA5SLWkAyi6v9UvyETRmQV4FgsqyQofML8BHdATM9puHQ39W3bAgEUpUoDP",
+     "slot": 448923015,
+     "blockTime": 1789958443,
+     "mint": "9PSxYDFLPbSVx2PKjYRMumW14xtxViQU3Qmi7M8NQ32W",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3991682905867007,
+     "utc": "2026-09-21T02:40:43Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3ZLPgqkMBb7YmKC53cNn3w6yudvva2ogvLwR7aSE4WDywWRi5cBuGbTbnMcEULvsWebuh6LwNX927N7bTvKfeNiY",
+     "slot": 448907736,
+     "blockTime": 1789954349,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 3948444924,
+     "utc": "2026-09-21T01:32:29Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "9deXsVGypUVxq99DWaVSV91gtPMPHK1sCe65nrXkW8GutznJC4s1BP3sssu8JGPMcNeLoV95rcYtA1g6jMvRREZ",
+     "slot": 448827117,
+     "blockTime": 1789932793,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.644112017,
+     "tokens_raw": 70871505,
+     "utc": "2026-09-20T19:33:13Z",
+     "почему": "покупка источника 0.6441 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "ermPy2rirav9svbcEqt5XxPqZaX6UhLfBNk16jngp74ZaspyhiE5G66mitxKSqyCb3zgFTAVPD7CK8exxYizDQ4",
+     "slot": 448812987,
+     "blockTime": 1789929009,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2408973665,
+     "utc": "2026-09-20T18:30:09Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "3P1A7Sn3NdnRowisqTzmA1SnPRQjsEmKmCqSXAE48mLq6pECoXZNr2tr9dtf4StbBYs1b5xELkAvv1VbknVDVLcF",
+     "slot": 448665866,
+     "blockTime": 1789889798,
+     "mint": "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
+     "sol_out": 0.00055084,
+     "tokens_raw": 151834170204,
+     "utc": "2026-09-20T07:36:38Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2FkBtmRTpxx9z9hckcXw6GX2DH1TAPKKStuQ6w5jDcWCAs986TeJAFmWV7ZjTWX6uftXxnA4uAj16vucDj8y9Rv4",
+     "slot": 448657127,
+     "blockTime": 1789887472,
+     "mint": "9PSxYDFLPbSVx2PKjYRMumW14xtxViQU3Qmi7M8NQ32W",
+     "sol_out": 0.00055084,
+     "tokens_raw": 288819541194848,
+     "utc": "2026-09-20T06:57:52Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2LAi9rvcrnsBoDeTRGbkmyGHxRkiDcWcH6ofzveoo8SoxdQ8T478t67qemHxPqsC5imifVQPzAtQnr89avSAYP6C",
+     "slot": 448595814,
+     "blockTime": 1789871138,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 1.843307691,
+     "tokens_raw": 202490885,
+     "utc": "2026-09-20T02:25:38Z",
+     "почему": "покупка источника 1.8433 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5h75u2aqaG5QHG1bSh4rxMEvPT1rJSTz6SpMrWAFfwhr5H8o4dmtrjarPyrvGs8Tv38hLDRMnDQWMcumPDPJgASp",
+     "slot": 448590879,
+     "blockTime": 1789869829,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 1.84330358,
+     "tokens_raw": 203286916,
+     "utc": "2026-09-20T02:03:49Z",
+     "почему": "покупка источника 1.8433 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5erJywT4i8trEwx5e6m1zqmc6EpYiAcswymzeARBGpiftvbHpSSUVukTKiE3zEURQBBQASKqkJo8rAp5V1cvS9kF",
+     "slot": 448590532,
+     "blockTime": 1789869737,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 4125203215,
+     "utc": "2026-09-20T02:02:17Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "43F99Mh4utQHPXdtMduVoCzymF2dFRXsxHuBhuuvCpCNRpQMQCEJ8bKcmBxDSNEBesQCvmiCATftH4rF5aQ6q3nb",
+     "slot": 448573391,
+     "blockTime": 1789865166,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1149589775,
+     "utc": "2026-09-20T00:46:06Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "ymmcjcCMcYUNSeeaZEMjW9yYHNKqg4Y9B6AWubGpAGcbnVMys3LEbY4zsijF29ZsD1JYwSGYNUSfTQkcfHTDXKv",
+     "slot": 448548344,
+     "blockTime": 1789858482,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 7.111488999,
+     "tokens_raw": 786848936,
+     "utc": "2026-09-19T22:54:42Z",
+     "почему": "не восстановить по данным журнала: решения детектора DBot нам не отдаёт"
+    },
+    {
+     "signature": "2dEntu8kMA3xoC6N3NHCJFYidyte6gDjZSNTYxo9Qnq1JBJtBWM8Xn1oMskzCM4dwpoWN4SFZVJSjsHhPnFn43Ln",
+     "slot": 448542318,
+     "blockTime": 1789856867,
+     "mint": "BXrbjRfUH35Y9fDxmHw9GambqVHZ6McmgfRXGqkzUjQr",
+     "sol_out": 0.00055084,
+     "tokens_raw": 5388206306973,
+     "utc": "2026-09-19T22:27:47Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "EpMcLxhPfcN9Lw77w84hpF4Rh2uURdgQyN6PD745KwoRDALpD9JBSvZGtSu5Rcc6mDTkAA9beFU5H1YuP8XXMHj",
+     "slot": 448270129,
+     "blockTime": 1789784328,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1974040711,
+     "utc": "2026-09-19T02:18:48Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "2LcdP8wEwHQmCLYiBqpEdS9rp79pQMf7LqwZhWJYn3cbfU6W7eatTZs7KrJ9i5wMPKbk25FNWpmJeDXSknPH6HC7",
+     "slot": 448016166,
+     "blockTime": 1789716561,
+     "mint": "DUZN7M6ezXez9UVrou4N8UEGRkwnbWmXqqZgEKiZCrnN",
+     "sol_out": 0.00055084,
+     "tokens_raw": 42019933063641799,
+     "utc": "2026-09-18T07:29:21Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5Dq7J5Fbcj45fr49ciwFx3teqctrqnuiQTUrMeyGRfA5H7WrkDp4VVqR8CXHTd1XYTWbpUXnVt7DJ6zmzZ4e8P6A",
+     "slot": 448015265,
+     "blockTime": 1789716322,
+     "mint": "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi",
+     "sol_out": 0.00055084,
+     "tokens_raw": 423811106847,
+     "utc": "2026-09-18T07:25:22Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5nM3aLezLDGL25QM6f7gVHVfnaTsBV5N5sjZnt2wRfBCiZUmppmhoeJsuNLLZt9PXkpZNq9bMuLUNJdby4m8NKef",
+     "slot": 447940219,
+     "blockTime": 1789694099,
+     "mint": "JE3HT7SbCgXDQWV6xp3oiiAisDzq4HyZ8wyEVBDCs45Z",
+     "sol_out": 0.00055084,
+     "tokens_raw": 19839414375,
+     "utc": "2026-09-18T01:14:59Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5BnXSHzpaXCgbERvYno9ZFshFavLCbZKi8hpPqUegyF2yfUbPkH9YpgVuR6ndcgTL46tUFa1otfxQmByZPGMjXcr",
+     "slot": 447935221,
+     "blockTime": 1789692523,
+     "mint": "2pWXsELtCwtcKUyvNC6igngswUSQjVpJdY4hA4cTdjaL",
+     "sol_out": 0.00055084,
+     "tokens_raw": 377287883256,
+     "utc": "2026-09-18T00:48:43Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "aMNk5JxJhVuvGxUD8hyiGPmiwqLMuHRFJPF8Fxb6fWTsuZT3S9L2mRz2VQej1kMYu2CSazyXPEB4Nif9uGEaR6g",
+     "slot": 447927382,
+     "blockTime": 1789690034,
+     "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
+     "sol_out": 0.00055084,
+     "tokens_raw": 134560629809024,
+     "utc": "2026-09-18T00:07:14Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    }
+   ],
    "список_мы_без_источника": [
     {
      "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
@@ -250,14 +1123,6 @@
      "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
-     "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
-     "task": "pointfarmcap",
-     "наш_utc": "2026-09-23T03:09:15Z",
-     "sol_in": 2.0231546,
-     "our_sig": "66BnxB54bwFMf5S1kYhZ5c6SGEjEYpM8Ush6MZBn4Qba8xQi9eW4hnn8BwZEt5iqXpEgosozcuoMxXh6k3ABUZ1K",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
-    },
-    {
      "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
      "task": "pointfarmcap",
      "наш_utc": "2026-09-23T04:04:21Z",
@@ -322,14 +1187,6 @@
      "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
-     "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
-     "task": "BATCH-5",
-     "наш_utc": "2026-09-25T02:45:34Z",
-     "sol_in": 0.20415936,
-     "our_sig": "49PCCiHWkaoNVfQvC9wBEUnFAnn1W2biQ6riPH1UHhUJ3ACXfnJrLjoLuMbQt2ABqBPTUauSMGafyRHgNBukSanR",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
-    },
-    {
      "mint": "2Y5yqeadyaupzhKyn6WbBGZ99UWAZHaHmCYi9EuZDRTM",
      "task": "BATCH-5",
      "наш_utc": "2026-09-25T02:59:40Z",
@@ -342,19 +1199,19 @@
   "Brez": {
    "адрес": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
    "записей_журнала": 8,
-   "путь_по_цепи": "getTransactionsForAddress",
+   "путь_по_цепи": "getSignaturesForAddress + пакетные getTransaction",
    "подписей_в_окне": 0,
    "страниц_подписей": 0,
    "транзакций_посмотрено": 0,
    "не_покупок": 0,
    "покрытие_окна": null,
-   "узел_не_отдал": null,
+   "узел_не_отдал": 0,
    "покупок_источника": 0,
    "совпало": 0,
    "источник_без_нас": 0,
    "мы_без_источника": 8,
    "предел_уперся": false,
-   "why_not_подписи": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":100,\"maxSupportedTransactionVer",
+   "why_not_подписи": "HTTPError: 429 Client Error: Too Many Requests for url: https://mainnet.helius-rpc.com/?api-key=17719392-f758-4ccb-9420-f49bf831b95",
    "список_источник_без_нас": [],
    "список_мы_без_источника": [
     {
@@ -426,19 +1283,61 @@
  },
  "числа": {
   "сверено": 0,
-  "отказов": 0,
+  "отказов": 2,
   "медиана_пп": null,
   "p90_пп": null,
   "макс_пп": null,
-  "причины_отказов": {}
+  "причины_отказов": {
+   "котировка пула не SOL (XsqE9cRRpzxc)": 1,
+   "котировка пула не SOL (4rkGWJNSUPBc)": 1
+  }
  },
  "ряды_чисел": [],
- "отказы_чисел": [],
- "вызовов_узла": 5,
- "ошибок_узла": 4,
- "обращений_к_узлу": 0,
- "запросов_в_пакетах": 0,
- "отказов_429": 0,
- "секунд": 0.7,
+ "отказы_чисел": [
+  {
+   "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
+   "task": "BATCH-5",
+   "источник": "Beqv6dzT",
+   "sol_in": 0.20415936,
+   "наш_utc": "2026-09-25T02:45:34Z",
+   "source_sig": "4qcDMxtRNnBofV4APix1jSbuncd7gXEWSAD6tSgbUNmPVHsRu5hDfBx1oWf8pNyRg1CZTvfoMjNk6Cj5KKNYfFM6",
+   "our_sig": "49PCCiHWkaoNVfQvC9wBEUnFAnn1W2biQ6riPH1UHhUJ3ACXfnJrLjoLuMbQt2ABqBPTUauSMGafyRHgNBukSanR",
+   "факт_токенов": 146268612697,
+   "факт_sol": 0.20415936,
+   "наш_слот": 450221546,
+   "слотов_позже": 2,
+   "сим_токенов": null,
+   "сим_метод": null,
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "why_not": "котировка пула не SOL (XsqE9cRRpzxc)"
+  },
+  {
+   "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
+   "task": "pointfarmcap",
+   "источник": "Beqv6dzT",
+   "sol_in": 2.0231546,
+   "наш_utc": "2026-09-23T03:09:15Z",
+   "source_sig": "2Jq4KMv8P9e2FwE4BJD5udwoi763Ze3pV7Vq6rfzXNf5EoXKvMzRcxojWcaB521VxhJCMP86Dp36aVtWVEHBPQLi",
+   "our_sig": "66BnxB54bwFMf5S1kYhZ5c6SGEjEYpM8Ush6MZBn4Qba8xQi9eW4hnn8BwZEt5iqXpEgosozcuoMxXh6k3ABUZ1K",
+   "факт_токенов": 1070058992421,
+   "факт_sol": 2.0231546,
+   "наш_слот": 449576767,
+   "слотов_позже": 6,
+   "сим_токенов": null,
+   "сим_метод": null,
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "why_not": "котировка пула не SOL (4rkGWJNSUPBc)"
+  }
+ ],
+ "вызовов_узла": 6599,
+ "ошибок_узла": 542,
+ "обращений_к_узлу": 188,
+ "запросов_в_пакетах": 6585,
+ "отказов_429": 56,
+ "секунд": 143.6,
  "предел_вызовов": 20000
 }
