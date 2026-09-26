@@ -94,6 +94,58 @@ def каталог_задачи(имя: str) -> Path:
     return п if п.is_absolute() else КОРЕНЬ / "data" / "podbivka" / имя
 
 
+# ---- пост-фактум курс и порог (слово владельца 26.09: без сети, по сохранённым суммам)
+
+_РЯД: list = []
+
+
+def курс_детектора(bt) -> float | None:
+    """USD за SOL из data/podbivka/kurs_sol_usd.json -- ближайший снимок не дальше 12 ч."""
+    import calendar
+    import time
+    if not _РЯД:
+        п = КОРЕНЬ / "data" / "podbivka" / "kurs_sol_usd.json"
+        if п.exists():
+            for x in json.loads(п.read_text(encoding="utf-8"))["ряд"]:
+                _РЯД.append((calendar.timegm(time.strptime(x["utc"], "%Y-%m-%dT%H:%M:%SZ")), x["usd_sol"]))
+    if not _РЯД or not bt:
+        return None
+    т, к = min(_РЯД, key=lambda x: abs(x[0] - bt))
+    return к if abs(т - bt) <= 12 * 3600 else None
+
+
+ДОСЧИТАТЬ: list = []
+ОТБРОШЕНО_ПОРОГОМ: list = []
+
+
+def пересчёт_порога(покупки: list, адрес: str) -> list:
+    """Порог 2 SOL-экв заново: трата SOL + трата USD / курс детектора (или сохранённый).
+
+    Ниже 2 -- отбросить; выше и без числа симулятора (в прогоне не взята) --
+    в список «досчитать» для второго прохода.
+    """
+    из_ = []
+    for п in покупки:
+        usd = float(п.get("трата_usd") or 0)
+        курс = курс_детектора(п.get("blockTime")) if usd > 0 else None
+        if usd > 0 and курс is None:
+            курс = п.get("курс")
+        sol = float(п.get("трата_sol") or 0) + (usd / курс if usd > 0 and курс else 0.0)
+        if usd > 0 and not курс:
+            ДОСЧИТАТЬ.append({"address": адрес, "signature": п.get("signature"),
+                              "почему": "трата в стейблах, курса нет ни в ряду, ни в файле"})
+            continue
+        порог = "5+" if sol >= 5 else "2-5" if sol >= 2 else None
+        if порог is None:
+            ОТБРОШЕНО_ПОРОГОМ.append({"address": адрес, "signature": п.get("signature"), "sol_экв": round(sol, 4)})
+            continue
+        if not п.get("sim"):
+            ДОСЧИТАТЬ.append({"address": адрес, "signature": п.get("signature"), "sol_экв": round(sol, 4),
+                              "почему": "выше порога после пересчёта, в прогоне не просчитана"})
+        из_.append({**п, "sol_экв": round(sol, 4), "порог": порог})
+    return из_
+
+
 def читать(каталог: Path) -> list:
     return [json.loads(Path(p).read_text(encoding="utf-8"))
             for p in sorted(glob.glob(str(каталог / "*.json"))) if not Path(p).name.startswith("_")]
@@ -224,7 +276,7 @@ def main() -> int:
         адрес = (к.get("строка") or {}).get("address")
         if к.get("why_not") or (к.get("скан") or {}).get("why_not"):
             не_разобр_п2.append({"address": адрес, "причина": к.get("why_not") or к["скан"]["why_not"]})
-        б = до_20([п for п in к.get("покупки") or [] if п.get("порог") and в_окне_7(п, до_ts)])
+        б = до_20([п for п in пересчёт_порога(к.get("покупки") or [], адрес) if в_окне_7(п, до_ts)])
         сырьё_п4.extend(б)
         все_п2.extend(б + [{"sim": x.get("sim")} for x in к.get("факт") or []])
         for пор in ПОРОГИ:
@@ -256,7 +308,7 @@ def main() -> int:
             continue
         if к.get("минут") is not None:
             минуты.append(к["минут"])
-        б = [п for п in к.get("покупки") or [] if п.get("порог")]
+        б = пересчёт_порога(к.get("покупки") or [], адрес)
         сырьё_п4.extend(б)
         все = строка_порога(б)
         for пор in ПОРОГИ:
@@ -304,6 +356,11 @@ def main() -> int:
             (f"{ряд[H]['ср']:+.1f} / {ряд[H]['мед']:+.1f} ({ряд[H]['n']})" if ряд[H].get("n") else "—")
             for H in ГОРИЗОНТЫ) + " |")
     md.append("")
+    итог["досчитать"] = ДОСЧИТАТЬ
+    итог["отброшено_порогом_после_пересчёта"] = len(ОТБРОШЕНО_ПОРОГОМ)
+    md += ["### Досчитать во втором проходе", "",
+           f"Выше 2 SOL-экв после пересчёта курса, но без числа симулятора: {len(ДОСЧИТАТЬ)}; "
+           f"отброшено как ниже порога после пересчёта: {len(ОТБРОШЕНО_ПОРОГОМ)}.", ""]
     md += ["### Не разобрались", "",
            *[f"- {x['address']}: {x['причина']}" for x in не_разобр_п2 + не_разобр_п3], ""]
     Path(а.out_json).write_text(json.dumps(итог, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
