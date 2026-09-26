@@ -1,3 +1,9 @@
+--- слушатель шредов: доставка 36255079724 ---
+websockets на месте
+  [ok  ] признак жизни считает шреды и слоты
+  [ok  ] старые слоты уходят на диск строкой JSON
+самопроверка слушателя шредов: 10/10 пройдено
+
 --- правила на хосте до правки ---
 Status: active
 Logging: on (low)
@@ -21,25 +27,25 @@ table ip filter {
 	}
 
 	chain ufw-before-input {
-		iifname "lo" counter packets 215878 bytes 40149831 accept
-		ct state related,established counter packets 1042431 bytes 653106361 accept
+		iifname "lo" counter packets 217262 bytes 40331932 accept
+		ct state related,established counter packets 1048458 bytes 656628239 accept
 		ct state invalid counter packets 272 bytes 74356 jump ufw-logging-deny
 		ct state invalid counter packets 272 bytes 74356 drop
 		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
-		ip protocol icmp icmp type echo-request counter packets 24502 bytes 2075557 accept
-		udp sport 67 udp dport 68 counter packets 3360 bytes 1102080 accept
-		counter packets 135463 bytes 8489080 jump ufw-not-local
+		ip protocol icmp icmp type echo-request counter packets 24639 bytes 2087200 accept
+		udp sport 67 udp dport 68 counter packets 3378 bytes 1107984 accept
+		counter packets 136263 bytes 8539102 jump ufw-not-local
 		ip daddr 224.0.0.251 udp dport 5353 counter packets 0 bytes 0 accept
 		ip daddr 239.255.255.250 udp dport 1900 counter packets 0 bytes 0 accept
-		counter packets 135463 bytes 8489080 jump ufw-user-input
+		counter packets 136263 bytes 8539102 jump ufw-user-input
 	}
 
 	chain ufw-before-output {
-		oifname "lo" counter packets 215878 bytes 40149831 accept
-		ct state related,established counter packets 1178183 bytes 166704713 accept
-		counter packets 71079 bytes 4583565 jump ufw-user-output
+		oifname "lo" counter packets 217262 bytes 40331932 accept
+		ct state related,established counter packets 1185311 bytes 167635480 accept
+		counter packets 71465 bytes 4607083 jump ufw-user-output
 	}
 
 	chain ufw-before-forward {
