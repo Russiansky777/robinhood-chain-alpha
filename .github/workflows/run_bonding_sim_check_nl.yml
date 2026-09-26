@@ -1,0 +1,115 @@
+name: "Кривая pump.fun: примет ли программа нашу сборку (симуляция, без отправки)"
+
+# ЗАЧЕМ. Сборщик кривой (I.2б) сверен на настоящих транзакциях байт в байт, но
+# это проверка нашей арифметики. Ответ на вопрос "примет ли САМА ПРОГРАММА нашу
+# покупку" даёт только цепь -- simulateTransaction: та же транзакция, тот же
+# кошелёк, подпись не проверяется, ничего не отправляется.
+#
+# Свежие сигналы кривой берём потоком из живого журнала решений на хосте (там
+# детектор отказывается по типу пула и пишет подпись источника, минт и адрес).
+# Журнал в память не читается: grep -F под nice, наружу только хвост.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "сколько последних сигналов кривой проверить"
+        required: false
+        default: "10"
+      sol:
+        description: "трата на нашу покупку, SOL"
+        required: false
+        default: "0.01"
+      wallet:
+        description: "кошелёк (пусто -- исполнитель)"
+        required: false
+        default: ""
+      rotated:
+        description: "'yes' -- искать и в ротированных .gz"
+        required: false
+        default: "no"
+
+concurrency:
+  group: bonding-sim-check
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  CURVE: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки сборки (без них проверять нечего)"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/bs_venv"
+          "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/bs_venv/bin/python" analysis/c2_swap_build.py --self-test | tail -6
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Свежие сигналы кривой из живого журнала (потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p /tmp/bsim
+          ROT=""
+          [ "${{ inputs.rotated }}" = "yes" ] && ROT="yes"
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
+             { nice -n 15 \$ION grep -F -e $CURVE $STATE_DIR/decisions.jsonl; \
+               if [ -n \"$ROT\" ]; then \
+                 for G in $STATE_DIR/decisions.jsonl.*.gz; do [ -e \"\$G\" ] || continue; \
+                   nice -n 15 \$ION zgrep -F -e $CURVE \"\$G\" || true; done; \
+               fi; } | tail -n 400" \
+            > /tmp/bsim/curve.jsonl && RC=0 || RC=$?
+          echo "выборка завершилась кодом $RC"
+          wc -l < /tmp/bsim/curve.jsonl
+
+      - name: "Симуляция нашей покупки на кривой"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          WALLET_ARG=""
+          if [ -n "${{ inputs.wallet }}" ]; then WALLET_ARG="--wallet ${{ inputs.wallet }}"; fi
+          $PY analysis/bonding_sim_check.py \
+            --decisions /tmp/bsim/curve.jsonl \
+            --limit "${{ inputs.limit }}" \
+            --sol "${{ inputs.sol }}" $WALLET_ARG
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/bonding_sim_check.json ] && git add data/bonding_sim_check.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Krivaya pump.fun: simulyatsiya nashey sborki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
