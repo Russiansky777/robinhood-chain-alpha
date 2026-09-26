@@ -307,6 +307,20 @@ class Узел(B1.Пакетный):
                            "пауз": self.страж.пауз, "сбоев_чтения": self.страж.сбоев}}
 
 
+_РЯД: list = []
+
+
+def ряд_курса() -> list:
+    """[(ts, usd_sol)] из data/podbivka/kurs_sol_usd.json (история vps_health_nl.txt)."""
+    if not _РЯД:
+        import calendar  # noqa: PLC0415
+        п = Path(__file__).resolve().parent.parent / "data" / "podbivka" / "kurs_sol_usd.json"
+        if п.exists():
+            for x in json.loads(п.read_text(encoding="utf-8"))["ряд"]:
+                _РЯД.append((calendar.timegm(time.strptime(x["utc"], "%Y-%m-%dT%H:%M:%SZ")), x["usd_sol"]))
+    return _РЯД
+
+
 class КурсПулом(C.RateBook):
     """Курс USD/SOL для перевода стейблов в SOL-экв.
 
@@ -331,6 +345,14 @@ class КурсПулом(C.RateBook):
         if узел_по_времени(bt) == "helius":
             заглушка = {"blockTime": bt, "transaction": (tx or {}).get("transaction"), "meta": {}}
             return super().rate_for(заглушка)
+        # Данные с 24.09: курс детектора (GeckoTerminal) из его признака жизни,
+        # ближайший снимок не дальше 12 часов. Проба 1б: курс «из сделки» у
+        # маршрутов лидера систематически врал (500 USD -> меньше 2 SOL).
+        ряд = ряд_курса()
+        if ряд and bt:
+            бл = min(ряд, key=lambda x: abs(x[0] - bt))
+            if abs(бл[0] - bt) <= 12 * 3600:
+                return D(str(бл[1])), f"детектор GeckoTerminal ({utc(бл[0])})"
         кандидат = C.rate_from_tx(tx)
         час = (bt or 0) // 3600
         выборка = self.по_часу.setdefault(час, [])
