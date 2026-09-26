@@ -72,7 +72,7 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             cd $CODE_DIR
-            sudo -n -u bot env BLOOM_STATE_DIR=\$BLOOM_STATE_DIR               HELIUS_API_KEY=\$HELIUS_API_KEY PYTHONPATH=$CODE_DIR               /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/dozhat_zastryavshie.py $APPLY
+            sudo -n -u bot env BLOOM_STATE_DIR=\$BLOOM_STATE_DIR               HELIUS_API_KEY=\$HELIUS_API_KEY OWN_SEND_WALLET=\$OWN_SEND_WALLET PYTHONPATH=$CODE_DIR               /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/dozhat_zastryavshie.py $APPLY
             rm -f /tmp/dozhat_zastryavshie.py" | tee data/dozhat_zastryavshie.json
 
       - name: "Коммит"

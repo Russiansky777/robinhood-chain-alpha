@@ -32,6 +32,56 @@ def остаток(кошелёк: str, минт: str) -> dict:
     return SL.token_balance_raw(кошелёк, минт)
 
 
+def tx_по_подписи(подпись: str):
+    от = SL.rpc_call("getTransaction", [подпись, {"encoding": "jsonParsed",
+                                                  "maxSupportedTransactionVersion": 0,
+                                                  "commitment": "confirmed"}])
+    return (от or {}).get("result") if isinstance(от, dict) else None
+
+
+def счета_минта(кошелёк: str, минт: str) -> list:
+    """Наши токен-счета этого минта -- включая уже ЗАКРЫТЫЕ.
+
+    Закрытый счёт узел в getTokenAccountsByOwner уже не отдаёт, поэтому адрес
+    выводится: ATA от кошелька и минта для обеих программ токена. История
+    закрытого счёта в цепи остаётся и отвечает на вопрос, чем он закрылся.
+    """
+    из_ = []
+    try:
+        import c2_swap_build as B  # noqa: PLC0415
+        for программа in (B.TOKEN_PROGRAM, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"):
+            из_.append(B.ata(кошелёк, минт, программа))
+    except Exception:  # noqa: BLE001
+        pass
+    return из_
+
+
+def закрывающая_по_счёту(кошелёк: str, минт: str, *, предел: int = 25) -> dict:
+    """Транзакция, в которой остаток НАШЕГО минта уменьшился: ищем по истории
+    самого токен-счёта. Возвращает то же, что найти_закрывающую сторожа."""
+    из_ = {"signature": None, "outcome": None, "looked": 0, "why_not": None,
+           "accounts": []}
+    for счёт in счета_минта(кошелёк, минт):
+        из_["accounts"].append(счёт)
+        от = SL.rpc_call("getSignaturesForAddress", [счёт, {"limit": предел}])
+        строки = (от or {}).get("result") or [] if isinstance(от, dict) else []
+        for зап in строки:                      # от новых к старым
+            подпись = (зап or {}).get("signature")
+            if not подпись:
+                continue
+            tx = tx_по_подписи(подпись)
+            из_["looked"] += 1
+            if not tx:
+                continue
+            исход = SL.итог_продажи(tx, кошелёк, минт)
+            if исход and исход.get("tokens_delta") is not None and исход["tokens_delta"] < 0:
+                из_.update(signature=подпись, outcome=исход)
+                return из_
+    из_["why_not"] = (f"в истории токен-счетов ({', '.join(из_['accounts'])}) "
+                      f"нет транзакции, уменьшившей остаток минта; осмотрено {из_['looked']}")
+    return из_
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--apply", action="store_true",
@@ -67,12 +117,12 @@ def main() -> int:
             итог["оставлено"] += 1
             итог["позиции"].append(строка)
             continue
-        найдено = SL.найти_закрывающую(кошелёк, минт, предел=20,
-                                       читатель_tx=lambda s: (SL.rpc_call(
-                                           "getTransaction",
-                                           [s, {"encoding": "jsonParsed",
-                                                "maxSupportedTransactionVersion": 0,
-                                                "commitment": "confirmed"}]) or {}).get("result"))
+        # ИСКАТЬ НАДО ПО ИСТОРИИ ТОКЕН-СЧЁТА, А НЕ КОШЕЛЬКА. Продажа была 13
+        # часов назад, и последние подписи кошелька -- это уже совсем другие
+        # транзакции (26.09 там 22 закрытия пустых счетов). У ATA история
+        # короткая: создание, покупка, продажа, закрытие -- и в ней закрывающая
+        # находится точно.
+        найдено = закрывающая_по_счёту(кошелёк, минт)
         строка["закрывающая"] = найдено.get("signature")
         строка["осмотрено_подписей"] = найдено.get("looked")
         исход = найдено.get("outcome") or {}
