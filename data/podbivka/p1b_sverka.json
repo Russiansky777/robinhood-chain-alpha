@@ -1,5 +1,5 @@
 {
- "utc": "2026-09-26T13:01:13Z",
+ "utc": "2026-09-26T13:16:40Z",
  "окно": {
   "с": "2026-09-18T00:00:00Z",
   "до": "2026-09-26T00:00:00Z"
@@ -12,7 +12,7 @@
    {
     "форма": "адрес и словарь",
     "ok": false,
-    "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":1,\"maxSupportedTransactionVersion\":0,\"status\":\"succ"
+    "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":1,\"maxSupportedTransactionVersion\":0,\"status\":\"succeeded\""
    },
    {
     "форма": "один словарь",
@@ -33,7 +33,7 @@
    "страниц_подписей": 8,
    "транзакций_посмотрено": 6585,
    "не_покупок": 5956,
-   "покрытие_окна": 1.0,
+   "покрытие_окна": 0.918,
    "узел_не_отдал": 540,
    "покупок_источника": 89,
    "совпало": 2,
@@ -1200,28 +1200,61 @@
    "адрес": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
    "записей_журнала": 8,
    "путь_по_цепи": "getSignaturesForAddress + пакетные getTransaction",
-   "подписей_в_окне": 0,
-   "страниц_подписей": 0,
-   "транзакций_посмотрено": 0,
-   "не_покупок": 0,
-   "покрытие_окна": null,
+   "подписей_в_окне": 348,
+   "страниц_подписей": 1,
+   "транзакций_посмотрено": 348,
+   "не_покупок": 340,
+   "покрытие_окна": 1.0,
    "узел_не_отдал": 0,
-   "покупок_источника": 0,
-   "совпало": 0,
-   "источник_без_нас": 0,
-   "мы_без_источника": 8,
+   "покупок_источника": 8,
+   "совпало": 4,
+   "источник_без_нас": 4,
+   "мы_без_источника": 4,
    "предел_уперся": false,
-   "why_not_подписи": "HTTPError: 429 Client Error: Too Many Requests for url: <узел вычищен>",
-   "список_источник_без_нас": [],
-   "список_мы_без_источника": [
+   "why_not_подписи": null,
+   "список_источник_без_нас": [
     {
-     "mint": "SPqTn8KkooByR41x3SsaNxGxXDqPFFRXR2Kkt8TJhSK",
-     "task": "BATCH-3",
-     "наш_utc": "2026-09-19T06:33:45Z",
-     "sol_in": 0.11151884,
-     "our_sig": "Hwt61uErBzwp1pVA14vVTc5WXavnkyyZgZKrxtX1aFkYSDDBSNc4yWW4F6bi9GQXk7Ca7T1BruHi44UjM4gbAvi",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
+     "signature": "2qQhxE9d88tcALNkRz8vg6L5GEJiF1ghACscc9Yk7U3xFdjaor7mjUVFsEtn56Cfp5Pj5bkXBsrC9gWm5hQSXx45",
+     "slot": 449830588,
+     "blockTime": 1790200320,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 1654812350,
+     "utc": "2026-09-23T21:52:00Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
     },
+    {
+     "signature": "4ezmDaaGQcXPUoVrLPKmna5MxwGjL42Y6VWB4fbgFV6PWnfPGgm4GGKmAX2gmiqwc6hZwNQgYXqoSVRE8rcAAqjo",
+     "slot": 448151050,
+     "blockTime": 1789752522,
+     "mint": "57eBR7XfEEdWR44gTfL2cA2nhTpGbzXph4BHBzWjcCgi",
+     "sol_out": 0.00055084,
+     "tokens_raw": 14757789204211,
+     "utc": "2026-09-18T17:28:42Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "5fqoYU2X1y2vyf1SEWVG3PUVDdSjspwVNPQVxxRHS8RzLyXZodjJysPBc5b8jug1YxLs9KNjn8o1BTN96xNyJCJV",
+     "slot": 447965537,
+     "blockTime": 1789702123,
+     "mint": "4R2vepDVY7Gdcm2VKuAy6EbBfWsYSEsDJou1QGKuMfnf",
+     "sol_out": 0.00055084,
+     "tokens_raw": 2075323209164,
+     "utc": "2026-09-18T03:28:43Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    },
+    {
+     "signature": "34CnDA836JKdkAsJq9JV1D2N2twarrmBofmHDGPDF3tCoXSpmGyS557ZprkHfSjnKLbm3tK4qMETXiwNaB2qNtqM",
+     "slot": 447944891,
+     "blockTime": 1789695581,
+     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "sol_out": 0.00055084,
+     "tokens_raw": 961386424,
+     "utc": "2026-09-18T01:39:41Z",
+     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
+    }
+   ],
+   "список_мы_без_источника": [
     {
      "mint": "8dnA3uotwGL4kgCoraKTypU4owcWSgkdBBXzXWykLL5h",
      "task": "BATCH-3",
@@ -1239,27 +1272,11 @@
      "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
-     "mint": "BJ9mPPkCqnMisMiv7JQW7MJ2fgDyjm9udmwHZuJ2YcTf",
-     "task": "BATCH-3",
-     "наш_utc": "2026-09-20T21:21:20Z",
-     "sol_in": 0.51171884,
-     "our_sig": "5vUy1J9BJWYXBTPGY4FZnefMAELN2yqEFRaeZX8jzkvZkY1qWP6QgjS2xiEriLFkzAw4VTiVmQZH5qR5mdcevzxJ",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
-    },
-    {
      "mint": "9DdHxVe1BSPaTy3iGEwvWsooRchNLK61XFAvzot59FwD",
      "task": "BATCH-3",
      "наш_utc": "2026-09-22T04:25:32Z",
      "sol_in": 0.510205,
      "our_sig": "fFBrAYCpTeRiRuhP6bsW1W55ftZCUv41xp5ymW5v8HrHkd7fLJtzfbXB3Zf9HxMVKcqdztUmisLjAxzbtFpPeJK",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
-    },
-    {
-     "mint": "EgrQxdckmSBEzKXzMD6PxjYdwsMcBpJjW8dx3RBWx4By",
-     "task": "BATCH-3",
-     "наш_utc": "2026-09-22T04:29:04Z",
-     "sol_in": 0.51171884,
-     "our_sig": "5R3BoHURyFnrEehEV3nDnprcXMUMezdQNPoiURFMs3CFUWsEaayq37cVt12Ja6gP6ZeJ6emYL61ohw6fAioP2Ak6",
      "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
@@ -1269,30 +1286,99 @@
      "sol_in": 0.51171884,
      "our_sig": "65jVN51Ld9hn3JduuTACg5XcY8LWJe4rbegkY3A2Fvf5ZF2GUHTv7EWg7qDMbMQM1dqFWuidEtg5DBV6JfPvrVnr",
      "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
-    },
-    {
-     "mint": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
-     "task": "BATCH-3",
-     "наш_utc": "2026-09-25T21:17:30Z",
-     "sol_in": 0.20253884,
-     "our_sig": "5gDeKDYXsjwbYjFferUYAZyKPYiNXsHgLEuZriorrX4G1cj64UuJu1nV71qbAg1yTULebDe6fBdiVEokR4tUKuey",
-     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     }
    ]
   }
  },
  "числа": {
-  "сверено": 0,
+  "сверено": 4,
   "отказов": 2,
-  "медиана_пп": null,
-  "p90_пп": null,
-  "макс_пп": null,
+  "медиана_пп": 24.293,
+  "p90_пп": 30.009,
+  "макс_пп": 30.009,
   "причины_отказов": {
    "котировка пула не SOL (XsqE9cRRpzxc)": 1,
    "котировка пула не SOL (4rkGWJNSUPBc)": 1
   }
  },
- "ряды_чисел": [],
+ "ряды_чисел": [
+  {
+   "mint": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+   "task": "BATCH-3",
+   "источник": "Fvkc2thk",
+   "sol_in": 0.20253884,
+   "наш_utc": "2026-09-25T21:17:30Z",
+   "source_sig": "3QtwohoQ3vLGNPZozzFKf7btwtuWfZc64MUhw5rFZUwq7Py4Xyf9c5pGer1q9dvwrAYnNyMZrGPYZ45cVMjxnba7",
+   "our_sig": "5gDeKDYXsjwbYjFferUYAZyKPYiNXsHgLEuZriorrX4G1cj64UuJu1nV71qbAg1yTULebDe6fBdiVEokR4tUKuey",
+   "факт_токенов": 144318275417,
+   "факт_sol": 0.20253884,
+   "наш_слот": 450471116,
+   "слотов_позже": 2,
+   "сим_токенов": 192673431114,
+   "сим_метод": "x*y=k по резервам после источника, комиссия калибрована",
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "расхождение_пп": -25.097
+  },
+  {
+   "mint": "EgrQxdckmSBEzKXzMD6PxjYdwsMcBpJjW8dx3RBWx4By",
+   "task": "BATCH-3",
+   "источник": "Fvkc2thk",
+   "sol_in": 0.51171884,
+   "наш_utc": "2026-09-22T04:29:04Z",
+   "source_sig": "24Q2bDsXYB25QaL6M55X2vrxGgC2U8uGHmJxrGpoMswMT5eg5pjrJPuuQAaBsfe1sdkVhXnwbdWK6K7ur2oQoyET",
+   "our_sig": "5R3BoHURyFnrEehEV3nDnprcXMUMezdQNPoiURFMs3CFUWsEaayq37cVt12Ja6gP6ZeJ6emYL61ohw6fAioP2Ak6",
+   "факт_токенов": 164866094431,
+   "факт_sol": 0.51171884,
+   "наш_слот": 449270837,
+   "слотов_позже": 1,
+   "сим_токенов": 197303198313,
+   "сим_метод": "x*y=k по резервам после источника, комиссия калибрована",
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "расхождение_пп": -16.44
+  },
+  {
+   "mint": "BJ9mPPkCqnMisMiv7JQW7MJ2fgDyjm9udmwHZuJ2YcTf",
+   "task": "BATCH-3",
+   "источник": "Fvkc2thk",
+   "sol_in": 0.51171884,
+   "наш_utc": "2026-09-20T21:21:20Z",
+   "source_sig": "632na1g6tetiRQG9g7SFUSHhbmWEGt5is83yMJVxTMPJ9692fzKDDk2EYhRqk6tGuxnvVdQZgajqfYrfb9e4v4m6",
+   "our_sig": "5vUy1J9BJWYXBTPGY4FZnefMAELN2yqEFRaeZX8jzkvZkY1qWP6QgjS2xiEriLFkzAw4VTiVmQZH5qR5mdcevzxJ",
+   "факт_токенов": 196814252952,
+   "факт_sol": 0.51171884,
+   "наш_слот": 448851356,
+   "слотов_позже": 1,
+   "сим_токенов": 281200349994,
+   "сим_метод": "x*y=k по резервам после источника, комиссия калибрована",
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "расхождение_пп": -30.009
+  },
+  {
+   "mint": "SPqTn8KkooByR41x3SsaNxGxXDqPFFRXR2Kkt8TJhSK",
+   "task": "BATCH-3",
+   "источник": "Fvkc2thk",
+   "sol_in": 0.11151884,
+   "наш_utc": "2026-09-19T06:33:45Z",
+   "source_sig": "54JR5Re1SuCHA7H9s7uPQHCNBALtSbeBEiYGwmFzy5vsdBTWUd3Cq3UfTbtkigwNipT3Mw9owppsBKKeUGB5AqU5",
+   "our_sig": "Hwt61uErBzwp1pVA14vVTc5WXavnkyyZgZKrxtX1aFkYSDDBSNc4yWW4F6bi9GQXk7Ca7T1BruHi44UjM4gbAvi",
+   "факт_токенов": 57292342173,
+   "факт_sol": 0.11151884,
+   "наш_слот": 448327587,
+   "слотов_позже": 3,
+   "сим_токенов": 74880198394,
+   "сим_метод": "x*y=k по резервам после источника, комиссия калибрована",
+   "сосредоточенный": false,
+   "кривая": false,
+   "программа": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "расхождение_пп": -23.488
+  }
+ ],
  "отказы_чисел": [
   {
    "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
@@ -1333,11 +1419,11 @@
    "why_not": "котировка пула не SOL (4rkGWJNSUPBc)"
   }
  ],
- "вызовов_узла": 6599,
- "ошибок_узла": 542,
- "обращений_к_узлу": 188,
- "запросов_в_пакетах": 6585,
- "отказов_429": 56,
- "секунд": 143.6,
- "предел_вызовов": 20000
+ "вызовов_узла": 7491,
+ "ошибок_узла": 1082,
+ "обращений_к_узлу": 278,
+ "запросов_в_пакетах": 6933,
+ "отказов_429": 0,
+ "секунд": 534.6,
+ "предел_вызовов": 25000
 }
