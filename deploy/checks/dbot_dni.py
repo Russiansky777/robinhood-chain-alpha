@@ -295,6 +295,19 @@ def главное() -> int:
                                  "itog_pct": (round(процент, 2) if процент is not None
                                               else None),
                                  "tx": з["tx"]})
+            # ВРЕМЯ ПЕРВОЙ ТРАНЗАКЦИИ ПО МИНТУ -- по нему потом ищется, что
+            # делал наш детектор на том же сигнале.
+            когда_минт = {}
+            for р2 in разборы:
+                for минт in (р2["минты"] or {}):
+                    если_есть = когда_минт.get(минт)
+                    if если_есть is None or (р2["t"] or 0) < если_есть:
+                        когда_минт[минт] = р2["t"]
+            for з in закрытые:
+                т = когда_минт.get(з["mint"])
+                з["utc"] = (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(т))
+                            if т else None)
+                з["ts"] = т
             закрытые.sort(key=lambda з: з["itog_sol"])
             n = len(закрытые)
             сумма = sum(з["itog_sol"] for з in закрытые)
@@ -315,6 +328,9 @@ def главное() -> int:
                 "summa_itogov_sol": round(сумма, 9),
                 "luchshaya": (закрытые[-1] if n else None),
                 "hudshaya": (закрытые[0] if n else None),
+                # ВСЕ закрытые сделки списком: по ним сверяется, что делал наш
+                # детектор на тех же сигналах (задание владельца 26.09, 21:50).
+                "sdelki": закрытые,
                 "tarif_seti_sol": round(тариф, 9),
                 "chaevye_i_sbory_sol": round(
                     sum(v for р2 in разборы
