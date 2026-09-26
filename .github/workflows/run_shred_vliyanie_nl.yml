@@ -1,0 +1,100 @@
+name: "Слушатель шредов: влияние на хост -- полоса, потери UDP, возраст сигнала (только чтение)"
+
+# ЗАЧЕМ (задание владельца 26.09 вечером): служба принимает около 7 000 шредов в
+# секунду, и надо знать три числа -- (1) скорость порта и входящий трафик за
+# 60 с, (2) потери UDP в буфере ядра, (3) медиана и p90 net_slot_age детектора
+# за час ДО старта слушателя и за час ПОСЛЕ. Если возраст сигнала вырос, служба
+# мешает торговому пути -- тогда её приоритет вниз или стоп.
+#
+# Только чтение: /proc/net/dev и /proc/net/snmp вместо ifstat и netstat (их на
+# хосте может не быть), журнал решений -- потоком. Служб не касается.
+on:
+  workflow_dispatch:
+    inputs:
+      start_utc:
+        description: "момент старта слушателя шредов"
+        required: false
+        default: "2026-09-26T18:11:00Z"
+      hours:
+        description: "сколько часов брать до и после"
+        required: false
+        default: "1"
+      seconds:
+        description: "окно замера трафика и потерь, секунд"
+        required: false
+        default: "60"
+
+concurrency:
+  group: shred-vliyanie
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/shred_vliyanie.txt
+
+jobs:
+  vliyanie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Порт, трафик, потери UDP, возраст сигнала"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/shred_vliyanie.py" < deploy/checks/shred_vliyanie.py
+          {
+            echo "=== слушатель шредов: влияние на хост ==="
+            echo "старт слушателя: ${{ inputs.start_utc }}"
+          } > "$OUT"
+          # ethtool и ifstat -- если есть; числа всё равно считаются из /proc.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo '--- ethtool (если установлен) ---'
+            (command -v ethtool >/dev/null 2>&1 && ethtool \$(ip route show default | awk '{print \$5; exit}') 2>&1 | head -12) || echo 'ethtool не установлен -- скорость порта берём из /sys'
+            echo '--- netstat -su (если установлен) ---'
+            (command -v netstat >/dev/null 2>&1 && netstat -su | head -20) || echo 'netstat не установлен -- Udp берём из /proc/net/snmp'
+            echo '--- служба слушателя ---'
+            systemctl is-active shred-listener; systemctl show shred-listener -p Nice -p CPUQuotaPerSecUSec -p ActiveEnterTimestamp | head -5
+            echo '--- три числа ---'
+            nice -n 15 python3 /tmp/shred_vliyanie.py --state-dir '$STATE_DIR' \
+              --start-utc '${{ inputs.start_utc }}' --hours '${{ inputs.hours }}' \
+              --seconds '${{ inputs.seconds }}'
+            rc=\$?; rm -f /tmp/shred_vliyanie.py; exit \$rc" 2>&1 | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Slushatel shredov: vliyanie na host -- polosa, potery UDP, vozrast signala [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
