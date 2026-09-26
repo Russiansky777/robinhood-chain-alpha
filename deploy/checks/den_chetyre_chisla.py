@@ -169,6 +169,22 @@ def режим_журнала(а) -> int:
                 "why": чисто(str(п.get("result_uncountable_why") or ""))[:120]})
 
     несчитаемые.sort(key=lambda з: (з["buy_sig"] is None, з["sell_sig"] is None))
+
+    # ОБРАЗЕЦ СДЕЛОК ПЛОЩАДКИ -- для числа 2. Комиссию Bloom мы не запрашиваем
+    # и в журнал не пишем: она берётся внутри свопа. Единственный способ её
+    # увидеть -- посмотреть, кому ушли лампорты с нашего кошелька в самих
+    # транзакциях площадки.
+    образец_bloom = []
+    for cid, п in sorted(за_день.items(),
+                         key=lambda кв: float(кв[1].get("ts_intent") or 0)):
+        if п.get("lane"):
+            continue
+        б = подпись_покупки(п)
+        if not б:
+            continue
+        образец_bloom.append({"cid": cid, "wallet": п.get("wallet"),
+                              "mint": п.get("mint"), "in_sol": п.get("sol_in"),
+                              "buy_sig": б, "sell_sig": подпись_продажи(п)})
     итог = {
         "since_utc": а.since_utc,
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -182,11 +198,14 @@ def режим_журнала(а) -> int:
         "neschitaemyh": len(несчитаемые),
         "wallets": кошельки,
         "obrazets_neschitaemyh": несчитаемые[:а.skolko],
+        "bloom_sdelok_s_podpisyu": len(образец_bloom),
+        "obrazets_bloom": образец_bloom[:а.skolko_bloom],
     }
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump(итог, ф, ensure_ascii=False, indent=1)
     печать = dict(итог)
     печать["obrazets_neschitaemyh"] = f"{len(итог['obrazets_neschitaemyh'])} штук в файле"
+    печать["obrazets_bloom"] = f"{len(итог['obrazets_bloom'])} штук в файле"
     print(json.dumps(печать, ensure_ascii=False, indent=1))
     return 0
 
@@ -339,6 +358,47 @@ def режим_цепи(а) -> int:
             "why": з.get("why"),
         })
 
+    # СДЕЛКИ ПЛОЩАДКИ: кому ушли лампорты помимо нас. Пулы отличаются тем, что
+    # адрес у каждой сделки свой; счёт площадки повторяется на каждой.
+    образец_б = (вх.get("obrazets_bloom") or [])[:а.skolko_bloom]
+    подписи_б = [з[поле] for з in образец_б for поле in ("buy_sig", "sell_sig")
+                 if з.get(поле)]
+    txs_б = {}
+    for н in range(0, len(подписи_б), ПАКЕТ):
+        куски = подписи_б[н:н + ПАКЕТ]
+        запросы = [{"jsonrpc": "2.0", "id": и, "method": "getTransaction",
+                    "params": [с, {"encoding": "jsonParsed",
+                                   "maxSupportedTransactionVersion": 0}]}
+                   for и, с in enumerate(куски)]
+        for о in узел.пакет(запросы):
+            и = о.get("id")
+            if isinstance(и, int) and и < len(куски):
+                txs_б[куски[и]] = о.get("result")
+    получатели_б = {}
+    тариф_б = 0.0
+    дельта_б = 0.0
+    tx_с_дельтой = 0
+    for з in образец_б:
+        к = з.get("wallet")
+        for поле in ("buy_sig", "sell_sig"):
+            if not з.get(поле):
+                continue
+            д = нативная_дельта(txs_б.get(з[поле]) or {}, к)
+            if д.get("delta_sol") is not None:
+                дельта_б += д["delta_sol"]
+                tx_с_дельтой += 1
+            тариф_б += float(д.get("fee_sol") or 0.0)
+            for пол in (д.get("poluchateli") or []):
+                з_п = получатели_б.setdefault(пол["address"],
+                                              {"raz": 0, "sol": 0.0})
+                з_п["raz"] += 1
+                з_п["sol"] = round(з_п["sol"] + пол["sol"], 9)
+    # ПОВТОРЯЮЩИЕСЯ получатели -- это и есть постоянные сборы (площадка,
+    # чаевые, рента счетов). Разовые -- пулы и наши же новые счета.
+    постоянные = {а_: в_ for а_, в_ in получатели_б.items()
+                  if в_["raz"] >= max(3, len(образец_б) // 4)}
+    верх_б = sorted(получатели_б.items(), key=lambda кв: -кв[1]["raz"])[:12]
+
     верх = sorted(получатели.items(), key=lambda кв: -кв[1]["sol"])[:12]
     итог = {
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -355,6 +415,20 @@ def режим_цепи(а) -> int:
         # ЧИСЛО 2 ЖИВЁТ ЗДЕСЬ: получатели лампортов помимо нас. Повторяющийся
         # адрес с крупной суммой -- счёт площадки или чаевые отправителя.
         "poluchateli_lamportov": [{"address": а_, **в_} for а_, в_ in верх],
+        "chislo_2_bloom": {
+            "sdelok_v_obrazce": len(образец_б),
+            "tranzakciy_s_deltoy": tx_с_дельтой,
+            "summa_nativnyh_delt_sol": round(дельта_б, 9),
+            "tarif_seti_sol": round(тариф_б, 9),
+            "postoyannye_poluchateli": [
+                {"address": а_, **в_,
+                 "sol_na_tranzakciyu": round(в_["sol"] / max(1, в_["raz"]), 9)}
+                for а_, в_ in sorted(постоянные.items(),
+                                     key=lambda кв: -кв[1]["sol"])],
+            "summa_postoyannyh_sol": round(
+                sum(в_["sol"] for в_ in постоянные.values()), 9),
+            "verh_po_chastote": [{"address": а_, **в_} for а_, в_ in верх_б],
+        },
         "vyzovov_uzla": узел.вызовов,
     }
     with open(а.out, "w", encoding="utf-8") as ф:
@@ -372,6 +446,8 @@ def main() -> int:
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--since-utc", default="2026-09-26T00:00:00Z")
     р.add_argument("--skolko", type=int, default=20)
+    р.add_argument("--skolko-bloom", type=int, default=40,
+                   help="сколько сделок площадки смотреть для числа 2")
     р.add_argument("--vhod", default="/tmp/den_chisla_zhurnal.json")
     р.add_argument("--out", default="/tmp/den_chisla.json")
     а = р.parse_args()
