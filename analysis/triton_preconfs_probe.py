@@ -543,6 +543,9 @@ def свод_по_регионам(*, строки_зонда: list, наши_с
     for р, ряд in sorted(по_регионам.items()):
         св = сравнить(строки_зонда=ряд, наши_сигналы=наши_сигналы)
         из_[р] = {"n_preconf": св["n_preconf"], "n_matched": св["n_matched"],
+                   "n_ours_in_window": св.get("n_ours_in_window"),
+                   "n_matched_in_window": св.get("n_matched_in_window"),
+                   "coverage_in_window": св.get("coverage_in_window"),
                    "coverage": св["coverage"],
                    "lead_ms_median": св["lead_ms_median"],
                    "lead_ms_p90": св["lead_ms_p90"],
@@ -571,6 +574,11 @@ def _p90(ряд: list):
     р = sorted(ряд)
     из_ = р[min(len(р) - 1, int(round(0.9 * (len(р) - 1))))]
     return round(из_, 2)
+
+
+# Допуск на края окна зонда: сигнал, пришедший за секунду до первого события
+# фида, всё ещё "в окне" -- иначе граница резала бы годные пары.
+ДОПУСК_ОКНА_S = 1.0
 
 
 def сравнить(*, строки_зонда: list, наши_сигналы: list) -> dict:
@@ -609,8 +617,24 @@ def сравнить(*, строки_зонда: list, наши_сигналы: 
                         "feed": зонд[п].get("feed"),
                         "result": зонд[п].get("result")})
     раньше = [м for м in разницы if м > 0]
+    # ПОКРЫТИЕ НАДО СЧИТАТЬ НА ОДНОМ ОКНЕ. Знаменатель "все наши сигналы"
+    # неверен, если зонд слушал пять минут, а журнал решений покрывает часы:
+    # именно так вышло 25.09 19:37Z -- 16 010 наших против 11 317 событий фида
+    # за 300 секунд, и "покрытие 0 %" читалось как вывод, хотя было артефактом.
+    # Поэтому рядом с прежним числом считается покрытие ПО ОКНУ ЗОНДА.
+    окно_от = min((float(с["t_recv"]) for с in зонд.values()), default=None)
+    окно_до = max((float(с["t_recv"]) for с in зонд.values()), default=None)
+    в_окне = {п: с for п, с in наши.items()
+              if окно_от is not None
+              and окно_от - ДОПУСК_ОКНА_S <= float(с["t_recv"]) <= окно_до + ДОПУСК_ОКНА_S}
+    общие_в_окне = [п for п in в_окне if п in зонд]
     из_ = {"n_ours": len(наши), "n_preconf": len(зонд), "n_matched": len(общие),
             "coverage": (round(len(общие) / len(наши), 4) if наши else None),
+            "probe_window_from": окно_от, "probe_window_to": окно_до,
+            "n_ours_in_window": len(в_окне),
+            "n_matched_in_window": len(общие_в_окне),
+            "coverage_in_window": (round(len(общие_в_окне) / len(в_окне), 4)
+                                    if в_окне else None),
             "lead_ms_median": _медиана(разницы),
             "lead_ms_p90": _p90(разницы),
             "share_preconf_earlier": (round(len(раньше) / len(разницы), 4)
@@ -846,6 +870,10 @@ def self_test() -> int:
             св["share_preconf_earlier"] == 0.5, св)
         chk("покрытие: две наши подписи из трёх нашлись на фиде",
             св["coverage"] == round(2 / 3, 4), св)
+        chk("покрытие ПО ОКНУ ЗОНДА: наш сигнал вне окна в знаменатель не идёт",
+            св["n_ours_in_window"] == 2 and св["n_matched_in_window"] == 2
+            and св["coverage_in_window"] == 1.0
+            and св["probe_window_from"] == 100.0 and св["probe_window_to"] == 300.0, св)
         chk("preconf был, а мы его не видели -- посчитано отдельно",
             св["preconf_not_seen_by_us"] == 1
             and св["share_preconf_not_seen"] == round(1 / 3, 4), св)
