@@ -1,24 +1,33 @@
 {
  "файл": "/home/bot/data/sources_2026-09-25.json",
- "группа": "bloom_lane",
- "поле": "bloom_sol",
- "было": null,
+ "группа": "speed_only",
+ "поле": "day_cap_sol",
+ "было": 1.0,
  "вся_политика_группы": {
-  "lane_sol": 0.05,
+  "lane_sol": 0.01,
   "bloom_trades": true,
-  "fanout": true,
-  "note": "BATCH-3/5 плюс лидер: Bloom торгует 0.2 SOL, полоса 0.05 SOL (пункты 2 и 3). Адресов здесь нет нарочно -- они приходят из DBot живьём; это группа по умолчанию для всякого источника, которого нет в других группах."
+  "bloom_sol": 0.01,
+  "fanout": false,
+  "day_cap_sol": 1.0,
+  "stop_loss_sol": 0.5,
+  "min_target_sol": 0.5,
+  "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 1 SOL в сутки (покупки плюс чаевые), стоп при -0.5 SOL. Цель -- 30+ покупок в час.",
+  "credits_rule": "30 адресов с наибольшим числом попаданий в S+0 (только подписанты, не наши) по слову владельца 25.09 вечером; расход детектора после снятия двух авторити пулов ~5 150 кредитов в час, прогноз ~124 000 в сутки против потолка 1 000 000"
  }
 }
 {
- "копия": "/home/bot/data/sources_2026-09-25.json.bak-20260926T112810Z",
- "стало": 0.05,
+ "копия": "/home/bot/data/sources_2026-09-25.json.bak-20260926T141936Z",
+ "стало": 3.0,
  "вся_политика_группы_после": {
-  "lane_sol": 0.05,
+  "lane_sol": 0.01,
   "bloom_trades": true,
-  "fanout": true,
-  "note": "BATCH-3/5 плюс лидер: Bloom торгует 0.2 SOL, полоса 0.05 SOL (пункты 2 и 3). Адресов здесь нет нарочно -- они приходят из DBot живьём; это группа по умолчанию для всякого источника, которого нет в других группах.",
-  "bloom_sol": 0.05
+  "bloom_sol": 0.01,
+  "fanout": false,
+  "day_cap_sol": 3.0,
+  "stop_loss_sol": 0.5,
+  "min_target_sol": 0.5,
+  "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 1 SOL в сутки (покупки плюс чаевые), стоп при -0.5 SOL. Цель -- 30+ покупок в час.",
+  "credits_rule": "30 адресов с наибольшим числом попаданий в S+0 (только подписанты, не наши) по слову владельца 25.09 вечером; расход детектора после снятия двух авторити пулов ~5 150 кредитов в час, прогноз ~124 000 в сутки против потолка 1 000 000"
  }
 }
-{"file": "/home/bot/data/sources_2026-09-25.json", "policies": {"bloom_lane": {"lane_sol": 0.05, "bloom_trades": true, "bloom_sol": 0.05, "fanout": true, "day_cap_sol": null, "stop_loss_sol": null, "min_target_sol": null}, "lane_only": {"lane_sol": 0.05, "bloom_trades": true, "bloom_sol": 0.05, "fanout": true, "day_cap_sol": null, "stop_loss_sol": null, "min_target_sol": null}, "speed_only": {"lane_sol": 0.01, "bloom_trades": true, "bloom_sol": 0.01, "fanout": false, "day_cap_sol": 1.0, "stop_loss_sol": 0.5, "min_target_sol": 0.5}}}
+{"file": "/home/bot/data/sources_2026-09-25.json", "policies": {"bloom_lane": {"lane_sol": 0.05, "bloom_trades": true, "bloom_sol": 0.05, "fanout": true, "day_cap_sol": null, "stop_loss_sol": null, "min_target_sol": null}, "lane_only": {"lane_sol": 0.05, "bloom_trades": true, "bloom_sol": 0.05, "fanout": true, "day_cap_sol": null, "stop_loss_sol": null, "min_target_sol": null}, "speed_only": {"lane_sol": 0.01, "bloom_trades": true, "bloom_sol": 0.01, "fanout": false, "day_cap_sol": 3.0, "stop_loss_sol": 0.5, "min_target_sol": 0.5}}}
