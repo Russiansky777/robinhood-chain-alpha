@@ -31,7 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import c2_common as C  # noqa: E402
 import c2_swap_build as B  # noqa: E402
 
-ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
+# Версия 1 (слово владельца 26.09): на 0 узел отвечает -32015 на транзакциях
+# версии 1 -- это вероятная причина 15 отказов «узел: RuntimeError» контроля.
+ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
             "commitment": "confirmed"}
 СОСРЕДОТОЧЕННЫЕ = {B.DLMM, B.CLMM, "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"}
 ЛАМПОРТОВ = 1_000_000_000
