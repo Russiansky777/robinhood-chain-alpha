@@ -87,8 +87,22 @@ HELIUS_ЗАПРОСОВ_В_С = float(_os.environ.get("PODB_HELIUS_RPS") or 10.0
 ПАУЗА_ДЕТЕКТОРА_С = 300
 
 
+# СКОЛЬЗЯЩАЯ ГРАНЬ (слово владельца 26.09 вечер): история Shyft ~2.5 суток и
+# сдвигается -- контроль 18:46Z уже не получил сделки 24.09 00:07. Поэтому
+# грань -- «сейчас минус 2.4 суток», а неподвижная ГРАНЬ_SHYFT остаётся только
+# нижним пределом (Shyft всё равно не глубже неё). --tolko-shyft ставит 0.
+ГЛУБИНА_SHYFT_С = 2.4 * 86400
+СКОЛЬЗЯЩАЯ = True
+
+
+def грань() -> float:
+    if not СКОЛЬЗЯЩАЯ:
+        return ГРАНЬ_SHYFT
+    return max(ГРАНЬ_SHYFT, time.time() - ГЛУБИНА_SHYFT_С) if ГРАНЬ_SHYFT else 0
+
+
 def узел_по_времени(ts) -> str:
-    return "helius" if ts and float(ts) < ГРАНЬ_SHYFT else "shyft"
+    return "helius" if ts and float(ts) < грань() else "shyft"
 
 
 class СторожДетектора:
@@ -1051,7 +1065,7 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
     слоты_подписей: list = []
     до = None
     набрано = {имя: 0 for имя, *_ in ПОРОГИ}
-    узел_списка = "shyft" if до_ts > ГРАНЬ_SHYFT else "helius"
+    узел_списка = "shyft" if до_ts > грань() else "helius"
     видели: set = set()
     while True:
         try:
@@ -1065,8 +1079,8 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
         старейшее = min((з.get("blockTime") or до_ts for з in стр), default=до_ts)
         # Shyft кончился (история ~2.5 суток) или перешли грань 24.09, а окно
         # глубже -- дальше листает Helius от последней подписи.
-        if узел_списка == "shyft" and с_ts < ГРАНЬ_SHYFT and \
-                (len(стр) < 1000 or старейшее < ГРАНЬ_SHYFT):
+        if узел_списка == "shyft" and с_ts < грань() and \
+                (len(стр) < 1000 or старейшее < грань()):
             узел_списка = "helius"
             из_["листание_на_helius_с"] = utc(старейшее)
             if len(стр) < 1000 and старейшее >= с_ts:
