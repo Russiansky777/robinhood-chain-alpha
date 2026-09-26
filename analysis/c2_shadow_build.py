@@ -103,7 +103,8 @@ import c2_swap_build as B  # noqa: E402
 
 CAP_SKIP_USD = 200_000
 SUPPORTED = {B.PUMP_AMM: "Pump AMM", B.CPMM: "Raydium CPMM", B.DAMM2: "Meteora DAMM v2",
-             B.LAUNCHLAB: "Raydium Launchlab", B.DLMM: "Meteora DLMM", B.CLMM: "Raydium CLMM"}
+             B.LAUNCHLAB: "Raydium Launchlab", B.DLMM: "Meteora DLMM", B.CLMM: "Raydium CLMM",
+             B.BONDING: "Pump.fun bonding curve"}
 PRICE_DEPENDENT = {B.DLMM, B.CLMM}    # счета инструкции (бины, тики) зависят от цены
 LEG_MAX_AGE_S = 30
 LEG_REFRESH_S = 10
@@ -466,11 +467,21 @@ def shadow_build(source_tx: dict, source_wallet: str, mint: str, our_wallet: str
     t0 = time.perf_counter()
     try:
         pool = C.identify_pool(source_tx, source_wallet, mint)
-        if not pool["ok"]:
-            res["why_not"] = f"пул: {pool['why_not']}"
-            return res
         import c2_pool_programs as PP  # noqa: PLC0415
-        prog = PP.pool_program(source_tx, pool["pool_vault"], _labels())["pool_program"]
+        prog = (PP.pool_program(source_tx, pool.get("pool_vault"), _labels())["pool_program"]
+                if pool.get("pool_vault") else None)
+        if not pool["ok"]:
+            # У кривой pump.fun котировка НАТИВНАЯ по устройству программы:
+            # токенового счёта котировки в её buy нет вовсе (проверено на 5
+            # настоящих покупках). Поэтому «неоднозначная котировка» -- когда
+            # сделка источника шла роутером и задела USDC -- для кривой не
+            # причина отказываться: хранилище пула определено, а котировку
+            # угадывать не нужно. Для остальных типов отказ как был.
+            if prog != B.BONDING:
+                res["why_not"] = f"пул: {pool['why_not']}"
+                return res
+            pool = dict(pool, ok=True, quote_mint=C.NATIVE_QUOTE, quote_vault="CURVE",
+                        quote_why=f"кривая pump.fun: котировка нативная ({pool['why_not']})")
         res.update(pool_program=prog, pool_label=SUPPORTED.get(prog), quote_mint=pool["quote_mint"])
         if prog not in SUPPORTED:
             res["why_not"] = f"тип пула не покрыт сборщиком: {prog}"
@@ -483,7 +494,8 @@ def shadow_build(source_tx: dict, source_wallet: str, mint: str, our_wallet: str
         if not mv:
             res["why_not"] = "минты/хранилища пула не восстановились"
             return res
-        if mv.get("quote_mint") != C.WSOL:
+        # Нативный SOL -- такой же один шаг, как WSOL: оборачивать нечего.
+        if mv.get("quote_mint") not in (C.WSOL, C.NATIVE_QUOTE):
             if leg_cache is None:
                 res["why_not"] = "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)"
                 return res
@@ -497,11 +509,21 @@ def shadow_build(source_tx: dict, source_wallet: str, mint: str, our_wallet: str
         res["supported"] = True
         mo = B.min_out_from_reserves(tpl, source_tx, amount_lamports, slippage)
         if mo.get("ok"):
-            res.update(min_out=mo["min_out"], expected_out=mo["expected_out"],
-                       min_out_method="launchlab_virtual_reserves" if prog == B.LAUNCHLAB
-                       else "xyk_reserves_after_source")
+            метод = ("launchlab_virtual_reserves" if prog == B.LAUNCHLAB
+                     else "pumpfun_curve_after_source" if prog == B.BONDING
+                     else "xyk_reserves_after_source")
+            res.update(min_out=mo["min_out"], expected_out=mo["expected_out"], min_out_method=метод)
+            if prog == B.BONDING:
+                res.update(sol_to_curve=mo["sol_to_curve"], max_sol_cost=mo["max_sol_cost"])
         else:
             res["min_out_method"] = f"не выдаётся: {mo.get('why_not')}"
+            # На кривой pump.fun минимум -- это САМ АРГУМЕНТ покупки (сколько
+            # токенов взять). Без него сборка не «без защиты», а бессмысленна:
+            # с min_out=1 транзакция купит один сырой токен и заплатит комиссии.
+            # Поэтому здесь отказ, а не сборка на удачу.
+            if B.SPECS[prog].get("exact_out"):
+                res["why_not"] = f"кривая: минимум не посчитан ({mo.get('why_not')})"
+                return res
         built = B.build_buy(tpl, source_tx, user=our_wallet, payer=our_wallet,
                             amount_in=amount_lamports, min_out=res["min_out"] or 1,
                             cu_units=cu_units, cu_price_micro=cu_price_micro, wrap_sol=True)
@@ -551,6 +573,22 @@ def self_test() -> int:
                 first = r
     checks.append((f"Pump AMM/Launchlab с котировкой SOL: собрано и «симулировано» {n_ok} из {tried}",
                    tried >= 10 and n_ok == tried))
+    # Кривая pump.fun: котировка НАТИВНАЯ, поэтому проверяем отдельно -- это
+    # один шаг, минимум считается по кривой, а трата ограничена аргументом.
+    pf_n = pf_ok = 0
+    for s in B.load_samples(B.BONDING):
+        if not s.get("mint"):
+            continue
+        pf_n += 1
+        r = shadow_build(s["tx"], s["source"], s["mint"], C.EXECUTOR_WALLET, 10_000_000, fake_rpc,
+                         sol_usd=115.0, spend_sol_equiv=2.5)
+        pf_ok += bool(r["ok"] and r["route"] == "one_hop" and r["quote_mint"] == C.NATIVE_QUOTE
+                      and r["min_out_method"] == "pumpfun_curve_after_source"
+                      and 0 < r["min_out"] < r["expected_out"]
+                      and r.get("max_sol_cost") == 10_000_000
+                      and 0 < r.get("sol_to_curve", 0) < 10_000_000)
+    checks.append((f"кривая pump.fun: один шаг, минимум по кривой, предел траты = наша трата "
+                   f"({pf_ok} из {pf_n})", pf_n >= 4 and pf_ok >= pf_n - 1))
     checks.append(("время сборки измерено, мс", first.get("build_ms") is not None and first["build_ms"] < 50))
     checks.append(("cap_usd посчитан и флаг выставлен", first.get("cap_usd") is not None
                    and isinstance(first.get("would_skip_cap"), bool)))

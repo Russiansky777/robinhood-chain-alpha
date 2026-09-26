@@ -59,6 +59,14 @@ DAMM2 = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+# Pump.fun bonding curve -- кривая ДО миграции в Pump AMM. Отличий от прочих
+# типов три, и все три money-path: (1) котировка -- НАТИВНЫЙ SOL, токенового
+# счёта котировки нет вовсе, оборачивать нечего; (2) инструкция buy -- «точный
+# выход»: первый аргумент это КОЛИЧЕСТВО ТОКЕНОВ (он же наш минимум), второй --
+# предел траты SOL (он же наша трата); (3) цена берётся из события сделки,
+# как у Launchlab. Раскладка 18 счетов установлена по 5 настоящим покупкам
+# в data/c2_pool_samples/6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P.json.
+BONDING = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 # Пулы, где направление задаётся тем, в какое хранилище пришла котировка:
 # индексы входа/выхода пользователя, хранилищ a/b, их минтов и программ токена.
 DYN = {
@@ -112,6 +120,19 @@ SPECS = {
     CLMM: {"label": "Raydium CLMM", "ix": "swap_v2", "alt": [], "n_accounts": None, "min_accounts": 13,
            "user": [0], "user_ata": "dyn", "pda": [], "tail": True,
            "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
+    # Счета buy у кривой (проверено на 5 настоящих покупках, вывод счётов сошёлся
+    # у всех): 0 global, 1 получатель комиссии, 2 минт, 3 счёт кривой
+    # (PDA bonding-curve+минт, он же держит SOL), 4 ATA кривой, 5 НАШ ATA токена,
+    # 6 НАШ кошелёк (подписант), 7 системная, 8 программа токена (бывает и
+    # Token-2022), 9 хранилище создателя, 10 event_authority, 11 сама программа,
+    # 12 global_volume_accumulator, 13 НАШ user_volume_accumulator (PDA от нас),
+    # 14 fee_config, 15 программа комиссий, 16-17 счета создателя. Подставляем
+    # только 5, 6 и 13 -- остальное переносится из сделки источника как есть.
+    BONDING: {"label": "Pump.fun bonding curve", "ix": "buy", "alt": [], "n_accounts": 18,
+              "user": [6], "user_ata": [(5, 2, 8)],
+              "pda": [(13, [b"user_volume_accumulator", "USER"])],
+              "base_mint": 2, "quote_mint": None, "base_vault": 4, "quote_vault": 3,
+              "native_quote": True, "exact_out": True},
     DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"], "n_accounts": 14,
             "user": [8], "user_ata": "dyn", "pda": [],
             "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
@@ -242,6 +263,13 @@ def mints_and_vaults(tpl: dict, tx: dict) -> dict:
         return {"quote_mint": r["in"][1], "base_mint": r["out"][1], "quote_program": r["in"][2],
                 "base_program": r["out"][2], "quote_vault": r["quote_vault"],
                 "base_vault": r["base_vault"]}
+    if spec.get("native_quote"):
+        # Котировка -- нативный SOL: минта и программы токена у неё нет,
+        # «хранилище котировки» это сам счёт кривой (лампорты лежат на нём).
+        ba_ = next(x for x in spec["user_ata"] if x[1] == spec["base_mint"])
+        return {"quote_mint": C.NATIVE_QUOTE, "base_mint": acc[spec["base_mint"]],
+                "quote_program": None, "base_program": acc[ba_[2]],
+                "quote_vault": acc[spec["quote_vault"]], "base_vault": acc[spec["base_vault"]]}
     qa = next(x for x in spec["user_ata"] if x[1] == spec["quote_mint"])
     ba = next(x for x in spec["user_ata"] if x[1] == spec["base_mint"])
     return {"quote_mint": acc[spec["quote_mint"]], "base_mint": acc[spec["base_mint"]],
@@ -351,7 +379,8 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     if cu_price_micro:
         ixs.append(cu_price(cu_price_micro))
     ixs.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
-    ixs.append(ata_idempotent(payer, user, mv["quote_mint"], mv["quote_program"]))
+    if mv["quote_program"]:   # нативная котировка (кривая pump.fun): счёта нет
+        ixs.append(ata_idempotent(payer, user, mv["quote_mint"], mv["quote_program"]))
     if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
         wsol_ata = ata(user, C.WSOL, mv["quote_program"])
         ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
@@ -366,7 +395,13 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
 
     if tip and tip_first:
         ixs += _чаевые_инструкции(tip)
-    ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
+    if SPECS[tpl["program"]].get("exact_out"):
+        # «Точный выход»: программа сама считает цену наших min_out токенов и
+        # отказывается, если она выше amount_in. То есть оба денежных предела --
+        # минимум токенов и максимум траты -- стоят в одной инструкции.
+        ixs.append(swap_instruction(tpl, tx, user, min_out, amount_in))
+    else:
+        ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
     if tip and tip_first:
         tip = None
     if tip:
@@ -400,6 +435,9 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
         return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
+    if tpl["program"] == BONDING:
+        return bonding_min_out(tx, tpl["accounts"][SPECS[BONDING]["base_mint"]],
+                               amount_in, slippage)
     mv = mints_and_vaults(tpl, tx)
     rows = {r["account"]: r for r in C.token_rows(tx).values()}
     qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
@@ -465,6 +503,97 @@ def launchlab_min_out(tx: dict, amount_in: int, slippage: float) -> dict:
     return {"ok": True, "fee_rate": float(fee_rate), "virtual_reserves_after": [
         ev["virtual_base"] - ev["real_base_after"], ev["virtual_quote"] + ev["real_quote_after"]],
         "expected_out": int(exp), "min_out": int(exp * D(1 - slippage))}
+
+
+# ------------------------------------------------------------ Pump.fun: кривая до миграции
+
+# Событие сделки кривой -- тоже "event:TradeEvent" (дискриминатор тот же, что у
+# Launchlab), но раскладка другая и длина у настоящих покупок 374 байта:
+#   минт(32) sol(8) токены(8) покупка(1) кошелёк(32) время(8)
+#   вирт_sol(8) вирт_токены(8) реал_sol(8) реал_токены(8)
+#   получатель_комиссии(32) bps(8) комиссия(8) создатель(32) bps(8) комиссия(8)
+# Раскладка НЕ угадана: у программы встречается и другая, длинная запись (389
+# байт в образце HzfxBXKq), поэтому каждое разобранное событие обязано
+# воспроизвести собственную сделку по кривой -- иначе оно не берётся вовсе.
+PF_EVENT_DISC = hashlib.sha256(b"event:TradeEvent").digest()[:8]
+PF_MIN_EVENT = 8 + 217
+
+
+def pump_trade_event(tx: dict, mint: str | None = None) -> dict | None:
+    """Событие покупки по кривой pump.fun из логов сделки источника.
+
+    Виртуальные резервы в событии -- ПОСЛЕ сделки источника, то есть ровно та
+    цена, по которой считаем свою покупку следом. None -- событие не найдено,
+    не разобралось или не воспроизвело собственную сделку."""
+    for ln in ((tx or {}).get("meta") or {}).get("logMessages") or []:
+        if not ln.startswith("Program data: "):
+            continue
+        try:
+            raw = base64.b64decode(ln[len("Program data: "):].strip())
+        except ValueError:
+            continue
+        if raw[:8] != PF_EVENT_DISC or len(raw) < PF_MIN_EVENT:
+            continue
+        b = raw[8:]
+        try:
+            ev_mint = str(Pubkey(bytes(b[0:32])))
+            sol, tok = struct.unpack_from("<QQ", b, 32)
+            is_buy = b[48]
+            user = str(Pubkey(bytes(b[49:81])))
+            vs, vt, rs, rt = struct.unpack_from("<QQQQ", b, 89)
+            fee_bps, fee = struct.unpack_from("<QQ", b, 153)
+            cr_bps, cr_fee = struct.unpack_from("<QQ", b, 201)
+        except (struct.error, ValueError):
+            continue
+        if mint is not None and ev_mint != mint:
+            continue
+        if is_buy != 1 or sol <= 0 or tok <= 0 or vs <= sol or vt <= 0:
+            continue
+        vs0, vt0 = vs - sol, vt + tok
+        if vt0 * sol // (vs0 + sol) != tok:            # событие не про эту кривую
+            continue
+        if -(-sol * fee_bps // 10_000) != fee or -(-sol * cr_bps // 10_000) != cr_fee:
+            continue                                   # поля комиссий не на месте
+        return {"mint": ev_mint, "user": user, "sol_amount": sol, "token_amount": tok,
+                "virtual_sol_reserves": vs, "virtual_token_reserves": vt,
+                "real_sol_reserves": rs, "real_token_reserves": rt,
+                "virtual_before": [vs0, vt0], "fee_bps": fee_bps, "fee": fee,
+                "creator_fee_bps": cr_bps, "creator_fee": cr_fee}
+    return None
+
+
+def pump_net_to_curve(budget: int, fee_bps: int, creator_bps: int) -> int:
+    """Сколько лампортов дойдёт до кривой, если ВСЯ трата вместе с комиссиями не
+    должна превысить budget. Комиссии программа считает вверх (ceil) -- это
+    проверено на настоящих сделках, поэтому подбор идёт по целым лампортам."""
+    if budget <= 0 or fee_bps < 0 or creator_bps < 0:
+        return 0
+
+    def всего(n: int) -> int:
+        return n + -(-n * fee_bps // 10_000) + -(-n * creator_bps // 10_000)
+
+    net = budget * 10_000 // (10_000 + fee_bps + creator_bps)
+    while net > 0 and всего(net) > budget:
+        net -= 1
+    while всего(net + 1) <= budget:
+        net += 1
+    return net
+
+
+def bonding_min_out(tx: dict, mint: str | None, amount_in: int, slippage: float) -> dict:
+    """Минимум токенов на кривой pump.fun при трате amount_in лампортов ВСЕГО
+    (вместе с комиссиями программы). Возвращает и трату до кривой, и предел."""
+    ev = pump_trade_event(tx, mint)
+    if not ev:
+        return {"ok": False, "why_not": "нет события сделки кривой pump.fun в логах"}
+    net = pump_net_to_curve(amount_in, ev["fee_bps"], ev["creator_fee_bps"])
+    if net <= 0:
+        return {"ok": False, "why_not": "трата меньше комиссий кривой"}
+    expected = ev["virtual_token_reserves"] * net // (ev["virtual_sol_reserves"] + net)
+    return {"ok": True, "fee_bps": ev["fee_bps"], "creator_fee_bps": ev["creator_fee_bps"],
+            "sol_to_curve": net, "max_sol_cost": amount_in,
+            "virtual_reserves_after": [ev["virtual_sol_reserves"], ev["virtual_token_reserves"]],
+            "expected_out": int(expected), "min_out": int(D(expected) * D(1 - slippage))}
 
 
 # ------------------------------------------------------------ самопроверка
@@ -548,7 +677,8 @@ def self_test() -> int:
         checks.append((f"{spec['label']}: из {len(sm)} настоящих транзакций восстановлено точно {len(ok)}, "
                        f"не сверяемо {len(skipped)} ({sorted({r['why'] for r in skipped})}), "
                        f"расхождений {len(bad)} {[r.get('diff_idx') for r in bad]}",
-                       (len(ok) >= 10 or (program == LAUNCHLAB and len(ok) >= 8)) and not bad))
+                       (len(ok) >= 10 or (program == LAUNCHLAB and len(ok) >= 8)
+                        or (program == BONDING and len(ok) >= 4)) and not bad))
         # Launchlab: в образцах задачи D всего 12 транзакций; добор до 10+
         # точных делает c2_swap_sim на раннере (сделки Launchlab из задачи A).
         t0 = time.perf_counter()
@@ -563,7 +693,10 @@ def self_test() -> int:
             n += 1
             assert b["size"] <= 1232, b["size"]
         dt = (time.perf_counter() - t0) * 1000 / max(1, n)
-        checks.append((f"{spec['label']}: сборка {n} транзакций, среднее {dt:.2f} мс, размер <= 1232", n >= 10))
+        # Кривая pump.fun: в образцах репозитория 5 настоящих покупок, одна из
+        # них другой разновидности инструкции (27 счетов) -- порог 4.
+        checks.append((f"{spec['label']}: сборка {n} транзакций, среднее {dt:.2f} мс, размер <= 1232",
+                       n >= (4 if program == BONDING else 10)))
     v1 = v1_ok = 0
     for s_ in load_samples(DLMM):
         tpl = extract_template(s_["tx"], DLMM, s_["pool_vault"])
@@ -606,6 +739,71 @@ def self_test() -> int:
                    len(ll) >= 10 and max(ll) < 1e-6))
     checks.append((f"формула x*y=k с калибровкой воспроизводит сделку источника ({len(errs)} сделок, "
                    f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
+    # ---- кривая pump.fun: только денежный путь (цена, минимум, предел траты)
+    pf_n = pf_exact = 0
+    for s in load_samples(BONDING):
+        ev = pump_trade_event(s["tx"], s.get("mint"))
+        if not ev:
+            continue
+        pf_n += 1
+        vs0, vt0 = ev["virtual_before"]
+        pf_exact += (vt0 * ev["sol_amount"] // (vs0 + ev["sol_amount"])) == ev["token_amount"]
+    checks.append((f"кривая pump.fun: событие воспроизводит сделку источника токен в токен "
+                   f"({pf_exact} из {pf_n})", pf_n >= 4 and pf_exact == pf_n))
+    # Трата: подбор до кривой обязан быть ПЛОТНЫМ снизу и не вылезать сверху.
+    tight = []
+    for bps, cbps in ((95, 30), (100, 0), (0, 0), (500, 250)):
+        for budget in (10_000_000, 1_000_000, 123_456_789, 5_001):
+            net = pump_net_to_curve(budget, bps, cbps)
+            всего = lambda n: n + -(-n * bps // 10_000) + -(-n * cbps // 10_000)  # noqa: E731
+            tight.append(net > 0 and всего(net) <= budget < всего(net + 1))
+    checks.append((f"трата до кривой: комиссии вверх, предел не превышен, плотно снизу "
+                   f"({sum(tight)} из {len(tight)})", all(tight)))
+    # Сборка покупки: нативная котировка -- ни обёртки SOL, ни ATA котировки;
+    # аргументы инструкции -- (минимум токенов, предел траты), и не наоборот.
+    pf_build = []
+    for s in load_samples(BONDING):
+        tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
+        if not tpl["ok"]:
+            continue
+        mo = min_out_from_reserves(tpl, s["tx"], 10_000_000, 0.35)
+        if not mo["ok"]:
+            pf_build.append(("минимум не посчитан", False))
+            continue
+        kp = Keypair()
+        me = str(kp.pubkey())
+        ix = swap_instruction(tpl, s["tx"], me, mo["min_out"], 10_000_000)
+        got = [str(m.pubkey) for m in ix.accounts]
+        подставлено = {i for i, (g, w) in enumerate(zip(got, tpl["accounts"])) if g != w}
+        args = struct.unpack("<QQ", bytes(ix.data)[8:24])
+        b = build_buy(tpl, s["tx"], user=me, payer=me, amount_in=10_000_000,
+                      min_out=mo["min_out"], cu_price_micro=10_000, tip=None)
+        raw = base64.b64decode(b["tx_base64"])
+        pf_build.append((s.get("mint"), подставлено == {5, 6, 13}
+                         and args == (mo["min_out"], 10_000_000)
+                         and bytes(ix.data)[:8] == disc("buy")
+                         and b["quote_mint"] == C.NATIVE_QUOTE
+                         and C.WSOL.encode() not in raw   # обёртки SOL нет
+                         and 0 < mo["min_out"] < mo["expected_out"]
+                         and mo["sol_to_curve"] < 10_000_000
+                         and len(ix.accounts) == 18))
+    checks.append((f"покупка на кривой: подставлены только наши 5/6/13, аргументы "
+                   f"(минимум, предел), обёртки SOL нет ({sum(1 for _, o in pf_build if o)} "
+                   f"из {len(pf_build)})", len(pf_build) >= 4 and all(o for _, o in pf_build)))
+    # Больше траты -- больше токенов, и минимум всегда ниже ожидания.
+    mono = []
+    for s in load_samples(BONDING):
+        tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
+        if not tpl["ok"]:
+            continue
+        outs = [min_out_from_reserves(tpl, s["tx"], a, 0.35) for a in (1_000_000, 10_000_000, 100_000_000)]
+        if not all(o["ok"] for o in outs):
+            mono.append(False)
+            continue
+        mono.append(all(outs[i]["expected_out"] < outs[i + 1]["expected_out"] for i in (0, 1))
+                    and all(o["min_out"] < o["expected_out"] for o in outs))
+    checks.append((f"цена кривой растёт с тратой, минимум ниже ожидания ({sum(mono)} из {len(mono)})",
+                   len(mono) >= 4 and all(mono)))
     bad_n = 0
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
