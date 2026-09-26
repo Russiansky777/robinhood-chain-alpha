@@ -14,6 +14,7 @@
 Только чтение. Ничего не меняет.
 """
 import argparse
+import calendar
 import gzip
 import json
 import os
@@ -45,7 +46,14 @@ def файлы(каталог: str, имя: str) -> list:
 
 
 def в_секунды(s: str) -> float:
-    return time.mktime(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
+    """UTC-строка в epoch. Через timegm, а не mktime.
+
+    ПОЧЕМУ ЭТО ВАЖНО. mktime читает время как МЕСТНОЕ, и на хосте в CEST окно
+    съезжало на час: записи полосы фильтровались тем же сдвинутым временем и
+    сходились, а записи решений площадки (у них epoch настоящий) уезжали из
+    окна -- разбор сделки 11:53:57Z нашёл только exec_result без строки решения.
+    """
+    return calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))
 
 
 def группа_причины(почему: str) -> str:
@@ -90,7 +98,10 @@ def main() -> int:
             if not т:
                 # у записей полосы своего времени нет -- берём ts_utc
                 у = з.get("ts_utc")
-                т = в_секунды(у) if isinstance(у, str) and у.endswith("Z") else None
+                try:
+                    т = в_секунды(у) if isinstance(у, str) and у.endswith("Z") else None
+                except ValueError:
+                    т = None
             if т is None or float(т) < порог:
                 continue
             # ЗАПИСЬ ПОЛОСЫ узнаётся по своему полю времени сборки.
