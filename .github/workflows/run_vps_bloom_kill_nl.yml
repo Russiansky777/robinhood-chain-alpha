@@ -16,9 +16,16 @@ name: "Bloom: рубильник покупок KILL (status/set/clear), про�
 # ЧЕСТНОЕ ПРЕДУПРЕЖДЕНИЕ. Файл KILL -- общий запрет НОВЫХ ПОКУПОК, и полоса
 # своей отправки сверяется с ним тоже (bloom_own_send.py:1323, 2359, 2477
 # зовут состояние.kill_active() раньше своего KILL_OWN_SEND). Поэтому
-# mode=set останавливает и Bloom, и полосу. Отдельного выключателя только для
-# Bloom в коде нет -- он появится утром вместе с починкой учёта. Владельцу это
-# сказано словами 25.09.
+# switch=common + mode=set останавливает и Bloom, и полосу.
+#
+# ОТДЕЛЬНЫЙ ВЫКЛЮЧАТЕЛЬ ТОЛЬКО BLOOM появился с правкой I.1 (задеплоена 26.09):
+# switch=bloom пишет /etc/bloom-executor/KILL_BLOOM. Его читает ТОЛЬКО путь
+# площадки (bloom_exec_state.можно_открыть -> kill_bloom_active, свой код отказа
+# КОД_РУБИЛЬНИК); полоса своей отправки этого файла не читает вовсе и продолжает
+# покупать. Это и есть проверка пункта 3 дневного плана владельца 26.09:
+# "положить KILL_BLOOM на 10 минут -- Bloom отказывает своим кодом, полоса
+# покупает". Признак жизни показывает его отдельным полем
+# kill_switch.bloom_active, а общий -- kill_switch.active.
 on:
   workflow_dispatch:
     inputs:
@@ -26,6 +33,10 @@ on:
         description: "status -- посмотреть; set -- запретить новые покупки; clear -- снять запрет"
         required: true
         default: "status"
+      switch:
+        description: "'common' -- общий KILL (глушит и полосу); 'bloom' -- только KILL_BLOOM (полоса торгует)"
+        required: false
+        default: "common"
       reason:
         description: "почему (обязательно для set и clear; попадёт в файл и в журнал прогона)"
         required: false
@@ -68,6 +79,19 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      - name: "Какой именно рубильник трогаем"
+        run: |
+          set -e
+          case "${{ inputs.switch }}" in
+            common) echo "KILL_FILE=$ENV_DIR/KILL" >> "$GITHUB_ENV"
+                    echo "KILL_KEY=kill_active" >> "$GITHUB_ENV"
+                    echo "трогаем ОБЩИЙ рубильник: $ENV_DIR/KILL (глушит и полосу)" ;;
+            bloom)  echo "KILL_FILE=$ENV_DIR/KILL_BLOOM" >> "$GITHUB_ENV"
+                    echo "KILL_KEY=bloom_active" >> "$GITHUB_ENV"
+                    echo "трогаем рубильник ТОЛЬКО BLOOM: $ENV_DIR/KILL_BLOOM (полоса торгует)" ;;
+            *) echo "СБОЙ: switch должен быть common или bloom, а не '${{ inputs.switch }}'"; exit 1 ;;
+          esac
+
       - name: "Что сейчас с рубильниками (оба файла и мнение службы)"
         run: |
           set -e
@@ -76,6 +100,8 @@ jobs:
             T=$STATE_DIR/KILL_BY_TELEGRAM
             if [ -f \"\$F\" ]; then printf 'KILL СТОИТ: '; head -c 400 \"\$F\"; echo; else echo 'KILL нет'; fi
             if [ -f \"\$T\" ]; then printf 'KILL_BY_TELEGRAM СТОИТ: '; head -c 400 \"\$T\"; echo; else echo 'KILL_BY_TELEGRAM нет'; fi
+            B=$ENV_DIR/KILL_BLOOM
+            if [ -f \"\$B\" ]; then printf 'KILL_BLOOM СТОИТ (только площадка): '; head -c 400 \"\$B\"; echo; else echo 'KILL_BLOOM нет: площадка покупает'; fi
             echo '--- продажи (этот прогон их не трогает) ---'
             if [ -f $ENV_DIR/KILL_SELL ]; then echo 'KILL_SELL стоит'; else echo 'KILL_SELL нет: продажи разрешены'; fi
             echo '--- что видит служба ---'
@@ -91,7 +117,7 @@ jobs:
           [ -n "$reason_text" ] || { echo "СБОЙ: для mode=set нужна причина"; exit 1; }
           # Первая причина НЕ затирается: важна та, из-за которой встали впервые.
           ssh -n $SSH_OPTS root@$HOST "
-            F=$ENV_DIR/KILL
+            F=$KILL_FILE
             if [ -f \"\$F\" ]; then
               printf 'рубильник уже стоял, первую причину не трогаем: '; head -c 400 \"\$F\"; echo
             else
@@ -116,12 +142,12 @@ jobs:
           set -e
           reason_text='${{ inputs.reason }}'
           ssh -n $SSH_OPTS root@$HOST "
-            F=$ENV_DIR/KILL
-            if [ ! -f \"\$F\" ]; then echo 'KILL и не стоял -- снимать нечего'; exit 0; fi
+            F=$KILL_FILE
+            if [ ! -f \"\$F\" ]; then echo 'рубильник и не стоял -- снимать нечего'; exit 0; fi
             cp -a \"\$F\" \"\$F.snyat.\$(date -u +%Y%m%dT%H%M%SZ)\"
             printf 'снимаю, прежняя причина: '; head -c 400 \"\$F\"; echo
             rm -f \"\$F\"
-            echo 'KILL снят, причина снятия: $reason_text'
+            echo 'рубильник снят, причина снятия: $reason_text'
             ls -l $ENV_DIR/KILL* 2>/dev/null || echo 'файлов KILL больше нет'"
 
       - name: "Строка владельцу в Telegram (для set, по запросу)"
@@ -139,7 +165,7 @@ jobs:
             code=\$(curl -s -o /tmp/tg_bloom_kill.out -w '%{http_code}' \
               -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
               --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
-              --data-urlencode text='СТОП: новые покупки Bloom запрещены (файл KILL). Причина: $reason_text Продажи продолжаются. Полоса тоже встала: она сверяется с тем же файлом. Снять: прогон run_vps_bloom_kill_nl.yml mode=clear confirm=SNYAT.')
+              --data-urlencode text='СТОП: новые покупки запрещены, файл $KILL_FILE (switch=${{ inputs.switch }}). Причина: $reason_text Продажи продолжаются. При switch=common полоса тоже встала (тот же файл); при switch=bloom полоса торгует. Снять: прогон run_vps_bloom_kill_nl.yml mode=clear switch=${{ inputs.switch }} confirm=SNYAT.')
             echo \"telegram http \$code\"
             head -c 200 /tmp/tg_bloom_kill.out; echo
             rm -f /tmp/tg_bloom_kill.out"
@@ -148,17 +174,31 @@ jobs:
         if: ${{ always() && inputs.mode != 'status' }}
         run: |
           set -e
-          # Признак жизни пишется РАЗ В ПУЛЬС, а пульс у детектора около
-          # минуты. Ждать 40 с значило бы объявлять сбой там, где служба просто
-          # ещё не обновила файл: ровно так и вышло 26.09 в 00:46Z -- рубильник
-          # стоял, Telegram ушёл, а прогон упал. Ждём до двух минут.
+          # ОБЩИЙ рубильник виден в признаке жизни полем kill_active (детектор
+          # пишет его на верхнем уровне, bloom_detector.py:2027). Признак жизни
+          # пишется РАЗ В ПУЛЬС, а пульс около минуты: ждать 40 с значило бы
+          # объявлять сбой там, где служба просто ещё не обновила файл -- ровно
+          # так и вышло 26.09 в 00:46Z. Ждём до двух минут.
+          #
+          # РУБИЛЬНИКА ТОЛЬКО BLOOM в признаке жизни отдельным полем пока НЕТ
+          # (поле добавлено в код 26.09 и появится с ближайшим перезапуском
+          # детектора). Поэтому для switch=bloom проверяется ФАЙЛ на диске плюс
+          # то, что общий рубильник остался снят -- иначе встала бы и полоса, а
+          # смысл этого выключателя ровно обратный. Отказы площадки своим кодом
+          # считает отдельный прогон по журналу решений.
           mode_now='${{ inputs.mode }}'
+          if [ "${{ inputs.switch }}" = "bloom" ]; then
+            ssh -n $SSH_OPTS root@$HOST "
+              if [ -f $ENV_DIR/KILL_BLOOM ]; then echo 'файл KILL_BLOOM на диске: СТОИТ'; else echo 'файл KILL_BLOOM на диске: нет'; fi
+              if [ -f $ENV_DIR/KILL ]; then echo 'ВНИМАНИЕ: общий KILL стоит -- полоса тоже не торгует'; else echo 'общий KILL снят: полоса торгует'; fi"
+            exit 0
+          fi
           for i in $(seq 1 24); do
-            out=$(ssh -n $SSH_OPTS root@$HOST "grep -m1 '\"kill_active\"' $STATE_DIR/detector_status.json || true")
-            echo "пульс: $out"
+            out=$(ssh -n $SSH_OPTS root@$HOST "python3 -c 'import json; print(json.load(open(\"$STATE_DIR/detector_status.json\")).get(\"kill_active\"))'" || echo "?")
+            echo "пульс: kill_active=$out"
             case "$mode_now" in
-              set)   case "$out" in *true*)  echo "служба видит запрет"; exit 0 ;; esac ;;
-              clear) case "$out" in *false*) echo "служба видит разрешение"; exit 0 ;; esac ;;
+              set)   case "$out" in True)  echo "служба видит запрет"; exit 0 ;; esac ;;
+              clear) case "$out" in False) echo "служба видит разрешение"; exit 0 ;; esac ;;
             esac
             sleep 5
           done

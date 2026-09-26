@@ -2026,6 +2026,15 @@ class Детектор:
         st["kill_readable"] = доступен
         st["kill_active"] = убит
         st["kill_note"] = (почему if доступен else почему) or причина
+        # РУБИЛЬНИК ТОЛЬКО ПЛОЩАДКИ -- отдельным полем. Общий kill_active глушит
+        # всё, включая полосу, и по нему нельзя отличить "встала одна площадка"
+        # от "встало всё". Проверка пункта 3 владельца 26.09 (KILL_BLOOM на 10
+        # минут: площадка отказывает, полоса покупает) без этого поля читается
+        # только по журналу решений.
+        убит_б, причина_б = self.состояние.kill_bloom_active()
+        st["kill_bloom_path"] = str(self.состояние.kill_bloom_path)
+        st["kill_bloom_active"] = убит_б
+        st["kill_bloom_note"] = причина_б
         st["net_slot"] = self.слот_сети
         st["slot_notifications"] = self.слот_уведомлений
         st["net_slot_age_s"] = (round(time.time() - self.t_слот, 2)
