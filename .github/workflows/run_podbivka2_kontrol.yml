@@ -35,10 +35,9 @@ jobs:
           "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
 
-      - name: "Shyft RPC probe (key names from 24.09 Shyft runs)"
+      - name: "Shyft RPC probe"
         env:
-          GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
-          GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
         run: |
           set +e
           $PY analysis/podbivka_shyft_proba.py --out data/podbivka/shyft_proba.json
@@ -52,11 +51,9 @@ jobs:
       - name: "Control: simulator vs chain via Shyft"
         if: env.PROBE_RC == '0'
         env:
-          GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
-          GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
         run: |
           set -e
-          export SHYFT_API_KEY="${!SHYFT_KEY_NAME}"
           $PY analysis/podbivka.py --sdelki /tmp/nashi_sdelki_258.json --limit 0 --out data/podbivka/kontrol_ceny_shyft.json > /tmp/kontrol_svod.txt
           $PY analysis/podbivka_kontrol_sravnenie.py --bylo data/podbivka/kontrol_ceny.json --stalo data/podbivka/kontrol_ceny_shyft.json --out data/podbivka/kontrol_ceny_shyft_sravnenie.json
 

@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from podbivka_1b import чисто  # noqa: E402
 
-КАНДИДАТЫ = ("GRPC_FEED_TOKEN", "GRPC_FEED2_TOKEN")
+КАНДИДАТЫ = ("SHYFT_API_KEY",)
 АДРЕС = "https://rpc.shyft.to?api_key={}"
 BREZ = "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB"
 ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
@@ -62,8 +62,6 @@ def main() -> int:
     итог: dict = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                   "адрес_rpc": "https://rpc.shyft.to?api_key=<ключ>", "кандидаты": {}}
     значения = {имя: (os.environ.get(имя) or "").strip() for имя in КАНДИДАТЫ}
-    итог["ключи_совпадают"] = (bool(значения[КАНДИДАТЫ[0]]) and
-                               значения[КАНДИДАТЫ[0]] == значения[КАНДИДАТЫ[1]])
     выбран = None
     for имя in КАНДИДАТЫ:
         к = значения[имя]

@@ -61,7 +61,7 @@ jobs:
 
       - name: "Run"
         env:
-          SHYFT_API_KEY: ${{ secrets.SHYFT_SECRET_NAME_TBD }}
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
           SKRIPT: ${{ matrix.skript }}
           ARGS: ${{ matrix.args }}
         run: |
