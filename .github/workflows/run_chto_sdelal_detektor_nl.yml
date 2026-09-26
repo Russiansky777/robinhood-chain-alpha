@@ -1,0 +1,84 @@
+name: "Что сделал наш детектор на сделках DBot (только чтение)"
+
+# ЗАЧЕМ (задание владельца 26.09, 21:50): по каждой закрытой сделке DBot за
+# сутки -- что на том же сигнале сделали мы: не увидел / рубильник / порог /
+# STALE / повтор минта / предел позиций / отказ сборки / купил Bloom вместо
+# полосы / полоса купила. Плюс итог по причинам с числом.
+#
+# Два шага: сначала (по желанию) обновляется таблица DBot по цепи, потом на
+# хосте потоком читаются наши журналы решений и позиций по минтам этих сделок.
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "сутки по Мадриду"
+        required: false
+        default: "2026-09-26"
+
+concurrency:
+  group: chto-sdelal-detektor
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/chto_sdelal_detektor.txt
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Разбор на хосте по нашим журналам"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/chto_sdelal_detektor.py" < deploy/checks/chto_sdelal_detektor.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/dbot_dni.json" < data/dbot_dni.json
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/chto_sdelal_detektor.py --state-dir '$STATE_DIR' \
+              --dbot /tmp/dbot_dni.json --day '${{ inputs.day }}' \
+              --out /tmp/chto_sdelal_detektor.json
+            rc=\$?; rm -f /tmp/chto_sdelal_detektor.py /tmp/dbot_dni.json; exit \$rc" | tee "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/chto_sdelal_detektor.json" > data/chto_sdelal_detektor.json
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/chto_sdelal_detektor.json"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" data/chto_sdelal_detektor.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" data/chto_sdelal_detektor.json; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Chto sdelal nash detektor na sdelkah DBot [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
