@@ -91,7 +91,7 @@ def факт_покупки(tx: dict, кошелёк: str, минт: str | None 
     так и пишем: сделка села, а токен не пришёл (внутренняя ошибка свопа).
     """
     из_ = {"ok": False, "why_not": None, "tokens_raw": None, "decimals": None,
-           "mint": минт, "sol_out": None, "fee_sol": None, "err": None, "slot": tx.get("slot")}
+           "mint": минт, "sol_out": None, "fee_sol": None, "err": None, "slot": (tx or {}).get("slot")}
     if not tx:
         из_["why_not"] = "узел не отдал транзакцию"
         return из_
