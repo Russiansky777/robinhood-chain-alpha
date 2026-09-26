@@ -48,6 +48,8 @@ def пакеты(м: dict) -> list:
                "--sverka", str(м.get("sverka", 0) if н == с else 0), "--push"]
         if м.get("fakt"):
             арг.append("--fakt")
+        if м.get("tolko_shyft"):
+            арг.append("--tolko-shyft")
         из_.append({"skript": "podbivka_run.py", "args": " ".join(арг), "name": f"{м['zadacha']}_{н}_{до}"})
     # Предел Helius 10 запросов/с -- на все одновременные пакеты (max-parallel 12).
     доля = round(10.0 / min(12, max(1, len(из_))), 3)

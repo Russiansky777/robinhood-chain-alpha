@@ -240,9 +240,13 @@ def main() -> int:
     р.add_argument("--sverka", type=int, default=0, help="у первых N кошельков -- прямой разбор")
     р.add_argument("--push", action="store_true")
     р.add_argument("--fakt", action="store_true", help="п.2а: наши сделки DBot/Bloom/полосы")
+    р.add_argument("--tolko-shyft", action="store_true",
+                   help="ни одного запроса в Helius: всё на Shyft (проход (а) чужих)")
     р.add_argument("--host-sdelki", default=str(КОРЕНЬ / "data" / "podbivka" / "nashi_sdelki_host.json"))
     а = р.parse_args()
     до_ts = в_секунды(а.do_utc)
+    if а.tolko_shyft:
+        S.ГРАНЬ_SHYFT = 0
     с_ts = int(до_ts - а.dney * 86400)
     строки = список(а.spisok)
     строки = строки[а.s:(а.po or None)]
