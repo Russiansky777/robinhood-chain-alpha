@@ -172,7 +172,13 @@ SPECS = {
               "pda": [(13, [b"user_volume_accumulator", "USER"])],
               "base_mint": 2, "quote_mint": None, "base_vault": 4, "quote_vault": 3,
               "native_quote": True, "exact_out": True},
-    DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"], "n_accounts": 14,
+    # У DAMM v2 в живых сделках ДВЕ инструкции: swap и swap2 (у второй ещё один
+    # байт хвоста). Счетов бывает 14 или 15: пятнадцатый -- Sysvar instructions
+    # в САМОМ КОНЦЕ, и счета 0..13 при этом совпадают дословно (проверено на
+    # образцах 1, 5, 14). Поэтому раскладка одна, а число счетов -- 14 или 15;
+    # шестнадцатого в живых сделках не встречалось, и вслепую его не берём.
+    DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"],
+            "n_accounts": None, "min_accounts": 14, "max_accounts": 15,
             "user": [8], "user_ata": "dyn", "pda": [],
             "base_mint": None, "quote_mint": None, "base_vault": None, "quote_vault": None},
 }
@@ -248,9 +254,14 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
                      if data[:8] == disc(n)), data[:8].hex())
         if data[:8] != want and name not in spec["alt"]:
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
-        if spec["n_accounts"] is not None and len(ix["accounts"]) != spec["n_accounts"] or \
-                len(ix["accounts"]) < (spec.get("min_accounts") or 0):
-            return {"ok": False, "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
+        ждём = spec["n_accounts"]
+        макс = spec.get("max_accounts")
+        if ждём is not None and len(ix["accounts"]) != ждём or \
+                len(ix["accounts"]) < (spec.get("min_accounts") or 0) or \
+                (макс is not None and len(ix["accounts"]) > макс):
+            return {"ok": False,
+                    "why_not": f"счетов {len(ix['accounts'])}, ожидалось "
+                                f"{ждём if ждём is not None else (spec.get('min_accounts'), макс)}"}
         a0, a1 = struct.unpack("<QQ", data[8:24])
         # DLMM swap (v1): счета 0..12 те же, что у swap2 (проверено на
         # настоящих транзакциях), данные -- дискриминатор + 2 u64 без хвоста.
@@ -371,9 +382,16 @@ def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
             return Instruction(Pubkey.from_string(tpl["program"]),
                                tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:],
                                metas)
-        ix_name = tpl["ix"] if tpl["program"] == DLMM else SPECS[tpl["program"]]["ix"]
+        # ИМЯ ИНСТРУКЦИИ -- КАК У ИСТОЧНИКА там, где у программы их несколько
+        # (DLMM: swap/swap2; DAMM v2: swap/swap2). Собрать swap со счетами
+        # swap2 значило бы отдать программе не тот список счетов.
+        ix_name = (tpl["ix"] if tpl["program"] in (DLMM, DAMM2)
+                   else SPECS[tpl["program"]]["ix"])
         data = disc(ix_name) + struct.pack("<QQ", arg0, arg1)
-        if spec_of(tpl).get("tail") and not (tpl["program"] == DLMM and ix_name == "swap"):
+        # ХВОСТ -- ТОЛЬКО ТОТ, ЧТО БЫЛ У ИСТОЧНИКА, и только когда мы собираем
+        # ту же инструкцию: у swap2 это один байт, у CLMM -- лимит цены с
+        # признаком, у Launchlab -- доля комиссии.
+        if tpl["data"][24:] and (spec_of(tpl).get("tail") or ix_name == tpl["ix"]):
             data += tpl["data"][24:]
     return Instruction(Pubkey.from_string(tpl["program"]), data, metas)
 
@@ -505,13 +523,56 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
 
 # ------------------------------------------------------------ минимум по резервам
 
+def damm2_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
+    """Минимум выхода в DAMM v2: кривая восстанавливается по сделке источника.
+
+    Резервы в хранилищах у сосредоточенной ликвидности цену не дают, поэтому
+    цена берётся из события свопа (next_sqrt_price -- число из цепи) и пары
+    "вход/выход" этой же сделки. Проверки события -- в c2_cl_quote: заявленный
+    вход обязан совпасть с аргументом инструкции, выход -- с движением
+    хранилища, а решённая кривая -- воспроизвести выход источника.
+    """
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    try:
+        import c2_cl_quote as CL  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"нет модуля цены ({type(exc).__name__})"}
+    # ПУЛ -- счёт 1 инструкции DAMM v2 (проверено на живых сделках): по нему
+    # событие привязывается к НАШЕМУ пулу, а не к первому в маршруте.
+    пул = tpl["accounts"][1] if len(tpl["accounts"]) > 1 else None
+    тело = CL.тело_события(tx, tpl["program"], all_instructions, b58decode,
+                            пул=пул)
+    база_это_a = mv["base_mint"] == tpl["accounts"][DYN[tpl["program"]]["ma"]]
+    из_ = CL.минимум(тело=тело, вход_источника=вход, выход_источника=выход,
+                      аргумент_входа=tpl["arg0"], база_это_a=база_это_a,
+                      наш_вход=amount_in, проскальзывание=slippage)
+    if из_.get("ok"):
+        из_["source_in"] = вход
+        из_["source_out"] = выход
+    return из_
+
+
 def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
 
     f -- доля траты, доходящая до пула, калиброванная на сделке источника по
     его резервам ДО и его дельтам: f = x0*dy/((y0-dy)*spent), где spent --
     всё, что ушло из котировки в счета этой инструкции (пул + комиссии)."""
-    if tpl["program"] in (DAMM2, DLMM, CLMM):
+    if tpl["program"] == DAMM2:
+        # DAMM v2: цена -- по событию свопа и сделке источника (см. c2_cl_quote).
+        return damm2_min_out(tpl, tx, amount_in, slippage)
+    if tpl["program"] in (DLMM, CLMM):
         return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
@@ -972,6 +1033,63 @@ def self_test() -> int:
                     and all(o["min_out"] < o["expected_out"] for o in outs))
     checks.append((f"цена кривой растёт с тратой, минимум ниже ожидания ({sum(mono)} из {len(mono)})",
                    len(mono) >= 4 and all(mono)))
+
+    # ---------------------------------------------------- DAMM v2: цена по событию
+    # Это ДЕНЕЖНЫЙ путь: по этим числам полоса считает минимум выхода. Проверки:
+    #   (1) решённая кривая воспроизводит выход самой сделки источника;
+    #   (2) наше ожидание НИЖЕ наивной оценки по соотношению -- иначе мы считали
+    #       бы, что после покупки источника цена не сдвинулась;
+    #   (3) больше траты -- больше выхода, минимум ниже ожидания;
+    #   (4) событие берётся по НАШЕМУ пулу, чужое не годится;
+    #   (5) комиссия пула видна в ответе (у свежих пулов Meteora она бывает
+    #       десятками процентов -- решение "дорого" принимает полоса).
+    d2_модель, d2_ниже, d2_моно, d2_комиссии = [], [], [], []
+    for s_ in load_samples(DAMM2):
+        tpl = extract_template(s_["tx"], DAMM2, s_["pool_vault"])
+        if not tpl.get("ok"):
+            continue
+        r1 = min_out_from_reserves(tpl, s_["tx"], 10_000_000, 0.35)
+        if not r1.get("ok"):
+            d2_модель.append(False)
+            continue
+        d2_модель.append(r1["model_error"] < 1e-7)
+        наив = r1["source_out"] * 10_000_000 / r1["source_in"]
+        d2_ниже.append(0 < r1["expected_out"] < наив)
+        d2_комиссии.append(0.0 <= r1["fee_share"] < 0.60)
+        ряд = [min_out_from_reserves(tpl, s_["tx"], a, 0.35)
+               for a in (1_000_000, 10_000_000, 100_000_000)]
+        d2_моно.append(all(x.get("ok") for x in ряд)
+                       and all(ряд[i]["expected_out"] < ряд[i + 1]["expected_out"]
+                               for i in (0, 1))
+                       and all(0 < x["min_out"] < x["expected_out"] for x in ряд))
+    checks.append((f"DAMM v2: кривая по событию воспроизводит сделку источника "
+                   f"({sum(d2_модель)} из {len(d2_модель)})",
+                   len(d2_модель) >= 10 and all(d2_модель)))
+    checks.append((f"DAMM v2: наше ожидание ниже наивной оценки по соотношению "
+                   f"({sum(d2_ниже)} из {len(d2_ниже)})",
+                   len(d2_ниже) >= 10 and all(d2_ниже)))
+    checks.append((f"DAMM v2: больше траты -- больше выхода, минимум ниже ожидания "
+                   f"({sum(d2_моно)} из {len(d2_моно)})",
+                   len(d2_моно) >= 10 and all(d2_моно)))
+    checks.append((f"DAMM v2: комиссия пула посчитана и названа ({sum(d2_комиссии)} "
+                   f"из {len(d2_комиссии)})", len(d2_комиссии) >= 10
+                   and all(d2_комиссии)))
+    # (4) Чужой пул: событие с другим адресом пула не берётся вовсе.
+    чужой = None
+    for s_ in load_samples(DAMM2):
+        tpl = extract_template(s_["tx"], DAMM2, s_["pool_vault"])
+        if not tpl.get("ok"):
+            continue
+        import c2_cl_quote as CL_  # noqa: PLC0415
+
+        своё = CL_.тело_события(s_["tx"], DAMM2, all_instructions, b58decode,
+                                 пул=tpl["accounts"][1])
+        не_своё = CL_.тело_события(s_["tx"], DAMM2, all_instructions, b58decode,
+                                    пул="11111111111111111111111111111111")
+        чужой = (своё is not None and не_своё is None)
+        break
+    checks.append(("DAMM v2: событие берётся по нашему пулу, чужое не берётся",
+                   bool(чужой)))
     bad_n = 0
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
