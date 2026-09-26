@@ -737,6 +737,44 @@ class Seller:
                                  "commitment": "confirmed"}])
         return r.get("result") if r.get("ok") else None
 
+    def закрыть_счёт_после_продажи(self, pos: dict, доклад: dict):
+        """Закрыть пустой токен-счёт продажи и вернуть ренту. None -- не звали.
+
+        Ошибка закрытия НИКОГДА не роняет круг сторожа: позиция уже закрыта, и
+        рента -- это возврат заперного, а не выручка.
+        """
+        try:
+            import bloom_close_on_sell as CS  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            print(f"[сторож] модуль закрытия счёта не загружен: {type(exc).__name__}",
+                  flush=True)
+            return None
+        if not CS.включено():
+            return None
+        кошелёк = pos.get("wallet") or EXECUTOR_WALLET
+        минт = pos.get("mint") or ""
+        if not минт:
+            return {"ok": False, "why_not": "минт в позиции не известен"}
+        подпись = (доклад or {}).get("signature") or pos.get("closed_signature")
+        try:
+            рез = CS.закрыть_после_продажи(
+                lambda метод_, парам_: (rpc_call(метод_, парам_) or {}).get("result"),
+                кошелёк, минт, подпись_продажи=подпись)
+        except Exception as exc:  # noqa: BLE001
+            рез = {"ok": False, "why_not": f"закрытие не прошло ({type(exc).__name__})"}
+        try:
+            self.state.update_position(pos.get("client_order_id"), close_on_sell=рез)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[сторож] итог закрытия счёта в позицию не записан: "
+                  f"{type(exc).__name__}", flush=True)
+        # Наружу -- только имя класса и наши слова: текст исключения может
+        # унести с собой что угодно, включая адрес узла с ключом.
+        print(scrub_all(f"[сторож] закрытие счёта минта {минт[:12]}: "
+                        + ("рента вернулась" if рез.get("ok") else "не закрыт")
+                        + (f" ({рез.get('why_not')})" if рез.get("why_not") else "")),
+              flush=True)
+        return рез
+
     def доложить_закрытие(self, pos: dict, *, now: float,
                            читатель_tx=None) -> dict:
         """Строка о закрытии позиции: чем продано, за сколько секунд, сколько SOL.
@@ -1032,6 +1070,15 @@ class Seller:
                     self.state.note_sell_outcome(sold=True)
                 итог.update(closed_confirmed=bool(доклад.get("confirmed")),
                              closed_why_not=доклад.get("why_not") or "")
+                # РЕНТА ОБРАТНО (слово владельца 26.09, пункт 1). Счёт минта
+                # после продажи пуст, и в нём заперто 0.00203928 SOL. Закрываем
+                # СВОЕЙ транзакцией сразу следом: транзакцию продажи строит
+                # площадка, дописать в неё инструкцию нельзя. Путь выключен по
+                # умолчанию (BLOOM_CLOSE_ON_SELL), и его провал НЕ мешает
+                # закрытию позиции -- деньги уже в кошельке, рента лишь лежит.
+                зак = self.закрыть_счёт_после_продажи(pos, доклад)
+                if зак is not None:
+                    итог["close_on_sell"] = зак
             else:
                 self.state.update_position(cid, zero_streak=серия)
                 итог.update(action="ноль первый раз -- ещё не закрываю",
@@ -2605,6 +2652,65 @@ def self_test() -> None:
             os.environ.pop("BLOOM_SELL_VIA_JUPITER", None)
         else:
             os.environ["BLOOM_SELL_VIA_JUPITER"] = было_вкл_л
+
+    # --- ЗАКРЫТИЕ ТОКЕН-СЧЁТА ПРИ ПРОДАЖЕ (пункт 1 владельца 26.09, ночь).
+    # Денежный путь: без флага ничего не происходит, с флагом итог ложится в
+    # позицию, а любая ошибка закрытия не роняет круг.
+    import bloom_close_on_sell as CS_т  # noqa: PLC0415
+
+    было_фл = os.environ.get("BLOOM_CLOSE_ON_SELL")
+    старое_закрытие = CS_т.закрыть_после_продажи
+    try:
+        os.environ.pop("BLOOM_CLOSE_ON_SELL", None)
+        поз_з = {"client_order_id": "cz_close", "mint": "MINTCLOSE",
+                 "wallet": EXECUTOR_WALLET}
+        chk("без флага закрытие счёта не зовётся вовсе",
+            s.закрыть_счёт_после_продажи(поз_з, {"confirmed": True}) is None)
+
+        os.environ["BLOOM_CLOSE_ON_SELL"] = "1"
+        звали = {}
+
+        def поддельное(rpc, кошелёк, минт, *, подпись_продажи=None, **кв):
+            звали.update(кошелёк=кошелёк, минт=минт, подпись=подпись_продажи)
+            return {"ok": True, "rent_returned_sol": 0.00203928,
+                    "signature": "П" * 88, "accounts_closed": 1}
+
+        CS_т.закрыть_после_продажи = поддельное
+        st.write_intent(client_order_id="cz_close", mint="MINTCLOSE",
+                        source_sig="SZC", source_slot=1, sol_in=0.01, pool=None,
+                        program=None, taxed=None, tax_bps=None, mode="dry",
+                        sell_after_s=28.8)
+        рез_з = s.закрыть_счёт_после_продажи(
+            {"client_order_id": "cz_close", "mint": "MINTCLOSE",
+             "wallet": EXECUTOR_WALLET}, {"confirmed": True, "signature": "С" * 88})
+        chk("с флагом закрытие зовётся с нашим кошельком, минтом и подписью продажи",
+            звали.get("кошелёк") == EXECUTOR_WALLET
+            and звали.get("минт") == "MINTCLOSE"
+            and звали.get("подпись") == "С" * 88, звали)
+        chk("рента и подпись закрытия записаны в позицию",
+            (st.positions().get("cz_close") or {}).get("close_on_sell", {})
+            .get("rent_returned_sol") == 0.00203928,
+            (st.positions().get("cz_close") or {}).get("close_on_sell"))
+        chk("итог закрытия вернулся вызывающему", (рез_з or {}).get("ok") is True)
+
+        def падучее(*а, **к):
+            raise RuntimeError("узел отвалился")
+
+        CS_т.закрыть_после_продажи = падучее
+        рез_п = s.закрыть_счёт_после_продажи(
+            {"client_order_id": "cz_close", "mint": "MINTCLOSE",
+             "wallet": EXECUTOR_WALLET}, {"confirmed": True})
+        chk("падение закрытия не роняет круг и названо словами",
+            рез_п and рез_п.get("ok") is False
+            and "закрытие не прошло" in (рез_п.get("why_not") or ""), рез_п)
+        chk("текст исключения наружу не идёт -- только класс",
+            "узел отвалился" not in json.dumps(рез_п, ensure_ascii=False), рез_п)
+    finally:
+        CS_т.закрыть_после_продажи = старое_закрытие
+        if было_фл is None:
+            os.environ.pop("BLOOM_CLOSE_ON_SELL", None)
+        else:
+            os.environ["BLOOM_CLOSE_ON_SELL"] = было_фл
 
     # --- тело продажи, которое сторож реально отправляет
     body = build_sell_body(address="MINT3", percent=100, slippage_pct=40.0,
