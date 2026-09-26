@@ -1,491 +1,45 @@
 {
- "utc": "2026-09-26T12:46:07Z",
+ "utc": "2026-09-26T12:55:25Z",
  "окно": {
   "с": "2026-09-18T00:00:00Z",
   "до": "2026-09-26T00:00:00Z"
  },
  "план_getTransactionsForAddress": {
-  "ok": false,
-  "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":1,\"maxSupportedTransactionVersi"
+  "ok": true,
+  "форма": "только адрес",
+  "вид_ответа": "dict",
+  "попытки": [
+   {
+    "форма": "адрес и словарь",
+    "ok": false,
+    "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":1,\"maxSupportedTransactionVersion\":0,\"status\":\"succ"
+   },
+   {
+    "форма": "один словарь",
+    "ok": false,
+    "why_not": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: invalid type: map, expected a string'}"
+   }
+  ]
  },
  "порог_задачи_sol": 2.0,
  "по_источнику": {
   "leader": {
    "адрес": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
    "записей_журнала": 37,
-   "путь_по_цепи": "getSignaturesForAddress + getTransaction",
-   "подписей_в_окне": 6585,
-   "страниц_подписей": 8,
-   "транзакций_посмотрено": 2491,
-   "не_покупок": 2249,
-   "покупок_источника": 48,
-   "совпало": 2,
-   "источник_без_нас": 46,
-   "мы_без_источника": 35,
-   "предел_уперся": true,
-   "why_not_подписи": null,
-   "список_источник_без_нас": [
-    {
-     "signature": "4acZMvYjJoCZ7txNjJrYtjCM53aZRD3CoLtyV7W8EF3qTjgfLs1FWChDEdUo4ipMwe886gq5s4uxok5xEjG5bdqj",
-     "slot": 450407563,
-     "blockTime": 1790354005,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 89987323478,
-     "utc": "2026-09-25T16:33:25Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2GzvBDRsXq3bPiSJkHbvNTyJWk5g4Rcv3z7Ly8F4TNXt2zfdVYstFspW6nTn1FimkxNzmHjeqgsPnEmT4zh59gZD",
-     "slot": 450407432,
-     "blockTime": 1790353970,
-     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1513675490,
-     "utc": "2026-09-25T16:32:50Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4GAqCx8FDdyQbEu91y4wTKE25jaX2aVZwmS9SNUSfjWe4kyHVQQrnjh4FBoZF8JsZddjJrGwsXqSz8r2DxAtnu1Z",
-     "slot": 450225298,
-     "blockTime": 1790305336,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 86840732703,
-     "utc": "2026-09-25T03:02:16Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "44BkmqJkAR1J5D7PQCHTr3GiRMB2HWBRPn2hpLyoGgS7ApUvEuRHXUvwfvstHicLtF7sJmTK4zmhRyCLwK3PGQFp",
-     "slot": 450225209,
-     "blockTime": 1790305313,
-     "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1850997552436,
-     "utc": "2026-09-25T03:01:53Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3TKGGnDn2p47Mb4KaYbZ6mS8Bq22fd6WspwkmXGW1mqTCnbzEVzRT3msaSTMButeBNfVYMUxfanY5PK7qHtxeKLN",
-     "slot": 450194809,
-     "blockTime": 1790297174,
-     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
-     "sol_out": 0.00055084,
-     "tokens_raw": 144283668433,
-     "utc": "2026-09-25T00:46:14Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4QXMQBPT3oKYLFveuxFBenAbhnLzRZw8RvKdkEbB2JsGTeFcKDBc63RsMinNuSYREHnkq75rB3DnkZ82w3u5pTfs",
-     "slot": 450074489,
-     "blockTime": 1790265047,
-     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1123781942689,
-     "utc": "2026-09-24T15:50:47Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "dVEeTpBzSTjo2vCT39MpjxPsv4JPgHV4NaCErepKaEF3mvxQwHGzbpGKtexXdtQJjGPzgUGjxo2J22jdrW8Hhzn",
-     "slot": 450066874,
-     "blockTime": 1790263015,
-     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "sol_out": 0.00055084,
-     "tokens_raw": 723885314,
-     "utc": "2026-09-24T15:16:55Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3egBxswdzyhJnnMe7ubTVwMr6M9ani5jqUikTCs4kXx9tcaxbcWzmmgznnu8mqKbyQJEvzBpJ7p5VasZn71DNJRg",
-     "slot": 450051862,
-     "blockTime": 1790259007,
-     "mint": "5MhscascCnJJNsPAsbEFtBMW6VanEmdyEcCx7v9172rS",
-     "sol_out": 0.00055084,
-     "tokens_raw": 53655259432694,
-     "utc": "2026-09-24T14:10:07Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "55povDnweDjMCX4NTjXzBUF1m6DbjerHSANnEGQATw6ucGFpP2kucj4nVdmqEyitaUaxx1G5npRYNKr84VFRBYsC",
-     "slot": 450044753,
-     "blockTime": 1790257109,
-     "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
-     "sol_out": 0.00055084,
-     "tokens_raw": 206909497988,
-     "utc": "2026-09-24T13:38:29Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "61UuNWbXkCR4JYdZjXLitV9eS3BtuV2h1F4q8RUcbiF5jM2CKJgAwZ2qf4JXNML1S4THho89q6GfkVUVxyxBa6H6",
-     "slot": 450032152,
-     "blockTime": 1790253763,
-     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1239692824335,
-     "utc": "2026-09-24T12:42:43Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3NnkxWBsniaUwVoUXh1BRJgzecccQKUj3ux3P9XJSAnTeTRD4PZ3DPNMQ3JdDTvsJaM1ebRGvg3jBiKRhzHhDLWk",
-     "slot": 450009056,
-     "blockTime": 1790247657,
-     "mint": "FTjYFyQLRX34RmfX1Xxh1VUJe9c2H8WFr7XophMa55g4",
-     "sol_out": 0.00055084,
-     "tokens_raw": 531002421950,
-     "utc": "2026-09-24T11:00:57Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3NNWq9ENTtJZPisCrRGywMgwj59Hor5N26wZT3wva7E1cSDydrckH8YQ3s6voxnjNsMqEaSLzQ9US26me62ftAh1",
-     "slot": 449924048,
-     "blockTime": 1790225124,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 82908033293,
-     "utc": "2026-09-24T04:45:24Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "MydsxHEmGhvnREM4MiMddzRfkLxZDWrLW6dXNEUc4ugYux1aq7xorFbARCQEeiyNzgKLScEZkUfyVDMaRhqT36M",
-     "slot": 449924046,
-     "blockTime": 1790225124,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 83083357903,
-     "utc": "2026-09-24T04:45:24Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "24j2Uo5kF4PEiuY3TXsrN9YBMARygXBdLJue3gY4VZ5fcec8GarAvTJvionDTPCCB2rDUU65Zxevvy7s6XRiDgTy",
-     "slot": 449924046,
-     "blockTime": 1790225124,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 83255510141,
-     "utc": "2026-09-24T04:45:24Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5LLhmiAT1RShWdsUCHtxnGBuADe4gAVghsipsGaNskZC5CgzLxZ678y67VFvggR5zFaZGnEL1EhN1jTh6GegLUZm",
-     "slot": 449923429,
-     "blockTime": 1790224963,
-     "mint": "CASs9vMniGPtsnnKrV9uziBHA7JU5dS9MQY15WsRqVfx",
-     "sol_out": 0.00055084,
-     "tokens_raw": 25514241369,
-     "utc": "2026-09-24T04:42:43Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5VdMejWsnPZcg9FyFudApVz5UkC17LpPbqkhN2mUSC3qM8YepLhYnjAu8jUTr8tN22t9rUiYg9rNDhPyzy6bCka3",
-     "slot": 449923378,
-     "blockTime": 1790224950,
-     "mint": "FTjYFyQLRX34RmfX1Xxh1VUJe9c2H8WFr7XophMa55g4",
-     "sol_out": 0.00055084,
-     "tokens_raw": 77257413300,
-     "utc": "2026-09-24T04:42:30Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2LHPpCqEQbkSkm2Hk2JgA2unsPaku64C1uQmCnRkwh95v3oJKV2faEnTuJM7HM6FLT8sf3HvXPkJpBnRG7TPrktk",
-     "slot": 449899215,
-     "blockTime": 1790218550,
-     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
-     "sol_out": 0.00055084,
-     "tokens_raw": 715620836039,
-     "utc": "2026-09-24T02:55:50Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "35uz5JsXbYr2558747yzUFjoabGsH9216PHv9bGK8LQZnWMHHL69v8A35B3HQmmazbd5hyazZsuPwSqGyyKJRRtA",
-     "slot": 449887600,
-     "blockTime": 1790215466,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 80394908817,
-     "utc": "2026-09-24T02:04:26Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3ySaezYHv9QXmyMyw3eq6EJaPHPY9vKssYxWX6y4H6uYsfzuoXtrEeLF3KzL4X2zj4FbEf5ehRrmEiLMWfx7Ka93",
-     "slot": 449875675,
-     "blockTime": 1790212301,
-     "mint": "21UpvT3s4rMhYGvoB4cxsZzNr5GmYss4PV12cTr82thy",
-     "sol_out": 0.00055084,
-     "tokens_raw": 3336203471080,
-     "utc": "2026-09-24T01:11:41Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2pkfNvQ1qgd4quX5yosQPDnFk1mE97Dav8LPUWzUHszEJ5c6jdTmXF5vDhZXfKrkqnigykhqmDwNp8rZaVqRvRQp",
-     "slot": 449875476,
-     "blockTime": 1790212249,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 85174311349,
-     "utc": "2026-09-24T01:10:49Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2R8ByA9weBZuZdsVjg5UnkB7jQyDV4xURdei8ZPX3PSWX2LSxSDT5M2FVyRh7zVLMKv83MvY13qHXQJCJ9TfSYMP",
-     "slot": 449875368,
-     "blockTime": 1790212219,
-     "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 8849884188,
-     "utc": "2026-09-24T01:10:19Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5TFxAfvnVBnDDxFyQPaWfst2sa4HjY1grRCpEY1AiorAxWLgAPzGpyrCunVWegVtHmvuPw3bmdh37dszRvFVZnzB",
-     "slot": 449872056,
-     "blockTime": 1790211338,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.000550832,
-     "tokens_raw": 135950475491,
-     "utc": "2026-09-24T00:55:38Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5ArbKS2AxY6fq5RoVHbiuK3JjJ6h3DZCkUED3NDE75DQfePrp8Qi4eU7Q5TAsvt3znpT1aGbqdroqLG3LqJJQDRg",
-     "slot": 449852229,
-     "blockTime": 1790206071,
-     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 281676651681,
-     "utc": "2026-09-23T23:27:51Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "vPNh656hAKkvMfu39ScTt9A5YDCdP1NFsHMfTTan62dLfmWaBaYnU9BQYcei888QQj515BFGutWmoRbPPGqGBib",
-     "slot": 449828433,
-     "blockTime": 1790199750,
-     "mint": "21UpvT3s4rMhYGvoB4cxsZzNr5GmYss4PV12cTr82thy",
-     "sol_out": 0.00055084,
-     "tokens_raw": 2932369024740,
-     "utc": "2026-09-23T21:42:30Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2Asw8NsUrxf15UMM4UAYuK6eNyqgPZwKuyqpdPYgXHPGdBLax6grxT37Z1pNEAaYh7FgQyo8tzAXVWhGwzJJmnuQ",
-     "slot": 449810290,
-     "blockTime": 1790194934,
-     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
-     "sol_out": 0.00055084,
-     "tokens_raw": 925901507130,
-     "utc": "2026-09-23T20:22:14Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2paabjrTji3ZAnWXcdGqARnCbc6CpvmeED791SckVBXLedLTVgjSoCiKRqkdmKNro6LPMoB4PJsthdTarW2E9RYx",
-     "slot": 449806407,
-     "blockTime": 1790193903,
-     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1559867628788,
-     "utc": "2026-09-23T20:05:03Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4z64UaZSk3Cn1GxgM3TTawhMer2k6qLBzJXVFKz6L8YrMNQ8hMhN1SVik4nGz5tEK7PBtwb8eZwoRTLxbVBCn2c1",
-     "slot": 449775401,
-     "blockTime": 1790185679,
-     "mint": "B6f5Gc88ADwbtv5xKcmL68nspKAHJ7Vmei3QTm8nQok9",
-     "sol_out": 0.00055084,
-     "tokens_raw": 2226377140175,
-     "utc": "2026-09-23T17:47:59Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "59UunfEJMScNwiQHFm4pkqdFP36mqtG6FwJBKgXbCLmdtYkbDJz5Y9qTdQgLFyT8EbfB3LqM4MKUhyGQHSpXuggT",
-     "slot": 449766605,
-     "blockTime": 1790183329,
-     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
-     "sol_out": 0.00055084,
-     "tokens_raw": 838361144804,
-     "utc": "2026-09-23T17:08:49Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5UZL2Ey4uvRinKDkQR9arwG1gbW3tkEHKT5aemmqpoQyFaxdZWm44QcrwgoxRm4ai4DRiKHDoY9nKhUjjCSrVWEj",
-     "slot": 449766544,
-     "blockTime": 1790183313,
-     "mint": "6gxc6ZWCMA2XzwWFGD9CKFHe8UMBmPxdKDHC1w3HfzDw",
-     "sol_out": 0.00055084,
-     "tokens_raw": 2047306146678,
-     "utc": "2026-09-23T17:08:33Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2XUcQV4emccQSPgYHuBBegedw6guCGbPztgfMASmJdkRNcKnvgqQVivLye3X9FPfaFhbTeVnEiMhWYj5k5s2NEzj",
-     "slot": 449759153,
-     "blockTime": 1790181345,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 114830332483,
-     "utc": "2026-09-23T16:35:45Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2Zo3ZNYf3saqPeX19CtbXu4Ne7T2ts6fe6B4sLBuwqWMfV4zZvqKmeW6cceJ3aEFsEXdT5ALmkNiCYq4zSXivfFk",
-     "slot": 449720236,
-     "blockTime": 1790170955,
-     "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
-     "sol_out": 0.00055084,
-     "tokens_raw": 2756876845006,
-     "utc": "2026-09-23T13:42:35Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3WREczD7see67ftMXX8zcBZGWBxjHndQUoKQ8s7pLQ7wByAEPg8M9wGpYHm7u7VtiSDbC2jDY9mwV5h6SdbBCRaH",
-     "slot": 449614256,
-     "blockTime": 1790142899,
-     "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1268905760930,
-     "utc": "2026-09-23T05:54:59Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "dUusWty8rtbiz6XhS5MHqYA7er8phyf4RSs8rEyGAWR3t3kkqLqamoZZ8hVq2PyrxgwAMs1g2iSfNM7yXDfJbQ4",
-     "slot": 449603733,
-     "blockTime": 1790140106,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 3306474764770,
-     "utc": "2026-09-23T05:08:26Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3B7TsdPhy1Z8TXoTLBysNx2dnwN9TXHhEcoxdwm1Um8gH4MWJtMPNcXEyH7WDxGdTRTHyZMEbrBdwptTZYGj4LKP",
-     "slot": 449590433,
-     "blockTime": 1790136574,
-     "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
-     "sol_out": 0.00055084,
-     "tokens_raw": 792366221182,
-     "utc": "2026-09-23T04:09:34Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5qb5XtjhsEarWq7tHwrqTKcacuNxsZeKAUoPHiKjC1yoBk9MNFsJtSfR6D87BWjCXi6bPUhU9obYVgtFK7z3YqUH",
-     "slot": 449582957,
-     "blockTime": 1790134596,
-     "mint": "6wUEFWYBvSTV685mk6Kb4xDpE8q6MvTveUJ3DN5Hn8Ui",
-     "sol_out": 0.00055084,
-     "tokens_raw": 13817377003092,
-     "utc": "2026-09-23T03:36:36Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3rSnSojb8W2RWZ7NHsD1k2HAo4Vja1ja8pKMdknHe8N64F8ZX7XavF5LRWpR7xAhEWdthRgrfr1HjLRsJYRoouZb",
-     "slot": 449582775,
-     "blockTime": 1790134548,
-     "mint": "6wUEFWYBvSTV685mk6Kb4xDpE8q6MvTveUJ3DN5Hn8Ui",
-     "sol_out": 0.00055084,
-     "tokens_raw": 27025205879816,
-     "utc": "2026-09-23T03:35:48Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4NvzFCTrLk82XPRYEEB5FyQhY9sCSKzQ7rywtpKKSkGhqy7VT5o68HQ3hwZodrMwCZZR2hhX1g3rrFJ2j7jUZdsz",
-     "slot": 449579225,
-     "blockTime": 1790133609,
-     "mint": "MYQZzuiiRyy38hY8X7KQN8XyE67y2GYWs63cqjDjgLs",
-     "sol_out": 0.00055084,
-     "tokens_raw": 13474424344868,
-     "utc": "2026-09-23T03:20:09Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2Hskw3aTZNcgz83uW8XAhf9QcS4jZk95cxxmEADViH8ergGdGuYB8TFExNNXJuhUrjU9E1mvCVr7LifiEBr1gCfd",
-     "slot": 449571174,
-     "blockTime": 1790131478,
-     "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 3815892166680,
-     "utc": "2026-09-23T02:44:38Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "SQRQkwPPkafxmVt8oCavvFd68qsPnQt8jzLH3tnd2TucG6Ktbszwe66B5winwmo93ZkkLwXySTkGrhbky7zVGHb",
-     "slot": 449566331,
-     "blockTime": 1790130192,
-     "mint": "5RXEzhbfmAtEHaPo7qkHk6ThLEXEKzxszEmaY2R1Bydz",
-     "sol_out": 0.00055084,
-     "tokens_raw": 420771952071,
-     "utc": "2026-09-23T02:23:12Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "3ni7FChjLGrPeSdjjPSAefipbM4xzLmPe9fJUcZ4Frq2FNa5w5p8Vpv4wao2m3voA3G3Yqb1dn3a8tVuTDkdh4hg",
-     "slot": 449564465,
-     "blockTime": 1790129697,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 360115696064,
-     "utc": "2026-09-23T02:14:57Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "25ChycMKh37wchLXhk31mYAZf1T1HuTJ7xdXzuz3e6c1je59MXQHfG345UPYBpuvTEqfWMTMNUEJc7GgodFLaUKJ",
-     "slot": 449564423,
-     "blockTime": 1790129686,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 376735816743,
-     "utc": "2026-09-23T02:14:46Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "5rzqJ4Uj4V7A1LKQt98JuJa9MNSPoPUcm6i1gK8pBZAUUY1ttHzx3GSSrapcDafw8Npe1EvVGfbEGSq2B8s4PjBx",
-     "slot": 449564405,
-     "blockTime": 1790129682,
-     "mint": "Du2r1SrGZMjw6e8Fr6dVFz9qf4zW66LeSRV13w69GX7h",
-     "sol_out": 0.00055084,
-     "tokens_raw": 371312912768,
-     "utc": "2026-09-23T02:14:42Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "2FCHBaxXfX358jf2PAJsbKsoftCa1XzUWLXjYAPi7D7sWPWNW1PSfpskgmKRPKQTkUKiukMYK8VW4Gvz9tffbaAb",
-     "slot": 449544354,
-     "blockTime": 1790124356,
-     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1830307570,
-     "utc": "2026-09-23T00:45:56Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4o8XAZfRR8kNKWLjE43JcvK5E5yW4dVVDGQa77jgP3iyCRj56HVXSM2qQManWRHS7qWdSkKuLo7te2tfWKGMeUbY",
-     "slot": 449544340,
-     "blockTime": 1790124353,
-     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "sol_out": 0.00055084,
-     "tokens_raw": 2289936832,
-     "utc": "2026-09-23T00:45:53Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "4i8eXsXCcNFeC64ePy5w6XHHCzknBKHuPcnpuCXoeeWspcp5n9mbzLLNk3KajyYSrj9EMAVtv3PiyxnkH8LpyoFM",
-     "slot": 449530768,
-     "blockTime": 1790120757,
-     "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
-     "sol_out": 0.00055084,
-     "tokens_raw": 27104918240,
-     "utc": "2026-09-22T23:45:57Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    },
-    {
-     "signature": "wfoxqVB2F6j2gCHbX57jfGbaKENUDJunxfX8wSLKTo1VK7w8Rput2A7zitzXDW1dnF5EmdPBZXFw9sDemQv9qNP",
-     "slot": 449527325,
-     "blockTime": 1790119841,
-     "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "sol_out": 0.00055084,
-     "tokens_raw": 1790397989,
-     "utc": "2026-09-22T23:30:41Z",
-     "почему": "покупка источника 0.0006 SOL ниже порога задачи 2.0 SOL-экв"
-    }
-   ],
+   "путь_по_цепи": "getTransactionsForAddress",
+   "подписей_в_окне": 0,
+   "страниц_подписей": 0,
+   "транзакций_посмотрено": 0,
+   "не_покупок": 0,
+   "покрытие_окна": null,
+   "узел_не_отдал": null,
+   "покупок_источника": 0,
+   "совпало": 0,
+   "источник_без_нас": 0,
+   "мы_без_источника": 37,
+   "предел_уперся": false,
+   "why_not_подписи": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":100,\"maxSupportedTransactionVer",
+   "список_источник_без_нас": [],
    "список_мы_без_источника": [
     {
      "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
@@ -493,7 +47,7 @@
      "наш_utc": "2026-09-18T16:37:54Z",
      "sol_in": 0.51149344,
      "our_sig": "RM7rPEEZSVuKxTZyrTX39SSvMPvMGNQPBi7jEbeTF4ueHkDTXPDY1iQtxoQydWeGY6Sqv968GiFWLg9BsYGqmGa",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "EgP1f5J9LDn1fuTMfrrgT5ZRMiLBitYdkmDs818BS44k",
@@ -501,7 +55,7 @@
      "наш_utc": "2026-09-18T16:55:42Z",
      "sol_in": 0.5115798,
      "our_sig": "36VcibN7V8z5wHTJ2QxaHj3xR1KB5whMqvS2DnU1ZvVPQjCFsgov7qssSAMEFWBjVroXnMhLCAS3M2XyCi3TDc7z",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "XzC5SwuoRYUCXaqMNybdzbNyVL14wyzuiWHps5iqtgf",
@@ -509,7 +63,7 @@
      "наш_utc": "2026-09-18T16:58:16Z",
      "sol_in": 0.5146278,
      "our_sig": "26zpn65TWXPr5UB9PaujJTQotKq2Me778i8WQqwmmuXwYzYX2T1APLC1dnpSevmS5bVVkXjNsNXUHo5jjEb5tGdA",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "vAddewUHuYgRDrL6n3kXtBXMT635evJz8K93j6Wm1Ba",
@@ -517,7 +71,7 @@
      "наш_utc": "2026-09-18T17:35:52Z",
      "sol_in": 0.5115798,
      "our_sig": "3kJaUg7psEq6gtPdcwg2CiBgr9D8MpVkCfLqBrFZRqVKjhsCqt5ep3k1cubeSsCisbiDssD1QNPG5JUk4FFzmjE2",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
@@ -525,7 +79,7 @@
      "наш_utc": "2026-09-18T23:26:48Z",
      "sol_in": 0.5115798,
      "our_sig": "2c7yuL68DQMPo7myYCWWEvDRGqXqaYgJFeP64kHUfjFHEUmMhZdqaJruXMtMUT1Ezrn93oEau1X7UpSKEfrEZBF2",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "7rUNV1HjfCzbtGi3ZbKQ5hYXVjzbAfyCTcgTULQxCwki",
@@ -533,7 +87,7 @@
      "наш_utc": "2026-09-18T23:33:29Z",
      "sol_in": 0.51306824,
      "our_sig": "2DHSXrmytPa5zGG3zmS3QRdEYNKNTuoWkLUsAFpMTkkaizPzx7cEz2pjsoe8bWD8ktnNeZZy3Kmv5JKqD87n8qXH",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "GpuxEQPLFftuDZeo5nXm2UJWH7uAWDDaG94aa54SRQjc",
@@ -541,7 +95,7 @@
      "наш_utc": "2026-09-19T02:20:37Z",
      "sol_in": 0.5115798,
      "our_sig": "5rrvUgPWEbHF7ij8Du2eNmYxfFtBBjPF2KdSweqEJJ28JrpDdGikGNjecHJ9cqpgQpbCF8DjB5bfoNe2EWDiGnem",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "AaEhFTX4naHSWSXz9TVe5QgLbtSLT8ZqYJGZzDDcoroh",
@@ -549,7 +103,7 @@
      "наш_utc": "2026-09-19T13:57:37Z",
      "sol_in": 0.76306824,
      "our_sig": "2u7xoQkBTAzGK5ksA9NyYgF2sANgKeFwZ7bfYzT2Y3L8h3Z7sANPj32LLrjhSgTcvtAbH7rj3jRW83xGLnvQaPGQ",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "2YGDVkt2NFtb9xZmgndZaDPsMgFwNLdTwsV5QiGUPhmc",
@@ -557,7 +111,7 @@
      "наш_utc": "2026-09-19T21:44:27Z",
      "sol_in": 1.52311396,
      "our_sig": "5yWK9HynCBkoqi7VswJUms6s213ZJj5DGYqvudYjWvvaBioUwMYFYZScujDKgwowWd52LBsinqj1PtuSXK4vn9F4",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "FRBrpR2K5g77VjbSjKFS2V4huAddxVmhD7g2oobcLmmM",
@@ -565,7 +119,7 @@
      "наш_utc": "2026-09-19T21:44:53Z",
      "sol_in": 1.52311396,
      "our_sig": "5MwejenNfx2Guxf6eKD9UKciWMe38eL9MrzfboWgZqjcPFQXdXhUgrLfeuGZgym1jkiT5cueWxKk8nz1nFiBPRqU",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "AAHvR3SK2KKa6nGyJZnkbbauLfEWnxqZGgbHHQWG8Aqz",
@@ -573,7 +127,7 @@
      "наш_utc": "2026-09-19T22:01:48Z",
      "sol_in": 1.5215798,
      "our_sig": "2CmNmic5wMEZGrmjr9v8Rdy5PYFpCUd9LXLzLT28uU7LssZAcBrYy2HJmwzx2P4fncXSXpogaFBW6CmEWYhQBFDN",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "CTMV7yXV1mpucM7svPEtmVFBB8g6hqHGVPczmbYrj9Jb",
@@ -581,7 +135,7 @@
      "наш_utc": "2026-09-20T00:27:39Z",
      "sol_in": 1.52454144,
      "our_sig": "5y1CrEpJta89Mg7Q7wYsZL1gXfuTB8hv8Mov7V9ReqjaUgmqy7hhiaWCXmGR1V4LNHAQ6o8xAdCbq5dbGSn9Myan",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "4UHmZGe6X4DZ5dxYGiGXMhi3Sp34uPWtHB7qDMyvRbYB",
@@ -589,7 +143,7 @@
      "наш_utc": "2026-09-20T05:49:43Z",
      "sol_in": 1.5215798,
      "our_sig": "35db1jdZbNNkJmtZNDN5K2oujazZvXTEWM6ynpbmeqLy6ViDYUXocRyhAkbvpnQ3nX5TPCbK1XaZRDMXQJANuT3Y",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "9LAcK5XfutibvzXAqNMjVCL5FRuSTv2TVNxnLK5QExUt",
@@ -597,7 +151,7 @@
      "наш_utc": "2026-09-20T06:01:20Z",
      "sol_in": 1.5215798,
      "our_sig": "phJYjC4fQVgztVuBs8RiJ4kMoyQJd3XZNrbJCaJbCArYxjbJS8ZU7q4RDWTGH2Hu85Q2pYuQhwDSmo6BtgrGn6F",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "CNTcaYTBBrSjYQXrWSL3T126eCjYnmvAhSwYBXBScLLM",
@@ -605,7 +159,7 @@
      "наш_utc": "2026-09-20T21:45:55Z",
      "sol_in": 1.5215798,
      "our_sig": "61EF1L1X53uu3WCfNVkRrMe3rwpSeCyyzAzwKiTCowc8dhcmdnC7M7mzjDPNcRGz4fLf2jtLqbRUAVjPV8HhJ8Eo",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "7nTAA8U8kAD7t8Z1W9g6DXNTfMf4YYg2PzV9PiNRWaas",
@@ -613,7 +167,7 @@
      "наш_utc": "2026-09-21T01:12:43Z",
      "sol_in": 1.5215798,
      "our_sig": "bUR8Bfw55ZWQmYbYEdn5bDJBLqZTdpXAZnnntbQSYehG6kt3K7TWLHQjvvhcZrQReeAKAj3tjieqs2CrWoMJ9Ve",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "7uvLyn87LSxW2GdwdEeiwmSJwQLVrcVyo7SRVcLbbtGc",
@@ -621,7 +175,7 @@
      "наш_utc": "2026-09-21T01:17:14Z",
      "sol_in": 1.52306824,
      "our_sig": "xY7BCPwxFqn1rSDdnh6xWbssdxQm8vxjMiEs8kHK3aTw2BbZLRbV4FGvL17m942XQgetJ2yLDV7rqMsftq4LkAJ",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "FPPGF5RNgCvNzqrRqWrkgkL4YQhzqKMNVtD1kWk1ooqg",
@@ -629,7 +183,7 @@
      "наш_utc": "2026-09-21T03:11:25Z",
      "sol_in": 1.5215798,
      "our_sig": "53GGYcvURz1mX77S1JYjUevZz28FtWggnRBzmqU9XgcDSXKycUFqfqSX5yVUE59ozPbM1QJHzmHkenv64THDkEb3",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "Aigf5pKPyZW8nzxCrHEisE4tZMiUhFpKie8mYE7cmj6c",
@@ -637,7 +191,7 @@
      "наш_utc": "2026-09-21T15:51:57Z",
      "sol_in": 1.523053,
      "our_sig": "ZnR1v9hMi1m6bCEv9bU59xtmD5vug1EqBnnSX18i7ibzTczK7WuA4JmFzQoXdUqCkn4WcJYbE55HU2P8Swstv5D",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
@@ -645,7 +199,7 @@
      "наш_utc": "2026-09-21T18:26:19Z",
      "sol_in": 1.523053,
      "our_sig": "RGDTQTT4K7xzEK5boWXhizqBC4ai1NPaQHsxJc7V5ySwgRCBoUxXJy9g1BYXibbmiiFEyNPWx4EMc4isUJoFhgh",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "BVdbH7PLTSQxBssqvWTxVDoA8qfsztdVtMsZQSS9CScZ",
@@ -653,7 +207,7 @@
      "наш_utc": "2026-09-22T04:10:02Z",
      "sol_in": 2.02306824,
      "our_sig": "pcqUtbqMPsr5wWXerFZU9gbQSEVFqusfLR1eTwrjrveiGvXNsH83sP1MC5bkn1gFhMW8xkDGj45MFqTVXGX4wdN",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "B5ANwoWkptDv1QszdPHXjCF2gTWdo27FGLffdfXzzoe6",
@@ -661,7 +215,7 @@
      "наш_utc": "2026-09-22T06:50:01Z",
      "sol_in": 2.02151884,
      "our_sig": "66T8RnbXVpDMMyccbiuFXqTnkV1AE2fu9bvL2C474MqP8VfyaRUyoegdggsSsg7mLYkx2S8o5rCE3vVfKECjCPa2",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "6LrDt7nBiHraUuk9PZoUL8Qy9WX6pnSpDz1RkWWRR7hN",
@@ -669,7 +223,7 @@
      "наш_utc": "2026-09-22T07:06:26Z",
      "sol_in": 2.0215798,
      "our_sig": "kRHaiP4zkR2V7RYQgxw7SyaPx8dd4YV9EpyuSCd1Kjg4hWgUYgiCWDSKWJPwFgS9jiwPbhodSeKFy6xczT7xxnW",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "6kNNgyrdvjkRC8eRGQqx5sLfZG2jTmg3NCFmkX2hYP4j",
@@ -677,7 +231,7 @@
      "наш_utc": "2026-09-22T21:55:23Z",
      "sol_in": 2.0215798,
      "our_sig": "5NGnPS1HPbD9iLgPcZkFUfTQyyfrvmknMUkhpAi9Viz19sC3z779mVPPtEVFjCUnPFXKNavLqYQESvECMMGVNpPF",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "3nqHijNUExsnjNBb15WJsJ2xisyMVGN6FK4aUgZk1Rwj",
@@ -685,7 +239,7 @@
      "наш_utc": "2026-09-23T01:03:41Z",
      "sol_in": 2.0215798,
      "our_sig": "27yoRZw9LVpZY3L6eKojkUo44EK6cWhpQkRMxoVXGxj81natG3bfsm5enf5qp89227WAQikXF8MXxK4otfUDAFTY",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "DupFBba8HP6DpYX9XpLn6uhdYnnEXXUUiAhWitGQc8qN",
@@ -693,7 +247,15 @@
      "наш_utc": "2026-09-23T02:10:49Z",
      "sol_in": 2.0231546,
      "our_sig": "239hr2T9WgHSLNe2bBf6WauGXC85pfkNJiAtUVmNXRCibFntxJgytM5yc4u1xgLFeEFY61Drh7jLMSkyPwUL45eJ",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
+    },
+    {
+     "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
+     "task": "pointfarmcap",
+     "наш_utc": "2026-09-23T03:09:15Z",
+     "sol_in": 2.0231546,
+     "our_sig": "66BnxB54bwFMf5S1kYhZ5c6SGEjEYpM8Ush6MZBn4Qba8xQi9eW4hnn8BwZEt5iqXpEgosozcuoMxXh6k3ABUZ1K",
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
@@ -701,7 +263,7 @@
      "наш_utc": "2026-09-23T04:04:21Z",
      "sol_in": 2.0215798,
      "our_sig": "Y2EEC3oHn8Ri7sZ4xoM4ki8nHDdgrexQ3dqYa3kBm2aA5fgz74bTf57QC3YqXEYmGgg2fs2XgvJPLDweWTrTkHw",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "3w1T8HXSZ2axXv3YPXFGWdLRMYRVNBGcntuJRM7vC7Da",
@@ -709,7 +271,7 @@
      "наш_utc": "2026-09-23T05:51:52Z",
      "sol_in": 2.0215798,
      "our_sig": "5FHjLhFmU5F3guKXM2eXfscKMB8x7utWpVAtFTpi1D5byG6wQ8WqSc5ygwEUqz5qZDRMHmPRr1ohUeKAwuDaSVH7",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
@@ -717,7 +279,7 @@
      "наш_utc": "2026-09-23T12:38:02Z",
      "sol_in": 2.0215798,
      "our_sig": "3LDstzbddt923pr8An42vCqxbaJJxgiSFUvij2Uo9kg8nGXfZGtycUkDb2o88q1ViYAgRTRV5MozfT3mEoqaF9Ru",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "65dw58ugEt3EN9uNuJ2CCyWz7SENe2hnVv9dNHyUjz8x",
@@ -725,7 +287,7 @@
      "наш_utc": "2026-09-23T13:37:00Z",
      "sol_in": 0.5215798,
      "our_sig": "4mUwP3S5gDiZqU3FGuNXdMNZdUrWbnHhiKoyWi2UW7yGWw3VoAyP6t93honHP5GT755Fxbp6Qc2j4jZiAKGn6zqp",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "5TPNaSi63HSfEHwVSBL2STi7yTPwgtedeXCowjnYHVG5",
@@ -733,7 +295,7 @@
      "наш_utc": "2026-09-24T20:04:40Z",
      "sol_in": 0.2025998,
      "our_sig": "zUjCeyB6QCEAKDQBJ5DQMN52KdxrKGC3yQBLvbKq8BagoScQjVT2gSNgsGmqbq5qHJRwYCbfHmCAVnU4e346Y8a",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "H3MfB5wk9zks9CV8GTLDALCG3DWGX2CTyMrPeURgAz4z",
@@ -741,7 +303,7 @@
      "наш_utc": "2026-09-24T22:17:46Z",
      "sol_in": 0.2025998,
      "our_sig": "L5eseiYxMZsU36hBM5rFn3FB8Bxc3k7qr5qXc5N4445dfjGuBkD7XrC3jkaBbBxv9Gz4mkmqTds1n6wry7FLJMB",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
@@ -749,7 +311,7 @@
      "наш_utc": "2026-09-25T00:31:53Z",
      "sol_in": 0.2025998,
      "our_sig": "QhKVtVuZDCgNMahCcWpBoHkQySaPfjk3giFArTL2j5jQWk3LAK66za1Ciex98euH32BAmrL52uhvEovVESUs1WR",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "7T3XGNziCNwgiETftmQPW1Qj47KfVQyvZj7YQjrgE4K7",
@@ -757,7 +319,15 @@
      "наш_utc": "2026-09-25T00:47:20Z",
      "sol_in": 0.20253884,
      "our_sig": "3ds3KXbvka3gDnATYzbvrNmZGUCbiZLw4ACnbE7ZZfLEy4LYnf2i3v6hKX9Eg8rDqEnqYpqXNdc3KAHP6WEcE994",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
+    },
+    {
+     "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
+     "task": "BATCH-5",
+     "наш_utc": "2026-09-25T02:45:34Z",
+     "sol_in": 0.20415936,
+     "our_sig": "49PCCiHWkaoNVfQvC9wBEUnFAnn1W2biQ6riPH1UHhUJ3ACXfnJrLjoLuMbQt2ABqBPTUauSMGafyRHgNBukSanR",
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "2Y5yqeadyaupzhKyn6WbBGZ99UWAZHaHmCYi9EuZDRTM",
@@ -765,24 +335,26 @@
      "наш_utc": "2026-09-25T02:59:40Z",
      "sol_in": 0.20251344,
      "our_sig": "4UkcmPGhu6k4uYMQB4EpSL1RudMq4znXhFSvFXExM3823jkokrE6gWPcvVQrMxadXzL9PhJK7qB3A1kKjGDztgpY",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     }
    ]
   },
   "Brez": {
    "адрес": "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB",
    "записей_журнала": 8,
-   "путь_по_цепи": "getSignaturesForAddress + getTransaction",
+   "путь_по_цепи": "getTransactionsForAddress",
    "подписей_в_окне": 0,
    "страниц_подписей": 0,
    "транзакций_посмотрено": 0,
    "не_покупок": 0,
+   "покрытие_окна": null,
+   "узел_не_отдал": null,
    "покупок_источника": 0,
    "совпало": 0,
    "источник_без_нас": 0,
    "мы_без_источника": 8,
-   "предел_уперся": true,
-   "why_not_подписи": null,
+   "предел_уперся": false,
+   "why_not_подписи": "RuntimeError: узел: {'code': -32602, 'message': 'Invalid params: Expected end of params, got [{\"limit\":100,\"maxSupportedTransactionVer",
    "список_источник_без_нас": [],
    "список_мы_без_источника": [
     {
@@ -791,7 +363,7 @@
      "наш_utc": "2026-09-19T06:33:45Z",
      "sol_in": 0.11151884,
      "our_sig": "Hwt61uErBzwp1pVA14vVTc5WXavnkyyZgZKrxtX1aFkYSDDBSNc4yWW4F6bi9GQXk7Ca7T1BruHi44UjM4gbAvi",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "8dnA3uotwGL4kgCoraKTypU4owcWSgkdBBXzXWykLL5h",
@@ -799,7 +371,7 @@
      "наш_utc": "2026-09-19T21:48:14Z",
      "sol_in": 0.51318188,
      "our_sig": "649ALyYW69mGXkeoiJM43pfyPACJTxomhKHJ9qRNBspQ6rWMxZkopgTCRkDnVTFCr3aCMg1T6ojuofT6pE3wzjyb",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "95pCcNPexz8rg1Sazi2GscfAGSFy3NXSPDL9TdEMZE2V",
@@ -807,7 +379,7 @@
      "наш_utc": "2026-09-20T17:44:34Z",
      "sol_in": 0.51171884,
      "our_sig": "nW2nCwyTt24sEShCRQhrdtkcBX6LtRu8jjjQ6AcjzufdTTFD5rAoxnLCJ2QCxNqXNSEmdErRZxws2Z9rxrjmtBu",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "BJ9mPPkCqnMisMiv7JQW7MJ2fgDyjm9udmwHZuJ2YcTf",
@@ -815,7 +387,7 @@
      "наш_utc": "2026-09-20T21:21:20Z",
      "sol_in": 0.51171884,
      "our_sig": "5vUy1J9BJWYXBTPGY4FZnefMAELN2yqEFRaeZX8jzkvZkY1qWP6QgjS2xiEriLFkzAw4VTiVmQZH5qR5mdcevzxJ",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "9DdHxVe1BSPaTy3iGEwvWsooRchNLK61XFAvzot59FwD",
@@ -823,7 +395,7 @@
      "наш_utc": "2026-09-22T04:25:32Z",
      "sol_in": 0.510205,
      "our_sig": "fFBrAYCpTeRiRuhP6bsW1W55ftZCUv41xp5ymW5v8HrHkd7fLJtzfbXB3Zf9HxMVKcqdztUmisLjAxzbtFpPeJK",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "EgrQxdckmSBEzKXzMD6PxjYdwsMcBpJjW8dx3RBWx4By",
@@ -831,7 +403,7 @@
      "наш_utc": "2026-09-22T04:29:04Z",
      "sol_in": 0.51171884,
      "our_sig": "5R3BoHURyFnrEehEV3nDnprcXMUMezdQNPoiURFMs3CFUWsEaayq37cVt12Ja6gP6ZeJ6emYL61ohw6fAioP2Ak6",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "DFmkM8ZhfvkuzWz5gyMEkH2ocLP7qxyCaSme9TYqGczN",
@@ -839,7 +411,7 @@
      "наш_utc": "2026-09-22T17:57:50Z",
      "sol_in": 0.51171884,
      "our_sig": "65jVN51Ld9hn3JduuTACg5XcY8LWJe4rbegkY3A2Fvf5ZF2GUHTv7EWg7qDMbMQM1dqFWuidEtg5DBV6JfPvrVnr",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     },
     {
      "mint": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
@@ -847,34 +419,26 @@
      "наш_utc": "2026-09-25T21:17:30Z",
      "sol_in": 0.20253884,
      "our_sig": "5gDeKDYXsjwbYjFferUYAZyKPYiNXsHgLEuZriorrX4G1cj64UuJu1nV71qbAg1yTULebDe6fBdiVEokR4tUKuey",
-     "почему": "покупки источника по этому минту на цепи в окне нет: перебор цепи уперся в предел вызовов"
+     "почему": "покупки источника по этому минту на цепи в окне нет: источник указан журналом DBot (source_match_method=dbot_record), своей покупки под нашу копию на цепи не нашлось"
     }
    ]
   }
  },
  "числа": {
   "сверено": 0,
-  "отказов": 2,
+  "отказов": 0,
   "медиана_пп": null,
   "p90_пп": null,
   "макс_пп": null,
-  "причины_отказов": {
-   "предел вызовов узла": 2
-  }
+  "причины_отказов": {}
  },
  "ряды_чисел": [],
- "отказы_чисел": [
-  {
-   "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
-   "why_not": "предел вызовов узла"
-  },
-  {
-   "mint": "9rN5DaCvibiD62G8HBK4FPXCpXp1rWJV9sgSsUcdWrE9",
-   "why_not": "предел вызовов узла"
-  }
- ],
- "вызовов_узла": 2500,
- "ошибок_узла": 195,
- "секунд": 249.2,
- "предел_вызовов": 2500
+ "отказы_чисел": [],
+ "вызовов_узла": 5,
+ "ошибок_узла": 4,
+ "обращений_к_узлу": 0,
+ "запросов_в_пакетах": 0,
+ "отказов_429": 0,
+ "секунд": 0.7,
+ "предел_вызовов": 20000
 }
