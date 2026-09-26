@@ -1,0 +1,92 @@
+name: "Две строки к таблице 22: порог источника и сборщик пула (только чтение)"
+
+# ЗАЧЕМ (задание владельца 26.09, ночь):
+#  1) по четырём отказам "порог источника" -- сколько источник купил в
+#     SOL-эквиваленте по НАШЕМУ счёту и по журналу DBot, и в чём разница
+#     (валюта сделки, курс, порог задачи);
+#  2) по трём "тип пула" и трём "котировка" -- программа и адрес пула, чтобы
+#     утром выбрать сборщик.
+#
+# Наши числа -- из журнала решений на хосте (там и сумма цели, и курс, которым
+# мы считали). Числа DBot -- из его журнала follow_trades в репозитории.
+# Только чтение.
+on:
+  workflow_dispatch:
+    inputs:
+      minty:
+        description: "минты через запятую"
+        required: false
+        default: "F1Zx9ye3wRxUmCVcbxgrW6raDh4F64zH25jQyW7Y1L1N,9oDtTSoFtFXrGKodNYBAXpowvBdW4P9VPV4Y4p5tYvJ,GJSfEpiK9RnmRt9AnZi3FL1b2K6AApcW1SzTs2FeHGis,777XNvfVmvumMEc6M9yxJQJQnQtjbUYJyx53cqrwo777,7M3gDRgozcumFsiTeXwjB8cYxpg7Q9R7rH7rkw2Fpump,5gDnzAC4EEFmTjFzFjHUXS7wx5Cdvi2NTKGZT61meta,NaEYURvfxaHpEC7FmuEtfeBzz5qSxyRjEtctfmQ8bx7,8t5C4AWDg4CroMChxdo7rG2e8nJM31QG2GG7Czx9X7x2,HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7,Enk5EqQBkLNSeZnkGQzZhDW8WoqXquGD9QPSipfqPAdm"
+
+concurrency:
+  group: dve-stroki-k-22
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/dve_stroki_k_22.txt
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Наши решения по этим минтам (хост, потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/dve_stroki_k_22.py" < deploy/checks/dve_stroki_k_22.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/dve_stroki_k_22.py --state-dir '$STATE_DIR' \
+              --minty '${{ inputs.minty }}' --out /tmp/dve_stroki.json
+            rc=\$?; rm -f /tmp/dve_stroki_k_22.py; exit \$rc" | tee "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/dve_stroki.json" > data/dve_stroki_nashi.json
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/dve_stroki.json"
+
+      - name: "Суммы источников по журналу DBot"
+        run: |
+          set -e
+          set -o pipefail
+          python3 deploy/checks/dbot_summy_po_mintam.py --minty '${{ inputs.minty }}' \
+            --out data/dbot_summy_po_mintam.json | tail -40 | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" data/dve_stroki_nashi.json data/dbot_summy_po_mintam.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" data/dve_stroki_nashi.json data/dbot_summy_po_mintam.json; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Dve stroki k tablice 22: porog istochnika i sborshchik pula [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
