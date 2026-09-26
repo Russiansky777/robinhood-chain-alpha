@@ -1,0 +1,99 @@
+name: "Четыре числа дня и несчитаемые по цепи (только чтение)"
+
+# ЗАЧЕМ (задание владельца 26.09 вечером, пункт 2): закрыть разрыв между
+# учётом (-0.572 SOL за день) и кошельками (потеряли больше). Четыре числа:
+# чаевые+приоритет, комиссии Bloom, запертая рента, валовый ход цены. И
+# отдельно -- 20 из 102 "несчитаемых" с нативными дельтами покупки и продажи
+# по цепи и средним итогом на позицию.
+#
+# Два шага, потому что данные в двух местах: журнал -- на хосте, цепь -- через
+# Helius с бегунка. Только чтение, ключ не печатается.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени считать день"
+        required: false
+        default: "2026-09-26T00:00:00Z"
+      skolko:
+        description: "сколько несчитаемых смотреть по цепи"
+        required: false
+        default: "20"
+
+concurrency:
+  group: den-chetyre-chisla
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/den_chetyre_chisla.json
+
+jobs:
+  chisla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Суммы из журнала на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/den_chetyre_chisla.py" < deploy/checks/den_chetyre_chisla.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/den_chetyre_chisla.py --zhurnal \
+              --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' \
+              --skolko '${{ inputs.skolko }}' --out /tmp/den_chisla_zhurnal.json
+            rc=\$?; rm -f /tmp/den_chetyre_chisla.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/den_chisla_zhurnal.json" > /tmp/den_chisla_zhurnal.json
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/den_chisla_zhurnal.json"
+          wc -c /tmp/den_chisla_zhurnal.json
+
+      - name: "Цепь: рента, дельты несчитаемых, получатели лампортов"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          python3 deploy/checks/den_chetyre_chisla.py --cep \
+            --vhod /tmp/den_chisla_zhurnal.json --skolko '${{ inputs.skolko }}' \
+            --out "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Chetyre chisla dnya i neschitaemye po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
