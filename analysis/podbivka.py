@@ -156,15 +156,32 @@ def резервы_после(tx_источника: dict, источник: str
     return из_
 
 
+# Доля траты, доходящая до пула: у настоящих пулов это 0.9-1.0 (комиссия
+# 0.25-1 %, иногда плюс доля платформы). Значение вне этой рамки означает, что
+# калибровка поймала не то направление или не то хранилище -- такие сделки
+# идут в отказ с числом, а не в среднее. 26.09 ровно на этом симулятор давал
+# расхождения до 1.6e10 п.п.
+РАМКА_КОМИССИИ = (0.80, 1.0)
+
+
 def наша_покупка_по_симулятору(tx_источника: dict, источник: str, минт: str,
                                лампорты: int, *, проскальзывание: float = 0.0) -> dict:
     """Сколько токенов дал бы пул на нашу трату сразу после сделки источника."""
     из_ = {"ok": False, "why_not": None, "tokens_raw": None, "method": None,
-           "concentrated": False, "curve": False, "program": None}
+           "concentrated": False, "curve": False, "program": None, "quote_mint": None,
+           "fee_factor": None}
     рез = резервы_после(tx_источника, источник, минт)
-    из_.update(program=рез.get("program"), concentrated=рез["concentrated"], curve=рез["curve"])
+    из_.update(program=рез.get("program"), concentrated=рез["concentrated"], curve=рез["curve"],
+               quote_mint=рез.get("quote_mint"))
     if not рез["ok"]:
         из_["why_not"] = рез["why_not"]
+        return из_
+    # КОТИРОВКА ОБЯЗАНА БЫТЬ SOL. Иначе наши лампорты попадают в резерв другого
+    # токена с другими decimals, и число выходит бессмысленным: 26.09 это дало
+    # медиану 5.9 п.п. и выбросы до 1.6e10 на пулах CPMM с котировкой не SOL.
+    котировка = рез.get("quote_mint")
+    if not рез["curve"] and котировка not in (C.WSOL, getattr(C, "NATIVE_QUOTE", "native_sol"), None):
+        из_["why_not"] = f"котировка пула не SOL ({котировка[:12]})"
         return из_
     прог = рез.get("program")
     # 1. Кривая pump.fun -- своя формула по событию сделки (как в I.2б).
@@ -191,6 +208,12 @@ def наша_покупка_по_симулятору(tx_источника: dic
     if tpl.get("ok"):
         мо = B.min_out_from_reserves(tpl, tx_источника, лампорты, проскальзывание)
         if мо.get("ok"):
+            f = мо.get("fee_factor")
+            из_["fee_factor"] = round(float(f), 6) if f is not None else None
+            if f is not None and not (РАМКА_КОМИССИИ[0] <= float(f) <= РАМКА_КОМИССИИ[1]):
+                из_["why_not"] = (f"калиброванная доля траты {float(f):.4f} вне рамки "
+                                  f"{РАМКА_КОМИССИИ} -- направление или хранилище не то")
+                return из_
             из_.update(ok=True, tokens_raw=int(мо["expected_out"]),
                        method="x*y=k по резервам после источника, комиссия калибрована")
             return из_
@@ -198,9 +221,11 @@ def наша_покупка_по_симулятору(tx_источника: dic
     else:
         из_["why_not"] = f"шаблон пула: {tpl.get('why_not')}"
     # 4. Запасной путь -- цена исполнения его же свопа. Флаг ставим.
-    if рез.get("price_last"):
+    if рез.get("price_last") and котировка in (C.WSOL, getattr(C, "NATIVE_QUOTE", "native_sol")):
         из_.update(ok=True, tokens_raw=int(лампорты / рез["price_last"]),
                    method="цена исполнения свопа источника (запасной путь)")
+    elif рез.get("price_last"):
+        из_["why_not"] = (из_.get("why_not") or "") + "; запасной путь тоже не годится: котировка не SOL"
     return из_
 
 
@@ -257,8 +282,16 @@ def контроль_цены(сделки: list, уз: Узел, *, кошел�
             return None
         и = min(len(абс) - 1, int(round(доля * (len(абс) - 1))))
         return round(абс[и], 3)
+    по_методу: dict = {}
+    for r in ряды:
+        м = r.get("сим_метод") or "без метода"
+        б = по_методу.setdefault(м, [])
+        б.append(abs(r["расхождение_пп"]))
+    методы = {м: {"сделок": len(л), "медиана_пп": round(statistics.median(л), 3),
+                  "макс_пп": round(max(л), 3)} for м, л in по_методу.items()}
     свод = {
         "сделок_на_входе": len(сделки), "сверено": len(ряды), "отказов": len(отказы),
+        "по_методу": методы,
         "медиана_расхождения_пп": round(statistics.median(абс), 3) if абс else None,
         "p90_расхождения_пп": квантиль(0.9),
         "макс_расхождения_пп": абс[-1] if абс else None,
