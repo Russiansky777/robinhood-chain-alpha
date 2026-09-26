@@ -1,0 +1,138 @@
+name: "III.12: скачать документацию по шредам (только чтение)"
+
+# ЗАЧЕМ. Владелец 25.09: "шреды: BlockRazor Shred Stream, DoubleZero Edge,
+# Helius LaserStream -- протокол, регионы, задержка, дизайн зонда". Разбор
+# делается ПО СТРАНИЦАМ, а не по памяти, поэтому страницы сначала ложатся в
+# репозиторий, и у каждого числа в отчёте есть файл, из которого оно взято.
+#
+# ПОЧЕМУ КАЧАЕТ ХОСТ. У штаба сеть закрыта политикой окружения: docs.blockrazor.io
+# прокси не пускает вовсе (EGRESS_BLOCKED 26.09). У NL-хоста сеть открыта.
+#
+# Ни одного секрета: это публичные страницы. Ни одной покупки, ни одной записи
+# в состояние службы.
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "пусто -- все; иначе blockrazor, helius, doublezero, jito"
+        required: false
+        default: ""
+
+concurrency:
+  group: shred-docs
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  OUT: data/docs/shreds
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Скачать страницы с хоста"
+        run: |
+          set -e
+          mkdir -p "$OUT"
+          only='${{ inputs.only }}'
+          # Ссылки найдены поиском 26.09 и проверяются кодом ответа. Ничего
+          # угаданного: не отдалась страница -- рядом ложится файл с причиной.
+          cat > /tmp/shred_docs_list.txt <<'LIST'
+          blockrazor|blockrazor_shred_stream.html|https://docs.blockrazor.io/streams/block-stream/solana/shred-stream
+          blockrazor|blockrazor_shred_benchmark.html|https://blockrazor.io/blog/20250818shredbenchmark/
+          blockrazor|blockrazor_solana_chain.html|https://blockrazor.io/chains/solana/
+          helius|helius_laserstream_grpc.html|https://www.helius.dev/docs/laserstream/grpc
+          helius|helius_laserstream_intro.html|https://www.helius.dev/blog/introducing-laserstream
+          helius|helius_laserstream_page.html|https://www.helius.dev/laserstream
+          doublezero|doublezero_edge_guide.html|https://doublezero.xyz/journal/a-validators-guide-to-doublezero-edge
+          doublezero|doublezero_docs.html|https://docs.malbeclabs.com/
+          jito|jito_shredstream.html|https://docs.jito.wtf/lowlatencytxnfeed/
+          LIST
+          while IFS='|' read -r svc name url; do
+            [ -n "$svc" ] || continue
+            if [ -n "$only" ] && [ "$only" != "$svc" ]; then continue; fi
+            code=$(ssh -n $SSH_OPTS root@$HOST "curl -sS -L --max-time 40 -o /tmp/shd.out -w '%{http_code}' '$url' || echo 000")
+            echo "$svc $name -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              ssh -n $SSH_OPTS root@$HOST "cat /tmp/shd.out" > "$OUT/$name"
+              echo "  сохранено: $(wc -c < "$OUT/$name") байт"
+              rm -f "$OUT/$name.why_not.txt"
+            else
+              printf 'НЕ СКАЧАНО: %s (HTTP %s), время UTC %s\n' "$url" "$code" \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/$name.why_not.txt"
+            fi
+            ssh -n $SSH_OPTS root@$HOST "rm -f /tmp/shd.out"
+          done < /tmp/shred_docs_list.txt
+          ls -l "$OUT"
+
+      - name: "Что нашлось в страницах: регионы, протокол, цена, задержка"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import pathlib, re, html, json
+          каталог = pathlib.Path("data/docs/shreds")
+          слова = {
+              "регионы": r"(Frankfurt|Amsterdam|Tokyo|New York|Singapore|London|"
+                          r"Los Angeles|Salt Lake|Newark|Ashburn|Pittsburgh|"
+                          r"регион|region)",
+              "протокол": r"(gRPC|QUIC|UDP|TCP|Yellowstone|websocket)",
+              "цена": r"(\$\s?\d[\d,.]*\s*(/|per)\s*(stream|day|month|device|epoch)|USDC)",
+              "задержка": r"(\d+\s?(ms|milliseconds?|мс)\b)",
+          }
+          из_ = {}
+          for ф in sorted(каталог.glob("*.html")):
+              текст = html.unescape(re.sub(r"<[^>]+>", " ", ф.read_text(
+                  encoding="utf-8", errors="replace")))
+              текст = re.sub(r"\s+", " ", текст)
+              з = {}
+              for имя, образец in слова.items():
+                  найдено = []
+                  for м in re.finditer(образец, текст, re.I):
+                      начало = max(0, м.start() - 90)
+                      найдено.append(текст[начало:м.end() + 90].strip())
+                      if len(найдено) >= 8:
+                          break
+                  з[имя] = найдено
+              из_[ф.name] = {"байт": ф.stat().st_size, "выдержки": з}
+              print(f"== {ф.name} ({ф.stat().st_size} байт)")
+              for имя, список in з.items():
+                  print(f"  {имя}: {len(список)}")
+                  for с in список[:3]:
+                      print(f"    ...{с[:220]}")
+          pathlib.Path("data/shred_docs_extract.json").write_text(
+              json.dumps(из_, ensure_ascii=False, indent=1), encoding="utf-8")
+          PY
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/docs/shreds data/shred_docs_extract.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "III.12: dokumentatsiya po shredam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
