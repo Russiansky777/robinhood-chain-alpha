@@ -1,0 +1,268 @@
+name: "NL-хост: слушатель шредов (замер, ничего не торгует)"
+
+# ЗАЧЕМ (пункт 4 владельца 26.09): владелец покупает день BlockRazor
+# (Amsterdam, UDP на хост). Нужно узнать, насколько наш сигнал по WS Helius
+# отстаёт от последнего шреда слота -- то есть можно ли вообще успеть раньше,
+# чем блок собран.
+#
+# ЧЕГО СЛУЖБА НЕ ДЕЛАЕТ: не торгует, не подписывает, кошельков не знает. Из
+# шреда берутся ТОЛЬКО слот и индекс из заголовка, сырые данные не хранятся.
+# На торговый путь не влияет: Nice=15, CPUWeight/IOWeight занижены,
+# CPUQuota ограничена, свой каталог состояния, отдельный юнит.
+#
+# ПОРТ. Порт даёт владелец (BlockRazor). Без порта служба не поднимается:
+# входом port=0 прогон только доставляет код, гоняет самопроверку НА ХОСТЕ и
+# печатает готовность -- ни юнита, ни запуска.
+on:
+  workflow_dispatch:
+    inputs:
+      port:
+        description: "порт UDP от BlockRazor (0 -- только доставка и готовность, без запуска)"
+        required: false
+        default: "0"
+      enable_service:
+        description: "'yes' -- записать юнит и запустить (нужен непустой port)"
+        required: false
+        default: "no"
+      ws:
+        description: "'1' -- вторая подписка Helius для часов WS, '0' -- только шреды"
+        required: false
+        default: "1"
+      max_sources:
+        description: "сколько наших источников брать в transactionSubscribe"
+        required: false
+        default: "70"
+      open_firewall:
+        description: "'yes' -- разрешить входящий UDP на этот порт (иначе только показать правила)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: shred-listener-deploy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SVC: shred-listener
+  CODE_DIR: /home/bot/shred_probe
+  STATE_DIR: /home/bot/shred_probe_data
+  ENV_DIR: /etc/bloom-executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin/python
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка слушателя на бегунке"
+        run: python3 analysis/shred_listener.py --self-test
+
+      - name: "Вход разобран"
+        run: |
+          set -e
+          PORT="${{ inputs.port }}"
+          case "$PORT" in ''|*[!0-9]*) echo "СБОЙ: порт не число: $PORT"; exit 1;; esac
+          if [ "$PORT" != "0" ] && { [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; }; then
+            echo "СБОЙ: порт вне 1024-65535: $PORT"; exit 1
+          fi
+          case "${{ inputs.ws }}" in 0|1) ;; *) echo "СБОЙ: ws должен быть 0 или 1"; exit 1;; esac
+          case "${{ inputs.max_sources }}" in ''|*[!0-9]*) echo "СБОЙ: max_sources не число"; exit 1;; esac
+          if [ "${{ inputs.enable_service }}" = "yes" ] && [ "$PORT" = "0" ]; then
+            echo "СБОЙ: запуск просят, а порта нет -- служба ушла бы в перезапуск по кругу"
+            exit 1
+          fi
+          echo "PORT=$PORT" >> "$GITHUB_ENV"
+          echo "порт: $PORT, ws: ${{ inputs.ws }}, источников в подписке: ${{ inputs.max_sources }}"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Каталоги от пользователя службы"
+        run: |
+          set -e
+          # Каталог состояния создаётся СРАЗУ от bot, а не от root: на этом уже
+          # сгорел учёт кредитов у зонда -- каталог создал root, и служба не
+          # могла в него писать.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            install -d -o bot -g bot -m 755 $CODE_DIR $STATE_DIR
+            ls -ld $CODE_DIR $STATE_DIR"
+
+      - name: "Доставка кода + сверка sha256"
+        run: |
+          set -e
+          scp $SSH_OPTS analysis/shred_listener.py root@"$HOST":$CODE_DIR/shred_listener.py
+          scp $SSH_OPTS analysis/bloom_source_groups.py root@"$HOST":$CODE_DIR/bloom_source_groups.py
+          ssh -n $SSH_OPTS root@"$HOST" "chown -R bot:bot $CODE_DIR"
+          HERE=$(sha256sum analysis/shred_listener.py | awk '{print $1}')
+          THERE=$(ssh -n $SSH_OPTS root@"$HOST" "sha256sum $CODE_DIR/shred_listener.py | awk '{print \$1}'")
+          [ -n "$THERE" ] || { echo "СБОЙ: пустая сумма"; exit 1; }
+          [ "$HERE" = "$THERE" ] || { echo "СБОЙ: суммы не сошлись"; exit 1; }
+          echo "код на месте, сумма сошлась"
+
+      - name: "Самопроверка НА ХОСТЕ и зависимости"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            $VENV -c 'import websockets; print(\"websockets на месте\")'
+            sudo -u bot $VENV $CODE_DIR/shred_listener.py --self-test | tail -3"
+
+      - name: "Правила входящего UDP (показать, менять только по просьбе)"
+        run: |
+          set -e
+          {
+            echo "--- правила на хосте до правки ---"
+          } > data/shred_listener_deploy.txt
+          ssh -n $SSH_OPTS root@"$HOST" "
+            (ufw status verbose 2>/dev/null || echo 'ufw не установлен');
+            echo '--- nft/iptables INPUT ---';
+            (nft list ruleset 2>/dev/null | head -40 || iptables -S 2>/dev/null | head -40 || echo 'правил не видно')" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
+          if [ "${{ inputs.open_firewall }}" = "yes" ] && [ "$PORT" != "0" ]; then
+            ssh -n $SSH_OPTS root@"$HOST" "
+              if command -v ufw >/dev/null 2>&1; then
+                ufw allow $PORT/udp comment 'BlockRazor shreds (zamer)'
+                ufw status | grep -F '$PORT' || true
+              else
+                echo 'ufw нет -- правило не добавлено, скажите как открывать порт'
+              fi" 2>&1 | tee -a data/shred_listener_deploy.txt
+          else
+            echo "порт не открывался (open_firewall=${{ inputs.open_firewall }})" | tee -a data/shred_listener_deploy.txt
+          fi
+
+      - name: "env слушателя (без ключей в аргументах)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          # Ключ Helius служба берёт из ОБЩЕГО env как все остальные; свой файл
+          # держит только порт и размеры замера. Общий env не переписывается.
+          {
+            printf 'SHRED_UDP_PORT=%s\n' "$PORT"
+            printf 'SHRED_OUT_DIR=%s\n' "$STATE_DIR"
+            printf 'SHRED_MAX_SOURCES=%s\n' "${{ inputs.max_sources }}"
+            printf 'BLOOM_SOURCE_GROUPS=%s\n' "/home/bot/data/sources_2026-09-25.json"
+          } | ssh $SSH_OPTS root@"$HOST" "
+            set -e
+            umask 077
+            cat > $ENV_DIR/shred_listener_env
+            chown root:bot $ENV_DIR/shred_listener_env
+            chmod 640 $ENV_DIR/shred_listener_env
+            echo 'env слушателя записан, строк:' \$(wc -l < $ENV_DIR/shred_listener_env)
+            echo 'общий env не тронут, его строк:' \$(wc -l < $ENV_DIR/env)"
+
+      - name: "systemd-юнит с низким приоритетом"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          WS_ARG=""
+          [ "${{ inputs.ws }}" = "0" ] && WS_ARG="--ws-url none"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            {
+              echo '[Unit]'
+              echo 'Description=Slushatel shredov BlockRazor: slot i indeks, zamer (ne torguet)'
+              echo 'After=network-online.target'
+              echo ''
+              echo '[Service]'
+              echo 'Type=simple'
+              echo 'User=bot'
+              echo 'Group=bot'
+              echo 'Environment=PYTHONUNBUFFERED=1'
+              echo 'EnvironmentFile=$ENV_DIR/env'
+              echo 'EnvironmentFile=-$ENV_DIR/shred_listener_env'
+              echo 'WorkingDirectory=$CODE_DIR'
+              echo 'ExecStart=$VENV $CODE_DIR/shred_listener.py $WS_ARG'
+              # НА ТОРГОВЫЙ ПУТЬ НЕ ВЛИЯЕТ (слово владельца). Ниже всех по
+              # приоритету процессора и диска, с потолком в треть ядра:
+              # детектор и сторож всегда впереди.
+              echo 'Nice=15'
+              echo 'CPUWeight=20'
+              echo 'IOWeight=20'
+              echo 'CPUQuota=35%'
+              echo 'MemoryMax=400M'
+              echo 'Restart=always'
+              echo 'RestartSec=5'
+              echo 'NoNewPrivileges=true'
+              echo 'PrivateTmp=true'
+              echo 'ProtectSystem=strict'
+              echo 'ProtectHome=read-only'
+              echo 'ReadWritePaths=$STATE_DIR'
+              echo ''
+              echo '[Install]'
+              echo 'WantedBy=multi-user.target'
+            } > /etc/systemd/system/$SVC.service
+            systemctl daemon-reload
+            echo 'юнит записан'"
+
+      - name: "Запуск и признак жизни"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            systemctl enable $SVC
+            RESTART_TS=\$(date +%s)
+            systemctl restart $SVC
+            sleep 25
+            systemctl is-active $SVC || { journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            test -s $STATE_DIR/heartbeat.json || { echo 'СБОЙ: признака жизни нет'; journalctl -u $SVC -n 40 --no-pager; exit 1; }
+            HB=\$(stat -c %Y $STATE_DIR/heartbeat.json)
+            if [ \"\$HB\" -lt \"\$RESTART_TS\" ]; then
+              echo 'СБОЙ: признак жизни старше перезапуска'
+              journalctl -u $SVC -n 40 --no-pager
+              exit 1
+            fi
+            cat $STATE_DIR/heartbeat.json
+            echo '--- порт слушается? ---'
+            (ss -lunp | grep -F ':$PORT' || echo 'порт в ss не виден')
+            echo '--- приоритет процесса ---'
+            (ps -o pid,ni,pcpu,rss,cmd -C python | grep shred_listener || true)" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
+
+      - name: "Готовность без порта (когда port=0)"
+        if: ${{ inputs.port == '0' }}
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- готовность: код доставлен, порт ещё не задан ---"
+            echo "служба НЕ поднята: без порта UDP она не запускается по построению"
+            echo "что нужно от владельца: порт BlockRazor; дальше этот же прогон"
+            echo "с port=<порт> enable_service=yes open_firewall=yes"
+          } | tee -a data/shred_listener_deploy.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py data/shred_listener_deploy.txt
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/shred_listener_deploy.txt ] && git add data/shred_listener_deploy.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Slushatel shredov: dostavka, gotovnost, priznak zhizni [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

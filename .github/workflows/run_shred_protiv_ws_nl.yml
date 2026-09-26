@@ -1,0 +1,74 @@
+name: "Шреды против WS: на сколько наш сигнал позже слота (только чтение)"
+
+# ЗАЧЕМ (пункт 4 владельца, утро 27.09): медиана и p90 разницы
+# "WS - последний шред слота" по всем слотам и отдельно по слотам с НАШИМИ
+# сигналами, плюс шредов принято и слотов покрыто.
+#
+# Только чтение. Служба слушателя не трогается, журнал слотов читается потоком.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: shred-protiv-ws
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/shred_probe_data
+  OUT: data/shred_protiv_ws.txt
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Числа с хоста"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/shred_protiv_ws.py" < deploy/checks/shred_protiv_ws.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            test -d $STATE_DIR || { echo 'СБОЙ: каталога замера нет -- служба не поднималась'; exit 1; }
+            echo '--- признак жизни слушателя ---'
+            cat $STATE_DIR/heartbeat.json 2>/dev/null || echo 'признака жизни нет'
+            echo '--- числа ---'
+            nice -n 15 python3 /tmp/shred_protiv_ws.py --out-dir $STATE_DIR
+            rc=\$?; rm -f /tmp/shred_protiv_ws.py; exit \$rc" | tee "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Shredy protiv WS: mediana i p90 zapozdaniya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
