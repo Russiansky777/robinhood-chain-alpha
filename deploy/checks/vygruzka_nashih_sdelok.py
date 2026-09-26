@@ -38,6 +38,9 @@ import sys
 import time
 
 ЛАМПОРТОВ_В_SOL = 1_000_000_000
+# Правило службы (bloom_source_groups.ГРУППА_ПО_УМОЛЧАНИЮ): адрес, которого нет
+# в файле групп, пришёл из DBot и считается bloom_lane.
+ГРУППА_ПО_УМОЛЧАНИЮ = "bloom_lane"
 # Подпись Solana в base58 -- 86-88 знаков. Короче 80 не подпись, а метка вроде
 # "ok"/"sent": такие в поля подписей писать нельзя (правка 26.09 по продавцу).
 МИН_ПОДПИСЬ = 80
@@ -102,18 +105,66 @@ def окно(момент: str) -> float:
     return calendar.timegm(time.strptime(момент, "%Y-%m-%dT%H:%M:%SZ"))
 
 
-def учёт_хоста(корень: str):
-    """Функции учёта с ХОСТА (итог, расход) или (None, None, почему)."""
-    путь = os.path.join(корень, "analysis", "bloom_exec_state.py")
-    if not os.path.exists(путь):
-        return None, None, f"нет файла {путь}"
+def модуль_хоста(имя: str, каталоги: list):
+    """Живой модуль службы по имени файла: (модуль, путь, почему_нет).
+
+    ПОРЯДОК КАТАЛОГОВ ВАЖЕН. Служба работает из /home/bot/bloom_executor
+    (ExecStart в юните), а /home/bot/robinhood-chain-alpha -- просто checkout
+    и бывает старее боевого кода: прогон 16:03Z взял учёт оттуда и получил
+    "нет итог_позиции", потому что в том checkout правки I.1 ещё не было.
+    Брать формулу нужно из ТОГО кода, который писал журнал.
+    """
+    беды = []
+    for кат in каталоги:
+        путь = os.path.join(кат, имя + ".py")
+        if not os.path.exists(путь):
+            беды.append(f"нет {путь}")
+            continue
+        try:
+            спец = importlib.util.spec_from_file_location(имя + "_host", путь)
+            м = importlib.util.module_from_spec(спец)
+            sys.modules[спец.name] = м
+            спец.loader.exec_module(м)
+            return м, путь, None
+        except Exception as exc:  # noqa: BLE001
+            беды.append(f"{путь}: {type(exc).__name__} {чисто(str(exc))[:100]}")
+    return None, None, "; ".join(беды)[:300]
+
+
+def учёт_хоста(каталоги: list):
+    """Функции учёта с ХОСТА (итог, расход, путь) или (None, None, ..., почему)."""
+    м, путь, почему = модуль_хоста("bloom_exec_state", каталоги)
+    if м is None:
+        return None, None, None, почему
+    итог = getattr(м, "итог_позиции", None)
+    расход = getattr(м, "расход_отправки", None)
+    if итог is None:
+        return None, расход, путь, f"в {путь} нет итог_позиции"
+    return итог, расход, путь, None
+
+
+def группы_хоста(каталоги: list, файл_групп: str | None):
+    """Функция "группа по адресу источника" с хоста: (фн, путь, почему_нет).
+
+    Группа есть в записи только у полосы (lane_group). У покупок Bloom её нет
+    вовсе, а она нужна: по группе считаются деньги. Источник правды -- тот же
+    файл групп, который читает служба, и тот же код чтения.
+    """
+    if файл_групп:
+        os.environ["BLOOM_SOURCE_GROUPS"] = файл_групп
+    м, путь, почему = модуль_хоста("bloom_source_groups", каталоги)
+    if м is None:
+        return None, None, почему
+    фн = getattr(м, "адреса_всех_групп", None)
+    if фн is None:
+        return None, путь, f"в {путь} нет адреса_всех_групп"
     try:
-        спец = importlib.util.spec_from_file_location("bloom_exec_state_host", путь)
-        м = importlib.util.module_from_spec(спец)
-        спец.loader.exec_module(м)
-        return м.итог_позиции, м.расход_отправки, None
+        по_адресу = dict(фн(файл_групп) if файл_групп else фн())
     except Exception as exc:  # noqa: BLE001
-        return None, None, f"{type(exc).__name__}: {чисто(str(exc))[:160]}"
+        return None, путь, f"{type(exc).__name__}: {чисто(str(exc))[:120]}"
+    if not по_адресу:
+        return None, путь, f"файл групп {файл_групп} не дал ни одного адреса"
+    return по_адресу, путь, None
 
 
 def подпись_покупки(п: dict) -> tuple:
@@ -212,7 +263,17 @@ def собрать(поз: dict, итог_фн, расход_фн) -> dict:
     return {
         "cid": поз.get("client_order_id"),
         "wallet": поз.get("wallet"),
-        "group": поз.get("lane_group") or поз.get("_group_iz_resheniy"),
+        "group": (поз.get("lane_group") or поз.get("_group_iz_resheniy")
+                  or поз.get("_group_po_adresu")),
+        # ДЕЙСТВУЮЩАЯ ГРУППА: незнакомому файлу групп адресу служба даёт
+        # bloom_lane (bloom_source_groups.ГРУППА_ПО_УМОЛЧАНИЮ) -- по ней и шли
+        # деньги. Отдельным полем, чтобы не путать правило с фактом.
+        "group_effective": (поз.get("lane_group") or поз.get("_group_iz_resheniy")
+                            or поз.get("_group_po_adresu")
+                            or (ГРУППА_ПО_УМОЛЧАНИЮ if поз.get("source_sig") else None)),
+        "group_field": ("lane_group" if поз.get("lane_group") else
+                        ("decisions" if поз.get("_group_iz_resheniy") else
+                         ("файл групп" if поз.get("_group_po_adresu") else None))),
         "side": "lane" if поз.get("lane") else "bloom",
         "mint": поз.get("mint"),
         "source": поз.get("_source_iz_resheniy"),
@@ -246,8 +307,12 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--state-dir", default=os.environ.get("BLOOM_STATE_DIR")
                    or "/home/bot/bloom_executor_live_data")
+    р.add_argument("--live-dir", default="/home/bot/bloom_executor",
+                   help="каталог БОЕВОГО кода службы (ExecStart в юните)")
     р.add_argument("--repo-root", default="/home/bot/robinhood-chain-alpha",
-                   help="откуда брать боевую схему учёта (itog_pozicii)")
+                   help="запасной checkout, если боевого каталога нет")
+    р.add_argument("--groups-file", default="/home/bot/data/sources_2026-09-25.json",
+                   help="файл групп источников, как у службы")
     р.add_argument("--since-utc", default="2026-09-24T00:00:00Z")
     р.add_argument("--out", default="/tmp/nashi_sdelki_host.json")
     р.add_argument("--self-test", action="store_true")
@@ -260,7 +325,9 @@ def main() -> int:
         return проверить(а.proverit)
 
     порог = окно(а.since_utc)
-    итог_фн, расход_фн, почему_нет_схемы = учёт_хоста(а.repo_root)
+    каталоги = [а.live_dir, os.path.join(а.repo_root, "analysis"), а.repo_root]
+    итог_фн, расход_фн, путь_схемы, почему_нет_схемы = учёт_хоста(каталоги)
+    группы_по_адресу, путь_групп, почему_нет_групп = группы_хоста(каталоги, а.groups_file)
 
     # ПРОХОД 1: позиции потоком, по cid -- последнее состояние.
     по_cid: dict = {}
@@ -299,6 +366,12 @@ def main() -> int:
         нашли = по_подписи.get(п.get("source_sig") or "", {})
         п["_source_iz_resheniy"] = нашли.get("source")
         п["_group_iz_resheniy"] = нашли.get("group")
+        # ГРУППА ТОЛЬКО ЯВНАЯ. bloom_source_groups.группа() незнакомому адресу
+        # отдаёт bloom_lane по умолчанию -- это правило службы, но в выгрузке
+        # такая подстановка выглядела бы как факт. Пишем группу, только если
+        # адрес ЕСТЬ в файле групп.
+        if группы_по_адресу and нашли.get("source"):
+            п["_group_po_adresu"] = группы_по_адресу.get(нашли["source"])
         сделки.append(собрать(п, итог_фн, расход_фн))
     сделки.sort(key=lambda с: (с.get("ts_intent_utc") or ""))
 
@@ -319,9 +392,21 @@ def main() -> int:
         "with_buy_sig": sum(1 for с in сделки if с.get("buy_sig")),
         "with_sell_sig": sum(1 for с in сделки if с.get("sell_sig")),
         "closed": sum(1 for с in сделки if с.get("state") == "closed"),
-        "pnl_schema": "хост" if итог_фн is not None else "нет",
+        "pnl_schema": путь_схемы if итог_фн is not None else "нет",
         "pnl_schema_why_not": почему_нет_схемы,
+        "groups_schema": путь_групп if группы_по_адресу else "нет",
+        "groups_addresses": len(группы_по_адресу or {}),
+        "groups_file": а.groups_file,
+        "groups_schema_why_not": почему_нет_групп,
+        "by_group": {},
     }
+    for с in сделки:
+        г = с.get("group") or "?"
+        свод["by_group"][г] = свод["by_group"].get(г, 0) + 1
+    свод["by_group_effective"] = {}
+    for с in сделки:
+        г = с.get("group_effective") or "?"
+        свод["by_group_effective"][г] = свод["by_group_effective"].get(г, 0) + 1
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump({"svod": свод, "sdelki": сделки}, ф, ensure_ascii=False, indent=1)
     print(json.dumps(свод, ensure_ascii=False, indent=1))
@@ -419,6 +504,20 @@ def самопроверка() -> int:
        "причина закрытия идёт через вычистку")
     ок(причина_закрытия({"closed_reason": "stop", "why_not": "x"})[0] == "stop",
        "причина закрытия -- первая известная")
+
+    # Группа: запись полосы важнее, у Bloom -- по адресу источника из файла.
+    сг = собрать({"client_order_id": "g1", "lane": "own", "lane_group": "speed_only",
+                  "_group_po_adresu": "bloom_lane"}, None, None)
+    ок(сг["group"] == "speed_only" and сг["group_field"] == "lane_group",
+       "группа полосы -- из записи")
+    сг2 = собрать({"client_order_id": "g2", "_group_po_adresu": "lane_only"}, None, None)
+    ок(сг2["group"] == "lane_only" and сг2["group_field"] == "файл групп",
+       "группа Bloom -- по адресу источника")
+    ок(собрать({"client_order_id": "g3"}, None, None)["group"] is None,
+       "нет группы -- пусто, а не выдуманная")
+    сг3 = собрать({"client_order_id": "g4", "source_sig": "S" * 88}, None, None)
+    ок(сг3["group"] is None and сг3["group_effective"] == "bloom_lane",
+       "адреса нет в файле групп -- действующая группа bloom_lane правилом службы")
 
     # Окно: UTC без сдвига локального часового пояса.
     ок(окно("2026-09-24T00:00:00Z") == 1790208000, "окно считается по UTC")
