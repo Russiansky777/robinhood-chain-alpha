@@ -143,6 +143,7 @@ Secrets) и **не выдумывать**. В коде обращение к у�
 | `data/podbivka/wallets.csv` | 543 чужих кошелька (544 строки с заголовком), колонки `address,name,group,rank,prev_status,source` |
 | `data/podbivka/kontrol_ceny.json` | результат п.1 (контроль цены) |
 | `data/podbivka/p1b_sverka.json` | результат п.1б (сквозная сверка) |
+| `data/podbivka/nashi_sdelki_host.json` | **НАШИ сделки с хоста, 24.09 -> сейчас** (прогон `run_vygruzka_nashih_sdelok_nl.yml`, только чтение). `svod` -- счётчики и пути схем, `sdelki` -- по позиции: `wallet`, `group` (явная, из файла групп или записи полосы), `group_effective` (незнакомый адрес = `bloom_lane` правилом службы), `side` (`lane`/`bloom`), `mint`, `source`, `source_sig`, `source_slot`, `entry_slot`, `buy_sig` (**севшая**) + `buy_sig_field`, `buy_landed`, `sell_sig` + `sell_sig_field`, `in_sol` / `back_sol` / `spend_sol` / `pnl_sol` + `pnl_source`, `close_reason`, `state`, `ts_intent_utc`, `ts_closed_utc`. Адреса источников в позиции НЕТ -- он взят из `decisions.jsonl` по подписи; итог считает боевая `/home/bot/bloom_executor/bloom_exec_state.py`, не своя копия формулы. Ключей и URL в файле нет: прогон отказывается коммитить файл, в котором они нашлись |
 
 ## 5. Сделанные ошибки -- чтобы не повторять
 
