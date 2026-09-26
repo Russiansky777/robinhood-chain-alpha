@@ -1,0 +1,77 @@
+name: "Podbivka-2: kontrol ceny cherez Shyft (tolko chtenie)"
+
+# ZACHEM. Pervoe deystvie vtoroy sessii: vosproizvesti kontrol simulyatora na
+# toy zhe vyborke 258 sdelok (data/podbivka/kontrol_ceny.json), no uzel --
+# Shyft (reshenie vladelca 26.09, Helius u detektora). Obyazano vyyti okolo
+# 1.27 p.p. mediany na 80 sverennyh. Hosta ne kasaetsya: vyborka iz repozitoriya.
+# Zapusk -- push markera data/podbivka/zapusk/kontrol.txt v vetku claude/podbivka.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/kontrol.txt"
+
+concurrency:
+  group: podbivka2-kontrol
+  cancel-in-progress: false
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+
+      - name: "Python venv with requests and solders"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/pod_venv"
+          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Shyft RPC probe (key names from 24.09 Shyft runs)"
+        env:
+          GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
+          GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+        run: |
+          set +e
+          $PY analysis/podbivka_shyft_proba.py --out data/podbivka/shyft_proba.json
+          echo "PROBE_RC=$?" >> "$GITHUB_ENV"
+
+      - name: "Sample of 258 from saved control"
+        run: |
+          set -e
+          $PY analysis/podbivka_kontrol_vyborka.py --iz data/podbivka/kontrol_ceny.json --out /tmp/nashi_sdelki_258.json
+
+      - name: "Control: simulator vs chain via Shyft"
+        if: env.PROBE_RC == '0'
+        env:
+          GRPC_FEED_TOKEN: ${{ secrets.GRPC_FEED_TOKEN }}
+          GRPC_FEED2_TOKEN: ${{ secrets.GRPC_FEED2_TOKEN }}
+        run: |
+          set -e
+          export SHYFT_API_KEY="${!SHYFT_KEY_NAME}"
+          $PY analysis/podbivka.py --sdelki /tmp/nashi_sdelki_258.json --limit 0 --out data/podbivka/kontrol_ceny_shyft.json > /tmp/kontrol_svod.txt
+          $PY analysis/podbivka_kontrol_sravnenie.py --bylo data/podbivka/kontrol_ceny.json --stalo data/podbivka/kontrol_ceny_shyft.json --out data/podbivka/kontrol_ceny_shyft_sravnenie.json
+
+      - name: "Commit to claude/podbivka"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in data/podbivka/shyft_proba.json data/podbivka/kontrol_ceny_shyft.json data/podbivka/kontrol_ceny_shyft_sravnenie.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          git commit -m "Podbivka-2: kontrol ceny cherez Shyft [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/podbivka && exit 0
+            git pull --rebase -X theirs origin claude/podbivka
+            sleep 3
+          done
+          exit 1

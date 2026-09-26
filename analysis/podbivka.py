@@ -38,6 +38,13 @@ import c2_swap_build as B  # noqa: E402
 
 
 def узел() -> str:
+    # Решение владельца 26.09: RPC всей цепи для подбивки -- Shyft, Helius
+    # оставлен детектору и сторожу. Прогон кладёт ключ Shyft в SHYFT_API_KEY
+    # (секрет -- тот, под которым Shyft ходил 24.09); без него -- прежний путь,
+    # чтобы не сломать старые прогоны первой сессии.
+    shyft = (os.environ.get("SHYFT_API_KEY") or "").strip()
+    if shyft:
+        return f"https://rpc.shyft.to?api_key={shyft}"
     ключ = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
     if not ключ:
         raise RuntimeError("ключа узла нет в окружении (HELIUS_API_KEY)")
