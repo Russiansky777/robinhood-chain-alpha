@@ -204,64 +204,97 @@ def адреса_источников(файл_групп: str, предел: in
 
 
 def поток_ws(замер: Замер, url: str, источники: list, стоп: threading.Event) -> None:
-    import websocket  # noqa: PLC0415
+    """Часы WS рядом с часами шредов: slotSubscribe, slotsUpdates и наши источники.
+
+    БИБЛИОТЕКА -- websockets (асинхронная), та же, что у детектора и в
+    requirements. Первая версия этого потока звала синхронный websocket-client,
+    которого на хосте нет: поток умирал на импорте МОЛЧА (импорт стоял выше
+    try), признак жизни показывал ws_messages 0 и ws_breaks 0, и замер 18:11Z
+    собрал 586 287 шредов без единой отметки WS -- то есть был бесполезен.
+    Поэтому импорт теперь внутри try, а сбой виден и в журнале, и счётчиком.
+    """
+    import asyncio  # noqa: PLC0415
+
+    try:
+        import websockets  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        замер.ws_обрывов += 1
+        print(f"СБОЙ: нет модуля websockets ({type(exc).__name__}) -- часов WS не будет",
+              file=sys.stderr, flush=True)
+        return
 
     подписки = {}
-    while not стоп.is_set():
+
+    async def подписаться(ws) -> None:
+        await ws.send(json.dumps({"jsonrpc": "2.0", "id": 1,
+                                   "method": "slotSubscribe", "params": []}))
+        await ws.send(json.dumps({"jsonrpc": "2.0", "id": 2,
+                                   "method": "slotsUpdatesSubscribe", "params": []}))
+        for и, адрес in enumerate(источники, start=10):
+            await ws.send(json.dumps({"jsonrpc": "2.0", "id": и,
+                                       "method": "transactionSubscribe",
+                                       "params": [{"accountInclude": [адрес],
+                                                    "failed": False},
+                                                   {"commitment": "processed",
+                                                    "encoding": "jsonParsed",
+                                                    "transactionDetails": "signatures",
+                                                    "maxSupportedTransactionVersion": 0}]}))
+
+    def разобрать(сырое: str, моно: float) -> None:
         try:
-            ws = websocket.create_connection(url, timeout=20)
-        except Exception:  # noqa: BLE001
-            замер.ws_обрывов += 1
-            time.sleep(3)
-            continue
-        try:
-            ws.send(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "slotSubscribe",
-                                 "params": []}))
-            ws.send(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "slotsUpdatesSubscribe",
-                                 "params": []}))
-            for и, адрес in enumerate(источники, start=10):
-                ws.send(json.dumps({"jsonrpc": "2.0", "id": и,
-                                     "method": "transactionSubscribe",
-                                     "params": [{"accountInclude": [адрес],
-                                                 "failed": False},
-                                                {"commitment": "processed",
-                                                 "encoding": "jsonParsed",
-                                                 "transactionDetails": "signatures",
-                                                 "maxSupportedTransactionVersion": 0}]}))
-            ws.settimeout(30)
-            while not стоп.is_set():
-                сырое = ws.recv()
-                моно = time.monotonic()
-                if not сырое:
-                    break
-                try:
-                    с = json.loads(сырое)
-                except ValueError:
-                    continue
-                метод = с.get("method") or ""
-                рез = ((с.get("params") or {}).get("result") or {})
-                if метод == "slotNotification":
-                    слот = рез.get("slot")
-                    if isinstance(слот, int):
-                        замер.ws_слот(слот, моно)
-                elif метод == "slotsUpdatesNotification":
-                    слот = рез.get("slot")
-                    if isinstance(слот, int):
-                        замер.ws_слот(слот, моно)
-                elif метод == "transactionNotification":
-                    слот = рез.get("slot")
-                    if isinstance(слот, int):
-                        замер.ws_сигнал(слот, моно)
-                elif "result" in с and isinstance(с.get("result"), int):
-                    подписки[с.get("id")] = с["result"]
-        except Exception:  # noqa: BLE001
-            замер.ws_обрывов += 1
-        finally:
+            с = json.loads(сырое)
+        except ValueError:
+            return
+        метод = с.get("method") or ""
+        рез = ((с.get("params") or {}).get("result") or {})
+        слот = рез.get("slot") if isinstance(рез, dict) else None
+        if метод in ("slotNotification", "slotsUpdatesNotification"):
+            if isinstance(слот, int):
+                замер.ws_слот(слот, моно)
+        elif метод == "transactionNotification":
+            if isinstance(слот, int):
+                замер.ws_сигнал(слот, моно)
+        elif isinstance(с.get("result"), int):
+            подписки[с.get("id")] = с["result"]
+
+    async def круг() -> None:
+        while not стоп.is_set():
             try:
-                ws.close()
-            except Exception:  # noqa: BLE001
-                pass
-        time.sleep(1)
+                async with websockets.connect(url, ping_interval=20,
+                                              ping_timeout=20,
+                                              max_size=8 * 1024 * 1024) as ws:
+                    await подписаться(ws)
+                    print(f"WS подключён, подписок на источники: {len(источники)}",
+                          file=sys.stderr, flush=True)
+                    while not стоп.is_set():
+                        сырое = await asyncio.wait_for(ws.recv(), timeout=45)
+                        разобрать(сырое, time.monotonic())
+            except Exception as exc:  # noqa: BLE001
+                замер.ws_обрывов += 1
+                print(f"WS обрыв ({type(exc).__name__}) -- переподключаюсь",
+                      file=sys.stderr, flush=True)
+                await asyncio.sleep(2)
+
+    try:
+        asyncio.run(круг())
+    except Exception as exc:  # noqa: BLE001
+        замер.ws_обрывов += 1
+        print(f"СБОЙ потока WS: {type(exc).__name__}", file=sys.stderr, flush=True)
+
+
+def зависимости() -> int:
+    """Есть ли на этом питоне ровно то, что зовёт служба. Печатает и падает."""
+    плохо = []
+    for имя in ("websockets",):
+        try:
+            __import__(имя)
+            print(f"{имя}: есть")
+        except Exception as exc:  # noqa: BLE001
+            плохо.append(f"{имя} ({type(exc).__name__})")
+    if плохо:
+        print("СБОЙ: не хватает " + ", ".join(плохо), file=sys.stderr)
+        return 1
+    return 0
 
 
 def self_test() -> int:
@@ -318,6 +351,8 @@ def self_test() -> int:
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--self-test", action="store_true")
+    р.add_argument("--zavisimosti", action="store_true",
+                   help="проверить модули, которые зовёт служба")
     р.add_argument("--port", type=int,
                    default=int(os.environ.get("SHRED_UDP_PORT", "0")))
     р.add_argument("--out-dir", default=os.environ.get("SHRED_OUT_DIR")
@@ -333,6 +368,8 @@ def main() -> int:
     а = р.parse_args()
     if а.self_test:
         return self_test()
+    if а.zavisimosti:
+        return зависимости()
     if not а.port:
         print("СТОП: порт UDP не задан (SHRED_UDP_PORT или --port)", file=sys.stderr)
         return 2
