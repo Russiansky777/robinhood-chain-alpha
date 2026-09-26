@@ -96,7 +96,8 @@ jobs:
           $PY analysis/bonding_sim_check.py \
             --decisions /tmp/bsim/curve.jsonl \
             --limit "${{ inputs.limit }}" \
-            --sol "${{ inputs.sol }}" $WALLET_ARG
+            --sol "${{ inputs.sol }}" $WALLET_ARG \
+            --save-samples data/c2_curve_variant_samples.json
 
       - name: "Коммит"
         if: always()
@@ -104,7 +105,9 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/bonding_sim_check.json ] && git add data/bonding_sim_check.json
+          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json; do
+            [ -f "$F" ] && git add "$F"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Krivaya pump.fun: simulyatsiya nashey sborki [automated]"
           for i in 1 2 3 4 5; do
