@@ -1,0 +1,222 @@
+name: "NL-хост: автообновления не трогают торговые службы + осознанная перезагрузка"
+
+# ЗАЧЕМ. 26.09 в 04:53:36Z сработала apt-daily-upgrade (unattended-upgrades),
+# обновила curl и libexpat, и по ним перезапустились bloom-detector,
+# bloom-seller (дважды), dbot-detect-probe, grpc-feed-probe и бегунок GitHub.
+# Хост при этом НЕ перезагружался. Случись это в торговле: детектор теряет
+# подписки, тёплый nonce сбрасывается, у сделки в воздухе нет сторожа.
+#
+# ЧТО ДЕЛАЕТ (решение владельца 26.09, пункт 2 дневного плана):
+#   mode=config            -- запретить автообновлениям перезапускать наши
+#                             службы (needrestart) И сдвинуть окно apt на
+#                             03:00-04:00Z. Службы не трогает.
+#   mode=config_and_reboot -- то же плюс ОСОЗНАННАЯ перезагрузка хоста
+#                             (с 25.09 лежит /var/run/reboot-required).
+#                             Перезагрузка идёт ТОЛЬКО при стоящем рубильнике
+#                             KILL и нуле открытых позиций -- проверяется здесь
+#                             же и без этого job падает.
+#
+# Прогон идёт с ОБЛАЧНОГО бегунка: перезагрузка убила бы бегунок на самом хосте
+# вместе с job. Ключей кошельков здесь нет вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "'config' (по умолчанию) или 'config_and_reboot'"
+        required: false
+        default: "config"
+      apt_window_utc:
+        description: "во сколько UTC пускать автообновления (окно 03:00-04:00Z)"
+        required: false
+        default: "03:20"
+      wait_s:
+        description: "сколько секунд ждать возврата хоста после перезагрузки"
+        required: false
+        default: "240"
+
+concurrency:
+  group: vps-autoupdate-guard
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Как есть сейчас (до правок)"
+        run: |
+          set -e
+          OUT=data/vps_autoupdate_guard_nl.txt
+          {
+            echo "=== NL-хост: автообновления и перезагрузка, $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+            echo "--- ДО ПРАВОК ---"
+            ssh -n $SSH_OPTS root@"$HOST" '
+              echo "needrestart установлен:"; (command -v needrestart >/dev/null && echo да || echo нет);
+              ls -l /etc/needrestart/conf.d/ 2>/dev/null || echo "каталога needrestart/conf.d нет";
+              echo "--- таймеры apt ---";
+              systemctl show apt-daily-upgrade.timer -p OnCalendar -p RandomizedDelaySec -p NextElapseUSecRealtime 2>/dev/null;
+              systemctl show apt-daily.timer -p OnCalendar -p RandomizedDelaySec 2>/dev/null;
+              echo "--- просьба перезагрузиться ---";
+              ls -l /var/run/reboot-required 2>/dev/null || echo "нет";
+              cat /var/run/reboot-required.pkgs 2>/dev/null | head -5 || true;
+              echo "--- работает с ---"; uptime -p;
+            '
+          } > "$OUT" 2>&1
+          tail -30 "$OUT"
+
+      - name: "Правка 1: needrestart не трогает наши службы"
+        run: |
+          set -e
+          # Конфигурация needrestart -- на perl: override_rc задаёт, какие юниты
+          # НЕ перезапускать (0 -- не перезапускать). Наши три семейства служб и
+          # бегунок GitHub: перезапуск решаем мы сами, деплоем.
+          ssh -n $SSH_OPTS root@"$HOST" '
+            install -d -m 755 /etc/needrestart/conf.d
+            cat > /etc/needrestart/conf.d/90-bloom-no-restart.conf <<CONF
+# Поставлено прогоном run_vps_autoupdate_guard_nl.yml по решению владельца
+# 26.09: автообновления НЕ перезапускают торговые службы. 26.09 04:53:45Z
+# обновление curl и libexpat перезапустило детектор, сторож и зонды без
+# предупреждения -- в торговле это стоило бы сделки.
+\$nrconf{override_rc} = {
+    qr(^bloom-)          => 0,
+    qr(^dbot-)           => 0,
+    qr(^grpc-feed-probe) => 0,
+    qr(^actions\.runner\.) => 0,
+};
+CONF
+            chmod 644 /etc/needrestart/conf.d/90-bloom-no-restart.conf
+            echo "--- файл на месте ---"; cat /etc/needrestart/conf.d/90-bloom-no-restart.conf'
+          echo "--- ДЕЙСТВИЕ: needrestart override поставлен ---" >> data/vps_autoupdate_guard_nl.txt
+
+      - name: "Правка 2: окно автообновлений 03:00-04:00Z"
+        run: |
+          set -e
+          WINDOW="${{ inputs.apt_window_utc }}"
+          # Таймер apt по умолчанию бьёт в непредсказуемую минуту (случайная
+          # задержка до часа): 25.09 это было 06:18Z, 26.09 -- 04:53Z. Ставим
+          # фиксированное окно в UTC и малую задержку, чтобы минута была наша.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            install -d -m 755 /etc/systemd/system/apt-daily-upgrade.timer.d
+            cat > /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf <<CONF
+# Поставлено прогоном run_vps_autoupdate_guard_nl.yml по решению владельца
+# 26.09: автообновления только в окно 03:00-04:00 UTC, когда мы не торгуем.
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* $WINDOW:00 UTC
+RandomizedDelaySec=600
+Persistent=false
+CONF
+            chmod 644 /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf
+            systemctl daemon-reload
+            systemctl restart apt-daily-upgrade.timer
+            echo '--- как стало ---'
+            systemctl show apt-daily-upgrade.timer -p OnCalendar -p RandomizedDelaySec -p Persistent
+            systemctl list-timers apt-daily-upgrade.timer --no-pager | head -3"
+          echo "--- ДЕЙСТВИЕ: окно apt задано $WINDOW UTC ---" >> data/vps_autoupdate_guard_nl.txt
+
+      - name: "Проверка ПЕРЕД перезагрузкой: рубильник стоит и позиций 0"
+        if: ${{ inputs.mode == 'config_and_reboot' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ПЕРЕЗАГРУЗКА ТОЛЬКО ПРИ СТОЯЩЕМ РУБИЛЬНИКЕ И НУЛЕ ПОЗИЦИЙ. Это
+          # деньги: перезагрузка с позицией в воздухе оставляет её без сторожа.
+          ssh -n $SSH_OPTS root@"$HOST" '
+            test -f /etc/bloom-executor/KILL || { echo "СТОП: рубильника KILL нет -- перезагрузка отменена"; exit 3; }
+            python3 - <<PY
+import json, sys
+s = json.load(open("/home/bot/bloom_executor_live_data/detector_status.json"))
+own = (s.get("own_send") or {})
+st = (own.get("lane_state") or {})
+открытых = st.get("open")
+висящих = st.get("stuck")
+print("открытых позиций:", открытых, "| зависших:", висящих)
+if открытых not in (0, None) or (висящих or 0) not in (0, None):
+    print("СТОП: есть открытые или зависшие позиции -- перезагрузка отменена")
+    sys.exit(4)
+PY'
+          echo "--- ПРОВЕРКА ПЕРЕД ПЕРЕЗАГРУЗКОЙ: рубильник стоит, позиций 0 ---" >> data/vps_autoupdate_guard_nl.txt
+
+      - name: "Перезагрузка хоста"
+        if: ${{ inputs.mode == 'config_and_reboot' }}
+        run: |
+          set -e
+          # reboot рвёт ssh, поэтому команда уходит в фон, а ssh выходит сам.
+          ssh -n $SSH_OPTS root@"$HOST" 'nohup sh -c "sleep 2; systemctl reboot" >/dev/null 2>&1 &' || true
+          echo "перезагрузка отправлена $(date -u +%H:%M:%SZ)" | tee -a data/vps_autoupdate_guard_nl.txt
+          sleep 25
+
+      - name: "Ждём возврата хоста и смотрим службы"
+        if: ${{ inputs.mode == 'config_and_reboot' }}
+        run: |
+          set -e
+          WAIT="${{ inputs.wait_s }}"
+          DEADLINE=$(( $(date +%s) + WAIT ))
+          UP=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            if ssh -n $SSH_OPTS root@"$HOST" 'uptime -p' >/dev/null 2>&1; then UP="да"; break; fi
+            sleep 10
+          done
+          [ -n "$UP" ] || { echo "СБОЙ: хост не вернулся за $WAIT с"; exit 5; }
+          echo "хост вернулся $(date -u +%H:%M:%SZ)" | tee -a data/vps_autoupdate_guard_nl.txt
+          # Службы поднимаются не мгновенно: даём им до 120 с и печатаем как есть.
+          sleep 30
+          {
+            echo "--- ПОСЛЕ ПЕРЕЗАГРУЗКИ ---"
+            ssh -n $SSH_OPTS root@"$HOST" '
+              uptime -p; who -b;
+              for U in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+                printf "%s: %s %s restarts=%s since=%s\n" "$U" \
+                  "$(systemctl is-active $U)" "$(systemctl is-enabled $U)" \
+                  "$(systemctl show $U -p NRestarts --value)" \
+                  "$(systemctl show $U -p ActiveEnterTimestamp --value)";
+              done
+              echo "--- рубильник ---"; ls -l /etc/bloom-executor/KILL 2>/dev/null || echo "рубильника нет";
+              echo "--- просьба перезагрузиться ---"; ls -l /var/run/reboot-required 2>/dev/null || echo "нет (снята перезагрузкой)";
+              echo "--- возраст признаков жизни ---";
+              for F in /home/bot/bloom_executor_live_data/detector_status.json \
+                       /home/bot/bloom_executor_live_data/seller_heartbeat.json \
+                       /home/bot/dbot_detect_probe/status.json \
+                       /home/bot/grpc_feed_probe_data/heartbeat.json; do
+                [ -f "$F" ] && printf "%s: %s с\n" "$F" "$(( $(date +%s) - $(stat -c %Y "$F") ))" || printf "%s: файла нет\n" "$F";
+              done'
+          } | tee -a data/vps_autoupdate_guard_nl.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/vps_autoupdate_guard_nl.txt ] && git add data/vps_autoupdate_guard_nl.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "NL-host: avtoobnovleniya i osoznannaya perezagruzka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
