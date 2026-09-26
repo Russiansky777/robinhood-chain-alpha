@@ -152,6 +152,26 @@ def main() -> int:
                                        and not isinstance(v, (dict, list))},
                     })
 
+    # ВРЕМЯ ОТВЕТА BLOOM живёт в журнале вызовов API (bloom_ms в строке
+    # stage=response), а не в решении: там его нет ни под одним именем.
+    вызовы = []
+    if цель is not None:
+        for путь in файлы(а.state_dir, "api_calls.jsonl"):
+            for з in строки(путь):
+                у = з.get("ts_utc")
+                try:
+                    т = в_секунды(у) if isinstance(у, str) and у.endswith("Z") else None
+                except ValueError:
+                    т = None
+                if т is None or abs(т - цель) > а.okno_s:
+                    continue
+                if з.get("bloom_ms") is None:
+                    continue
+                вызовы.append({к: v for к, v in з.items()
+                                if к in ("ts_utc", "stage", "client_order_id",
+                                          "bloom_ms", "code", "ok", "order_id",
+                                          "new_connections", "http_status")})
+
     позиции = {"полосы_всего": 0, "село_по_цепи": 0, "с_местом_по_цепи": 0,
                "не_село": 0, "без_признака": 0}
     по_cid = {}
@@ -184,6 +204,13 @@ def main() -> int:
         print("--- разбор сделки площадки ---")
         for з in разбор:
             print(json.dumps(з, ensure_ascii=False))
+        if вызовы:
+            print("--- вызовы Bloom в окне (bloom_ms -- время ответа) ---")
+            for в in вызовы:
+                print(json.dumps(в, ensure_ascii=False))
+        else:
+            print("вызовов Bloom с bloom_ms в окне нет (журнал вызовов пуст или "
+                  "строки без этого поля)")
         плохие = [з for з in разбор if isinstance(з.get("slot_lag"), int)
                   and з["slot_lag"] > ПОРОГ_STALE and з.get("code") == "BUY"]
         if плохие:
