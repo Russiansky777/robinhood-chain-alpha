@@ -192,11 +192,23 @@ ATA и счёта WSOL.
 | модуль | самопроверок |
 |---|---|
 | bloom_detector | 470/470 |
-| bloom_own_send | 258/258 |
+| bloom_own_send | 263/263 (пять новых -- кривая pump.fun) |
 | bloom_exec_state | 123/123 |
 | bloom_seller | 136/136 |
+| c2_swap_build | 21/21 (четыре новых -- кривая pump.fun) |
+| c2_shadow_build | 19/19 (одна новая -- кривая pump.fun) |
+| c2_common | 42/42 |
+| c2_pool_programs | 2/2 |
 | night_leader_stonkfun | 59/59 |
 | triton_preconfs_probe | 52/52 |
+
+Отдельно про c2_common и c2_pool_programs: ночью они краснели (32/35 и падение
+с StopIteration), и причина была НЕ в коде -- прогоны разбора пропавшего сигнала
+перезаписали `data/bloom_tx_raw.json` и `data/bloom_seller_diag.json`, которые
+служили фикстурами. Нужные копии восстановлены из истории в файлы, которые
+прогоны не трогают (`data/bloom_regression_txs.json`,
+`data/fixtures/bloom_seller_diag_7_sdelok.json`); числа проверок те же,
+изменился только путь к данным (коммит про фикстуры).
 
 Что это значит для порядка деплоя: если разворачивать голову ветки, I.1 и
 I.4/I.5 уедут вместе. Это не опасно (обе правки идут в одну сторону -- делают
