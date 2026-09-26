@@ -1,7 +1,7 @@
-=== NL-хост: почему перезагрузился, снято 2026-09-26T04:59:58Z ===
+=== NL-хост: почему перезагрузился, снято 2026-09-26T05:01:14Z ===
 --- сейчас и с какого времени работает ---
-2026-09-26T05:00:00Z
-up 3 weeks, 1 day, 12 hours, 32 minutes
+2026-09-26T05:01:16Z
+up 3 weeks, 1 day, 12 hours, 33 minutes
          system boot  2026-09-03 18:27
 --- последние загрузки и выключения ---
 reboot   system boot  6.8.0-71-generic Thu Sep  3 18:27   still running
@@ -11,7 +11,7 @@ wtmp begins Thu Sep  3 18:27:40 2026
 wtmp begins Thu Sep  3 18:27:40 2026
 --- список загрузок systemd ---
 IDX BOOT ID                          FIRST ENTRY                  LAST ENTRY
-  0 ec7fbedc0b724fad9fa2ad7911d2fd48 Thu 2026-09-03 18:27:41 CEST Sat 2026-09-26 06:59:59 CEST
+  0 ec7fbedc0b724fad9fa2ad7911d2fd48 Thu 2026-09-03 18:27:41 CEST Sat 2026-09-26 07:01:15 CEST
 --- хвост ПРЕДЫДУЩЕЙ загрузки: что было перед выключением ---
 --- ядро этой загрузки, первые строки ---
 Sep 03 18:27:41 ubuntu kernel: Linux version 6.8.0-71-generic (buildd@lcy02-amd64-053) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #71-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 22 16:52:38 UTC 2025 (Ubuntu 6.8.0-71.71-generic 6.8.12)
@@ -108,11 +108,6 @@ Sep 26 06:58:33 claude-nl systemd[1]: Stopped user@0.service - User Manager for 
 Sep 26 06:58:33 claude-nl systemd[1]: Stopping user-runtime-dir@0.service - User Runtime Directory /run/user/0...
 Sep 26 06:58:33 claude-nl systemd[1]: Stopped user-runtime-dir@0.service - User Runtime Directory /run/user/0.
 --- входы и sudo в это окно ---
-2026-09-26T06:55:19.135180+02:00 claude-nl sshd[1312070]: Accepted publickey for root from 20.171.123.132 port 34843 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
-2026-09-26T06:55:19.136718+02:00 claude-nl sshd[1312070]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
-2026-09-26T06:55:21.222617+02:00 claude-nl sshd[1312119]: Accepted publickey for root from 20.171.123.132 port 34841 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
-2026-09-26T06:55:21.223919+02:00 claude-nl sshd[1312119]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
-2026-09-26T06:56:01.843016+02:00 claude-nl CRON[1312200]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
 2026-09-26T06:57:01.662770+02:00 claude-nl CRON[1312217]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
 2026-09-26T06:57:01.663159+02:00 claude-nl CRON[1312218]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
 2026-09-26T06:58:01.666926+02:00 claude-nl CRON[1312279]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
@@ -123,8 +118,55 @@ Sep 26 06:58:33 claude-nl systemd[1]: Stopped user-runtime-dir@0.service - User 
 2026-09-26T06:59:59.618168+02:00 claude-nl sshd[1312500]: Accepted publickey for root from 172.212.165.177 port 49164 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
 2026-09-26T06:59:59.619491+02:00 claude-nl sshd[1312500]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
 2026-09-26T06:59:59.654078+02:00 claude-nl (systemd): pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T07:00:01.118952+02:00 claude-nl CRON[1312612]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T07:01:01.217694+02:00 claude-nl CRON[1312673]: pam_unix(cron:session): session opened for user bot(uid=1000) by bot(uid=0)
+2026-09-26T07:01:15.434327+02:00 claude-nl sshd[1312688]: Accepted publickey for root from 172.174.165.226 port 60437 ssh2: ED25519 SHA256:j+Zi/tuVUix4S4pcUaqAnrvcCf0vvtYOrF8NJAwxinc
+2026-09-26T07:01:15.435704+02:00 claude-nl sshd[1312688]: pam_unix(sshd:session): session opened for user root(uid=0) by root(uid=0)
+2026-09-26T07:01:15.466753+02:00 claude-nl (systemd): pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)
+--- что ставил apt и когда (история пакетов) ---
+Start-Date: 2026-09-25  06:18:34
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-09-25  06:18:35
+Start-Date: 2026-09-25  06:18:37
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-09-25  06:18:38
+Start-Date: 2026-09-25  06:18:40
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-09-25  06:18:40
+Start-Date: 2026-09-25  06:18:41
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-09-25  06:18:43
+Start-Date: 2026-09-26  06:53:40
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.13, 8.5.0-2ubuntu10.15), libcurl4t64:amd64 (8.5.0-2ubuntu10.13, 8.5.0-2ubuntu10.15), curl:amd64 (8.5.0-2ubuntu10.13, 8.5.0-2ubuntu10.15)
+End-Date: 2026-09-26  06:53:41
+Start-Date: 2026-09-26  06:53:45
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: libexpat1:amd64 (2.6.1-2ubuntu0.5, 2.6.1-2ubuntu0.6), libexpat1-dev:amd64 (2.6.1-2ubuntu0.5, 2.6.1-2ubuntu0.6)
+End-Date: 2026-09-26  06:53:45
+--- автообновления сегодня ---
+2026-09-26 06:53:36,828 INFO Starting unattended upgrades script
+2026-09-26 06:53:36,829 INFO Allowed origins are: o=Ubuntu,a=noble, o=Ubuntu,a=noble-security, o=UbuntuESMApps,a=noble-apps-security, o=UbuntuESM,a=noble-infra-security
+2026-09-26 06:53:36,829 INFO Initial blacklist: 
+2026-09-26 06:53:36,829 INFO Initial whitelist (not strict): 
+2026-09-26 06:53:39,624 INFO Packages that will be upgraded: curl libcurl3t64-gnutls libcurl4t64 libexpat1 libexpat1-dev
+2026-09-26 06:53:39,624 INFO Writing dpkg log to /var/log/unattended-upgrades/unattended-upgrades-dpkg.log
+2026-09-26 06:54:03,174 INFO All upgrades installed
+total 68
+-rw-r--r-- 1 root adm  38663 Sep 26 06:54 unattended-upgrades-dpkg.log
+-rw-r--r-- 1 root root     0 Sep  3 18:27 unattended-upgrades-shutdown.log
+-rw-r--r-- 1 root root 19483 Sep 26 06:54 unattended-upgrades.log
+--- needrestart и dpkg в окно 06:40-07:00 ---
+Sep 26 06:53:36 claude-nl systemd[1]: Starting apt-daily-upgrade.service - Daily apt upgrade and clean activities...
+Sep 26 06:53:39 claude-nl apt.systemd.daily[1310848]: /usr/bin/unattended-upgrade:567: DeprecationWarning: This process (pid=1310848) is multi-threaded, use of fork() may lead to deadlocks in the child.
+Sep 26 06:53:39 claude-nl apt.systemd.daily[1310848]:   pid = os.fork()
+Sep 26 06:53:44 claude-nl apt.systemd.daily[1310848]: /usr/bin/unattended-upgrade:567: DeprecationWarning: This process (pid=1310848) is multi-threaded, use of fork() may lead to deadlocks in the child.
+Sep 26 06:53:44 claude-nl apt.systemd.daily[1310848]:   pid = os.fork()
+Sep 26 06:54:03 claude-nl systemd[1]: apt-daily-upgrade.service: Deactivated successfully.
+Sep 26 06:54:03 claude-nl systemd[1]: Finished apt-daily-upgrade.service - Daily apt upgrade and clean activities.
+Sep 26 06:54:03 claude-nl systemd[1]: apt-daily-upgrade.service: Consumed 10.403s CPU time, 439.3M memory peak, 0B memory swap peak.
 --- память и OOM в этой загрузке ---
                total        used        free      shared  buff/cache   available
-Mem:            3916         763         186          17        3253        3152
+Mem:            3916         792         151          17        3259        3123
 Swap:              0           0           0
 1
