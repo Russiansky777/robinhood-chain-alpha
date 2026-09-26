@@ -982,9 +982,14 @@ def собрать(*, tx_источника: dict, источник: str, мин
         из_["too_big"] = True
         return из_
     if нативная:
-        # На кривой предел траты -- сам аргумент инструкции: программа не даст
-        # заплатить больше. В запись кладём и его, и сколько дойдёт до кривой.
-        из_["max_sol_cost_lamports"] = int(лампорты)
+        # У кривой две разновидности инструкции, и предел траты в них выражен
+        # по-разному: у "точного выхода" это второй аргумент (предел), у
+        # "точного входа" -- первый (сама трата). Трата в обоих случаях ровно
+        # наша, поэтому пишем и её, и то, сколько дойдёт до кривой.
+        из_["spend_lamports"] = int(лампорты)
+        из_["curve_exact_out"] = bool(tpl.get("exact_out"))
+        if tpl.get("exact_out"):
+            из_["max_sol_cost_lamports"] = int(лампорты)
         из_["sol_to_curve_lamports"] = мо.get("sol_to_curve")
     из_.update(ok=True, min_out=мо["min_out"], expected_out=мо.get("expected_out"),
                nonce_account=(str(нонс[0]) if нонс else None),
@@ -3359,11 +3364,15 @@ def self_test() -> int:
             chk("кривая pump.fun по флагу -- собрана, минимум положителен",
                 вкл["ok"] is True and isinstance(вкл.get("min_out"), int) and вкл["min_out"] > 0,
                 вкл)
-            chk("кривая: предел траты равен нашей трате, до кривой доходит меньше "
-                "(остальное -- комиссии программы)",
-                вкл.get("max_sol_cost_lamports") == ЛАМП_КР
+            предел_ок = (вкл.get("max_sol_cost_lamports") == ЛАМП_КР
+                         if вкл.get("curve_exact_out") else
+                         вкл.get("max_sol_cost_lamports") is None)
+            chk("кривая: трата ровно наша, до кривой доходит меньше "
+                "(остальное -- комиссии программы), предел по разновидности",
+                вкл.get("spend_lamports") == ЛАМП_КР and предел_ок
                 and 0 < int(вкл.get("sol_to_curve_lamports") or 0) < ЛАМП_КР,
-                {к: вкл.get(к) for к in ("max_sol_cost_lamports", "sol_to_curve_lamports")})
+                {к: вкл.get(к) for к in ("spend_lamports", "curve_exact_out",
+                                          "max_sol_cost_lamports", "sol_to_curve_lamports")})
             сыр_кр = base64.b64decode(вкл["tx_base64"]) if вкл.get("tx_base64") else b""
             chk("кривая: обёртки SOL в транзакции нет, котировка нативная, размер в пределе",
                 вкл.get("native_quote") is True and C_ж.WSOL.encode() not in сыр_кр

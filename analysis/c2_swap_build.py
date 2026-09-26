@@ -67,6 +67,22 @@ CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
 # как у Launchlab. Раскладка 18 счетов установлена по 5 настоящим покупкам
 # в data/c2_pool_samples/6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P.json.
 BONDING = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+# РАЗНОВИДНОСТИ ИНСТРУКЦИИ КРИВОЙ. Имён у них мы не знаем (перебор
+# sha256("global:<имя>") по сотням правдоподобных имён ничего не дал), и
+# выдумывать их не стали: дискриминатор берётся из НАСТОЯЩЕЙ сделки источника и
+# переносится в нашу сборку как есть. Значение аргументов установлено по живым
+# сделкам, а не по документации:
+#   66063d1201daebea -- 18 счетов, "точный выход": (сколько токенов, предел SOL);
+#   38fc74089edfcd5f -- 18 счетов, ТОТ ЖЕ порядок счетов, но "точный вход":
+#     (сколько лампортов тратим, минимум токенов). Проверено на трёх живых
+#     сделках: первый аргумент был ровно 50 000 000 = 0.05 SOL, а событие
+#     сделки дало sol_amount + комиссии = ровно этот аргумент.
+# Замер 26.09 05:0xZ: из 37 свежих сигналов кривой 31 -- 38fc7408, 5 -- вариант
+# с котировкой НЕ в SOL (27 счетов), 1 -- ещё один (26 счетов), buy -- НИ ОДНОГО.
+BONDING_DISCS = {
+    "66063d1201daebea": {"exact_out": True},
+    "38fc74089edfcd5f": {"exact_out": False},
+}
 # Пулы, где направление задаётся тем, в какое хранилище пришла котировка:
 # индексы входа/выхода пользователя, хранилищ a/b, их минтов и программ токена.
 DYN = {
@@ -173,6 +189,20 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
         if ix.get("programId") != program or pool_vault not in ix["accounts"]:
             continue
         data = b58decode(ix["data"])
+        # КРИВАЯ: разновидность узнаём по дискриминатору настоящей сделки, а не
+        # по имени. Неизвестный дискриминатор -- отказ с ним же в причине.
+        if program == BONDING:
+            ключ = data[:8].hex()
+            вид = BONDING_DISCS.get(ключ)
+            if вид is None:
+                return {"ok": False, "why_not": f"разновидность инструкции кривой не известна: {ключ}"}
+            if spec["n_accounts"] is not None and len(ix["accounts"]) != spec["n_accounts"]:
+                return {"ok": False,
+                        "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
+            a0_, a1_ = struct.unpack("<QQ", data[8:24])
+            return {"ok": True, "program": program, "ix": ключ, "accounts": list(ix["accounts"]),
+                    "data": data, "arg0": a0_, "arg1": a1_, "writable": writable_map(tx),
+                    "signers": sorted(C.signers(tx)), "exact_out": bool(вид["exact_out"])}
         name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output", "swap")
                      if data[:8] == disc(n)), data[:8].hex())
         if data[:8] != want and name not in spec["alt"]:
@@ -293,6 +323,13 @@ def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
         data = tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:]
     else:                # наша сборка: основная инструкция типа, два u64 (+ хвост источника,
                          # у Launchlab это share_fee_rate u64)
+        if tpl["program"] == BONDING:
+            # Дискриминатор -- ИЗ СДЕЛКИ ИСТОЧНИКА: имени разновидности мы не
+            # знаем, а угадывать его на деньгах нельзя. Хвост (у части сделок
+            # один лишний байт) переносится как есть.
+            return Instruction(Pubkey.from_string(tpl["program"]),
+                               tpl["data"][:8] + struct.pack("<QQ", arg0, arg1) + tpl["data"][24:],
+                               metas)
         ix_name = tpl["ix"] if tpl["program"] == DLMM else SPECS[tpl["program"]]["ix"]
         data = disc(ix_name) + struct.pack("<QQ", arg0, arg1)
         if SPECS[tpl["program"]].get("tail") and not (tpl["program"] == DLMM and ix_name == "swap"):
@@ -395,7 +432,9 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
 
     if tip and tip_first:
         ixs += _чаевые_инструкции(tip)
-    if SPECS[tpl["program"]].get("exact_out"):
+    точный_выход = (tpl.get("exact_out") if tpl.get("exact_out") is not None
+                    else SPECS[tpl["program"]].get("exact_out"))
+    if точный_выход:
         # «Точный выход»: программа сама считает цену наших min_out токенов и
         # отказывается, если она выше amount_in. То есть оба денежных предела --
         # минимум токенов и максимум траты -- стоят в одной инструкции.
@@ -550,7 +589,15 @@ def pump_trade_event(tx: dict, mint: str | None = None) -> dict | None:
         if is_buy != 1 or sol <= 0 or tok <= 0 or vs <= sol or vt <= 0:
             continue
         vs0, vt0 = vs - sol, vt + tok
-        if vt0 * sol // (vs0 + sol) != tok:            # событие не про эту кривую
+        # ПРОВЕРКА ЗДЕСЬ ЛОВИТ НЕ ТУ РАСКЛАДКУ, А НЕ ОКРУГЛЕНИЕ ПРОГРАММЫ.
+        # У разновидности "точный выход" формула воспроизводит выход ТОЧНО
+        # (отклонение 0 на пяти сделках), у "точного входа" -- с отклонением
+        # 2e-8 (13 163 токена из 650 млрд, замер 26.09): целочисленная
+        # арифметика программы округляет иначе. Требовать бит в бит значит
+        # отказываться от живой разновидности; поэтому допуск 1e-6, а неверная
+        # раскладка даёт расхождение на порядки и всё равно не проходит.
+        пред = vt0 * sol // (vs0 + sol)
+        if tok <= 0 or abs(пред - tok) > max(1, tok // 1_000_000):
             continue
         if -(-sol * fee_bps // 10_000) != fee or -(-sol * cr_bps // 10_000) != cr_fee:
             continue                                   # поля комиссий не на месте
@@ -601,6 +648,21 @@ def bonding_min_out(tx: dict, mint: str | None, amount_in: int, slippage: float)
 def load_samples(program: str) -> list:
     p = SAMPLES_DIR / f"{program}.json"
     own = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+    if program == BONDING:
+        # Живые разновидности инструкции кривой лежат отдельным файлом: их
+        # собрал прогон проверки симуляцией с настоящих сигналов.
+        вар = C.DATA / "c2_curve_variant_samples.json"
+        if вар.exists():
+            д = json.loads(вар.read_text(encoding="utf-8"))
+            for ключ, лист in д.items():
+                if ключ not in BONDING_DISCS:
+                    continue
+                for x in лист:
+                    if x.get("pool_vault") and x.get("mint") and x.get("tx"):
+                        own.append({"source": x.get("source"), "mint": x["mint"],
+                                    "pool_vault": x["pool_vault"], "quote_mint": None,
+                                    "tx": x["tx"]})
+        return own
     if program not in (DLMM, CLMM):
         return own
     # DLMM и CLMM встречаются и как шаг чужих маршрутов (SOL -> xStock и т.п.)
@@ -741,15 +803,22 @@ def self_test() -> int:
                    f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
     # ---- кривая pump.fun: только денежный путь (цена, минимум, предел траты)
     pf_n = pf_exact = 0
+    pf_откл = []
     for s in load_samples(BONDING):
         ev = pump_trade_event(s["tx"], s.get("mint"))
         if not ev:
             continue
         pf_n += 1
         vs0, vt0 = ev["virtual_before"]
-        pf_exact += (vt0 * ev["sol_amount"] // (vs0 + ev["sol_amount"])) == ev["token_amount"]
-    checks.append((f"кривая pump.fun: событие воспроизводит сделку источника токен в токен "
-                   f"({pf_exact} из {pf_n})", pf_n >= 4 and pf_exact == pf_n))
+        пред = vt0 * ev["sol_amount"] // (vs0 + ev["sol_amount"])
+        pf_exact += пред == ev["token_amount"]
+        pf_откл.append(abs(пред - ev["token_amount"]) / ev["token_amount"])
+    # Точно в токен -- у разновидности "точный выход"; у "точного входа"
+    # программа округляет иначе, и отклонение измерено, а не допущено на глаз.
+    checks.append((f"кривая pump.fun: событие воспроизводит сделку источника "
+                   f"(сделок {pf_n}, точно в токен {pf_exact}, макс. отклонение "
+                   f"{max(pf_откл) if pf_откл else None})",
+                   pf_n >= 6 and pf_exact >= 5 and pf_откл and max(pf_откл) < 1e-6))
     # Трата: подбор до кривой обязан быть ПЛОТНЫМ снизу и не вылезать сверху.
     tight = []
     for bps, cbps in ((95, 30), (100, 0), (0, 0), (500, 250)):
@@ -772,7 +841,11 @@ def self_test() -> int:
             continue
         kp = Keypair()
         me = str(kp.pubkey())
-        ix = swap_instruction(tpl, s["tx"], me, mo["min_out"], 10_000_000)
+        # Порядок аргументов -- по разновидности: "точный выход" это
+        # (минимум токенов, предел траты), "точный вход" -- (трата, минимум).
+        ожид = ((mo["min_out"], 10_000_000) if tpl.get("exact_out")
+                else (10_000_000, mo["min_out"]))
+        ix = swap_instruction(tpl, s["tx"], me, ожид[0], ожид[1])
         got = [str(m.pubkey) for m in ix.accounts]
         подставлено = {i for i, (g, w) in enumerate(zip(got, tpl["accounts"])) if g != w}
         args = struct.unpack("<QQ", bytes(ix.data)[8:24])
@@ -780,16 +853,32 @@ def self_test() -> int:
                       min_out=mo["min_out"], cu_price_micro=10_000, tip=None)
         raw = base64.b64decode(b["tx_base64"])
         pf_build.append((s.get("mint"), подставлено == {5, 6, 13}
-                         and args == (mo["min_out"], 10_000_000)
-                         and bytes(ix.data)[:8] == disc("buy")
+                         and args == ожид
+                         and bytes(ix.data)[:8].hex() in BONDING_DISCS
                          and b["quote_mint"] == C.NATIVE_QUOTE
                          and C.WSOL.encode() not in raw   # обёртки SOL нет
                          and 0 < mo["min_out"] < mo["expected_out"]
                          and mo["sol_to_curve"] < 10_000_000
                          and len(ix.accounts) == 18))
-    checks.append((f"покупка на кривой: подставлены только наши 5/6/13, аргументы "
-                   f"(минимум, предел), обёртки SOL нет ({sum(1 for _, o in pf_build if o)} "
+    checks.append((f"покупка на кривой: подставлены только наши 5/6/13, аргументы по "
+                   f"разновидности, обёртки SOL нет ({sum(1 for _, o in pf_build if o)} "
                    f"из {len(pf_build)})", len(pf_build) >= 4 and all(o for _, o in pf_build)))
+    # РАЗНОВИДНОСТИ: обе живые должны и извлекаться, и собираться, и данные
+    # нашей сборки при аргументах источника должны совпасть с его данными
+    # байт в байт -- это и есть доказательство, что мы поняли инструкцию.
+    по_видам: dict = {}
+    for s in load_samples(BONDING):
+        tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
+        if not tpl.get("ok"):
+            continue
+        ix_ = swap_instruction(tpl, s["tx"], tpl["accounts"][SPECS[BONDING]["user"][0]],
+                               tpl["arg0"], tpl["arg1"])
+        б = по_видам.setdefault(tpl["ix"], {"n": 0, "байт_в_байт": 0, "точный_выход": tpl["exact_out"]})
+        б["n"] += 1
+        б["байт_в_байт"] += bytes(ix_.data) == tpl["data"]
+    checks.append(("разновидности кривой: " + json.dumps(по_видам, ensure_ascii=False),
+                   len(по_видам) >= 2 and all(v["n"] == v["байт_в_байт"] for v in по_видам.values())
+                   and all(v["n"] >= 1 for v in по_видам.values())))
     # Больше траты -- больше токенов, и минимум всегда ниже ожидания.
     mono = []
     for s in load_samples(BONDING):
