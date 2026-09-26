@@ -63,12 +63,16 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Самопроверки ДО всякой цепи"
+      # ВАЖНО ПРО ПОРЯДОК. Настоящая самопроверка идёт на ХОСТЕ тем же питоном,
+      # которым пойдёт прогон (шаг ниже), и строго ДО любого обращения к цепи.
+      # Здесь только разбор файла: у системного python3 бегунка нет solders --
+      # ровно на этом 26.09 09:18 прогон и упал, и это не причина считать модуль
+      # негодным.
+      - name: "Модуль разбирается (без solders на бегунке)"
         run: |
           set -e
-          set -o pipefail
-          cd analysis
-          python3 close_empty_token_accounts.py --self-test | tail -2
+          python3 -m py_compile analysis/close_empty_token_accounts.py
+          echo "разбор ок"
 
       - name: "SSH key"
         env:
