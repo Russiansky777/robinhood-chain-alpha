@@ -659,14 +659,61 @@ class ExecState:
             прежние = {}
         if прежние.get("pnl_counted"):
             return {}
+        # ИТОГ -- ЭТО ВОЗВРАТ МИНУС ВХОД МИНУС РАСХОД НА ОТПРАВКУ, а не
+        # возврат сам по себе. Первая версия этой правки писала в счёт
+        # closed_sol_net (сколько вернулось), и на живой сделке 26.09 в
+        # 00:11:40Z это дало бы +0.012913 вместо честных +0.0009: вход 0.01 и
+        # чаевые с приоритетом в счёт не попадали. Такой счёт не просто врёт --
+        # он НИКОГДА не даст сработать стопу по убытку.
+        слитое = dict(прежние)
+        слитое.update(поля)
+        итог, расход = self.итог_позиции(слитое)
+        if итог is None:
+            return {"pnl_counted": False,
+                    "pnl_count_why_not": "вход или возврат неизвестны"}
         try:
-            self.add_pnl(realized_sol=float(чисто), sells=1)
+            self.add_pnl(realized_sol=float(итог), spent_sol=float(расход), sells=1)
         except Exception as exc:  # noqa: BLE001
             # Счёт не должен ронять закрытие позиции: позиция закрыта по цепи,
             # и это факт. Но молчать тоже нельзя -- причина уходит в запись.
             return {"pnl_counted": False,
                     "pnl_count_why_not": f"{type(exc).__name__}"}
-        return {"pnl_counted": True, "pnl_counted_sol": round(float(чисто), 9)}
+        return {"pnl_counted": True, "pnl_counted_sol": round(float(итог), 9),
+                 "pnl_counted_spend_sol": round(float(расход), 9)}
+
+    def итог_позиции(self, поз: dict) -> tuple:
+        """Итог закрытой позиции и её расход на отправку: (итог, расход).
+
+        Правило ровно то же, что у суточного счёта полосы
+        (bloom_own_send.состояние_полосы): итог = возврат - вход, а расход на
+        отправку (чаевые, приоритет, базовый тариф) вычитается ВСЕГДА, даже
+        когда сама покупка не села: с кошелька эти деньги уже ушли.
+
+        Возвращает (None, расход), если вход или возврат неизвестны: выдумывать
+        ноль нельзя -- ноль читался бы как "вышли в ноль".
+        """
+        п = поз or {}
+        расход = 0.0
+        чаевые = п.get("lane_tips_total_sol")
+        if чаевые:
+            расход += float(чаевые)
+        приоритет = п.get("lane_priority_lamports")
+        if приоритет:
+            расход += float(приоритет) / 1_000_000_000.0
+        if п.get("lane_signature") or п.get("ts_sent") or п.get("signatures"):
+            расход += 5000 / 1_000_000_000.0
+        вход = п.get("sol_in")
+        возврат = п.get("closed_sol_net")
+        if возврат is None:
+            возврат = (п.get("last_sell_outcome") or {}).get("sol_delta_net")
+        # НЕСЧИТАЕМАЯ ПАРА: количество не добралось, продажа шла по остатку
+        # кошелька. Разницу цен посчитать нечем -- в итог идёт только расход,
+        # он-то известен точно.
+        if п.get("result_uncountable"):
+            return -расход, расход
+        if not вход or возврат is None:
+            return None, расход
+        return float(возврат) - float(вход) - расход, расход
 
     def log_decision(self, row: dict) -> None:
         append_jsonl_fsync(self.decisions_path,
@@ -1013,31 +1060,69 @@ def self_test() -> None:
     # закрытая с убытком позиция -> счёт вырос -> гейт закрылся; и что повтор
     # той же записи счёт НЕ удваивает.
     сч = ExecState(base=base / "pnl_gate", kill=base / "pnl_gate" / "НЕТ")
-    сч.daily_loss_sol = 0.05
+    сч.daily_loss_sol = 0.01
     сч.write_intent(client_order_id="p1", mint="M1", source_sig="S1",
                     source_slot=1, sol_in=0.01, pool=None, program=None,
                     taxed=None, tax_bps=None, mode=MODE_LIVE, sell_after_s=28.8)
     chk("до закрытия суточный итог нулевой", сч.pnl()["realized_sol"] == 0.0)
     ок_до, _, _ = сч.can_open_detailed(balance_sol=10.0, mint="M9", source_sig="S9")
     chk("и гейт покупок открыт", ок_до is True)
-    стр = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=-0.06,
+    стр = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=0.0,
+                              lane_tips_total_sol=0.005,
+                              lane_priority_lamports=1_000_000,
+                              lane_signature="ПОДПИСЬ",
                               closed_reason="самопроверка: продажа в минус")
-    chk("закрытие с убытком учтено ровно один раз",
+    # Вход 0.01, вернулось 0.0, расход 0.005 чаевых + 0.001 приоритета +
+    # 0.000005 тарифа: итог -0.016005, а НЕ "вернулось 0".
+    chk("учтён итог, а не возврат: возврат минус вход минус расход",
         стр.get("pnl_counted") is True
-        and abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
+        and abs(сч.pnl()["realized_sol"] + 0.016005) < 1e-9,
+        (стр.get("pnl_counted_sol"), сч.pnl()))
+    chk("расход записан отдельной строкой суточного счёта",
+        abs(сч.pnl()["spent_sol"] - 0.006005) < 1e-9, сч.pnl())
     ок_после, почему_п, код_п = сч.can_open_detailed(
         balance_sol=10.0, mint="M9", source_sig="S9")
     chk("после убытка гейт закрыт дневным лимитом",
         ок_после is False and код_п == КОД_ДНЕВНОЙ_УБЫТОК, (код_п, почему_п))
-    стр2 = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=-0.06,
+    стр2 = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=0.0,
                                closed_reason="повтор той же записи")
     chk("повторная запись того же закрытия счёт НЕ удваивает",
         стр2.get("pnl_counted") is not True
-        and abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
+        and abs(сч.pnl()["realized_sol"] + 0.016005) < 1e-9, сч.pnl())
     сч.update_position("p2", state=STATE_CLOSED,
                         closed_reason="закрыта без числа итога")
     chk("закрытие без числа итога счёт не трогает",
-        abs(сч.pnl()["realized_sol"] + 0.06) < 1e-9, сч.pnl())
+        abs(сч.pnl()["realized_sol"] + 0.016005) < 1e-9, сч.pnl())
+    # ПРИБЫЛЬНАЯ ЖИВАЯ СДЕЛКА 26.09 00:11:40Z: вход 0.01, вернулось 0.012913,
+    # чаевые 0.001, приоритет 0.001, тариф 0.000005 -> итог +0.000908, а не
+    # +0.012913. Проверяем ровно эти числа: на них видно разницу между
+    # "вернулось" и "заработали".
+    сч2 = ExecState(base=base / "pnl_real", kill=base / "pnl_real" / "НЕТ")
+    сч2.write_intent(client_order_id="ж1", mint="MZ", source_sig="SZ",
+                     source_slot=3, sol_in=0.01, pool=None, program=None,
+                     taxed=None, tax_bps=None, mode=MODE_LIVE, sell_after_s=28.8)
+    стр_ж = сч2.update_position("ж1", state=STATE_CLOSED,
+                                 closed_sol_net=0.012912956,
+                                 lane_tips_total_sol=0.001,
+                                 lane_priority_lamports=1_000_000,
+                                 lane_signature="ПОДПИСЬ_Ж",
+                                 closed_reason="продажа подтверждена по цепи")
+    chk("на живых числах итог +0.000908, а не возврат +0.012913",
+        abs((стр_ж.get("pnl_counted_sol") or 0) - 0.000907956) < 1e-9,
+        стр_ж.get("pnl_counted_sol"))
+    # НЕСЧИТАЕМАЯ ПАРА: разницу цен посчитать нечем, но чаевые ушли.
+    сч2.write_intent(client_order_id="н1", mint="MN", source_sig="SN",
+                     source_slot=4, sol_in=0.01, pool=None, program=None,
+                     taxed=None, tax_bps=None, mode=MODE_LIVE, sell_after_s=28.8)
+    стр_н = сч2.update_position("н1", state=STATE_CLOSED, closed_sol_net=0.0,
+                                 result_uncountable=True,
+                                 lane_tips_total_sol=0.001,
+                                 lane_priority_lamports=1_000_000,
+                                 lane_signature="ПОДПИСЬ_Н",
+                                 closed_reason="продавать нечего")
+    chk("у несчитаемой пары в счёт идёт только расход",
+        abs((стр_н.get("pnl_counted_sol") or 0) + 0.002005) < 1e-9,
+        стр_н.get("pnl_counted_sol"))
 
     class БросаетПриПроверке:
         """Путь, проверка которого падает: права, битый монтаж, что угодно."""
