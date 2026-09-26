@@ -64,10 +64,15 @@ def main() -> int:
     for путь in а.markery:
         if not путь.endswith(".json") or not Path(путь).exists():
             continue
-        вкл.extend(пакеты(json.loads(Path(путь).read_text(encoding="utf-8"))))
+        м = json.loads(Path(путь).read_text(encoding="utf-8"))
+        пк = пакеты(м)
+        for x in пк:
+            x["_rps"] = м.get("helius_rps_na_paket")
+        вкл.extend(пк)
     # Предел Helius 10 запросов/с -- на ВСЕ одновременные задания прогона.
     for x in вкл:
-        x["helius_rps"] = str(round(10.0 / min(12, max(1, len(вкл))), 3))
+        общий = round(10.0 / min(12, max(1, len(вкл))), 3)
+        x["helius_rps"] = str(min(общий, float(x.pop("_rps") or общий)))
     строка = "matrix=" + json.dumps({"include": вкл}, ensure_ascii=True)
     print(строка)
     print(f"count={len(вкл)}")
