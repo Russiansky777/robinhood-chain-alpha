@@ -63,6 +63,16 @@ jobs:
               systemctl is-enabled unattended-upgrades 2>/dev/null || true;
               ls -l /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null || echo "просьбы перезагрузиться нет";
               tail -20 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || echo "журнала автообновлений нет";
+              echo "--- КТО остановил службы: строки самого systemd (без вывода служб) ---";
+              for U in bloom-detector bloom-seller; do
+                echo "== $U";
+                journalctl -u "$U" --since "2026-09-26 06:40:00" --until "2026-09-26 07:00:00"                   --no-pager 2>/dev/null                   | grep -E "Stopping|Stopped|Started|Starting|Scheduled restart|Deactivated|Killing|Consumed|Failed"                   | tail -12;
+              done;
+              echo "--- бегунок GitHub: что с ним было ---";
+              systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -i runner | head -5;
+              journalctl --no-pager --since "2026-09-26 06:40:00" --until "2026-09-26 07:00:00" 2>/dev/null                 | grep -iE "actions.runner|runner listener|self-update|Stopping|Reloading|systemd\[1\]: Stopped"                 | tail -25;
+              echo "--- входы и sudo в это окно ---";
+              grep -aiE "session opened|sudo:|Accepted" /var/log/auth.log 2>/dev/null                 | awk "NR>0" | tail -15;
               echo "--- память и OOM в этой загрузке ---";
               free -m | head -3;
               journalctl -k -b 0 --no-pager 2>/dev/null | grep -ci "out of memory" || true;
