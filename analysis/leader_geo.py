@@ -64,18 +64,34 @@ def _наш_слот(п: dict):
 
 def покупки(путь: Path, с_utc: str) -> list:
     """Покупки из журнала позиций с отметкой, чьи они: полосы или Bloom."""
-    из_ = []
+    # ПОЗИЦИЯ СОБИРАЕТСЯ ИЗ ВСЕХ СВОИХ СТРОК, а не берётся последняя. Журнал
+    # дописывается по шагам: слот и место в блоке приходят отдельной строкой
+    # ПОЗЖЕ, чем намерение, и "последняя запись" их как раз и не содержит.
+    # Первый прогон II.14 из-за этого показал S+0 = 0 во всех регионах, хотя в
+    # таблице полосы за ту же ночь S+0 было 12 -- это была ошибка счёта, а не
+    # свойство географии. Свёртка теперь такая же, как в lane_table.py: по
+    # client_order_id, последняя строка правит поля.
+    #
     # Журнал читается ПОТОКОМ, строка за строкой: правило владельца 25.09 --
     # журналы в память не грузить (635 МБ решений уже роняли хост).
-    ф = путь.open(encoding="utf-8", errors="replace")
-    for строка in ф:
-        строка = строка.strip()
-        if not строка:
-            continue
-        try:
-            п = json.loads(строка)
-        except json.JSONDecodeError:
-            continue
+    свёрнуто: dict = {}
+    with путь.open(encoding="utf-8", errors="replace") as ф:
+        for строка in ф:
+            строка = строка.strip()
+            if not строка.startswith("{"):
+                continue
+            try:
+                п = json.loads(строка)
+            except json.JSONDecodeError:
+                continue
+            cid = п.get("client_order_id")
+            if not cid:
+                continue
+            свёрнуто.setdefault(cid, {}).update(
+                {к: v for к, v in п.items() if v is not None})
+
+    из_ = []
+    for п in свёрнуто.values():
         когда = (п.get("ts_intent_utc") or "")
         if с_utc and когда < с_utc:
             continue
@@ -94,14 +110,7 @@ def покупки(путь: Path, с_utc: str) -> list:
             "sol_in": п.get("sol_in"),
             "state": п.get("state"),
         })
-    ф.close()
-    # В журнале позиция дописывается много раз -- берём последнюю запись
-    # по каждому client_order_id... но его тут уже нет, поэтому сворачиваем по
-    # паре (подпись источника, чья): последняя запись самая полная.
-    свёрнуто = {}
-    for з in из_:
-        свёрнуто[(з["source_sig"], з["чья"])] = з
-    return sorted(свёрнуто.values(), key=lambda з: з["когда"])
+    return sorted(из_, key=lambda з: з["когда"])
 
 
 def цель(з: dict) -> bool | None:
