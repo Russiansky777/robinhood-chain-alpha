@@ -1,22 +1,41 @@
-# Ночь 25.09: боевое и исследование (доклад собран 2026-09-25T08:14:31Z)
+# Ночь 25.09: боевое и исследование (доклад собран 2026-09-26T03:03:46Z)
 
 ## 1. Боевое
 
-**Решения по сигналам.** Покупок 10; по кодам: {"NOT_A_BUY": 242, "TOKEN_RECEIVED_NOT_BOUGHT": 120, "SKIP_TARGET_INCREASE_POSITION": 116, "TARGET_AMOUNT_OUT_OF_RANGE": 105, "BUY": 10, "SKIPPED_DUP_MINT": 2, "SKIP_TAXED_ROUTE": 2, "THRESHOLD_EDGE": 1}.
+**Решения по сигналам.** Покупок 78; по кодам: {"NOT_A_BUY": 5222, "TARGET_AMOUNT_OUT_OF_RANGE": 2367, "TOKEN_RECEIVED_NOT_BOUGHT": 573, "KILL_SWITCH": 311, "SKIP_TARGET_INCREASE_POSITION": 185, "BUY": 78, "SKIPPED_DUP_MINT": 73, "AMBIGUOUS_TX": 53, "MAX_BUY_TIMES_PER_TOKEN_REACHED": 38, "SKIP_TAXED_ROUTE": 17, "STALE": 6, "THRESHOLD_EDGE": 3, "MAX_OPEN_POSITIONS": 1}.
 
-**Полоса своей отправки.** Путей 5, отправлено 1, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 1, закрыто 1, UNSOLD 0. Итог по закрытым: — (по 0 сделкам). Медиана от отправки до появления в потоке: 781.09 мс.
-**ПОЛОСА ОСТАНОВЛЕНА РУБИЛЬНИКОМ.** полоса остановлена: 2026-09-25T05:18:48Z raskhozhdenie ucheta ostatka: polosa kupila 3453513816 raw minta 571aBZbC, a k prodazhe ostatok minta byl 0 -- avtoprodazha Bloom cherez 28.8 s prodala ves balans koshelka vmeste s nashimi tokenami; itog polosy poschitat nechem. Bez vladeltsa ne chinit. Снимать -- только владельцу; Bloom, сторож продаж и тень работают.
-Где путь останавливался: build -- 3, sent -- 1, lane_seen -- 1. Причины: котировка пула не SOL -- полоса только одношаговая (3).
+**Полоса своей отправки.** Путей 78, отправлено 18, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 18, закрыто 18, UNSOLD 0. Итог по закрытым: 0.019045802 SOL (по 17 сделкам). Медиана от отправки до появления в потоке: —.
+Рубильник полосы не взведён: полоса отправляет, если сигнал подходит.
+Где путь останавливался: gate -- 8, build -- 52, sent -- 18. Причины: предел полосы: открытых позиций полосы 1 при пределе 1 (8); котировка пула не SOL -- полоса только одношаговая (20); тип пула вне полосы: cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG (6); тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P (16); тип пула вне полосы: LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo (2); тип пула вне полосы: dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN (1); тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj (4); тип пула вне полосы: CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK (1); тип пула вне полосы: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8 (1); тип пула вне полосы: FUTARELBfJfQ8RDGhg1wdhddq1odMAJUePHFuBYfUxKq (1).
 
-**Пары «Bloom против нашей».** Пар 1, из них мы раньше 0; медиана разницы -11.4 мс (плюс -- мы раньше).
+**Пары «Bloom против нашей».** Пар 0, из них мы раньше 0; медиана разницы — (плюс -- мы раньше).
 
-**Тень.** Записей 96, по вердиктам: {"would_pass": 28, "нет вердикта": 68}. Медиана сборки 0.83 мс, симуляции 15.9 мс.
-Кэш ног двухшаговой тени: включён, котировочных пулов 4, шаблонов 4, скормлено 41080, кредитов 18600 из 30000.
+**Слоты и места в блоке.**
+| исполнитель | сделок со слотами | В ЦЕЛИ (S+0 или голова S+1) | S+0 | S+1 | S+2 | S+3 и дальше | медиана отставания | медиана места | медиана доли места |
+|---|---|---|---|---|---|---|---|---|---|
+| bloom | 70 | 0.5571 (39 из 70) | 0.4286 | 0.5714 | 0.0 | 0.0 | 1.0 | 480.5 | 0.38 |
+| lane | 0 | — (0 из 0) | — | — | — | — | — | — | — |
 
-**Узкий фильтр по налогу маршрута.** Пропусков 2, тень измерила 0: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 0 (фильтр отнял), неизвестна в 2. Оценка сбережённого при размере 0.2 SOL: —.
-Почему цена неизвестна: ближайшая сделка через 2140.2 с после цели -- дальше допуска 2.0 с; сделок на эту точку и позже нет.
+Цель по месту (слово владельца 25.09): S+0 в ЛЮБОМ месте блока или голова S+1 -- место не дальше сотого. Пары S+1 без известного места в знаменатель не идут: отсутствие места -- это не промах.
 
-**Разложение закрытых сделок с 2026-09-24T00:00:00Z.** Сделок 28, сумма итога -0.025437211 SOL, медиана -0.0 SOL. По каждой сделке в JSON: налог в SOL (и откуда взята ставка), комиссия Bloom, чаевые обработчику, приоритет, комиссия сети и остаток. Комиссия пула НЕ посчитана: ставки bps по программе пула нет ни в кэше, ни в репозитории, поэтому остаток -- это ход цены минус комиссия пула.
+**Итог по цепи.**
+| исполнитель | сделок в счёте | итог, SOL | итог, % от вложенного | итог несчитаем |
+|---|---|---|---|---|
+| bloom | 70 | -0.096629433 | -7.549 % | 0 |
+| lane | 1 | 0.002637062 | 26.371 % | 17 |
+
+**Запасной канал logsSubscribe.** Переходов 0, возвратов 0, обрывов 2; на запасном 0 с; наибольшая доля за час 0.0; по причинам: {"соединение закрыто: ConnectionClosedError": 2}. По счётчикам службы: {"switches_total": 0, "switches_short": 0, "seconds_total": 0.0, "hour_switches": 0, "hour_seconds": 0.0, "on_fallback_now": false, "report_threshold_s": 30.0, "silent_ticks": 4049, "tick_s": 2.0, "breaks_by_reason": {"соединение закрыто: ConnectionClosedError": 2}}.
+
+**Контроль доставки (З2).** Пар с контролем 0; медиана доставки покупки —, контроля по лучшему пути —; разница — -> —.
+Кто довозит быстрее (медиана доставки пустой транзакции): данных пока нет. Покупки полосы довозил: blockrazor x5, nozomi x5, astralane x6, helius x2.
+
+**Тень.** Записей 3076, по вердиктам: {"нет вердикта": 1137, "would_pass": 1937, "slippage": 1, "other_error": 1}. Медиана сборки 0.84 мс, симуляции 14.8 мс.
+Кэш ног двухшаговой тени: выключен, котировочных пулов —, шаблонов 0, скормлено —, кредитов — из —.
+
+**Узкий фильтр по налогу маршрута.** Пропусков 17, тень измерила 1: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 1 (фильтр отнял), неизвестна в 16. Оценка сбережённого при размере 0.2 SOL: -0.03656 SOL.
+Почему цена неизвестна: ближайшая сделка через 3.2 с после цели -- дальше допуска 2.0 с; ближайшая сделка через 5.2 с после цели -- дальше допуска 2.0 с; сделок на эту точку и позже нет; хранилища минта в транзакции нет -- пул не выделить; хранилище не встречается в счетах инструкций DEX.
+
+**Разложение закрытых сделок с 2026-09-24T00:00:00Z.** Сделок 87, сумма итога -0.077583631 SOL, медиана -0.0 SOL. По каждой сделке в JSON: налог в SOL (и откуда взята ставка), комиссия Bloom, чаевые обработчику, приоритет, комиссия сети и остаток. Комиссия пула НЕ посчитана: ставки bps по программе пула нет ни в кэше, ни в репозитории, поэтому остаток -- это ход цены минус комиссия пула.
 
 ## Ответы на вопросы владельца (числа)
 
@@ -368,104 +387,153 @@ Bloom, сторож продаж и тень работают как раньш�
 Теперь по каждому пропуску пишутся `price_s1_why_not` и `price_288_why_not`, и в
 тексте есть строка с причинами.
 
+## Решения владельца 25.09 — исполнение
+
+### Пункт 2. Пара 05:11Z: противоречия нет, это две разные точки отсчёта
+
+`lane_pair_delta_ms = t(видно Bloom) − t(видно наша)` — обе величины с **одних
+часов нашего узла**, это единственное честное сравнение. −11.4 мс = наша
+появилась позже.
+
+«От решения до потока» у каждой стороны считается **от своего нуля**
+(`ts_intent` своей позиции): у Bloom он ставится в момент решения, у полосы —
+внутри `отправить()`, то есть уже после сборки и симуляции. Арифметика сходится:
+759.39 (Bloom) − 700.32 (мы) = 59.07 мс кажущегося опережения, при реальном
+отставании 11.4 мс, значит наш ноль наступил на **70.5 мс позже**. Это и есть
+путь полосы до резервирования позиции: сборка 0.745 мс + **симуляция 52.95 мс** +
+служебное.
+
+Починено: обе стороны теперь пишут в позицию `signal_recv_ts` — время прихода
+сигнала источника на наш узел, и в строке пары и в журнале стоят
+`lane_from_signal_ms` / `bloom_from_signal_ms` от этого **единого нуля**.
+Самопроверка требует, чтобы их разность совпадала с разницей пары.
+
+Место в блоке у полосы не добиралось **никогда**: кандидат на добор брался по
+`signatures[0]`, а у полосы подпись лежит в `lane_signature` (своя отправка не
+идёт через площадку). Тоже починено, вместе с добором `chain_ok`.
+
+### Пункт 3. Сделка 571aBZbC: обвала никто не устраивал, это была толпа
+
+Разбор по цепи (`data/trade_forensics.json`, 51 кредит): пул
+`Ap8KXaPujEb9341pecDMJLV9Lhp7aFY5KkNKthLsc7DS`, окно 90 слотов от покупки
+источника (450254305).
+
+| величина | значение |
+|---|---|
+| транзакций пула в окне | **4881** за 90 слотов (~36 с), то есть ~54 на слот |
+| из 24 прочитанных (края окна) | 6 продаж, 3 покупки, **20 упавших** |
+| запас WSOL в пуле | 217.565 → 164.777 SOL (**−24.3 %**) |
+| запас минта в пуле | 83.58 млн → 108.40 млн (**+29.7 %**) |
+| цена пула (WSOL/минт) | 2.603e-6 → 1.520e-6 (**−41.6 %**) |
+| ликвидность снимали? | **нет**: в пуле осталось 164.8 SOL |
+| продал ли источник | **да, но позже нас**: слот 450254843 (538 слотов ≈ 3.6 мин после своей покупки), продал весь объём 8 888 329.32 |
+
+Наша продажа прошла примерно на слоте 450254378 — то есть **за ~465 слотов до
+продажи источника**. Источник на нас не сливал.
+
+Что видно в первом же слоте источника (450254305): чужая покупка на 4.87 SOL,
+чужая продажа на 1.06 SOL и покупка `7JVQMwRj…` — того самого снайпера из
+разбора PICKAXE — на 0.0095 SOL.
+
+Откуда −61 % при движении пула −41.6 %: мы вошли по 2.896e-6 против цены пула
+2.603e-6, то есть **на 11 % выше середины** (проскальзывание и сбор на входе),
+дальше 1 % Bloom на сторону, 0.002 SOL чаевых на сторону (это ещё 2 % от 0.2 SOL)
+и проскальзывание на выходе в падающий и тонкий стакан. Отдельная деталь: на
+выходе продавались и токены полосы в том же ордере, то есть объём продажи был
+больше расчётного.
+
 ## P1 (тень против Bloom)
 ```json
 {
   "ok": true,
-  "built_utc": "2026-09-25T08:14:30Z",
+  "built_utc": "2026-09-26T03:00:52Z",
   "pickaxe": {
-    "ok": true,
-    "client_order_id": "7b11a2d6f2284e50a6d9e275f9e2b824",
-    "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
-    "ts_intent_utc": "2026-09-25T00:31:53Z",
-    "source_sig": "2Nm7Ef1QUsoAZ8AUvC4d34oNbtEuZqbLfL8vy8ihVSv9dRyPZbz4umEsY4TV9r1FDTbw4cdrapKs7pyP7Vj3qtcA",
-    "bloom_signature": "2Vs5qv9V2HVhbNzd5sMzgfqLFZ37SxbbMDUBjm6a6PaFkX6N6m8BGgzEePAp4uvdiwQvV8E2UaCorAktn2Lo5fCS",
-    "chain_ok": true,
-    "bloom_route": {
-      "programs": "Raydium AMM v4,Orca Whirlpool,Raydium CPMM",
-      "direct": false,
-      "hops_by_mints": 1
-    },
-    "collected": false,
-    "why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
-    "shadow_route": "one_hop",
-    "shadow_pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
-    "shadow_pool_label": "Raydium CPMM",
-    "shadow_sim_verdict": null,
-    "shadow_build_ms": null,
-    "shadow_expected_out_raw": null,
-    "shadow_min_out_raw": null,
-    "shadow_why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
-    "route_agrees_with_bloom": null,
-    "bloom_bought_raw": null,
-    "diff_pct": null,
-    "verdict_ours": null,
-    "pct_note": "тень посчитана без комиссии Bloom и без налога токена на перевод -- Bloom bought_raw их уже несёт, поэтому diff_pct показывает разницу С УЧЁТОМ них, а не чистую разницу цены пула"
+    "ok": false,
+    "signature": "2Vs5qv9V2HVhbNzd5sMzgfqLFZ37SxbbMDUBjm6a6PaFkX6N6m8BGgzEePAp4uvdiwQvV8E2UaCorAktn2Lo5fCS",
+    "why_not": "позиции с подписью Bloom 2Vs5qv9V2HVhbNzd5sMzgfqLFZ37SxbbMDUBjm6a6PaFkX6N6m8BGgzEePAp4uvdiwQvV8E2UaCorAktn2Lo5fCS нет в positions.jsonl (каталог прочитан, такой подписи нет)"
   },
   "summary": {
     "since": "2026-09-24T00:00:00Z",
     "state_dir": "/tmp/night_state",
     "positions_why_not": null,
     "shadow_why_not": null,
-    "excluded_not_bloom_lane_or_dry": 1,
+    "excluded_not_bloom_lane_or_dry": 18,
     "excluded_before_since": 1,
-    "total_bloom_trades": 33,
-    "collected": 3,
-    "collected_share": 0.0909,
-    "with_diff_pct": 1,
-    "median_diff_pct": 6.028
+    "total_bloom_trades": 77,
+    "collected": 29,
+    "collected_share": 0.3766,
+    "with_diff_pct": 21,
+    "median_diff_pct": 1897.578
   },
   "rows": [
     {
-      "client_order_id": "a6ef989063f7425aa670b0d5ec8bcbf2",
-      "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
-      "ts_intent_utc": "2026-09-24T00:07:05Z",
-      "source_sig": "23SefhJsSQ79XfNSYzSzjptCZQSZNXyVtp4ZR7E5aWKmPEJCewrfyBGCZFRwYU8yxJC2GFaZujNtD6DsSFLMCqZh",
-      "bloom_signature": "4jPfUpVAWTd46yFaVHqKVxLkojPPA4YV7UN9JHaK2eh4HoFReZMUAbKzoyqY55TRkJTbBNnkEiFp5tNxyinxAbPE",
+      "client_order_id": "debda48f365c4f4da62bbd1fc7a3c60d",
+      "mint": "C2WtD354XEvS9gzpJDLqzqkADq7wUtmJg1UzUdmL5a21",
+      "ts_intent_utc": "2026-09-25T22:04:45Z",
+      "source_sig": "4xn3Akhjs7dDNMiP6zQeGwMMKQftGHCxKFwRY35JSmuXJLK4hthGWUwatuxPDbCoAmoL2wXvvB9qYbzhSt5j3y36",
+      "bloom_signature": "5Wkyksgkfup5QB2ArPZj8M5ZzZ2wo8MpG9z2K2XoRS8WnikYs7teHujB5dUKQUfR7JjEuZeeSfpJp3NavJpF1HpY",
       "chain_ok": true,
       "bloom_route": {
-        "programs": "Raydium AMM v4,Orca Whirlpool",
+        "programs": "Raydium AMM v4,Orca Whirlpool,Raydium CPMM",
         "direct": false,
         "hops_by_mints": 1
       },
       "collected": false,
-      "why_not": "тени нет: в decisions.jsonl нет строки stage=shadow по подписи источника этой покупки",
-      "shadow_route": null,
-      "shadow_pool_program": null,
-      "shadow_pool_label": null,
+      "why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
+      "shadow_route": "one_hop",
+      "shadow_pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "shadow_pool_label": "Raydium CPMM",
       "shadow_sim_verdict": null,
       "shadow_build_ms": null,
       "shadow_expected_out_raw": null,
       "shadow_min_out_raw": null,
-      "shadow_why_not": null,
+      "shadow_why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
       "route_agrees_with_bloom": null,
-      "bloom_bought_raw": null,
+      "bloom_bought_raw": 7533489517,
       "diff_pct": null,
       "verdict_ours": null,
       "pct_note": "тень посчитана без комиссии Bloom и без налога токена на перевод -- Bloom bought_raw их уже несёт, поэтому diff_pct показывает разницу С УЧЁТОМ них, а не чистую разницу цены пула"
     },
     {
-      "client_order_id": "27b4f0ca2d604288a2d597aa3c84bf28",
-      "mint": "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
-      "ts_intent_utc": "2026-09-24T00:21:06Z",
-      "source_sig": "2r7o2xMzvhQKDT2EABSsCvUqF46jHCB94RfLHYViU3XRkKkWyKyGPjRvSE8jM6ETk4kTdJJnjGKggncEr2NUtga",
-      "bloom_signature": "5Pf6CNG64mBCDdTyB8ZkhSpZ6fk64TU3xwxpnmBPayHh5KEAeRZbUVHq5FELy76532jygM6XHxGY2WsWQ4JyNpHV",
+      "client_order_id": "2c4d1d6f94f240efa0d7a46066464553",
+      "mint": "Ekfbe93ybDm7JnS3xFbTVrfiov2xtx7bgJkbQc74SLWo",
+      "ts_intent_utc": "2026-09-25T22:05:56Z",
+      "source_sig": "5a2DbwEgFf5FQ2KaKFgN1dU4NdHWa4Ld1i7fNjYosztXiJYpjY1FehQyp7yLauFrPRXEmJsjfQPAbC7CreuQ23bo",
+      "bloom_signature": "62XMHL6yb2UMzhs1e3W8CD1vCuaMLdAT6ryJLMVdcjEKK4VxEJqPNL8C2oAuB9Bszd7BqjH8RrxEhdjdJ92e1QiR",
       "chain_ok": true,
       "bloom_route": {
-        "programs": "Pump AMM",
-        "direct": true,
+        "programs": "Meteora DLMM,Raydium CPMM",
+        "direct": false,
         "hops_by_mints": 1
       },
       "collected": false,
-      "why_not": "тени нет: в decisions.jsonl нет строки stage=shadow по подписи источника этой покупки",
-      "shadow_route": null,
-      "shadow_pool_program": null,
-      "shadow_pool_label": null,
+      "why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
+      "shadow_route": "one_hop",
+      "shadow_pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "shadow_pool_label": "Raydium CPMM",
       "shadow_sim_verdict": null,
       "shadow_build_ms": null,
       "shadow_expected_out_raw": null,
       "shadow_min_out_raw": null,
-      "sh
+      "shadow_why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)",
+      "route_agrees_with_bloom": null,
+      "bloom_bought_raw": 20720921512,
+      "diff_pct": null,
+      "verdict_ours": null,
+      "pct_note": "тень посчитана без комиссии Bloom и без налога токена на перевод -- Bloom bought_raw их уже несёт, поэтому diff_pct показывает разницу С УЧЁТОМ них, а не чистую разницу цены пула"
+    },
+    {
+      "client_order_id": "57e3bf7687734a61ad3ae8963963292b",
+      "mint": "FDfxBRSc3MraBGcGmkHgfkvwHTUDMEA2hRV2cRNbpeg",
+      "ts_intent_utc": "2026-09-25T22:09:19Z",
+      "source_sig": "5kg73DDD3fjeygdAkLhXvPSoYUeKyGF46JH6rU6Cyd4GiBU93wV2rhBP4LpnuSowgpZGzfbSarZUDZGHptPi6UkX",
+      "bloom_signature": null,
+      "chain_ok": null,
+      "bloom_route": {
+        "programs": null,
+        "direct": null,
+        "hops_by_mints": null
+ 
 ```
 
 ## P2 (сверка по цепи)
@@ -860,7 +928,7 @@ Bloom, сторож продаж и тень работают как раньш�
 ```json
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-25T02:57:37Z",
+  "generated_utc": "2026-09-26T03:03:46Z",
   "inputs": {
     "crowd_cache": "/tmp/night_state/crowd_metric.json",
     "state_dir": "/tmp/night_state",
@@ -879,12 +947,12 @@ Bloom, сторож продаж и тень работают как раньш�
     "ok": true,
     "service": "c2_night_leader_stonkfun",
     "key_env": "HELIUS_API_KEY",
-    "local_credit_limit": 500,
+    "local_credit_limit": 20000,
     "owner_stop_fraction": 0.7,
     "owner_stop_credits": 140000,
     "c2_daily_budget": 200000,
-    "credits_used": 11,
-    "calls_used": 11,
+    "credits_used": 3579,
+    "calls_used": 3579,
     "stopped_reason": null
   },
   "task_e_leader": {
@@ -979,7 +1047,7 @@ Bloom, сторож продаж и тень работают как раньш�
           "signature": "3VCvVA97A7jKzSW47W51wXxZ8XxgrH1Z9keiEEDb8aSfuYJkTTLkke545qrxakCTBM6ryzenGoj2EbGWg3yGpET8",
           "block_time_utc": "2026-09-23T20:21:40Z",
           "spend_sol_equiv": 6.671219
-        }
+   
 ```
 
 ## Что из данных НЕ следует
