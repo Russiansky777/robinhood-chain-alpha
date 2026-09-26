@@ -71,11 +71,77 @@ def порог_покупки(sol: float | None) -> str | None:
 
 # ================================================================ узел
 
+# Правило владельца 26.09: всё от 24.09 00:00Z и новее -- Shyft (он отдаёт
+# историю ~2.5 суток), всё старше -- Helius, темп не выше 10 запросов в секунду,
+# а при первом новом 429 на стороне детектора -- пауза скана на 5 минут.
+ГРАНЬ_SHYFT = 1790208000          # 2026-09-24T00:00:00Z
+import os as _os  # noqa: E402
+# 10 запросов/с -- на ВСЕ параллельные пакеты вместе: прогон делит предел.
+HELIUS_ЗАПРОСОВ_В_С = float(_os.environ.get("PODB_HELIUS_RPS") or 10.0)
+ПАУЗА_ДЕТЕКТОРА_С = 300
+
+
+def узел_по_времени(ts) -> str:
+    return "helius" if ts and float(ts) < ГРАНЬ_SHYFT else "shyft"
+
+
+class СторожДетектора:
+    """Признак жизни детектора -- без ssh: ветка первой сессии, data/vps_health_nl.txt.
+
+    Раз в 5 минут берётся свежий файл (git fetch ветки claude/nifty-sagan-r0polg);
+    рост числа строк с 429 / PAUSED_RATE_LIMITED / «предел запросов» -- пауза
+    скана ПАУЗА_ДЕТЕКТОРА_С. Файл обновляется примерно раз в час -- это предел
+    зоркости сторожа, и он написан в отчёте. Наш собственный 429 от Helius
+    (ключ тот же, что у детектора) -- пауза сразу (см. Узел._пост).
+    """
+
+    ВЕТКА = "claude/nifty-sagan-r0polg"
+    ФАЙЛ = "data/vps_health_nl.txt"
+
+    def __init__(self) -> None:
+        self.последняя = 0.0
+        self.база = None
+        self.пауз = 0
+        self.проверок = 0
+        self.сбоев = 0
+
+    def счёт(self) -> int | None:
+        import re  # noqa: PLC0415
+        import subprocess  # noqa: PLC0415
+        try:
+            subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", self.ВЕТКА],
+                           capture_output=True, timeout=60, check=True)
+            т = subprocess.run(["git", "show", f"FETCH_HEAD:{self.ФАЙЛ}"], capture_output=True,
+                               text=True, timeout=30, check=True).stdout
+            return len(re.findall(r"PAUSED_RATE_LIMITED|\b429\b|предел запросов", т))
+        except Exception:  # noqa: BLE001
+            self.сбоев += 1
+            return None
+
+    def пауза(self, почему: str) -> None:
+        self.пауз += 1
+        print(f"сторож: {почему}, пауза {ПАУЗА_ДЕТЕКТОРА_С} с", flush=True)
+        time.sleep(ПАУЗА_ДЕТЕКТОРА_С)
+
+    def проверить(self) -> None:
+        if time.time() - self.последняя < 300:
+            return
+        self.последняя = time.time()
+        self.проверок += 1
+        с = self.счёт()
+        if с is None:
+            return
+        if self.база is not None and с > self.база:
+            self.пауза(f"у детектора новые 429 ({self.база} -> {с})")
+        self.база = с
+
+
 class Узел(B1.Пакетный):
-    """Пакетный узел подбивки с отступом на 429 И 5xx И сбой сети.
+    """Пакетный узел подбивки с отступом на 429 И 5xx И сбой сети, два узла.
 
     Кэш транзакций НЕ растёт сам: история кошелька в тысячи транзакций не
     должна жить в памяти -- пакет() отдаёт и забывает, кэш -- только явный.
+    Узел вызова: явный, иначе текущий (with уз.на("helius")), иначе Shyft.
     """
 
     ПОПЫТОК = 7
@@ -84,14 +150,57 @@ class Узел(B1.Пакетный):
         super().__init__()
         self.отказов_5xx = 0
         self.сбоев_сети = 0
+        self.текущий = "shyft"
+        self.по_узлу = {"shyft": 0, "helius": 0}
+        self.страж = СторожДетектора()
+        self._окно_helius: list = []
 
-    def _пост(self, тело, *, срок: float = 60.0):
+    def на(self, имя: str):
+        уз = self
+
+        class _К:
+            def __enter__(self_):
+                self_.было = уз.текущий
+                уз.текущий = имя
+                return уз
+
+            def __exit__(self_, *a):
+                уз.текущий = self_.было
+                return False
+        return _К()
+
+    def адрес(self, имя: str) -> str:
+        import os  # noqa: PLC0415
+        if имя == "helius":
+            ключ = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
+            if not ключ:
+                raise RuntimeError("ключа Helius нет в окружении (нужен для данных старше 24.09)")
+            return f"https://mainnet.helius-rpc.com/?api-key={ключ}"
+        return P.узел()
+
+    def _темп_helius(self, запросов: int) -> None:
+        """Не больше HELIUS_ЗАПРОСОВ_В_С запросов (внутри пакета -- каждый) в секунду."""
+        self.страж.проверить()
+        сейчас = time.time()
+        self._окно_helius = [(t, n) for t, n in self._окно_helius if сейчас - t < 1.0]
+        while sum(n for _, n in self._окно_helius) + запросов > HELIUS_ЗАПРОСОВ_В_С and self._окно_helius:
+            time.sleep(max(0.05, 1.0 - (сейчас - self._окно_helius[0][0])))
+            сейчас = time.time()
+            self._окно_helius = [(t, n) for t, n in self._окно_helius if сейчас - t < 1.0]
+        self._окно_helius.append((time.time(), запросов))
+
+    def _пост(self, тело, *, срок: float = 60.0, узел: str | None = None):
         import requests  # noqa: PLC0415
+        имя = узел or self.текущий
+        n = len(тело) if isinstance(тело, list) else 1
         пауза = 1.0
         for попытка in range(self.ПОПЫТОК):
+            if имя == "helius":
+                self._темп_helius(n)
             self.обращений += 1
+            self.по_узлу[имя] = self.по_узлу.get(имя, 0) + n
             try:
-                от = requests.post(P.узел(), json=тело, timeout=срок)
+                от = requests.post(self.адрес(имя), json=тело, timeout=срок)
             except requests.RequestException as exc:
                 self.сбоев_сети += 1
                 if попытка == self.ПОПЫТОК - 1:
@@ -102,22 +211,25 @@ class Узел(B1.Пакетный):
             if от.status_code == 429 or от.status_code >= 500:
                 if от.status_code == 429:
                     self.отказов_429 += 1
+                    if имя == "helius":
+                        # Ключ общий с детектором: наш 429 -- его риск.
+                        self.страж.пауза("429 от Helius на нашем скане")
                 else:
                     self.отказов_5xx += 1
                 time.sleep(пауза)
                 пауза = min(пауза * 2, 30.0)
                 continue
             if от.status_code != 200:
-                raise RuntimeError(f"узел: http {от.status_code}")
+                raise RuntimeError(f"узел {имя}: http {от.status_code}")
             return от.json()
-        raise RuntimeError("узел: 429/5xx на всех попытках")
+        raise RuntimeError(f"узел {имя}: 429/5xx на всех попытках")
 
-    def вызов(self, метод: str, парам: list, *, срок: float = 25.0):
+    def вызов(self, метод: str, парам: list, *, срок: float = 25.0, узел: str | None = None):
         пауза = 1.0
         for попытка in range(self.ПОПЫТОК):
             self.вызовов += 1
             тело = self._пост({"jsonrpc": "2.0", "id": 1, "method": метод, "params": парам},
-                              срок=срок)
+                              срок=срок, узел=узел)
             if isinstance(тело, dict) and "error" in тело:
                 ош = str(тело["error"])
                 if ("429" in ош or "rate" in ош.lower() or "Too Many" in ош) and \
@@ -131,31 +243,36 @@ class Узел(B1.Пакетный):
             return тело.get("result") if isinstance(тело, dict) else None
         raise RuntimeError("узел: предел частоты на всех попытках")
 
-    def пакет(self, подписи: list) -> dict:
-        """{подпись: tx или None} без записи в кэш. Пропавшие -- по одной."""
+    def пакет(self, подписи: list, времена: dict | None = None) -> dict:
+        """{подпись: tx или None} без записи в кэш; узел -- по времени подписи."""
         из_: dict = {}
-        for и in range(0, len(подписи), self.РАЗМЕР_ПАКЕТА):
-            кусок = подписи[и:и + self.РАЗМЕР_ПАКЕТА]
-            тело = [{"jsonrpc": "2.0", "id": j, "method": "getTransaction",
-                     "params": [п, P.ОПЦИИ_TX]} for j, п in enumerate(кусок)]
-            self.запросов += len(кусок)
-            self.вызовов += len(кусок)
-            try:
-                ответ = self._пост(тело)
-            except RuntimeError:
-                ответ = []
-            по_id = {о.get("id"): о for о in (ответ if isinstance(ответ, list) else [ответ])
-                     if isinstance(о, dict)}
-            for j, п in enumerate(кусок):
-                о = по_id.get(j) or {}
-                if о and "error" not in о and о.get("result"):
-                    из_[п] = о["result"]
-                    continue
+        группы: dict = {}
+        for п in подписи:
+            имя = узел_по_времени((времена or {}).get(п)) if времена else self.текущий
+            группы.setdefault(имя, []).append(п)
+        for имя, спис in группы.items():
+            for и in range(0, len(спис), self.РАЗМЕР_ПАКЕТА):
+                кусок = спис[и:и + self.РАЗМЕР_ПАКЕТА]
+                тело = [{"jsonrpc": "2.0", "id": j, "method": "getTransaction",
+                         "params": [п, P.ОПЦИИ_TX]} for j, п in enumerate(кусок)]
+                self.запросов += len(кусок)
+                self.вызовов += len(кусок)
                 try:
-                    из_[п] = self.вызов("getTransaction", [п, P.ОПЦИИ_TX], срок=40.0)
+                    ответ = self._пост(тело, узел=имя)
                 except RuntimeError:
-                    из_[п] = None
-            time.sleep(self.ПАУЗА_МЕЖДУ_ПАКЕТАМИ_С)
+                    ответ = []
+                по_id = {о.get("id"): о for о in (ответ if isinstance(ответ, list) else [ответ])
+                         if isinstance(о, dict)}
+                for j, п in enumerate(кусок):
+                    о = по_id.get(j) or {}
+                    if о and "error" not in о and о.get("result"):
+                        из_[п] = о["result"]
+                        continue
+                    try:
+                        из_[п] = self.вызов("getTransaction", [п, P.ОПЦИИ_TX], срок=40.0, узел=имя)
+                    except RuntimeError:
+                        из_[п] = None
+                time.sleep(self.ПАУЗА_МЕЖДУ_ПАКЕТАМИ_С)
         return из_
 
     def tx(self, подпись: str):
@@ -167,19 +284,21 @@ class Узел(B1.Пакетный):
         return т
 
     def подписи(self, адрес: str, *, до: str | None = None, по: str | None = None,
-                limit: int = 1000) -> list:
+                limit: int = 1000, узел: str | None = None) -> list:
         парам: dict = {"limit": limit}
         if до:
             парам["before"] = до
         if по:
             парам["until"] = по
-        return self.вызов("getSignaturesForAddress", [адрес, парам]) or []
+        return self.вызов("getSignaturesForAddress", [адрес, парам], узел=узел) or []
 
     def расход(self) -> dict:
         return {"вызовов": self.вызовов, "обращений": self.обращений,
                 "запросов_в_пакетах": self.запросов, "ошибок": self.ошибок,
                 "отказов_429": self.отказов_429, "отказов_5xx": self.отказов_5xx,
-                "сбоев_сети": self.сбоев_сети}
+                "сбоев_сети": self.сбоев_сети, "запросов_по_узлу": dict(self.по_узлу),
+                "сторож": {"проверок": self.страж.проверок,
+                           "пауз": self.страж.пауз, "сбоев_чтения": self.страж.сбоев}}
 
 
 class КурсУзла:
@@ -533,9 +652,24 @@ def режим_из_метода(метод: str | None) -> str | None:
     return "price"
 
 
-def симулировать(уз: Узел, покупка: dict, *, опора: str | None = None,
-                 горизонты: tuple = ГОРИЗОНТЫ, наш_слот: int | None = None,
-                 наша_трата_лам: int | None = None) -> dict:
+def симулировать(уз: Узел, покупка: dict, **кв) -> dict:
+    """Узел -- по времени сделки источника (правило 24.09); без времени -- Shyft,
+    а если Shyft сделку не отдал -- Helius."""
+    вр = покупка.get("blockTime") or покупка.get("ts")
+    имя = узел_по_времени(вр) if вр else "shyft"
+    with уз.на(имя):
+        рез = _симулировать(уз, покупка, **кв)
+    if not вр and рез.get("why_not", "").startswith("узел не отдал сделку источника"):
+        with уз.на("helius"):
+            рез = _симулировать(уз, покупка, **кв)
+        имя = "helius"
+    рез["узел"] = имя
+    return рез
+
+
+def _симулировать(уз: Узел, покупка: dict, *, опора: str | None = None,
+                  горизонты: tuple = ГОРИЗОНТЫ, наш_слот: int | None = None,
+                  наша_трата_лам: int | None = None) -> dict:
     """Вход S+0/S+1/S+2, выход s0+H для одной первой покупки источника.
 
     покупка: signature, slot, blockTime, mint, wallet (источник).
@@ -604,7 +738,9 @@ def симулировать(уз: Узел, покупка: dict, *, опора
     # Shyft (проба 26.09) НЕ принимает before с чужой подписью: 0 подписей даже
     # на свежей. Опора отключена -- листаем от вершины до сделки источника
     # (until); предел страниц пишется в причину.
-    опора = None
+    # На Helius (данные старше 24.09) опора есть: before с любой подписью
+    # стандартный узел принимает, и окно не листается от вершины.
+    опора = подпись_после_слота(уз, макс_слот + 1) if уз.текущий == "helius" else None
     ист = история_пула(уз, пул["pool_vault"], подп, s0, опора=опора, до_слота=макс_слот)
     из_["история"] = {"подписей": len(ист["подписи"]), "страниц": ист["страниц"],
                       "с_опорой": ист["с_опорой"], "предел": ист["предел"],
@@ -730,6 +866,11 @@ def симулировать(уз: Узел, покупка: dict, *, опора
 
 def возраст_токена(уз: Узел, минт: str, подпись_ист: str, bt_ист: int) -> dict:
     """Минуты от первой подписи минта до сделки источника (или нижняя граница)."""
+    with уз.на(узел_по_времени(bt_ист - 86400)):
+        return _возраст(уз, минт, подпись_ист, bt_ист)
+
+
+def _возраст(уз: Узел, минт: str, подпись_ист: str, bt_ист: int) -> dict:
     до = подпись_ист
     старейшая = None
     for _ in range(ПРЕДЕЛ_СТРАНИЦ_МИНТА):
@@ -829,13 +970,33 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
     слоты_подписей: list = []
     до = None
     набрано = {имя: 0 for имя, *_ in ПОРОГИ}
+    узел_списка = "shyft" if до_ts > ГРАНЬ_SHYFT else "helius"
+    видели: set = set()
     while True:
         try:
-            стр = уз.подписи(кош, до=до, limit=1000)
+            стр = уз.подписи(кош, до=до, limit=1000, узел=узел_списка)
         except RuntimeError as exc:
             из_["why_not"] = чисто(str(exc))[:160]
             break
         из_["страниц"] += 1
+        стр = [з for з in стр if з["signature"] not in видели]
+        видели.update(з["signature"] for з in стр)
+        старейшее = min((з.get("blockTime") or до_ts for з in стр), default=до_ts)
+        # Shyft кончился (история ~2.5 суток) или перешли грань 24.09, а окно
+        # глубже -- дальше листает Helius от последней подписи.
+        if узел_списка == "shyft" and с_ts < ГРАНЬ_SHYFT and \
+                (len(стр) < 1000 or старейшее < ГРАНЬ_SHYFT):
+            узел_списка = "helius"
+            из_["листание_на_helius_с"] = utc(старейшее)
+            if len(стр) < 1000 and старейшее >= с_ts:
+                if not стр:
+                    continue
+                до = стр[-1]["signature"]
+                обрезать_конец = True
+            else:
+                обрезать_конец = False
+        else:
+            обрезать_конец = False
         if not стр:
             break
         окно, конец = [], False
@@ -850,11 +1011,12 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
             if з.get("err"):
                 continue
             окно.append(з)
-        txs = уз.пакет([з["signature"] for з in окно]) if окно else {}
+        txs = уз.пакет([з["signature"] for з in окно],
+                       времена={з["signature"]: з.get("blockTime") for з in окно}) if окно else {}
         for з in окно:
             из_["подписей"] += 1
             if все_покупки:
-                из_["_подписи_окна"].append(з["signature"])
+                из_["_подписи_окна"].append((з["signature"], з.get("blockTime")))
             tx = txs.get(з["signature"])
             if not tx:
                 из_["не_отдал"] += 1
@@ -882,7 +1044,8 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
             if пк["трата_usd"] > 0:
                 if курс is not None:
                     try:
-                        курс_usd, откуда_курса = курс.rate_for(tx)
+                        with уз.на(узел_по_времени(р["blockTime"])):
+                            курс_usd, откуда_курса = курс.rate_for(tx)
                     except Exception as exc:  # noqa: BLE001
                         курс_usd, откуда_курса = None, чисто(str(exc))[:80]
                 if курс_usd is None:
@@ -907,6 +1070,8 @@ def скан_кошелька(уз: Узел, кош: str, с_ts: float, до_ts
                                                  else "SOL" if пк["трата_usd"] <= 0 else "SOL+USD"),
                                    "курс": float(курс_usd) if курс_usd else None,
                                    "курс_откуда": откуда_курса})
+        if обрезать_конец and not конец:
+            continue
         if конец or len(стр) < 1000:
             break
         if предел_на_порог and all(v >= предел_на_порог for v in набрано.values()):

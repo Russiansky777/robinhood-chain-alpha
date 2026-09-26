@@ -33,7 +33,8 @@ def длина_списка(имя: str) -> int:
 
 def пакеты(м: dict) -> list:
     if м.get("skript", "podbivka_run.py") != "podbivka_run.py":
-        return [{"skript": м["skript"], "args": " ".join(м.get("args") or []), "name": м["skript"]}]
+        return [{"skript": м["skript"], "args": " ".join(м.get("args") or []), "name": м["skript"],
+                 "helius_rps": "10"}]
     всего = длина_списка(м["spisok"])
     с, по = int(м.get("s") or 0), int(м.get("po") or 0) or всего
     шаг = int(м.get("paket") or 50)
@@ -48,6 +49,10 @@ def пакеты(м: dict) -> list:
         if м.get("fakt"):
             арг.append("--fakt")
         из_.append({"skript": "podbivka_run.py", "args": " ".join(арг), "name": f"{м['zadacha']}_{н}_{до}"})
+    # Предел Helius 10 запросов/с -- на все одновременные пакеты (max-parallel 12).
+    доля = round(10.0 / min(12, max(1, len(из_))), 3)
+    for x in из_:
+        x["helius_rps"] = str(доля)
     return из_
 
 
@@ -60,6 +65,9 @@ def main() -> int:
         if not путь.endswith(".json") or not Path(путь).exists():
             continue
         вкл.extend(пакеты(json.loads(Path(путь).read_text(encoding="utf-8"))))
+    # Предел Helius 10 запросов/с -- на ВСЕ одновременные задания прогона.
+    for x in вкл:
+        x["helius_rps"] = str(round(10.0 / min(12, max(1, len(вкл))), 3))
     строка = "matrix=" + json.dumps({"include": вкл}, ensure_ascii=True)
     print(строка)
     print(f"count={len(вкл)}")

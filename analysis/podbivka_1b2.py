@@ -110,7 +110,7 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--istochniki", default=("Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit=leader,"
                                             "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB=Brez"))
-    р.add_argument("--s", default="2026-09-24T00:00:00Z")
+    р.add_argument("--s", default="2026-09-18T00:00:00Z")
     р.add_argument("--do", default="2026-09-26T00:00:00Z")
     р.add_argument("--dbot", default=str(КОРЕНЬ / "data" / "dbot_follow_trades_raw.json"))
     р.add_argument("--ledger", default=str(КОРЕНЬ / "data" / "solana_trades_all.json"))
@@ -229,7 +229,8 @@ def main() -> int:
         наша = min(наши, key=lambda т: abs((т.get("buy_block_time") or 0) - з["ts"]))
         строка["our_sig"] = наша["buy_signature"]
         try:
-            tx_наша = уз.tx(наша["buy_signature"])
+            with уз.на(S.узел_по_времени(наша.get("buy_block_time"))):
+                tx_наша = уз.tx(наша["buy_signature"])
         except RuntimeError as exc:
             строка["why_not"] = S.чисто(str(exc))[:120]
             итог["отказы_чисел"].append(строка)

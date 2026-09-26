@@ -62,6 +62,8 @@ jobs:
       - name: "Run"
         env:
           SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          PODB_HELIUS_RPS: ${{ matrix.helius_rps }}
           SKRIPT: ${{ matrix.skript }}
           ARGS: ${{ matrix.args }}
         run: |
