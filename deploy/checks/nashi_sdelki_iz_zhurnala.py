@@ -29,7 +29,12 @@ import time
         # ПОЧЕМУ ЗАКРЫТА БЕЗ ПРОДАЖИ. Закрытая позиция без подписи продажи --
         # это либо упавшая по цепи покупка, либо отказ отправителя, либо дыра в
         # учёте. Без причины эти три случая не отличить.
-        "closed_reason", "close_reason", "why_not", "chain_err")
+        "closed_reason", "close_reason", "why_not", "chain_err",
+        # ПОДПИСЬ ПРОДАЖИ У ПОЛОСЫ ЛЕЖИТ ЗДЕСЬ. Сторож закрывает позицию полосы
+        # полями state/ts_closed/closed_reason/closed_sol_net
+        # (bloom_seller.py:983) и подпись продажи в closed_signature НЕ пишет:
+        # она остаётся в last_sell_reported и last_sell_signatures.
+        "last_sell_reported", "last_sell_signatures", "last_sell_outcome")
 
 
 def строки(путь: str):

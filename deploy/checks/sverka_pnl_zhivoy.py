@@ -94,6 +94,24 @@ def подпись_покупки(п: dict) -> str:
             or п.get("signature") or "")
 
 
+def подпись_продажи(п: dict) -> str:
+    """Подпись НАШЕЙ продажи -- из трёх мест, потому что их три.
+
+    У позиции полосы сторож пишет закрытие полями state/ts_closed/
+    closed_reason/closed_sol_net (bloom_seller.py:983), а подпись продажи
+    остаётся в last_sell_reported (доложенная) или в last_sell_signatures.
+    Поле closed_signature есть у пути площадки. Первый прогон сверки искал
+    только его и написал "сверено 0" на трёх живых закрытых сделках.
+    """
+    подписи = п.get("last_sell_signatures") or []
+    последняя = подписи[-1] if isinstance(подписи, list) and подписи else ""
+    подпись = (п.get("closed_signature") or п.get("last_sell_reported")
+               or последняя or "")
+    # Служебные метки самопроверок ("ПРОДАЖА_ТАЙМЕРА" и подобные) подписями не
+    # являются: подпись Solana -- base58 длиной 87-88 знаков.
+    return подпись if len(подпись) >= 80 else ""
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--sdelki", required=True, help="выборка из журнала позиций")
@@ -114,10 +132,10 @@ def main() -> int:
     состояния: dict = {}
     for с in сделки:
         ключ = f"{с.get('state') or 'нет состояния'}"
-        if с.get("state") == "closed" and not с.get("closed_signature"):
+        if с.get("state") == "closed" and not подпись_продажи(с):
             ключ = "closed без подписи продажи"
         состояния[ключ] = состояния.get(ключ, 0) + 1
-    закрытые = [с for с in сделки if с.get("state") == "closed" and с.get("closed_signature")]
+    закрытые = [с for с in сделки if с.get("state") == "closed" and подпись_продажи(с)]
     закрытые.sort(key=lambda с: float(с.get("ts_closed") or с.get("ts_intent") or 0))
     if а.limit:
         закрытые = закрытые[-а.limit:]
@@ -126,7 +144,7 @@ def main() -> int:
     строки, отказы = [], []
     for с in закрытые:
         куп = подпись_покупки(с)
-        прод = с.get("closed_signature")
+        прод = подпись_продажи(с)
         if not куп:
             отказы.append({"cid": с.get("client_order_id"),
                             "почему": "в записи нет подписи нашей покупки"})
@@ -215,7 +233,7 @@ def main() -> int:
         "причина": (с.get("closed_reason") or с.get("close_reason")
                     or с.get("why_not") or "")[:300],
         "подпись_покупки": подпись_покупки(с),
-    } for с in сделки if с.get("state") == "closed" and not с.get("closed_signature")]
+    } for с in сделки if с.get("state") == "closed" and not подпись_продажи(с)]
     итог = {"собрано_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "окно_с": а.since_utc, "свод": свод, "суточный_счёт": счёт,
             "сделки": строки, "закрытые_без_продажи": без_продажи,
@@ -231,7 +249,7 @@ def main() -> int:
               f"источник={(с.get('source_task') or с.get('source') or '')[:14]} "
               f"минт={(с.get('mint') or '')[:8]} "
               f"наша_подпись={'есть' if подпись_покупки(с) else 'нет'} "
-              f"продажа={'есть' if с.get('closed_signature') else 'нет'}")
+              f"продажа={'есть' if подпись_продажи(с) else 'нет'}")
     for с in строки[-10:]:
         print(f"{с['закрыта_utc']} {(с['минт'] or '')[:8]} группа={с['группа']} "
               f"запись={с['итог_записи_sol']} цепь={с['итог_по_цепи_sol']} "
