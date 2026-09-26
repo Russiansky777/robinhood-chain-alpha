@@ -4190,6 +4190,88 @@ class Детектор:
                 break
         return из_
 
+    def догнать_соседей_по_слоту(self, *, предел: int = 2) -> dict:
+        """Соседи по слоту источника: кто ещё взял этот минт и сколько до нас.
+
+        Четвёртое поле строки владельца ("перед нами" / "в S+0 успели") без
+        этого разбора не заполнить: его нет ни в одном журнале, оно есть только
+        в блоке. Один getBlock уровня full на позицию -- дорого, поэтому:
+        считается ФОНОМ, по нескольку позиций за пульс, ровно один раз на
+        позицию (метка slot_peers_done) и только там, где есть слот источника,
+        минт и наша подпись.
+
+        Числа кладутся в позицию, а строка их только читает. Неудача узла --
+        причина словами в позицию и вторая попытка на следующем пульсе, но не
+        больше ПОПЫТОК_СОСЕДЕЙ раз: блок мог быть уже недоступен, и долбить его
+        вечно значит жечь кредиты.
+        """
+        итог = {"looked": 0, "filled": 0, "why_not": ""}
+        if self.helius is None:
+            итог["why_not"] = "узла нет"
+            return итог
+        try:
+            позиции = self.состояние.positions() or {}
+        except Exception as exc:  # noqa: BLE001
+            итог["why_not"] = f"{type(exc).__name__}"
+            return итог
+        try:
+            import bloom_copiers as CP  # noqa: PLC0415
+
+            известные = CP.список()
+        except Exception:  # noqa: BLE001
+            известные = frozenset()
+        свои = {ST.EXECUTOR_WALLET}
+        if OS is not None:
+            try:
+                свои.add(OS.кошелёк_полосы())
+            except Exception:  # noqa: BLE001
+                pass
+        кандидаты = []
+        for cid, p_ in позиции.items():
+            if p_.get("slot_peers_done"):
+                continue
+            if int(p_.get("slot_peers_tries") or 0) >= ПОПЫТОК_СОСЕДЕЙ:
+                continue
+            слот, минт = p_.get("source_slot"), p_.get("mint")
+            подпись = (p_.get("lane_signature") or p_.get("lane_signature_local")
+                        or (p_.get("signatures") or [None])[0])
+            if not isinstance(слот, int) or not минт or not подпись:
+                continue
+            кандидаты.append((cid, слот, минт, подпись, p_.get("source")))
+        кандидаты.sort(key=lambda x: x[0])
+        for cid, слот, минт, подпись, источник in кандидаты[:предел]:
+            итог["looked"] += 1
+            поля = {"slot_peers_tries":
+                        int((позиции.get(cid) or {}).get("slot_peers_tries") or 0) + 1}
+            try:
+                import bloom_slot_peers as SP  # noqa: PLC0415
+
+                с = SP.соседи(self.helius.call, слот=слот, минт=минт, свои=свои,
+                               наша_подпись=подпись, источник=источник,
+                               известные=известные)
+            except Exception as exc:  # noqa: BLE001
+                с = {"known": False,
+                     "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
+            if с.get("known"):
+                поля.update(slot_peers_done=True,
+                             slot_peers_total=с.get("всего"),
+                             slot_peers_before_us=с.get("до_нас"),
+                             slot_peers_known_copiers=с.get("известных"),
+                             # КОШЕЛЬКИ -- в позицию: из них суточный прогон
+                             # собирает список копировщиков. Без них список
+                             # строить было бы неоткуда.
+                             slot_peers_wallets=с.get("кошельки"),
+                             slot_peers_slot=слот)
+                итог["filled"] += 1
+            else:
+                поля["slot_peers_why_not"] = str(с.get("why_not") or "")[:200]
+            try:
+                self.состояние.update_position(cid, **поля)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("соседи по слоту: позиция не записана (%s)",
+                            type(exc).__name__)
+        return итог
+
     def догнать_место_источника(self, *, предел: int = 3) -> dict:
         """Место ИСТОЧНИКА в его блоке -- один getBlock уровня подписей.
 
@@ -5158,6 +5240,10 @@ async def слушать(детектор: Детектор, ключ: str, *, �
 # Сколько раз пробуем добрать место в блоке. Блок может уйти из доступных
 # узлу, и вечно его дёргать незачем -- в отчёте останется причина.
 ПОПЫТОК_МЕСТА_В_БЛОКЕ = ST.env_int("BLOOM_BLOCK_POS_TRIES", 3)
+# Соседей по слоту ищет полный getBlock -- он дорог, поэтому попыток на позицию
+# меньше: блок старше пары минут узел может уже не отдать, и вечный повтор
+# только жёг бы кредиты.
+ПОПЫТОК_СОСЕДЕЙ = ST.env_int("BLOOM_SLOT_PEERS_TRIES", 2)
 # КАК ЧАСТО ГРЕЕМ СОЕДИНЕНИЯ ОТПРАВИТЕЛЕЙ. Владелец 25.09: раз в 20-30 с. У
 # 0slot таймаут простоя 65 с (его письмо), поэтому 25 с -- с двойным запасом.
 OS_ПРОГРЕВ_S = ST.env_float("BLOOM_SENDER_WARM_S", 25.0)
@@ -5266,6 +5352,9 @@ async def биение(детектор: Детектор, стоп_через_s
             await asyncio.to_thread(детектор.догнать_места_контролей)
             await asyncio.to_thread(детектор.догнать_очередь_пары)
             await asyncio.to_thread(детектор.догнать_место_источника)
+            # Соседи по слоту источника: "перед нами" / "в S+0 успели" в строке
+            # владельца. Полный getBlock, поэтому по две позиции за пульс.
+            await asyncio.to_thread(детектор.догнать_соседей_по_слоту)
             await asyncio.to_thread(детектор.досказать_контроли)
             детектор.свод_контролей()
             # Часовое окно тени: ноль собранных при трёх и более сигналах --
