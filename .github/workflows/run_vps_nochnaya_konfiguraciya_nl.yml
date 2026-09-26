@@ -1,0 +1,113 @@
+name: "Ночная конфигурация: полоса 0.01 везде, Bloom только speed_only, стопы -0.3 / -0.2"
+
+# ЗАЧЕМ (пункт 3 владельца 26.09, с 19:00Z): полоса 0.01 на всех группах; Bloom
+# торгует ТОЛЬКО по speed_only и там же 0.01; на bloom_lane и lane_only Bloom
+# выключен. Стопы по настоящему счёту: полоса -0.3 (поле группы), Bloom -0.2
+# (общий предел площадки, BLOOM_DAILY_LOSS_SOL в окружении службы).
+#
+# По умолчанию прогон ТОЛЬКО ПОКАЗЫВАЕТ. Запись -- при apply=yes, и тогда рядом
+# остаётся копия файла групп и копия env. Размеры подтверждаются признаком жизни
+# после перезапуска: он печатает политику групп как её видит сама служба.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "'yes' -- записать (иначе только показать)"
+        required: false
+        default: "no"
+      bloom_daily_loss_sol:
+        description: "стоп площадки за сутки, SOL (пусто -- не трогать)"
+        required: false
+        default: "0.2"
+      restart_detector:
+        description: "'yes' -- перезапустить детектор, чтобы он перечитал файл и env"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: nochnaya-konfiguraciya-nl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  noch:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Какой файл групп читает детектор"
+        run: |
+          set -e
+          set -o pipefail
+          GFILE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; print((json.load(open(\"$STATE_DIR/detector_status.json\")).get(\"source_groups\") or {}).get(\"file\") or \"\")'")
+          [ -n "$GFILE" ] || { echo "СБОЙ: детектор не сообщает файл групп"; exit 1; }
+          echo "GROUPS_FILE=$GFILE" >> "$GITHUB_ENV"
+          echo "файл групп: $GFILE"
+
+      - name: "Показ или запись полей групп"
+        run: |
+          set -e
+          set -o pipefail
+          APPLY=""
+          if [ "${{ inputs.apply }}" = "yes" ]; then APPLY="--apply"; fi
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nochnaya_konfiguraciya.py" < deploy/checks/nochnaya_konfiguraciya.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            python3 /tmp/nochnaya_konfiguraciya.py --file '$GROUPS_FILE' $APPLY
+            rc=\$?; rm -f /tmp/nochnaya_konfiguraciya.py; exit \$rc" | tee data/nochnaya_konfiguraciya.txt
+
+      - name: "Стоп площадки в окружении службы"
+        if: ${{ inputs.apply == 'yes' && inputs.bloom_daily_loss_sol != '' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cp -a $ENV_DIR/env $ENV_DIR/env.bak-noch-\$(date -u +%Y%m%dT%H%M%SZ)
+            sed -i '/^BLOOM_DAILY_LOSS_SOL=/d' $ENV_DIR/env
+            echo 'BLOOM_DAILY_LOSS_SOL=${{ inputs.bloom_daily_loss_sol }}' >> $ENV_DIR/env
+            chmod 600 $ENV_DIR/env
+            grep -E '^BLOOM_DAILY_LOSS_SOL' $ENV_DIR/env" | tee -a data/nochnaya_konfiguraciya.txt
+
+      - name: "Перезапуск детектора и подтверждение размеров признаком жизни"
+        if: ${{ inputs.apply == 'yes' && inputs.restart_detector == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py; rc=\$?; rm -f /tmp/pered_perezapuskom_sluzhby.py; exit \$rc"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart bloom-detector; sleep 16; systemctl is-active bloom-detector"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; s=json.load(open(\"$STATE_DIR/detector_status.json\")); g=(s.get(\"source_groups\") or {}); print(json.dumps({\"policies\": g.get(\"policies\"), \"buy_sol\": (s.get(\"executor\") or {}).get(\"buy_sol\"), \"daily_loss_sol\": ((s.get(\"limits\") or {}).get(\"daily_loss_sol\"))}, ensure_ascii=False))'" | tee -a data/nochnaya_konfiguraciya.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/nochnaya_konfiguraciya.txt ] && git add data/nochnaya_konfiguraciya.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Nochnaya konfiguraciya: polya grupp i stop ploshchadki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
