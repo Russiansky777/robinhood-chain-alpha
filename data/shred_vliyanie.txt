@@ -1,0 +1,66 @@
+=== слушатель шредов: влияние на хост ===
+старт слушателя: 2026-09-26T18:11:00Z
+--- ethtool (если установлен) ---
+Settings for enp3s0:
+	Supported ports: [  ]
+	Supported link modes:   Not reported
+	Supported pause frame use: No
+	Supports auto-negotiation: No
+	Supported FEC modes: Not reported
+	Advertised link modes:  Not reported
+	Advertised pause frame use: No
+	Advertised auto-negotiation: No
+	Advertised FEC modes: Not reported
+	Speed: Unknown!
+	Duplex: Unknown! (255)
+--- netstat -su (если установлен) ---
+netstat не установлен -- Udp берём из /proc/net/snmp
+--- служба слушателя ---
+active
+CPUQuotaPerSecUSec=350ms
+Nice=15
+ActiveEnterTimestamp=Sat 2026-09-26 20:24:33 CEST
+--- три числа ---
+{
+ "снято_utc": "2026-09-26T18:45:13Z",
+ "chislo_1_trafik": {
+  "интерфейс": "enp3s0",
+  "скорость_порта_мбит": null,
+  "окно_с": 60.0,
+  "входящих_байт": 542121004,
+  "входящих_мбит_с": 72.283,
+  "входящих_пакетов": 433665,
+  "пакетов_в_с": 7227.7,
+  "доля_полосы": null,
+  "rx_errs_накоплено": 0,
+  "rx_drop_накоплено": 0,
+  "rx_drop_за_окно": 0
+ },
+ "chislo_2_udp": {
+  "InErrors_накоплено": 81130,
+  "RcvbufErrors_накоплено": 81130,
+  "InErrors_за_окно": 374,
+  "RcvbufErrors_за_окно": 374,
+  "InDatagrams_за_окно": 429528,
+  "оговорка": "накопленные счётчики -- с загрузки машины, не с старта службы: за окно измерена скорость потерь"
+ },
+ "chislo_3_vozrast_signala": {
+  "строк_с_возрастом": 441514,
+  "до": {
+   "имя": "час до старта",
+   "n": 2100,
+   "медиана_с": 0.109,
+   "p90_с": 0.213,
+   "макс_с": 0.453
+  },
+  "после": {
+   "имя": "час после старта",
+   "n": 1187,
+   "медиана_с": 0.107,
+   "p90_с": 0.225,
+   "макс_с": 0.457
+  },
+  "вырос": false,
+  "вывод": "не вырос: медиана после в пределах порога"
+ }
+}
