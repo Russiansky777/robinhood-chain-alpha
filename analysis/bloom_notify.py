@@ -119,6 +119,12 @@ def кратко(подпись: str | None, n: int = 10) -> str:
     return (s[:n] + "…") if len(s) > n else (s or "-")
 
 
+def _время_iso(ts: float | None = None) -> str:
+    """ISO-время для формата 2: из него берутся часы, минуты и секунды."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                         time.gmtime(ts if ts is not None else time.time()))
+
+
 def _время(ts: float | None = None) -> str:
     return time.strftime("%H:%M:%SZ", time.gmtime(ts if ts is not None else time.time()))
 
@@ -157,8 +163,42 @@ def имя_источника_кратко(имя) -> str:
 
 def строка_покупки(*, exec_row: dict, наш_слот: int | None,
                     слот_источника: int | None, размер_sol, метки=None,
-                    источник=None) -> str:
-    """Наша покупка: подпись, S+N, куда покупали, размер, чей сигнал."""
+                    источник=None, место=None, путь=None, отправитель=None,
+                    bloom=None, имя_токена=None,
+                    подпись_источника=None) -> str:
+    """Наша покупка: подпись, S+N, куда покупали, размер, чей сигнал.
+
+    В ФОРМАТЕ 2 (пакет владельца 26.09) строка собирается bloom_tg_format:
+    время, размер, имя токена и ссылка на транзакцию ИСТОЧНИКА, место в его
+    блоке, наше S+N с местом, разложение пути, кто довёз, сколько успело до нас
+    и строка Bloom, если пара. Чего не измерено -- в строке черта, не ноль.
+    """
+    if формат_2():
+        try:
+            import bloom_tg_format as F  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            F = None
+        if F is not None:
+            м = место or {}
+            п_ = путь or {}
+            б = bloom or {}
+            s_наш = ((наш_слот - слот_источника)
+                     if isinstance(наш_слот, int) and isinstance(слот_источника, int)
+                     else None)
+            return F.строка_buy(
+                время_utc=_время_iso(), размер_sol=размер_sol,
+                имя_токена=имя_токена, имя_источника=имя_источника_кратко(источник),
+                подпись_источника=подпись_источника,
+                индекс_источника=м.get("индекс_источника"),
+                всего_в_блоке=м.get("всего"), наш_s=s_наш,
+                наш_индекс=м.get("наш_индекс"), наш_всего=м.get("всего"),
+                путь_мс=п_.get("всего"), увидели_мс=п_.get("увидели"),
+                решили_мс=п_.get("решили"), собрали_мс=п_.get("собрали"),
+                отправитель=отправитель,
+                перед_нами=п_.get("перед_нами"),
+                копировщиков=п_.get("копировщиков"),
+                bloom_s=б.get("s"), bloom_индекс=б.get("индекс"),
+                bloom_всего=б.get("всего"), bloom_собрали_мс=б.get("собрали"))
     подписи = exec_row.get("signatures") or []
     вид = exec_row.get("buy_address_kind") or "?"
     адрес = exec_row.get("buy_address")
@@ -218,8 +258,26 @@ def строка_продажи_не_подтверждена(*, через: str
 
 
 def строка_продажи(*, ok: bool, код: str | None, через: str, секунды,
-                    sol_вернулось=None, подпись: str | None = None) -> str:
-    """Продажа: успех или код ошибки, через что, секунды от покупки, SOL."""
+                    sol_вернулось=None, подпись: str | None = None,
+                    вход_sol=None, имя_токена=None, источник=None,
+                    попыток=None) -> str:
+    """Продажа: успех или код ошибки, через что, секунды от покупки, SOL.
+
+    В ФОРМАТЕ 2 это ЕДИНСТВЕННОЕ сообщение о выходе: "круг" отдельной строкой
+    больше не идёт, а вход, возврат и доля стоят здесь.
+    """
+    if формат_2():
+        try:
+            import bloom_tg_format as F  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            F = None
+        if F is not None:
+            return F.строка_sell(
+                время_utc=_время_iso(), имя_токена=имя_токена,
+                имя_источника=имя_источника_кратко(источник), секунды=секунды,
+                вход_sol=вход_sol, возврат_sol=sol_вернулось,
+                подпись_продажи=подпись, попыток=попыток,
+                причина=(None if ok else (код or "причина не названа")))
     метка = "🔵" if ok else "🔴"
     итог = "продана" if ok else f"НЕ продана ({код or 'причина ?'})"
     сек = (f"{float(секунды):.0f} с от покупки"
@@ -323,9 +381,14 @@ class Оповещатель:
         токен = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
         кому = чат(куда)
         try:
-            r = requests.post(f"{API}/bot{токен}/sendMessage",
-                               json={"chat_id": кому, "text": текст[:ПРЕДЕЛ_ТЕКСТА],
-                                     "disable_web_page_preview": True}, timeout=10)
+            тело = {"chat_id": кому, "text": текст[:ПРЕДЕЛ_ТЕКСТА],
+                    "disable_web_page_preview": True}
+            # РАЗМЕТКА ТОЛЬКО В ФОРМАТЕ 2: там ссылка идёт как <a href=...>tx</a>.
+            # В прежнем формате разметки нет, и включать её задним числом нельзя:
+            # старые строки содержат символы, на которых Telegram откажет.
+            if формат_2():
+                тело["parse_mode"] = "HTML"
+            r = requests.post(f"{API}/bot{токен}/sendMessage", json=тело, timeout=10)
             if r.status_code == 200:
                 # НОМЕР СООБЩЕНИЯ нужен, чтобы потом ПРАВИТЬ эту же строку, а не
                 # сыпать в чат новую на каждый шаг сделки.
@@ -347,10 +410,13 @@ class Оповещатель:
             return {"ok": False, "why_not": "requests недоступен"}
         токен = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
         try:
-            r = requests.post(f"{API}/bot{токен}/editMessageText",
-                               json={"chat_id": чат(куда), "message_id": int(номер),
-                                     "text": текст[:ПРЕДЕЛ_ТЕКСТА],
-                                     "disable_web_page_preview": True}, timeout=10)
+            тело = {"chat_id": чат(куда), "message_id": int(номер),
+                    "text": текст[:ПРЕДЕЛ_ТЕКСТА],
+                    "disable_web_page_preview": True}
+            if формат_2():
+                тело["parse_mode"] = "HTML"
+            r = requests.post(f"{API}/bot{токен}/editMessageText", json=тело,
+                               timeout=10)
             if r.status_code == 200:
                 return {"ok": True, "code": 200, "edited": True,
                         "message_id": номер}
