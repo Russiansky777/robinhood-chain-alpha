@@ -1,4 +1,4 @@
---- слушатель шредов: доставка 36255079724 ---
+--- слушатель шредов: доставка 36261613863 ---
 websockets на месте
   [ok  ] признак жизни считает шреды и слоты
   [ok  ] старые слоты уходят на диск строкой JSON
@@ -27,25 +27,25 @@ table ip filter {
 	}
 
 	chain ufw-before-input {
-		iifname "lo" counter packets 217262 bytes 40331932 accept
-		ct state related,established counter packets 1048458 bytes 656628239 accept
-		ct state invalid counter packets 272 bytes 74356 jump ufw-logging-deny
-		ct state invalid counter packets 272 bytes 74356 drop
+		iifname "lo" counter packets 281640 bytes 47909247 accept
+		ct state related,established counter packets 1383894 bytes 881945829 accept
+		ct state invalid counter packets 290 bytes 75076 jump ufw-logging-deny
+		ct state invalid counter packets 290 bytes 75076 drop
 		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
-		ip protocol icmp icmp type echo-request counter packets 24639 bytes 2087200 accept
-		udp sport 67 udp dport 68 counter packets 3378 bytes 1107984 accept
-		counter packets 136263 bytes 8539102 jump ufw-not-local
+		ip protocol icmp icmp type echo-request counter packets 32383 bytes 2744725 accept
+		udp sport 67 udp dport 68 counter packets 4473 bytes 1467144 accept
+		counter packets 2676314 bytes 3114241937 jump ufw-not-local
 		ip daddr 224.0.0.251 udp dport 5353 counter packets 0 bytes 0 accept
 		ip daddr 239.255.255.250 udp dport 1900 counter packets 0 bytes 0 accept
-		counter packets 136263 bytes 8539102 jump ufw-user-input
+		counter packets 2676314 bytes 3114241937 jump ufw-user-input
 	}
 
 	chain ufw-before-output {
-		oifname "lo" counter packets 217262 bytes 40331932 accept
-		ct state related,established counter packets 1185311 bytes 167635480 accept
-		counter packets 71465 bytes 4607083 jump ufw-user-output
+		oifname "lo" counter packets 281640 bytes 47909247 accept
+		ct state related,established counter packets 1560628 bytes 219859807 accept
+		counter packets 93884 bytes 6051184 jump ufw-user-output
 	}
 
 	chain ufw-before-forward {
@@ -56,9 +56,47 @@ table ip filter {
 		ip protocol icmp icmp type echo-request counter packets 0 bytes 0 accept
 		counter packets 0 bytes 0 jump ufw-user-forward
 	}
-порт не открывался (open_firewall=no)
+Rule added
+20001/udp                  ALLOW       64.130.43.48               # BlockRazor shreds (zamer)
+Created symlink /etc/systemd/system/multi-user.target.wants/shred-listener.service → /etc/systemd/system/shred-listener.service.
+active
+{
+ "updated_utc": "2026-09-26T18:11:43Z",
+ "uptime_s": 20.0,
+ "shreds": 187554,
+ "bytes": 227971862,
+ "packets_out_of_window": 0,
+ "slots_in_memory": 76,
+ "slots_with_shreds": 76,
+ "slots_with_ws": 0,
+ "slots_with_our_signal": 0,
+ "ws_messages": 0,
+ "ws_signals": 0,
+ "ws_breaks": 0,
+ "last_ws_slot": null,
+ "mono_to_wall_offset_s": 1790418666.909354
+}--- порт слушается? ---
+UNCONN 0      0            0.0.0.0:20001      0.0.0.0:*    users:(("python",pid=80210,fd=3))        
+--- приоритет процесса ---
+  80210  15  6.9 14340 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/shred_probe/shred_listener.py
 
---- готовность: код доставлен, порт ещё не задан ---
-служба НЕ поднята: без порта UDP она не запускается по построению
-что нужно от владельца: порт BlockRazor; дальше этот же прогон
-с port=<порт> enable_service=yes open_firewall=yes
+--- первые 60 секунд работы ---
+{
+ "updated_utc": "2026-09-26T18:12:43Z",
+ "uptime_s": 80.1,
+ "shreds": 586287,
+ "bytes": 712631711,
+ "packets_out_of_window": 0,
+ "slots_in_memory": 301,
+ "slots_with_shreds": 301,
+ "slots_with_ws": 0,
+ "slots_with_our_signal": 0,
+ "ws_messages": 0,
+ "ws_signals": 0,
+ "ws_breaks": 0,
+ "last_ws_slot": null,
+ "mono_to_wall_offset_s": 1790418666.909354
+}--- слушает ли порт ---
+UNCONN 0      0            0.0.0.0:20001      0.0.0.0:*    users:(("python",pid=80210,fd=3))        
+ШРЕДОВ 586287 СЛОТОВ С ШРЕДАМИ 301 СЛОТОВ С WS 0 ПАКЕТОВ ВНЕ ОКНА 0
+шреды идут -- tcpdump не нужен
