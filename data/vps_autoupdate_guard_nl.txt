@@ -1,11 +1,12 @@
-=== NL-хост: автообновления и перезагрузка, 2026-09-26T10:29:18Z ===
+=== NL-хост: автообновления и перезагрузка, 2026-09-26T10:30:44Z ===
 --- ДО ПРАВОК ---
 needrestart установлен:
 да
-total 4
--rw-r--r-- 1 root root 241 Dec  5  2024 README.needrestart
+total 8
+-rw-r--r-- 1 root root 1189 Sep 26 12:29 90-bloom-no-restart.conf
+-rw-r--r-- 1 root root  241 Dec  5  2024 README.needrestart
 --- таймеры apt ---
-NextElapseUSecRealtime=Sun 2026-09-27 06:14:37 CEST
+NextElapseUSecRealtime=Sun 2026-09-27 05:25:23 CEST
 --- просьба перезагрузиться ---
 -rw-r--r-- 1 root root 32 Sep 25 06:18 /var/run/reboot-required
 libc6
@@ -14,7 +15,7 @@ linux-image-6.8.0-139-generic
 linux-base
 libc6
 --- работает с ---
-up 3 weeks, 1 day, 18 hours, 1 minute
+up 3 weeks, 1 day, 18 hours, 3 minutes
 --- как легло ---
 #
 # 0 -- не перезапускать. Пакеты при этом ставятся как обычно.
@@ -27,5 +28,26 @@ $nrconf{override_rc} = {
 --- как стало ---
 Persistent=no
 NEXT                         LEFT LAST                               PASSED UNIT                    ACTIVATES
-Sun 2026-09-27 05:25:23 CEST  16h Sat 2026-09-26 06:53:36 CEST 5h 35min ago apt-daily-upgrade.timer apt-daily-upgrade.service
+Sun 2026-09-27 05:23:04 CEST  16h Sat 2026-09-26 06:53:36 CEST 5h 37min ago apt-daily-upgrade.timer apt-daily-upgrade.service
 
+признак жизни: 47 с назад; группы ['деньги']; открытых 0, зависших 0; рубильник стоит
+МОЖНО: рубильник стоит, позиций 0, зависших 0
+перезагрузка отправлена 10:31:01Z
+хост вернулся 10:31:28Z
+--- ПОСЛЕ ПЕРЕЗАГРУЗКИ ---
+up 0 minutes
+         system boot  2026-09-26 12:31
+bloom-detector: active enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
+bloom-seller: active enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
+dbot-sold-guard: active enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
+dbot-detect-probe: active enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
+grpc-feed-probe: active enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
+--- рубильник ---
+-rw-r--r-- 1 root root 229 Sep 26 02:46 /etc/bloom-executor/KILL
+--- просьба перезагрузиться ---
+нет (снята перезагрузкой)
+--- возраст признаков жизни ---
+/home/bot/bloom_executor_live_data/detector_status.json: 33 с
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 14 с
+/home/bot/dbot_detect_probe/status.json: 43 с
+/home/bot/grpc_feed_probe_data/heartbeat.json: 3 с
