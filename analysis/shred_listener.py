@@ -69,6 +69,7 @@ class Замер:
         self.ws_сообщений = 0
         self.ws_сигналов = 0
         self.ws_обрывов = 0
+        self.буфер_байт = None
         self.t0_моно = time.monotonic()
         self.t0_стенных = time.time()
         self.путь_слотов = os.path.join(каталог, "slots.jsonl")
@@ -145,6 +146,7 @@ class Замер:
                     "packets_out_of_window": self.пакетов_мимо,
                     "slots_in_memory": покрыто, "slots_with_shreds": с_шредами,
                     "slots_with_ws": с_ws, "slots_with_our_signal": с_сигналом,
+                    "udp_rcvbuf_bytes": self.буфер_байт,
                     "ws_messages": self.ws_сообщений, "ws_signals": self.ws_сигналов,
                     "ws_breaks": self.ws_обрывов, "last_ws_slot": self.слот_ws,
                     "mono_to_wall_offset_s": round(self.t0_стенных - self.t0_моно, 6)}
@@ -164,6 +166,15 @@ def поток_udp(замер: Замер, порт: int, стоп: threading.Ev
         s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16 * 1024 * 1024)
     except OSError:
         pass
+    # СКОЛЬКО БУФЕРА ДАЛО ЯДРО, А НЕ СКОЛЬКО ПРОСИЛИ. Просим 16 МБ, но ядро
+    # режет по net.core.rmem_max (по умолчанию 208 КБ), и при 7 200 пакетах в
+    # секунду это стоит около 374 потерянных датаграмм в минуту (замер 18:45Z,
+    # RcvbufErrors). Пишем действующий размер в признак жизни, чтобы потеря
+    # была видна числом, а не догадкой.
+    try:
+        замер.буфер_байт = s.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+    except OSError:
+        замер.буфер_байт = None
     s.bind(("0.0.0.0", порт))
     s.settimeout(1.0)
     буфер = bytearray(2048)
