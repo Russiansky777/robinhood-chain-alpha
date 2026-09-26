@@ -575,20 +575,31 @@ def self_test() -> int:
                    tried >= 10 and n_ok == tried))
     # Кривая pump.fun: котировка НАТИВНАЯ, поэтому проверяем отдельно -- это
     # один шаг, минимум считается по кривой, а трата ограничена аргументом.
-    pf_n = pf_ok = 0
+    pf_n = pf_ok = pf_чужих = 0
     for s in B.load_samples(B.BONDING):
         if not s.get("mint"):
             continue
-        pf_n += 1
         r = shadow_build(s["tx"], s["source"], s["mint"], C.EXECUTOR_WALLET, 10_000_000, fake_rpc,
                          sol_usd=115.0, spend_sol_equiv=2.5)
-        pf_ok += bool(r["ok"] and r["route"] == "one_hop" and r["quote_mint"] == C.NATIVE_QUOTE
+        # Разновидность инструкции, которую мы НЕ покрываем (кривая с котировкой
+        # не в SOL), обязана получить честный отказ с этой самой причиной, а не
+        # молча собраться. Это не провал проверки, это её вторая половина.
+        if "разновидность инструкции кривой не известна" in (r.get("why_not") or ""):
+            pf_чужих += 1
+            continue
+        pf_n += 1
+        # quote_mint в ответе -- от опознания пула (там бывает и WSOL, когда
+        # сделка источника оборачивала SOL); сборка при этом нативная, что
+        # проверяет самопроверка сборщика по самой транзакции.
+        pf_ok += bool(r["ok"] and r["route"] == "one_hop"
+                      and r["quote_mint"] in (C.NATIVE_QUOTE, C.WSOL)
                       and r["min_out_method"] == "pumpfun_curve_after_source"
                       and 0 < r["min_out"] < r["expected_out"]
                       and r.get("max_sol_cost") == 10_000_000
                       and 0 < r.get("sol_to_curve", 0) < 10_000_000)
     checks.append((f"кривая pump.fun: один шаг, минимум по кривой, предел траты = наша трата "
-                   f"({pf_ok} из {pf_n})", pf_n >= 4 and pf_ok >= pf_n - 1))
+                   f"({pf_ok} из {pf_n}); непокрытых разновидностей отказано {pf_чужих}",
+                   pf_n >= 6 and pf_ok == pf_n and pf_чужих >= 1))
     checks.append(("время сборки измерено, мс", first.get("build_ms") is not None and first["build_ms"] < 50))
     checks.append(("cap_usd посчитан и флаг выставлен", first.get("cap_usd") is not None
                    and isinstance(first.get("would_skip_cap"), bool)))
