@@ -1,0 +1,110 @@
+name: "II.8: добор налогового статуса минтов и пересчёт A3"
+
+# ЗАЧЕМ. В прогоне A3 из 346 сигналов посчитано 132, а 214 помечены missing.
+# Самая большая причина -- не свойство данных, а пробел справочника: 107
+# сигналов выпали потому, что минта нет в аудите налога (тот собирался 23.09 по
+# НАШИМ сделкам и знает не все минты кэша толпы). Этот прогон добирает статус
+# из цепи и пересчитывает A3 с добором, чтобы стало видно, сколько из 214
+# закрывается справочником, а сколько остаётся настоящим пробелом данных.
+#
+# ТОЛЬКО ЧТЕНИЕ ЦЕПИ: getAccountInfo по минтам. Ни одной покупки, ни одной
+# записи на хост, службы не трогаются. Исходный аудит 23.09 НЕ перезаписывается
+# -- добор ложится отдельным файлом и при склейке уступает ему приоритет.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "сколько минтов добрать (0 -- все)"
+        required: false
+        default: "0"
+      recount:
+        description: "'yes' -- сразу пересчитать A3 с добором"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: a2-mint-tax-fill
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "requests"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/fill_venv"
+            "$RUNNER_TEMP/fill_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/fill_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Добор налогового статуса минтов из цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY analysis/a2_mint_tax_fill.py --limit "${{ inputs.limit }}"
+
+      - name: "Пересчёт A3 с добором"
+        if: ${{ inputs.recount == 'yes' }}
+        run: |
+          set -e
+          $PY analysis/a2_a1a3.py --mint-fill data/a2_mint_tax_fill.json \
+            --out data/a2_a1a3_dobor.json
+          # Сколько сигналов закрылось и сколько осталось -- одной сводкой, по
+          # тем же полям, что и в исходном прогоне.
+          $PY - <<'PY'
+          import json, collections, pathlib
+          def свод(путь):
+              д = json.loads(pathlib.Path(путь).read_text(encoding="utf-8"))
+              из_ = {}
+              for гор in ("t28_8", "t60s"):
+                  в = д["A3"]["S+1"][гор].get("all") or {}
+                  из_[гор] = {"посчитано": в.get("n_trades"), "непосчитано": в.get("n_missing"),
+                              "сумма_sol": в.get("sum_sol"), "среднее_sol": в.get("mean_sol"),
+                              "доля_в_плюс": в.get("share_positive")}
+              причины = collections.Counter()
+              for з in д["A1"]["S+1"]:
+                  г = з["t28_8"]
+                  if г.get("missing"):
+                      причины[г.get("why_not")] += 1
+              return из_, причины
+          было, п_было = свод("data/a2_a1a3.json")
+          стало, п_стало = свод("data/a2_a1a3_dobor.json")
+          print("== A3 S+1, было (data/a2_a1a3.json):")
+          print(json.dumps(было, ensure_ascii=False, indent=1))
+          print("== A3 S+1, стало с добором (data/a2_a1a3_dobor.json):")
+          print(json.dumps(стало, ensure_ascii=False, indent=1))
+          print("== причины непосчитанных на t28_8, было -> стало:")
+          for к in sorted(set(п_было) | set(п_стало)):
+              print(f"  {п_было.get(к, 0):4d} -> {п_стало.get(к, 0):4d}  {к}")
+          PY
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/a2_mint_tax_fill.json data/a2_a1a3_dobor.json; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "II.8: dobor nalogovogo statusa mintov i pereschyot A3 [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
