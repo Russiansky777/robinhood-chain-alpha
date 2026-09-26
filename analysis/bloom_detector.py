@@ -1283,6 +1283,40 @@ class Helius:
             log.debug("getTransaction %s… не отдался: %s", подпись[:10], последняя)
         return None
 
+    def севшая_подпись(self, подписи: list) -> dict:
+        """Какая из подписей варианта села -- ОДНИМ вызовом getSignatureStatuses.
+
+        ЗАЧЕМ. Полоса шлёт шесть вариантов на одном nonce, и садится РОВНО
+        ОДИН, а в позицию пишется тот, чей сервис первым сказал "принял". Это
+        разные подписи: 25.09 18:09:41Z принял zeroslot (4UV1iMzo...), а села
+        67Nt8E64... Догон количества спрашивал узел про принятую -- узел
+        честно отвечал "нет такой", и пара становилась несчитаемой. За ночь
+        так вышло у 61 пары из 63.
+
+        Возвращает {"signature": ..., "slot": ..., "err": ...} по севшей или
+        {"why_not": ...}. Шесть подписей -- один вызов, а не шесть.
+        """
+        из_: dict = {"signature": None, "slot": None, "err": None,
+                     "why_not": None}
+        чистые = [п for п in (подписи or []) if isinstance(п, str) and п]
+        if not чистые:
+            из_["why_not"] = "подписей нет"
+            return из_
+        try:
+            о = self.call("getSignatureStatuses",
+                          [чистые[:256], {"searchTransactionHistory": True}])
+        except RuntimeError as exc:
+            из_["why_not"] = f"getSignatureStatuses не отдался: {str(exc)[:120]}"
+            return из_
+        значения = (о or {}).get("value") or []
+        for подпись, з in zip(чистые, значения):
+            if not isinstance(з, dict):
+                continue
+            из_.update(signature=подпись, slot=з.get("slot"), err=з.get("err"))
+            return из_
+        из_["why_not"] = "ни одна из подписей в цепи не найдена"
+        return из_
+
     def слот(self) -> int | None:
         try:
             s = self.call("getSlot", [{"commitment": "processed"}])
@@ -3346,14 +3380,32 @@ class Детектор:
                 continue
             if поз.get("state") in (ST.STATE_CLOSED, "closed"):
                 continue
-            подпись = поз.get("lane_signature") or поз.get("lane_signature_local")
-            if not подпись:
+            # СПРАШИВАТЬ НАДО ПРО СЕВШУЮ ПОДПИСЬ, А НЕ ПРО ПРИНЯТУЮ. Вариантов
+            # на одном nonce шесть, садится один, а в lane_signature лежит тот,
+            # чей сервис первым ответил "принял". За ночь 25->26.09 из-за этого
+            # 61 пара из 63 осталась без количества и стала несчитаемой.
+            варианты = [поз.get("lane_signature"),
+                        поз.get("lane_signature_accepted_first")]
+            варианты += list(поз.get("lane_pool_candidates") or [])
+            варианты.append(поз.get("lane_signature_local"))
+            варианты = list(dict.fromkeys([в for в in варианты if в]))
+            if not варианты:
                 continue
             попыток = int(поз.get("lane_bought_tries") or 0)
             if попыток >= ПОПЫТОК_МЕСТА_В_БЛОКЕ:
                 continue
             итог["looked"] += 1
             cid = поз.get("client_order_id")
+            подпись = варианты[0]
+            села = {"signature": None, "err": None, "why_not": "одна подпись"}
+            if len(варианты) > 1:
+                try:
+                    села = self.helius.севшая_подпись(варианты)
+                except Exception as exc:  # noqa: BLE001
+                    села = {"signature": None, "err": None,
+                            "why_not": f"{type(exc).__name__}: {str(exc)[:80]}"}
+                if села.get("signature"):
+                    подпись = села["signature"]
             try:
                 tx = self.helius.транзакция(подпись)
             except Exception as exc:  # noqa: BLE001
@@ -3364,6 +3416,18 @@ class Детектор:
             куплено = OS.купленное_raw(tx or {}, OS.кошелёк_полосы(),
                                         поз.get("mint") or "")
             поля = {"lane_bought_tries": попыток + 1}
+            if села.get("signature"):
+                поля["lane_landed_signature"] = села["signature"]
+                if села.get("slot"):
+                    поля["lane_landed_slot"] = села["slot"]
+            # РАСХОД ПОКУПКИ ПО ЦЕПИ. Поля позиции не видят платы за создание
+            # счетов: живая покупка 25.09 18:09:41Z стоила кошельку 0.053493440
+            # при 0.052005 по полям. Раз транзакция уже в руках -- берём число
+            # из неё, лишнего вызова это не стоит.
+            натив = OS.натив_покупки(tx or {}, OS.кошелёк_полосы())
+            if натив.get("ok"):
+                поля["lane_buy_native_sol"] = натив["native_sol"]
+                поля["lane_buy_fee_sol"] = натив["fee_sol"]
             if куплено.get("ok"):
                 поля["lane_bought_raw"] = куплено["raw"]
                 поля["chain_ok"] = True
@@ -6922,6 +6986,10 @@ def self_test() -> int:
             def купленное_raw(tx, кошелёк, минт):
                 return настоящая_полоса.купленное_raw(tx, кошелёк, минт)
 
+            @staticmethod
+            def натив_покупки(tx, кошелёк):
+                return настоящая_полоса.натив_покупки(tx, кошелёк)
+
             # ЗАГЛУШКА ПОВТОРЯЕТ ПОДПИСЬ НАСТОЯЩЕГО МОДУЛЯ, а не придумывает
             # свою: 25.09 заглушка с **кв спрятала настоящую ошибку вызова на
             # живых деньгах, и это стоило прогона.
@@ -7006,8 +7074,23 @@ def self_test() -> int:
                         return {"value": {"blockhash": HeliusСчётный.хеш}}
                     return None
 
+                # Заглушка знает, КАКАЯ подпись села: без этого нельзя
+                # проверить главное -- что догон спрашивает про севшую, а не
+                # про принятую.
+                севшая_ответ: dict = {}
+                tx_по_подписи: dict = {}
+
                 def транзакция(self, подпись, **kw):
+                    if HeliusСчётный.tx_по_подписи:
+                        return HeliusСчётный.tx_по_подписи.get(подпись)
                     return HeliusСчётный.tx_ответ
+
+                def севшая_подпись(self, подписи):
+                    HeliusСчётный.вызовов += 1
+                    if HeliusСчётный.севшая_ответ:
+                        return dict(HeliusСчётный.севшая_ответ)
+                    return {"signature": None, "slot": None, "err": None,
+                            "why_not": "заглушка не знает"}
 
             хел = HeliusСчётный()
             детектор_пп = Детектор(источники={"SRC": "BATCH-5"}, состояние=st_п,
@@ -7215,6 +7298,59 @@ def self_test() -> int:
                 == ПОПЫТОК_МЕСТА_В_БЛОКЕ
                 and st_п.positions()["lane3"].get("lane_bought_why_not"),
                 st_п.positions()["lane3"])
+
+            # 6б. ДОГОН ИДЁТ ЗА СЕВШЕЙ ПОДПИСЬЮ, А НЕ ЗА ПРИНЯТОЙ. Вариантов
+            # шесть, садится один; за ночь 25->26.09 догон спрашивал про
+            # принятую (4UV1iMzo...), узел отвечал "нет такой", и 61 пара из 63
+            # осталась без количества. Числа ниже -- с живой покупки
+            # 25.09 18:09:41Z: кошелёк отдал 0.053493440 при входе 0.05.
+            КОШ = OS.кошелёк_полосы()
+            st_п.write_intent(client_order_id="lane4", mint="MINTP", source_sig="SL4",
+                             source_slot=11, sol_in=0.05, pool=None, program=None,
+                             taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                             sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ)
+            st_п.update_position("lane4", state="bought",
+                                lane_signature="ПРИНЯТАЯ_НО_НЕ_СЕЛА",
+                                lane_pool_candidates=["ПРИНЯТАЯ_НО_НЕ_СЕЛА",
+                                                      "СЕВШАЯ"],
+                                ts_sent=time.time())
+            HeliusСчётный.tx_ответ = None
+            HeliusСчётный.севшая_ответ = {"signature": "СЕВШАЯ", "slot": 4321,
+                                          "err": None, "why_not": None}
+            HeliusСчётный.tx_по_подписи = {"СЕВШАЯ": {
+                "meta": {"err": None, "fee": 1_005_000,
+                         "preBalances": [640_856_911, 0],
+                         "postBalances": [587_363_471, 0],
+                         "preTokenBalances": [],
+                         "postTokenBalances": [
+                             {"accountIndex": 3, "owner": КОШ, "mint": "MINTP",
+                              "uiTokenAmount": {"amount": "12703485536",
+                                                "decimals": 6,
+                                                "uiAmount": 12703.485536}}]},
+                "transaction": {"message": {"accountKeys": [
+                    {"pubkey": КОШ}, {"pubkey": "ЧУЖОЙ"}]}}}}
+            догон4 = детектор_пп.догнать_купленное_полосы()
+            поз4 = st_п.positions()["lane4"]
+            chk("догон нашёл севшую подпись и взял количество из неё",
+                догон4["filled"] == 1 and поз4.get("lane_bought_raw") == 12_703_485_536
+                and поз4.get("lane_landed_signature") == "СЕВШАЯ"
+                and поз4.get("lane_landed_slot") == 4321, (догон4, поз4))
+            chk("и записал расход покупки ПО ЦЕПИ: -0.052488440 плюс 0.001005 комиссии",
+                abs((поз4.get("lane_buy_native_sol") or 0) + 0.05248844) < 1e-9
+                and abs((поз4.get("lane_buy_fee_sol") or 0) - 0.001005) < 1e-9,
+                (поз4.get("lane_buy_native_sol"), поз4.get("lane_buy_fee_sol")))
+            # И ГЛАВНОЕ -- ИТОГ. Продажа вернула 0.048637848; честный итог
+            # -0.004855592, а по полям вышло бы -0.003367152: разница 0.00148844
+            # -- плата за счета, которую поля не видят.
+            стр4 = st_п.update_position("lane4", state=ST.STATE_CLOSED,
+                                        closed_sol_net=0.048637848,
+                                        lane_tips_total_sol=0.001,
+                                        lane_priority_lamports=1_000_000)
+            chk("итог по цепи -0.004855592, а не -0.003367152 по полям",
+                abs((стр4.get("pnl_counted_sol") or 0) + 0.004855592) < 1e-9,
+                стр4.get("pnl_counted_sol"))
+            HeliusСчётный.tx_по_подписи = {}
+            HeliusСчётный.севшая_ответ = {}
 
             # 7. ПАРА "BLOOM ПРОТИВ НАШЕЙ" -- один раз и только когда есть обе.
             куда_пара: list = []
