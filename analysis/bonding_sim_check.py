@@ -56,6 +56,43 @@ def строки_решений(путь: Path, *, предел: int) -> list:
     return хвост
 
 
+def форма_инструкции(tx: dict, минт: str) -> dict:
+    """Как выглядит инструкция кривой у источника: дискриминатор, сколько счетов,
+    сколько байт аргументов, есть ли в ней второй минт (котировка не SOL) и
+    сколько программ токена. Ничего не решает -- только описывает."""
+    import c2_swap_build as B  # noqa: PLC0415
+    из_: dict = {"ix_disc": None, "ix_accounts": None, "ix_data_len": None,
+                 "ix_args": None, "ix_token_programs": None, "ix_other_mint": None}
+    лучший = None
+    for ix in B.all_instructions(tx):
+        if ix.get("programId") != КРИВАЯ:
+            continue
+        сч = ix.get("accounts") or []
+        if len(сч) <= 1:          # событие Anchor -- не инструкция сделки
+            continue
+        if лучший is None or len(сч) > len(лучший.get("accounts") or []):
+            лучший = ix
+    if лучший is None:
+        из_["ix_disc"] = "инструкции кривой в сделке нет"
+        return из_
+    данные = B.b58decode(лучший["data"])
+    сч = лучший["accounts"]
+    программы = [a for a in сч if a in (B.TOKEN_PROGRAM,
+                                        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")]
+    # "другой минт" -- счёт из инструкции, который в балансах транзакции
+    # встречается как МИНТ и не равен нашему: признак котировки не в SOL.
+    минты = {b.get("mint") for side in ("preTokenBalances", "postTokenBalances")
+             for b in ((tx.get("meta") or {}).get(side) or [])}
+    другой = [a for a in сч if a in минты and a != минт]
+    из_.update(ix_disc=данные[:8].hex(), ix_accounts=len(сч), ix_data_len=len(данные),
+               ix_token_programs=len(программы),
+               ix_other_mint=(другой[0] if другой else None))
+    if len(данные) >= 24:
+        import struct as _s  # noqa: PLC0415
+        из_["ix_args"] = list(_s.unpack("<QQ", данные[8:24]))
+    return из_
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--decisions", default=str(КОРЕНЬ / "data" / "triton" / "decisions_tail.jsonl"))
@@ -92,6 +129,10 @@ def main() -> int:
             строка["why_not"] = "узел не отдал сделку источника"
             итоги.append(строка)
             continue
+        # ФОРМА ИНСТРУКЦИИ -- ВСЕГДА, даже когда сборка откажется. Иначе отказ
+        # "у источника инструкция <hex>, не buy" говорит только о том, что мы
+        # её не знаем, и ничего о том, что это за инструкция.
+        строка.update(форма_инструкции(tx, r["mint"]))
         res = SB.shadow_build(tx, r["source"], r["mint"], кошелёк, лампорты, rpc.call,
                               slippage=0.35)
         строка.update({к: res.get(к) for к in (
@@ -102,6 +143,22 @@ def main() -> int:
         print(f"  {и}/{len(ряды)} {r['mint'][:8]} verdict={строка.get('sim_verdict')} "
               f"min_out={строка.get('min_out')} why={строка.get('why_not')}")
 
+    по_инструкции: dict = {}
+    for с in итоги:
+        д = с.get("ix_disc") or "нет данных"
+        б = по_инструкции.setdefault(д, {"сигналов": 0, "счетов": set(), "байт": set(),
+                                          "программ_токена": set(), "котировка_не_sol": 0})
+        б["сигналов"] += 1
+        б["счетов"].add(с.get("ix_accounts"))
+        б["байт"].add(с.get("ix_data_len"))
+        б["программ_токена"].add(с.get("ix_token_programs"))
+        б["котировка_не_sol"] += bool(с.get("ix_other_mint"))
+    по_инструкции = {к: {"сигналов": v["сигналов"],
+                         "счетов": sorted(x for x in v["счетов"] if x is not None),
+                         "байт": sorted(x for x in v["байт"] if x is not None),
+                         "программ_токена": sorted(x for x in v["программ_токена"] if x is not None),
+                         "котировка_не_sol": v["котировка_не_sol"]}
+                     for к, v in sorted(по_инструкции.items(), key=lambda x: -x[1]["сигналов"])}
     по_вердикту: dict = {}
     for с in итоги:
         к = с.get("sim_verdict") or (с.get("why_not") or "нет ответа")
@@ -112,6 +169,7 @@ def main() -> int:
         "сигналов": len(итоги), "вызовов_rpc": rpc.calls,
         "секунд": round(time.time() - начало, 1),
         "по_вердикту": dict(sorted(по_вердикту.items(), key=lambda x: -x[1])),
+        "по_инструкции": по_инструкции,
         "прошло_бы": sum(1 for с in итоги if с.get("sim_verdict") == "would_pass"),
         "ряды": итоги,
     }
