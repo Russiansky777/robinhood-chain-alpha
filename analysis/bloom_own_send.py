@@ -245,6 +245,16 @@ def цена_единицы_cu(приоритет_лампорты: int, cu_unit
 ПУЛЫ_ПОЛОСЫ = ("PUMP_AMM", "CPMM")     # имена констант в c2_swap_build
 
 
+def кривая_включена() -> bool:
+    """Кривая pump.fun в полосе -- ПО ФЛАГУ, по умолчанию выключена.
+
+    Сборщик кривую умеет (I.2б), но включение полосы на новый тип пула -- это
+    деньги: отдельный деплой и отдельная живая сделка 0.01, как просил
+    владелец. Поэтому флаг, а не молчаливое расширение белого списка.
+    """
+    return os.environ.get("LANE_BONDING_CURVE", "0").strip() == "1"
+
+
 def _модули():
     """Модули тени подгружаются лениво: без них полоса просто выключена."""
     import c2_common as C  # noqa: PLC0415
@@ -265,7 +275,10 @@ def тип_пула_подходит(программа: str) -> bool:
         _, _, _, B = _модули()
     except Exception:  # noqa: BLE001
         return False
-    return программа in {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}
+    типы = {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}
+    if кривая_включена():
+        типы.add(B.BONDING)
+    return программа in типы
 
 
 def потолок_лампортов() -> int:
@@ -889,7 +902,10 @@ def собрать(*, tx_источника: dict, источник: str, мин
             return из_
         прог = PP.pool_program(tx_источника, пул["pool_vault"], SB._labels())["pool_program"]
         из_["pool_program"] = прог
-        if прог not in {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}:
+        типы_полосы = {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}
+        if кривая_включена():
+            типы_полосы.add(getattr(B, "BONDING", "нет такой программы"))
+        if прог not in типы_полосы:
             из_["why_not"] = f"тип пула вне полосы: {прог}"
             return из_
         tpl = B.extract_template(tx_источника, прог, пул["pool_vault"])
@@ -897,9 +913,15 @@ def собрать(*, tx_источника: dict, источник: str, мин
             из_["why_not"] = f"шаблон: {tpl.get('why_not')}"
             return из_
         mv = B.mints_and_vaults(tpl, tx_источника)
-        if not mv or mv.get("quote_mint") != C.WSOL:
+        # Кривая pump.fun платит НАТИВНЫМ SOL: токенового счёта котировки у неё
+        # нет вовсе, оборачивать нечего. Это такой же один шаг, как WSOL, но
+        # пускаем его только по флагу и только для кривой.
+        нативная = bool(mv) and mv.get("quote_mint") == getattr(C, "NATIVE_QUOTE", "native_sol") \
+            and прог == getattr(B, "BONDING", None) and кривая_включена()
+        if not mv or (mv.get("quote_mint") != C.WSOL and not нативная):
             из_["why_not"] = "котировка пула не SOL -- полоса только одношаговая"
             return из_
+        из_["native_quote"] = нативная
         мо = B.min_out_from_reserves(tpl, tx_источника, лампорты, проскальзывание)
         if not мо.get("ok"):
             # Без минимума отправлять нельзя: это покупка по любой цене.
@@ -959,6 +981,11 @@ def собрать(*, tx_источника: dict, источник: str, мин
                            "отправлять нельзя, сеть отвергнет")
         из_["too_big"] = True
         return из_
+    if нативная:
+        # На кривой предел траты -- сам аргумент инструкции: программа не даст
+        # заплатить больше. В запись кладём и его, и сколько дойдёт до кривой.
+        из_["max_sol_cost_lamports"] = int(лампорты)
+        из_["sol_to_curve_lamports"] = мо.get("sol_to_curve")
     из_.update(ok=True, min_out=мо["min_out"], expected_out=мо.get("expected_out"),
                nonce_account=(str(нонс[0]) if нонс else None),
                tip_account=чаевые,
@@ -3283,6 +3310,73 @@ def self_test() -> int:
             м0)
     finally:
         globals()["_модули"] = было_модули
+
+    # --- КРИВАЯ PUMP.FUN В ПОЛОСЕ (I.2б): только по флагу, и трата не выше
+    # нашей. Проверяем на НАСТОЯЩЕЙ покупке из образцов: подменяется только
+    # определение пула (у образцов сделка источника шла роутером и задела USDC,
+    # поэтому котировка у неё неоднозначная), всё остальное -- настоящий
+    # сборщик, настоящая транзакция, настоящая кривая.
+    try:
+        C_ж, PP_ж, SB_ж, B_ж = _модули()
+    except Exception:  # noqa: BLE001
+        C_ж = None
+    обр_кр = []
+    if C_ж is not None:
+        файл_кр = (Path(__file__).resolve().parent.parent / "data" / "c2_pool_samples"
+                   / f"{B_ж.BONDING}.json")
+        if файл_кр.exists():
+            обр_кр = json.loads(файл_кр.read_text(encoding="utf-8"))
+    образец_кр = next((x for x in обр_кр
+                       if B_ж.extract_template(x["tx"], B_ж.BONDING, x["pool_vault"]).get("ok")), None)
+    if образец_кр is not None:
+        ЛАМП_КР = 10_000_000
+        хран_кр = образец_кр["pool_vault"]
+
+        class МодулиКривой:
+            class C:
+                WSOL = C_ж.WSOL
+                NATIVE_QUOTE = getattr(C_ж, "NATIVE_QUOTE", "native_sol")
+
+                @staticmethod
+                def identify_pool(*a, **kw):
+                    return {"ok": True, "pool_vault": хран_кр,
+                            "quote_mint": getattr(C_ж, "NATIVE_QUOTE", "native_sol")}
+
+        было_м = globals()["_модули"]
+        было_флаг = os.environ.get("LANE_BONDING_CURVE")
+        globals()["_модули"] = lambda: (МодулиКривой.C, PP_ж, SB_ж, B_ж)
+        try:
+            os.environ["LANE_BONDING_CURVE"] = "0"
+            выкл = собрать(tx_источника=образец_кр["tx"], источник=образец_кр["source"],
+                            минт=образец_кр["mint"], наш_кошелёк=кошелёк_полосы(),
+                            лампорты=ЛАМП_КР)
+            chk("кривая pump.fun без флага -- отказ, полоса её не берёт",
+                выкл["ok"] is False and "вне полосы" in (выкл["why_not"] or ""), выкл)
+            os.environ["LANE_BONDING_CURVE"] = "1"
+            вкл = собрать(tx_источника=образец_кр["tx"], источник=образец_кр["source"],
+                           минт=образец_кр["mint"], наш_кошелёк=кошелёк_полосы(),
+                           лампорты=ЛАМП_КР)
+            chk("кривая pump.fun по флагу -- собрана, минимум положителен",
+                вкл["ok"] is True and isinstance(вкл.get("min_out"), int) and вкл["min_out"] > 0,
+                вкл)
+            chk("кривая: предел траты равен нашей трате, до кривой доходит меньше "
+                "(остальное -- комиссии программы)",
+                вкл.get("max_sol_cost_lamports") == ЛАМП_КР
+                and 0 < int(вкл.get("sol_to_curve_lamports") or 0) < ЛАМП_КР,
+                {к: вкл.get(к) for к in ("max_sol_cost_lamports", "sol_to_curve_lamports")})
+            сыр_кр = base64.b64decode(вкл["tx_base64"]) if вкл.get("tx_base64") else b""
+            chk("кривая: обёртки SOL в транзакции нет, котировка нативная, размер в пределе",
+                вкл.get("native_quote") is True and C_ж.WSOL.encode() not in сыр_кр
+                and 0 < int(вкл.get("size") or 0) <= ПРЕДЕЛ_РАЗМЕРА_TX,
+                {"size": вкл.get("size"), "quote_mint": вкл.get("quote_mint")})
+            chk("кривая: минимум ниже ожидания (проскальзывание учтено)",
+                int(вкл.get("min_out") or 0) < int(вкл.get("expected_out") or 0), вкл)
+        finally:
+            globals()["_модули"] = было_м
+            if было_флаг is None:
+                os.environ.pop("LANE_BONDING_CURVE", None)
+            else:
+                os.environ["LANE_BONDING_CURVE"] = было_флаг
 
     # --- ПУСТОЙ BLOCKHASH. Подписать можно, отправить можно, сеть не примет,
     # а чаевые и приоритет уже потрачены.
