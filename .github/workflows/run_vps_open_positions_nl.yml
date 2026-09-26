@@ -7,7 +7,16 @@ name: "Какие позиции считаются открытыми (толь
 #
 # Только чтение журнала позиций на хосте. Ничего не продаёт и не меняет.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dozhat:
+        description: "'yes' -- показать, чем закрылись застрявшие записи по цепи (без записи)"
+        required: false
+        default: "no"
+      dozhat_apply:
+        description: "'yes' -- ЗАПИСАТЬ закрытие в журнал позиций (продажи не делает, ключей не читает)"
+        required: false
+        default: "no"
 
 concurrency:
   group: open-positions-nl
@@ -52,13 +61,29 @@ jobs:
               /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/otkrytye_pozicii.py
             rm -f /tmp/otkrytye_pozicii.py" | tee data/otkrytye_pozicii.json
 
+      - name: "Дожать застрявшие записи по цепи (по флагу)"
+        if: ${{ inputs.dozhat == 'yes' || inputs.dozhat_apply == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          APPLY=""
+          if [ "${{ inputs.dozhat_apply }}" = "yes" ]; then APPLY="--apply"; fi
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/dozhat_zastryavshie.py" < deploy/checks/dozhat_zastryavshie.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env BLOOM_STATE_DIR=\$BLOOM_STATE_DIR               HELIUS_API_KEY=\$HELIUS_API_KEY PYTHONPATH=$CODE_DIR               /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/dozhat_zastryavshie.py $APPLY
+            rm -f /tmp/dozhat_zastryavshie.py" | tee data/dozhat_zastryavshie.json
+
       - name: "Коммит"
         if: always()
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/otkrytye_pozicii.json ] && git add data/otkrytye_pozicii.json
+          for F in data/otkrytye_pozicii.json data/dozhat_zastryavshie.json; do
+            [ -f "$F" ] && git add "$F"
+          done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Otkrytye pozicii: razbor [automated]"
           for i in 1 2 3 4 5; do
