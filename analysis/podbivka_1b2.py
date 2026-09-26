@@ -97,11 +97,20 @@ def сопоставить(запись: dict, покупки: list) -> tuple:
     return None, "покупки этим минтом есть, но ни число токенов, ни время (120 с) не сходятся"
 
 
+def доли_котировок(покупки: list) -> dict:
+    из_: dict = {}
+    for п in покупки:
+        к = п.get("котировка_пула") or "нет данных"
+        из_[к] = из_.get(к, 0) + 1
+    n = sum(из_.values())
+    return {к: {"n": v, "доля": round(v / n, 3)} for к, v in sorted(из_.items())} if n else {}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--istochniki", default=("Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit=leader,"
                                             "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB=Brez"))
-    р.add_argument("--s", default="2026-09-18T00:00:00Z")
+    р.add_argument("--s", default="2026-09-24T00:00:00Z")
     р.add_argument("--do", default="2026-09-26T00:00:00Z")
     р.add_argument("--dbot", default=str(КОРЕНЬ / "data" / "dbot_follow_trades_raw.json"))
     р.add_argument("--ledger", default=str(КОРЕНЬ / "data" / "solana_trades_all.json"))
@@ -190,6 +199,8 @@ def main() -> int:
             "покрытие_окна": ск["покрытие"], "узел_не_отдал": ск["не_отдал"],
             "покупок_всех": len(все), "первых_от_2_sol": len(отбор),
             "первых_без_курса": len(без_курса),
+            "котировка_пула_первых_от_2": доли_котировок(отбор),
+            "котировка_пула_всех_первых": доли_котировок(ск["покупки"]),
             "записей_dbot_buy": len(записи),
             "сделок_dbot_done": sum(1 for з in записи if з["state"] == "done"),
             "записей_dbot_не_сопоставлено": len(несопоставлены),
@@ -260,7 +271,8 @@ def main() -> int:
     for имя, и in итог["по_источнику"].items():
         print(f"1б {имя}: покрытие {и['покрытие_окна']} | первых от 2 SOL {и['первых_от_2_sol']} | "
               f"DBot done {и['сделок_dbot_done']} | совпало {и['совпало']} | у сим без DBot "
-              f"{и['у_симулятора_без_DBot']} | у DBot без сим {и['у_DBot_без_симулятора']}")
+              f"{и['у_симулятора_без_DBot']} | у DBot без сим {и['у_DBot_без_симулятора']} | "
+              f"котировка пула (первые от 2 SOL): {json.dumps(и['котировка_пула_первых_от_2'], ensure_ascii=False)}")
     ч = итог["числа"]
     print(f"1б числа: сверено {ч['сверено']}/{ч['пар']} медиана {ч['медиана_пп']} p90 {ч['p90_пп']}")
     return 0

@@ -188,7 +188,7 @@ def кошелёк(уз: S.Узел, курс, строка: dict, с_ts: int, �
         if not пк.get("порог"):
             покупки.append({**{к: v for к, v in пк.items() if к != "опора"}, "sim": None})
             continue
-        сим = S.симулировать(уз, пк, опора=пк.get("опора"))
+        сим = S.симулировать(уз, пк)
         уз._кэш.clear()  # noqa: SLF001
         возраст = S.возраст_токена(уз, пк["mint"], пк["signature"], пк.get("blockTime") or 0)
         покупки.append({**{к: v for к, v in пк.items() if к != "опора"}, "sim": сим,
