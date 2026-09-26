@@ -1,0 +1,33 @@
+name: "Podbivka-2: imena sekretov i proba RPC Shyft (tolko imena)"
+
+# ZACHEM. Klyuch RPC Shyft ne pod imenem gRPC-fida (401 na GRPC_FEED_TOKEN).
+# Imya berem iz nastroek repozitoriya: pechatayutsya TOLKO imena sekretov,
+# znacheniya -- nikogda. Sekrety s SHYFT v imeni proboyutsya odnim getSlot.
+# Tolko sistemnyy python bez storonnih paketov. Plyus stranica dokumentacii
+# Shyft pro adres RPC -- istochnik, a ne pamyat.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/sekrety.txt"
+
+jobs:
+  imena:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+
+      - name: "Secret names only + Shyft RPC probe"
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: python3 analysis/podbivka_sekrety_imena.py
+
+      - name: "Shyft docs: RPC endpoint format"
+        run: curl -s --max-time 20 https://docs.shyft.to/solana/shyft-rpcs.md | grep -i -E "rpc\.shyft|api_key|x-token|endpoint" | head -40
