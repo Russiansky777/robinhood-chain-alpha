@@ -44,6 +44,13 @@ API = "https://api.telegram.org"
 ПРЕДЕЛ_ТЕКСТА = 3500
 
 
+def формат_2() -> bool:
+    """Формат владельца (пакет 26.09): BUY с правкой, SELL, часовая сводка,
+    тревоги ВМЕСТО строки круга. По умолчанию выключен: без флага строки идут
+    как сейчас, и ночной деплой ничего не меняет молча."""
+    return (os.environ.get("BLOOM_TG_FORMAT") or "").strip() == "2"
+
+
 def включено() -> bool:
     """Строки стенда включены? Выключено -- полная тишина, без ошибок."""
     return (os.environ.get("BLOOM_TELEGRAM_LIVE_TEST", "0").strip() == "1")
@@ -292,9 +299,13 @@ def код_итога(итог: dict) -> str:
 class Оповещатель:
     """Отправитель без исключений наружу и без задержки горячего пути."""
 
-    def __init__(self, *, отправитель=None, в_фоне: bool = True) -> None:
+    def __init__(self, *, отправитель=None, в_фоне: bool = True,
+                  правщик=None) -> None:
         # Отправитель подменяется в самопроверке: сети в ней быть не должно.
         self._отправитель = отправитель
+        self._правщик = правщик
+        # {ключ сделки: номер сообщения} -- по нему строка правится на месте.
+        self._сообщения: dict = {}
         self._в_фоне = в_фоне
         self.послано = 0
         self.сбоев = 0
@@ -316,7 +327,33 @@ class Оповещатель:
                                json={"chat_id": кому, "text": текст[:ПРЕДЕЛ_ТЕКСТА],
                                      "disable_web_page_preview": True}, timeout=10)
             if r.status_code == 200:
-                return {"ok": True, "code": 200}
+                # НОМЕР СООБЩЕНИЯ нужен, чтобы потом ПРАВИТЬ эту же строку, а не
+                # сыпать в чат новую на каждый шаг сделки.
+                номер = None
+                try:
+                    номер = ((r.json() or {}).get("result") or {}).get("message_id")
+                except Exception:  # noqa: BLE001
+                    номер = None
+                return {"ok": True, "code": 200, "message_id": номер}
+            return {"ok": False, "code": r.status_code,
+                     "why_not": вычистить(r.text[:200])}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "why_not": вычистить(f"{type(exc).__name__}: {exc}")}
+
+    def _правка_по_сети(self, номер: int, текст: str,
+                         куда: str = КУДА_ОСНОВНОЙ) -> dict:
+        """editMessageText: та же строка обновляется на месте."""
+        if requests is None:
+            return {"ok": False, "why_not": "requests недоступен"}
+        токен = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
+        try:
+            r = requests.post(f"{API}/bot{токен}/editMessageText",
+                               json={"chat_id": чат(куда), "message_id": int(номер),
+                                     "text": текст[:ПРЕДЕЛ_ТЕКСТА],
+                                     "disable_web_page_preview": True}, timeout=10)
+            if r.status_code == 200:
+                return {"ok": True, "code": 200, "edited": True,
+                        "message_id": номер}
             return {"ok": False, "code": r.status_code,
                      "why_not": вычистить(r.text[:200])}
         except Exception as exc:  # noqa: BLE001
@@ -337,7 +374,30 @@ class Оповещатель:
         строка["last_error"] = текст
         self.последняя_ошибка = текст
 
-    def отправить(self, текст: str, *, куда: str = КУДА_ОСНОВНОЙ) -> dict:
+    def правка(self, ключ: str, текст: str, *,
+                куда: str = КУДА_ОСНОВНОЙ) -> dict:
+        """Обновить строку сделки на месте. Номера не знаем -- посылаем новую.
+
+        Так честнее тишины: после перезапуска службы номера сообщений в памяти
+        нет, и владелец всё равно должен увидеть исход сделки.
+        """
+        номер = (self._сообщения or {}).get(ключ)
+        if not номер:
+            итог = self.отправить(текст, куда=куда, ключ=ключ)
+            итог["edited"] = False
+            итог["fallback"] = "номер сообщения не известен -- послана новая строка"
+            return итог
+        try:
+            фн = self._правщик or self._правка_по_сети
+            итог = фн(номер, вычистить(текст), куда)
+        except Exception as exc:  # noqa: BLE001
+            итог = {"ok": False,
+                     "why_not": вычистить(f"{type(exc).__name__}: {exc}")[:200]}
+        self._учесть(куда, итог)
+        return итог
+
+    def отправить(self, текст: str, *, куда: str = КУДА_ОСНОВНОЙ,
+                   ключ: str | None = None) -> dict:
         """Синхронно. Наружу не бросает НИЧЕГО -- это главное свойство.
 
         Адресат обязателен по смыслу, но по умолчанию основной: забытый
@@ -367,6 +427,13 @@ class Оповещатель:
                 # их незачем: адресат у них один -- основной.
                 итог = фн(вычистить(текст))
             self._учесть(куда, итог)
+            # НОМЕР ПОД КЛЮЧОМ (cid сделки): по нему строку потом правят.
+            if ключ and итог.get("message_id"):
+                self._сообщения[ключ] = итог["message_id"]
+                # Память не растёт бесконечно: держим последние 500 сделок.
+                if len(self._сообщения) > 500:
+                    for к in list(self._сообщения)[:-500]:
+                        self._сообщения.pop(к, None)
             return итог
         except Exception as exc:  # noqa: BLE001
             # Сюда попасть можно только на ошибке в самом этом коде -- и даже
@@ -375,13 +442,14 @@ class Оповещатель:
             self.последняя_ошибка = вычистить(f"{type(exc).__name__}: {exc}")[:200]
             return {"ok": False, "why_not": self.последняя_ошибка}
 
-    def послать(self, текст: str, *, куда: str = КУДА_ОСНОВНОЙ) -> dict:
+    def послать(self, текст: str, *, куда: str = КУДА_ОСНОВНОЙ,
+                 ключ: str | None = None) -> dict:
         """Из горячего пути: в фоновом потоке, без ожидания ответа Telegram."""
         if not self._в_фоне:
-            return self.отправить(текст, куда=куда)
+            return self.отправить(текст, куда=куда, ключ=ключ)
         try:
             t = threading.Thread(target=self.отправить, args=(текст,),
-                                  kwargs={"куда": куда}, daemon=True)
+                                  kwargs={"куда": куда, "ключ": ключ}, daemon=True)
             t.start()
             return {"ok": None, "queued": True}
         except Exception as exc:  # noqa: BLE001
@@ -398,6 +466,7 @@ class Оповещатель:
         готов, почему = настроен(КУДА_ОСНОВНОЙ)
         готов_ж, почему_ж = настроен(КУДА_ЖУРНАЛ)
         return {"enabled": включено(), "configured": готов,
+                 "format2": формат_2(), "tracked_messages": len(self._сообщения),
                  "sent": self.послано, "failed": self.сбоев,
                  "last_error": self.последняя_ошибка,
                  "off_reason": self.выключен_почему or почему,
@@ -631,6 +700,64 @@ def self_test() -> int:
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+    # --- ФОРМАТ ВЛАДЕЛЬЦА (пакет 26.09): BUY правится на месте, а не сыпет
+    # новыми строками. Проверяем ровно механику: номер запомнился, правка ушла
+    # тем же номером, без номера -- честная новая строка, а не тишина.
+    было_ф = os.environ.get("BLOOM_TG_FORMAT")
+    было_вкл_ф = os.environ.get("BLOOM_TELEGRAM_LIVE_TEST")
+    было_чат_ф = os.environ.get("TELEGRAM_CHAT_ID")
+    было_ток_ф = os.environ.get("TELEGRAM_BOT_TOKEN")
+    try:
+        os.environ.pop("BLOOM_TG_FORMAT", None)
+        проверки.append(("формат 2 по умолчанию выключен", формат_2() is False, ""))
+        os.environ["BLOOM_TG_FORMAT"] = "2"
+        проверки.append(("флаг включает формат 2", формат_2() is True, ""))
+        os.environ["BLOOM_TELEGRAM_LIVE_TEST"] = "1"
+        os.environ["TELEGRAM_CHAT_ID"] = "-100500"
+        os.environ["TELEGRAM_BOT_TOKEN"] = "ТОКЕН_ПРОБА"
+        посланное, правки = [], []
+
+        def отпр_ф(текст, куда=КУДА_ОСНОВНОЙ):
+            посланное.append((текст, куда))
+            return {"ok": True, "code": 200, "message_id": 4242}
+
+        def правщик_ф(номер, текст, куда=КУДА_ОСНОВНОЙ):
+            правки.append((номер, текст, куда))
+            return {"ok": True, "code": 200, "edited": True, "message_id": номер}
+
+        оп = Оповещатель(отправитель=отпр_ф, в_фоне=False, правщик=правщик_ф)
+        р1 = оп.отправить("BUY минт", ключ="cid-1")
+        проверки.append(("номер сообщения запомнился под ключом сделки",
+                         р1.get("message_id") == 4242
+                         and оп._сообщения.get("cid-1") == 4242, оп._сообщения))
+        р2 = оп.правка("cid-1", "BUY минт -- село S+0, итог +0.004")
+        проверки.append(("правка ушла тем же номером, новой строки нет",
+                         р2.get("edited") is True and правки
+                         and правки[-1][0] == 4242 and len(посланное) == 1,
+                         (правки[-1][0], len(посланное))))
+        р3 = оп.правка("cid-незнакомый", "SELL итог")
+        проверки.append(("без номера правка превращается в новую строку, а не в тишину",
+                         р3.get("ok") is True and р3.get("edited") is False
+                         and "не известен" in (р3.get("fallback") or ""),
+                         р3.get("fallback")))
+        проверки.append(("в статусе видно формат и сколько строк отслеживаем",
+                         оп.статус().get("format2") is True
+                         and оп.статус().get("tracked_messages") >= 1,
+                         оп.статус().get("tracked_messages")))
+        # Ключ бота в правке наружу не идёт.
+        проверки.append(("токен не попадает в текст правки",
+                         "ТОКЕН_ПРОБА" not in json.dumps(правки, ensure_ascii=False),
+                         "проверено"))
+    finally:
+        for имя_, знач_ in (("BLOOM_TG_FORMAT", было_ф),
+                            ("BLOOM_TELEGRAM_LIVE_TEST", было_вкл_ф),
+                            ("TELEGRAM_CHAT_ID", было_чат_ф),
+                            ("TELEGRAM_BOT_TOKEN", было_ток_ф)):
+            if знач_ is None:
+                os.environ.pop(имя_, None)
+            else:
+                os.environ[имя_] = знач_
 
     плохо = [c for c in проверки if not c[1]]
     for имя, ок, факт in проверки:
