@@ -139,7 +139,7 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST" "
             set -e
             set -o pipefail
-            $VENV -c 'import websockets; print(\"websockets на месте\")'
+            sudo -u bot $VENV $CODE_DIR/shred_listener.py --zavisimosti
             sudo -u bot $VENV $CODE_DIR/shred_listener.py --self-test | tail -3" \
             2>&1 | tee -a data/shred_listener_deploy.txt
 
@@ -269,10 +269,12 @@ jobs:
             sleep 60
             cat $STATE_DIR/heartbeat.json
             echo '--- слушает ли порт ---'
-            (ss -lunp | grep -F ':$PORT' || echo 'порт в ss не виден')" \
+            (ss -lunp | grep -F ':$PORT' || echo 'порт в ss не виден')
+            echo '--- журнал службы: подключился ли WS ---'
+            journalctl -u $SVC --since '-3 min' --no-pager | tail -12" \
             2>&1 | tee -a data/shred_listener_deploy.txt
           ssh -n $SSH_OPTS root@"$HOST" "cat $STATE_DIR/heartbeat.json" > /tmp/shred_hb.json
-          python3 -c "import json,sys; d=json.load(open('/tmp/shred_hb.json')); print('ШРЕДОВ', d.get('shreds'), 'СЛОТОВ С ШРЕДАМИ', d.get('slots_with_shreds'), 'СЛОТОВ С WS', d.get('slots_with_ws'), 'ПАКЕТОВ ВНЕ ОКНА', d.get('packets_out_of_window')); sys.exit(0 if (d.get('shreds') or 0) > 0 else 7)" \
+          python3 -c "import json,sys; d=json.load(open('/tmp/shred_hb.json')); print('ШРЕДОВ', d.get('shreds'), 'СЛОТОВ С ШРЕДАМИ', d.get('slots_with_shreds'), 'СЛОТОВ С WS', d.get('slots_with_ws'), 'СИГНАЛОВ WS', d.get('ws_signals'), 'ОБРЫВОВ WS', d.get('ws_breaks'), 'ПАКЕТОВ ВНЕ ОКНА', d.get('packets_out_of_window')); print('ВНИМАНИЕ: часов WS нет -- разницу мерить нечем' if not (d.get('slots_with_ws') or 0) else 'часы WS идут'); sys.exit(0 if (d.get('shreds') or 0) > 0 else 7)" \
             | tee -a data/shred_listener_deploy.txt \
             && echo "SHREDS_OK=yes" >> "$GITHUB_ENV" \
             || echo "SHREDS_OK=no" >> "$GITHUB_ENV"
