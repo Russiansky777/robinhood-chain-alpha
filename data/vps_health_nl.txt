@@ -1,4 +1,4 @@
-=== NL-хост, живучесть служб, 2026-09-26T06:15:32Z ===
+=== NL-хост, живучесть служб, 2026-09-26T07:12:52Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 06:53:45 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 06:53:45 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 06:53:45 CEST
@@ -6,11 +6,11 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 06
 grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 07:54:51 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-26T06:15:11Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-26T07:12:50Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-26T06:15:11Z",
-  "updated_ts": 1790403311.9499147,
+  "updated_utc": "2026-09-26T07:12:50Z",
+  "updated_ts": 1790406770.4318788,
   "alive_since_utc": "2026-09-26T04:53:46Z",
   "mode": "live",
   "sources": 85,
@@ -59,55 +59,55 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 4873.1,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 4873.0,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 4873.0,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "jito": {
-        "age_s": 4873.0,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "nozomi": {
-        "age_s": 4873.0,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.0,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "zeroslot": {
-        "age_s": 4873.0,
+        "age_s": 8331.5,
         "last_use_s": null,
         "last_ping_s": 0.0,
-        "pings_ok": 70,
+        "pings_ok": 119,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
@@ -125,17 +125,18 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 1988,
+  "signals_seen": 3102,
   "to_buy": 0,
   "by_code": {
-    "NOT_A_BUY": 1230,
-    "KILL_SWITCH": 84,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 521,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 105,
-    "SKIP_TARGET_INCREASE_POSITION": 43,
-    "STALE": 3,
+    "NOT_A_BUY": 1943,
+    "KILL_SWITCH": 114,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 804,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 168,
+    "SKIP_TARGET_INCREASE_POSITION": 60,
+    "STALE": 5,
     "THRESHOLD_EDGE": 1,
-    "AMBIGUOUS_TX": 1
+    "AMBIGUOUS_TX": 4,
+    "SKIP_TAXED_ROUTE": 3
   },
   "by_code_test_source": {},
   "test_sources": [
@@ -146,34 +147,35 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 120.28155288016917,
+  "rate_usd_sol": 120.25837933231047,
   "rate_fresh": true,
-  "rate_stale_used": 303,
+  "rate_stale_used": 466,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
   "kill_active": true,
   "kill_note": "путь рубильника доступен на чтение",
-  "net_slot": 450590910,
-  "slot_notifications": 18178,
-  "net_slot_age_s": 0.22,
+  "net_slot": 450603807,
+  "slot_notifications": 31073,
+  "net_slot_age_s": 0.28,
   "balance_sol": 1.10911035,
-  "balance_age_s": 5.99,
-  "rpc_calls": 6584,
+  "balance_age_s": 0.91,
+  "rpc_calls": 11045,
   "rpc_by_method": {
-    "getLatestBlockhash": 406,
-    "getBalance": 974,
-    "getTransaction": 4200,
-    "getAccountInfo": 406,
-    "getMultipleAccounts": 164,
-    "simulateTransaction": 434
+    "getLatestBlockhash": 693,
+    "getBalance": 1664,
+    "getTransaction": 7144,
+    "getAccountInfo": 693,
+    "getMultipleAccounts": 261,
+    "simulateTransaction": 587,
+    "getSignaturesForAddress": 3
   },
-  "session_credits": 7800,
+  "session_credits": 12877,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
     "configured": true,
-    "sent": 1,
+    "sent": 2,
     "failed": 0,
     "last_error": "",
     "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
@@ -181,7 +183,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
       "main": {
-        "sent": 1,
+        "sent": 2,
         "failed": 0,
         "last_error": ""
       },
@@ -210,43 +212,47 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 1730,
+    "silent_ticks": 2990,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 650,
-    "would_pass": 434,
+    "built": 984,
+    "would_pass": 586,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
     "passed_in_row_by_pool": {
-      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 236,
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 45,
       "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
       "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0,
-      "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": 0,
-      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 7,
+      "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": 2,
+      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 11,
       "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
-      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 2
+      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 0,
+      "QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 0,
+      "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 0
     },
     "hour": {
-      "since_ts": 1790402041.5104947,
-      "since_utc": "2026-09-26T05:54:01Z",
-      "signals": 162,
-      "built": 100,
+      "since_ts": 1790405710.9067535,
+      "since_utc": "2026-09-26T06:55:10Z",
+      "signals": 120,
+      "built": 51,
       "sim_failed": 0,
       "not_built": {
-        "тип пула не покрыт сборщиком: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 56,
-        "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 4,
-        "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)": 2
+        "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 9,
+        "пул: неоднозначная котировка: 2 встречных счетов (So1111)": 1,
+        "тип пула не покрыт сборщиком: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 57,
+        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 1,
+        "пул: неоднозначная котировка: 3 встречных счетов (4N4DnN, So1111)": 1
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 3189,
+    "credits_day": 3342,
     "credits_write_why_not": "FileNotFoundError"
   },
   "route_tax_filter": {
@@ -255,7 +261,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "module_loaded": true,
     "module_why_not": "",
     "code": "SKIP_TAXED_ROUTE",
-    "skipped": 0,
+    "skipped": 3,
     "skipped_test": 0
   },
   "own_send": {
@@ -278,13 +284,13 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
       "why_not": null
     },
     "balance_sol": 0.411055089,
-    "balance_age_s": 6.0,
+    "balance_age_s": 0.9,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 8.8,
-    "blockhash_updates": 406,
+    "blockhash_age_s": 12.0,
+    "blockhash_updates": 693,
     "blockhash_why_not": "",
     "last": {},
     "lane_kill": [
@@ -354,9 +360,9 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 8.8,
+        "возраст_с": 11.95,
         "почему": "",
-        "обновлений": 406,
+        "обновлений": 693,
         "взят_тёплым": 0,
         "взят_по_сети": 0,
         "срок_с": 30.0
@@ -382,11 +388,11 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "bloom_keepalive": {
     "enabled": true,
     "period_s": 20.0,
-    "ok": 245,
+    "ok": 418,
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-26T06:14:53Z",
+    "last_utc": "2026-09-26T07:12:40Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -416,14 +422,14 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "n": 200,
     "median": 0.5,
     "min": 0.2,
-    "max": 21.1
+    "max": 25.2
   }
 }
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-26T06:15:31Z):
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-26T07:12:46Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-26T06:15:31Z",
-  "updated_ts": 1790403331.6763482,
+  "updated_utc": "2026-09-26T07:12:46Z",
+  "updated_ts": 1790406766.7097,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -482,10 +488,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-26T06:14:46Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-26T07:12:46Z):
 {
-  "updated_utc": "2026-09-26T06:14:46Z",
-  "uptime_s": 4860.4,
+  "updated_utc": "2026-09-26T07:12:46Z",
+  "uptime_s": 8340.5,
   "tx_method_работает": "transactionSubscribe",
   "tx_method_история": [
     {
@@ -496,7 +502,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     }
   ],
   "источников": 18,
-  "событий_записано": 97,
+  "событий_записано": 140,
   "дублей_пропущено": 0,
   "неудачных_пропущено": 0,
   "переподключений_tx": 0,
@@ -504,22 +510,22 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "слепое_время_с": 0.0,
   "слепое_время_доля": 0.0,
   "переподключений_slot": 0,
-  "slot_уведомлений": 18085,
-  "текущий_слот": 450590816,
-  "последнее_событие_utc": "2026-09-26T06:13:48Z",
+  "slot_уведомлений": 31062,
+  "текущий_слот": 450603795,
+  "последнее_событие_utc": "2026-09-26T07:11:15Z",
   "часы": {
-    "checked_at_utc": "2026-09-26T05:53:46Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sat 2026-09-26 07:53:46 CEST\nRTCTimeUSec=Sat 2026-09-26 07:53:47 CEST",
+    "checked_at_utc": "2026-09-26T06:53:46Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sat 2026-09-26 08:53:46 CEST\nRTCTimeUSec=Sat 2026-09-26 08:53:47 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-26T06:15:34Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-26T07:12:58Z):
 {
-  "utc": "2026-09-26T06:15:34Z",
+  "utc": "2026-09-26T07:12:58Z",
   "started_utc": "2026-09-26T05:54:52Z",
-  "uptime_s": 1242.1,
+  "uptime_s": 4686.1,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -606,7 +612,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "spent_today": 14,
     "limit": 300000,
     "share": 0.0,
-    "projected_daily": 973,
+    "projected_daily": 258,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 0.0,
@@ -638,10 +644,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "rabbit_ams": 66,
-      "rabbit_fra": 66,
-      "grpc2": 59,
-      "grpc": 59
+      "rabbit_ams": 126,
+      "rabbit_fra": 126,
+      "grpc2": 101,
+      "grpc": 101
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -655,107 +661,107 @@ grpc-feed-probe: active=active enabled=enabled restarts=4 since=Sat 2026-09-26 0
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 59,
-        "first_share": 0.3051,
-        "median_ms": -2.59,
-        "p10_ms": -4.78,
-        "p90_ms": 1.28,
-        "p95_ms": 2.08,
-        "mean_ms": -1.79
+        "pairs": 50,
+        "first_share": 0.3,
+        "median_ms": -2.81,
+        "p10_ms": -5.57,
+        "p90_ms": 1.36,
+        "p95_ms": 2.21,
+        "mean_ms": -2.24
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 59,
-        "first_share": 0.2034,
-        "median_ms": -2.47,
-        "p10_ms": -6.49,
-        "p90_ms": 10.12,
-        "p95_ms": 26.24,
-        "mean_ms": 8.0
+        "pairs": 50,
+        "first_share": 0.06,
+        "median_ms": -2.53,
+        "p10_ms": -6.26,
+        "p90_ms": -0.49,
+        "p95_ms": 205.58,
+        "mean_ms": 9.03
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 59,
-        "first_share": 0.1356,
-        "median_ms": -4.29,
-        "p10_ms": -8.39,
-        "p90_ms": 0.15,
-        "p95_ms": 0.9,
-        "mean_ms": -6.43
+        "pairs": 50,
+        "first_share": 0.1,
+        "median_ms": -4.36,
+        "p10_ms": -8.53,
+        "p90_ms": -0.23,
+        "p95_ms": 2.15,
+        "mean_ms": -4.07
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 59,
-        "first_share": 0.5085,
-        "median_ms": 0.14,
-        "p10_ms": -6.89,
-        "p90_ms": 12.7,
-        "p95_ms": 29.31,
-        "mean_ms": 9.79
+        "pairs": 50,
+        "first_share": 0.42,
+        "median_ms": -0.66,
+        "p10_ms": -4.11,
+        "p90_ms": 2.45,
+        "p95_ms": 204.79,
+        "mean_ms": 11.27
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 59,
-        "first_share": 0.1864,
-        "median_ms": -1.96,
-        "p10_ms": -6.23,
-        "p90_ms": 0.42,
-        "p95_ms": 1.08,
-        "mean_ms": -4.64
+        "pairs": 50,
+        "first_share": 0.16,
+        "median_ms": -1.94,
+        "p10_ms": -5.08,
+        "p90_ms": 0.36,
+        "p95_ms": 0.98,
+        "mean_ms": -1.83
       },
       "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 66,
-        "first_share": 0.3333,
-        "median_ms": -1.66,
-        "p10_ms": -24.79,
-        "p90_ms": 1.97,
-        "p95_ms": 2.69,
-        "mean_ms": -16.24
+        "pairs": 69,
+        "first_share": 0.4203,
+        "median_ms": -0.97,
+        "p10_ms": -4.53,
+        "p90_ms": 2.45,
+        "p95_ms": 3.47,
+        "mean_ms": -15.85
       }
     },
-    "pairs_total": 66
+    "pairs_total": 69
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 20579 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 22026 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: 921 строк
-/home/bot/dbot_detect_probe/events.jsonl: 9119 строк
+/home/bot/dbot_detect_probe/events.jsonl: 9161 строк
 
 --- решения детектора по кодам ---
-всего решений: 20580
+всего решений: 22026
 первое: "ts_utc": "2026-09-25T22:00:06Z"
-последнее: "ts_utc": "2026-09-26T06:15:45Z"
+последнее: "ts_utc": "2026-09-26T07:12:53Z"
 по кодам:
-   8887 NOT_A_BUY
-   3986 TARGET_AMOUNT_OUT_OF_RANGE
-    838 TOKEN_RECEIVED_NOT_BOUGHT
-    602 KILL_SWITCH
-    335 SKIP_TARGET_INCREASE_POSITION
+   9596 NOT_A_BUY
+   4269 TARGET_AMOUNT_OUT_OF_RANGE
+    902 TOKEN_RECEIVED_NOT_BOUGHT
+    632 KILL_SWITCH
+    351 SKIP_TARGET_INCREASE_POSITION
     144 OWN_TX_SEEN
      78 BUY
      73 SKIPPED_DUP_MINT
-     64 AMBIGUOUS_TX
+     67 AMBIGUOUS_TX
      38 MAX_BUY_TIMES_PER_TOKEN_REACHED
-     17 SKIP_TAXED_ROUTE
-     15 STALE
+     20 SKIP_TAXED_ROUTE
+     17 STALE
       6 THRESHOLD_EDGE
       2 WS_BREAK
       1 MAX_OPEN_POSITIONS
 по задачам источника:
-  12975 speed_only
-   1157 lane_only
-    480 BATCH-5
-    282 BATCH-3
-забран bloom_detector.json (9018 байт)
+  13928 speed_only
+   1272 lane_only
+    509 BATCH-5
+    295 BATCH-3
+забран bloom_detector.json (9132 байт)
 забран bloom_seller.json (5271 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 39703 кредитов, бюджет 1000000, доля 0.0397
+  bloom_detector: 44770 кредитов, бюджет 1000000, доля 0.0448
   bloom_seller: 147 кредитов, бюджет 15000, доля 0.0098
-  ВСЕГО за 2026-09-26: 39850 кредитов
+  ВСЕГО за 2026-09-26: 44917 кредитов
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 46 с (свежий)
-/home/bot/bloom_executor_live_data/seller_heartbeat.json: 11 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 11 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 3 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 20 с (свежий)
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 9 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 24 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 2 с (свежий)
 
 --- сбои за последние 60 минут ---
 сбоев в окне нет
