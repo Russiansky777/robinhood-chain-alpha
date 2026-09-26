@@ -34,7 +34,7 @@ def main() -> int:
             час = S.utc(з["blockTime"])[:13]
             по_часу[час]["всего"] += 1
             try:
-                tx = уз.вызов("getTransaction", [з["signature"], P.ОПЦИИ_TX], срок=40.0, узел="shyft")
+                tx = уз.вызов("getTransaction", [з["signature"], S.ОПЦИИ_TX], срок=40.0, узел="shyft")
                 причина = None if tx else "result пуст"
             except RuntimeError as exc:
                 tx, причина = None, S.чисто(str(exc))[:100]
@@ -45,7 +45,7 @@ def main() -> int:
             if проверено_helius < 20:
                 проверено_helius += 1
                 try:
-                    if уз.вызов("getTransaction", [з["signature"], P.ОПЦИИ_TX], срок=40.0, узел="helius"):
+                    if уз.вызов("getTransaction", [з["signature"], S.ОПЦИИ_TX], срок=40.0, узел="helius"):
                         helius_отдал += 1
                 except RuntimeError:
                     pass

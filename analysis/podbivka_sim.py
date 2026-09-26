@@ -42,6 +42,10 @@ import podbivka as P  # noqa: E402
 import podbivka_1b as B1  # noqa: E402
 
 ЛАМПОРТОВ = 1_000_000_000
+# ВЕРСИЯ ТРАНЗАКЦИИ 1. Проба 26.09: Shyft и Helius отвечали -32015 "Transaction
+# version (1) is not supported" на maxSupportedTransactionVersion 0 -- в пробе
+# на 10 кошельках так пропало до 89 % окна. Детектор уже на 1 (C.TX_VERSION).
+ОПЦИИ_TX = {**P.ОПЦИИ_TX, "maxSupportedTransactionVersion": C.TX_VERSION}
 РАЗМЕР_ЛАМ = 500_000_000          # наша сделка 0.5 SOL
 ИЗДЕРЖКИ_SOL = 0.002              # на сделку, сверх формулы пула
 ВХОДЫ = (0, 1, 2)
@@ -51,7 +55,7 @@ import podbivka_1b as B1  # noqa: E402
 МИН_ПОРОГ_SOL = 2.0
 TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 КОТИРОВКИ = {C.WSOL, C.USDC, C.USDT}
-ПРЕДЕЛ_СТРАНИЦ_ПУЛА = 40          # 40 000 подписей хранилища на одну покупку
+ПРЕДЕЛ_СТРАНИЦ_ПУЛА = 150         # 150 000 подписей хранилища на одну покупку (Shyft листает от вершины)
 ПРЕДЕЛ_СТРАНИЦ_МИНТА = 3          # возраст токена: не дальше 3 000 подписей назад
 ШАГОВ_НАЗАД = 4                   # нечитаемая точка -- до 4 транзакций назад
 
@@ -254,7 +258,7 @@ class Узел(B1.Пакетный):
             for и in range(0, len(спис), self.РАЗМЕР_ПАКЕТА):
                 кусок = спис[и:и + self.РАЗМЕР_ПАКЕТА]
                 тело = [{"jsonrpc": "2.0", "id": j, "method": "getTransaction",
-                         "params": [п, P.ОПЦИИ_TX]} for j, п in enumerate(кусок)]
+                         "params": [п, ОПЦИИ_TX]} for j, п in enumerate(кусок)]
                 self.запросов += len(кусок)
                 self.вызовов += len(кусок)
                 try:
@@ -269,7 +273,7 @@ class Узел(B1.Пакетный):
                         из_[п] = о["result"]
                         continue
                     try:
-                        из_[п] = self.вызов("getTransaction", [п, P.ОПЦИИ_TX], срок=40.0, узел=имя)
+                        из_[п] = self.вызов("getTransaction", [п, ОПЦИИ_TX], срок=40.0, узел=имя)
                     except RuntimeError:
                         из_[п] = None
                 time.sleep(self.ПАУЗА_МЕЖДУ_ПАКЕТАМИ_С)
@@ -279,7 +283,7 @@ class Узел(B1.Пакетный):
         """Одна транзакция с кэшем (исходные и точки состояния пула)."""
         if подпись in self._кэш:
             return self._кэш[подпись]
-        т = self.вызов("getTransaction", [подпись, P.ОПЦИИ_TX], срок=40.0)
+        т = self.вызов("getTransaction", [подпись, ОПЦИИ_TX], срок=40.0)
         self._кэш[подпись] = т
         return т
 

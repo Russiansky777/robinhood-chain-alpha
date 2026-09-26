@@ -84,7 +84,7 @@ def прямой_счёт(уз: S.Узел, кош: str, подписи: list) -
     первых, разобрано, не_отдал = 0, 0, 0
     for з, bt in подписи:
         try:
-            tx = уз.вызов("getTransaction", [з, P.ОПЦИИ_TX], срок=40.0, узел=S.узел_по_времени(bt))
+            tx = уз.вызов("getTransaction", [з, S.ОПЦИИ_TX], срок=40.0, узел=S.узел_по_времени(bt))
         except RuntimeError:
             tx = None
         if not tx:
