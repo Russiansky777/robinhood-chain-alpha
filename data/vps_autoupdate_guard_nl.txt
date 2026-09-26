@@ -1,0 +1,31 @@
+=== NL-хост: автообновления и перезагрузка, 2026-09-26T10:29:18Z ===
+--- ДО ПРАВОК ---
+needrestart установлен:
+да
+total 4
+-rw-r--r-- 1 root root 241 Dec  5  2024 README.needrestart
+--- таймеры apt ---
+NextElapseUSecRealtime=Sun 2026-09-27 06:14:37 CEST
+--- просьба перезагрузиться ---
+-rw-r--r-- 1 root root 32 Sep 25 06:18 /var/run/reboot-required
+libc6
+apparmor
+linux-image-6.8.0-139-generic
+linux-base
+libc6
+--- работает с ---
+up 3 weeks, 1 day, 18 hours, 1 minute
+--- как легло ---
+#
+# 0 -- не перезапускать. Пакеты при этом ставятся как обычно.
+$nrconf{override_rc} = {
+    qr(^bloom-)            => 0,
+    qr(^dbot-)             => 0,
+    qr(^grpc-feed-probe)   => 0,
+    qr(^actions\.runner\.) => 0,
+};
+--- как стало ---
+Persistent=no
+NEXT                         LEFT LAST                               PASSED UNIT                    ACTIVATES
+Sun 2026-09-27 05:25:23 CEST  16h Sat 2026-09-26 06:53:36 CEST 5h 35min ago apt-daily-upgrade.timer apt-daily-upgrade.service
+
