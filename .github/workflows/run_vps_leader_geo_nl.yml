@@ -1,0 +1,161 @@
+name: "II.14: география лидера слота (только чтение)"
+
+# ЗАЧЕМ. Владелец 25.09: "География (только чтение). Зависит ли доля S+0 от
+# региона лидера слота, в котором села транзакция источника". Если зависит --
+# есть смысл выбирать точку входа отправителя по расписанию лидеров (III.14).
+#
+# ПРОГОН ТОЛЬКО ЧИТАЕТ. Копия журнала позиций с хоста (вместе с ротированными),
+# расписание эпохи и список узлов -- обычными вызовами RPC, регион узла -- по
+# публичному геосервису. Ни одной записи на хост, ни одной покупки, ни одной
+# правки настроек.
+#
+# ЗАДЕРЖКА "сел -> увидели" считается по журналу решений и стоит дорого: там
+# 635 МБ, и выборка идёт потоком под nice/ionice по списку подписей. Поэтому
+# она за отдельным входом latency и по умолчанию выключена.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "только покупки с этого UTC (например 2026-09-25T20:07:00Z)"
+        required: false
+        default: "2026-09-25T20:07:00Z"
+      latency:
+        description: "'yes' -- добрать из журнала решений оценку «сел -> увидели» (дорого)"
+        required: false
+        default: "no"
+      rotated:
+        description: "'yes' -- брать и ротированные журналы (история за прошлые сутки)"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: leader-geo-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  geo:
+    # Облачный бегунок: свой стоит на боевом хосте, а расписание эпохи и гео --
+    # долгая сетевая работа, которой нечего делать рядом с торговлей.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "requests"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/geo_venv"
+            "$RUNNER_TEMP/geo_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/geo_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Копия журнала позиций (с ротированными)"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p /tmp/geo_state
+          if [ "${{ inputs.rotated }}" = "yes" ]; then
+            ssh -n $SSH_OPTS root@$HOST \
+              "for G in \$(ls -tr $STATE_DIR/positions.jsonl.*.gz 2>/dev/null); do zcat \"\$G\"; done; \
+               cat $STATE_DIR/positions.jsonl" > /tmp/geo_state/positions.jsonl
+          else
+            ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/geo_state/positions.jsonl
+          fi
+          echo "строк позиций: $(wc -l < /tmp/geo_state/positions.jsonl)"
+
+      - name: "Выборка решений по подписям источников (по запросу)"
+        if: ${{ inputs.latency == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # Подписи источников берём из уже скопированного журнала позиций --
+          # это ровно те сигналы, по которым были покупки, и ничего лишнего.
+          $PY - <<'PY' > /tmp/geo_state/sigs.txt
+          import json, pathlib
+          из_ = set()
+          with pathlib.Path("/tmp/geo_state/positions.jsonl").open(
+                  encoding="utf-8", errors="replace") as ф:
+              for строка in ф:
+                  строка = строка.strip()
+                  if not строка.startswith("{"):
+                      continue
+                  try:
+                      з = json.loads(строка)
+                  except json.JSONDecodeError:
+                      continue
+                  п = з.get("source_sig")
+                  if п:
+                      из_.add(п)
+          print("\n".join(sorted(из_)))
+          PY
+          echo "подписей источников: $(wc -l < /tmp/geo_state/sigs.txt)"
+          if [ ! -s /tmp/geo_state/sigs.txt ]; then
+            echo "подписей нет -- задержку посчитать нечем"; : > /tmp/geo_state/decisions.jsonl; exit 0
+          fi
+          scp $SSH_OPTS /tmp/geo_state/sigs.txt root@$HOST:/tmp/geo_sigs.txt
+          # Один проход по журналу потоком под nice/ionice: детектор на том же
+          # хосте торгует, и замер не должен его тормозить.
+          ssh -n $SSH_OPTS root@$HOST \
+            "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
+             { nice -n 15 \$ION grep -F -f /tmp/geo_sigs.txt $STATE_DIR/decisions.jsonl || true; \
+               for G in $STATE_DIR/decisions.jsonl.*.gz; do [ -e \"\$G\" ] || continue; \
+                 nice -n 15 \$ION zgrep -F -f /tmp/geo_sigs.txt \"\$G\" || true; done; } ; \
+             rm -f /tmp/geo_sigs.txt" > /tmp/geo_state/decisions.jsonl
+          echo "строк решений: $(wc -l < /tmp/geo_state/decisions.jsonl)"
+
+      - name: "География лидера слота"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          mkdir -p data
+          DEC=""
+          [ -s /tmp/geo_state/decisions.jsonl ] && DEC="--decisions /tmp/geo_state/decisions.jsonl"
+          $PY analysis/leader_geo.py \
+            --positions /tmp/geo_state/positions.jsonl \
+            --since "${{ inputs.since }}" \
+            --rpc "https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY" \
+            $DEC \
+            --out-md data/leader_geo.md \
+            --out-json data/leader_geo.json
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/leader_geo.md data/leader_geo.json; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "II.14: geografiya lidera slota [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
