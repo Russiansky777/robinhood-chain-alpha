@@ -1,0 +1,58 @@
+--- правила на хосте до правки ---
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere                  
+22/tcp (v6)                ALLOW IN    Anywhere (v6)             
+
+--- nft/iptables INPUT ---
+table ip filter {
+	chain ufw-before-logging-input {
+	}
+
+	chain ufw-before-logging-output {
+	}
+
+	chain ufw-before-logging-forward {
+	}
+
+	chain ufw-before-input {
+		iifname "lo" counter packets 215878 bytes 40149831 accept
+		ct state related,established counter packets 1042431 bytes 653106361 accept
+		ct state invalid counter packets 272 bytes 74356 jump ufw-logging-deny
+		ct state invalid counter packets 272 bytes 74356 drop
+		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type echo-request counter packets 24502 bytes 2075557 accept
+		udp sport 67 udp dport 68 counter packets 3360 bytes 1102080 accept
+		counter packets 135463 bytes 8489080 jump ufw-not-local
+		ip daddr 224.0.0.251 udp dport 5353 counter packets 0 bytes 0 accept
+		ip daddr 239.255.255.250 udp dport 1900 counter packets 0 bytes 0 accept
+		counter packets 135463 bytes 8489080 jump ufw-user-input
+	}
+
+	chain ufw-before-output {
+		oifname "lo" counter packets 215878 bytes 40149831 accept
+		ct state related,established counter packets 1178183 bytes 166704713 accept
+		counter packets 71079 bytes 4583565 jump ufw-user-output
+	}
+
+	chain ufw-before-forward {
+		ct state related,established counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type echo-request counter packets 0 bytes 0 accept
+		counter packets 0 bytes 0 jump ufw-user-forward
+	}
+порт не открывался (open_firewall=no)
+
+--- готовность: код доставлен, порт ещё не задан ---
+служба НЕ поднята: без порта UDP она не запускается по построению
+что нужно от владельца: порт BlockRazor; дальше этот же прогон
+с port=<порт> enable_service=yes open_firewall=yes
