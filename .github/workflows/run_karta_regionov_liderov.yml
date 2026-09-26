@@ -1,0 +1,76 @@
+name: "Карта валидатор -> регион для региональной отправки (только чтение)"
+
+# ЗАЧЕМ (пункт 2 владельца 26.09 ночью, III.14): региональная отправка выбирает
+# точку по региону ЛИДЕРА СЛОТА, и этот регион надо знать заранее -- в горячем
+# пути ни getClusterNodes на три тысячи узлов, ни внешний гео-запрос не место.
+# Прогон строит data/leader_regions.json тем же правилом региона, что и разбор
+# II.14 (analysis/leader_geo.регион).
+#
+# Только чтение: getClusterNodes и ip-api.com. Ключей в отчёт не попадает.
+on:
+  workflow_dispatch:
+    inputs:
+      only_schedule:
+        description: "'yes' -- только лидеры текущей эпохи (быстрее), 'no' -- весь кластер"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: karta-regionov-liderov
+  cancel-in-progress: false
+
+env:
+  OUT: data/leader_regions.json
+
+jobs:
+  karta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон с requests"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/kv"
+          "$RUNNER_TEMP/kv/bin/pip" install -q requests
+          echo "PY=$RUNNER_TEMP/kv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Карта регионов"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          ONLY_ARG=""
+          [ "${{ inputs.only_schedule }}" = "yes" ] && ONLY_ARG="--only-schedule"
+          $PY deploy/checks/karta_regionov_liderov.py --out "$OUT" $ONLY_ARG | tee data/leader_regions.txt
+
+      - name: "Самопроверка региональной отправки НА ЭТОЙ карте"
+        run: |
+          set -e
+          cd analysis && python3 bloom_region_send.py --self-test | tail -2
+          python3 bloom_region_send.py
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" data/leader_regions.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" data/leader_regions.txt; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Karta validator -> region dlya regionalnoy otpravki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
