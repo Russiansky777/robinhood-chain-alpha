@@ -1,0 +1,157 @@
+name: "III.14: срок до региональных точек отправителей с хоста (только чтение)"
+
+# ЗАЧЕМ. II.14 показал числом, что доля S+0 падает с удалением лидера слота от
+# нашего узла: EU 40.4 %, US-East 16.7 %, Asia 10.5 %, US-West 0 %. Отсюда
+# вопрос III.14: стоит ли отправлять в точку входа рядом с лидером. Прежде чем
+# это строить, нужна ЦЕНА -- сколько стоит дотянуться с нашего хоста в
+# Амстердаме до точки в чужом регионе. Если океан отнимает больше, чем даёт
+# близость к лидеру, правильный ответ -- второй узел отправки, а не переключение
+# адреса.
+#
+# ЧТО ДЕЛАЕТ. Открывает TCP-соединение к каждой региональной точке входа
+# отправителей и записывает время. Никаких ключей, никаких транзакций,
+# ни одного запроса к API: только установка соединения. Список имён -- из
+# сохранённой документации (analysis/sender_regions.py), ничего по памяти.
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "сколько замеров на точку"
+        required: false
+        default: "5"
+
+concurrency:
+  group: sender-region-rtt-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  rtt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Список точек входа из документации"
+        run: |
+          set -e
+          python3 analysis/sender_regions.py
+          python3 - <<'PY' > /tmp/hosts.txt
+          import json, pathlib
+          д = json.loads(pathlib.Path("data/sender_regions.json").read_text(encoding="utf-8"))
+          for отправитель, список in (д.get("точки") or {}).items():
+              for з in список:
+                  print(f"{отправитель} {з['host']} {з['port']} {з['регион']}")
+          PY
+          echo "точек: $(wc -l < /tmp/hosts.txt)"
+
+      - name: "Замер TCP с хоста"
+        run: |
+          set -e
+          set -o pipefail
+          scp $SSH_OPTS /tmp/hosts.txt root@$HOST:/tmp/rtt_hosts.txt
+          # curl --connect-timeout: только установка соединения, ни одного
+          # запроса к API. nice -- чтобы замер не мешал торговле на том же хосте.
+          ssh -n $SSH_OPTS root@$HOST "
+            while read -r SENDER HOSTNAME PORT REGION; do
+              [ -n \"\$HOSTNAME\" ] || continue
+              for I in \$(seq 1 ${{ inputs.samples }}); do
+                T=\$(nice -n 15 curl -s -o /dev/null --connect-timeout 4 --max-time 5 \
+                      -w '%{time_connect}' \"telnet://\$HOSTNAME:\$PORT\" 2>/dev/null || echo '')
+                printf '%s %s %s %s %s\n' \"\$SENDER\" \"\$HOSTNAME\" \"\$PORT\" \"\$REGION\" \"\${T:-нет}\"
+              done
+            done < /tmp/rtt_hosts.txt
+            rm -f /tmp/rtt_hosts.txt" > /tmp/rtt_raw.txt
+          echo "строк замера: $(wc -l < /tmp/rtt_raw.txt)"
+          head -5 /tmp/rtt_raw.txt
+
+      - name: "Сводка по регионам"
+        run: |
+          set -e
+          python3 - <<'PY'
+          import json, pathlib, statistics
+          строки = pathlib.Path("/tmp/rtt_raw.txt").read_text(
+              encoding="utf-8", errors="replace").splitlines()
+          по_точкам: dict = {}
+          for с in строки:
+              части = с.split()
+              if len(части) < 5:
+                  continue
+              отправитель, имя, порт, регион, значение = части[:5]
+              try:
+                  мс = float(значение) * 1000.0
+              except ValueError:
+                  мс = None
+              з = по_точкам.setdefault((отправитель, имя), {
+                  "отправитель": отправитель, "host": имя, "port": int(порт),
+                  "регион": регион, "замеры": [], "нет_ответа": 0})
+              if мс is None or мс <= 0.0:
+                  з["нет_ответа"] += 1
+              else:
+                  з["замеры"].append(мс)
+          точки = []
+          for з in по_точкам.values():
+              зн = з.pop("замеры")
+              точки.append({**з, "замеров": len(зн),
+                            "мин_мс": round(min(зн), 1) if зн else None,
+                            "медиана_мс": round(statistics.median(зн), 1) if зн else None})
+          по_регионам: dict = {}
+          for т in точки:
+              if т["медиана_мс"] is None:
+                  continue
+              по_регионам.setdefault(т["регион"], []).append(т["мин_мс"])
+          свод = {р: {"точек": len(v), "лучший_мин_мс": round(min(v), 1),
+                      "медиана_минимумов_мс": round(statistics.median(v), 1)}
+                  for р, v in sorted(по_регионам.items())}
+          pathlib.Path("data").mkdir(exist_ok=True)
+          pathlib.Path("data/sender_region_rtt.json").write_text(
+              json.dumps({"точки": sorted(точки, key=lambda т: (т["регион"], т["отправитель"])),
+                          "по_регионам": свод,
+                          "оговорка": ("это время установки TCP-соединения с нашего хоста в "
+                                       "Амстердаме, то есть цена дотянуться до точки входа. "
+                                       "Сколько добавляет сам отправитель до лидера, отсюда "
+                                       "не видно.")},
+                         ensure_ascii=False, indent=1), encoding="utf-8")
+          print(json.dumps(свод, ensure_ascii=False, indent=1))
+          print()
+          print("| регион | отправитель | точка | мин, мс | медиана, мс | без ответа |")
+          print("|---|---|---|---|---|---|")
+          for т in sorted(точки, key=lambda т: (т["регион"], т["мин_мс"] if т["мин_мс"] is not None else 9e9)):
+              print(f"| {т['регион']} | {т['отправитель']} | {т['host']}:{т['port']} | "
+                    f"{т['мин_мс']} | {т['медиана_мс']} | {т['нет_ответа']} |")
+          PY
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/sender_regions.json data/sender_region_rtt.json; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "III.14: srok do regionalnykh tochek otpraviteley [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
