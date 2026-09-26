@@ -1,0 +1,84 @@
+name: "Дневные счётчики полосы и разбор одной сделки площадки (только чтение)"
+
+# ЗАЧЕМ (пункты 3 и 4 дневного плана владельца 26.09):
+#   4) цепочка чисел по полосе с 11:33Z: сигналов -> отказ на сборке (по
+#      причинам) -> отправлено -> село -> с местом по цепи. В таблице полосы 14
+#      покупок, а суточные счётчики показывают 82 попытки;
+#   3) по одной сделке площадки: возраст сигнала при решении В СЛОТАХ, возраст
+#      сети в секундах и время ответа Bloom; отставание больше порога STALE при
+#      состоявшейся покупке -- отдельная беда.
+#
+# Только чтение журналов на хосте, потоком. Ни ордеров, ни записи.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени считать"
+        required: false
+        default: "2026-09-26T11:33:00Z"
+      sdelka_utc:
+        description: "время сделки площадки для разбора (пусто -- не разбирать)"
+        required: false
+        default: ""
+      okno_s:
+        description: "сколько секунд вокруг сделки смотреть"
+        required: false
+        default: "90"
+
+concurrency:
+  group: dnevnye-schetchiki-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  schet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Счётчики по журналу на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/dnevnye_schetchiki.py" < deploy/checks/dnevnye_schetchiki.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            nice -n 15 python3 /tmp/dnevnye_schetchiki.py --state-dir '$STATE_DIR' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --sdelka-utc '${{ inputs.sdelka_utc }}' --okno-s '${{ inputs.okno_s }}'
+            rc=\$?; rm -f /tmp/dnevnye_schetchiki.py; exit \$rc" | tee data/dnevnye_schetchiki.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/dnevnye_schetchiki.txt ] && git add data/dnevnye_schetchiki.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Dnevnye schetchiki polosy i razbor sdelki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
