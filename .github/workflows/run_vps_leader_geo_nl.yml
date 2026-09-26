@@ -142,13 +142,62 @@ jobs:
             --out-md data/leader_geo.md \
             --out-json data/leader_geo.json
 
+      - name: "Регион узла Helius нашего WebSocket и региона хоста"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Вторая половина II.14: где стоит тот узел, от которого мы
+          # получаем сигналы. У Helius гео-DNS, поэтому имена надо разрешать С
+          # ХОСТА -- из облака они укажут на другую точку.
+          #
+          # ИМЕНА УЗЛОВ ЗАШИТЫ В КОДЕ детектора (bloom_detector.ws_url:1523):
+          # mainnet.helius-rpc.com и atlas-mainnet.helius-rpc.com. Ключ здесь не
+          # участвует вовсе -- ни в выводе, ни в запросе.
+          ssh -n $SSH_OPTS root@$HOST "
+            for NAME in mainnet.helius-rpc.com atlas-mainnet.helius-rpc.com; do
+              echo \"имя: \$NAME\"
+              getent ahosts \"\$NAME\" | awk '{print \"адрес: \" \$1}' | sort -u
+            done
+            printf 'имя: сам хост\\n'
+            printf 'адрес: %s\\n' \"\$(curl -s --max-time 10 https://api.ipify.org)\""             > /tmp/geo_state/helius.txt
+          cat /tmp/geo_state/helius.txt
+          $PY - <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0, "analysis")
+          from leader_geo import гео_пакетом, гео_поштучно, регион
+          адреса, имена = [], []
+          for с in pathlib.Path("/tmp/geo_state/helius.txt").read_text(
+                  encoding="utf-8", errors="replace").splitlines():
+              с = с.strip()
+              if с.startswith("адрес:"):
+                  а = с.split(":", 1)[1].strip()
+                  if а:
+                      адреса.append(а)
+              elif с.startswith("имя:"):
+                  имена.append(с.split(":", 1)[1].strip())
+          адреса = list(dict.fromkeys(адреса))
+          гео = гео_пакетом(адреса)
+          гео.update(гео_поштучно(адреса, гео))
+          из_ = {"имена": имена, "адреса": адреса,
+                 "по_адресам": {а: {"регион": регион(гео.get(а)),
+                                     "страна": (гео.get(а) or {}).get("country"),
+                                     "город": (гео.get(а) or {}).get("city"),
+                                     "сеть": (гео.get(а) or {}).get("isp"),
+                                     "источник": (гео.get(а) or {}).get("источник")}
+                                 for а in адреса}}
+          pathlib.Path("data").mkdir(exist_ok=True)
+          pathlib.Path("data/leader_geo_helius.json").write_text(
+              json.dumps(из_, ensure_ascii=False, indent=1), encoding="utf-8")
+          print(json.dumps(из_, ensure_ascii=False, indent=1))
+          PY
+
       - name: "Коммит отчёта"
         if: always()
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for F in data/leader_geo.md data/leader_geo.json; do
+          for F in data/leader_geo.md data/leader_geo.json data/leader_geo_helius.json; do
             [ -f "$F" ] && git add "$F"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
