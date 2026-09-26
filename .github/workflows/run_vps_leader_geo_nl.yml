@@ -159,7 +159,12 @@ jobs:
               getent ahosts \"\$NAME\" | awk '{print \"адрес: \" \$1}' | sort -u
             done
             printf 'имя: сам хост\\n'
-            printf 'адрес: %s\\n' \"\$(curl -s --max-time 10 https://api.ipify.org)\""             > /tmp/geo_state/helius.txt
+            printf 'адрес: %s\\n' \"\$(curl -s --max-time 10 https://api.ipify.org)\"
+            for NAME in mainnet.helius-rpc.com atlas-mainnet.helius-rpc.com; do
+              for I in 1 2 3 4 5; do
+                printf 'срок: %s %s\\n' \"\$NAME\" \"\$(curl -s -o /dev/null --max-time 5 -w '%{time_connect} %{time_appconnect}' https://\$NAME/ || echo 'нет ответа')\"
+              done
+            done" > /tmp/geo_state/helius.txt
           cat /tmp/geo_state/helius.txt
           $PY - <<'PY'
           import json, pathlib, sys
@@ -176,9 +181,44 @@ jobs:
               elif с.startswith("имя:"):
                   имена.append(с.split(":", 1)[1].strip())
           адреса = list(dict.fromkeys(адреса))
+          # СРОК ДО ТОЧКИ ВХОДА. Адреса Helius анкастовые (Cloudflare), и гео
+          # по IP называет место регистрации сети, а не узел, который нас
+          # обслуживает. Честное расстояние показывает только время: TCP и TLS
+          # с самого хоста. Берём минимум и медиану -- минимум ближе всего к
+          # чистому сетевому сроку.
+          import statistics
+          сроки = {}
+          for с in pathlib.Path("/tmp/geo_state/helius.txt").read_text(
+                  encoding="utf-8", errors="replace").splitlines():
+              с = с.strip()
+              if not с.startswith("срок:"):
+                  continue
+              части = с.split()
+              if len(части) < 4:
+                  continue
+              try:
+                  сроки.setdefault(части[1], []).append(
+                      (float(части[2]) * 1000.0, float(части[3]) * 1000.0))
+              except ValueError:
+                  continue
+          срок_итог = {}
+          for имя, пары in сроки.items():
+              tcp = [a for a, b in пары]
+              tls = [b for a, b in пары]
+              срок_итог[имя] = {
+                  "замеров": len(пары),
+                  "tcp_мин_мс": round(min(tcp), 1),
+                  "tcp_медиана_мс": round(statistics.median(tcp), 1),
+                  "tls_мин_мс": round(min(tls), 1),
+                  "tls_медиана_мс": round(statistics.median(tls), 1)}
           гео = гео_пакетом(адреса)
           гео.update(гео_поштучно(адреса, гео))
           из_ = {"имена": имена, "адреса": адреса,
+                 "срок_до_точки_с_хоста": срок_итог,
+                 "оговорка": ("адреса Helius анкастовые (Cloudflare): гео по IP "
+                              "называет место регистрации сети, а не узел, который "
+                              "нас обслуживает. Расстояние честно показывает только "
+                              "время TCP/TLS с самого хоста."),
                  "по_адресам": {а: {"регион": регион(гео.get(а)),
                                      "страна": (гео.get(а) or {}).get("country"),
                                      "город": (гео.get(а) or {}).get("city"),
