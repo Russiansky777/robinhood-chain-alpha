@@ -1,0 +1,90 @@
+name: "Сборщики: сколько сигналов взяли бы за сутки (только чтение)"
+
+# ЗАЧЕМ (ночное задание владельца 27.09, число к утреннему докладу): сколько
+# сигналов 26.09 отсеялось ИМЕННО по тем причинам, которые ночные сборщики
+# закрывают -- разновидность инструкции кривой, тип пула вне полосы (DAMM v2,
+# DBC), "резервы цену не дают".
+#
+# Журнал решений читается ПОТОКОМ на хосте. Ни сети, ни сделок.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "начало окна UTC (сутки по Мадриду: 2026-09-25T22:00:00Z)"
+        required: false
+        default: "2026-09-25T22:00:00Z"
+      po:
+        description: "конец окна UTC"
+        required: false
+        default: "2026-09-26T22:00:00Z"
+
+concurrency:
+  group: skolko-vzyali-by
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/skolko_vzyali_by_sborshchiki.json
+
+jobs:
+  schet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки сборщиков (без них считать нечего)"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/sb_venv"
+          "$RUNNER_TEMP/sb_venv/bin/pip" install -q solders
+          "$RUNNER_TEMP/sb_venv/bin/python" analysis/c2_swap_build.py --self-test | tail -8
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Счёт по журналу решений (хост, потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/skolko_vzyali_by.py" < deploy/checks/skolko_vzyali_by_sborshchiki.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/skolko_vzyali_by.py --state-dir '$STATE_DIR' \
+              --s '${{ inputs.s }}' --po '${{ inputs.po }}'
+            rc=\$?; rm -f /tmp/skolko_vzyali_by.py; exit \$rc" | tee "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Sborshchiki: skolko signalov vzyali by za sutki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
