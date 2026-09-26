@@ -245,13 +245,44 @@ def цена_единицы_cu(приоритет_лампорты: int, cu_unit
 ПУЛЫ_ПОЛОСЫ = ("PUMP_AMM", "CPMM")     # имена констант в c2_swap_build
 
 
-def кривая_включена() -> bool:
+def группа_источника(источник: str | None) -> str | None:
+    """Группа источника или None, если групп нет вовсе.
+
+    Отдельной функцией, потому что кривая включается ПО ГРУППАМ, а групп в
+    полосе спрашивают из трёх мест. None значит "группу узнать не удалось" и
+    читается строго: кривая по такому сигналу не идёт.
+    """
+    try:
+        import bloom_source_groups as SG  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        return SG.группа(источник)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def кривая_включена(группа: str | None = None) -> bool:
     """Кривая pump.fun в полосе -- ПО ФЛАГУ, по умолчанию выключена.
 
     Сборщик кривую умеет (I.2б), но включение полосы на новый тип пула -- это
     деньги: отдельный деплой и отдельная живая сделка 0.01, как просил
     владелец. Поэтому флаг, а не молчаливое расширение белого списка.
+
+    ДВА ФЛАГА, И СПИСОК СИЛЬНЕЕ ОБЩЕГО (решение владельца 26.09, пункт 4:
+    "LANE_BONDING_CURVE=1 сначала только на speed_only (0.01); если ок -- на все
+    группы"):
+      LANE_BONDING_CURVE_GROUPS=speed_only -- кривая только по этим группам;
+      LANE_BONDING_CURVE=1                 -- кривая по всем группам.
+    Пока список задан, общий флаг кривую на остальные группы НЕ расширяет:
+    иначе "включить на одной группе" зависело бы от порядка правок env.
+    Группа неизвестна -- кривой нет: молчаливое расширение на всех дороже
+    пропущенного сигнала.
     """
+    список = [г.strip() for г in (os.environ.get("LANE_BONDING_CURVE_GROUPS") or "")
+              .replace(";", ",").split(",") if г.strip()]
+    if список:
+        return bool(группа) and группа in список
     return os.environ.get("LANE_BONDING_CURVE", "0").strip() == "1"
 
 
@@ -264,7 +295,7 @@ def _модули():
     return C, PP, SB, B
 
 
-def тип_пула_подходит(программа: str) -> bool:
+def тип_пула_подходит(программа: str, группа: str | None = None) -> bool:
     """Полоса берёт только одношаговые пулы с котировкой SOL.
 
     Слово владельца: Pump AMM или Raydium CPMM. Сосредоточенная ликвидность
@@ -276,7 +307,7 @@ def тип_пула_подходит(программа: str) -> bool:
     except Exception:  # noqa: BLE001
         return False
     типы = {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}
-    if кривая_включена():
+    if кривая_включена(группа):
         типы.add(B.BONDING)
     return программа in типы
 
@@ -903,7 +934,12 @@ def собрать(*, tx_источника: dict, источник: str, мин
         прог = PP.pool_program(tx_источника, пул["pool_vault"], SB._labels())["pool_program"]
         из_["pool_program"] = прог
         типы_полосы = {getattr(B, имя) for имя in ПУЛЫ_ПОЛОСЫ}
-        if кривая_включена():
+        # КРИВАЯ -- ПО ГРУППЕ ИСТОЧНИКА. Группа берётся здесь, а не в подписи
+        # функции: сборка уже знает адрес источника, а протягивать группу через
+        # три вызова значило бы менять денежный путь ради одного флага.
+        группа_сигнала = группа_источника(источник)
+        из_["lane_group"] = группа_сигнала
+        if кривая_включена(группа_сигнала):
             типы_полосы.add(getattr(B, "BONDING", "нет такой программы"))
         if прог not in типы_полосы:
             из_["why_not"] = f"тип пула вне полосы: {прог}"
@@ -917,7 +953,7 @@ def собрать(*, tx_источника: dict, источник: str, мин
         # нет вовсе, оборачивать нечего. Это такой же один шаг, как WSOL, но
         # пускаем его только по флагу и только для кривой.
         нативная = bool(mv) and mv.get("quote_mint") == getattr(C, "NATIVE_QUOTE", "native_sol") \
-            and прог == getattr(B, "BONDING", None) and кривая_включена()
+            and прог == getattr(B, "BONDING", None) and кривая_включена(группа_сигнала)
         if not mv or (mv.get("quote_mint") != C.WSOL and not нативная):
             из_["why_not"] = "котировка пула не SOL -- полоса только одношаговая"
             return из_
@@ -3380,12 +3416,62 @@ def self_test() -> int:
                 {"size": вкл.get("size"), "quote_mint": вкл.get("quote_mint")})
             chk("кривая: минимум ниже ожидания (проскальзывание учтено)",
                 int(вкл.get("min_out") or 0) < int(вкл.get("expected_out") or 0), вкл)
+            # КРИВАЯ ПО ОДНОЙ ГРУППЕ (владелец 26.09, пункт 4). Источник
+            # образца в группах не числится, значит его группа -- bloom_lane;
+            # при списке "speed_only" кривая по нему идти НЕ должна, даже когда
+            # общий флаг стоит.
+            os.environ["LANE_BONDING_CURVE_GROUPS"] = "speed_only"
+            чужая = собрать(tx_источника=образец_кр["tx"], источник=образец_кр["source"],
+                             минт=образец_кр["mint"], наш_кошелёк=кошелёк_полосы(),
+                             лампорты=ЛАМП_КР)
+            chk("кривая только для speed_only: по источнику bloom_lane -- отказ, "
+                "хотя общий флаг стоит",
+                чужая["ok"] is False and "вне полосы" in (чужая["why_not"] or "")
+                and чужая.get("lane_group") == "bloom_lane", чужая)
+            os.environ.pop("LANE_BONDING_CURVE_GROUPS", None)
         finally:
             globals()["_модули"] = было_м
+            os.environ.pop("LANE_BONDING_CURVE_GROUPS", None)
             if было_флаг is None:
                 os.environ.pop("LANE_BONDING_CURVE", None)
             else:
                 os.environ["LANE_BONDING_CURVE"] = было_флаг
+
+    # --- ФЛАГ КРИВОЙ ПО ГРУППАМ, без сборки: чистая логика решения.
+    было_общий = os.environ.get("LANE_BONDING_CURVE")
+    было_список = os.environ.get("LANE_BONDING_CURVE_GROUPS")
+    try:
+        os.environ.pop("LANE_BONDING_CURVE", None)
+        os.environ.pop("LANE_BONDING_CURVE_GROUPS", None)
+        chk("без флагов кривой нет ни по одной группе",
+            кривая_включена("speed_only") is False and кривая_включена(None) is False, "")
+        os.environ["LANE_BONDING_CURVE"] = "1"
+        chk("общий флаг -- кривая по всем группам и даже без группы",
+            кривая_включена("speed_only") and кривая_включена("bloom_lane")
+            and кривая_включена(None), "")
+        os.environ["LANE_BONDING_CURVE_GROUPS"] = "speed_only"
+        chk("список сильнее общего флага: кривая только у speed_only",
+            кривая_включена("speed_only") is True
+            and кривая_включена("lane_only") is False
+            and кривая_включена("bloom_lane") is False, "")
+        chk("группа неизвестна -- кривой нет (молчаливое расширение дороже)",
+            кривая_включена(None) is False, "")
+        os.environ["LANE_BONDING_CURVE_GROUPS"] = "speed_only, lane_only"
+        chk("в списке можно перечислить несколько групп через запятую",
+            кривая_включена("speed_only") and кривая_включена("lane_only")
+            and кривая_включена("bloom_lane") is False, "")
+        os.environ.pop("LANE_BONDING_CURVE", None)
+        os.environ["LANE_BONDING_CURVE_GROUPS"] = "speed_only"
+        chk("список работает и без общего флага",
+            кривая_включена("speed_only") is True
+            and кривая_включена("bloom_lane") is False, "")
+    finally:
+        os.environ.pop("LANE_BONDING_CURVE", None)
+        os.environ.pop("LANE_BONDING_CURVE_GROUPS", None)
+        if было_общий is not None:
+            os.environ["LANE_BONDING_CURVE"] = было_общий
+        if было_список is not None:
+            os.environ["LANE_BONDING_CURVE_GROUPS"] = было_список
 
     # --- ПУСТОЙ BLOCKHASH. Подписать можно, отправить можно, сеть не примет,
     # а чаевые и приоритет уже потрачены.
