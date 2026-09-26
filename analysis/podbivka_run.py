@@ -123,14 +123,66 @@ def прямой_счёт(уз: S.Узел, кош: str, подписи: list) -
     return {"первых_покупок_любого_размера": первых, "разобрано": разобрано, "не_отдал": не_отдал}
 
 
+# ------------------------------------------------------------ факт по нашим сделкам (п.2а)
+
+class Факт:
+    """Наши сделки по источнику с 18.09: DBot (журнал + сырые записи) и Bloom/полоса.
+
+    DBot: готовая покупка в сырых записях (follow.receive.amount -- точное
+    число токенов источника) сопоставляется с покупкой источника в цепи, итог
+    по цепи -- net_sol из журнала сделок. Bloom/полоса: у позиции есть
+    source_sig, итог -- closed_sol_net (chain_ok рядом).
+    """
+
+    def __init__(self, с_ts: int, до_ts: int, host_path: str | None) -> None:
+        import podbivka_1b2 as Q  # noqa: PLC0415
+        self.Q = Q
+        все = {з["address"] for з in список("nashi")}
+        self.dbot = Q.записи_dbot(КОРЕНЬ / "data" / "dbot_follow_trades_raw.json", все, с_ts, до_ts)
+        self.журнал = Q.журнал_сделок(КОРЕНЬ / "data" / "solana_trades_all.json", все)
+        self.host: list = []
+        if host_path and Path(host_path).exists():
+            д = json.loads(Path(host_path).read_text(encoding="utf-8"))
+            for с in д.get("сделки") or []:
+                т = float(с.get("ts_intent") or 0)
+                if с_ts <= т < до_ts and с.get("source") in все:
+                    self.host.append(с)
+
+    def по_источнику(self, адрес: str, все_покупки: list) -> list:
+        из_ = []
+        for з in self.dbot:
+            if з["source"] != адрес or з["state"] != "done":
+                continue
+            п, как = self.Q.сопоставить(з, все_покупки)
+            наши = [т for т in self.журнал if т.get("mint") == з["mint"]
+                    and т.get("wallet") == з["our_wallet"]
+                    and abs((т.get("buy_block_time") or 0) - з["ts"]) <= self.Q.ОКНО_ВРЕМЕНИ_С]
+            наша = min(наши, key=lambda т: abs((т.get("buy_block_time") or 0) - з["ts"])) if наши else None
+            из_.append({"канал": "DBot", "task": з["task"], "mint": з["mint"], "ts": з["ts"],
+                        "source_sig": п["signature"] if п else None, "сопоставлено": как,
+                        "наш_sol_in": наша.get("sol_in") if наша else None,
+                        "факт_net_sol": наша.get("net_sol") if наша else None,
+                        "статус": наша.get("status") if наша else "нет в журнале сделок"})
+        for с in self.host:
+            if с.get("source") != адрес:
+                continue
+            из_.append({"канал": "полоса" if с.get("lane") else "Bloom",
+                        "task": с.get("lane_group") or с.get("source_task"), "mint": с.get("mint"),
+                        "ts": int(float(с.get("ts_intent") or 0)), "source_sig": с.get("source_sig"),
+                        "сопоставлено": "source_sig позиции", "наш_sol_in": с.get("sol_in"),
+                        "факт_net_sol": с.get("closed_sol_net"), "chain_ok": с.get("chain_ok"),
+                        "статус": с.get("state")})
+        return из_
+
+
 # ------------------------------------------------------------ один кошелёк
 
 def кошелёк(уз: S.Узел, курс, строка: dict, с_ts: int, до_ts: int, *, предел_на_порог,
-            предел_подписей, сверка: bool) -> dict:
+            предел_подписей, сверка: bool, факт: Факт | None = None) -> dict:
     t0 = time.time()
     адрес = строка["address"]
     ск = S.скан_кошелька(уз, адрес, с_ts, до_ts, предел_на_порог=предел_на_порог, курс=курс,
-                         предел_подписей=предел_подписей, все_покупки=сверка)
+                         предел_подписей=предел_подписей, все_покупки=сверка or факт is not None)
     покупки = []
     for пк in ск["покупки"]:
         if not пк.get("порог"):
@@ -141,8 +193,28 @@ def кошелёк(уз: S.Узел, курс, строка: dict, с_ts: int, �
         возраст = S.возраст_токена(уз, пк["mint"], пк["signature"], пк.get("blockTime") or 0)
         покупки.append({**{к: v for к, v in пк.items() if к != "опора"}, "sim": сим,
                         "возраст": возраст})
+    сделки_факт = []
+    if факт is not None:
+        по_сиг = {п["signature"]: п for п in ск["все_покупки"]}
+        готовые = {п["signature"]: п.get("sim") for п in покупки if п.get("sim")}
+        for ф in факт.по_источнику(адрес, ск["все_покупки"]):
+            сиг = ф.get("source_sig")
+            if сиг and сиг not in готовые:
+                пк = по_сиг.get(сиг) or {"signature": сиг, "slot": None, "mint": ф["mint"]}
+                try:
+                    готовые[сиг] = S.симулировать(уз, {**пк, "wallet": адрес})
+                except Exception as exc:  # noqa: BLE001
+                    готовые[сиг] = {"why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:160]}
+                уз._кэш.clear()  # noqa: SLF001
+            сделки_факт.append({**ф, "sim": готовые.get(сиг) if сиг else None,
+                                "первая_от_2": any(п["signature"] == сиг for п in покупки
+                                                   if п.get("порог"))})
     из_ = {"строка": строка, "окно": {"с": S.utc(с_ts), "до": S.utc(до_ts)},
+           "факт": сделки_факт,
            "скан": {к: v for к, v in ск.items() if к not in ("покупки", "все_покупки", "_подписи_окна")},
+           "все_покупки": [{к: п.get(к) for к in ("signature", "slot", "blockTime", "mint", "tokens_raw",
+                                                  "первая", "трата_sol", "трата_usd")}
+                           for п in ск["все_покупки"]] if факт is not None else None,
            "покупки": покупки, "минут": round((time.time() - t0) / 60, 2),
            "расход_узла": уз.расход()}
     if сверка:
@@ -167,6 +239,8 @@ def main() -> int:
     р.add_argument("--predel-podpisey", type=int, default=0)
     р.add_argument("--sverka", type=int, default=0, help="у первых N кошельков -- прямой разбор")
     р.add_argument("--push", action="store_true")
+    р.add_argument("--fakt", action="store_true", help="п.2а: наши сделки DBot/Bloom/полосы")
+    р.add_argument("--host-sdelki", default=str(КОРЕНЬ / "data" / "podbivka" / "nashi_sdelki_host.json"))
     а = р.parse_args()
     до_ts = в_секунды(а.do_utc)
     с_ts = int(до_ts - а.dney * 86400)
@@ -178,12 +252,14 @@ def main() -> int:
     курс = C.RateBook(S.КурсУзла(уз))
     последний_пуш = time.time()
     итог = {"кошельков": len(строки), "готово": 0, "не_разобрались": []}
+    факт = Факт(с_ts, до_ts, а.host_sdelki) if а.fakt else None
     for н, строка in enumerate(строки):
         путь = каталог / f"{строка['address']}.json"
         try:
             рез = кошелёк(уз, курс, строка, с_ts, до_ts,
                           предел_на_порог=а.predel_na_porog or None,
-                          предел_подписей=а.predel_podpisey or None, сверка=н < а.sverka)
+                          предел_подписей=а.predel_podpisey or None, сверка=н < а.sverka,
+                          факт=факт)
             if рез["скан"].get("why_not"):
                 итог["не_разобрались"].append({"address": строка["address"],
                                                "причина": рез["скан"]["why_not"]})

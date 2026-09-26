@@ -45,6 +45,8 @@ def пакеты(м: dict) -> list:
                "--predel-na-porog", str(м.get("predel_na_porog", 0)),
                "--predel-podpisey", str(м.get("predel_podpisey", 0)),
                "--sverka", str(м.get("sverka", 0) if н == с else 0), "--push"]
+        if м.get("fakt"):
+            арг.append("--fakt")
         из_.append({"skript": "podbivka_run.py", "args": " ".join(арг), "name": f"{м['zadacha']}_{н}_{до}"})
     return из_
 
