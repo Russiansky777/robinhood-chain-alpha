@@ -76,6 +76,15 @@
    "задержка": []
   }
  },
+ "doublezero_architecture.html": {
+  "байт": 39331,
+  "выдержки": {
+   "регионы": [],
+   "протокол": [],
+   "цена": [],
+   "задержка": []
+  }
+ },
  "doublezero_docs.html": {
   "байт": 35513,
   "выдержки": {
@@ -91,6 +100,65 @@
    "регионы": [],
    "протокол": [],
    "цена": [],
+   "задержка": []
+  }
+ },
+ "doublezero_edge_subscriber.html": {
+  "байт": 55055,
+  "выдержки": {
+   "регионы": [
+    ". Pricing Seats are billed per month , per machine, in the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locat",
+    "eats are billed per month , per machine, in the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 /",
+    ", per machine, in the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit",
+    "achine, in the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit Request Go",
+    "the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit Request Go to https:/",
+    "you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit Request Go to https://double",
+    "s for leader shreds only, in addition to full feed comparison. You can also drill down by region to see expected performance. Edge Publishers The \"Publishing Shreds\" metric at the top le"
+   ],
+   "протокол": [
+    "-j ACCEPT sudo iptables -A INPUT -i doublezero1 -s 169 .254.0.0/16 -d 169 .254.0.0/16 -p tcp --dport 179 -j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -s 169 .254.0.0/16 -d 169 .2",
+    "-j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -s 169 .254.0.0/16 -d 169 .254.0.0/16 -p tcp --dport 179 -j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -p pim -j ACCEPT sudo iptabl",
+    "tables -A OUTPUT -o doublezero1 -p pim -j ACCEPT sudo iptables -A INPUT -i doublezero1 -p udp --dport 7733 -j ACCEPT sudo iptables -A INPUT -i doublezero0 -p udp --dport 44880 -j ACCE",
+    "PUT -i doublezero1 -p udp --dport 7733 -j ACCEPT sudo iptables -A INPUT -i doublezero0 -p udp --dport 44880 -j ACCEPT UFW: sudo ufw allow proto gre from any to any sudo ufw allow in o",
+    "y sudo ufw allow in on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto tcp sudo ufw allow out on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto",
+    "sudo ufw allow out on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto tcp sudo ufw allow out on doublezero1 proto pim from any to any sudo ufw allow in on doubleze",
+    "lezero1 proto pim from any to any sudo ufw allow in on doublezero1 to any port 7733 proto udp sudo ufw allow in on doublezero0 to any port 44880 proto udp Step 2: Choose a metro Ident",
+    "zero1 to any port 7733 proto udp sudo ufw allow in on doublezero0 to any port 44880 proto udp Step 2: Choose a metro Identify the lowest-latency location from the machine that will re"
+   ],
+   "цена": [
+    "illed per month , per machine, in the metro you select: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3:",
+    "lect: Metros Price Frankfurt, Amsterdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit Request Go to https://doublezero.xyz/edge",
+    "terdam $1,500 / month London, New York, Singapore, Tokyo $900 / month All other locations $450 / month Step 3: Submit Request Go to https://doublezero.xyz/edge/subscribe . Select Solana Shreds"
+   ],
+   "задержка": []
+  }
+ },
+ "doublezero_edge_subscriber_cli.html": {
+  "байт": 68820,
+  "выдержки": {
+   "регионы": [
+    "s for leader shreds only, in addition to full feed comparison. You can also drill down by region to see expected performance. Edge Publishers The \"Publishing Shreds\" metric at the top le"
+   ],
+   "протокол": [
+    "-j ACCEPT sudo iptables -A INPUT -i doublezero1 -s 169 .254.0.0/16 -d 169 .254.0.0/16 -p tcp --dport 179 -j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -s 169 .254.0.0/16 -d 169 .2",
+    "-j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -s 169 .254.0.0/16 -d 169 .254.0.0/16 -p tcp --dport 179 -j ACCEPT sudo iptables -A OUTPUT -o doublezero1 -p pim -j ACCEPT sudo iptabl",
+    "tables -A OUTPUT -o doublezero1 -p pim -j ACCEPT sudo iptables -A INPUT -i doublezero1 -p udp --dport 7733 -j ACCEPT sudo iptables -A INPUT -i doublezero0 -p udp --dport 44880 -j ACCE",
+    "PUT -i doublezero1 -p udp --dport 7733 -j ACCEPT sudo iptables -A INPUT -i doublezero0 -p udp --dport 44880 -j ACCEPT UFW: sudo ufw allow proto gre from any to any sudo ufw allow in o",
+    "y sudo ufw allow in on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto tcp sudo ufw allow out on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto",
+    "sudo ufw allow out on doublezero1 from 169 .254.0.0/16 to 169 .254.0.0/16 port 179 proto tcp sudo ufw allow out on doublezero1 proto pim from any to any sudo ufw allow in on doubleze",
+    "lezero1 proto pim from any to any sudo ufw allow in on doublezero1 to any port 7733 proto udp sudo ufw allow in on doublezero0 to any port 44880 proto udp 3. Enable the Reconciler The",
+    "zero1 to any port 7733 proto udp sudo ufw allow in on doublezero0 to any port 44880 proto udp 3. Enable the Reconciler The reconciler monitors onchain state and automatically provisio"
+   ],
+   "цена": [
+    "ens: SOL — for Solana transaction fees. Transfer SOL to the wallet address printed above. USDC — for seat funding. The CLI pulls from your wallet's Associated Token Account (ATA) for t",
+    "funding. The CLI pulls from your wallet's Associated Token Account (ATA) for the mainnet USDC mint ( EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v ). Step 3: Buy a Seat 1. Find Your Ne",
+    "e Code , Metro Code , Metro Name , Status , Settled Seats , Available Seats , Base Price (USDC) , Premium (USDC) , Epoch Price (USDC) . The epoch price is the total cost per epoch for",
+    "de , Metro Name , Status , Settled Seats , Available Seats , Base Price (USDC) , Premium (USDC) , Epoch Price (USDC) . The epoch price is the total cost per epoch for a seat on that de",
+    "tus , Settled Seats , Available Seats , Base Price (USDC) , Premium (USDC) , Epoch Price (USDC) . The epoch price is the total cost per epoch for a seat on that device (base + premium)",
+    "code (e.g., <Device_Name> ) --client-ip <IP> Your machine's public IPv4 address --amount <USDC> USDC to fund (decimal format, e.g. 100 = 100 USDC). Must meet the minimum epoch price. -",
+    "e.g., <Device_Name> ) --client-ip <IP> Your machine's public IPv4 address --amount <USDC> USDC to fund (decimal format, e.g. 100 = 100 USDC). Must meet the minimum epoch price. --sourc",
+    "achine's public IPv4 address --amount <USDC> USDC to fund (decimal format, e.g. 100 = 100 USDC). Must meet the minimum epoch price. --source-token-account <PUBKEY> Custom USDC source a"
+   ],
    "задержка": []
   }
  },
