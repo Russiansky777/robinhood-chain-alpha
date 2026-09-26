@@ -95,6 +95,7 @@ jobs:
       - name: "Каталоги от пользователя службы"
         run: |
           set -e
+          echo "--- слушатель шредов: доставка ${{ github.run_id }} ---" > data/shred_listener_deploy.txt
           # Каталог состояния создаётся СРАЗУ от bot, а не от root: на этом уже
           # сгорел учёт кредитов у зонда -- каталог создал root, и служба не
           # могла в него писать.
@@ -118,17 +119,24 @@ jobs:
       - name: "Самопроверка НА ХОСТЕ и зависимости"
         run: |
           set -e
+          set -o pipefail
+          # pipefail И НА ХОСТЕ: без него "самопроверка | tail -3" отдаёт код
+          # tail, то есть ноль, и провалившаяся самопроверка проходит молча.
+          # Заодно строки самопроверки уходят в отчёт, а не только в лог.
           ssh -n $SSH_OPTS root@"$HOST" "
             set -e
+            set -o pipefail
             $VENV -c 'import websockets; print(\"websockets на месте\")'
-            sudo -u bot $VENV $CODE_DIR/shred_listener.py --self-test | tail -3"
+            sudo -u bot $VENV $CODE_DIR/shred_listener.py --self-test | tail -3" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
 
       - name: "Правила входящего UDP (показать, менять только по просьбе)"
         run: |
           set -e
           {
+            echo ""
             echo "--- правила на хосте до правки ---"
-          } > data/shred_listener_deploy.txt
+          } >> data/shred_listener_deploy.txt
           ssh -n $SSH_OPTS root@"$HOST" "
             (ufw status verbose 2>/dev/null || echo 'ufw не установлен');
             echo '--- nft/iptables INPUT ---';
