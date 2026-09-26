@@ -24,9 +24,9 @@ on:
         required: false
         default: "0"
       day:
-        description: "какой суточный счёт печатать (YYYYMMDD)"
+        description: "какой суточный счёт печатать (ГГГГ-ММ-ДД по Мадриду, как в имени файла)"
         required: false
-        default: "20260926"
+        default: "2026-09-26"
 
 concurrency:
   group: sverka-pnl-zhivoy
@@ -77,6 +77,11 @@ jobs:
               --out /tmp/nashi_sdelki.json
             rm -f /tmp/nashi_sdelki_iz_zhurnala.py"
           ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nashi_sdelki.json" > /tmp/nashi_sdelki.json
+          # ИМЯ ФАЙЛА -- С ДЕФИСАМИ И ПО МАДРИДУ (bloom_exec_state.day_key):
+          # pnl_2026-09-26.json. Прогон 11:52Z искал pnl_20260926.json, не нашёл
+          # и напечатал пустой счёт -- это выглядело как "учёт не пишется".
+          # Поэтому же рядом печатается список всех файлов счёта.
+          ssh -n $SSH_OPTS root@"$HOST" "ls -l $STATE_DIR/pnl_*.json 2>/dev/null || echo 'файлов счёта нет вовсе'"
           ssh -n $SSH_OPTS root@"$HOST" "cat $STATE_DIR/pnl_${{ inputs.day }}.json 2>/dev/null || echo '{}'" > /tmp/pnl_dnya.json
           wc -c /tmp/nashi_sdelki.json /tmp/pnl_dnya.json
           cat /tmp/pnl_dnya.json
