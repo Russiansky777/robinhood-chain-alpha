@@ -1,0 +1,95 @@
+name: "Архив хоста для бэкапа -- артефактом прогона (только чтение)"
+
+# ЗАЧЕМ (пункт 4 владельца 26.09, ночь): иметь снимок хоста на случай потери
+# машины. Архив кладётся АРТЕФАКТОМ прогона, а не в репозиторий: журналы там
+# сотни мегабайт, и в git им не место.
+#
+# ЧЕГО В АРХИВЕ НЕТ И БЫТЬ НЕ МОЖЕТ: файлов окружения с ключами
+# (/etc/bloom-executor/env*), любых *.key / *.pem / id_*, кошельковых json.
+# Список исключений применяется ДВАЖДЫ: при упаковке (tar --exclude) и при
+# проверке готового архива (имена файлов плюс поиск ключей в текстовых). Если
+# проверка нашла подозрительное -- артефакт НЕ выкладывается.
+on:
+  workflow_dispatch:
+    inputs:
+      journals:
+        description: "'yes' -- положить журналы состояния (сотни МБ), 'no' -- только код и конфигурация"
+        required: false
+        default: "yes"
+      retention_days:
+        description: "сколько дней держать артефакт"
+        required: false
+        default: "7"
+
+concurrency:
+  group: arhiv-hosta
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  arhiv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Упаковка на хосте (ключи исключены)"
+        run: |
+          set -e
+          set -o pipefail
+          WITH_JOURNALS="${{ inputs.journals }}"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            rm -f /tmp/host_backup.tar.gz
+            PATHS='/home/bot/bloom_executor /home/bot/shred_probe /home/bot/data /home/bot/bin /etc/systemd/system/bloom-detector.service /etc/systemd/system/bloom-seller.service /etc/systemd/system/shred-listener.service /etc/systemd/system/dbot-sold-guard.service /etc/systemd/system/dbot-detect-probe.service /etc/systemd/system/grpc-feed-probe.service'
+            if [ '$WITH_JOURNALS' = 'yes' ]; then
+              PATHS=\"\$PATHS /home/bot/bloom_executor_live_data /home/bot/shred_probe_data /home/bot/grpc_feed_probe_data /home/bot/dbot_detect_probe\"
+            fi
+            tar czf /tmp/host_backup.tar.gz --ignore-failed-read \
+              --exclude='*/env' --exclude='*/env.*' --exclude='*.key' \
+              --exclude='*.pem' --exclude='id_*' --exclude='*wallet*.json' \
+              --exclude='*secret*' --exclude='*.sock' --exclude='__pycache__' \
+              --exclude='*/venv/*' \$PATHS 2>/dev/null || true
+            ls -l /tmp/host_backup.tar.gz
+            echo '--- что внутри, верхние каталоги ---'
+            tar tzf /tmp/host_backup.tar.gz | awk -F/ '{print \$1\"/\"\$2\"/\"\$3}' | sort -u | head -20"
+
+      - name: "Забрать архив"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/host_backup.tar.gz" > host_backup.tar.gz
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/host_backup.tar.gz"
+          ls -l host_backup.tar.gz
+
+      - name: "Проверка архива: ключей внутри быть не должно"
+        run: |
+          set -e
+          python3 deploy/checks/arhiv_bez_klyuchey.py host_backup.tar.gz | tee arhiv_proverka.txt
+
+      - name: "Выложить артефактом"
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-backup
+          path: |
+            host_backup.tar.gz
+            arhiv_proverka.txt
+          retention-days: ${{ inputs.retention_days }}
+          if-no-files-found: error
