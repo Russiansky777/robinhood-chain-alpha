@@ -1,0 +1,92 @@
+name: "Не севшие отправки полосы: разбор по цепи + ответ Bloom (только чтение)"
+
+# ЗАЧЕМ (пункт 2 владельца 26.09). С 11:33Z отправлено 17 сделок полосы, село 10.
+# По каждой не севшей нужно одно из двух: не дошла до цепи вовсе или села с
+# ошибкой -- и тогда с каким кодом (проскальзывание, blockhash, nonce, другое);
+# отдельно -- списан ли расход у севших с ошибкой. Плюс распределение времени
+# ответа Bloom: медиана, p90, число ответов дольше секунды.
+#
+# Выжимка из журналов идёт потоком с хоста, цепь спрашивается с облачного
+# бегунка пакетами по 25. Только чтение, ключей кошельков в прогоне нет.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени брать отправки"
+        required: false
+        default: "2026-09-26T11:33:00Z"
+
+concurrency:
+  group: nesevshie-razbor
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон с requests"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/ns_venv"
+          "$RUNNER_TEMP/ns_venv/bin/pip" install -q requests
+          echo "PY=$RUNNER_TEMP/ns_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Выжимка из журналов потоком"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/nesevshie_iz_zhurnala.py" < deploy/checks/nesevshie_iz_zhurnala.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            nice -n 15 python3 /tmp/nesevshie_iz_zhurnala.py --state-dir '$STATE_DIR' \
+              --since-utc '${{ inputs.since_utc }}' --out /tmp/nesevshie.json
+            rm -f /tmp/nesevshie_iz_zhurnala.py"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nesevshie.json" > /tmp/nesevshie.json
+          wc -c /tmp/nesevshie.json
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY analysis/nesevshie_po_cepi.py --vyzhimka /tmp/nesevshie.json \
+            --out data/nesevshie_razbor.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/nesevshie_razbor.json ] && git add data/nesevshie_razbor.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Nesevshie otpravki polosy: razbor po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
