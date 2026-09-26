@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-26T03:03:46Z",
+  "generated_utc": "2026-09-26T03:10:55Z",
   "inputs": {
     "crowd_cache": "/tmp/night_state/crowd_metric.json",
     "state_dir": "/tmp/night_state",
@@ -19,12 +19,12 @@
     "ok": true,
     "service": "c2_night_leader_stonkfun",
     "key_env": "HELIUS_API_KEY",
-    "local_credit_limit": 20000,
+    "local_credit_limit": 30000,
     "owner_stop_fraction": 0.7,
     "owner_stop_credits": 140000,
     "c2_daily_budget": 200000,
-    "credits_used": 3579,
-    "calls_used": 3579,
+    "credits_used": 2607,
+    "calls_used": 2607,
     "stopped_reason": null
   },
   "task_e_leader": {
@@ -126,16 +126,22 @@
     },
     "exit_reconstruction": {
       "ok": true,
-      "n_signatures_fetched": 4373,
-      "n_getSignatures_calls": 127,
-      "n_getTransaction_calls": 3450,
+      "n_signatures_fetched": 5578,
+      "n_getSignatures_calls": 129,
+      "n_getTransaction_calls": 2476,
       "partial": false,
       "stopped_reason": null,
       "trades": [
         {
           "exit_signature": "UdeTuULGbfTMsLTwLp5GZujXdfUjTjtz5G5CyLRxHvpdTU25ctRus4PYHCNkPr4X4wXw6oiqegbYJMdfx1RFewo",
           "exit_slot": 447933301,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1655.736581
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001855098346032128951274394311",
@@ -145,13 +151,19 @@
           "mint": "6UymExPNxsyZwWzaPVvgjWy315yjSSupB8CKFbyjUEp3",
           "ok": true,
           "sol_in": 22.191624,
-          "net_sol": -22.191624,
+          "net_sol": null,
           "held_slots": 95349
         },
         {
           "exit_signature": "3DrGZwxSFLkRjuZ6RcjhzgEGgYrXZrEFXukyVNf7cS6Um1kKNGUuqnWYwV3GnPsjaoLpwJJDNJiUJxEuHkT7o9BU",
           "exit_slot": 448230812,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2769.640913
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.1031383397815490695110023303",
@@ -161,18 +173,21 @@
           "mint": "7rUNV1HjfCzbtGi3ZbKQ5hYXVjzbAfyCTcgTULQxCwki",
           "ok": true,
           "sol_in": 29.7151,
-          "net_sol": -29.7151,
+          "net_sol": null,
           "held_slots": 388747
         },
         {
           "exit_signature": "3rJt5Moy9jyifNpUK2uQghqX69uijJkVT35GbZNDhmUtDHBiqTkKbpsb4qKDfmHGsLu4YpXfNaK8fAevVWs4FpM6",
           "exit_slot": 450086737,
           "sol_received": -8e-05,
+          "quote_other": null,
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": false,
           "pool_why_not": "у хранилища минта нет встречного котировочного счёта",
           "price": null,
           "vault": "2QaV2CPmTeQEvu6YPM94wGGFBs5HFV8NnwMKKmEygeeJ",
-          "candidates_seen": 313,
+          "candidates_seen": 318,
           "signature": "2hrnu91GH42UkGyoZqdqh3E6QUq2zQbDkxbGuh22zcg93862cL24cbST4HB15igFNxNtBv3dNrw4SdE4BwNauW1f",
           "mint": "GCjgZ2X4XmSrLX7SVuiAVkA3c1ptXdtWiVQN4u1P9GeR",
           "ok": true,
@@ -183,7 +198,13 @@
         {
           "exit_signature": "2je5tbFk4g5uDVDEGf94ecmokY5GhGjszuYssWXgBUmtpB6MJcMS9vBjmjSY55ugrf8ySef9X6t1CeXiZ2QU1vrm",
           "exit_slot": 449141335,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 842.347583
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": false,
           "pool_why_not": "неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, Xsv9hR)",
           "price": null,
@@ -193,21 +214,41 @@
           "mint": "2pWXsELtCwtcKUyvNC6igngswUSQjVpJdY4hA4cTdjaL",
           "ok": true,
           "sol_in": 19.798226,
-          "net_sol": -19.798226,
+          "net_sol": null,
           "held_slots": 1296075
         },
         {
+          "exit_signature": "FYCoByiGWN3pRwZPFsp8YVnCeBTWuq1vTZX6reMwHFRfxyxrzsSpbi5hpw6UwdVMzH6KFKaYu8JcG9H5KiueD69",
+          "exit_slot": 448828399,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3478.725282
+          },
+          "pages_read": 3,
+          "pages_capped": false,
+          "pool_ok": false,
+          "pool_why_not": "неоднозначная котировка: 5 встречных счетов (EPjFWd, HTmQz7, So1111, Xsv9hR)",
+          "price": null,
+          "vault": "3n7NbQ8qcccc4cETgMsqdfRttFDxTvW2GcFJsoCrRGwC",
+          "candidates_seen": 200,
           "signature": "5WaybDFctdvtUZAuhGgCp83hCvGhMuf76j5cAsnuxYeC5tdusto9tfgj5zYD9X8i6qEgxs6KqnwGAPBW7n4vmXoP",
           "mint": "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3",
-          "ok": false,
-          "vault": "3n7NbQ8qcccc4cETgMsqdfRttFDxTvW2GcFJsoCrRGwC",
-          "candidates_seen": 1000,
-          "why_not": "продажи этого минта после покупки нет (ещё держит, либо вышел не продажей)"
+          "ok": true,
+          "sol_in": 24.715836,
+          "net_sol": null,
+          "held_slots": 982992
         },
         {
           "exit_signature": "2jK9bq2tP8zRSb6FbhVyhv1CjPE3e8FAx7xPQcjh6BvyHMEzoEJDdsVjj7PAaFHSRyiaduxuyRRQuUd5Y6hWhZMo",
           "exit_slot": 449928395,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1353.465933
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.003204372680989645290814329676",
@@ -217,13 +258,19 @@
           "mint": "ELazwqKFcnjiZ894i8bkcaV8WKuEoudncvBhsgHEgzmw",
           "ok": true,
           "sol_in": 9.885991,
-          "net_sol": -9.885991,
+          "net_sol": null,
           "held_slots": 2082951
         },
         {
           "exit_signature": "sBKje48TjJt6FwnqEvGpAYyFG1B55m3qZAXgYZdbuWL9dh6TE6mwGJJp2KXikYoK7vEmQXF8PreN6nt1iQBHPAY",
           "exit_slot": 449581384,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5686.924065
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.02124314436663555025807859405",
@@ -233,13 +280,19 @@
           "mint": "FTjYFyQLRX34RmfX1Xxh1VUJe9c2H8WFr7XophMa55g4",
           "ok": true,
           "sol_in": 9.884358,
-          "net_sol": -9.884358,
+          "net_sol": null,
           "held_slots": 1735871
         },
         {
           "exit_signature": "61Dko2R3zVGosnoQyT2veQVNCyPV6AbHXzMrYqpGiyg1w68Y4kZjsDXaKDjLkPc3CH1vZDgKYtiiwFRmTfFgTemX",
           "exit_slot": 448009316,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3354.712058
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00004114771446860276986778679103",
@@ -249,13 +302,19 @@
           "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
           "ok": true,
           "sol_in": 2.754526,
-          "net_sol": -2.754526,
+          "net_sol": null,
           "held_slots": 162340
         },
         {
           "exit_signature": "2yYsmKCbBSF8RkJYWNUie9Xvujm2CQfwJ4pP5DJkK7Fub4eE715VVnaHmMq5qzLF7K5688gUENbfbSfoxYWX4312",
           "exit_slot": 449299678,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 365.654759
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00005945466929294356856648288784",
@@ -265,13 +324,19 @@
           "mint": "8jZTEysTtA2f57evMwWyrWXQAnSksGRtCYp6vQUw7L76",
           "ok": true,
           "sol_in": 19.676825,
-          "net_sol": -19.676825,
+          "net_sol": null,
           "held_slots": 1444111
         },
         {
           "exit_signature": "r87WcmmeWUen92PzoTd6ys1FjnYq6FNLqwFjy8tF9VuCb4WgHeM1w11DAcxU9Q4VvJFGc3AGgztXUn5dufJNFNp",
           "exit_slot": 449610060,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 13851.281577
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000005882783704038610878331143369",
@@ -281,13 +346,19 @@
           "mint": "7hGgx1VtNTj193fFXXuMEkp1MRV6JbWYgMBhHRYxaxu2",
           "ok": true,
           "sol_in": 8.378178,
-          "net_sol": -8.378178,
+          "net_sol": null,
           "held_slots": 1749842
         },
         {
           "exit_signature": "8GuykYaTPSG3caWFs9zuxdATLFy3u9J18Ybc4QVkrvy1JXLXw7C4i8oYikpuHiPPBneT4zq5iPvJfdAPkDHPi82",
           "exit_slot": 449428287,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1169.914042
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.686333216268046266062326574E-7",
@@ -297,13 +368,19 @@
           "mint": "DDndHihssMMJnd3je9Fxukq4M9PdxwQ2XqF8cZgkZu1s",
           "ok": true,
           "sol_in": 5.947736,
-          "net_sol": -5.947736,
+          "net_sol": null,
           "held_slots": 1557875
         },
         {
           "exit_signature": "4tHKMHVPtYzhSB9hmskUCBxEb3Mr3nZykUW5vCLVw6gbHQpwBhNPoRWo1KgCAMroWYyvVfVbvLXXyK82wVMr2sa",
           "exit_slot": 448594190,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5886.930785
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002767904122004704351164414204",
@@ -313,13 +390,19 @@
           "mint": "BXrbjRfUH35Y9fDxmHw9GambqVHZ6McmgfRXGqkzUjQr",
           "ok": true,
           "sol_in": 19.818204,
-          "net_sol": -19.818204,
+          "net_sol": null,
           "held_slots": 723635
         },
         {
           "exit_signature": "2h4ZhiQeh6PkANbT6ZGA4NjWkF5UyLNLFu8uxT2ix2HTPGXf3kGW3UyqryWwQ7BkkFnJXSD1cPtYkt5D386PZ9jV",
           "exit_slot": 449204573,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3059.335499
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.01259205770516358539569923389",
@@ -329,13 +412,19 @@
           "mint": "541vHPysHQJnxW1sH728mnxqPsRW3JukWaUtbWEMaDj",
           "ok": true,
           "sol_in": 12.320968,
-          "net_sol": -12.320968,
+          "net_sol": null,
           "held_slots": 1267580
         },
         {
           "exit_signature": "3tstU62mJte7kmmp6aU3qmhEYVhDaEpsZuD9NjWPhxJ1Yb5B3n9m85tDpy43j6abZQhisSwqpYgHGPMi5Hd4XZYU",
           "exit_slot": 449590250,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1668.052285
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001513815910398669625446219895",
@@ -345,13 +434,19 @@
           "mint": "DfNEvU3GCLrdhZyxGL7qnm2TM9M1NcUiKAFBgjxLT1hf",
           "ok": true,
           "sol_in": 6.835077,
-          "net_sol": -6.835077,
+          "net_sol": null,
           "held_slots": 1636870
         },
         {
           "exit_signature": "5D67Yz39p7PiEXD1RxpDdV9xHqQ9kp4YHmuThi6PCfPQAA2xWY11rPTFGDHrra5sDr74vZ8qi6yC6V3B8awzKAT5",
           "exit_slot": 449204470,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2620.271
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.05125668967173763545357933857",
@@ -361,13 +456,19 @@
           "mint": "3c7mmVSyEH8jfZXgxvpLsETtko1Y16DyRJ5XYB4snhGt",
           "ok": true,
           "sol_in": 19.516433,
-          "net_sol": -19.516433,
+          "net_sol": null,
           "held_slots": 1220086
         },
         {
           "exit_signature": "a9ssjXqsBmgkGtB8dDSVbeND1ZBJrKgpQtKebez9PMNkq1Wwie8rJkg7MZhNHxJ7YMmYBiLm1MzcHB4GmdFBCh2",
           "exit_slot": 450133718,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2351.750295
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002839267627348093234483536870",
@@ -377,7 +478,7 @@
           "mint": "2Az3YTaYkrQWkdch16KFvtuXmyCTmm2FoQdVEDa9qkQ1",
           "ok": true,
           "sol_in": 4.725517,
-          "net_sol": -4.725517,
+          "net_sol": null,
           "held_slots": 2149163
         },
         {
@@ -391,7 +492,13 @@
         {
           "exit_signature": "24qKmtyDBsAD8P2vLmcwyWJSWcq2JAnfjGpJyvLgYU46WK81SBkNSTwPoCV8rKiaUYVYNYk3qmCCt64FnvfkBoDN",
           "exit_slot": 449586576,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2709.10251
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.004862680854524432367802153430",
@@ -401,13 +508,19 @@
           "mint": "5RXEzhbfmAtEHaPo7qkHk6ThLEXEKzxszEmaY2R1Bydz",
           "ok": true,
           "sol_in": 15.323573,
-          "net_sol": -15.323573,
+          "net_sol": null,
           "held_slots": 1601108
         },
         {
           "exit_signature": "2E5azVfWcjmVr2UWvprwEVvxBWL4HfjpVgNHHE4NmacQh9VuJsv2FH2qDHrDS98EnR3Ko8FcqANxRyjD1sQuG8xX",
           "exit_slot": 449278536,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1824.591929
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001448723684877212535429374101",
@@ -417,13 +530,19 @@
           "mint": "SkA82maVyUBgt4HUvMTLRDGyXX1yJpAsMNPhxEeSTNK",
           "ok": true,
           "sol_in": 37.87032,
-          "net_sol": -37.87032,
+          "net_sol": null,
           "held_slots": 1292045
         },
         {
           "exit_signature": "4uJS5JjfsdxDUoLLBi9eSgNpf7zFsTsTe2odPF35UrwwmfgA8gWevAq2Vs8ZUswz4XchWpxCfVwQZ8ZCYAk25wrE",
           "exit_slot": 449586232,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2527.5422
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002713991449150824766781154408",
@@ -433,13 +552,19 @@
           "mint": "3w1T8HXSZ2axXv3YPXFGWdLRMYRVNBGcntuJRM7vC7Da",
           "ok": true,
           "sol_in": 3.226375,
-          "net_sol": -3.226375,
+          "net_sol": null,
           "held_slots": 1594296
         },
         {
           "exit_signature": "2pGQnoeZNSoSTvGUsHg9FVz22EmzHabhgiZCBCQSFLNtAN1c64GMj9bfNBWSgQmvQwa1DfnX8rcjtrwe4ZD9FqtA",
           "exit_slot": 449428240,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1636.910039
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "7.220091205240980503682053733E-8",
@@ -449,13 +574,19 @@
           "mint": "Fb8iF1se85hQ7S8cJkuTi8hQRxStMLq6hubh7d4Qpump",
           "ok": true,
           "sol_in": 32.107069,
-          "net_sol": -32.107069,
+          "net_sol": null,
           "held_slots": 1316794
         },
         {
           "exit_signature": "4dRVPRL1FuW22Xwemh4uTaCeHxuqs7EyCP2rCPMyztHktdRxh9HbtvSnWfks4vw3UiJbv2zwCHZF7CHFa3stuFst",
           "exit_slot": 449928365,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1614.03091
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.009044330554342564022010576344",
@@ -465,13 +596,19 @@
           "mint": "6JETXVHFmWFu95A6UmzJPMa8MLNzsoA1Wd6qrWT4TcP2",
           "ok": true,
           "sol_in": 3.49655,
-          "net_sol": -3.49655,
+          "net_sol": null,
           "held_slots": 1804305
         },
         {
           "exit_signature": "C9oYB52Ko4pSvdrzHxPMsWtGURVWTUnTx2gBG1FpMTANh2D571nqDTpUnyfQpWG3nhTnbTcjrU4ufynaAQuF8oG",
           "exit_slot": 450168050,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4319.3356
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001537867499690643776995685425",
@@ -481,13 +618,19 @@
           "mint": "HWbLXKQnEM4mngniNLpgyqEekMDk8NPUvcjpT6qZJDrM",
           "ok": true,
           "sol_in": 9.054881,
-          "net_sol": -9.054881,
+          "net_sol": null,
           "held_slots": 2043938
         },
         {
           "exit_signature": "58kdwQNYtGfGUZaHi9sy7kAVuzgXrbm9TPnBEUYN9B4Fa8EE9cygeh4JJroHkbCj6UJwy1MUtUY8tkdgqbR3ZPKv",
           "exit_slot": 448146537,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3752.069012
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000006865743069511886241545422351",
@@ -497,13 +640,19 @@
           "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
           "ok": true,
           "sol_in": 22.321938,
-          "net_sol": -22.321938,
+          "net_sol": null,
           "held_slots": 6910
         },
         {
           "exit_signature": "4xpdXVoXkTCBWGdDVjkxaaHhmHZx1fvJoULwpmJiRTD4edgRer7KyGNxVYHgQNr4N4fQgXWGdsvnLzMcBM3hV2yS",
           "exit_slot": 449487449,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1666.322226
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000007951891731407632010261828530",
@@ -513,13 +662,19 @@
           "mint": "HdApvneP9ELet5wEu5qCG73xf4zB2Amgvf6PHVLjpV7j",
           "ok": true,
           "sol_in": 3.525433,
-          "net_sol": -3.525433,
+          "net_sol": null,
           "held_slots": 1344231
         },
         {
           "exit_signature": "3CLUFv85zxyeeTmrx2GNMGV5bF3JoM8xtVx8eLXCZk2zdgECRtaXJbEvprpB8kVLmT4qoP8ZNf87anBvJnCcxxuV",
           "exit_slot": 449299427,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 908.766097
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.937916824931532419975483334E-7",
@@ -529,13 +684,19 @@
           "mint": "2x2CNPngMaKoTfDfzKzUCSVqJfwyUmN2qipV4DqRDjA4",
           "ok": true,
           "sol_in": 4.476348,
-          "net_sol": -4.476348,
+          "net_sol": null,
           "held_slots": 1156112
         },
         {
           "exit_signature": "5EtViS2ubY6KRYR5Yo6LFEPHAmNSnJ2vYuH2f9q14cNsAdX2PjyyR9iPY2jhx5Ws4BpySKURrGhBLfctESzkPcae",
           "exit_slot": 449269160,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 606.365732
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "8.428624353969627741629937686E-8",
@@ -545,13 +706,19 @@
           "mint": "5CuABGLn6kqEqSHuMJqci62JvAbmDEHYzEh7iUEv3Cax",
           "ok": true,
           "sol_in": 3.578804,
-          "net_sol": -3.578804,
+          "net_sol": null,
           "held_slots": 1125799
         },
         {
           "exit_signature": "51TajMtpWMfLzhDbDi1BkGoZ6uhXWsRsBKrmh1UcQDkRmsGe5mbUosJ3RbVGgGRvd8ASEcuF5GjYTbPvNbBPjTAd",
           "exit_slot": 449299753,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3306.330827
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0009020742849983247172730606916",
@@ -561,13 +728,19 @@
           "mint": "6iQNZnEKzKHnVfFczHhD39EjGN3uH7zDtKumErpq8qFJ",
           "ok": true,
           "sol_in": 2.684103,
-          "net_sol": -2.684103,
+          "net_sol": null,
           "held_slots": 1156310
         },
         {
           "exit_signature": "g27YDY2Bn3SfiPk55V63HuEzwo3PrLtnmKW5LSFK1mbtVqxKE1MHK2wjKdV65NFaKTjLn3PPVc5GZ4kPcmGBDGj",
           "exit_slot": 449427960,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1665.303487
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0004741434925745268614625189007",
@@ -577,13 +750,19 @@
           "mint": "EgP1f5J9LDn1fuTMfrrgT5ZRMiLBitYdkmDs818BS44k",
           "ok": true,
           "sol_in": 22.380151,
-          "net_sol": -22.380151,
+          "net_sol": null,
           "held_slots": 1284331
         },
         {
           "exit_signature": "4xi56Ew49UXAYqWZkEXfVTyYyK81FTBxeMj7UZw9Zo77ykPh69cQc2wektfyBgWrJmqpTgxJTiFpfb78TMxVGxNR",
           "exit_slot": 449195321,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 882.622305
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000003261657365702809344763639426",
@@ -593,13 +772,19 @@
           "mint": "5y4P3R4FTmx5Ni3MYLrM73z4utnzsKHURWs7xjBVSTNK",
           "ok": true,
           "sol_in": 5.818839,
-          "net_sol": -5.818839,
+          "net_sol": null,
           "held_slots": 1051640
         },
         {
           "exit_signature": "557qf12n89HHdkxsGx4WdKk5WLH466u4ETbrcgmGK1iXFbNiiygBSExKqnxybZbq3iHD32yJtXDBDdNzW7bovd3X",
           "exit_slot": 449455111,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2045.260437
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00001938955892464019707081254196",
@@ -609,13 +794,19 @@
           "mint": "7gYKUXFqbshpydGN6EQyMHUkeigak2J9MbfKCKyTWH73",
           "ok": true,
           "sol_in": 2.553765,
-          "net_sol": -2.553765,
+          "net_sol": null,
           "held_slots": 1311375
         },
         {
           "exit_signature": "2ZZG1ByiSA2CUgXdPxzfQ3cHfuhSpfJQgZDa8ixhaSbLPwpAJcqfLtyyCszEBdYchBVatsmGJfNEVMLPLAnnmN3G",
           "exit_slot": 448856729,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2560.425779
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00008885497398040246452488936816",
@@ -625,13 +816,19 @@
           "mint": "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
           "ok": true,
           "sol_in": 11.491943,
-          "net_sol": -11.491943,
+          "net_sol": null,
           "held_slots": 712878
         },
         {
           "exit_signature": "9iQfe5NPNpxwbxbHep24zX3Ti54opXL462mwoyP3sTcYoexs2pR7mtXGWS1oeCU9ttL6YpAbiJ48LfJSCH8CpqZ",
           "exit_slot": 449455397,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1959.781353
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000002187876700084836536130741139",
@@ -641,13 +838,19 @@
           "mint": "H3H7Nym8aKTgoHXvjvPXivCafnbZP22rd72XMLoST1U",
           "ok": true,
           "sol_in": 53.664815,
-          "net_sol": -53.664815,
+          "net_sol": null,
           "held_slots": 1311402
         },
         {
           "exit_signature": "3str8y2Lsxw8fdUPkvJzC12XikkmpunnmYEsHBwqH5yyqc7JfuRo85FouE8pc1wBNzWyN5EsswZsLRjWresg9Qzu",
           "exit_slot": 449302422,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 387.281145
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "4.796983656206551915743010973E-8",
@@ -657,13 +860,19 @@
           "mint": "F2xa6Hr6fuQXFqh6Ck8Fn6VQcgM84KfMNHowLiJ7zBMC",
           "ok": true,
           "sol_in": 3.565261,
-          "net_sol": -3.565261,
+          "net_sol": null,
           "held_slots": 1158320
         },
         {
           "exit_signature": "3JsMKs8QfhcTEPUSLcVDKJJgJgvDNU1XVcdTTtPqRNHHZmNshJhn5aWs6h1XijeTWkSur3zjxXGQBvWW2V29UxsU",
           "exit_slot": 449299524,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 478.670863
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "5.067894667129883778043242616E-8",
@@ -673,13 +882,19 @@
           "mint": "7xhogtLskteh647n6jSVFjTXCRwzVfPaxtdTyekCcvGo",
           "ok": true,
           "sol_in": 3.577721,
-          "net_sol": -3.577721,
+          "net_sol": null,
           "held_slots": 1155356
         },
         {
           "exit_signature": "3c2Uhsn9S5voY3q2bCyiPtQC8DTqe24DBTxFuTdZQkWz9Jc4x43EaQTexyjMDF2GMM4pN5LHE1bQtfaqwBcXbTDJ",
           "exit_slot": 449299470,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 526.653172
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.890045683150559914687935341E-8",
@@ -689,13 +904,19 @@
           "mint": "XzC5SwuoRYUCXaqMNybdzbNyVL14wyzuiWHps5iqtgf",
           "ok": true,
           "sol_in": 4.471828,
-          "net_sol": -4.471828,
+          "net_sol": null,
           "held_slots": 1155262
         },
         {
           "exit_signature": "3AUCEHJcZp4UEURHvyJgSSMjzmCAMu19sz5DMw4stki6LVu9aSuovGGzqnNrC5WDku4j4WfNWU8ubuQwNDfNMSX5",
           "exit_slot": 449396602,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 250.089179
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.737751197265485278131203398E-8",
@@ -705,13 +926,19 @@
           "mint": "sstg3SFfpJoosqZZ37o4dDu3RSHbR733QnA6vRfSTNK",
           "ok": true,
           "sol_in": 3.577721,
-          "net_sol": -3.577721,
+          "net_sol": null,
           "held_slots": 1252344
         },
         {
           "exit_signature": "4yWHUbUmqezyjuKDEDuVqxgGDaEe7UHGLMBYrH6237jh6XQYx2qJ2cHAhjUErAcURWZaTsbxhkcLLMqp2hCSMFXx",
           "exit_slot": 449534565,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2541.014162
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001375298163933639317795455856",
@@ -721,13 +948,19 @@
           "mint": "9swyN5J7fUQRYEJv46wHfZN5KHPSfQWctq31ZXHe5zqr",
           "ok": true,
           "sol_in": 13.436075,
-          "net_sol": -13.436075,
+          "net_sol": null,
           "held_slots": 1390125
         },
         {
           "exit_signature": "5LR7gzLdvisspGYK3KKeR8TcVPzgR96xudKJYaV9B91Hg3QAsvLQCXYYXjHDdFpkAYPsoetv2oQGAKBBoJyX4uPc",
           "exit_slot": 449299510,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 726.433949
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.607021264000465874844731769E-7",
@@ -737,13 +970,19 @@
           "mint": "GAMuAhwi6oYBsopfUbk5HqfM2rUx3nzY2MMB1QcvAW2G",
           "ok": true,
           "sol_in": 5.367052,
-          "net_sol": -5.367052,
+          "net_sol": null,
           "held_slots": 1153692
         },
         {
           "exit_signature": "5wtTAr21TUVcmQfYF2BxL3R665TXeKEd9AbQkGL5NQFP5X1g3Z9tUQNCzBH9cyveGLbrqhgjdqCVGXVqXEhmtxLD",
           "exit_slot": 449263301,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1195.222527
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.274421333742462698095372301E-7",
@@ -753,13 +992,19 @@
           "mint": "EcC5VERX69PB3kP2xLAws13SdhWPFgpCai6RtJn1bkQD",
           "ok": true,
           "sol_in": 4.460315,
-          "net_sol": -4.460315,
+          "net_sol": null,
           "held_slots": 1111693
         },
         {
           "exit_signature": "4grpJkAqsnKXv5RRvk6YTiiVAX9cEkq8fAmq42sU7hbg2ocukrZ5ru4DAMYNx6HiciH2ZaCxstDhJJRhRrX9iAkd",
           "exit_slot": 448846040,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2857.31022
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "3.727624557803305730810367481E-7",
@@ -769,13 +1014,19 @@
           "mint": "6cryqwcRfbWURXxGGuhA5oTvHo2aezrs1UGw1UgyqWhs",
           "ok": true,
           "sol_in": 6.367292,
-          "net_sol": -6.367292,
+          "net_sol": null,
           "held_slots": 694381
         },
         {
           "exit_signature": "2EzQoVLSGUenLTZJd39KPya6Y7qujZXwhuyK2zyngYkVcxGCsfjb1MiStf1pU7VeKt5KQFQnzrCCZRKySbytFSr3",
           "exit_slot": 449241762,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1555.064811
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.962841376562866639876782404E-7",
@@ -785,13 +1036,19 @@
           "mint": "3a67JHqxYSyoc4Ndhkwz4nX9eog91tMiyzgRm86TA3y1",
           "ok": true,
           "sol_in": 8.920629,
-          "net_sol": -8.920629,
+          "net_sol": null,
           "held_slots": 1090047
         },
         {
           "exit_signature": "5s5FgWHuuWGKCZGSESA6pMchPSDaG2QERTLYzgcLjGK5Doj1gbGqYVWmKye9NFrmSL1aiPNxJ23LkUvmiTu8RrVU",
           "exit_slot": 449454348,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 430.461063
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001739122499755244548414240048",
@@ -801,13 +1058,19 @@
           "mint": "DgcHi71mEudJ5hqCp6tqLBJF4dNF7vPqxFUw97UEtcEL",
           "ok": true,
           "sol_in": 4.466776,
-          "net_sol": -4.466776,
+          "net_sol": null,
           "held_slots": 1302455
         },
         {
           "exit_signature": "3qQbrAz6uTVoLDyuzB6dCzCcqHbEH7g2xzH1fRvYjbgEuk5ZpLgoYE8rzPVHMHGUSqQuZ3ynRaAi53jW77wWipcD",
           "exit_slot": 449455097,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2367.228481
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "3.957299257394465106398436088E-7",
@@ -817,13 +1080,19 @@
           "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
           "ok": true,
           "sol_in": 8.933551,
-          "net_sol": -8.933551,
+          "net_sol": null,
           "held_slots": 1303145
         },
         {
           "exit_signature": "2y1STyvgDg5ocAXYZZf21k1CT1VRYnebpK8QWE6QQ9HvSg8j3eRB7SH6J8FyFU5cYxZhu4QoyXpqJCVEFmpGbU82",
           "exit_slot": 449454306,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 643.629331
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "3.959615677940613976308518728E-7",
@@ -833,13 +1102,19 @@
           "mint": "7goMm2ZcfAcxQ8NiA8MbgmH1bjKA7smzWB4LCGcZvrYZ",
           "ok": true,
           "sol_in": 7.606006,
-          "net_sol": -7.606006,
+          "net_sol": null,
           "held_slots": 1302266
         },
         {
           "exit_signature": "5n1erzkRMiq856a6wfLFGB2mFatEs6n5qFvwuvX6yCgbKas3N1Wvrqd5vzyLWFuPvVesGK8YGk9crnXow9ZDYfr2",
           "exit_slot": 449299497,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 596.914539
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00003331360544906501340348303654",
@@ -849,13 +1124,19 @@
           "mint": "26vrrfTKMn1RPqUZJu11rTsjrKGrgEr1otPURRFvrvv4",
           "ok": true,
           "sol_in": 4.466916,
-          "net_sol": -4.466916,
+          "net_sol": null,
           "held_slots": 1147178
         },
         {
           "exit_signature": "Rfc8LLCDoYfG7P2mK6Krrrbp6KDo4QcvhYRsDRrH32dyrrUQjtQ8XcZ3cHwhQPNQ6GRf1WcWUaZEYTbqrKF5XkF",
           "exit_slot": 449427838,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1919.032685
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001460880913418757966159441214",
@@ -865,13 +1146,19 @@
           "mint": "GUbMJTArKAH8MxUhvBZw7NpXQcRD5jY6Sw4zdTQxdJNS",
           "ok": true,
           "sol_in": 3.126841,
-          "net_sol": -3.126841,
+          "net_sol": null,
           "held_slots": 1275380
         },
         {
           "exit_signature": "5a6vWFo4FXgGZTEeVCT6u5gbtTXjamScBfHKJzqfCsJfi2ZNoEAUFpSaq6ySdJfbez3XZNaWbB3ygs9AFy1PoQ6S",
           "exit_slot": 448927884,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5200.20464
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001612275341803798556656486194",
@@ -881,13 +1168,19 @@
           "mint": "vAddewUHuYgRDrL6n3kXtBXMT635evJz8K93j6Wm1Ba",
           "ok": true,
           "sol_in": 89.202379,
-          "net_sol": -89.202379,
+          "net_sol": null,
           "held_slots": 775234
         },
         {
           "exit_signature": "2vhjMKdKVRMSun3hoYqRebUhsDvfRJ1GCbBiLKYfF4otq773LUbVprh7kc7rPP4Z7UD361bekcCLeyDbYrmB2tNR",
           "exit_slot": 448638966,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4756.251387
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0001096982956471784222494189332",
@@ -897,13 +1190,19 @@
           "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
           "ok": true,
           "sol_in": 44.216696,
-          "net_sol": -44.216696,
+          "net_sol": null,
           "held_slots": 407515
         },
         {
           "exit_signature": "2ApTuATDEgA6jeJQoEL5NVQooKdt7v2yp76wvQHmDZAtDwM65DL7MBxeEEzhthRbCB1qMwuZTV7pzE2vdToXk2zf",
           "exit_slot": 448590568,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1497.699754
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.05650097275133725642541240197",
@@ -913,13 +1212,19 @@
           "mint": "7rUNV1HjfCzbtGi3ZbKQ5hYXVjzbAfyCTcgTULQxCwki",
           "ok": true,
           "sol_in": 17.694657,
-          "net_sol": -17.694657,
+          "net_sol": null,
           "held_slots": 357629
         },
         {
           "exit_signature": "46iAbgyFoZDMNLeDaQoj73YUF3Ki8FKNJHawPq1N8umsSw2zLYGQTKJAx6nMA4kWY9QpMvFdzXi7MJYAcRdWsST3",
           "exit_slot": 449295572,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1560.306445
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00008657584472398855124426169162",
@@ -929,13 +1234,19 @@
           "mint": "GpuxEQPLFftuDZeo5nXm2UJWH7uAWDDaG94aa54SRQjc",
           "ok": true,
           "sol_in": 21.996581,
-          "net_sol": -21.996581,
+          "net_sol": null,
           "held_slots": 1025038
         },
         {
           "exit_signature": "a1vh9PLnVV5jwSjiSXMZFDRnBL7g8yqGmAib1VbBBJDPdr9vgkhje3MsxqCQ9KrcmQwrgNXvLaAtWCqTasEvhpn",
           "exit_slot": 448598690,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3652.699159
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.005279365649944905561182158447",
@@ -945,13 +1256,19 @@
           "mint": "AaEhFTX4naHSWSXz9TVe5QgLbtSLT8ZqYJGZzDDcoroh",
           "ok": true,
           "sol_in": 4.494505,
-          "net_sol": -4.494505,
+          "net_sol": null,
           "held_slots": 170917
         },
         {
           "exit_signature": "2JLAnrAXj3VZFivk7XYs88nENq1hDYBEsgRvwkajfEQzgNT6JKDN9oTYAVq43xjvah8ZFii5JrJ3iE9XvCbekg19",
           "exit_slot": 449453780,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 682.329287
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001885481309034441079876493340",
@@ -961,13 +1278,19 @@
           "mint": "tDaipedqjB6y4pzV2Mrgv44X1nd1pQGvVoHTZZB1aC4",
           "ok": true,
           "sol_in": 8.949986,
-          "net_sol": -8.949986,
+          "net_sol": null,
           "held_slots": 992824
         },
         {
           "exit_signature": "4gAxXYBsPi55dAs8NHwY7hSMuRKLMzfAJhJmRDsvXjmPxEHoE7Vs5Zcethyx33dpxRnF8RkQnKXERYPC6VkJXxU7",
           "exit_slot": 449241781,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1371.001131
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "2.614972111846238062730188664E-7",
@@ -977,13 +1300,16 @@
           "mint": "2YGDVkt2NFtb9xZmgndZaDPsMgFwNLdTwsV5QiGUPhmc",
           "ok": true,
           "sol_in": 4.471584,
-          "net_sol": -4.471584,
+          "net_sol": null,
           "held_slots": 709178
         },
         {
           "exit_signature": "yNXrTqRWY1xm18gjrZ3T4ntmNYJVoqmkWokZdCHQHE6sHhiTja8QeAvtW67rxyTm4N6gQa12o3Vt5dfsZwcYC8b",
           "exit_slot": 449487562,
           "sol_received": -0.000551,
+          "quote_other": null,
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "6.621898383754673143445301854E-8",
@@ -999,7 +1325,13 @@
         {
           "exit_signature": "xgdi3fHf7LeKLGMVgs95jZiL2NJmPFfvDuWMm3FJoD9CUUcSufxJ1Dki78n9GhVjUQa9z49z5CrcCBGuBvpWpFi",
           "exit_slot": 449299632,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 389.683044
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "1.622663673078069909822093365E-8",
@@ -1009,13 +1341,19 @@
           "mint": "GgmYZQQPgZJrtPR8yCH4MDn6ggkksuRhSew5Jxo8xVnK",
           "ok": true,
           "sol_in": 2.138975,
-          "net_sol": -2.138975,
+          "net_sol": null,
           "held_slots": 766772
         },
         {
           "exit_signature": "3bht2JzTw8zTnzAgE6mviMPdY4qZpdQA7iUWXWnLhttxokn2zeeZBSZpyjVS2iNnrV1SN2DhsQVJKBjWZG6yu22k",
           "exit_slot": 449464547,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2676.497103
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0004976472235868950044812052445",
@@ -1025,13 +1363,19 @@
           "mint": "AAHvR3SK2KKa6nGyJZnkbbauLfEWnxqZGgbHHQWG8Aqz",
           "ok": true,
           "sol_in": 36.229799,
-          "net_sol": -36.229799,
+          "net_sol": null,
           "held_slots": 928043
         },
         {
           "exit_signature": "5CgKb26Hq8cif9mBRV7phT8KVTyQRrHWBmpcbf2dYgMUbczQqgtwrbKgXdtBJ6h5b69s91crUXNHxPuJj1tHTPgb",
           "exit_slot": 449455458,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1020.187268
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.02078151175659194295903018532",
@@ -1041,13 +1385,19 @@
           "mint": "5TPNaSi63HSfEHwVSBL2STi7yTPwgtedeXCowjnYHVG5",
           "ok": true,
           "sol_in": 20.418639,
-          "net_sol": -20.418639,
+          "net_sol": null,
           "held_slots": 914972
         },
         {
           "exit_signature": "mFtuyp2zQkptLZkJb5i5KFqXavRuo9iKb4Zig5urNxDSTozHxzm8fCTTtjab3kbadtLzYhzGoTtQ6VdFMiJw9kH",
           "exit_slot": 449456024,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1126.512517
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": false,
           "pool_why_not": "неоднозначная котировка: 5 встречных счетов (72yxYm, EPjFWd, So1111, Xsv9hR)",
           "price": null,
@@ -1057,13 +1407,19 @@
           "mint": "DfcCdx79bbMnSuBp72kMKaEhmbFvGtx88tnP36pra2Rz",
           "ok": true,
           "sol_in": 11.340208,
-          "net_sol": -11.340208,
+          "net_sol": null,
           "held_slots": 915484
         },
         {
           "exit_signature": "5tFs3GM4tWNGcFajqSrew79RY2bJBQ9WWsX5FZozL9JUJoiUjcoeo3DLuHWjSMupaXTeRb236RkewRLB1XJD96hg",
           "exit_slot": 448659154,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2125.489193
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "6.808907662651766992141084448E-7",
@@ -1073,13 +1429,19 @@
           "mint": "5VLjC8DdHYkVHVMgnkdhVKWgPDhUephvoFrk1UMTQkPk",
           "ok": true,
           "sol_in": 18.141483,
-          "net_sol": -18.141483,
+          "net_sol": null,
           "held_slots": 115685
         },
         {
           "exit_signature": "2kXarQTqnjdhKNuweuSN4pNcMaTJcoTgE7nygg14xGo41trbrJiodRPatKA8EybikVggonhWQ2w4enEQuN1sfXGY",
           "exit_slot": 448828054,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4224.623431
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00001635125033858780363509761161",
@@ -1089,13 +1451,19 @@
           "mint": "CTMV7yXV1mpucM7svPEtmVFBB8g6hqHGVPczmbYrj9Jb",
           "ok": true,
           "sol_in": 86.967522,
-          "net_sol": -86.967522,
+          "net_sol": null,
           "held_slots": 258820
         },
         {
           "exit_signature": "2XF53ZEL5Sk1x8nkxwAharLj9jP4uJpAaM43b4Z4UmQiPpVe4ZSwU412sZYACEDX8uNbxZXLgRATAScmJePcoop9",
           "exit_slot": 449141679,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 844.008801
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0003972472615764231772648203115",
@@ -1105,13 +1473,19 @@
           "mint": "7pBPhnFP39W8WF7Wo5QPDvDR9avQ1me8QAUHqStHapzh",
           "ok": true,
           "sol_in": 9.083197,
-          "net_sol": -9.083197,
+          "net_sol": null,
           "held_slots": 546564
         },
         {
           "exit_signature": "3u4YvmfqRjmhEsCDQQSnkaAp1KyeoonoHEVcxAEgxd78XDmRKKSZ7yiA1erCvw4x68Dv3gd2vC23uZagsQQGhxqN",
           "exit_slot": 449520293,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 606.795339
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0002796546426035564391994399247",
@@ -1121,13 +1495,19 @@
           "mint": "DZZYaxGnYgmpRnZwxPd2dAgJHT3vjY3rLqZcTrZ4aNCk",
           "ok": true,
           "sol_in": 4.541599,
-          "net_sol": -4.541599,
+          "net_sol": null,
           "held_slots": 925083
         },
         {
           "exit_signature": "oR6JMFrbTPEH9H4HmJWfBsxarqfNkB5ZWf8pKRMg9YTnReLTy98SAFDPA17dhY75U456U28uUUztfNRDj1sXVbG",
           "exit_slot": 448866832,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2115.419127
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002058779481938573192784808118",
@@ -1137,13 +1517,19 @@
           "mint": "FFgjwTgfVP7YZyUSn2VBQvbSz5P7EjWnhJW3bVSMSTNK",
           "ok": true,
           "sol_in": 6.426555,
-          "net_sol": -6.426555,
+          "net_sol": null,
           "held_slots": 227569
         },
         {
           "exit_signature": "63KJMjvaNKXKGhHuw73Z4XBUigYyyK5uf53tNdntxptX67SHjjx5ptGxP45A4c2Zo3KfKhAXu6eGtBd8Rz6QW6gm",
           "exit_slot": 448896700,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4157.958687
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.02158214152933322442222081881",
@@ -1153,13 +1539,19 @@
           "mint": "4UHmZGe6X4DZ5dxYGiGXMhi3Sp34uPWtHB7qDMyvRbYB",
           "ok": true,
           "sol_in": 12.05331,
-          "net_sol": -12.05331,
+          "net_sol": null,
           "held_slots": 254954
         },
         {
           "exit_signature": "2b8RpTvRiQzbevRogxfAQTg7iHzubSisVEQhCMqDtiweQ54j2XJZQZjysqvN9QqLi6CdjBWRmZe5DWRoPNDbtuXR",
           "exit_slot": 449281052,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2304.782672
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0001687404907555401673402453509",
@@ -1169,13 +1561,19 @@
           "mint": "9LAcK5XfutibvzXAqNMjVCL5FRuSTv2TVNxnLK5QExUt",
           "ok": true,
           "sol_in": 27.591762,
-          "net_sol": -27.591762,
+          "net_sol": null,
           "held_slots": 636678
         },
         {
           "exit_signature": "5mVYLEzFoXiMveKaJLzKKfR8LQZ4JMVtQ7XSECsxF3h2sbcN5vB7iNftfuNj7qfGNo17XjRvBjMsVFxFefJ7ffpW",
           "exit_slot": 449392297,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3417.328324
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002535117579198958509279940254",
@@ -1185,13 +1583,19 @@
           "mint": "DkjoTNGY6nFGEPRPGCo79siM1w3ZL3RDyfBDPGNSnGn3",
           "ok": true,
           "sol_in": 27.616074,
-          "net_sol": -27.616074,
+          "net_sol": null,
           "held_slots": 726932
         },
         {
           "exit_signature": "4ykB3yTqURYrjEAYeh5cHVNahmJQy2gfnyzCCG1nN5y4EhiKc2k3fx64e9uTUy54bWgrSUaRE5ZeABeNXWWK6jbg",
           "exit_slot": 449262013,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3471.038894
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.003006831172094120313576153841",
@@ -1201,13 +1605,19 @@
           "mint": "B5ANwoWkptDv1QszdPHXjCF2gTWdo27FGLffdfXzzoe6",
           "ok": true,
           "sol_in": 39.101,
-          "net_sol": -39.101,
+          "net_sol": null,
           "held_slots": 417410
         },
         {
           "exit_signature": "7XTMw4oDKa9mUP6dfcpuNBnGQtXh51zXhZKkSd16vtPAKHnvTDsxgRPUBwsCTCmT73mMPKSefUyVdqARer9vsFf",
           "exit_slot": 449585017,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 844.474453
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.01218215137341204687920343840",
@@ -1217,13 +1627,19 @@
           "mint": "9ni8ZTUidhLWyRF1Uch8BAEEVETMZxtcdupSGim4Mcrj",
           "ok": true,
           "sol_in": 2.746803,
-          "net_sol": -2.746803,
+          "net_sol": null,
           "held_slots": 735763
         },
         {
           "exit_signature": "4BgJxH9UqtJJcAgSb1436hEhVgPpJkuKDAmZ5U6VzQXddPyWRcHPs3eDAgufvTKdi7kpb7fEtdvZ87taELUCQTJP",
           "exit_slot": 449455128,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2030.358892
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "3.587246097885411338573725486E-7",
@@ -1233,13 +1649,19 @@
           "mint": "27tNoYYhtovz1EmCQz3VufMMuDh6Nrv35QRX2vAyBNeA",
           "ok": true,
           "sol_in": 18.198493,
-          "net_sol": -18.198493,
+          "net_sol": null,
           "held_slots": 599999
         },
         {
           "exit_signature": "26BcPJ32Wk7NXfqcsPvkSpHPySgQ4M3jNCGmvdVeU1JHsuFFMfMhAJBCi2yqDzWxFEVaWzCxyTWA1b4NeChSMTsY",
           "exit_slot": 449073173,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3883.567457
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "8.044728724561031737573300604E-7",
@@ -1249,13 +1671,19 @@
           "mint": "CNTcaYTBBrSjYQXrWSL3T126eCjYnmvAhSwYBXBScLLM",
           "ok": true,
           "sol_in": 41.00316,
-          "net_sol": -41.00316,
+          "net_sol": null,
           "held_slots": 216302
         },
         {
           "exit_signature": "2ncGqhmWQHQcJtM3b1Nk3LvoUumLj5RHGjd9vPNnKNk4UgixSiojyJZZaeUq9E1PDwtZWZWz3qJeRF1AC9iamuHC",
           "exit_slot": 449299653,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 348.596119
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "2.118547634613043380233261387E-7",
@@ -1265,13 +1693,19 @@
           "mint": "3NZRsipTAuusbz9PdTEHX6faw8Lzr9D9jzFEoYsXJ1j1",
           "ok": true,
           "sol_in": 7.284019,
-          "net_sol": -7.284019,
+          "net_sol": null,
           "held_slots": 438964
         },
         {
           "exit_signature": "2H1eV4xhm5PvuRNkLR1gbYVtJdLNbM4UL9E35hJWfPD8HmzpjX3owskX4wHo5qrRfbV7t6r4NNk6FytmzMm1x2wF",
           "exit_slot": 449586210,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2596.063762
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001199386030305178062370753923",
@@ -1281,13 +1715,19 @@
           "mint": "J1GRFyyw7AkGMDEqn3YF6A4LE3BQrmzMM1XpnKkTymLC",
           "ok": true,
           "sol_in": 4.439556,
-          "net_sol": -4.439556,
+          "net_sol": null,
           "held_slots": 683008
         },
         {
           "exit_signature": "2QJndFqmcRj38QyvF88UaN3x4bQHGiebo9XEH6wsHZiepaJKaKgDKti3jEhEHnSi8q9JcQ364iv1MejaFXnuDJ9U",
           "exit_slot": 450531631,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1942.540249
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001351253604484964991748624759",
@@ -1297,13 +1737,19 @@
           "mint": "7nTAA8U8kAD7t8Z1W9g6DXNTfMf4YYg2PzV9PiNRWaas",
           "ok": true,
           "sol_in": 7.491945,
-          "net_sol": -7.491945,
+          "net_sol": null,
           "held_slots": 1628344
         },
         {
           "exit_signature": "PcmDVHZAomAnG6nBM4hPeQd5dGg25okVvrVQxjE2D5eMfjxZGo1u6HBD1zm5z3stAYvhnMWA3v19sCw9MgiBeBF",
           "exit_slot": 449230046,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 6914.582072
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00003104735996065477395672537643",
@@ -1313,13 +1759,19 @@
           "mint": "7uvLyn87LSxW2GdwdEeiwmSJwQLVrcVyo7SRVcLbbtGc",
           "ok": true,
           "sol_in": 37.020849,
-          "net_sol": -37.020849,
+          "net_sol": null,
           "held_slots": 325746
         },
         {
           "exit_signature": "TVaEvmDqyNoUNraxz8NCTjTwzAwtg7qxj9xYTd7b5T4EUgRPyF9V6KqMQDXeVviXzADLGFLM9NQvoVVyWiL4MH9",
           "exit_slot": 449230256,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2427.052833
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000003510036823492783145232321565",
@@ -1329,13 +1781,19 @@
           "mint": "CTMV7yXV1mpucM7svPEtmVFBB8g6hqHGVPczmbYrj9Jb",
           "ok": true,
           "sol_in": 36.19049,
-          "net_sol": -36.19049,
+          "net_sol": null,
           "held_slots": 322750
         },
         {
           "exit_signature": "43dkSURV9gc7qeo4M3UebPGUhKDgJYm9ry7XYVM1DPFUFbfLBhmYCy9hMg1g3LRNvQCg3rbi9g11NHAZpbUvyWEM",
           "exit_slot": 449555992,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2771.868263
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.004419856706445484367247640133",
@@ -1345,13 +1803,19 @@
           "mint": "EPJQWq9AUPsAEnT9ZU1vdj7mk1woAHt4QwaYdZLoPprb",
           "ok": true,
           "sol_in": 9.003026,
-          "net_sol": -9.003026,
+          "net_sol": null,
           "held_slots": 642291
         },
         {
           "exit_signature": "2HyA8YuqNdLcvu2uUzFC6fVSuEPzsFCoNSDHUBFnS4UUCiP8XAUMkKysHKyN6EojGTu6xYFPbcdeZVMoX5kXzYTV",
           "exit_slot": 449590200,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2989.92166
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001928711318657405779650393003",
@@ -1361,13 +1825,19 @@
           "mint": "3xPfXX2RrEAD3dWx7YYYTuQ2AXS4S1xBu4GVHxiFoAwQ",
           "ok": true,
           "sol_in": 9.016691,
-          "net_sol": -9.016691,
+          "net_sol": null,
           "held_slots": 676451
         },
         {
           "exit_signature": "VXgjfSQx4bS9SuaJPWnEvqMxmWxpFi726CBeRxNJZSCHKwKfviXGSz7SejQ4HZkXmpYaf5tBuxSE44CFVTrGzdy",
           "exit_slot": 449584960,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2377.02966
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0008586445934237206431072657550",
@@ -1377,13 +1847,19 @@
           "mint": "8xcFi3LnVbbaorwrGL4sdvTXESS9LKd8WCVdFKRj4xTC",
           "ok": true,
           "sol_in": 4.506079,
-          "net_sol": -4.506079,
+          "net_sol": null,
           "held_slots": 671136
         },
         {
           "exit_signature": "Sg8QRMei646aPACxqaT5AKPUozLKya7MwUxWJLsWiLf1y2C57NAdbbCheDr7X8C4MtPMnozRkwKdMVB9cePcbej",
           "exit_slot": 449586271,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2066.454846
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001280336741588896544409215740",
@@ -1393,13 +1869,19 @@
           "mint": "FcYSxP7zD3jJL8jrLyUd7KGDfjyx1apbjxD5gZhT3LWU",
           "ok": true,
           "sol_in": 6.311421,
-          "net_sol": -6.311421,
+          "net_sol": null,
           "held_slots": 672381
         },
         {
           "exit_signature": "4d3513ZyzSSBi2BTcsyn8Wu6NjNWLQt8fq5tbLGWQ7wsPsELzx46WTYc268BkPTyASBUUBWhCcLg2w3adQKJNBFZ",
           "exit_slot": 450531203,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1699.440728
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001722822777685010514229541464",
@@ -1409,13 +1891,19 @@
           "mint": "8f9E3iCyYff8QVienqkc8CsAzPuAPP7AWyxGVu6cy91n",
           "ok": true,
           "sol_in": 15.316921,
-          "net_sol": -15.316921,
+          "net_sol": null,
           "held_slots": 1617248
         },
         {
           "exit_signature": "Xipq7sc6pDRmdtphp6PW5jKPRkrc6oPAmfSrosRazqhYdg1XfRQ2838L3fsyfKXBGnjumWHMi7w4M4fNubp2hoi",
           "exit_slot": 449455166,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2658.427778
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00001492558689047041029710902293",
@@ -1425,13 +1913,19 @@
           "mint": "FPPGF5RNgCvNzqrRqWrkgkL4YQhzqKMNVtD1kWk1ooqg",
           "ok": true,
           "sol_in": 17.770794,
-          "net_sol": -17.770794,
+          "net_sol": null,
           "held_slots": 525245
         },
         {
           "exit_signature": "jyApsYmNgvpVLN9y7e6qovTFyme5YsJTGRvVtfo4QgfHVffcpi381BM9gmnohWqxx4NRFa7UKJxSo3P9JN2CPyT",
           "exit_slot": 449390126,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1795.877245
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0001081617493963420123914365985",
@@ -1441,13 +1935,19 @@
           "mint": "AP5YnCZRFHayveJ1zSSWeGpB1Hps4v8pLJ6ASmXLMD6M",
           "ok": true,
           "sol_in": 8.357949,
-          "net_sol": -8.357949,
+          "net_sol": null,
           "held_slots": 334458
         },
         {
           "exit_signature": "4BW2CxaDwMTAPf3ft6Hev6M2NDcsPnWfyDT3MhZLYcTecgTX1fbcZzSrVoWvYMHy7BTTaZ8gf4eZy3drGo3duokt",
           "exit_slot": 449428273,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1184.311619
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0001227330053147999441896597160",
@@ -1457,13 +1957,19 @@
           "mint": "CuDP8ohRfj72Aw8bfLE5ox5Cox2wtVv51iWBbGLQDtRD",
           "ok": true,
           "sol_in": 17.146185,
-          "net_sol": -17.146185,
+          "net_sol": null,
           "held_slots": 369830
         },
         {
           "exit_signature": "3iwdFRgjoYGrEkoGoqp99kkChZ6JZpkQSnguf4ynf8xzVruwrj3zVNFBX2XsZi9T832mdbUkqKZjfQHthRN3FArw",
           "exit_slot": 449584981,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2033.491353
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002342762697439000419180020236",
@@ -1473,13 +1979,19 @@
           "mint": "AhGvakNcP6akXHGFKKiiPNWq5MJTmHbMLuRyR3dsu44P",
           "ok": true,
           "sol_in": 8.558812,
-          "net_sol": -8.558812,
+          "net_sol": null,
           "held_slots": 513861
         },
         {
           "exit_signature": "SDeyU5MCjdVgxNBQBhVVGRm6TLW17ZAtMhHnms4ugkWMftLkE4vdg8B9kcsXjxfKZK94NGmC1PPQqhLu6URawtR",
           "exit_slot": 450176826,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2066.182465
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.003148257559845830671175311739",
@@ -1489,13 +2001,19 @@
           "mint": "5Gp6mKmqJ5ssGKtL8NEUXCSnDynTx3yvod287yiPpump",
           "ok": true,
           "sol_in": 8.55126,
-          "net_sol": -8.55126,
+          "net_sol": null,
           "held_slots": 1105171
         },
         {
           "exit_signature": "5gBShTDkCX67yvPLrnEW5SVDCUtFinMXwja2s2szku71A17izEAHcYCWLpkvhqBLcc3djX9dCspFKLSXtKXR8udy",
           "exit_slot": 449230076,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5697.11068
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000002967311114210102959988036283",
@@ -1505,13 +2023,19 @@
           "mint": "EYMBTNraihZkLhjVQhDivPhjAWFgRF1By2zVd8rcNcGz",
           "ok": true,
           "sol_in": 84.809969,
-          "net_sol": -84.809969,
+          "net_sol": null,
           "held_slots": 136027
         },
         {
           "exit_signature": "r3Bt2MJnMg1H8BPty7DA4dC3Dz7XJQvGd7f5mnGHK4rCzQ7uqsZsEt4i45XudrBAckEKgU5DqULYztHHmsasRRL",
           "exit_slot": 449428438,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4993.319998
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000001011854157217964958423607772",
@@ -1521,13 +2045,19 @@
           "mint": "Aigf5pKPyZW8nzxCrHEisE4tZMiUhFpKie8mYE7cmj6c",
           "ok": true,
           "sol_in": 67.541176,
-          "net_sol": -67.541176,
+          "net_sol": null,
           "held_slots": 327475
         },
         {
           "exit_signature": "5yJ4aG4DgzQDJkaVHh3hmZoYbeYgdkbRAqeM2utLAXQcSUFwkJs1hy5pschAMdK9tcLAUygGJ9jzknFTqWxakRUW",
           "exit_slot": 449454940,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 7676.099442
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0001015210293987837612509244561",
@@ -1537,13 +2067,19 @@
           "mint": "9CPfv7rc6vxBd3jtovmZtf5Zy8bdvssv8c4BwzbGk147",
           "ok": true,
           "sol_in": 84.127625,
-          "net_sol": -84.127625,
+          "net_sol": null,
           "held_slots": 342171
         },
         {
           "exit_signature": "3mK3XTwreE7uUNi39TDVbJ5T765W6ZCur1uZmb7xL5YiXWksu1mNbTsXPpK8vKixJHa8rcfeTs1x61nhLpda7d22",
           "exit_slot": 449493367,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 8997.656989
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00003937153779569990932144249348",
@@ -1553,13 +2089,19 @@
           "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
           "ok": true,
           "sol_in": 85.168155,
-          "net_sol": -85.168155,
+          "net_sol": null,
           "held_slots": 357865
         },
         {
           "exit_signature": "5iJfJSQs7iv4ci1jXf29WhvkZ2VZSqFbYfPKAJJ5oNAnLYynZHbE5AF2GUg9BN8MNALueQ1KAXVrVuEP67fyzDvu",
           "exit_slot": 449586250,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2216.769649
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001451953037865039929759496191",
@@ -1569,13 +2111,19 @@
           "mint": "4tJ1g3BnQDXiMGaPE8Ab4U8Vq8YnFxHDe75WQDrPfURy",
           "ok": true,
           "sol_in": 8.99185,
-          "net_sol": -8.99185,
+          "net_sol": null,
           "held_slots": 427614
         },
         {
           "exit_signature": "2XnmMFLdJp5NxnccZbTex1XPdsCSr1PJAgX5wb5G7Ur6ZkYfPmckXnh3yjPWqAuSLY7t7UzVmPKe4FrsPFLv2wet",
           "exit_slot": 449283101,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 7116.447973
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000003863854726215170911286179101",
@@ -1585,13 +2133,19 @@
           "mint": "HhcfXbZ2rukoKx8oAH8rfkmzXbwvfdh6MMLZjneg4rWk",
           "ok": true,
           "sol_in": 20.983754,
-          "net_sol": -20.983754,
+          "net_sol": null,
           "held_slots": 119950
         },
         {
           "exit_signature": "5NeJF1uuiKNjQThba7ZMTT6v4pxtukQtFNGMWhiWsWyF1GHdyRwt6uSR4qPSbBRKkLy48AucJyhQv78PKzux69qQ",
           "exit_slot": 449271312,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3211.118169
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000006261116208105089657945651455",
@@ -1601,13 +2155,19 @@
           "mint": "F1XuZNvTm3ALrAyM9xUnF8VGcJuxDpK2VrkZZ2PykPiY",
           "ok": true,
           "sol_in": 21.263326,
-          "net_sol": -21.263326,
+          "net_sol": null,
           "held_slots": 41556
         },
         {
           "exit_signature": "2ocy8XsvHnkMi8mQQFNoYTqYVcPg2n6HEH6PxSKb7Vifcb5Nsr63XBYY2SffVUA9Gc5U5w7qH2HFK8Bkcu9R9ryv",
           "exit_slot": 449496854,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 2104.63011
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.004002545418955786974686413728",
@@ -1617,13 +2177,19 @@
           "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
           "ok": true,
           "sol_in": 4.252569,
-          "net_sol": -4.252569,
+          "net_sol": null,
           "held_slots": 266995
         },
         {
           "exit_signature": "5y3M6pnuXWSgNSdnn1j29TbDXcUapbHHZBv93sjtzPaEgMThkESqRtyyN6ZjRAWXBjYqJGWEphMepziLJinZcHVT",
           "exit_slot": 449269626,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5314.744442
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000002613621064464606207933685264",
@@ -1633,13 +2199,19 @@
           "mint": "AVXPQqxd32ABAP5F7shHKNeWBpos9miktdH3uKqgXYJZ",
           "ok": true,
           "sol_in": 84.906876,
-          "net_sol": -84.906876,
+          "net_sol": null,
           "held_slots": 39506
         },
         {
           "exit_signature": "5ZuxcwAFBhJbS5HKu6rGmTM4h6ZpjjvReH9FoB9vGYcwfsbun7qTSMfCjn5riTgE3Knp3wQUbLL8QCpZb6K9KXP8",
           "exit_slot": 449389236,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3726.147553
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.000002604822702309099215072390833",
@@ -1649,13 +2221,19 @@
           "mint": "BVdbH7PLTSQxBssqvWTxVDoA8qfsztdVtMsZQSS9CScZ",
           "ok": true,
           "sol_in": 68.536707,
-          "net_sol": -68.536707,
+          "net_sol": null,
           "held_slots": 122675
         },
         {
           "exit_signature": "4JyAMcMww2uDTSuixKdTVWruveTdQGGzPfx2iXxLRCbrUm2Tz61Rd15uz2wPJstLZjUp38xdjE2wQPBJgGKr7g1D",
           "exit_slot": 449300037,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4915.701408
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "962.5931289097353251811621483",
@@ -1665,13 +2243,19 @@
           "mint": "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT",
           "ok": true,
           "sol_in": 17.140275,
-          "net_sol": -17.140275,
+          "net_sol": null,
           "held_slots": 28549
         },
         {
           "exit_signature": "4GsooEU6PDy2UkwGB2vdUkfUrD7wmaWcmQDdXM6kWMesyN38Qz2xjXw1TExNvp8zuxhR2TFzjdTucps7xsV3ZMf2",
           "exit_slot": 449590224,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1909.532618
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002910015004031943797745545243",
@@ -1681,13 +2265,19 @@
           "mint": "2W5Xqf8V7KraVpqbJuiwQrXonh9kpyQ3yAXfCMfGizQD",
           "ok": true,
           "sol_in": 3.600699,
-          "net_sol": -3.600699,
+          "net_sol": null,
           "held_slots": 288851
         },
         {
           "exit_signature": "4DhWC9eaRnBJwvUp9rmefJ82F6i6Q69PDDuf96uDiYDtujFTcpwHUiVrii3XKKVJKMAgV4rkn1t9taQYdXf2MABL",
           "exit_slot": 449590541,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1419.668646
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002256854650632550827953281683",
@@ -1697,13 +2287,19 @@
           "mint": "J5eYNzLV2CZHjUqppR3NZaQ7unu4U6t8NNTtrfTYPWtr",
           "ok": true,
           "sol_in": 10.290005,
-          "net_sol": -10.290005,
+          "net_sol": null,
           "held_slots": 289084
         },
         {
           "exit_signature": "P3mgfWymD1WYvxowhDC7yU2NtGnqQpW8PZNVuDUz1sidmGj1Aq9q29ATxrgWnVEJTRXkLL4PqdKqKonXJPzm7fY",
           "exit_slot": 449428451,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 4261.991328
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002876295590408154833082450918",
@@ -1713,13 +2309,19 @@
           "mint": "B5ANwoWkptDv1QszdPHXjCF2gTWdo27FGLffdfXzzoe6",
           "ok": true,
           "sol_in": 42.850597,
-          "net_sol": -42.850597,
+          "net_sol": null,
           "held_slots": 125884
         },
         {
           "exit_signature": "ZaaUqzcuLU3ciwpCtjMu8W7F4T6DfFkoeQuNVSXFe7zhrxwv9UGBGBUJAgreoYMSbSFZxadUpf3CWUvA6dKCXMm",
           "exit_slot": 449451719,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5115.941643
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.00006802534292083712209307216633",
@@ -1729,13 +2331,19 @@
           "mint": "6LrDt7nBiHraUuk9PZoUL8Qy9WX6pnSpDz1RkWWRR7hN",
           "ok": true,
           "sol_in": 38.574326,
-          "net_sol": -38.574326,
+          "net_sol": null,
           "held_slots": 145432
         },
         {
           "exit_signature": "xvDnBUVcDXqQRptRaS84wB3Q6iMCUdq5E9KH4VJ5rzbnKzT1SPLsmusD58EXgrS5JQzuPjmzB7ygfkrYBGqz1tq",
           "exit_slot": 449511272,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1132.347749
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.009077774063325824662418913382",
@@ -1745,13 +2353,19 @@
           "mint": "HraqV71uEgzmhRWupWfMT7vSkkm7YMBYq7moBRHceWxP",
           "ok": true,
           "sol_in": 4.229153,
-          "net_sol": -4.229153,
+          "net_sol": null,
           "held_slots": 52948
         },
         {
           "exit_signature": "3s7cHp8FfRBbZ7uqkmVrcGLkNc3nBEYfjhLVskZ6BQ3c8vZB6KWNrsZwyHDpyfLWMDL3yqCL5PuZn9ie6pvg7mh1",
           "exit_slot": 449520265,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1003.479443
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001691429991760679215276852299",
@@ -1761,13 +2375,16 @@
           "mint": "6kNNgyrdvjkRC8eRGQqx5sLfZG2jTmg3NCFmkX2hYP4j",
           "ok": true,
           "sol_in": 6.725662,
-          "net_sol": -6.725662,
+          "net_sol": null,
           "held_slots": 14350
         },
         {
           "exit_signature": "wfoxqVB2F6j2gCHbX57jfGbaKENUDJunxfX8wSLKTo1VK7w8Rput2A7zitzXDW1dnF5EmdPBZXFw9sDemQv9qNP",
           "exit_slot": 449527325,
           "sol_received": -0.000551,
+          "quote_other": null,
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": false,
           "pool_why_not": "неоднозначная котировка: 4 встречных счетов (8RVBk8, EPjFWd, So1111)",
           "price": null,
@@ -1783,7 +2400,13 @@
         {
           "exit_signature": "4r73XACFRE69iecDeX9BiAFxqfskm5D4kHrsx2sTkATwvvgMmULy56KdmyEhu16Qo2gRN8YZ73QiZaykdjtEhnAs",
           "exit_slot": 450190679,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1168.559171
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0008706637585794336928550128587",
@@ -1793,13 +2416,19 @@
           "mint": "EwwbPUhP8EYf2i7GJQYn7NFVMFKa8ucNYLc6zaR6mhpu",
           "ok": true,
           "sol_in": 3.378836,
-          "net_sol": -3.378836,
+          "net_sol": null,
           "held_slots": 660222
         },
         {
           "exit_signature": "3fG9zVFocrgEPShAJNUfKypQY7pzz3CU9SEnu6M4TavJFnkCh5DU1XifRhHYk5Bw8YcktJ7rprSkjBWJhCDTYyik",
           "exit_slot": 449579013,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1491.792314
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002196108227084483721808925986",
@@ -1809,13 +2438,19 @@
           "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
           "ok": true,
           "sol_in": 8.412632,
-          "net_sol": -8.412632,
+          "net_sol": null,
           "held_slots": 32422
         },
         {
           "exit_signature": "Sn6XxubHr5ExxBU2ApLQUedbMeMRYijU5EkMDkHbkYCaNDhXcLmC2zc3g17B7YGbBsd3pFSxT16SFQT785t8gY1",
           "exit_slot": 449574197,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 5599.135869
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.008159128250790908175332375407",
@@ -1825,13 +2460,19 @@
           "mint": "3nqHijNUExsnjNBb15WJsJ2xisyMVGN6FK4aUgZk1Rwj",
           "ok": true,
           "sol_in": 22.732029,
-          "net_sol": -22.732029,
+          "net_sol": null,
           "held_slots": 25842
         },
         {
           "exit_signature": "5CD2sp4KXRkdcLWXzy8SjXk93qfwottN1bA58E7hRKo46ubUeceCn6i2SVGtiPhpdudWDHidEpZtUFfdctQGqGXM",
           "exit_slot": 449590558,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1391.481877
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001927401539228011943743792821",
@@ -1841,13 +2482,19 @@
           "mint": "99Wee3vRCy8mRwqe5e3BLUAiBcBJfQDfsfS7K5SjZXKM",
           "ok": true,
           "sol_in": 8.403641,
-          "net_sol": -8.403641,
+          "net_sol": null,
           "held_slots": 41622
         },
         {
           "exit_signature": "5nfqm4uLxBQjfa78L9T9En9kUGBxcAJuYfCBSXrTh5jx6wtSkhxvdupVoBxnD66vDnnZd58ooxgGgy7T2ULhZfK2",
           "exit_slot": 450531807,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1889.74358
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001239958786746239588865374024",
@@ -1857,13 +2504,19 @@
           "mint": "CmjfLEwNw614ZxHmrj9BUbwG4fJNoV3tXvMwQY1cN1G7",
           "ok": true,
           "sol_in": 16.891883,
-          "net_sol": -16.891883,
+          "net_sol": null,
           "held_slots": 975008
         },
         {
           "exit_signature": "3A8BqMrnddaj8hYoi2T4SuLaBc8XnVWYWWejvNiGKov4xyAQgtoXNgi61xY3KSH86j62CeSE2WRhMHrzvWbMSRiz",
           "exit_slot": 449588400,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 711.044717
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002788009698803595239948235019",
@@ -1873,7 +2526,7 @@
           "mint": "HzokUsQjU9jhqwGkrMJp4AYeFKjSUdmNe5u9Wxrtj5Wb",
           "ok": true,
           "sol_in": 8.44682,
-          "net_sol": -8.44682,
+          "net_sol": null,
           "held_slots": 31505
         },
         {
@@ -1887,7 +2540,13 @@
         {
           "exit_signature": "5DxDnYLqg6qdR4qmomv7XGqfQhJEJ2JYmWYdgoEt875DG7vyf5ZwaQVM7p9ZEWNqTAnSzEbScZhMD2wMgg4eQR3r",
           "exit_slot": 449588383,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 609.852023
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.01108429411787975512463659287",
@@ -1897,13 +2556,19 @@
           "mint": "DupFBba8HP6DpYX9XpLn6uhdYnnEXXUUiAhWitGQc8qN",
           "ok": true,
           "sol_in": 7.378721,
-          "net_sol": -7.378721,
+          "net_sol": null,
           "held_slots": 24852
         },
         {
           "exit_signature": "5J4WfaC2TnSeYstvvkz8BdxLQV4arTy5ofnL7GyeVHvE4iBLkmPcTPNtDMUn2XKcshd4Z349PVdjJQcseRPfV9q4",
           "exit_slot": 449576607,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 3140.238194
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.004253521512635663849026640902",
@@ -1913,13 +2578,19 @@
           "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
           "ok": true,
           "sol_in": 2.533873,
-          "net_sol": -2.533873,
+          "net_sol": null,
           "held_slots": 5727
         },
         {
           "exit_signature": "41bAcRTu1y89WYSpHoQucf7uJL93AjYAVQfuo7nhHTcTRdvuA3uCSuz7TPTdPyfSM6u7MPEos2m69TYV2snXrZbm",
           "exit_slot": 449576991,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 660.766595
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001070330780247929610325528032",
@@ -1929,13 +2600,19 @@
           "mint": "ELiHAPKgQ8B6PqQKYfZmSLn42vVQH8dtjTJkcSsyLbgN",
           "ok": true,
           "sol_in": 4.223046,
-          "net_sol": -4.223046,
+          "net_sol": null,
           "held_slots": 6069
         },
         {
           "exit_signature": "3dtJSYN6gJMGs74MHFWRhX3XgkLwnCNaV9QMnnFftV8YDeiQGX2NVidvJYMZuwwDcZXGQ3EqgQQqRd6RVR3jeePv",
           "exit_slot": 449576965,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 307.089762
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.001013256403356662394724951881",
@@ -1945,13 +2622,19 @@
           "mint": "8ZqYx4QfEET5PnK9BAaWdWHHnzojfVAVnDDBfz2iPD7W",
           "ok": true,
           "sol_in": 2.533903,
-          "net_sol": -2.533903,
+          "net_sol": null,
           "held_slots": 6005
         },
         {
           "exit_signature": "5QMwA8sKcgvTiEkJNj3a63nBKWXGMfnHM3DBTcvXRszgXnujBzdMcwJ1DDn3ZYwe1ErUVtAB8U2JWyQk3UkUy33v",
           "exit_slot": 449577134,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 381.979508
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0007517354358936211278832908748",
@@ -1961,13 +2644,19 @@
           "mint": "EvY27zhm1rVSTudgXFV2HMsGXH7TwAsJrBJsFxTFAaHM",
           "ok": true,
           "sol_in": 2.534076,
-          "net_sol": -2.534076,
+          "net_sol": null,
           "held_slots": 6125
         },
         {
           "exit_signature": "gRKPTekfT4RqV7im9Y8ZiejMDrfJ3DWtiqoPSX96GVGBDgkAXqN9vs9pn7CmJ26qkSHusiXT6YoDVUdSt2uFbT9",
           "exit_slot": 449577039,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 404.015697
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0004211329038368892742453190150",
@@ -1977,7 +2666,7 @@
           "mint": "8gTSFyCta6qkY1f9EMRzpWctW6p2PeyMwAt1fT6k7R4o",
           "ok": true,
           "sol_in": 2.531328,
-          "net_sol": -2.531328,
+          "net_sol": null,
           "held_slots": 5992
         },
         {
@@ -1992,6 +2681,9 @@
           "exit_signature": "3mnkJx7TbB7U42BDegymQ74pqRBYVR6EadyyEaywJMhNdvpa2WueFkBCw4grYntphkLEtrvvxy3jCyNy3AM3hNNj",
           "exit_slot": 450181568,
           "sol_received": -8e-05,
+          "quote_other": null,
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": false,
           "pool_why_not": "у хранилища минта нет встречного котировочного счёта",
           "price": null,
@@ -2023,7 +2715,13 @@
         {
           "exit_signature": "3vS7C5zisA7MgkYHcvpQt2u84iKoQYLafk5Cr85MGsJDQ8p2TmdVGbGCqLAKGHmyQp3HduSKVnkEqBMfYxLfcCee",
           "exit_slot": 450531679,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1151.942673
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.0007403752118075406559771339924",
@@ -2033,7 +2731,7 @@
           "mint": "BmJX4uxrtmsjJfXKsmPKbWPWxcUi3RnyzckyZ1CiQWww",
           "ok": true,
           "sol_in": 3.37676,
-          "net_sol": -3.37676,
+          "net_sol": null,
           "held_slots": 916809
         },
         {
@@ -2055,7 +2753,13 @@
         {
           "exit_signature": "36s5rtMYWutaG6hvLC34syVVrbJs1S4ZsRG6PUHrumyUXXH6nuMrXra3rdAKCSNELsfaMPDkdQj2kMhTi6UKbWyu",
           "exit_slot": 450531645,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1900.00369
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.005345957812357652679364908412",
@@ -2065,13 +2769,19 @@
           "mint": "sEkzZ2YRgG1FDQRKjP7uoUZmq1BCDSMJttRqyu4teNC",
           "ok": true,
           "sol_in": 2.167899,
-          "net_sol": -2.167899,
+          "net_sol": null,
           "held_slots": 770652
         },
         {
           "exit_signature": "5Vu1kj2GdTNjA5hJbyUxmVVoqocsncqKU4jkd1QPVrjvUV15xRMLn8sp4XsotUwfPsjZcqwGp7prVyJTjY7N3LQ6",
           "exit_slot": 450098623,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 1286.173707
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.003035536860441778909675430940",
@@ -2081,13 +2791,19 @@
           "mint": "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu",
           "ok": true,
           "sol_in": 6.671219,
-          "net_sol": -6.671219,
+          "net_sol": null,
           "held_slots": 288461
         },
         {
           "exit_signature": "3bHBKbcPM8vJUkYRJmcoXtSQQuwVhbrsMJTWd6TuBzJL1eEv64jarWddGUEwvE81HaE9Y7aDmjkQDijSeZF34jUe",
           "exit_slot": 450532647,
-          "sol_received": 0.0,
+          "sol_received": null,
+          "quote_other": {
+            "quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "quote_amount": 636.551897
+          },
+          "pages_read": 1,
+          "pages_capped": false,
           "pool_ok": true,
           "pool_why_not": null,
           "price": "0.002447011467768026942422428965",
@@ -2097,41 +2813,41 @@
           "mint": "5MhscascCnJJNsPAsbEFtBMW6VanEmdyEcCx7v9172rS",
           "ok": true,
           "sol_in": 2.175091,
-          "net_sol": -2.175091,
+          "net_sol": null,
           "held_slots": 480785
         }
       ],
       "group_summary_after_tax": {
         "tax": {
-          "n_closed": 40,
-          "n_with_net_sol": 40,
-          "median_net_sol": -18.643614,
-          "mean_net_sol": -26.87611,
+          "n_closed": 41,
+          "n_with_net_sol": 1,
+          "median_net_sol": -42.21307,
+          "mean_net_sol": -42.21307,
           "n_positive": 0,
           "share_positive": 0.0,
-          "median_held_slots": 398131.0
+          "median_held_slots": 407515.0
         },
         "normal": {
           "n_closed": 10,
-          "n_with_net_sol": 10,
-          "median_net_sol": -37.645745,
-          "mean_net_sol": -39.018812,
+          "n_with_net_sol": 1,
+          "median_net_sol": -2.82113,
+          "mean_net_sol": -2.82113,
           "n_positive": 0,
           "share_positive": 0.0,
           "median_held_slots": 325112.5
         },
         "unknown": {
           "n_closed": 69,
-          "n_with_net_sol": 69,
-          "median_net_sol": -7.284019,
-          "mean_net_sol": -8.849452,
+          "n_with_net_sol": 2,
+          "median_net_sol": -6.733682,
+          "mean_net_sol": -6.733682,
           "n_positive": 0,
           "share_positive": 0.0,
           "median_held_slots": 925083.0
         }
       },
-      "chain_credits_used": 3577,
-      "chain_calls_used": 3577
+      "chain_credits_used": 2605,
+      "chain_calls_used": 2605
     }
   },
   "task_f_our_gp_trades": {
@@ -9142,7 +9858,7 @@
       },
       "decisions": {
         "ok": true,
-        "n_lines": 12494,
+        "n_lines": 12836,
         "n_bad_lines": 0
       }
     }
@@ -9157,7 +9873,7 @@
           "has_transfer_fee_config": true,
           "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
           "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
-          "withheld_amount_raw": 95651647077,
+          "withheld_amount_raw": 9310403944,
           "decimals": 6
         },
         "CRACKER": {
@@ -9177,7 +9893,7 @@
           "has_transfer_fee_config": true,
           "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
           "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
-          "withheld_amount_raw": 499165320858,
+          "withheld_amount_raw": 562704713241,
           "decimals": 6
         },
         "RED": {
@@ -9187,7 +9903,7 @@
           "has_transfer_fee_config": true,
           "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
           "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
-          "withheld_amount_raw": 349308721125,
+          "withheld_amount_raw": 385865048032,
           "decimals": 6
         },
         "GP": {
@@ -9207,7 +9923,7 @@
           "has_transfer_fee_config": true,
           "config_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
           "withdraw_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
-          "withheld_amount_raw": 1788028409774,
+          "withheld_amount_raw": 2065703348457,
           "decimals": 6
         }
       },
@@ -9229,7 +9945,7 @@
         "n_checked": 149,
         "common_authority": "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD",
         "share_with_common_authority": 0.979866,
-        "chain_credits_used": 3579
+        "chain_credits_used": 2607
       }
     },
     "g2_price_impact": {

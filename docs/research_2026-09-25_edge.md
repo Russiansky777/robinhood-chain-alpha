@@ -1,8 +1,8 @@
-# Ночь 25.09: боевое и исследование (доклад собран 2026-09-26T03:03:46Z)
+# Ночь 25.09: боевое и исследование (доклад собран 2026-09-26T03:10:55Z)
 
 ## 1. Боевое
 
-**Решения по сигналам.** Покупок 78; по кодам: {"NOT_A_BUY": 5222, "TARGET_AMOUNT_OUT_OF_RANGE": 2367, "TOKEN_RECEIVED_NOT_BOUGHT": 573, "KILL_SWITCH": 311, "SKIP_TARGET_INCREASE_POSITION": 185, "BUY": 78, "SKIPPED_DUP_MINT": 73, "AMBIGUOUS_TX": 53, "MAX_BUY_TIMES_PER_TOKEN_REACHED": 38, "SKIP_TAXED_ROUTE": 17, "STALE": 6, "THRESHOLD_EDGE": 3, "MAX_OPEN_POSITIONS": 1}.
+**Решения по сигналам.** Покупок 78; по кодам: {"NOT_A_BUY": 5365, "TARGET_AMOUNT_OUT_OF_RANGE": 2431, "TOKEN_RECEIVED_NOT_BOUGHT": 590, "KILL_SWITCH": 320, "SKIP_TARGET_INCREASE_POSITION": 203, "BUY": 78, "SKIPPED_DUP_MINT": 73, "AMBIGUOUS_TX": 53, "MAX_BUY_TIMES_PER_TOKEN_REACHED": 38, "SKIP_TAXED_ROUTE": 17, "STALE": 6, "THRESHOLD_EDGE": 3, "MAX_OPEN_POSITIONS": 1}.
 
 **Полоса своей отправки.** Путей 78, отправлено 18, отказ по симуляции (SKIP_SIM_FAIL) 0. Позиций полосы 18, закрыто 18, UNSOLD 0. Итог по закрытым: 0.019045802 SOL (по 17 сделкам). Медиана от отправки до появления в потоке: —.
 Рубильник полосы не взведён: полоса отправляет, если сигнал подходит.
@@ -24,12 +24,12 @@
 | bloom | 70 | -0.096629433 | -7.549 % | 0 |
 | lane | 1 | 0.002637062 | 26.371 % | 17 |
 
-**Запасной канал logsSubscribe.** Переходов 0, возвратов 0, обрывов 2; на запасном 0 с; наибольшая доля за час 0.0; по причинам: {"соединение закрыто: ConnectionClosedError": 2}. По счётчикам службы: {"switches_total": 0, "switches_short": 0, "seconds_total": 0.0, "hour_switches": 0, "hour_seconds": 0.0, "on_fallback_now": false, "report_threshold_s": 30.0, "silent_ticks": 4049, "tick_s": 2.0, "breaks_by_reason": {"соединение закрыто: ConnectionClosedError": 2}}.
+**Запасной канал logsSubscribe.** Переходов 0, возвратов 0, обрывов 2; на запасном 0 с; наибольшая доля за час 0.0; по причинам: {"соединение закрыто: ConnectionClosedError": 2}. По счётчикам службы: {"switches_total": 0, "switches_short": 0, "seconds_total": 0.0, "hour_switches": 0, "hour_seconds": 0.0, "on_fallback_now": false, "report_threshold_s": 30.0, "silent_ticks": 4196, "tick_s": 2.0, "breaks_by_reason": {"соединение закрыто: ConnectionClosedError": 2}}.
 
 **Контроль доставки (З2).** Пар с контролем 0; медиана доставки покупки —, контроля по лучшему пути —; разница — -> —.
 Кто довозит быстрее (медиана доставки пустой транзакции): данных пока нет. Покупки полосы довозил: blockrazor x5, nozomi x5, astralane x6, helius x2.
 
-**Тень.** Записей 3076, по вердиктам: {"нет вердикта": 1137, "would_pass": 1937, "slippage": 1, "other_error": 1}. Медиана сборки 0.84 мс, симуляции 14.8 мс.
+**Тень.** Записей 3167, по вердиктам: {"нет вердикта": 1168, "would_pass": 1997, "slippage": 1, "other_error": 1}. Медиана сборки 0.84 мс, симуляции 14.8 мс.
 Кэш ног двухшаговой тени: выключен, котировочных пулов —, шаблонов 0, скормлено —, кредитов — из —.
 
 **Узкий фильтр по налогу маршрута.** Пропусков 17, тень измерила 1: цена через 28.8 с была ниже входа в 0 случаях (фильтр сберёг), выше -- в 1 (фильтр отнял), неизвестна в 16. Оценка сбережённого при размере 0.2 SOL: -0.03656 SOL.
@@ -928,7 +928,7 @@ Bloom, сторож продаж и тень работают как раньш�
 ```json
 {
   "schema_version": 1,
-  "generated_utc": "2026-09-26T03:03:46Z",
+  "generated_utc": "2026-09-26T03:10:55Z",
   "inputs": {
     "crowd_cache": "/tmp/night_state/crowd_metric.json",
     "state_dir": "/tmp/night_state",
@@ -947,12 +947,12 @@ Bloom, сторож продаж и тень работают как раньш�
     "ok": true,
     "service": "c2_night_leader_stonkfun",
     "key_env": "HELIUS_API_KEY",
-    "local_credit_limit": 20000,
+    "local_credit_limit": 30000,
     "owner_stop_fraction": 0.7,
     "owner_stop_credits": 140000,
     "c2_daily_budget": 200000,
-    "credits_used": 3579,
-    "calls_used": 3579,
+    "credits_used": 2607,
+    "calls_used": 2607,
     "stopped_reason": null
   },
   "task_e_leader": {
