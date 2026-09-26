@@ -56,6 +56,10 @@ MINT_EXT_CACHE_PATH = DATA / "solana_buyer_200/prior/current/solana_three_check/
 
 LEADER_BEQV = "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
 GP_MINT = "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ"
+# Котировочные минты, в которые лидер тоже продаёт: адреса -- те же, что в
+# аудите налога (analysis/solana_transfer_fee_audit.py), не по памяти.
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 PICKAXE_MINT = "6QxMcEpYULAUs4Qa28ui2GJ55daY2KqFLRJXHEosNPAu"
 # Транзакция лидера, названная владельцем: наш source_signature на неё есть
 # в data/bloom_report.json (position_rows[14]) -- найдена по тексту, не выдумана.
@@ -432,6 +436,12 @@ def хранилище_владельца(tx: dict, owner: str, mint: str) -> st
     return None
 
 
+# Сколько страниц подписей листать назад в поиске ПЕРВОЙ продажи. Шесть
+# страниц по 1000 -- шесть тысяч подписей на один токен-счёт; больше значит,
+# что счёт живёт своей жизнью и "первую продажу" по нему всё равно не назвать.
+ПРЕДЕЛ_СТРАНИЦ_ВЫХОДА = 6
+
+
 def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
                           sig_limit: int = 1000,
                           max_tx: int | None = None) -> dict:
@@ -509,17 +519,40 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
             results.append({"signature": sig, "mint": mint, "ok": False,
                              "why_not": "в покупке нет токен-счёта лидера по этому минту"})
             continue
+        # ЛИСТАЕМ ДО САМОЙ РАННЕЙ СТРАНИЦЫ. getSignaturesForAddress с
+        # until=подпись отдаёт САМЫЕ НОВЫЕ подписи из тех, что новее покупки,
+        # а не ближайшие к ней. Прогон 26.09 03:03Z на этом и сломался:
+        # "первой продажей" оказывалась транзакция из далёкого будущего, и
+        # держание вышло медианой 683 008 слотов при окне семь суток, а
+        # возврат -- нулём у 115 сделок из 119. Поэтому листаем назад
+        # (before = самая старая этой страницы) пока страница не окажется
+        # короче предела: она и есть самая ранняя после покупки.
+        страница: list = []
+        курсор = None
+        страниц = 0
+        обрезано = False
         try:
-            страница = rpc_call("getSignaturesForAddress",
-                                 [хран, {"limit": sig_limit, "until": sig,
-                                          "commitment": "finalized"}]) or []
-            sig_calls_used += 1
+            while страниц < ПРЕДЕЛ_СТРАНИЦ_ВЫХОДА:
+                парам = {"limit": sig_limit, "until": sig,
+                         "commitment": "finalized"}
+                if курсор:
+                    парам["before"] = курсор
+                очередная = rpc_call("getSignaturesForAddress", [хран, парам]) or []
+                sig_calls_used += 1
+                страниц += 1
+                sigs_seen += len(очередная)
+                if очередная:
+                    страница = очередная
+                if len(очередная) < sig_limit:
+                    break
+                курсор = очередная[-1].get("signature")
+                if страниц >= ПРЕДЕЛ_СТРАНИЦ_ВЫХОДА:
+                    обрезано = True
         except CreditLimitExceeded as exc:
             stopped_reason = str(exc)
             results.append({"signature": sig, "mint": mint, "ok": False,
                              "why_not": f"остановлено на этой сделке -- {stopped_reason}"})
             continue
-        sigs_seen += len(страница)
         # От старых к новым: первая найденная продажа и есть первая продажа.
         кандидаты = sorted(страница, key=lambda x: x.get("slot") or 0)
         found = None
@@ -538,9 +571,23 @@ def compute_leader_exits(rpc_call, trades: list, *, leader: str = LEADER_BEQV,
             delta = C2.owner_mint_delta(tx, mint).get(leader)
             if delta is not None and delta < 0:
                 recv = quote_received(tx, leader)
+                в_sol = recv["sol"] + recv["wsol"]
+                # ПРОДАЖА МОГЛА УЙТИ НЕ В SOL. Тогда возврат в SOL честно ноль,
+                # и писать его нулём -- значит объявить сделку полной потерей.
+                # Называем полученную котировку как есть и оставляем sol_received
+                # неизвестным: пусть лучше не будет числа, чем будет неверное.
+                иная = {}
+                if abs(float(в_sol)) < 1e-9:
+                    for кв in (USDC_MINT, USDT_MINT):
+                        д = C2.owner_mint_delta(tx, кв).get(leader)
+                        if д is not None and д > 0:
+                            иная = {"quote_mint": кв, "quote_amount": r6(д)}
+                            break
                 pool = C2.identify_pool(tx, leader, mint, side="sell")
                 found = {"exit_signature": подпись_к, "exit_slot": s.get("slot"),
-                          "sol_received": r6(recv["sol"] + recv["wsol"]),
+                          "sol_received": (None if иная else r6(в_sol)),
+                          "quote_other": (иная or None),
+                          "pages_read": страниц, "pages_capped": обрезано,
                           "pool_ok": pool.get("ok"), "pool_why_not": pool.get("why_not"),
                           "price": str(pool.get("price")) if pool.get("price") is not None else None,
                           "vault": хран, "candidates_seen": len(кандидаты)}
