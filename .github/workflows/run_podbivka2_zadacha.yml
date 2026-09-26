@@ -1,0 +1,85 @@
+name: "Podbivka-2: zadacha -- matrica paketov (tolko chtenie)"
+
+# ZACHEM. Odin progon na vse zadachi podbivki vtoroy sessii: marker
+# data/podbivka/zapusk/zadacha_*.json (poslednim kommitom pusha) zadaet
+# skript i spisok; plan raskladyvaet koshelki po 50 na paket, pakety idut
+# parallelnoy matricey na oblachnom beguneke. Rezultat po koshelku -- v fayl
+# srazu i v git kazhdye 10 minut. Uzel -- Shyft RPC. Helius ne ispolzuetsya.
+on:
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/zadacha_*.json"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.p.outputs.matrix }}
+      count: ${{ steps.p.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - id: p
+        run: |
+          set -e
+          MARKERS=$(git diff --name-only HEAD~1 HEAD -- data/podbivka/zapusk/ | grep -E 'zadacha_.*[.]json$' || true)
+          echo "markers: $MARKERS"
+          python3 analysis/podbivka_plan.py $MARKERS
+
+  run:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+
+      - name: "Python venv with requests and solders"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/pod_venv"
+          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: "Run"
+        env:
+          SHYFT_API_KEY: ${{ secrets.SHYFT_SECRET_NAME_TBD }}
+          SKRIPT: ${{ matrix.skript }}
+          ARGS: ${{ matrix.args }}
+        run: |
+          set -e
+          [ -n "$SHYFT_API_KEY" ] || { echo "STOP: Shyft RPC key is empty"; exit 1; }
+          $PY analysis/$SKRIPT $ARGS
+
+      - name: "Final commit"
+        if: always()
+        run: |
+          set -e
+          git add data/podbivka || true
+          git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          git commit -q -m "Podbivka-2: ${{ matrix.name }} [automated]"
+          for i in 1 2 3 4 5 6; do
+            git push -q origin HEAD:claude/podbivka && exit 0
+            git fetch -q --depth=50 origin claude/podbivka
+            git rebase -q FETCH_HEAD || git rebase --abort
+            sleep 4
+          done
+          exit 1
