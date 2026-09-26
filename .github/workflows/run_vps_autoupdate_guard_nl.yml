@@ -90,75 +90,29 @@ jobs:
       - name: "Правка 1: needrestart не трогает наши службы"
         run: |
           set -e
-          # Конфигурация needrestart -- на perl: override_rc задаёт, какие юниты
-          # НЕ перезапускать (0 -- не перезапускать). Наши три семейства служб и
-          # бегунок GitHub: перезапуск решаем мы сами, деплоем.
-          ssh -n $SSH_OPTS root@"$HOST" '
-            install -d -m 755 /etc/needrestart/conf.d
-            cat > /etc/needrestart/conf.d/90-bloom-no-restart.conf <<CONF
-# Поставлено прогоном run_vps_autoupdate_guard_nl.yml по решению владельца
-# 26.09: автообновления НЕ перезапускают торговые службы. 26.09 04:53:45Z
-# обновление curl и libexpat перезапустило детектор, сторож и зонды без
-# предупреждения -- в торговле это стоило бы сделки.
-\$nrconf{override_rc} = {
-    qr(^bloom-)          => 0,
-    qr(^dbot-)           => 0,
-    qr(^grpc-feed-probe) => 0,
-    qr(^actions\.runner\.) => 0,
-};
-CONF
-            chmod 644 /etc/needrestart/conf.d/90-bloom-no-restart.conf
-            echo "--- файл на месте ---"; cat /etc/needrestart/conf.d/90-bloom-no-restart.conf'
-          echo "--- ДЕЙСТВИЕ: needrestart override поставлен ---" >> data/vps_autoupdate_guard_nl.txt
+          # Файл конфигурации лежит в репозитории (deploy/needrestart/) и
+          # доставляется потоком: так его видно в истории и он не собирается
+          # в строке прогона.
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 755 /etc/needrestart/conf.d && cat > /etc/needrestart/conf.d/90-bloom-no-restart.conf && chmod 644 /etc/needrestart/conf.d/90-bloom-no-restart.conf" < deploy/needrestart/90-bloom-no-restart.conf
+          ssh -n $SSH_OPTS root@"$HOST" "echo '--- как легло ---'; cat /etc/needrestart/conf.d/90-bloom-no-restart.conf | tail -8" | tee -a data/vps_autoupdate_guard_nl.txt
 
       - name: "Правка 2: окно автообновлений 03:00-04:00Z"
         run: |
           set -e
-          WINDOW="${{ inputs.apt_window_utc }}"
-          # Таймер apt по умолчанию бьёт в непредсказуемую минуту (случайная
-          # задержка до часа): 25.09 это было 06:18Z, 26.09 -- 04:53Z. Ставим
-          # фиксированное окно в UTC и малую задержку, чтобы минута была наша.
-          ssh -n $SSH_OPTS root@"$HOST" "
-            install -d -m 755 /etc/systemd/system/apt-daily-upgrade.timer.d
-            cat > /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf <<CONF
-# Поставлено прогоном run_vps_autoupdate_guard_nl.yml по решению владельца
-# 26.09: автообновления только в окно 03:00-04:00 UTC, когда мы не торгуем.
-[Timer]
-OnCalendar=
-OnCalendar=*-*-* $WINDOW:00 UTC
-RandomizedDelaySec=600
-Persistent=false
-CONF
-            chmod 644 /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf
-            systemctl daemon-reload
-            systemctl restart apt-daily-upgrade.timer
-            echo '--- как стало ---'
-            systemctl show apt-daily-upgrade.timer -p OnCalendar -p RandomizedDelaySec -p Persistent
-            systemctl list-timers apt-daily-upgrade.timer --no-pager | head -3"
-          echo "--- ДЕЙСТВИЕ: окно apt задано $WINDOW UTC ---" >> data/vps_autoupdate_guard_nl.txt
+          set -o pipefail
+          sed "s/__WINDOW__/${{ inputs.apt_window_utc }}/" deploy/systemd/apt-daily-upgrade-override.conf > /tmp/apt_override.conf
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 755 /etc/systemd/system/apt-daily-upgrade.timer.d && cat > /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf && chmod 644 /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf" < /tmp/apt_override.conf
+          ssh -n $SSH_OPTS root@"$HOST" "systemctl daemon-reload && systemctl restart apt-daily-upgrade.timer && echo '--- как стало ---' && systemctl show apt-daily-upgrade.timer -p OnCalendar -p RandomizedDelaySec -p Persistent && systemctl list-timers apt-daily-upgrade.timer --no-pager | head -3" | tee -a data/vps_autoupdate_guard_nl.txt
 
       - name: "Проверка ПЕРЕД перезагрузкой: рубильник стоит и позиций 0"
         if: ${{ inputs.mode == 'config_and_reboot' }}
         run: |
           set -e
           set -o pipefail
-          # ПЕРЕЗАГРУЗКА ТОЛЬКО ПРИ СТОЯЩЕМ РУБИЛЬНИКЕ И НУЛЕ ПОЗИЦИЙ. Это
-          # деньги: перезагрузка с позицией в воздухе оставляет её без сторожа.
-          ssh -n $SSH_OPTS root@"$HOST" '
-            test -f /etc/bloom-executor/KILL || { echo "СТОП: рубильника KILL нет -- перезагрузка отменена"; exit 3; }
-            python3 - <<PY
-import json, sys
-s = json.load(open("/home/bot/bloom_executor_live_data/detector_status.json"))
-own = (s.get("own_send") or {})
-st = (own.get("lane_state") or {})
-открытых = st.get("open")
-висящих = st.get("stuck")
-print("открытых позиций:", открытых, "| зависших:", висящих)
-if открытых not in (0, None) or (висящих or 0) not in (0, None):
-    print("СТОП: есть открытые или зависшие позиции -- перезагрузка отменена")
-    sys.exit(4)
-PY'
-          echo "--- ПРОВЕРКА ПЕРЕД ПЕРЕЗАГРУЗКОЙ: рубильник стоит, позиций 0 ---" >> data/vps_autoupdate_guard_nl.txt
+          # Проверка лежит в репозитории (deploy/checks/) и доставляется потоком:
+          # её видно в истории, и она не собирается в строке прогона.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pered_perezagruzkoy.py" < deploy/checks/pered_perezagruzkoy.py
+          ssh -n $SSH_OPTS root@"$HOST" "python3 /tmp/pered_perezagruzkoy.py; rc=\$?; rm -f /tmp/pered_perezagruzkoy.py; exit \$rc" | tee -a data/vps_autoupdate_guard_nl.txt
 
       - name: "Перезагрузка хоста"
         if: ${{ inputs.mode == 'config_and_reboot' }}
