@@ -3751,6 +3751,70 @@ def self_test() -> int:
             else:
                 os.environ["LANE_DAMM2"] = было_ф2
 
+    # --- METEORA DBC В ПОЛОСЕ (ночное задание владельца 27.09, пункт 3).
+    # Берётся образец с котировкой SOL: остальные полоса и так не возьмёт.
+    обр_dbc = []
+    файл_dbc = (Path(__file__).resolve().parent.parent / "data" / "c2_pool_samples"
+                / f"{getattr(B_ж, 'DBC', 'нет')}.json")
+    if файл_dbc.exists():
+        обр_dbc = json.loads(файл_dbc.read_text(encoding="utf-8"))
+
+    def _dbc_годный(x):
+        t_ = B_ж.extract_template(x["tx"], B_ж.DBC, x["pool_vault"])
+        if not t_.get("ok"):
+            return False
+        mv_ = B_ж.mints_and_vaults(t_, x["tx"])
+        if not mv_ or mv_["quote_mint"] != C_ж.WSOL:
+            return False
+        return B_ж.min_out_from_reserves(t_, x["tx"], 10_000_000, 0.35).get("ok") is True
+
+    образец_dbc = next((x for x in обр_dbc if _dbc_годный(x)), None)
+    if образец_dbc is not None:
+        хран_dbc = образец_dbc["pool_vault"]
+
+        class МодулиDBC:
+            class C:
+                WSOL = C_ж.WSOL
+                NATIVE_QUOTE = getattr(C_ж, "NATIVE_QUOTE", "native_sol")
+
+                @staticmethod
+                def identify_pool(*a, **kw):
+                    return {"ok": True, "pool_vault": хран_dbc, "quote_mint": C_ж.WSOL}
+
+        было_м3 = globals()["_модули"]
+        было_ф3 = os.environ.get("LANE_DBC")
+        globals()["_модули"] = lambda: (МодулиDBC.C, PP_ж, SB_ж, B_ж)
+        try:
+            os.environ.pop("LANE_DBC_GROUPS", None)
+            os.environ["LANE_DBC"] = "0"
+            dbc_выкл = собрать(tx_источника=образец_dbc["tx"],
+                                источник=образец_dbc["source"],
+                                минт=образец_dbc["mint"], наш_кошелёк=кошелёк_полосы(),
+                                лампорты=10_000_000)
+            chk("DBC без флага -- отказ, полоса его не берёт",
+                dbc_выкл["ok"] is False and "вне полосы" in (dbc_выкл["why_not"] or ""),
+                dbc_выкл)
+            os.environ["LANE_DBC"] = "1"
+            dbc_вкл = собрать(tx_источника=образец_dbc["tx"],
+                               источник=образец_dbc["source"],
+                               минт=образец_dbc["mint"], наш_кошелёк=кошелёк_полосы(),
+                               лампорты=10_000_000)
+            chk("DBC по флагу -- собран, минимум положителен и ниже ожидания, "
+                "комиссия кривой названа",
+                dbc_вкл["ok"] is True
+                and 0 < int(dbc_вкл.get("min_out") or 0) < int(dbc_вкл.get("expected_out") or 0)
+                and dbc_вкл.get("pool_fee_share") is not None
+                and float(dbc_вкл["pool_fee_share"]) <= ПОТОЛОК_КОМИССИИ_ПУЛА,
+                {к: dbc_вкл.get(к) for к in ("why_not", "min_out", "expected_out",
+                                              "pool_fee_share")})
+        finally:
+            globals()["_модули"] = было_м3
+            os.environ.pop("LANE_DBC_GROUPS", None)
+            if было_ф3 is None:
+                os.environ.pop("LANE_DBC", None)
+            else:
+                os.environ["LANE_DBC"] = было_ф3
+
     # --- ФЛАГ КРИВОЙ ПО ГРУППАМ, без сборки: чистая логика решения.
     было_общий = os.environ.get("LANE_BONDING_CURVE")
     было_список = os.environ.get("LANE_BONDING_CURVE_GROUPS")

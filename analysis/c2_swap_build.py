@@ -56,6 +56,8 @@ SAMPLES_DIR = C.DATA / "c2_pool_samples"
 PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 DAMM2 = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+# Meteora DBC -- кривая запуска (dynamic bonding curve) ДО перехода в DAMM v2.
+DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
@@ -177,6 +179,19 @@ SPECS = {
     # в САМОМ КОНЦЕ, и счета 0..13 при этом совпадают дословно (проверено на
     # образцах 1, 5, 14). Поэтому раскладка одна, а число счетов -- 14 или 15;
     # шестнадцатого в живых сделках не встречалось, и вслепую его не берём.
+    # METEORA DBC. Раскладка 15 счетов установлена по ДВУМ живым сделкам и по
+    # внутренним переводам этих же транзакций (видно, какой счёт платил
+    # котировкой и какой получил базу):
+    #   0 распорядитель хранилищ, 1 конфигурация, 2 сам пул (его адрес лежит и в
+    #   событии), 3 НАШ счёт котировки, 4 НАШ счёт базы, 5 базовое хранилище
+    #   пула, 6 хранилище котировки, 7 базовый минт, 8 минт котировки, 9 НАШ
+    #   кошелёк (подписант), 10 программа базового токена, 11 программа
+    #   котировки, 12 место реферала (там стоит сама программа), 13
+    #   event_authority, 14 сама программа.
+    # Подставляем только 3, 4 и 9 -- остальное переносится из сделки источника.
+    DBC: {"label": "Meteora DBC", "ix": "swap", "alt": [], "n_accounts": 15,
+          "user": [9], "user_ata": [(4, 7, 10), (3, 8, 11)], "pda": [],
+          "base_mint": 7, "quote_mint": 8, "base_vault": 5, "quote_vault": 6},
     DAMM2: {"label": "Meteora DAMM v2", "ix": "swap", "alt": ["swap2"],
             "n_accounts": None, "min_accounts": 14, "max_accounts": 15,
             "user": [8], "user_ata": "dyn", "pda": [],
@@ -563,6 +578,49 @@ def damm2_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     return из_
 
 
+def dbc_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
+    """Минимум выхода в Meteora DBC -- та же математика cpAMM, своя схема события.
+
+    Кривая запуска считается по цене после сделки источника (u128 из события) и
+    по паре "вход/выход" этой же сделки. Проверки те же: заявленный вход
+    совпадает с аргументом инструкции, выход -- с движением хранилища, сдвиг
+    цены физически возможен, модель воспроизводит сделку источника.
+
+    ОТДЕЛЬНОЕ ПРЕДУПРЕЖДЕНИЕ. Схема события снята с ДВУХ живых сделок; у кривой
+    запуска бывают участки ликвидности, и на большом входе экстраполяция по
+    одному участку может врать. Поэтому флаг LANE_DBC включается только после
+    симуляции на хосте, и размер сделки там 0.01 SOL.
+    """
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    try:
+        import c2_cl_quote as CL  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"нет модуля цены ({type(exc).__name__})"}
+    схема = CL.СХЕМЫ["DBC"]
+    # Пул у DBC -- счёт 2 инструкции (его адрес лежит и в теле события).
+    пул = tpl["accounts"][2] if len(tpl["accounts"]) > 2 else None
+    тело = CL.тело_события(tx, tpl["program"], all_instructions, b58decode,
+                            пул=пул, длина=схема["длина"])
+    из_ = CL.минимум(тело=тело, вход_источника=вход, выход_источника=выход,
+                      аргумент_входа=tpl["arg0"], база_это_a=True,
+                      наш_вход=amount_in, проскальзывание=slippage, схема=схема)
+    if из_.get("ok"):
+        из_["source_in"] = вход
+        из_["source_out"] = выход
+    return из_
+
+
 def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
 
@@ -572,6 +630,8 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
     if tpl["program"] == DAMM2:
         # DAMM v2: цена -- по событию свопа и сделке источника (см. c2_cl_quote).
         return damm2_min_out(tpl, tx, amount_in, slippage)
+    if tpl["program"] == DBC:
+        return dbc_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] in (DLMM, CLMM):
         return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
     if tpl["program"] == LAUNCHLAB:
@@ -843,7 +903,11 @@ def self_test() -> int:
                        f"не сверяемо {len(skipped)} ({sorted({r['why'] for r in skipped})}), "
                        f"расхождений {len(bad)} {[r.get('diff_idx') for r in bad]}",
                        (len(ok) >= 10 or (program == LAUNCHLAB and len(ok) >= 8)
-                        or (program == BONDING and len(ok) >= 4)) and not bad))
+                        or (program == BONDING and len(ok) >= 4)
+                        # DBC: в репозитории ДВЕ живые сделки этой программы.
+                        # Порог честный -- два, и это мало: поэтому флаг LANE_DBC
+                        # включается только после симуляции на хосте.
+                        or (program == DBC and len(ok) >= 2)) and not bad))
         # Launchlab: в образцах задачи D всего 12 транзакций; добор до 10+
         # точных делает c2_swap_sim на раннере (сделки Launchlab из задачи A).
         t0 = time.perf_counter()
@@ -860,8 +924,9 @@ def self_test() -> int:
         dt = (time.perf_counter() - t0) * 1000 / max(1, n)
         # Кривая pump.fun: в образцах репозитория 5 настоящих покупок, одна из
         # них другой разновидности инструкции (27 счетов) -- порог 4.
+        порог_сборки = 4 if program == BONDING else (2 if program == DBC else 10)
         checks.append((f"{spec['label']}: сборка {n} транзакций, среднее {dt:.2f} мс, размер <= 1232",
-                       n >= (4 if program == BONDING else 10)))
+                       n >= порог_сборки))
     v1 = v1_ok = 0
     for s_ in load_samples(DLMM):
         tpl = extract_template(s_["tx"], DLMM, s_["pool_vault"])
@@ -1090,6 +1155,42 @@ def self_test() -> int:
         break
     checks.append(("DAMM v2: событие берётся по нашему пулу, чужое не берётся",
                    bool(чужой)))
+
+    # ------------------------------------------------- DBC: цена по событию кривой
+    dbc_модель, dbc_ниже, dbc_моно, dbc_ком = [], [], [], []
+    for s_ in load_samples(DBC):
+        tpl = extract_template(s_["tx"], DBC, s_["pool_vault"])
+        if not tpl.get("ok"):
+            continue
+        r1 = min_out_from_reserves(tpl, s_["tx"], 10_000_000, 0.35)
+        if not r1.get("ok"):
+            dbc_модель.append(False)
+            continue
+        dbc_модель.append(r1["model_error"] < 1e-7 and 1.0 < r1["price_shift"] <= 8.0)
+        наив = r1["source_out"] * 10_000_000 / r1["source_in"]
+        dbc_ниже.append(0 < r1["expected_out"] < наив)
+        # Комиссия кривой у обеих живых сделок -- 2 % с точностью до округления
+        # вверх (2.0012 %): проверяем именно это узкое окно, а не "какое-нибудь
+        # число" -- выход за него значил бы другой разбор события.
+        dbc_ком.append(0.0200 <= r1["fee_share"] <= 0.0201)
+        ряд = [min_out_from_reserves(tpl, s_["tx"], a, 0.35)
+               for a in (1_000_000, 10_000_000, 100_000_000)]
+        dbc_моно.append(all(x.get("ok") for x in ряд)
+                        and all(ряд[i]["expected_out"] < ряд[i + 1]["expected_out"]
+                                for i in (0, 1))
+                        and all(0 < x["min_out"] < x["expected_out"] for x in ряд))
+    checks.append((f"DBC: кривая по событию воспроизводит сделку источника и сдвиг "
+                   f"цены в разумных границах ({sum(dbc_модель)} из {len(dbc_модель)})",
+                   len(dbc_модель) >= 2 and all(dbc_модель)))
+    checks.append((f"DBC: наше ожидание ниже наивной оценки по соотношению "
+                   f"({sum(dbc_ниже)} из {len(dbc_ниже)})",
+                   len(dbc_ниже) >= 2 and all(dbc_ниже)))
+    checks.append((f"DBC: больше траты -- больше выхода, минимум ниже ожидания "
+                   f"({sum(dbc_моно)} из {len(dbc_моно)})",
+                   len(dbc_моно) >= 2 and all(dbc_моно)))
+    checks.append((f"DBC: комиссия кривой 2 % (с округлением вверх) у обеих живых сделок "
+                   f"({sum(dbc_ком)} из {len(dbc_ком)})",
+                   len(dbc_ком) >= 2 and all(dbc_ком)))
     bad_n = 0
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
