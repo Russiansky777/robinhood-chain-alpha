@@ -141,6 +141,7 @@ PUBLIC_RPC = "https://api.mainnet-beta.solana.com"
 HELIUS_RPC = "https://mainnet.helius-rpc.com"
 TOKEN_CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+ЛАМПОРТОВ_В_SOL = 1_000_000_000
 
 DEFAULT_SELL_SLIPPAGE_PCT = 40.0
 DEFAULT_GRACE_S = 15.0            # столько ждём после срока таймерного ордера
@@ -508,6 +509,123 @@ def итог_продажи(tx: dict, wallet: str, mint: str) -> dict:
              "fee_sol": комиссия, "mint_delta_ui": минт_дельта}
 
 
+def счета_минта(wallet: str, mint: str) -> list:
+    """Наши токен-счета этого минта -- ВКЛЮЧАЯ уже закрытые.
+
+    Закрытый счёт узел в getTokenAccountsByOwner больше не отдаёт, поэтому
+    адрес выводится: ATA от кошелька и минта для обеих программ токена. История
+    закрытого счёта в цепи остаётся и отвечает на вопрос, чем он закрылся.
+    """
+    из_ = []
+    try:
+        import c2_swap_build as B  # noqa: PLC0415
+        for программа in (B.TOKEN_PROGRAM, TOKEN_2022):
+            адрес = B.ata(wallet, mint, программа)
+            if адрес and адрес not in из_:
+                из_.append(адрес)
+    except Exception:  # noqa: BLE001
+        pass
+    return из_
+
+
+def дельта_по_счёту(tx: dict, счёт: str):
+    """Дельта остатка КОНКРЕТНОГО токен-счёта. ПРОПАВШАЯ СТРОКА -- ЭТО НОЛЬ.
+
+    ЗАЧЕМ ОТДЕЛЬНО ОТ БАЛАНСОВ ПО ВЛАДЕЛЬЦУ. Продажа часто идёт вместе с
+    закрытием токен-счёта одной транзакцией, и закрытый счёт из
+    postTokenBalances исчезает совсем. Проверка "остаток уменьшился" по
+    владельцу и минту такую продажу не видит вовсе: строки в post нет, и
+    дельта выходит None -- "нет данных" вместо "ушёл в ноль". Позиция тогда
+    остаётся открытой навсегда, а выручка не попадает в суточный счёт.
+    """
+    мета = (tx or {}).get("meta") or {}
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k
+             for k in ((((tx or {}).get("transaction") or {}).get("message") or {})
+                       .get("accountKeys") or [])]
+    try:
+        и = ключи.index(счёт)
+    except ValueError:
+        return None
+
+    def взять(сторона):
+        for b in мета.get(сторона) or []:
+            if isinstance(b, dict) and b.get("accountIndex") == и:
+                try:
+                    return int((b.get("uiTokenAmount") or {}).get("amount"))
+                except (TypeError, ValueError):
+                    return None
+        return 0            # строки нет -- остаток ноль
+
+    до = взять("preTokenBalances")
+    после = взять("postTokenBalances")
+    if до is None:
+        return None
+    return после - до
+
+
+def натив_кошелька(tx: dict, кошелёк: str):
+    """Нативная дельта кошелька в этой транзакции, SOL (вместе с комиссией)."""
+    мета = (tx or {}).get("meta") or {}
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k
+             for k in ((((tx or {}).get("transaction") or {}).get("message") or {})
+                       .get("accountKeys") or [])]
+    try:
+        и = ключи.index(кошелёк)
+    except ValueError:
+        return None
+    до = (мета.get("preBalances") or [])
+    после = (мета.get("postBalances") or [])
+    if и >= len(до) or и >= len(после):
+        return None
+    return round((int(после[и]) - int(до[и])) / ЛАМПОРТОВ_В_SOL, 9)
+
+
+def закрывающая_по_счёту(wallet: str, mint: str, *, предел: int = 25,
+                          читатель_tx=None, подписи_фн=None) -> dict:
+    """Закрывающая транзакция по истории САМОГО токен-счёта.
+
+    Запасной путь к поиску по истории кошелька: у занятого кошелька продажа
+    уходит за окно последних подписей, а у токен-счёта в истории ровно наши
+    покупка и продажа. Здесь же считается дельта по строкам счёта -- то есть
+    пропавшая строка читается как ноль.
+    """
+    из_ = {"found": False, "signature": None, "outcome": None, "looked": 0,
+            "accounts": [], "why_not": None}
+    if подписи_фн is None:
+        def подписи_фн(адрес, лимит):  # noqa: E306
+            r = rpc_call("getSignaturesForAddress", [адрес, {"limit": лимит}])
+            return (r.get("result") or []) if r.get("ok") else []
+    for счёт in счета_минта(wallet, mint):
+        из_["accounts"].append(счёт)
+        for зап in подписи_фн(счёт, предел) or []:
+            подпись = (зап or {}).get("signature")
+            if not подпись:
+                continue
+            tx = читатель_tx(подпись) if читатель_tx else None
+            из_["looked"] += 1
+            if not tx:
+                continue
+            исход = итог_продажи(tx, wallet, mint)
+            дельта = исход.get("mint_delta_ui")
+            if not isinstance(дельта, (int, float)) or дельта >= 0:
+                сырая = дельта_по_счёту(tx, счёт)
+                if сырая is not None and сырая < 0:
+                    натив = натив_кошелька(tx, wallet)
+                    исход = {**исход, "mint_delta_ui": None,
+                              "mint_delta_raw": сырая,
+                              "sol_delta": натив, "sol_delta_net": натив,
+                              "why_not": ("остаток счёта ушёл в ноль вместе с закрытием "
+                                           "счёта -- дельта посчитана по строкам счёта")}
+                    дельта = -1.0
+            if isinstance(дельта, (int, float)) and дельта < 0:
+                из_.update(found=True, signature=подпись,
+                            block_time=(зап or {}).get("blockTime"), outcome=исход)
+                return из_
+    из_["why_not"] = (f"в истории токен-счетов ({', '.join(из_['accounts']) or 'адрес не выведен'}) "
+                       f"нет транзакции, уменьшившей остаток минта; осмотрено {из_['looked']}")
+    return из_
+
+
 def найти_закрывающую(wallet: str, mint: str, *, предел: int = 8,
                        читатель_tx=None, подписи_фн=None) -> dict:
     """Чем именно закрылась позиция, когда остаток стал нулём.
@@ -540,9 +658,19 @@ def найти_закрывающую(wallet: str, mint: str, *, предел: i
                      "block_time": (зап or {}).get("blockTime"),
                      "outcome": итог}
         осмотрено.append({"signature": подпись, "mint_delta_ui": дельта})
+    # ЗАПАСНОЙ ПУТЬ -- ПО ИСТОРИИ ТОКЕН-СЧЁТА. У занятого кошелька продажа
+    # уходит за окно последних подписей, и тогда позиция закрывалась без
+    # возврата: выручка не попадала в суточный счёт. Плюс там дельта считается
+    # по строкам счёта, где пропавшая строка -- это ноль, а не "нет данных".
+    по_счёту = закрывающая_по_счёту(wallet, mint, читатель_tx=читатель_tx,
+                                     подписи_фн=подписи_фн)
+    if по_счёту.get("found"):
+        по_счёту["fallback"] = "история токен-счёта"
+        return по_счёту
     return {"found": False, "checked": len(строки), "seen": осмотрено[:5],
              "why_not": (f"среди последних {len(строки)} подписей кошелька нет "
-                          "транзакции, уменьшившей остаток этого минта")}
+                          "транзакции, уменьшившей остаток этого минта; по истории "
+                          f"токен-счёта тоже нет ({по_счёту.get('why_not')})")}
 
 
 class Seller:
@@ -873,13 +1001,21 @@ class Seller:
             # с индексацией узла.
             серия = int(pos.get("zero_streak") or 0) + 1
             if серия >= 2:
-                self.state.update_position(cid, state=STATE_CLOSED, zero_streak=серия,
-                                            closed_reason="остаток ноль дважды подряд")
-                итог.update(action="позиция закрыта", zero_streak=серия)
+                # ПОРЯДОК ВАЖЕН И ЭТО ДЕНЬГИ. Суточный счёт пишется РОВНО ОДИН
+                # РАЗ -- в тот момент, когда позиция становится закрытой (I.1).
+                # Пока доклад шёл ПОСЛЕ закрытия, возврат (closed_sol_net) в
+                # записи появлялся позже, и счёт закрывал позицию без выручки:
+                # итог не считался вовсе. Сначала доклад -- он же находит
+                # закрывающую транзакцию и пишет возврат, -- и только потом
+                # закрытие.
                 # СТРОКА ОБЯЗАТЕЛЬНА НА ЛЮБОЕ ЗАКРЫТИЕ. Позиция KMNO 24.09
                 # закрылась в 00:08:10 таймерным ордером Bloom -- и владелец
                 # не получил ни строки: эта ветка молчала.
                 доклад = self.доложить_закрытие(pos, now=now, читатель_tx=читатель_tx)
+                self.state.update_position(cid, state=STATE_CLOSED, zero_streak=серия,
+                                            ts_closed=now,
+                                            closed_reason="остаток ноль дважды подряд")
+                итог.update(action="позиция закрыта", zero_streak=серия)
                 # Счётчик "продано" ставится ТОЛЬКО на подтверждённую продажу.
                 # Раньше он ставился на любой нулевой остаток -- в том числе
                 # на остаток, которого не было никогда (упавшая покупка), и
@@ -1679,6 +1815,69 @@ def self_test() -> None:
             r.get("closed_confirmed") is False, r)
         chk("и счётчик непроданных не сбит неподтверждённым закрытием",
             int(st.counters().get("unsold_streak", 0)) == 0, st.counters())
+
+        # ПРОДАЖА ВМЕСТЕ С ЗАКРЫТИЕМ СЧЁТА, а история кошелька её не достаёт.
+        # Это правка (б) по слову владельца 26.09: исчезнувшая строка
+        # postTokenBalances -- остаток 0, позиция закрывается, выручка в счёт.
+        # Занятый кошелёк уводит продажу за окно последних подписей, и позиция
+        # прежде закрывалась БЕЗ возврата: выручка не попадала в суточный счёт.
+        import c2_swap_build as B_з  # noqa: PLC0415
+        МИНТ_ЗС = "So11111111111111111111111111111111111111113"
+        СЧЁТ_ЗС = B_з.ata(EXECUTOR_WALLET, МИНТ_ЗС, B_з.TOKEN_PROGRAM)
+        chk("адрес токен-счёта выводится для обеих программ токена",
+            len(счета_минта(EXECUTOR_WALLET, МИНТ_ЗС)) == 2
+            and СЧЁТ_ЗС in счета_минта(EXECUTOR_WALLET, МИНТ_ЗС),
+            счета_минта(EXECUTOR_WALLET, МИНТ_ЗС))
+        tx_зс = {"slot": 77, "meta": {
+                     "err": None, "fee": 5000,
+                     "preBalances": [10 ** 9, 2_039_280],
+                     "postBalances": [10 ** 9 + 9_039_280, 0],
+                     # Строки этого счёта в postTokenBalances НЕТ -- счёт закрыт
+                     # той же транзакцией. И owner в pre тоже нет: узел его не
+                     # обязан отдавать, а сторож обязан это переживать.
+                     "preTokenBalances": [{"accountIndex": 1, "mint": МИНТ_ЗС,
+                                            "uiTokenAmount": {"amount": "1000000",
+                                                              "decimals": 6}}],
+                     "postTokenBalances": [], "innerInstructions": []},
+                 "transaction": {"message": {
+                     "accountKeys": [{"pubkey": EXECUTOR_WALLET}, {"pubkey": СЧЁТ_ЗС}],
+                     "instructions": []}}}
+        chk("пропавшая строка postTokenBalances читается как НОЛЬ, а не как нет данных",
+            дельта_по_счёту(tx_зс, СЧЁТ_ЗС) == -1_000_000, дельта_по_счёту(tx_зс, СЧЁТ_ЗС))
+        chk("а по владельцу и минту дельты нет вовсе -- прежний путь слеп",
+            итог_продажи(tx_зс, EXECUTOR_WALLET, МИНТ_ЗС).get("mint_delta_ui") is None,
+            итог_продажи(tx_зс, EXECUTOR_WALLET, МИНТ_ЗС).get("mint_delta_ui"))
+        st.write_intent(client_order_id="pзс", mint=МИНТ_ЗС, source_sig="SЗС",
+                         source_slot=16, sol_in=0.01, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode="dry-run", sell_after_s=28.8)
+        st.update_position("pзс", state="bought", ts_accepted=time.time() - 60,
+                            zero_streak=1)
+        посланное_з.clear()
+        # История КОШЕЛЬКА отдаёт чужие подписи (продажа ушла за окно), история
+        # СЧЁТА -- ту самую транзакцию.
+        подписи_по_адресу = {СЧЁТ_ЗС: [{"signature": "ПРОДАЖА_И_ЗАКРЫТИЕ",
+                                         "blockTime": 1790000000}]}
+        было_подписи = s.подписи_читатель
+        s.подписи_читатель = lambda адрес, лимит: (
+            подписи_по_адресу.get(адрес) or [{"signature": "ЧУЖАЯ1"},
+                                              {"signature": "ЧУЖАЯ2"}])
+        try:
+            r_зс = s.handle(st.positions()["pзс"], balance_reader=читатель(0),
+                             читатель_tx=lambda подпись: (
+                                 tx_зс if подпись == "ПРОДАЖА_И_ЗАКРЫТИЕ" else None))
+        finally:
+            s.подписи_читатель = было_подписи
+        поз_зс = st.positions()["pзс"]
+        chk("продажа с закрытием счёта найдена по истории токен-счёта",
+            поз_зс.get("closed_signature") == "ПРОДАЖА_И_ЗАКРЫТИЕ"
+            and поз_зс.get("state") == STATE_CLOSED, поз_зс)
+        chk("и ВЫРУЧКА попала в позицию: возврат по нативной дельте кошелька",
+            abs((поз_зс.get("closed_sol_net") or 0) - 0.00903928) < 1e-8,
+            поз_зс.get("closed_sol_net"))
+        chk("и суточный счёт её учёл ровно один раз",
+            поз_зс.get("pnl_counted") is True
+            and isinstance(поз_зс.get("pnl_counted_sol"), (int, float)),
+            {к: поз_зс.get(к) for к in ("pnl_counted", "pnl_counted_sol")})
 
         # Транзакция НАЙДЕНА, но возврат нулевой: это тоже не продажа.
         st.write_intent(client_order_id="pz", mint="MINTZ", source_sig="SZ",

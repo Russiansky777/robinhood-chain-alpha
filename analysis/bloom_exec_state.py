@@ -765,14 +765,24 @@ class ExecState:
         """
         if str(поля.get("state") or "") != STATE_CLOSED:
             return {}
-        чисто = поля.get("closed_sol_net")
-        if чисто is None:
-            return {}
         try:
             все_позиции = self.positions()
         except Exception:  # noqa: BLE001
             все_позиции = {}
         прежние = все_позиции.get(cid) or {}
+        # ВОЗВРАТ БЕРЁТСЯ ИЗ СЛИТОЙ ЗАПИСИ, А НЕ ТОЛЬКО ИЗ ЭТОГО ВЫЗОВА.
+        # Сторож сначала докладывает закрытие (и пишет closed_sol_net), а потом
+        # закрывает позицию отдельным вызовом. Пока возврат искался только в
+        # полях самого закрывающего вызова, счёт видел None и не считал ничего:
+        # выручка подтверждённой продажи в суточный счёт не попадала вовсе.
+        чисто = поля.get("closed_sol_net")
+        if чисто is None:
+            чисто = прежние.get("closed_sol_net")
+        if чисто is None:
+            чисто = ((прежние.get("last_sell_outcome") or {}).get("sol_delta_net")
+                     if isinstance(прежние.get("last_sell_outcome"), dict) else None)
+        if чисто is None:
+            return {}
         if прежние.get("pnl_counted"):
             return {}
         # ИТОГ -- ЭТО ВОЗВРАТ МИНУС ВХОД МИНУС РАСХОД НА ОТПРАВКУ, а не
@@ -1190,6 +1200,23 @@ def self_test() -> None:
         ок_после is False and код_п == КОД_ДНЕВНОЙ_УБЫТОК, (код_п, почему_п))
     стр2 = сч.update_position("p1", state=STATE_CLOSED, closed_sol_net=0.0,
                                closed_reason="повтор той же записи")
+    # ВОЗВРАТ, ЗАПИСАННЫЙ РАНЬШЕ ЗАКРЫТИЯ, тоже попадает в счёт: сторож
+    # докладывает закрытие (и пишет closed_sol_net) отдельным вызовом ДО того,
+    # как поставит state=closed.
+    сч_р = ExecState(base=base / "ранний_возврат", kill=base / "ранний_возврат" / "НЕТ")
+    сч_р.write_intent(client_order_id="ранний", mint="MR", source_sig="SR",
+                       source_slot=1, sol_in=0.01, pool=None, program=None,
+                       taxed=None, tax_bps=None, mode="live", sell_after_s=28.8)
+    сч_р.update_position("ранний", state="bought", lane_tips_total_sol=0.001,
+                          lane_priority_lamports=5000, lane_signature="ПОДПИСЬ_Р")
+    сч_р.update_position("ранний", closed_sol_net=0.012, closed_signature="ПР")
+    стр_р = сч_р.update_position("ранний", state=STATE_CLOSED)
+    chk("возврат из прежней записи учтён при закрытии",
+        стр_р.get("pnl_counted") is True
+        and abs((стр_р.get("pnl_counted_sol") or 0) - 0.00099) < 1e-9,
+        {к: стр_р.get(к) for к in ("pnl_counted", "pnl_counted_sol",
+                                    "pnl_count_why_not")})
+
     chk("повторная запись того же закрытия счёт НЕ удваивает",
         стр2.get("pnl_counted") is not True
         and abs(сч.pnl()["realized_sol"] + 0.016005) < 1e-9, сч.pnl())
