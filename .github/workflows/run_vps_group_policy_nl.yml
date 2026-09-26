@@ -86,10 +86,13 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          # Перезапуск только при стоящем рубильнике и нуле позиций -- та же
-          # проверка, что перед перезагрузкой хоста.
-          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezagruzkoy.py" < deploy/checks/pered_perezagruzkoy.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezagruzkoy.py; rc=\$?; rm -f /tmp/pered_perezagruzkoy.py; exit \$rc"
+          # Своя проверка перед перезапуском СЛУЖБЫ: позиций 0, зависших 0,
+          # признак жизни свежий, продажи не запрещены. Проверка перед
+          # перезагрузкой ХОСТА (pered_perezagruzkoy.py) осталась строже и
+          # нетронутой -- она требует стоящий рубильник покупок, потому что
+          # перезагрузка уносит сторожа вместе с хостом.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py; rc=\$?; rm -f /tmp/pered_perezapuskom_sluzhby.py; exit \$rc"
           ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart bloom-detector; sleep 12; systemctl is-active bloom-detector"
           ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; g=(json.load(open(\"/home/bot/bloom_executor_live_data/detector_status.json\")).get(\"source_groups\") or {}); print(json.dumps({\"file\": g.get(\"file\"), \"policies\": g.get(\"policies\")}, ensure_ascii=False))'" | tee -a data/politika_gruppy.json
 
