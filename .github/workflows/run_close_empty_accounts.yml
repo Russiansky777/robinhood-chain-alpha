@@ -1,0 +1,156 @@
+name: "Вернуть ренту: закрыть ПУСТЫЕ токен-счета (по умолчанию только план)"
+
+# ЗАЧЕМ. В 320 незакрытых счетах двух кошельков заперто 0.714136 SOL, и 0.488980
+# из них заперла ночь 25->26.09 (замер по датам рождения счетов). Покупка счёт
+# создаёт, продажа его не закрывает. Вернуть можно только закрытием -- это
+# ЗАПИСЬ В ЦЕПЬ, разрешена владельцем 26.09 (пункт 1 дневного плана).
+#
+# ПОЧЕМУ НА ХОСТЕ, А НЕ НА ОБЛАЧНОМ БЕГУНКЕ. Ключ кошелька полосы
+# (OWN_SEND_WALLET_KEY) живёт ТОЛЬКО в окружении службы /etc/bloom-executor/env.
+# Здесь он не копируется и не печатается: скрипт запускается на хосте от bot с
+# этим окружением, наружу идут только числа.
+#
+# ЗАЩИТЫ (все с самопроверками, 22/22): без live=yes отправки нет вовсе;
+# закрываются только ПУСТЫЕ счета (исключение -- WSOL, где остаток это
+# завёрнутый SOL и он возвращается владельцу); получатель ренты равен владельцу
+# счёта по построению; остаток перечитывается прямо перед сборкой пакета;
+# при снятом рубильнике закрывать нельзя без явного флага.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "'lane' -- кошелёк полосы, 'executor' -- кошелёк исполнителя"
+        required: false
+        default: "lane"
+      live:
+        description: "'yes' -- ОТПРАВЛЯТЬ закрытия в цепь; иначе только план"
+        required: false
+        default: "no"
+      first_one:
+        description: "'yes' -- закрыть РОВНО ОДИН счёт и сверить возврат"
+        required: false
+        default: "yes"
+      batch:
+        description: "счетов в пакете"
+        required: false
+        default: "12"
+      max_batches:
+        description: "сколько пакетов за прогон"
+        required: false
+        default: "1"
+      while_trading:
+        description: "'yes' -- разрешить без стоящего рубильника KILL (по умолчанию нельзя)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: close-empty-accounts
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  close:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО всякой цепи"
+        run: |
+          set -e
+          set -o pipefail
+          cd analysis
+          python3 close_empty_token_accounts.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/close_empty_token_accounts.py && chown bot:bot $CODE_DIR/close_empty_token_accounts.py && chmod 644 $CODE_DIR/close_empty_token_accounts.py" < analysis/close_empty_token_accounts.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $CODE_DIR/close_empty_token_accounts.py"
+
+      - name: "Самопроверки на хосте (тем же питоном, что и прогон)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR
+            sudo -n -u bot env PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py --self-test | tail -2"
+
+      - name: "План, а при live -- закрытие"
+        run: |
+          set -e
+          set -o pipefail
+          LIVE=""
+          if [ "${{ inputs.live }}" = "yes" ]; then LIVE="CLOSE_ACCOUNTS_LIVE=1"; fi
+          TRADING=""
+          if [ "${{ inputs.while_trading }}" = "yes" ]; then TRADING="CLOSE_ACCOUNTS_WHILE_TRADING=1"; fi
+          FIRST=""
+          if [ "${{ inputs.first_one }}" = "yes" ]; then FIRST="--first-one"; fi
+          # Кошелёк: полоса берётся из окружения службы (OWN_SEND_WALLET),
+          # исполнитель -- по умолчанию в самом модуле.
+          WALLET_ARG=""
+          if [ "${{ inputs.wallet }}" = "lane" ]; then WALLET_ARG='--wallet $OWN_SEND_WALLET'; fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
+              OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
+              EXEC_WALLET_KEY=\$EXEC_WALLET_KEY \
+              BLOOM_WALLET_KEY=\$BLOOM_WALLET_KEY \
+              $LIVE $TRADING \
+              PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
+                $WALLET_ARG $FIRST \
+                --batch '${{ inputs.batch }}' \
+                --max-batches '${{ inputs.max_batches }}' \
+                --out /tmp/close_accounts_plan.json \
+                --result /tmp/close_accounts_result.json
+          " | tee data/close_accounts_last_run.txt
+
+      - name: "Забрать план и результат с хоста"
+        if: always()
+        run: |
+          set -e
+          for F in close_accounts_plan close_accounts_result; do
+            ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/$F.json 2>/dev/null || echo '{}'" > "data/$F.json"
+          done
+          wc -c data/close_accounts_plan.json data/close_accounts_result.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/close_accounts_plan.json data/close_accounts_result.json data/close_accounts_last_run.txt; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Zakrytie pustykh schetov: plan i rezultat [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
