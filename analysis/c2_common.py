@@ -962,7 +962,13 @@ def self_test() -> int:
         chk("кошельки задач читаются", task_wallets(tasks).get(BATCH5_WALLET) == "BATCH-5")
         chk("Beqv в BATCH-5 снимка 23.09 нет", LEADER_BEQV not in {s["address"] for s in src})
     # 9. Настоящая копия журнала исполнителя: 7 боевых сделок, кошелёк 4s87.
-    tr = executor_trades()
+    # ПУТЬ -- ОТДЕЛЬНАЯ ФИКСТУРА, а не рабочий снимок. Рабочий
+    # data/bloom_seller_diag.json перезаписывает каждый прогон разбора
+    # пропавшего сигнала, и 26.09 в 03:30 он перезаписал его ночными сделками
+    # -- самопроверка покраснела не от кода, а от свежих данных. Числа в
+    # проверке привязаны к конкретной копии, поэтому и копия своя.
+    фикстура = DATA / "fixtures" / "bloom_seller_diag_7_sdelok.json"
+    tr = executor_trades(path=фикстура if фикстура.exists() else None)
     chk("журнал исполнителя: 7 боевых сделок с подписями",
         len(tr) == 7 and all(x["signature"] and SIG_RE.match(x["signature"]) for x in tr),
         [(x["ts_intent_utc"], x["signature"][:8] if x["signature"] else None) for x in tr])
