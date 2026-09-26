@@ -1,0 +1,87 @@
+name: "Незакрытые счета: когда созданы и сколько заперла ночь (только чтение)"
+
+# ЗАЧЕМ. Утверждение "70 % убытка ночи это рента в незакрытых счетах" нельзя
+# оставлять предположением: 320 счетов накопились не за одну ночь. Дату рождения
+# каждого счёта даёт самая старая его подпись -- по ней и считается, сколько
+# денег заперла ИМЕННО ночь.
+#
+# Только чтение цепи: getSignaturesForAddress по счетам. Ни одной подписи, ни
+# одного закрытия, ключа кошелька в прогоне нет вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "кошелёк (пусто -- исполнитель); список счетов сначала читается прогоном run_bloom_token_accounts.yml"
+        required: false
+        default: ""
+      since_utc:
+        description: "начало окна, например 2026-09-25T20:06:44Z"
+        required: false
+        default: "2026-09-25T20:06:44Z"
+      limit:
+        description: "сколько счетов разобрать (0 -- все)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: token-accounts-age
+  cancel-in-progress: false
+
+jobs:
+  age:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "requests"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/age_venv"
+            "$RUNNER_TEMP/age_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/age_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Свежий список счетов кошелька"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          ARGS=""
+          if [ -n "${{ inputs.wallet }}" ]; then ARGS="--wallet ${{ inputs.wallet }}"; fi
+          $PY analysis/bloom_token_accounts.py $ARGS | tail -20
+
+      - name: "Дата рождения каждого счёта"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          $PY analysis/token_accounts_age.py \
+            --since-utc "${{ inputs.since_utc }}" \
+            --limit "${{ inputs.limit }}"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/bloom_token_accounts.json data/token_accounts_age.json; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Nezakrytye scheta: vozrast i dolya nochi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
