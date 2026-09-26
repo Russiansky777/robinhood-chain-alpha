@@ -307,6 +307,46 @@ class Узел(B1.Пакетный):
                            "пауз": self.страж.пауз, "сбоев_чтения": self.страж.сбоев}}
 
 
+class КурсПулом(C.RateBook):
+    """Курс USD/SOL для перевода стейблов в SOL-экв.
+
+    Проба 1б 26.09: у маршрутов лидера через третьи токены курс «из самой
+    сделки» (c2_common.rate_from_tx) брал чужое плечо -- покупка на 1471 USD
+    вышла ниже 2 SOL-экв при SOL около 121 USD. Поэтому:
+      * данные старше 24.09 (Helius) -- только опорный пул SOL/USDC на ту же
+        минуту (RateBook без курса сделки);
+      * данные с 24.09 (Shyft не принимает before с чужой подписью, опорный
+        пул не пролистать) -- курс сделки, но только в пределах ±15 % от
+        медианы курсов этого часа за прогон; иначе -- медиана часа.
+    """
+
+    ДОПУСК = 0.15
+
+    def __init__(self, rpc) -> None:
+        super().__init__(rpc)
+        self.по_часу: dict = {}
+
+    def rate_for(self, tx: dict):
+        bt = (tx or {}).get("blockTime")
+        if узел_по_времени(bt) == "helius":
+            заглушка = {"blockTime": bt, "transaction": (tx or {}).get("transaction"), "meta": {}}
+            return super().rate_for(заглушка)
+        кандидат = C.rate_from_tx(tx)
+        час = (bt or 0) // 3600
+        выборка = self.по_часу.setdefault(час, [])
+        мед = медиана([float(x) for x in выборка]) if len(выборка) >= 5 else None
+        сосед = next((медиана([float(x) for x in self.по_часу[ч]]) for ч in (час - 1, час + 1, час - 2)
+                      if len(self.по_часу.get(ч) or []) >= 5), None)
+        if кандидат is not None and мед is None and сосед and abs(float(кандидат) / сосед - 1) > 0.25:
+            return D(str(сосед)), "медиана соседнего часа (курс сделки вне ±25 %)"
+        if кандидат is not None and (мед is None or abs(float(кандидат) / мед - 1) <= self.ДОПУСК):
+            выборка.append(кандидат)
+            return кандидат, "сделка (сверена с медианой часа)" if мед else "сделка (медианы часа ещё нет)"
+        if мед is not None:
+            return D(str(мед)), f"медиана часа ({len(выборка)})"
+        return None, "курса нет: в сделке нет плеча WSOL/стейбл, медианы часа ещё нет"
+
+
 class КурсУзла:
     """Мост для c2_common.RateBook: его .signatures/.get_tx поверх нашего узла."""
 

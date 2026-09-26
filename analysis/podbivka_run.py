@@ -249,7 +249,7 @@ def main() -> int:
     каталог = КОРЕНЬ / "data" / "podbivka" / а.zadacha
     каталог.mkdir(parents=True, exist_ok=True)
     уз = S.Узел()
-    курс = C.RateBook(S.КурсУзла(уз))
+    курс = S.КурсПулом(S.КурсУзла(уз))
     последний_пуш = time.time()
     итог = {"кошельков": len(строки), "готово": 0, "не_разобрались": []}
     факт = Факт(с_ts, до_ts, а.host_sdelki) if а.fakt else None
