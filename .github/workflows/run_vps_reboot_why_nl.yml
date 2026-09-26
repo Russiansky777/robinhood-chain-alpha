@@ -1,0 +1,87 @@
+name: "NL-хост: почему перезагрузился (только чтение системного журнала)"
+
+# ЗАЧЕМ. 26.09 в 04:53:45Z хост перезагрузился сам: все пять служб показали
+# since 04:53:45Z, а прогон зонда на самом хосте оборвался с shutdown signal.
+# Поднялось всё само и деньги не двинулись, но если хост уходит в перезагрузку
+# сам, он сделает это и посреди сделки. Причину надо назвать до снятия
+# рубильника.
+#
+# ТОЛЬКО ЧТЕНИЕ и только СИСТЕМНОЕ: ядро, время загрузок, обновления пакетов.
+# Журналы наших служб здесь НЕ читаются намеренно -- в них могут попасть ключи.
+# Всё, что похоже на длинный токен, в выводе маскируется.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: vps-reboot-why-nl
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+
+jobs:
+  why:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Системный журнал о загрузках"
+        run: |
+          set -e
+          OUT=data/vps_reboot_why_nl.txt
+          {
+            echo "=== NL-хост: почему перезагрузился, снято $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+            ssh $SSH_OPTS root@"$HOST" '
+              echo "--- сейчас и с какого времени работает ---";
+              date -u +%Y-%m-%dT%H:%M:%SZ; uptime -p; who -b;
+              echo "--- последние загрузки и выключения ---";
+              last -x reboot 2>/dev/null | head -6;
+              last -x shutdown 2>/dev/null | head -6;
+              echo "--- список загрузок systemd ---";
+              journalctl --list-boots --no-pager 2>/dev/null | tail -6;
+              echo "--- хвост ПРЕДЫДУЩЕЙ загрузки: что было перед выключением ---";
+              journalctl -b -1 -n 60 --no-pager 2>/dev/null | tail -60;
+              echo "--- ядро этой загрузки, первые строки ---";
+              journalctl -k -b 0 --no-pager 2>/dev/null | head -25;
+              echo "--- следы автообновлений и просьбы перезагрузиться ---";
+              systemctl is-enabled unattended-upgrades 2>/dev/null || true;
+              ls -l /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null || echo "просьбы перезагрузиться нет";
+              tail -20 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || echo "журнала автообновлений нет";
+              echo "--- память и OOM в этой загрузке ---";
+              free -m | head -3;
+              journalctl -k -b 0 --no-pager 2>/dev/null | grep -ci "out of memory" || true;
+            ' 2>&1 | sed -E 's/[A-Za-z0-9_-]{40,}/<скрыто>/g'
+          } > "$OUT" 2>&1 || true
+          tail -60 "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/vps_reboot_why_nl.txt ] && git add data/vps_reboot_why_nl.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "NL-host: pochemu perezagruzilsya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
