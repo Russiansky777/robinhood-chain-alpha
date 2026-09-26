@@ -67,18 +67,23 @@ jobs:
           set -e
           set -o pipefail
           scp $SSH_OPTS /tmp/hosts.txt root@$HOST:/tmp/rtt_hosts.txt
-          # curl --connect-timeout: только установка соединения, ни одного
-          # запроса к API. nice -- чтобы замер не мешал торговле на том же хосте.
+          # Нас интересует ТОЛЬКО время установки соединения (time_connect);
+          # обычный HTTP-запрос к корню нужен лишь чтобы curl сам завершился.
+          # Никаких ключей и никаких обращений к API отправителей. nice -- чтобы
+          # замер не мешал торговле на том же хосте.
+          #
+          # ВХОД CURL -- ИЗ /dev/null. Первый прогон (02:37Z) брал telnet:// и
+          # без перенаправления входа: curl пересылал свой stdin, а stdin в
+          # цикле -- файл со списком точек, и первый же замер съедал весь
+          # список. Второй прогон (02:39Z) вход починил, но telnet:// ждёт
+          # данные до --max-time, и 54 точки по 5 секунд в пять заходов не
+          # уложились в 30 минут -- прогон пришлось снять.
           ssh -n $SSH_OPTS root@$HOST "
             while read -r SENDER HOSTNAME PORT REGION; do
               [ -n \"\$HOSTNAME\" ] || continue
               for I in \$(seq 1 ${{ inputs.samples }}); do
-                # ВХОД CURL -- ИЗ /dev/null. У telnet:// curl пересылает свой
-                # stdin, а stdin здесь -- файл со списком точек: первый же
-                # замер съедал весь список, и прогон мерил ровно одну точку
-                # (так и вышло в первом прогоне: 5 строк вместо 270).
-                T=\$(nice -n 15 curl -s -o /dev/null --connect-timeout 4 --max-time 5 \
-                      -w '%{time_connect}' \"telnet://\$HOSTNAME:\$PORT\" \
+                T=\$(nice -n 15 curl -s -o /dev/null --connect-timeout 3 --max-time 4 \
+                      -w '%{time_connect}' \"http://\$HOSTNAME:\$PORT/\" \
                       < /dev/null 2>/dev/null || echo '')
                 printf '%s %s %s %s %s\n' \"\$SENDER\" \"\$HOSTNAME\" \"\$PORT\" \"\$REGION\" \"\${T:-нет}\"
               done
