@@ -25,7 +25,11 @@ import time
         # Без этих полей сверку записи с цепью делать нечем -- пункт 3
         # дневного плана владельца требует ровно её.
         "pnl_counted", "pnl_counted_sol", "pnl_counted_spend_sol", "ts_closed",
-        "lane_tips_total_sol", "lane_priority_lamports", "source_task")
+        "lane_tips_total_sol", "lane_priority_lamports", "source_task",
+        # ПОЧЕМУ ЗАКРЫТА БЕЗ ПРОДАЖИ. Закрытая позиция без подписи продажи --
+        # это либо упавшая по цепи покупка, либо отказ отправителя, либо дыра в
+        # учёте. Без причины эти три случая не отличить.
+        "closed_reason", "close_reason", "why_not", "chain_err")
 
 
 def строки(путь: str):

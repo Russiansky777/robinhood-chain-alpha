@@ -200,9 +200,26 @@ def main() -> int:
         except ValueError:
             счёт = {"corrupt": True}
 
+    # ЗАКРЫТЫЕ БЕЗ ПРОДАЖИ -- отдельным списком с причиной. Упавшая по цепи
+    # покупка и дыра в учёте выглядят в сводке одинаково, а различать их надо.
+    без_продажи = [{
+        "cid": с.get("client_order_id"),
+        "минт": с.get("mint"),
+        "группа": с.get("lane_group"),
+        "вход_sol": с.get("sol_in"),
+        "куплено_по_цепи": с.get("chain_ok"),
+        "pnl_counted": с.get("pnl_counted"),
+        "итог_записи_sol": с.get("pnl_counted_sol"),
+        "расход_записи_sol": с.get("pnl_counted_spend_sol"),
+        "натив_покупки_sol": с.get("lane_buy_native_sol"),
+        "причина": (с.get("closed_reason") or с.get("close_reason")
+                    or с.get("why_not") or "")[:300],
+        "подпись_покупки": подпись_покупки(с),
+    } for с in сделки if с.get("state") == "closed" and not с.get("closed_signature")]
     итог = {"собрано_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "окно_с": а.since_utc, "свод": свод, "суточный_счёт": счёт,
-            "сделки": строки, "отказы": отказы}
+            "сделки": строки, "закрытые_без_продажи": без_продажи,
+            "отказы": отказы}
     os.makedirs(os.path.dirname(а.out) or ".", exist_ok=True)
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump(итог, ф, ensure_ascii=False, indent=1)
@@ -219,6 +236,10 @@ def main() -> int:
         print(f"{с['закрыта_utc']} {(с['минт'] or '')[:8]} группа={с['группа']} "
               f"запись={с['итог_записи_sol']} цепь={с['итог_по_цепи_sol']} "
               f"расхождение={с['расхождение_sol']}")
+    for б in без_продажи[-10:]:
+        print(f"БЕЗ ПРОДАЖИ {(б['минт'] or '')[:8]} группа={б['группа']} "
+              f"вход={б['вход_sol']} цепь={б['куплено_по_цепи']} "
+              f"итог={б['итог_записи_sol']} причина={б['причина'][:120]}")
     for о in отказы[:10]:
         print(f"ОТКАЗ {о['cid']}: {о['почему']}")
     if свод["худшее_расхождение_sol"] is not None and свод["худшее_расхождение_sol"] > ПОРОГ_SOL:
