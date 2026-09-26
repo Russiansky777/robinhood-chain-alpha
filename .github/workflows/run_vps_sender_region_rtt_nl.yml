@@ -73,8 +73,13 @@ jobs:
             while read -r SENDER HOSTNAME PORT REGION; do
               [ -n \"\$HOSTNAME\" ] || continue
               for I in \$(seq 1 ${{ inputs.samples }}); do
+                # ВХОД CURL -- ИЗ /dev/null. У telnet:// curl пересылает свой
+                # stdin, а stdin здесь -- файл со списком точек: первый же
+                # замер съедал весь список, и прогон мерил ровно одну точку
+                # (так и вышло в первом прогоне: 5 строк вместо 270).
                 T=\$(nice -n 15 curl -s -o /dev/null --connect-timeout 4 --max-time 5 \
-                      -w '%{time_connect}' \"telnet://\$HOSTNAME:\$PORT\" 2>/dev/null || echo '')
+                      -w '%{time_connect}' \"telnet://\$HOSTNAME:\$PORT\" \
+                      < /dev/null 2>/dev/null || echo '')
                 printf '%s %s %s %s %s\n' \"\$SENDER\" \"\$HOSTNAME\" \"\$PORT\" \"\$REGION\" \"\${T:-нет}\"
               done
             done < /tmp/rtt_hosts.txt
