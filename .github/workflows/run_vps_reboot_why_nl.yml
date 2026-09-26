@@ -73,6 +73,13 @@ jobs:
               journalctl --no-pager --since "2026-09-26 06:40:00" --until "2026-09-26 07:00:00" 2>/dev/null                 | grep -iE "actions.runner|runner listener|self-update|Stopping|Reloading|systemd\[1\]: Stopped"                 | tail -25;
               echo "--- входы и sudo в это окно ---";
               grep -aiE "session opened|sudo:|Accepted" /var/log/auth.log 2>/dev/null                 | awk "NR>0" | tail -15;
+              echo "--- что ставил apt и когда (история пакетов) ---";
+              tail -40 /var/log/apt/history.log 2>/dev/null | grep -aE "Start-Date|Commandline|Upgrade:|End-Date" | tail -20;
+              echo "--- автообновления сегодня ---";
+              grep -a "2026-09-26" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null | tail -20 || echo "сегодня записей нет";
+              ls -l /var/log/unattended-upgrades/ 2>/dev/null | tail -6;
+              echo "--- needrestart и dpkg в окно 06:40-07:00 ---";
+              journalctl --no-pager --since "2026-09-26 06:40:00" --until "2026-09-26 07:00:00" 2>/dev/null                 | grep -iE "needrestart|dpkg|apt|unattended|upgrade" | tail -20;
               echo "--- память и OOM в этой загрузке ---";
               free -m | head -3;
               journalctl -k -b 0 --no-pager 2>/dev/null | grep -ci "out of memory" || true;
