@@ -1,0 +1,109 @@
+name: "Полоса: кривая pump.fun по группам (флаг env + перезапуск детектора)"
+
+# ЗАЧЕМ (пункт 4 дневного плана владельца 26.09): включить кривую pump.fun в
+# полосе СНАЧАЛА ТОЛЬКО на speed_only, живая сделка 0.01, и если ок -- на все
+# группы. Сборщик кривую умеет (I.2б, самопроверки полосы 270/270), включение --
+# отдельный флаг, потому что новый тип пула это деньги.
+#
+# ЧТО ДЕЛАЕТ. Правит РОВНО два ключа окружения детектора:
+#   LANE_BONDING_CURVE_GROUPS -- список групп через запятую (пусто = кривой нет);
+#   LANE_BONDING_CURVE        -- общий флаг на все группы, вычищается всегда.
+# Список сильнее общего флага (analysis/bloom_own_send.кривая_включена), поэтому
+# общий флаг здесь не пишется вовсе: включение по группам однозначно.
+#
+# Полный деплой детектора для этого не годится: он переписывает десяток ключей
+# env из входов, и одна ошибка во входе меняет боевой размер покупки.
+#
+# Перезапуск детектора нужен, чтобы он перечитал окружение, и идёт только через
+# проверку deploy/checks/pered_perezapuskom_sluzhby.py (позиций 0, зависших 0,
+# признак жизни свежий, продажи не запрещены).
+on:
+  workflow_dispatch:
+    inputs:
+      groups:
+        description: "группы через запятую (speed_only; пусто -- выключить кривую)"
+        required: false
+        default: "speed_only"
+      restart_detector:
+        description: "'yes' -- перезапустить детектор, чтобы он перечитал env"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: lane-curve-flag-nl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  curve:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка полосы ДО правки (на venv хоста)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd /home/bot/bloom_executor && ./venv/bin/python analysis/bloom_own_send.py --self-test 2>&1 | tail -2"
+
+      - name: "Как есть сейчас"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env || echo 'ключей кривой в env нет -- кривая выключена'"
+
+      - name: "Правка ровно двух ключей env"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cp -a $ENV_DIR/env $ENV_DIR/env.bak-curve-\$(date -u +%Y%m%dT%H%M%SZ)
+            sed -i '/^LANE_BONDING_CURVE=/d; /^LANE_BONDING_CURVE_GROUPS=/d' $ENV_DIR/env
+            echo 'LANE_BONDING_CURVE_GROUPS=${{ inputs.groups }}' >> $ENV_DIR/env
+            chmod 600 $ENV_DIR/env
+            grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env
+            echo '--- ключей в env всего ---'
+            grep -c '=' $ENV_DIR/env"
+
+      - name: "Перезапуск детектора (по флагу)"
+        if: ${{ inputs.restart_detector == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py; rc=\$?; rm -f /tmp/pered_perezapuskom_sluzhby.py; exit \$rc"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart bloom-detector; sleep 14; systemctl is-active bloom-detector"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl show bloom-detector -p ActiveEnterTimestamp --value; grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env" | tee data/lane_curve_flag.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/lane_curve_flag.txt ] && git add data/lane_curve_flag.txt
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Polosa: flag krivoy pump.fun po gruppam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
