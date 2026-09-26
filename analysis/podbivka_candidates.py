@@ -52,19 +52,29 @@ def main() -> int:
         ряд["проходит"] = bool(ряд["n"] >= 5 and ряд["продал_в_окне"] is not None and ряд["продал_в_окне"] < 0.30
                                and ряд["доля_SOL"] >= 0.50)
         ряды.append(ряд)
-    годные = sorted([r for r in ряды if r["проходит"]], key=lambda r: -r["медиана_S1_72"])[:а.top]
+    # Слово владельца 26.09: только медиана S+1/72 >= +2 п.п.; если таких
+    # меньше 10 -- добить медианой > 0 до 10 с пометкой; минусовые не пишутся.
+    прошли = sorted([r for r in ряды if r["проходит"]], key=lambda r: -r["медиана_S1_72"])
+    от2 = [r for r in прошли if r["медиана_S1_72"] >= 2.0]
+    годные = от2[:а.top]
+    if len(годные) < 10:
+        добор = [dict(r, пометка="добор: медиана > 0, ниже +2") for r in прошли
+                 if 0 < r["медиана_S1_72"] < 2.0][:10 - len(годные)]
+        годные = годные + добор
     with open(а.out, "w", encoding="utf-8", newline="") as ф:
         w = csv.writer(ф)
         w.writerow(["address", "name"])
         for r in годные:
-            w.writerow([r["address"], r["name"]])
+            имя = r["name"] + (" | " + r["пометка"] if r.get("пометка") else "")
+            w.writerow([r["address"], имя])
     Path(а.out).with_suffix(".json").write_text(json.dumps(
         {"кошельков_в_файлах": кошельков, "с_покупками": len(ряды),
-         "прошли_фильтр": sum(1 for r in ряды if r["проходит"]), "верхние": годные}, ensure_ascii=False, indent=1),
+         "прошли_фильтр": len(прошли), "от_плюс_2": len(от2), "верхние": годные}, ensure_ascii=False, indent=1),
         encoding="utf-8")
     мед = [r["медиана_S1_72"] for r in годные]
-    print(f"candidates: кошельков {кошельков}, прошли фильтр {sum(1 for r in ряды if r['проходит'])}, "
-          f"в списке {len(годные)}, медиана S+1/72 от {min(мед) if мед else None} до {max(мед) if мед else None}")
+    print(f"candidates: кошельков {кошельков}, прошли фильтр {len(прошли)}, из них >= +2 п.п. {len(от2)}, "
+          f"в списке {len(годные)} (добор {sum(1 for r in годные if r.get('пометка'))}), "
+          f"медиана S+1/72 от {min(мед) if мед else None} до {max(мед) if мед else None}")
     return 0
 
 
