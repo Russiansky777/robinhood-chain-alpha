@@ -1,4 +1,4 @@
-name: "Ночная конфигурация: полоса 0.01 везде, Bloom только speed_only, стопы -0.3 / -0.2"
+name: "Ночная конфигурация: Bloom выключен везде, speed_only выключена, полоса 0.01 и стоп -0.15"
 
 # ЗАЧЕМ (пункт 3 владельца 26.09, с 19:00Z): полоса 0.01 на всех группах; Bloom
 # торгует ТОЛЬКО по speed_only и там же 0.01; на bloom_lane и lane_only Bloom
@@ -55,6 +55,9 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      - name: "Самопроверка ночной конфигурации (денежный путь: размеры, признаки, стопы)"
+        run: python3 deploy/checks/nochnaya_konfiguraciya.py --self-test
+
       - name: "Какой файл групп читает детектор"
         run: |
           set -e
@@ -63,6 +66,17 @@ jobs:
           [ -n "$GFILE" ] || { echo "СБОЙ: детектор не сообщает файл групп"; exit 1; }
           echo "GROUPS_FILE=$GFILE" >> "$GITHUB_ENV"
           echo "файл групп: $GFILE"
+
+      - name: "Код полосы на хосте умеет выключать группу"
+        run: |
+          set -e
+          # БЕЗ ЭТОЙ ПРОВЕРКИ ночная конфигурация была бы обманом: признак
+          # lane_trades появился 26.09 вечером, и старый код на хосте его не
+          # читает -- speed_only продолжала бы торговать размером из окружения.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -c 'def полоса_торгует' /home/bot/bloom_executor/bloom_own_send.py" \
+            || { echo "СБОЙ: на хосте старый bloom_own_send -- сначала деплой детектора"; exit 1; }
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -c 'lane_trades' /home/bot/bloom_executor/bloom_source_groups.py" \
+            || { echo "СБОЙ: на хосте старый bloom_source_groups -- сначала деплой детектора"; exit 1; }
 
       - name: "Показ или запись полей групп"
         run: |
