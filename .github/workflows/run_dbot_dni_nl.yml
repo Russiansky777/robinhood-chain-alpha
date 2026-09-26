@@ -1,0 +1,73 @@
+name: "DBot BATCH-3 и BATCH-5 по суткам: таблица по кошелькам (только чтение)"
+
+# ЗАЧЕМ (задание владельца 26.09, 23:36): по каждому кошельку BATCH-3 и BATCH-5
+# за 25.09 и 26.09 (сутки по Мадриду) -- изменение баланса по цепи, число
+# закрытых сделок, средний итог в SOL и в %, лучшая и худшая сделка, издержки
+# (тариф сети, чаевые и сборы, комиссия DBot). Отдельной строкой -- наша полоса
+# по ТЕМ ЖЕ источникам за 26.09, для сравнения на одних сигналах.
+#
+# Итог сделок считается ПО ЦЕПИ: в журнале follow_trades у этих задач лежат
+# только покупки, а продажи DBot делает своим режимом PnL и в журнал не пишет
+# (отказ FOLLOW_ORDER_IS_ONLY_PNL_MODE). Журнал даёт кошельки, число покупок и
+# комиссию площадки.
+#
+# Только чтение. Задачи DBot не меняются и не удаляются.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "сутки по Мадриду, через запятую"
+        required: false
+        default: "2026-09-25,2026-09-26"
+      configs:
+        description: "какие задачи DBot"
+        required: false
+        default: "BATCH-3,BATCH-5"
+
+concurrency:
+  group: dbot-dni
+  cancel-in-progress: false
+
+env:
+  OUT: data/dbot_dni.json
+
+jobs:
+  dni:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Числа по цепи и из журнала DBot"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          ls -l data/dbot_follow_trades_raw.json
+          python3 deploy/checks/dbot_dni.py --days '${{ inputs.days }}' \
+            --configs '${{ inputs.configs }}' --out "$OUT" | tee data/dbot_dni.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" data/dbot_dni.txt
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" data/dbot_dni.txt; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "DBot BATCH-3/5 po sutkam: tablica po koshelkam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
