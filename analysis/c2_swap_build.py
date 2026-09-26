@@ -79,9 +79,32 @@ BONDING = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 #     сделки дало sol_amount + комиссии = ровно этот аргумент.
 # Замер 26.09 05:0xZ: из 37 свежих сигналов кривой 31 -- 38fc7408, 5 -- вариант
 # с котировкой НЕ в SOL (27 счетов), 1 -- ещё один (26 счетов), buy -- НИ ОДНОГО.
+#   c2ab1c46684d5b2f -- 27 счетов, "точный вход" и КОТИРОВКА ОТДЕЛЬНЫМ МИНТОМ:
+#     у кривой появился токеновый счёт котировки (WSOL или иной минт), то есть
+#     нативной котировки здесь нет и SOL надо оборачивать, как в обычном пуле.
+#     Раскладка снята с ЖИВЫХ сделок (data/c2_curve_variant_samples.json, три
+#     покупки 26.09 плюс одна с токеновой котировкой в образцах программы):
+#     0 global, 1 базовый минт, 2 минт котировки, 3 программа базового токена,
+#     4 программа котировки, 5 ATA-программа, 6-9 получатели комиссий и их
+#     счета, 10 счёт кривой (PDA bonding-curve+минт), 11 её базовое хранилище,
+#     12 её хранилище котировки, 13 НАШ кошелёк (подписант), 14 НАШ базовый ATA,
+#     15 НАШ ATA котировки, 16-18 счета кривой и конфигурация, 19 global_volume_
+#     accumulator, 20 НАШ user_volume_accumulator, 21-22 счета создателя,
+#     23 программа комиссий, 24 системная, 25 event_authority, 26 сама
+#     программа. Индексы 13/14/15/20 проверены выводом PDA и ATA из подписанта
+#     сделки: совпали ровно на этих местах.
+#     Хвост данных -- один байт (0x01) -- переносится как есть.
 BONDING_DISCS = {
     "66063d1201daebea": {"exact_out": True},
     "38fc74089edfcd5f": {"exact_out": False},
+    "c2ab1c46684d5b2f": {
+        "exact_out": False,
+        "spec": {"n_accounts": 27, "user": [13],
+                  "user_ata": [(14, 1, 3), (15, 2, 4)],
+                  "pda": [(20, [b"user_volume_accumulator", "USER"])],
+                  "base_mint": 1, "quote_mint": 2, "base_vault": 11,
+                  "quote_vault": 12, "native_quote": False},
+    },
 }
 # Пулы, где направление задаётся тем, в какое хранилище пришла котировка:
 # индексы входа/выхода пользователя, хранилищ a/b, их минтов и программ токена.
@@ -155,6 +178,21 @@ SPECS = {
 }
 
 
+def spec_of(tpl: dict) -> dict:
+    """Раскладка счетов для ЭТОГО шаблона: у кривой она зависит от разновидности.
+
+    Разновидность c2ab1c46684d5b2f кладёт наши счета на другие места и имеет
+    отдельный минт котировки; спутать её с 18-счётной значило бы подставить наш
+    кошелёк не туда, то есть подписать покупку с чужими счетами.
+    """
+    s = dict(SPECS[tpl["program"]])
+    if tpl.get("program") == BONDING:
+        вар = BONDING_DISCS.get(tpl.get("ix")) or {}
+        if вар.get("spec"):
+            s.update(вар["spec"])
+    return s
+
+
 def all_instructions(tx: dict) -> list:
     msg = ((tx or {}).get("transaction") or {}).get("message") or {}
     out = list(msg.get("instructions") or [])
@@ -196,9 +234,12 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
             вид = BONDING_DISCS.get(ключ)
             if вид is None:
                 return {"ok": False, "why_not": f"разновидность инструкции кривой не известна: {ключ}"}
-            if spec["n_accounts"] is not None and len(ix["accounts"]) != spec["n_accounts"]:
+            # СКОЛЬКО СЧЕТОВ -- ПО РАЗНОВИДНОСТИ: у 18-счётной и 27-счётной они
+            # разные, и общее число из SPECS годится только для первой.
+            ждём_счетов = (вид.get("spec") or {}).get("n_accounts", spec["n_accounts"])
+            if ждём_счетов is not None and len(ix["accounts"]) != ждём_счетов:
                 return {"ok": False,
-                        "why_not": f"счетов {len(ix['accounts'])}, ожидалось {spec['n_accounts']}"}
+                        "why_not": f"счетов {len(ix['accounts'])}, ожидалось {ждём_счетов}"}
             a0_, a1_ = struct.unpack("<QQ", data[8:24])
             return {"ok": True, "program": program, "ix": ключ, "accounts": list(ix["accounts"]),
                     "data": data, "arg0": a0_, "arg1": a1_, "writable": writable_map(tx),
@@ -266,7 +307,7 @@ def flip_template(tpl: dict, in_mint: str) -> dict:
 
 def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
     """{индекс: адрес} для пользовательских счетов шаблона при данном user."""
-    spec = SPECS[tpl["program"]]
+    spec = spec_of(tpl)
     acc = tpl["accounts"]
     out = {i: user for i in spec["user"]}
     if spec["user_ata"] == "dyn":
@@ -284,7 +325,7 @@ def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
 
 
 def mints_and_vaults(tpl: dict, tx: dict) -> dict:
-    spec = SPECS[tpl["program"]]
+    spec = spec_of(tpl)
     acc = tpl["accounts"]
     if spec["user_ata"] == "dyn":
         r = roles_damm2(tpl, tx)
@@ -332,7 +373,7 @@ def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
                                metas)
         ix_name = tpl["ix"] if tpl["program"] == DLMM else SPECS[tpl["program"]]["ix"]
         data = disc(ix_name) + struct.pack("<QQ", arg0, arg1)
-        if SPECS[tpl["program"]].get("tail") and not (tpl["program"] == DLMM and ix_name == "swap"):
+        if spec_of(tpl).get("tail") and not (tpl["program"] == DLMM and ix_name == "swap"):
             data += tpl["data"][24:]
     return Instruction(Pubkey.from_string(tpl["program"]), data, metas)
 
@@ -433,7 +474,7 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     if tip and tip_first:
         ixs += _чаевые_инструкции(tip)
     точный_выход = (tpl.get("exact_out") if tpl.get("exact_out") is not None
-                    else SPECS[tpl["program"]].get("exact_out"))
+                    else spec_of(tpl).get("exact_out"))
     if точный_выход:
         # «Точный выход»: программа сама считает цену наших min_out токенов и
         # отказывается, если она выше amount_in. То есть оба денежных предела --
@@ -475,7 +516,7 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
     if tpl["program"] == BONDING:
-        return bonding_min_out(tx, tpl["accounts"][SPECS[BONDING]["base_mint"]],
+        return bonding_min_out(tx, tpl["accounts"][spec_of(tpl)["base_mint"]],
                                amount_in, slippage)
     mv = mints_and_vaults(tpl, tx)
     rows = {r["account"]: r for r in C.token_rows(tx).values()}
@@ -695,7 +736,8 @@ def rebuild_check(s: dict, program: str) -> dict:
     tpl = extract_template(tx, program, s["pool_vault"])
     if not tpl["ok"]:
         return {"ok": None, "why": tpl["why_not"]}
-    user = tpl["accounts"][SPECS[program]["user"][0]]
+    spec_t = spec_of(tpl)
+    user = tpl["accounts"][spec_t["user"][0]]
     try:
         ix = swap_instruction(tpl, tx, user, tpl["arg0"], tpl["arg1"], keep_source_ix=True)
     except ValueError as exc:
@@ -706,7 +748,7 @@ def rebuild_check(s: dict, program: str) -> dict:
     # Счёт пользователя у источника -- не ATA (временный счёт роутера):
     # сверять не с чем, это не ошибка сборщика, а другой счёт у источника.
     rows = {r["account"]: r for r in C.token_rows(tx).values()}
-    user_tok = {i for i in user_accounts(tpl, tx, user)} - set(SPECS[program]["user"])
+    user_tok = {i for i in user_accounts(tpl, tx, user)} - set(spec_t["user"])
     not_ata = [i for i in diff if i in user_tok and (tpl["accounts"][i] not in rows
                                                      or rows[tpl["accounts"][i]]["owner"] == user)]
     if diff and set(diff) == set(not_ata) and same_data:
@@ -837,7 +879,13 @@ def self_test() -> int:
             continue
         mo = min_out_from_reserves(tpl, s["tx"], 10_000_000, 0.35)
         if not mo["ok"]:
-            pf_build.append(("минимум не посчитан", False))
+            # Цены нет только там, где котировка не в SOL (см. проверку
+            # монотонности ниже): собирать покупку без минимума нельзя, и
+            # такая сделка полосе не годится. Это не провал сборщика, но и
+            # молча пропускать нельзя -- отказ обязан быть назван словами.
+            mv_н = mints_and_vaults(tpl, s["tx"])
+            не_sol = bool(mv_н) and mv_н["quote_mint"] not in (C.NATIVE_QUOTE, C.WSOL)
+            pf_build.append((s.get("mint"), не_sol and bool(mo.get("why_not"))))
             continue
         kp = Keypair()
         me = str(kp.pubkey())
@@ -852,17 +900,36 @@ def self_test() -> int:
         b = build_buy(tpl, s["tx"], user=me, payer=me, amount_in=10_000_000,
                       min_out=mo["min_out"], cu_price_micro=10_000, tip=None)
         raw = base64.b64decode(b["tx_base64"])
-        pf_build.append((s.get("mint"), подставлено == {5, 6, 13}
+        # ЕСТЬ ЛИ ОБЁРТКА SOL -- по СЧЕТАМ собранной транзакции, а не поиском
+        # строки в байтах: адреса в транзакции лежат 32 байтами, и поиск
+        # "So111..." по сырым байтам не находил ничего никогда, то есть
+        # проверка обёртки до 27.09 была пустой.
+        ключи_сборки = {str(k) for k in
+                        VersionedTransaction.from_bytes(raw).message.account_keys}
+        # НАШИ МЕСТА И ОБЁРТКА SOL -- ПО РАЗНОВИДНОСТИ. У 18-счётной котировка
+        # нативная: ни ATA котировки, ни обёртки. У 27-счётной котировка --
+        # отдельный минт (в живых сделках WSOL), значит обёртка ОБЯЗАНА быть, и
+        # наши счета стоят на 13/14/15/20. Спутать их -- подписать покупку с
+        # чужими счетами, поэтому проверяется каждая разновидность отдельно.
+        сп = spec_of(tpl)
+        наши_места = set(сп["user"]) | {i for i, _, _ in сп["user_ata"]} \
+            | {i for i, _ in сп["pda"]}
+        нативная = bool(сп.get("native_quote"))
+        обёртка_нужна = (not нативная) and b["quote_mint"] == C.WSOL
+        pf_build.append((s.get("mint"), подставлено == наши_места
                          and args == ожид
                          and bytes(ix.data)[:8].hex() in BONDING_DISCS
-                         and b["quote_mint"] == C.NATIVE_QUOTE
-                         and C.WSOL.encode() not in raw   # обёртки SOL нет
+                         and (b["quote_mint"] == C.NATIVE_QUOTE if нативная
+                               else b["quote_mint"] != C.NATIVE_QUOTE)
+                         and ((C.WSOL in ключи_сборки) if обёртка_нужна
+                               else (C.WSOL not in ключи_сборки))
                          and 0 < mo["min_out"] < mo["expected_out"]
                          and mo["sol_to_curve"] < 10_000_000
-                         and len(ix.accounts) == 18))
-    checks.append((f"покупка на кривой: подставлены только наши 5/6/13, аргументы по "
-                   f"разновидности, обёртки SOL нет ({sum(1 for _, o in pf_build if o)} "
-                   f"из {len(pf_build)})", len(pf_build) >= 4 and all(o for _, o in pf_build)))
+                         and len(ix.accounts) == сп["n_accounts"]))
+    checks.append((f"покупка на кривой: подставлены только наши счета по разновидности, "
+                   f"аргументы по разновидности, обёртка SOL там, где котировка минтом "
+                   f"({sum(1 for _, o in pf_build if o)} из {len(pf_build)})",
+                   len(pf_build) >= 4 and all(o for _, o in pf_build)))
     # РАЗНОВИДНОСТИ: обе живые должны и извлекаться, и собираться, и данные
     # нашей сборки при аргументах источника должны совпасть с его данными
     # байт в байт -- это и есть доказательство, что мы поняли инструкцию.
@@ -871,7 +938,7 @@ def self_test() -> int:
         tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
         if not tpl.get("ok"):
             continue
-        ix_ = swap_instruction(tpl, s["tx"], tpl["accounts"][SPECS[BONDING]["user"][0]],
+        ix_ = swap_instruction(tpl, s["tx"], tpl["accounts"][spec_of(tpl)["user"][0]],
                                tpl["arg0"], tpl["arg1"])
         б = по_видам.setdefault(tpl["ix"], {"n": 0, "байт_в_байт": 0, "точный_выход": tpl["exact_out"]})
         б["n"] += 1
@@ -880,16 +947,28 @@ def self_test() -> int:
                    len(по_видам) >= 2 and all(v["n"] == v["байт_в_байт"] for v in по_видам.values())
                    and all(v["n"] >= 1 for v in по_видам.values())))
     # Больше траты -- больше токенов, и минимум всегда ниже ожидания.
+    #
+    # ЦЕНА ТРЕБУЕТСЯ ТАМ, ГДЕ КОТИРОВКА В SOL. У кривой встречаются сделки с
+    # котировкой ЧУЖИМ токеном (образец HzfxBXKq: котировка HiMSSzz…) -- у них
+    # раскладка события другая, событие не разбирается, и цены у нас нет. Полоса
+    # такие сигналы всё равно не берёт (её правило -- один шаг с котировкой SOL),
+    # поэтому проверка требует ЧЕСТНОГО ОТКАЗА с причиной, а не числа: выдать
+    # там цену значило бы посчитать её по неизвестной раскладке.
     mono = []
     for s in load_samples(BONDING):
         tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
         if not tpl["ok"]:
             continue
+        mv_ = mints_and_vaults(tpl, s["tx"])
+        котировка_sol = bool(mv_) and mv_["quote_mint"] in (C.NATIVE_QUOTE, C.WSOL)
         outs = [min_out_from_reserves(tpl, s["tx"], a, 0.35) for a in (1_000_000, 10_000_000, 100_000_000)]
         if not all(o["ok"] for o in outs):
-            mono.append(False)
+            # Отказ годится только при котировке НЕ в SOL и только со словами.
+            mono.append((not котировка_sol)
+                        and all(str(o.get("why_not") or "") for o in outs))
             continue
-        mono.append(all(outs[i]["expected_out"] < outs[i + 1]["expected_out"] for i in (0, 1))
+        mono.append(котировка_sol
+                    and all(outs[i]["expected_out"] < outs[i + 1]["expected_out"] for i in (0, 1))
                     and all(o["min_out"] < o["expected_out"] for o in outs))
     checks.append((f"цена кривой растёт с тратой, минимум ниже ожидания ({sum(mono)} из {len(mono)})",
                    len(mono) >= 4 and all(mono)))
