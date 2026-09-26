@@ -1,0 +1,77 @@
+name: "Наши сделки ночи: через какие программы покупали и продавали (только чтение)"
+
+# ЗАЧЕМ. Сборщик полосы теперь умеет кривую pump.fun, и следующий вопрос
+# денежный: сможем ли мы продать то, что на кривой купим. "Bloom и Jupiter
+# умеют pump.fun" -- предположение, пока нет числа. Число даёт цепь: у каждого
+# токен-счёта есть транзакция создания (покупка) и последняя (продажа).
+#
+# Только чтение: getTransaction и getSignaturesForAddress. Ключа кошелька в
+# прогоне нет вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "сколько счетов разобрать (0 -- все)"
+        required: false
+        default: "30"
+      only_window:
+        description: "1 -- только счета из окна ночи"
+        required: false
+        default: "1"
+      since_utc:
+        description: "начало окна"
+        required: false
+        default: "2026-09-25T20:06:44Z"
+
+concurrency:
+  group: night-pool-programs
+  cancel-in-progress: false
+
+jobs:
+  programs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "requests"
+        run: |
+          set -e
+          if python3 -c "import requests" 2>/dev/null; then
+            echo "PY=python3" >> "$GITHUB_ENV"
+          else
+            python3 -m venv "$RUNNER_TEMP/npp_venv"
+            "$RUNNER_TEMP/npp_venv/bin/pip" install -q requests
+            echo "PY=$RUNNER_TEMP/npp_venv/bin/python" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Программы покупок и продаж по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY analysis/night_pool_programs_of_ours.py \
+            --limit "${{ inputs.limit }}" \
+            --only-window "${{ inputs.only_window }}" \
+            --since-utc "${{ inputs.since_utc }}"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/night_pool_programs_of_ours.json ] && git add data/night_pool_programs_of_ours.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Nashi sdelki nochi: programmy pokupok i prodazh [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
