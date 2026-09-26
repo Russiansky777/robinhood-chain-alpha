@@ -34,7 +34,7 @@ def длина_списка(имя: str) -> int:
 def пакеты(м: dict) -> list:
     if м.get("skript", "podbivka_run.py") != "podbivka_run.py":
         return [{"skript": м["skript"], "args": " ".join(м.get("args") or []), "name": м["skript"],
-                 "helius_rps": "10"}]
+                 "helius_rps": "10", "_rps": м.get("helius_rps_na_paket")}]
     всего = длина_списка(м["spisok"])
     с, по = int(м.get("s") or 0), int(м.get("po") or 0) or всего
     шаг = int(м.get("paket") or 50)
@@ -69,7 +69,7 @@ def main() -> int:
         м = json.loads(Path(путь).read_text(encoding="utf-8"))
         пк = пакеты(м)
         for x in пк:
-            x["_rps"] = м.get("helius_rps_na_paket")
+            x.setdefault("_rps", м.get("helius_rps_na_paket"))
         вкл.extend(пк)
     # Предел Helius 10 запросов/с -- на ВСЕ одновременные задания прогона.
     for x in вкл:
