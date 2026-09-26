@@ -109,6 +109,14 @@ def main() -> int:
         порог_т = time.mktime(time.strptime(а.since_utc, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
     сделки = [с for с in д.get("сделки") or []
               if с.get("lane") and (float(с.get("ts_intent") or 0) >= порог_т)]
+    # СОСТОЯНИЯ ВСЕХ СДЕЛОК ОКНА -- отдельной строкой. Без неё "сверено 0"
+    # читается как "полоса не торговала", а она могла купить и ещё не продать.
+    состояния: dict = {}
+    for с in сделки:
+        ключ = f"{с.get('state') or 'нет состояния'}"
+        if с.get("state") == "closed" and not с.get("closed_signature"):
+            ключ = "closed без подписи продажи"
+        состояния[ключ] = состояния.get(ключ, 0) + 1
     закрытые = [с for с in сделки if с.get("state") == "closed" and с.get("closed_signature")]
     закрытые.sort(key=lambda с: float(с.get("ts_closed") or с.get("ts_intent") or 0))
     if а.limit:
@@ -172,6 +180,8 @@ def main() -> int:
     расхождения = [abs(с["расхождение_sol"]) for с in строки
                    if с["расхождение_sol"] is not None]
     свод = {
+        "сделок_полосы_в_окне": len(сделки),
+        "по_состояниям": состояния,
         "сверено_сделок": len(строки),
         "без_записи_итога": sum(1 for с in строки if с["итог_записи_sol"] is None),
         "сумма_по_записи_sol": round(sum(float(с["итог_записи_sol"] or 0) for с in строки), 9),
@@ -196,7 +206,15 @@ def main() -> int:
     os.makedirs(os.path.dirname(а.out) or ".", exist_ok=True)
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump(итог, ф, ensure_ascii=False, indent=1)
-    print(json.dumps({"свод": свод, "суточный_счёт": счёт}, ensure_ascii=False, indent=1))
+    итог_кратко = {"свод": свод, "суточный_счёт": счёт}
+    print(json.dumps(итог_кратко, ensure_ascii=False, indent=1))
+    for с in сделки[-12:]:
+        print(f"{с.get('ts_intent_utc') or с.get('ts_intent')} состояние={с.get('state')} "
+              f"группа={с.get('lane_group')} вход={с.get('sol_in')} "
+              f"источник={(с.get('source_task') or с.get('source') or '')[:14]} "
+              f"минт={(с.get('mint') or '')[:8]} "
+              f"наша_подпись={'есть' if подпись_покупки(с) else 'нет'} "
+              f"продажа={'есть' if с.get('closed_signature') else 'нет'}")
     for с in строки[-10:]:
         print(f"{с['закрыта_utc']} {(с['минт'] or '')[:8]} группа={с['группа']} "
               f"запись={с['итог_записи_sol']} цепь={с['итог_по_цепи_sol']} "
