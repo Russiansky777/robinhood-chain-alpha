@@ -56,6 +56,46 @@ def счета_минта(кошелёк: str, минт: str) -> list:
     return из_
 
 
+def дельта_по_счёту(tx: dict, счёт: str):
+    """Дельта остатка КОНКРЕТНОГО токен-счёта. Пропавшая строка -- ноль."""
+    мета = (tx or {}).get("meta") or {}
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k
+             for k in ((((tx or {}).get("transaction") or {}).get("message") or {})
+                       .get("accountKeys") or [])]
+    try:
+        и = ключи.index(счёт)
+    except ValueError:
+        return None
+    def взять(сторона):
+        for b in мета.get(сторона) or []:
+            if b.get("accountIndex") == и:
+                try:
+                    return int((b.get("uiTokenAmount") or {}).get("amount"))
+                except (TypeError, ValueError):
+                    return None
+        return 0
+    до = взять("preTokenBalances")
+    после = взять("postTokenBalances")
+    if до is None:
+        return None
+    return после - до
+
+
+def натив_кошелька(tx: dict, кошелёк: str):
+    """Нативная дельта кошелька в этой транзакции, SOL (с платой за подпись)."""
+    мета = (tx or {}).get("meta") or {}
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k
+             for k in ((((tx or {}).get("transaction") or {}).get("message") or {})
+                       .get("accountKeys") or [])]
+    try:
+        и = ключи.index(кошелёк)
+        до = (мета.get("preBalances") or [])[и]
+        после = (мета.get("postBalances") or [])[и]
+    except (ValueError, IndexError):
+        return None
+    return round((после - до) / 1_000_000_000, 9)
+
+
 def закрывающая_по_счёту(кошелёк: str, минт: str, *, предел: int = 25) -> dict:
     """Транзакция, в которой остаток НАШЕГО минта уменьшился: ищем по истории
     самого токен-счёта. Возвращает то же, что найти_закрывающую сторожа."""
@@ -74,8 +114,22 @@ def закрывающая_по_счёту(кошелёк: str, минт: str, *
             if not tx:
                 continue
             исход = SL.итог_продажи(tx, кошелёк, минт)
-            if исход and исход.get("tokens_delta") is not None and исход["tokens_delta"] < 0:
-                из_.update(signature=подпись, outcome=исход)
+            дельта = (исход or {}).get("tokens_delta")
+            if дельта is None or дельта >= 0:
+                # ПРОПАВШАЯ СТРОКА -- ЭТО НОЛЬ, А НЕ "НЕТ ДАННЫХ". Продажа часто
+                # идёт вместе с закрытием токен-счёта одной транзакцией, и
+                # закрытый счёт из postTokenBalances исчезает совсем: сторож
+                # видит "остаток не уменьшался", хотя он ушёл в ноль. Считаем
+                # дельту прямо по строкам этого счёта.
+                дельта = дельта_по_счёту(tx, счёт)
+            if дельта is not None and дельта < 0:
+                из_.update(signature=подпись,
+                           outcome=(исход if (исход or {}).get("tokens_delta") is not None
+                                    else {**(исход or {}), "tokens_delta": дельта,
+                                          "sol_delta": натив_кошелька(tx, кошелёк),
+                                          "sol_delta_net": натив_кошелька(tx, кошелёк),
+                                          "why_not": "остаток счёта ушёл в ноль вместе с закрытием "
+                                                     "счёта -- дельта посчитана по строкам счёта"}))
                 return из_
     из_["why_not"] = (f"в истории токен-счетов ({', '.join(из_['accounts'])}) "
                       f"нет транзакции, уменьшившей остаток минта; осмотрено {из_['looked']}")
