@@ -1,24 +1,54 @@
 {
- "utc": "2026-09-26T14:36:19Z",
+ "utc": "2026-09-26T15:14:01Z",
  "адрес_rpc": "https://rpc.shyft.to?api_key=<ключ>",
  "кандидаты": {
-  "GRPC_FEED_TOKEN": {
+  "SHYFT_API_KEY": {
    "задан": true,
-   "getSlot_ok": false,
-   "http": 401,
-   "мс": 203,
-   "ошибка": "Unauthorized: Invalid API key\n"
-  },
-  "GRPC_FEED2_TOKEN": {
-   "задан": true,
-   "getSlot_ok": false,
-   "http": 401,
-   "мс": 158,
-   "ошибка": "Unauthorized: Invalid API key\n"
+   "getSlot_ok": true,
+   "http": 200,
+   "мс": 288,
+   "ошибка": null
   }
  },
- "ключи_совпадают": true,
- "выбран": null,
+ "выбран": "SHYFT_API_KEY",
+ "проверки": {
+  "пакет_из_2": {
+   "ok": true,
+   "http": 200,
+   "ошибка": null
+  },
+  "tx_24_09": {
+   "ok": true,
+   "slot": 449864246,
+   "мс": 269,
+   "ошибка": null
+  },
+  "tx_18_09": {
+   "ok": false,
+   "slot": null,
+   "мс": 351,
+   "ошибка": "result пуст"
+  },
+  "подписи_brez": {
+   "ok": true,
+   "штук": 3,
+   "мс": 284,
+   "ошибка": null
+  },
+  "before_чужая_подпись": {
+   "ok": false,
+   "штук": 0,
+   "слот_опоры": 447927382,
+   "слоты": [],
+   "ошибка": null
+  },
+  "getBlock_подписи": {
+   "ok": false,
+   "подписей": 0,
+   "мс": 193,
+   "ошибка": "{'code': -32009, 'message': 'Slot 447927382 was skipped, or missing in long-term storage'}"
+  }
+ },
  "документация_rpc": [
   "- [Shyft RPCs](https://docs.shyft.to/solana/shyft-rpcs.md): Reliable, fast and cost-efficient",
   "- [Solana RPC Methods](https://docs.shyft.to/solana/rpc-calls.md): Interact with Solana nodes directly using HTTP and WebSocket-based JSON RPC methods.",
