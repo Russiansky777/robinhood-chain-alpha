@@ -1,0 +1,84 @@
+name: "Подбивка п.1б: сквозная сверка по лидеру и Brez (только чтение)"
+
+# ЗАЧЕМ (задание 2, пункт 1б). Условие владельца, чтобы идти к таблицам: по
+# лидеру Beqv6d... и Brez (BATCH-3) за 18-25.09 сойтись СПИСКАМИ (покупки
+# источника по цепи против записей журнала DBot, каждое расхождение с причиной)
+# и ЧИСЛАМИ (симулятор на фактическом слоте входа и фактическом размере против
+# факта по цепи, медиана не больше 3 п.п.).
+#
+# Облачный бегунок, только чтение цепи и локального журнала сделок. Торговый путь
+# не трогается: ни подписи, ни отправки, ключей кошельков в прогоне нет.
+on:
+  workflow_dispatch:
+    inputs:
+      istochniki:
+        description: "адрес=имя через запятую"
+        required: false
+        default: "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit=leader,Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB=Brez"
+      s:
+        description: "начало окна UTC"
+        required: false
+        default: "2026-09-18T00:00:00Z"
+      do:
+        description: "конец окна UTC"
+        required: false
+        default: "2026-09-26T00:00:00Z"
+      predel_vyzovov:
+        description: "предел вызовов узла за прогон"
+        required: false
+        default: "4000"
+      porog_sol:
+        description: "порог покупки источника в задачах DBot"
+        required: false
+        default: "2.0"
+
+concurrency:
+  group: podbivka-p1b
+  cancel-in-progress: false
+
+jobs:
+  p1b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон с requests и solders"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/p1b_venv"
+          "$RUNNER_TEMP/p1b_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/p1b_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Сквозная сверка"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY analysis/podbivka_1b.py \
+            --istochniki '${{ inputs.istochniki }}' \
+            --s '${{ inputs.s }}' --do '${{ inputs.do }}' \
+            --porog-sol '${{ inputs.porog_sol }}' \
+            --predel-vyzovov '${{ inputs.predel_vyzovov }}' \
+            --out data/podbivka/p1b_sverka.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/podbivka/p1b_sverka.json ] && git add data/podbivka/p1b_sverka.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Podbivka p.1b: skvoznaya sverka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
