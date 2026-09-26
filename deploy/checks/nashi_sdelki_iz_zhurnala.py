@@ -20,7 +20,12 @@ import time
         "signature", "signatures", "lane_signature", "lane_landed_signature",
         "lane_landed_slot", "lane_buy_native_sol", "lane_buy_fee_sol", "qty",
         "closed_sol_net", "closed_sol_delta", "closed_signature", "chain_ok",
-        "result_uncountable", "slot", "our_slot")
+        "result_uncountable", "slot", "our_slot",
+        # УЧЁТ (правка I.1, 26.09): одна запись суточного счёта на позицию.
+        # Без этих полей сверку записи с цепью делать нечем -- пункт 3
+        # дневного плана владельца требует ровно её.
+        "pnl_counted", "pnl_counted_sol", "pnl_counted_spend_sol", "ts_closed",
+        "lane_tips_total_sol", "lane_priority_lamports", "source_task")
 
 
 def строки(путь: str):
