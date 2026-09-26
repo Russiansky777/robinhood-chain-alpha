@@ -100,6 +100,10 @@ def main() -> int:
     р.add_argument("--sol", type=float, default=0.01)
     р.add_argument("--wallet", default="")
     р.add_argument("--out", default=str(КОРЕНЬ / "data" / "bonding_sim_check.json"))
+    р.add_argument("--save-samples", default="",
+                   help="файл: сохранить по паре настоящих сделок на каждую разновидность "
+                        "инструкции (они нужны, чтобы собрать и проверить сборку байт в байт)")
+    р.add_argument("--per-variant", type=int, default=3)
     а = р.parse_args()
 
     import c2_common as C  # noqa: PLC0415
@@ -115,6 +119,7 @@ def main() -> int:
     лампорты = int(round(а.sol * 1_000_000_000))
 
     итоги, начало = [], time.time()
+    образцы: dict = {}
     for и, r in enumerate(ряды, 1):
         строка = dict(r)
         try:
@@ -140,6 +145,19 @@ def main() -> int:
             "expected_out", "min_out_method", "sol_to_curve", "max_sol_cost",
             "sim_verdict", "sim_err", "sim_units", "build_ms", "sim_ms", "why_not")})
         итоги.append(строка)
+        if а.save_samples:
+            д = строка.get("ix_disc") or "нет"
+            если_мало = len(образцы.get(д, [])) < а.per_variant
+            if если_мало:
+                пул = None
+                try:
+                    п_ = C.identify_pool(tx, r["source"], r["mint"])
+                    пул = п_.get("pool_vault")
+                except Exception:  # noqa: BLE001
+                    пул = None
+                образцы.setdefault(д, []).append({
+                    "source": r["source"], "mint": r["mint"], "pool_vault": пул,
+                    "quote_mint": None, "ix_disc": д, "tx": tx})
         print(f"  {и}/{len(ряды)} {r['mint'][:8]} verdict={строка.get('sim_verdict')} "
               f"min_out={строка.get('min_out')} why={строка.get('why_not')}")
 
@@ -173,6 +191,10 @@ def main() -> int:
         "прошло_бы": sum(1 for с in итоги if с.get("sim_verdict") == "would_pass"),
         "ряды": итоги,
     }
+    if а.save_samples and образцы:
+        Path(а.save_samples).write_text(json.dumps(образцы, ensure_ascii=False), encoding="utf-8")
+        print("сохранено образцов по разновидностям: "
+              + json.dumps({к: len(v) for к, v in образцы.items()}, ensure_ascii=False))
     Path(а.out).write_text(json.dumps(свод, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({к: v for к, v in свод.items() if к != "ряды"}, ensure_ascii=False, indent=1))
     return 0
