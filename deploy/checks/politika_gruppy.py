@@ -30,6 +30,12 @@ def без_адресов(г: dict) -> dict:
             if not isinstance(v, (list, dict))}
 
 
+def _целое(текст: str) -> bool:
+    """Записано ли значение целым числом ("3", "-1"), а не дробным ("0.05")."""
+    т = (текст or "").strip()
+    return bool(т) and (т[1:] if т[0] in "+-" else т).isdigit()
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--file", required=True)
@@ -55,8 +61,12 @@ def main() -> int:
     if not а.set:
         print("режим показа: файл не изменён")
         return 0
+    # ЦЕЛОЕ ПИШЕТСЯ ЦЕЛЫМ. Поле lane_open_max -- счёт позиций, и "3.0" в файле
+    # счётом не выглядит; читателю (bloom_own_send.предел_открытых) всё равно,
+    # но человек, открывший файл, обязан видеть 3, а не 3.0. Дробные поля
+    # (bloom_sol 0.05) при этом остаются дробными.
     try:
-        новое = float(а.set)
+        новое = int(а.set) if _целое(а.set) else float(а.set)
     except ValueError:
         print(f"СТОП: {а.set!r} не число -- поле числовое", file=sys.stderr)
         return 4

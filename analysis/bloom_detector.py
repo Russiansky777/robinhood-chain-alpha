@@ -309,6 +309,32 @@ def _баланс_ключи(tx: dict) -> list:
     return out
 
 
+def _пределы_открытых_по_группам() -> dict:
+    """{группа: предел открытых позиций полосы} для признака жизни.
+
+    Числа спрашиваются У ТОГО ЖЕ КОДА, что решает на денежном пути
+    (bloom_own_send.предел_открытых), а не собираются здесь заново: иначе
+    признак жизни рассказывал бы про свой предел, а гейт применял другой.
+    Модуль полосы не загрузился или файла групп нет -- пустой словарь, без
+    выдуманных чисел.
+    """
+    if OS is None or not hasattr(OS, "предел_открытых"):
+        return {}
+    try:
+        import bloom_source_groups as SG  # noqa: PLC0415
+
+        группы = sorted(SG.свод().get("policies") or {})
+    except Exception:  # noqa: BLE001
+        return {}
+    из_ = {}
+    for г in группы:
+        try:
+            из_[г] = OS.предел_открытых(г)
+        except Exception:  # noqa: BLE001
+            continue
+    return из_
+
+
 def полосу_пускать(строка: dict) -> bool:
     """Идёт ли полоса своей отправки по этому решению.
 
@@ -2154,6 +2180,10 @@ class Детектор:
             "lane_kill": (list(self.состояние.lane_kill_active())
                            if hasattr(self.состояние, "lane_kill_active") else None),
             "limits": ({"open": OS.ЛИМИТ_ОТКРЫТЫХ, "per_day": OS.ЛИМИТ_В_СУТКИ,
+                         # Предел открытых -- теперь поле группы (lane_open_max),
+                         # и в признаке жизни он показан ПО ГРУППАМ: одно число
+                         # врало бы, как только у группы стоит своё.
+                         "open_by_group": _пределы_открытых_по_группам(),
                          "size_sol": OS.размер_sol(),
                          "stop_failed_in_row": OS.СТОП_ПОДРЯД_УПАВШИХ,
                          "stop_loss_sol": OS.СТОП_УБЫТОК_SOL}
@@ -9040,6 +9070,8 @@ def main() -> int:
                                    os.environ.get("EXEC_WALLET_KEY")
                                    or os.environ.get("BLOOM_WALLET_KEY")),
                                "limits": ({"open": OS.ЛИМИТ_ОТКРЫТЫХ,
+                                            "open_by_group":
+                                                _пределы_открытых_по_группам(),
                                             "per_day": OS.ЛИМИТ_В_СУТКИ,
                                             "stop_failed_in_row": OS.СТОП_ПОДРЯД_УПАВШИХ,
                                             "stop_loss_sol": OS.СТОП_УБЫТОК_SOL,
