@@ -36,6 +36,10 @@ on:
         description: "'yes' -- разрешить входящий UDP на этот порт (иначе только показать правила)"
         required: false
         default: "no"
+      allow_from:
+        description: "адрес источника шредов: правило только с него (пусто -- отказ открывать)"
+        required: false
+        default: ""
 
 concurrency:
   group: shred-listener-deploy
@@ -72,6 +76,15 @@ jobs:
             echo "СБОЙ: порт вне 1024-65535: $PORT"; exit 1
           fi
           case "${{ inputs.ws }}" in 0|1) ;; *) echo "СБОЙ: ws должен быть 0 или 1"; exit 1;; esac
+          FROM_IP="${{ inputs.allow_from }}"
+          if [ "${{ inputs.open_firewall }}" = "yes" ]; then
+            # ОТКРЫВАТЬ ПОРТ МИРУ НЕЛЬЗЯ: UDP без адреса источника -- это
+            # приглашение любому набивать нам слоты мусором, а служба берёт из
+            # пакета слот и индекс и верит им. Правило только с адреса потока.
+            printf '%s' "$FROM_IP" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$' \
+              || { echo "СБОЙ: allow_from не адрес IPv4: $FROM_IP"; exit 1; }
+          fi
+          echo "FROM_IP=$FROM_IP" >> "$GITHUB_ENV"
           case "${{ inputs.max_sources }}" in ''|*[!0-9]*) echo "СБОЙ: max_sources не число"; exit 1;; esac
           if [ "${{ inputs.enable_service }}" = "yes" ] && [ "$PORT" = "0" ]; then
             echo "СБОЙ: запуск просят, а порта нет -- служба ушла бы в перезапуск по кругу"
@@ -143,9 +156,10 @@ jobs:
             (nft list ruleset 2>/dev/null | head -40 || iptables -S 2>/dev/null | head -40 || echo 'правил не видно')" \
             2>&1 | tee -a data/shred_listener_deploy.txt
           if [ "${{ inputs.open_firewall }}" = "yes" ] && [ "$PORT" != "0" ]; then
+            # ТОЛЬКО С АДРЕСА ПОТОКА и только UDP на этот порт.
             ssh -n $SSH_OPTS root@"$HOST" "
               if command -v ufw >/dev/null 2>&1; then
-                ufw allow $PORT/udp comment 'BlockRazor shreds (zamer)'
+                ufw allow from $FROM_IP to any port $PORT proto udp comment 'BlockRazor shreds (zamer)'
                 ufw status | grep -F '$PORT' || true
               else
                 echo 'ufw нет -- правило не добавлено, скажите как открывать порт'
@@ -241,6 +255,45 @@ jobs:
             (ss -lunp | grep -F ':$PORT' || echo 'порт в ss не виден')
             echo '--- приоритет процесса ---'
             (ps -o pid,ni,pcpu,rss,cmd -C python | grep shred_listener || true)" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
+
+      - name: "Первые 60 секунд: шредов принято, слотов покрыто"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- первые 60 секунд работы ---"
+          } >> data/shred_listener_deploy.txt
+          ssh -n $SSH_OPTS root@"$HOST" "
+            sleep 60
+            cat $STATE_DIR/heartbeat.json
+            echo '--- слушает ли порт ---'
+            (ss -lunp | grep -F ':$PORT' || echo 'порт в ss не виден')" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
+          ssh -n $SSH_OPTS root@"$HOST" "cat $STATE_DIR/heartbeat.json" > /tmp/shred_hb.json
+          python3 -c "import json,sys; d=json.load(open('/tmp/shred_hb.json')); print('ШРЕДОВ', d.get('shreds'), 'СЛОТОВ С ШРЕДАМИ', d.get('slots_with_shreds'), 'СЛОТОВ С WS', d.get('slots_with_ws'), 'ПАКЕТОВ ВНЕ ОКНА', d.get('packets_out_of_window')); sys.exit(0 if (d.get('shreds') or 0) > 0 else 7)" \
+            | tee -a data/shred_listener_deploy.txt \
+            && echo "SHREDS_OK=yes" >> "$GITHUB_ENV" \
+            || echo "SHREDS_OK=no" >> "$GITHUB_ENV"
+
+      - name: "Ноль шредов -- смотрим, приходят ли пакеты вообще"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          if [ "$SHREDS_OK" = "yes" ]; then
+            echo "шреды идут -- tcpdump не нужен" | tee -a data/shred_listener_deploy.txt
+            exit 0
+          fi
+          {
+            echo ""
+            echo "--- ноль шредов за 60 с: tcpdump 20 пакетов с $FROM_IP ---"
+          } >> data/shred_listener_deploy.txt
+          # Фильтр БЕЗ КАВЫЧЕК: кавычки внутри команды ssh рвут блок YAML, а
+          # tcpdump принимает выражение обычными аргументами.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            timeout 70 tcpdump -i any -n -c 20 src host $FROM_IP 2>&1 | tail -30 \
+              || echo 'tcpdump ничего не поймал за 70 секунд'" \
             2>&1 | tee -a data/shred_listener_deploy.txt
 
       - name: "Готовность без порта (когда port=0)"
