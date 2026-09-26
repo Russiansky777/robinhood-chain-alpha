@@ -1,0 +1,70 @@
+=== NL-хост: почему перезагрузился, снято 2026-09-26T04:58:18Z ===
+--- сейчас и с какого времени работает ---
+2026-09-26T04:58:20Z
+up 3 weeks, 1 day, 12 hours, 30 minutes
+         system boot  2026-09-03 18:27
+--- последние загрузки и выключения ---
+reboot   system boot  6.8.0-71-generic Thu Sep  3 18:27   still running
+
+wtmp begins Thu Sep  3 18:27:40 2026
+
+wtmp begins Thu Sep  3 18:27:40 2026
+--- список загрузок systemd ---
+IDX BOOT ID                          FIRST ENTRY                  LAST ENTRY
+  0 ec7fbedc0b724fad9fa2ad7911d2fd48 Thu 2026-09-03 18:27:41 CEST Sat 2026-09-26 06:58:19 CEST
+--- хвост ПРЕДЫДУЩЕЙ загрузки: что было перед выключением ---
+--- ядро этой загрузки, первые строки ---
+Sep 03 18:27:41 ubuntu kernel: Linux version 6.8.0-71-generic (buildd@lcy02-amd64-053) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #71-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 22 16:52:38 UTC 2025 (Ubuntu 6.8.0-71.71-generic 6.8.12)
+Sep 03 18:27:41 ubuntu kernel: Command line: BOOT_IMAGE=/vmlinuz-6.8.0-71-generic root=LABEL=cloudimg-rootfs ro console=tty1 console=ttyS0
+Sep 03 18:27:41 ubuntu kernel: KERNEL supported cpus:
+Sep 03 18:27:41 ubuntu kernel:   Intel GenuineIntel
+Sep 03 18:27:41 ubuntu kernel:   AMD AuthenticAMD
+Sep 03 18:27:41 ubuntu kernel:   Hygon HygonGenuine
+Sep 03 18:27:41 ubuntu kernel:   Centaur CentaurHauls
+Sep 03 18:27:41 ubuntu kernel:   zhaoxin   Shanghai  
+Sep 03 18:27:41 ubuntu kernel: BIOS-provided physical RAM map:
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x0000000000000000-0x000000000009fbff] usable
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x000000000009fc00-0x000000000009ffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x00000000000f0000-0x00000000000fffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x0000000000100000-0x000000007ffdbfff] usable
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x000000007ffdc000-0x000000007fffffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x00000000b0000000-0x00000000bfffffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x00000000fed1c000-0x00000000fed1ffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x00000000feffc000-0x00000000feffffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x00000000fffc0000-0x00000000ffffffff] reserved
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x0000000100000000-0x000000017fffffff] usable
+Sep 03 18:27:41 ubuntu kernel: BIOS-e820: [mem 0x000000fd00000000-0x000000ffffffffff] reserved
+Sep 03 18:27:41 ubuntu kernel: NX (Execute Disable) protection: active
+Sep 03 18:27:41 ubuntu kernel: APIC: Static calls initialized
+Sep 03 18:27:41 ubuntu kernel: SMBIOS 2.8 present.
+Sep 03 18:27:41 ubuntu kernel: DMI: Red Hat KVM/RHEL, BIOS 1.16.3-5.el9.alma.1 11/05/2023
+Sep 03 18:27:41 ubuntu kernel: Hypervisor detected: KVM
+--- следы автообновлений и просьбы перезагрузиться ---
+enabled
+-rw-r--r-- 1 root root  32 Sep 25 06:18 /var/run/reboot-required
+-rw-r--r-- 1 root root 103 Sep 25 06:18 /var/run/reboot-required.pkgs
+2026-09-25 06:18:06,174 INFO Starting unattended upgrades script
+2026-09-25 06:18:06,175 INFO Allowed origins are: o=Ubuntu,a=noble, o=Ubuntu,a=noble-security, o=UbuntuESMApps,a=noble-apps-security, o=UbuntuESM,a=noble-infra-security
+2026-09-25 06:18:06,175 INFO Initial blacklist: 
+2026-09-25 06:18:06,175 INFO Initial whitelist (not strict): 
+2026-09-25 06:18:09,610 INFO Packages that will be upgraded: libisns0t64 linux-headers-generic linux-headers-virtual linux-image-virtual linux-libc-dev linux-tools-common linux-virtual
+2026-09-25 06:18:09,610 INFO Writing dpkg log to /var/log/unattended-upgrades/unattended-upgrades-dpkg.log
+2026-09-25 06:18:33,837 INFO All upgrades installed
+2026-09-25 06:18:44,973 INFO Packages that were successfully auto-removed: linux-headers-6.8.0-139 linux-headers-6.8.0-139-generic linux-image-6.8.0-139-generic linux-modules-6.8.0-139-generic linux-tools-6.8.0-139 linux-tools-6.8.0-139-generic
+2026-09-25 06:18:44,973 INFO Packages that are kept back: 
+2026-09-25 08:05:40,191 INFO Starting unattended upgrades script
+2026-09-25 08:05:40,192 INFO Allowed origins are: o=Ubuntu,a=noble, o=Ubuntu,a=noble-security, o=UbuntuESMApps,a=noble-apps-security, o=UbuntuESM,a=noble-infra-security
+2026-09-25 08:05:40,192 INFO Initial blacklist: 
+2026-09-25 08:05:40,192 INFO Initial whitelist (not strict): 
+2026-09-26 06:53:36,828 INFO Starting unattended upgrades script
+2026-09-26 06:53:36,829 INFO Allowed origins are: o=Ubuntu,a=noble, o=Ubuntu,a=noble-security, o=UbuntuESMApps,a=noble-apps-security, o=UbuntuESM,a=noble-infra-security
+2026-09-26 06:53:36,829 INFO Initial blacklist: 
+2026-09-26 06:53:36,829 INFO Initial whitelist (not strict): 
+2026-09-26 06:53:39,624 INFO Packages that will be upgraded: curl libcurl3t64-gnutls libcurl4t64 libexpat1 libexpat1-dev
+2026-09-26 06:53:39,624 INFO Writing dpkg log to /var/log/unattended-upgrades/unattended-upgrades-dpkg.log
+2026-09-26 06:54:03,174 INFO All upgrades installed
+--- память и OOM в этой загрузке ---
+               total        used        free      shared  buff/cache   available
+Mem:            3916         727         264          17        3212        3188
+Swap:              0           0           0
+1
