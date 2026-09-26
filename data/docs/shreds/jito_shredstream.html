@@ -1,0 +1,455 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="readthedocs-addons-api-version" content="1"><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>➤ Low Latency Block Updates (Shredstream) &mdash; Jito Labs Documentation - High Performance Solana Infrastructure</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+
+  
+    <link rel="shortcut icon" href="../_static/Jitolabs_Logo_White.png"/>
+    <link rel="canonical" href="https://docs.jito.wtf/lowlatencytxnfeed/" />
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f9d24b49"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/versions.js"></script>
+    <link rel="search" type="application/opensearchdescription+xml"
+          title="Search within Jito Labs Documentation - High Performance Solana Infrastructure"
+          href="../_static/opensearch.xml"/>
+    <link rel="index" title="Index" href="../genindex/" />
+    <link rel="search" title="Search" href="../search/" /> 
+<script async type="text/javascript" src="/_/static/javascript/readthedocs-addons.js"></script><meta name="readthedocs-project-slug" content="jito-docs" /><meta name="readthedocs-version-slug" content="latest" /><meta name="readthedocs-resolver-filename" content="/lowlatencytxnfeed/" /><meta name="readthedocs-http-status" content="200" /></head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #0a0a0a" >
+
+          
+          
+          <a href="../">
+            
+              <img src="../_static/Jitolabs_Logo_White.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="switch-menus">
+                <div class="version-switch"></div>
+                <div class="language-switch"></div>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../lowlatencytxnsend/">⚡ Low Latency Transaction Send</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#system-overview">System Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#how-does-the-system-work">🌐 How does the system work?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#what-are-bundles">💼 What are bundles?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#how-do-bundles-work">📬 How do Bundles work?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#what-is-the-auction">⚖️ What is the auction?</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#transactions-api-v1-transactions">📨 Transactions(<code class="docutils literal notranslate"><span class="pre">/api/v1/transactions</span></code>)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#sendtransaction">sendTransaction</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#request">Request</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#transaction-request-example-base64">Transaction Request Example base64</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#transaction-request-example-base58">Transaction Request Example base58</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#response">Response</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#response-example">Response Example</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#json-rpc-authentication-uuid">JSON-RPC Authentication (UUID):</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#bundles-api-v1">💼 Bundles (<code class="docutils literal notranslate"><span class="pre">/api/v1</span></code>)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#sendbundle">sendBundle</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id2">Request</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#bundle-request-example-base64">Bundle Request Example base64</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#bundle-request-example-base58">Bundle Request Example base58</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id3">Response</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id4">Response Example</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#getbundlestatuses">getBundleStatuses</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id5">Request</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#request-example">Request Example</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id6">Response</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="../lowlatencytxnsend/#object-fields">Object Fields</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id7">Response Example</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#gettipaccounts">getTipAccounts</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id8">Request</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id9">Request Example</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id10">Response</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#response-example-tips">Response Example</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#getinflightbundlestatuses">getInflightBundleStatuses</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id12">Request</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id13">Request Example</a></li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id14">Response</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="../lowlatencytxnsend/#id15">Object Fields</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="../lowlatencytxnsend/#id16">Response Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#key-endpoints-supported-by-these-libraries">Key Endpoints Supported by These Libraries:</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#sandwich-mitigation">Sandwich Mitigation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#how-it-works">How It Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#important-points">Important Points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#example">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#tips">Tips</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#tip-amount">🪙 Tip Amount</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#id18">sendTransaction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#id19">sendBundle</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#get-tip-information">💸 Get Tip Information</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#rest-api-endpoint-showing-most-recent-tip-amounts">REST API endpoint showing most recent tip amounts:<br></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#websocket-showing-tip-amounts">WebSocket showing tip amounts:</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#tip-dashboard">Tip Dashboard</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#rate-limits">Rate Limits</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#default-limits">Default Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#rate-limit-operation">Rate Limit Operation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#exceeding-limits">Exceeding Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#authorization-issues">Authorization Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#custom-rate-limit-request">Custom Rate Limit Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../lowlatencytxnsend/#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#priority-fee">Priority Fee</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#id21">Tip Amount</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#bundle-landing">Bundle Landing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../lowlatencytxnsend/#failed-transactions">Failed Transactions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#uncled-blocks">Uncled Blocks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../lowlatencytxnsend/#mitigations">Mitigations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../legal/">⚖️ Legal</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../legal/#terms-of-use">Terms of Use</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#introduction">1. Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#the-tools-services">2. The Tools &amp; Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#modifications">3. Modifications</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#your-representations-responsibilities">4. Your Representations &amp; Responsibilities</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#a-your-representations">a. Your Representations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#b-your-responsibilities">b. Your Responsibilities</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#intellectual-property-rights">5. Intellectual Property Rights</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#a-ownership-license">a. Ownership &amp; License</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#b-reciprocal-license">b. Reciprocal License</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#c-jito-trademarks">c. Jito Trademarks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#d-your-feedback">d. Your Feedback</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#third-party-information-or-services">6. Third Party Information or Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#indemnification">7. Indemnification</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#a-general">a. General</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#b-process">b. Process</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#disclaimers-and-limitations-of-liability">8. Disclaimers and Limitations of Liability</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#a-tools-services">a. Tools &amp; Services</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#b-other-disclaimers">b. Other Disclaimers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#c-no-representations-or-warranties">c. No Representations or Warranties</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#d-limitations-of-liability">d. Limitations of Liability</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#governing-law-dispute-resolution-class-action-waiver">9. Governing Law, Dispute Resolution &amp; Class Action Waiver</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#a-governing-law">a. Governing Law</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#b-dispute-resolution">b. Dispute Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#c-mandatory-arbitration">c. Mandatory Arbitration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#d-class-action-waiver">d. Class Action Waiver</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#no-relationship">10. No Relationship</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#assignments">11. Assignments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#entire-agreement">12. Entire Agreement</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#no-waiver">13. No Waiver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#severability">14. Severability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#notice">15. Notice</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#contact-us">16. Contact Us</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../legal/#privacy-policy">Privacy Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#data-we-collect">1. Data We Collect</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#use-of-information">2. Use of Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#sharing-information">3. Sharing Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#location-of-information">4. Location of Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#retention-of-information">5. Retention of Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#access-deletion-choice">6. Access, Deletion, Choice</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#childrens-information">7. Children’s Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#notices">8. Notices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#additional-information-for-certain-jurisdictions">9. Additional Information for Certain Jurisdictions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#california">California</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../legal/#european-economic-area-the-united-kingdom-and-switzerland">European Economic Area, the United Kingdom, and Switzerland</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../legal/#id1">10. Contact Us</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #0a0a0a" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../">Jito Docs</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">➤ Low Latency Block Updates (Shredstream)</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="low-latency-block-updates-shredstream">
+<h1>➤ Low Latency Block Updates (Shredstream)<a class="headerlink" href="#low-latency-block-updates-shredstream" title="Link to this heading"></a></h1>
+<blockquote>
+<div><p><strong>🚨 Jito ShredStream Sunset Notice 🚨</strong></p>
+<p>We are beginning the process of deprecating Jito ShredStream. The service will be completely shut down in 60 days (<strong>September 5, 2026</strong>), meaning you won’t have access to Jito ShredStream at that time. You should begin the process of migrating off of Jito ShredStream.</p>
+<p>To ensure uninterrupted access to Solana shreds, we highly recommend transitioning to <strong>DoubleZero Edge</strong> before the shutdown date. DoubleZero has put together a comprehensive transition guide for our users, which includes details on how users can access a free trial. We encourage you to review it and begin migrating as soon as possible.</p>
+<p>🔗 Full details on the migration, performance benchmarks, and how to get set up can be found here: <a class="reference external" href="https://doublezero.xyz/jito-shredstream">DoubleZero migration guide</a>.</p>
+<p>If you need any support during the transition, head over to the <a class="reference external" href="https://discord.com/invite/doublezerotech"><strong>#jito-shredstream</strong></a> channel in the DoubleZero Discord.</p>
+</div></blockquote>
+<p>Jito’s ShredStream service delivers the lowest latency shreds from leaders on the Solana network, optimizing performance for high-frequency trading, validation, and RPC operations. ShredStream ensures minimal latency for receiving shreds, which can save hundreds of milliseconds during trading on Solana—a critical advantage in high-frequency trading environments. Additionally, it provides a redundant shred path for servers in remote locations, enhancing reliability and performance for users operating in less connected regions. This makes ShredStream particularly valuable for traders, validators, and node operators who require the fastest and most reliable data to maintain a competitive edge.</p>
+<section id="shreds">
+<h2>Shreds<a class="headerlink" href="#shreds" title="Link to this heading"></a></h2>
+<p>Shreds are fragments of data used in the Solana blockchain to represent parts of transactions before they are assembled into a full block. When a validator processes transactions, it breaks them down into smaller units called shreds. These shreds are distributed across the network to other validators and nodes, which then reassemble them to form complete blocks.</p>
+<p>Shreds help in fast and efficient data propagation, maintaining Solana’s high throughput and low latency. They also provide redundancy and fault tolerance, ensuring that even if some data is lost or delayed during transmission, the network can still reconstruct the necessary information. Shreds are crucial for enabling Solana’s rapid block times and overall network performance.</p>
+</section>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading"></a></h2>
+</section>
+<section id="jito-shredstream-proxy">
+<h2>Jito ShredStream Proxy<a class="headerlink" href="#jito-shredstream-proxy" title="Link to this heading"></a></h2>
+<p>The proxy client connects to the Jito Block Engine and authenticates using the provided keypair. It sends a heartbeat to keep shreds flowing. Received shreds are distributed to all <code class="docutils literal notranslate"><span class="pre">DEST_IP_PORTS</span></code>. We recommend running a proxy instance for each region where you have RPCs.</p>
+</section>
+<section id="preparation">
+<h2>Preparation<a class="headerlink" href="#preparation" title="Link to this heading"></a></h2>
+<ol class="arabic">
+<li><p>Get your Solana <a class="reference external" href="https://discord.com/channels/938287290806042626/1336799632898134037">public key approved</a></p></li>
+<li><p>Ensure your firewall is open.</p>
+<ul class="simple">
+<li><p>Default port for incoming unicast shreds is <code class="docutils literal notranslate"><span class="pre">20000/udp</span></code>.</p></li>
+<li><p>NAT connections currently not supported.</p></li>
+<li><p>If you use a firewall, see the firewall configuration section</p></li>
+</ul>
+</li>
+<li><p>Find your TVU port</p>
+<ul>
+<li><p>Run get_tvu_port.sh to find your port</p></li>
+<li><p>Example on machine with Solana RPC:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LEDGER_DIR</span><span class="o">=</span>MY_LEDGER_DIR<span class="p">;</span><span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/jito-labs/shredstream-proxy/master/scripts/get_tvu_port.sh<span class="k">)</span><span class="s2">"</span>
+</pre></div>
+</div>
+</li>
+<li><p>Example on remote machine (port may differ):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">HOST</span><span class="o">=</span>http://1.2.3.4:8899<span class="p">;</span><span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/jito-labs/shredstream-proxy/master/scripts/get_tvu_port.sh<span class="k">)</span><span class="s2">"</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p>Run via docker or natively and set the following parameters</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">BLOCK_ENGINE_URL</span></code>: https://mainnet.block-engine.jito.wtf</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DESIRED_REGIONS</span></code>: Comma-delimited regions you want to receive shreds from, maximum of 2 regions, anything in excess will be ignored. <a class="reference internal" href="../lowlatencytxnsend/#api"><span class="std std-ref">Same regions as for Block Engine</span></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DEST_IP_PORTS</span></code>: Comma-delimited IP:Port combinations to receive shreds on</p></li>
+<li><p>Note: these examples will receive shreds from <code class="docutils literal notranslate"><span class="pre">amsterdam</span></code> and <code class="docutils literal notranslate"><span class="pre">ny</span></code> regions</p></li>
+</ul>
+</li>
+</ol>
+<section id="running-natively">
+<h3>🦾 Running Natively<a class="headerlink" href="#running-natively" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/jito-labs/shredstream-proxy.git<span class="w"> </span>--recurse-submodules
+
+<span class="nv">RUST_LOG</span><span class="o">=</span>info<span class="w"> </span>cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--bin<span class="w"> </span>jito-shredstream-proxy<span class="w"> </span>--<span class="w"> </span>shredstream<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--block-engine-url<span class="w"> </span>https://mainnet.block-engine.jito.wtf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--auth-keypair<span class="w"> </span>my_keypair.json<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--desired-regions<span class="w"> </span>amsterdam,ny<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--dest-ip-ports<span class="w"> </span><span class="m">127</span>.0.0.1:8001,10.0.0.1:8001
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-via-docker">
+<h2>Running via Docker<a class="headerlink" href="#running-via-docker" title="Link to this heading"></a></h2>
+<p>View logs with <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">logs</span> <span class="pre">-f</span> <span class="pre">jito-shredstream-proxy</span></code></p>
+<section id="host-networking-recommended">
+<h3>🐳 Host Networking (Recommended)<a class="headerlink" href="#host-networking-recommended" title="Link to this heading"></a></h3>
+<p>This exposes all ports, bypassing Docker NAT.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+--name<span class="w"> </span>jito-shredstream-proxy<span class="w"> </span><span class="se">\</span>
+--rm<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">RUST_LOG</span><span class="o">=</span>info<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">BLOCK_ENGINE_URL</span><span class="o">=</span>https://mainnet.block-engine.jito.wtf<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">AUTH_KEYPAIR</span><span class="o">=</span>my_keypair.json<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">DESIRED_REGIONS</span><span class="o">=</span>amsterdam,ny<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">DEST_IP_PORTS</span><span class="o">=</span><span class="m">127</span>.0.0.1:8001,10.0.0.1:8001<span class="w"> </span><span class="se">\</span>
+--network<span class="w"> </span>host<span class="w"> </span><span class="se">\</span>
+-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/my_keypair.json:/app/my_keypair.json<span class="w"> </span><span class="se">\</span>
+jitolabs/jito-shredstream-proxy<span class="w"> </span>shredstream
+</pre></div>
+</div>
+</section>
+<section id="bridge-networking">
+<h3>🚝 Bridge Networking<a class="headerlink" href="#bridge-networking" title="Link to this heading"></a></h3>
+<p>Use bridge networking in environments where Docker host networking is unavailable. Note: This setup requires manual exposure of <code class="docutils literal notranslate"><span class="pre">SRC_BIND_PORT</span></code>. For shred listeners running locally on the Docker host, use Docker’s bridge IP (typically <code class="docutils literal notranslate"><span class="pre">172.17.0.1</span></code>). For non-local endpoints, use their regular IP addresses. Note that Docker’s bridge IP can vary, so confirm it by running: <code class="docutils literal notranslate"><span class="pre">ip</span> <span class="pre">-brief</span> <span class="pre">address</span> <span class="pre">show</span> <span class="pre">dev</span> <span class="pre">docker0</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+--name<span class="w"> </span>jito-shredstream-proxy<span class="w"> </span><span class="se">\</span>
+--rm<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">RUST_LOG</span><span class="o">=</span>info<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">BLOCK_ENGINE_URL</span><span class="o">=</span>https://mainnet.block-engine.jito.wtf<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">AUTH_KEYPAIR</span><span class="o">=</span>my_keypair.json<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">DESIRED_REGIONS</span><span class="o">=</span>amsterdam,ny<span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">SRC_BIND_PORT</span><span class="o">=</span><span class="m">20000</span><span class="w"> </span><span class="se">\</span>
+--env<span class="w"> </span><span class="nv">DEST_IP_PORTS</span><span class="o">=</span><span class="m">172</span>.17.0.1:8001,10.0.0.1:8001<span class="w"> </span><span class="se">\</span>
+--network<span class="w"> </span>bridge<span class="w"> </span><span class="se">\</span>
+-p<span class="w"> </span><span class="m">20000</span>:20000/udp<span class="w"> </span><span class="se">\</span>
+-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/my_keypair.json:/app/my_keypair.json<span class="w"> </span><span class="se">\</span>
+jitolabs/jito-shredstream-proxy<span class="w"> </span>shredstream
+</pre></div>
+</div>
+</section>
+<section id="decoding-shreds">
+<h3>Decoding Shreds<a class="headerlink" href="#decoding-shreds" title="Link to this heading"></a></h3>
+<p>Decoding shreds lets you access transactions without running a full Solana node. Add <code class="docutils literal notranslate"><span class="pre">GRPC_SERVICE_PORT=&lt;PORT&gt;</span></code> environment variable or <code class="docutils literal notranslate"><span class="pre">--grpc-service-port</span> <span class="pre">&lt;PORT&gt;</span></code> arg to start the gRPC server which streams out transactions to gRPC clients. See the <a class="reference external" href="https://github.com/jito-labs/mev-protos/blob/master/shredstream.proto#L48">Entry type</a> of the protobuf for more details. A sample client implementation is available in the <a class="reference external" href="https://github.com/jito-labs/shredstream-proxy/blob/master/examples/deshred.rs">deshred</a> example.</p>
+</section>
+<section id="firewall-configuration">
+<h3>📛 Firewall Configuration<a class="headerlink" href="#firewall-configuration" title="Link to this heading"></a></h3>
+<p>If you use a firewall, allow access to the following IPs:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Location</p></th>
+<th class="head"><p>IP Addresses</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>🇳🇱 Amsterdam</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">74.118.140.240</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.8.174</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.42.228</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.43.92</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.55.26</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.42.227</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.43.19</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.55.28</span></code>, <code class="docutils literal notranslate"><span class="pre">63.254.166.12</span></code>, <code class="docutils literal notranslate"><span class="pre">198.13.134.208</span></code>, <code class="docutils literal notranslate"><span class="pre">198.13.134.231</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>🇮🇪 Dublin</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">64.130.61.138</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.61.139</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.61.140</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>🇩🇪 Frankfurt</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">64.130.50.14</span></code>, <code class="docutils literal notranslate"><span class="pre">198.13.137.137</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.25</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.47.93</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.57.171</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.23</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.22</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.21</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.26</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.40.24</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>🇬🇧 London</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">64.130.46.153</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.46.71</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.63.195</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.46.72</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.63.196</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.46.73</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>🇺🇸 New York</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">141.98.216.96</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.51.60</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.186</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.143</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.142</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.189</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.190</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.34.141</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>🇺🇸 Salt Lake City</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">64.130.53.8</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.53.57</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.53.81</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.53.90</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.53.82</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.33.181</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.33.88</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>🇸🇬 Singapore</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">202.8.11.224</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.11.173</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.11.102</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.11.103</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.11.104</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>🇯🇵 Tokyo</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">202.8.9.160</span></code>, <code class="docutils literal notranslate"><span class="pre">202.8.9.187</span></code>, <code class="docutils literal notranslate"><span class="pre">63.254.162.35</span></code>, <code class="docutils literal notranslate"><span class="pre">64.130.49.109</span></code>, <code class="docutils literal notranslate"><span class="pre">208.91.109.102</span></code>, <code class="docutils literal notranslate"><span class="pre">198.13.133.123</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Confirm shreds are reaching your server by inspecting packet flow (default <code class="docutils literal notranslate"><span class="pre">SRC_BIND_PORT</span></code> is <code class="docutils literal notranslate"><span class="pre">20000</span></code>, adjust accordingly):</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>tcpdump<span class="w"> </span><span class="s1">'udp and dst port 20000'</span>
+</pre></div>
+</div>
+<p>You should see many shreds of ~1200 bytes being received.</p>
+<ol class="arabic simple" start="2">
+<li><p>Ensure your firewall allows UDP packets on your <code class="docutils literal notranslate"><span class="pre">SRC_BIND_PORT</span></code></p></li>
+<li><p>Ensure your RPC is receiving shreds by configuring the <code class="docutils literal notranslate"><span class="pre">SOLANA_METRICS_CONFIG</span></code> in your systemd unit/startup script. Refer to <a class="reference external" href="https://docs.solana.com/clusters">Solana Clusters Documentation</a> for details.
+To verify, query the number of packets received by your RPC before and after configuring ShredStream in InfluxDB:</p></li>
+</ol>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">shred_count</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="ss">"shred_fetch"</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="k">time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="n">h</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Jito Labs.
+      <span class="lastupdated">Last updated on Sep 09, 2026.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
