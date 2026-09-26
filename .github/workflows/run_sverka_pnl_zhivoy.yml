@@ -1,0 +1,109 @@
+name: "Учёт против цепи: итог сделки = возврат - вход - расход (только чтение)"
+
+# ЗАЧЕМ (пункт 3 дневного плана владельца 26.09). После деплоя I.1+I.4+I.5
+# суточный счёт пишется РОВНО ОДИН РАЗ на позицию и итог берётся по нативной
+# дельте кошелька. Верить этому можно только если на живой сделке запись
+# совпадает с цепью: по каждой закрытой сделке полосы берутся ДВЕ транзакции --
+# покупка и продажа -- и складываются нативные дельты нашего кошелька. Сумма и
+# есть "возврат - вход - расход" целиком, без всякого учёта.
+#
+# Заодно печатается суточный счёт pnl_<день>.json как он лежит на хосте.
+#
+# Прогон идёт с ОБЛАЧНОГО бегунка: свой стоит на боевом хосте и бывает занят.
+# Только чтение: ни подписи, ни отправки, ключей кошельков здесь нет. Журнал в
+# память не читается -- потоком и только нужные поля.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени брать сделки"
+        required: false
+        default: "2026-09-26T11:30:00Z"
+      limit:
+        description: "сколько последних закрытых сверить (0 -- все в окне)"
+        required: false
+        default: "0"
+      day:
+        description: "какой суточный счёт печатать (YYYYMMDD)"
+        required: false
+        default: "20260926"
+
+concurrency:
+  group: sverka-pnl-zhivoy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  sverka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Питон с requests"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/sv_venv"
+          "$RUNNER_TEMP/sv_venv/bin/pip" install -q requests
+          echo "PY=$RUNNER_TEMP/sv_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Сделки из журнала потоком и суточный счёт как он есть"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/nashi_sdelki_iz_zhurnala.py" < deploy/checks/nashi_sdelki_iz_zhurnala.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            nice -n 15 python3 /tmp/nashi_sdelki_iz_zhurnala.py \
+              --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' \
+              --out /tmp/nashi_sdelki.json
+            rm -f /tmp/nashi_sdelki_iz_zhurnala.py"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nashi_sdelki.json" > /tmp/nashi_sdelki.json
+          ssh -n $SSH_OPTS root@"$HOST" "cat $STATE_DIR/pnl_${{ inputs.day }}.json 2>/dev/null || echo '{}'" > /tmp/pnl_dnya.json
+          wc -c /tmp/nashi_sdelki.json /tmp/pnl_dnya.json
+          cat /tmp/pnl_dnya.json
+
+      - name: "Сверка записи с цепью"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/sverka_pnl_zhivoy.py --sdelki /tmp/nashi_sdelki.json \
+            --pnl /tmp/pnl_dnya.json --since-utc '${{ inputs.since_utc }}' \
+            --limit '${{ inputs.limit }}' \
+            --out data/sverka_pnl_zhivoy.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/sverka_pnl_zhivoy.json ] && git add data/sverka_pnl_zhivoy.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Uchet protiv cepi: itog sdelki po zhivym dannym [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
