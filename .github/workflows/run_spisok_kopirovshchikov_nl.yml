@@ -1,0 +1,94 @@
+name: "Список копировщиков: суточный сбор (только чтение)"
+
+# ЗАЧЕМ (формат владельца 26.09, ночь): в строке BUY поле "копировщиков K" --
+# это кошельки, которые не менее трёх раз садились позади наших источников в том
+# же слоте, и список обновляется раз в сутки. Записи о соседях по слоту пишет
+# фоновая догонялка детектора (догнать_соседей_по_слоту) в позиции; здесь они
+# только читаются потоком и складываются в список.
+#
+# Список кладётся на хост рядом с состоянием и копией -- в репозиторий, чтобы
+# было видно, кто в нём и с каким числом встреч. Только чтение журналов.
+on:
+  workflow_dispatch:
+    inputs:
+      porog:
+        description: "порог встреч (пусто -- 3, слово владельца)"
+        required: false
+        default: ""
+      zapisat_na_host:
+        description: "'yes' -- записать список на хост (иначе только показ)"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: spisok-kopirovshchikov
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  HOST_FILE: /home/bot/bloom_executor_live_data/kopirovshchiki.json
+  OUT: data/kopirovshchiki.json
+
+jobs:
+  spisok:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка счёта (порог три встречи)"
+        run: python3 analysis/bloom_copiers.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Собрать список на хосте (потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          POROG_ARG=""
+          if [ -n "${{ inputs.porog }}" ]; then POROG_ARG="--porog ${{ inputs.porog }}"; fi
+          OUT_ARG=""
+          if [ "${{ inputs.zapisat_na_host }}" = "yes" ]; then OUT_ARG="--out $HOST_FILE"; fi
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/spisok_kopirovshchikov.py" < deploy/checks/spisok_kopirovshchikov.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/spisok_kopirovshchikov.py --state-dir '$STATE_DIR' \
+              $POROG_ARG $OUT_ARG
+            rc=\$?; rm -f /tmp/spisok_kopirovshchikov.py; exit \$rc" | tee /tmp/spisok.txt
+          python3 -c "import json,sys; t=open('/tmp/spisok.txt',encoding='utf-8').read(); i=t.find('{'); j=t.rfind('}'); open('$OUT','w',encoding='utf-8').write(t[i:j+1]+chr(10)) if i>=0 and j>i else sys.exit('СБОЙ: в выводе нет JSON')"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Spisok kopirovshchikov: sutochnyj sbor [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
