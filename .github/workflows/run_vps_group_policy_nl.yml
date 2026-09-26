@@ -1,0 +1,110 @@
+name: "Политика группы источников: показать или изменить одно поле"
+
+# ЗАЧЕМ. Владелец 26.09 (пункт 9 дневного плана): "Bloom на bloom_lane 0.2 ->
+# 0.05 при снятии KILL". Размер покупки площадки для группы живёт в файле групп
+# (policies.<группа>.bloom_sol); пусто означает "брать общий buy_sol" = 0.2.
+# Общий buy_sol менять нельзя -- он для всех групп сразу.
+#
+# По умолчанию прогон ТОЛЬКО ПОКАЗЫВАЕТ. Запись -- при set, и тогда рядом
+# остаётся копия прежнего файла. Меняется ровно одно поле ровно одной группы.
+on:
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "группа источников (bloom_lane, lane_only, speed_only)"
+        required: false
+        default: "bloom_lane"
+      field:
+        description: "поле политики"
+        required: false
+        default: "bloom_sol"
+      set:
+        description: "новое значение (пусто -- только показать)"
+        required: false
+        default: ""
+      restart_detector:
+        description: "'yes' -- перезапустить детектор, чтобы он перечитал файл"
+        required: false
+        default: "no"
+
+concurrency:
+  group: group-policy-nl
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  policy:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Какой файл групп читает детектор"
+        run: |
+          set -e
+          set -o pipefail
+          # Однострочник намеренно: многострочный python внутри YAML-блока уже
+          # ломал разбор прогона (26.09, дважды) -- тело съезжает за отступ.
+          GFILE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; print((json.load(open(\"/home/bot/bloom_executor_live_data/detector_status.json\")).get(\"source_groups\") or {}).get(\"file\") or \"\")'")
+          [ -n "$GFILE" ] || { echo "СБОЙ: детектор не сообщает файл групп"; exit 1; }
+          echo "GROUPS_FILE=$GFILE" >> "$GITHUB_ENV"
+          echo "файл групп: $GFILE"
+
+      - name: "Показать или изменить поле"
+        run: |
+          set -e
+          set -o pipefail
+          SET=""
+          if [ -n "${{ inputs.set }}" ]; then SET="--set ${{ inputs.set }}"; fi
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/politika_gruppy.py" < deploy/checks/politika_gruppy.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            python3 /tmp/politika_gruppy.py --file '$GROUPS_FILE' \
+              --group '${{ inputs.group }}' --field '${{ inputs.field }}' $SET
+            rc=\$?; rm -f /tmp/politika_gruppy.py; exit \$rc" | tee data/politika_gruppy.json
+
+      - name: "Перезапуск детектора (по флагу), чтобы файл перечитался"
+        if: ${{ inputs.restart_detector == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # Перезапуск только при стоящем рубильнике и нуле позиций -- та же
+          # проверка, что перед перезагрузкой хоста.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezagruzkoy.py" < deploy/checks/pered_perezagruzkoy.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezagruzkoy.py; rc=\$?; rm -f /tmp/pered_perezagruzkoy.py; exit \$rc"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart bloom-detector; sleep 12; systemctl is-active bloom-detector"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; g=(json.load(open(\"/home/bot/bloom_executor_live_data/detector_status.json\")).get(\"source_groups\") or {}); print(json.dumps({\"file\": g.get(\"file\"), \"policies\": g.get(\"policies\")}, ensure_ascii=False))'" | tee -a data/politika_gruppy.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/politika_gruppy.json ] && git add data/politika_gruppy.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Politika gruppy istochnikov: pokaz ili pravka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
