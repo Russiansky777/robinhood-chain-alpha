@@ -77,7 +77,7 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
     "leader": {
         "lane_size": 0.5, "lane_trades": True, "bloom_trades": False,
         "bloom_sol": None, "fanout": False,
-        "min_target_sol": 10, "max_slots_from_source": None,
+        "min_target_sol": 3, "max_slots_from_source": None,
         "skip_flippers": False, "allow_taxed_route": True,
         # НАЦЕНКА ЛИДЕРА -- ЧИСЛА ВЛАДЕЛЬЦА 27.09 вечером. 0.2 значит min-out
         # 80 % ожидания, то есть допустимая наценка входа 25 % (по данным
@@ -88,7 +88,7 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         "slippage_thin_pool": 0.5, "thin_pool_below_sol": 30,
         "lane_open_max": 3, "stop_loss_sol": 0.75, "hold_slots": 150,
         "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
-        "note": ("Лидер. Размер 0.5 SOL, порог источника 10 SOL-экв., налоговый "
+        "note": ("Лидер. Размер 0.5 SOL, порог источника 3 SOL-экв., налоговый "
                   "маршрут берём и пишем налог в строку решения, наценка входа до "
                   "0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже "
                   "30 SOL-экв. -- 0.5 (наценка до 100 %); три открытых, стоп "
@@ -307,10 +307,10 @@ def self_test() -> int:
     chk("наших кошельков в источниках нет",
         not (set(НАШИ_КОШЕЛЬКИ) & set(все)), set(НАШИ_КОШЕЛЬКИ) & set(все))
     # ДЕНЬГИ: размеры и стопы -- те, что назвал владелец.
-    chk("лидер: 0.5, стоп -0.75, порог 10, наценка 0.2 и 0.5 на тонком пуле",
+    chk("лидер: 0.5, стоп -0.75, порог 3, наценка 0.2 и 0.5 на тонком пуле",
         ф["groups"]["leader"]["lane_size"] == 0.5
         and ф["groups"]["leader"]["stop_loss_sol"] == 0.75
-        and ф["groups"]["leader"]["min_target_sol"] == 10
+        and ф["groups"]["leader"]["min_target_sol"] == 3
         and ф["groups"]["leader"]["slippage"] == 0.2
         and ф["groups"]["leader"]["slippage_thin_pool"] == 0.5
         and ф["groups"]["leader"]["thin_pool_below_sol"] == 30,
